@@ -5305,35 +5305,8 @@ number of the command it answers, the generation of tcspecial that made it,
 which type of response it is, the status, and the time the spacecraft made
 it. The tables below list what each type adds to that.
 
-Requirement
-    Every valid packet from the MOC that is a command is answered exactly
-    once, whether it is done, refused or not acted on, and the answer says
-    which. A packet that is not valid -- damaged, of another layout, or from
-    an address the configuration does not say the MOC sends from -- is not
-    answered, and is logged.
-
-Requirement
-    **Every command is safe to send again.** The ground decides that a
-    command or its answer was lost -- by a timeout of its own, which is not
-    tcspecial's to know -- and sends the command again, and nothing aboard
-    keeps a record of the answers it gave to make a repeat safe. So every
-    command is written so that a repeat changes nothing a first one did not:
-    it asks for a state, not an action, and a repeat answers with the state
-    reached rather than with a failure. RESTART and SWITCH are the two
-    exceptions, and are never sent again on a timeout: the beacon, not an
-    answer, says whether one was taken. See `What the ground may send
-    meanwhile`_.
-
-What that means for each command: PING, CONNECT and the two queries change
-nothing. CONFIG sets an interval rather than changing one. START_NODE and
-STOP_NODE answer ``Success`` for a node already in the state asked for, and
-every attribute SET_NODE may set is a value, not a step. RESTART_ARM with the
-key of the arm already standing leaves that arm as it was -- see
-`Restarting`_ -- and the upload commands answer a repeat ``Success`` once
-what was asked for is done: see `Uploading, and keeping what was uploaded`_.
-A repeated RESTART is refused, ``NotArmed`` because the first used the arm up
-or ``WrongGeneration`` because it has already restarted the vehicle; neither
-changes anything, and neither is how the ground learns what happened.
+What is done with a command or an answer the link loses, and why every
+command is safe to send again, is in `Lost, late and repeated commands`_.
 
 Requirement
     A timestamp is microseconds since the UNIX epoch: one number and one
@@ -5634,9 +5607,13 @@ there should have been in between.
 
 Requirement
     The count is the sender's, so it starts again at one when tcspecial does.
-    A number that does not go forward is therefore a restart rather than a
-    gap, and the MOC says which it was: *n beacons did not arrive*, or *the
-    beacons start again at #1, so tcspecial has restarted*.
+    The generation is what says a start; within one generation a number
+    that starts again at one is a start that could not count itself, and
+    any other number that does not go forward is a beacon the link delayed
+    past a later one or delivered twice, which counts for nothing. The MOC
+    says which it was: *n beacons did not arrive*, *the beacons start again
+    at #1, so tcspecial has restarted*, or *beacon #n arrived late, after
+    #m*. See `What is assumed`_.
 
 The Interface, the Fallback and Switching Over
 ==============================================
@@ -5644,9 +5621,11 @@ The Interface, the Fallback and Switching Over
 This section is the whole of what was asked for when the link was moved from
 JSON to XTCE: what every packet is, the two interfaces the vehicle speaks,
 how a new interface and everything it needs is uploaded and protected, how
-the vehicle restarts onto it, what the beacon says while it does, and what
-the ground may send meanwhile. Each requirement is stated here once; where
-another section says the same thing, this one is the one it follows.
+and how the vehicle restarts onto it. What the beacon says across a restart,
+what the ground may send meanwhile, and everything else about surviving a
+fault are in `Fault Resiliency`_, which follows. Each requirement is stated
+once; where another section says the same thing, the one stating it is the
+one it follows.
 
 .. note::
    **What runs today.** The beacon carries the generation number, the
@@ -5705,17 +5684,8 @@ Requirement
     ``tcslib`` and through it the C/C++ library and tcsmoc, and every test's
     stand-in.
 
-No packet carries a check of its own: the transport beneath it checks it.
-On this link that is UDP's checksum, and beneath a gateway it is the frame
-check of the radio or the bus as well. A datagram that fails the transport's
-check is dropped before anything reads it, so a second check in the packet
-would only check again what was checked.
-
-Requirement
-    Every transport the link runs over checks what it carries end to end.
-    UDP is sent with its checksum, over IPv4 as over IPv6: nothing in
-    tcspecial or ``tcslib`` turns it off (``SO_NO_CHECK``), and a MOC that
-    sends some other way must not either.
+No packet carries a check of its own: the transport beneath it checks it,
+which is one of the things `What is assumed`_ assumes.
 
 Requirement
     A packet is *valid* when the transport beneath it delivered it and it is
@@ -5906,6 +5876,81 @@ Requirement
     LOAD_CHECK, and is checked again -- every size and every MD5 -- just
     before the restart, because storage can change between the two.
 
+Which build starts, what is done with a load set that will not start, and
+what both rest on are in `Kinds of restart`_.
+
+Fault Resiliency
+================
+
+What tcspecial and the ground do about faults, in one place: what is
+assumed, how each kind of start is handled, how commands survive a link that
+loses, reorders and repeats them, what the beacon says across a restart, what
+the ground holds, and what is still open. The sections before say as much of
+this as they need to explain how something works, and point here for the
+rule.
+
+The order the qualities are ranked in decides what is here: a fault is
+answered with what is most reliable, and a design that would be easier to
+use or more flexible is not taken where it would be less sure.
+
+What is assumed
+---------------
+
+Requirement
+    **The golden configuration always works.** The build and configuration
+    the vehicle is installed with -- the golden build, see `Kinds of
+    restart`_ -- always start, and always work well enough to receive a new
+    operating configuration and switch to it. Everything below rests on
+    this: it is the one way in that no upload, switch or fault can take
+    away, so it is proved before launch rather than trusted in flight, and
+    nothing in flight replaces it.
+
+Requirement
+    A golden build that fails is started again as the golden build. Falling
+    back to the golden configuration and then failing falls back to the
+    golden configuration, never to anything else, because there is nothing
+    surer to go to.
+
+Requirement
+    tcspecial runs under a supervisor that starts it again when it exits.
+    Every failure that ends the process -- a restart that cannot ``exec``, a
+    load set that fails its check, a crash -- relies on that, and the manual
+    says how to set one up.
+
+Requirement
+    The state file is kept on storage that survives a power cycle, which is
+    what lets a count of starts, and whether the next start is commanded,
+    outlast the starts they are about.
+
+Requirement
+    The link between the MOC and the vehicle is never relied on to deliver in
+    order, to deliver at all, or to deliver once. A packet may be lost,
+    delayed past later ones, or arrive twice, and nothing in tcspecial or the
+    ground depends on otherwise. Order is kept by whoever receives: a command
+    older than one already taken is not acted on -- see `What the ground may
+    send meanwhile`_ -- and a beacon of the same start numbered at or before
+    one already heard is late, and counts for nothing: see `Asynchronous
+    Telemetry`_.
+
+No packet on the link carries a check of its own: the transport beneath it
+checks it. On this link that is UDP's checksum, and beneath a gateway it is
+the frame check of the radio or the bus as well. A datagram that fails the transport's
+check is dropped before anything reads it, so a second check in the packet
+would only check again what was checked.
+
+Requirement
+    Every transport the link runs over checks what it carries end to end.
+    UDP is sent with its checksum, over IPv4 as over IPv6: nothing in
+    tcspecial or ``tcslib`` turns it off (``SO_NO_CHECK``), and a MOC that
+    sends some other way must not either.
+
+Kinds of restart
+----------------
+
+A start of tcspecial is commanded or it is not, and which it is decides
+whether the definitions it runs with may change: see `The beacon across a
+restart`_ for what each says in its beacons.
+
 Requirement
     The executable the vehicle is installed with is the *golden* build. It is
     always what starts: on every start it reads the state file and, where a
@@ -5920,13 +5965,42 @@ Requirement
     set that has started ``load_trials`` times -- three where the
     configuration does not say -- without being confirmed is not started
     again: the golden build falls back to the last confirmed load set, or to
-    itself, and says so in the log and in the answer to CONNECT.
+    itself, and says so in the log and in the answer to CONNECT. The fallback
+    is the one start nobody commanded that may change the definitions, and
+    the interface digest in its beacons says that it has.
+
+Lost, late and repeated commands
+--------------------------------
 
 Requirement
-    tcspecial runs under a supervisor that starts it again when it exits.
-    Every failure above that ends the process -- a restart that cannot
-    ``exec``, a load set that fails its check -- relies on that, and the
-    manual says how to set one up.
+    Every valid packet from the MOC that is a command is answered exactly
+    once, whether it is done, refused or not acted on, and the answer says
+    which. A packet that is not valid -- damaged, of another layout, or from
+    an address the configuration does not say the MOC sends from -- is not
+    answered, and is logged.
+
+Requirement
+    **Every command is safe to send again.** The ground decides that a
+    command or its answer was lost -- by a timeout of its own, which is not
+    tcspecial's to know -- and sends the command again, and nothing aboard
+    keeps a record of the answers it gave to make a repeat safe. So every
+    command is written so that a repeat changes nothing a first one did not:
+    it asks for a state, not an action, and a repeat answers with the state
+    reached rather than with a failure. RESTART and SWITCH are the two
+    exceptions, and are never sent again on a timeout: the beacon, not an
+    answer, says whether one was taken. See `What the ground may send
+    meanwhile`_.
+
+What that means for each command: PING, CONNECT and the two queries change
+nothing. CONFIG sets an interval rather than changing one. START_NODE and
+STOP_NODE answer ``Success`` for a node already in the state asked for, and
+every attribute SET_NODE may set is a value, not a step. RESTART_ARM with the
+key of the arm already standing leaves that arm as it was -- see
+`Restarting`_ -- and the upload commands answer a repeat ``Success`` once
+what was asked for is done: see `Uploading, and keeping what was uploaded`_.
+A repeated RESTART is refused, ``NotArmed`` because the first used the arm up
+or ``WrongGeneration`` because it has already restarted the vehicle; neither
+changes anything, and neither is how the ground learns what happened.
 
 The generation number and the state file
 ----------------------------------------
@@ -6252,6 +6326,25 @@ A configuration the new build would refuse
 The full interface breaking the way in
     The fallback interface has its own document and its own link, and no
     upload replaces it.
+
+A beacon delayed past a later one
+    Within one generation a beacon numbered at or before the last is taken
+    for late, not for a restart, and the count goes on from the later one.
+    Still open: a late beacon of the generation before, arriving after the
+    new generation's, is taken for another restart, and a station that
+    hands it to ``TcsClient`` sends for that generation until the vehicle
+    refuses a command as ``WrongGeneration`` and the next beacon says
+    again. Generations only go up, but for a damaged state file starting
+    again from one, so the remedy is to take a generation before the last
+    for late unless its beacon is numbered #1.
+
+A confirmed load set that later fails at every start
+    A load set is given up after ``load_trials`` starts that the MOC was not
+    heard in, and a crash keeps the definitions it had. Still open: a load
+    set confirmed once, that later fails at every start before the MOC is
+    heard, is started again and again. The remedy is to count every start,
+    not only those on trial, that ends before a valid packet from the MOC
+    arrives, and to fall back after ``load_trials`` of them in a row.
 
 Still open
     The command link carries no authentication. Anyone who can reach it can

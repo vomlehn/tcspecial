@@ -3464,10 +3464,14 @@ the beacon box
   .. code-block:: console
 
      2 beacons did not arrive: #9 came after #6
-     the beacons start again at #1, so tcspecial has restarted
+     beacon #8 arrived late, after #9
+     the beacons start again at #1, so tcspecial has restarted as commanded
 
   A beacon says only that the spacecraft is alive, so without the number a
   beacon that was lost on the way reads exactly like one that was never sent.
+  The network may deliver beacons out of order or twice, and a beacon
+  numbered before the last one heard is said to be late rather than taken for
+  a restart.
 
   A datagram that reaches the beacon address from anywhere but where the
   configuration says beacons come from is not a beacon, and is ignored. That

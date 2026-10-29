@@ -236,7 +236,7 @@ vehicle:
                     answered.push(command.cmd_type());
                     let answer = match &command {
                         tcslibgs::Command::Connect(_) => Telemetry::Connect(
-                            ConnectTelemetry::new(seq, version, digest),
+                            ConnectTelemetry::new(seq, version, digest, 1),
                         ),
                         tcslibgs::Command::Ping(_) => Telemetry::Ping(
                             PingTelemetry::new(seq, CommandStatus::Success),

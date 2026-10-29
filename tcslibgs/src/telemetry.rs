@@ -166,6 +166,11 @@ pub struct ConnectTelemetry {
     /// The digest of the configuration this end read, which says which set
     /// it is serving: see `crate::config_digest`.
     pub digest: ConfigDigest,
+    /// The generation flying: how many times tcspecial has started, from
+    /// its state file, as the beacon says it. A ground station that has
+    /// heard no beacon learns from this which generation to send its
+    /// commands for. Nought in a refusal, which knows none.
+    pub generation: u32,
 }
 
 impl ConnectTelemetry {
@@ -173,6 +178,7 @@ impl ConnectTelemetry {
         sequence: u32,
         version: ConfigVersion,
         digest: ConfigDigest,
+        generation: u32,
     ) -> Self {
         Self {
             header: TelemetryHeader::new(
@@ -182,6 +188,7 @@ impl ConnectTelemetry {
             ),
             version,
             digest,
+            generation,
         }
     }
 
@@ -518,6 +525,7 @@ pub fn answer_to(
                 sequence,
                 ConfigVersion::of_this_build(),
                 ConfigDigest([0u8; 16]),
+                0,
             )
             .refused(status),
         ),
@@ -742,7 +750,7 @@ mod tests {
 
         let answers = [
             Telemetry::Ping(PingTelemetry::new(1, CommandStatus::Success)),
-            Telemetry::Connect(ConnectTelemetry::new(2, version, digest)),
+            Telemetry::Connect(ConnectTelemetry::new(2, version, digest, 1)),
             Telemetry::RestartArm(RestartArmTelemetry::new(
                 3,
                 CommandStatus::Success,

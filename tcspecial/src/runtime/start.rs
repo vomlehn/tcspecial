@@ -155,7 +155,7 @@ pub fn run_graph(path: &str, mode: Mode) -> Result<(), Vec<String>> {
 
     // Beacons, once everything has opened: a vehicle that will not start has
     // nothing to announce. Held until the vehicle stops.
-    let beacon = beacons(&graph, digest, telemetry_log.clone())
+    let (beacon, generation) = beacons(&graph, digest, telemetry_log.clone())
         .map_err(|why| vec![format!("{path}: {why}")])?;
 
     // And the ground's commands, on a thread of their own. After the beacons
@@ -166,6 +166,7 @@ pub fn run_graph(path: &str, mode: Mode) -> Result<(), Vec<String>> {
     let flying = Flying {
         version: ConfigVersion::of_this_build(),
         digest,
+        generation,
     };
     let mut commands = command_links(
         &graph,
@@ -324,6 +325,10 @@ fn segsend_for(graph: &Graph) -> Result<SegSend, String> {
 /// An interval of nought sends none. Recorded in the telemetry log, which is
 /// the vehicle's own account of what it sent.
 ///
+/// Returns the generation as well, which the command links refuse a command
+/// of any other generation by. Nought, which no start is, where there is no
+/// `tcspecial` section, which takes no commands either.
+///
 /// A `beacon.send` that cannot be bound, or a `beacon.recv` that does not
 /// resolve, stops the start: a vehicle flying without beacons is one the
 /// ground cannot tell from a dead one.
@@ -331,9 +336,9 @@ fn beacons(
     graph: &Graph,
     digest: ConfigDigest,
     telemetry_log: TelemetryLog,
-) -> Result<Option<BeaconSend>, String> {
+) -> Result<(Option<BeaconSend>, u32), String> {
     let Some(section) = graph.tcspecial.as_ref() else {
-        return Ok(None);
+        return Ok((None, 0));
     };
     let ci = tcslibgs::graph::parameters::ci_config_of(
         &tcslibgs::graph::parameters::flatten(section),
@@ -371,7 +376,7 @@ fn beacons(
             ci.beacon_recv
         ));
     }
-    Ok(sending)
+    Ok((sending, started.generation))
 }
 
 /// Take the ground's commands where the configuration's `tcspecial` section

@@ -115,6 +115,10 @@ pub struct Flying {
     pub version: ConfigVersion,
     /// The digest of the configuration file this process read.
     pub digest: ConfigDigest,
+    /// This start's generation, from the state file: a command sent for
+    /// any other is refused, but for PING and CONNECT. See
+    /// [`tcslibgs::CommandType::takes_any_generation`].
+    pub generation: u32,
 }
 
 /// The command interpreter: two links, one thread.
@@ -437,6 +441,24 @@ impl Serving {
             return answer_to(command, CommandStatus::InvalidCommand);
         }
 
+        // Sent for another start of tcspecial than this one: before a
+        // restart and delivered after it, or by a station that has not heard
+        // which generation is flying. Refused rather than read, because the
+        // definitions it was written for may not be this start's.
+        if !command.cmd_type().takes_any_generation()
+            && command.generation() != self.flying.generation
+        {
+            warn!(
+                "{:?} {} was sent for generation {} and this is generation \
+                 {}: refused, and nothing in it acted on",
+                command.cmd_type(),
+                sequence,
+                command.generation(),
+                self.flying.generation
+            );
+            return answer_to(command, CommandStatus::WrongGeneration);
+        }
+
         match command {
             Command::Ping(_) => Telemetry::Ping(PingTelemetry::new(
                 sequence,
@@ -450,6 +472,7 @@ impl Serving {
                 sequence,
                 self.flying.version,
                 self.flying.digest,
+                self.flying.generation,
             )),
 
             // The beacon thread is retimed where it waits, so the next beacon
@@ -771,19 +794,30 @@ mod tests {
         Graph::load(&path).expect("it reads")
     }
 
+    /// The generation the vehicle in these tests is flying.
+    const GENERATION: u32 = 3;
+
     fn flying() -> Flying {
         Flying {
             version: ConfigVersion::of_this_build(),
             digest: ConfigDigest([0x5Au8; 16]),
+            generation: GENERATION,
         }
     }
 
     /// Ask on a link and read the answer, or say nothing came.
+    ///
+    /// For the generation flying, as a station that has heard it sends, but
+    /// where the command was given one of its own.
     fn ask(
         ground: &UdpSocket,
         at: SocketAddr,
         command: &Command,
     ) -> Option<Telemetry> {
+        let command = match command.generation() {
+            0 => command.clone().for_generation(GENERATION),
+            _ => command.clone(),
+        };
         let asked = command.to_bytes();
         ground.send_to(&asked, at).expect("it is sent");
         let mut buffer = [0u8; COMMAND_BYTES];
@@ -893,8 +927,74 @@ mod tests {
                     ConfigVersion::of_this_build(),
                     "this build"
                 );
+                assert_eq!(tm.generation, GENERATION, "this start");
             }
             other => panic!("expected a connect answer, got {other:?}"),
+        }
+    }
+
+    /// A command sent for another generation is refused and not acted on,
+    /// whichever generation that is -- the one before, or none at all from
+    /// a station that has heard neither a beacon nor a CONNECT's answer --
+    /// but a PING and a CONNECT are answered whatever generation they say,
+    /// because they are how a station finds out which one is flying.
+    #[test]
+    fn a_command_for_another_generation_is_refused() {
+        let graph = two_nodes();
+        let states = Arc::new(NodeStates::of(&graph).expect("states"));
+        let ids = tcslibgs::graph::telemetry::ids(&graph);
+        let inside = NodeId::of(ids["inside"]);
+        let (bench, done) = a_pass_answering(|_| Ok(()));
+        let (ground, commands) = started_with(states.clone(), bench);
+        let node_at = commands.node_address();
+        let at = commands.spacecraft_address();
+
+        for other in [GENERATION - 1, GENERATION + 1, 0] {
+            let stop = Command::StopNode(NodeCommand::stop(4, inside));
+            // `ask` stamps nought as the generation flying, so nought is
+            // sent by hand.
+            let answer = if other == 0 {
+                ground
+                    .send_to(&stop.to_bytes(), node_at)
+                    .expect("it is sent");
+                let mut buffer = [0u8; COMMAND_BYTES];
+                let (size, _) = ground.recv_from(&mut buffer).expect("one");
+                Telemetry::read(&buffer[..size]).ok()
+            } else {
+                ask(&ground, node_at, &stop.for_generation(other))
+            };
+            match answer {
+                Some(Telemetry::StopNode(tm)) => assert_eq!(
+                    tm.header.status,
+                    CommandStatus::WrongGeneration,
+                    "generation {other}"
+                ),
+                other => panic!("expected a stop answer, got {other:?}"),
+            }
+            assert!(states.is_enabled("inside"), "the node was not stopped");
+            assert!(done.lock().expect("the record").is_empty());
+
+            let ping = Command::Ping(tcslibgs::PingCommand::new(5))
+                .for_generation(other.max(1) + 10);
+            match ask(&ground, at, &ping) {
+                Some(Telemetry::Ping(tm)) => {
+                    assert_eq!(tm.header.status, CommandStatus::Success)
+                }
+                other => panic!("expected a ping answer, got {other:?}"),
+            }
+            let connect = Command::Connect(tcslibgs::ConnectCommand::new(
+                6,
+                ConfigVersion::of_this_build(),
+                ConfigDigest([0x5Au8; 16]),
+            ))
+            .for_generation(other.max(1) + 10);
+            match ask(&ground, at, &connect) {
+                Some(Telemetry::Connect(tm)) => {
+                    assert_eq!(tm.header.status, CommandStatus::Success);
+                    assert_eq!(tm.generation, GENERATION);
+                }
+                other => panic!("expected a connect answer, got {other:?}"),
+            }
         }
     }
 
@@ -1417,7 +1517,8 @@ mod tests {
                     &Command::Restart(tcslibgs::RestartCommand::new(
                         1,
                         ArmKey(7),
-                    )),
+                    ))
+                    .for_generation(GENERATION),
                 )
                 .status()
         };

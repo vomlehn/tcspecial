@@ -105,6 +105,12 @@ pub struct TcsClient {
     /// The last beacon's generation and restarting bit, as the station
     /// passed them on: see [`TcsClient::beacon_heard`].
     beacon: Option<(u32, bool)>,
+    /// The generation every command is sent for: the one the last beacon or
+    /// CONNECT's answer said is flying. `None` until one has, and again once
+    /// the vehicle has refused a command as of another generation, when
+    /// every command but PING and CONNECT is refused here until one says
+    /// again. See [`tcslibgs::CommandType::takes_any_generation`].
+    generation: Option<u32>,
     /// What a RESTART that went out is waiting for, until a beacon says it
     /// came: see [`RestartWait`].
     restart_wait: Option<RestartWait>,
@@ -185,6 +191,7 @@ impl TcsClient {
             last_received: None,
             sent: 0,
             beacon: None,
+            generation: None,
             restart_wait: None,
         }
     }
@@ -215,6 +222,7 @@ impl TcsClient {
             last_received: None,
             sent: 0,
             beacon: None,
+            generation: None,
             restart_wait: None,
         }
     }
@@ -231,6 +239,7 @@ impl TcsClient {
         restarting: bool,
     ) -> Option<RestartWait> {
         self.beacon = Some((generation, restarting));
+        self.generation = Some(generation);
         let mut wait = self.restart_wait?;
         if wait.ended_by(generation, restarting) {
             self.restart_wait = None;
@@ -302,11 +311,35 @@ impl TcsClient {
         }
     }
 
+    /// The generation every command is sent for, as the last beacon or
+    /// CONNECT's answer said, or `None` where neither has.
+    pub fn generation(&self) -> Option<u32> {
+        self.generation
+    }
+
+    /// `command`, sent for the generation flying, or why it is not sent.
+    ///
+    /// A PING or a CONNECT goes whether or not this station knows which
+    /// generation that is, because that is how it finds out. Nought, which no
+    /// start is, is what such a command says where it does not.
+    fn for_generation(&self, command: Command) -> TcsResult<Command> {
+        match self.generation {
+            Some(generation) => Ok(command.for_generation(generation)),
+            None if command.cmd_type().takes_any_generation() => Ok(command),
+            None => Err(TcsError::GenerationUnknown(command.cmd_type())),
+        }
+    }
+
     /// Send a command and wait for the response
     fn send_command(&mut self, command: Command) -> TcsResult<Telemetry> {
         if let Some(wait) = &self.restart_wait {
             return Err(wait.refusal());
         }
+        // A command with no link to go on says so before anything is said
+        // of its generation: that is the client's own configuration, and no
+        // beacon would change it.
+        self.link_for(&command)?;
+        let command = self.for_generation(command)?;
         let timeout = self.timeout;
         let link = self.link_for(&command)?;
 
@@ -319,8 +352,13 @@ impl TcsClient {
         self.sent += 1;
 
         let answer = self.link_for(&command)?.receive_timeout(timeout);
-        if answer.is_ok() {
+        if let Ok(answer) = &answer {
             self.last_received = Some(Timestamp::now());
+            // The vehicle is not the start this station thought it was:
+            // nothing more goes until a beacon or a CONNECT says which is.
+            if answer.status() == CommandStatus::WrongGeneration {
+                self.generation = None;
+            }
         }
         answer
     }
@@ -374,6 +412,7 @@ impl TcsClient {
         if let Some(wait) = &self.restart_wait {
             return Err(wait.refusal());
         }
+        let command = self.for_generation(command)?;
 
         // The spacecraft's own link, and only that one. A CONNECT is about
         // having a connection to the vehicle, which is what this link is; a
@@ -387,7 +426,14 @@ impl TcsClient {
         self.last_received = Some(Timestamp::now());
 
         match answer {
-            Telemetry::Connect(tm) => Ok((tm.version, tm.digest)),
+            // The generation it answers with is the one commands are sent
+            // for from here on, where it answered at all.
+            Telemetry::Connect(tm) => {
+                if tm.header.status.is_success() {
+                    self.generation = Some(tm.generation);
+                }
+                Ok((tm.version, tm.digest))
+            }
             _ => {
                 Err(TcsError::Protocol("Unexpected telemetry type".to_string()))
             }
@@ -690,21 +736,31 @@ mod tests {
     /// asked.
     struct Canned {
         answer: Telemetry,
-        asked: Vec<Command>,
+        asked: std::sync::Arc<std::sync::Mutex<Vec<Command>>>,
     }
 
     impl Canned {
         fn answering(answer: Telemetry) -> Box<Canned> {
             Box::new(Canned {
                 answer,
-                asked: Vec::new(),
+                asked: Default::default(),
             })
+        }
+
+        /// The same, and what it is asked kept where a test can read it.
+        fn recording(
+            answer: Telemetry,
+        ) -> (Box<Canned>, std::sync::Arc<std::sync::Mutex<Vec<Command>>>)
+        {
+            let canned = Canned::answering(answer);
+            let asked = canned.asked.clone();
+            (canned, asked)
         }
     }
 
     impl Connection for Canned {
         fn send(&mut self, command: &Command) -> TcsResult<()> {
-            self.asked.push(command.clone());
+            self.asked.lock().expect("the record").push(command.clone());
             Ok(())
         }
 
@@ -733,6 +789,7 @@ mod tests {
             1,
             version,
             ConfigDigest([0x5A; 16]),
+            7,
         ))
     }
 
@@ -797,5 +854,60 @@ mod tests {
             .connect(ConfigVersion::of_this_build(), ConfigDigest([0x5A; 16]))
             .expect("the spacecraft's link is the one that answers it");
         assert_eq!(version, a_version(1));
+    }
+
+    /// A node command waits for the station to know which generation is
+    /// flying, and is sent for it once a CONNECT's answer or a beacon has
+    /// said. A vehicle that answers that it is another generation is one the
+    /// station no longer knows, until it is told again.
+    #[test]
+    fn a_command_is_sent_for_the_generation_last_heard() {
+        let stopped = |status| {
+            Telemetry::StopNode(tcslibgs::NodeTelemetry::stopped(
+                1,
+                status,
+                NodeId(2),
+            ))
+        };
+        let (nodes, asked) = Canned::recording(stopped(CommandStatus::Success));
+        let mut client = TcsClient::of_a_graph(
+            Canned::answering(an_answer(a_version(1))),
+            nodes,
+        );
+
+        assert_eq!(client.generation(), None);
+        assert!(matches!(
+            client.stop_node(NodeId(2)),
+            Err(TcsError::GenerationUnknown(_))
+        ));
+        assert!(asked.lock().unwrap().is_empty(), "and it was not sent");
+
+        client
+            .connect(ConfigVersion::of_this_build(), ConfigDigest([0x5A; 16]))
+            .expect("connected");
+        assert_eq!(client.generation(), Some(7), "the CONNECT's answer");
+        client.stop_node(NodeId(2)).expect("sent");
+        assert_eq!(asked.lock().unwrap()[0].generation(), 7);
+
+        client.beacon_heard(9, false);
+        client.stop_node(NodeId(2)).expect("sent");
+        assert_eq!(asked.lock().unwrap()[1].generation(), 9, "the beacon's");
+
+        // Told it is the wrong one: forgotten, and nothing more goes.
+        let (nodes, _) =
+            Canned::recording(stopped(CommandStatus::WrongGeneration));
+        client.nodes = Some(nodes);
+        let (status, _) = client.stop_node(NodeId(2)).expect("answered");
+        assert_eq!(status, CommandStatus::WrongGeneration);
+        assert_eq!(client.generation(), None);
+        assert!(matches!(
+            client.stop_node(NodeId(2)),
+            Err(TcsError::GenerationUnknown(_))
+        ));
+        // But a CONNECT still goes, and says again.
+        client
+            .connect(ConfigVersion::of_this_build(), ConfigDigest([0x5A; 16]))
+            .expect("connected");
+        assert_eq!(client.generation(), Some(7));
     }
 }

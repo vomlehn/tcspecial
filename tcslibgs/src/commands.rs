@@ -12,6 +12,18 @@ pub struct CommandHeader {
     pub sequence: u32,
     /// Command type identifier
     pub cmd_type: CommandType,
+    /// The generation of tcspecial this command was sent for: the one the
+    /// ground last heard, from a beacon or a CONNECT's answer. Nought, which
+    /// no start of tcspecial is, where the ground has heard none.
+    ///
+    /// Stamped by whatever sends the command, as it goes -- see
+    /// [`Command::for_generation`] -- because the sender is what knows which
+    /// generation it last heard, and a command built before a restart and
+    /// sent after one must say the generation it is sent in. The vehicle
+    /// refuses a command of any other generation than its own, but for
+    /// those [`CommandType::takes_any_generation`] names: see "The
+    /// generation number and the state file" in `docs/design.rst`.
+    pub generation: u32,
 }
 
 /// Command types
@@ -118,6 +130,31 @@ impl CommandType {
         self.link() == link
     }
 
+    /// Whether a command of this kind is taken whatever generation it was
+    /// sent for.
+    ///
+    /// PING and CONNECT, and nothing else: they are how a ground station that
+    /// has heard no beacon finds out what is flying, and neither changes
+    /// anything aboard, so neither can do harm by reaching a vehicle that is
+    /// not the one it was meant for. Every other command acts on definitions
+    /// a restart may have changed, and one sent before a restart and
+    /// delivered after it -- the usual case on a link light-seconds long --
+    /// is refused rather than read with definitions it was not written for.
+    pub fn takes_any_generation(&self) -> bool {
+        match self {
+            CommandType::Ping | CommandType::Connect => true,
+
+            CommandType::RestartArm
+            | CommandType::Restart
+            | CommandType::Config
+            | CommandType::StartNode
+            | CommandType::StopNode
+            | CommandType::SetNode
+            | CommandType::QueryNode
+            | CommandType::QueryNodeSample => false,
+        }
+    }
+
     /// The opcode a command of this kind carries. What goes on the link is
     /// stated in `xtce/link.xml`, and a test in [`crate::link`] holds this to
     /// it, so the two cannot come to differ.
@@ -165,6 +202,7 @@ impl PingCommand {
             header: CommandHeader {
                 sequence,
                 cmd_type: CommandType::Ping,
+                generation: 0,
             },
         }
     }
@@ -196,6 +234,7 @@ impl RestartArmCommand {
             header: CommandHeader {
                 sequence,
                 cmd_type: CommandType::RestartArm,
+                generation: 0,
             },
             arm_key,
         }
@@ -215,6 +254,7 @@ impl RestartCommand {
             header: CommandHeader {
                 sequence,
                 cmd_type: CommandType::Restart,
+                generation: 0,
             },
             arm_key,
         }
@@ -246,6 +286,7 @@ impl ConnectCommand {
             header: CommandHeader {
                 sequence,
                 cmd_type: CommandType::Connect,
+                generation: 0,
             },
             version,
             digest,
@@ -297,7 +338,11 @@ impl NodeCommand {
 
     fn of(sequence: u32, cmd_type: CommandType, node: NodeId) -> Self {
         Self {
-            header: CommandHeader { sequence, cmd_type },
+            header: CommandHeader {
+                sequence,
+                cmd_type,
+                generation: 0,
+            },
             node,
         }
     }
@@ -354,6 +399,7 @@ impl SetNodeCommand {
             header: CommandHeader {
                 sequence,
                 cmd_type: CommandType::SetNode,
+                generation: 0,
             },
             node,
             attribute: Attribute::of(attribute)?,
@@ -500,6 +546,7 @@ impl ConfigCommand {
             header: CommandHeader {
                 sequence,
                 cmd_type: CommandType::Config,
+                generation: 0,
             },
             beacon_interval,
         }
@@ -526,6 +573,48 @@ pub enum Command {
 }
 
 impl Command {
+    /// The generation this command was sent for: see
+    /// [`CommandHeader::generation`].
+    pub fn generation(&self) -> u32 {
+        self.header().generation
+    }
+
+    /// This command, sent for `generation`.
+    pub fn for_generation(mut self, generation: u32) -> Self {
+        self.header_mut().generation = generation;
+        self
+    }
+
+    fn header(&self) -> &CommandHeader {
+        match self {
+            Command::Ping(cmd) => &cmd.header,
+            Command::Connect(cmd) => &cmd.header,
+            Command::RestartArm(cmd) => &cmd.header,
+            Command::Restart(cmd) => &cmd.header,
+            Command::Config(cmd) => &cmd.header,
+            Command::StartNode(cmd)
+            | Command::StopNode(cmd)
+            | Command::QueryNode(cmd)
+            | Command::QueryNodeSample(cmd) => &cmd.header,
+            Command::SetNode(cmd) => &cmd.header,
+        }
+    }
+
+    fn header_mut(&mut self) -> &mut CommandHeader {
+        match self {
+            Command::Ping(cmd) => &mut cmd.header,
+            Command::Connect(cmd) => &mut cmd.header,
+            Command::RestartArm(cmd) => &mut cmd.header,
+            Command::Restart(cmd) => &mut cmd.header,
+            Command::Config(cmd) => &mut cmd.header,
+            Command::StartNode(cmd)
+            | Command::StopNode(cmd)
+            | Command::QueryNode(cmd)
+            | Command::QueryNodeSample(cmd) => &mut cmd.header,
+            Command::SetNode(cmd) => &mut cmd.header,
+        }
+    }
+
     pub fn sequence(&self) -> u32 {
         match self {
             Command::Ping(cmd) => cmd.header.sequence,

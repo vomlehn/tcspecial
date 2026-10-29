@@ -171,7 +171,12 @@ typedef enum tcs_status {
 	TCS_STATUS_NOT_ARMED = 4,
 	TCS_STATUS_NOT_FOUND = 5,
 	TCS_STATUS_ALREADY_EXISTS = 6,
-	TCS_STATUS_TIMEOUT = 7
+	TCS_STATUS_TIMEOUT = 7,
+	/* Sent for another generation of tcspecial than the one flying, and
+	 * not acted on: the vehicle restarted since this client last heard
+	 * which generation it is. Connect again, or hand the client the next
+	 * pass's beacon, before the next command. */
+	TCS_STATUS_WRONG_GENERATION = 8
 } tcs_status;
 
 /* A status's name: "Success", "NotFound" and so on. */
@@ -184,7 +189,13 @@ tcs_client *tcs_client_open(const tcs_configuration *configuration);
 
 /* Say what this end read, and hear what the vehicle read: *agrees is 1 where
  * the vehicle is flying this configuration -- the digests match -- and 0
- * where it is not, in which case no node command should be sent. */
+ * where it is not, in which case no node command should be sent.
+ *
+ * The answer also says which generation of tcspecial is flying, which every
+ * command after it is sent for; a beacon handed to tcs_client_beacon_heard
+ * says the same. Until one of the two has, every command but PING and
+ * CONNECT fails, unsent, because the vehicle refuses a command sent for any
+ * generation but its own. */
 int tcs_client_connect(tcs_client *client, int *agrees);
 
 /* Ask whether the vehicle's command link answers. */

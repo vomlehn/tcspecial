@@ -2175,6 +2175,7 @@ payloads:
                             // The same digest the window read: a vehicle flying
                             // the configuration this window is showing.
                             ConfigDigest([0x5Au8; 16]),
+                            1,
                         ))
                     }
                     Command::StopNode(cmd) => {

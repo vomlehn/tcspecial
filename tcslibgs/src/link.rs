@@ -103,8 +103,16 @@ fn seq_count(sequence: u32) -> u16 {
     (sequence & 0x3fff) as u16
 }
 
-fn header(sequence: u32, cmd_type: CommandType) -> CommandHeader {
-    CommandHeader { sequence, cmd_type }
+fn header(
+    sequence: u32,
+    generation: u32,
+    cmd_type: CommandType,
+) -> CommandHeader {
+    CommandHeader {
+        sequence,
+        cmd_type,
+        generation,
+    }
 }
 
 fn digest_of(bytes: &[u8]) -> ConfigDigest {
@@ -136,10 +144,10 @@ impl Command {
         use packet::CommandKind as K;
         Ok(match whole::<K>(datagram)? {
             K::Ping(p) => Command::Ping(PingCommand {
-                header: header(p.sequence, CommandType::Ping),
+                header: header(p.sequence, p.generation, CommandType::Ping),
             }),
             K::Connect(p) => Command::Connect(ConnectCommand {
-                header: header(p.sequence, CommandType::Connect),
+                header: header(p.sequence, p.generation, CommandType::Connect),
                 version: ConfigVersion {
                     major: p.major,
                     minor: p.minor,
@@ -148,35 +156,51 @@ impl Command {
                 digest: digest_of(&p.digest),
             }),
             K::RestartArm(p) => Command::RestartArm(RestartArmCommand {
-                header: header(p.sequence, CommandType::RestartArm),
+                header: header(
+                    p.sequence,
+                    p.generation,
+                    CommandType::RestartArm,
+                ),
                 arm_key: ArmKey(p.arm_key),
             }),
             K::Restart(p) => Command::Restart(RestartCommand {
-                header: header(p.sequence, CommandType::Restart),
+                header: header(p.sequence, p.generation, CommandType::Restart),
                 arm_key: ArmKey(p.arm_key),
             }),
             K::Config(p) => Command::Config(ConfigCommand {
-                header: header(p.sequence, CommandType::Config),
+                header: header(p.sequence, p.generation, CommandType::Config),
                 beacon_interval: BeaconInterval(p.beacon_interval),
             }),
             K::StartNode(p) => Command::StartNode(NodeCommand {
-                header: header(p.sequence, CommandType::StartNode),
+                header: header(
+                    p.sequence,
+                    p.generation,
+                    CommandType::StartNode,
+                ),
                 node: NodeId(p.node),
             }),
             K::StopNode(p) => Command::StopNode(NodeCommand {
-                header: header(p.sequence, CommandType::StopNode),
+                header: header(p.sequence, p.generation, CommandType::StopNode),
                 node: NodeId(p.node),
             }),
             K::QueryNode(p) => Command::QueryNode(NodeCommand {
-                header: header(p.sequence, CommandType::QueryNode),
+                header: header(
+                    p.sequence,
+                    p.generation,
+                    CommandType::QueryNode,
+                ),
                 node: NodeId(p.node),
             }),
             K::QueryNodeSample(p) => Command::QueryNodeSample(NodeCommand {
-                header: header(p.sequence, CommandType::QueryNodeSample),
+                header: header(
+                    p.sequence,
+                    p.generation,
+                    CommandType::QueryNodeSample,
+                ),
                 node: NodeId(p.node),
             }),
             K::SetNode(p) => Command::SetNode(SetNodeCommand {
-                header: header(p.sequence, CommandType::SetNode),
+                header: header(p.sequence, p.generation, CommandType::SetNode),
                 node: NodeId(p.node),
                 // Both fit: the XTCE's capacities are the command's.
                 attribute: Attribute::of(&p.attribute)
@@ -199,15 +223,18 @@ impl Command {
     fn packet(&self) -> packet::CommandKind {
         use packet::CommandKind as K;
         let sequence = self.sequence();
+        let generation = self.generation();
         let seq_count = seq_count(sequence);
         match self {
             Command::Ping(_) => K::Ping(packet::Ping {
                 seq_count,
                 sequence,
+                generation,
             }),
             Command::Connect(c) => K::Connect(packet::Connect {
                 seq_count,
                 sequence,
+                generation,
                 major: c.version.major,
                 minor: c.version.minor,
                 patch: c.version.patch,
@@ -216,43 +243,51 @@ impl Command {
             Command::RestartArm(c) => K::RestartArm(packet::RestartArm {
                 seq_count,
                 sequence,
+                generation,
                 arm_key: c.arm_key.0,
             }),
             Command::Restart(c) => K::Restart(packet::Restart {
                 seq_count,
                 sequence,
+                generation,
                 arm_key: c.arm_key.0,
             }),
             Command::Config(c) => K::Config(packet::Config {
                 seq_count,
                 sequence,
+                generation,
                 beacon_interval: c.beacon_interval.0,
             }),
             Command::StartNode(c) => K::StartNode(packet::StartNode {
                 seq_count,
                 sequence,
+                generation,
                 node: c.node.0,
             }),
             Command::StopNode(c) => K::StopNode(packet::StopNode {
                 seq_count,
                 sequence,
+                generation,
                 node: c.node.0,
             }),
             Command::QueryNode(c) => K::QueryNode(packet::QueryNode {
                 seq_count,
                 sequence,
+                generation,
                 node: c.node.0,
             }),
             Command::QueryNodeSample(c) => {
                 K::QueryNodeSample(packet::QueryNodeSample {
                     seq_count,
                     sequence,
+                    generation,
                     node: c.node.0,
                 })
             }
             Command::SetNode(c) => K::SetNode(packet::SetNode {
                 seq_count,
                 sequence,
+                generation,
                 node: c.node.0,
                 attribute: text(c.attribute.as_str()),
                 value_: fixed(c.value.as_bytes()),
@@ -302,6 +337,7 @@ fn status_of(status: CommandStatus) -> StatusType {
         CommandStatus::NotFound => StatusType::NOT_FOUND,
         CommandStatus::AlreadyExists => StatusType::ALREADY_EXISTS,
         CommandStatus::Timeout => StatusType::TIMEOUT,
+        CommandStatus::WrongGeneration => StatusType::WRONG_GENERATION,
     }
 }
 
@@ -316,6 +352,7 @@ fn status_from(status: StatusType) -> Result<CommandStatus, LinkError> {
         StatusType::NOT_FOUND => CommandStatus::NotFound,
         StatusType::ALREADY_EXISTS => CommandStatus::AlreadyExists,
         StatusType::TIMEOUT => CommandStatus::Timeout,
+        StatusType::WRONG_GENERATION => CommandStatus::WrongGeneration,
         _ => return Err(LinkError::Value("a status no build has")),
     })
 }
@@ -392,6 +429,7 @@ impl Telemetry {
                     patch: p.patch,
                 },
                 digest: digest_of(&p.digest),
+                generation: p.generation,
             }),
             K::ConfigAnswer(p) => Telemetry::Config(ConfigTelemetry {
                 header: head!(p, TelemetryType::Config),
@@ -485,6 +523,7 @@ impl Telemetry {
                     minor: t.version.minor,
                     patch: t.version.patch,
                     digest: fixed(&t.digest.0),
+                    generation: t.generation,
             )),
             Telemetry::Config(t) => {
                 K::ConfigAnswer(fill!(ConfigAnswer, t.header;))
@@ -635,6 +674,7 @@ mod tests {
                 2,
                 ConfigVersion::of_this_build(),
                 ConfigDigest([0xa5; 16]),
+                0x0102_0304,
             )),
             Telemetry::RestartArm(RestartArmTelemetry::new(
                 3,
@@ -687,7 +727,10 @@ mod tests {
 
     #[test]
     fn every_command_reads_back_as_itself() {
-        for command in every_command() {
+        // Each of a generation of its own, so that a generation read from
+        // another command's place in the packet would be seen.
+        for (generation, command) in (7..).zip(every_command()) {
+            let command = command.for_generation(generation);
             let packed = command.to_bytes();
             assert!(packed.len() <= COMMAND_BYTES);
             assert_eq!(Command::read(&packed), Ok(command.clone()));
@@ -704,22 +747,25 @@ mod tests {
     }
 
     /// A command is a CCSDS telecommand of APID 0x100, its length field the
-    /// CCSDS one, then the opcode and the sequence, most significant byte
-    /// first, then what it carries.
+    /// CCSDS one, then the opcode, the sequence and the generation, most
+    /// significant byte first, then what it carries.
     #[test]
     fn a_command_is_a_ccsds_packet() {
         let packed = Command::RestartArm(RestartArmCommand::new(
             0x0102_4005,
             ArmKey(0x1122_3344_5566_7788),
         ))
+        .for_generation(0x0a0b_0c0d)
         .to_bytes();
         // Version 0, type 1, no secondary header, APID 0x100; unsegmented,
-        // count 0x4005 & 0x3fff; 19 bytes in all, 13 after the header,
-        // less one. Then RESTART_ARM, the sequence and the key.
+        // count 0x4005 & 0x3fff; 23 bytes in all, 17 after the header,
+        // less one. Then RESTART_ARM, the sequence, the generation and the
+        // key.
         let want = vec![
-            0x11, 0x00, 0xc0, 0x05, 0x00, 0x0c, //
+            0x11, 0x00, 0xc0, 0x05, 0x00, 0x10, //
             0x02, //
             0x01, 0x02, 0x40, 0x05, //
+            0x0a, 0x0b, 0x0c, 0x0d, //
             0x11, 0x22, 0x33, 0x44, 0x55, 0x66, 0x77, 0x88,
         ];
         assert_eq!(packed, want);

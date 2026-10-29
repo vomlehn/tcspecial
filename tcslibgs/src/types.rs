@@ -15,8 +15,8 @@ use std::time::{Duration, SystemTime, UNIX_EPOCH};
 /// off its own clock. Two ends comparing times, or a log read later, then
 /// have nothing to agree about beyond the epoch.
 ///
-/// On the wire it is eight bytes, little-endian, and all ones says the
-/// spacecraft could not tell the time; see [`Timestamp::CLOCK_FAULT`].
+/// On the wire it is eight bytes, most significant first, and all ones says
+/// the spacecraft could not tell the time; see [`Timestamp::CLOCK_FAULT`].
 ///
 /// Eight bytes because four will not do. Four bytes of microseconds run out
 /// 4294.967295 seconds after the epoch -- 1970-01-01 01:11:34 UTC -- so a
@@ -135,17 +135,18 @@ impl Timestamp {
             .map(Duration::from_micros)
     }
 
-    /// This time as it goes on the wire: eight bytes, little-endian.
+    /// This time as it goes on the wire: eight bytes, most significant first.
     ///
-    /// Little-endian because both ends run on little-endian machines, so
-    /// network order would be a byte swap at each of them to agree with
-    /// nothing, and because the records a payload reads are written that way
-    /// already -- the GPIO node's, for one.
+    /// Most significant first because everything this software puts on the
+    /// network is, unless the protocol it goes in says otherwise. It is the
+    /// order of CCSDS and of the link's packets, so the eight bytes of time
+    /// in a record a node makes -- the GPIO node's, for one -- are the eight
+    /// bytes of time in an answer.
     ///
     /// Here rather than at each place that sends a time, so that the format
     /// is written down once and the test below is the whole of what holds it.
-    pub fn to_le_bytes(&self) -> [u8; 8] {
-        self.micros.to_le_bytes()
+    pub fn to_be_bytes(&self) -> [u8; 8] {
+        self.micros.to_be_bytes()
     }
 
     /// A time read off the wire, those eight bytes back again.
@@ -153,9 +154,9 @@ impl Timestamp {
     /// All ones arrives as [`Timestamp::CLOCK_FAULT`] and is not rejected
     /// here: it is a value the spacecraft means to send, and what to do about
     /// it belongs to whatever was going to use the time.
-    pub fn from_le_bytes(bytes: [u8; 8]) -> Self {
+    pub fn from_be_bytes(bytes: [u8; 8]) -> Self {
         Self {
-            micros: u64::from_le_bytes(bytes),
+            micros: u64::from_be_bytes(bytes),
         }
     }
 
@@ -481,7 +482,7 @@ impl DHName {
 /// A number and not a name, because every message carrying a name is a
 /// message whose construction and parsing have a length to get right, where a
 /// number is a field like the sequence and the type beside it. Four bytes,
-/// least significant first, as the sequence number is.
+/// most significant first, as the sequence number is.
 ///
 /// What makes the two ends mean the same node by one id is the digest: it is
 /// computed over the configuration including the order the nodes appear in,
@@ -519,12 +520,12 @@ impl NodeId {
         self.0 as usize
     }
 
-    /// This id as it goes on the wire: four bytes, little-endian.
+    /// This id as it goes on the wire: four bytes, most significant first.
     ///
     /// The order a [`Timestamp`] and a [`BeaconInterval`] go in, for the
     /// reason given on the first of them.
-    pub fn to_le_bytes(&self) -> [u8; 4] {
-        self.0.to_le_bytes()
+    pub fn to_be_bytes(&self) -> [u8; 4] {
+        self.0.to_be_bytes()
     }
 
     /// An id read off the wire.
@@ -532,8 +533,8 @@ impl NodeId {
     /// Any four bytes are a well-formed id, which is the point of a
     /// fixed-length field: an id the configuration does not have is a thing to
     /// answer rather than a thing that fails to parse.
-    pub fn from_le_bytes(bytes: [u8; 4]) -> Self {
-        Self(u32::from_le_bytes(bytes))
+    pub fn from_be_bytes(bytes: [u8; 4]) -> Self {
+        Self(u32::from_be_bytes(bytes))
     }
 }
 
@@ -562,7 +563,7 @@ pub struct ArmKey(pub u64);
 /// interval eight bytes of microseconds can state is longer than the mission
 /// of anything that flies, and the shortest is a microsecond.
 ///
-/// On the wire it is eight bytes, least significant byte first, like a
+/// On the wire it is eight bytes, most significant byte first, like a
 /// [`Timestamp`]. There is no reserved value: unlike a clock, an interval
 /// cannot fail to be read, and nought is refused where the sender is retimed
 /// rather than being given a meaning here.
@@ -595,16 +596,17 @@ impl BeaconInterval {
         Self(u64::try_from(interval.as_micros()).unwrap_or(u64::MAX))
     }
 
-    /// This interval as it goes on the wire: eight bytes, little-endian.
+    /// This interval as it goes on the wire: eight bytes, most significant
+    /// first.
     ///
     /// The order a [`Timestamp`] goes in, for the reason given there.
-    pub fn to_le_bytes(&self) -> [u8; 8] {
-        self.0.to_le_bytes()
+    pub fn to_be_bytes(&self) -> [u8; 8] {
+        self.0.to_be_bytes()
     }
 
     /// An interval read off the wire, those eight bytes back again.
-    pub fn from_le_bytes(bytes: [u8; 8]) -> Self {
-        Self(u64::from_le_bytes(bytes))
+    pub fn from_be_bytes(bytes: [u8; 8]) -> Self {
+        Self(u64::from_be_bytes(bytes))
     }
 }
 
@@ -2036,54 +2038,55 @@ mod tests {
         );
     }
 
-    /// A time goes on the wire as eight little-endian bytes and comes back.
+    /// A time goes on the wire as eight bytes, most significant first, and
+    /// comes back.
     ///
     /// The byte order written out by hand rather than taken from
-    /// `to_le_bytes` on both sides, which would pass whichever order it used:
+    /// `to_be_bytes` on both sides, which would pass whichever order it used:
     /// this is the format the ground has to agree with, so the test states it.
     #[test]
-    fn a_time_is_eight_little_endian_bytes() {
+    fn a_time_is_eight_big_endian_bytes() {
         let at = Timestamp {
             micros: 0x0807_0605_0403_0201,
         };
         assert_eq!(
-            at.to_le_bytes(),
-            [0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08],
-            "least significant byte first"
+            at.to_be_bytes(),
+            [0x08, 0x07, 0x06, 0x05, 0x04, 0x03, 0x02, 0x01],
+            "most significant byte first"
         );
-        assert_eq!(Timestamp::from_le_bytes(at.to_le_bytes()), at);
+        assert_eq!(Timestamp::from_be_bytes(at.to_be_bytes()), at);
 
         // All ones is the clock fault, and it survives the round trip: a
         // ground station has to be able to read it as what it is.
-        assert_eq!(Timestamp::CLOCK_FAULT.to_le_bytes(), [0xFF; 8]);
+        assert_eq!(Timestamp::CLOCK_FAULT.to_be_bytes(), [0xFF; 8]);
         assert_eq!(
-            Timestamp::from_le_bytes([0xFF; 8]),
+            Timestamp::from_be_bytes([0xFF; 8]),
             Timestamp::CLOCK_FAULT,
             "all ones read back as the clock fault"
         );
-        assert!(Timestamp::from_le_bytes([0xFF; 8]).clock_failed());
+        assert!(Timestamp::from_be_bytes([0xFF; 8]).clock_failed());
 
         // And the epoch itself is a real time, which is why nought is not
         // what a clock fault sends.
         assert!(!Timestamp { micros: 0 }.clock_failed());
     }
 
-    /// The beacon interval goes on the wire as eight little-endian bytes,
-    /// and is a length of time at both ends of that.
+    /// The beacon interval goes on the wire as eight bytes, most significant
+    /// first, and is a length of time at both ends of that.
     ///
     /// The byte order written out by hand rather than taken from
-    /// `to_le_bytes` on both sides, which would pass whichever order it used.
+    /// `to_be_bytes` on both sides, which would pass whichever order it used.
     #[test]
-    fn a_beacon_interval_is_eight_little_endian_bytes() {
+    fn a_beacon_interval_is_eight_big_endian_bytes() {
         let every = BeaconInterval::of(Duration::from_secs(5));
         assert_eq!(every.0, 5_000_000, "microseconds, as every time here is");
         assert_eq!(every.duration(), Duration::from_secs(5));
         assert_eq!(
-            every.to_le_bytes(),
-            [0x40, 0x4B, 0x4C, 0x00, 0x00, 0x00, 0x00, 0x00],
-            "least significant byte first"
+            every.to_be_bytes(),
+            [0x00, 0x00, 0x00, 0x00, 0x00, 0x4C, 0x4B, 0x40],
+            "most significant byte first"
         );
-        assert_eq!(BeaconInterval::from_le_bytes(every.to_le_bytes()), every);
+        assert_eq!(BeaconInterval::from_be_bytes(every.to_be_bytes()), every);
 
         // Five seconds is also what a configuration stating nothing gets.
         assert_eq!(BeaconInterval::default(), every);
@@ -2210,7 +2213,7 @@ mod tests {
         // The same sample from a node that sends something else: the bytes.
         assert_eq!(
             sample.panel_lines_of(false),
-            ("01:01:01".to_string(), "30 1D 79 11".to_string())
+            ("01:01:01".to_string(), "11 79 1D 30".to_string())
         );
 
         // Below zero, which is what the sign on a value is for: a conversion

@@ -1668,7 +1668,7 @@ Compute elements
 Two of them, and the difference is where the code lives.
 
 What a computation reads and writes is a **value**: four bytes of a signed
-count of micro-kelvin, least significant byte first. A reading is a value from
+count of micro-kelvin, most significant byte first. A reading is a value from
 the conversion that made it to the computation that uses it, to the log that
 records it and to the link that carries it to the ground, and it is a value in
 kelvins -- one unit everywhere, so that a comparison between two readings is a
@@ -1684,9 +1684,10 @@ kelvin -- so nothing a part said is lost in the rounding, and the number on
 the link is then *exact*. That is the property the arithmetic wants. Three
 doubles of one temperature can differ in their last bit, and a comparison
 between them turns on dust; three counts of micro-kelvin are equal or they are
-not. Little endian because every other number this software puts on a wire is:
-a timestamp's microseconds, a node's id, a beacon interval. A sensor's own
-bytes are the exception, and say which way round they are.
+not. Most significant byte first because everything this software puts on the
+network is, unless the protocol it travels in says otherwise (see "Byte order
+on the network"). A sensor's own bytes are that exception, and say which way
+round they are.
 
 Signed, although a temperature in kelvin is not. The arithmetic that produces
 one is signed -- a conversion is ``counts * scale + offset``, and a wrong
@@ -1796,7 +1797,7 @@ Requirement
     link is four bytes of micro-kelvin, and tcspecial converts at the pipe in
     both directions: a line is what every language reads without a library,
     which is the point of this type of node existing at all, and a program that
-    had to unpack a little-endian integer and scale it would not be writable in
+    had to unpack a binary integer and scale it would not be writable in
     a shell. Nothing is lost by the trip -- a value is a whole number of
     micro-kelvin, so six decimal places say all of it -- and a program's answer
     is held to the range a reading is held to, with the complaint naming the
@@ -5300,18 +5301,25 @@ Requirement
     long afterwards, then have nothing to agree about beyond the epoch.
 
 Requirement
-    On the link a timestamp is eight bytes, most significant byte first, as
-    every number in a command, an answer and the beacon is: that is the CCSDS
-    order, which a ground system reading the packets from their XTCE expects,
-    and one order for the whole link is one thing for the two ends to agree
-    about. In the records a node makes -- a GPIO node's events -- it is least
-    significant byte first, as those records' other fields are.
+    **Byte order on the network.** Every number tcspecial or the ground puts
+    on the network is most significant byte first, unless the protocol it
+    travels in says otherwise. That covers every field of a command, an
+    answer and the beacon, and the data tcspecial makes itself: a value's
+    micro-kelvin and a GPIO node's event records. The exceptions are the ones
+    a protocol or a part decides and the configuration states -- a sensor's
+    ``format`` such as ``i16_le``, a stream's ``u16le`` length prefix -- and
+    they are carried as they are. It is the CCSDS order, which a ground
+    system reading the packets from their XTCE expects, and one order is one
+    thing for the two ends to agree about.
 
-It was least significant byte first on the link too, while the link was
-JSON and the order was a matter of the records alone. Once commands and
-answers became CCSDS packets the link had an order of its own, and a
-timestamp in it that went the other way would be the one field a reader of
-the packet had to know to turn round.
+Requirement
+    A timestamp is eight bytes, most significant byte first, wherever it is
+    carried: in an answer, and in the records a node makes.
+
+Times and values were once least significant byte first, chosen because both
+ends ran on little-endian machines. Once commands and answers became CCSDS
+packets the link had an order of its own, and a field that went the other way
+would be the one a reader had to know to turn round.
 
 Requirement
     All ones -- ``FF FF FF FF FF FF FF FF`` -- is the one value that is not a
@@ -7445,7 +7453,7 @@ Requirement
     its shape is settled here: each event becomes a record of sixteen bytes
     -- eight of time, four of line offset, four of value. The time is a
     timestamp as every other time here is: microseconds since the UNIX epoch,
-    least significant byte first, and all ones for a clock that could not be
+    most significant byte first, and all ones for a clock that could not be
     read. A line's change and a telemetry response can then be read against
     each other, which is the whole reason the field is a time since the epoch
     at all; the kernel's own timestamp is nanoseconds on a monotonic clock,
@@ -10855,7 +10863,7 @@ Each CI telemetry response to a command must contain a timestamp, command sequen
    Two responses used to carry a time of their own and the other eight
    carried none; it is in the header for all of them now. A timestamp is
    microseconds since the UNIX epoch, wherever one is carried: eight bytes,
-   least significant first, and all ones for a clock the spacecraft could not
+   most significant first, and all ones for a clock the spacecraft could not
    read.
 
 CI must periodically send a Telemetry::Beacon message with a timestamp and unique sequence number

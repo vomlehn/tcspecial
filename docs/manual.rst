@@ -123,7 +123,7 @@ compute element
     time, a comparison against a setpoint, a filter that remembers.
 
 value
-    A number on a link: four bytes of a signed count of micro-kelvin, least
+    A number on a link: four bytes of a signed count of micro-kelvin, most
     significant byte first. A temperature is a value in kelvins from the
     conversion that made it to the computation, the log and the ground, so
     that comparing two readings is a comparison and not a conversion. The unit

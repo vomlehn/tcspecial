@@ -13,6 +13,11 @@
        opcode or kind   1 byte: which command, or which answer
        sequence         4 bytes: the command's number, which its answer
                         carries back
+       generation       4 bytes, a command only: the generation of
+                        tcspecial the ground last heard, from a beacon or
+                        a CONNECT's answer; a command of any generation but
+                        the one flying, PING and CONNECT aside, is refused
+                        with WrongGeneration
        status           1 byte, an answer only: how the command went
        timestamp        8 bytes, an answer only: microseconds since the UNIX
                         epoch when the answer was made, all ones where the
@@ -96,6 +101,7 @@
           <Enumeration value="5" label="NotFound"/>
           <Enumeration value="6" label="AlreadyExists"/>
           <Enumeration value="7" label="Timeout"/>
+          <Enumeration value="8" label="WrongGeneration"/>
         </EnumerationList>
       </EnumeratedParameterType>
     </ParameterTypeSet>
@@ -120,6 +126,7 @@
       <Parameter name="Minor" parameterTypeRef="U8Type"/>
       <Parameter name="Patch" parameterTypeRef="U8Type"/>
       <Parameter name="Digest" parameterTypeRef="DigestType"/>
+      <Parameter name="Generation" parameterTypeRef="U32Type"/>
       <Parameter name="Node" parameterTypeRef="U32Type"/>
       <Parameter name="Reason" parameterTypeRef="ReasonType"/>
       <Parameter name="Enabled" parameterTypeRef="FlagType"/>
@@ -214,6 +221,7 @@
           <ParameterRefEntry parameterRef="Minor"/>
           <ParameterRefEntry parameterRef="Patch"/>
           <ParameterRefEntry parameterRef="Digest"/>
+          <ParameterRefEntry parameterRef="Generation"/>
         </EntryList>
         <BaseContainer containerRef="Answer">
           <RestrictionCriteria>
@@ -387,6 +395,7 @@
           </Argument>
           <Argument name="Opcode" argumentTypeRef="U8Arg"/>
           <Argument name="Sequence" argumentTypeRef="U32Arg"/>
+          <Argument name="Generation" argumentTypeRef="U32Arg"/>
         </ArgumentList>
         <CommandContainer name="CommandContainer">
           <EntryList>
@@ -399,6 +408,7 @@
             <ArgumentRefEntry argumentRef="PacketLength"/>
             <ArgumentRefEntry argumentRef="Opcode"/>
             <ArgumentRefEntry argumentRef="Sequence"/>
+            <ArgumentRefEntry argumentRef="Generation"/>
           </EntryList>
         </CommandContainer>
       </MetaCommand>

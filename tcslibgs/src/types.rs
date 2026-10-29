@@ -1920,6 +1920,12 @@ pub enum CommandStatus {
     NotFound,
     AlreadyExists,
     Timeout,
+    /// The command was sent for another generation of tcspecial than the
+    /// one flying: it was sent before a restart and arrived after it, or by
+    /// a ground station that has heard neither a beacon nor a CONNECT's
+    /// answer since the vehicle last started. Nothing in it was acted on.
+    /// See [`crate::CommandType::takes_any_generation`].
+    WrongGeneration,
 }
 
 impl CommandStatus {

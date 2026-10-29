@@ -5619,7 +5619,7 @@ another section says the same thing, this one is the one it follows.
    generation. Commands and answers are CCSDS packets stated in
    ``tcslibgs/xtce/link.xml``, packed and unpacked by
    ``tcslibgs::link`` without allocating; nothing on the link is JSON. Not
-   yet built: the generation in every command, a count of the packets
+   yet built: a count of the packets
    refused (they are logged), the fallback interface and its link, load
    sets, uploads, SWITCH, the golden build, the refusal of full-interface
    commands on an interface mismatch, and ``tcsverify --interface``.
@@ -5645,8 +5645,9 @@ Requirement
     A command is the six-byte CCSDS primary header -- version 0, packet type
     1, no secondary header, APID ``0x100``, unsegmented, the low fourteen
     bits of the command's sequence as the sequence count, and the CCSDS
-    packet length -- then a byte of opcode, the four-byte sequence, what the
-    command carries. An answer is the same header with packet
+    packet length -- then a byte of opcode, the four-byte sequence, the
+    four-byte generation it was sent for, what the command carries. An
+    answer is the same header with packet
     type 0, then a byte saying which answer it is, the sequence of the
     command it answers, a byte of status, the eight-byte timestamp, what the
     answer carries. Every number is most significant byte first.
@@ -5986,12 +5987,30 @@ Requirement
 Requirement
     Every command carries the generation number the ground last heard, and
     the vehicle refuses one carrying any other generation, answering
-    ``InvalidParameter``. A command sent before a restart and delivered after
-    it -- which on a link several light-seconds long is the usual case, not
-    the rare one -- is then refused instead of being read with definitions it
-    was not written for. PING and CONNECT are taken whatever generation they
-    carry, so a ground station that has not yet heard a beacon can still find
-    out what is flying.
+    ``WrongGeneration`` and acting on nothing in it. A command sent before a
+    restart and delivered after it -- which on a link several light-seconds
+    long is the usual case, not the rare one -- is then refused instead of
+    being read with definitions it was not written for. PING and CONNECT are
+    taken whatever generation they carry, so a ground station that has not
+    yet heard a beacon can still find out what is flying; which commands
+    those are is ``tcslibgs::CommandType::takes_any_generation``, and
+    nowhere else.
+
+Requirement
+    The answer to a CONNECT carries the generation flying, as the beacon
+    does, so that a ground station that does not watch the beacons -- a
+    program that only commands -- learns it too.
+
+Requirement
+    ``tcslib``'s ``TcsClient``, and through it the C/C++ library, sends every
+    command for the generation the last beacon it was handed or the last
+    CONNECT's answer said. Until one has, it refuses every command but PING
+    and CONNECT, unsent, saying to CONNECT first. A command answered with
+    ``WrongGeneration`` makes it forget the generation, so that it refuses
+    again until it is told: the vehicle has started since, and what it is
+    flying should be asked again before anything else is sent. A generation
+    of nought, which no start is, is what a command says where the sender
+    knows none.
 
 Holes in this, and what closes them
 -----------------------------------

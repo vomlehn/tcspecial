@@ -3659,6 +3659,13 @@ Restart
   by the station, unsent, saying which generation it is waiting to see
   change.
 
+  Every command carries the generation the station last heard, from a
+  beacon or from the answer to Connect, and the vehicle refuses one sent for
+  any other, answering ``WrongGeneration``: a command sent before a restart
+  and arriving after it is not acted on. Connect again after a
+  ``WrongGeneration``; until then the station refuses every command but a
+  ping and a Connect, unsent.
+
 The remaining four -- ``Query``, ``Query DH``, ``Start DH`` and ``Stop DH`` --
 answer in ``Last Response`` and send nothing. Starting and stopping a handler
 is done from its own panel, and the panels show what a query would ask for

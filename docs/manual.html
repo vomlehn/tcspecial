@@ -3763,13 +3763,19 @@ file the <tt class="docutils literal">tcspecial</tt> section's <tt class="docuti
 again at #1, say the new generation and have the flag clear. They go
 every <tt class="docutils literal">beacon.reset_interval</tt> until the first command from the MOC
 arrives, and every <tt class="docutils literal">beacon.default_interval</tt> after that.</p>
-<p class="last">Once a station has sent a restart it sends nothing more to the vehicle
+<p>Once a station has sent a restart it sends nothing more to the vehicle
 until a beacon of the new generation, not restarting, arrives: the
 vehicle that comes back may read packets differently from the one that
 went, and the beacon -- not the answer to the restart, which may never
 arrive -- is what says it is back. A command tried in between is refused
 by the station, unsent, saying which generation it is waiting to see
 change.</p>
+<p class="last">Every command carries the generation the station last heard, from a
+beacon or from the answer to Connect, and the vehicle refuses one sent for
+any other, answering <tt class="docutils literal">WrongGeneration</tt>: a command sent before a restart
+and arriving after it is not acted on. Connect again after a
+<tt class="docutils literal">WrongGeneration</tt>; until then the station refuses every command but a
+ping and a Connect, unsent.</p>
 </dd>
 </dl>
 <p>The remaining four -- <tt class="docutils literal">Query</tt>, <tt class="docutils literal">Query DH</tt>, <tt class="docutils literal">Start DH</tt> and <tt class="docutils literal">Stop DH</tt> --

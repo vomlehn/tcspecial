@@ -172,6 +172,7 @@ fn an_armed_restart_runs_tcspecial_again_keeping_what_it_was_given() {
             &commands,
             take_at,
             &tcslibgs::Command::RestartArm(RestartArmCommand::new(1, key))
+                .for_generation(before.generation)
         ),
         CommandStatus::Success
     );
@@ -180,6 +181,7 @@ fn an_armed_restart_runs_tcspecial_again_keeping_what_it_was_given() {
             &commands,
             take_at,
             &tcslibgs::Command::Restart(RestartCommand::new(2, key))
+                .for_generation(before.generation)
         ),
         CommandStatus::Success
     );

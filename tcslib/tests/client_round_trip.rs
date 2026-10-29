@@ -59,7 +59,7 @@ fn stub_spacecraft(count: usize) -> (String, thread::JoinHandle<()>) {
                 // The stub answers with the ground's own two, which is a
                 // spacecraft reading the same configuration.
                 Command::Connect(cmd) => Telemetry::Connect(
-                    ConnectTelemetry::new(seq, cmd.version, cmd.digest),
+                    ConnectTelemetry::new(seq, cmd.version, cmd.digest, 1),
                 ),
                 Command::RestartArm(_) => Telemetry::RestartArm(
                     RestartArmTelemetry::new(seq, CommandStatus::Success),
@@ -149,6 +149,9 @@ fn client_to(addr: &str) -> TcsClient {
     let mut client =
         TcsClient::of_a_graph(Box::new(spacecraft), Box::new(nodes));
     client.set_timeout(Duration::from_secs(10));
+    // A station that has heard a beacon, so that its node commands are sent
+    // for a generation rather than refused unsent.
+    client.beacon_heard(1, false);
     client
 }
 

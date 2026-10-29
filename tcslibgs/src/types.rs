@@ -1803,19 +1803,15 @@ impl CIConfigJson {
             );
         }
         // A length of time, which is what a beacon is sent on. The
-        // protocol counts milliseconds in four bytes, so an interval longer
-        // than that could be set here and never commanded -- refused where
-        // the file is read rather than at the first CONFIG.
+        // protocol's CONFIG counts microseconds in eight bytes (a
+        // BeaconInterval), so an interval longer than that could be set
+        // here and never commanded -- refused where the file is read
+        // rather than at the first CONFIG.
         let beacon_interval =
             crate::graph::parse_interval(&self.beacon.default_interval)
                 .map_err(|why| format!("beacon.default_interval: {why}"))?;
-        if u32::try_from(beacon_interval.as_millis()).is_err() {
-            return Err(
-                "beacon.default_interval: longer than the protocol can \
-                 carry, which counts milliseconds in four bytes"
-                    .to_string(),
-            );
-        }
+        beyond_a_beacon_interval(beacon_interval)
+            .map_err(|why| format!("beacon.default_interval: {why}"))?;
 
         let reset_interval =
             reset_interval_of(&self.beacon.reset_interval, beacon_interval)?;
@@ -1877,6 +1873,17 @@ impl CIConfigJson {
     }
 }
 
+/// Refuses a length of time longer than a [`BeaconInterval`] states:
+/// 2^64 - 1 microseconds, about 585,000 years.
+fn beyond_a_beacon_interval(interval: Duration) -> Result<(), String> {
+    if u64::try_from(interval.as_micros()).is_err() {
+        return Err("longer than the protocol can carry, which counts \
+             microseconds in eight bytes"
+            .to_string());
+    }
+    Ok(())
+}
+
 /// How often beacons go across a restart, from what
 /// `beacon.reset_interval` says and the `beacon.default_interval` it must not
 /// be longer than.
@@ -1891,6 +1898,8 @@ pub fn reset_interval_of(
     beacon_interval: Duration,
 ) -> Result<Duration, String> {
     let interval = crate::graph::parse_interval(said)
+        .map_err(|why| format!("beacon.reset_interval: {why}"))?;
+    beyond_a_beacon_interval(interval)
         .map_err(|why| format!("beacon.reset_interval: {why}"))?;
     if interval.is_zero() {
         return Err("beacon.reset_interval is nought, which is a vehicle \
@@ -2105,6 +2114,21 @@ mod tests {
         assert_eq!(
             BeaconInterval::of(Duration::from_secs(u64::MAX)).0,
             u64::MAX
+        );
+    }
+
+    /// The beacon and reset intervals are as long as a BeaconInterval's
+    /// eight bytes of microseconds state, well past the 49.7 days that four
+    /// bytes of milliseconds would.
+    #[test]
+    fn an_interval_is_as_long_as_eight_bytes_of_microseconds() {
+        let hundred_days = Duration::from_secs(100 * 86_400);
+        assert!(beyond_a_beacon_interval(hundred_days).is_ok());
+        assert_eq!(reset_interval_of("100 d", hundred_days), Ok(hundred_days));
+        let most = Duration::from_micros(u64::MAX);
+        assert!(beyond_a_beacon_interval(most).is_ok());
+        assert!(
+            beyond_a_beacon_interval(most + Duration::from_micros(1)).is_err()
         );
     }
 

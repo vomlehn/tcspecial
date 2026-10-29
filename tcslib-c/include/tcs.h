@@ -150,6 +150,11 @@ typedef struct tcs_datum {
 	const char *source;  /* the node's name */
 	const uint8_t *data; /* what it produced, exactly as sent */
 	size_t length;
+	int held;            /* whether it arrived while the moc node's hold
+	                        was holding: then source is only what this
+	                        configuration calls the port it arrived at, and
+	                        the bytes may be in another configuration's
+	                        format, so neither should be believed */
 } tcs_datum;
 
 /* Open the moc node called moc. */
@@ -161,6 +166,44 @@ tcs_moc *tcs_moc_open(const tcs_configuration *configuration, const char *moc);
 int tcs_moc_receive(tcs_moc *moc, int64_t wait_ms, tcs_datum *datum);
 
 void tcs_moc_close(tcs_moc *moc);
+
+/* ---- Holding the vehicle's data ----------------------------------------- */
+
+/* A datum is the node's bytes and nothing else, so one an earlier
+ * configuration sent, still on its way after the vehicle switched, cannot be
+ * told from one the new configuration sent. A station's hold, handed every
+ * beacon, holds the data from the moment the beacons say the configuration
+ * changed, or is not the one the station read, until the station says the
+ * path from the vehicle is purged. One hold for a station, shared by every
+ * moc node it opens. */
+typedef struct tcs_hold tcs_hold;
+
+/* A hold that is not holding. */
+tcs_hold *tcs_hold_new(void);
+
+/* Have moc hold its data whenever hold is holding: 0, or -1 on an error. */
+int tcs_moc_share_hold(tcs_moc *moc, const tcs_hold *hold);
+
+/* Hand the hold what the last pass of beacons heard: 1 when that began a
+ * hold, 0 when it did not, -1 on an error. */
+int tcs_hold_beacon_heard(tcs_hold *hold, const tcs_beacons *beacons);
+
+/* Why data is held: 0 when it is not; 1 when the vehicle serves another
+ * configuration than this station read; 2 when its configuration changed;
+ * 3 when the first beacon heard was of a commanded start; -1 on an error. */
+int tcs_hold_held(const tcs_hold *hold);
+
+/* The station says the path from the vehicle is purged: 0 when the hold
+ * ended; 1 when it was refused, because the vehicle serves another
+ * configuration than this station read, and tcs_hold_why says which; -1 on
+ * an error. */
+int tcs_hold_purged(tcs_hold *hold);
+
+/* Why data is held, or why the last tcs_hold_purged was refused, or "" where
+ * it is not held. */
+const char *tcs_hold_why(tcs_hold *hold);
+
+void tcs_hold_free(tcs_hold *hold);
 
 /* ---- Commands ----------------------------------------------------------- */
 

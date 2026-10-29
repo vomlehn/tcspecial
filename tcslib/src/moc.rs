@@ -13,14 +13,38 @@
 //! what to do with it next -- process it, display it, log it -- is the
 //! caller's. One function between the configuration and the data means one
 //! place that counts ports, and it is the same counting the vehicle does.
+//!
+//! # Holding data whose format is not known
+//!
+//! A datum is the node's bytes and nothing else: no header, no generation.
+//! Which node sent it is the port it arrived at, and how to read it is that
+//! node's configuration. When the vehicle changes configuration -- a commanded
+//! switch, or a fallback to the golden build -- a datum the old start sent can
+//! still be on its way, held by a relay or a recorder, and would arrive at a
+//! port the new configuration may give to another node, in another format.
+//! Nothing in it says so.
+//!
+//! So a [`DataHold`], fed every beacon, stops attributing data the moment the
+//! beacons say the configuration or the interface has changed, or that it is
+//! not the one this station reads with, and keeps on not attributing it until
+//! the station says the path has been purged of what the old configuration
+//! sent: a datum that arrives meanwhile comes back marked
+//! [`Arrival::held`], its bytes and its port, with nothing claimed about who
+//! sent it. One hold for a station, shared by every `Moc` it opens, so that
+//! opening the new configuration's `moc` nodes does not end it. See "What is
+//! held at the MOC" in `docs/design.rst`.
 
 use std::net::UdpSocket;
 use std::os::fd::AsRawFd;
 use std::path::Path;
+use std::sync::atomic::{AtomicU8, Ordering};
+use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
+use tcslibgs::config_digest::{digest_of_graph, ConfigDigest};
 use tcslibgs::graph::telemetry::{self, Telemetered, Via};
 use tcslibgs::graph::Graph;
+use tcslibgs::InterfaceDigest;
 
 /// What the ground's end of the `payload_telemetry` links is called.
 pub const PAYLOAD_TELEMETRY: &str = "payload_telemetry";
@@ -36,6 +60,10 @@ pub struct Received {
     pub source: String,
     /// What it produced, exactly as it was sent.
     pub data: Vec<u8>,
+    /// Whether it arrived while the station's [`DataHold`] was holding, so
+    /// that `source` is only the name this configuration gives the port it
+    /// arrived at, and the bytes may be in another configuration's format.
+    pub held: bool,
 }
 
 /// Where [`Moc::receive_into`] put a datum.
@@ -46,6 +74,187 @@ pub struct Arrival {
     pub source: usize,
     /// How many bytes of the buffer it filled.
     pub length: usize,
+    /// Whether it arrived while the station's [`DataHold`] was holding: see
+    /// [`Received::held`].
+    pub held: bool,
+}
+
+/// Why a station's data is being held.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Hold {
+    /// The last beacon says the vehicle is serving a configuration or an
+    /// interface other than the one this station reads with.
+    Differs,
+    /// The configuration or the interface the beacons say changed between
+    /// one beacon and the next: a switch, or a fallback to the golden build.
+    Changed,
+    /// The first beacon this station heard is of a start the ground
+    /// commanded, which may have taken up definitions this station did not
+    /// see the vehicle change to.
+    CommandedStart,
+}
+
+impl Hold {
+    fn number(self) -> u8 {
+        match self {
+            Hold::Differs => 1,
+            Hold::Changed => 2,
+            Hold::CommandedStart => 3,
+        }
+    }
+
+    fn of(number: u8) -> Option<Hold> {
+        match number {
+            1 => Some(Hold::Differs),
+            2 => Some(Hold::Changed),
+            3 => Some(Hold::CommandedStart),
+            _ => None,
+        }
+    }
+
+    /// Why, in words an operator reads beside the button that ends it.
+    pub fn why(self) -> &'static str {
+        match self {
+            Hold::Differs => {
+                "the vehicle is serving another configuration than this \
+                 station read, so its data cannot be read with this one"
+            }
+            Hold::Changed => {
+                "the vehicle's configuration changed, and data the old one \
+                 sent may still be on its way: purge the path, then say so"
+            }
+            Hold::CommandedStart => {
+                "the vehicle was restarted by command before this station \
+                 heard it, and data an earlier configuration sent may still \
+                 be on its way: purge the path, then say so"
+            }
+        }
+    }
+}
+
+/// What the beacons say the vehicle serves: its configuration's digest and
+/// its interface's.
+type Serving = (ConfigDigest, InterfaceDigest);
+
+#[derive(Debug, Default)]
+struct HoldState {
+    /// What this station reads with: the digest of the configuration its
+    /// `Moc`s were opened from, and this build's interface. `None` until one
+    /// has been opened.
+    ours: Option<Serving>,
+    /// What the last beacon said, if one has been heard.
+    last: Option<Serving>,
+}
+
+/// Whether a station's data is being held, shared by every [`Moc`] it opens
+/// and fed every beacon it hears. Cheap to clone: the clones are one hold.
+///
+/// Asked once for every datum, without a lock or an allocation; told of a
+/// beacon, which takes a lock, on the beacon's thread.
+#[derive(Debug, Clone, Default)]
+pub struct DataHold {
+    held: Arc<AtomicU8>,
+    state: Arc<Mutex<HoldState>>,
+}
+
+impl DataHold {
+    /// A hold that is not holding, and has heard no beacon.
+    pub fn new() -> DataHold {
+        DataHold::default()
+    }
+
+    /// Why data is being held, or `None` where it is not.
+    pub fn held(&self) -> Option<Hold> {
+        Hold::of(self.held.load(Ordering::SeqCst))
+    }
+
+    fn hold(&self, why: Hold) -> Option<Hold> {
+        match self.held.swap(why.number(), Ordering::SeqCst) {
+            0 => Some(why),
+            _ => None,
+        }
+    }
+
+    /// The station reads with the configuration whose digest is `digest`,
+    /// and this build's interface: said by [`Moc::open`].
+    fn reading_with(&self, digest: ConfigDigest) {
+        let ours = (digest, InterfaceDigest::of_this_build());
+        if let Ok(mut state) = self.state.lock() {
+            state.ours = Some(ours);
+            if state.last.is_some_and(|last| last != ours) {
+                self.hold(Hold::Differs);
+            }
+        }
+    }
+
+    /// A beacon has arrived, serving the configuration and interface of
+    /// these digests, from a start that was or was not commanded. Returns
+    /// why the hold began, where this began it, for the station to say so.
+    ///
+    /// Holds where what it serves is not what this station reads with,
+    /// where it differs from what the beacon before it served, and where
+    /// it is the first beacon heard and its start was commanded. Nothing
+    /// here ends a hold: only [`DataHold::purged`] does.
+    pub fn beacon_heard(
+        &self,
+        config: ConfigDigest,
+        interface: InterfaceDigest,
+        commanded: bool,
+    ) -> Option<Hold> {
+        let now = (config, interface);
+        let Ok(mut state) = self.state.lock() else {
+            return None;
+        };
+        let why = match (state.last, state.ours) {
+            (Some(last), _) if last != now => Some(Hold::Changed),
+            (_, Some(ours)) if ours != now => Some(Hold::Differs),
+            (None, _) if commanded => Some(Hold::CommandedStart),
+            _ => None,
+        };
+        state.last = Some(now);
+        why.and_then(|why| self.hold(why))
+    }
+
+    /// What a pass of the station's [`crate::beacon::Beacons`] heard, handed
+    /// on: [`DataHold::beacon_heard`] for a pass on which a beacon arrived,
+    /// and nothing for one on which none did.
+    pub fn pass_heard(&self, pass: &crate::beacon::Pass) -> Option<Hold> {
+        if pass.arrived != crate::beacon::Arrived::Beacon {
+            return None;
+        }
+        let (config, interface) = pass.serving?;
+        self.beacon_heard(config, interface, pass.commanded_restart)
+    }
+
+    /// The station says the path from the vehicle has been purged of what
+    /// an earlier configuration sent: the hold ends, and data is attributed
+    /// again.
+    ///
+    /// Refused while the last beacon serves another configuration or
+    /// interface than this station reads with, saying both: purging the
+    /// path does not make the station read the right configuration, and
+    /// data attributed by the wrong one would be worse than data held.
+    pub fn purged(&self) -> Result<(), String> {
+        let state = self
+            .state
+            .lock()
+            .map_err(|_| "the hold could not be read".to_string())?;
+        if let (Some((config, interface)), Some((ours, ours_interface))) =
+            (state.last, state.ours)
+        {
+            if config != ours || interface != ours_interface {
+                return Err(format!(
+                    "data is still held: the vehicle is serving configuration \
+                     md5 {config} and interface {interface}, and this station \
+                     read md5 {ours} and interface {ours_interface}. Open the \
+                     configuration the vehicle is serving, then say the path \
+                     is purged"
+                ));
+            }
+        }
+        self.held.store(0, Ordering::SeqCst);
+        Ok(())
+    }
 }
 
 /// A `moc` node, open on the ground: a port for each node drawn into it.
@@ -61,6 +270,12 @@ pub struct Moc {
     /// Which port the next receive looks at first, so that one busy source
     /// cannot keep the others waiting.
     next: usize,
+    /// Whether the station's data is being held: its own until
+    /// [`Moc::share`] gives it the station's.
+    hold: DataHold,
+    /// The digest of the configuration this was opened from, which is what
+    /// it reads data with.
+    digest: ConfigDigest,
 }
 
 impl Moc {
@@ -101,7 +316,7 @@ impl Moc {
                  arrive at it"
             ));
         }
-        Moc::binding(moc, ours)
+        Moc::binding(moc, ours, graph)
     }
 
     /// Open the ground's end of every payload that reports over the
@@ -122,11 +337,18 @@ impl Moc {
         if ours.is_empty() {
             return Ok(None);
         }
-        Moc::binding(PAYLOAD_TELEMETRY, ours).map(Some)
+        Moc::binding(PAYLOAD_TELEMETRY, ours, graph).map(Some)
     }
 
     /// Bind each link's ground end.
-    fn binding(name: &str, links: Vec<Telemetered>) -> Result<Moc, String> {
+    fn binding(
+        name: &str,
+        links: Vec<Telemetered>,
+        graph: &Graph,
+    ) -> Result<Moc, String> {
+        let digest = digest_of_graph(graph).map_err(|e| {
+            format!("\"{name}\": the configuration cannot be digested: {e}")
+        })?;
         let mut ports = Vec::new();
         for link in links {
             let at = format!("{}:{}", link.ground.address, link.ground.port);
@@ -146,12 +368,29 @@ impl Moc {
                 revents: 0,
             })
             .collect();
+        let hold = DataHold::new();
+        hold.reading_with(digest);
         Ok(Moc {
             name: name.to_string(),
             ports,
             fds,
             next: 0,
+            hold,
+            digest,
         })
+    }
+
+    /// Hold this one's data whenever `hold` -- the station's, which every
+    /// `Moc` it opens shares -- is holding, in place of the hold it was
+    /// opened with.
+    pub fn share(&mut self, hold: &DataHold) {
+        hold.reading_with(self.digest);
+        self.hold = hold.clone();
+    }
+
+    /// The hold this asks before it attributes a datum.
+    pub fn hold(&self) -> &DataHold {
+        &self.hold
     }
 
     /// The `moc` node's name.
@@ -193,6 +432,7 @@ impl Moc {
         Ok(Some(Received {
             source: self.ports[arrival.source].0.clone(),
             data: datum,
+            held: arrival.held,
         }))
     }
 
@@ -273,7 +513,14 @@ impl Moc {
                     out.len()
                 ));
             }
-            return Ok(Some(Arrival { source: at, length }));
+            // Asked as each datum is taken, so that one that arrived
+            // before a beacon began a hold is attributed and one after it
+            // is not. One atomic load, which allocates nothing.
+            return Ok(Some(Arrival {
+                source: at,
+                length,
+                held: self.hold.held().is_some(),
+            }));
         }
         Ok(None)
     }
@@ -348,6 +595,85 @@ payloads:
                 ("b".to_string(), b"from b".to_vec())
             ]
         );
+    }
+
+    /// A hold begins when the beacons say the configuration or interface
+    /// changed, or differs from the station's, or on a first beacon of a
+    /// commanded start; it ends only when the station says the path is
+    /// purged, and not while the vehicle serves another configuration.
+    #[test]
+    fn data_is_held_from_a_change_until_the_path_is_purged() {
+        let ours = ConfigDigest([1; 16]);
+        let theirs = ConfigDigest([2; 16]);
+        let interface = InterfaceDigest::of_this_build();
+        let hold = DataHold::new();
+        hold.reading_with(ours);
+
+        assert_eq!(hold.beacon_heard(ours, interface, false), None);
+        assert_eq!(hold.held(), None, "the configuration this station read");
+
+        // A switch: the beacons change, and the station is not yet reading
+        // the new configuration.
+        assert_eq!(
+            hold.beacon_heard(theirs, interface, true),
+            Some(Hold::Changed)
+        );
+        assert_eq!(hold.beacon_heard(theirs, interface, true), None, "once");
+        let refused = hold.purged().expect_err("still the wrong one");
+        assert!(refused.contains(&theirs.to_string()), "{refused}");
+        assert_eq!(hold.held(), Some(Hold::Differs));
+
+        // The station opens the new configuration: still held, because what
+        // the old one sent may still be on its way.
+        hold.reading_with(theirs);
+        assert!(hold.held().is_some());
+        hold.purged().expect("the path is purged");
+        assert_eq!(hold.held(), None);
+        assert_eq!(hold.beacon_heard(theirs, interface, true), None);
+
+        // A station whose first beacon is of a commanded start did not see
+        // what changed before it.
+        let fresh = DataHold::new();
+        fresh.reading_with(ours);
+        assert_eq!(
+            fresh.beacon_heard(ours, interface, true),
+            Some(Hold::CommandedStart)
+        );
+        let quiet = DataHold::new();
+        quiet.reading_with(ours);
+        assert_eq!(quiet.beacon_heard(ours, interface, false), None);
+    }
+
+    /// A datum that arrives while the station's hold is holding is marked
+    /// held, and one after the hold ends is not; every `Moc` sharing the hold
+    /// holds together.
+    #[test]
+    fn a_datum_that_arrives_while_held_is_marked() {
+        let port = a_free_port();
+        let graph = graph(port);
+        let hold = DataHold::new();
+        let mut moc = Moc::open(&graph, "ground").expect("it opens");
+        moc.share(&hold);
+        let digest = digest_of_graph(&graph).expect("a digest");
+        let interface = InterfaceDigest::of_this_build();
+        let vehicle =
+            UdpSocket::bind("127.0.0.1:0").expect("the vehicle's socket");
+        let mut next = |what: &[u8]| {
+            vehicle.send_to(what, ("127.0.0.1", port)).expect("sent");
+            moc.receive(Some(Duration::from_secs(5)))
+                .expect("it reads")
+                .expect("something arrived")
+        };
+
+        hold.beacon_heard(digest, interface, false);
+        assert!(!next(b"before").held);
+        hold.beacon_heard(ConfigDigest([9; 16]), interface, true);
+        let held = next(b"during");
+        assert!(held.held);
+        assert_eq!(held.data, b"during", "the bytes, as they came");
+        hold.beacon_heard(digest, interface, true);
+        hold.purged().expect("purged");
+        assert!(!next(b"after").held);
     }
 
     /// An F´ gateway is opened as a ground link is, and what is drawn into

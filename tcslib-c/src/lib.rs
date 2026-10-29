@@ -43,7 +43,7 @@ use std::path::PathBuf;
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
 use tcslib::beacon::{Beacons, Contact, Schedule, Stage, STANDARD_INTERVAL};
-use tcslib::moc::{Moc, DATUM_BYTES};
+use tcslib::moc::{DataHold, Hold, Moc, DATUM_BYTES};
 use tcslib::ping::{route_of, Pinger, Uplink, NO_MESSAGE};
 use tcslib::{command_links_of, CommandStatus, TcsClient};
 use tcslibgs::config_digest::{digest_of_graph, ConfigDigest, ConfigVersion};
@@ -447,6 +447,10 @@ pub struct tcs_beacons {
     /// The last beacon's generation and whether its start was commanded, for
     /// `tcs_client_beacon_heard`: `None` before one has arrived.
     last: Option<(u32, bool)>,
+    /// What the beacon that arrived on the last pass served, and whether
+    /// its start was commanded, for `tcs_hold_beacon_heard`: `None` for a
+    /// pass on which none arrived.
+    arrived: Option<(ConfigDigest, tcslibgs::InterfaceDigest, bool)>,
 }
 
 /// Listen where the configuration says beacons arrive.
@@ -490,6 +494,7 @@ pub unsafe extern "C" fn tcs_beacons_listen(
             remarks: Notes::EMPTY,
             warnings: Notes::EMPTY,
             last: None,
+            arrived: None,
         })))
     })
 }
@@ -527,6 +532,12 @@ pub unsafe extern "C" fn tcs_beacons_pass(
             commanded_restart: c_int::from(found.commanded_restart),
         };
         watch.last = found.generation.map(|g| (g, found.commanded_restart));
+        watch.arrived = (found.arrived == tcslib::beacon::Arrived::Beacon)
+            .then_some(found.serving)
+            .flatten()
+            .map(|(config, interface)| {
+                (config, interface, found.commanded_restart)
+            });
         watch.said.set(&found.said);
         watch.remarks.set(&found.remarks);
         watch.warnings.set(&found.warnings);
@@ -648,6 +659,7 @@ pub struct tcs_datum {
     source: *const c_char,
     data: *const u8,
     length: usize,
+    held: c_int,
 }
 
 /// Open the `moc` node called `moc`.
@@ -717,6 +729,7 @@ pub unsafe extern "C" fn tcs_moc_receive(
             source: source.as_ptr(),
             data: node.data.as_ptr(),
             length: arrival.length,
+            held: c_int::from(arrival.held),
         };
         Ok(1)
     })
@@ -731,6 +744,146 @@ pub unsafe extern "C" fn tcs_moc_receive(
 pub unsafe extern "C" fn tcs_moc_close(moc: *mut tcs_moc) {
     if !moc.is_null() {
         drop(Box::from_raw(moc));
+    }
+}
+
+// ---- Holding the vehicle's data -------------------------------------------
+
+/// The station's hold on the vehicle's data: see `tcslib::moc::DataHold`.
+pub struct tcs_hold {
+    hold: DataHold,
+    /// Why it is held, or why the last `tcs_hold_purged` was refused.
+    why: Text<TEXT_BYTES>,
+}
+
+/// A hold that is not holding. Allocates, once, the handle.
+#[no_mangle]
+pub extern "C" fn tcs_hold_new() -> *mut tcs_hold {
+    Box::into_raw(Box::new(tcs_hold {
+        hold: DataHold::new(),
+        why: Text::EMPTY,
+    }))
+}
+
+/// Have `moc` hold its data whenever `hold` is holding: 0, or -1 on an
+/// error.
+///
+/// # Safety
+///
+/// `moc` as [`tcs_moc_receive`]; `hold` NULL or made by `tcs_hold_new` and
+/// not yet freed.
+#[no_mangle]
+pub unsafe extern "C" fn tcs_moc_share_hold(
+    moc: *mut tcs_moc,
+    hold: *const tcs_hold,
+) -> c_int {
+    guard(-1, || {
+        let node = handle_of_mut(moc, "the moc node")?;
+        let hold = handle_of(hold, "the hold")?;
+        node.moc.share(&hold.hold);
+        Ok(0)
+    })
+}
+
+/// Hand `hold` what the last pass of `beacons` heard: 1 when that began a
+/// hold, 0 when it did not, -1 on an error.
+///
+/// # Safety
+///
+/// `hold` as [`tcs_moc_share_hold`]; `beacons` as [`tcs_beacons_said`].
+#[no_mangle]
+pub unsafe extern "C" fn tcs_hold_beacon_heard(
+    hold: *mut tcs_hold,
+    beacons: *const tcs_beacons,
+) -> c_int {
+    guard(-1, || {
+        let hold = handle_of_mut(hold, "the hold")?;
+        let watch = handle_of(beacons, "the beacons")?;
+        let Some((config, interface, commanded)) = watch.arrived else {
+            return Ok(0);
+        };
+        Ok(c_int::from(
+            hold.hold
+                .beacon_heard(config, interface, commanded)
+                .is_some(),
+        ))
+    })
+}
+
+/// Why data is held: 0 when it is not, 1 when the vehicle serves another
+/// configuration than this station read, 2 when its configuration changed,
+/// 3 when the first beacon heard was of a commanded start; -1 on an error.
+///
+/// # Safety
+///
+/// `hold` as [`tcs_moc_share_hold`].
+#[no_mangle]
+pub unsafe extern "C" fn tcs_hold_held(hold: *const tcs_hold) -> c_int {
+    guard(-1, || {
+        let hold = handle_of(hold, "the hold")?;
+        Ok(match hold.hold.held() {
+            None => 0,
+            Some(Hold::Differs) => 1,
+            Some(Hold::Changed) => 2,
+            Some(Hold::CommandedStart) => 3,
+        })
+    })
+}
+
+/// The station says the path from the vehicle is purged: 0 when the hold
+/// ended, 1 when it was refused -- [`tcs_hold_why`] says why -- and -1 on an
+/// error.
+///
+/// # Safety
+///
+/// `hold` as [`tcs_moc_share_hold`].
+#[no_mangle]
+pub unsafe extern "C" fn tcs_hold_purged(hold: *mut tcs_hold) -> c_int {
+    guard(-1, || {
+        let hold = handle_of_mut(hold, "the hold")?;
+        match hold.hold.purged() {
+            Ok(()) => {
+                hold.why.set("");
+                Ok(0)
+            }
+            Err(why) => {
+                hold.why.set(why);
+                Ok(1)
+            }
+        }
+    })
+}
+
+/// Why data is held, or why the last `tcs_hold_purged` was refused, or ""
+/// where it is not held; NULL on an error.
+///
+/// # Safety
+///
+/// `hold` as [`tcs_moc_share_hold`].
+#[no_mangle]
+pub unsafe extern "C" fn tcs_hold_why(hold: *mut tcs_hold) -> *const c_char {
+    guard(std::ptr::null(), || {
+        let hold = handle_of_mut(hold, "the hold")?;
+        if hold.why.len == 0 {
+            if let Some(why) = hold.hold.held() {
+                hold.why.set(why.why());
+            }
+        } else if hold.hold.held().is_none() {
+            hold.why.set("");
+        }
+        Ok(hold.why.as_ptr())
+    })
+}
+
+/// Free a hold.
+///
+/// # Safety
+///
+/// `hold` NULL or made by `tcs_hold_new` and not yet freed.
+#[no_mangle]
+pub unsafe extern "C" fn tcs_hold_free(hold: *mut tcs_hold) {
+    if !hold.is_null() {
+        drop(Box::from_raw(hold));
     }
 }
 

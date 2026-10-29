@@ -197,7 +197,14 @@ news, and warnings, which are to be said whether or not anybody
 asked.</li>
 <li><strong>The vehicle’s data.</strong> <code>tcs_moc_open</code> opens
 a <code>moc</code> node, and each <code>tcs_moc_receive</code> returns
-one datum and the name of the node that produced it.</li>
+one datum and the name of the node that produced it. A station’s
+<code>tcs_hold</code>, shared with each <code>moc</code> node by
+<code>tcs_moc_share_hold</code> and handed every pass’s beacon by
+<code>tcs_hold_beacon_heard</code>, marks a datum <code>held</code> from
+the moment the beacons say the vehicle’s configuration changed until
+<code>tcs_hold_purged</code> says the path from the vehicle has been
+purged of what the old one sent: a held datum’s source and format are
+not known.</li>
 <li><strong>Commands.</strong> <code>tcs_client_open</code> opens the
 two command links the configuration states.
 <code>tcs_client_connect</code> says whether the vehicle is flying this

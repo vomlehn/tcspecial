@@ -1225,6 +1225,12 @@ fn serve(
                 continue;
             }
         };
+        // Held: which node sent it, and in what format, is not known, so
+        // no panel is given it and no ping answer is timed by it. The window
+        // says data is held, beside the beacon.
+        if arrival.held {
+            continue;
+        }
         let data = &datum[..arrival.length];
         let Some(source) = sources.get_mut(arrival.source) else {
             continue;
@@ -1486,6 +1492,29 @@ pub fn run(
             tcslib::beacon::STANDARD_INTERVAL
         }
     };
+    // Whether data from the vehicle is held, which the beacons decide and
+    // every receiver asks: one for the window, shared by them all. Path
+    // purged is the one thing that ends it, and it says why where it cannot.
+    let data_hold = tcslib::moc::DataHold::new();
+    {
+        let hold = data_hold.clone();
+        let weak = ui.as_weak();
+        ui.on_path_purged(move || {
+            let Some(ui) = weak.upgrade() else {
+                return;
+            };
+            match hold.purged() {
+                Ok(()) => {
+                    eprintln!("the path is purged: data is attributed again");
+                    crate::beacon_receive::show_hold(&ui, None);
+                }
+                Err(why) => {
+                    eprintln!("{why}");
+                    ui.set_data_held_why(SharedString::from(why));
+                }
+            }
+        });
+    }
     let _beacon_receive = match tcslibgs::graph::parameters::beacon_of(&graph) {
         Ok(Some(beacon)) => {
             eprintln!(
@@ -1496,7 +1525,10 @@ pub fn run(
                 ui.as_weak(),
                 beacon,
                 crate::config::constants::beacon_schedule(interval),
-                contact.clone(),
+                crate::beacon_receive::Decided {
+                    contact: contact.clone(),
+                    hold: data_hold.clone(),
+                },
                 digest,
                 Some(crate::ask_whether_to_continue(
                     pm_tcssim.clone(),
@@ -1585,12 +1617,18 @@ pub fn run(
     let mut receivers = Vec::new();
     for name in mocs {
         match Moc::open(&graph, name) {
-            Ok(moc) => receivers.push(moc),
+            Ok(mut moc) => {
+                moc.share(&data_hold);
+                receivers.push(moc);
+            }
             Err(e) => startup.warning(e),
         }
     }
     match Moc::open_payload_telemetry(&graph) {
-        Ok(Some(moc)) => receivers.push(moc),
+        Ok(Some(mut moc)) => {
+            moc.share(&data_hold);
+            receivers.push(moc);
+        }
         Ok(None) => {}
         Err(e) => startup.warning(e),
     }

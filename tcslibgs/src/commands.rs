@@ -21,7 +21,7 @@ pub struct CommandHeader {
     /// generation it last heard, and a command built before a restart and
     /// sent after one must say the generation it is sent in. The vehicle
     /// refuses a command of any other generation than its own, but for
-    /// those [`CommandType::takes_any_generation`] names: see "The
+    /// those [`CommandType::always_taken`] names: see "The
     /// generation number and the state file" in `docs/design.rst`.
     pub generation: u32,
 }
@@ -131,16 +131,19 @@ impl CommandType {
     }
 
     /// Whether a command of this kind is taken whatever generation it was
-    /// sent for.
+    /// sent for, and however old it is.
     ///
     /// PING and CONNECT, and nothing else: they are how a ground station that
-    /// has heard no beacon finds out what is flying, and neither changes
+    /// has heard no beacon finds out what is flying, and where one whose count
+    /// has gone back learns where to start it again, and neither changes
     /// anything aboard, so neither can do harm by reaching a vehicle that is
-    /// not the one it was meant for. Every other command acts on definitions
-    /// a restart may have changed, and one sent before a restart and
-    /// delivered after it -- the usual case on a link light-seconds long --
-    /// is refused rather than read with definitions it was not written for.
-    pub fn takes_any_generation(&self) -> bool {
+    /// not the one it was meant for or by arriving late. Every other command
+    /// acts on definitions a restart may have changed, and one sent before a
+    /// restart and delivered after it -- the usual case on a link
+    /// light-seconds long -- is refused rather than read with definitions it
+    /// was not written for; and one older than a command already taken is
+    /// not acted on, because the later one is what the ground meant last.
+    pub fn always_taken(&self) -> bool {
         match self {
             CommandType::Ping | CommandType::Connect => true,
 
@@ -554,6 +557,18 @@ impl ConfigCommand {
 }
 /// Union of all command types
 ///
+/// Whether command sequence `a` was sent before `b`.
+///
+/// The sequence is four bytes and counts on past its largest to nought, so
+/// "before" is serial-number arithmetic (RFC 1982): `a` is before `b` when `b`
+/// is less than half the counter's range ahead of it. A count that wraps
+/// would otherwise make every command after it look older than the last one
+/// taken, and be answered `Stale` for ever. The vehicle refuses a command by
+/// this and a ground station starts its count again by it, so both ask here.
+pub fn sequence_is_before(a: u32, b: u32) -> bool {
+    (b.wrapping_sub(a) as i32) > 0
+}
+
 /// As large as a SET_NODE, whose attribute and value are held in place: a
 /// SET_NODE boxed to make the rest smaller would be an allocation for each
 /// one read, which is what holding them in place is for.
@@ -702,6 +717,24 @@ impl Command {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// One sequence is before another by serial-number arithmetic, so a
+    /// count that wraps past its largest is still going forward.
+    #[test]
+    fn a_sequence_is_before_one_that_follows_it_even_across_the_wrap() {
+        assert!(sequence_is_before(1, 2));
+        assert!(!sequence_is_before(2, 1));
+        assert!(
+            !sequence_is_before(5, 5),
+            "the same one is not before itself"
+        );
+        assert!(
+            sequence_is_before(u32::MAX, 0),
+            "nought follows the largest"
+        );
+        assert!(sequence_is_before(u32::MAX - 3, 2));
+        assert!(!sequence_is_before(2, u32::MAX - 3));
+    }
 
     /// An arm lasts twenty minutes unless the configuration says otherwise,
     /// and the manual says the same: an operator deciding whether there is

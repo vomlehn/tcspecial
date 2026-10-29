@@ -3706,9 +3706,22 @@ Restart
   Every command carries the generation the station last heard, from a
   beacon or from the answer to Connect, and the vehicle refuses one sent for
   any other, answering ``WrongGeneration``: a command sent before a restart
-  and arriving after it is not acted on. Connect again after a
-  ``WrongGeneration``; until then the station refuses every command but a
+  and arriving after it is not acted on. Every answer says the generation
+  that made it, so an answer from a vehicle that has restarted since is
+  noticed too. Connect again after a ``WrongGeneration``, or after an answer
+  of another generation; until then the station refuses every command but a
   ping and a Connect, unsent.
+
+  A command older than one the vehicle has already taken -- overtaken on
+  the way by a later one -- is answered ``Stale`` and not acted on: the
+  later command is the one that counts. A station that has been started
+  again may find its commands answered ``Stale`` until it connects, since
+  the answer to Connect tells it where to go on counting from.
+
+  Any command whose answer does not come can be sent again: a second one
+  changes nothing the first did not. The exception is the restart itself,
+  which is never sent again for want of an answer; the beacons say whether
+  it was taken.
 
 The remaining four -- ``Query``, ``Query DH``, ``Start DH`` and ``Stop DH`` --
 answer in ``Last Response`` and send nothing. Starting and stopping a handler

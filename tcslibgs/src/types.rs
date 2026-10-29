@@ -1933,8 +1933,15 @@ pub enum CommandStatus {
     /// one flying: it was sent before a restart and arrived after it, or by
     /// a ground station that has heard neither a beacon nor a CONNECT's
     /// answer since the vehicle last started. Nothing in it was acted on.
-    /// See [`crate::CommandType::takes_any_generation`].
+    /// See [`crate::CommandType::always_taken`].
     WrongGeneration,
+    /// The command is older than one this start of tcspecial has already
+    /// taken -- overtaken on the link, or sent by a ground station whose
+    /// count has gone back -- and nothing in it was acted on. The answer to
+    /// a CONNECT says the newest one taken, which is where a station whose
+    /// count has gone back starts again. See
+    /// [`crate::CommandType::always_taken`].
+    Stale,
 }
 
 impl CommandStatus {

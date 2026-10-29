@@ -50,6 +50,13 @@ fn stub_spacecraft(count: usize) -> (String, thread::JoinHandle<()>) {
             let command = Command::read(&buffer[..size])
                 .expect("the client sent a valid command");
             let seq = command.sequence();
+            // Answered as the generation the command was sent for, as a
+            // vehicle that took it would be; generation 1 for one sent for
+            // none, a PING or a CONNECT before anything was heard.
+            let generation = match command.generation() {
+                0 => 1,
+                sent => sent,
+            };
 
             let answer = match command {
                 Command::Ping(_) => Telemetry::Ping(PingTelemetry::new(
@@ -59,7 +66,7 @@ fn stub_spacecraft(count: usize) -> (String, thread::JoinHandle<()>) {
                 // The stub answers with the ground's own two, which is a
                 // spacecraft reading the same configuration.
                 Command::Connect(cmd) => Telemetry::Connect(
-                    ConnectTelemetry::new(seq, cmd.version, cmd.digest, 1),
+                    ConnectTelemetry::new(seq, cmd.version, cmd.digest, seq),
                 ),
                 Command::RestartArm(_) => Telemetry::RestartArm(
                     RestartArmTelemetry::new(seq, CommandStatus::Success),
@@ -126,7 +133,7 @@ fn stub_spacecraft(count: usize) -> (String, thread::JoinHandle<()>) {
                 }
             };
 
-            let data = answer.to_bytes();
+            let data = answer.for_generation(generation).to_bytes();
             socket.send_to(&data, from).expect("answer");
         }
     });

@@ -338,6 +338,7 @@ fn status_of(status: CommandStatus) -> StatusType {
         CommandStatus::AlreadyExists => StatusType::ALREADY_EXISTS,
         CommandStatus::Timeout => StatusType::TIMEOUT,
         CommandStatus::WrongGeneration => StatusType::WRONG_GENERATION,
+        CommandStatus::Stale => StatusType::STALE,
     }
 }
 
@@ -353,6 +354,7 @@ fn status_from(status: StatusType) -> Result<CommandStatus, LinkError> {
         StatusType::ALREADY_EXISTS => CommandStatus::AlreadyExists,
         StatusType::TIMEOUT => CommandStatus::Timeout,
         StatusType::WRONG_GENERATION => CommandStatus::WrongGeneration,
+        StatusType::STALE => CommandStatus::Stale,
         _ => return Err(LinkError::Value("a status no build has")),
     })
 }
@@ -401,6 +403,7 @@ impl Telemetry {
             ($p:expr, $kind:expr) => {
                 TelemetryHeader {
                     sequence: $p.sequence,
+                    generation: $p.generation,
                     tm_type: $kind,
                     status: status_from($p.status)?,
                     timestamp: Timestamp {
@@ -429,7 +432,7 @@ impl Telemetry {
                     patch: p.patch,
                 },
                 digest: digest_of(&p.digest),
-                generation: p.generation,
+                newest_taken: p.newest_taken,
             }),
             K::ConfigAnswer(p) => Telemetry::Config(ConfigTelemetry {
                 header: head!(p, TelemetryType::Config),
@@ -502,6 +505,7 @@ impl Telemetry {
                 packet::$ty {
                     seq_count: seq_count($h.sequence),
                     sequence: $h.sequence,
+                    generation: $h.generation,
                     status: status_of($h.status),
                     timestamp: $h.timestamp.micros,
                     $($field: $value,)*
@@ -523,7 +527,7 @@ impl Telemetry {
                     minor: t.version.minor,
                     patch: t.version.patch,
                     digest: fixed(&t.digest.0),
-                    generation: t.generation,
+                    newest_taken: t.newest_taken,
             )),
             Telemetry::Config(t) => {
                 K::ConfigAnswer(fill!(ConfigAnswer, t.header;))
@@ -685,6 +689,7 @@ mod tests {
                 CommandStatus::NotArmed,
             )),
             Telemetry::Config(ConfigTelemetry::new(5, CommandStatus::Timeout)),
+            Telemetry::Config(ConfigTelemetry::new(12, CommandStatus::Stale)),
             Telemetry::StartNode(NodeTelemetry::started(
                 6,
                 CommandStatus::Success,
@@ -739,7 +744,9 @@ mod tests {
 
     #[test]
     fn every_answer_reads_back_as_itself() {
-        for answer in every_answer() {
+        // Each of a generation of its own, as the commands are.
+        for (generation, answer) in (7..).zip(every_answer()) {
+            let answer = answer.for_generation(generation);
             let packed = answer.to_bytes();
             assert!(packed.len() <= ANSWER_BYTES);
             assert_eq!(Telemetry::read(&packed), Ok(answer.clone()));
@@ -772,19 +779,21 @@ mod tests {
     }
 
     /// An answer is a CCSDS telemetry packet of the same APID, its kind,
-    /// sequence, status and time after the header.
+    /// sequence, generation, status and time after the header.
     #[test]
     fn an_answer_is_a_ccsds_packet() {
         let mut ping = PingTelemetry::new(7, CommandStatus::NotArmed);
         ping.header.timestamp = Timestamp { micros: 0x0102 };
-        let packed = Telemetry::Ping(ping).to_bytes();
+        let packed =
+            Telemetry::Ping(ping).for_generation(0x0a0b_0c0d).to_bytes();
         // Version 0, type 0, no secondary header, APID 0x100; unsegmented,
-        // count 7; 20 bytes in all. Then the answer to a PING, the
-        // sequence, NotArmed and the time.
+        // count 7; 24 bytes in all. Then the answer to a PING, the
+        // sequence, the generation that made it, NotArmed and the time.
         let want = vec![
-            0x01, 0x00, 0xc0, 0x07, 0x00, 0x0d, //
+            0x01, 0x00, 0xc0, 0x07, 0x00, 0x11, //
             0x81, //
             0x00, 0x00, 0x00, 0x07, //
+            0x0a, 0x0b, 0x0c, 0x0d, //
             0x04, //
             0, 0, 0, 0, 0, 0, 0x01, 0x02,
         ];

@@ -3038,8 +3038,11 @@ A RESTART runs tcspecial again, in the process it is already running in.
 
 Requirement
     A RESTART_ARM is taken, with its key, and answered ``Success``. A second
-    arm replaces the first, so the arm that counts is the one the operator
-    gave last.
+    arm with another key replaces the first, so the arm that counts is the
+    one the operator gave last. One with the key of the arm already
+    standing is a repeat and leaves that arm as it was, its time included: a
+    repeat that started the arm's time again would leave the vehicle open to
+    a RESTART for longer than anybody asked.
 
 Requirement
     A RESTART is taken only with the key of an arm taken within
@@ -5290,9 +5293,39 @@ Commands cause generation of one or more telemetry responses. Every response
 contains a success failure and may contain additional parameter values
 
 Every response carries a header before whatever else it says: the sequence
-number of the command it answers, which type of response it is, the status,
-and the time the spacecraft made it. The tables below list what each type
-adds to that.
+number of the command it answers, the generation of tcspecial that made it,
+which type of response it is, the status, and the time the spacecraft made
+it. The tables below list what each type adds to that.
+
+Requirement
+    Every valid packet from the MOC that is a command is answered exactly
+    once, whether it is done, refused or not acted on, and the answer says
+    which. A packet that is not valid -- damaged, of another layout, or from
+    an address the configuration does not say the MOC sends from -- is not
+    answered, and is logged.
+
+Requirement
+    **Every command is safe to send again.** The ground decides that a
+    command or its answer was lost -- by a timeout of its own, which is not
+    tcspecial's to know -- and sends the command again, and nothing aboard
+    keeps a record of the answers it gave to make a repeat safe. So every
+    command is written so that a repeat changes nothing a first one did not:
+    it asks for a state, not an action, and a repeat answers with the state
+    reached rather than with a failure. RESTART and SWITCH are the two
+    exceptions, and are never sent again on a timeout: the beacon, not an
+    answer, says whether one was taken. See `What the ground may send
+    meanwhile`_.
+
+What that means for each command: PING, CONNECT and the two queries change
+nothing. CONFIG sets an interval rather than changing one. START_NODE and
+STOP_NODE answer ``Success`` for a node already in the state asked for, and
+every attribute SET_NODE may set is a value, not a step. RESTART_ARM with the
+key of the arm already standing leaves that arm as it was -- see
+`Restarting`_ -- and the upload commands answer a repeat ``Success`` once
+what was asked for is done: see `Uploading, and keeping what was uploaded`_.
+A repeated RESTART is refused, ``NotArmed`` because the first used the arm up
+or ``WrongGeneration`` because it has already restarted the vehicle; neither
+changes anything, and neither is how the ground learns what happened.
 
 Requirement
     A timestamp is microseconds since the UNIX epoch: one number and one
@@ -5649,8 +5682,8 @@ Requirement
     four-byte generation it was sent for, what the command carries. An
     answer is the same header with packet
     type 0, then a byte saying which answer it is, the sequence of the
-    command it answers, a byte of status, the eight-byte timestamp, what the
-    answer carries. Every number is most significant byte first.
+    command it answers, the four-byte generation that made it, a byte of
+    status, the eight-byte timestamp, what the answer carries. Every number is most significant byte first.
     A datagram that holds anything after its packet, or whose header's
     constants are not these, is refused: an answer's kind is a node
     command's opcode, and it is the packet type that keeps one from being
@@ -5811,14 +5844,17 @@ Requirement
     size and MD5 the whole file will have; FILE_WRITE, carrying an offset and
     up to one packet of bytes; and FILE_CLOSE, which is answered ``Success``
     only when the bytes written are the size and the MD5 FILE_OPEN stated.
-    Each is idempotent: a FILE_WRITE repeated writes the same bytes to the
-    same place, and FILE_OPEN of a file already complete and correct answers
-    ``AlreadyExists``.
+    Each is safe to send again: a FILE_WRITE repeated writes the same bytes
+    to the same place, a FILE_OPEN of a file already complete and correct
+    answers ``Success`` and changes nothing, and so does a FILE_CLOSE of one
+    already accepted.
 
 Requirement
     LOAD_CHECK checks a staged load set as ``tcsverify`` does and, when it
     passes, moves it from staging to its own directory under ``loads``, in one
-    rename.
+    rename. A LOAD_CHECK of a load set already in its own directory, and
+    passing its check there, answers ``Success``: it is a repeat of one whose
+    answer was lost.
 
 Requirement
     Every file uploaded is made read-only as FILE_CLOSE accepts it -- mode
@@ -5840,7 +5876,9 @@ Requirement
     LOAD_UNLOCK makes a load set's directory and files writable again, so
     that it can be replaced or removed, and LOAD_REMOVE removes one. Both
     refuse the running load set and the one the vehicle would fall back to,
-    answering ``InvalidParameter`` and saying which it is.
+    answering ``InvalidParameter`` and saying which it is. A LOAD_UNLOCK of
+    one already writable, and a LOAD_REMOVE of one that is not there,
+    answer ``Success``: what was asked for is so.
 
 Restarting onto a load set
 --------------------------
@@ -5993,24 +6031,51 @@ Requirement
     being read with definitions it was not written for. PING and CONNECT are
     taken whatever generation they carry, so a ground station that has not
     yet heard a beacon can still find out what is flying; which commands
-    those are is ``tcslibgs::CommandType::takes_any_generation``, and
+    those are is ``tcslibgs::CommandType::always_taken``, and
     nowhere else.
 
 Requirement
-    The answer to a CONNECT carries the generation flying, as the beacon
-    does, so that a ground station that does not watch the beacons -- a
-    program that only commands -- learns it too.
+    Every answer carries the generation of tcspecial that made it, refusals
+    among them, as the beacon does, so that a ground station that does not
+    watch the beacons -- a program that only commands -- learns it too, and
+    hears of a restart from whichever answer reaches it first.
+
+Requirement
+    A command older than one this start of tcspecial has already taken, on
+    either link, is answered ``Stale`` and nothing in it is acted on. The
+    link does not keep order -- it is never relied on to -- so a command can
+    arrive after one sent later, and the later one is what the ground meant
+    last. Older is by serial-number arithmetic on the four-byte sequence
+    (RFC 1982), ``tcslibgs::sequence_is_before``, so that a count that wraps
+    still goes forward. A command of the same sequence as the newest taken
+    is a repeat, not an older command, and is taken. PING and CONNECT are
+    answered however old they are, by the same
+    ``tcslibgs::CommandType::always_taken``. The newest taken is not kept
+    across a restart, and need not be: a command sent before a restart is of
+    the generation before, and refused for that.
+
+Requirement
+    The answer to a CONNECT carries the newest command sequence this start
+    has taken, or the CONNECT's own where it has taken none. A ground station
+    whose count has gone back -- started again, or a second station -- would
+    otherwise have every command answered ``Stale``, and this is where it
+    starts its count again.
 
 Requirement
     ``tcslib``'s ``TcsClient``, and through it the C/C++ library, sends every
     command for the generation the last beacon it was handed or the last
     CONNECT's answer said. Until one has, it refuses every command but PING
-    and CONNECT, unsent, saying to CONNECT first. A command answered with
-    ``WrongGeneration`` makes it forget the generation, so that it refuses
-    again until it is told: the vehicle has started since, and what it is
-    flying should be asked again before anything else is sent. A generation
-    of nought, which no start is, is what a command says where the sender
-    knows none.
+    and CONNECT, unsent, saying to CONNECT first. An answer of
+    ``WrongGeneration``, or an answer made by another generation than the
+    one it is sending for, makes it forget the generation, so that it
+    refuses again until it is told: the vehicle has started since, and what
+    it is flying should be asked again before anything else is sent. It does
+    not take the generation from the answer and carry on, which would be
+    carrying on as though nothing had happened. After a CONNECT its count
+    goes on from past the newest command the vehicle says it has taken,
+    forward only. A generation of nought, which no start is, is what a
+    command says where the sender knows none, and an answer that carries
+    nought is read as saying nothing of it.
 
 Holes in this, and what closes them
 -----------------------------------

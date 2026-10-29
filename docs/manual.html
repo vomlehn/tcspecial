@@ -3816,16 +3816,28 @@ restart that sees the beacons start again without the flag says so: the
 restart it sent did not happen, and the vehicle restarted for a reason of
 its own, which is worth finding out before the restart is sent again.</p>
 <p>Once a station has sent a restart it sends nothing more to the vehicle
-until a beacon arrives whose number has gone back: the vehicle that comes
-back may read packets differently from the one that went, and the beacon
--- not the answer to the restart, which may never arrive -- is what says
-it is back. A command tried in between is refused by the station, unsent.
-When the wait ends, <tt class="docutils literal">Last Response</tt> says which it was -- <tt class="docutils literal">tcspecial
-has started again as commanded: Connect before anything else</tt>, or
-<tt class="docutils literal">tcspecial started again without being commanded to, so the restart
-initiated here did not happen: Connect before anything else</tt> -- and the
-station refuses everything but a ping and a <tt class="docutils literal">Connect</tt> until it has
-connected.</p>
+but <tt class="docutils literal">Connect</tt>, <tt class="docutils literal">Arm restart</tt> and <tt class="docutils literal">Initiate restart</tt> until a beacon
+arrives whose number has gone back: the vehicle that comes back may read
+packets differently from the one that went, and the beacon -- not the
+answer to the restart, which may never arrive -- is what says it is back.
+Any other command tried in between, a ping among them, is refused by the
+station, unsent. The three that go do not end the wait. <tt class="docutils literal">Connect</tt> asks
+what is flying and changes nothing the restart depends on; <tt class="docutils literal">Arm
+restart</tt> and <tt class="docutils literal">Initiate restart</tt> are how a restart that may never have
+arrived is sent again. A restart answered as refused ends the wait it
+began, since nothing was started; one sent again during the wait does
+not end it, refused or not, since the first may have been taken.</p>
+<p>Any beacon whose number has gone back, waited for or not, takes the
+command link down: the status beside the address reads <tt class="docutils literal">Disconnected</tt>,
+what the last <tt class="docutils literal">Connect</tt> agreed is forgotten, and the next thing to press
+is <tt class="docutils literal">Connect</tt>. When the beacon also ends the wait, <tt class="docutils literal">Last Response</tt> says
+which start came back -- <tt class="docutils literal">tcspecial has started again as commanded:
+press Connect</tt>, or <tt class="docutils literal">tcspecial started again without being commanded
+to, so the restart initiated here did not happen: press Connect</tt>. A
+<tt class="docutils literal">Connect</tt> answered during the wait by the start that came back clears
+that start's flag, so its beacons can no longer say whether it was the
+start commanded; then <tt class="docutils literal">Last Response</tt> says that this cannot be told,
+and to find out before initiating another restart.</p>
 <p>A command carries its sequence number and no generation. Every answer
 says the generation that made it, and the station learns which
 generation is flying from the answer to <tt class="docutils literal">Connect</tt>, since the beacons do
@@ -3840,9 +3852,13 @@ the later command is the one that counts. A station that has been started
 again may find its commands answered <tt class="docutils literal">Stale</tt> until it connects, since
 the answer to Connect tells it where to go on counting from.</p>
 <p class="last">Any command whose answer does not come can be sent again: a second one
-changes nothing the first did not. The exception is the restart itself,
-which is never sent again for want of an answer; the beacons say whether
-it was taken.</p>
+changes nothing the first did not. The exception is the restart itself:
+look at the beacons before sending it again for want of an answer, since
+they say whether it was taken, and a restart that reaches the tcspecial
+that came back restarts it again. The station sends one only while it
+knows which generation is flying, so a restart sent again after an answer
+from the new start, or after a beacon whose number went back, is refused
+until a <tt class="docutils literal">Connect</tt>.</p>
 </dd>
 </dl>
 <p>The remaining four -- <tt class="docutils literal">Query</tt>, <tt class="docutils literal">Query DH</tt>, <tt class="docutils literal">Start DH</tt> and <tt class="docutils literal">Stop DH</tt> --

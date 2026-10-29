@@ -212,7 +212,8 @@ until one is answered, and again after a beacon whose number went back
 or an answer from another generation, it refuses every command but ping
 and connect, unsent. <code>tcs_client_beacon_heard</code> tells it of
 each pass’s beacon; after a restart is sent it is what ends the wait for
-the vehicle to come back.</li>
+the vehicle to come back, during which nothing but connect, arm and
+restart goes.</li>
 <li><strong>Pinging a ping node.</strong> <code>tcs_pinger_open</code>
 finds the first <code>ping</code> node the ground can reach both ways
 and its <code>moc</code> node. <code>tcs_pinger_ping</code> sends a ping

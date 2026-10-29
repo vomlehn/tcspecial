@@ -3729,16 +3729,29 @@ Initiate restart
   its own, which is worth finding out before the restart is sent again.
 
   Once a station has sent a restart it sends nothing more to the vehicle
-  until a beacon arrives whose number has gone back: the vehicle that comes
-  back may read packets differently from the one that went, and the beacon
-  -- not the answer to the restart, which may never arrive -- is what says
-  it is back. A command tried in between is refused by the station, unsent.
-  When the wait ends, ``Last Response`` says which it was -- ``tcspecial
-  has started again as commanded: Connect before anything else``, or
-  ``tcspecial started again without being commanded to, so the restart
-  initiated here did not happen: Connect before anything else`` -- and the
-  station refuses everything but a ping and a ``Connect`` until it has
-  connected.
+  but ``Connect``, ``Arm restart`` and ``Initiate restart`` until a beacon
+  arrives whose number has gone back: the vehicle that comes back may read
+  packets differently from the one that went, and the beacon -- not the
+  answer to the restart, which may never arrive -- is what says it is back.
+  Any other command tried in between, a ping among them, is refused by the
+  station, unsent. The three that go do not end the wait. ``Connect`` asks
+  what is flying and changes nothing the restart depends on; ``Arm
+  restart`` and ``Initiate restart`` are how a restart that may never have
+  arrived is sent again. A restart answered as refused ends the wait it
+  began, since nothing was started; one sent again during the wait does
+  not end it, refused or not, since the first may have been taken.
+
+  Any beacon whose number has gone back, waited for or not, takes the
+  command link down: the status beside the address reads ``Disconnected``,
+  what the last ``Connect`` agreed is forgotten, and the next thing to press
+  is ``Connect``. When the beacon also ends the wait, ``Last Response`` says
+  which start came back -- ``tcspecial has started again as commanded:
+  press Connect``, or ``tcspecial started again without being commanded
+  to, so the restart initiated here did not happen: press Connect``. A
+  ``Connect`` answered during the wait by the start that came back clears
+  that start's flag, so its beacons can no longer say whether it was the
+  start commanded; then ``Last Response`` says that this cannot be told,
+  and to find out before initiating another restart.
 
   A command carries its sequence number and no generation. Every answer
   says the generation that made it, and the station learns which
@@ -3756,9 +3769,13 @@ Initiate restart
   the answer to Connect tells it where to go on counting from.
 
   Any command whose answer does not come can be sent again: a second one
-  changes nothing the first did not. The exception is the restart itself,
-  which is never sent again for want of an answer; the beacons say whether
-  it was taken.
+  changes nothing the first did not. The exception is the restart itself:
+  look at the beacons before sending it again for want of an answer, since
+  they say whether it was taken, and a restart that reaches the tcspecial
+  that came back restarts it again. The station sends one only while it
+  knows which generation is flying, so a restart sent again after an answer
+  from the new start, or after a beacon whose number went back, is refused
+  until a ``Connect``.
 
 The remaining four -- ``Query``, ``Query DH``, ``Start DH`` and ``Stop DH`` --
 answer in ``Last Response`` and send nothing. Starting and stopping a handler

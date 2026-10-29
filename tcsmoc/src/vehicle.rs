@@ -1329,46 +1329,103 @@ fn no_command_link(ui: &MainWindow) {
     });
 }
 
-/// Hand a beacon to the window's commands, and say so in Last Response
-/// where it ends the wait an Initiate restart began: whether the start that
-/// came back was the one it commanded.
+/// Hand a beacon to the window's commands, and show the link down where its
+/// number says tcspecial has started again: see [`take_down_at_a_start`].
 ///
 /// # Arguments
 ///
 /// * `weak`      - The window.
 /// * `link`      - The command link, whose client is handed the beacon.
+/// * `agreed`    - What the last Connect agreed, forgotten with the link.
 /// * `restarted` - Whether the beacon's number says tcspecial started again.
 /// * `commanded` - Whether it says a commanded restart is under way.
 fn beacon_to_commands(
     weak: &slint::Weak<MainWindow>,
     link: &Arc<Mutex<CiLink>>,
+    agreed: &Agreed,
     restarted: bool,
     commanded: bool,
 ) {
-    let ended = link
-        .lock()
-        .ok()
-        .and_then(|mut link| {
-            link.client()
-                .map(|client| client.beacon_heard(restarted, commanded))
-        })
-        .flatten();
-    let Some(ended) = ended else {
+    let Some((address, said)) =
+        take_down_at_a_start(link, agreed, restarted, commanded)
+    else {
         return;
     };
-    let said = if ended.commanded {
-        "tcspecial has started again as commanded: Connect before anything \
-         else"
-    } else {
-        "tcspecial started again without being commanded to, so the restart \
-         initiated here did not happen: Connect before anything else"
-    };
+    eprintln!("Disconnected from {address}: {said}");
     let weak = weak.clone();
+    let link = link.clone();
     let _ = slint::invoke_from_event_loop(move || {
-        if let Some(ui) = weak.upgrade() {
+        // Unless Connect was pressed in between, which brought a link up to
+        // the start that came back, and said so itself.
+        let down = link
+            .lock()
+            .map_or(true, |link| link.command_times().is_none());
+        if let (Some(ui), true) = (weak.upgrade(), down) {
+            ui.set_ci_status(SharedString::from(DISCONNECTED_STATUS));
             ui.set_last_response(SharedString::from(said));
         }
     });
+}
+
+/// Hand a beacon to the link's client, and take the link down where its
+/// number says tcspecial has started again.
+///
+/// The start that came back knows nothing of this window, and may be flying
+/// other definitions, so what was agreed was agreed with a start that has
+/// gone: the window shows Disconnected, and the next thing to press is
+/// Connect, as it is for the client, which sends nothing but a PING or a
+/// CONNECT until one is answered. Where the beacon also ends the wait an
+/// Initiate restart began, what is said is whether the start that came back
+/// was the one it commanded.
+///
+/// # Arguments
+///
+/// * `link`      - The command link, whose client is handed the beacon.
+/// * `agreed`    - What the last Connect agreed, forgotten with the link.
+/// * `restarted` - Whether the beacon's number says tcspecial started again.
+/// * `commanded` - Whether it says a commanded restart is under way.
+///
+/// # Returns
+///
+/// Where the link was, and what Last Response is to say, where this took it
+/// down; `None` where the same start goes on or the link was already down.
+fn take_down_at_a_start(
+    link: &Arc<Mutex<CiLink>>,
+    agreed: &Agreed,
+    restarted: bool,
+    commanded: bool,
+) -> Option<(String, &'static str)> {
+    let (ended, address) = {
+        let mut guard = link.lock().ok()?;
+        // A link that is down has nothing to take down, and no wait.
+        let ended = guard.client()?.beacon_heard(restarted, commanded);
+        if !restarted {
+            return None;
+        }
+        let address = guard.address().to_string();
+        guard.disconnect();
+        (ended, address)
+    };
+    if let Ok(mut held) = agreed.lock() {
+        *held = None;
+    }
+    let said = match ended.map(|ended| ended.commanded) {
+        Some(Some(true)) => {
+            "tcspecial has started again as commanded: press Connect"
+        }
+        Some(Some(false)) => {
+            "tcspecial started again without being commanded to, so the \
+             restart initiated here did not happen: press Connect"
+        }
+        Some(None) => {
+            "tcspecial has started again, and a Connect sent while it was \
+             awaited cleared its restart flag, so whether this is the \
+             restart initiated here cannot be told: press Connect, and find \
+             out before initiating another"
+        }
+        None => "tcspecial has started again: press Connect",
+    };
+    Some((address, said))
 }
 
 /// The key a window arms a restart with: made from the time and the process
@@ -1832,9 +1889,10 @@ pub fn run(
                     contact: contact.clone(),
                     heard: link.clone().map(|link| {
                         let weak = ui.as_weak();
+                        let agreed = agreed.clone();
                         Arc::new(move |restarted, commanded| {
                             beacon_to_commands(
-                                &weak, &link, restarted, commanded,
+                                &weak, &link, &agreed, restarted, commanded,
                             )
                         })
                             as crate::beacon_receive::OnBeacon
@@ -2352,6 +2410,44 @@ payloads:
 
         *agreed.lock().unwrap() = Some(true);
         assert!(may_command_nodes(&agreed));
+    }
+
+    /// A beacon whose number says tcspecial started again takes the link
+    /// down and forgets what was agreed, because the start that came back
+    /// knows nothing of this window; one of the same start leaves both.
+    #[test]
+    fn a_new_start_takes_the_link_down() {
+        let link = Arc::new(Mutex::new(CiLink::down_commanding(
+            "127.0.0.1:0",
+            Commanded {
+                from: tcslibgs::HostPort {
+                    address: "127.0.0.1".to_string(),
+                    port: 0,
+                },
+                to: tcslibgs::HostPort {
+                    address: "127.0.0.1".to_string(),
+                    port: 1,
+                },
+            },
+        )));
+        let agreed: Agreed = Arc::new(Mutex::new(Some(true)));
+        link.lock().unwrap().connect("127.0.0.1:1").expect("up");
+
+        assert_eq!(take_down_at_a_start(&link, &agreed, false, true), None);
+        assert!(link.lock().unwrap().client().is_some(), "still up");
+        assert!(may_command_nodes(&agreed));
+
+        let (address, said) = take_down_at_a_start(&link, &agreed, true, false)
+            .expect("taken down");
+        assert_eq!(address, "127.0.0.1:1");
+        assert!(said.contains("press Connect"), "{said}");
+        assert!(link.lock().unwrap().client().is_none(), "down");
+        assert!(!may_command_nodes(&agreed), "nothing agreed");
+        assert_eq!(
+            take_down_at_a_start(&link, &agreed, true, false),
+            None,
+            "a link already down has nothing to take down"
+        );
     }
     /// Send ping, pressed, pings the ping node through its moc node, and the
     /// node's answer, taken as the receiver takes it, is timed in the window.

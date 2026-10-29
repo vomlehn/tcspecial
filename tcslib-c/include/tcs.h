@@ -283,7 +283,8 @@ tcs_client *tcs_client_open(const tcs_configuration *configuration);
  * says tcspecial has started again or an answer comes from another
  * generation, every command but PING and CONNECT fails, unsent, because what
  * the vehicle flies may have changed. A command carries no generation, only
- * its sequence.
+ * its sequence. A Connect goes during a wait begun by a RESTART, without
+ * ending it.
  *
  * @param client  The client.
  * @param agrees  Where 1 is written when the vehicle is flying this
@@ -340,14 +341,16 @@ int tcs_client_restart_arm(tcs_client *client, uint64_t key,
  * from then, the process restarts, and its beacons start again at #1, the
  * bit still set until a Connect.
  *
- * Never send it again for want of an answer: the beacons say whether it was
- * taken. From the moment it is sent, every command on this client is
- * refused, unsent, until a beacon whose number starts again says tcspecial
- * has started again, and then all but PING and CONNECT until a Connect:
- * the beacon is the acknowledgement, and the answer to the RESTART may never
- * arrive. Hand the client each pass's beacon
- * with tcs_client_beacon_heard. A RESTART answered as refused ends the wait
- * at once.
+ * Look at the beacons before sending it again for want of an answer: they
+ * say whether it was taken, and a RESTART that reaches the start that came
+ * back restarts it again. From the moment it is sent, every command on this
+ * client but CONNECT, RESTART_ARM and RESTART is refused, unsent, until a
+ * beacon whose number starts again says tcspecial has started again, and
+ * then all but PING and CONNECT until a Connect: the beacon is the
+ * acknowledgement, and the answer to the RESTART may never arrive. Hand the
+ * client each pass's beacon with tcs_client_beacon_heard. A RESTART
+ * answered as refused ends the wait it began at once; one sent again during
+ * the wait does not end it either way.
  *
  * @param client  The client.
  * @param key     The key the last RESTART_ARM armed the restart with.
@@ -365,8 +368,10 @@ int tcs_client_restart(tcs_client *client, uint64_t key,
  *                 commanded; 2 when it ended it with a start nobody
  *                 commanded -- the vehicle restarted for some other reason
  *                 before the RESTART was taken, and runs with the
- *                 definitions it had; 0 when it did not end one; -1 on an
- *                 error. */
+ *                 definitions it had; 3 when it ended it with a start the
+ *                 beacon cannot say of, because a Connect during the wait
+ *                 reached that start and cleared its flag; 0 when it did
+ *                 not end one; -1 on an error. */
 int tcs_client_beacon_heard(tcs_client *client, const tcs_beacons *beacons);
 
 /** Says whether the client is waiting for a beacon to say a RESTART is

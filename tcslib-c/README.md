@@ -41,7 +41,7 @@ linkage throughout, and nothing in it that C++ will not compile.
   or an answer from another generation, it refuses every command but ping
   and connect, unsent. `tcs_client_beacon_heard` tells it of each pass's
   beacon; after a restart is sent it is what ends the wait for the vehicle
-  to come back.
+  to come back, during which nothing but connect, arm and restart goes.
 - **Pinging a ping node.** `tcs_pinger_open` finds the first `ping` node the
   ground can reach both ways and its `moc` node. `tcs_pinger_ping` sends a
   ping up; its answer comes down as the ping node's data, which a station

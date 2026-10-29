@@ -6034,9 +6034,12 @@ Requirement
     command is written so that a repeat changes nothing a first one did not:
     it asks for a state, not an action, and a repeat answers with the state
     reached rather than with a failure. RESTART and SWITCH are the two
-    exceptions, and are never sent again on a timeout: the beacon, not an
-    answer, says whether one was taken. See `What the ground may send
-    meanwhile`_.
+    exceptions, and are not sent again on a timeout alone: the beacon, not
+    an answer, says whether one was taken, and one that reaches the start
+    that came back starts it again. An operator who has looked at the
+    beacons may send a RESTART again during the wait; the ground's client
+    sends it only while it knows the generation, so not to a start it has
+    heard from since. See `What the ground may send meanwhile`_.
 
 What that means for each command: PING and the two queries change nothing.
 CONNECT changes only the beacons -- it clears the commanded-restart flag and
@@ -6191,12 +6194,25 @@ that beacon, the ground cannot know which definitions a packet it sends would
 be read with, so it sends none.
 
 Requirement
-    Once the MOC has sent a SWITCH -- or a RESTART -- it sends no command at
-    all until it has a beacon whose number is lower than the one before
-    it: a beacon saying that tcspecial has started again, and is using the
-    definitions it has started with. Then it sends nothing but PING and
-    CONNECT until a CONNECT is answered. ``tcslib``'s ``TcsClient`` holds to
-    this itself, refusing any command in between, unsent.
+    Once the MOC has sent a SWITCH -- or a RESTART -- it sends no command
+    but CONNECT, RESTART_ARM and RESTART until it has a beacon whose number
+    is lower than the one before it: a beacon saying that tcspecial has
+    started again, and is using the definitions it has started with. Then
+    it sends nothing but PING and CONNECT until a CONNECT is answered.
+    ``tcslib``'s ``TcsClient`` holds to this itself, refusing any other
+    command in between, unsent, and ``RestartWait::lets`` is where the three
+    are named. CONNECT changes nothing the restart depends on, and is how an
+    operator asks what is flying; RESTART_ARM and RESTART are how a RESTART
+    that may never have arrived is sent again. A RESTART still goes only
+    while the generation is known, so one that would reach the start that
+    came back, after an answer from it, is refused until a CONNECT.
+
+Requirement
+    A beacon whose number has gone back, waited for or not, ends the
+    station's connection: tcsmoc takes its command link down, shows it
+    Disconnected and forgets what the last CONNECT agreed, because the
+    start that came back may be flying other definitions and knows nothing
+    of the station.
 
 Requirement
     The wait says how it ended. Beacons that start again with the
@@ -6205,14 +6221,19 @@ Requirement
     clear is a start nobody commanded -- the vehicle crashed or lost power
     before the command was taken -- running with the definitions it had: the
     command did not happen, and the station says so rather than going on as
-    though it had.
+    though it had. Where a CONNECT sent during the wait was answered by a
+    generation other than the one the RESTART went to, that start has
+    cleared its flag, and a clear flag says nothing: the station says it
+    cannot tell, and finds out before sending the RESTART again.
 
 Requirement
     The wait does not depend on the answer: one that never arrives leaves it
     standing until the beacon comes. An answer that does arrive and says
     the command was refused ends it, because then nothing was initiated and
-    the definitions have not changed. An operator can end it by hand, which
-    the station records; nothing else ends it.
+    the definitions have not changed -- the answer to the command that
+    began the wait, not to one sent again during it, since the first may
+    have been taken. An operator can end it by hand, which the station
+    records; nothing else ends it, a CONNECT answered during it included.
 
 Requirement
     A command carries its sequence and no generation: a generation is a
@@ -6221,11 +6242,12 @@ Requirement
     read with definitions it was not written for is the order of the link
     and the ground's client. The link delivers in order -- see `What is
     assumed`_ -- so a command sent before a RESTART arrives before it, and
-    the client sends nothing after a RESTART until a beacon says a start
-    came back, and then nothing but PING and CONNECT until a CONNECT is
-    answered; nor anything but those after an answer of another generation,
-    or a beacon whose number went back, until a CONNECT is answered.
-    PING and CONNECT go regardless, so a ground station that has not yet
+    the client sends nothing after a RESTART but CONNECT, RESTART_ARM and
+    RESTART until a beacon says a start came back, and then nothing but
+    PING and CONNECT until a CONNECT is answered; nor anything but those
+    after an answer of another generation, or a beacon whose number went
+    back, until a CONNECT is answered. PING and CONNECT go whatever the
+    generation, so a ground station that has not yet
     heard a beacon can still find out what is flying; which commands those
     are is ``tcslibgs::CommandType::always_taken``, and nowhere else.
 
@@ -6391,9 +6413,11 @@ A restart whose first beacons are all lost
     the next beacon of the old. The new start begins at ``reset_interval``,
     so the window is short. A station that is not waiting on a restart
     hears of one nobody commanded from the generation in the next answer
-    it gets. A station waiting on a commanded restart sends nothing, and
-    its wait does not end without a beacon whose number went back, so the
-    restart is not taken for done: the wait goes on. The flag cannot end it,
+    it gets. A station waiting on a commanded restart sends nothing but
+    CONNECT, RESTART_ARM and RESTART, and its wait does not end without a
+    beacon whose number went back, so the restart is not taken for done:
+    the wait goes on. A CONNECT then answered by another generation says a
+    start came back, but does not end the wait either. The flag cannot end it,
     because the old start's last beacons carried it too. What ends it is
     ``TcsClient::end_restart_wait``, by hand, which tcsmoc does not yet
     offer: until it does, an operator in that state starts tcsmoc again.

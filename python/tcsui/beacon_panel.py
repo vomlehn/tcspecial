@@ -176,9 +176,15 @@ class BeaconPanel(ttk.LabelFrame):
         self._message.configure(text=shown.message)
 
     def showing(self):
-        """What the panel shows now, for a test to read back."""
+        """What the panel shows now, for a test to read back.
+
+        The stage is empty: this panel shows none, as ``beacon.slint`` shows
+        none when its ``stage`` is empty -- tcsmoc's panel, which this one is
+        the Python twin of, does not set it.
+        """
         return Shown(
             indicator=self._indicator.itemcget(self._oval, "fill"),
             received=self._received.cget("text"),
             message=self._message.cget("text"),
+            stage="",
         )

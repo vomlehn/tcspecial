@@ -17,7 +17,8 @@
 //! there before it reaches this.
 //!
 //! It replaced JSON, which no ground system reads from a mission database,
-//! and which named every field in every packet. See "Every packet is XTCE" in `docs/design.rst`.
+//! and which named every field in every packet. See "Every packet is XTCE"
+//! in `docs/design.rst`.
 
 use std::fmt;
 

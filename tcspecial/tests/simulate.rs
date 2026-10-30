@@ -131,7 +131,8 @@ fn a_stand_in_is_where_a_simulated_channel_is_reached() {
   gateway: radio
   beacon: {{ default_interval: \"5 s\", reset_interval: \"1 s\", \
   recv: \"127.0.0.1:1\", send: \"127.0.0.1:2\" }}
-  payload_command: {{ dest_base: \"127.0.0.1:3\", source_base: \"127.0.0.1:4\" }}
+  payload_command: {{ dest_base: \"127.0.0.1:3\", \
+  source_base: \"127.0.0.1:4\" }}
   payload_telemetry: {{ dest_base: \"127.0.0.1:5\", \
   source_base: \"127.0.0.1:6\" }}
   state_file: \"{state}\"

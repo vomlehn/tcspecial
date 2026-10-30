@@ -1,12 +1,12 @@
 //! The beacon, as it goes on the link.
 //!
-//! What tcspecial sends every `beacon.default_interval`, whether or not anything has
-//! connected to it: the build it is, the digest of the configuration it read,
-//! the beacon's own number, whether a restart the ground commanded is under
-//! way, and which interface it speaks. A ground station that is only
-//! listening can then see which software is flying, which payload set it is
-//! serving and whether it has just come back, rather than having to ask
-//! before it can know.
+//! What tcspecial sends every `beacon.default_interval`, whether or not
+//! anything has connected to it: the build it is, the digest of the
+//! configuration it read, the beacon's own number, whether a restart the
+//! ground commanded is under way, and which interface it speaks. A ground
+//! station that is only listening can then see which software is flying,
+//! which payload set it is serving and whether it has just come back, rather
+//! than having to ask before it can know.
 //!
 //! A beacon is text, and nothing but text: its fields in order, a colon
 //! between each, so that a person reading a packet capture or a log reads it

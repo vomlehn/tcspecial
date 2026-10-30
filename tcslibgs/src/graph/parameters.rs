@@ -269,7 +269,8 @@ pub fn retired(attribute: &str) -> Option<&'static str> {
              other being beacon.reset_interval",
         ),
         "beacon.interval_ms" => Some(
-            "say beacon.default_interval, as a length of time: 5 s rather than 5000",
+            "say beacon.default_interval, as a length of time: 5 s rather \
+             than 5000",
         ),
         _ => None,
     }

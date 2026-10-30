@@ -471,10 +471,10 @@ impl TcsClient {
     /// # Errors
     ///
     /// `TcsError::AwaitingRestart` while a RESTART is awaited and the wait
-    /// does not let this command go, `TcsError::Config` if the client has no link for it,
-    /// `TcsError::GenerationUnknown` if no generation is known to send it
-    /// for, and `TcsError::Io` if it cannot be sent or no answer comes in
-    /// time.
+    /// does not let this command go, `TcsError::Config` if the client has no
+    /// link for it, `TcsError::GenerationUnknown` if no generation is known
+    /// to send it for, and `TcsError::Io` if it cannot be sent or no answer
+    /// comes in time.
     fn send_command(&mut self, command: Command) -> TcsResult<Telemetry> {
         self.wait_lets(&command)?;
         // A command with no link to go on says so before anything is said
@@ -504,11 +504,12 @@ impl TcsClient {
     /// What an answer says of the generation flying.
     ///
     /// A vehicle that answered as another start than the one this station
-    /// thought it was has started again since: nothing more goes until a beacon or a CONNECT
-    /// says which start it is, because the definitions it started with may
-    /// not be the ones this station is reading. Learning the generation from
-    /// the answer instead would carry on as though nothing had happened. An
-    /// answer of generation nought, which no start is, says nothing of it.
+    /// thought it was has started again since: nothing more goes until a
+    /// beacon or a CONNECT says which start it is, because the definitions it
+    /// started with may not be the ones this station is reading. Learning the
+    /// generation from the answer instead would carry on as though nothing
+    /// had happened. An answer of generation nought, which no start is, says
+    /// nothing of it.
     ///
     /// # Arguments
     ///
@@ -651,8 +652,8 @@ impl TcsClient {
 
         match answer {
             // The generation it answers with is the one this station knows
-            // is flying from here on, where it answered at all, and the count goes
-            // on from past the newest command it has taken.
+            // is flying from here on, where it answered at all, and the count
+            // goes on from past the newest command it has taken.
             Telemetry::Connect(tm) => {
                 if tm.header.status.is_success() {
                     self.generation = Some(tm.header.generation);

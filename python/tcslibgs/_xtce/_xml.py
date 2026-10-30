@@ -1,1 +1,1 @@
-../../../vendor/tcs-xtce/python/xtce/_xml.py
+../../../vendor/tcs-xtce/python/tcs_xtce/_xml.py

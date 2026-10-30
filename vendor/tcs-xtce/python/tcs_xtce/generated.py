@@ -1,7 +1,7 @@
-# @generated automatically by tcs-xtce (generator/xtcegen) from
+# @generated automatically by tcs-xtce (python/tcs_xtce/binding) from
 # references/SpaceSystem.xsd.
 # Any changes made to this file will be lost when it is regenerated;
-# change generator/xtcegen instead and run `make generate`.
+# change python/tcs_xtce/binding instead and run `make generate`.
 # tcs-xtce: https://github.com/vomlehn/tcs-xtce
 # Rust crate: https://crates.io/crates/tcs-xtce
 """Data structures for XTCE 1.3 (``http://www.omg.org/spec/XTCE/20250214``)."""

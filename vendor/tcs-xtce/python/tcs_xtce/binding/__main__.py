@@ -1,4 +1,5 @@
-"""Command line entry point: ``python3 -m xtcegen --xsd ... --rust ... ``."""
+"""Command line entry point:
+``python3 -m tcs_xtce.binding --xsd ... --rust ... ``."""
 
 from __future__ import annotations
 
@@ -78,7 +79,7 @@ def main() -> None:
     outputs asked for: the Rust module, the C++ header and source, the
     Python module and the sample documents.
     """
-    p = argparse.ArgumentParser(prog="xtcegen", description=__doc__)
+    p = argparse.ArgumentParser(prog="tcs_xtce.binding", description=__doc__)
     p.add_argument("--xsd", required=True, help="path to SpaceSystem.xsd")
     p.add_argument("--rust", help="output path of the generated Rust module")
     p.add_argument("--cpp-header",

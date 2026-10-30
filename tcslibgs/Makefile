@@ -36,8 +36,8 @@ README.html: README.md
 # tcs-xtce, vendored in vendor/tcs-xtce, and committed, so that building
 # needs no Python; run this after changing the XML, and commit what it
 # writes.
-TCS_XTCE := cd ../vendor/tcs-xtce/generator && python3 -m tcs_xtce
-XTCE_DIGEST := cd ../vendor/tcs-xtce/generator && python3 -m xtce_digest
+TCS_XTCE := cd ../vendor/tcs-xtce/python && python3 -m tcs_xtce
+XTCE_DIGEST := cd ../vendor/tcs-xtce/python && python3 -m tcs_xtce.digest_cli
 
 # Every command and answer on the link is stated once, in xtce/link.xml, and
 # packed and unpacked by the Rust tcs-xtce generates from it, without dynamic

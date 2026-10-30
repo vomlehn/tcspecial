@@ -1,9 +1,10 @@
 """Runtime for packet codecs generated from a mission's XTCE document.
 
-``tcs-xtce`` (in ``generator/``) turns the containers and meta-commands of a
-mission database into Python dataclasses derived from :class:`Packet`.  The
+``tcs-xtce`` (:mod:`tcs_xtce.compiler`) turns the containers and
+meta-commands of a mission database into Python dataclasses derived from
+:class:`Packet`.  The
 generated code reads packets with a :class:`BitReader` and writes them with a
-:class:`BitWriter` into a :class:`~xtce.ManagedBuffer`; this module provides
+:class:`BitWriter` into a :class:`~tcs_xtce.ManagedBuffer`; this module provides
 those and the integer, float, string and calibration helpers they call.  It
 mirrors ``tcs_xtce::packet`` in Rust and ``xtce/packet.h`` in C and C++.
 
@@ -135,7 +136,7 @@ class Codec:
 
     @property
     def input(self) -> ManagedBuffer:
-        """The input buffer (as for :attr:`xtce.Document.input`)."""
+        """The input buffer (as for :attr:`tcs_xtce.Document.input`)."""
         return self._input
 
     @property
@@ -808,7 +809,7 @@ class BitReader:
 
 
 class BitWriter:
-    """Writes big-endian bit fields into a :class:`~xtce.ManagedBuffer`.
+    """Writes big-endian bit fields into a :class:`~tcs_xtce.ManagedBuffer`.
 
     The buffer is cleared when the writer is created and grows (zero filled)
     to cover the furthest bit written; its allocation is reused.

@@ -1,6 +1,6 @@
 """Compile a mission's XTCE documents into the packet model.
 
-The documents are loaded with the ``xtce`` Python package (the XML binding
+The documents are loaded with the ``tcs_xtce`` Python package (the XML binding
 generated from the XTCE schema), so anything that package accepts can be
 compiled.  The compiler resolves names, fills in schema defaults, flattens
 included containers and records which XTCE constructs it does not support.
@@ -1738,8 +1738,11 @@ class Compiler:
         Its checks, and those of the containers it includes, cover its
         bytes before the transform, so they are Verify items at its end:
         checked once its items are read, and computed before the transform
-        when encoding.  A length field can't be in it: what it counts on
-        the wire would depend on the transform of its own value.
+        when encoding.  So do its length fields: one that measures an
+        included container counts that container's bytes before the
+        transform, as do this container's own if it is included, and a
+        packet length field counts from itself to the end of this
+        container's bytes before the transform.
 
         Args:
             sc:     The XTCE container.
@@ -1756,19 +1759,22 @@ class Compiler:
             them and their checks.
 
         Raises:
-            Unsupported: It holds a packet length field, or its SizeInBits
-                         isn't a number of whole bytes, or an included
-                         container has none.
+            Unsupported: It holds more than one packet length field, or
+                         its SizeInBits isn't a number of whole bytes, or
+                         an included container has none.
         """
         be = sc.binary_encoding
         names = self.transform_names(be) if be is not None else None
         if names is None:
             return items
-        for it in walk(items):
-            if isinstance(it, Value) and it.local.length is not None:
-                raise Unsupported(f"{where}: packet length field "
-                                  f"{it.local.name} in a container with "
-                                  "transform algorithms")
+        if not packet:
+            items = self.measure(items, where)
+        lengths = [it.local for it in walk(items, inner=False)
+                   if isinstance(it, Value) and it.local.length is not None
+                   and not it.local.measures]
+        if len(lengths) > 1:
+            raise Unsupported(f"{where}: more than one packet length field in "
+                              "a container with transform algorithms")
         marks = {it.id for it in walk(items) if isinstance(it, Mark)}
         inside = [c for c in self.included_checks if c[2] in marks]
         self.included_checks = [c for c in self.included_checks
@@ -1799,7 +1805,8 @@ class Compiler:
         fa, ta = names
         return [Transform(items, self.hook("binary_from", fa) if fa else None,
                           self.hook("binary_to", ta) if ta else None, raw, cap,
-                          out_cap, name, start)]
+                          out_cap, name, start,
+                          lengths[0] if lengths else None)]
 
     def has_transform(self, sc, where: str) -> bool:
         be = sc.binary_encoding
@@ -2636,9 +2643,10 @@ class Compiler:
         own fields: the rest of the value is in other packets.
 
         A segment repeated a fixed number of times, one right after
-        another, is that many segments.  Repeated otherwise (a count that
-        another value gives, or an Offset between the repeats), its
-        segments are a list of raw fields.
+        another, is that many segments; with an order N, they are parts N,
+        N + 1 and on of what they are segments of.  Repeated otherwise (a
+        count that another value gives, or an Offset between the repeats),
+        its segments are a list of raw fields.
 
         Args:
             name:    The entry's element name, such as
@@ -2658,14 +2666,13 @@ class Compiler:
             The items for the entry.
 
         Raises:
-            Unsupported: A repeated segment has an order or a Count that
-                         isn't positive, or a segment is invalid.
+            Unsupported: A repeated segment has a Count that isn't
+                         positive, or a segment is invalid.
         """
         rp = e.repeat_entry
         if rp is None:
-            return self.one_segment(name, e, path, where, segs, cond, scope)
-        if e.order is not None:
-            raise Unsupported(f"{where}: a repeated {name} with an order")
+            return self.one_segment(name, e, path, where, segs, cond, scope,
+                                    e.order)
         count = self.int_value(rp.count, path, "RepeatEntry Count", where)
         gap = (self.int_value(rp.offset, path, "RepeatEntry Offset", where)
                if rp.offset is not None else 0)
@@ -2674,13 +2681,17 @@ class Compiler:
                 raise Unsupported(f"{where}: RepeatEntry Count {count} is not "
                                   "positive")
             out: list[Item] = []
-            for _ in range(count):
-                out += self.one_segment(name, e, path, where, segs, cond, scope)
+            for i in range(count):
+                order = e.order + i if e.order is not None else None
+                out += self.one_segment(name, e, path, where, segs, cond, scope,
+                                        order)
             return out
         ref = self.segment_ref(name, e, path)
         counts = segs.setdefault("#counts", {})
         k = counts.get(ref, 0)
         counts[ref] = k + 1
+        if e.order is not None:
+            k = e.order
         lc = self.raw_segment(ref, k, e.size_in_bits, where)
         lc = self.bind(self.repeat(lc, e, path, where), scope, where, arg_key)
         scope.append(lc)
@@ -2739,7 +2750,8 @@ class Compiler:
         return e.stream_ref
 
     def one_segment(self, name: str, e, path: Key, where: str, segs: dict,
-                    cond: bool, scope: list) -> list[Item]:
+                    cond: bool, scope: list,
+                    order: Optional[int]) -> list[Item]:
         """Compiles one segment of an entry.  A parameter's segments are
         collected in ``segs`` until they make up its encoding, when the
         value is assembled; other segments are raw fields of their own.
@@ -2755,6 +2767,9 @@ class Compiler:
                    have been.
             cond:  Whether the entry has an IncludeCondition.
             scope: The values read so far; grows as values are added.
+            order: Which part of the thing it is a segment of this one is,
+                   from the entry's order attribute (plus its place among
+                   the entry's repeats), or None if it has none.
 
         Returns:
             The items: the Segment, followed by the parameter's Value once
@@ -2769,8 +2784,8 @@ class Compiler:
         counts = segs.setdefault("#counts", {})
         k = counts.get(ref, 0)
         counts[ref] = k + 1
-        if e.order is not None:
-            k = e.order
+        if order is not None:
+            k = order
         if name == "ParameterSegmentRefEntry" and not cond:
             group = segs.get(ref)
             if group is None:
@@ -2780,7 +2795,7 @@ class Compiler:
                 group = segs[ref] = (local, total, [])
             local, total, parts = group
             seg = Segment(local, bits, total or 0)
-            parts.append((seg, e.order, k))
+            parts.append((seg, order, k))
             got = sum(s.bits for s, _, _ in parts)
             if total is not None and total <= 64 and got >= total:
                 if got > total:
@@ -3590,6 +3605,93 @@ class Compiler:
         self.order.append(node)
         return node
 
+    def early_check(self, node: Node, c: Check, checks: list,
+                    where: str) -> None:
+        """Lets a check of a packet cover bytes outside the transformed
+        data its field is in, when they end before the outermost
+        transformed container holding the field starts on the wire, so
+        that encoding can compute it before the transform: the check
+        covers up to that container, or, from the end, the container ends
+        the bits it is located from and it is no more than their ``skip``.
+        Marks the check, puts a Mark before the container, and has the
+        innermost one holding the field compute the check.
+
+        Args:
+            node:   The packet.
+            c:      The check; left alone unless its field is in
+                    transformed data.
+            checks: The packet's checks, whose fields are filled in after
+                    the transforms.
+            where:  What the packet is, for error messages.
+
+        Raises:
+            Unsupported: The container is conditional or follows the
+                         check's start, the check's bits run into it, or
+                         they hold a field that encoding fills in after
+                         the transform.
+        """
+        holders = [t for t in walk(node.all_items()) if isinstance(t, Transform)
+                   and any(isinstance(x, Value) and x.local is c.local
+                           for x in walk(t.items))]
+        if not holders:
+            return
+        outer = holders[0]
+        why = (f"{where}: checksum field {c.local.name} is in transformed "
+               "data, but its check covers bytes outside it")
+        owner = next((n for n in node.chain()
+                      if any(it is outer for it in n.items)), None)
+        if owner is None:
+            raise Unsupported(f"{why} in a conditional container")
+        flat = walk(node.all_items(), inner=False)
+        at = next(i for i, it in enumerate(flat) if it is outer)
+
+        def mark_at(mid: int) -> Optional[int]:
+            return next((i for i, it in enumerate(flat) if isinstance(it, Mark)
+                         and it.id == mid), None)
+        first = 0 if c.start == 0 else mark_at(c.start)
+        if first is None or first > at:
+            raise Unsupported(f"{why}, after it")
+        back = 0
+        if c.from_end:
+            end = len(flat) if c.end is None else mark_at(c.end)
+            if (end is None or outer.raw is None or max_bits(flat[at + 1:end])
+                    or c.skip < 8 * outer.raw):
+                raise Unsupported(f"{why}, which run into it")
+            back = c.skip - 8 * outer.raw
+        elif c.skip:
+            # The bits start past the field, and so run into the
+            # container, unless what comes before it is surely as long.
+            bits = 0
+            for it in flat[first:at]:
+                if isinstance(it, (Mark, Require, Verify, LengthEnd)):
+                    b = 0
+                elif isinstance(it, (Pad, Fixed, Segment)):
+                    b = it.bits
+                elif isinstance(it, Value) and not it.local.optional:
+                    b = fixed_bits(it.local.vtype)
+                elif isinstance(it, Transform) and it.raw is not None:
+                    b = 8 * it.raw
+                else:
+                    b = None
+                if not isinstance(b, int):
+                    raise Unsupported(f"{why}, which may run into it")
+                bits += b
+            if bits < c.skip:
+                raise Unsupported(f"{why}, which run into it")
+        later = {id(k.local) for k in checks if k is not c}
+        ended = {id(it.local) for it in flat[:at] if isinstance(it, LengthEnd)}
+        for it in flat[first:at]:
+            if isinstance(it, Value) and (id(it.local) in later
+                                          or (it.local.length is not None
+                                              and id(it.local) not in ended)):
+                raise Unsupported(f"{why}, among them {it.local.name}, which "
+                                  "encoding fills in after the transform")
+        c.stop = self._id()
+        c.stop_back = back
+        owner.items.insert(next(i for i, it in enumerate(owner.items)
+                                if it is outer), Mark(c.stop))
+        holders[-1].patches.append(c)
+
     def node_checks(self, node: Node, where: str) -> list:
         """Compiles the ErrorDetectCorrect checks of a concrete packet:
         those of the containers in its inheritance chain, which cover the
@@ -3604,8 +3706,10 @@ class Compiler:
             is the order they are computed in.
 
         Raises:
-            Unsupported: A checksum field is in transformed data, or a
-                         criterion or assignment is on one.
+            Unsupported: A checksum field is in transformed data and its
+                         check covers bytes that early_check can't
+                         compute first, or a criterion or assignment is on
+                         one.
         """
         out = []
         chain = node.chain()
@@ -3623,14 +3727,8 @@ class Compiler:
                 for name, v in edc_items(inc):
                     out.append(self.check(name, v, path, scope, m, end, ckey,
                                           where))
-        transformed = {id(x.local) for it in walk(node.all_items())
-                       if isinstance(it, Transform) for x in walk(it.items)
-                       if isinstance(x, Value)}
         for c in out:
-            if id(c.local) in transformed:
-                raise Unsupported(f"{where}: checksum field {c.local.name} is "
-                                  "in transformed data, but its check covers "
-                                  "bytes outside it")
+            self.early_check(node, c, out, where)
         criteria = (node.all_criteria()
                     + [c for it in node.all_items() for c in conds(it)])
         verified = [it.check for it in walk(node.all_items())
@@ -3764,8 +3862,10 @@ class Compiler:
 
     @staticmethod
     def check_length(node: Node, where: str) -> None:
-        """Checks that a packet has at most one length field, which is
-        always present and which nothing compares or takes a size from.
+        """Checks that a packet has at most one length field outside
+        transformed data (wrap_transform allows one in each Transform), and
+        that each is always present and nothing compares or takes a size
+        from it.
 
         Args:
             node:  The packet.
@@ -3775,20 +3875,19 @@ class Compiler:
             Unsupported: It doesn't.
         """
         items = node.all_items()
-        lengths = [it.local for it in walk(items) if isinstance(it, Value)
-                   and it.local.length is not None and not it.local.measures]
-        if len(lengths) > 1:
+        is_length = (  # noqa: E731
+            lambda it: isinstance(it, Value) and it.local.length is not None
+            and not it.local.measures)
+        if sum(map(is_length, walk(items, inner=False))) > 1:
             raise Unsupported(f"{where}: more than one packet length field")
-        if not lengths:
-            return
-        lc = lengths[0]
-        if lc.optional:
-            raise Unsupported(f"{where}: packet length field {lc.name} has an "
-                              "IncludeCondition")
         criteria = node.all_criteria() + [c for it in items for c in conds(it)]
-        if any(x is lc for c in criteria for x in term_locals(c)):
-            raise Unsupported(f"{where}: a criterion or assignment on packet "
-                              f"length field {lc.name}")
+        for lc in [it.local for it in walk(items) if is_length(it)]:
+            if lc.optional:
+                raise Unsupported(f"{where}: packet length field {lc.name} has "
+                                  "an IncludeCondition")
+            if any(x is lc for c in criteria for x in term_locals(c)):
+                raise Unsupported(f"{where}: a criterion or assignment on "
+                                  f"packet length field {lc.name}")
 
     @staticmethod
     def scope_of(node: Node) -> list[Local]:

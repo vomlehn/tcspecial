@@ -1,9 +1,9 @@
 """Language-neutral model of a mission's packets.
 
-:mod:`xtcepkt.compile` builds this model from a mission's XTCE document and
-the ``emit_*`` modules turn it into code.  Everything here is already
-resolved: references point at objects, defaults are filled in and sizes are
-in bits.
+:mod:`tcs_xtce.compiler.compile` builds this model from a mission's XTCE
+document and the ``emit_*`` modules turn it into code.  Everything here is
+already resolved: references point at objects, defaults are filled in and
+sizes are in bits.
 """
 
 from __future__ import annotations
@@ -881,7 +881,9 @@ class Transform:
     at most ``cap`` bytes, from mark ``start``; encoding writes ``items``,
     then gives their bytes to ``encode``, which gives at most ``out_cap``
     bytes in their place, exactly ``raw`` when it is given.  It starts on
-    a byte boundary."""
+    a byte boundary.  ``length`` is a packet length field among ``items``,
+    which counts what the transform is given: decoding checks it once
+    ``items`` are read, and encoding fills it in before the transform."""
 
     items: list
     # None for a direction the document doesn't give, which fails with
@@ -893,6 +895,10 @@ class Transform:
     out_cap: int
     name: str
     start: int
+    length: Optional["Local"] = None
+    # Checks of bits outside it whose fields are in it, computed before
+    # the transform when encoding.
+    patches: list = field(default_factory=list)
 
     @property
     def bits(self) -> int:
@@ -989,7 +995,12 @@ class Check:
     from ``skip`` bits after mark ``start`` to ``local``, if that lies after
     them, or else to the container's end.  ``local`` holds the
     value: its low bits when the algorithm gives more.  ``spec`` is the
-    algorithm, as the Python runtime's ``checksum`` takes it."""
+    algorithm, as the Python runtime's ``checksum`` takes it.
+
+    When ``local`` is in transformed data and the bits end before it on
+    the wire, ``stop`` is the mark where the outermost transformed
+    container holding it starts, and the bits end ``stop_back`` bits
+    before that; encoding computes the value before the transform."""
 
     spec: tuple
     local: Local
@@ -998,6 +1009,8 @@ class Check:
     skip: int
     from_end: bool
     container: str
+    stop: Optional[int] = None
+    stop_back: int = 0
 
 
 @dataclass
@@ -1284,8 +1297,9 @@ class Node:
         return [c for n in self.chain() for c in n.criteria]
 
     def length_field(self) -> Optional[Local]:
-        """The packet length field, if the packet has one."""
-        return next((it.local for it in walk(self.all_items())
+        """The packet length field, if the packet has one: not one in
+        transformed data, which counts what the transform is given."""
+        return next((it.local for it in walk(self.all_items(), inner=False)
                      if isinstance(it, Value) and it.local.length is not None
                      and not it.local.measures), None)
 

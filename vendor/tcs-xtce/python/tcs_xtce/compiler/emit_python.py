@@ -1,4 +1,4 @@
-"""Emit a Python module of packet codecs (uses ``xtce.packet``)."""
+"""Emit a Python module of packet codecs (uses ``tcs_xtce.packet``)."""
 
 from __future__ import annotations
 
@@ -10,7 +10,7 @@ from .common import (doc_header, HOOK_DOCS, written, checks_hooks, items_hooks,
                      math_value, size_args, string_spec)
 from .model import (term_indexes, term_locals, walk, Index, AggregateEnc, AllOf,
                     AnyOf, ArrayEnc, BinaryEnc, Cond, ContextCal, Criterion,
-                    DynSize, Fixed, FloatEnc, IntEnc, Kind, Mark, MathOp,
+                    DynSize, Fixed, FloatEnc, IntEnc, Kind, Local, Mark, MathOp,
                     Mission, Node, Pad, Polynomial, Seek, Span, Spline, Value,
                     VType, Require, Fill, Segment, Verify, Custom, TailPad,
                     TailSeek, LengthEnd, Transform, XformEnc, StringEnc)
@@ -751,7 +751,7 @@ class PythonEmitter:
         self.line("from dataclasses import dataclass")
         self.line("from typing import ClassVar, Optional, Union")
         self.line()
-        self.line("from xtce import packet as pk")
+        self.line("from tcs_xtce import packet as pk")
         self.line()
         self.line()
         self.line("def _describe_bool(v: bool) -> str:")
@@ -938,7 +938,7 @@ class PythonEmitter:
         self.line(f'"""Enumeration ``{vt.key}``.', 1)
         self.line()
         self.line("Decoding keeps values the enumeration does not list (see", 1)
-        self.line(':func:`xtce.packet.enum_value`)."""', 1)
+        self.line(':func:`tcs_xtce.packet.enum_value`)."""', 1)
         self.line()
         for lab in vt.labels:
             self.line(f"{lab.ident} = {lab.value}", 1)
@@ -1027,6 +1027,8 @@ class PythonEmitter:
                 self.line(f"r, _r{it.start} = pk.BitReader(_t{it.start}), r",
                           depth)
                 self.read_items(it.items, depth, where, nested)
+                if it.length is not None:
+                    self.line(f"r.finish({pstr(it.length.name)})", depth)
                 self.line(f"r = _r{it.start}", depth)
             elif isinstance(it, TailPad):
                 # The packet's last bits, which encoding fills with zeros.
@@ -1117,6 +1119,10 @@ class PythonEmitter:
                 # Write its items, then what the transform makes of them.
                 self.line(f"_t{it.start} = w.pos", depth)
                 self.write_items(n, it.items, depth, where, names)
+                if it.length is not None:
+                    self.patch_length(it.length, depth)
+                for c in it.patches:
+                    self.patch(c, depth, early=True)
                 self.line(f"w.transform(_t{it.start}, "
                           f"{transform_hook(it.encode)}, {it.raw}, "
                           f"{it.out_cap}, {pstr(it.name)})", depth)
@@ -1304,6 +1310,18 @@ class PythonEmitter:
     def mark(i: int) -> str:
         return "0" if i == 0 else f"m{i}"
 
+    def patch_length(self, lc: Local, depth: int) -> None:
+        """Writes the statement filling in a packet length field from what
+        has been written.
+
+        Args:
+            lc:    The field.
+            depth: The statement's indentation level.
+        """
+        enc = lc.vtype.enc
+        self.line(f"w.patch_length(l{lc.id}, {enc.bits}, {enc.little_endian}, "
+                  f"{lc.length}, {pstr(lc.name)})", depth)
+
     def finish(self, n: Node, depth: int) -> None:
         """Writes the statements checking the packet length field and the
         checksums when decoding ends.
@@ -1332,13 +1350,18 @@ class PythonEmitter:
                   f"{mask} != v{c.local.id}:", depth)
         self.line(f'raise pk.PacketError("BadChecksum", {f})', depth + 1)
 
-    def patch(self, c, depth: int) -> None:
-        """Writes the statement writing a check's value into its field.
+    def patch(self, c, depth: int, early: bool = False) -> None:
+        """Writes the statement writing a check's value into its field,
+        unless it is computed elsewhere: before a transform when it has a
+        ``stop``, and otherwise where the packet or container ends.
 
         Args:
             c:     The check.
             depth: The statement's indentation level.
+            early: Whether this is before the transform of its field.
         """
+        if (c.stop is not None) != early:
+            return
         enc = c.local.vtype.enc
         start, end = self.region(c, "w")
         self.line(f"w.patch_checksum({pspec(c.spec)}, {start}, {end}, "
@@ -1361,7 +1384,9 @@ class PythonEmitter:
         base = self.mark(c.start)
         start = f"{base} + {c.skip}" if c.skip and not c.from_end else base
         end = f"m{c.end}" if c.end is not None else f"{rw}.packet_end()"
-        if c.from_end:
+        if c.stop is not None:
+            end = f"max(m{c.stop} - {c.stop_back}, 0)"
+        elif c.from_end:
             end = f"max({end} - {c.skip}, 0)"
         elif start == "0":
             end = pos  # the field always follows the packet's start
@@ -1481,10 +1506,7 @@ class PythonEmitter:
         for node in n.chain():
             self.write_items(n, node.items, 2, node.key, names)
         if length is not None:
-            enc = length.vtype.enc
-            self.line(f"w.patch_length(l{length.id}, {enc.bits}, "
-                      f"{enc.little_endian}, {length.length}, "
-                      f"{pstr(length.name)})", 2)
+            self.patch_length(length, 2)
         for c in n.checks:
             self.patch(c, 2)
         if len(self.out) == body:

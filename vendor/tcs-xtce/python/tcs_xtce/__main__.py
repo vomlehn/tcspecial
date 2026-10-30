@@ -29,16 +29,12 @@ import argparse
 import sys
 from pathlib import Path
 
-# The compiler reads XTCE documents with the generated `xtce` Python package.
-sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "python"))
-
-import xtce  # noqa: E402
-
-from xtcegen.__main__ import rustfmt  # noqa: E402
-from xtcegen.wrap import wrap  # noqa: E402
-from xtcepkt import emit_c, emit_python, emit_rust, report  # noqa: E402
-from xtcepkt.compile import DIALECTS, compile_documents  # noqa: E402
-from xtcepkt.model import Unsupported  # noqa: E402
+import tcs_xtce
+from tcs_xtce.binding.__main__ import rustfmt
+from tcs_xtce.binding.wrap import wrap
+from tcs_xtce.compiler import emit_c, emit_python, emit_rust, report
+from tcs_xtce.compiler.compile import DIALECTS, compile_documents
+from tcs_xtce.compiler.model import Unsupported
 
 LANGS = ("c", "c++", "rust", "python")
 
@@ -134,8 +130,8 @@ def main(argv=None) -> int:
     roots = []
     for name in inputs:
         try:
-            roots.append(xtce.Document.from_file(name).root)
-        except (OSError, xtce.XtceError) as e:
+            roots.append(tcs_xtce.Document.from_file(name).root)
+        except (OSError, tcs_xtce.XtceError) as e:
             print(f"tcs-xtce: {name}: {e}", file=sys.stderr)
             return 1
     try:

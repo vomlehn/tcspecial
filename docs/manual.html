@@ -4066,11 +4066,8 @@ every one of the nineteen manifests, the root and each crate under it. The
 crates they depend on in turn are not listed: <tt class="docutils literal">cargo tree</tt> shows the whole
 graph, and <tt class="docutils literal">Cargo.lock</tt> says which version of each is built.</p>
 <p>Every one is fetched from <a class="reference external" href="https://crates.io">crates.io</a>, the Rust package
-registry, which is where <tt class="docutils literal">cargo build</tt> downloads it from, but one: <tt class="docutils literal">xtce</tt>,
-tcs-xtce's runtime, which packs and unpacks the commands and answers, is
-taken from a copy in
-<tt class="docutils literal"><span class="pre">vendor/tcs-xtce</span></tt> until tcs-xtce is published, and is not listed below. Each
-name below links to its page there, the version links to its documentation on
+registry, which is where <tt class="docutils literal">cargo build</tt> downloads it from. Each name below
+links to its page there, the version links to its documentation on
 <a class="reference external" href="https://docs.rs">docs.rs</a>, and the last column to the repository its source
 is developed in.</p>
 <p><em>Asked</em> is the version the manifests ask for -- <tt class="docutils literal">1.18</tt> admits any 1.x from
@@ -4197,6 +4194,13 @@ with <tt class="docutils literal">visual</tt></td>
 <td>Sets a socket up before it is bound, which the standard library cannot.</td>
 <td><a class="reference external" href="https://github.com/rust-lang/socket2">repository</a></td>
 </tr>
+<tr><td><a class="reference external" href="https://crates.io/crates/tcs-xtce">tcs-xtce</a></td>
+<td>=0.3.0</td>
+<td><a class="reference external" href="https://docs.rs/tcs-xtce/0.3.0">0.3.0</a></td>
+<td>tcslibgs</td>
+<td>The runtime the generated link packet code calls to pack and unpack the commands and answers, and the interface digest. Its generator and Python runtime are in <tt class="docutils literal"><span class="pre">vendor/tcs-xtce</span></tt>, at the same version.</td>
+<td><a class="reference external" href="https://github.com/vomlehn/tcs-xtce">repository</a></td>
+</tr>
 <tr><td><a class="reference external" href="https://crates.io/crates/tcslog">tcslog</a></td>
 <td>0.3.1</td>
 <td><a class="reference external" href="https://docs.rs/tcslog/0.3.1">0.3.1</a></td>
@@ -4220,8 +4224,10 @@ with <tt class="docutils literal">visual</tt></td>
 </tr>
 </tbody>
 </table>
-<p><tt class="docutils literal">tcslog</tt> is this project's own: it is the telemetry log, kept as a crate of
-its own so that it can be used and tested apart from tcspecial.</p>
+<p><tt class="docutils literal">tcslog</tt> and <tt class="docutils literal"><span class="pre">tcs-xtce</span></tt> are this project's own: <tt class="docutils literal">tcslog</tt> is the
+telemetry log, kept as a crate of its own so that it can be used and tested
+apart from tcspecial, and <tt class="docutils literal"><span class="pre">tcs-xtce</span></tt> is the packet compiler, a project of
+its own.</p>
 <p>To see where everything in the build comes from, its dependencies included:</p>
 <pre class="literal-block">
 $ cargo tree --workspace

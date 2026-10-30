@@ -10,8 +10,8 @@ carries.
 import sys
 from pathlib import Path
 
-# tcs-xtce's Python runtime, vendored in this tree until tcs-xtce is
-# published: see vendor/tcs-xtce/README.md.
+# tcs-xtce's Python runtime, vendored in this tree until it is published:
+# see vendor/tcs-xtce/README.md.
 _XTCE = Path(__file__).resolve().parents[2] / "vendor" / "tcs-xtce" / "python"
 if str(_XTCE) not in sys.path:
     sys.path.insert(0, str(_XTCE))

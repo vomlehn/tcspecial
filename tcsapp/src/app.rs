@@ -44,12 +44,27 @@
 //! read a terminal and wait, or write telemetry into somebody's shell -- and
 //! the sentence it is refused with says which interface and what that
 //! interface is for.
+//!
+//! # And the standard streams
+//!
+//! Descriptors 0, 1 and 2 are the interfaces, which is what lets a program in
+//! any language take part; they are also a Rust program's stdin, stdout and
+//! stderr. A `println!` would write unframed text into a data interface, and a
+//! panic message into the error interface, each read at the far end as a
+//! packet's length followed by nonsense. So once `inherited` has its handles
+//! it moves each interface to a descriptor of its own, above 2 and closed on
+//! exec, and opens `/dev/null` over 0, 1 and 2: a stray `println!` goes
+//! nowhere, a read of stdin finds it ended, and a program the app starts
+//! inherits none of the interfaces. A panic is said on the error interface as
+//! one packet, by a panic hook `inherited` installs. Anything else an app has
+//! to say goes on [`Errors::say`].
 
 use std::fs::File;
 use std::io;
-use std::os::fd::{FromRawFd, RawFd};
+use std::os::fd::{AsRawFd, FromRawFd, RawFd};
 use std::os::unix::net::UnixStream;
 use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::OnceLock;
 
 use crate::{is_handed_over, is_open, packet, Interface};
 
@@ -186,11 +201,14 @@ impl AppPayloadVeh {
     pub fn inherited() -> Result<AppPayloadVeh, String> {
         taking(&[Interface::Payload, Interface::Errors])?;
         let [name, payload_arg] = told(["the node's name", "app-payload-arg"])?;
+        let payload = PayloadInterface(stream(Interface::Payload)?);
+        let errors = Errors(file(Interface::Errors)?);
+        quiet(&name, &errors)?;
         Ok(AppPayloadVeh {
             name,
             payload_arg,
-            payload: PayloadInterface(stream(Interface::Payload)),
-            errors: Errors(file(Interface::Errors)),
+            payload,
+            errors,
         })
     }
 }
@@ -227,11 +245,14 @@ impl AppMocVeh {
     pub fn inherited() -> Result<AppMocVeh, String> {
         taking(&[Interface::Moc, Interface::Errors])?;
         let [name, moc_arg] = told(["the node's name", "app-moc-arg"])?;
+        let moc = MocInterface(stream(Interface::Moc)?);
+        let errors = Errors(file(Interface::Errors)?);
+        quiet(&name, &errors)?;
         Ok(AppMocVeh {
             name,
             moc_arg,
-            moc: MocInterface(stream(Interface::Moc)),
-            errors: Errors(file(Interface::Errors)),
+            moc,
+            errors,
         })
     }
 }
@@ -274,13 +295,17 @@ impl AppAllVeh {
         taking(&[Interface::Payload, Interface::Moc, Interface::Errors])?;
         let [name, payload_arg, moc_arg] =
             told(["the node's name", "app-payload-arg", "app-moc-arg"])?;
+        let payload = PayloadInterface(stream(Interface::Payload)?);
+        let moc = MocInterface(stream(Interface::Moc)?);
+        let errors = Errors(file(Interface::Errors)?);
+        quiet(&name, &errors)?;
         Ok(AppAllVeh {
             name,
             payload_arg,
             moc_arg,
-            payload: PayloadInterface(stream(Interface::Payload)),
-            moc: MocInterface(stream(Interface::Moc)),
-            errors: Errors(file(Interface::Errors)),
+            payload,
+            moc,
+            errors,
         })
     }
 }
@@ -325,11 +350,14 @@ impl AppPl {
     pub fn inherited() -> Result<AppPl, String> {
         taking(&[Interface::Moc, Interface::Errors])?;
         let [name, payload_arg] = told(["the node's name", "app-payload-arg"])?;
+        let payload = PayloadOut(stream(Interface::Moc)?);
+        let errors = Errors(file(Interface::Errors)?);
+        quiet(&name, &errors)?;
         Ok(AppPl {
             name,
             payload_arg,
-            payload: PayloadOut(stream(Interface::Moc)),
-            errors: Errors(file(Interface::Errors)),
+            payload,
+            errors,
         })
     }
 }
@@ -374,12 +402,15 @@ impl AppAllPl {
         taking(&[Interface::Moc, Interface::Errors])?;
         let [name, payload_arg, moc_arg] =
             told(["the node's name", "app-payload-arg", "app-moc-arg"])?;
+        let moc = MocInterface(stream(Interface::Moc)?);
+        let errors = Errors(file(Interface::Errors)?);
+        quiet(&name, &errors)?;
         Ok(AppAllPl {
             name,
             payload_arg,
             moc_arg,
-            moc: MocInterface(stream(Interface::Moc)),
-            errors: Errors(file(Interface::Errors)),
+            moc,
+            errors,
         })
     }
 }
@@ -440,21 +471,37 @@ fn told<const N: usize>(expects: [&str; N]) -> Result<[String; N], String> {
 /// where it is not -- there being nowhere to say it then, which is itself what
 /// went wrong. Unframed text would be worse than silence: the first four bytes
 /// of it would be read as a packet's length, and the parent would wait for
-/// bytes that are not coming.
+/// bytes that are not coming. Once `inherited` has moved the interface off
+/// descriptor 2, it is said where the interface went.
 ///
 /// # Arguments
 ///
 /// * `message` - What went wrong, written as one packet.
 pub fn complain(message: &str) {
+    if let Some(errors) = MOVED.get() {
+        let _ = packet::write(&mut &*errors, message.as_bytes());
+        return;
+    }
     if !is_open(Interface::Errors.fd()) {
         return;
     }
     // Held rather than owned: this does not close the interface, which an app
     // that goes on to use it would need and a `File` would close as it went
     // out of scope.
-    let mut errors = std::mem::ManuallyDrop::new(file(Interface::Errors));
+    //
+    // SAFETY: from_raw_fd needs an open descriptor, which descriptor 2 was
+    // just found to be. Nothing owns it, the interfaces not having been
+    // taken (MOVED is set when they are), and the ManuallyDrop means this
+    // File never closes it either.
+    let mut errors = std::mem::ManuallyDrop::new(unsafe {
+        File::from_raw_fd(Interface::Errors.fd())
+    });
     let _ = packet::write(&mut *errors, message.as_bytes());
 }
+
+/// The error interface where `inherited` moved it, for [`complain`] and for
+/// a panic.
+static MOVED: OnceLock<File> = OnceLock::new();
 
 /// Whether the interfaces have been taken: see [`taking`].
 static TAKEN: AtomicBool = AtomicBool::new(false);
@@ -552,28 +599,125 @@ fn take_once(taken: &AtomicBool) -> Result<(), String> {
 /// One of the two interfaces that is read and written, which is a socket.
 ///
 /// Called only from an `inherited`, once [`taking`] has said the interfaces
-/// are its to take, which it says once: the descriptor is owned from here on
-/// and closed when the handle is dropped.
-fn stream(interface: Interface) -> UnixStream {
-    // SAFETY: from_raw_fd needs an open descriptor that nothing else owns.
-    // Open holds: every `inherited` calls `taking` first, which refuses an
-    // interface that was not handed over. `taking` also refuses a second
-    // call, so no descriptor gets two owners here. But descriptors 0 and 1
-    // are std's stdin and stdout as well, which go on using them, so this
-    // is sound only while the program does not read or print through std.
-    unsafe { UnixStream::from_raw_fd(interface.fd() as RawFd) }
+/// are its to take, which it says once: the interface is moved to a
+/// descriptor of its own (see [`moved`]), owned from here on and closed when
+/// the handle is dropped.
+///
+/// # Arguments
+///
+/// * `interface` - The interface.
+///
+/// # Returns
+///
+/// The handle.
+///
+/// # Errors
+///
+/// Why not, if it could not be moved.
+fn stream(interface: Interface) -> Result<UnixStream, String> {
+    let fd = moved(interface)?;
+    // SAFETY: from_raw_fd needs an open descriptor that nothing else owns,
+    // and `moved` has just made this one: nothing else has its number.
+    Ok(unsafe { UnixStream::from_raw_fd(fd) })
 }
 
 /// And the one that is only written, which need be no more than a file.
 ///
 /// Called as [`stream`] is.
-fn file(interface: Interface) -> File {
-    // SAFETY: as for `stream`: `taking`, or `complain` itself, has checked
-    // descriptor 2 is open, and `taking` hands it over once. Descriptor 2
-    // is std's stderr as well, which a panic message is written to.
-    // `complain` holds its File in a ManuallyDrop, so that one never closes
-    // the descriptor.
-    unsafe { File::from_raw_fd(interface.fd() as RawFd) }
+///
+/// # Arguments
+///
+/// * `interface` - The interface.
+///
+/// # Returns
+///
+/// The handle.
+///
+/// # Errors
+///
+/// Why not, if it could not be moved.
+fn file(interface: Interface) -> Result<File, String> {
+    let fd = moved(interface)?;
+    // SAFETY: as for `stream`.
+    Ok(unsafe { File::from_raw_fd(fd) })
+}
+
+/// Gives an interface a descriptor of its own, the lowest above 2, closed on
+/// exec, so that it is not std's stdin, stdout or stderr as well and a
+/// program the app starts does not inherit it. Its standard descriptor is
+/// left as it was, for [`quiet`] to cover.
+///
+/// # Arguments
+///
+/// * `interface` - The interface.
+///
+/// # Returns
+///
+/// The new descriptor.
+///
+/// # Errors
+///
+/// Why not, if the system would not make one.
+fn moved(interface: Interface) -> Result<RawFd, String> {
+    // SAFETY: F_DUPFD_CLOEXEC makes a new descriptor from an open one and
+    // reads nothing through a pointer; `taking` has checked this one is
+    // open, and one that is not would fail with EBADF.
+    let fd = unsafe { libc::fcntl(interface.fd(), libc::F_DUPFD_CLOEXEC, 3) };
+    if fd == -1 {
+        return Err(format!(
+            "{} could not be moved off descriptor {}: {}",
+            interface.name(),
+            interface.fd(),
+            io::Error::last_os_error()
+        ));
+    }
+    Ok(fd)
+}
+
+/// Takes the standard streams off the interfaces, now that each has a
+/// descriptor of its own: `/dev/null` over descriptors 0, 1 and 2, and a
+/// panic hook that says a panic on the error interface. See this module's
+/// documentation.
+///
+/// # Arguments
+///
+/// * `name`   - The node's name, which a panic is said with.
+/// * `errors` - The error interface.
+///
+/// # Errors
+///
+/// Why not, if the error interface could not be held again or `/dev/null`
+/// could not be put in place.
+fn quiet(name: &str, errors: &Errors) -> Result<(), String> {
+    let held = errors.0.try_clone().map_err(|e| {
+        format!("the error interface could not be held for panics: {e}")
+    })?;
+    // Set once, `taking` refusing a second taking.
+    let _ = MOVED.set(held);
+    let name = name.to_string();
+    std::panic::set_hook(Box::new(move |info| {
+        complain(&format!("{name}: {info}"));
+    }));
+    let null = File::options()
+        .read(true)
+        .write(true)
+        .open("/dev/null")
+        .map_err(|e| format!("/dev/null could not be opened: {e}"))?;
+    for fd in 0..=2 {
+        // SAFETY: dup2 puts a copy of an open descriptor at a number, closing
+        // what was there, and reads nothing through a pointer. `null` is
+        // open, and what is closed at 0, 1 and 2 nothing owns: the
+        // interfaces' handles hold the descriptors `moved` made, and std's
+        // standard streams name these numbers without owning them -- which
+        // is the point, as they now reach /dev/null.
+        if unsafe { libc::dup2(null.as_raw_fd(), fd) } == -1 {
+            return Err(format!(
+                "/dev/null could not be put at descriptor {fd}: {}",
+                io::Error::last_os_error()
+            ));
+        }
+    }
+    Ok(())
 }
 
 #[cfg(test)]

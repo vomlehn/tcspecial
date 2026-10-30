@@ -192,9 +192,16 @@ class Batch:
         """Makes an empty batch, preallocated.
 
         Args:
-            capacity: The most bytes of packets it holds; at most 2**32 - 1.
+            capacity: The most bytes of packets it holds: at most 2**32 - 1,
+                      which the batch's length can say.
+
+        Raises:
+            ValueError: The capacity is negative or more than 2**32 - 1.
         """
-        self._capacity = min(capacity, 0xFFFFFFFF)
+        if not 0 <= capacity <= 0xFFFFFFFF:
+            raise ValueError("a batch's capacity is 0 to 4294967295 bytes, "
+                             f"not {capacity}")
+        self._capacity = capacity
         self._buf = ManagedBuffer(BATCH_LENGTH_BYTES + self._capacity)
         self._scratch = ManagedBuffer()
         self.clear()
@@ -1256,6 +1263,7 @@ def checksum(spec: tuple, data, start: int, end: int, field: str) -> int:
         PacketError: ``InvalidValue`` for a non-digit under a decimal
                      algorithm, ``NoAlgorithm`` for a custom one with no
                      function.
+        ValueError:  ``spec`` names no kind of checksum this runtime has.
     """
     kind = spec[0]
     if kind == "crc":
@@ -1328,8 +1336,12 @@ def checksum(spec: tuple, data, start: int, end: int, field: str) -> int:
         if spec[1] is None:
             raise PacketError("NoAlgorithm", field)
         return int(spec[1](bytes(data), start, end))
-    ones = sum(bin(w).count("1") for w in _words(data, start, end, 8))
-    return (ones + spec[1]) & 1  # parity: odd adds one
+    if kind == "parity":
+        ones = sum(bin(w).count("1") for w in _words(data, start, end, 8))
+        return (ones + spec[1]) & 1  # odd adds one
+    # Not from the generator, which writes only the kinds above: a spec
+    # built or damaged by hand.
+    raise ValueError(f"{kind!r} is not a checksum kind")
 
 
 # -- integers

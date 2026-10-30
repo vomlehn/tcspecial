@@ -1,0 +1,81 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="940" height="1080" viewBox="0 0 940 1080" role="img" aria-labelledby="title desc">
+<title id="title">A commanded restart from A to B</title>
+<desc id="desc">The vehicle runs configuration A and the station is matched with it. The station arms and initiates a restart to B. A datum the vehicle sent before taking the restart arrives before the beacon that carries the restart flag, so it is read with A. A START_NODE the station sent before hearing that beacon reaches a vehicle that has taken the restart, so it is not acted on, and its refusal is dropped and counted on the ground. The flagged beacon ends the match, and the station throws away commands it built with A. The new start loads B and beacons B with the flag set. The operator loads B and sends CONNECT with B, which matches, so the vehicle clears the flag and opens the downlink. The station drops anything queued from before, becomes matched, and reads and commands with B.</desc>
+<rect width="940" height="1080" fill="#ffffff"/>
+<text x="40" y="24" style="font-family: Helvetica, Arial, sans-serif; font-size: 15px; font-weight: bold">A commanded restart from A to B</text>
+<line x1="40" y1="46" x2="110" y2="46" stroke="#0072B2" stroke-width="2.5" stroke-dasharray=""/>
+<text x="120" y="50" style="font-family: Helvetica, Arial, sans-serif; font-size: 12px">[A] made with configuration A: solid line</text>
+<line x1="40" y1="64" x2="110" y2="64" stroke="#D55E00" stroke-width="2.5" stroke-dasharray="10 5"/>
+<text x="120" y="68" style="font-family: Helvetica, Arial, sans-serif; font-size: 12px">[B] made with configuration B: dashed line</text>
+<line x1="40" y1="82" x2="110" y2="82" stroke="#555555" stroke-width="2.5" stroke-dasharray="2 4"/>
+<text x="120" y="86" style="font-family: Helvetica, Arial, sans-serif; font-size: 12px">[any] layout never changes (beacon, CONNECT, RESTART_ARM, RESTART, their answers): dotted line</text>
+<text x="40" y="104" style="font-family: Helvetica, Arial, sans-serif; font-size: 12px">Arrowhead: read or acted on. Cross: dropped and counted, or not acted on. The words at each end say which.</text>
+<text x="300" y="128" text-anchor="middle" style="font-family: Helvetica, Arial, sans-serif; font-size: 13px; font-weight: bold">Vehicle (tcspecial)</text>
+<line x1="300" y1="138" x2="300" y2="1070" stroke="#000000" stroke-width="1.5"/>
+<text x="640" y="128" text-anchor="middle" style="font-family: Helvetica, Arial, sans-serif; font-size: 13px; font-weight: bold">MOC (ground station)</text>
+<line x1="640" y1="138" x2="640" y2="1070" stroke="#000000" stroke-width="1.5"/>
+<text x="288" y="154" text-anchor="end" style="font-family: Helvetica, Arial, sans-serif; font-size: 12px; font-style: italic; fill: #000000"><tspan x="288" dy="0">Running A, restart flag clear</tspan></text>
+<text x="652" y="154" text-anchor="start" style="font-family: Helvetica, Arial, sans-serif; font-size: 12px; font-style: italic; fill: #000000"><tspan x="652" dy="0">Using A, matched</tspan></text>
+<line x1="300" y1="180" x2="626" y2="210" stroke="#0072B2" stroke-width="2.5" stroke-dasharray=""/>
+<polygon points="640,210 630,205 630,215" fill="#0072B2"/>
+<text x="408.8" y="183.6" text-anchor="middle" style="font-family: Helvetica, Arial, sans-serif; font-size: 12px; fill: #000000; paint-order: stroke; stroke: #ffffff; stroke-width: 4px">[A] datum</text>
+<text x="652" y="214" text-anchor="start" style="font-family: Helvetica, Arial, sans-serif; font-size: 12px; fill: #000000"><tspan x="652" dy="0">read with A</tspan></text>
+<line x1="640" y1="240" x2="314" y2="270" stroke="#555555" stroke-width="2.5" stroke-dasharray="2 4"/>
+<polygon points="300,270 310,265 310,275" fill="#555555"/>
+<text x="531.2" y="243.6" text-anchor="middle" style="font-family: Helvetica, Arial, sans-serif; font-size: 12px; fill: #000000; paint-order: stroke; stroke: #ffffff; stroke-width: 4px">[any] RESTART_ARM to B</text>
+<text x="288" y="274" text-anchor="end" style="font-family: Helvetica, Arial, sans-serif; font-size: 12px; fill: #000000"><tspan x="288" dy="0">armed</tspan></text>
+<line x1="300" y1="300" x2="626" y2="330" stroke="#555555" stroke-width="2.5" stroke-dasharray="2 4"/>
+<polygon points="640,330 630,325 630,335" fill="#555555"/>
+<text x="408.8" y="303.6" text-anchor="middle" style="font-family: Helvetica, Arial, sans-serif; font-size: 12px; fill: #000000; paint-order: stroke; stroke: #ffffff; stroke-width: 4px">[any] answer: armed</text>
+<text x="652" y="334" text-anchor="start" style="font-family: Helvetica, Arial, sans-serif; font-size: 12px; fill: #000000"><tspan x="652" dy="0">taken</tspan></text>
+<line x1="300" y1="360" x2="626" y2="450" stroke="#0072B2" stroke-width="2.5" stroke-dasharray=""/>
+<polygon points="640,450 630,445 630,455" fill="#0072B2"/>
+<text x="408.8" y="382.8" text-anchor="middle" style="font-family: Helvetica, Arial, sans-serif; font-size: 12px; fill: #000000; paint-order: stroke; stroke: #ffffff; stroke-width: 4px">[A] datum</text>
+<text x="652" y="454" text-anchor="start" style="font-family: Helvetica, Arial, sans-serif; font-size: 12px; fill: #000000"><tspan x="652" dy="0">read with A: sent before the flagged</tspan><tspan x="652" dy="14">beacon</tspan></text>
+<line x1="640" y1="375" x2="314" y2="405" stroke="#555555" stroke-width="2.5" stroke-dasharray="2 4"/>
+<polygon points="300,405 310,400 310,410" fill="#555555"/>
+<text x="531.2" y="378.6" text-anchor="middle" style="font-family: Helvetica, Arial, sans-serif; font-size: 12px; fill: #000000; paint-order: stroke; stroke: #ffffff; stroke-width: 4px">[any] RESTART to B</text>
+<text x="288" y="409" text-anchor="end" style="font-family: Helvetica, Arial, sans-serif; font-size: 12px; fill: #000000"><tspan x="288" dy="0">taken: flag set; from now on only</tspan><tspan x="288" dy="14">beacons and answers go down</tspan></text>
+<line x1="300" y1="420" x2="626" y2="495" stroke="#555555" stroke-width="2.5" stroke-dasharray="2 4"/>
+<polygon points="640,495 630,490 630,500" fill="#555555"/>
+<text x="408.8" y="438.0" text-anchor="middle" style="font-family: Helvetica, Arial, sans-serif; font-size: 12px; fill: #000000; paint-order: stroke; stroke: #ffffff; stroke-width: 4px">[any] beacon A, restart</text>
+<text x="652" y="499" text-anchor="start" style="font-family: Helvetica, Arial, sans-serif; font-size: 12px; fill: #000000"><tspan x="652" dy="0">no longer matched; unsent [A]</tspan><tspan x="652" dy="14">commands thrown away</tspan></text>
+<line x1="300" y1="438" x2="626" y2="534" stroke="#555555" stroke-width="2.5" stroke-dasharray="2 4"/>
+<polygon points="640,534 630,529 630,539" fill="#555555"/>
+<text x="408.8" y="462.72" text-anchor="middle" style="font-family: Helvetica, Arial, sans-serif; font-size: 12px; fill: #000000; paint-order: stroke; stroke: #ffffff; stroke-width: 4px">[any] answer to RESTART</text>
+<text x="652" y="538" text-anchor="start" style="font-family: Helvetica, Arial, sans-serif; font-size: 12px; fill: #000000"><tspan x="652" dy="0">taken</tspan></text>
+<line x1="640" y1="480" x2="314" y2="519" stroke="#0072B2" stroke-width="2.5" stroke-dasharray=""/>
+<polygon points="300,519 310,514 310,524" fill="#0072B2"/>
+<text x="531.2" y="486.48" text-anchor="middle" style="font-family: Helvetica, Arial, sans-serif; font-size: 12px; fill: #000000; paint-order: stroke; stroke: #ffffff; stroke-width: 4px">[A] START_NODE</text>
+<text x="288" y="523" text-anchor="end" style="font-family: Helvetica, Arial, sans-serif; font-size: 12px; fill: #000000"><tspan x="288" dy="0">not acted on; answered with a</tspan><tspan x="288" dy="14">refusal</tspan></text>
+<line x1="300" y1="540" x2="626" y2="585" stroke="#0072B2" stroke-width="2.5" stroke-dasharray=""/>
+<path d="M620,579 L632,591 M620,591 L632,579" stroke="#0072B2" stroke-width="2.5"/>
+<text x="408.8" y="548.4" text-anchor="middle" style="font-family: Helvetica, Arial, sans-serif; font-size: 12px; fill: #000000; paint-order: stroke; stroke: #ffffff; stroke-width: 4px">[A] refusal of START_NODE</text>
+<text x="652" y="589" text-anchor="start" style="font-family: Helvetica, Arial, sans-serif; font-size: 12px; fill: #000000"><tspan x="652" dy="0">dropped and counted: not matched</tspan></text>
+<text x="288" y="604" text-anchor="end" style="font-family: Helvetica, Arial, sans-serif; font-size: 12px; font-style: italic; fill: #000000"><tspan x="288" dy="0">Cleans up, runs again, loads B;</tspan><tspan x="288" dy="14">restart flag set</tspan></text>
+<line x1="300" y1="645" x2="626" y2="675" stroke="#555555" stroke-width="2.5" stroke-dasharray="2 4"/>
+<polygon points="640,675 630,670 630,680" fill="#555555"/>
+<text x="408.8" y="648.6" text-anchor="middle" style="font-family: Helvetica, Arial, sans-serif; font-size: 12px; fill: #000000; paint-order: stroke; stroke: #ffffff; stroke-width: 4px">[any] beacon B, restart</text>
+<text x="652" y="679" text-anchor="start" style="font-family: Helvetica, Arial, sans-serif; font-size: 12px; fill: #000000"><tspan x="652" dy="0">beacon&#x27;s B is not this station&#x27;s A:</tspan><tspan x="652" dy="14">not matched; says the vehicle runs B</tspan></text>
+<text x="652" y="724" text-anchor="start" style="font-family: Helvetica, Arial, sans-serif; font-size: 12px; font-style: italic; fill: #000000"><tspan x="652" dy="0">Operator retrieves B and loads it</tspan></text>
+<line x1="640" y1="750" x2="314" y2="780" stroke="#555555" stroke-width="2.5" stroke-dasharray="2 4"/>
+<polygon points="300,780 310,775 310,785" fill="#555555"/>
+<text x="531.2" y="753.6" text-anchor="middle" style="font-family: Helvetica, Arial, sans-serif; font-size: 12px; fill: #000000; paint-order: stroke; stroke: #ffffff; stroke-width: 4px">[any] CONNECT with B</text>
+<text x="288" y="784" text-anchor="end" style="font-family: Helvetica, Arial, sans-serif; font-size: 12px; fill: #000000"><tspan x="288" dy="0">checksums match: flag cleared;</tspan><tspan x="288" dy="14">queued commands dropped; downlink</tspan><tspan x="288" dy="14">opens</tspan></text>
+<line x1="300" y1="825" x2="626" y2="855" stroke="#555555" stroke-width="2.5" stroke-dasharray="2 4"/>
+<polygon points="640,855 630,850 630,860" fill="#555555"/>
+<text x="408.8" y="828.6" text-anchor="middle" style="font-family: Helvetica, Arial, sans-serif; font-size: 12px; fill: #000000; paint-order: stroke; stroke: #ffffff; stroke-width: 4px">[any] beacon B, normal</text>
+<text x="652" y="859" text-anchor="start" style="font-family: Helvetica, Arial, sans-serif; font-size: 12px; fill: #000000"><tspan x="652" dy="0">matched: queued data dropped, then</tspan><tspan x="652" dy="14">reads on</tspan></text>
+<line x1="300" y1="840" x2="626" y2="891" stroke="#555555" stroke-width="2.5" stroke-dasharray="2 4"/>
+<polygon points="640,891 630,886 630,896" fill="#555555"/>
+<text x="408.8" y="850.32" text-anchor="middle" style="font-family: Helvetica, Arial, sans-serif; font-size: 12px; fill: #000000; paint-order: stroke; stroke: #ffffff; stroke-width: 4px">[any] answer: running B</text>
+<text x="652" y="895" text-anchor="start" style="font-family: Helvetica, Arial, sans-serif; font-size: 12px; fill: #000000"><tspan x="652" dy="0">matched for commanding</tspan></text>
+<line x1="300" y1="930" x2="626" y2="960" stroke="#D55E00" stroke-width="2.5" stroke-dasharray="10 5"/>
+<polygon points="640,960 630,955 630,965" fill="#D55E00"/>
+<text x="408.8" y="933.6" text-anchor="middle" style="font-family: Helvetica, Arial, sans-serif; font-size: 12px; fill: #000000; paint-order: stroke; stroke: #ffffff; stroke-width: 4px">[B] datum</text>
+<text x="652" y="964" text-anchor="start" style="font-family: Helvetica, Arial, sans-serif; font-size: 12px; fill: #000000"><tspan x="652" dy="0">read with B</tspan></text>
+<line x1="640" y1="990" x2="314" y2="1020" stroke="#D55E00" stroke-width="2.5" stroke-dasharray="10 5"/>
+<polygon points="300,1020 310,1015 310,1025" fill="#D55E00"/>
+<text x="531.2" y="993.6" text-anchor="middle" style="font-family: Helvetica, Arial, sans-serif; font-size: 12px; fill: #000000; paint-order: stroke; stroke: #ffffff; stroke-width: 4px">[B] START_NODE</text>
+<text x="288" y="1024" text-anchor="end" style="font-family: Helvetica, Arial, sans-serif; font-size: 12px; fill: #000000"><tspan x="288" dy="0">acted on</tspan></text>
+</svg>

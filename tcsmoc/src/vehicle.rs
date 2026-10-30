@@ -61,10 +61,10 @@ use crate::beacon_receive::BeaconReceive;
 use crate::ci_link::{CiLink, Commanded};
 use crate::oc_link::{Arrival, Arrivals};
 use crate::{
-    ask_for_the_edge, grid_shape, handle_close, handle_quit, present,
-    show_arrivals, stop, window_size, DHInfo, Edge, MainWindow, MenuAction,
-    PingWindow, ProcessManager, Sizes, CHILDREN, CONNECTED_STATUS,
-    DISCONNECTED_STATUS, ERROR_STATUS, NO_TRANSFER_TIME,
+    ask_for_the_edge, child_program, grid_shape, handle_close, handle_quit,
+    installed_directory, present, show_arrivals, stop, window_size, DHInfo,
+    Edge, MainWindow, MenuAction, PingWindow, ProcessManager, Sizes, CHILDREN,
+    CONNECTED_STATUS, DISCONNECTED_STATUS, ERROR_STATUS, NO_TRANSFER_TIME,
     PANEL_REFRESH_INTERVAL,
 };
 
@@ -1823,6 +1823,18 @@ pub fn run(
     // endpoint before it opens anything, and a stand-in not made yet is one
     // it does not find. Then the vehicle, which has no command interpreter to
     // ask whether it is already running, so one is started.
+    //
+    // An installed MOC missing either child is stopped here, before it has
+    // started the other: a tcssim left running for a tcspecial that could
+    // not be started holds the payloads' paths and the readiness port for
+    // nothing.
+    let installed = installed_directory();
+    for name in CHILDREN {
+        if let Err(e) = child_program(name, installed.as_deref()) {
+            startup.error(e);
+            stop(&startup);
+        }
+    }
     let [tcspecial, _] = CHILDREN;
     let pm_tcssim = Arc::new(ProcessManager::new());
     if let Err(e) =

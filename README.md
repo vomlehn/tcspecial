@@ -37,6 +37,59 @@ will build HTML pages of each for viewing.
 
 * There are make clean and make distclean targets.
 
+# Installing
+
+Everything installs under `/opt/tcs`, as three packages:
+
+* `tcspecial`, what flies: `bin/tcspecial`, `bin/tcsverify`,
+  the five test app programs in `libexec/`, the documents and the example
+  configurations, and a systemd unit, `tcspecial.service`, installed but not
+  enabled.
+* `tcspecial-ground`, what a ground station is built on: `libtcs` for C and
+  C++ (`lib/libtcs.so.1`, `lib/libtcs.a`, `include/tcs.h`,
+  `lib/pkgconfig/tcs.pc`), the Python packages `tcslibgs`, `tcslib` and
+  `tcsui`, and `bin/tcsgui` with its data.
+* `tcspecial-test`, the test ground station and simulator: `bin/tcsmoc` and
+  `bin/tcssim`, and `bin/segsend`, the test one, which deletes each
+  telemetry log segment. A vehicle that keeps a log puts its own segsend in
+  `/opt/tcs/bin` instead.
+
+To build them, or to install without them:
+
+     make deb                                # build/packages/*.deb
+     make rpm                                # build/packages/*.rpm
+     make install-build && sudo make install-files HOOKS=1
+     make install PREFIX=$HOME/tcs           # no hooks outside the prefix
+     pip install ./python                    # the Python alone
+     cargo install --path tcsverify --root /opt/tcs
+     cc station.c $(pkg-config --cflags --libs tcs)
+
+`HOOKS=1`, which the packages have, also installs what puts `/opt/tcs` on
+the search paths: `/etc/profile.d/<package>.sh`,
+`/etc/ld.so.conf.d/tcspecial-ground.conf` and a `.pth` file for python3.
+
+The profile.d scripts put `/opt/tcs/bin` on `PATH` for login shells only:
+sudo, cron and other minimal environments do not see it. To make a
+package's programs available everywhere, link them into `/usr/local/bin`,
+and to undo it, take the links away:
+
+     sudo /opt/tcs/sbin/tcspecial-links          # likewise -ground, -test
+     sudo /opt/tcs/sbin/tcspecial-links --remove
+     sudo make links                             # for a make install
+     sudo make unlinks
+
+Each script links only its own package's programs, leaves alone a name
+something else already has, and takes `--dir DIR` for a directory other
+than `/usr/local/bin`. Removing a package takes its links away.
+
+Everything installed is stripped (`--strip-unneeded` for programs and
+`libtcs.so.1`, `--strip-debug` for `libtcs.a`), which takes a fifth to a
+quarter off what each package installs. `STRIP=0` keeps everything as cargo
+built it:
+`make packages STRIP=0`.
+
+See "Installing" in docs/manual.rst for where everything goes and why.
+
 # Stuff
 
 TCSpecial supports standard network protocols and devices for communication, as

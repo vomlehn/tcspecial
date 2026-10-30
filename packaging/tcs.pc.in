@@ -1,0 +1,15 @@
+# pkg-config's account of libtcs, tcslib for C and C++, written by
+# `make install` with the prefix it installs under.
+prefix=@PREFIX@
+exec_prefix=${prefix}
+libdir=${exec_prefix}/lib
+includedir=${prefix}/include
+
+Name: tcs
+Description: tcslib for C and C++: a ground station's beacons, data and commands
+URL: https://github.com/vomlehn/tcspecial
+Version: @LIBTCS_VERSION@
+Libs: -L${libdir} -ltcs
+# What libtcs.a needs besides, as `rustc --print native-static-libs` says.
+Libs.private: -lgcc_s -lutil -lrt -lpthread -lm -ldl -lc
+Cflags: -I${includedir}

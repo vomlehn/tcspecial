@@ -35,3 +35,12 @@ claude-resume
 # is now in the user's own state directory: $XDG_STATE_HOME/tcsgui. Kept here
 # for a while so that a checkout with an old one in it stays clean.
 *.tcsgui-history
+
+# What `make stage`, `make deb` and `make rpm` build: the staged installs and
+# the packages cut from them.
+/build/
+
+# What pip and setuptools leave in python/ when `make install` or
+# `pip install ./python` builds the distribution there.
+/python/build/
+/python/*.egg-info/

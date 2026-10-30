@@ -62,6 +62,38 @@ cc  my_station.c   -I tcslib-c/include target/debug/libtcs.a -lpthread -ldl -lm
 c++ my_station.cpp -I tcslib-c/include target/debug/libtcs.a -lpthread -ldl -lm
 ```
 
+Installed -- by the `tcspecial-ground` package, or `make install` at the
+repository's root -- it is `/opt/tcs/lib/libtcs.so.<ABI>`, with the link
+`libtcs.so` to it, `libtcs.a`, the header as `/opt/tcs/include/tcs.h`, and
+`/opt/tcs/lib/pkgconfig/tcs.pc`. A station then includes `<tcs.h>` and is
+built with pkg-config:
+
+```
+cc  my_station.c   $(pkg-config --cflags --libs tcs)
+c++ my_station.cpp $(pkg-config --cflags --libs tcs)
+```
+
+### The ABI version
+
+`<ABI>` is the library's ABI version, the one whole number in `abi-version`,
+now 1. It is the shared library's soname, `libtcs.so.<ABI>`, which a station
+linked with the library asks for at run time; `build.rs` sets the soname
+from the file, and the Makefile installs the library under the same name,
+so the number is stated once. It is not the crate's version, and changes
+for another reason. Add one to it when, and only when, a station built
+against the old `tcs.h` would not work with the new library:
+
+- a function's signature changes, or its behaviour changes in a way a
+  station relying on the old behaviour would notice;
+- a function is removed;
+- a struct or enum in `tcs.h` changes its layout or its values, a
+  constant such as `TCS_TEXT_BYTES` included.
+
+Adding a function, or anything else an old station cannot notice, leaves it
+alone. A new ABI version is a new soname, so a station built against the
+old one is refused by the loader, saying which library it wanted, rather
+than run against a library it does not match.
+
 `examples/ground.c` is a ground station in C, and `examples/ground.cpp` the
 same one in C++: each reads the configuration, waits for the first beacon,
 connects and pings, asks about a node and sets one of its attributes,

@@ -1,0 +1,9 @@
+#!/bin/sh
+# systemd forgets the tcspecial.service this package took away. The state
+# and telemetry under /var/opt/tcs/tcspecial and the configuration under
+# /etc/opt/tcs/tcspecial are the mission's, and are left where they are.
+set -e
+if { [ "$1" = remove ] || [ "$1" = purge ]; } && [ -d /run/systemd/system ]
+then
+	systemctl daemon-reload || true
+fi

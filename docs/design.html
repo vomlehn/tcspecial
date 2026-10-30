@@ -4819,15 +4819,21 @@ rather than merely different. The writer now folds a run of hyphens to one in
 an XML comment, which is a thing the XML spelling does not preserve.</p>
 <p>Where the tree is, in order: <tt class="docutils literal">$TCSGUI_DATA</tt>, then
 <tt class="docutils literal">$XDG_DATA_HOME/tcsgui</tt> (or <tt class="docutils literal"><span class="pre">~/.local/share/tcsgui</span></tt>), then
-<tt class="docutils literal">/usr/local/share/tcsgui</tt>, then <tt class="docutils literal">/usr/share/tcsgui</tt>, then <tt class="docutils literal">tcsgui/share</tt>
-and <tt class="docutils literal">share</tt> under the working directory. The user's own directory before the
-installed one, because that is where edited descriptions belong and where a
-person's own node goes; the working directory last, so that running the editor
-out of a checkout finds the checkout's own. <tt class="docutils literal">make <span class="pre">install-data</span></tt> puts them
-under <tt class="docutils literal"><span class="pre">$(PREFIX)/share/tcsgui</span></tt>, which is <tt class="docutils literal">/usr/local/share/tcsgui</tt> for
-software built locally and <tt class="docutils literal">/usr/share/tcsgui</tt> for a distribution's package:
+<tt class="docutils literal">share/tcsgui</tt> one level up from the directory the editor's own executable
+is in, then <tt class="docutils literal">/usr/local/share/tcsgui</tt>, then <tt class="docutils literal">/usr/share/tcsgui</tt>, then
+<tt class="docutils literal">tcsgui/share</tt> and <tt class="docutils literal">share</tt> under the working directory. The user's own
+directory before the installed one, because that is where edited
+descriptions belong and where a person's own node goes; the install the
+editor is part of before any other, found from the program rather than
+named, so that <tt class="docutils literal">/opt/tcs/bin/tcsgui</tt> reads <tt class="docutils literal">/opt/tcs/share/tcsgui</tt> and
+an install under another prefix reads its own; the working directory last,
+so that running the editor out of a checkout finds the checkout's own.
+<tt class="docutils literal">make <span class="pre">install-data</span></tt>, which <tt class="docutils literal">make install</tt> runs, puts them under
+<tt class="docutils literal"><span class="pre">$(PREFIX)/share/tcsgui</span></tt>, <tt class="docutils literal">/opt/tcs/share/tcsgui</tt> by default:
 architecture-independent data belonging to one package, which is where the
-filesystem hierarchy standard puts it.</p>
+filesystem hierarchy standard puts it. <tt class="docutils literal">/usr/local/share/tcsgui</tt> and
+<tt class="docutils literal">/usr/share/tcsgui</tt> are where installing put them before everything went
+under one prefix, and are still read.</p>
 </div>
 <div class="section" id="the-editor-is-lazy">
 <h2><a class="toc-backref" href="#toc-entry-45">The editor is lazy</a></h2>

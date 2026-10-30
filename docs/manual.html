@@ -417,41 +417,51 @@ ul.auto-toc {
 </ul>
 </li>
 <li><a class="reference internal" href="#the-simulator-configuration" id="toc-entry-40">The Simulator Configuration</a></li>
-<li><a class="reference internal" href="#running-the-programs" id="toc-entry-41">Running the Programs</a><ul>
-<li><a class="reference internal" href="#everything-at-once" id="toc-entry-42">Everything at once</a></li>
-<li><a class="reference internal" href="#one-program-at-a-time" id="toc-entry-43">One program at a time</a></li>
-<li><a class="reference internal" href="#checking-a-set-without-running-it" id="toc-entry-44">Checking a set without running it</a></li>
-<li><a class="reference internal" href="#what-the-programs-take-without-the-makefile" id="toc-entry-45">What the programs take without the Makefile</a></li>
-<li><a class="reference internal" href="#what-the-vehicle-answers-to" id="toc-entry-46">What the vehicle answers to</a></li>
-<li><a class="reference internal" href="#where-the-links-are" id="toc-entry-47">Where the links are</a></li>
-<li><a class="reference internal" href="#where-the-logs-segments-go" id="toc-entry-48">Where the logs' segments go</a></li>
-<li><a class="reference internal" href="#stand-ins-or-hardware-simulate" id="toc-entry-49">Stand-ins or hardware: <tt class="docutils literal"><span class="pre">--simulate</span></tt></a><ul>
-<li><a class="reference internal" href="#waiting-for-the-simulator" id="toc-entry-50">Waiting for the simulator</a></li>
+<li><a class="reference internal" href="#installing" id="toc-entry-41">Installing</a><ul>
+<li><a class="reference internal" href="#the-packages" id="toc-entry-42">The packages</a></li>
+<li><a class="reference internal" href="#make-install" id="toc-entry-43"><tt class="docutils literal">make install</tt></a></li>
+<li><a class="reference internal" href="#programs-everywhere-not-only-in-a-login-shell" id="toc-entry-44">Programs everywhere, not only in a login shell</a></li>
+<li><a class="reference internal" href="#the-python-alone" id="toc-entry-45">The Python alone</a></li>
+<li><a class="reference internal" href="#the-rust-programs-alone" id="toc-entry-46">The Rust programs alone</a></li>
+<li><a class="reference internal" href="#a-c-or-c-ground-station" id="toc-entry-47">A C or C++ ground station</a></li>
+<li><a class="reference internal" href="#running-tcspecial-under-a-supervisor" id="toc-entry-48">Running tcspecial under a supervisor</a></li>
 </ul>
 </li>
-<li><a class="reference internal" href="#building-tcspecial-for-a-vehicle" id="toc-entry-51">Building tcspecial for a vehicle</a></li>
-<li><a class="reference internal" href="#watching-tcspecial-work" id="toc-entry-52">Watching tcspecial work</a></li>
+<li><a class="reference internal" href="#running-the-programs" id="toc-entry-49">Running the Programs</a><ul>
+<li><a class="reference internal" href="#everything-at-once" id="toc-entry-50">Everything at once</a></li>
+<li><a class="reference internal" href="#one-program-at-a-time" id="toc-entry-51">One program at a time</a></li>
+<li><a class="reference internal" href="#checking-a-set-without-running-it" id="toc-entry-52">Checking a set without running it</a></li>
+<li><a class="reference internal" href="#what-the-programs-take-without-the-makefile" id="toc-entry-53">What the programs take without the Makefile</a></li>
+<li><a class="reference internal" href="#what-the-vehicle-answers-to" id="toc-entry-54">What the vehicle answers to</a></li>
+<li><a class="reference internal" href="#where-the-links-are" id="toc-entry-55">Where the links are</a></li>
+<li><a class="reference internal" href="#where-the-logs-segments-go" id="toc-entry-56">Where the logs' segments go</a></li>
+<li><a class="reference internal" href="#stand-ins-or-hardware-simulate" id="toc-entry-57">Stand-ins or hardware: <tt class="docutils literal"><span class="pre">--simulate</span></tt></a><ul>
+<li><a class="reference internal" href="#waiting-for-the-simulator" id="toc-entry-58">Waiting for the simulator</a></li>
 </ul>
 </li>
-<li><a class="reference internal" href="#testing" id="toc-entry-53">Testing</a><ul>
-<li><a class="reference internal" href="#tcsmoc" id="toc-entry-54">tcsmoc</a><ul>
-<li><a class="reference internal" href="#the-tcsmoc-window" id="toc-entry-55">The tcsmoc window</a></li>
-<li><a class="reference internal" href="#when-data-last-arrived" id="toc-entry-56">When data last arrived</a></li>
-<li><a class="reference internal" href="#a-triggered-payload-on-the-console" id="toc-entry-57">A triggered payload on the console</a></li>
-<li><a class="reference internal" href="#what-each-end-read" id="toc-entry-58">What each end read</a></li>
-<li><a class="reference internal" href="#commands" id="toc-entry-59">Commands</a></li>
-<li><a class="reference internal" href="#beaconing" id="toc-entry-60">Beaconing</a></li>
+<li><a class="reference internal" href="#building-tcspecial-for-a-vehicle" id="toc-entry-59">Building tcspecial for a vehicle</a></li>
+<li><a class="reference internal" href="#watching-tcspecial-work" id="toc-entry-60">Watching tcspecial work</a></li>
 </ul>
 </li>
-<li><a class="reference internal" href="#tcssim" id="toc-entry-61">tcssim</a><ul>
-<li><a class="reference internal" href="#the-tcssim-window" id="toc-entry-62">The tcssim window</a></li>
+<li><a class="reference internal" href="#testing" id="toc-entry-61">Testing</a><ul>
+<li><a class="reference internal" href="#tcsmoc" id="toc-entry-62">tcsmoc</a><ul>
+<li><a class="reference internal" href="#the-tcsmoc-window" id="toc-entry-63">The tcsmoc window</a></li>
+<li><a class="reference internal" href="#when-data-last-arrived" id="toc-entry-64">When data last arrived</a></li>
+<li><a class="reference internal" href="#a-triggered-payload-on-the-console" id="toc-entry-65">A triggered payload on the console</a></li>
+<li><a class="reference internal" href="#what-each-end-read" id="toc-entry-66">What each end read</a></li>
+<li><a class="reference internal" href="#commands" id="toc-entry-67">Commands</a></li>
+<li><a class="reference internal" href="#beaconing" id="toc-entry-68">Beaconing</a></li>
+</ul>
+</li>
+<li><a class="reference internal" href="#tcssim" id="toc-entry-69">tcssim</a><ul>
+<li><a class="reference internal" href="#the-tcssim-window" id="toc-entry-70">The tcssim window</a></li>
 </ul>
 </li>
 </ul>
 </li>
-<li><a class="reference internal" href="#crates-used" id="toc-entry-63">Crates Used</a></li>
-<li><a class="reference internal" href="#license" id="toc-entry-64">License</a></li>
-<li><a class="reference internal" href="#see-also" id="toc-entry-65">See Also</a></li>
+<li><a class="reference internal" href="#crates-used" id="toc-entry-71">Crates Used</a></li>
+<li><a class="reference internal" href="#license" id="toc-entry-72">License</a></li>
+<li><a class="reference internal" href="#see-also" id="toc-entry-73">See Also</a></li>
 </ul>
 </div>
 <div class="section" id="introduction">
@@ -2916,8 +2926,199 @@ cannot see it.</p>
     </span><span class="name tag">packet_interval</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">500 ms</span>
 </pre>
 </div>
+<div class="section" id="installing">
+<h1><a class="toc-backref" href="#toc-entry-41">Installing</a></h1>
+<p>Everything installs under one prefix, <tt class="docutils literal">/opt/tcs</tt>, which the filesystem
+hierarchy standard gives an add-on package of its own, with its host
+configuration in <tt class="docutils literal">/etc/opt/tcs</tt> and its variable data in <tt class="docutils literal">/var/opt/tcs</tt>.
+tcslog, tcslog-tools and tcs-xtce install under the same prefix, so a
+machine with all of them has one <tt class="docutils literal">bin</tt>, one <tt class="docutils literal">lib</tt> and one <tt class="docutils literal">include</tt> to
+be told of.</p>
+<div class="section" id="the-packages">
+<h2><a class="toc-backref" href="#toc-entry-42">The packages</a></h2>
+<p>There are three, because three kinds of machine take them:</p>
+<dl class="docutils">
+<dt><tt class="docutils literal">tcspecial</tt></dt>
+<dd>What flies. <tt class="docutils literal">bin/tcspecial</tt> and <tt class="docutils literal">bin/tcsverify</tt>; the
+five test app programs, in <tt class="docutils literal">libexec</tt> because tcspecial runs them rather
+than a person -- a configuration names one as <tt class="docutils literal">executable:
+/opt/tcs/libexec/app_pl</tt>; the manual and design in
+<tt class="docutils literal">share/doc/tcspecial</tt>; the example configurations in
+<tt class="docutils literal">share/examples/tcspecial</tt>; and empty <tt class="docutils literal">/etc/opt/tcs/tcspecial</tt> and
+<tt class="docutils literal">/var/opt/tcs/tcspecial</tt> for a vehicle's configuration and its state
+and telemetry. No <tt class="docutils literal">segsend</tt>: a vehicle that keeps a log puts its own
+in <tt class="docutils literal">/opt/tcs/bin</tt>, beside tcspecial (see <a class="reference internal" href="#where-the-logs-segments-go">Where the logs' segments
+go</a>).</dd>
+<dt><tt class="docutils literal"><span class="pre">tcspecial-ground</span></tt></dt>
+<dd>What a ground station is built on. <tt class="docutils literal">lib/libtcs.so.1</tt> and <tt class="docutils literal">lib/libtcs.a</tt>
+with <tt class="docutils literal">include/tcs.h</tt> and <tt class="docutils literal">lib/pkgconfig/tcs.pc</tt>; the Python
+packages <tt class="docutils literal">tcslibgs</tt>, <tt class="docutils literal">tcslib</tt> and <tt class="docutils literal">tcsui</tt> in
+<tt class="docutils literal"><span class="pre">lib/python3/site-packages</span></tt>; and <tt class="docutils literal">bin/tcsgui</tt> with its descriptions
+and schemas in <tt class="docutils literal">share/tcsgui</tt>.</dd>
+<dt><tt class="docutils literal"><span class="pre">tcspecial-test</span></tt></dt>
+<dd><tt class="docutils literal">bin/tcsmoc</tt> and <tt class="docutils literal">bin/tcssim</tt>, which never fly, and <tt class="docutils literal">bin/segsend</tt>,
+the test one, which deletes each segment it is given. It depends on
+<tt class="docutils literal">tcspecial</tt>, because an installed tcsmoc starts the tcspecial and the
+tcssim installed beside it. The test <tt class="docutils literal">segsend</tt> is here rather than in
+<tt class="docutils literal">tcspecial</tt> because a vehicle that flew it would throw its telemetry
+away, and because a package that owned <tt class="docutils literal">/opt/tcs/bin/segsend</tt> would
+overwrite a mission's own on every upgrade.</dd>
+</dl>
+<p><tt class="docutils literal">make deb</tt> builds them as <tt class="docutils literal">.deb</tt> files and <tt class="docutils literal">make rpm</tt> as RPMs, both
+into <tt class="docutils literal">build/packages</tt>; <tt class="docutils literal">make packages</tt> builds both. Each is cut from
+<tt class="docutils literal">make stage</tt>, which installs each package into a directory of its own
+under <tt class="docutils literal">build/stage</tt>. Then, as root:</p>
+<pre class="code console literal-block">
+<span class="generic prompt"># </span>apt<span class="whitespace"> </span>install<span class="whitespace"> </span>./build/packages/tcspecial_0.1.0-1_amd64.deb<span class="whitespace">
+</span><span class="generic prompt"># </span>dnf<span class="whitespace"> </span>install<span class="whitespace"> </span>./build/packages/tcspecial-0.1.0-1.x86_64.rpm
+</pre>
+<p>A package also installs what makes <tt class="docutils literal">/opt/tcs</tt> usable without being told
+of it, each file named after the package so that no two own one:
+<tt class="docutils literal"><span class="pre">/etc/profile.d/&lt;package&gt;.sh</span></tt>, which puts <tt class="docutils literal">/opt/tcs/bin</tt> on <tt class="docutils literal">PATH</tt> --
+and, for the ground package, <tt class="docutils literal">/opt/tcs/lib/pkgconfig</tt> on
+<tt class="docutils literal">PKG_CONFIG_PATH</tt>; <tt class="docutils literal"><span class="pre">/etc/ld.so.conf.d/tcspecial-ground.conf</span></tt>, which puts
+<tt class="docutils literal">/opt/tcs/lib</tt> on the loader's path; a <tt class="docutils literal"><span class="pre">tcspecial-ground.pth</span></tt> in the
+system python3's own directory -- <tt class="docutils literal"><span class="pre">/usr/lib/python3/dist-packages</span></tt> on
+Debian, <tt class="docutils literal"><span class="pre">/usr/lib/python3.&lt;minor&gt;/site-packages</span></tt> on Fedora, which has no
+directory every python3 reads -- which puts the Python on python3's path;
+and <tt class="docutils literal">/usr/lib/systemd/system/tcspecial.service</tt> (see <a class="reference internal" href="#running-tcspecial-under-a-supervisor">Running tcspecial
+under a supervisor</a>).</p>
+</div>
+<div class="section" id="make-install">
+<h2><a class="toc-backref" href="#toc-entry-43"><tt class="docutils literal">make install</tt></a></h2>
+<p><tt class="docutils literal">make install</tt> builds what is installed, with cargo's release profile, and
+installs all three packages under <tt class="docutils literal">PREFIX</tt>, <tt class="docutils literal">/opt/tcs</tt> unless it is
+given another. <tt class="docutils literal">DESTDIR</tt> is put in front of every path, for staging, and
+is not part of any path a program looks in. <tt class="docutils literal">HOOKS=1</tt> installs the files
+outside the prefix as well, which a developer's install leaves alone unless
+asked. <tt class="docutils literal">make <span class="pre">install-build</span></tt> and <tt class="docutils literal">make <span class="pre">install-files</span></tt> are its two halves,
+so that nothing is built as root, and <tt class="docutils literal">make <span class="pre">install-tcspecial</span></tt>,
+<tt class="docutils literal"><span class="pre">install-tcspecial-ground</span></tt> and <tt class="docutils literal"><span class="pre">install-tcspecial-test</span></tt> install one
+package. <tt class="docutils literal">make uninstall</tt>, with the same variables, takes away what was
+installed, leaving the configuration and the state, which are the mission's.</p>
+<pre class="code console literal-block">
+<span class="generic prompt">$ </span>make<span class="whitespace"> </span>install-build<span class="whitespace">
+</span><span class="generic prompt">$ </span>sudo<span class="whitespace"> </span>make<span class="whitespace"> </span>install-files<span class="whitespace"> </span><span class="name variable">HOOKS</span><span class="operator">=</span><span class="literal number">1</span><span class="whitespace">
+</span><span class="generic prompt">$ </span>sudo<span class="whitespace"> </span>ldconfig<span class="whitespace">
+</span><span class="generic prompt">$ </span>make<span class="whitespace"> </span>install<span class="whitespace"> </span><span class="name variable">PREFIX</span><span class="operator">=</span><span class="name variable">$HOME</span>/tcs
+</pre>
+<p>Everything <tt class="docutils literal">make install</tt> installs, and so everything in the packages, is
+stripped: the programs and <tt class="docutils literal">libtcs.so.1</tt> with <tt class="docutils literal">strip <span class="pre">--strip-unneeded</span></tt>,
+which leaves what they need to be run and linked with, and <tt class="docutils literal">libtcs.a</tt>
+with <tt class="docutils literal">strip <span class="pre">--strip-debug</span></tt>, which keeps the symbols a program linked with
+it needs. That takes a fifth to a quarter off what each package installs:
+the flight package installs about 9 MB stripped and 12 MB not.
+<tt class="docutils literal">STRIP=0</tt> keeps everything as cargo built it, for a build that is to be
+debugged:</p>
+<pre class="code console literal-block">
+<span class="generic prompt">$ </span>make<span class="whitespace"> </span>packages<span class="whitespace"> </span><span class="name variable">STRIP</span><span class="operator">=</span><span class="literal number">0</span>
+</pre>
+</div>
+<div class="section" id="programs-everywhere-not-only-in-a-login-shell">
+<h2><a class="toc-backref" href="#toc-entry-44">Programs everywhere, not only in a login shell</a></h2>
+<p>The packages' <tt class="docutils literal">/etc/profile.d</tt> scripts put <tt class="docutils literal">/opt/tcs/bin</tt> on <tt class="docutils literal">PATH</tt>,
+but only a login shell reads them: <tt class="docutils literal">sudo</tt>, <tt class="docutils literal">cron</tt>, a systemd unit and
+other minimal environments do not see it, and find the programs only by
+their full path. So each package ships <tt class="docutils literal"><span class="pre">/opt/tcs/sbin/&lt;package&gt;-links</span></tt>,
+which links that package's programs into <tt class="docutils literal">/usr/local/bin</tt> -- on every
+path, <tt class="docutils literal">sudo</tt>'s <tt class="docutils literal">secure_path</tt> included, and the administrator's own,
+which is where the filesystem hierarchy standard lets an administrator link
+an <tt class="docutils literal">/opt</tt> package's programs. Installing a package never does it; it is
+the administrator's choice:</p>
+<pre class="code console literal-block">
+<span class="generic prompt"># </span>/opt/tcs/sbin/tcspecial-links<span class="whitespace">
+</span><span class="generic prompt"># </span>/opt/tcs/sbin/tcspecial-ground-links<span class="whitespace">
+</span><span class="generic prompt"># </span>/opt/tcs/sbin/tcspecial-test-links<span class="whitespace">
+</span><span class="generic prompt"># </span>/opt/tcs/sbin/tcspecial-links<span class="whitespace"> </span>--dir<span class="whitespace"> </span>/opt/bin
+</pre>
+<p>Each links only its own package's programs, named in it when it was
+installed, never everything in <tt class="docutils literal">/opt/tcs/bin</tt>, which every TCS package
+shares. A name already taken in the directory -- a file, or a link to
+somewhere else -- is left alone and said, and the script exits 1 once it has
+linked the rest. A directory that is not there is not made. To undo it:</p>
+<pre class="code console literal-block">
+<span class="generic prompt"># </span>/opt/tcs/sbin/tcspecial-links<span class="whitespace"> </span>--remove
+</pre>
+<p>which takes away only links to the package's own programs. Removing a
+package does this itself, in <tt class="docutils literal">/usr/local/bin</tt> and <tt class="docutils literal">/opt/bin</tt>, so no
+link is left pointing at nothing. After a <tt class="docutils literal">make install</tt>, <tt class="docutils literal">make links</tt>
+and <tt class="docutils literal">make unlinks</tt> run every package's script, with <tt class="docutils literal">LINKDIR</tt> for
+another directory.</p>
+</div>
+<div class="section" id="the-python-alone">
+<h2><a class="toc-backref" href="#toc-entry-45">The Python alone</a></h2>
+<p><tt class="docutils literal">python/pyproject.toml</tt> makes <tt class="docutils literal">tcslibgs</tt>, <tt class="docutils literal">tcslib</tt> and <tt class="docutils literal">tcsui</tt> one
+distribution, <tt class="docutils literal"><span class="pre">tcspecial-ground</span></tt>:</p>
+<pre class="code console literal-block">
+<span class="generic prompt">$ </span>pip<span class="whitespace"> </span>install<span class="whitespace"> </span>./python<span class="whitespace">
+</span><span class="generic prompt">$ </span>pip<span class="whitespace"> </span>install<span class="whitespace"> </span><span class="literal string single">'./python[yaml]'</span>
+</pre>
+<p>The extra brings PyYAML, which a station reading a YAML configuration
+needs. <tt class="docutils literal">tcsui</tt> needs tkinter, which pip cannot install: <tt class="docutils literal"><span class="pre">python3-tk</span></tt> on
+Debian, <tt class="docutils literal"><span class="pre">python3-tkinter</span></tt> on Fedora. The XTCE documents the interface
+digest is taken over, and the part of tcs-xtce that takes it, are inside
+<tt class="docutils literal">tcslibgs</tt>, so an installed station needs nothing from the source tree.</p>
+</div>
+<div class="section" id="the-rust-programs-alone">
+<h2><a class="toc-backref" href="#toc-entry-46">The Rust programs alone</a></h2>
+<p>Each program's crate installs with cargo, into the prefix's <tt class="docutils literal">bin</tt>:</p>
+<pre class="code console literal-block">
+<span class="generic prompt">$ </span>cargo<span class="whitespace"> </span>install<span class="whitespace"> </span>--path<span class="whitespace"> </span>tcspecial<span class="whitespace"> </span>--root<span class="whitespace"> </span>/opt/tcs<span class="whitespace">
+</span><span class="generic prompt">$ </span>cargo<span class="whitespace"> </span>install<span class="whitespace"> </span>--path<span class="whitespace"> </span>tcsverify<span class="whitespace"> </span>--root<span class="whitespace"> </span>/opt/tcs<span class="whitespace">
+</span><span class="generic prompt">$ </span>cargo<span class="whitespace"> </span>install<span class="whitespace"> </span>--path<span class="whitespace"> </span>tcsgui<span class="whitespace"> </span>--root<span class="whitespace"> </span>/opt/tcs
+</pre>
+<p>cargo installs programs and nothing else, so tcsgui installed this way has
+no descriptions or schemas until <tt class="docutils literal">make <span class="pre">install-data</span></tt> puts them in
+<tt class="docutils literal">/opt/tcs/share/tcsgui</tt>, and an app program installed this way is in
+<tt class="docutils literal">bin</tt> rather than <tt class="docutils literal">libexec</tt>. The library crates -- <tt class="docutils literal">tcslibgs</tt>,
+<tt class="docutils literal">tcslib</tt> and the rest -- are taken by a Rust ground station as path or git
+dependencies, and are not installed.</p>
+</div>
+<div class="section" id="a-c-or-c-ground-station">
+<h2><a class="toc-backref" href="#toc-entry-47">A C or C++ ground station</a></h2>
+<p>With <tt class="docutils literal">/opt/tcs/lib/pkgconfig</tt> on <tt class="docutils literal">PKG_CONFIG_PATH</tt> -- the ground
+package's profile script puts it there -- a station includes
+<tt class="docutils literal">&lt;tcs.h&gt;</tt> and is built with what <tt class="docutils literal">tcs.pc</tt> says:</p>
+<pre class="code console literal-block">
+<span class="generic prompt">$ </span>cc<span class="whitespace">  </span>station.c<span class="whitespace">   </span><span class="keyword">$(</span>pkg-config<span class="whitespace"> </span>--cflags<span class="whitespace"> </span>--libs<span class="whitespace"> </span>tcs<span class="keyword">)</span><span class="whitespace">
+</span><span class="generic prompt">$ </span>c++<span class="whitespace"> </span>station.cpp<span class="whitespace"> </span><span class="keyword">$(</span>pkg-config<span class="whitespace"> </span>--cflags<span class="whitespace"> </span>--libs<span class="whitespace"> </span>tcs<span class="keyword">)</span>
+</pre>
+<p>That links with <tt class="docutils literal">libtcs.so.1</tt>, which the loader finds through the ground
+package's <tt class="docutils literal">ld.so.conf.d</tt> file. The <tt class="docutils literal">1</tt> is libtcs's ABI version, which is
+not the package's: it goes up only when a station built against the old
+<tt class="docutils literal">tcs.h</tt> would not work with the new library, so an upgrade that keeps it
+needs no station rebuilt. See tcslib-c's README. A station linked with <tt class="docutils literal">libtcs.a</tt> instead
+names it and what it needs besides:</p>
+<pre class="code console literal-block">
+<span class="generic prompt">$ </span>cc<span class="whitespace"> </span>station.c<span class="whitespace"> </span><span class="keyword">$(</span>pkg-config<span class="whitespace"> </span>--cflags<span class="whitespace"> </span>tcs<span class="keyword">)</span><span class="whitespace"> </span>/opt/tcs/lib/libtcs.a<span class="whitespace"> </span><span class="literal string escape">\
+</span><span class="generic prompt">    $</span><span class="operator">(</span>pkg-config<span class="whitespace"> </span>--static<span class="whitespace"> </span>--libs-only-l<span class="whitespace"> </span>tcs<span class="whitespace"> </span><span class="punctuation">|</span><span class="whitespace"> </span>sed<span class="whitespace"> </span><span class="literal string single">'s/-ltcs//'</span><span class="operator">)</span>
+</pre>
+</div>
+<div class="section" id="running-tcspecial-under-a-supervisor">
+<h2><a class="toc-backref" href="#toc-entry-48">Running tcspecial under a supervisor</a></h2>
+<p>tcspecial relies on a supervisor to start it again whenever it exits: a
+restart that cannot run itself again, and a crash, both end the process.
+The <tt class="docutils literal">tcspecial</tt> package's systemd unit is that supervisor. It runs
+<tt class="docutils literal">/opt/tcs/bin/tcspecial /etc/opt/tcs/tcspecial/tcspecial.yaml</tt> in
+<tt class="docutils literal">/var/opt/tcs/tcspecial</tt>, with no <tt class="docutils literal"><span class="pre">--simulate</span></tt> and so the flight
+setting, and starts it again a second after it exits, however often it
+does. It is installed and not enabled, and does nothing until a
+configuration is at that path: no package ships one, because a vehicle that
+flew an example in place of its own would be flying the wrong payloads.
+So, as root:</p>
+<pre class="code console literal-block">
+<span class="generic prompt"># </span>cp<span class="whitespace"> </span>vehicle.yaml<span class="whitespace"> </span>/etc/opt/tcs/tcspecial/tcspecial.yaml<span class="whitespace">
+</span><span class="generic prompt"># </span>tcsverify<span class="whitespace"> </span>--types<span class="operator">=</span><span class="keyword">$(</span>tcspecial<span class="whitespace"> </span>--types<span class="keyword">)</span><span class="whitespace"> </span>/etc/opt/tcs/tcspecial/tcspecial.yaml<span class="whitespace">
+</span><span class="generic prompt"># </span>systemctl<span class="whitespace"> </span><span class="name builtin">enable</span><span class="whitespace"> </span>--now<span class="whitespace"> </span>tcspecial
+</pre>
+<p>The configuration's <tt class="docutils literal">state_file</tt> and <tt class="docutils literal">log.directory</tt> belong under
+<tt class="docutils literal">/var/opt/tcs/tcspecial</tt>, on storage that survives a power cycle. An XML
+configuration is named with <tt class="docutils literal">systemctl edit tcspecial</tt>, in a drop-in
+that sets <tt class="docutils literal">ExecStart</tt> and <tt class="docutils literal">ConditionPathExists</tt> to the <tt class="docutils literal">.xml</tt> file.</p>
+</div>
+</div>
 <div class="section" id="running-the-programs">
-<h1><a class="toc-backref" href="#toc-entry-41">Running the Programs</a></h1>
+<h1><a class="toc-backref" href="#toc-entry-49">Running the Programs</a></h1>
 <p>The Makefile names a configuration once and gives it to every program that needs
 it, which is the point: tcsmoc builds its panels from the tcspecial
 configuration and hands that same file to the tcspecial and tcssim it starts,
@@ -2943,7 +3144,7 @@ tcssim at the bottom -- because they are read together and would otherwise
 land on top of each other. It is a request to the window system: X11 honours
 it, Wayland may ignore it, and a tiling window manager will do as it likes.</p>
 <div class="section" id="everything-at-once">
-<h2><a class="toc-backref" href="#toc-entry-42">Everything at once</a></h2>
+<h2><a class="toc-backref" href="#toc-entry-50">Everything at once</a></h2>
 <p><tt class="docutils literal">make runmocy</tt> runs tcsmoc, which starts a tcspecial and a tcssim of its own:</p>
 <pre class="code console literal-block">
 <span class="generic prompt">$ </span>make<span class="whitespace"> </span>runmocy<span class="whitespace">
@@ -2970,9 +3171,19 @@ left over from an earlier configuration goes on serving that one's nodes,
 and a payload the new file plainly contains is then answered <tt class="docutils literal">NotFound</tt>.
 Stopping it and letting tcsmoc start a fresh one is the fix; tcspecial's log
 says which handlers it does serve.</p>
+<p>Run out of the source tree, tcsmoc starts its tcspecial and tcssim with
+<tt class="docutils literal">cargo run</tt>, which builds each first, so a child is never older than the
+source. An installed tcsmoc -- one with no cargo build directory beside it,
+such as <tt class="docutils literal">/opt/tcs/bin/tcsmoc</tt> -- starts the <tt class="docutils literal">tcspecial</tt> and <tt class="docutils literal">tcssim</tt>
+in its own directory instead, so a ground station needs neither cargo nor
+the source to run one; see <a class="reference internal" href="#installing">Installing</a>. Where either is not there it
+starts neither, and says which program is missing, where it looked, and
+which package puts it there: <tt class="docutils literal">tcspecial</tt> for tcspecial, <tt class="docutils literal"><span class="pre">tcspecial-test</span></tt>
+for tcssim. It never looks for them anywhere else, as a program found on
+<tt class="docutils literal">PATH</tt> could be another install's, at another version.</p>
 </div>
 <div class="section" id="one-program-at-a-time">
-<h2><a class="toc-backref" href="#toc-entry-43">One program at a time</a></h2>
+<h2><a class="toc-backref" href="#toc-entry-51">One program at a time</a></h2>
 <p>Useful when a program is to be run under a debugger, or restarted without
 disturbing the others, or watched with its own logging.</p>
 <pre class="code console literal-block">
@@ -3000,7 +3211,7 @@ one of it, and <tt class="docutils literal">make runverifyy</tt> and <tt class="
 spellings the same way.</p>
 </div>
 <div class="section" id="checking-a-set-without-running-it">
-<h2><a class="toc-backref" href="#toc-entry-44">Checking a set without running it</a></h2>
+<h2><a class="toc-backref" href="#toc-entry-52">Checking a set without running it</a></h2>
 <p><tt class="docutils literal">tcsverify</tt> reads a configuration and says what is wrong with it, without
 opening a socket or a device node. It takes one file, two or three, the
 tcspecial configuration first, and <tt class="docutils literal"><span class="pre">-h</span></tt> or <tt class="docutils literal"><span class="pre">--help</span></tt> prints how:</p>
@@ -3126,7 +3337,7 @@ a set reports the other half as unsimulated -- and tcsverify says so rather
 than leaving it unsaid.</p>
 </div>
 <div class="section" id="what-the-programs-take-without-the-makefile">
-<h2><a class="toc-backref" href="#toc-entry-45">What the programs take without the Makefile</a></h2>
+<h2><a class="toc-backref" href="#toc-entry-53">What the programs take without the Makefile</a></h2>
 <pre class="code console literal-block">
 <span class="generic prompt">$ </span>cargo<span class="whitespace"> </span>run<span class="whitespace"> </span>--bin<span class="whitespace"> </span>tcspecial<span class="whitespace"> </span>--<span class="whitespace"> </span>--simulate<span class="operator">=</span>all<span class="whitespace"> </span>tests/manual/thermostat.yaml<span class="whitespace">
 </span><span class="generic prompt">$ </span><span class="name variable">PAYLOAD_SIM_YAML</span><span class="operator">=</span>examples/thermostat/thermostat-sim.yaml<span class="whitespace"> </span><span class="literal string escape">\
@@ -3231,7 +3442,7 @@ file:</p>
 </pre>
 </div>
 <div class="section" id="what-the-vehicle-answers-to">
-<h2><a class="toc-backref" href="#toc-entry-46">What the vehicle answers to</a></h2>
+<h2><a class="toc-backref" href="#toc-entry-54">What the vehicle answers to</a></h2>
 <p>The section's <tt class="docutils literal">gateway</tt> says what commands the vehicle and takes its
 telemetry, and every configuration states it:</p>
 <pre class="code yaml literal-block">
@@ -3254,7 +3465,7 @@ because a vehicle answers to one: commands, beacons and data all go the one
 way.</p>
 </div>
 <div class="section" id="where-the-links-are">
-<h2><a class="toc-backref" href="#toc-entry-47">Where the links are</a></h2>
+<h2><a class="toc-backref" href="#toc-entry-55">Where the links are</a></h2>
 <p>Five of the section's attributes are a host and a port written together, as
 <tt class="docutils literal">address:port</tt>, and most of them sit in a subsection with the rest of what
 they are about:</p>
@@ -3374,14 +3585,15 @@ address, stops it before it starts, saying which setting to change: a vehicle
 flying without beacons is one the ground cannot tell from a dead one.</p>
 </div>
 <div class="section" id="where-the-logs-segments-go">
-<h2><a class="toc-backref" href="#toc-entry-48">Where the logs' segments go</a></h2>
+<h2><a class="toc-backref" href="#toc-entry-56">Where the logs' segments go</a></h2>
 <p>A log -- the telemetry log under <tt class="docutils literal">log.directory</tt>, or a <tt class="docutils literal">log</tt> node -- is
 written in segment files, and each one that fills is handed to a program
 called <tt class="docutils literal">segsend</tt>, beside tcspecial's own executable, with the segment's file
 name as its one argument. By then the name has <tt class="docutils literal">.segsend</tt> on the end, which
 takes the file out of the log. tcspecial runs one <tt class="docutils literal">segsend</tt> at a time, in
 the order the segments filled, and does not wait for it in the main loop.</p>
-<p>The <tt class="docutils literal">segsend</tt> that <tt class="docutils literal">cargo build <span class="pre">--workspace</span></tt> builds deletes the file it is
+<p>The <tt class="docutils literal">segsend</tt> that <tt class="docutils literal">cargo build <span class="pre">--workspace</span></tt> builds, and the
+<tt class="docutils literal"><span class="pre">tcspecial-test</span></tt> package installs, deletes the file it is
 given, which is for testing. A mission puts its own program in its place --
 one that sends the file to the ground -- and that program must deal with the
 file before it ends: tcspecial hands each segment over once. A segment left
@@ -3389,7 +3601,7 @@ with <tt class="docutils literal">.segsend</tt> on its name when tcspecial stopp
 the next start.</p>
 <p>A configuration that keeps a log does not start without a <tt class="docutils literal">segsend</tt> there:</p>
 <pre class="code console literal-block">
-<span class="generic output">filled log segments: /usr/local/bin/segsend</span>
+<span class="generic output">filled log segments: /opt/tcs/bin/segsend</span>
 </pre>
 <p><tt class="docutils literal">RUST_LOG</tt> sets the logging, which the Makefile leaves at <tt class="docutils literal">info</tt>; it
 overrides the quieter default as well.</p>
@@ -3400,7 +3612,7 @@ overrides the quieter default as well.</p>
 </pre>
 </div>
 <div class="section" id="stand-ins-or-hardware-simulate">
-<h2><a class="toc-backref" href="#toc-entry-49">Stand-ins or hardware: <tt class="docutils literal"><span class="pre">--simulate</span></tt></a></h2>
+<h2><a class="toc-backref" href="#toc-entry-57">Stand-ins or hardware: <tt class="docutils literal"><span class="pre">--simulate</span></tt></a></h2>
 <p>Nothing in a configuration says whether a payload is the hardware or a
 stand-in for it, and <tt class="docutils literal"><span class="pre">/dev/i2c-7</span></tt> can be the kernel's I2C stub on one host
 and a real bus on the next. So each run says which kind of run it is, with
@@ -3457,7 +3669,7 @@ which is <tt class="docutils literal">all</tt> unless the command line says othe
 <span class="generic prompt">$ </span>make<span class="whitespace"> </span>runmocy<span class="whitespace"> </span><span class="name variable">SIMULATE</span><span class="operator">=</span>some
 </pre>
 <div class="section" id="waiting-for-the-simulator">
-<h3><a class="toc-backref" href="#toc-entry-50">Waiting for the simulator</a></h3>
+<h3><a class="toc-backref" href="#toc-entry-58">Waiting for the simulator</a></h3>
 <p>A stand-in has to exist before tcspecial looks for it, so in a run with
 stand-ins tcssim is started first, and tcspecial only once tcssim has said it
 has made them all. tcssim makes every stand-in as it starts; a panel's button
@@ -3489,7 +3701,7 @@ through <tt class="docutils literal"><span class="pre">tcslib::simulator::wait</
 </div>
 </div>
 <div class="section" id="building-tcspecial-for-a-vehicle">
-<h2><a class="toc-backref" href="#toc-entry-51">Building tcspecial for a vehicle</a></h2>
+<h2><a class="toc-backref" href="#toc-entry-59">Building tcspecial for a vehicle</a></h2>
 <p>A tcspecial contains the payload types it was built with, and no others.
 Each type is a Cargo feature named as a configuration writes the type --
 <tt class="docutils literal"><span class="pre">device-file</span></tt>, <tt class="docutils literal">serial</tt>, <tt class="docutils literal">i2c</tt>, <tt class="docutils literal">spi</tt>, <tt class="docutils literal">can</tt>, <tt class="docutils literal">iio</tt>, <tt class="docutils literal">rpmsg</tt>,
@@ -3525,7 +3737,7 @@ configuration</span>
 vehicle; see <a class="reference internal" href="#checking-a-set-without-running-it">Checking a set without running it</a>.</p>
 </div>
 <div class="section" id="watching-tcspecial-work">
-<h2><a class="toc-backref" href="#toc-entry-52">Watching tcspecial work</a></h2>
+<h2><a class="toc-backref" href="#toc-entry-60">Watching tcspecial work</a></h2>
 <p>A tcspecial built with the <tt class="docutils literal">visual</tt> feature can show what it is doing. Never
 build a tcspecial that flies this way: the feature is for a vehicle on a desk.</p>
 <pre class="code console literal-block">
@@ -3550,7 +3762,7 @@ build one that has it.</p>
 </div>
 </div>
 <div class="section" id="testing">
-<h1><a class="toc-backref" href="#toc-entry-53">Testing</a></h1>
+<h1><a class="toc-backref" href="#toc-entry-61">Testing</a></h1>
 <p>Testing is done with two programs, and a third that checks the files they
 read:</p>
 <ul class="simple">
@@ -3562,9 +3774,9 @@ and errors.</li>
 running any of it: see <a class="reference internal" href="#checking-a-set-without-running-it">Checking a set without running it</a>.</li>
 </ul>
 <div class="section" id="tcsmoc">
-<h2><a class="toc-backref" href="#toc-entry-54">tcsmoc</a></h2>
+<h2><a class="toc-backref" href="#toc-entry-62">tcsmoc</a></h2>
 <div class="section" id="the-tcsmoc-window">
-<h3><a class="toc-backref" href="#toc-entry-55">The tcsmoc window</a></h3>
+<h3><a class="toc-backref" href="#toc-entry-63">The tcsmoc window</a></h3>
 <p>Across the top, from the left:</p>
 <dl class="docutils">
 <dt>the <tt class="docutils literal">tcspecial link</tt> box</dt>
@@ -3685,7 +3897,7 @@ see traffic, and nothing is asked of the spacecraft to show it.</p>
 said about that handler: see <a class="reference internal" href="#seeing-what-was-read">Seeing what was read</a>.</p>
 </div>
 <div class="section" id="when-data-last-arrived">
-<h3><a class="toc-backref" href="#toc-entry-56">When data last arrived</a></h3>
+<h3><a class="toc-backref" href="#toc-entry-64">When data last arrived</a></h3>
 <p><tt class="docutils literal">Last recv</tt> on each panel is when that source's data last arrived, and the
 panel says nothing more about whether that was recent enough. Nothing in a
 configuration states how often a node's data should arrive -- a node produces
@@ -3699,7 +3911,7 @@ what has arrived without a command going out. What only the spacecraft can say
 is for.</p>
 </div>
 <div class="section" id="a-triggered-payload-on-the-console">
-<h3><a class="toc-backref" href="#toc-entry-57">A triggered payload on the console</a></h3>
+<h3><a class="toc-backref" href="#toc-entry-65">A triggered payload on the console</a></h3>
 <p>A payload that answers requests sends nothing until tcspecial asks it to, so
 when such a panel shows no data the question is what the MOC sent and what came
 back -- and a panel shows neither. For those payloads, and only those, tcsmoc
@@ -3731,7 +3943,7 @@ appears in no other counter, because a trigger is a write with no read behind
 it.</p>
 </div>
 <div class="section" id="what-each-end-read">
-<h3><a class="toc-backref" href="#toc-entry-58">What each end read</a></h3>
+<h3><a class="toc-backref" href="#toc-entry-66">What each end read</a></h3>
 <p>When a link comes up, tcsmoc sends its software version and an MD5 of the
 payload configuration it read, and tcspecial answers with its own. Each
 prints what it read on the terminal it was
@@ -3768,7 +3980,7 @@ rather than replacing; stopping it and letting tcsmoc start a fresh one is the
 fix.</p>
 </div>
 <div class="section" id="commands">
-<h3><a class="toc-backref" href="#toc-entry-59">Commands</a></h3>
+<h3><a class="toc-backref" href="#toc-entry-67">Commands</a></h3>
 <p>From the <tt class="docutils literal">Command</tt> menu. Three of the seven items send a command:</p>
 <dl class="docutils">
 <dt>Ping</dt>
@@ -3874,7 +4086,7 @@ is done from its own panel, and the panels show what a query would ask for
 without anyone asking.</p>
 </div>
 <div class="section" id="beaconing">
-<h3><a class="toc-backref" href="#toc-entry-60">Beaconing</a></h3>
+<h3><a class="toc-backref" href="#toc-entry-68">Beaconing</a></h3>
 <p>TCSpecial sends a beacon every <tt class="docutils literal">beacon.reset_interval</tt> from when it starts,
 or from when a restart is initiated, until it takes a <tt class="docutils literal">Connect</tt>, and every
 <tt class="docutils literal">beacon.default_interval</tt> after that (see Initiate restart, above), from the
@@ -4000,9 +4212,9 @@ arrived and leaves the status to the commands and to the beacon.</p>
 </div>
 </div>
 <div class="section" id="tcssim">
-<h2><a class="toc-backref" href="#toc-entry-61">tcssim</a></h2>
+<h2><a class="toc-backref" href="#toc-entry-69">tcssim</a></h2>
 <div class="section" id="the-tcssim-window">
-<h3><a class="toc-backref" href="#toc-entry-62">The tcssim window</a></h3>
+<h3><a class="toc-backref" href="#toc-entry-70">The tcssim window</a></h3>
 <p>One panel per simulated payload, in a grid, and a <tt class="docutils literal">Quit All</tt> button at the
 foot of the window. Nothing in the window names a payload or fixes how many
 there are: the two configuration files decide that, so a payload added to or
@@ -4065,7 +4277,7 @@ both are shown the same way.</p>
 </div>
 </div>
 <div class="section" id="crates-used">
-<h1><a class="toc-backref" href="#toc-entry-63">Crates Used</a></h1>
+<h1><a class="toc-backref" href="#toc-entry-71">Crates Used</a></h1>
 <p>These are the crates the workspace's <tt class="docutils literal">Cargo.toml</tt> files name directly --
 every one of the nineteen manifests, the root and each crate under it. The
 crates they depend on in turn are not listed: <tt class="docutils literal">cargo tree</tt> shows the whole
@@ -4240,7 +4452,7 @@ $ cargo metadata --format-version 1
 </pre>
 </div>
 <div class="section" id="license">
-<h1><a class="toc-backref" href="#toc-entry-64">License</a></h1>
+<h1><a class="toc-backref" href="#toc-entry-72">License</a></h1>
 <p>TCSpecial -- the flight software, the libraries, the ground programs and the
 examples -- is licensed under either of the Apache License, Version 2.0
 (<tt class="docutils literal"><span class="pre">LICENSE-APACHE</span></tt>, or <a class="reference external" href="http://www.apache.org/licenses/LICENSE-2.0">http://www.apache.org/licenses/LICENSE-2.0</a>) or the MIT
@@ -4253,7 +4465,7 @@ dual licensed as above, without any additional terms or conditions.</p>
 <a class="reference internal" href="#crates-used">Crates Used</a>.</p>
 </div>
 <div class="section" id="see-also">
-<h1><a class="toc-backref" href="#toc-entry-65">See Also</a></h1>
+<h1><a class="toc-backref" href="#toc-entry-73">See Also</a></h1>
 <dl class="docutils">
 <dt><a class="reference external" href="https://vomlehn.github.io/tcs-xtce/docs/manual.html">tcs-xtce manual</a></dt>
 <dd>tcs-xtce turns an XTCE description of telemetry and command packets

@@ -1,0 +1,13 @@
+#!/bin/sh
+# Takes away the links that /opt/tcs/sbin/tcspecial-ground-links made
+# in /usr/local/bin or /opt/bin, so that none is left pointing at a program
+# that is gone. Here, before the files go, rather than in postrm, because by
+# postrm the links script has gone with them. Only on "remove": an upgrade
+# keeps the programs where the links point.
+set -e
+if [ "$1" = remove ]; then
+	for dir in /usr/local/bin /opt/bin; do
+		/opt/tcs/sbin/tcspecial-ground-links --remove --dir "$dir" \
+			>/dev/null 2>&1 || true
+	done
+fi

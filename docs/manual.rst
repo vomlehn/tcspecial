@@ -2677,6 +2677,223 @@ This is the shipped ``examples/thermostat/thermostat-sim.yaml``.
        protocol: udp
        packet_interval: 500 ms
 
+Installing
+==========
+
+Everything installs under one prefix, ``/opt/tcs``, which the filesystem
+hierarchy standard gives an add-on package of its own, with its host
+configuration in ``/etc/opt/tcs`` and its variable data in ``/var/opt/tcs``.
+tcslog, tcslog-tools and tcs-xtce install under the same prefix, so a
+machine with all of them has one ``bin``, one ``lib`` and one ``include`` to
+be told of.
+
+The packages
+------------
+
+There are three, because three kinds of machine take them:
+
+``tcspecial``
+   What flies. ``bin/tcspecial`` and ``bin/tcsverify``; the
+   five test app programs, in ``libexec`` because tcspecial runs them rather
+   than a person -- a configuration names one as ``executable:
+   /opt/tcs/libexec/app_pl``; the manual and design in
+   ``share/doc/tcspecial``; the example configurations in
+   ``share/examples/tcspecial``; and empty ``/etc/opt/tcs/tcspecial`` and
+   ``/var/opt/tcs/tcspecial`` for a vehicle's configuration and its state
+   and telemetry. No ``segsend``: a vehicle that keeps a log puts its own
+   in ``/opt/tcs/bin``, beside tcspecial (see `Where the logs' segments
+   go`_).
+``tcspecial-ground``
+   What a ground station is built on. ``lib/libtcs.so.1`` and ``lib/libtcs.a``
+   with ``include/tcs.h`` and ``lib/pkgconfig/tcs.pc``; the Python
+   packages ``tcslibgs``, ``tcslib`` and ``tcsui`` in
+   ``lib/python3/site-packages``; and ``bin/tcsgui`` with its descriptions
+   and schemas in ``share/tcsgui``.
+``tcspecial-test``
+   ``bin/tcsmoc`` and ``bin/tcssim``, which never fly, and ``bin/segsend``,
+   the test one, which deletes each segment it is given. It depends on
+   ``tcspecial``, because an installed tcsmoc starts the tcspecial and the
+   tcssim installed beside it. The test ``segsend`` is here rather than in
+   ``tcspecial`` because a vehicle that flew it would throw its telemetry
+   away, and because a package that owned ``/opt/tcs/bin/segsend`` would
+   overwrite a mission's own on every upgrade.
+
+``make deb`` builds them as ``.deb`` files and ``make rpm`` as RPMs, both
+into ``build/packages``; ``make packages`` builds both. Each is cut from
+``make stage``, which installs each package into a directory of its own
+under ``build/stage``. Then, as root:
+
+.. code-block:: console
+
+   # apt install ./build/packages/tcspecial_0.1.0-1_amd64.deb
+   # dnf install ./build/packages/tcspecial-0.1.0-1.x86_64.rpm
+
+A package also installs what makes ``/opt/tcs`` usable without being told
+of it, each file named after the package so that no two own one:
+``/etc/profile.d/<package>.sh``, which puts ``/opt/tcs/bin`` on ``PATH`` --
+and, for the ground package, ``/opt/tcs/lib/pkgconfig`` on
+``PKG_CONFIG_PATH``; ``/etc/ld.so.conf.d/tcspecial-ground.conf``, which puts
+``/opt/tcs/lib`` on the loader's path; a ``tcspecial-ground.pth`` in the
+system python3's own directory -- ``/usr/lib/python3/dist-packages`` on
+Debian, ``/usr/lib/python3.<minor>/site-packages`` on Fedora, which has no
+directory every python3 reads -- which puts the Python on python3's path;
+and ``/usr/lib/systemd/system/tcspecial.service`` (see `Running tcspecial
+under a supervisor`_).
+
+``make install``
+----------------
+
+``make install`` builds what is installed, with cargo's release profile, and
+installs all three packages under ``PREFIX``, ``/opt/tcs`` unless it is
+given another. ``DESTDIR`` is put in front of every path, for staging, and
+is not part of any path a program looks in. ``HOOKS=1`` installs the files
+outside the prefix as well, which a developer's install leaves alone unless
+asked. ``make install-build`` and ``make install-files`` are its two halves,
+so that nothing is built as root, and ``make install-tcspecial``,
+``install-tcspecial-ground`` and ``install-tcspecial-test`` install one
+package. ``make uninstall``, with the same variables, takes away what was
+installed, leaving the configuration and the state, which are the mission's.
+
+.. code-block:: console
+
+   $ make install-build
+   $ sudo make install-files HOOKS=1
+   $ sudo ldconfig
+   $ make install PREFIX=$HOME/tcs
+
+Everything ``make install`` installs, and so everything in the packages, is
+stripped: the programs and ``libtcs.so.1`` with ``strip --strip-unneeded``,
+which leaves what they need to be run and linked with, and ``libtcs.a``
+with ``strip --strip-debug``, which keeps the symbols a program linked with
+it needs. That takes a fifth to a quarter off what each package installs:
+the flight package installs about 9 MB stripped and 12 MB not.
+``STRIP=0`` keeps everything as cargo built it, for a build that is to be
+debugged:
+
+.. code-block:: console
+
+   $ make packages STRIP=0
+
+Programs everywhere, not only in a login shell
+----------------------------------------------
+
+The packages' ``/etc/profile.d`` scripts put ``/opt/tcs/bin`` on ``PATH``,
+but only a login shell reads them: ``sudo``, ``cron``, a systemd unit and
+other minimal environments do not see it, and find the programs only by
+their full path. So each package ships ``/opt/tcs/sbin/<package>-links``,
+which links that package's programs into ``/usr/local/bin`` -- on every
+path, ``sudo``'s ``secure_path`` included, and the administrator's own,
+which is where the filesystem hierarchy standard lets an administrator link
+an ``/opt`` package's programs. Installing a package never does it; it is
+the administrator's choice:
+
+.. code-block:: console
+
+   # /opt/tcs/sbin/tcspecial-links
+   # /opt/tcs/sbin/tcspecial-ground-links
+   # /opt/tcs/sbin/tcspecial-test-links
+   # /opt/tcs/sbin/tcspecial-links --dir /opt/bin
+
+Each links only its own package's programs, named in it when it was
+installed, never everything in ``/opt/tcs/bin``, which every TCS package
+shares. A name already taken in the directory -- a file, or a link to
+somewhere else -- is left alone and said, and the script exits 1 once it has
+linked the rest. A directory that is not there is not made. To undo it:
+
+.. code-block:: console
+
+   # /opt/tcs/sbin/tcspecial-links --remove
+
+which takes away only links to the package's own programs. Removing a
+package does this itself, in ``/usr/local/bin`` and ``/opt/bin``, so no
+link is left pointing at nothing. After a ``make install``, ``make links``
+and ``make unlinks`` run every package's script, with ``LINKDIR`` for
+another directory.
+
+The Python alone
+----------------
+
+``python/pyproject.toml`` makes ``tcslibgs``, ``tcslib`` and ``tcsui`` one
+distribution, ``tcspecial-ground``:
+
+.. code-block:: console
+
+   $ pip install ./python
+   $ pip install './python[yaml]'
+
+The extra brings PyYAML, which a station reading a YAML configuration
+needs. ``tcsui`` needs tkinter, which pip cannot install: ``python3-tk`` on
+Debian, ``python3-tkinter`` on Fedora. The XTCE documents the interface
+digest is taken over, and the part of tcs-xtce that takes it, are inside
+``tcslibgs``, so an installed station needs nothing from the source tree.
+
+The Rust programs alone
+-----------------------
+
+Each program's crate installs with cargo, into the prefix's ``bin``:
+
+.. code-block:: console
+
+   $ cargo install --path tcspecial --root /opt/tcs
+   $ cargo install --path tcsverify --root /opt/tcs
+   $ cargo install --path tcsgui --root /opt/tcs
+
+cargo installs programs and nothing else, so tcsgui installed this way has
+no descriptions or schemas until ``make install-data`` puts them in
+``/opt/tcs/share/tcsgui``, and an app program installed this way is in
+``bin`` rather than ``libexec``. The library crates -- ``tcslibgs``,
+``tcslib`` and the rest -- are taken by a Rust ground station as path or git
+dependencies, and are not installed.
+
+A C or C++ ground station
+-------------------------
+
+With ``/opt/tcs/lib/pkgconfig`` on ``PKG_CONFIG_PATH`` -- the ground
+package's profile script puts it there -- a station includes
+``<tcs.h>`` and is built with what ``tcs.pc`` says:
+
+.. code-block:: console
+
+   $ cc  station.c   $(pkg-config --cflags --libs tcs)
+   $ c++ station.cpp $(pkg-config --cflags --libs tcs)
+
+That links with ``libtcs.so.1``, which the loader finds through the ground
+package's ``ld.so.conf.d`` file. The ``1`` is libtcs's ABI version, which is
+not the package's: it goes up only when a station built against the old
+``tcs.h`` would not work with the new library, so an upgrade that keeps it
+needs no station rebuilt. See tcslib-c's README. A station linked with ``libtcs.a`` instead
+names it and what it needs besides:
+
+.. code-block:: console
+
+   $ cc station.c $(pkg-config --cflags tcs) /opt/tcs/lib/libtcs.a \
+       $(pkg-config --static --libs-only-l tcs | sed 's/-ltcs//')
+
+Running tcspecial under a supervisor
+------------------------------------
+
+tcspecial relies on a supervisor to start it again whenever it exits: a
+restart that cannot run itself again, and a crash, both end the process.
+The ``tcspecial`` package's systemd unit is that supervisor. It runs
+``/opt/tcs/bin/tcspecial /etc/opt/tcs/tcspecial/tcspecial.yaml`` in
+``/var/opt/tcs/tcspecial``, with no ``--simulate`` and so the flight
+setting, and starts it again a second after it exits, however often it
+does. It is installed and not enabled, and does nothing until a
+configuration is at that path: no package ships one, because a vehicle that
+flew an example in place of its own would be flying the wrong payloads.
+So, as root:
+
+.. code-block:: console
+
+   # cp vehicle.yaml /etc/opt/tcs/tcspecial/tcspecial.yaml
+   # tcsverify --types=$(tcspecial --types) /etc/opt/tcs/tcspecial/tcspecial.yaml
+   # systemctl enable --now tcspecial
+
+The configuration's ``state_file`` and ``log.directory`` belong under
+``/var/opt/tcs/tcspecial``, on storage that survives a power cycle. An XML
+configuration is named with ``systemctl edit tcspecial``, in a drop-in
+that sets ``ExecStart`` and ``ConditionPathExists`` to the ``.xml`` file.
+
 Running the Programs
 ====================
 The Makefile names a configuration once and gives it to every program that needs
@@ -2739,6 +2956,17 @@ left over from an earlier configuration goes on serving that one's nodes,
 and a payload the new file plainly contains is then answered ``NotFound``.
 Stopping it and letting tcsmoc start a fresh one is the fix; tcspecial's log
 says which handlers it does serve.
+
+Run out of the source tree, tcsmoc starts its tcspecial and tcssim with
+``cargo run``, which builds each first, so a child is never older than the
+source. An installed tcsmoc -- one with no cargo build directory beside it,
+such as ``/opt/tcs/bin/tcsmoc`` -- starts the ``tcspecial`` and ``tcssim``
+in its own directory instead, so a ground station needs neither cargo nor
+the source to run one; see `Installing`_. Where either is not there it
+starts neither, and says which program is missing, where it looked, and
+which package puts it there: ``tcspecial`` for tcspecial, ``tcspecial-test``
+for tcssim. It never looks for them anywhere else, as a program found on
+``PATH`` could be another install's, at another version.
 
 One program at a time
 ---------------------
@@ -3223,7 +3451,8 @@ name as its one argument. By then the name has ``.segsend`` on the end, which
 takes the file out of the log. tcspecial runs one ``segsend`` at a time, in
 the order the segments filled, and does not wait for it in the main loop.
 
-The ``segsend`` that ``cargo build --workspace`` builds deletes the file it is
+The ``segsend`` that ``cargo build --workspace`` builds, and the
+``tcspecial-test`` package installs, deletes the file it is
 given, which is for testing. A mission puts its own program in its place --
 one that sends the file to the ground -- and that program must deal with the
 file before it ends: tcspecial hands each segment over once. A segment left
@@ -3234,7 +3463,7 @@ A configuration that keeps a log does not start without a ``segsend`` there:
 
 .. code-block:: console
 
-   filled log segments: /usr/local/bin/segsend
+   filled log segments: /opt/tcs/bin/segsend
 
 ``RUST_LOG`` sets the logging, which the Makefile leaves at ``info``; it
 overrides the quieter default as well.

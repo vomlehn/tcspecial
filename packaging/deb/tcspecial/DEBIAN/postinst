@@ -1,0 +1,7 @@
+#!/bin/sh
+# systemd learns of tcspecial.service. It is not enabled or started: which
+# configuration a vehicle flies is the mission's to put in place first.
+set -e
+if [ "$1" = configure ] && [ -d /run/systemd/system ]; then
+	systemctl daemon-reload || true
+fi

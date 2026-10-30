@@ -232,6 +232,36 @@ the repository’s root:</p>
 <pre><code>cargo build -p tcslib-c
 cc  my_station.c   -I tcslib-c/include target/debug/libtcs.a -lpthread -ldl -lm
 c++ my_station.cpp -I tcslib-c/include target/debug/libtcs.a -lpthread -ldl -lm</code></pre>
+<p>Installed – by the <code>tcspecial-ground</code> package, or
+<code>make install</code> at the repository’s root – it is
+<code>/opt/tcs/lib/libtcs.so.&lt;ABI&gt;</code>, with the link
+<code>libtcs.so</code> to it, <code>libtcs.a</code>, the header as
+<code>/opt/tcs/include/tcs.h</code>, and
+<code>/opt/tcs/lib/pkgconfig/tcs.pc</code>. A station then includes
+<code>&lt;tcs.h&gt;</code> and is built with pkg-config:</p>
+<pre><code>cc  my_station.c   $(pkg-config --cflags --libs tcs)
+c++ my_station.cpp $(pkg-config --cflags --libs tcs)</code></pre>
+<h3 id="the-abi-version">The ABI version</h3>
+<p><code>&lt;ABI&gt;</code> is the library’s ABI version, the one whole
+number in <code>abi-version</code>, now 1. It is the shared library’s
+soname, <code>libtcs.so.&lt;ABI&gt;</code>, which a station linked with
+the library asks for at run time; <code>build.rs</code> sets the soname
+from the file, and the Makefile installs the library under the same
+name, so the number is stated once. It is not the crate’s version, and
+changes for another reason. Add one to it when, and only when, a station
+built against the old <code>tcs.h</code> would not work with the new
+library:</p>
+<ul>
+<li>a function’s signature changes, or its behaviour changes in a way a
+station relying on the old behaviour would notice;</li>
+<li>a function is removed;</li>
+<li>a struct or enum in <code>tcs.h</code> changes its layout or its
+values, a constant such as <code>TCS_TEXT_BYTES</code> included.</li>
+</ul>
+<p>Adding a function, or anything else an old station cannot notice,
+leaves it alone. A new ABI version is a new soname, so a station built
+against the old one is refused by the loader, saying which library it
+wanted, rather than run against a library it does not match.</p>
 <p><code>examples/ground.c</code> is a ground station in C, and
 <code>examples/ground.cpp</code> the same one in C++: each reads the
 configuration, waits for the first beacon, connects and pings, asks

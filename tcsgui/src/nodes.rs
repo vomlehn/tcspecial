@@ -598,8 +598,14 @@ pub fn matching<'a>(
 /// * `$TCSGUI_DATA`, for a copy somebody is working on;
 /// * `$XDG_DATA_HOME/tcsgui`, or `~/.local/share/tcsgui`, which is where a
 ///   person's own descriptions belong and where edited ones will be written;
+/// * `share/tcsgui` beside the directory this program is in -- so
+///   `/opt/tcs/share/tcsgui` for an editor installed as `/opt/tcs/bin/tcsgui`,
+///   which is where `make install` and the packages put them -- found from
+///   the program rather than named, so that an install under any `PREFIX`
+///   finds its own data and not another install's;
 /// * `/usr/local/share/tcsgui` and `/usr/share/tcsgui`, which is where
-///   installing puts them -- see the `install-data` target;
+///   installing put them before it put everything under one prefix, and
+///   where a copy installed by hand may still be;
 /// * `tcsgui/share` and `share` under the working directory, which is the
 ///   source tree: running the editor out of a checkout should find the
 ///   checkout's own descriptions.
@@ -622,12 +628,31 @@ pub fn data_dir() -> Option<PathBuf> {
     } else if let Some(home) = std::env::var_os("HOME") {
         tried.push(PathBuf::from(home).join(".local/share/tcsgui"));
     }
+    if let Some(installed) = beside_this_program() {
+        tried.push(installed);
+    }
     tried.push(PathBuf::from("/usr/local/share/tcsgui"));
     tried.push(PathBuf::from("/usr/share/tcsgui"));
     tried.push(PathBuf::from("tcsgui/share"));
     tried.push(PathBuf::from("share"));
 
     tried.into_iter().find(|where_| where_.is_dir())
+}
+
+/// Where an installed tcsgui's data is: `../share/tcsgui` from the directory
+/// its executable is in.
+///
+/// Through the executable's own path with its links resolved, so that a link
+/// to the program from somewhere else -- `/usr/local/bin/tcsgui`, say -- still
+/// finds the data of the install it links to.
+///
+/// # Returns
+///
+/// The directory, whether or not it exists; `None` where this program's own
+/// path cannot be found or is at the root of the filesystem.
+fn beside_this_program() -> Option<PathBuf> {
+    let program = std::env::current_exe().ok()?.canonicalize().ok()?;
+    Some(program.parent()?.parent()?.join("share/tcsgui"))
 }
 
 /// The schemas inside a data directory.
@@ -709,7 +734,7 @@ pub fn schema_reference(destination: &Path, schema: &str) -> String {
         }
     }
 
-    format!("/usr/local/share/tcsgui/schema/{schema}")
+    format!("/opt/tcs/share/tcsgui/schema/{schema}")
 }
 
 /// The description tree inside a data directory.
@@ -739,6 +764,22 @@ mod tests {
     /// The tree this repository ships.
     fn shipped() -> PathBuf {
         Path::new(env!("CARGO_MANIFEST_DIR")).join("share/nodes")
+    }
+
+    /// An installed editor looks for its data in `share/tcsgui` one level up
+    /// from the directory it is in, which is where `make install` puts it:
+    /// `/opt/tcs/share/tcsgui` for `/opt/tcs/bin/tcsgui`.
+    #[test]
+    fn an_installed_editor_looks_beside_its_own_directory() {
+        let program = std::env::current_exe()
+            .expect("this test's path")
+            .canonicalize()
+            .expect("this test's path, resolved");
+        let prefix = program
+            .parent()
+            .and_then(Path::parent)
+            .expect("a directory above this test's");
+        assert_eq!(beside_this_program(), Some(prefix.join("share/tcsgui")));
     }
 
     /// The shipped tree reads, and says what it is expected to say.

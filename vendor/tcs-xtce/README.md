@@ -1,7 +1,7 @@
 # tcs-xtce, vendored
 
 A copy of the parts of tcs-xtce this tree uses, taken from
-`github.com:vomlehn/tcs-xtce` (commit 30d8c4e, of 2026-10-29) because
+`github.com:vomlehn/tcs-xtce` (commit 7a51180, of 2026-10-30) because
 tcs-xtce is not yet published. **When tcs-xtce is on crates.io, replace this
 directory with a dependency on it**: `tcs-xtce = "<version>"` in
 `tcslibgs/Cargo.toml` in place of the path, the `exclude` in the workspace's
@@ -26,12 +26,14 @@ time -- and the CRC that ends every packet and tcspecial's state file.
 
 Copied as they are, with nothing changed. To refresh the copy, copy those
 directories again from a tcs-xtce commit (`rust/` without its `tests/`,
-`examples/` or `target/`), and `tests/doc_headers.py`, leaving out
-`__pycache__`. Take them from the commit -- `git archive` -- and not from a
-working tree, which may hold work in progress. `rust/src/generated.rs` and `python/xtce/generated.py` are not in
-the commit: `make rust/src/generated.rs python/xtce/generated.py` in the
-exported copy writes them from the XTCE schema. Then run `make link-packet
-interface-digest` in `tcslibgs/` and `cargo test --workspace`.
+`examples/`, `target/` or `LICENSE-*` links, and `generator/` without its
+`tests/`), and `tests/doc_headers.py`, leaving out `__pycache__`. Take them
+from the commit -- `git archive` -- and not from a working tree, which may
+hold work in progress. `rust/src/generated.rs` and
+`python/xtce/generated.py` are not in the commit: `make
+rust/src/generated.rs python/xtce/generated.py` in the exported copy writes
+them from the XTCE schema. Then run `make link-packet interface-digest` in
+`tcslibgs/` and `cargo test --workspace`.
 
 tcs-xtce is licensed under either of the Apache License, Version 2.0, in
 `LICENSE-APACHE`, or the MIT license, in `LICENSE-MIT`, at your option; its

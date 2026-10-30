@@ -1,8 +1,8 @@
-"""Command line: ``python3 -m xtce_digest [--set] FILE...``.
+"""Command line: ``python3 -m tcs_xtce.digest_cli [--set] FILE...``.
 
 Reads each XTCE document in the order given and prints ``FILE: DIGEST``,
 where DIGEST is the MD5 digest of what the document means (see
-``xtce_digest``).  With ``--set``, the documents are one mission split
+``tcs_xtce.digest_cli``).  With ``--set``, the documents are one mission split
 across several files, and it prints the one DIGEST of the set instead,
 which doesn't depend on the order of the files.  The first document that
 can't be read or isn't valid XTCE is reported, and ends the command with a
@@ -15,7 +15,7 @@ import argparse
 import sys
 from pathlib import Path
 
-from xtce_digest import Document, XtceError, checked_digest, digest_set
+from tcs_xtce.digest_cli import Document, XtceError, checked_digest, digest_set
 
 
 def main(argv=None) -> int:

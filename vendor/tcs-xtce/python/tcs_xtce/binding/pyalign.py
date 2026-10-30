@@ -1261,7 +1261,7 @@ def align(src: str) -> str:
 
 
 def main(argv=None) -> int:
-    """Runs ``python3 -m xtcegen.pyalign [--check] FILE...``: lays out
+    """Runs ``python3 -m tcs_xtce.binding.pyalign [--check] FILE...``: lays out
     each file, or with ``--check`` reports the files whose layout would
     change.
 

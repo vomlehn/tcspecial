@@ -1,1 +1,1 @@
-../../../vendor/tcs-xtce/python/xtce/digest.py
+../../../vendor/tcs-xtce/python/tcs_xtce/digest.py

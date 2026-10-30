@@ -7,7 +7,7 @@ import math
 import re
 import textwrap
 
-from xtcegen import CRATE, REPOSITORY
+from tcs_xtce.binding import CRATE, REPOSITORY
 
 from .model import (AggregateEnc, BinaryEnc, Cond, ContextCal, Criterion,
                     DynSize, Fill, FloatEnc, IntEnc, MathOp, Node, Polynomial,

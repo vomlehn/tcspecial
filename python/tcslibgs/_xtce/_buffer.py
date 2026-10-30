@@ -1,1 +1,1 @@
-../../../vendor/tcs-xtce/python/xtce/_buffer.py
+../../../vendor/tcs-xtce/python/tcs_xtce/_buffer.py

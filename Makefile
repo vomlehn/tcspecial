@@ -184,8 +184,17 @@ test:
 		set -eu; \
 		echo "Running tests..."; \
 		cd $(RUST) && cargo test; \
+		$(MAKE) --no-print-directory doc-headers; \
 		echo "✓ Tests complete"; \
 	)
+
+# Every non-trivial function, in Rust, C, C++ and Python, has a header:
+# what it does, what each parameter means and what it returns, in its
+# language's own convention. The checker is tcs-xtce's, vendored with the
+# rest of it; it checks every file git tracks but vendor/ and target/.
+.PHONY: doc-headers
+doc-headers:
+	python3 -I vendor/tcs-xtce/tests/doc_headers.py
 
 # Run the tcspecial application
 .PHONY: run

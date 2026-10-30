@@ -22,12 +22,13 @@ time -- and the CRC that ends every packet and tcspecial's state file.
 | `rust/` | The `tcs-xtce` crate: the packet runtime the generated Rust calls, its fixed-capacity buffers and its digest, and the XML binding the crate also holds | `tcslibgs`, through a path dependency. Not a member of the workspace, so `cargo test`, `clippy` and `fmt` leave it alone. |
 | `python/xtce/` | The same runtime in Python, digest included | `python/tcslibgs/interface.py` |
 | `generator/` | `tcs_xtce`, the compiler, which runs as `python3 -m tcs_xtce` because a Python module's name cannot hold a hyphen, and the two packages it is built from: `xtcepkt` and `xtcegen`; and `xtce_digest`, the digest's command line | `make link-packet` and `make interface-digest`. They read XTCE with `python/xtce/`. |
+| `tests/doc_headers.py` | tcs-xtce's check that every non-trivial function has a header in its language's convention | `make doc-headers`, which `make test` runs |
 
 Copied as they are, with nothing changed. To refresh the copy, copy those
 directories again from a tcs-xtce commit (`rust/` without its `tests/`,
-`examples/` or `target/`), leaving out `__pycache__`. Take them from the
-commit -- `git archive` -- and not from a working tree, which may hold work in
-progress. `rust/src/generated.rs` and `python/xtce/generated.py` are not in
+`examples/` or `target/`), and `tests/doc_headers.py`, leaving out
+`__pycache__`. Take them from the commit -- `git archive` -- and not from a
+working tree, which may hold work in progress. `rust/src/generated.rs` and `python/xtce/generated.py` are not in
 the commit: `make rust/src/generated.rs python/xtce/generated.py` in the
 exported copy writes them from the XTCE schema. Then run `make link-packet
 interface-digest` in `tcslibgs/` and `cargo test --workspace`.

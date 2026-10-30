@@ -1,0 +1,54 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="940" height="720" viewBox="0 0 940 720" role="img" aria-labelledby="title desc">
+<title id="title">A crash and restart on the same configuration</title>
+<desc id="desc">The vehicle runs A and crashes. A datum sent before the crash arrives before the new start&#x27;s first beacon and is read with A. A command the station sent before hearing of the restart reaches the new start, which is not matched, so it is not acted on, and its refusal is dropped and counted. The flagged beacon ends the match. CONNECT with A matches again; the station drops anything queued and reads and commands with A.</desc>
+<rect width="940" height="720" fill="#ffffff"/>
+<text x="40" y="24" style="font-family: Helvetica, Arial, sans-serif; font-size: 15px; font-weight: bold">A crash and restart on the same configuration</text>
+<line x1="40" y1="46" x2="110" y2="46" stroke="#0072B2" stroke-width="2.5" stroke-dasharray=""/>
+<text x="120" y="50" style="font-family: Helvetica, Arial, sans-serif; font-size: 12px">[A] made with configuration A: solid line</text>
+<line x1="40" y1="64" x2="110" y2="64" stroke="#555555" stroke-width="2.5" stroke-dasharray="2 4"/>
+<text x="120" y="68" style="font-family: Helvetica, Arial, sans-serif; font-size: 12px">[any] layout never changes (beacon, CONNECT, RESTART_ARM, RESTART, their answers): dotted line</text>
+<text x="40" y="86" style="font-family: Helvetica, Arial, sans-serif; font-size: 12px">Arrowhead: read or acted on. Cross: dropped and counted, or not acted on. The words at each end say which.</text>
+<text x="300" y="128" text-anchor="middle" style="font-family: Helvetica, Arial, sans-serif; font-size: 13px; font-weight: bold">Vehicle (tcspecial)</text>
+<line x1="300" y1="138" x2="300" y2="710" stroke="#000000" stroke-width="1.5"/>
+<text x="640" y="128" text-anchor="middle" style="font-family: Helvetica, Arial, sans-serif; font-size: 13px; font-weight: bold">MOC (ground station)</text>
+<line x1="640" y1="138" x2="640" y2="710" stroke="#000000" stroke-width="1.5"/>
+<text x="288" y="154" text-anchor="end" style="font-family: Helvetica, Arial, sans-serif; font-size: 12px; font-style: italic; fill: #000000"><tspan x="288" dy="0">Running A, restart flag clear</tspan></text>
+<text x="652" y="154" text-anchor="start" style="font-family: Helvetica, Arial, sans-serif; font-size: 12px; font-style: italic; fill: #000000"><tspan x="652" dy="0">Using A, matched</tspan></text>
+<line x1="300" y1="180" x2="626" y2="210" stroke="#0072B2" stroke-width="2.5" stroke-dasharray=""/>
+<polygon points="640,210 630,205 630,215" fill="#0072B2"/>
+<text x="408.8" y="183.6" text-anchor="middle" style="font-family: Helvetica, Arial, sans-serif; font-size: 12px; fill: #000000; paint-order: stroke; stroke: #ffffff; stroke-width: 4px">[A] datum</text>
+<text x="652" y="214" text-anchor="start" style="font-family: Helvetica, Arial, sans-serif; font-size: 12px; fill: #000000"><tspan x="652" dy="0">read with A</tspan></text>
+<line x1="300" y1="240" x2="626" y2="300" stroke="#0072B2" stroke-width="2.5" stroke-dasharray=""/>
+<polygon points="640,300 630,295 630,305" fill="#0072B2"/>
+<text x="408.8" y="253.2" text-anchor="middle" style="font-family: Helvetica, Arial, sans-serif; font-size: 12px; fill: #000000; paint-order: stroke; stroke: #ffffff; stroke-width: 4px">[A] datum</text>
+<text x="652" y="304" text-anchor="start" style="font-family: Helvetica, Arial, sans-serif; font-size: 12px; fill: #000000"><tspan x="652" dy="0">read with A: sent before the new</tspan><tspan x="652" dy="14">start&#x27;s first beacon</tspan></text>
+<text x="288" y="274" text-anchor="end" style="font-family: Helvetica, Arial, sans-serif; font-size: 12px; font-style: italic; fill: #000000"><tspan x="288" dy="0">Crashes; the supervisor starts it</tspan><tspan x="288" dy="14">again; it loads A; restart flag set</tspan></text>
+<line x1="300" y1="330" x2="626" y2="375" stroke="#555555" stroke-width="2.5" stroke-dasharray="2 4"/>
+<polygon points="640,375 630,370 630,380" fill="#555555"/>
+<text x="408.8" y="338.4" text-anchor="middle" style="font-family: Helvetica, Arial, sans-serif; font-size: 12px; fill: #000000; paint-order: stroke; stroke: #ffffff; stroke-width: 4px">[any] beacon A, restart</text>
+<text x="652" y="379" text-anchor="start" style="font-family: Helvetica, Arial, sans-serif; font-size: 12px; fill: #000000"><tspan x="652" dy="0">no longer matched; unsent [A]</tspan><tspan x="652" dy="14">commands thrown away</tspan></text>
+<line x1="640" y1="324" x2="314" y2="360" stroke="#0072B2" stroke-width="2.5" stroke-dasharray=""/>
+<polygon points="300,360 310,355 310,365" fill="#0072B2"/>
+<text x="531.2" y="329.52" text-anchor="middle" style="font-family: Helvetica, Arial, sans-serif; font-size: 12px; fill: #000000; paint-order: stroke; stroke: #ffffff; stroke-width: 4px">[A] START_NODE</text>
+<text x="288" y="364" text-anchor="end" style="font-family: Helvetica, Arial, sans-serif; font-size: 12px; fill: #000000"><tspan x="288" dy="0">not acted on: not matched; answered</tspan><tspan x="288" dy="14">with a refusal</tspan></text>
+<line x1="300" y1="390" x2="626" y2="435" stroke="#0072B2" stroke-width="2.5" stroke-dasharray=""/>
+<path d="M620,429 L632,441 M620,441 L632,429" stroke="#0072B2" stroke-width="2.5"/>
+<text x="408.8" y="398.4" text-anchor="middle" style="font-family: Helvetica, Arial, sans-serif; font-size: 12px; fill: #000000; paint-order: stroke; stroke: #ffffff; stroke-width: 4px">[A] refusal of START_NODE</text>
+<text x="652" y="439" text-anchor="start" style="font-family: Helvetica, Arial, sans-serif; font-size: 12px; fill: #000000"><tspan x="652" dy="0">dropped and counted: not matched</tspan></text>
+<line x1="640" y1="465" x2="314" y2="495" stroke="#555555" stroke-width="2.5" stroke-dasharray="2 4"/>
+<polygon points="300,495 310,490 310,500" fill="#555555"/>
+<text x="531.2" y="468.6" text-anchor="middle" style="font-family: Helvetica, Arial, sans-serif; font-size: 12px; fill: #000000; paint-order: stroke; stroke: #ffffff; stroke-width: 4px">[any] CONNECT with A</text>
+<text x="288" y="499" text-anchor="end" style="font-family: Helvetica, Arial, sans-serif; font-size: 12px; fill: #000000"><tspan x="288" dy="0">checksums match: flag cleared;</tspan><tspan x="288" dy="14">downlink opens</tspan></text>
+<line x1="300" y1="525" x2="626" y2="555" stroke="#555555" stroke-width="2.5" stroke-dasharray="2 4"/>
+<polygon points="640,555 630,550 630,560" fill="#555555"/>
+<text x="408.8" y="528.6" text-anchor="middle" style="font-family: Helvetica, Arial, sans-serif; font-size: 12px; fill: #000000; paint-order: stroke; stroke: #ffffff; stroke-width: 4px">[any] beacon A, normal</text>
+<text x="652" y="559" text-anchor="start" style="font-family: Helvetica, Arial, sans-serif; font-size: 12px; fill: #000000"><tspan x="652" dy="0">matched again: queued data dropped,</tspan><tspan x="652" dy="14">then reads on</tspan></text>
+<line x1="300" y1="540" x2="626" y2="591" stroke="#555555" stroke-width="2.5" stroke-dasharray="2 4"/>
+<polygon points="640,591 630,586 630,596" fill="#555555"/>
+<text x="408.8" y="550.32" text-anchor="middle" style="font-family: Helvetica, Arial, sans-serif; font-size: 12px; fill: #000000; paint-order: stroke; stroke: #ffffff; stroke-width: 4px">[any] answer: running A</text>
+<text x="652" y="595" text-anchor="start" style="font-family: Helvetica, Arial, sans-serif; font-size: 12px; fill: #000000"><tspan x="652" dy="0">matched for commanding</tspan></text>
+<line x1="300" y1="630" x2="626" y2="660" stroke="#0072B2" stroke-width="2.5" stroke-dasharray=""/>
+<polygon points="640,660 630,655 630,665" fill="#0072B2"/>
+<text x="408.8" y="633.6" text-anchor="middle" style="font-family: Helvetica, Arial, sans-serif; font-size: 12px; fill: #000000; paint-order: stroke; stroke: #ffffff; stroke-width: 4px">[A] datum</text>
+<text x="652" y="664" text-anchor="start" style="font-family: Helvetica, Arial, sans-serif; font-size: 12px; fill: #000000"><tspan x="652" dy="0">read with A</tspan></text>
+</svg>

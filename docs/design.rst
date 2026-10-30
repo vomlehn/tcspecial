@@ -5936,6 +5936,552 @@ Requirement
     tcspecial or ``tcslib`` turns it off (``SO_NO_CHECK``), and a MOC that
     sends some other way must not either.
 
+Configurations named by their checksum
+--------------------------------------
+
+.. note::
+   **Designed, not yet built** (2026-10-30). This section is how tcspecial
+   and the ground are to make sure nothing is sent with one configuration
+   and read with another. Once it is built it replaces the requirements
+   listed under `What this replaces`_, below; until then those describe
+   what runs. What is still to be decided is under `Still to be decided`_.
+
+A configuration is known by its *checksum*: the MD5 ``tcsverify``
+computes of it, the configuration digest (``tcslibgs::config_digest``).
+The checksum is taken over what the configuration says, not over its
+bytes, so the YAML and the XML spellings of one configuration have the
+same checksum. Two configurations with the same checksum mean the same
+thing to the vehicle and to the ground, and that is all the scheme below
+needs.
+
+Every exchange rests on three facts. The beacon carries the checksum of the
+configuration the vehicle is running. The radio delivers in order, though it
+may lose packets (see `What is assumed`_). And the MOC can retrieve any
+configuration by its checksum (the same). Neither end acts on anything the
+other made with a different configuration: until both have said which one
+they are using and the two agree, each drops what the other sends, and
+counts it.
+
+Order is kept on the radio, not between sockets. Each end reads its links
+on sockets of their own, so a packet the radio delivered first can still be
+read after one it delivered later, on another socket. The requirements
+below that drop what is queued at a match are what make up for that.
+
+Keeping configurations on board
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Requirement
+    For now a configuration is a single file. One that includes another
+    file is refused when it is uplinked and when it is loaded, saying so.
+    A configuration spread across several files is to be handled later.
+
+Requirement
+    The vehicle keeps each configuration it holds under its checksum, in
+    hex, in the directory the ``tcspecial`` section's ``configurations``
+    attribute names. A configuration is uplinked by CFDP (CCSDS 727.0-B-5),
+    using the ``cfdp-rs`` crate, to a staging area beside that directory,
+    and is checked with ``tcsverify``'s ``verify`` before it is kept. One
+    that fails is not kept, and why is reported. The checksum ``verify``
+    computes is the name it is kept under; a name the ground gives it is
+    not trusted.
+
+Requirement
+    Configuration provisioning -- receiving uplinked configurations,
+    checking them, keeping them and removing them -- is a crate of its own
+    within tcspecial, built on ``cfdp-rs``. tcspecial writes no CFDP of its
+    own.
+
+Requirement
+    Keeping a configuration under a checksum already held writes nothing,
+    since the configuration held already means the same, and is answered
+    as a success. A configuration once kept is therefore never overwritten.
+
+Requirement
+    A configuration's checksum is computed again from its file each time
+    it is loaded, and one whose checksum is not its name is not loaded. A
+    write cut short by a crash or a power loss then shows as a configuration
+    that does not match its name, and is refused rather than flown.
+
+Requirement
+    Which configurations are kept, and which may never be removed, is the
+    operators' policy, not the protocol's. A configuration they mean never
+    to lose -- what was called the golden configuration -- is simply one
+    they do not remove. Provisioning in flight enforces the minimum number
+    of configurations to keep, which the ``tcspecial`` section's
+    ``configurations_kept`` attribute states, and never removes the
+    configuration running or the one a taken RESTART named.
+
+Requirement
+    A configuration installed when the vehicle is first provisioned, on the
+    ground, is written once and read-only from then on: mode ``0444`` in a
+    directory of mode ``0555``, and immutable where the file system allows
+    it (``FS_IMMUTABLE_FL``). Nothing in flight can then overwrite it, even
+    by mistake.
+
+Starting, and the restart flag
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Requirement
+    There is no generation number. A start of tcspecial is told by its
+    restart flag, and which configuration it runs by its checksum; nothing
+    in the state file, the beacon, the answers or ``tcslib`` counts starts.
+
+Requirement
+    The state file names, by checksum, the configuration the next start
+    loads -- the one the last taken RESTART named, or else the one the
+    start before ran -- and the *confirmed* configuration: the last one a
+    matching CONNECT was taken on. A matching CONNECT writes the running
+    configuration to it as confirmed.
+
+Requirement
+    Every start loads the first of these that passes its check: the
+    configuration the state file names for it; else the confirmed one;
+    else the configuration given on tcspecial's command line, which
+    provisioning installed and made read-only. Whichever it loads, it says
+    in the log which and why, and from its first beacon on every beacon
+    carries that configuration's checksum, so the ground sees which
+    configuration a start is running whatever chose it.
+
+Requirement
+    A state file that does not exist, or that fails its CRC or cannot be
+    read, names nothing: the start loads the configuration on its command
+    line, and says so. A vehicle that would not start because its state
+    file was damaged would be lost to a counter.
+
+Requirement
+    The state file counts the starts of the configuration it names for the
+    next start that ended -- a crash, a power loss, a failed check --
+    before a matching CONNECT, and a matching CONNECT sets the count back
+    to nought. When the count reaches ``load_trials``, from the
+    ``tcspecial`` section of the configuration on the command line and
+    three where it does not say, that configuration is no longer named:
+    the next start loads the confirmed one, and says so. A configuration
+    that passes its check but takes tcspecial down at every start is then
+    given up, rather than started for ever.
+
+Requirement
+    The beacon's restart flag is set at every start: the first start, a
+    commanded restart, a crash the supervisor restarted, a power cycle. It
+    says that this start has not yet been told by the ground that the
+    ground is using the same configuration. It is cleared by a CONNECT
+    whose checksum matches the running configuration's, and by nothing
+    else. It is set again the moment a RESTART is taken.
+
+Requirement
+    From a start, and from the moment a RESTART is taken, until a CONNECT
+    with a matching checksum, tcspecial sends nothing to the ground but its
+    beacons and answers. What its nodes produce meanwhile is still written
+    to the on-board log, so it is kept, and reaches the ground later as the
+    log's segment files do. After a RESTART is taken there is no match
+    again: the process ends first.
+
+Requirement
+    Over the same span, a command other than CONNECT, RESTART_ARM and
+    RESTART is not acted on, and is answered with a refusal saying the
+    configurations have not been matched. A refusal, rather than silence,
+    so that a station that does not watch the beacons learns why, instead
+    of taking the command for lost and sending it again.
+
+Requirement
+    On taking a CONNECT with a matching checksum, tcspecial drops every
+    command already queued on its other command links before reading them
+    again. The ground sends nothing but the three commands before a match,
+    so everything queued at that moment was sent before it.
+
+The three commands that always go
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Requirement
+    CONNECT, RESTART_ARM and RESTART are taken at any time: before a
+    matching CONNECT, while a restart is under way, and whatever
+    configuration is running. Their layout on the link, the layout of their
+    answers and the layout of the beacon never change, in any build or
+    configuration, so that a ground station and a vehicle that agree about
+    nothing else can still agree about these.
+
+Requirement
+    Each of the three carries a configuration checksum. CONNECT's is the
+    one the ground believes the vehicle is running, read from the beacon.
+    RESTART_ARM's and RESTART's is the one the vehicle is to run after the
+    restart, and a RESTART must carry the same checksum as well as the same
+    key as the arm it uses.
+
+Requirement
+    The answer to a CONNECT always carries the running configuration's
+    checksum. A CONNECT whose checksum matches it clears the restart flag,
+    sends a beacon at once, sets the beacons to their normal interval, and
+    opens the downlink and the other commands. One whose checksum does not
+    match changes nothing else. A CONNECT taken after a RESTART is answered
+    and changes nothing. The ground takes a CONNECT as matched only when
+    its answer's checksum is the station's own.
+
+Requirement
+    A RESTART_ARM or RESTART whose checksum names no configuration the
+    vehicle holds is refused ``NotFound``, and nothing restarts: the
+    configuration does not change. The configuration it names is checked
+    again, as it would be loaded, just before the restart, because storage
+    can change between the arm and the restart. A RESTART naming the
+    configuration already running is allowed, and is a plain restart.
+
+Requirement
+    tcspecial provides two functions. One cleans up the running
+    configuration: every node stopped, every thread joined, every link
+    closed and what was queued on it dropped, the log flushed. The other
+    loads a configuration by its checksum. A restart calls the first,
+    writes the state file, and runs the process again, whose start calls
+    the second, so that nothing the old configuration left in memory
+    survives into the new one.
+
+On the ground
+~~~~~~~~~~~~~
+
+Requirement
+    A ground station is *matched* while the last beacon it heard, since it
+    began using its configuration, has its restart flag clear and carries
+    that configuration's checksum, and while that beacon is recent: its
+    beacon watch says the vehicle is heard from
+    (``tcslib::beacon::Stage::Heard``). A beacon gone overdue ends the
+    match as a flagged one does, and the next beacon that qualifies begins
+    it again, with the drop of queued data that a match begins with. A
+    station that has missed beacons cannot then go on reading as though
+    the vehicle had not changed in the meantime. A clear flag says that the vehicle has taken a
+    matching CONNECT for the configuration in that beacon, from this
+    station or another, so a station that only listens is matched as
+    surely as one that commands. A station that commands is matched for
+    commanding only once, besides, a CONNECT of its own has been answered
+    with its checksum.
+
+Requirement
+    A station that is not matched reads no downlinked data and takes no
+    answer but those to CONNECT, RESTART_ARM and RESTART. What it drops it
+    counts. On becoming matched it first drops everything already queued
+    on its data sockets, since all of it was made before the match, and
+    then reads on. Its command socket is not emptied so, because the answer
+    to its own CONNECT may be on its way there; a stale answer is dropped
+    by its sequence instead, below.
+
+Requirement
+    A station stops being matched on a beacon whose restart flag is set, on
+    a beacon whose checksum is not its configuration's, and when it changes
+    the configuration it is using. Stopping discards every command built
+    under the configuration it was matched with that has not yet gone,
+    whether queued or waiting to be sent again, and a node id taken from
+    that configuration is taken again from the new one before it is used.
+
+Requirement
+    An answer is taken only as the answer to the command it says it
+    answers, by its sequence. An answer to any other command -- late,
+    repeated, or from before a restart on either side -- may have been made
+    with another configuration, and is counted and dropped.
+
+Requirement
+    A station counts every packet it receives from the vehicle, data and
+    answers, and each in exactly one of: processed, malformed (it cannot be
+    read with the configuration's definitions), or dropped for a
+    configuration mismatch. tcsmoc shows all four.
+
+Requirement
+    A station whose configuration does not match the beacon says which
+    checksum the vehicle is running, so that the operator can retrieve that
+    configuration.
+
+Requirement
+    ``tcslib``'s ``TcsClient``, and through it the C/C++ library, refuses
+    every command but CONNECT, RESTART_ARM and RESTART, unsent, while the
+    station is not matched for commanding.
+
+Requirement
+    tcsmoc says the same in a pop-up error for every other command pressed
+    meanwhile: that the match between the ground's and the vehicle's
+    configurations is still in progress, and to check the beacon's checksum
+    against the configuration this station is using. Arm restart and
+    Initiate restart pressed before a CONNECT has been answered give an
+    advisory pop-up instead, which lets the operator go on or cancel.
+
+Holes in the checksum scheme, and what closes them
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+What was looked for: any way a message could be read with a configuration
+that did not make it, any way the vehicle could be left running nothing the
+ground can match, and any way a kept configuration could be lost or
+damaged. Each is paired with what closes it.
+
+A configuration written partly, or damaged where it is kept
+    Its checksum is computed again from its file at every load, and one
+    that does not match its name is not loaded. Configurations installed
+    at first provisioning are read-only and immutable, and one kept in
+    flight is never written again.
+
+A configuration that checks but fails at every start
+    The state file counts its starts that end before a matching CONNECT,
+    and ``load_trials`` of them give it up for the confirmed configuration.
+
+A damaged or missing state file
+    It names nothing, and the start loads the configuration on its command
+    line, which is read-only. The ground sees which from the beacon's
+    checksum, and matches it as it would any other.
+
+A RESTART to a configuration the vehicle does not hold
+    Refused ``NotFound`` at the arm and again at the restart, and nothing
+    restarts. The configuration it names is checked once more just before
+    the restart.
+
+A restart whose first beacons are all lost
+    Every beacon of a start carries the restart flag until a matching
+    CONNECT, and the start sends nothing else down and acts on no other
+    command until then. Losing its first beacons, or all of them, delays
+    the match and lets nothing through.
+
+Packets on their way across a restart, on either side
+    Read with the configuration that made them or dropped and counted, by
+    the order of the radio and the drops at a match: see `In-flight data
+    across a restart`_.
+
+A listening station that misses every beacon of a change
+    It is matched only while its beacon is recent, so missing the beacons
+    of a change ends its match within twice the beacon interval, before
+    the new configuration's data can be read with the old. The interval it
+    ages beacons against is its configuration's, which is the vehicle's
+    too: nothing changes it while tcspecial runs.
+
+A CONNECT from a station that has not matched
+    Only a CONNECT whose checksum is the running configuration's clears
+    the flag or opens the downlink, and one whose checksum differs changes
+    nothing on the vehicle. A station whose configuration has the same
+    checksum reads everything the same, so its CONNECT is as good as any.
+
+The CFDP crate's own faults
+    ``cfdp-rs`` 0.3.0 allocates dynamically in one place, where tcspecial
+    allows no allocation once running, and its receiver panics on a
+    Metadata PDU that carries a message to user. Both are to be fixed, and
+    the fixes offered to its authors, before configurations are uplinked
+    in flight. Until then the provisioning crate sends no message to user,
+    and looks at every Metadata PDU before ``cfdp-rs`` does, dropping one
+    that carries a message to user, since the panic comes as ``cfdp-rs``
+    reads it.
+
+Still open
+    The command link carries no authentication: anyone who can reach it
+    can connect, arm a restart and restart the vehicle into any
+    configuration it holds. The arm key guards against mistakes, not
+    against anybody. CCSDS SDLS, or authentication at the radio, is the
+    remedy, and it is not designed here. A MOC built elsewhere that sends
+    UDP without its checksum is open as it is today: see `Holes in this,
+    and what closes them`_ under `Fault Resiliency`_, which this scheme
+    leaves as it is.
+
+What this replaces
+~~~~~~~~~~~~~~~~~~
+
+Once built, these requirements are replaced:
+
+- `The beacon across a restart`_: the commanded-restart flag, set only for
+  a commanded restart and cleared by any CONNECT. The flag becomes the
+  restart flag above.
+- `Kinds of restart`_: a start being commanded or not, and only a
+  commanded start changing the definitions. The checksum in the beacon
+  says which configuration a start is running, whichever kind it is.
+- `The generation number and the state file`_, and every requirement that
+  an answer carries a generation or that the ground compares generations.
+  There is no generation.
+- `What the ground may send meanwhile`_: the wait for a beacon whose
+  number went back, and the commands allowed during it. Being matched
+  decides what the ground may send.
+- `Downlinked data across a switch`_: reading each datum with the last
+  beacon's definitions. The ground reads data only while matched.
+- In `Holes in this, and what closes them`_ under `Fault Resiliency`_: the
+  entries on the generation, the state file, downlinked data and commands
+  across a switch, a restart nobody commanded, a wait that never ends, a
+  stray packet, and a restart whose first beacons are lost. The holes of
+  this scheme are those in `Holes in the checksum scheme, and what closes
+  them`_.
+
+The load sets, SWITCH, the golden build and the fallback interface, in `The
+Interface, the Fallback and Switching Over`_, are set aside: they are not
+part of this scheme, and are not to be built for now.
+
+Still to be decided
+~~~~~~~~~~~~~~~~~~~
+
+The frozen layout of the three commands
+    Freezing the three commands, their answers and the beacon freezes the
+    packet header they share. Whether the header is frozen with them, or
+    the three get a layout of their own, is open.
+
+In-flight data across a restart
+-------------------------------
+
+.. note::
+   **Designed, not yet built**, with `Configurations named by their
+   checksum`_, whose rules this section follows through a restart.
+
+When either end restarts, or the ground changes the configuration it is
+using, there are packets on their way that one configuration made and that
+may reach an end now using another. None of them is read with the wrong
+configuration. Each is read with the configuration that made it, or dropped
+and counted, by the rules of `Configurations named by their checksum`_;
+this section shows how, message by message.
+
+Three kinds of packet cross the link, and only one kind depends on the
+configuration:
+
+- **Beacons, and CONNECT, RESTART_ARM and RESTART with their answers**,
+  whose layout never changes. They read the same under every configuration,
+  so they are never dropped for a mismatch. A beacon says which
+  configuration the vehicle is running and whether its restart flag is set.
+- **Every other command and its answer.** Node ids, attribute names and
+  values mean what the configuration says, so these are acted on only
+  while the two ends are matched.
+- **Downlinked data.** A datum is a node's bytes, read by the node's
+  definition in the configuration, so it is read only while matched.
+
+What decides each case is that the radio keeps order and that neither end
+sends a packet of the second or third kind until it is matched. Whatever an
+old configuration made is sent before the packet that ends the match --
+the beacon with the restart flag set, or the vehicle's taking a RESTART --
+and so arrives before it. Whatever a new configuration makes is sent after
+the matching CONNECT, and so arrives after the end that reads it has
+matched. What order cannot cover is a packet left waiting on a socket
+while another socket's packet is read; the drops at a match cover that.
+
+In the figures, time runs down the page. Every message is tagged with the
+configuration that made it -- ``[A]``, ``[B]``, or ``[any]`` for the kinds
+whose layout never changes -- and is drawn in that configuration's own
+line style as well as its colour, so the figures read the same without
+colour. What becomes of each message is written beside the end it reaches.
+
+A commanded restart
+~~~~~~~~~~~~~~~~~~~
+
+.. figure:: restart-commanded.svg
+   :alt: A sequence diagram of a commanded restart from configuration A
+         to B. The vehicle runs A and the station is matched with it. The
+         station arms and initiates a restart to B. A datum tagged A that
+         the vehicle sent before taking the restart arrives before the
+         beacon that carries the restart flag, and is read with A. A
+         START_NODE tagged A that the station sent before hearing that
+         beacon reaches a vehicle that has taken the restart; it is not
+         acted on, and its refusal, tagged A, is dropped and counted on the
+         ground. The flagged beacon ends the match, and the station throws
+         away commands it built with A. The new start loads B and beacons B
+         with the flag set. The operator loads B and sends CONNECT with B,
+         which matches; the vehicle clears the flag and opens the downlink.
+         The station drops anything queued, becomes matched, reads a datum
+         tagged B with B and sends a START_NODE tagged B, which is acted
+         on.
+   :width: 100%
+
+   A commanded restart from configuration A to configuration B.
+
+The datum the vehicle sent just before it took the RESTART crosses the
+RESTART on the way down. It is read with A, correctly: it left before the
+flagged beacon, so it arrives before it, while the station is still matched
+with A. From the moment the vehicle takes the RESTART it sends no more data,
+so nothing made with A can arrive after that beacon.
+
+The START_NODE the station sent before it heard the flagged beacon was
+built with A and reaches a vehicle that has taken the RESTART. It is not
+acted on. The refusal that answers it is counted and dropped, since by the
+time it arrives the station is no longer matched and the answer may say
+something only A gives a meaning to. Any command built with A that had not
+yet gone is thrown away when the match ends, so none can be sent once the
+station has moved to B.
+
+The new start sends nothing but beacons until a CONNECT matches it, and the
+station reads nothing until it has heard a beacon of B with the flag clear.
+Every datum it reads from then on was made with B.
+
+A restart on the same configuration
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+.. figure:: restart-crash.svg
+   :alt: A sequence diagram of a crash. The vehicle runs A and the station
+         is matched. A datum tagged A sent before the crash arrives before
+         the new start's first beacon and is read with A. The vehicle
+         crashes, the supervisor starts it again, and it loads A with the
+         restart flag set. A START_NODE tagged A that the station sent
+         before hearing of the restart reaches the new start, which is not
+         matched, so it is not acted on, and its refusal is dropped and
+         counted. The flagged beacon ends the match. CONNECT with A matches
+         again; the station drops anything queued and reads a datum tagged
+         A with A.
+   :width: 100%
+
+   A crash, and a start that loads the same configuration.
+
+A crash changes no configuration, but it is handled as every start is: the
+restart flag is set, nothing but beacons goes down, and a command that
+arrives is not acted on until a CONNECT matches. A command sent to the old
+start that arrives at the new one would mean the same, but it was sent
+before the station knew of the restart, and the station may have sent it
+on the strength of a state the crash has lost. Refusing it costs one more
+CONNECT and keeps the rule the same for every start.
+
+A ground station that restarts or changes configuration
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+.. figure:: restart-ground.svg
+   :alt: A sequence diagram of a ground station that restarts using
+         configuration C while the vehicle runs A, matched with another
+         station. A datum tagged A is dropped and counted, because the
+         station is not matched. The beacon says A, which is not the
+         station's C. The station's CONNECT with C does not match and
+         changes nothing on the vehicle, and its answer, saying A, does
+         not match the station either. The operator retrieves A and loads
+         it. A datum tagged A that arrives before the next beacon is still
+         dropped and counted. A beacon of A with the flag clear makes the
+         station matched for listening: it drops anything queued and reads
+         the next datum tagged A with A. Its own CONNECT with A makes it
+         matched for commanding.
+   :width: 100%
+
+   A ground station that restarts with configuration C while the vehicle
+   runs A.
+
+A ground station that restarts, or whose operator loads another
+configuration, stops being matched at once, and throws away any command it
+built with the configuration it had. It reads nothing until it hears a beacon
+whose checksum is its new configuration's, and it does not take a beacon it
+heard before the change for one: the vehicle may have restarted since. A
+CONNECT whose checksum does not match changes nothing on the vehicle, which
+goes on serving whichever station matched it.
+
+What is dropped, and where
+~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+.. list-table::
+   :header-rows: 1
+   :widths: 45 55
+
+   * - What arrives
+     - What becomes of it
+   * - At the vehicle, a command other than the three, before a match or
+       after a RESTART was taken
+     - Not acted on. Answered with a refusal that says the configurations
+       are not matched.
+   * - At the vehicle, at a matching CONNECT
+     - Every command already queued on its other command links is
+       dropped.
+   * - At the ground, a datum while not matched
+     - Dropped and counted for a mismatch.
+   * - At the ground, on becoming matched
+     - Every datum already queued on its data sockets is dropped and
+       counted.
+   * - At the ground, an answer other than to the three, while not
+       matched
+     - Dropped and counted for a mismatch.
+   * - At the ground, an answer whose sequence is not the command's
+     - Dropped and counted: it is late, repeated, or from before a
+       restart.
+   * - At the ground, the match ending
+     - Every command built with the old configuration and not yet sent is
+       thrown away.
+
+Nothing on this list is read with a configuration that did not make it.
+What can be lost is a datum or an answer made with the right configuration
+that arrived at the switch-over, which is a loss, counted, and never a
+misreading.
+
 Kinds of restart
 ----------------
 

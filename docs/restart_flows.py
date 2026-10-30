@@ -39,19 +39,52 @@ LABEL_AT = 0.32
 
 
 def msg(direction, tag, label, sent, arrives, outcome, taken=True):
-    """A message: `direction` "up" (MOC to vehicle) or "down", sent at row
-    `sent` and arriving at row `arrives`; `outcome` is what the receiver
-    does with it, and `taken` whether that is to act on it or read it."""
+    """Describes one message for a diagram.
+
+    Args:
+        direction: "up", from the MOC to the vehicle, or "down".
+        tag:       The configuration that made it: a key of ``STYLES``.
+        label:     What the message is, drawn along its line.
+        sent:      The row it is sent at.
+        arrives:   The row it arrives at.
+        outcome:   What the receiver does with it, in words.
+        taken:     Whether the receiver reads or acts on it, rather than
+                   dropping it.
+
+    Returns:
+        The message, as a step of a diagram.
+    """
     return ("msg", direction, tag, label, sent, arrives, outcome, taken)
 
 
 def note(side, row, text):
-    """Something one end does, written beside its lifeline at `row`."""
+    """Describes something one end does, written beside its lifeline.
+
+    Args:
+        side: "vehicle" or "moc".
+        row:  The row it is written at.
+        text: What it does.
+
+    Returns:
+        The note, as a step of a diagram.
+    """
     return ("note", side, row, text)
 
 
 def wrapped(x, y, text, anchor, style, chars=OUTCOME_CHARS):
-    """`text` as lines of at most `chars` characters, from `y` down."""
+    """Writes text as lines of at most a given width, from a point down.
+
+    Args:
+        x:      Where the lines are anchored across.
+        y:      Where the first line's baseline is.
+        text:   The text.
+        anchor: The SVG text-anchor: "start" or "end".
+        style:  More CSS for the text.
+        chars:  The most characters on a line.
+
+    Returns:
+        The SVG text element.
+    """
     lines = textwrap.wrap(text, chars)
     spans = "".join(
         f'<tspan x="{x}" dy="{0 if i == 0 else 14}">{escape(line)}</tspan>'
@@ -61,7 +94,14 @@ def wrapped(x, y, text, anchor, style, chars=OUTCOME_CHARS):
 
 
 def legend(tags):
-    """The key: one sample line per tag used, and the two outcomes."""
+    """Draws the key: one sample line per tag used, and the two outcomes.
+
+    Args:
+        tags: The configuration tags the diagram uses, in the order shown.
+
+    Returns:
+        The SVG elements of the key.
+    """
     out = []
     y = 46
     for tag in tags:
@@ -81,20 +121,46 @@ def legend(tags):
 
 
 def arrowhead(x, y, toward_right, colour):
-    """A filled arrowhead pointing along the message."""
+    """Draws a filled arrowhead where a message is taken.
+
+    Args:
+        x:            Where its point is across.
+        y:            Where its point is down.
+        toward_right: Whether the message goes from left to right.
+        colour:       Its fill.
+
+    Returns:
+        The SVG polygon.
+    """
     d = -1 if toward_right else 1
     return (f'<polygon points="{x},{y} {x + 10 * d},{y - 5} '
             f'{x + 10 * d},{y + 5}" fill="{colour}"/>')
 
 
 def cross(x, y, colour):
-    """A cross where a message is dropped."""
+    """Draws a cross where a message is dropped.
+
+    Args:
+        x:      Its centre across.
+        y:      Its centre down.
+        colour: Its stroke.
+
+    Returns:
+        The SVG path.
+    """
     return (f'<path d="M{x - 6},{y - 6} L{x + 6},{y + 6} M{x - 6},{y + 6} '
             f'L{x + 6},{y - 6}" stroke="{colour}" stroke-width="2.5"/>')
 
 
 def draw(name, title, desc, steps):
-    """Writes `name`.svg from `steps`."""
+    """Writes one diagram as an SVG file.
+
+    Args:
+        name:  The file's name, without ``.svg``.
+        title: The diagram's title, drawn and given as the SVG's title.
+        desc:  The SVG's description, for a reader who cannot see it.
+        steps: Its messages and notes, from ``msg`` and ``note``.
+    """
     tags = []
     for step in steps:
         if step[0] == "msg" and step[2] not in tags:

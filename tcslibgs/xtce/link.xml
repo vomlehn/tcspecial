@@ -240,14 +240,6 @@
           </RestrictionCriteria>
         </BaseContainer>
       </SequenceContainer>
-      <SequenceContainer name="ConfigAnswer">
-        <EntryList/>
-        <BaseContainer containerRef="Answer">
-          <RestrictionCriteria>
-            <Comparison parameterRef="Kind" value="160"/>
-          </RestrictionCriteria>
-        </BaseContainer>
-      </SequenceContainer>
       <SequenceContainer name="StartNodeAnswer">
         <EntryList>
           <ParameterRefEntry parameterRef="Node"/>
@@ -505,23 +497,10 @@
           <BaseContainer containerRef="TcsCommandContainer"/>
         </CommandContainer>
       </MetaCommand>
-      <MetaCommand name="Config">
-        <BaseMetaCommand metaCommandRef="TcsCommand">
-          <ArgumentAssignmentList>
-            <ArgumentAssignment argumentName="Opcode" argumentValue="32"/>
-          </ArgumentAssignmentList>
-        </BaseMetaCommand>
-        <ArgumentList>
-          <!-- How often to beacon, in microseconds. -->
-          <Argument name="BeaconInterval" argumentTypeRef="U64Arg"/>
-        </ArgumentList>
-        <CommandContainer name="ConfigContainer">
-          <EntryList>
-            <ArgumentRefEntry argumentRef="BeaconInterval"/>
-          </EntryList>
-          <BaseContainer containerRef="TcsCommandContainer"/>
-        </CommandContainer>
-      </MetaCommand>
+      <!-- Opcode 32, and answer kind 160, are not used: they were CONFIG,
+           which set the beacon interval while tcspecial ran. The interval
+           is the configuration's alone, so that every station with the same
+           configuration knows it. -->
       <MetaCommand name="StartNode">
         <BaseMetaCommand metaCommandRef="TcsCommand">
           <ArgumentAssignmentList>

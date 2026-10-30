@@ -3,9 +3,8 @@
  *
  * What a ground station does, in the order it does it: read the
  * configuration, wait for the vehicle's first beacon, connect and ping, ask
- * about a node and set one of its attributes, retime the beacon, ping the
- * vehicle's ping node and time the answer, and take the vehicle's data from a
- * moc node. Each step prints one line, and the same program in C++ --
+ * about a node and set one of its attributes, ping the vehicle's ping node
+ * and time the answer, and take the vehicle's data from a moc node. Each step prints one line, and the same program in C++ --
  * ground.cpp -- prints the same lines.
  *
  * Arguments, all optional: --yaml or --xml, but not both, saying which of
@@ -179,12 +178,6 @@ int main(int argc, char **argv)
 		       (const char *)taken.bytes, (unsigned)taken.total,
 		       given.moved ? "gave something" : "gave nothing");
 	}
-
-	tcs_status configured = TCS_STATUS_FAILURE;
-	if (tcs_client_configure(client, 5000000, &configured) != 0) {
-		return fail("configure");
-	}
-	printf("configure: beacon every 5 s, %s\n", outcome(configured));
 
 	if (restart) {
 		tcs_status armed = TCS_STATUS_FAILURE,

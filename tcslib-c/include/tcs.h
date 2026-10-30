@@ -389,17 +389,6 @@ int tcs_client_awaiting_restart(const tcs_client *client);
  *                error. */
 int tcs_client_end_restart_wait(tcs_client *client);
 
-/** Sends CONFIG, to change how often the vehicle beacons. A station's beacon
- * watch goes on aging beacons against the configuration's interval: see the
- * README's known limits.
- *
- * @param client              The client.
- * @param beacon_interval_us  The new interval, in microseconds.
- * @param status              Where what the vehicle answered is written.
- * @return                    0, or -1 on an error. */
-int tcs_client_configure(tcs_client *client, uint64_t beacon_interval_us,
-			 tcs_status *status);
-
 /* The longest attribute name, and the longest value, a SET_NODE carries, in
  * bytes. Longer is refused here, and not sent. */
 #define TCS_ATTRIBUTE_BYTES 64

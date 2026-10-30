@@ -182,10 +182,10 @@ pub fn run_graph(path: &str, mode: Mode) -> Result<(), Vec<String>> {
         .map_err(|why| vec![format!("{path}: {why}")])?;
 
     // And the ground's commands, on a thread of their own. After the beacons
-    // because a CONFIG retimes them, and after the ports because the first
-    // thing the ground may do is stop a node: a command link that opened
-    // before the nodes did could be asked to stop one that does not exist
-    // yet.
+    // because a CONNECT or a RESTART retimes them, and after the ports
+    // because the first thing the ground may do is stop a node: a command
+    // link that opened before the nodes did could be asked to stop one that
+    // does not exist yet.
     let flying = Flying {
         version: ConfigVersion::of_this_build(),
         digest,
@@ -493,7 +493,8 @@ fn beacons(
 /// * `states`        - Every node's state, which commands change.
 /// * `bench`         - Where the interpreter queues work for the pass.
 /// * `flying`        - What the vehicle is flying, for commands that ask.
-/// * `beacon`        - The beacon sender, which a CONFIG retimes.
+/// * `beacon`        - The beacon sender, which a CONNECT and a RESTART
+///                     retime.
 /// * `telemetry_log` - Where answers to the ground are recorded.
 ///
 /// # Returns

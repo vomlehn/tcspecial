@@ -49,7 +49,7 @@ use tcslib::{command_links_of, CommandStatus, TcsClient};
 use tcslibgs::config_digest::{digest_of_graph, ConfigDigest, ConfigVersion};
 use tcslibgs::graph::parameters::{beacon_interval_of, beacon_of};
 use tcslibgs::graph::{telemetry, Graph};
-use tcslibgs::{ArmKey, BeaconInterval, DHSample, NodeId, DH_SAMPLE_BYTES};
+use tcslibgs::{ArmKey, DHSample, NodeId, DH_SAMPLE_BYTES};
 
 /// The size of the buffer `tcs_last_error` returns, its NUL included:
 /// `TCS_ERROR_BYTES` in the header.
@@ -1325,39 +1325,6 @@ pub unsafe extern "C" fn tcs_client_end_restart_wait(
     guard(-1, || {
         let link = handle_of_mut(client, "the client")?;
         Ok(c_int::from(link.client.end_restart_wait().is_some()))
-    })
-}
-
-/// Sends CONFIG, to change how often the vehicle beacons.
-///
-/// # Arguments
-///
-/// * `client`             - The client.
-/// * `beacon_interval_us` - The new interval, in microseconds.
-/// * `status`             - Where what the vehicle answered is written.
-///
-/// # Returns
-///
-/// 0, or -1 on an error.
-///
-/// # Safety
-///
-/// As [`tcs_client_restart_arm`].
-#[no_mangle]
-pub unsafe extern "C" fn tcs_client_configure(
-    client: *mut tcs_client,
-    beacon_interval_us: u64,
-    status: *mut c_int,
-) -> c_int {
-    guard(-1, || {
-        let link = handle_of_mut(client, "the client")?;
-        let out = out_of(status, "the status")?;
-        let answered = link
-            .client
-            .configure(BeaconInterval(beacon_interval_us))
-            .map_err(|e| fail(format_args!("CONFIG: {e}")))?;
-        *out = status_number(answered);
-        Ok(0)
     })
 }
 

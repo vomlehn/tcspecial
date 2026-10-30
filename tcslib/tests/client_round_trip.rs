@@ -16,11 +16,11 @@ use std::time::Duration;
 
 use tcslib::{TcsClient, UdpConnection};
 use tcslibgs::{
-    ArmKey, BeaconInterval, Command, CommandStatus, ConfigDigest,
-    ConfigTelemetry, ConfigVersion, ConnectTelemetry, DHSample, NodeCounts,
-    NodeId, NodeTelemetry, PingTelemetry, QueryNodeSampleTelemetry,
-    QueryNodeTelemetry, Reason, RestartArmTelemetry, RestartTelemetry,
-    SetNodeTelemetry, TcsError, Telemetry,
+    ArmKey, Command, CommandStatus, ConfigDigest, ConfigVersion,
+    ConnectTelemetry, DHSample, NodeCounts, NodeId, NodeTelemetry,
+    PingTelemetry, QueryNodeSampleTelemetry, QueryNodeTelemetry, Reason,
+    RestartArmTelemetry, RestartTelemetry, SetNodeTelemetry, TcsError,
+    Telemetry,
 };
 
 fn stub_sample(first: u8) -> DHSample {
@@ -84,10 +84,6 @@ fn stub_spacecraft(count: usize) -> (String, thread::JoinHandle<()>) {
                 Command::Restart(_) => Telemetry::Restart(
                     RestartTelemetry::new(seq, CommandStatus::Success),
                 ),
-                Command::Config(_) => Telemetry::Config(ConfigTelemetry::new(
-                    seq,
-                    CommandStatus::Success,
-                )),
                 // A node's commands, each answered for the node it named.
                 // Every command has an answer here because the stub reads
                 // whatever arrives, and a command it could not answer would
@@ -331,10 +327,10 @@ fn every_operation_reaches_the_spacecraft_and_comes_back() {
     // until a beacon says it is done: the rest are refused here, unsent, so
     // the stand-in is not asked them. A PING among them, which goes
     // regardless of the generation but not during the wait.
-    let configure = |client: &mut tcslib::TcsClient| {
-        client.configure(BeaconInterval::of(Duration::from_secs(1)))
+    let start = |client: &mut tcslib::TcsClient| {
+        client.start_node(NodeId::of(2)).map(|(status, _)| status)
     };
-    let refused = configure(&mut client).expect_err("refused while waiting");
+    let refused = start(&mut client).expect_err("refused while waiting");
     assert!(
         matches!(refused, TcsError::AwaitingRestart(_)),
         "{refused:?}"
@@ -363,11 +359,11 @@ fn every_operation_reaches_the_spacecraft_and_comes_back() {
     assert!(client.restart_wait().is_none());
     // And then a CONNECT, before anything but a PING.
     assert!(matches!(
-        configure(&mut client),
+        start(&mut client),
         Err(TcsError::GenerationUnknown(_))
     ));
     client.connect(version, digest).unwrap();
-    assert_eq!(configure(&mut client).unwrap(), CommandStatus::Success);
+    assert_eq!(start(&mut client).unwrap(), CommandStatus::Success);
 
     stub.join().expect("the stand-in answered every command");
 }

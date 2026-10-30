@@ -612,8 +612,7 @@ impl NodeId {
 
     /// This id as it goes on the wire: four bytes, most significant first.
     ///
-    /// The order a [`Timestamp`] and a [`BeaconInterval`] go in, for the
-    /// reason given on the first of them.
+    /// The order a [`Timestamp`] goes in, for the reason given there.
     ///
     /// # Returns
     ///
@@ -643,70 +642,6 @@ impl std::fmt::Display for NodeId {
 /// Arm key for restart commands
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
 pub struct ArmKey(pub u64);
-
-/// How often beacons are sent, in microseconds.
-///
-/// A length of time and not a time of day, which is what it was called:
-/// `BeaconTime` read as the time a beacon was sent, and the time a beacon
-/// carries is the [`Timestamp`] in its header. The two are nothing alike --
-/// one is how often, the other is when -- and the only thing in the system
-/// named "beacon time" was the one that is not a time.
-///
-/// Microseconds, as every other time on this wire is, so that a number
-/// crossing the link means one thing. It cost nothing to agree: the longest
-/// interval eight bytes of microseconds can state is longer than the mission
-/// of anything that flies, and the shortest is a microsecond.
-///
-/// On the wire it is eight bytes, most significant byte first, like a
-/// [`Timestamp`]. There is no reserved value: unlike a clock, an interval
-/// cannot fail to be read, and nought is refused where the sender is retimed
-/// rather than being given a meaning here.
-#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
-pub struct BeaconInterval(pub u64);
-
-impl Default for BeaconInterval {
-    /// Five seconds, which is what a configuration that states nothing gets.
-    fn default() -> Self {
-        Self(5 * 1_000_000)
-    }
-}
-
-impl BeaconInterval {
-    /// This interval as a length of time, for setting a timer by.
-    ///
-    /// The one way the number is read, so that nothing outside this type
-    /// knows what unit it is in.
-    pub fn duration(&self) -> Duration {
-        Duration::from_micros(self.0)
-    }
-
-    /// A length of time as the interval that states it.
-    ///
-    /// A length too long to state saturates rather than wrapping: the
-    /// alternative is a very long interval arriving as a very short one,
-    /// which is a spacecraft beaconing as fast as it can because the ground
-    /// asked it to beacon once a century.
-    pub fn of(interval: Duration) -> Self {
-        Self(u64::try_from(interval.as_micros()).unwrap_or(u64::MAX))
-    }
-
-    /// This interval as it goes on the wire: eight bytes, most significant
-    /// first.
-    ///
-    /// The order a [`Timestamp`] goes in, for the reason given there.
-    ///
-    /// # Returns
-    ///
-    /// The interval's microseconds, most significant byte first.
-    pub fn to_be_bytes(&self) -> [u8; 8] {
-        self.0.to_be_bytes()
-    }
-
-    /// An interval read off the wire, those eight bytes back again.
-    pub fn from_be_bytes(bytes: [u8; 8]) -> Self {
-        Self(u64::from_be_bytes(bytes))
-    }
-}
 
 /// What one node of a graph has moved.
 ///
@@ -2005,15 +1940,12 @@ impl CIConfigJson {
                     .to_string(),
             );
         }
-        // A length of time, which is what a beacon is sent on. The
-        // protocol's CONFIG counts microseconds in eight bytes (a
-        // BeaconInterval), so an interval longer than that could be set
-        // here and never commanded -- refused where the file is read
-        // rather than at the first CONFIG.
+        // A length of time, which is what a beacon is sent on, and one the
+        // beacon thread can add to the time now: see too_long_to_time.
         let beacon_interval =
             crate::graph::parse_interval(&self.beacon.default_interval)
                 .map_err(|why| format!("beacon.default_interval: {why}"))?;
-        beyond_a_beacon_interval(beacon_interval)
+        too_long_to_time(beacon_interval)
             .map_err(|why| format!("beacon.default_interval: {why}"))?;
 
         let reset_interval =
@@ -2073,8 +2005,13 @@ impl CIConfigJson {
     }
 }
 
-/// Refuses a length of time longer than a [`BeaconInterval`] states:
-/// 2^64 - 1 microseconds, about 585,000 years.
+/// Refuses a length of time longer than 2^64 - 1 microseconds, about
+/// 585,000 years.
+///
+/// The beacon thread adds its interval to the time now to know when to send
+/// next, and the sum overflows -- which panics -- for an interval long
+/// enough. Refused where the file is read, at a length far past any
+/// mission's and well short of that, rather than found by the vehicle.
 ///
 /// # Arguments
 ///
@@ -2082,15 +2019,15 @@ impl CIConfigJson {
 ///
 /// # Returns
 ///
-/// `Ok(())` if it fits in a [`BeaconInterval`].
+/// `Ok(())` if it is no longer than that.
 ///
 /// # Errors
 ///
-/// A message saying it is too long for the protocol.
-fn beyond_a_beacon_interval(interval: Duration) -> Result<(), String> {
+/// A message saying it is too long.
+fn too_long_to_time(interval: Duration) -> Result<(), String> {
     if u64::try_from(interval.as_micros()).is_err() {
-        return Err("longer than the protocol can carry, which counts \
-             microseconds in eight bytes"
+        return Err("longer than tcspecial can time, which is 2^64 - 1 \
+             microseconds, about 585,000 years"
             .to_string());
     }
     Ok(())
@@ -2125,7 +2062,7 @@ pub fn reset_interval_of(
 ) -> Result<Duration, String> {
     let interval = crate::graph::parse_interval(said)
         .map_err(|why| format!("beacon.reset_interval: {why}"))?;
-    beyond_a_beacon_interval(interval)
+    too_long_to_time(interval)
         .map_err(|why| format!("beacon.reset_interval: {why}"))?;
     if interval.is_zero() {
         return Err("beacon.reset_interval is nought, which is a vehicle \
@@ -2313,50 +2250,17 @@ mod tests {
         assert!(!Timestamp { micros: 0 }.clock_failed());
     }
 
-    /// The beacon interval goes on the wire as eight bytes, most significant
-    /// first, and is a length of time at both ends of that.
-    ///
-    /// The byte order written out by hand rather than taken from
-    /// `to_be_bytes` on both sides, which would pass whichever order it used.
-    #[test]
-    fn a_beacon_interval_is_eight_big_endian_bytes() {
-        let every = BeaconInterval::of(Duration::from_secs(5));
-        assert_eq!(every.0, 5_000_000, "microseconds, as every time here is");
-        assert_eq!(every.duration(), Duration::from_secs(5));
-        assert_eq!(
-            every.to_be_bytes(),
-            [0x00, 0x00, 0x00, 0x00, 0x00, 0x4C, 0x4B, 0x40],
-            "most significant byte first"
-        );
-        assert_eq!(BeaconInterval::from_be_bytes(every.to_be_bytes()), every);
-
-        // Five seconds is also what a configuration stating nothing gets.
-        assert_eq!(BeaconInterval::default(), every);
-
-        // A microsecond is the shortest interval statable, and an interval
-        // too long to state saturates rather than wrapping round to a short
-        // one -- a spacecraft asked to beacon once a century must not answer
-        // by beaconing as fast as it can.
-        assert_eq!(BeaconInterval::of(Duration::from_micros(1)).0, 1);
-        assert_eq!(
-            BeaconInterval::of(Duration::from_secs(u64::MAX)).0,
-            u64::MAX
-        );
-    }
-
-    /// The beacon and reset intervals are as long as a BeaconInterval's
-    /// eight bytes of microseconds state, well past the 49.7 days that four
-    /// bytes of milliseconds would.
+    /// The beacon and reset intervals may be as long as 2^64 - 1
+    /// microseconds, well past the 49.7 days that four bytes of
+    /// milliseconds would allow, and no longer.
     #[test]
     fn an_interval_is_as_long_as_eight_bytes_of_microseconds() {
         let hundred_days = Duration::from_secs(100 * 86_400);
-        assert!(beyond_a_beacon_interval(hundred_days).is_ok());
+        assert!(too_long_to_time(hundred_days).is_ok());
         assert_eq!(reset_interval_of("100 d", hundred_days), Ok(hundred_days));
         let most = Duration::from_micros(u64::MAX);
-        assert!(beyond_a_beacon_interval(most).is_ok());
-        assert!(
-            beyond_a_beacon_interval(most + Duration::from_micros(1)).is_err()
-        );
+        assert!(too_long_to_time(most).is_ok());
+        assert!(too_long_to_time(most + Duration::from_micros(1)).is_err());
     }
 
     /// A clock that cannot be read says so, however it failed.

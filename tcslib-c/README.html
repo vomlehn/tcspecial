@@ -205,15 +205,15 @@ one datum and the name of the node that produced it.</li>
 two command links the configuration states.
 <code>tcs_client_connect</code> says whether the vehicle is flying this
 configuration; then ping; start, stop or query a node by its id, set one
-of its attributes, or ask for the last datum it moved each way; retime
-the beacon; and arm a restart and restart the vehicle. The client learns
-which generation of tcspecial is flying from the answer to connect, so
-until one is answered, and again after a beacon whose number went back
-or an answer from another generation, it refuses every command but ping
-and connect, unsent. <code>tcs_client_beacon_heard</code> tells it of
-each pass’s beacon; after a restart is sent it is what ends the wait for
-the vehicle to come back, during which nothing but connect, arm and
-restart goes.</li>
+of its attributes, or ask for the last datum it moved each way; and arm
+a restart and restart the vehicle. The client learns which generation of
+tcspecial is flying from the answer to connect, so until one is
+answered, and again after a beacon whose number went back or an answer
+from another generation, it refuses every command but ping and connect,
+unsent. <code>tcs_client_beacon_heard</code> tells it of each pass’s
+beacon; after a restart is sent it is what ends the wait for the vehicle
+to come back, during which nothing but connect, arm and restart
+goes.</li>
 <li><strong>Pinging a ping node.</strong> <code>tcs_pinger_open</code>
 finds the first <code>ping</code> node the ground can reach both ways
 and its <code>moc</code> node. <code>tcs_pinger_ping</code> sends a ping
@@ -235,9 +235,9 @@ c++ my_station.cpp -I tcslib-c/include target/debug/libtcs.a -lpthread -ldl -lm<
 <p><code>examples/ground.c</code> is a ground station in C, and
 <code>examples/ground.cpp</code> the same one in C++: each reads the
 configuration, waits for the first beacon, connects and pings, asks
-about a node and sets one of its attributes, retimes the beacon, pings
-the vehicle’s ping node and times the answer, and prints the vehicle’s
-data from a <code>moc</code> node. They take <code>--yaml</code> or
+about a node and sets one of its attributes, pings the vehicle’s ping
+node and times the answer, and prints the vehicle’s data from a
+<code>moc</code> node. They take <code>--yaml</code> or
 <code>--xml</code>, as every example program does, and
 <code>--restart</code> to arm a restart and restart the vehicle, which
 they do only when asked.</p>
@@ -254,10 +254,6 @@ header whose numbers had drifted from the library’s fails. The header
 alone is also compiled as C99 and as C++11.</p>
 <h2 id="known-limits">Known limits</h2>
 <ul>
-<li><strong>A retimed beacon is not followed.</strong> After
-<code>tcs_client_configure</code>, a station’s beacon watch goes on
-aging beacons against the interval the configuration states, as tcsmoc’s
-does.</li>
 <li><strong>A query’s counts are not given.</strong>
 <code>tcs_client_query_node</code> says whether a node is running; the
 counts of what it has moved, which tcslib’s answer carries, have no C

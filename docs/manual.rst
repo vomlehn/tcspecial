@@ -346,9 +346,8 @@ Times
    to the year 586524; all ones means the clock failed. The beacon interval,
    ``beacon.default_interval``, and the interval until the MOC connects,
    ``beacon.reset_interval``, are at most 2\ :sup:`64` - 1 microseconds,
-   about 585,000 years, which is what the eight bytes of microseconds a
-   ``CONFIG`` carries state; the reset interval is no longer than the
-   beacon interval.
+   about 585,000 years, the longest tcspecial can time; the reset interval
+   is no longer than the beacon interval.
 
 Command sequence numbers
    A ground client numbers its commands from 1 in 32 bits. After
@@ -3724,7 +3723,7 @@ Initiate restart
   Every start beacons every ``beacon.reset_interval`` until the MOC
   connects. When tcspecial takes a ``Connect`` it clears the flag, sends a
   beacon at once, and from then on beacons every
-  ``beacon.default_interval``, or the interval the last ``Config`` set. A
+  ``beacon.default_interval``. A
   ``Connect`` taken after the restart is initiated and before the old
   tcspecial has gone neither clears the flag nor slows the beacons: the
   restart is still under way.
@@ -3851,9 +3850,8 @@ the spacecraft to be heard from again.
 One beacon may be missed with the indicator still steady, because one lost
 datagram is a network and not a spacecraft. For a five-second interval the
 indicator is steady for ten seconds, blinks green for ten more, is yellow for
-twenty and red after that. The interval is the one the configuration states: a
-``Config`` command that retimes the beacon aboard is not followed by the
-indicator, which goes on aging beacons against the configured interval.
+twenty and red after that. The interval is the one the configuration states,
+which is the vehicle's too: nothing changes it while tcspecial runs.
 
 Beside the indicator is the time the last beacon arrived, shown the way every
 other time in the window is. It is the time the beacon reached the MOC rather

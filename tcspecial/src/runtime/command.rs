@@ -60,10 +60,9 @@ use std::os::fd::BorrowedFd;
 use tcslibgs::config_digest::{ConfigDigest, ConfigVersion};
 use tcslibgs::{
     answer_to, came_from, sequence_is_before, AnswerPacker, ArmKey, CIConfig,
-    Command, CommandLink, CommandStatus, ConfigTelemetry, ConnectTelemetry,
-    HostPort, NodeTelemetry, PingTelemetry, QueryNodeSampleTelemetry,
-    QueryNodeTelemetry, Reason, SetNodeTelemetry, TcsError, TcsResult,
-    Telemetry,
+    Command, CommandLink, CommandStatus, ConnectTelemetry, HostPort,
+    NodeTelemetry, PingTelemetry, QueryNodeSampleTelemetry, QueryNodeTelemetry,
+    Reason, SetNodeTelemetry, TcsError, TcsResult, Telemetry,
 };
 
 use crate::beacon_send::BeaconSend;
@@ -165,8 +164,8 @@ impl Commands {
     /// * `bench`   - How work a command causes is handed to the pass.
     /// * `flying`  - What this vehicle answers a CONNECT with, and the
     ///               generation commands must be sent for.
-    /// * `beacon`  - The beacon sender, which a CONFIG retimes and hearing
-    ///               from the MOC slows; `None` where no beacons are sent.
+    /// * `beacon`  - The beacon sender, which a CONNECT slows and a RESTART
+    ///               speeds up; `None` where no beacons are sent.
     /// * `log`     - Where every answer is recorded.
     /// * `restart` - What an armed RESTART calls once it has been answered.
     ///
@@ -307,7 +306,8 @@ struct Serving {
     /// takes time and can fail, and neither belongs on this thread.
     bench: Workbench,
     flying: Flying,
-    /// The beacon sender, so that a CONFIG retimes the one that is running.
+    /// The beacon sender, so that a CONNECT or a RESTART retimes the one
+    /// that is running.
     /// `None` for a configuration that sends no beacons.
     beacon: Option<BeaconSend>,
     /// Where every answer is recorded, which is the log the beacons use: one
@@ -567,18 +567,6 @@ impl Serving {
                     self.flying.version,
                     self.flying.digest,
                     self.newest.unwrap_or(sequence),
-                ))
-            }
-
-            // The beacon thread is retimed where it waits, so the next beacon
-            // goes at the new interval rather than after the old one elapses.
-            Command::Config(cmd) => {
-                if let Some(beacon) = self.beacon.as_mut() {
-                    beacon.set_interval(cmd.beacon_interval.duration());
-                }
-                Telemetry::Config(ConfigTelemetry::new(
-                    sequence,
-                    CommandStatus::Success,
                 ))
             }
 

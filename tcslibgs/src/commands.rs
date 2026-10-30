@@ -3,7 +3,7 @@
 //! Commands are sent from ground to space and are idempotent.
 
 use crate::config_digest::{ConfigDigest, ConfigVersion};
-use crate::types::{ArmKey, BeaconInterval, NodeId};
+use crate::types::{ArmKey, NodeId};
 
 /// Command message header
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -26,7 +26,6 @@ pub enum CommandType {
     Connect,
     RestartArm,
     Restart,
-    Config,
     /// Enable a node.
     ///
     /// The five below are what answer for a node, which a command names by
@@ -104,8 +103,7 @@ impl CommandType {
             CommandType::Ping
             | CommandType::Connect
             | CommandType::RestartArm
-            | CommandType::Restart
-            | CommandType::Config => CommandLink::Spacecraft,
+            | CommandType::Restart => CommandLink::Spacecraft,
 
             CommandType::StartNode
             | CommandType::StopNode
@@ -149,7 +147,6 @@ impl CommandType {
 
             CommandType::RestartArm
             | CommandType::Restart
-            | CommandType::Config
             | CommandType::StartNode
             | CommandType::StopNode
             | CommandType::SetNode
@@ -171,7 +168,8 @@ impl CommandType {
             CommandType::Connect => 0x04,
             CommandType::RestartArm => 0x02,
             CommandType::Restart => 0x03,
-            CommandType::Config => 0x20,
+            // 0x20 is not used: it was CONFIG, which set the beacon
+            // interval. The interval is the configuration's alone.
             CommandType::StartNode => 0x30,
             CommandType::StopNode => 0x31,
             CommandType::SetNode => 0x32,
@@ -196,7 +194,6 @@ impl CommandType {
             0x04 => Some(CommandType::Connect),
             0x02 => Some(CommandType::RestartArm),
             0x03 => Some(CommandType::Restart),
-            0x20 => Some(CommandType::Config),
             0x30 => Some(CommandType::StartNode),
             0x31 => Some(CommandType::StopNode),
             0x32 => Some(CommandType::SetNode),
@@ -632,34 +629,6 @@ impl std::fmt::Debug for Value {
     }
 }
 
-/// CONFIG command - configure TCSpecial values
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub struct ConfigCommand {
-    pub header: CommandHeader,
-    pub beacon_interval: BeaconInterval,
-}
-
-impl ConfigCommand {
-    /// Makes a CONFIG, its generation not yet stamped.
-    ///
-    /// # Arguments
-    ///
-    /// * `sequence`        - The command's sequence number.
-    /// * `beacon_interval` - The beacon interval it sets.
-    ///
-    /// # Returns
-    ///
-    /// The command.
-    pub fn new(sequence: u32, beacon_interval: BeaconInterval) -> Self {
-        Self {
-            header: CommandHeader {
-                sequence,
-                cmd_type: CommandType::Config,
-            },
-            beacon_interval,
-        }
-    }
-}
 /// Union of all command types
 ///
 /// Whether command sequence `a` was sent before `b`.
@@ -684,7 +653,6 @@ pub enum Command {
     Connect(ConnectCommand),
     RestartArm(RestartArmCommand),
     Restart(RestartCommand),
-    Config(ConfigCommand),
     StartNode(NodeCommand),
     StopNode(NodeCommand),
     SetNode(SetNodeCommand),
@@ -704,7 +672,6 @@ impl Command {
             Command::Connect(cmd) => cmd.header.sequence,
             Command::RestartArm(cmd) => cmd.header.sequence,
             Command::Restart(cmd) => cmd.header.sequence,
-            Command::Config(cmd) => cmd.header.sequence,
             Command::StartNode(cmd)
             | Command::StopNode(cmd)
             | Command::QueryNode(cmd)
@@ -730,8 +697,7 @@ impl Command {
             Command::Ping(_)
             | Command::Connect(_)
             | Command::RestartArm(_)
-            | Command::Restart(_)
-            | Command::Config(_) => None,
+            | Command::Restart(_) => None,
         }
     }
 
@@ -751,7 +717,6 @@ impl Command {
             Command::Connect(cmd) => cmd.header.cmd_type,
             Command::RestartArm(cmd) => cmd.header.cmd_type,
             Command::Restart(cmd) => cmd.header.cmd_type,
-            Command::Config(cmd) => cmd.header.cmd_type,
             Command::StartNode(cmd)
             | Command::StopNode(cmd)
             | Command::QueryNode(cmd)
@@ -870,7 +835,6 @@ mod tests {
             CommandType::Connect,
             CommandType::RestartArm,
             CommandType::Restart,
-            CommandType::Config,
         ];
         let payload = [
             // A node's commands go on this link because what the ground

@@ -4323,8 +4323,8 @@ that satisfies both.
      - Sets a socket up before it is bound, which the standard library cannot.
      - `repository <https://github.com/rust-lang/socket2>`__
    * - `tcs-xtce <https://crates.io/crates/tcs-xtce>`__
-     - =0.3.0
-     - `0.3.0 <https://docs.rs/tcs-xtce/0.3.0>`__
+     - =0.4.0
+     - `0.4.0 <https://docs.rs/tcs-xtce/0.4.0>`__
      - tcslibgs
      - The runtime the generated link packet code calls to pack and unpack the commands and answers, and the interface digest. Its generator and Python runtime are in ``vendor/tcs-xtce``, at the same version.
      - `repository <https://github.com/vomlehn/tcs-xtce>`__

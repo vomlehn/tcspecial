@@ -2,17 +2,13 @@
 
 A copy of the parts of tcs-xtce this tree uses that are not published: its
 Python package, `tcs_xtce`, which holds the generator and the Python runtime.
-Taken from `github.com:vomlehn/tcs-xtce` (commit 7ad16b9, of 2026-10-30,
-after release 0.3.0, when the package took the name `tcs_xtce`). The Rust
-runtime is published, and `tcslibgs` takes it from crates.io:
-`tcs-xtce = "=0.3.0"` in `tcslibgs/Cargo.toml`. **The code the generator
-writes calls the crate, so the two must agree**: the version is pinned
-exactly, and changes with the copy. This copy is newer than 0.3.0 only in
-how the generator handles XTCE that `tcslibgs/xtce/link.xml` does not use,
-and the code it writes for this tree calls nothing 0.3.0 lacks -- `make
-link-packet` writes what is committed. Take the next copy from a release
-and set the crate's version to match. When the Python package is
-published, replace this directory with it.
+Taken from `github.com:vomlehn/tcs-xtce` (commit b4e04a7, of 2026-10-30,
+which is release 0.4.0). The Rust runtime is published, and `tcslibgs` takes
+it from crates.io: `tcs-xtce = "=0.4.0"` in `tcslibgs/Cargo.toml`. **The
+copy and the crate must be of the same release**, as the code the generator
+writes calls the runtime, so the version is pinned exactly and changes with
+the copy. When the Python package is published, replace this directory with
+it.
 
 tcs-xtce compiles an XTCE description of a packet into code that packs and
 unpacks it. This tree uses it for the link's commands and answers: the

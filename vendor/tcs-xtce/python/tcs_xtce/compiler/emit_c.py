@@ -1,6 +1,6 @@
 """Emit a header of packet codecs that compiles both as C11 and as C++.
 
-The header uses only ``xtce/packet.h``, which is itself plain C.  C has no
+The header uses only ``xtce-packet.h``, which is itself plain C.  C has no
 namespaces, so every name the header defines starts with a prefix (by default
 the root SpaceSystem name in snake_case followed by ``_``).  Fallible
 functions return 0 or an ``XTCE_PK_*`` error code instead of throwing, and
@@ -320,7 +320,7 @@ class CEmitter:
                         if vt.wide})
         if wides:
             self.line()
-            self.line("/** Integers of N bits, xtce/bnum.h's: whole bytes, "
+            self.line("/** Integers of N bits, xtce-bnum.h's: whole bytes, "
                       "least significant first. */")
             for bits, signed in wides:
                 self.line(f"XTCE_BN_TYPEDEF({self.p}{'' if signed else 'u'}int"
@@ -843,7 +843,7 @@ class CEmitter:
 
         Args:
             vt:    The integer's type.
-            dst:   What receives the value, an xtce/bnum.h integer.
+            dst:   What receives the value, an xtce-bnum.h integer.
             f:     The C string literal naming the field, for errors.
             depth: The indentation level.
         """
@@ -1007,7 +1007,7 @@ class CEmitter:
 
         Args:
             vt:    The integer's type.
-            x:     The expression for the value, an xtce/bnum.h integer.
+            x:     The expression for the value, an xtce-bnum.h integer.
             f:     The C string literal naming the field, for errors.
             depth: The indentation level.
         """
@@ -1032,7 +1032,7 @@ class CEmitter:
         self.line("}", depth)
 
     def int_bytes(self, vt: VType, x: str) -> str:
-        """Gives the bytes of an integer, to compare it with xtce/bnum.h.
+        """Gives the bytes of an integer, to compare it with xtce-bnum.h.
 
         Args:
             vt: The integer's type (or an enumeration's).
@@ -1444,7 +1444,7 @@ class CEmitter:
         for h in ("stdbool.h", "stddef.h", "stdint.h", "string.h"):
             self.line(f"#include <{h}>")
         self.line()
-        self.line('#include "xtce/packet.h"')
+        self.line('#include "xtce-packet.h"')
         self.line()
         self.line("#ifdef __cplusplus")
         self.line('extern "C" {')
@@ -2014,6 +2014,13 @@ class CEmitter:
                     self.patch_length(it.length, depth)
                 for c in it.patches:
                     self.patch(c, depth, early=True)
+                if it.keeps:
+                    # For checks of what follows it (see late_patch).
+                    self.line(f"uint8_t p{t}[{it.cap}];", depth)
+                    self.line(f"size_t n{t};", depth)
+                    self.line(f"XTCE_PK_TRY(xtce_pk_write_copy_out(w, t{t}, "
+                              f"p{t}, {it.cap}, &n{t}, {cstr(it.name)}));",
+                              depth)
                 self.line(f"XTCE_PK_TRY(xtce_pk_write_transform(w, t{t}, "
                           f"{self.transform_hook(it.encode)}, "
                           f"{bool_lit(it.raw is not None)}, {it.raw or 0}, "
@@ -2243,7 +2250,7 @@ class CEmitter:
             depth: The indentation level.
             early: Whether this is before the transform of its field.
         """
-        if (c.stop is not None) != early:
+        if c.late is not None or (c.stop is not None) != early:
             return
         enc = c.local.vtype.enc
         self.line("{", depth)
@@ -2253,6 +2260,27 @@ class CEmitter:
         self.line(f"XTCE_PK_TRY(xtce_pk_patch_checksum(w, &k, {start}, {end}, "
                   f"l{c.local.id}, {enc.bits}, {bool_lit(enc.little_endian)}, "
                   f"{cstr(c.local.name)}));", depth + 1)
+        self.line("}", depth)
+
+    def late_patch(self, c, depth: int) -> None:
+        """Writes the statement writing a late check's value (see
+        model.Check) into its transformed data, which it transforms again.
+
+        Args:
+            c:     The check: its field's Local, spec, region and data.
+            depth: The indentation level.
+        """
+        enc = c.local.vtype.enc
+        t = c.late.start
+        self.line("{", depth)
+        self.line(f"{spec_decl(c.spec)} xtce_pk_checksum_spec k = "
+                  f"{checksum_spec(c.spec, self.p)};", depth + 1)
+        start, end = self.region(c, "w")
+        self.line("XTCE_PK_TRY(xtce_pk_patch_transformed_checksum(w, &k, "
+                  f"{start}, {end}, p{t}, n{t}, l{c.local.id} - t{t}, "
+                  f"{enc.bits}, {bool_lit(enc.little_endian)}, t{t}, "
+                  f"{self.transform_hook(c.late.encode)}, {c.late.raw}, "
+                  f"{c.late.out_cap}, {cstr(c.local.name)}));", depth + 1)
         self.line("}", depth)
 
     def region(self, c, rw: str) -> tuple:
@@ -2277,6 +2305,8 @@ class CEmitter:
         if c.stop is not None:
             end = (f"(m{c.stop} > {c.stop_back} ? m{c.stop} - {c.stop_back} : "
                    "0)")
+        elif c.late is not None:
+            pass  # the field is before the bits, which run to the end
         elif c.from_end:
             end = f"({end} > {c.skip} ? {end} - {c.skip} : 0)"
         elif start == "(size_t)0":
@@ -2395,6 +2425,11 @@ class CEmitter:
         length = n.length_field()
         if length is not None:
             self.patch_length(length, 1)
+        # Late checks first: transforming their data again changes what
+        # the others cover.
+        for c in n.checks:
+            if c.late is not None:
+                self.late_patch(c, 1)
         for c in n.checks:
             self.patch(c, 1)
         self.line("return 0;", 1)

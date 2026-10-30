@@ -3980,11 +3980,8 @@ crates they depend on in turn are not listed: ``cargo tree`` shows the whole
 graph, and ``Cargo.lock`` says which version of each is built.
 
 Every one is fetched from `crates.io <https://crates.io>`_, the Rust package
-registry, which is where ``cargo build`` downloads it from, but one: ``xtce``,
-tcs-xtce's runtime, which packs and unpacks the commands and answers, is
-taken from a copy in
-``vendor/tcs-xtce`` until tcs-xtce is published, and is not listed below. Each
-name below links to its page there, the version links to its documentation on
+registry, which is where ``cargo build`` downloads it from. Each name below
+links to its page there, the version links to its documentation on
 `docs.rs <https://docs.rs>`_, and the last column to the repository its source
 is developed in.
 
@@ -4090,6 +4087,12 @@ that satisfies both.
      - tcspecial
      - Sets a socket up before it is bound, which the standard library cannot.
      - `repository <https://github.com/rust-lang/socket2>`__
+   * - `tcs-xtce <https://crates.io/crates/tcs-xtce>`__
+     - =0.3.0
+     - `0.3.0 <https://docs.rs/tcs-xtce/0.3.0>`__
+     - tcslibgs
+     - The runtime the generated link packet code calls to pack and unpack the commands and answers, and the interface digest. Its generator and Python runtime are in ``vendor/tcs-xtce``, at the same version.
+     - `repository <https://github.com/vomlehn/tcs-xtce>`__
    * - `tcslog <https://crates.io/crates/tcslog>`__
      - 0.3.1
      - `0.3.1 <https://docs.rs/tcslog/0.3.1>`__
@@ -4109,8 +4112,10 @@ that satisfies both.
      - Writes the error types and their messages.
      - `repository <https://github.com/dtolnay/thiserror>`__
 
-``tcslog`` is this project's own: it is the telemetry log, kept as a crate of
-its own so that it can be used and tested apart from tcspecial.
+``tcslog`` and ``tcs-xtce`` are this project's own: ``tcslog`` is the
+telemetry log, kept as a crate of its own so that it can be used and tested
+apart from tcspecial, and ``tcs-xtce`` is the packet compiler, a project of
+its own.
 
 To see where everything in the build comes from, its dependencies included::
 

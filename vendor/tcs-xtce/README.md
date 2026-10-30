@@ -1,12 +1,14 @@
 # tcs-xtce, vendored
 
-A copy of the parts of tcs-xtce this tree uses, taken from
-`github.com:vomlehn/tcs-xtce` (commit 7a51180, of 2026-10-30) because
-tcs-xtce is not yet published. **When tcs-xtce is on crates.io, replace this
-directory with a dependency on it**: `tcs-xtce = "<version>"` in
-`tcslibgs/Cargo.toml` in place of the path, the `exclude` in the workspace's
-`Cargo.toml` removed, and the generator and Python runtime taken from the
-release.
+A copy of the parts of tcs-xtce this tree uses that are not published,
+taken from `github.com:vomlehn/tcs-xtce` (commit 7a51180, of 2026-10-30,
+which is release 0.3.0). The Rust runtime is published, and `tcslibgs` takes
+it from crates.io: `tcs-xtce = "=0.3.0"` in `tcslibgs/Cargo.toml`. The
+generator and the Python runtime are not, so they are here. **The copy and
+the crate must be of the same release**, as the code the generator writes
+calls the runtime, so the version is pinned exactly and changes with the
+copy. When the generator and the Python runtime are published, replace this
+directory with them.
 
 tcs-xtce compiles an XTCE description of a packet into code that packs and
 unpacks it. This tree uses it for the link's commands and answers: the
@@ -19,22 +21,19 @@ time -- and the CRC that ends every packet and tcspecial's state file.
 
 | Directory | What it is | Used by |
 |---|---|---|
-| `rust/` | The `tcs-xtce` crate: the packet runtime the generated Rust calls, its fixed-capacity buffers and its digest, and the XML binding the crate also holds | `tcslibgs`, through a path dependency. Not a member of the workspace, so `cargo test`, `clippy` and `fmt` leave it alone. |
-| `python/xtce/` | The same runtime in Python, digest included | `python/tcslibgs/interface.py` |
+| `python/xtce/` | The packet runtime in Python, as the crate is in Rust, digest included | `python/tcslibgs/interface.py` |
 | `generator/` | `tcs_xtce`, the compiler, which runs as `python3 -m tcs_xtce` because a Python module's name cannot hold a hyphen, and the two packages it is built from: `xtcepkt` and `xtcegen`; and `xtce_digest`, the digest's command line | `make link-packet` and `make interface-digest`. They read XTCE with `python/xtce/`. |
 | `tests/doc_headers.py` | tcs-xtce's check that every non-trivial function has a header in its language's convention | `make doc-headers`, which `make test` runs |
 
-Copied as they are, with nothing changed. To refresh the copy, copy those
-directories again from a tcs-xtce commit (`rust/` without its `tests/`,
-`examples/`, `target/` or `LICENSE-*` links, and `generator/` without its
-`tests/`), and `tests/doc_headers.py`, leaving out `__pycache__`. Take them
-from the commit -- `git archive` -- and not from a working tree, which may
-hold work in progress. `rust/src/generated.rs` and
-`python/xtce/generated.py` are not in the commit: `make
-rust/src/generated.rs python/xtce/generated.py` in the exported copy writes
-them from the XTCE schema. Then run `make link-packet interface-digest` in
-`tcslibgs/` and `cargo test --workspace`.
+Copied as they are, with nothing changed. To refresh the copy, take a
+tcs-xtce release: copy `generator/` without its `tests/`, `python/xtce/`
+and `tests/doc_headers.py` again from its commit, leaving out
+`__pycache__`, and set the version in `tcslibgs/Cargo.toml` to the
+release's. Take them from the commit -- `git archive` -- and not from a
+working tree, which may hold work in progress. `python/xtce/generated.py`
+is not in the commit: `make python/xtce/generated.py` in the exported copy
+writes it from the XTCE schema. Then run `make link-packet
+interface-digest` in `tcslibgs/` and `make test`.
 
 tcs-xtce is licensed under either of the Apache License, Version 2.0, in
-`LICENSE-APACHE`, or the MIT license, in `LICENSE-MIT`, at your option; its
-Rust crate says `MIT OR Apache-2.0`.
+`LICENSE-APACHE`, or the MIT license, in `LICENSE-MIT`, at your option.

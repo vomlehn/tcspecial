@@ -3,11 +3,11 @@
 //! For now that is the generation number, which every start of tcspecial adds
 //! one to before it sends its first beacon, so that the ground can tell from a
 //! beacon alone that the vehicle has started again, and whether the next start
-//! is one the ground commanded, which its beacons then say. It is kept in the file the
-//! `tcspecial` section's `state_file` names, on storage that survives a power
-//! cycle, because a count kept in memory would start again at every crash and
-//! every power cycle -- which are the restarts the ground most needs to know
-//! about.
+//! is one the ground commanded, which its beacons then say. It is kept in the
+//! file the `tcspecial` section's `state_file` names, on storage that survives
+//! a power cycle, because a count kept in memory would start again at every
+//! crash and every power cycle -- which are the restarts the ground most needs
+//! to know about.
 //!
 //! The file is a few lines of text, so that somebody at a console can read
 //! it, and ends with a CRC of everything before it:

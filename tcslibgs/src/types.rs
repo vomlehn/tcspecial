@@ -2136,8 +2136,8 @@ pub fn reset_interval_of(
     if interval > beacon_interval {
         return Err(format!(
             "beacon.reset_interval is {said}, longer than \
-             beacon.default_interval: across a restart the beacon is meant to come \
-             sooner, not later, so make it no longer than {:?}",
+             beacon.default_interval: across a restart the beacon is meant to \
+             come sooner, not later, so make it no longer than {:?}",
             beacon_interval
         ));
     }

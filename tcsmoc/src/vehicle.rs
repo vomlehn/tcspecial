@@ -144,8 +144,8 @@ fn was_declined(declined: &crate::Declined, row: usize) -> bool {
 
 /// What a node command says when the two ends have not agreed what they read.
 pub const NOT_AGREED: &str = "The vehicle has not agreed which configuration \
-                              it is flying, so      a node id means nothing \
-                              yet: press Connect, which sends CONNECT and      \
+                              it is flying, so a node id means nothing yet: \
+                              press Connect, which sends CONNECT and \
                               compares the digests.";
 
 /// Whether the vehicle has agreed that it is flying the configuration this
@@ -2085,6 +2085,14 @@ pub fn run(
 pub(crate) mod tests {
     use super::*;
     use std::path::Path;
+
+    /// What a refused node command says is one sentence, spaced as one: a
+    /// line continuation inside the literal drops the next line's leading
+    /// spaces, and text before it that ended in spaces would leave a run.
+    #[test]
+    fn the_refusal_is_spaced_as_a_sentence() {
+        assert!(!NOT_AGREED.contains("  "), "{NOT_AGREED:?}");
+    }
 
     /// An answer from the ping node reaches the pinger, timed, and the
     /// window is told there is something to show -- by a flag, the receiver

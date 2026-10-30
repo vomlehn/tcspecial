@@ -6,7 +6,7 @@ meta-commands of a mission database into Python dataclasses derived from
 generated code reads packets with a :class:`BitReader` and writes them with a
 :class:`BitWriter` into a :class:`~tcs_xtce.ManagedBuffer`; this module provides
 those and the integer, float, string and calibration helpers they call.  It
-mirrors ``tcs_xtce::packet`` in Rust and ``xtce/packet.h`` in C and C++.
+mirrors ``tcs_xtce::packet`` in Rust and ``xtce-packet.h`` in C and C++.
 
 A :class:`Codec` owns one input and one output buffer, preallocated for the
 largest packet it will see and reused until the codec is discarded.  A
@@ -1093,6 +1093,69 @@ class BitWriter:
         self.pos = at
         self.uint_order(bits, le, v & ((1 << bits) - 1))
         self.pos = pos
+
+    def copy_out(self, start: int) -> bytes:
+        """Copies the bytes written from bit ``start``, on a byte boundary, to
+        the position: transformed data before its transform, for
+        :meth:`patch_transformed_checksum`.
+
+        Args:
+            start: Where they start.
+
+        Returns:
+            The bytes.
+        """
+        return bytes(self.buf._data[start // 8:(self.pos + 7) // 8])
+
+    def patch_transformed_checksum(self, spec: tuple, start: int, end: int,
+                                   plain: bytes, at: int, bits: int, le: bool,
+                                   t: int, f, raw: int, cap: int,
+                                   field: str) -> None:
+        """Fills in a checksum field in transformed data with the checksum
+        of bits after that data: puts it in the data's bytes before the
+        transform, transforms them again and writes what that makes in
+        their place, which has to be the same size.  The position is kept.
+
+        Args:
+            spec:  The checksum, as :func:`checksum` takes it.
+            start: The first bit it covers.
+            end:   The bit after the last it covers.
+            plain: The data's bytes before the transform, as
+                   :meth:`copy_out` gave them.
+            at:    The field's position in ``plain``, in bits.
+            bits:  Its size in bits; the checksum's low ``bits`` bits go in
+                   it.
+            le:    Whether it is little endian.
+            t:     Where the transformed data is, in bits.
+            f:     The encoding transform, as :meth:`transform` takes it.
+            raw:   The data's size on the wire, in bytes.
+            cap:   The most bytes the transform may make.
+            field: The field's name, for errors.
+
+        Raises:
+            PacketError: As :func:`checksum` and :meth:`transform` do.
+        """
+        v = checksum(spec, self.buf._data, start, end, field)
+        if f is None:
+            raise PacketError("NotInvertible", field)
+        n, pos = len(self.buf), self.pos
+        # The bytes go after the packet, so the field is written in them as
+        # it was the first time.
+        self.pos = 8 * n
+        self.bytes(plain)
+        self.pos = 8 * n + at
+        self.uint_order(bits, le, v & ((1 << bits) - 1))
+        data = bytes(self.buf._data[n:n + len(plain)])
+        self.buf.resize(n)
+        self.pos = pos
+        out = f(data)
+        if out is None:
+            raise PacketError("InvalidValue", field)
+        if len(out) > cap:
+            raise PacketError("TooLong", field)
+        if len(out) != raw:
+            raise PacketError("BadSize", field)
+        self.buf._data[t // 8:t // 8 + raw] = out
 
     def bytes(self, data) -> None:
         """Writes bytes, in the writer's bit order off a byte boundary.

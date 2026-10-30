@@ -548,26 +548,120 @@ fn update_row(
 /// With the MOC's own simulation mode, so that the two cannot disagree in a
 /// run the MOC started: see `tcslibgs::simulate`.
 ///
+/// Which program is run depends on where the MOC is. An installed MOC --
+/// `/opt/tcs/bin/tcsmoc` -- runs the child installed beside it, from the same
+/// install, so that a ground station with no source tree and no cargo can
+/// start a vehicle; see [`child_program`]. One run out of a source tree runs
+/// the child with `cargo run`, which builds it first, so that a child is never
+/// a build older than the source the MOC was built from. See
+/// [`installed_directory`].
+///
 /// # Arguments
 ///
 /// * `name`         - The binary to run, `tcspecial` or `tcssim`.
 /// * `payload_path` - The tcspecial configuration the child is to read.
 /// * `mode`         - The run's simulation mode, passed on as the flag.
+/// * `installed`    - The directory an installed MOC is in, or `None` for
+///                    one run out of a source tree.
 ///
 /// # Returns
 ///
-/// A `cargo run` of that binary, not yet started.
-fn child_command(name: &str, payload_path: &str, mode: Mode) -> Command {
+/// The program in `installed`, or a `cargo run` of that binary where there is
+/// no `installed`; not yet started.
+///
+/// # Errors
+///
+/// What [`child_program`] says, where an installed MOC's child is not beside
+/// it.
+fn child_command(
+    name: &str,
+    payload_path: &str,
+    mode: Mode,
+    installed: Option<&Path>,
+) -> Result<Command, String> {
+    let flag = format!("{}={mode}", tcslibgs::simulate::FLAG);
+    if let Some(program) = child_program(name, installed)? {
+        let mut command = Command::new(program);
+        command.args([flag.as_str(), payload_path]);
+        return Ok(command);
+    }
     let mut command = Command::new("cargo");
-    command.args([
-        "run",
-        "--bin",
-        name,
-        "--",
-        &format!("{}={mode}", tcslibgs::simulate::FLAG),
-        payload_path,
-    ]);
-    command
+    command.args(["run", "--bin", name, "--", &flag, payload_path]);
+    Ok(command)
+}
+
+/// Where an installed MOC's child is: beside the MOC.
+///
+/// An installed MOC never falls back to `cargo run`, or to a program of the
+/// same name somewhere on `PATH`. A ground station with no cargo would be told
+/// that cargo could not be started, which says nothing about what is wrong,
+/// and a program found elsewhere would be one from another install, at
+/// another version, serving a vehicle this MOC was not built to talk to. So
+/// a child missing from the install is refused, by name, with where it was
+/// looked for and which package puts it there.
+///
+/// # Arguments
+///
+/// * `name`      - The binary, `tcspecial` or `tcssim`.
+/// * `installed` - The directory an installed MOC is in, or `None` for one
+///                 run out of a source tree.
+///
+/// # Returns
+///
+/// The program's path, or `None` for a MOC run out of a source tree, which
+/// runs its children with `cargo run`.
+///
+/// # Errors
+///
+/// A sentence saying which program is missing, the path it was looked for
+/// at, and which package to install, where `installed` has no file `name`.
+fn child_program(
+    name: &str,
+    installed: Option<&Path>,
+) -> Result<Option<std::path::PathBuf>, String> {
+    let Some(dir) = installed else {
+        return Ok(None);
+    };
+    let program = dir.join(name);
+    if program.is_file() {
+        return Ok(Some(program));
+    }
+    // The packages are cut by the Makefile's lists: tcspecial is the flight
+    // package's, and tcssim is in tcspecial-test with tcsmoc itself.
+    let package = if name == "tcssim" {
+        "tcspecial-test"
+    } else {
+        "tcspecial"
+    };
+    Err(format!(
+        "tcsmoc starts {name}, and there is no {name} beside it at {}: \
+         install the {package} package, which puts it there",
+        program.display()
+    ))
+}
+
+/// The directory this MOC is installed in, or `None` where it was built and
+/// is being run out of a source tree.
+///
+/// Told apart by what is beside the program rather than by anything in the
+/// environment: cargo puts every program it builds in a profile directory
+/// that holds its `deps`, and an install directory such as `/opt/tcs/bin`
+/// has none. Out of a source tree the children are run with `cargo run`, as
+/// they always were, because a `tcspecial` that happens to be beside a
+/// freshly built MOC may be a build of older source.
+///
+/// # Returns
+///
+/// The directory the MOC's own executable is in, its links resolved, where
+/// that has no `deps` beside the program; `None` otherwise, or where the
+/// executable's path cannot be found.
+fn installed_directory() -> Option<std::path::PathBuf> {
+    let program = env::current_exe().ok()?.canonicalize().ok()?;
+    let dir = program.parent()?;
+    if dir.join("deps").is_dir() {
+        return None;
+    }
+    Some(dir.to_path_buf())
 }
 
 /// Manages the tcssim subprocess
@@ -608,9 +702,12 @@ impl ProcessManager {
     ///
     /// If the child cannot be started, or a lock on it is poisoned.
     fn start_child(&self, name: &str, payload_path: &str, mode: Mode) {
-        let child = child_command(name, payload_path, mode)
-            .spawn()
-            .unwrap_or_else(|_| panic!("Failed to start {}", name));
+        let installed = installed_directory();
+        let child =
+            child_command(name, payload_path, mode, installed.as_deref())
+                .unwrap_or_else(|e| panic!("{e}"))
+                .spawn()
+                .unwrap_or_else(|_| panic!("Failed to start {}", name));
 
         *self.child.lock().unwrap() = Some(child);
         *self.name.lock().unwrap() = name.to_string();
@@ -2097,7 +2194,9 @@ mod tests {
     #[test]
     fn each_child_is_started_on_the_mocs_payload_file() {
         for name in CHILDREN {
-            let command = child_command(name, "tcspecial2.yaml", Mode::All);
+            let command =
+                child_command(name, "tcspecial2.yaml", Mode::All, None)
+                    .unwrap();
 
             assert_eq!(command.get_program(), "cargo", "{name}");
             let args: Vec<&OsStr> = command.get_args().collect();
@@ -2131,7 +2230,8 @@ mod tests {
             payload_path_from_args(args(&["tcspecial2.yaml"]), None).unwrap();
 
         for name in CHILDREN {
-            let command = child_command(name, &payload_path, Mode::All);
+            let command =
+                child_command(name, &payload_path, Mode::All, None).unwrap();
             let args: Vec<&OsStr> = command.get_args().collect();
             assert_eq!(
                 args.last(),
@@ -2149,7 +2249,8 @@ mod tests {
         assert_eq!(payload_path, DEFAULT_PAYLOAD_CONFIG_PATH);
 
         for name in CHILDREN {
-            let command = child_command(name, &payload_path, Mode::All);
+            let command =
+                child_command(name, &payload_path, Mode::All, None).unwrap();
             let args: Vec<&OsStr> = command.get_args().collect();
             assert_eq!(
                 args.last(),
@@ -2157,6 +2258,68 @@ mod tests {
                 "{name}"
             );
         }
+    }
+
+    /// An installed MOC runs the children installed beside it, on the same
+    /// command line that `cargo run` would have given them.
+    #[test]
+    fn an_installed_moc_runs_the_children_beside_it() {
+        let installed = tempfile::tempdir().expect("a directory");
+        for name in CHILDREN {
+            std::fs::write(installed.path().join(name), "").expect("written");
+            let command = child_command(
+                name,
+                "tcspecial2.yaml",
+                Mode::None,
+                Some(installed.path()),
+            )
+            .expect("the child is beside the MOC");
+
+            assert_eq!(
+                command.get_program(),
+                installed.path().join(name).as_os_str(),
+                "{name}"
+            );
+            let args: Vec<&OsStr> = command.get_args().collect();
+            assert_eq!(args, ["--simulate=none", "tcspecial2.yaml"], "{name}");
+        }
+    }
+
+    /// An installed MOC with a child missing from beside it refuses to start
+    /// it, naming the program, where it looked and the package that has it,
+    /// rather than falling back to `cargo run`.
+    #[test]
+    fn a_child_missing_from_the_install_is_refused_by_name() {
+        let installed = tempfile::tempdir().expect("a directory");
+        for (name, package) in [
+            ("tcspecial", "tcspecial package"),
+            ("tcssim", "tcspecial-test"),
+        ] {
+            let refused = child_command(
+                name,
+                "tcspecial2.yaml",
+                Mode::All,
+                Some(installed.path()),
+            )
+            .expect_err("a missing child is refused");
+            let looked = installed.path().join(name);
+            assert!(
+                refused.contains(&format!("no {name} beside it")),
+                "{refused}"
+            );
+            assert!(
+                refused.contains(&looked.display().to_string()),
+                "{refused}"
+            );
+            assert!(refused.contains(package), "{refused}");
+        }
+    }
+
+    /// Run out of a source tree, a child is run with `cargo run` whatever is
+    /// beside the MOC.
+    #[test]
+    fn out_of_a_source_tree_a_child_is_run_with_cargo() {
+        assert_eq!(child_program("tcssim", None), Ok(None));
     }
 
     /// The MOC starts the two programs it is meant to.

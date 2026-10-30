@@ -1,0 +1,20 @@
+# Puts @PREFIX@/bin on the search path, and @PREFIX@/lib/pkgconfig on
+# pkg-config's, for @PACKAGE@: the second is what lets a C or C++ ground
+# station be built with `pkg-config --cflags --libs tcs`.
+#
+# Each TCS package installs one of these, named after itself, so that no two
+# packages own the same file. Each adds a directory only if it is not already
+# there: a login shell reads every one of them, and the second must change
+# nothing.
+case ":${PATH}:" in
+*:@PREFIX@/bin:*) ;;
+*) PATH="${PATH:+${PATH}:}@PREFIX@/bin"; export PATH ;;
+esac
+case ":${PKG_CONFIG_PATH:-}:" in
+*:@PREFIX@/lib/pkgconfig:*) ;;
+*)
+	PKG_CONFIG_PATH="${PKG_CONFIG_PATH:+${PKG_CONFIG_PATH}:}"
+	PKG_CONFIG_PATH="${PKG_CONFIG_PATH}@PREFIX@/lib/pkgconfig"
+	export PKG_CONFIG_PATH
+	;;
+esac

@@ -4701,15 +4701,21 @@ an XML comment, which is a thing the XML spelling does not preserve.
 
 Where the tree is, in order: ``$TCSGUI_DATA``, then
 ``$XDG_DATA_HOME/tcsgui`` (or ``~/.local/share/tcsgui``), then
-``/usr/local/share/tcsgui``, then ``/usr/share/tcsgui``, then ``tcsgui/share``
-and ``share`` under the working directory. The user's own directory before the
-installed one, because that is where edited descriptions belong and where a
-person's own node goes; the working directory last, so that running the editor
-out of a checkout finds the checkout's own. ``make install-data`` puts them
-under ``$(PREFIX)/share/tcsgui``, which is ``/usr/local/share/tcsgui`` for
-software built locally and ``/usr/share/tcsgui`` for a distribution's package:
+``share/tcsgui`` one level up from the directory the editor's own executable
+is in, then ``/usr/local/share/tcsgui``, then ``/usr/share/tcsgui``, then
+``tcsgui/share`` and ``share`` under the working directory. The user's own
+directory before the installed one, because that is where edited
+descriptions belong and where a person's own node goes; the install the
+editor is part of before any other, found from the program rather than
+named, so that ``/opt/tcs/bin/tcsgui`` reads ``/opt/tcs/share/tcsgui`` and
+an install under another prefix reads its own; the working directory last,
+so that running the editor out of a checkout finds the checkout's own.
+``make install-data``, which ``make install`` runs, puts them under
+``$(PREFIX)/share/tcsgui``, ``/opt/tcs/share/tcsgui`` by default:
 architecture-independent data belonging to one package, which is where the
-filesystem hierarchy standard puts it.
+filesystem hierarchy standard puts it. ``/usr/local/share/tcsgui`` and
+``/usr/share/tcsgui`` are where installing put them before everything went
+under one prefix, and are still read.
 
 The editor is lazy
 ------------------

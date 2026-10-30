@@ -1,0 +1,1 @@
+../../../vendor/tcs-xtce/python/xtce/_xml.py

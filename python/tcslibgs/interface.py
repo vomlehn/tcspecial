@@ -7,20 +7,19 @@ in Python can compare its copy of the documents with the digest every beacon
 carries.
 """
 
-import sys
 from pathlib import Path
 
-# tcs-xtce's Python runtime, vendored in this tree until it is published:
-# see vendor/tcs-xtce/README.md.
-_XTCE = Path(__file__).resolve().parents[2] / "vendor" / "tcs-xtce" / "python"
-if str(_XTCE) not in sys.path:
-    sys.path.insert(0, str(_XTCE))
-
-from xtce import digest as _digest  # noqa: E402
+# tcs-xtce's digest, vendored in this tree until it is published: see
+# _xtce/__init__.py.
+from ._xtce import digest as _digest
 
 #: Where this tree's interface is stated: every XTCE document in it is part
 #: of the one interface, as ``make interface-digest`` in tcslibgs/ takes them.
-DOCUMENTS = Path(__file__).resolve().parents[2] / "tcslibgs" / "xtce"
+#: Beside this module rather than found in the source tree, so that an
+#: installed package has them too: ``xtce`` here is a link to the crate's
+#: ``tcslibgs/xtce``, which is the one copy, and installing the package copies
+#: what it links to.
+DOCUMENTS = Path(__file__).resolve().parent / "xtce"
 
 
 def of_files(paths):

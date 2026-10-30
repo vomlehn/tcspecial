@@ -1,0 +1,6 @@
+#!/bin/sh
+# The loader forgets the libtcs this package took away.
+set -e
+if [ "$1" = remove ] || [ "$1" = purge ]; then
+	ldconfig
+fi

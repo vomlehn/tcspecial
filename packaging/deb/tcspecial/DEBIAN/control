@@ -1,0 +1,24 @@
+Package: tcspecial
+Version: @VERSION@
+Architecture: @ARCH@
+Maintainer: David VomLehn <dvomlehn@gmail.com>
+Installed-Size: @SIZE@
+Depends: @SHLIBS@
+Section: misc
+Priority: optional
+Homepage: https://github.com/vomlehn/tcspecial
+Description: telemetry and control, special: spacecraft flight software
+ tcspecial runs a spacecraft's payloads as nodes in a configured graph and
+ relays their data and commands to and from the mission operations center
+ over UDP. This package is what flies: tcspecial itself, tcsverify,
+ which checks a configuration, the five test app programs under
+ /opt/tcs/libexec, the manual, and the example configurations. Everything
+ is under /opt/tcs. /etc/profile.d/tcspecial.sh puts /opt/tcs/bin on a
+ login shell's search path, and /opt/tcs/sbin/tcspecial-links links the
+ programs into /usr/local/bin for everything else.
+ A configuration that keeps a telemetry log needs a segsend beside
+ tcspecial: the mission's own, or the test one in tcspecial-test.
+ .
+ A systemd unit, tcspecial.service, is installed but not enabled: it runs
+ /opt/tcs/bin/tcspecial on /etc/opt/tcs/tcspecial/tcspecial.yaml once
+ one is put there, and starts it again whenever it exits.

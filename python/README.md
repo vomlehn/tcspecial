@@ -34,9 +34,26 @@ two consequences:
 
 The interface digest every beacon carries is worked out with tcs-xtce's
 Python runtime, which is not the standard library either but is in this tree,
-in `vendor/tcs-xtce/python`: `tcslibgs/interface.py` puts it on the path
-itself, so nothing need be installed for it. A beacon itself is plain text
-and needs nothing to read.
+in `vendor/tcs-xtce/python`. The three modules of it the digest needs are
+linked into `tcslibgs/_xtce`, and the XTCE documents it is taken over into
+`tcslibgs/xtce`, a link to the crate's `tcslibgs/xtce`: so there is one copy
+of each in the tree, and installing the package installs them, and an
+installed station needs nothing from the source tree. A beacon itself is
+plain text and needs nothing to read.
+
+`pyproject.toml` makes the three packages one distribution,
+`tcspecial-ground`, at the workspace's version, which `tests/test_version.py`
+holds it to:
+
+```
+pip install ./python
+pip install './python[yaml]'     # with PyYAML, for YAML configurations
+```
+
+The `tcspecial-ground` system package installs them in
+`/opt/tcs/lib/python3/site-packages`, a path that names no Python version,
+and puts that on python3's path with a `.pth` file: see "Installing" in
+docs/manual.rst.
 
 Written twice, a rule can drift, so each one here is held to its Rust:
 

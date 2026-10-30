@@ -1,0 +1,43 @@
+# The Python a ground station is built on -- tcslibgs, tcslib and tcsui --
+# as one distribution, so that `pip install ./python` installs all three.
+#
+# Named tcspecial-ground, as the system package that carries them is, and
+# not after any one of the three: the import names are the crates' own and
+# stay so, but a distribution called tcslib would be one name on PyPI away
+# from somebody else's.
+
+[build-system]
+requires = ["setuptools>=64"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "tcspecial-ground"
+# The workspace's version, [workspace.package] in ../Cargo.toml.
+# tests/test_version.py fails when the two differ.
+version = "0.1.0"
+description = """\
+The Python spelling of tcspecial's ground libraries: beacons, \
+configurations and the beacon panel"""
+readme = "README.md"
+license = { text = "MIT OR Apache-2.0" }
+authors = [{ name = "David VomLehn", email = "dvomlehn@gmail.com" }]
+requires-python = ">=3.9"
+# Nothing outside the standard library is needed to import any of them. A
+# YAML configuration is read with PyYAML, imported only when one is read, so
+# it is an extra rather than a requirement; tcsui needs tkinter, which is
+# part of the standard library but packaged on its own by most
+# distributions, and is not something pip can install.
+dependencies = []
+
+[project.optional-dependencies]
+yaml = ["PyYAML"]
+
+[tool.setuptools]
+# Named rather than found: tcslibgs._xtce is a directory of links, which
+# package discovery does not follow, and tests/ is not to be installed.
+packages = ["tcslibgs", "tcslibgs._xtce", "tcslib", "tcsui"]
+
+[tool.setuptools.package-data]
+# The XTCE documents the interface digest is taken over: see
+# tcslibgs/interface.py.
+tcslibgs = ["xtce/*.xml"]

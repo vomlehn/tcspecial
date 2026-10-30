@@ -2527,11 +2527,6 @@ both ends read; what follows is what a vehicle made of nodes does with each.
     configuration is flown. The arm key is the interlock, and an unarmed
     RESTART is refused. See `Restarting`_.
 
-``CONFIG``
-    Sets the beacon interval. The beacon thread is retimed where it waits, so
-    the next beacon goes at the new interval rather than after the old one
-    elapses.
-
 ``START_NODE`` and ``STOP_NODE``
     Enable and disable a node. The unit is a node of the graph, so a
     computation, a log and a payload are each something the ground can stop.
@@ -2998,8 +2993,8 @@ node's wait and no other.
    computation's deadline.
 
    The command interpreter is there: two links, each taking commands only from
-   the address the configuration states, answering PING, CONNECT, CONFIG and
-   the five NODE commands, and recording every answer in the log
+   the address the configuration states, answering PING, CONNECT, RESTART_ARM,
+   RESTART and the five NODE commands, and recording every answer in the log
    beside the beacons. Each node has a state and a wakeup descriptor, and
    stopping a node takes effect at once -- it is not read, not asked, and
    deliveries to it are dropped and counted.
@@ -5439,52 +5434,13 @@ the last RESTART_ARM command. Otherwise it is answered ``NotArmed``. See
 
 **The rest of these need work done, but do list the applicatable commands**
 
-Configure
-~~~~~~~~~
-Configure various TCSpecial values
-
-+----------------+-------------------------------------------------------------+
-| Name           | Parameters                                                  |
-+================+============+================+===============================+
-| CONFIG_CM      | Name       | Type           | Description                   |
-|                +------------+----------------+-------------------------------+
-|                | beacon_int | BeaconInterval | Interval at which BEACON      |
-|                |            |                | telemetry is sent             |
-+----------------+------------+----------------+-------------------------------+
-| CONFIG_TM      | Parameters                                                  |
-|                +------------+----------------+-------------------------------+
-|                | Name       | Type           |  Description                  |
-|                +------------+----------------+-------------------------------+
-|                | None                                                        |
-+----------------+------------+----------------+-------------------------------+
-
-Requirement
-    The interval is eight bytes of microseconds, most significant byte
-    first: the unit and the order a timestamp uses, so that a number crossing
-    this link means one thing whichever field it is in. There is no reserved
-    value in it -- an interval, unlike a clock, cannot fail to be read -- and
-    nought is refused where the sender is retimed rather than meaning
-    anything here.
-
-Requirement
-    The interval CONFIG sets is the one the beacons go at once the MOC has
-    connected. Until a CONNECT, and while a restart is under way, the
-    beacons go every ``beacon.reset_interval`` whatever CONFIG said, and
-    the interval set takes effect at the next CONNECT: see `The beacon
-    across a restart`_.
-
-Requirement
-    A spacecraft asked for an interval longer than eight bytes of
-    microseconds can state uses the longest it can state. The alternative is
-    a very long interval arriving as a very short one, which is a spacecraft
-    beaconing as fast as it can because the ground asked it to beacon once a
-    century. Nothing will meet the limit: eight bytes of microseconds are
-    584,554 years.
-
-It is called ``BeaconInterval`` because it is a length of time and not a time
-of day. It was ``BeaconTime``, which read as the time a beacon was sent, so the one
-thing in the system named "beacon time" was the one thing that was not a
-time.
+There is no command that changes the beacon interval. It was CONFIG, opcode
+0x20 and answer kind 0xA0, neither of which is used now. The intervals are
+the configuration's, ``beacon.default_interval`` and
+``beacon.reset_interval``, so every station reading the same configuration
+knows them, which a station that only listens could not if a command it did
+not see had changed them. A mission that wants the vehicle to beacon at
+another interval flies a configuration that says so.
 
 Asynchronous Telemetry
 ----------------------
@@ -6051,8 +6007,7 @@ Requirement
 
 What that means for each command: PING and the two queries change nothing.
 CONNECT changes only the beacons -- it clears the commanded-restart flag and
-slows them -- which a repeat leaves as the first did. CONFIG sets an
-interval rather than changing one. START_NODE and
+slows them -- which a repeat leaves as the first did. START_NODE and
 STOP_NODE answer ``Success`` for a node already in the state asked for, and
 every attribute SET_NODE may set is a value, not a step. RESTART_ARM with the
 key of the arm already standing leaves that arm as it was -- see
@@ -6164,17 +6119,11 @@ Requirement
 Requirement
     A CONNECT taken -- valid, from where the configuration says the MOC
     sends from, and answered -- clears the commanded-restart flag, sends a
-    beacon at once, and from then on beacons every ``default_interval``, or
-    every interval the last CONFIG set. Once a restart has been initiated a
+    beacon at once, and from then on beacons every ``default_interval``.
+    Once a restart has been initiated a
     CONNECT does neither: the flag stays set and the beacons stay at
     ``reset_interval`` until the process ends. No other command slows the
     beacons or clears the flag.
-
-Requirement
-    CONFIG sets the interval the beacons go at once the MOC has connected.
-    Taken after a CONNECT, with no restart under way, it takes effect at
-    once, with a beacon sent at once; taken before, or while a restart is
-    under way, it takes effect at the next CONNECT.
 
 The beacon goes fast across a restart because that is when the ground most
 needs to know how the vehicle is: that the restart was taken, and that it has
@@ -7258,7 +7207,7 @@ Those operations are ``tcslib::client::TcsClient``. A control application
 drives one of those rather than speaking the command and telemetry protocol
 itself: each operation sends its command, waits for the answering telemetry,
 and hands back what that telemetry carried. The spacecraft's own operations
-are PING, CONNECT, RESTART_ARM, RESTART and CONFIG; the per-node ones are
+are PING, CONNECT, RESTART_ARM and RESTART; the per-node ones are
 START_NODE, STOP_NODE, SET_NODE, QUERY_NODE and QUERY_NODE_SAMPLE.
 
 Requirement

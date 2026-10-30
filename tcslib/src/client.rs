@@ -19,11 +19,10 @@
 use std::sync::atomic::{AtomicU32, Ordering};
 use std::time::Duration;
 use tcslibgs::{
-    sequence_is_before, ArmKey, BeaconInterval, Command, CommandLink,
-    CommandStatus, CommandType, ConfigCommand, ConfigDigest, ConfigVersion,
-    ConnectCommand, DHSample, NodeCommand, NodeCounts, NodeId, PingCommand,
-    Reason, RestartArmCommand, RestartCommand, SetNodeCommand, TcsError,
-    TcsResult, Telemetry, Timestamp,
+    sequence_is_before, ArmKey, Command, CommandLink, CommandStatus,
+    CommandType, ConfigDigest, ConfigVersion, ConnectCommand, DHSample,
+    NodeCommand, NodeCounts, NodeId, PingCommand, Reason, RestartArmCommand,
+    RestartCommand, SetNodeCommand, TcsError, TcsResult, Telemetry, Timestamp,
 };
 
 use crate::connection::Connection;
@@ -89,7 +88,7 @@ pub fn command_links_of(
 
 /// TCSpecial client for sending commands and receiving telemetry
 pub struct TcsClient {
-    /// The spacecraft's own link: ping it, arm it, restart it, configure it.
+    /// The spacecraft's own link: ping it, connect, arm it, restart it.
     connection: Box<dyn Connection>,
     /// The one link every node is commanded on.
     ///
@@ -274,7 +273,7 @@ impl TcsClient {
     /// A client with the spacecraft's link and no node link.
     ///
     /// For a program that commands the vehicle itself and no node of it: a
-    /// PING, a CONNECT, a CONFIGURE. A node command is refused rather than
+    /// PING, a CONNECT, a RESTART. A node command is refused rather than
     /// sent -- see `link_for` -- because there is nowhere for it to go.
     ///
     /// # Arguments
@@ -934,40 +933,6 @@ impl TcsClient {
             Telemetry::QueryNodeSample(tm) => {
                 Ok((tm.header.status, tm.taken, tm.given))
             }
-            _ => {
-                Err(TcsError::Protocol("Unexpected telemetry type".to_string()))
-            }
-        }
-    }
-
-    // -- configuring the spacecraft ----------------------------------------
-
-    /// Sends a CONFIG and waits for its answer.
-    ///
-    /// # Arguments
-    ///
-    /// * `beacon_interval` - How often the vehicle is to send its beacon.
-    ///
-    /// # Returns
-    ///
-    /// The status the vehicle answered with.
-    ///
-    /// # Errors
-    ///
-    /// `TcsError::AwaitingRestart` while a RESTART is awaited,
-    /// `TcsError::GenerationUnknown` if no generation is known to send it
-    /// for, `TcsError::Io` if it cannot be sent or no answer comes in time,
-    /// and `TcsError::Protocol` if the answer is not this command's.
-    pub fn configure(
-        &mut self,
-        beacon_interval: BeaconInterval,
-    ) -> TcsResult<CommandStatus> {
-        let seq = self.next_sequence();
-        let cmd = Command::Config(ConfigCommand::new(seq, beacon_interval));
-        let response = self.send_command(cmd)?;
-
-        match response {
-            Telemetry::Config(tm) => Ok(tm.header.status),
             _ => {
                 Err(TcsError::Protocol("Unexpected telemetry type".to_string()))
             }

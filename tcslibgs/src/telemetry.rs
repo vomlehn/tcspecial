@@ -80,7 +80,6 @@ pub enum TelemetryType {
     Connect,
     RestartArm,
     Restart,
-    Config,
     /// The answer to a START_NODE: see [`NodeTelemetry`].
     StartNode,
     /// And to a STOP_NODE.
@@ -107,7 +106,7 @@ impl TelemetryType {
             TelemetryType::Connect => 0x84,
             TelemetryType::RestartArm => 0x82,
             TelemetryType::Restart => 0x83,
-            TelemetryType::Config => 0xA0,
+            // 0xA0 is not used: it was CONFIG's answer.
             TelemetryType::StartNode => 0x30,
             TelemetryType::StopNode => 0x31,
             TelemetryType::SetNode => 0x32,
@@ -132,7 +131,6 @@ impl TelemetryType {
             0x84 => Some(TelemetryType::Connect),
             0x82 => Some(TelemetryType::RestartArm),
             0x83 => Some(TelemetryType::Restart),
-            0xA0 => Some(TelemetryType::Config),
             0x30 => Some(TelemetryType::StartNode),
             0x31 => Some(TelemetryType::StopNode),
             0x32 => Some(TelemetryType::SetNode),
@@ -282,33 +280,6 @@ impl ConnectTelemetry {
                 status,
             ),
             ..self
-        }
-    }
-}
-/// CONFIG telemetry response
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub struct ConfigTelemetry {
-    pub header: TelemetryHeader,
-}
-
-impl ConfigTelemetry {
-    /// Makes the answer to a CONFIG, made now.
-    ///
-    /// # Arguments
-    ///
-    /// * `sequence` - The sequence number of the command it answers.
-    /// * `status`   - How the command went.
-    ///
-    /// # Returns
-    ///
-    /// The answer.
-    pub fn new(sequence: u32, status: CommandStatus) -> Self {
-        Self {
-            header: TelemetryHeader::new(
-                sequence,
-                TelemetryType::Config,
-                status,
-            ),
         }
     }
 }
@@ -679,9 +650,6 @@ pub fn answer_to(
         Command::Restart(_) => {
             Telemetry::Restart(RestartTelemetry::new(sequence, status))
         }
-        Command::Config(_) => {
-            Telemetry::Config(ConfigTelemetry::new(sequence, status))
-        }
         // The id the command carried, refused or not: an answer about a node
         // says which node, and an id out of range is exactly the case where
         // the ground needs to see which one it sent.
@@ -718,7 +686,6 @@ pub enum Telemetry {
     Connect(ConnectTelemetry),
     RestartArm(RestartArmTelemetry),
     Restart(RestartTelemetry),
-    Config(ConfigTelemetry),
     StartNode(NodeTelemetry),
     StopNode(NodeTelemetry),
     SetNode(SetNodeTelemetry),
@@ -738,7 +705,6 @@ impl Telemetry {
             Telemetry::Connect(tm) => &tm.header,
             Telemetry::RestartArm(tm) => &tm.header,
             Telemetry::Restart(tm) => &tm.header,
-            Telemetry::Config(tm) => &tm.header,
             Telemetry::StartNode(tm) | Telemetry::StopNode(tm) => &tm.header,
             Telemetry::SetNode(tm) => &tm.header,
             Telemetry::QueryNode(tm) => &tm.header,
@@ -757,7 +723,6 @@ impl Telemetry {
             Telemetry::Connect(tm) => &mut tm.header,
             Telemetry::RestartArm(tm) => &mut tm.header,
             Telemetry::Restart(tm) => &mut tm.header,
-            Telemetry::Config(tm) => &mut tm.header,
             Telemetry::StartNode(tm) | Telemetry::StopNode(tm) => {
                 &mut tm.header
             }
@@ -907,7 +872,6 @@ mod tests {
                 4,
                 CommandStatus::Success,
             )),
-            Telemetry::Config(ConfigTelemetry::new(9, CommandStatus::Success)),
             Telemetry::StartNode(NodeTelemetry::started(
                 11,
                 CommandStatus::Success,

@@ -921,203 +921,6 @@ impl fmt::Display for ConnectAnswer {
     }
 }
 
-/// Sequence container `/TcsLink/ConfigAnswer`.
-///
-/// Fixed by its inheritance: `Version` = 0, `PacketType` = 0, `SecHdrFlag` = 0,
-/// `APID` = 256, `SeqFlags` = 3, `Kind` = 160.
-///
-/// `PacketLength` is the packet length: computed when encoding, checked when
-/// decoding.
-#[derive(Debug, Clone, PartialEq, Default)]
-pub struct ConfigAnswer {
-    /// `/TcsLink/SeqCount` (/TcsLink/U14Type)
-    pub seq_count: u16,
-    /// `/TcsLink/Sequence` (/TcsLink/U32Type)
-    pub sequence: u32,
-    /// `/TcsLink/Generation` (/TcsLink/U32Type)
-    pub generation: u32,
-    /// `/TcsLink/Status` (/TcsLink/StatusType)
-    pub status: StatusType,
-    /// `/TcsLink/Timestamp` (/TcsLink/U64Type)
-    pub timestamp: u64,
-}
-
-impl ConfigAnswer {
-    /// The number of fields with an alarm.
-    pub const ALARMS: usize = 0;
-
-    /// Evaluates the alarms of this `/TcsLink/ConfigAnswer` packet's fields.
-    /// Alarms that depend on earlier samples count only this one (see
-    /// `monitor`).
-    ///
-    /// # Returns
-    ///
-    /// The alarm level of each field with an alarm, `None` when the field is
-    /// absent.
-    pub fn alarms(&self) -> pk::Alarms<0> {
-        let mut a = pk::Alarms::new();
-        a
-    }
-
-    /// Evaluates the alarms of this `/TcsLink/ConfigAnswer` packet's fields
-    /// like `alarms()`, counting the earlier samples for change ranges,
-    /// minViolations and minConformance.
-    ///
-    /// # Arguments
-    ///
-    /// * `m` - The state of the alarms that depend on earlier samples, which
-    ///         the method reads and updates.
-    /// * `t` - This sample's time, in seconds.
-    ///
-    /// # Returns
-    ///
-    /// The alarm level of each field with an alarm, `None` when the field is
-    /// absent.
-    pub fn monitor(&self, m: &mut AlarmMonitor, t: f64) -> pk::Alarms<0> {
-        let mut a = pk::Alarms::new();
-        a
-    }
-
-    /// The number of MathAlgorithms this packet triggers.
-    pub const ALGORITHMS: usize = 0;
-
-    /// Evaluates the MathAlgorithms that a `/TcsLink/ConfigAnswer` packet
-    /// triggers, from this one's values.
-    ///
-    /// # Returns
-    ///
-    /// The output of each, `None` when an input is absent or a custom
-    /// algorithm's function isn't set or fails.
-    pub fn algorithms(&self) -> pk::Outputs<0> {
-        let mut o = pk::Outputs::new();
-        o
-    }
-}
-
-impl Packet for ConfigAnswer {
-    const NAME: &'static str = "/TcsLink/ConfigAnswer";
-    const MAX_BYTES: usize = 24;
-
-    fn decode_prefix(data: &[u8]) -> Result<(Self, usize)> {
-        let mut r = BitReader::new(data);
-        let v1 = r.uint_order(3, false, "Version")? as u8;
-        let v2 = r.uint_order(1, false, "PacketType")? as u8;
-        let v3 = r.uint_order(1, false, "SecHdrFlag")? as u8;
-        let v4 = r.uint_order(11, false, "APID")? as u16;
-        let v5 = r.uint_order(2, false, "SeqFlags")? as u8;
-        let v6 = r.uint_order(14, false, "SeqCount")? as u16;
-        let v7 = r.uint_order(16, false, "PacketLength")? as u16;
-        r.limit(v7 as u64, -1, "PacketLength")?;
-        let v8 = r.uint_order(8, false, "Kind")? as u8;
-        let v9 = r.uint_order(32, false, "Sequence")? as u32;
-        let v10 = r.uint_order(32, false, "Generation")? as u32;
-        let v11 = StatusType(r.uint_order(8, false, "Status")? as i64);
-        let v12 = r.uint_order(64, false, "Timestamp")? as u64;
-        if !((v1 as i128) == 0) {
-            return Err(PacketError::Mismatch {
-                container: "/TcsLink/Answer",
-                criterion: "/TcsLink/Version == 0",
-            });
-        }
-        if !((v2 as i128) == 0) {
-            return Err(PacketError::Mismatch {
-                container: "/TcsLink/Answer",
-                criterion: "/TcsLink/PacketType == 0",
-            });
-        }
-        if !((v3 as i128) == 0) {
-            return Err(PacketError::Mismatch {
-                container: "/TcsLink/Answer",
-                criterion: "/TcsLink/SecHdrFlag == 0",
-            });
-        }
-        if !((v4 as i128) == 256) {
-            return Err(PacketError::Mismatch {
-                container: "/TcsLink/Answer",
-                criterion: "/TcsLink/APID == 256",
-            });
-        }
-        if !((v5 as i128) == 3) {
-            return Err(PacketError::Mismatch {
-                container: "/TcsLink/Answer",
-                criterion: "/TcsLink/SeqFlags == 3",
-            });
-        }
-        if !((v8 as i128) == 160) {
-            return Err(PacketError::Mismatch {
-                container: "/TcsLink/ConfigAnswer",
-                criterion: "/TcsLink/Kind == 160",
-            });
-        }
-        r.finish("PacketLength")?;
-        Ok((
-            ConfigAnswer {
-                seq_count: v6,
-                sequence: v9,
-                generation: v10,
-                status: v11,
-                timestamp: v12,
-            },
-            r.used(),
-        ))
-    }
-
-    fn encode_into(&self, w: &mut BitWriter<'_>) -> Result<()> {
-        w.uint_order(3, false, pk::from_unsigned(0 as u64, 3, "Version")?);
-        w.uint_order(1, false, pk::from_unsigned(0 as u64, 1, "PacketType")?);
-        w.uint_order(1, false, pk::from_unsigned(0 as u64, 1, "SecHdrFlag")?);
-        w.uint_order(11, false, pk::from_unsigned(256 as u64, 11, "APID")?);
-        w.uint_order(2, false, pk::from_unsigned(3 as u64, 2, "SeqFlags")?);
-        w.uint_order(
-            14,
-            false,
-            pk::from_unsigned(self.seq_count as u64, 14, "SeqCount")?,
-        );
-        let l7 = w.position();
-        w.zeros(16);
-        w.uint_order(8, false, pk::from_unsigned(160 as u64, 8, "Kind")?);
-        w.uint_order(
-            32,
-            false,
-            pk::from_unsigned(self.sequence as u64, 32, "Sequence")?,
-        );
-        w.uint_order(
-            32,
-            false,
-            pk::from_unsigned(self.generation as u64, 32, "Generation")?,
-        );
-        w.uint_order(
-            8,
-            false,
-            pk::from_signed(self.status.0, 8, IntEncoding::Unsigned, "Status")?,
-        );
-        w.uint_order(
-            64,
-            false,
-            pk::from_unsigned(self.timestamp as u64, 64, "Timestamp")?,
-        );
-        w.patch_length(l7, 16, false, -1, "PacketLength")?;
-        Ok(())
-    }
-}
-
-impl fmt::Display for ConfigAnswer {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        f.write_str("ConfigAnswer{")?;
-        f.write_str("seq_count=")?;
-        write!(f, "{}", self.seq_count)?;
-        f.write_str(", sequence=")?;
-        write!(f, "{}", self.sequence)?;
-        f.write_str(", generation=")?;
-        write!(f, "{}", self.generation)?;
-        f.write_str(", status=")?;
-        write!(f, "{}", self.status)?;
-        f.write_str(", timestamp=")?;
-        write!(f, "{}", self.timestamp)?;
-        f.write_char('}')
-    }
-}
-
 /// Sequence container `/TcsLink/StartNodeAnswer`.
 ///
 /// Fixed by its inheritance: `Version` = 0, `PacketType` = 0, `SecHdrFlag` = 0,
@@ -3130,184 +2933,6 @@ impl fmt::Display for Connect {
     }
 }
 
-/// Meta-command `/TcsLink/Config`.
-///
-/// Fixed by its inheritance: `Version` = 0, `PacketType` = 1, `SecHdrFlag` = 0,
-/// `APID` = 256, `SeqFlags` = 3, `Opcode` = 32.
-///
-/// `PacketLength` is the packet length: computed when encoding, checked when
-/// decoding.
-#[derive(Debug, Clone, PartialEq, Default)]
-pub struct Config {
-    /// `/TcsLink/Command#SeqCount` (/TcsLink/U14Arg)
-    pub seq_count: u16,
-    /// `/TcsLink/Command#Sequence` (/TcsLink/U32Arg)
-    pub sequence: u32,
-    /// `/TcsLink/Config#BeaconInterval` (/TcsLink/U64Arg)
-    pub beacon_interval: u64,
-}
-
-impl Config {
-    /// The number of fields with an alarm.
-    pub const ALARMS: usize = 0;
-
-    /// Evaluates the alarms of this `/TcsLink/Config` packet's fields. Alarms
-    /// that depend on earlier samples count only this one (see `monitor`).
-    ///
-    /// # Returns
-    ///
-    /// The alarm level of each field with an alarm, `None` when the field is
-    /// absent.
-    pub fn alarms(&self) -> pk::Alarms<0> {
-        let mut a = pk::Alarms::new();
-        a
-    }
-
-    /// Evaluates the alarms of this `/TcsLink/Config` packet's fields like
-    /// `alarms()`, counting the earlier samples for change ranges,
-    /// minViolations and minConformance.
-    ///
-    /// # Arguments
-    ///
-    /// * `m` - The state of the alarms that depend on earlier samples, which
-    ///         the method reads and updates.
-    /// * `t` - This sample's time, in seconds.
-    ///
-    /// # Returns
-    ///
-    /// The alarm level of each field with an alarm, `None` when the field is
-    /// absent.
-    pub fn monitor(&self, m: &mut AlarmMonitor, t: f64) -> pk::Alarms<0> {
-        let mut a = pk::Alarms::new();
-        a
-    }
-
-    /// The number of MathAlgorithms this packet triggers.
-    pub const ALGORITHMS: usize = 0;
-
-    /// Evaluates the MathAlgorithms that a `/TcsLink/Config` packet triggers,
-    /// from this one's values.
-    ///
-    /// # Returns
-    ///
-    /// The output of each, `None` when an input is absent or a custom
-    /// algorithm's function isn't set or fails.
-    pub fn algorithms(&self) -> pk::Outputs<0> {
-        let mut o = pk::Outputs::new();
-        o
-    }
-}
-
-impl Packet for Config {
-    const NAME: &'static str = "/TcsLink/Config";
-    const MAX_BYTES: usize = 19;
-
-    fn decode_prefix(data: &[u8]) -> Result<(Self, usize)> {
-        let mut r = BitReader::new(data);
-        let v47 = r.uint_order(3, false, "Version")? as u8;
-        let v48 = r.uint_order(1, false, "PacketType")? as u8;
-        let v49 = r.uint_order(1, false, "SecHdrFlag")? as u8;
-        let v50 = r.uint_order(11, false, "APID")? as u16;
-        let v51 = r.uint_order(2, false, "SeqFlags")? as u8;
-        let v52 = r.uint_order(14, false, "SeqCount")? as u16;
-        let v53 = r.uint_order(16, false, "PacketLength")? as u16;
-        r.limit(v53 as u64, -1, "PacketLength")?;
-        let v54 = r.uint_order(8, false, "Opcode")? as u8;
-        let v55 = r.uint_order(32, false, "Sequence")? as u32;
-        if !((v47 as i128) == 0) {
-            return Err(PacketError::Mismatch {
-                container: "/TcsLink/TcsCommand",
-                criterion: "Version = 0",
-            });
-        }
-        if !((v48 as i128) == 1) {
-            return Err(PacketError::Mismatch {
-                container: "/TcsLink/TcsCommand",
-                criterion: "PacketType = 1",
-            });
-        }
-        if !((v49 as i128) == 0) {
-            return Err(PacketError::Mismatch {
-                container: "/TcsLink/TcsCommand",
-                criterion: "SecHdrFlag = 0",
-            });
-        }
-        if !((v50 as i128) == 256) {
-            return Err(PacketError::Mismatch {
-                container: "/TcsLink/TcsCommand",
-                criterion: "APID = 256",
-            });
-        }
-        if !((v51 as i128) == 3) {
-            return Err(PacketError::Mismatch {
-                container: "/TcsLink/TcsCommand",
-                criterion: "SeqFlags = 3",
-            });
-        }
-        if !((v54 as i128) == 32) {
-            return Err(PacketError::Mismatch {
-                container: "/TcsLink/Config",
-                criterion: "Opcode = 32",
-            });
-        }
-        let v62 = r.uint_order(64, false, "BeaconInterval")? as u64;
-        r.finish("PacketLength")?;
-        Ok((
-            Config {
-                seq_count: v52,
-                sequence: v55,
-                beacon_interval: v62,
-            },
-            r.used(),
-        ))
-    }
-
-    fn encode_into(&self, w: &mut BitWriter<'_>) -> Result<()> {
-        w.uint_order(3, false, pk::from_unsigned(0 as u64, 3, "Version")?);
-        w.uint_order(1, false, pk::from_unsigned(1 as u64, 1, "PacketType")?);
-        w.uint_order(1, false, pk::from_unsigned(0 as u64, 1, "SecHdrFlag")?);
-        w.uint_order(11, false, pk::from_unsigned(256 as u64, 11, "APID")?);
-        w.uint_order(2, false, pk::from_unsigned(3 as u64, 2, "SeqFlags")?);
-        w.uint_order(
-            14,
-            false,
-            pk::from_unsigned(self.seq_count as u64, 14, "SeqCount")?,
-        );
-        let l53 = w.position();
-        w.zeros(16);
-        w.uint_order(8, false, pk::from_unsigned(32 as u64, 8, "Opcode")?);
-        w.uint_order(
-            32,
-            false,
-            pk::from_unsigned(self.sequence as u64, 32, "Sequence")?,
-        );
-        w.uint_order(
-            64,
-            false,
-            pk::from_unsigned(
-                self.beacon_interval as u64,
-                64,
-                "BeaconInterval",
-            )?,
-        );
-        w.patch_length(l53, 16, false, -1, "PacketLength")?;
-        Ok(())
-    }
-}
-
-impl fmt::Display for Config {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        f.write_str("Config{")?;
-        f.write_str("seq_count=")?;
-        write!(f, "{}", self.seq_count)?;
-        f.write_str(", sequence=")?;
-        write!(f, "{}", self.sequence)?;
-        f.write_str(", beacon_interval=")?;
-        write!(f, "{}", self.beacon_interval)?;
-        f.write_char('}')
-    }
-}
-
 /// Meta-command `/TcsLink/StartNode`.
 ///
 /// Fixed by its inheritance: `Version` = 0, `PacketType` = 1, `SecHdrFlag` = 0,
@@ -3429,13 +3054,13 @@ impl Packet for StartNode {
                 criterion: "Opcode = 48",
             });
         }
-        let v63 = r.uint_order(32, false, "Node")? as u32;
+        let v62 = r.uint_order(32, false, "Node")? as u32;
         r.finish("PacketLength")?;
         Ok((
             StartNode {
                 seq_count: v52,
                 sequence: v55,
-                node: v63,
+                node: v62,
             },
             r.used(),
         ))
@@ -3603,13 +3228,13 @@ impl Packet for StopNode {
                 criterion: "Opcode = 49",
             });
         }
-        let v64 = r.uint_order(32, false, "Node")? as u32;
+        let v63 = r.uint_order(32, false, "Node")? as u32;
         r.finish("PacketLength")?;
         Ok((
             StopNode {
                 seq_count: v52,
                 sequence: v55,
-                node: v64,
+                node: v63,
             },
             r.used(),
         ))
@@ -3784,8 +3409,8 @@ impl Packet for SetNode {
                 criterion: "Opcode = 50",
             });
         }
-        let v65 = r.uint_order(32, false, "Node")? as u32;
-        let v66 = pk::read_fixed_string::<64, 65>(
+        let v64 = r.uint_order(32, false, "Node")? as u32;
+        let v65 = pk::read_fixed_string::<64, 65>(
             &mut r,
             &StringSpec {
                 fixed_bits: None,
@@ -3796,9 +3421,9 @@ impl Packet for SetNode {
             },
             "Attribute",
         )?;
-        let v67 = r.uint_order(16, false, "ValueLength")? as u16;
-        let v68 = r.fixed_bytes::<256>(
-            pk::dynamic_size(v67 as f64, 8.0, 0.0, 8, 256, "Value")?,
+        let v66 = r.uint_order(16, false, "ValueLength")? as u16;
+        let v67 = r.fixed_bytes::<256>(
+            pk::dynamic_size(v66 as f64, 8.0, 0.0, 8, 256, "Value")?,
             "Value",
         )?;
         r.finish("PacketLength")?;
@@ -3806,16 +3431,16 @@ impl Packet for SetNode {
             SetNode {
                 seq_count: v52,
                 sequence: v55,
-                node: v65,
-                attribute: v66,
-                value_: v68,
+                node: v64,
+                attribute: v65,
+                value_: v67,
             },
             r.used(),
         ))
     }
 
     fn encode_into(&self, w: &mut BitWriter<'_>) -> Result<()> {
-        let d67 = u16::try_from(pk::size_source(
+        let d66 = u16::try_from(pk::size_source(
             self.value_.len(),
             8.0,
             0.0,
@@ -3864,10 +3489,10 @@ impl Packet for SetNode {
         w.uint_order(
             16,
             false,
-            pk::from_unsigned(d67 as u64, 16, "ValueLength")?,
+            pk::from_unsigned(d66 as u64, 16, "ValueLength")?,
         );
         {
-            let n = pk::dynamic_size(d67 as f64, 8.0, 0.0, 8, 256, "Value")?;
+            let n = pk::dynamic_size(d66 as f64, 8.0, 0.0, 8, 256, "Value")?;
             if self.value_.len() != n {
                 return Err(PacketError::BadSize { field: "Value" });
             }
@@ -4016,13 +3641,13 @@ impl Packet for QueryNode {
                 criterion: "Opcode = 51",
             });
         }
-        let v69 = r.uint_order(32, false, "Node")? as u32;
+        let v68 = r.uint_order(32, false, "Node")? as u32;
         r.finish("PacketLength")?;
         Ok((
             QueryNode {
                 seq_count: v52,
                 sequence: v55,
-                node: v69,
+                node: v68,
             },
             r.used(),
         ))
@@ -4191,13 +3816,13 @@ impl Packet for QueryNodeSample {
                 criterion: "Opcode = 52",
             });
         }
-        let v70 = r.uint_order(32, false, "Node")? as u32;
+        let v69 = r.uint_order(32, false, "Node")? as u32;
         r.finish("PacketLength")?;
         Ok((
             QueryNodeSample {
                 seq_count: v52,
                 sequence: v55,
-                node: v70,
+                node: v69,
             },
             r.used(),
         ))
@@ -4252,7 +3877,6 @@ pub enum AnswerLayoutKind {
     RestartArmAnswer(RestartArmAnswer),
     RestartAnswer(RestartAnswer),
     ConnectAnswer(ConnectAnswer),
-    ConfigAnswer(ConfigAnswer),
     StartNodeAnswer(StartNodeAnswer),
     StopNodeAnswer(StopNodeAnswer),
     SetNodeAnswer(SetNodeAnswer),
@@ -4345,19 +3969,6 @@ impl Packet for AnswerLayoutKind {
                         patch: v15,
                         digest: v16,
                         newest_taken: v17,
-                    }),
-                    r.used(),
-                ));
-            }
-            if (v8 as i128) == 160 {
-                r.finish("PacketLength")?;
-                return Ok((
-                    Self::ConfigAnswer(ConfigAnswer {
-                        seq_count: v6,
-                        sequence: v9,
-                        generation: v10,
-                        status: v11,
-                        timestamp: v12,
                     }),
                     r.used(),
                 ));
@@ -4510,7 +4121,6 @@ impl Packet for AnswerLayoutKind {
             Self::RestartArmAnswer(p) => p.encode_into(w),
             Self::RestartAnswer(p) => p.encode_into(w),
             Self::ConnectAnswer(p) => p.encode_into(w),
-            Self::ConfigAnswer(p) => p.encode_into(w),
             Self::StartNodeAnswer(p) => p.encode_into(w),
             Self::StopNodeAnswer(p) => p.encode_into(w),
             Self::SetNodeAnswer(p) => p.encode_into(w),
@@ -4527,7 +4137,6 @@ impl fmt::Display for AnswerLayoutKind {
             Self::RestartArmAnswer(p) => p.fmt(f),
             Self::RestartAnswer(p) => p.fmt(f),
             Self::ConnectAnswer(p) => p.fmt(f),
-            Self::ConfigAnswer(p) => p.fmt(f),
             Self::StartNodeAnswer(p) => p.fmt(f),
             Self::StopNodeAnswer(p) => p.fmt(f),
             Self::SetNodeAnswer(p) => p.fmt(f),
@@ -4567,11 +4176,6 @@ impl AnswerLayoutKind {
                 }
             }
             Self::ConnectAnswer(p) => {
-                for a in p.alarms().as_slice() {
-                    out.push(a.field, a.level);
-                }
-            }
-            Self::ConfigAnswer(p) => {
                 for a in p.alarms().as_slice() {
                     out.push(a.field, a.level);
                 }
@@ -4633,11 +4237,6 @@ impl AnswerLayoutKind {
                 }
             }
             Self::ConnectAnswer(p) => {
-                for o in p.algorithms().as_slice() {
-                    out.push(o.name, o.value);
-                }
-            }
-            Self::ConfigAnswer(p) => {
                 for o in p.algorithms().as_slice() {
                     out.push(o.name, o.value);
                 }
@@ -4707,11 +4306,6 @@ impl AnswerLayoutKind {
                     out.push(a.field, a.level);
                 }
             }
-            Self::ConfigAnswer(p) => {
-                for a in p.monitor(m, t).as_slice() {
-                    out.push(a.field, a.level);
-                }
-            }
             Self::StartNodeAnswer(p) => {
                 for a in p.monitor(m, t).as_slice() {
                     out.push(a.field, a.level);
@@ -4766,12 +4360,6 @@ impl From<ConnectAnswer> for AnswerLayoutKind {
     }
 }
 
-impl From<ConfigAnswer> for AnswerLayoutKind {
-    fn from(p: ConfigAnswer) -> Self {
-        Self::ConfigAnswer(p)
-    }
-}
-
 impl From<StartNodeAnswer> for AnswerLayoutKind {
     fn from(p: StartNodeAnswer) -> Self {
         Self::StartNodeAnswer(p)
@@ -4809,7 +4397,6 @@ pub enum CommandKind {
     RestartArm(RestartArm),
     Restart(Restart),
     Connect(Connect),
-    Config(Config),
     StartNode(StartNode),
     StopNode(StopNode),
     SetNode(SetNode),
@@ -4893,23 +4480,23 @@ impl Packet for CommandKind {
                     r.used(),
                 ));
             }
-            if (v54 as i128) == 32 {
-                let v62 = r.uint_order(64, false, "BeaconInterval")? as u64;
+            if (v54 as i128) == 48 {
+                let v62 = r.uint_order(32, false, "Node")? as u32;
                 r.finish("PacketLength")?;
                 return Ok((
-                    Self::Config(Config {
+                    Self::StartNode(StartNode {
                         seq_count: v52,
                         sequence: v55,
-                        beacon_interval: v62,
+                        node: v62,
                     }),
                     r.used(),
                 ));
             }
-            if (v54 as i128) == 48 {
+            if (v54 as i128) == 49 {
                 let v63 = r.uint_order(32, false, "Node")? as u32;
                 r.finish("PacketLength")?;
                 return Ok((
-                    Self::StartNode(StartNode {
+                    Self::StopNode(StopNode {
                         seq_count: v52,
                         sequence: v55,
                         node: v63,
@@ -4917,21 +4504,9 @@ impl Packet for CommandKind {
                     r.used(),
                 ));
             }
-            if (v54 as i128) == 49 {
-                let v64 = r.uint_order(32, false, "Node")? as u32;
-                r.finish("PacketLength")?;
-                return Ok((
-                    Self::StopNode(StopNode {
-                        seq_count: v52,
-                        sequence: v55,
-                        node: v64,
-                    }),
-                    r.used(),
-                ));
-            }
             if (v54 as i128) == 50 {
-                let v65 = r.uint_order(32, false, "Node")? as u32;
-                let v66 = pk::read_fixed_string::<64, 65>(
+                let v64 = r.uint_order(32, false, "Node")? as u32;
+                let v65 = pk::read_fixed_string::<64, 65>(
                     &mut r,
                     &StringSpec {
                         fixed_bits: None,
@@ -4942,9 +4517,9 @@ impl Packet for CommandKind {
                     },
                     "Attribute",
                 )?;
-                let v67 = r.uint_order(16, false, "ValueLength")? as u16;
-                let v68 = r.fixed_bytes::<256>(
-                    pk::dynamic_size(v67 as f64, 8.0, 0.0, 8, 256, "Value")?,
+                let v66 = r.uint_order(16, false, "ValueLength")? as u16;
+                let v67 = r.fixed_bytes::<256>(
+                    pk::dynamic_size(v66 as f64, 8.0, 0.0, 8, 256, "Value")?,
                     "Value",
                 )?;
                 r.finish("PacketLength")?;
@@ -4952,33 +4527,33 @@ impl Packet for CommandKind {
                     Self::SetNode(SetNode {
                         seq_count: v52,
                         sequence: v55,
-                        node: v65,
-                        attribute: v66,
-                        value_: v68,
+                        node: v64,
+                        attribute: v65,
+                        value_: v67,
                     }),
                     r.used(),
                 ));
             }
             if (v54 as i128) == 51 {
-                let v69 = r.uint_order(32, false, "Node")? as u32;
+                let v68 = r.uint_order(32, false, "Node")? as u32;
                 r.finish("PacketLength")?;
                 return Ok((
                     Self::QueryNode(QueryNode {
                         seq_count: v52,
                         sequence: v55,
-                        node: v69,
+                        node: v68,
                     }),
                     r.used(),
                 ));
             }
             if (v54 as i128) == 52 {
-                let v70 = r.uint_order(32, false, "Node")? as u32;
+                let v69 = r.uint_order(32, false, "Node")? as u32;
                 r.finish("PacketLength")?;
                 return Ok((
                     Self::QueryNodeSample(QueryNodeSample {
                         seq_count: v52,
                         sequence: v55,
-                        node: v70,
+                        node: v69,
                     }),
                     r.used(),
                 ));
@@ -4998,7 +4573,6 @@ impl Packet for CommandKind {
             Self::RestartArm(p) => p.encode_into(w),
             Self::Restart(p) => p.encode_into(w),
             Self::Connect(p) => p.encode_into(w),
-            Self::Config(p) => p.encode_into(w),
             Self::StartNode(p) => p.encode_into(w),
             Self::StopNode(p) => p.encode_into(w),
             Self::SetNode(p) => p.encode_into(w),
@@ -5015,7 +4589,6 @@ impl fmt::Display for CommandKind {
             Self::RestartArm(p) => p.fmt(f),
             Self::Restart(p) => p.fmt(f),
             Self::Connect(p) => p.fmt(f),
-            Self::Config(p) => p.fmt(f),
             Self::StartNode(p) => p.fmt(f),
             Self::StopNode(p) => p.fmt(f),
             Self::SetNode(p) => p.fmt(f),
@@ -5055,11 +4628,6 @@ impl CommandKind {
                 }
             }
             Self::Connect(p) => {
-                for a in p.alarms().as_slice() {
-                    out.push(a.field, a.level);
-                }
-            }
-            Self::Config(p) => {
                 for a in p.alarms().as_slice() {
                     out.push(a.field, a.level);
                 }
@@ -5121,11 +4689,6 @@ impl CommandKind {
                 }
             }
             Self::Connect(p) => {
-                for o in p.algorithms().as_slice() {
-                    out.push(o.name, o.value);
-                }
-            }
-            Self::Config(p) => {
                 for o in p.algorithms().as_slice() {
                     out.push(o.name, o.value);
                 }
@@ -5195,11 +4758,6 @@ impl CommandKind {
                     out.push(a.field, a.level);
                 }
             }
-            Self::Config(p) => {
-                for a in p.monitor(m, t).as_slice() {
-                    out.push(a.field, a.level);
-                }
-            }
             Self::StartNode(p) => {
                 for a in p.monitor(m, t).as_slice() {
                     out.push(a.field, a.level);
@@ -5251,12 +4809,6 @@ impl From<Restart> for CommandKind {
 impl From<Connect> for CommandKind {
     fn from(p: Connect) -> Self {
         Self::Connect(p)
-    }
-}
-
-impl From<Config> for CommandKind {
-    fn from(p: Config) -> Self {
-        Self::Config(p)
     }
 }
 

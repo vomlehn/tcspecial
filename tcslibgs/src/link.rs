@@ -25,22 +25,21 @@ use std::fmt;
 use tcs_xtce::packet::{Codec, FixedBytes, FixedString, Packet, PacketError};
 
 use crate::commands::{
-    Attribute, Command, CommandHeader, CommandType, ConfigCommand,
-    ConnectCommand, NodeCommand, PingCommand, RestartArmCommand,
-    RestartCommand, SetNodeCommand, Value,
+    Attribute, Command, CommandHeader, CommandType, ConnectCommand,
+    NodeCommand, PingCommand, RestartArmCommand, RestartCommand,
+    SetNodeCommand, Value,
 };
 use crate::config_digest::{ConfigDigest, ConfigVersion};
 use crate::link_packet as packet;
 use crate::link_packet::StatusType;
 use crate::telemetry::{
-    ConfigTelemetry, ConnectTelemetry, NodeTelemetry, PingTelemetry,
-    QueryNodeSampleTelemetry, QueryNodeTelemetry, Reason, RestartArmTelemetry,
-    RestartTelemetry, SetNodeTelemetry, Telemetry, TelemetryHeader,
-    TelemetryType,
+    ConnectTelemetry, NodeTelemetry, PingTelemetry, QueryNodeSampleTelemetry,
+    QueryNodeTelemetry, Reason, RestartArmTelemetry, RestartTelemetry,
+    SetNodeTelemetry, Telemetry, TelemetryHeader, TelemetryType,
 };
 use crate::types::{
-    ArmKey, BeaconInterval, CommandStatus, DHSample, NodeCounts, NodeId,
-    Timestamp, DH_SAMPLE_BYTES,
+    ArmKey, CommandStatus, DHSample, NodeCounts, NodeId, Timestamp,
+    DH_SAMPLE_BYTES,
 };
 
 /// The longest command there is, in bytes: a SET_NODE with the longest
@@ -192,10 +191,6 @@ impl Command {
                 header: header(p.sequence, CommandType::Restart),
                 arm_key: ArmKey(p.arm_key),
             }),
-            K::Config(p) => Command::Config(ConfigCommand {
-                header: header(p.sequence, CommandType::Config),
-                beacon_interval: BeaconInterval(p.beacon_interval),
-            }),
             K::StartNode(p) => Command::StartNode(NodeCommand {
                 header: header(p.sequence, CommandType::StartNode),
                 node: NodeId(p.node),
@@ -263,11 +258,6 @@ impl Command {
                 seq_count,
                 sequence,
                 arm_key: c.arm_key.0,
-            }),
-            Command::Config(c) => K::Config(packet::Config {
-                seq_count,
-                sequence,
-                beacon_interval: c.beacon_interval.0,
             }),
             Command::StartNode(c) => K::StartNode(packet::StartNode {
                 seq_count,
@@ -500,9 +490,6 @@ impl Telemetry {
                 digest: digest_of(&p.digest),
                 newest_taken: p.newest_taken,
             }),
-            K::ConfigAnswer(p) => Telemetry::Config(ConfigTelemetry {
-                header: head!(p, TelemetryType::Config),
-            }),
             K::StartNodeAnswer(p) => Telemetry::StartNode(NodeTelemetry {
                 header: head!(p, TelemetryType::StartNode),
                 node: NodeId(p.node),
@@ -599,9 +586,6 @@ impl Telemetry {
                     digest: fixed(&t.digest.0),
                     newest_taken: t.newest_taken,
             )),
-            Telemetry::Config(t) => {
-                K::ConfigAnswer(fill!(ConfigAnswer, t.header;))
-            }
             Telemetry::StartNode(t) => K::StartNodeAnswer(fill!(
                 StartNodeAnswer,
                 t.header; node: t.node.0
@@ -709,7 +693,6 @@ mod tests {
             )),
             Command::RestartArm(RestartArmCommand::new(3, ArmKey(0x1234))),
             Command::Restart(RestartCommand::new(4, ArmKey(0x1234))),
-            Command::Config(ConfigCommand::new(5, BeaconInterval(2_000_000))),
             Command::StartNode(NodeCommand::start(6, NodeId(7))),
             Command::StopNode(NodeCommand::stop(7, NodeId(7))),
             Command::QueryNode(NodeCommand::query(8, NodeId(7))),
@@ -768,8 +751,14 @@ mod tests {
                 4,
                 CommandStatus::NotArmed,
             )),
-            Telemetry::Config(ConfigTelemetry::new(5, CommandStatus::Timeout)),
-            Telemetry::Config(ConfigTelemetry::new(12, CommandStatus::Stale)),
+            Telemetry::Restart(RestartTelemetry::new(
+                5,
+                CommandStatus::Timeout,
+            )),
+            Telemetry::RestartArm(RestartArmTelemetry::new(
+                12,
+                CommandStatus::Stale,
+            )),
             Telemetry::StartNode(NodeTelemetry::started(
                 6,
                 CommandStatus::Success,

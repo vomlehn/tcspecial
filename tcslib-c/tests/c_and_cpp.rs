@@ -23,9 +23,9 @@ use std::time::Duration;
 use tcslibgs::config_digest::{digest_of_file, ConfigVersion};
 use tcslibgs::node::vehicle::ping;
 use tcslibgs::{
-    Beacon, CommandStatus, ConfigTelemetry, ConnectTelemetry, DHSample,
-    NodeCounts, PingTelemetry, QueryNodeSampleTelemetry, QueryNodeTelemetry,
-    Reason, RestartArmTelemetry, RestartTelemetry, SetNodeTelemetry, Telemetry,
+    Beacon, CommandStatus, ConnectTelemetry, DHSample, NodeCounts,
+    PingTelemetry, QueryNodeSampleTelemetry, QueryNodeTelemetry, Reason,
+    RestartArmTelemetry, RestartTelemetry, SetNodeTelemetry, Telemetry,
     Timestamp,
 };
 
@@ -328,9 +328,6 @@ vehicle:
                                 ),
                             )
                         }
-                        tcslibgs::Command::Config(_) => Telemetry::Config(
-                            ConfigTelemetry::new(seq, CommandStatus::Success),
-                        ),
                         tcslibgs::Command::RestartArm(_) => {
                             Telemetry::RestartArm(RestartArmTelemetry::new(
                                 seq,
@@ -387,7 +384,6 @@ vehicle:
             tcslibgs::CommandType::QueryNode,
             tcslibgs::CommandType::SetNode,
             tcslibgs::CommandType::QueryNodeSample,
-            tcslibgs::CommandType::Config,
             tcslibgs::CommandType::RestartArm,
             tcslibgs::CommandType::Restart,
         ],
@@ -407,7 +403,6 @@ vehicle:
         may set \"ping.count\""
             .to_string(),
         "sample ping: took \"ping\" of 6 bytes, gave nothing".to_string(),
-        "configure: beacon every 5 s, done".to_string(),
         "restart: armed done, restarted done".to_string(),
         "restart: awaiting a beacon that starts again: yes".to_string(),
         "ping ping through moc: sent".to_string(),

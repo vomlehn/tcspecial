@@ -37,13 +37,12 @@ pub struct BeaconTiming {
 pub struct BeaconSend {
     pair: ArcCondPair<SystemTime>,
     /// How long until the next beacon: `reset_interval` as the process
-    /// starts and once a restart is initiated, `normal` once the MOC
-    /// connects.
+    /// starts and once a restart is initiated, `default_interval` once the
+    /// MOC connects. Nothing else sets it: the intervals are the
+    /// configuration's alone, so every station reading the same
+    /// configuration knows them.
     interval: Arc<Mutex<Duration>>,
     timing: BeaconTiming,
-    /// The interval the beacons go at once the MOC has connected:
-    /// `default_interval` until a CONFIG says another.
-    normal: Arc<Mutex<Duration>>,
     /// Whether the beacons are still going every `reset_interval` because
     /// no CONNECT has come from the MOC since this process started. Shared,
     /// so that the command interpreter's copy clears it for all of them.
@@ -186,7 +185,6 @@ impl BeaconSend {
             pair,
             interval: Arc::new(Mutex::new(interval)),
             timing,
-            normal: Arc::new(Mutex::new(timing.default_interval)),
             awaiting_connect: Arc::new(AtomicBool::new(true)),
             ending: Arc::new(AtomicBool::new(false)),
             commanded: Arc::new(AtomicBool::new(commanded)),
@@ -291,27 +289,6 @@ impl BeaconSend {
         Ok(())
     }
 
-    /// Takes the interval a CONFIG has set the beacons to go at once the
-    /// MOC has connected. Where it has, and no restart is under way, they go
-    /// at it from now, starting with one at once; otherwise from the next
-    /// CONNECT.
-    ///
-    /// # Arguments
-    ///
-    /// * `interval` - How long from one beacon to the next; nought is ignored
-    ///                and changes nothing.
-    pub fn set_interval(&mut self, interval: Duration) {
-        if interval == Duration::from_secs(0) {
-            return;
-        }
-        *self.normal.lock().unwrap() = interval;
-        if !self.awaiting_connect.load(Ordering::SeqCst)
-            && !self.ending.load(Ordering::SeqCst)
-        {
-            self.retime(interval);
-        }
-    }
-
     /// A CONNECT has been taken from the MOC: the commanded-restart bit is
     /// cleared, and the beacons go back to their normal interval, starting
     /// with one at once so that the ground sees the bit clear.
@@ -324,7 +301,7 @@ impl BeaconSend {
             return;
         }
         self.commanded.store(false, Ordering::SeqCst);
-        let normal = *self.normal.lock().unwrap();
+        let normal = self.timing.default_interval;
         if self.awaiting_connect.swap(false, Ordering::SeqCst) {
             // The one allocation this makes in the command loop, where the
             // log formats the line: once a start, at the first CONNECT, and
@@ -630,14 +607,14 @@ mod tests {
         }
     }
 
-    /// Every start beacons fast until the MOC connects; then at the
-    /// interval, and a CONFIG's interval from the next CONNECT. A restart
+    /// Every start beacons fast until the MOC connects, and then at the
+    /// default interval. A restart
     /// initiated sets the commanded-restart bit and sends one at once, fast
     /// again, and a CONNECT does not slow them or clear the bit after that.
     #[test]
     fn beacons_go_fast_across_a_restart_and_slow_when_the_moc_connects() {
         let fast = Duration::from_millis(20);
-        let (ground, mut sender) = sending(
+        let (ground, sender) = sending(
             BeaconTiming {
                 default_interval: Duration::from_secs(60),
                 reset_interval: fast,
@@ -650,10 +627,6 @@ mod tests {
                 next(&ground, wait).expect("fast beacons as it starts");
             assert!(!beacon.commanded_restart, "nobody commanded this start");
         }
-        // A CONFIG before a CONNECT changes nothing yet.
-        sender.set_interval(Duration::from_secs(120));
-        next(&ground, wait).expect("still fast");
-
         sender.connected();
         // One goes at once, and one may already have been on its way; after
         // that, none for two minutes, and a quarter of a second is a dozen

@@ -762,9 +762,8 @@ the same address and port, is refused when the file is read.</dd>
 to the year 586524; all ones means the clock failed. The beacon interval,
 <tt class="docutils literal">beacon.default_interval</tt>, and the interval until the MOC connects,
 <tt class="docutils literal">beacon.reset_interval</tt>, are at most 2<sup>64</sup> - 1 microseconds,
-about 585,000 years, which is what the eight bytes of microseconds a
-<tt class="docutils literal">CONFIG</tt> carries state; the reset interval is no longer than the
-beacon interval.</dd>
+about 585,000 years, the longest tcspecial can time; the reset interval
+is no longer than the beacon interval.</dd>
 <dt>Command sequence numbers</dt>
 <dd>A ground client numbers its commands from 1 in 32 bits. After
 4294967295 commands the number wraps to 0 and starts again, so a client
@@ -3812,7 +3811,7 @@ new <em>generation</em>, one more than the last, which it keeps in the file the
 Every start beacons every <tt class="docutils literal">beacon.reset_interval</tt> until the MOC
 connects. When tcspecial takes a <tt class="docutils literal">Connect</tt> it clears the flag, sends a
 beacon at once, and from then on beacons every
-<tt class="docutils literal">beacon.default_interval</tt>, or the interval the last <tt class="docutils literal">Config</tt> set. A
+<tt class="docutils literal">beacon.default_interval</tt>. A
 <tt class="docutils literal">Connect</tt> taken after the restart is initiated and before the old
 tcspecial has gone neither clears the flag nor slows the beacons: the
 restart is still under way.</p>
@@ -3951,9 +3950,8 @@ the spacecraft to be heard from again.</p>
 <p>One beacon may be missed with the indicator still steady, because one lost
 datagram is a network and not a spacecraft. For a five-second interval the
 indicator is steady for ten seconds, blinks green for ten more, is yellow for
-twenty and red after that. The interval is the one the configuration states: a
-<tt class="docutils literal">Config</tt> command that retimes the beacon aboard is not followed by the
-indicator, which goes on aging beacons against the configured interval.</p>
+twenty and red after that. The interval is the one the configuration states,
+which is the vehicle's too: nothing changes it while tcspecial runs.</p>
 <p>Beside the indicator is the time the last beacon arrived, shown the way every
 other time in the window is. It is the time the beacon reached the MOC rather
 than the time the spacecraft stamped on it: the line is read to find out

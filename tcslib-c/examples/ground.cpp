@@ -196,12 +196,6 @@ int main(int argc, char **argv)
 			    given.moved ? "gave something" : "gave nothing");
 	}
 
-	tcs_status configured = TCS_STATUS_FAILURE;
-	if (tcs_client_configure(client.get(), 5000000, &configured) != 0) {
-		return fail("configure");
-	}
-	std::printf("configure: beacon every 5 s, %s\n", outcome(configured));
-
 	if (restart) {
 		tcs_status armed = TCS_STATUS_FAILURE,
 			   restarted = TCS_STATUS_FAILURE;

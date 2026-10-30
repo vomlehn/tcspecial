@@ -35,7 +35,7 @@ linkage throughout, and nothing in it that C++ will not compile.
   configuration states. `tcs_client_connect` says whether the vehicle is
   flying this configuration; then ping; start, stop or query a node by its
   id, set one of its attributes, or ask for the last datum it moved each way;
-  retime the beacon; and arm a restart and restart the vehicle. The client
+  and arm a restart and restart the vehicle. The client
   learns which generation of tcspecial is flying from the answer to connect,
   so until one is answered, and again after a beacon whose number went back
   or an answer from another generation, it refuses every command but ping
@@ -65,7 +65,7 @@ c++ my_station.cpp -I tcslib-c/include target/debug/libtcs.a -lpthread -ldl -lm
 `examples/ground.c` is a ground station in C, and `examples/ground.cpp` the
 same one in C++: each reads the configuration, waits for the first beacon,
 connects and pings, asks about a node and sets one of its attributes,
-retimes the beacon, pings the vehicle's ping node and times the answer, and
+pings the vehicle's ping node and times the answer, and
 prints the vehicle's data from a `moc` node. They take `--yaml` or `--xml`,
 as every example program does, and `--restart` to arm a restart and restart
 the vehicle, which they do only when asked.
@@ -83,9 +83,6 @@ The header alone is also compiled as C99 and as C++11.
 
 ## Known limits
 
-- **A retimed beacon is not followed.** After `tcs_client_configure`, a
-  station's beacon watch goes on aging beacons against the interval the
-  configuration states, as tcsmoc's does.
 - **A query's counts are not given.** `tcs_client_query_node` says whether a
   node is running; the counts of what it has moved, which tcslib's answer
   carries, have no C spelling yet.

@@ -5920,6 +5920,13 @@ Requirement
     nothing in flight replaces it.
 
 Requirement
+    **Every configuration can be retrieved.** The MOC can retrieve every
+    configuration the vehicle has ever run, by the MD5 checksum that names
+    it. The checksum in a beacon identifies the configuration tcspecial is
+    running, and the ground reads the vehicle's data and commands it with
+    that configuration and no other.
+
+Requirement
     A golden build that fails is started again as the golden build. Falling
     back to the golden configuration and then failing falls back to the
     golden configuration, never to anything else, because there is nothing

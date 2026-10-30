@@ -6035,6 +6035,12 @@ this: it is the one way in that no upload, switch or fault can take
 away, so it is proved before launch rather than trusted in flight, and
 nothing in flight replaces it.</dd>
 <dt>Requirement</dt>
+<dd><strong>Every configuration can be retrieved.</strong> The MOC can retrieve every
+configuration the vehicle has ever run, by the MD5 checksum that names
+it. The checksum in a beacon identifies the configuration tcspecial is
+running, and the ground reads the vehicle's data and commands it with
+that configuration and no other.</dd>
+<dt>Requirement</dt>
 <dd>A golden build that fails is started again as the golden build. Falling
 back to the golden configuration and then failing falls back to the
 golden configuration, never to anything else, because there is nothing

@@ -1691,7 +1691,7 @@ class Compiler:
         if name == "BinaryDataEncoding":
             # Binary data is bytes, which have no byte order.
             enc = self.binary_encoding(e, path, where)
-            enc.transform = self.transform_names(e, where)
+            enc.transform = self.transform_names(e)
             return enc, None
         raise Unsupported(f"{where}: {name}")
 
@@ -1761,7 +1761,7 @@ class Compiler:
                          container has none.
         """
         be = sc.binary_encoding
-        names = self.transform_names(be, where) if be is not None else None
+        names = self.transform_names(be) if be is not None else None
         if names is None:
             return items
         for it in walk(items):
@@ -1803,16 +1803,15 @@ class Compiler:
 
     def has_transform(self, sc, where: str) -> bool:
         be = sc.binary_encoding
-        return be is not None and self.transform_names(be, where) is not None
+        return be is not None and self.transform_names(be) is not None
 
     @staticmethod
-    def transform_names(e, where: str) -> Optional[tuple]:
+    def transform_names(e) -> Optional[tuple]:
         """Reads the names of the algorithms that transform the bits of an
         encoding.
 
         Args:
-            e:     A BinaryDataEncoding or a container's BinaryEncoding.
-            where: What it belongs to (unused).
+            e: A BinaryDataEncoding or a container's BinaryEncoding.
 
         Returns:
             The names of the from-binary and to-binary algorithms, either
@@ -3298,7 +3297,7 @@ class Compiler:
                          of whole bytes.
         """
         be = sc.binary_encoding
-        names = self.transform_names(be, what) if be is not None else None
+        names = self.transform_names(be) if be is not None else None
         if names is None:
             return None
         if edc_items(sc):
@@ -5328,13 +5327,17 @@ def int_range(e: IntEnc) -> tuple[int, int]:
         e: The encoding.
 
     Returns:
-        (smallest, largest).  Any encoding but unsigned and two's
-        complement is taken as sign-magnitude or ones' complement, which
-        has no most negative value.
+        (smallest, largest).  BCD holds a decimal digit in each byte and
+        packed BCD one in each 4 bits, from 0 up.  Sign-magnitude and
+        ones' complement have no most negative value.
     """
     b = e.bits
     if e.encoding == "unsigned":
         return 0, (1 << b) - 1
+    if e.encoding == "BCD":
+        return 0, 10 ** (b // 8) - 1
+    if e.encoding == "packedBCD":
+        return 0, 10 ** (b // 4) - 1
     if e.encoding == "twosComplement":
         return -(1 << (b - 1)), (1 << (b - 1)) - 1
     return -((1 << (b - 1)) - 1), (1 << (b - 1)) - 1

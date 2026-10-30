@@ -1077,7 +1077,8 @@ section every configuration holds, and it is required of every one of them.</p>
     </span><span class="name tag">source_base</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">0.0.0.0:6000</span><span class="whitespace">
     </span><span class="name tag">dest_base</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">127.0.0.1:6100</span><span class="whitespace">
   </span><span class="name tag">beacon</span><span class="punctuation">:</span><span class="whitespace">
-    </span><span class="name tag">interval</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal string">&quot;5</span><span class="name variable"> </span><span class="literal string">s&quot;</span><span class="whitespace">
+    </span><span class="name tag">default_interval</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal string">&quot;5</span><span class="name variable"> </span><span class="literal string">s&quot;</span><span class="whitespace">
+    </span><span class="name tag">reset_interval</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal string">&quot;1</span><span class="name variable"> </span><span class="literal string">s&quot;</span><span class="whitespace">
     </span><span class="name tag">send</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal string">&quot;0.0.0.0:5550&quot;</span><span class="whitespace">
     </span><span class="name tag">recv</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal string">&quot;127.0.0.1:5650&quot;</span><span class="whitespace">
   </span><span class="name tag">log</span><span class="punctuation">:</span><span class="whitespace">
@@ -6590,8 +6591,9 @@ project's configuration is written in.</p>
 <pre class="code yaml literal-block">
 <span class="name tag">tcspecial</span><span class="punctuation">:</span><span class="whitespace">
   </span><span class="name tag">beacon</span><span class="punctuation">:</span><span class="whitespace">
-    </span><span class="name tag">interval</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal string">&quot;5</span><span class="name variable"> </span><span class="literal string">s&quot;</span><span class="whitespace">
+    </span><span class="name tag">default_interval</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal string">&quot;5</span><span class="name variable"> </span><span class="literal string">s&quot;</span><span class="whitespace">
     </span><span class="name tag">recv</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal string">&quot;127.0.0.1:5650&quot;</span><span class="whitespace">
+    </span><span class="name tag">reset_interval</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal string">&quot;1</span><span class="name variable"> </span><span class="literal string">s&quot;</span><span class="whitespace">
     </span><span class="name tag">send</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal string">&quot;0.0.0.0:5550&quot;</span><span class="whitespace">
   </span><span class="name tag">log</span><span class="punctuation">:</span><span class="whitespace">
     </span><span class="name tag">directory</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal string">&quot;/var/log/tcspecial&quot;</span><span class="whitespace">

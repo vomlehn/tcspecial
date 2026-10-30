@@ -3032,9 +3032,10 @@ file:
 
    tcspecial:
      beacon:
-       interval: 5 s
-       send: "0.0.0.0:5550"
+       default_interval: 5 s
        recv: "127.0.0.1:5650"
+       reset_interval: 1 s
+       send: "0.0.0.0:5550"
 
 What the vehicle answers to
 ---------------------------

@@ -570,7 +570,8 @@ section every configuration holds, and it is required of every one of them.
        source_base: 0.0.0.0:6000
        dest_base: 127.0.0.1:6100
      beacon:
-       interval: "5 s"
+       default_interval: "5 s"
+       reset_interval: "1 s"
        send: "0.0.0.0:5550"
        recv: "127.0.0.1:5650"
      log:
@@ -6529,8 +6530,9 @@ This is the ``tcspecial`` section of the shipped ``tests/manual/thermostat.yaml`
 
    tcspecial:
      beacon:
-       interval: "5 s"
+       default_interval: "5 s"
        recv: "127.0.0.1:5650"
+       reset_interval: "1 s"
        send: "0.0.0.0:5550"
      log:
        directory: "/var/log/tcspecial"

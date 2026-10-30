@@ -17,7 +17,7 @@
 //! -- it is [`tcslibgs::CommandType::link`], the one table both ends read.
 
 use std::sync::atomic::{AtomicU32, Ordering};
-use std::time::Duration;
+use std::time::{Duration, Instant};
 use tcslibgs::{
     sequence_is_before, ArmKey, Command, CommandLink, CommandStatus,
     CommandType, ConfigDigest, ConfigVersion, ConnectCommand, DHSample,
@@ -115,6 +115,9 @@ pub struct TcsClient {
     /// How many commands have gone out, so that a caller can tell whether
     /// the one it asked for did.
     sent: u64,
+    /// How many answers arrived that were not to the command being waited
+    /// for, and were dropped: see [`answer_to`].
+    answers_dropped: u64,
     /// The generation this station knows is flying: the one the last
     /// CONNECT's answer said. `None` until one has, and again once a beacon
     /// says tcspecial has started again or an answer has come from another
@@ -240,6 +243,7 @@ impl TcsClient {
             last_sent: None,
             last_received: None,
             sent: 0,
+            answers_dropped: 0,
             generation: None,
             restart_wait: None,
         }
@@ -293,6 +297,7 @@ impl TcsClient {
             last_sent: None,
             last_received: None,
             sent: 0,
+            answers_dropped: 0,
             generation: None,
             restart_wait: None,
         }
@@ -360,6 +365,16 @@ impl TcsClient {
     /// When the last answer came back, if one has.
     pub fn last_received(&self) -> Option<Timestamp> {
         self.last_received
+    }
+
+    /// Says how many answers this client has dropped because they did not
+    /// answer the command it was waiting for.
+    ///
+    /// # Returns
+    ///
+    /// The count, since the client was made.
+    pub fn answers_dropped(&self) -> u64 {
+        self.answers_dropped
     }
 
     /// Set the command timeout, on both links.
@@ -492,7 +507,14 @@ impl TcsClient {
         self.last_sent = Some(Timestamp::now());
         self.sent += 1;
 
-        let answer = self.link_for(&command)?.receive_timeout(timeout);
+        let mut dropped = 0;
+        let answer = answer_to(
+            self.link_for(&command)?,
+            command.sequence(),
+            timeout,
+            &mut dropped,
+        );
+        self.answers_dropped += dropped;
         if let Ok(answer) = &answer {
             self.last_received = Some(Timestamp::now());
             self.heard_generation_of(answer);
@@ -646,7 +668,11 @@ impl TcsClient {
         self.connection.send(&command)?;
         self.last_sent = Some(Timestamp::now());
 
-        let answer = self.connection.receive_timeout(timeout)?;
+        let mut dropped = 0;
+        let answer =
+            answer_to(&mut self.connection, seq, timeout, &mut dropped);
+        self.answers_dropped += dropped;
+        let answer = answer?;
         self.last_received = Some(Timestamp::now());
 
         match answer {
@@ -1015,6 +1041,55 @@ impl Default for TcsClientBuilder {
     }
 }
 
+/// Waits on `link` for the answer to the command numbered `sequence`, and
+/// drops every other answer that arrives first.
+///
+/// An answer is taken only for the command it says it answers. One that
+/// answers another command -- late, after its own command timed out;
+/// repeated by the link; or made before a restart, on either side -- may
+/// say something only another command, or another configuration, gives a
+/// meaning to, so it is counted and dropped rather than read as this one's.
+/// See "On the ground" in `docs/design.rst`.
+///
+/// # Arguments
+///
+/// * `link`     - The link the command went on.
+/// * `sequence` - The command's sequence number.
+/// * `timeout`  - How long to wait in all, however many are dropped.
+/// * `dropped`  - Counts the answers dropped, for the caller to keep.
+///
+/// # Returns
+///
+/// The answer to that command.
+///
+/// # Errors
+///
+/// `TcsError::Io` if the link fails, or no answer to that command comes
+/// within `timeout`; whatever the link returns for an answer it cannot
+/// read.
+fn answer_to(
+    link: &mut Box<dyn Connection>,
+    sequence: u32,
+    timeout: Duration,
+    dropped: &mut u64,
+) -> TcsResult<Telemetry> {
+    let deadline = Instant::now() + timeout;
+    loop {
+        let left = deadline.saturating_duration_since(Instant::now());
+        if left.is_zero() {
+            return Err(TcsError::Io(std::io::Error::new(
+                std::io::ErrorKind::TimedOut,
+                format!("no answer to command #{sequence} came in time"),
+            )));
+        }
+        let answer = link.receive_timeout(left)?;
+        if answer.sequence() == sequence {
+            return Ok(answer);
+        }
+        *dropped += 1;
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1157,6 +1232,24 @@ mod tests {
         }
     }
 
+    impl Canned {
+        /// Gives its one answer, as the answer to the last command it was
+        /// asked, as a vehicle would.
+        ///
+        /// # Returns
+        ///
+        /// The answer, carrying that command's sequence number.
+        fn answer_to_the_last(&self) -> Telemetry {
+            let asked = self.asked.lock().expect("the record");
+            match asked.last() {
+                Some(command) => {
+                    self.answer.clone().for_sequence(command.sequence())
+                }
+                None => self.answer.clone(),
+            }
+        }
+    }
+
     impl Connection for Canned {
         fn send(&mut self, command: &Command) -> TcsResult<()> {
             self.asked.lock().expect("the record").push(command.clone());
@@ -1164,14 +1257,14 @@ mod tests {
         }
 
         fn receive(&mut self) -> TcsResult<Telemetry> {
-            Ok(self.answer.clone())
+            Ok(self.answer_to_the_last())
         }
 
         fn receive_timeout(
             &mut self,
             _timeout: Duration,
         ) -> TcsResult<Telemetry> {
-            Ok(self.answer.clone())
+            Ok(self.answer_to_the_last())
         }
 
         fn has_data(&self) -> TcsResult<bool> {
@@ -1181,6 +1274,95 @@ mod tests {
         fn close(&mut self) -> TcsResult<()> {
             Ok(())
         }
+    }
+
+    /// A link that answers each command with a script of answers: each
+    /// is a PING's answer for the command asked, offset by a number, so
+    /// that nought is the right answer and anything else answers another
+    /// command. Once the script is spent it times out, as a quiet link
+    /// does.
+    struct Scripted {
+        offsets: std::collections::VecDeque<i64>,
+        asked: u32,
+    }
+
+    impl Scripted {
+        /// Makes a link that answers with `offsets`, in order.
+        ///
+        /// # Arguments
+        ///
+        /// * `offsets` - How far each answer's sequence is from the
+        ///               command's.
+        ///
+        /// # Returns
+        ///
+        /// The link, boxed to be given to a client.
+        fn answering(offsets: &[i64]) -> Box<Scripted> {
+            Box::new(Scripted {
+                offsets: offsets.iter().copied().collect(),
+                asked: 0,
+            })
+        }
+    }
+
+    impl Connection for Scripted {
+        fn send(&mut self, command: &Command) -> TcsResult<()> {
+            self.asked = command.sequence();
+            Ok(())
+        }
+
+        fn receive(&mut self) -> TcsResult<Telemetry> {
+            self.receive_timeout(Duration::ZERO)
+        }
+
+        fn receive_timeout(
+            &mut self,
+            _timeout: Duration,
+        ) -> TcsResult<Telemetry> {
+            match self.offsets.pop_front() {
+                Some(offset) => {
+                    Ok(Telemetry::Ping(tcslibgs::PingTelemetry::new(
+                        (i64::from(self.asked) + offset) as u32,
+                        CommandStatus::Success,
+                    )))
+                }
+                None => Err(TcsError::Io(std::io::Error::new(
+                    std::io::ErrorKind::TimedOut,
+                    "nothing more to say",
+                ))),
+            }
+        }
+
+        fn has_data(&self) -> TcsResult<bool> {
+            Ok(!self.offsets.is_empty())
+        }
+
+        fn close(&mut self) -> TcsResult<()> {
+            Ok(())
+        }
+    }
+
+    /// An answer is taken only for the command it answers: a late answer
+    /// to an earlier command, and one to a later number, are dropped and
+    /// counted, and the client goes on waiting for its own.
+    #[test]
+    fn an_answer_to_another_command_is_dropped_and_counted() {
+        let mut client =
+            TcsClient::spacecraft_only(Scripted::answering(&[-1, 3, 0]));
+        let sent = client.sequence.load(Ordering::SeqCst);
+        let answer = client.ping().expect("its own answer, third");
+        assert_eq!(answer.header.sequence, sent);
+        assert_eq!(client.answers_dropped(), 2);
+    }
+
+    /// Where its own answer never comes, the wait ends in a timeout, not in
+    /// another command's answer.
+    #[test]
+    fn only_answers_to_other_commands_is_no_answer() {
+        let mut client =
+            TcsClient::spacecraft_only(Scripted::answering(&[-2, -1]));
+        assert!(matches!(client.ping(), Err(TcsError::Io(_))));
+        assert_eq!(client.answers_dropped(), 2);
     }
 
     /// Makes a CONNECT's answer from generation 7, which has taken up to

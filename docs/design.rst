@@ -6557,6 +6557,15 @@ Requirement
     sends it only while it knows the generation, so not to a start it has
     heard from since. See `What the ground may send meanwhile`_.
 
+Requirement
+    The ground takes an answer only as the answer to the command whose
+    sequence it carries. ``tcslib``'s ``TcsClient``, and through it the C/C++
+    library, waits for the answer to the command it sent, and drops and
+    counts any other that arrives first -- an answer to a command that timed
+    out, one the link repeated, or one from before a restart -- so that
+    nothing one command was answered with is read as another's
+    (``TcsClient::answers_dropped``).
+
 What that means for each command: PING and the two queries change nothing.
 CONNECT changes only the beacons -- it clears the commanded-restart flag and
 slows them -- which a repeat leaves as the first did. START_NODE and

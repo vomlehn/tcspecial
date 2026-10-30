@@ -748,6 +748,24 @@ impl Telemetry {
         self
     }
 
+    /// Gives this answer as the answer to the command numbered `sequence`.
+    ///
+    /// For a stand-in vehicle, which answers whatever it is asked: the
+    /// ground takes an answer only for the command whose sequence it
+    /// carries.
+    ///
+    /// # Arguments
+    ///
+    /// * `sequence` - The sequence number of the command it answers.
+    ///
+    /// # Returns
+    ///
+    /// The answer, carrying that sequence number.
+    pub fn for_sequence(mut self, sequence: u32) -> Self {
+        self.header_mut().sequence = sequence;
+        self
+    }
+
     pub fn tm_type(&self) -> TelemetryType {
         self.header().tm_type
     }

@@ -32,6 +32,12 @@
 //! data on the same interface, and the pairing is the point. A descriptor like
 //! that is one end of a socket pair rather than a pipe -- see [`parent`].
 //!
+//! A Rust app does not keep them there. They are its stdin, stdout and stderr
+//! too, so [`app`] moves each to a descriptor of its own once it holds them,
+//! and puts `/dev/null` at 0, 1 and 2: a stray `println!` cannot write into
+//! an interface, and a panic is said on the error interface as a packet. See
+//! [`app`].
+//!
 //! Payload data is what travels groundward, from what the vehicle carries
 //! towards the ground; MOC data is what travels vehicleward, from the ground
 //! towards what it carries. The names are the graph's own: see

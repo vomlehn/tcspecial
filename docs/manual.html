@@ -724,8 +724,15 @@ and TCSpecial relies on it to. Nothing puts packets back in order.</dd>
 components within the MOC, uses reliable datagrams: nothing there is
 lost, repeated or delivered out of order. Only the radio loses or
 repeats a packet.</dd>
+<dt>Every configuration can be retrieved</dt>
+<dd>The MOC can retrieve every configuration the vehicle has ever run, by
+the MD5 checksum that names it. The checksum a beacon carries
+identifies the configuration tcspecial is running, and a ground station
+reads the vehicle's data and commands it with that configuration, so a
+station that hears a checksum it does not have at hand fetches the
+configuration it names rather than reading with another.</dd>
 <dt>Guarding the assumptions</dt>
-<dd>Should either assumption fail in flight, the receiving end still drops
+<dd>Should either assumption about delivery fail in flight, the receiving end still drops
 anything older than what it has already taken: a command older than
 one tcspecial has already taken is answered <tt class="docutils literal">Stale</tt> and not acted on,
 and a beacon older than one the ground has already heard counts for

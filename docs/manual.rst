@@ -304,8 +304,16 @@ Reliable datagrams
    lost, repeated or delivered out of order. Only the radio loses or
    repeats a packet.
 
+Every configuration can be retrieved
+   The MOC can retrieve every configuration the vehicle has ever run, by
+   the MD5 checksum that names it. The checksum a beacon carries
+   identifies the configuration tcspecial is running, and a ground station
+   reads the vehicle's data and commands it with that configuration, so a
+   station that hears a checksum it does not have at hand fetches the
+   configuration it names rather than reading with another.
+
 Guarding the assumptions
-   Should either assumption fail in flight, the receiving end still drops
+   Should either assumption about delivery fail in flight, the receiving end still drops
    anything older than what it has already taken: a command older than
    one tcspecial has already taken is answered ``Stale`` and not acted on,
    and a beacon older than one the ground has already heard counts for

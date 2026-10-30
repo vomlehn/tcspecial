@@ -6628,6 +6628,14 @@ that came back starts it again. An operator who has looked at the
 beacons may send a RESTART again during the wait; the ground's client
 sends it only while it knows the generation, so not to a start it has
 heard from since. See <a class="reference internal" href="#what-the-ground-may-send-meanwhile">What the ground may send meanwhile</a>.</dd>
+<dt>Requirement</dt>
+<dd>The ground takes an answer only as the answer to the command whose
+sequence it carries. <tt class="docutils literal">tcslib</tt>'s <tt class="docutils literal">TcsClient</tt>, and through it the C/C++
+library, waits for the answer to the command it sent, and drops and
+counts any other that arrives first -- an answer to a command that timed
+out, one the link repeated, or one from before a restart -- so that
+nothing one command was answered with is read as another's
+(<tt class="docutils literal"><span class="pre">TcsClient::answers_dropped</span></tt>).</dd>
 </dl>
 <p>What that means for each command: PING and the two queries change nothing.
 CONNECT changes only the beacons -- it clears the commanded-restart flag and

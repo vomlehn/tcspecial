@@ -187,8 +187,8 @@ pub struct Appearance {
     /// The nominal width and height, in pixels, before a label widens it.
     ///
     /// Width is [`WIDTH`] for every type, so what varies here is the height:
-    /// size is still the fourth channel -- a MOC link is visibly taller than a
-    /// sensor -- and it is one channel whichever of the two carries it.
+    /// size is still the fourth channel -- a gateway link is visibly taller
+    /// than a sensor -- and it is one channel whichever of the two carries it.
     pub size: (u32, u32),
     /// How the label is set: the face, its size in pixels, its weight, and
     /// whether it is italic. The fifth channel.
@@ -214,7 +214,7 @@ pub struct Appearance {
 /// which ground, and the window says what that ground is.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Ground {
-    Moc,
+    Gateway,
     Vehicle,
     Payloads,
 }
@@ -233,7 +233,7 @@ pub enum Ground {
 /// The ground it is painted.
 pub fn ground_of(pane: crate::pane::Pane) -> Ground {
     match pane {
-        crate::pane::Pane::Moc => Ground::Moc,
+        crate::pane::Pane::Gateway => Ground::Gateway,
         crate::pane::Pane::Vehicle => Ground::Vehicle,
         crate::pane::Pane::Payloads => Ground::Payloads,
     }
@@ -308,8 +308,8 @@ impl Terminals {
 /// Two rows and two columns, and the arrangement is the two streams: the
 /// groundward one along the top, left to right, arriving from the payload at
 /// `payload-in` and leaving for the ground at `payload-out`; the vehicleward
-/// one along the bottom, right to left, arriving from the ground at `moc-in`
-/// and leaving for the payload at `moc-out`.
+/// one along the bottom, right to left, arriving from the ground at
+/// `gateway-in` and leaving for the payload at `gateway-out`.
 ///
 /// Which means the arrows all point the way the data actually travels across
 /// the canvas, because the canvas is laid out the same way: the payloads are
@@ -345,12 +345,12 @@ pub fn corner_of(terminal: &str) -> Option<Corner> {
         // And what the ground sends along the bottom, travelling leftwards:
         // it arrives from the ground on the right and leaves for a payload on
         // the left.
-        "moc-out" => Some(Corner {
+        "gateway-out" => Some(Corner {
             top: false,
             left: true,
             rightward: false,
         }),
-        "moc-in" => Some(Corner {
+        "gateway-in" => Some(Corner {
             top: false,
             left: false,
             rightward: false,
@@ -374,9 +374,9 @@ pub struct Corner {
     /// sends points left.
     ///
     /// All four carry one. A terminal's name says whose data it is and whether
-    /// it arrives or leaves -- `payload-in`, `moc-out` -- and the arrow says
-    /// which way that is on the screen, which is the half a reader can take in
-    /// without reading.
+    /// it arrives or leaves -- `payload-in`, `gateway-out` -- and the arrow
+    /// says which way that is on the screen, which is the half a reader can
+    /// take in without reading.
     pub rightward: bool,
 }
 
@@ -974,14 +974,14 @@ pub enum NodeType {
     Gpio,
     Compute,
     /// A vehicle node that takes what the ground sends and drops it.
-    NullMoc,
+    NullGateway,
     /// A vehicle node that takes a payload's data and drops it.
     NullPayload,
     /// A vehicle node that takes what the ground sends and sends it on both
-    /// ways: as MOC data, and again as payload data.
-    TeeMoc,
+    /// ways: as gateway data, and again as payload data.
+    TeeGateway,
     /// A vehicle node that takes a payload's data and sends it on both ways:
-    /// as payload data, and again as MOC data.
+    /// as payload data, and again as gateway data.
     TeePayload,
     /// A vehicle node that answers each ping from the ground with the
     /// vehicle's time. See `tcslibgs::node::vehicle::ping`.
@@ -992,7 +992,7 @@ pub enum NodeType {
     /// the two data interfaces the program is run with: see
     /// `tcslibgs::node::app`.
     AppPayloadVeh,
-    AppMocVeh,
+    AppGatewayVeh,
     AppAllVeh,
     /// And a payload that is a program rather than a device: one that is asked
     /// for a reading and answers, and one that is never asked and reports of
@@ -1000,7 +1000,7 @@ pub enum NodeType {
     /// graph, so these two are placed on the payload pane.
     AppPl,
     AppAllPl,
-    Moc,
+    GatewayRadio,
     /// A link to an F´ flight computer's bridge component, which the vehicle
     /// answers to in place of the ground: see `tcslibgs::gateway`.
     GatewayFprime,
@@ -1022,18 +1022,18 @@ impl NodeType {
         NodeType::DeviceFile,
         NodeType::Gpio,
         NodeType::Compute,
-        NodeType::TeeMoc,
+        NodeType::TeeGateway,
         NodeType::TeePayload,
         NodeType::Ping,
         NodeType::Log,
-        NodeType::NullMoc,
+        NodeType::NullGateway,
         NodeType::NullPayload,
         NodeType::AppPayloadVeh,
-        NodeType::AppMocVeh,
+        NodeType::AppGatewayVeh,
         NodeType::AppAllVeh,
         NodeType::AppPl,
         NodeType::AppAllPl,
-        NodeType::Moc,
+        NodeType::GatewayRadio,
         NodeType::GatewayFprime,
         NodeType::Subdiagram,
     ];
@@ -1058,18 +1058,18 @@ impl NodeType {
             NodeType::DeviceFile => "device-file",
             NodeType::Gpio => "gpio",
             NodeType::Compute => "compute",
-            NodeType::NullMoc => "null-moc",
+            NodeType::NullGateway => "null-gateway",
             NodeType::NullPayload => "null-payload",
-            NodeType::TeeMoc => "tee-moc",
+            NodeType::TeeGateway => "tee-gateway",
             NodeType::TeePayload => "tee-payload",
             NodeType::Ping => "ping",
             NodeType::Log => "log",
             NodeType::AppPayloadVeh => "app_payload_veh",
-            NodeType::AppMocVeh => "app_moc_veh",
+            NodeType::AppGatewayVeh => "app_gateway_veh",
             NodeType::AppAllVeh => "app_all_veh",
             NodeType::AppPl => "app_pl",
             NodeType::AppAllPl => "app_all_pl",
-            NodeType::Moc => "moc",
+            NodeType::GatewayRadio => "gateway_radio",
             NodeType::GatewayFprime => "gateway_fprime",
             NodeType::Subdiagram => "subdiagram",
         }
@@ -1276,9 +1276,9 @@ impl NodeType {
             // it on both ways: a name and a type are the whole of what there
             // is to say, and the configuration check refuses any attribute
             // written on one.
-            NodeType::NullMoc
+            NodeType::NullGateway
             | NodeType::NullPayload
-            | NodeType::TeeMoc
+            | NodeType::TeeGateway
             | NodeType::TeePayload => &[],
             // Nothing either, for the same reason: what a ping node does is
             // fixed by the format of a ping, and the check refuses an
@@ -1292,14 +1292,14 @@ impl NodeType {
             // its own and an attribute added there appears in a node's window
             // without this file being touched.
             NodeType::AppPayloadVeh
-            | NodeType::AppMocVeh
+            | NodeType::AppGatewayVeh
             | NodeType::AppAllVeh
             | NodeType::AppPl
             | NodeType::AppAllPl => {
                 tcslibgs::node::app::attributes_of(self.spelling())
                     .expect("a type that is one of the app kinds")
             }
-            NodeType::Moc => {
+            NodeType::GatewayRadio => {
                 &[("ground_base", true), ("address", false), ("port", false)]
             }
             NodeType::GatewayFprime => &[
@@ -1341,7 +1341,7 @@ impl NodeType {
     /// What is *drawn* and what is *written* are not the same question. A
     /// terminal is written into the file only where the type has more than one
     /// of that kind -- see [`NodeType::must_name`] -- so the file keeps saying
-    /// `{ from: temp_1, to: moc }`, which is what the schema reads it as
+    /// `{ from: temp_1, to: gateway }`, which is what the schema reads it as
     /// anyway.
     ///
     /// # Returns
@@ -1364,8 +1364,8 @@ impl NodeType {
             },
             // A computation and a page: both ends of both streams.
             _ => Terminals {
-                sinks: &["payload-in", "moc-in"],
-                sources: &["payload-out", "moc-out"],
+                sinks: &["payload-in", "gateway-in"],
+                sources: &["payload-out", "gateway-out"],
             },
         }
     }
@@ -1382,8 +1382,8 @@ impl NodeType {
     /// is one of the boxes on the screen. Asking the schema's table instead
     /// threw away what a person had just said -- a computation has two data
     /// sinks drawn on it and the schema calls its sinks its own business, so a
-    /// line dragged to the `moc-in` in its upper left was recorded as a link
-    /// naming no terminal, and then drawn arriving at the other corner.
+    /// line dragged to the `gateway-in` in its upper left was recorded as a
+    /// link naming no terminal, and then drawn arriving at the other corner.
     ///
     /// # Arguments
     ///
@@ -1429,8 +1429,10 @@ impl NodeType {
             NodeType::Gpio => "Driven",
             NodeType::Compute => "Computation",
             // Where a stream goes both ways, and where one stops.
-            NodeType::TeeMoc | NodeType::TeePayload => "Pass-through",
-            NodeType::NullMoc | NodeType::NullPayload => "Ends of the graph",
+            NodeType::TeeGateway | NodeType::TeePayload => "Pass-through",
+            NodeType::NullGateway | NodeType::NullPayload => {
+                "Ends of the graph"
+            }
             NodeType::Ping => "Link checks",
             // Two families of one, because they are two kinds of end and now
             // two shapes: the log is where the data stops on board and the
@@ -1442,7 +1444,7 @@ impl NodeType {
             // common: the node is a program, and what it does is not in this
             // software at all.
             NodeType::AppPayloadVeh
-            | NodeType::AppMocVeh
+            | NodeType::AppGatewayVeh
             | NodeType::AppAllVeh => "Programs of their own",
             // The same thing on the other side of the canvas, and a heading of
             // its own because it is a different sentence: these are not parts
@@ -1452,7 +1454,7 @@ impl NodeType {
             // appears on is `is_payload`, and the two must agree: see
             // `tests::a_payload_is_a_device_or_a_driven_line`.
             NodeType::AppPl | NodeType::AppAllPl => "Payloads of their own",
-            NodeType::Moc => "The ground station",
+            NodeType::GatewayRadio => "The ground station",
             NodeType::GatewayFprime => "An F´ flight computer",
             NodeType::Subdiagram => "Pages",
         }
@@ -1498,16 +1500,16 @@ impl NodeType {
             | NodeType::AppPl
             | NodeType::AppAllPl => true,
             NodeType::Compute
-            | NodeType::NullMoc
+            | NodeType::NullGateway
             | NodeType::NullPayload
-            | NodeType::TeeMoc
+            | NodeType::TeeGateway
             | NodeType::TeePayload
             | NodeType::Ping
             | NodeType::Log
             | NodeType::AppPayloadVeh
-            | NodeType::AppMocVeh
+            | NodeType::AppGatewayVeh
             | NodeType::AppAllVeh
-            | NodeType::Moc
+            | NodeType::GatewayRadio
             | NodeType::GatewayFprime
             | NodeType::Subdiagram => false,
         }
@@ -1660,7 +1662,7 @@ impl NodeType {
             // And the one that sends the ground's data on both ways: the line
             // doubled and broken, being two ways at once, and the label
             // italic, which is what a node the ground drives is set in.
-            NodeType::TeeMoc => Appearance {
+            NodeType::TeeGateway => Appearance {
                 face: Face::Plain,
                 label_size: 10,
                 label_weight: 700,
@@ -1674,7 +1676,7 @@ impl NodeType {
             // one rounded edge nothing else has, a line that runs out. The
             // one that takes the ground's data italic, as above, and narrow;
             // the one that takes a payload's upright and wide.
-            NodeType::NullMoc => Appearance {
+            NodeType::NullGateway => Appearance {
                 face: Face::Plain,
                 label_size: 12,
                 label_weight: 400,
@@ -1736,7 +1738,7 @@ impl NodeType {
                 weight: Wide,
                 size: (WIDTH, HEIGHT),
             },
-            NodeType::AppMocVeh => Appearance {
+            NodeType::AppGatewayVeh => Appearance {
                 face: Face::Plain,
                 label_size: 12,
                 label_weight: 400,
@@ -1823,7 +1825,7 @@ impl NodeType {
             // notations already knows the meaning of. Wide, solid, azure and
             // set in the largest italic, so it is the one that catches the eye
             // without being the one shaped oddly.
-            NodeType::Moc => Appearance {
+            NodeType::GatewayRadio => Appearance {
                 face: Face::Plain,
                 label_size: 16,
                 label_weight: 700,
@@ -2165,7 +2167,7 @@ mod tests {
                 // side it comes from: the payloads are to the left of the
                 // vehicle and the ground to its right.
                 let from_the_left =
-                    *terminal == "payload-in" || *terminal == "moc-out";
+                    *terminal == "payload-in" || *terminal == "gateway-out";
                 assert_eq!(corner.left, from_the_left, "{terminal}");
             }
         }
@@ -2253,10 +2255,10 @@ mod tests {
     /// Every box carries an arrow, pointing the way its data travels.
     ///
     /// The name says whose data a terminal carries and whether it arrives or
-    /// leaves -- `payload-in`, `moc-out` -- and the arrow says which way that
-    /// is on the screen. One statement of it, derived from the stream rather
-    /// than written out per corner: the payload's own data is on its way to
-    /// the ground, which is rightwards, and what the ground sends is on its
+    /// leaves -- `payload-in`, `gateway-out` -- and the arrow says which way
+    /// that is on the screen. One statement of it, derived from the stream
+    /// rather than written out per corner: the payload's own data is on its way
+    /// to the ground, which is rightwards, and what the ground sends is on its
     /// way to a payload, which is leftwards.
     #[test]
     fn every_terminal_carries_an_arrow_the_way_its_data_goes() {
@@ -2266,7 +2268,7 @@ mod tests {
                 "{terminal}: the payload's own data is on its way to the ground"
             );
         }
-        for terminal in ["moc-in", "moc-out"] {
+        for terminal in ["gateway-in", "gateway-out"] {
             assert!(
                 !corner_of(terminal).expect("a corner").rightward,
                 "{terminal}: what the ground sends is on its way to a payload"
@@ -2305,7 +2307,7 @@ mod tests {
                 assert!(!corner_of(terminal).unwrap().left, "{terminal}");
             }
         }
-        for terminal in NodeType::Moc.terminals().each() {
+        for terminal in NodeType::GatewayRadio.terminals().each() {
             assert!(corner_of(terminal).unwrap().left, "{terminal}");
         }
     }
@@ -2360,7 +2362,7 @@ mod tests {
         }
         // A tee has one sink, which needs no naming, and two sources, which
         // do.
-        for t in [NodeType::TeeMoc, NodeType::TeePayload] {
+        for t in [NodeType::TeeGateway, NodeType::TeePayload] {
             assert!(!t.must_name(true), "{}", t.spelling());
             assert!(t.must_name(false), "{}", t.spelling());
         }
@@ -2369,8 +2371,8 @@ mod tests {
             assert!(!t.must_name(true), "{}", t.spelling());
             assert!(!t.must_name(false), "{}", t.spelling());
         }
-        assert!(!NodeType::Moc.must_name(true));
-        assert!(!NodeType::Moc.must_name(false));
+        assert!(!NodeType::GatewayRadio.must_name(true));
+        assert!(!NodeType::GatewayRadio.must_name(false));
         // A log receives on one and sends on none.
         assert!(!NodeType::Log.must_name(true));
         assert!(!NodeType::Log.must_name(false));
@@ -2381,8 +2383,8 @@ mod tests {
     fn a_line_is_drawn_to_the_terminal_the_link_means() {
         // Named, and the type has it.
         assert_eq!(
-            terminal_for("app_all_veh", Some("moc-in"), true),
-            Some("moc-in")
+            terminal_for("app_all_veh", Some("gateway-in"), true),
+            Some("gateway-in")
         );
         // Named, and the type has not: a computation's own input, which is
         // not a terminal. The groundward sink is where readings arrive.
@@ -2392,7 +2394,10 @@ mod tests {
         );
         // Nothing named, and one of that kind: the one.
         assert_eq!(terminal_for("i2c", None, false), Some("payload-out"));
-        assert_eq!(terminal_for("moc", None, true), Some("payload-in"));
+        assert_eq!(
+            terminal_for("gateway_radio", None, true),
+            Some("payload-in")
+        );
         // Nothing named and two of that kind: the groundward one, which is
         // what a node does unless the file says otherwise. The checking
         // refuses such a file; the canvas still has to draw it.
@@ -2442,7 +2447,7 @@ mod tests {
         assert!(y < at.1 as f32 + height as f32 / 2.0, "the upper corner");
 
         let ((_, lower), rightward) =
-            attachment("i2c", at, "moc-in").expect("a payload");
+            attachment("i2c", at, "gateway-in").expect("a payload");
         assert!(
             !rightward && lower > y,
             "what asks arrives at the lower corner"
@@ -2450,7 +2455,7 @@ mod tests {
 
         // And the ground link's pair, both on its left.
         let ((x, _), _) =
-            attachment("moc", at, "payload-in").expect("the ground");
+            attachment("gateway_radio", at, "payload-in").expect("the ground");
         assert_eq!(x, at.0 as f32);
 
         // A terminal a node does not have is not a place to join it, and
@@ -2579,9 +2584,9 @@ mod tests {
             // would be a node that means nothing.
             if matches!(
                 t,
-                NodeType::NullMoc
+                NodeType::NullGateway
                     | NodeType::NullPayload
-                    | NodeType::TeeMoc
+                    | NodeType::TeeGateway
                     | NodeType::TeePayload
                     | NodeType::Ping
             ) {

@@ -163,13 +163,13 @@ export struct NodeView {
     // Two rows, which are the two streams. Along the top, left to right, what
     // comes back from the payloads: it arrives at `payload-in` and leaves at
     // `payload-out`. Along the bottom, right to left, what the ground sends: it
-    // arrives at `moc-in` and leaves at `moc-out`. The arrows therefore point
-    // the way the canvas itself is laid out -- the payloads are the leftmost
-    // working pane and the ground the rightmost -- so a reader who has worked
-    // that out once need not read the names again. The table is in style.rs,
-    // taken from tcslibgs::graph::terminals.
-    moc-in: TerminalView,
-    moc-out: TerminalView,
+    // arrives at `gateway-in` and leaves at `gateway-out`. The arrows therefore
+    // point the way the canvas itself is laid out -- the payloads are the
+    // leftmost working pane and the ground the rightmost -- so a reader who has
+    // worked that out once need not read the names again. The table is in
+    // style.rs, taken from tcslibgs::graph::terminals.
+    gateway-in: TerminalView,
+    gateway-out: TerminalView,
     payload-in: TerminalView,
     payload-out: TerminalView,
     // How much room a terminal takes along an edge, which is what the label
@@ -491,9 +491,9 @@ export component NodeShape inherits Rectangle {
         // for a name on the shortest node.
         VerticalLayout {
             padding: Space.tight;
-            padding-left: (node.moc-in.shown || node.payload-out.shown)
+            padding-left: (node.gateway-in.shown || node.payload-out.shown)
                 ? node.terminal-column : Space.tight;
-            padding-right: (node.moc-out.shown || node.payload-in.shown)
+            padding-right: (node.gateway-out.shown || node.payload-in.shown)
                 ? node.terminal-column : Space.tight;
             spacing: 1px;
             alignment: center;
@@ -692,42 +692,42 @@ export component NodeShape inherits Rectangle {
     // here by hand for the same reason -- these are outside the group that
     // carries it, and a terminal that stayed put while its node moved would be
     // a line attached to where the node used to be.
-    if node.moc-in.shown: Terminal {
-        x: node.moc-in.x + drag-x;
-        y: node.moc-in.y + drag-y;
-        rightward: node.moc-in.rightward;
+    if node.gateway-in.shown: Terminal {
+        x: node.gateway-in.x + drag-x;
+        y: node.gateway-in.y + drag-y;
+        rightward: node.gateway-in.rightward;
         dragged(x, y) => {
-            link-dragging(node.x + node.moc-in.x + x,
-                          node.y + node.moc-in.y + y);
+            link-dragging(node.x + node.gateway-in.x + x,
+                          node.y + node.gateway-in.y + y);
         }
         sink: true;
         ink: ink;
         mark: mark;
-        grabbed => { link-from("moc-in"); }
+        grabbed => { link-from("gateway-in"); }
         released(x, y) => {
-            link-dropped(node.x + node.moc-in.x + x,
-                         node.y + node.moc-in.y + y);
+            link-dropped(node.x + node.gateway-in.x + x,
+                         node.y + node.gateway-in.y + y);
         }
     }
-    if node.moc-out.shown: Terminal {
-        x: node.moc-out.x + drag-x;
-        y: node.moc-out.y + drag-y;
-        rightward: node.moc-out.rightward;
+    if node.gateway-out.shown: Terminal {
+        x: node.gateway-out.x + drag-x;
+        y: node.gateway-out.y + drag-y;
+        rightward: node.gateway-out.rightward;
         dragged(x, y) => {
-            link-dragging(node.x + node.moc-out.x + x,
-                          node.y + node.moc-out.y + y);
+            link-dragging(node.x + node.gateway-out.x + x,
+                          node.y + node.gateway-out.y + y);
         }
         sink: false;
         ink: ink;
         mark: mark;
-        grabbed => { link-from("moc-out"); }
+        grabbed => { link-from("gateway-out"); }
         // Where the pointer was let go of, in the canvas's own coordinates:
         // the node is placed at node.x and the terminal sits at its own offset
         // inside it, so the two and the pointer's offset from the terminal's
         // corner are the whole of it.
         released(x, y) => {
-            link-dropped(node.x + node.moc-out.x + x,
-                         node.y + node.moc-out.y + y);
+            link-dropped(node.x + node.gateway-out.x + x,
+                         node.y + node.gateway-out.y + y);
         }
     }
     if node.payload-in.shown: Terminal {
@@ -897,7 +897,7 @@ export component SheetGround inherits Rectangle {
     // What each pane's band is painted. See tcsdiagram::look::ground_of.
     in property <color> payload-ground;
     in property <color> vehicle-ground;
-    in property <color> moc-ground;
+    in property <color> gateway-ground;
 
     width: 100%;
     height: 100%;
@@ -908,7 +908,7 @@ export component SheetGround inherits Rectangle {
     // Asked of the labels, so a change to the type scale is a
     // change to the bands as well.
     property <length> heading-tall:
-        max(moc-heading.preferred-height,
+        max(gateway-heading.preferred-height,
             max(vehicle-heading.preferred-height,
                 payload-heading.preferred-height))
         + 2 * Space.tight;
@@ -1006,12 +1006,12 @@ export component SheetGround inherits Rectangle {
         y: 0;
         width: root.working-width - root.vehicle-divider;
         height: root.heading-tall;
-        background: root.moc-ground;
+        background: root.gateway-ground;
 
-        moc-heading := Text {
+        gateway-heading := Text {
             x: Space.step;
             y: Space.tight;
-            text: "MOC";
+            text: "Gateway";
             font-size: Type.small;
             font-italic: true;
             color: #9ca3af;

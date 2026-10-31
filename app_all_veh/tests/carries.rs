@@ -16,7 +16,7 @@ fn app() -> PathBuf {
 }
 
 /// The arguments an `app_all_veh` is run with: its name, then the payload
-/// argument, then the MOC one, this kind handling both streams.
+/// argument, then the gateway one, this kind handling both streams.
 ///
 /// # Returns
 ///
@@ -44,9 +44,11 @@ fn each_stream_is_carried_to_the_other_interface() {
     );
 
     // And vehicleward, the other way about.
-    running.write_moc(b"SET 300").expect("it takes a packet");
+    running
+        .write_gateway(b"SET 300")
+        .expect("it takes a packet");
     assert_eq!(
-        running.read_moc().expect("it is carried"),
+        running.read_gateway().expect("it is carried"),
         Some(b"SET 300".to_vec())
     );
 
@@ -58,8 +60,13 @@ fn each_stream_is_carried_to_the_other_interface() {
         running.read_payload().expect("it is carried"),
         Some(Vec::new())
     );
-    running.write_moc(b"").expect("it takes an empty packet");
-    assert_eq!(running.read_moc().expect("it is carried"), Some(Vec::new()));
+    running
+        .write_gateway(b"")
+        .expect("it takes an empty packet");
+    assert_eq!(
+        running.read_gateway().expect("it is carried"),
+        Some(Vec::new())
+    );
 
     running.no_more().expect("the interfaces end");
     assert!(
@@ -81,10 +88,12 @@ fn the_streams_are_not_crossed() {
     // default would have it wait five seconds to find out.
     running.waits(Some(Duration::from_millis(500)));
 
-    // Payload data in. Nothing comes back as MOC data, which is what the
+    // Payload data in. Nothing comes back as gateway data, which is what the
     // first interface carries the other way.
     running.write_payload(b"293.15").expect("it takes a packet");
-    let said = running.read_moc().expect_err("nothing should come back");
+    let said = running
+        .read_gateway()
+        .expect_err("nothing should come back");
     assert!(
         said.contains("the payload interface"),
         "the wait should have been on the interface it was asked of: {said}"

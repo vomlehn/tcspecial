@@ -18,8 +18,8 @@
 //! rule in one place, `tcslibgs::node::app`, and the interfaces their programs
 //! are run with are `tcsapp`.
 //!
-//! There is no `moc` directory, and that is not an omission: a ground link is
-//! a network endpoint, so what opens one is `payload/network`. See
+//! There is no `gateway` directory, and that is not an omission: a ground link
+//! is a network endpoint, so what opens one is `payload/network`. See
 //! `tcslibgs::node`, which has the argument.
 //!
 //! See `tcslibgs::node` for why there are three trees rather than one.

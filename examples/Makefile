@@ -112,7 +112,7 @@ run-fprime:
 # sending a line of text a word at a time.
 #
 # Both ends are run here. The vehicle goes in the background, and the ground
-# station, lorem_moc, in the foreground: it is what prints the line, and it
+# station, lorem_gateway, in the foreground: it is what prints the line, and it
 # stops at the end of it. Then the vehicle is stopped. The payload,
 # lorem_pl.py, is the `executable` the configuration names, a Python 3 script
 # beside it, and tcspecial starts it -- so Python 3 is checked for first.
@@ -129,7 +129,7 @@ SIMPLE_APP_WAITS = 30
 
 .PHONY: run-simple-app
 run-simple-app: check-python3
-	cd $(ROOT) && cargo build -q --bin tcspecial --bin lorem_moc
+	cd $(ROOT) && cargo build -q --bin tcspecial --bin lorem_gateway
 	( \
 		set -eu; \
 		echo "Running $(PROJECT_NAME) on" \
@@ -145,7 +145,7 @@ run-simple-app: check-python3
 			kill -INT $$vehicle 2>/dev/null || true; \
 			wait $$vehicle || true' EXIT; \
 		trap 'exit 130' INT TERM; \
-		timeout $(SIMPLE_APP_WAITS) target/debug/lorem_moc \
+		timeout $(SIMPLE_APP_WAITS) target/debug/lorem_gateway \
 	)
 
 # Run the beacon example: a window watching the beacon, with a button that
@@ -183,12 +183,12 @@ run-beacon:
 # kills it when it exits -- however it exits, the kernel being told to kill
 # tcspecial if the ground station is killed or crashes. It stays until its
 # window is closed. The ground station is Python 3,
-# examples/ping/ping_moc.py, so Python and its tkinter are checked for first;
-# tcsverify is built beside the vehicle because the window asks it for the
-# configuration's digest, which it compares every beacon's with.
+# examples/ping/ping_gateway.py, so Python and its tkinter are checked for
+# first; tcsverify is built beside the vehicle because the window asks it for
+# the configuration's digest, which it compares every beacon's with.
 #
 # It opens a window, so it wants a display. Without one,
-#   python3 examples/ping/ping_moc.py --pings 3
+#   python3 examples/ping/ping_gateway.py --pings 3
 # starts the vehicle, sends three pings, prints each answer and its times,
 # and stops the vehicle.
 .PHONY: run-ping
@@ -200,7 +200,7 @@ run-ping: check-tkinter
 		cd $(ROOT); \
 		rm -rf $(TELEMETRY); \
 		mkdir $(TELEMETRY); \
-		RUST_LOG=$(RUST_LOG) python3 examples/ping/ping_moc.py \
+		RUST_LOG=$(RUST_LOG) python3 examples/ping/ping_gateway.py \
 			examples/ping/ping.xml \
 	)
 
@@ -216,7 +216,7 @@ check-tkinter: check-python3
 		echo "the ping example's window is drawn with tkinter, and" \
 			"this python3 has none: install it" \
 			"(python3-tk on Debian and Ubuntu), or run python3" \
-			"examples/ping/ping_moc.py --pings 3 for no" \
+			"examples/ping/ping_gateway.py --pings 3 for no" \
 			"window" >&2; \
 		exit 1; \
 	}

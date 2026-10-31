@@ -22,15 +22,15 @@ fn arguments() -> Vec<String> {
     vec!["fore".to_string(), "--readings".to_string()]
 }
 
-/// Payload data in, the same bytes out as MOC data.
+/// Payload data in, the same bytes out as gateway data.
 #[test]
-fn a_packet_of_payload_data_comes_back_as_moc_data() {
+fn a_packet_of_payload_data_comes_back_as_gateway_data() {
     let mut running = parent::start(&app(), &arguments(), Supports::PAYLOAD)
         .expect("it starts");
 
     running.write_payload(b"293.15").expect("it takes a packet");
     assert_eq!(
-        running.read_moc().expect("an answer"),
+        running.read_gateway().expect("an answer"),
         Some(b"293.15".to_vec())
     );
 
@@ -38,7 +38,7 @@ fn a_packet_of_payload_data_comes_back_as_moc_data() {
     // pass a test that sent one packet.
     running.write_payload(b"294.05").expect("it takes another");
     assert_eq!(
-        running.read_moc().expect("another answer"),
+        running.read_gateway().expect("another answer"),
         Some(b"294.05".to_vec())
     );
 
@@ -64,7 +64,7 @@ fn a_zero_length_packet_comes_back() {
     running
         .write_payload(b"")
         .expect("it takes an empty packet");
-    assert_eq!(running.read_moc().expect("an answer"), Some(Vec::new()));
+    assert_eq!(running.read_gateway().expect("an answer"), Some(Vec::new()));
 
     running.no_more().expect("the interfaces end");
     assert!(running.waited_for().expect("it stops").success());
@@ -81,15 +81,15 @@ fn the_interface_it_has_not_got_cannot_be_reached() {
         .expect("it starts");
 
     let said = running
-        .write_moc(b"SET 300")
+        .write_gateway(b"SET 300")
         .expect_err("an interface it has not got");
-    assert!(said.contains("the MOC interface"), "{said}");
+    assert!(said.contains("the gateway interface"), "{said}");
     assert!(said.contains("descriptor 1"), "{said}");
 
     let said = running
         .read_payload()
         .expect_err("an interface it has not got");
-    assert!(said.contains("the MOC interface"), "{said}");
+    assert!(said.contains("the gateway interface"), "{said}");
 
     running.no_more().expect("the interfaces end");
     assert!(running.waited_for().expect("it stops").success());
@@ -114,7 +114,7 @@ fn run_as_a_kind_it_is_not_it_refuses_and_says_why() {
         .expect("a message");
     assert!(said.contains("app_payload_veh"), "{said}");
     assert!(said.contains("does not support"), "{said}");
-    assert!(said.contains("the MOC interface"), "{said}");
+    assert!(said.contains("the gateway interface"), "{said}");
 
     assert!(
         !running.waited_for().expect("it stops").success(),

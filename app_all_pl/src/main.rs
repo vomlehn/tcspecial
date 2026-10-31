@@ -11,7 +11,7 @@
 //! interface it was *not* going to would be the streams crossed, and here it
 //! would be the same bytes and so unmistakable.
 //!
-//! The mirror of `app_moc_veh`, whose program holds the same interface and
+//! The mirror of `app_gateway_veh`, whose program holds the same interface and
 //! does the same two things with it. What tells the two node types apart is
 //! which side of the graph each stands on, which is the configuration's
 //! business and not the program's.
@@ -45,15 +45,15 @@ fn main() -> ExitCode {
     let AppAllPl {
         name,
         payload_arg: _,
-        moc_arg: _,
-        mut moc,
+        gateway_arg: _,
+        mut gateway,
         mut errors,
     } = app;
 
     loop {
-        match moc.read_moc() {
+        match gateway.read_gateway() {
             Ok(Some(data)) => {
-                if let Err(e) = moc.write_payload(&data) {
+                if let Err(e) = gateway.write_payload(&data) {
                     let _ = errors.say(&format!(
                         "app_all_pl {name}: a reading of {} bytes could not be \
                          written: {e}",

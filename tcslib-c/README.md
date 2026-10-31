@@ -2,7 +2,7 @@
 
 **tcslib-c is tcslib for C and C++.** It is the library a ground station
 written in C or C++ is built on: the vehicle's beacons, the vehicle's data
-from a `moc` node, and commands to the vehicle, behind one header,
+from a gateway node, and commands to the vehicle, behind one header,
 `include/tcs.h`.
 
 It is not a second implementation of anything. Each function is a call into
@@ -29,7 +29,7 @@ linkage throughout, and nothing in it that C++ will not compile.
   configuration's checksum. Each pass also gives remarks, which are news, and
   warnings, which are to be said whether or not anybody asked.
 - **Matching.** Each pass keeps the configuration's *match* with the
-  vehicle, which every beacon watch, client and moc node made from that
+  vehicle, which every beacon watch, client and gateway node made from that
   configuration shares. The station is matched for listening while the last
   beacon is recent, has the restart flag clear and carries the
   configuration's checksum, and for commanding once, besides, its own
@@ -37,9 +37,9 @@ linkage throughout, and nothing in it that C++ will not compile.
   says which; `tcs_configuration_counts` says how many packets have come
   from the vehicle, data and answers, and how many of them were processed,
   malformed or dropped for a configuration mismatch, which add up.
-- **The vehicle's data.** `tcs_moc_open` opens a `moc` node, and each
-  `tcs_moc_receive` returns one datum and the name of the node that produced
-  it. A moc node reads data only while the station is matched for listening:
+- **The vehicle's data.** `tcs_gateway_open` opens a gateway node, and each
+  `tcs_gateway_receive` returns one datum and the name of the node that produced
+  it. A gateway node reads data only while the station is matched for listening:
   what arrives before is dropped and counted, as is whatever is waiting when
   the match begins. So a station that reads data passes its beacons too.
 - **Commands.** `tcs_client_open` opens the two command links the
@@ -58,9 +58,9 @@ linkage throughout, and nothing in it that C++ will not compile.
   beacon; after a restart is sent it is what ends the wait for the vehicle
   to come back, during which nothing but connect, arm and restart goes.
 - **Pinging a ping node.** `tcs_pinger_open` finds the first `ping` node the
-  ground can reach both ways and its `moc` node. `tcs_pinger_ping` sends a
+  ground can reach both ways and its gateway node. `tcs_pinger_ping` sends a
   ping up; its answer comes down as the ping node's data, which a station
-  takes with `tcs_moc_receive` and hands to `tcs_pinger_answered`; and
+  takes with `tcs_gateway_receive` and hands to `tcs_pinger_answered`; and
   `tcs_pinger_exchange` gives the round trip and the two halves of it.
 
 Every handle is made by an `_open` and freed by its `_close`. A function that
@@ -113,7 +113,7 @@ than run against a library it does not match.
 same one in C++: each reads the configuration, waits for the first beacon,
 connects and pings, asks about a node and sets one of its attributes,
 pings the vehicle's ping node and times the answer, and
-prints the vehicle's data from a `moc` node. They take `--yaml` or `--xml`,
+prints the vehicle's data from a gateway node. They take `--yaml` or `--xml`,
 as every example program does, and `--restart` to arm a restart and restart
 the vehicle, which they do only when asked.
 
@@ -164,7 +164,7 @@ The header alone is also compiled as C99 and as C++11.
   remains is said in the source where it happens, and is:
   - *Once, at startup.* Each `_open` allocates its handle, which has to outlive
     the call and whose size C does not see. `tcs_configuration_open` reads and
-    checks a whole configuration, as tcslib does; `tcs_moc_open` makes the
+    checks a whole configuration, as tcslib does; `tcs_gateway_open` makes the
     names of the node's sources, which every receive then points at, and the
     buffer every datum is received in; and `tcs_configuration_node_id` asks
     tcslib for every node's id.

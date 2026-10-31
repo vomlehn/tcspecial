@@ -164,7 +164,7 @@ fn the_configuration_schema_has_the_sections_the_reader_reads() {
         "include",
         "tcspecial",
         "payload_groups",
-        "moc",
+        "gateway",
         "vehicle",
         "payloads",
         "commands",
@@ -240,7 +240,7 @@ fn each_section_takes_the_node_types_the_software_knows() {
     let json = read("tcspecial.schema.json");
     let xsd = text_of("tcspecial.xsd");
     for (section, key, simple_type) in [
-        (Section::Moc, "moc", "mocType"),
+        (Section::Gateway, "gateway", "gatewayType"),
         (Section::Vehicle, "vehicle", "vehicleType"),
         (Section::Payloads, "payloads", "payloadType"),
     ] {
@@ -618,7 +618,7 @@ fn every_key_of_a_shipped_configuration_is_in_the_schema() {
 
             // The node sections, whose entries are what a schema has most to
             // say about.
-            if !["moc", "vehicle", "payloads"].contains(&key.as_str()) {
+            if !["gateway", "vehicle", "payloads"].contains(&key.as_str()) {
                 continue;
             }
             let allowed = properties(&schema, &[&key]);

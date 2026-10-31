@@ -5,7 +5,7 @@ The Python spelling of ``tcslib/src/ping.rs``, which is what tcsmoc pings a
 shown the same way. Here between the two halves it borrows: the ping format
 (``python/tcslibgs/ping.py``, after ``tcslibgs``) and the configuration
 (``python/tcslibgs/configuration.py``). A :class:`Pinger`
-sends each ping up to the ``moc`` node, takes each answer the ``ping`` node
+sends each ping up to the ``gateway`` node, takes each answer the ``ping`` node
 sends back down, and keeps what a window shows: the last ping sent and when,
 the last answer received and when, and the three times between them.
 
@@ -94,11 +94,11 @@ class Exchange:
 
 class Pinger:
     """The ground's end of the ping link: a ping goes up to ``uplink``, which
-    the ``moc`` node binds aboard, and its answer comes down to ``downlink``,
-    which this binds.
+    the ``gateway`` node binds aboard, and its answer comes down to
+    ``downlink``, which this binds.
 
     Args:
-        uplink:   Where pings are sent: the ``HostPort`` the ``moc`` node
+        uplink:   Where pings are sent: the ``HostPort`` the ``gateway`` node
                   binds aboard.
         downlink: Where answers are received: the ``HostPort`` this binds.
         clock:    What gives the time now, in nanoseconds since the epoch.

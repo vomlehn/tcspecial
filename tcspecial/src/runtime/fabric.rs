@@ -36,8 +36,8 @@
 //! this was here.
 //!
 //! A node with more than one of either has to be told and has to say. An
-//! `app_all_veh` is one: it reads payload data on one interface and MOC data
-//! on the other, so a datum it produces belongs to one of the two and
+//! `app_all_veh` is one: it reads payload data on one interface and gateway
+//! data on the other, so a datum it produces belongs to one of the two and
 //! delivering it to the other's links would send telemetry out as a command.
 //! So the stream travels with the bytes -- [`Taken::stream`] on the way out,
 //! [`Arriving::stream`] on the way in -- and [`Fabric::deliver_on`] follows
@@ -147,7 +147,7 @@ enum Job {
 ///
 /// `Some` is a node that produces on more than one terminal and knows which
 /// -- an `app_all_veh`, whose two interfaces are two streams. Delivering its
-/// reading to the links leaving its `moc-out` would send telemetry out as a
+/// reading to the links leaving its `gateway-out` would send telemetry out as a
 /// command, so the stream travels with the bytes.
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
 pub struct Taken {
@@ -431,8 +431,8 @@ pub trait Port: Send {
     /// node.
     ///
     /// Asked rather than simply reading every destination after a delivery,
-    /// because reading a device is not free and reading a MOC link would take
-    /// a command off it and pass it on as though it were a result.
+    /// because reading a device is not free and reading a gateway link would
+    /// take a command off it and pass it on as though it were a result.
     fn ready(&self) -> bool {
         false
     }
@@ -1003,8 +1003,8 @@ impl Fabric {
     /// heaters -- all of it from the one delivery of the one reading, and all
     /// of it in the pass that read the sensor. A node is asked whether it has
     /// a result ([`Port::ready`]) rather than simply read, because reading a
-    /// device is not free and reading a MOC link would take a command off it
-    /// and pass that on as though it were a result.
+    /// device is not free and reading a gateway link would take a command off
+    /// it and pass that on as though it were a result.
     ///
     /// Breadth first, a wave at a time, so that the three destinations of a
     /// "T" are all reached before any of their own destinations are. The
@@ -1028,9 +1028,9 @@ impl Fabric {
     /// `stream` is which of them this datum is on, as the node that produced
     /// it said: see [`Taken`]. Only the links leaving that stream's terminal
     /// are followed, which is the whole point -- an `app_all_veh` reading on
-    /// its payload interface and writing on its MOC one would otherwise have
-    /// its reading delivered to both, and the ground's commands would carry
-    /// telemetry.
+    /// its payload interface and writing on its gateway one would otherwise
+    /// have its reading delivered to both, and the ground's commands would
+    /// carry telemetry.
     ///
     /// `None` is a node that does not keep them apart, and then every link out
     /// of it is followed, which is what the fabric did before and what every
@@ -1962,7 +1962,7 @@ mod tests {
 
     /// The example itself, without its links to the ground: see
     /// [`thermostat`]. With no `tcspecial` section no payload reports on its
-    /// own, and with no `ground_base` on the moc node what is drawn into it
+    /// own, and with no `ground_base` on the gateway node what is drawn into it
     /// is delivered to it, as drawn.
     ///
     /// # Returns
@@ -1977,7 +1977,11 @@ mod tests {
         let mut graph = Graph::load(root.join("tests/manual/thermostat.yaml"))
             .expect("it reads");
         graph.tcspecial = None;
-        for node in graph.nodes.iter_mut().filter(|n| n.node_type == "moc") {
+        for node in graph
+            .nodes
+            .iter_mut()
+            .filter(|n| n.node_type == "gateway_radio")
+        {
             node.attributes.remove("ground_base");
         }
         graph
@@ -1990,10 +1994,10 @@ mod tests {
     #[test]
     fn a_fan_out_delivers_to_every_destination() {
         let mut fabric = Fabric::new(thermostat(), 64);
-        let (moc, moc_port) = recorder();
+        let (gateway, gateway_port) = recorder();
         let (mean, mean_port) = recorder();
         let (log, log_port) = recorder();
-        fabric.hold("moc", moc_port);
+        fabric.hold("gateway", gateway_port);
         fabric.hold("cabin_temp", mean_port);
         fabric.hold("housekeeping", log_port);
 
@@ -2005,7 +2009,7 @@ mod tests {
 
         let groundward = Some(Stream::Groundward);
         assert_eq!(
-            moc.lock().expect("the record").given,
+            gateway.lock().expect("the record").given,
             vec![(None, groundward, vec![1, 2, 3, 4])]
         );
         assert_eq!(
@@ -2033,10 +2037,10 @@ mod tests {
         let path = dir.path().join("tees.yaml");
         std::fs::write(
             &path,
-            "moc:
+            "gateway:
   - name: ground
-    type: moc
-    moc-out: [commands]
+    type: gateway_radio
+    gateway-out: [commands]
 payloads:
   - name: valve
     type: network
@@ -2046,15 +2050,15 @@ payloads:
     payload-out: [readings]
 vehicle:
   - name: commands
-    type: tee-moc
-    moc-out: [valve]
+    type: tee-gateway
+    gateway-out: [valve]
     payload-out: [ground]
   - name: readings
     type: tee-payload
     payload-out: [ground]
-    moc-out: [dropped]
+    gateway-out: [dropped]
   - name: dropped
-    type: null-moc
+    type: null-gateway
 ",
         )
         .expect("written");
@@ -2103,10 +2107,10 @@ vehicle:
     fn a_fan_in_arrives_as_named_inputs() {
         let mut fabric = Fabric::new(thermostat(), 64);
         let (mean, mean_port) = recorder();
-        let (moc, moc_port) = recorder();
+        let (gateway, gateway_port) = recorder();
         let (log, log_port) = recorder();
         fabric.hold("cabin_temp", mean_port);
-        fabric.hold("moc", moc_port);
+        fabric.hold("gateway", gateway_port);
         fabric.hold("housekeeping", log_port);
 
         fabric.deliver("k_1", &[1]);
@@ -2125,7 +2129,7 @@ vehicle:
         // And the ground and the log got all three as well, which are the
         // other two legs: a fan-in on one destination does not take anything
         // away from the fan-out that feeds it.
-        assert_eq!(moc.lock().expect("the record").given.len(), 3);
+        assert_eq!(gateway.lock().expect("the record").given.len(), 3);
         assert_eq!(log.lock().expect("the record").given.len(), 3);
     }
 
@@ -2157,11 +2161,11 @@ vehicle:
             fabric.hold(name, Box::new(port));
         }
 
-        let (moc, moc_port) = recorder();
+        let (gateway, gateway_port) = recorder();
         let (log, log_port) = recorder();
         let (first, first_port) = recorder();
         let (second, second_port) = recorder();
-        fabric.hold("moc", moc_port);
+        fabric.hold("gateway", gateway_port);
         fabric.hold("housekeeping", log_port);
         fabric.hold("heaters_1", first_port);
         fabric.hold("heaters_2", second_port);
@@ -2182,7 +2186,7 @@ vehicle:
         // A temperature is four bytes of micro-kelvin and a decision is text,
         // so they are read back differently -- which is what the two are: a
         // reading, and the thing a set of discrete lines is driven to.
-        let given: Vec<Vec<u8>> = moc
+        let given: Vec<Vec<u8>> = gateway
             .lock()
             .expect("the record")
             .given
@@ -2266,11 +2270,11 @@ vehicle:
                 ),
             );
         }
-        let (_, moc_port) = recorder();
+        let (_, gateway_port) = recorder();
         let (_, log_port) = recorder();
         let (heaters, heater_port) = recorder();
         let (_, second_port) = recorder();
-        fabric.hold("moc", moc_port);
+        fabric.hold("gateway", gateway_port);
         fabric.hold("housekeeping", log_port);
         fabric.hold("heaters_1", heater_port);
         fabric.hold("heaters_2", second_port);
@@ -2315,8 +2319,8 @@ vehicle:
                 .expect("it builds"),
             ),
         );
-        let (moc, moc_port) = recorder();
-        fabric.hold("moc", moc_port);
+        let (gateway, gateway_port) = recorder();
+        fabric.hold("gateway", gateway_port);
 
         // Three bytes where the part's format is two: a bus that returned
         // something else, or a sensor read wrongly.
@@ -2331,7 +2335,7 @@ vehicle:
         );
         // Nothing reached the ground along that branch, and nothing was lost
         // quietly: the refusal is in hand.
-        assert!(moc.lock().expect("the record").given.is_empty());
+        assert!(gateway.lock().expect("the record").given.is_empty());
     }
 
     /// A command from the ground changes what the thermostat decides.
@@ -2360,11 +2364,11 @@ vehicle:
         let (heaters, heater_port) = recorder();
         let (_, second_port) = recorder();
         let (_, log_port) = recorder();
-        let (_, moc_port) = recorder();
+        let (_, gateway_port) = recorder();
         fabric.hold("heaters_1", heater_port);
         fabric.hold("heaters_2", second_port);
         fabric.hold("housekeeping", log_port);
-        fabric.hold("moc", moc_port);
+        fabric.hold("gateway", gateway_port);
 
         // 294 kelvin against a setpoint of 293.15 with two degrees either
         // side: inside the band, so nothing is decided.
@@ -2388,7 +2392,7 @@ vehicle:
             heaters.lock().expect("the record").given,
             // Vehicleward: what a thermostat sends a heater is a command, and
             // the link it goes down is the one leaving the computation's
-            // `moc-out`.
+            // `gateway-out`.
             vec![(None, Some(Stream::Vehicleward), b"1".to_vec())],
             "294 is more than two degrees below 300"
         );
@@ -2426,11 +2430,11 @@ vehicle:
         let (heaters, heater_port) = device();
         let (second, second_port) = device();
         let (log, log_port) = recorder();
-        let (moc, moc_port) = recorder();
+        let (gateway, gateway_port) = recorder();
         fabric.hold("heaters_1", heater_port);
         fabric.hold("heaters_2", second_port);
         fabric.hold("housekeeping", log_port);
-        fabric.hold("moc", moc_port);
+        fabric.hold("gateway", gateway_port);
 
         // Cold: the first decision, which is a change and goes everywhere its
         // links lead.
@@ -2452,7 +2456,7 @@ vehicle:
         };
         assert_eq!(said(&heaters), vec![b"1".to_vec()]);
         assert_eq!(said(&log), vec![b"1".to_vec()]);
-        assert_eq!(said(&moc), vec![b"1".to_vec()]);
+        assert_eq!(said(&gateway), vec![b"1".to_vec()]);
 
         // Four more samples, still cold. Each asserts the decision to both
         // heaters again -- it is what they are to be held at -- and the
@@ -2473,7 +2477,11 @@ vehicle:
             vec![b"1".to_vec()],
             "the log should hold the transition and not the repetitions"
         );
-        assert_eq!(said(&moc), vec![b"1".to_vec()], "and so should the ground");
+        assert_eq!(
+            said(&gateway),
+            vec![b"1".to_vec()],
+            "and so should the ground"
+        );
 
         // A reading inside the band decides nothing new, and the heaters are
         // still held at what they were told: that is what the band means.
@@ -2527,7 +2535,7 @@ vehicle:
         // underscore, is told its spelling.
         let mut bound = graph.clone();
         bound.commands.push(tcslibgs::graph::CommandBinding {
-            from: "moc".to_string(),
+            from: "gateway".to_string(),
             sets: "thermostat.half_band".to_string(),
         });
         let mut fabric_bound = Fabric::new(Routes::of(&bound), 64);
@@ -2654,12 +2662,12 @@ vehicle:
     #[test]
     fn a_refused_delivery_does_not_stop_the_rest() {
         let mut fabric = Fabric::new(thermostat(), 64);
-        let (moc, moc_port) = recorder();
+        let (gateway, gateway_port) = recorder();
         let (mean, mean_port) = recorder();
         let (log, log_port) = recorder();
         log.lock().expect("the record").refuse =
             Some("the device is full".to_string());
-        fabric.hold("moc", moc_port);
+        fabric.hold("gateway", gateway_port);
         fabric.hold("cabin_temp", mean_port);
         fabric.hold("housekeeping", log_port);
 
@@ -2678,7 +2686,7 @@ vehicle:
             )],
             "the refusal should name the node and say why"
         );
-        assert_eq!(moc.lock().expect("the record").given.len(), 1);
+        assert_eq!(gateway.lock().expect("the record").given.len(), 1);
         assert_eq!(mean.lock().expect("the record").given.len(), 1);
     }
 
@@ -2686,8 +2694,8 @@ vehicle:
     #[test]
     fn a_missing_node_is_reported_rather_than_dropped() {
         let mut fabric = Fabric::new(thermostat(), 64);
-        let (moc, moc_port) = recorder();
-        fabric.hold("moc", moc_port);
+        let (gateway, gateway_port) = recorder();
+        fabric.hold("gateway", gateway_port);
         // cabin_temp and housekeeping are not held.
 
         let moved = fabric.deliver("k_1", &[7]);
@@ -2698,7 +2706,7 @@ vehicle:
             .refused
             .iter()
             .all(|(_, why)| why.contains("no such node")));
-        assert_eq!(moc.lock().expect("the record").given.len(), 1);
+        assert_eq!(gateway.lock().expect("the record").given.len(), 1);
     }
 
     /// A node that is only written is not read, and is not an error.

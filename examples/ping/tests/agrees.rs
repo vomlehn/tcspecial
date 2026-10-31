@@ -21,7 +21,7 @@ fn here() -> PathBuf {
     Path::new(env!("CARGO_MANIFEST_DIR")).to_path_buf()
 }
 
-/// What `ping_moc.py --describe` says, as `name value` pairs.
+/// What `ping_gateway.py --describe` says, as `name value` pairs.
 ///
 /// # Returns
 ///
@@ -33,7 +33,7 @@ fn here() -> PathBuf {
 /// value.
 fn described() -> Vec<(String, String)> {
     let ran = Command::new("python3")
-        .arg(here().join("ping_moc.py"))
+        .arg(here().join("ping_gateway.py"))
         .arg("--describe")
         .arg(here().join("ping.xml"))
         .output()
@@ -59,7 +59,7 @@ fn described() -> Vec<(String, String)> {
 /// # Returns
 ///
 /// The beacon link, its interval in nanoseconds, the uplink, the downlink
-/// and the digest, as `ping_moc.py --describe` names them.
+/// and the digest, as `ping_gateway.py --describe` names them.
 ///
 /// # Panics
 ///
@@ -78,26 +78,27 @@ fn worked_out() -> Vec<(String, String)> {
         .expect("it has one")
         .as_nanos();
 
-    let moc = graph
+    let gateway = graph
         .nodes
         .iter()
-        .find(|node| node.name == "moc")
-        .expect("a moc node");
-    let uplink = match reach_of(moc).expect("it is reached").endpoint {
+        .find(|node| node.name == "gateway")
+        .expect("a gateway node");
+    let uplink = match reach_of(gateway).expect("it is reached").endpoint {
         EndpointConfig::Network(network) => {
             format!("{}:{}", network.address, network.port)
         }
-        other => panic!("a moc node is a socket: {other:?}"),
+        other => panic!("a gateway node is a socket: {other:?}"),
     };
 
     let downlink = telemetry::of(&graph)
         .expect("its links to the ground work out")
         .into_iter()
         .find(|link| {
-            link.source == "ping" && link.via == Via::Moc("moc".to_string())
+            link.source == "ping"
+                && link.via == Via::Gateway("gateway".to_string())
         })
         .map(|link| format!("{}:{}", link.ground.address, link.ground.port))
-        .expect("ping sends to the moc node");
+        .expect("ping sends to the gateway node");
 
     vec![
         ("beacon.send".to_string(), link.send.to_string()),

@@ -36,15 +36,15 @@
     <!-- ground_base&apos;s address, at its port plus that node&apos;s -->
     <!-- device id: lorem is id 1, so its words go to 127.0.0.1:5101. Ground -->
     <!-- software gets them from this node with a function call, -->
-    <!-- tcslib::moc::Moc::receive: run `lorem_moc` to be that ground. It -->
-    <!-- states no address or port of its own, because nothing comes back -->
-    <!-- up. -->
-    <moc>
-        <name>moc-1</name>
-        <type>moc</type>
+    <!-- tcslib::gateway::GatewayReceiver::receive: run `lorem_gateway` -->
+    <!-- to be that ground. It states no address or port of its own, -->
+    <!-- because nothing comes back up. -->
+    <gateway>
+        <name>gateway-1</name>
+        <type>gateway_radio</type>
         <ground_base>127.0.0.1:5100</ground_base>
         <payload-in>true</payload-in>
-    </moc>
+    </gateway>
     <!-- A payload that is a program rather than a device: it is never -->
     <!-- asked, and reports one word of its line at a time, then a packet -->
     <!-- holding the line terminator. `app-payload-arg` is which line it -->
@@ -58,10 +58,10 @@
         <type>app_pl</type>
         <app-payload-arg>1</app-payload-arg>
         <executable>examples/simple-app/lorem_pl.py</executable>
-        <payload-out><target>moc-1</target></payload-out>
+        <payload-out><target>gateway-1</target></payload-out>
     </payloads>
     <tcsgui>
-        <nodes><name>moc-1</name><x>790</x><y>129</y></nodes>
+        <nodes><name>gateway-1</name><x>790</x><y>129</y></nodes>
         <nodes><name>lorem</name><x>15</x><y>204</y></nodes>
     </tcsgui>
 </configuration>

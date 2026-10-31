@@ -9,7 +9,7 @@ in Rust:
   and ``tcsui`` -- so the window says whether the vehicle is alive before
   anybody presses anything;
 * the ping, from ``ping_ground.py`` beside this, which sends each ping up to
-  the ``moc`` node and times the ``ping`` node's answer;
+  the ``gateway`` node and times the ``ping`` node's answer;
 * and this program: read the configuration, start the two loops, put what
   they report in the window.
 
@@ -26,11 +26,11 @@ of it, up and down. Press Ping to send one.
 
 Usage, from the repository's root::
 
-    python3 examples/ping/ping_moc.py [--yaml | --xml] [configuration]
-    python3 examples/ping/ping_moc.py --pings 3       # no window
-    python3 examples/ping/ping_moc.py --describe      # what it read
-    python3 examples/ping/ping_moc.py --no-vehicle    # tcspecial runs elsewhere
-    python3 examples/ping/ping_moc.py -v              # say what it is doing
+    python3 examples/ping/ping_gateway.py [--yaml | --xml] [configuration]
+    python3 examples/ping/ping_gateway.py --pings 3       # no window
+    python3 examples/ping/ping_gateway.py --describe      # what it read
+    python3 examples/ping/ping_gateway.py --no-vehicle    # tcspecial elsewhere
+    python3 examples/ping/ping_gateway.py -v              # say what it is doing
 
 Quiet unless ``-v`` or ``--verbose`` is given: the console then says where it
 is listening, each remark a beacon pass makes in the window's mode -- beacons
@@ -111,9 +111,10 @@ def arguments(argv):
         help="read the XML spelling of the configuration (the default)",
     )
     parser.add_argument(
-        "--moc",
+        "--gateway",
         help=(
-            "the moc node the ping goes through, where there is more than one"
+            "the gateway node the ping goes through, where there is more "
+            "than one"
         ),
     )
     parser.add_argument(
@@ -167,7 +168,7 @@ def the_one(nodes, kind, named):
 
     Args:
         nodes: The configuration's nodes.
-        kind:  The node type wanted, as ``moc`` or ``ping``.
+        kind:  The node type wanted, as ``gateway_radio`` or ``ping``.
         named: The node named on the command line, or ``None``.
 
     Returns:
@@ -182,7 +183,7 @@ def the_one(nodes, kind, named):
     if len(names) != 1:
         raise ValueError(
             f"the configuration has {len(names)} {kind} nodes, so say which: "
-            f"--{'moc' if kind == 'moc' else 'node'} <name>"
+            f"--{'gateway' if kind == 'gateway_radio' else 'node'} <name>"
         )
     return names[0]
 
@@ -297,10 +298,12 @@ class Setup:
 
     def __init__(self, options):
         self.config = configuration.load(options.configuration)
-        self.moc = the_one(self.config.nodes, "moc", options.moc)
+        self.gateway = the_one(
+            self.config.nodes, "gateway_radio", options.gateway
+        )
         self.node = the_one(self.config.nodes, "ping", options.node)
-        self.uplink = self.config.uplink(self.moc)
-        self.downlink = self.config.downlink(self.moc, self.node)
+        self.uplink = self.config.uplink(self.gateway)
+        self.downlink = self.config.downlink(self.gateway, self.node)
         self.beacon = self.config.beacon_link()
         self.beacon_interval = self.config.beacon_interval()
         self.digest, self.why_no_digest = configuration.digest(
@@ -619,7 +622,7 @@ def main(argv):
     status(
         f"Listening for beacons at {setup.beacon.recv}, which "
         f"{setup.beacon.send} sends from; pinging {setup.node} through "
-        f"{setup.moc} at {setup.uplink}, answers at {setup.downlink}"
+        f"{setup.gateway} at {setup.uplink}, answers at {setup.downlink}"
     )
 
     # The vehicle, once this end is listening: a beacon sent before the ground

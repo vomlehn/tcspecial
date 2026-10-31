@@ -58,12 +58,12 @@ use tcslibgs::{EndpointConfig, TcsError, TcsResult};
 use crate::node::payload::app_all_pl::AppAllPl;
 use crate::node::payload::app_pl::AppPl;
 use crate::node::vehicle::app_all_veh::AppAllVeh;
-use crate::node::vehicle::app_moc_veh::AppMocVeh;
+use crate::node::vehicle::app_gateway_veh::AppGatewayVeh;
 use crate::node::vehicle::app_payload_veh::AppPayloadVeh;
 use crate::node::vehicle::compute::{self, Function, Out};
 use crate::node::vehicle::log::LogNode;
 use crate::node::vehicle::ping::Answers;
-use crate::node::vehicle::tee_moc::Through;
+use crate::node::vehicle::tee_gateway::Through;
 
 use crate::runtime::frame::Framer;
 use crate::runtime::node_state::Abandon;
@@ -122,9 +122,9 @@ impl Use {
     pub fn of(routes: &Routes, node: &str) -> Result<Use, String> {
         // Commands count as something read, and they are the case a table of
         // links alone gets wrong: a thermostat commanded from the ground has
-        // a `commands` entry and no link out of the MOC node, so a MOC link
-        // judged by its links looks like a node that is only written -- and
-        // the setpoint would then never arrive.
+        // a `commands` entry and no link out of the gateway node, so a gateway
+        // link judged by its links looks like a node that is only written --
+        // and the setpoint would then never arrive.
         let produces =
             routes.fan_out(node) > 0 || !routes.commands_on(node).is_empty();
         let accepts = !routes.arriving_at(node).is_empty();
@@ -208,7 +208,7 @@ impl EndpointPort {
     /// Opens what this configuration describes and holds it as one node.
     ///
     /// For a device: this end reaches out to it. See [`EndpointPort::bind`]
-    /// for the end something else reaches, which is what a MOC link is.
+    /// for the end something else reaches, which is what a gateway link is.
     pub fn connect(
         what: &str,
         config: &EndpointConfig,
@@ -304,7 +304,7 @@ impl EndpointPort {
     /// to again.
     ///
     /// Set where the node type is known, which is [`EndpointPort::open`]: a
-    /// payload is a device and a MOC link is not, and the two are the same
+    /// payload is a device and a gateway link is not, and the two are the same
     /// kind of socket otherwise. Off by default, so a port built by hand --
     /// a test's, a ground link's -- is not one by accident.
     pub fn is_a_device(mut self) -> EndpointPort {
@@ -319,7 +319,7 @@ impl EndpointPort {
     /// so this is the whole of what turns a configured graph into something
     /// that moves bytes.
     ///
-    /// A MOC link is bound and everything else is reached out to. That
+    /// A gateway link is bound and everything else is reached out to. That
     /// follows from which end exists first: the ground sends to an address it
     /// was told, so the vehicle waits at it, where a device is something the
     /// vehicle opens.
@@ -373,7 +373,7 @@ impl EndpointPort {
         let mut port = opened.map_err(|e| format!("{e}"))?;
 
         // A payload is a thing in the world that stays as it was put: a
-        // decision written to it holds until another one is. A MOC link is
+        // decision written to it holds until another one is. A gateway link is
         // not, so a re-assertion is not sent down it.
         if node.is_payload() && uses.accepts() {
             port = port.is_a_device();
@@ -1116,7 +1116,7 @@ impl Port for LogPort {
     }
 }
 
-/// A `null-moc` or `null-payload` node, as a node of the graph: what
+/// A `null-gateway` or `null-payload` node, as a node of the graph: what
 /// arrives is taken and dropped.
 ///
 /// For a configuration that has to send a stream somewhere and has nowhere
@@ -1125,7 +1125,7 @@ impl Port for LogPort {
 /// terminal's business, in `tcslibgs::graph::terminals`; here, either is
 /// dropped alike, and is counted as delivered, because it was.
 ///
-/// Also what a `moc` node is held as where nothing is read from it and it
+/// Also what a gateway node is held as where nothing is read from it and it
 /// binds nothing: what is sent to the ground goes by each source's own link
 /// (see `crate::runtime::system::open_ground_link`), so nothing handed to the
 /// node itself has anywhere to go.
@@ -1157,13 +1157,13 @@ impl Port for NullPort {
     }
 }
 
-/// A `tee-moc` or `tee-payload` node, as a node of the graph.
+/// A `tee-gateway` or `tee-payload` node, as a node of the graph.
 ///
 /// The thinnest adapter there is, because the node itself holds what there
-/// is to hold: see [`crate::node::vehicle::tee_moc::Through`], which is where
-/// the queue and the rule about a datum that will not fit live. Here for the
-/// reason the log's adapter and the computation's are here -- the questions a
-/// port answers are the same whatever is behind it, and answers kept together
+/// is to hold: see [`crate::node::vehicle::tee_gateway::Through`], which is
+/// where the queue and the rule about a datum that will not fit live. Here for
+/// the reason the log's adapter and the computation's are here -- the questions
+/// a port answers are the same whatever is behind it, and answers kept together
 /// stay the same.
 pub struct TeePort {
     /// The node's name in the configuration, which every complaint names.
@@ -1191,7 +1191,7 @@ impl TeePort {
 
 impl Port for TeePort {
     /// What arrived, on no stream in particular: so that it goes down every
-    /// link leaving the node, the `moc-out` ones and the `payload-out` ones
+    /// link leaving the node, the `gateway-out` ones and the `payload-out` ones
     /// alike, which is what a tee is for. One stream arrives at a tee, so no
     /// other is mixed into it.
     fn take(&mut self, buffer: &mut [u8]) -> Result<Taken, String> {
@@ -1308,7 +1308,7 @@ pub struct AppPort {
 #[derive(Debug)]
 enum Program {
     Payload(AppPayloadVeh),
-    Moc(AppMocVeh),
+    Gateway(AppGatewayVeh),
     All(AppAllVeh),
     /// A payload that is never asked: it produces and takes nothing.
     Pl(AppPl),
@@ -1343,7 +1343,9 @@ impl AppPort {
             app::Kind::PayloadVeh => {
                 Program::Payload(AppPayloadVeh::of(&params)?)
             }
-            app::Kind::MocVeh => Program::Moc(AppMocVeh::of(&params)?),
+            app::Kind::GatewayVeh => {
+                Program::Gateway(AppGatewayVeh::of(&params)?)
+            }
             app::Kind::AllVeh => Program::All(AppAllVeh::of(&params)?),
             app::Kind::Pl => Program::Pl(AppPl::of(&params)?),
             app::Kind::AllPl => Program::AllPl(AppAllPl::of(&params)?),
@@ -1381,16 +1383,16 @@ impl AppPort {
         buffer: &mut [u8],
     ) -> Result<ReadInto, String> {
         match (&mut self.program, stream) {
-            // What the app writes as MOC data, which it does on the payload
+            // What the app writes as gateway data, which it does on the payload
             // interface: see `tcsapp`.
             (Program::Payload(app), Stream::Vehicleward) => {
-                app.take_moc_data_now_into(buffer)
+                app.take_gateway_data_now_into(buffer)
             }
-            (Program::Moc(app), Stream::Groundward) => {
+            (Program::Gateway(app), Stream::Groundward) => {
                 app.take_payload_data_now_into(buffer)
             }
             (Program::All(app), Stream::Vehicleward) => {
-                app.take_moc_data_now_into(buffer)
+                app.take_gateway_data_now_into(buffer)
             }
             (Program::All(app), Stream::Groundward) => {
                 app.take_payload_data_now_into(buffer)
@@ -1419,7 +1421,7 @@ impl AppPort {
     fn to_ask(&self) -> &'static [Stream] {
         match (&self.program, self.last) {
             (Program::Payload(_), _) => &[Stream::Vehicleward],
-            (Program::Moc(_), _) => &[Stream::Groundward],
+            (Program::Gateway(_), _) => &[Stream::Groundward],
             // A payload produces on the one stream, asked or not, so there is
             // nothing to take turns with.
             (Program::Pl(_), _) | (Program::AllPl(_), _) => {
@@ -1439,8 +1441,9 @@ impl Port for AppPort {
     ///
     /// The stream travels with the bytes because this is the node that needs
     /// it to: an `app_all_veh` writes payload data on the one interface and
-    /// MOC data on the other, and delivering a reading down the links leaving
-    /// its `moc-out` would send telemetry out as a command. See [`Taken`].
+    /// gateway data on the other, and delivering a reading down the links
+    /// leaving its `gateway-out` would send telemetry out as a command. See
+    /// [`Taken`].
     ///
     /// A packet of no bytes is read and goes no further. The interfaces carry
     /// one -- an app with nothing to say and an app that has said something
@@ -1502,13 +1505,13 @@ impl Port for AppPort {
             (Program::Payload(app), Some(Stream::Groundward) | None) => {
                 app.give_payload_data(data)
             }
-            (Program::Moc(app), Some(Stream::Vehicleward) | None) => {
-                app.give_moc_data(data)
+            (Program::Gateway(app), Some(Stream::Vehicleward) | None) => {
+                app.give_gateway_data(data)
             }
             // What asks a payload that is a program for a reading, which is
             // the datum itself: see `crate::node::payload::app_all_pl`.
             (Program::AllPl(app), Some(Stream::Vehicleward) | None) => {
-                app.give_moc_data(data)
+                app.give_gateway_data(data)
             }
             // And the kind nothing asks. It has no data sink at all, so
             // `Graph::check` refuses the link that would bring this about --
@@ -1525,7 +1528,7 @@ impl Port for AppPort {
                 app.give_payload_data(data)
             }
             (Program::All(app), Some(Stream::Vehicleward)) => {
-                app.give_moc_data(data)
+                app.give_gateway_data(data)
             }
             // A node with two ways in, and a link that does not say which.
             // `Graph::check` refuses that as a `BadTerminal`, so this is the
@@ -1862,9 +1865,9 @@ mod tests {
             .map(|(a, v)| (a.to_string(), tcslibgs::Scalar::of(v)))
             .collect(),
         };
-        let moc = Node {
-            name: "moc".to_string(),
-            node_type: "moc".to_string(),
+        let gateway = Node {
+            name: "gateway".to_string(),
+            node_type: "gateway_radio".to_string(),
             group: None,
             attributes: Default::default(),
         };
@@ -1872,10 +1875,10 @@ mod tests {
             description: None,
             tcspecial: None,
             groups: Vec::new(),
-            nodes: vec![gps.clone(), moc],
+            nodes: vec![gps.clone(), gateway],
             links: vec![Link {
                 from: "gps".to_string(),
-                to: Destinations::of(vec!["moc".to_string()]),
+                to: Destinations::of(vec!["gateway".to_string()]),
                 comment: None,
             }],
             commands: Vec::new(),
@@ -1927,7 +1930,7 @@ mod tests {
         // which is the binding and not a link -- see the commanded case
         // below. Nothing is delivered to it: what is drawn into it goes to
         // each source's own link to its ground_base.
-        assert_eq!(Use::of(&routes, "moc"), Ok(Use::Read));
+        assert_eq!(Use::of(&routes, "gateway"), Ok(Use::Read));
         // A log takes and produces nothing of its own.
         assert_eq!(Use::of(&routes, "housekeeping"), Ok(Use::Driven));
 
@@ -1936,12 +1939,12 @@ mod tests {
         assert!(Use::Both.accepts() && Use::Both.produces());
     }
 
-    /// A MOC link commands arrive on is read, though no link leaves it.
+    /// A gateway link commands arrive on is read, though no link leaves it.
     ///
     /// The case a table of links alone gets wrong. A command sets an
     /// attribute rather than travelling a link, so the only statement that
     /// anything arrives from the ground is the `commands` section -- and a
-    /// MOC link judged by its links would be opened as something only
+    /// gateway link judged by its links would be opened as something only
     /// written, with the setpoint never arriving and nothing saying so.
     #[test]
     fn a_commanded_ground_link_is_read_as_well() {
@@ -1965,15 +1968,15 @@ mod tests {
             nodes: vec![
                 node("sensor", "i2c"),
                 node("thermostat", "compute"),
-                node("moc", "moc"),
+                node("gateway", "gateway_radio"),
             ],
             links: vec![Link {
                 from: "sensor".to_string(),
-                to: Destinations::of(vec!["moc".to_string()]),
+                to: Destinations::of(vec!["gateway".to_string()]),
                 comment: None,
             }],
             commands: vec![CommandBinding {
-                from: "moc".to_string(),
+                from: "gateway".to_string(),
                 sets: "thermostat.setpoint".to_string(),
             }],
             files: Vec::new(),
@@ -1984,13 +1987,13 @@ mod tests {
         let routes = Routes::of(&graph);
 
         assert_eq!(
-            Use::of(&routes, "moc"),
+            Use::of(&routes, "gateway"),
             Ok(Use::Both),
             "a commanded ground link is read as well as written"
         );
         // And what the command sets, which is how the fabric will find the
         // thermostat's setpoint.
-        let commanded = routes.commands_on("moc");
+        let commanded = routes.commands_on("gateway");
         assert_eq!(commanded.len(), 1);
         assert_eq!(commanded[0].node, "thermostat");
         assert_eq!(commanded[0].attribute, "setpoint");
@@ -2066,7 +2069,7 @@ mod tests {
     /// would have the fabric count a truncated datum as delivered.
     #[test]
     fn a_part_written_datum_is_refused() {
-        let (script, mut port) = port("moc", Use::Both);
+        let (script, mut port) = port("gateway", Use::Both);
         script.lock().expect("the script").write_answers = vec![Ok(3)];
 
         let said = port
@@ -2082,7 +2085,7 @@ mod tests {
     /// A write that moved nothing is a failure and not a success.
     #[test]
     fn a_write_of_nothing_is_a_failure() {
-        let (script, mut port) = port("moc", Use::Both);
+        let (script, mut port) = port("gateway", Use::Both);
         script.lock().expect("the script").write_answers = vec![Ok(0)];
 
         let said = port
@@ -2837,7 +2840,7 @@ mod tests {
     /// device has data, which a write to it does not change.
     #[test]
     fn an_endpoint_is_never_ready_as_a_consequence_of_a_delivery() {
-        let (script, mut port) = port("moc", Use::Both);
+        let (script, mut port) = port("gateway", Use::Both);
         script.lock().expect("the script").to_read =
             vec![Ok(b"293.15".to_vec())];
 
@@ -3042,9 +3045,9 @@ mod tests {
         ///
         /// `cat` with its descriptors arranged for the kind of app it is
         /// standing in for: the real apps are the `app_payload_veh`,
-        /// `app_moc_veh` and `app_all_veh` crates, which have tests of their
-        /// own. What is tested here is this port and the fabric's streams, and
-        /// five lines of shell keep that test about those.
+        /// `app_gateway_veh` and `app_all_veh` crates, which have tests of
+        /// their own. What is tested here is this port and the fabric's
+        /// streams, and five lines of shell keep that test about those.
         ///
         /// # Arguments
         ///
@@ -3110,9 +3113,9 @@ mod tests {
                     tcslibgs::Scalar::of("--readings"),
                 );
             }
-            if kind.handles_moc_data() {
+            if kind.handles_gateway_data() {
                 attributes.insert(
-                    "app-moc-arg".to_string(),
+                    "app-gateway-arg".to_string(),
                     tcslibgs::Scalar::of("--commands"),
                 );
             }
@@ -3163,7 +3166,7 @@ mod tests {
         fn what_an_app_payload_veh_answers_is_vehicleward() {
             let where_ = tempfile::tempdir().expect("a directory");
             // Reads payload data at descriptor 0 and writes what it read back
-            // to the same descriptor, which is MOC data there.
+            // to the same descriptor, which is gateway data there.
             let program = stands_in(where_.path(), ">&0");
             let mut port = crate::when_not_busy(|| {
                 AppPort::open(&node("fore", "app_payload_veh", &program))
@@ -3229,9 +3232,9 @@ mod tests {
         /// A payload that is a program produces on the groundward stream.
         ///
         /// Asked for a reading and answering with one, which is what every
-        /// payload does: what tells this from an `app_moc_veh` is the section
-        /// of the file it is written in, and the fabric asks nothing about
-        /// that.
+        /// payload does: what tells this from an `app_gateway_veh` is the
+        /// section of the file it is written in, and the fabric asks nothing
+        /// about that.
         #[test]
         fn what_an_app_all_pl_answers_is_groundward() {
             let where_ = tempfile::tempdir().expect("a directory");

@@ -188,9 +188,9 @@ mod tests {
 
         // And a node of the top diagram is plain from anywhere, there being no
         // file name to qualify it with.
-        let top = Qualified::of("moc", &None);
-        assert_eq!(top.written_from(&None), "moc");
-        assert_eq!(top.written_from(&Some("cabin".to_string())), "moc");
+        let top = Qualified::of("gateway", &None);
+        assert_eq!(top.written_from(&None), "gateway");
+        assert_eq!(top.written_from(&Some("cabin".to_string())), "gateway");
     }
 
     /// Reading a name back gives what was written.
@@ -198,7 +198,7 @@ mod tests {
     fn a_qualified_name_reads_back_as_itself() {
         for (text, in_, node) in [
             ("cabin/temp_1", Some("cabin"), "temp_1"),
-            ("moc", None, "moc"),
+            ("gateway", None, "gateway"),
         ] {
             let read = Qualified::parse(text);
             assert_eq!(read.in_.as_deref(), in_, "{text}");

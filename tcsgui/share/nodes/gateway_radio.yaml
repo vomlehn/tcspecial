@@ -3,18 +3,18 @@
 #
 # Every payload aboard reports to one of these: the telemetry arrives at its
 # payload-in, told apart by the payload id its socket carries, and what the
-# ground sends leaves by its moc-out. It is at the root of this tree rather
+# ground sends leaves by its gateway-out. It is at the root of this tree rather
 # than in a family of its own because it has no Rust of its own: a ground
 # link is served by the network payload code,
 # tcspecial/src/node/payload/network/.
-node: moc
-type: moc
+node: gateway_radio
+type: gateway_radio
 about: >
   The ground station: the other end of the link, and not the vehicle.
 payload-sink: true
 payload-source: false
-moc-sink: false
-moc-source: true
+gateway-sink: false
+gateway-source: true
 attributes:
   - name: ground_base
     required: true

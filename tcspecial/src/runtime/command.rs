@@ -1575,9 +1575,10 @@ mod tests {
         let path = where_.path().join("ping.yaml");
         std::fs::write(
             &path,
-            "moc:\n\
-             \x20 - { name: ground, type: moc, address: 127.0.0.1, port: \
-             \"5000\", ground_base: \"127.0.0.1:5100\", moc-out: pinger }\n\
+            "gateway:\n\
+             \x20 - { name: ground, type: gateway_radio, address: 127.0.0.1, \
+             port: \"5000\", ground_base: \"127.0.0.1:5100\", \
+             gateway-out: pinger }\n\
              vehicle:\n\
              \x20 - { name: pinger, type: ping, payload-out: ground }\n",
         )

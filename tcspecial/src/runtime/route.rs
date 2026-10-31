@@ -13,8 +13,8 @@
 //! says so by name rather than by order.
 //!
 //! And the links to the ground, which are where what goes to the ground is
-//! actually delivered. A line drawn into a `moc` node is delivered to that
-//! source's own link to the `moc` node's `ground_base`, at the port plus the
+//! actually delivered. A line drawn into a gateway node is delivered to that
+//! source's own link to the gateway node's `ground_base`, at the port plus the
 //! source's device id; and a payload nothing touches is delivered to its link
 //! over the `tcspecial` section's `payload_telemetry`. They are in the same
 //! table because they are the same question -- where does this reading go --
@@ -48,7 +48,7 @@ pub struct Delivery {
     /// Which of that node's inputs, where it names them.
     ///
     /// `None` is a node that takes one input and does not name it, which is
-    /// most of them: a device, a MOC link, a log.
+    /// most of them: a device, a gateway link, a log.
     pub input: Option<String>,
     /// Which of the two streams this link carries.
     ///
@@ -142,12 +142,12 @@ pub struct Routes {
     /// computes a mean has to be told that its three inputs are bound before
     /// it starts, and has to know which arrival is `in0`.
     sources: BTreeMap<(String, String), String>,
-    /// What a command arriving on each MOC link sets, by the link's name.
+    /// What a command arriving on each gateway link sets, by the link's name.
     ///
     /// Kept here with the links because it is the same question in the same
     /// table: where does what arrives at this node go. A command is not a
     /// datum on a link -- it sets an attribute rather than being passed on --
-    /// but a MOC link that commands arrive on is a node something is read
+    /// but a gateway link that commands arrive on is a node something is read
     /// from, and nothing else in the configuration says so. A thermostat
     /// whose setpoint comes from the ground has a `commands` entry and no
     /// link out of the ground at all.
@@ -176,10 +176,10 @@ impl Routes {
     /// # Returns
     ///
     /// The table: each node's deliveries, the node filling each named
-    /// input, what the commands on each MOC link set, and the links to the
+    /// input, what the commands on each gateway link set, and the links to the
     /// ground.
     pub fn of(graph: &Graph) -> Routes {
-        // The links to the ground first, because a line into a moc node is
+        // The links to the ground first, because a line into a gateway node is
         // delivered to one of them. A configuration whose links to the ground
         // do not work out gives none: `Graph::check` refuses it, saying why,
         // and this is the table for a checked graph.
@@ -191,8 +191,8 @@ impl Routes {
             .ground_links
             .iter()
             .filter_map(|link| match &link.via {
-                Via::Moc(moc) => Some((
-                    (link.source.clone(), moc.clone()),
+                Via::Gateway(gateway) => Some((
+                    (link.source.clone(), gateway.clone()),
                     link.name.clone(),
                 )),
                 Via::PayloadTelemetry => None,
@@ -222,7 +222,7 @@ impl Routes {
                     tcslibgs::graph::terminals::stream_of(named).is_none()
                 });
 
-                // A line into a moc node goes to this source's own link to
+                // A line into a gateway node goes to this source's own link to
                 // that node's ground_base.
                 let to = to_the_ground
                     .get(&(from.clone(), node.clone()))
@@ -354,8 +354,8 @@ impl Routes {
 
     /// What a command arriving on this node sets.
     ///
-    /// Empty for every node but a MOC link, and for a MOC link that nothing
-    /// is commanded through.
+    /// Empty for every node but a gateway link, and for a gateway link that
+    /// nothing is commanded through.
     pub fn commands_on(&self, node: &str) -> &[Commanded] {
         self.commands.get(node).map_or(&[], Vec::as_slice)
     }
@@ -428,11 +428,11 @@ mod tests {
             "the T should deliver three ways: {from_k_fore:?}"
         );
 
-        // The one to the ground goes to k_1's own link to the moc node's
-        // ground_base: see `a_line_into_a_moc_node_goes_to_its_own_link`.
+        // The one to the ground goes to k_1's own link to the gateway node's
+        // ground_base: see `a_line_into_a_gateway_node_goes_to_its_own_link`.
         let places: Vec<&str> =
             from_k_fore.iter().map(|d| d.to.as_str()).collect();
-        assert!(places.contains(&"k_1 to moc"), "{places:?}");
+        assert!(places.contains(&"k_1 to gateway"), "{places:?}");
         assert!(places.contains(&"cabin_temp"), "{places:?}");
         assert!(places.contains(&"housekeeping"), "{places:?}");
 
@@ -443,8 +443,10 @@ mod tests {
             .find(|d| d.to == "cabin_temp")
             .expect("a delivery into the mean");
         assert_eq!(into_mean.input.as_deref(), Some("in0"));
-        let payload_out =
-            from_k_fore.iter().find(|d| d.to == "k_1 to moc").unwrap();
+        let payload_out = from_k_fore
+            .iter()
+            .find(|d| d.to == "k_1 to gateway")
+            .unwrap();
         assert_eq!(payload_out.input, None);
     }
 
@@ -477,7 +479,7 @@ mod tests {
             groups: Vec::new(),
             nodes: vec![
                 node("a", "i2c"),
-                node("c", "moc"),
+                node("c", "gateway_radio"),
                 node("m", "compute"),
             ],
             links: vec![tcslibgs::graph::Link {
@@ -638,28 +640,28 @@ mod tests {
         assert_eq!(linked, vec!["temp_2"]);
     }
 
-    /// A line into a moc node goes to the source's own link to the ground,
-    /// at the moc node's ground_base plus the source's device id -- and
-    /// nothing is delivered to the moc node itself, which only receives.
+    /// A line into a gateway node goes to the source's own link to the ground,
+    /// at the gateway node's ground_base plus the source's device id -- and
+    /// nothing is delivered to the gateway node itself, which only receives.
     #[test]
-    fn a_line_into_a_moc_node_goes_to_its_own_link() {
+    fn a_line_into_a_gateway_node_goes_to_its_own_link() {
         let routes = Routes::of(&thermostat());
-        assert!(routes.arriving_at("moc").is_empty());
+        assert!(routes.arriving_at("gateway").is_empty());
 
         let mean: Vec<&str> = routes
             .from("cabin_temp")
             .iter()
             .map(|d| d.to.as_str())
             .collect();
-        assert!(mean.contains(&"cabin_temp to moc"), "{mean:?}");
+        assert!(mean.contains(&"cabin_temp to gateway"), "{mean:?}");
 
         let link = routes
             .ground_links()
             .iter()
-            .find(|l| l.name == "cabin_temp to moc")
+            .find(|l| l.name == "cabin_temp to gateway")
             .expect("cabin_temp's link to the ground");
-        assert_eq!(link.via, Via::Moc("moc".to_string()));
-        // The thermostat's mean is its fifth node, id 4, and its moc node's
+        assert_eq!(link.via, Via::Gateway("gateway".to_string()));
+        // The thermostat's mean is its fifth node, id 4, and its gateway node's
         // ground_base is 10.0.0.2:5100.
         assert_eq!(
             (link.ground.address.as_str(), link.ground.port),

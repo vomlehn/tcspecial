@@ -26,17 +26,17 @@ tcspecial:
     recv: "0.0.0.0:4000"
     send: "127.0.0.1:4100"
 
-moc:
+gateway:
   # The ground's end of the vehicle's data. tcspecial sends
   # what each node drawn into it produces as UDP datagrams to
   # ground_base's address, at its port plus that node's
   # device id: lorem is id 1, so its words go to 127.0.0.1:5101. Ground
   # software gets them from this node with a function call,
-  # tcslib::moc::Moc::receive: run `lorem_moc` to be that ground. It
-  # states no address or port of its own, because nothing comes back
+  # tcslib::gateway::GatewayReceiver::receive: run `lorem_gateway` to be that
+  # ground. It states no address or port of its own, because nothing comes back
   # up.
-  - name: moc-1
-    type: moc
+  - name: gateway-1
+    type: gateway_radio
     ground_base: "127.0.0.1:5100"
     payload-in: true
 
@@ -54,9 +54,9 @@ payloads:
     app-payload-arg: "1"
     executable: "examples/simple-app/lorem_pl.py"
     payload-out:
-      - target: moc-1
+      - target: gateway-1
 
 tcsgui:
   nodes:
-    - { name: moc-1, x: 790, y: 129 }
+    - { name: gateway-1, x: 790, y: 129 }
     - { name: lorem, x: 15, y: 204 }

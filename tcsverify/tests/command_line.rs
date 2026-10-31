@@ -271,13 +271,13 @@ tcspecial:
   tcs_cmd:
     recv: \"0.0.0.0:4000\"
     send: \"127.0.0.1:4100\"
-moc:
+gateway:
   - name: ground
-    type: moc
+    type: gateway_radio
     address: \"127.0.0.1\"
     port: \"5000\"
     ground_base: \"127.0.0.1:5100\"
-    moc-out:
+    gateway-out:
       - target: pinger
 vehicle:
   - name: pinger

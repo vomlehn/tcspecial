@@ -15,7 +15,7 @@ HERE = Path(__file__).resolve().parent
 sys.path.insert(0, str(HERE.parents[1] / "python"))
 sys.path.insert(0, str(HERE))
 
-import ping_moc  # noqa: E402
+import ping_gateway  # noqa: E402
 
 
 def alive(pid):
@@ -40,7 +40,7 @@ def alive(pid):
 
 class VehicleTest(unittest.TestCase):
     def test_it_is_started_and_killed(self):
-        vehicle = ping_moc.Vehicle("sleep", ["1000"])
+        vehicle = ping_gateway.Vehicle("sleep", ["1000"])
         vehicle.start()
         pid = vehicle.process.pid
         self.assertTrue(alive(pid))
@@ -62,8 +62,8 @@ class VehicleTest(unittest.TestCase):
                 sys.executable,
                 "-c",
                 "import sys, time; sys.path[:0] = sys.argv[1:3]; "
-                "import ping_moc; "
-                "v = ping_moc.Vehicle('sleep', ['1000']); v.start(); "
+                "import ping_gateway; "
+                "v = ping_gateway.Vehicle('sleep', ['1000']); v.start(); "
                 "print(v.process.pid, flush=True); time.sleep(1000)",
                 str(HERE),
                 str(HERE.parents[1] / "python"),
@@ -82,13 +82,13 @@ class VehicleTest(unittest.TestCase):
         self.assertFalse(alive(pid), "the vehicle outlived its ground station")
 
     def test_a_vehicle_nobody_built_is_said_so(self):
-        original = ping_moc.find_built
-        ping_moc.find_built = lambda program: None
+        original = ping_gateway.find_built
+        ping_gateway.find_built = lambda program: None
         try:
             with self.assertRaises(ValueError) as said:
-                ping_moc.Vehicle.for_configuration("ping.xml")
+                ping_gateway.Vehicle.for_configuration("ping.xml")
         finally:
-            ping_moc.find_built = original
+            ping_gateway.find_built = original
         self.assertIn("cargo build --bin tcspecial", str(said.exception))
         self.assertIn("--no-vehicle", str(said.exception))
 
@@ -100,19 +100,19 @@ class VerboseTest(unittest.TestCase):
         import io
 
         for flag in ["-v", "--verbose"]:
-            self.assertTrue(ping_moc.arguments([flag]).verbose, flag)
-        self.assertFalse(ping_moc.arguments([]).verbose)
+            self.assertTrue(ping_gateway.arguments([flag]).verbose, flag)
+        self.assertFalse(ping_gateway.arguments([]).verbose)
 
-        was = ping_moc.VERBOSE
+        was = ping_gateway.VERBOSE
         try:
             for verbose, expected in [(False, ""), (True, "listening\n")]:
-                ping_moc.VERBOSE = verbose
+                ping_gateway.VERBOSE = verbose
                 said = io.StringIO()
                 with contextlib.redirect_stderr(said):
-                    ping_moc.status("listening")
+                    ping_gateway.status("listening")
                 self.assertEqual(said.getvalue(), expected)
         finally:
-            ping_moc.VERBOSE = was
+            ping_gateway.VERBOSE = was
 
 
 class SpellingTest(unittest.TestCase):
@@ -120,15 +120,19 @@ class SpellingTest(unittest.TestCase):
         import contextlib
         import io
 
-        stem = str(ping_moc.STEM)
-        self.assertEqual(ping_moc.arguments([]).configuration, stem + ".xml")
+        stem = str(ping_gateway.STEM)
         self.assertEqual(
-            ping_moc.arguments(["--xml"]).configuration, stem + ".xml"
+            ping_gateway.arguments([]).configuration, stem + ".xml"
         )
         self.assertEqual(
-            ping_moc.arguments(["--yaml"]).configuration, stem + ".yaml"
+            ping_gateway.arguments(["--xml"]).configuration, stem + ".xml"
         )
-        self.assertEqual(ping_moc.arguments(["a.yaml"]).configuration, "a.yaml")
+        self.assertEqual(
+            ping_gateway.arguments(["--yaml"]).configuration, stem + ".yaml"
+        )
+        self.assertEqual(
+            ping_gateway.arguments(["a.yaml"]).configuration, "a.yaml"
+        )
         for refused in (
             ["--yaml", "--xml"],
             ["--yaml", "a.xml"],
@@ -137,7 +141,7 @@ class SpellingTest(unittest.TestCase):
             with contextlib.redirect_stderr(io.StringIO()), self.assertRaises(
                 SystemExit, msg=refused
             ):
-                ping_moc.arguments(refused)
+                ping_gateway.arguments(refused)
 
 if __name__ == "__main__":
     unittest.main()

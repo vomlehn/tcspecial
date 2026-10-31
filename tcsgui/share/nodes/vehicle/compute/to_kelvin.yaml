@@ -6,8 +6,8 @@ sets:
   function: to_kelvin
 payload-sink: true
 payload-source: true
-moc-sink: true
-moc-source: true
+gateway-sink: true
+gateway-source: true
 attributes:
   - name: format
     required: true

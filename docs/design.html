@@ -772,15 +772,17 @@ real
 hardware arrives on. Each is what used to be called a payload endpoint, and
 the attributes are unchanged: a bus and an address, a chip and a set of
 lines, a path.</p>
-<p><em>MOC links</em> -- <tt class="docutils literal">moc</tt> -- a network link carrying telemetry to the ground
-and commands back. This is what the OC endpoint was.</p>
+<p><em>gateway links</em> -- <tt class="docutils literal">gateway_radio</tt> and <tt class="docutils literal">gateway_fprime</tt> -- a network
+link carrying telemetry to the ground and commands back. This is what the OC
+endpoint was.</p>
 <p><em>compute elements</em> -- <tt class="docutils literal">compute</tt> -- software that transforms what arrives.</p>
 <p><em>sinks</em> -- <tt class="docutils literal">log</tt> -- somewhere data is kept rather than passed on. See
 <a class="reference internal" href="#the-logging-node">The logging node</a>.</p>
-<p><em>generic vehicle nodes</em> -- <tt class="docutils literal"><span class="pre">null-moc</span></tt>, <tt class="docutils literal"><span class="pre">null-payload</span></tt>, <tt class="docutils literal"><span class="pre">tee-moc</span></tt>,
-<tt class="docutils literal"><span class="pre">tee-payload</span></tt> -- nodes that do nothing to what passes. Each takes one
-stream: a null node drops it, and a tee sends each datum on both ways, on
-its own stream and again on the other. See <a class="reference internal" href="#null-nodes-and-tees">Null nodes and tees</a>.</p>
+<p><em>generic vehicle nodes</em> -- <tt class="docutils literal"><span class="pre">null-gateway</span></tt>, <tt class="docutils literal"><span class="pre">null-payload</span></tt>,
+<tt class="docutils literal"><span class="pre">tee-gateway</span></tt>, <tt class="docutils literal"><span class="pre">tee-payload</span></tt> -- nodes that do nothing to what passes.
+Each takes one stream: a null node drops it, and a tee sends each datum on
+both ways, on its own stream and again on the other. See <a class="reference internal" href="#null-nodes-and-tees">Null nodes and
+tees</a>.</p>
 <p class="last"><em>link checks</em> -- <tt class="docutils literal">ping</tt> -- a node that answers each ping the ground sends
 it with the vehicle's time. See <a class="reference internal" href="#the-ping-node">The ping node</a>.</p>
 </dd>
@@ -804,7 +806,7 @@ test, configure and get wrong for no gain.</p>
 <p>Within one stream, that is. A link carries one stream and may not carry it
 into the other, so a copy that has to cross -- what the ground sent, back
 to the ground as payload data; a reading, to something that takes the
-ground's data -- is what the <tt class="docutils literal"><span class="pre">tee-moc</span></tt> and <tt class="docutils literal"><span class="pre">tee-payload</span></tt> nodes are
+ground's data -- is what the <tt class="docutils literal"><span class="pre">tee-gateway</span></tt> and <tt class="docutils literal"><span class="pre">tee-payload</span></tt> nodes are
 for. The crossing is a node, drawn and named, rather than a link that
 could be drawn backwards by mistake: see <a class="reference internal" href="#terminals-where-a-link-is-attached">Terminals: where a link is
 attached</a>.</p>
@@ -819,7 +821,7 @@ the data source it leaves by, with one entry per line:</p>
   </span><span class="name tag">type</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">compute</span><span class="whitespace">
   </span><span class="name tag">function</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal string">&quot;to_kelvin&quot;</span><span class="whitespace">
   </span><span class="name tag">payload-out</span><span class="punctuation">:</span><span class="whitespace">
-    </span><span class="punctuation indicator">-</span><span class="whitespace"> </span><span class="name tag">target</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">moc</span><span class="whitespace">
+    </span><span class="punctuation indicator">-</span><span class="whitespace"> </span><span class="name tag">target</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">gateway</span><span class="whitespace">
     </span><span class="punctuation indicator">-</span><span class="whitespace"> </span><span class="name tag">target</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">mean_temp</span><span class="whitespace">
       </span><span class="name tag">input</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">in0</span><span class="whitespace">
     </span><span class="punctuation indicator">-</span><span class="whitespace"> </span><span class="name tag">target</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">housekeeping</span>
@@ -829,14 +831,14 @@ which of that node's inputs it feeds, where it feeds a named one. One entry
 per line is what makes several of them safe: the alternative was two lists
 read against each other, and a list one name short is a configuration that
 reads as valid and delivers a reading to somebody else's input. A word an
-entry does not know is refused rather than ignored, because <tt class="docutils literal">targte: moc</tt>
-quietly ignored is a line that goes nowhere.</p>
-<p>The short spelling is still read -- <tt class="docutils literal"><span class="pre">payload-out:</span> moc</tt>, or <tt class="docutils literal"><span class="pre">payload-out:</span> [moc,
-mean_temp.in0]</tt>, the node and its input separated by a dot. Every
-configuration written before entries existed says what it said, and a link
-to one place is still a line somebody can write in a line. All of them read
-into the same thing, because every rule about a link is about where it goes
-and not about how the file said so.</p>
+entry does not know is refused rather than ignored, because <tt class="docutils literal">targte:
+gateway</tt> quietly ignored is a line that goes nowhere.</p>
+<p>The short spelling is still read -- <tt class="docutils literal"><span class="pre">payload-out:</span> gateway</tt>, or
+<tt class="docutils literal"><span class="pre">payload-out:</span> [gateway, mean_temp.in0]</tt>, the node and its input separated
+by a dot. Every configuration written before entries existed says what it
+said, and a link to one place is still a line somebody can write in a line.
+All of them read into the same thing, because every rule about a link is
+about where it goes and not about how the file said so.</p>
 <p>So there is no links section. A node and the links out of it are read,
 written and deleted together, which is where a reader of the file wants
 them: a list at the bottom has to be read against the nodes to make sense
@@ -851,7 +853,7 @@ at:</p>
   </span><span class="name tag">function</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal string">&quot;mean&quot;</span><span class="whitespace">
   </span><span class="name tag">inputs</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal string">&quot;in0,in1,in2&quot;</span><span class="whitespace">
   </span><span class="name tag">payload-out</span><span class="punctuation">:</span><span class="whitespace">
-    </span><span class="punctuation indicator">-</span><span class="whitespace"> </span><span class="name tag">target</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">moc</span><span class="whitespace">
+    </span><span class="punctuation indicator">-</span><span class="whitespace"> </span><span class="name tag">target</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">gateway</span><span class="whitespace">
     </span><span class="punctuation indicator">-</span><span class="whitespace"> </span><span class="name tag">target</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">thermostat</span><span class="whitespace">
   </span><span class="name tag">payload-in</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">true</span>
 </pre>
@@ -902,7 +904,7 @@ rather than being whatever the compute element happens to accept.</dd>
 <p>A configuration's nodes are written in three sections, and they are the three
 working panes of the editor:</p>
 <dl class="docutils">
-<dt><tt class="docutils literal">moc</tt></dt>
+<dt><tt class="docutils literal">gateway</tt></dt>
 <dd>the ground links: the other end of the link, which is not the vehicle at
 all.</dd>
 <dt><tt class="docutils literal">vehicle</tt></dt>
@@ -937,7 +939,7 @@ languages, so a reader who has learned one has learned the other.</p>
 <p>A link joins one node's <strong>data source</strong> to another's <strong>data sink</strong>. Each end
 has a name, and the name says two things about the data and nothing about what
 is at the other end: whose it is, and whether it arrives here or leaves.
-<tt class="docutils literal">payload-</tt> is a payload's own data, on its way to the ground; <tt class="docutils literal">moc-</tt> is
+<tt class="docutils literal">payload-</tt> is a payload's own data, on its way to the ground; <tt class="docutils literal">gateway-</tt> is
 what the ground sends, on its way to a payload. <tt class="docutils literal"><span class="pre">-in</span></tt> is where it arrives and
 <tt class="docutils literal"><span class="pre">-out</span></tt> is where it leaves -- so <strong>every ``-out`` is a data source and every
 ``-in`` a data sink</strong>, which is the whole of the rule a reader has to remember.
@@ -963,8 +965,8 @@ There are four:</p>
 <td>a payload's readings, on their way to the ground</td>
 </tr>
 <tr><td>vehicleward</td>
-<td><tt class="docutils literal"><span class="pre">moc-out</span></tt></td>
-<td><tt class="docutils literal"><span class="pre">moc-in</span></tt></td>
+<td><tt class="docutils literal"><span class="pre">gateway-out</span></tt></td>
+<td><tt class="docutils literal"><span class="pre">gateway-in</span></tt></td>
 <td>what the ground sends back: a command, a trigger, a setpoint</td>
 </tr>
 </tbody>
@@ -973,36 +975,36 @@ There are four:</p>
 <tt class="docutils literal"><span class="pre">payload-in</span></tt> where it arrives at the next -- and the two words are a sentence
 about the same bytes read from either end. The names say nothing about the type
 at the far end: with no vehicle node in the way, a payload's <tt class="docutils literal"><span class="pre">payload-out</span></tt>
-connects to a MOC link's <tt class="docutils literal"><span class="pre">payload-in</span></tt>, and with one it connects to that
+connects to a gateway link's <tt class="docutils literal"><span class="pre">payload-in</span></tt>, and with one it connects to that
 node's <tt class="docutils literal"><span class="pre">payload-in</span></tt> instead and the node's own <tt class="docutils literal"><span class="pre">payload-out</span></tt> carries it the
 rest of the way.</p>
 <p>A link end is written <tt class="docutils literal">node.terminal</tt>, and may be written as <tt class="docutils literal">node</tt> alone
 wherever the type has one terminal of the kind the end needs: <tt class="docutils literal">{ from:
-temp_fore, to: moc }</tt> is unambiguous, because a payload has one data source
-and a MOC link has one data sink. A type with two of either has to be told
+temp_fore, to: gateway }</tt> is unambiguous, because a payload has one data source
+and a gateway link has one data sink. A type with two of either has to be told
 which, which is why the links out of a tee name their terminals.</p>
 <p>Which types have which:</p>
 <dl class="docutils">
 <dt>payloads</dt>
-<dd><tt class="docutils literal"><span class="pre">moc-in</span></tt> and <tt class="docutils literal"><span class="pre">payload-out</span></tt>. A payload receives what asks it for a reading
--- a trigger, a command, a byte written to a line -- and sends what it
-read.</dd>
-<dt>MOC links</dt>
-<dd><tt class="docutils literal"><span class="pre">payload-in</span></tt> and <tt class="docutils literal"><span class="pre">moc-out</span></tt>. The ground is the other end of both.</dd>
-<dt><tt class="docutils literal"><span class="pre">null-moc</span></tt></dt>
-<dd><tt class="docutils literal"><span class="pre">moc-in</span></tt> alone: what the ground sends arrives, and nothing leaves.</dd>
+<dd><tt class="docutils literal"><span class="pre">gateway-in</span></tt> and <tt class="docutils literal"><span class="pre">payload-out</span></tt>. A payload receives what asks it for a
+reading -- a trigger, a command, a byte written to a line -- and sends what
+it read.</dd>
+<dt>gateway links</dt>
+<dd><tt class="docutils literal"><span class="pre">payload-in</span></tt> and <tt class="docutils literal"><span class="pre">gateway-out</span></tt>. The ground is the other end of both.</dd>
+<dt><tt class="docutils literal"><span class="pre">null-gateway</span></tt></dt>
+<dd><tt class="docutils literal"><span class="pre">gateway-in</span></tt> alone: what the ground sends arrives, and nothing leaves.</dd>
 <dt><tt class="docutils literal"><span class="pre">null-payload</span></tt></dt>
 <dd><tt class="docutils literal"><span class="pre">payload-in</span></tt> alone: a payload's data arrives, and nothing leaves.</dd>
-<dt><tt class="docutils literal"><span class="pre">tee-moc</span></tt></dt>
-<dd><tt class="docutils literal"><span class="pre">moc-in</span></tt>, and both sources, <tt class="docutils literal"><span class="pre">moc-out</span></tt> and <tt class="docutils literal"><span class="pre">payload-out</span></tt>: what the
-ground sends arrives, and leaves both ways.</dd>
+<dt><tt class="docutils literal"><span class="pre">tee-gateway</span></tt></dt>
+<dd><tt class="docutils literal"><span class="pre">gateway-in</span></tt>, and both sources, <tt class="docutils literal"><span class="pre">gateway-out</span></tt> and <tt class="docutils literal"><span class="pre">payload-out</span></tt>: what
+the ground sends arrives, and leaves both ways.</dd>
 <dt><tt class="docutils literal"><span class="pre">tee-payload</span></tt></dt>
-<dd><tt class="docutils literal"><span class="pre">payload-in</span></tt>, and both sources, <tt class="docutils literal"><span class="pre">payload-out</span></tt> and <tt class="docutils literal"><span class="pre">moc-out</span></tt>.</dd>
+<dd><tt class="docutils literal"><span class="pre">payload-in</span></tt>, and both sources, <tt class="docutils literal"><span class="pre">payload-out</span></tt> and <tt class="docutils literal"><span class="pre">gateway-out</span></tt>.</dd>
 <dt><tt class="docutils literal">app_all_veh</tt></dt>
 <dd>all four, a program with both interfaces: see <a class="reference internal" href="#app-nodes">App nodes</a>.</dd>
 <dt><tt class="docutils literal">ping</tt></dt>
-<dd><tt class="docutils literal"><span class="pre">moc-in</span></tt> and <tt class="docutils literal"><span class="pre">payload-out</span></tt>, a payload's pair: what the ground sends
-arrives, and the answer leaves groundward, to arrive at a MOC link.</dd>
+<dd><tt class="docutils literal"><span class="pre">gateway-in</span></tt> and <tt class="docutils literal"><span class="pre">payload-out</span></tt>, a payload's pair: what the ground sends
+arrives, and the answer leaves groundward, to arrive at a gateway link.</dd>
 </dl>
 <p>A computation's and a log's terminals are their own rules' business: a
 computation's data sinks are the inputs it declares, and a log's are whatever
@@ -1017,15 +1019,15 @@ whatever order they were sent, with nothing to say which was which.</dd>
 reading reaching the ground and an on-board computation at once is the
 ordinary case -- the arrangement drawn as a &quot;T&quot;.</dd>
 <dt>Requirement</dt>
-<dd>A MOC link's data sink takes as many sources as the configuration gives
+<dd>A gateway link's data sink takes as many sources as the configuration gives
 it. The exception to the rule above, and not one made to let the examples
 through: the ground is the one place that <em>can</em> tell interleaved streams
 apart, because each payload's telemetry arrives at its own socket --
 <tt class="docutils literal">payload_telemetry.source_base</tt> plus the payload's id -- and the id is
 what says whose a datagram is. Every payload aboard reporting to one
-<tt class="docutils literal">moc</tt> node is the ordinary shape of a configuration.</dd>
+gateway node is the ordinary shape of a configuration.</dd>
 <dt>Requirement</dt>
-<dd>A payload or a MOC link with no link on it at all is refused. Either a
+<dd>A payload or a gateway link with no link on it at all is refused. Either a
 sink or a source will do: a payload that is only read has a source and no
 sink, one that is only driven -- a heater, a valve, a latch -- has a sink
 and no source, and both are configurations somebody means. Neither is a
@@ -1033,10 +1035,10 @@ payload the configuration describes and nothing reads or drives.</dd>
 <dt>Requirement</dt>
 <dd><p class="first">Each terminal may be linked to one other terminal, and the pairing is four
 sentences: a <tt class="docutils literal"><span class="pre">payload-out</span></tt> only to a <tt class="docutils literal"><span class="pre">payload-in</span></tt>, a <tt class="docutils literal"><span class="pre">payload-in</span></tt> only
-to a <tt class="docutils literal"><span class="pre">payload-out</span></tt>, a <tt class="docutils literal"><span class="pre">moc-out</span></tt> only to a <tt class="docutils literal"><span class="pre">moc-in</span></tt>, a <tt class="docutils literal"><span class="pre">moc-in</span></tt>
-only to a <tt class="docutils literal"><span class="pre">moc-out</span></tt>. Which is one sentence twice over -- a stream
-leaves at one terminal and arrives at the other -- so the pairing is
-derived from the table above rather than written out again.</p>
+to a <tt class="docutils literal"><span class="pre">payload-out</span></tt>, a <tt class="docutils literal"><span class="pre">gateway-out</span></tt> only to a <tt class="docutils literal"><span class="pre">gateway-in</span></tt>, a
+<tt class="docutils literal"><span class="pre">gateway-in</span></tt> only to a <tt class="docutils literal"><span class="pre">gateway-out</span></tt>. Which is one sentence twice over
+-- a stream leaves at one terminal and arrives at the other -- so the
+pairing is derived from the table above rather than written out again.</p>
 <p class="last">The editor is held to it as a <em>gesture</em>: a line dragged from a terminal
 goes to the terminal that pairs with it and to no other, and a node with
 none takes nothing -- so a bad link cannot be drawn in the first place. The checking refuses a written-out configuration
@@ -1059,9 +1061,9 @@ wrong, which is worth saying in those words.</dd>
 <dt>Requirement</dt>
 <dd>A terminal is written into a file only where it says which. A node with one
 data source and one data sink needs neither name -- <tt class="docutils literal">{ from: temp_fore,
-to: moc }</tt> is unambiguous, and the schema reads an unnamed end as the only
-terminal of the kind that end needs -- so the editor writes a terminal only
-where the type has two of the kind, a tee's sources and an
+to: gateway }</tt> is unambiguous, and the schema reads an unnamed end as the
+only terminal of the kind that end needs -- so the editor writes a terminal
+only where the type has two of the kind, a tee's sources and an
 <tt class="docutils literal">app_all_veh</tt>'s four. A tool that wrote a name into every
 link of every file it saved would churn every configuration it opened for
 no gain.</dd>
@@ -1213,18 +1215,30 @@ is read and required; <tt class="docutils literal">radio</tt> and <tt class="doc
 configuration naming <tt class="docutils literal">cfs</tt> is refused as specified but not yet built --
 <tt class="docutils literal"><span class="pre">tcslibgs::gateway</span></tt> is the one place that says which kinds are built, which
 node type is which kind's, and what each calls its far end. The radio is the
-<tt class="docutils literal">moc</tt> node, under its old name; the F´ gateway is the <tt class="docutils literal">gateway_fprime</tt>
-node, opened, counted and driven as the radio's is, and <tt class="docutils literal">examples/fprime</tt>
-flies it. Not yet built: the bridge's F´ model generated from the
-configuration, and the <tt class="docutils literal">TcsBridge</tt> component itself.</p>
-<p>The gateway nodes are written in the <tt class="docutils literal">moc</tt> section, linked through
-<tt class="docutils literal"><span class="pre">moc-in</span></tt> and <tt class="docutils literal"><span class="pre">moc-out</span></tt>, with <tt class="docutils literal"><span class="pre">tee-moc</span></tt>, <tt class="docutils literal"><span class="pre">null-moc</span></tt> and <tt class="docutils literal">app_moc_veh</tt>
-beside them. The rename to <tt class="docutils literal">gateway</tt> changes configuration keys, so it is
-held back to land with the <tt class="docutils literal">payload</tt> rename, when the configuration schema
-is complete; until then a file says <tt class="docutils literal">moc</tt> wherever this section says
-<tt class="docutils literal">gateway</tt>, and the radio's node type is <tt class="docutils literal">moc</tt> where this section says
-<tt class="docutils literal">gateway_radio</tt>. The rest of this section is written in the names it will
-have, because it is the statement the code is to be built to.</p>
+<tt class="docutils literal">gateway_radio</tt> node; the F´ gateway is the <tt class="docutils literal">gateway_fprime</tt> node, opened,
+counted and driven as the radio's is, and <tt class="docutils literal">examples/fprime</tt> flies it. Not yet
+built: the bridge's F´ model generated from the configuration, and the
+<tt class="docutils literal">TcsBridge</tt> component itself.</p>
+<p>The gateway nodes are written in the <tt class="docutils literal">gateway</tt> section, linked through
+<tt class="docutils literal"><span class="pre">gateway-in</span></tt> and <tt class="docutils literal"><span class="pre">gateway-out</span></tt>, with <tt class="docutils literal"><span class="pre">tee-gateway</span></tt>, <tt class="docutils literal"><span class="pre">null-gateway</span></tt> and
+<tt class="docutils literal">app_gateway_veh</tt> beside them. Each of those was named for the MOC while the
+ground was the only thing a vehicle answered to: the section and the radio's
+node type were <tt class="docutils literal">moc</tt>, the links <tt class="docutils literal"><span class="pre">moc-in</span></tt> and <tt class="docutils literal"><span class="pre">moc-out</span></tt>, the others
+<tt class="docutils literal"><span class="pre">tee-moc</span></tt>, <tt class="docutils literal"><span class="pre">null-moc</span></tt> and <tt class="docutils literal">app_moc_veh</tt>, and an app's argument for the
+stream <tt class="docutils literal"><span class="pre">app-moc-arg</span></tt>. The rename was held back to land with the <tt class="docutils literal">payload</tt>
+rename and no longer is; the <tt class="docutils literal">payload</tt> rename still is, so <tt class="docutils literal">payloads:</tt>,
+<tt class="docutils literal"><span class="pre">payload-in</span></tt> and <tt class="docutils literal"><span class="pre">payload-out</span></tt> keep their names.</p>
+<dl class="docutils">
+<dt>Requirement</dt>
+<dd>A file that still writes one of the old words -- the <tt class="docutils literal">moc</tt> section, a
+node type <tt class="docutils literal">moc</tt>, <tt class="docutils literal"><span class="pre">tee-moc</span></tt>, <tt class="docutils literal"><span class="pre">null-moc</span></tt> or <tt class="docutils literal">app_moc_veh</tt>, a key
+<tt class="docutils literal"><span class="pre">moc-in</span></tt>, <tt class="docutils literal"><span class="pre">moc-out</span></tt> or <tt class="docutils literal"><span class="pre">app-moc-arg</span></tt> -- is refused as it is read,
+in either spelling, naming the file and the line and saying the word to
+write instead. Refused rather than read as the new word, because a reader
+that took both would leave every file free to say either for good, which
+is the one word for two things the rename was for. The list is
+<tt class="docutils literal"><span class="pre">tcslibgs::graph::renamed</span></tt>'s, and it is the one statement of it.</dd>
+</dl>
 <p>tcspecial was written to answer to the ground. What it does well -- reach a
 payload over any of the interfaces in <a class="reference internal" href="#payloads">Payloads</a> from a configuration
 alone, and check that configuration before it flies -- is what a flight
@@ -1251,7 +1265,7 @@ node, and there are three kinds of gateway:</p>
 <tbody valign="top">
 <tr><td><tt class="docutils literal">gateway_radio</tt></td>
 <td>the ground, through the vehicle's radio</td>
-<td>UDP, as the <tt class="docutils literal">moc</tt> node is today</td>
+<td>UDP</td>
 <td><tt class="docutils literal">address</tt>, <tt class="docutils literal">port</tt>, <tt class="docutils literal">ground_base</tt></td>
 </tr>
 <tr><td><tt class="docutils literal">gateway_cfs</tt></td>
@@ -1267,8 +1281,8 @@ UDP protocol module</td>
 </tr>
 </tbody>
 </table>
-<p>All three are in the <tt class="docutils literal">gateway</tt> section, and all three have the terminals a
-MOC link has today: <tt class="docutils literal"><span class="pre">payload-in</span></tt>, which takes as many sources as the
+<p>All three are in the <tt class="docutils literal">gateway</tt> section, and all three have the terminals
+the radio's has: <tt class="docutils literal"><span class="pre">payload-in</span></tt>, which takes as many sources as the
 configuration gives it, and <tt class="docutils literal"><span class="pre">gateway-out</span></tt>.</p>
 <div class="section" id="one-kind-per-configuration">
 <h3><a class="toc-backref" href="#toc-entry-11">One kind per configuration</a></h3>
@@ -1347,9 +1361,10 @@ ports and message IDs alike.</p>
 </div>
 <div class="section" id="the-radio-gateway-radio">
 <h3><a class="toc-backref" href="#toc-entry-12">The radio: <tt class="docutils literal">gateway_radio</tt></a></h3>
-<p>The <tt class="docutils literal">moc</tt> node, renamed, and nothing else changed. Every requirement on a
-<tt class="docutils literal">moc</tt> node in <a class="reference internal" href="#what-a-device-node-says">What a device node says</a> and <a class="reference internal" href="#where-the-addresses-are">Where the Addresses Are</a> is
-a requirement on it, and its link is UDP, which it will remain.</p>
+<p>What was the <tt class="docutils literal">moc</tt> node, renamed, and nothing else changed. Every
+requirement on a gateway node in <a class="reference internal" href="#what-a-device-node-says">What a device node says</a> and <a class="reference internal" href="#where-the-addresses-are">Where the
+Addresses Are</a> is a requirement on it, and its link is UDP, which it will
+remain.</p>
 </div>
 <div class="section" id="cfs-gateway-cfs">
 <h3><a class="toc-backref" href="#toc-entry-13">cFS: <tt class="docutils literal">gateway_cfs</tt></a></h3>
@@ -1635,7 +1650,8 @@ one flight at a time. A node's attributes are handed to those per-type rules,
 which refuse in the same words wherever the node is written.</p>
 <p>What locates a node depends on its type:</p>
 <pre class="code text literal-block">
-network, moc    address, port, and for network the protocol
+network, gateway_radio, gateway_fprime
+                address, port, and for network the protocol
 i2c             path (the bus) and address (the device on it)
 can             interface and can_id
 everything else path
@@ -1693,12 +1709,12 @@ a configuration cannot mean -- it asks the kernel for whichever port is
 free, so a configuration stating it describes a link nothing could be told
 where to find.</dd>
 <dt>Requirement</dt>
-<dd>A <tt class="docutils literal">moc</tt> node needs no protocol and a <tt class="docutils literal">network</tt> node does. A ground link
+<dd>A gateway node needs no protocol and a <tt class="docutils literal">network</tt> node does. A ground link
 is a datagram link, as the one tcspecial has always had is; a device
 reached over a socket could be any of the four, and guessing which is how a
 stream payload comes to be addressed as datagrams.</dd>
 <dt>Requirement</dt>
-<dd>A <tt class="docutils literal">moc</tt> node is the ground's end of the vehicle's data, and states where
+<dd>A gateway node is the ground's end of the vehicle's data, and states where
 the ground is as <tt class="docutils literal">ground_base</tt>, <tt class="docutils literal">address:port</tt>. What each node drawn
 into it produces is sent by tcspecial as UDP datagrams to that address, at
 that port plus the source node's device id -- its position among all the
@@ -1723,26 +1739,26 @@ computed itself; when they differ it says so on the beacon line and the
 console and asks the operator whether to continue anyway, quitting -- and
 stopping the tcspecial and tcssim it started -- if not.</dd>
 <dt>Requirement</dt>
-<dd>Ground software gets a <tt class="docutils literal">moc</tt> node's data with a function call --
-<tt class="docutils literal"><span class="pre">tcslib::moc::Moc::open</span></tt> names the node in the configuration, and
-<tt class="docutils literal"><span class="pre">Moc::receive</span></tt> returns each datum with the name of the node that
-produced it -- rather than opening sockets of its own. One function
-between the configuration and the data is one place that counts ports,
-and it counts them as the vehicle does.</dd>
+<dd>Ground software gets a gateway node's data with a function call --
+<tt class="docutils literal"><span class="pre">tcslib::gateway::GatewayReceiver::open</span></tt> names the node in the
+configuration, and <tt class="docutils literal"><span class="pre">GatewayReceiver::receive</span></tt> returns each datum with the
+name of the node that produced it -- rather than opening sockets of its own.
+One function between the configuration and the data is one place that counts
+ports, and it counts them as the vehicle does.</dd>
 <dt>Requirement</dt>
 <dd>A ground station's loop allocates nothing once it runs: a beacon pass,
-a datum taken with <tt class="docutils literal"><span class="pre">Moc::receive_into</span></tt> into a buffer of
-<tt class="docutils literal"><span class="pre">moc::DATUM_BYTES</span></tt> made beforehand, a ping and the folding in of its
+a datum taken with <tt class="docutils literal"><span class="pre">GatewayReceiver::receive_into</span></tt> into a buffer of
+<tt class="docutils literal"><span class="pre">gateway::DATUM_BYTES</span></tt> made beforehand, a ping and the folding in of its
 answer, and a command sent each reuse room made when they were opened.
 A datum longer than the buffer is refused, saying how long it was,
 rather than cut short. What still allocates does so only where
 something happens -- a remark on the beacon pass where something
 changed, the answer to a command, a datum that is not an answer to a
-ping -- and says so where it does; <tt class="docutils literal"><span class="pre">Moc::receive</span></tt>, which hands each
-datum back to be kept, allocates it, and the ground programs here --
-tcsmoc and <tt class="docutils literal">lorem_moc</tt> -- use <tt class="docutils literal">receive_into</tt>.</dd>
+ping -- and says so where it does; <tt class="docutils literal"><span class="pre">GatewayReceiver::receive</span></tt>, which hands
+each datum back to be kept, allocates it, and the ground programs here --
+tcsmoc and <tt class="docutils literal">lorem_gateway</tt> -- use <tt class="docutils literal">receive_into</tt>.</dd>
 <dt>Requirement</dt>
-<dd>A <tt class="docutils literal">moc</tt> node that the ground sends through -- a command binding comes
+<dd>A gateway node that the ground sends through -- a command binding comes
 from it, or a line leaves it -- states the <tt class="docutils literal">address</tt> and <tt class="docutils literal">port</tt>
 tcspecial binds to receive what the ground sends. One that only receives
 the vehicle's data states neither. <tt class="docutils literal">ground_base</tt> is refused on every
@@ -2005,9 +2021,9 @@ recording with everything else still working.</dd>
 </span><span class="name tag">      format</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="name variable">variable_ts_rc</span><span class="whitespace"> </span><span class="punctuation indicator">}</span><span class="whitespace">
 
 </span><span class="name tag">links</span><span class="punctuation">:</span><span class="whitespace">
-  </span><span class="punctuation indicator">-</span><span class="whitespace"> </span><span class="punctuation indicator">{</span><span class="name tag"> from</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="name variable">k_fore</span><span class="punctuation indicator">,</span><span class="name tag"> to</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="punctuation indicator">[</span><span class="name variable">moc</span><span class="punctuation indicator">,</span><span class="whitespace"> </span><span class="name variable">mean_temp.in0</span><span class="punctuation indicator">,</span><span class="whitespace"> </span><span class="name variable">housekeeping</span><span class="punctuation indicator">]</span><span class="whitespace"> </span><span class="punctuation indicator">}</span><span class="whitespace">
-  </span><span class="punctuation indicator">-</span><span class="whitespace"> </span><span class="punctuation indicator">{</span><span class="name tag"> from</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="name variable">k_aft</span><span class="punctuation indicator">,</span><span class="name tag"> to</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="punctuation indicator">[</span><span class="name variable">moc</span><span class="punctuation indicator">,</span><span class="whitespace"> </span><span class="name variable">mean_temp.in1</span><span class="punctuation indicator">,</span><span class="whitespace"> </span><span class="name variable">housekeeping</span><span class="punctuation indicator">]</span><span class="whitespace"> </span><span class="punctuation indicator">}</span><span class="whitespace">
-  </span><span class="punctuation indicator">-</span><span class="whitespace"> </span><span class="punctuation indicator">{</span><span class="name tag"> from</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="name variable">k_bay</span><span class="punctuation indicator">,</span><span class="name tag"> to</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="punctuation indicator">[</span><span class="name variable">moc</span><span class="punctuation indicator">,</span><span class="whitespace"> </span><span class="name variable">mean_temp.in2</span><span class="punctuation indicator">,</span><span class="whitespace"> </span><span class="name variable">housekeeping</span><span class="punctuation indicator">]</span><span class="whitespace"> </span><span class="punctuation indicator">}</span><span class="whitespace">
+  </span><span class="punctuation indicator">-</span><span class="whitespace"> </span><span class="punctuation indicator">{</span><span class="name tag"> from</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="name variable">k_fore</span><span class="punctuation indicator">,</span><span class="name tag"> to</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="punctuation indicator">[</span><span class="name variable">gateway</span><span class="punctuation indicator">,</span><span class="whitespace"> </span><span class="name variable">mean_temp.in0</span><span class="punctuation indicator">,</span><span class="whitespace"> </span><span class="name variable">housekeeping</span><span class="punctuation indicator">]</span><span class="whitespace"> </span><span class="punctuation indicator">}</span><span class="whitespace">
+  </span><span class="punctuation indicator">-</span><span class="whitespace"> </span><span class="punctuation indicator">{</span><span class="name tag"> from</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="name variable">k_aft</span><span class="punctuation indicator">,</span><span class="name tag"> to</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="punctuation indicator">[</span><span class="name variable">gateway</span><span class="punctuation indicator">,</span><span class="whitespace"> </span><span class="name variable">mean_temp.in1</span><span class="punctuation indicator">,</span><span class="whitespace"> </span><span class="name variable">housekeeping</span><span class="punctuation indicator">]</span><span class="whitespace"> </span><span class="punctuation indicator">}</span><span class="whitespace">
+  </span><span class="punctuation indicator">-</span><span class="whitespace"> </span><span class="punctuation indicator">{</span><span class="name tag"> from</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="name variable">k_bay</span><span class="punctuation indicator">,</span><span class="name tag"> to</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="punctuation indicator">[</span><span class="name variable">gateway</span><span class="punctuation indicator">,</span><span class="whitespace"> </span><span class="name variable">mean_temp.in2</span><span class="punctuation indicator">,</span><span class="whitespace"> </span><span class="name variable">housekeeping</span><span class="punctuation indicator">]</span><span class="whitespace"> </span><span class="punctuation indicator">}</span><span class="whitespace">
   </span><span class="punctuation indicator">-</span><span class="whitespace"> </span><span class="punctuation indicator">{</span><span class="name tag"> from</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="name variable">thermostat</span><span class="punctuation indicator">,</span><span class="name tag"> to</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="punctuation indicator">[</span><span class="name variable">heaters</span><span class="punctuation indicator">,</span><span class="whitespace"> </span><span class="name variable">housekeeping</span><span class="punctuation indicator">]</span><span class="whitespace"> </span><span class="punctuation indicator">}</span>
 </pre>
 <p>That is the thermostat's three converted readings and what the comparison
@@ -2024,29 +2040,30 @@ the ground left by every link it had, so a configuration that used both of its
 streams sent commands to the ground and readings to the payloads, which nothing
 in the file showed.</p>
 <dl class="docutils">
-<dt><tt class="docutils literal"><span class="pre">null-moc</span></tt> and <tt class="docutils literal"><span class="pre">null-payload</span></tt></dt>
-<dd>take one stream -- what the ground sends at a <tt class="docutils literal"><span class="pre">null-moc</span></tt>'s <tt class="docutils literal"><span class="pre">moc-in</span></tt>, a
-payload's data at a <tt class="docutils literal"><span class="pre">null-payload</span></tt>'s <tt class="docutils literal"><span class="pre">payload-in</span></tt> -- and drop it. For a
-stream that has to go somewhere and has nowhere to go yet. They have no
-data source.</dd>
-<dt><tt class="docutils literal"><span class="pre">tee-moc</span></tt> and <tt class="docutils literal"><span class="pre">tee-payload</span></tt></dt>
-<dd>take one stream and send each datum on both ways. A <tt class="docutils literal"><span class="pre">tee-moc</span></tt> sends what
-arrives at its <tt class="docutils literal"><span class="pre">moc-in</span></tt> on by its <tt class="docutils literal"><span class="pre">moc-out</span></tt>, as it was going, and again
-by its <tt class="docutils literal"><span class="pre">payload-out</span></tt>; a <tt class="docutils literal"><span class="pre">tee-payload</span></tt> sends what arrives at its
-<tt class="docutils literal"><span class="pre">payload-in</span></tt> on by its <tt class="docutils literal"><span class="pre">payload-out</span></tt> and again by its <tt class="docutils literal"><span class="pre">moc-out</span></tt>.</dd>
+<dt><tt class="docutils literal"><span class="pre">null-gateway</span></tt> and <tt class="docutils literal"><span class="pre">null-payload</span></tt></dt>
+<dd>take one stream -- what the ground sends at a <tt class="docutils literal"><span class="pre">null-gateway</span></tt>'s
+<tt class="docutils literal"><span class="pre">gateway-in</span></tt>, a payload's data at a <tt class="docutils literal"><span class="pre">null-payload</span></tt>'s <tt class="docutils literal"><span class="pre">payload-in</span></tt> --
+and drop it. For a stream that has to go somewhere and has nowhere to go
+yet. They have no data source.</dd>
+<dt><tt class="docutils literal"><span class="pre">tee-gateway</span></tt> and <tt class="docutils literal"><span class="pre">tee-payload</span></tt></dt>
+<dd>take one stream and send each datum on both ways. A <tt class="docutils literal"><span class="pre">tee-gateway</span></tt> sends
+what arrives at its <tt class="docutils literal"><span class="pre">gateway-in</span></tt> on by its <tt class="docutils literal"><span class="pre">gateway-out</span></tt>, as it was
+going, and again by its <tt class="docutils literal"><span class="pre">payload-out</span></tt>; a <tt class="docutils literal"><span class="pre">tee-payload</span></tt> sends what
+arrives at its <tt class="docutils literal"><span class="pre">payload-in</span></tt> on by its <tt class="docutils literal"><span class="pre">payload-out</span></tt> and again by its
+<tt class="docutils literal"><span class="pre">gateway-out</span></tt>.</dd>
 </dl>
 <pre class="code yaml literal-block">
-<span class="name tag">moc</span><span class="punctuation">:</span><span class="whitespace">
-  </span><span class="punctuation indicator">-</span><span class="whitespace"> </span><span class="punctuation indicator">{</span><span class="name tag"> name</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="name variable">ground</span><span class="punctuation indicator">,</span><span class="name tag"> type</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="name variable">moc</span><span class="punctuation indicator">,</span><span class="name tag"> address</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="name variable">127.0.0.1</span><span class="punctuation indicator">,</span><span class="name tag"> port</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal string">&quot;5000&quot;</span><span class="punctuation indicator">,</span><span class="whitespace">
-</span><span class="name tag">      ground_base</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal string">&quot;127.0.0.1:5100&quot;</span><span class="punctuation indicator">,</span><span class="name tag"> moc-out</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="name variable">echo</span><span class="whitespace"> </span><span class="punctuation indicator">}</span><span class="whitespace">
+<span class="name tag">gateway</span><span class="punctuation">:</span><span class="whitespace">
+  </span><span class="punctuation indicator">-</span><span class="whitespace"> </span><span class="punctuation indicator">{</span><span class="name tag"> name</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="name variable">ground</span><span class="punctuation indicator">,</span><span class="name tag"> type</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="name variable">gateway_radio</span><span class="punctuation indicator">,</span><span class="name tag"> address</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="name variable">127.0.0.1</span><span class="punctuation indicator">,</span><span class="name tag"> port</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal string">&quot;5000&quot;</span><span class="punctuation indicator">,</span><span class="whitespace">
+</span><span class="name tag">      ground_base</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal string">&quot;127.0.0.1:5100&quot;</span><span class="punctuation indicator">,</span><span class="name tag"> gateway-out</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="name variable">echo</span><span class="whitespace"> </span><span class="punctuation indicator">}</span><span class="whitespace">
 </span><span class="name tag">payloads</span><span class="punctuation">:</span><span class="whitespace">
   </span><span class="punctuation indicator">-</span><span class="whitespace"> </span><span class="punctuation indicator">{</span><span class="name tag"> name</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="name variable">heater</span><span class="punctuation indicator">,</span><span class="name tag"> type</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="name variable">gpio</span><span class="punctuation indicator">,</span><span class="name tag"> direction</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="name variable">output</span><span class="punctuation indicator">,</span><span class="name tag"> lines</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal string">&quot;4&quot;</span><span class="punctuation indicator">,</span><span class="whitespace">
 </span><span class="name tag">      path</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="name variable">/dev/gpiochip0</span><span class="whitespace"> </span><span class="punctuation indicator">}</span><span class="whitespace">
 </span><span class="name tag">vehicle</span><span class="punctuation">:</span><span class="whitespace">
   </span><span class="comment single"># What the ground sends the heater, and back to the ground to be seen.</span><span class="whitespace">
   </span><span class="punctuation indicator">-</span><span class="whitespace"> </span><span class="name tag">name</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">echo</span><span class="whitespace">
-    </span><span class="name tag">type</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">tee-moc</span><span class="whitespace">
-    </span><span class="name tag">moc-out</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="punctuation indicator">[</span><span class="name variable">heater</span><span class="punctuation indicator">]</span><span class="whitespace">
+    </span><span class="name tag">type</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">tee-gateway</span><span class="whitespace">
+    </span><span class="name tag">gateway-out</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="punctuation indicator">[</span><span class="name variable">heater</span><span class="punctuation indicator">]</span><span class="whitespace">
     </span><span class="name tag">payload-out</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="punctuation indicator">[</span><span class="name variable">ground</span><span class="punctuation indicator">]</span>
 </pre>
 <dl class="docutils">
@@ -2076,14 +2093,14 @@ with the time the vehicle had it written on the end, so that the ground can
 see how long a message takes to reach the vehicle and to come back, and how
 far apart the two clocks are -- which a ping is the one exchange able to show.</p>
 <pre class="code yaml literal-block">
-<span class="name tag">moc</span><span class="punctuation">:</span><span class="whitespace">
-  </span><span class="punctuation indicator">-</span><span class="whitespace"> </span><span class="punctuation indicator">{</span><span class="name tag"> name</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="name variable">ground</span><span class="punctuation indicator">,</span><span class="name tag"> type</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="name variable">moc</span><span class="punctuation indicator">,</span><span class="name tag"> address</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="name variable">127.0.0.1</span><span class="punctuation indicator">,</span><span class="name tag"> port</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal string">&quot;5000&quot;</span><span class="punctuation indicator">,</span><span class="whitespace">
-</span><span class="name tag">      ground_base</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal string">&quot;127.0.0.1:5100&quot;</span><span class="punctuation indicator">,</span><span class="name tag"> moc-out</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="name variable">pinger</span><span class="whitespace"> </span><span class="punctuation indicator">}</span><span class="whitespace">
+<span class="name tag">gateway</span><span class="punctuation">:</span><span class="whitespace">
+  </span><span class="punctuation indicator">-</span><span class="whitespace"> </span><span class="punctuation indicator">{</span><span class="name tag"> name</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="name variable">ground</span><span class="punctuation indicator">,</span><span class="name tag"> type</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="name variable">gateway_radio</span><span class="punctuation indicator">,</span><span class="name tag"> address</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="name variable">127.0.0.1</span><span class="punctuation indicator">,</span><span class="name tag"> port</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal string">&quot;5000&quot;</span><span class="punctuation indicator">,</span><span class="whitespace">
+</span><span class="name tag">      ground_base</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal string">&quot;127.0.0.1:5100&quot;</span><span class="punctuation indicator">,</span><span class="name tag"> gateway-out</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="name variable">pinger</span><span class="whitespace"> </span><span class="punctuation indicator">}</span><span class="whitespace">
 </span><span class="name tag">vehicle</span><span class="punctuation">:</span><span class="whitespace">
   </span><span class="punctuation indicator">-</span><span class="whitespace"> </span><span class="punctuation indicator">{</span><span class="name tag"> name</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="name variable">pinger</span><span class="punctuation indicator">,</span><span class="name tag"> type</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="name variable">ping</span><span class="punctuation indicator">,</span><span class="name tag"> payload-out</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="name variable">ground</span><span class="whitespace"> </span><span class="punctuation indicator">}</span>
 </pre>
-<p>The ground sends its pings to the MOC link's <tt class="docutils literal">address</tt> and <tt class="docutils literal">port</tt>, and the
-answers arrive at its <tt class="docutils literal">ground_base</tt> plus the ping node's device id, as any
+<p>The ground sends its pings to the gateway link's <tt class="docutils literal">address</tt> and <tt class="docutils literal">port</tt>, and
+the answers arrive at its <tt class="docutils literal">ground_base</tt> plus the ping node's device id, as any
 node's telemetry does.</p>
 <dl class="docutils">
 <dt>Requirement</dt>
@@ -2315,12 +2332,12 @@ with and on which side of the graph the node stands. Three are the vehicle's
 own, parts of the telemetry and control system itself:</p>
 <dl class="docutils">
 <dt><tt class="docutils literal">app_payload_veh</tt></dt>
-<dd>Reads payload data, writes MOC data. A sink for what travels groundward and
-a source of what travels vehicleward, which is the shape the ground link
+<dd>Reads payload data, writes gateway data. A sink for what travels groundward
+and a source of what travels vehicleward, which is the shape the ground link
 has: it takes readings and answers with commands.</dd>
-<dt><tt class="docutils literal">app_moc_veh</tt></dt>
-<dd>The mirror of it. Reads MOC data, writes payload data, which is the shape a
-payload has: it is asked for something and answers with it.</dd>
+<dt><tt class="docutils literal">app_gateway_veh</tt></dt>
+<dd>The mirror of it. Reads gateway data, writes payload data, which is the
+shape a payload has: it is asked for something and answers with it.</dd>
 <dt><tt class="docutils literal">app_all_veh</tt></dt>
 <dd>Both, and so all four terminals. The one kind that can carry a stream
 <em>through</em> -- payload data in at the one interface and out at the other --
@@ -2331,8 +2348,9 @@ what passes.</dd>
 carries is a program the mission wrote rather than a device on a bus. A payload
 sends readings and is sent what asks for them, so neither of these is run with
 the payload interface -- payload data is what they <em>write</em>, and the interface
-payload data is written on is the MOC one. Both are written in the <tt class="docutils literal">payloads</tt>
-section, drawn on the payload pane, and read the way a sensor is read.</p>
+payload data is written on is the gateway one. Both are written in the
+<tt class="docutils literal">payloads</tt> section, drawn on the payload pane, and read the way a sensor is
+read.</p>
 <dl class="docutils">
 <dt><tt class="docutils literal">app_pl</tt></dt>
 <dd>Writes payload data and reads nothing. A payload that is never asked: it
@@ -2342,13 +2360,13 @@ with no data sink at all, which is not an omission but the statement of
 what it is -- there is nothing to ask it with, so nothing may be linked
 into it.</dd>
 <dt><tt class="docutils literal">app_all_pl</tt></dt>
-<dd>Reads MOC data, writes payload data, which is a payload's own shape: asked
-for a reading, and answering with one. It states no <tt class="docutils literal">trigger</tt> as a device
-on a bus does, and for the reason a trigger exists: the bytes that ask a
-sensor are written before a read because a sensor has no other way of being
-told, where a program is told by being given the packet.</dd>
+<dd>Reads gateway data, writes payload data, which is a payload's own shape:
+asked for a reading, and answering with one. It states no <tt class="docutils literal">trigger</tt> as a
+device on a bus does, and for the reason a trigger exists: the bytes that
+ask a sensor are written before a read because a sensor has no other way of
+being told, where a program is told by being given the packet.</dd>
 </dl>
-<p>The payload pair hold the same interface an <tt class="docutils literal">app_moc_veh</tt> holds and do the
+<p>The payload pair hold the same interface an <tt class="docutils literal">app_gateway_veh</tt> holds and do the
 same two things with it. What tells the node types apart is which side of the
 graph each stands on -- which section of the file, which pane of the editor,
 which family of <tt class="docutils literal"><span class="pre">tcspecial::node</span></tt> opens it -- and not anything the program
@@ -2407,15 +2425,15 @@ node it is comes first, for every kind: one program may be several nodes of one
 configuration, and three processes that cannot say which of them each is are
 three processes whose complaints an operator cannot act on. Then one argument
 per stream the kind handles -- <tt class="docutils literal"><span class="pre">app-payload-arg</span></tt> for the kinds that handle
-payload data, <tt class="docutils literal"><span class="pre">app-moc-arg</span></tt> for the kinds that handle MOC data, payload
-before MOC where a kind has both:</p>
+payload data, <tt class="docutils literal"><span class="pre">app-gateway-arg</span></tt> for the kinds that handle gateway data,
+payload before gateway where a kind has both:</p>
 <pre class="code yaml literal-block">
 <span class="name tag">vehicle</span><span class="punctuation">:</span><span class="whitespace">
   </span><span class="punctuation indicator">-</span><span class="whitespace"> </span><span class="name tag">name</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">through</span><span class="whitespace">
     </span><span class="name tag">type</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">app_all_veh</span><span class="whitespace">
     </span><span class="name tag">executable</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">$HOME/libexec/tcs/through</span><span class="whitespace">
     </span><span class="name tag">app-payload-arg</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">--readings</span><span class="whitespace">
-    </span><span class="name tag">app-moc-arg</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">--commands</span><span class="whitespace">
+    </span><span class="name tag">app-gateway-arg</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">--commands</span><span class="whitespace">
 
 </span><span class="name tag">payloads</span><span class="punctuation">:</span><span class="whitespace">
   </span><span class="punctuation indicator">-</span><span class="whitespace"> </span><span class="name tag">name</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">bay_2</span><span class="whitespace">
@@ -2429,8 +2447,8 @@ take them, and refused of the kinds that do not. Required because the order is
 the whole of what makes the list readable from the program end: a list whose
 length depends on which attributes somebody wrote is a list a program has to
 count before it can read, and it would count wrongly on the day a node's type
-changed. Refused because an <tt class="docutils literal"><span class="pre">app-moc-arg</span></tt> on a kind that handles no MOC data
-is an argument written for a program that will not be given it.</p>
+changed. Refused because an <tt class="docutils literal"><span class="pre">app-gateway-arg</span></tt> on a kind that handles no
+gateway data is an argument written for a program that will not be given it.</p>
 <p>The data never comes that way. What a node was given arrives on an interface,
 and a command line carrying readings would be a node whose work was in neither
 the configuration nor the program.</p>
@@ -2442,12 +2460,13 @@ read; it sits beside the two node families rather than in one of them, because
 the rule is one rule and the kind says which family a given app belongs to.
 <tt class="docutils literal"><span class="pre">tcspecial::node::vehicle::app_payload_veh</span></tt> and its four neighbours are the
 flight side, two of them under <tt class="docutils literal"><span class="pre">tcspecial::node::payload</span></tt> because two of the
-kinds are payloads. And <tt class="docutils literal">app_payload_veh</tt>, <tt class="docutils literal">app_moc_veh</tt>, <tt class="docutils literal">app_all_veh</tt>,
-<tt class="docutils literal">app_pl</tt> and <tt class="docutils literal">app_all_pl</tt> are five programs of their own, built as crates
-and not installed: they are what the arrangement is tested with -- three of
-them answer what arrives, one carries each stream through to the other
-interface, one reports without being asked, and a test that a packet comes back
-out of the interface it was <em>not</em> going to is how the streams are held apart.</p>
+kinds are payloads. And <tt class="docutils literal">app_payload_veh</tt>, <tt class="docutils literal">app_gateway_veh</tt>,
+<tt class="docutils literal">app_all_veh</tt>, <tt class="docutils literal">app_pl</tt> and <tt class="docutils literal">app_all_pl</tt> are five programs of their own,
+built as crates and not installed: they are what the arrangement is tested with
+-- three of them answer what arrives, one carries each stream through to the
+other interface, one reports without being asked, and a test that a packet comes
+back out of the interface it was <em>not</em> going to is how the streams are held
+apart.</p>
 <div class="section" id="which-stream-a-datum-is-on">
 <h3><a class="toc-backref" href="#toc-entry-24">Which stream a datum is on</a></h3>
 <p>An app node is what made the fabric learn this, and the rule is worth stating
@@ -2460,11 +2479,11 @@ ground, and neither of those is the stream it is &quot;on&quot;. Those say nothi
 every link out of them is followed, which is what the fabric always did.</p>
 <p>A node with more than one terminal at either end has to be told and has to say.
 An <tt class="docutils literal">app_all_veh</tt> is the one that does: it reads payload data on the one
-interface and MOC data on the other, so each datum it produces belongs to one
-of the two, and delivering a reading to the links leaving its <tt class="docutils literal"><span class="pre">moc-out</span></tt> would
-send telemetry out as a command. So the stream travels with the bytes --
-<tt class="docutils literal">Taken</tt> carries it out of a node, <tt class="docutils literal">Arriving</tt> carries it in -- and
-<tt class="docutils literal">Fabric</tt> follows only the links that carry it.</p>
+interface and gateway data on the other, so each datum it produces belongs to
+one of the two, and delivering a reading to the links leaving its
+<tt class="docutils literal"><span class="pre">gateway-out</span></tt> would send telemetry out as a command. So the stream travels
+with the bytes -- <tt class="docutils literal">Taken</tt> carries it out of a node, <tt class="docutils literal">Arriving</tt> carries it in
+-- and <tt class="docutils literal">Fabric</tt> follows only the links that carry it.</p>
 <p>Which stream a link carries is settled once, where the routing table is built:
 from the terminal either end names, and failing that from the only terminal the
 type at either end has. A payload has one source and one sink, so a link from
@@ -2506,7 +2525,8 @@ port per node and holds them in a fabric. Four things run at once: the
 command interpreter on its own thread, the conductor running one pass,
 a thread for each node, given its part of every stage, and the beacons. Each node has a state and a wakeup descriptor, so a
 command that disables a node reaches it while it is waiting. On the
-ground, data arrives as UDP and is taken with tcslib::moc::Moc::receive.</object>
+ground, data arrives as UDP and is taken with
+tcslib::gateway::GatewayReceiver::receive.</object>
 <p class="caption">What a configuration becomes, and what runs at once.</p>
 </div>
 <div class="section" id="what-the-file-becomes">
@@ -2517,7 +2537,7 @@ with one node missing would be a vehicle flying a configuration nobody wrote.
 What survives the check is turned into four tables, described under <a class="reference internal" href="#running-a-graph">Running a
 graph</a>: <tt class="docutils literal">route</tt> says where each node's output goes and which link fills each
 of its named inputs, <tt class="docutils literal">schedule</tt> says when each group is next read,
-<tt class="docutils literal">telemetry</tt> gives each source its own link to the ground -- a <tt class="docutils literal">moc</tt> node's
+<tt class="docutils literal">telemetry</tt> gives each source its own link to the ground -- a gateway node's
 <tt class="docutils literal">ground_base</tt> counted on by that source's device id -- and <tt class="docutils literal">parameters</tt>
 reads the <tt class="docutils literal">tcspecial</tt> section for the beacons, the log and the two command
 ports. None of the four opens anything, which is what lets each be tested
@@ -3072,7 +3092,7 @@ again.</dd>
 <p>By its node id: the number the node has from the order the configuration
 declares it, counted across every node whatever its kind. It is not a number
 invented for commands -- it is the one a node's link to the ground is already
-counted by, a <tt class="docutils literal">moc</tt> node's <tt class="docutils literal">ground_base</tt> plus that node's id -- so the id
+counted by, a gateway node's <tt class="docutils literal">ground_base</tt> plus that node's id -- so the id
 in a command and the port its telemetry arrives on are the same number, worked
 out in one place.</p>
 <dl class="docutils">
@@ -3444,7 +3464,7 @@ depends on the shape of the graph.</dd>
 delivery. The two are different things: a sensor has a reading when its
 group is due and a delivery does not change that, while a computation has
 one <em>because</em> something arrived. Reading every destination instead would
-cost a device read per delivery, and would take a command off a MOC link
+cost a device read per delivery, and would take a command off a gateway link
 and pass it on as though it were a result.</dd>
 <dt>Requirement</dt>
 <dd>Delivery is breadth first. The three destinations of a &quot;T&quot; are all reached
@@ -3519,8 +3539,8 @@ passes.</dd>
 <dt>Requirement</dt>
 <dd>A node is polled only if it is in no group, its output goes somewhere, and
 it produces by the clock rather than by arrival. Each of those rules out a
-read whose result would be discarded. The one that matters is a MOC link:
-what arrives on one is a command, which sets an attribute rather than
+read whose result would be discarded. The one that matters is a gateway
+link: what arrives on one is a command, which sets an attribute rather than
 travelling a link, so polling it would be taking commands off the socket
 and throwing them away. A ground link that does feed the graph says so with
 a link out of it, and is polled like anything else.</dd>
@@ -3553,7 +3573,7 @@ sensors every three seconds would otherwise fill its log with the news that
 it is working, and the refusals -- which are what somebody is looking for
 -- would be the hardest lines to find in it.</dd>
 <dt>Requirement</dt>
-<dd>A command binding counts as a connection at both of its ends. A MOC link
+<dd>A command binding counts as a connection at both of its ends. A gateway link
 exists to carry commands as much as telemetry, and a computation whose
 setpoint is the only thing the ground sets is reached by its binding and by
 nothing else -- so a configuration judged by its links alone would call
@@ -3565,7 +3585,7 @@ somewhere is read, a node things are delivered to is written, and a node
 that is both is both. The refusal names which way the configuration has it,
 because the fault is in the file and not in the attempt.</dd>
 <dt>Requirement</dt>
-<dd>A MOC link that a command binding arrives on is read as well as written,
+<dd>A gateway link that a command binding arrives on is read as well as written,
 though no link leaves it. A command sets an attribute rather than
 travelling a link, so the <tt class="docutils literal">commands</tt> section is the only statement that
 anything arrives from the ground -- and a ground link judged by its links
@@ -3599,8 +3619,8 @@ anyway. Only a computation has named inputs; a device has one way in and
 does not name it. Delivering it would make a file that says something it
 does not mean work by accident. A <em>terminal</em> is not one of those -- see
 <a class="reference internal" href="#terminals-where-a-link-is-attached">Terminals: where a link is attached</a> -- and never reaches a port: a
-device's <tt class="docutils literal"><span class="pre">moc-in</span></tt> is its one way in, spelled, and is resolved where the
-routing table is built.</dd>
+device's <tt class="docutils literal"><span class="pre">gateway-in</span></tt> is its one way in, spelled, and is resolved where
+the routing table is built.</dd>
 <dt>Requirement</dt>
 <dd>A device that must be asked before it answers is asked after it is read,
 not before. Asked and read in the same breath, a device has had no time to
@@ -3663,10 +3683,10 @@ same line written directly above the <tt class="docutils literal">address</tt> a
 </ul>
 <p>A comment above a link is kept, and a link is now an attribute -- so this is
 the one attribute whose comment survives a save: the run of comment lines above
-a <tt class="docutils literal"><span class="pre">payload-out:</span></tt> or <tt class="docutils literal"><span class="pre">moc-out:</span></tt> is read as a note about the links that
+a <tt class="docutils literal"><span class="pre">payload-out:</span></tt> or <tt class="docutils literal"><span class="pre">gateway-out:</span></tt> is read as a note about the links that
 attribute makes. Where the attribute names several destinations the note is
 about all of them, one line carrying one comment.</p>
-<p>A comment above a <tt class="docutils literal"><span class="pre">payload-in:</span></tt> or <tt class="docutils literal"><span class="pre">moc-in:</span></tt> is not kept, those being
+<p>A comment above a <tt class="docutils literal"><span class="pre">payload-in:</span></tt> or <tt class="docutils literal"><span class="pre">gateway-in:</span></tt> is not kept, those being
 a record of links rather than links: the note belongs above the link, at the
 end it is written at, and a comment the editor kept in a derived line would be
 a comment it moved. It is the fourth kind in the list above.</p>
@@ -3681,9 +3701,10 @@ it is for. Left to right: the <em>payload working pane</em>, labelled <tt class=
 which holds everything the vehicle carries: a device on a bus, a line it
 drives, a link to something aboard; the <em>vehicle working pane</em>, labelled
 <tt class="docutils literal">Vehicle</tt>, which holds the vehicle's own graph -- the computations, the log,
-a page of its own; and the <em>moc working pane</em>, labelled <tt class="docutils literal">MOC</tt>, which holds
-the ground link. It is the order the examples' diagrams in the manual are drawn
-in, so a diagram there and the same configuration in the editor read alike.</p>
+a page of its own; and the <em>gateway working pane</em>, labelled <tt class="docutils literal">Gateway</tt>, which
+holds the ground link. It is the order the examples' diagrams in the manual are
+drawn in, so a diagram there and the same configuration in the editor read
+alike.</p>
 <p>The labels are light grey and italic, which is this window's way of saying &quot;not
 part of the drawing&quot;: one in the colour and the face of a node would read as
 something placed. They are drawn under the nodes, so a node may cover one. A
@@ -3692,7 +3713,7 @@ their bearings, and a pane that reserved a row for its own name would be a pane
 with a row nothing can be put in.</p>
 <p>There is a selection pane for each, one above another in the same order the
 working panes are in -- payloads at the top, then the vehicle's, then the
-MOC's -- and which one a shape was pressed in is what decides where it lands.
+gateway's -- and which one a shape was pressed in is what decides where it lands.
 A node stays in its pane: a drag that would carry a payload rightwards across a
 divider stops at it.</p>
 <p>Each of the three lists is as tall as its own share of the column, with a line
@@ -3702,7 +3723,7 @@ settings file as percentages. A line moves the boundary between its own two
 neighbours and leaves the third alone, which is what a person dragging it
 expects: the list above grows by what the list below gives up. The upper line
 is between the payload list and the vehicle's, the lower one between the
-vehicle's and the MOC's. The arithmetic
+vehicle's and the gateway's. The arithmetic
 is <tt class="docutils literal"><span class="pre">tcsgui::list_shares_after</span></tt>, in Rust where it can be tested, and the
 markup reports a drag as how far it went and how tall the column is -- what a
 share is depends on what it is a share of.</p>
@@ -3742,16 +3763,16 @@ stops where it would orphan something says what it is doing while it does it. A
 node already on the wrong side holds nothing, so one such node cannot freeze
 the control.</p>
 <p>Where the dividers sit is kept in <tt class="docutils literal"><span class="pre">$HOME/.tcsgui/preferences.xml</span></tt>, as the
-percentages of the working pane the moc and vehicle working panes take, the
+percentages of the working pane the gateway and vehicle working panes take, the
 payload pane taking what is left. Each is kept by the pane it is about rather
-than by its place on the screen, so a file written when the moc pane was the
+than by its place on the screen, so a file written when the gateway pane was the
 leftmost still means the same widths now that it is the rightmost. The file is
 read when the editor starts and is what places the dividers; it is written
 whenever a line is moved. The directory is made automatically, and a
 preferences file that is missing, unreadable or hand-edited into nonsense
 leaves the defaults in place and says so on the error output: an editor that
 refused to start because it could not remember a pane width would be an editor
-traded for a preference. A file written before there was a moc working pane
+traded for a preference. A file written before there was a gateway working pane
 states only the vehicle's share, and the new pane's share is taken out of that
 one rather than out of the payload column somebody had arranged. The file was
 called <tt class="docutils literal">config.xml</tt> in one build and is still read under that name when the
@@ -3765,7 +3786,7 @@ section at the end of the file rather than on the node it is about:</p>
 <span class="name tag">tcsgui</span><span class="punctuation">:</span><span class="whitespace">
   </span><span class="name tag">nodes</span><span class="punctuation">:</span><span class="whitespace">
     </span><span class="punctuation indicator">-</span><span class="whitespace"> </span><span class="punctuation indicator">{</span><span class="name tag"> name</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="name variable">payload</span><span class="punctuation indicator">,</span><span class="name tag"> x</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="name variable">40</span><span class="punctuation indicator">,</span><span class="name tag"> y</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="name variable">160</span><span class="whitespace"> </span><span class="punctuation indicator">}</span><span class="whitespace">
-    </span><span class="punctuation indicator">-</span><span class="whitespace"> </span><span class="punctuation indicator">{</span><span class="name tag"> name</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="name variable">moc</span><span class="punctuation indicator">,</span><span class="name tag"> x</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="name variable">784</span><span class="punctuation indicator">,</span><span class="name tag"> y</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="name variable">40</span><span class="whitespace"> </span><span class="punctuation indicator">}</span>
+    </span><span class="punctuation indicator">-</span><span class="whitespace"> </span><span class="punctuation indicator">{</span><span class="name tag"> name</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="name variable">gateway</span><span class="punctuation indicator">,</span><span class="name tag"> x</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="name variable">784</span><span class="punctuation indicator">,</span><span class="name tag"> y</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="name variable">40</span><span class="whitespace"> </span><span class="punctuation indicator">}</span>
 </pre>
 <p>Last, and in a section of its own, because it is a different kind of thing.
 The sections above say what the vehicle carries and what it is told; this says
@@ -3835,11 +3856,12 @@ edges are taken in to the places just inside them, so a node held against an
 edge is where a node may be as well. The canvas draws a faint line every five
 millimetres, which are the lines the terminals are on.</p>
 <p>Each working pane is painted, and every node type has its own colour inside its
-pane's family. The MOC pane is a pale blue, the vehicle pane a pale green and
-the payload pane a pale blush: all three light and neutral -- no chroma above
-14 -- so that a pane reads as tinted paper rather than as a coloured panel. The
-nodes drawn on one are darker members of its own hue family: a payload is a
-plum or a maroon, a vehicle node a green or an olive, the ground link an azure.</p>
+pane's family. The gateway pane is a pale blue, the vehicle pane a pale green
+and the payload pane a pale blush: all three light and neutral -- no chroma
+above 14 -- so that a pane reads as tinted paper rather than as a coloured
+panel. The nodes drawn on one are darker members of its own hue family: a
+payload is a plum or a maroon, a vehicle node a green or an olive, the ground
+link an azure.</p>
 <p>So a node's colour says two things at once. The hue says which family it is in,
 which makes a node drawn in the wrong pane visible as one; the step within the
 family -- lightness mostly, with chroma and a little hue beside it -- says
@@ -3914,8 +3936,8 @@ each corner it has one in, with an arrow in it pointing the way the data on it
 travels across the canvas. Two rows, which are the two streams. Along the top,
 left to right, the payload's own data on its way to the ground: it arrives at
 <tt class="docutils literal"><span class="pre">payload-in</span></tt> and leaves at <tt class="docutils literal"><span class="pre">payload-out</span></tt>. Along the bottom, right to left,
-what the ground sends on its way to a payload: it arrives at <tt class="docutils literal"><span class="pre">moc-in</span></tt> and
-leaves at <tt class="docutils literal"><span class="pre">moc-out</span></tt>. Each box's upper left corner is on one of the lines
+what the ground sends on its way to a payload: it arrives at <tt class="docutils literal"><span class="pre">gateway-in</span></tt> and
+leaves at <tt class="docutils literal"><span class="pre">gateway-out</span></tt>. Each box's upper left corner is on one of the lines
 five millimetres apart, so the terminals of nodes line up with each other and
 with those lines, and a line between two level terminals runs along one: worked
 out from where the node is, a millimetre not being a whole number of pixels,
@@ -3938,8 +3960,8 @@ and their insets have to fit inside that height with daylight between them,
 and two columns inside the width. A name never collides with them however they grow, being
 padded away from whichever side carries terminals.</p>
 <p>Only the terminals the type actually has. A payload carries its two on its
-right, a MOC link its two on its left, an <tt class="docutils literal">app_all_veh</tt> all four, a tee its
-three, a null node its one, a log the one
+right, a gateway link its two on its left, an <tt class="docutils literal">app_all_veh</tt> all four, a tee
+its three, a null node its one, a log the one
 it receives on, and a page of its own none -- what a page has is what the nodes
 inside it have, and nothing outside it knows that. A drawing that showed four
 on every node would say nothing about what may be linked to what, which is the
@@ -3967,13 +3989,13 @@ I decide to leave&quot; -- a decision nobody can find again is a decision nobody
 change.</p>
 <p>Which rules apply to a node depends on which pane it is in, because that is
 what the data flow is: a payload is where the payload's own data begins and a
-MOC link is where it ends, and the other stream runs the other way. A payload's
-<tt class="docutils literal"><span class="pre">payload-out</span></tt> with nothing on it is a concern -- those readings reach nobody
--- where a computation's is not, a computation being free to send its result
-the other way or to be read by nothing yet. What is asked of a vehicle node is
-that a stream passing through it comes out somewhere, which is the shape of the
-whole graph. A log is the exception by having no data source at all: it is
-where a stream stops on purpose.</p>
+gateway link is where it ends, and the other stream runs the other way. A
+payload's <tt class="docutils literal"><span class="pre">payload-out</span></tt> with nothing on it is a concern -- those readings
+reach nobody -- where a computation's is not, a computation being free to send
+its result the other way or to be read by nothing yet. What is asked of a
+vehicle node is that a stream passing through it comes out somewhere, which is
+the shape of the whole graph. A log is the exception by having no data source at
+all: it is where a stream stops on purpose.</p>
 <p>Setting one aside is an edit, so undo takes it back, and it is written in the
 file's own <tt class="docutils literal">tcsgui</tt> section beside where the nodes were drawn: two people
 editing one configuration should not each have to decide again that a payload
@@ -4048,7 +4070,7 @@ type carries and which way; what has gone is having to hit a small box in a
 corner to say something the stream already said.</p>
 <p>Which does not widen what may be joined to what. A node with no terminal of
 that stream takes nothing: the ground receives readings and is sent nothing, so
-a line carrying what the ground sends has nowhere to land on a <tt class="docutils literal">moc</tt> node,
+a line carrying what the ground sends has nowhere to land on a gateway node,
 and a log has nothing to leave it by. The rule is still
 <tt class="docutils literal"><span class="pre">tcslibgs::graph::terminals</span></tt>; only the aiming has changed.</p>
 <p>A link that is already there can be taken hold of by either of its ends. Press
@@ -4078,8 +4100,8 @@ is what makes a press on it ambiguous.</p>
 <p>Where it lands settles that. A node that could be <em>this</em> end -- one with the
 same terminal -- takes the end, which is the re-routing gesture. A node that
 could only be the <em>other</em> end gets a new line instead, and the line that was
-picked up stays where it was. So the moc node already feeding one payload,
-pressed on its <tt class="docutils literal"><span class="pre">moc-out</span></tt> and let go of over a second payload, feeds the
+picked up stays where it was. So the gateway node already feeding one payload,
+pressed on its <tt class="docutils literal"><span class="pre">gateway-out</span></tt> and let go of over a second payload, feeds the
 second one as well: a payload cannot be a data source, so there is nothing else
 the gesture could have meant.</p>
 <p>That case used to do nothing at all, and it is the first thing somebody tried.
@@ -4334,7 +4356,7 @@ body, and a test says so.</p>
 <p>Each link line is a <strong>darker shade of the pane its data comes from</strong>. The
 payload's own readings start in the payload pane and generally end at the
 ground, so that line is a teal taken from the teal pane they leave; what the
-ground sends starts in the moc pane and ends at a payload, so that line is a
+ground sends starts in the gateway pane and ends at a payload, so that line is a
 darker blue. A reader can then see where a line's data started without
 following it back, and the hue is held within twenty degrees of its own pane's
 by a test.</p>
@@ -4392,7 +4414,7 @@ anybody has drawn anything is a complaint about the editor's own first act,
 and it cannot be acted on until there is a second node. The rules come back as
 soon as there is a graph to apply them to.</p>
 <p>A configuration that does not exist yet opens with the ground station already
-in it, at the upper right, in the moc working pane. Every graph has
+in it, at the upper right, in the gateway working pane. Every graph has
 one -- a vehicle whose telemetry reaches nobody is a vehicle nobody is
 operating -- so placing it is work the editor can do rather than work it can
 wait for. It is placed through the history like any other edit, so it can be
@@ -4510,7 +4532,7 @@ station a new configuration is given is named the same way, by the same
 function, because a name the editor chose should look the same whichever of its
 hands chose it.</p>
 <p>Nothing the editor places itself covers a pane's own name. The three names are
-written across the top of the sheet -- &quot;MOC&quot;, &quot;Vehicle&quot;, &quot;Payloads&quot;, one per
+written across the top of the sheet -- &quot;Gateway&quot;, &quot;Vehicle&quot;, &quot;Payloads&quot;, one per
 pane at the same height -- and they are what a pane has to say when it is empty
 or when somebody has lost their bearings. A node somebody <em>drags</em> over one is
 their own business, the sheet being their drawing; a node the editor put there
@@ -4658,9 +4680,10 @@ arrives as two files: Rust in tcspecial, and a description tcsgui reads.</p>
 <tt class="docutils literal">vehicle/compute/vote.yaml</tt> has its Rust at
 <tt class="docutils literal">tcspecial/src/node/vehicle/compute/vote.rs</tt>; one at <tt class="docutils literal">payload/i2c.yaml</tt>
 has <tt class="docutils literal">node/payload/i2c/</tt>, a directory with as many files under it as it takes.
-<tt class="docutils literal">moc.yaml</tt> sits at the root of the tree because the ground station has no
-Rust of its own: it is the other end of the link rather than part of the
-vehicle, and the code that serves one is the network payload's.</p>
+<tt class="docutils literal">gateway_radio.yaml</tt> and <tt class="docutils literal">gateway_fprime.yaml</tt> sit at the root of the
+tree because a gateway node has no Rust of its own: it is the vehicle's end of
+the link to what it answers to rather than part of the vehicle, and the code
+that serves one is the network payload's.</p>
 <p>The correspondence is checked both ways by
 <tt class="docutils literal"><span class="pre">tcsgui::nodes::tests::every_description_has_its_rust</span></tt>: a description with no
 Rust is a node the editor offers and the vehicle cannot run, and a node type
@@ -4698,8 +4721,8 @@ twice is two statements of what its terminals are. What it says:</p>
   </span><span class="name tag">function</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">mean</span><span class="whitespace">
 </span><span class="name tag">payload-sink</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">true</span><span class="whitespace">         </span><span class="comment single"># which of the four terminals a node of this</span><span class="whitespace">
 </span><span class="name tag">payload-source</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">true</span><span class="whitespace">       </span><span class="comment single"># type has: the payload's own data in and out,</span><span class="whitespace">
-</span><span class="name tag">moc-sink</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">true</span><span class="whitespace">             </span><span class="comment single"># and what the ground sends in and out</span><span class="whitespace">
-</span><span class="name tag">moc-source</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">true</span><span class="whitespace">
+</span><span class="name tag">gateway-sink</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">true</span><span class="whitespace">         </span><span class="comment single"># and what the ground sends in and out</span><span class="whitespace">
+</span><span class="name tag">gateway-source</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">true</span><span class="whitespace">
 </span><span class="name tag">attributes</span><span class="punctuation">:</span><span class="whitespace">                </span><span class="comment single"># what a node of this kind says for itself</span><span class="whitespace">
   </span><span class="punctuation indicator">-</span><span class="whitespace"> </span><span class="name tag">name</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">inputs</span><span class="whitespace">
     </span><span class="name tag">required</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">true</span><span class="whitespace">
@@ -4861,7 +4884,7 @@ where the complaint can name the file, the line and the attribute:</p>
 <pre class="literal-block">
 vehicle.yaml:11: &quot;temp_fore&quot; is an i2c node, so it needs the device it is
 reached through: say path
-vehicle.yaml:13: &quot;moc&quot; is a network node, so it needs the host it is at:
+vehicle.yaml:13: &quot;gateway&quot; is a network node, so it needs the host it is at:
 say address
 </pre>
 <p>That check is new, and the editor's laziness rests on it: before it, a node
@@ -5153,28 +5176,31 @@ addresses are its own. What is here is checked as it stands, with a
 </span><span class="name tag">payload_groups</span><span class="punctuation">:</span><span class="whitespace">
   </span><span class="punctuation indicator">-</span><span class="whitespace"> </span><span class="punctuation indicator">{</span><span class="name tag"> name</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="name variable">cabin_temps</span><span class="punctuation indicator">,</span><span class="name tag"> interval</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal string">&quot;100</span><span class="name variable"> </span><span class="literal string">ms&quot;</span><span class="whitespace"> </span><span class="punctuation indicator">}</span><span class="whitespace">
 
-</span><span class="name tag">moc</span><span class="punctuation">:</span><span class="whitespace">
-  </span><span class="punctuation indicator">-</span><span class="whitespace"> </span><span class="punctuation indicator">{</span><span class="name tag"> name</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="name variable">moc</span><span class="punctuation indicator">,</span><span class="name tag"> type</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="name variable">moc</span><span class="punctuation indicator">,</span><span class="name tag"> address</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal string">&quot;10.0.0.1&quot;</span><span class="punctuation indicator">,</span><span class="name tag"> port</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal string">&quot;5000&quot;</span><span class="punctuation indicator">,</span><span class="whitespace">
+</span><span class="name tag">gateway</span><span class="punctuation">:</span><span class="whitespace">
+  </span><span class="punctuation indicator">-</span><span class="whitespace"> </span><span class="punctuation indicator">{</span><span class="name tag"> name</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="name variable">gateway</span><span class="punctuation indicator">,</span><span class="name tag"> type</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="name variable">gateway_radio</span><span class="punctuation indicator">,</span><span class="name tag"> address</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal string">&quot;10.0.0.1&quot;</span><span class="punctuation indicator">,</span><span class="name tag"> port</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal string">&quot;5000&quot;</span><span class="punctuation indicator">,</span><span class="whitespace">
 </span><span class="name tag">      ground_base</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal string">&quot;10.0.0.2:5100&quot;</span><span class="punctuation indicator">,</span><span class="name tag"> payload-in</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="name variable">true</span><span class="whitespace"> </span><span class="punctuation indicator">}</span><span class="whitespace">
 
 </span><span class="name tag">vehicle</span><span class="punctuation">:</span><span class="whitespace">
   </span><span class="punctuation indicator">-</span><span class="whitespace"> </span><span class="punctuation indicator">{</span><span class="name tag"> name</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="name variable">k_1</span><span class="punctuation indicator">,</span><span class="name tag"> type</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="name variable">compute</span><span class="punctuation indicator">,</span><span class="name tag"> function</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="name variable">to_kelvin</span><span class="punctuation indicator">,</span><span class="name tag"> format</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="name variable">i16_be</span><span class="punctuation indicator">,</span><span class="whitespace">
 </span><span class="name tag">      scale</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal string">&quot;0.0625&quot;</span><span class="punctuation indicator">,</span><span class="name tag"> offset</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal string">&quot;273.15&quot;</span><span class="punctuation indicator">,</span><span class="name tag"> payload-in</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="name variable">true</span><span class="punctuation indicator">,</span><span class="whitespace">
-</span><span class="name tag">      payload-out</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="punctuation indicator">[{</span><span class="name tag"> target</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="name variable">moc</span><span class="whitespace"> </span><span class="punctuation indicator">},</span><span class="whitespace"> </span><span class="punctuation indicator">{</span><span class="name tag"> target</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="name variable">cabin_temp</span><span class="punctuation indicator">,</span><span class="name tag"> input</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="name variable">in0</span><span class="whitespace"> </span><span class="punctuation indicator">}]</span><span class="whitespace"> </span><span class="punctuation indicator">}</span><span class="whitespace">
+</span><span class="name tag">      payload-out</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="punctuation indicator">[{</span><span class="name tag"> target</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="name variable">gateway</span><span class="whitespace"> </span><span class="punctuation indicator">},</span><span class="whitespace"> </span><span class="punctuation indicator">{</span><span class="name tag"> target</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="name variable">cabin_temp</span><span class="punctuation indicator">,</span><span class="name tag"> input</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="name variable">in0</span><span class="whitespace"> </span><span class="punctuation indicator">}]</span><span class="whitespace">
+      </span><span class="punctuation indicator">}</span><span class="whitespace">
   </span><span class="punctuation indicator">-</span><span class="whitespace"> </span><span class="punctuation indicator">{</span><span class="name tag"> name</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="name variable">k_2</span><span class="punctuation indicator">,</span><span class="name tag"> type</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="name variable">compute</span><span class="punctuation indicator">,</span><span class="name tag"> function</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="name variable">to_kelvin</span><span class="punctuation indicator">,</span><span class="name tag"> format</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="name variable">i16_be</span><span class="punctuation indicator">,</span><span class="whitespace">
 </span><span class="name tag">      scale</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal string">&quot;0.0625&quot;</span><span class="punctuation indicator">,</span><span class="name tag"> offset</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal string">&quot;273.15&quot;</span><span class="punctuation indicator">,</span><span class="name tag"> payload-in</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="name variable">true</span><span class="punctuation indicator">,</span><span class="whitespace">
-</span><span class="name tag">      payload-out</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="punctuation indicator">[{</span><span class="name tag"> target</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="name variable">moc</span><span class="whitespace"> </span><span class="punctuation indicator">},</span><span class="whitespace"> </span><span class="punctuation indicator">{</span><span class="name tag"> target</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="name variable">cabin_temp</span><span class="punctuation indicator">,</span><span class="name tag"> input</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="name variable">in1</span><span class="whitespace"> </span><span class="punctuation indicator">}]</span><span class="whitespace"> </span><span class="punctuation indicator">}</span><span class="whitespace">
+</span><span class="name tag">      payload-out</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="punctuation indicator">[{</span><span class="name tag"> target</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="name variable">gateway</span><span class="whitespace"> </span><span class="punctuation indicator">},</span><span class="whitespace"> </span><span class="punctuation indicator">{</span><span class="name tag"> target</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="name variable">cabin_temp</span><span class="punctuation indicator">,</span><span class="name tag"> input</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="name variable">in1</span><span class="whitespace"> </span><span class="punctuation indicator">}]</span><span class="whitespace">
+      </span><span class="punctuation indicator">}</span><span class="whitespace">
   </span><span class="punctuation indicator">-</span><span class="whitespace"> </span><span class="punctuation indicator">{</span><span class="name tag"> name</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="name variable">k_3</span><span class="punctuation indicator">,</span><span class="name tag"> type</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="name variable">compute</span><span class="punctuation indicator">,</span><span class="name tag"> function</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="name variable">to_kelvin</span><span class="punctuation indicator">,</span><span class="name tag"> format</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="name variable">u24_be</span><span class="punctuation indicator">,</span><span class="whitespace">
 </span><span class="name tag">      scale</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal string">&quot;0.0078&quot;</span><span class="punctuation indicator">,</span><span class="name tag"> offset</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal string">&quot;255.37&quot;</span><span class="punctuation indicator">,</span><span class="name tag"> payload-in</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="name variable">true</span><span class="punctuation indicator">,</span><span class="whitespace">
-</span><span class="name tag">      payload-out</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="punctuation indicator">[{</span><span class="name tag"> target</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="name variable">moc</span><span class="whitespace"> </span><span class="punctuation indicator">},</span><span class="whitespace"> </span><span class="punctuation indicator">{</span><span class="name tag"> target</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="name variable">cabin_temp</span><span class="punctuation indicator">,</span><span class="name tag"> input</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="name variable">in2</span><span class="whitespace"> </span><span class="punctuation indicator">}]</span><span class="whitespace"> </span><span class="punctuation indicator">}</span><span class="whitespace">
+</span><span class="name tag">      payload-out</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="punctuation indicator">[{</span><span class="name tag"> target</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="name variable">gateway</span><span class="whitespace"> </span><span class="punctuation indicator">},</span><span class="whitespace"> </span><span class="punctuation indicator">{</span><span class="name tag"> target</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="name variable">cabin_temp</span><span class="punctuation indicator">,</span><span class="name tag"> input</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="name variable">in2</span><span class="whitespace"> </span><span class="punctuation indicator">}]</span><span class="whitespace">
+      </span><span class="punctuation indicator">}</span><span class="whitespace">
 
   </span><span class="punctuation indicator">-</span><span class="whitespace"> </span><span class="punctuation indicator">{</span><span class="name tag"> name</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="name variable">cabin_temp</span><span class="punctuation indicator">,</span><span class="name tag"> type</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="name variable">compute</span><span class="punctuation indicator">,</span><span class="name tag"> function</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="name variable">vote</span><span class="punctuation indicator">,</span><span class="name tag"> algorithm</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="name variable">median</span><span class="punctuation indicator">,</span><span class="whitespace">
 </span><span class="name tag">      inputs</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal string">&quot;in0,in1,in2&quot;</span><span class="punctuation indicator">,</span><span class="name tag"> payload-in</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="name variable">true</span><span class="punctuation indicator">,</span><span class="whitespace">
-</span><span class="name tag">      payload-out</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="punctuation indicator">[{</span><span class="name tag"> target</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="name variable">moc</span><span class="whitespace"> </span><span class="punctuation indicator">},</span><span class="whitespace"> </span><span class="punctuation indicator">{</span><span class="name tag"> target</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="name variable">thermostat</span><span class="whitespace"> </span><span class="punctuation indicator">}]</span><span class="whitespace"> </span><span class="punctuation indicator">}</span><span class="whitespace">
+</span><span class="name tag">      payload-out</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="punctuation indicator">[{</span><span class="name tag"> target</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="name variable">gateway</span><span class="whitespace"> </span><span class="punctuation indicator">},</span><span class="whitespace"> </span><span class="punctuation indicator">{</span><span class="name tag"> target</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="name variable">thermostat</span><span class="whitespace"> </span><span class="punctuation indicator">}]</span><span class="whitespace"> </span><span class="punctuation indicator">}</span><span class="whitespace">
   </span><span class="punctuation indicator">-</span><span class="whitespace"> </span><span class="punctuation indicator">{</span><span class="name tag"> name</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="name variable">thermostat</span><span class="punctuation indicator">,</span><span class="name tag"> type</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="name variable">compute</span><span class="punctuation indicator">,</span><span class="name tag"> function</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="name variable">hysteresis</span><span class="punctuation indicator">,</span><span class="whitespace">
 </span><span class="name tag">      setpoint</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal string">&quot;293.15&quot;</span><span class="punctuation indicator">,</span><span class="name tag"> half_band</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal string">&quot;2.0&quot;</span><span class="punctuation indicator">,</span><span class="name tag"> payload-in</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="name variable">true</span><span class="punctuation indicator">,</span><span class="whitespace">
-</span><span class="name tag">      payload-out</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="punctuation indicator">[{</span><span class="name tag"> target</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="name variable">moc</span><span class="whitespace"> </span><span class="punctuation indicator">}],</span><span class="whitespace">
-</span><span class="name tag">      moc-out</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="punctuation indicator">[{</span><span class="name tag"> target</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="name variable">heaters_1</span><span class="whitespace"> </span><span class="punctuation indicator">},</span><span class="whitespace"> </span><span class="punctuation indicator">{</span><span class="name tag"> target</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="name variable">heaters_2</span><span class="whitespace"> </span><span class="punctuation indicator">}]</span><span class="whitespace"> </span><span class="punctuation indicator">}</span><span class="whitespace">
+</span><span class="name tag">      payload-out</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="punctuation indicator">[{</span><span class="name tag"> target</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="name variable">gateway</span><span class="whitespace"> </span><span class="punctuation indicator">}],</span><span class="whitespace">
+</span><span class="name tag">      gateway-out</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="punctuation indicator">[{</span><span class="name tag"> target</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="name variable">heaters_1</span><span class="whitespace"> </span><span class="punctuation indicator">},</span><span class="whitespace"> </span><span class="punctuation indicator">{</span><span class="name tag"> target</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="name variable">heaters_2</span><span class="whitespace"> </span><span class="punctuation indicator">}]</span><span class="whitespace"> </span><span class="punctuation indicator">}</span><span class="whitespace">
 
 </span><span class="name tag">payloads</span><span class="punctuation">:</span><span class="whitespace">
   </span><span class="punctuation indicator">-</span><span class="whitespace"> </span><span class="punctuation indicator">{</span><span class="name tag"> name</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="name variable">temp_1</span><span class="punctuation indicator">,</span><span class="name tag"> type</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="name variable">i2c</span><span class="punctuation indicator">,</span><span class="name tag"> group</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="name variable">cabin_temps</span><span class="punctuation indicator">,</span><span class="name tag"> path</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal string">&quot;/dev/i2c-1&quot;</span><span class="punctuation indicator">,</span><span class="whitespace">
@@ -5186,19 +5212,19 @@ addresses are its own. What is here is checked as it stands, with a
 </span><span class="name tag">      payload-out</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="punctuation indicator">[{</span><span class="name tag"> target</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="name variable">k_3</span><span class="whitespace"> </span><span class="punctuation indicator">}]</span><span class="whitespace"> </span><span class="punctuation indicator">}</span><span class="whitespace">
 
   </span><span class="punctuation indicator">-</span><span class="whitespace"> </span><span class="punctuation indicator">{</span><span class="name tag"> name</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="name variable">heaters_1</span><span class="punctuation indicator">,</span><span class="name tag"> type</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="name variable">gpio</span><span class="punctuation indicator">,</span><span class="name tag"> direction</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="name variable">output</span><span class="punctuation indicator">,</span><span class="name tag"> path</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal string">&quot;/dev/gpiochip0&quot;</span><span class="punctuation indicator">,</span><span class="whitespace">
-</span><span class="name tag">      lines</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal string">&quot;3,4,5&quot;</span><span class="punctuation indicator">,</span><span class="name tag"> moc-in</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="name variable">true</span><span class="whitespace"> </span><span class="punctuation indicator">}</span><span class="whitespace">
+</span><span class="name tag">      lines</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal string">&quot;3,4,5&quot;</span><span class="punctuation indicator">,</span><span class="name tag"> gateway-in</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="name variable">true</span><span class="whitespace"> </span><span class="punctuation indicator">}</span><span class="whitespace">
   </span><span class="punctuation indicator">-</span><span class="whitespace"> </span><span class="punctuation indicator">{</span><span class="name tag"> name</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="name variable">heaters_2</span><span class="punctuation indicator">,</span><span class="name tag"> type</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="name variable">gpio</span><span class="punctuation indicator">,</span><span class="name tag"> direction</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="name variable">output</span><span class="punctuation indicator">,</span><span class="name tag"> path</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal string">&quot;/dev/gpiochip0&quot;</span><span class="punctuation indicator">,</span><span class="whitespace">
-</span><span class="name tag">      lines</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal string">&quot;6,7,8&quot;</span><span class="punctuation indicator">,</span><span class="name tag"> moc-in</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="name variable">true</span><span class="whitespace"> </span><span class="punctuation indicator">}</span><span class="whitespace">
+</span><span class="name tag">      lines</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal string">&quot;6,7,8&quot;</span><span class="punctuation indicator">,</span><span class="name tag"> gateway-in</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="name variable">true</span><span class="whitespace"> </span><span class="punctuation indicator">}</span><span class="whitespace">
 
 </span><span class="name tag">commands</span><span class="punctuation">:</span><span class="whitespace">
-  </span><span class="punctuation indicator">-</span><span class="whitespace"> </span><span class="punctuation indicator">{</span><span class="name tag"> from</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="name variable">moc</span><span class="punctuation indicator">,</span><span class="name tag"> sets</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="name variable">thermostat.setpoint</span><span class="whitespace"> </span><span class="punctuation indicator">}</span>
+  </span><span class="punctuation indicator">-</span><span class="whitespace"> </span><span class="punctuation indicator">{</span><span class="name tag"> from</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="name variable">gateway</span><span class="punctuation indicator">,</span><span class="name tag"> sets</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="name variable">thermostat.setpoint</span><span class="whitespace"> </span><span class="punctuation indicator">}</span>
 </pre>
 <p>A line is written once, on the node it leaves, under the terminal it leaves
 by: <tt class="docutils literal"><span class="pre">payload-out</span></tt> on each sensor names the conversion it feeds, and the
 conversions name the vote's input they bind. The thermostat's decision leaves
 by two terminals, which is the file saying two different things with it -- its
-<tt class="docutils literal"><span class="pre">payload-out</span></tt> sends it to the ground as telemetry, and its <tt class="docutils literal"><span class="pre">moc-out</span></tt> drives
-the two heaters.</p>
+<tt class="docutils literal"><span class="pre">payload-out</span></tt> sends it to the ground as telemetry, and its <tt class="docutils literal"><span class="pre">gateway-out</span></tt>
+drives the two heaters.</p>
 <p>Several things in that file are refusals waiting to happen, which is the point.
 Drop <tt class="docutils literal">cabin_temp.in2</tt> from <tt class="docutils literal">k_3</tt>'s links and the configuration is refused
 for a vote whose declared inputs are not the ones that arrive, rather than
@@ -5290,7 +5316,7 @@ language the vehicle can execute, which tcspecial starts from the
 configuration and connects into the graph</p>
 <ul class="simple">
 <li>App nodes: three on the vehicle's side (<tt class="docutils literal">app_payload_veh</tt>,
-<tt class="docutils literal">app_moc_veh</tt>, <tt class="docutils literal">app_all_veh</tt>) and two that are payloads (<tt class="docutils literal">app_pl</tt>,
+<tt class="docutils literal">app_gateway_veh</tt>, <tt class="docutils literal">app_all_veh</tt>) and two that are payloads (<tt class="docutils literal">app_pl</tt>,
 <tt class="docutils literal">app_all_pl</tt>), each naming its <tt class="docutils literal">executable</tt></li>
 <li>The interface is file descriptors carrying length-prefixed packets, so a
 program links against nothing of tcspecial's -- <tt class="docutils literal">tcsapp</tt> speaks it for
@@ -5331,7 +5357,7 @@ systems as follows:</p>
 |  +---------+          |  :   |  | Beacon              |  |   |             |
 |       ^               |  :   |  +---------------------+  |   |             |
 |       |               |  :   |  | The graph           |  |   | +---------+ |
-|       v               |  :   |  |  moc nodes          |  |   | |Payload 0| |
+|       v               |  :   |  |  gateway nodes      |  |   | |Payload 0| |
 |  +-----------------+  |  :   |  |  vehicle nodes:     |  |   | +---------+ |
 |  | tcslib          |&lt;-------&gt;|  |   compute, log,     |  |   | +---------+ |
 |  | tcslib-c        |  |  :   |  |   tee, null, ping,  |  |   | |Payload 1| |
@@ -5352,8 +5378,8 @@ carries its digest, so each can tell when the other is reading another one.</p>
 carries -- see <a class="reference internal" href="#where-the-addresses-are">Where the Addresses Are</a>. Commands about the spacecraft go to
 the command interpreter on one port and commands about a payload on another;
 the command interpreter answers each. The beacon is sent on a link of its own.
-What the ground sends into the graph arrives at a <tt class="docutils literal">moc</tt> node, and what leaves
-the graph for the ground goes from each source to the <tt class="docutils literal">moc</tt> node's
+What the ground sends into the graph arrives at a gateway node, and what leaves
+the graph for the ground goes from each source to the gateway node's
 <tt class="docutils literal">ground_base</tt>, at a port of its own. On a space link the same division is by
 virtual channel.</p>
 <p>Inside tcspecial the payloads are nodes of a graph the configuration draws: a
@@ -8336,7 +8362,7 @@ what says what it said, rather than told the word is unknown.</dd>
 started; two on one device file, one serial line or one SPI peripheral is
 worse, each taking part of the one stream and reporting it as though it
 were the whole. Every node that is opened is compared with every other --
-the payloads and the MOC node, a port being a port whatever claims it --
+the payloads and the gateway node, a port being a port whatever claims it --
 and the node whose claim came second is the one named, since the first
 claim is the one that stands and a reader given both names has to change
 one of them. The claim is per kind, because what a kind shares by design
@@ -11972,10 +11998,10 @@ for the payloads, rather than one <tt class="docutils literal">tcstest</tt>. A t
 <p>Four words changed as well, and these requirements use the old ones throughout.
 What a requirement calls a <strong>payload</strong> is a <strong>device</strong> where it is hardware,
 and a <strong>node</strong> where the statement is about anything the configuration can name
--- a device, a MOC link, or a compute element. Where it says <em>device</em> and means
-an entry in the filesystem, that is a <strong>device file</strong>. Where it says <strong>OC</strong> it
-means the <strong>MOC</strong>, the mission operations center. The requirements stand as
-written; <tt class="docutils literal">manual.rst</tt> gives the vocabulary in force.</p>
+-- a device, a gateway link, or a compute element. Where it says <em>device</em> and
+means an entry in the filesystem, that is a <strong>device file</strong>. Where it says
+<strong>OC</strong> it means the <strong>MOC</strong>, the mission operations center. The requirements
+stand as written; <tt class="docutils literal">manual.rst</tt> gives the vocabulary in force.</p>
 <p>A <tt class="docutils literal">Not implemented</tt> or <tt class="docutils literal">Implemented differently</tt> note says where the
 software does not do what a requirement says. The requirement stands as
 written: a note records what is so today, and is not an amendment. What each
@@ -12048,7 +12074,7 @@ and the experimental <tt class="docutils literal">CanEndpoint</tt>, <tt class="d
 and <tt class="docutils literal">GpioEndpoint</tt>. Telemetry no longer leaves from the payload's own
 node: every payload had an OC endpoint of its own, and a node's data now
 reaches the ground along the links the configuration draws, through the
-<tt class="docutils literal">moc</tt> node, which is the one UDP socket to the ground whatever types the
+gateway node, which is the one UDP socket to the ground whatever types the
 nodes behind it are. What that is for is that the graph decides where a
 datum goes -- to the ground, to a log, to a computation, or to all three --
 and a payload wired to send its own telemetry could only decide the one.</p>

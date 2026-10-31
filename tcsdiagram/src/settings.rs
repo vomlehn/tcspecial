@@ -1,14 +1,15 @@
 //! What tcsgui remembers between sessions, in
 //! `$HOME/.tcsgui/preferences.xml`.
 //!
-//! Four settings, in two pairs. How much of the working pane the moc working
-//! pane takes and how much the vehicle's takes, across; and how much of the
-//! selection column the moc list takes and how much the vehicle's takes,
-//! down. Each set of panes is always in the same order -- payloads, vehicle,
-//! moc -- so two percentages and that sentence are the whole of where a pair
-//! of dividers is, the payload one taking what is left. The two are kept by
-//! the pane they are about and not by position, so a file written when the
-//! moc pane came first means the same widths now that it comes last.
+//! Four settings, in two pairs. How much of the working pane the gateway
+//! working pane takes and how much the vehicle's takes, across; and how much of
+//! the selection column the gateway list takes and how much the vehicle's
+//! takes, down. Each set of panes is always in the same order -- payloads,
+//! vehicle, gateway -- so two percentages and that sentence are the whole of
+//! where a pair of dividers is, the payload one taking what is left. The two
+//! are kept by the pane they are about and not by position, so a file written
+//! when the gateway pane came first means the same widths now that it comes
+//! last.
 //!
 //! Here rather than in the configuration, which is the distinction worth
 //! stating. A node's position is in the configuration because it is part of
@@ -53,10 +54,10 @@ pub const MOST: i32 = 100 - 2 * LEAST;
 /// the vehicle, its own graph being most of a configuration; and a column for
 /// what it carries this flight.
 ///
-/// The moc pane's share is enough for a node to sit in rather than overhang
+/// The gateway pane's share is enough for a node to sit in rather than overhang
 /// with a margin either side: a node is 152 pixels of a working pane of 960,
 /// so a seventh would not do.
-pub const DEFAULT_MOC: i32 = 20;
+pub const DEFAULT_GATEWAY: i32 = 20;
 pub const DEFAULT_VEHICLE: i32 = 55;
 
 /// How the selection column is divided until somebody divides it
@@ -72,19 +73,19 @@ pub const DEFAULT_VEHICLE: i32 = 55;
 ///
 /// The payload list takes what is left, which is the largest share for the
 /// longest list.
-pub const DEFAULT_LIST_MOC: i32 = 20;
+pub const DEFAULT_LIST_GATEWAY: i32 = 20;
 pub const DEFAULT_LIST_VEHICLE: i32 = 35;
 
 /// What the editor remembers.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct Settings {
-    /// How much of the working pane the moc working pane takes.
-    pub moc_percent: i32,
+    /// How much of the working pane the gateway working pane takes.
+    pub gateway_percent: i32,
     /// And how much the vehicle working pane takes. The payload working pane
     /// takes what is left.
     pub vehicle_percent: i32,
-    /// How much of the selection column the moc list takes.
-    pub list_moc_percent: i32,
+    /// How much of the selection column the gateway list takes.
+    pub list_gateway_percent: i32,
     /// And how much the vehicle list takes. The payload list takes what is
     /// left.
     pub list_vehicle_percent: i32,
@@ -93,9 +94,9 @@ pub struct Settings {
 impl Default for Settings {
     fn default() -> Self {
         Settings {
-            moc_percent: DEFAULT_MOC,
+            gateway_percent: DEFAULT_GATEWAY,
             vehicle_percent: DEFAULT_VEHICLE,
-            list_moc_percent: DEFAULT_LIST_MOC,
+            list_gateway_percent: DEFAULT_LIST_GATEWAY,
             list_vehicle_percent: DEFAULT_LIST_VEHICLE,
         }
     }
@@ -115,25 +116,25 @@ impl Default for Settings {
 ///
 /// # Arguments
 ///
-/// * `moc_percent`     - The share asked for the moc pane or list, in per
+/// * `gateway_percent` - The share asked for the gateway pane or list, in per
 ///                       cent.
 /// * `vehicle_percent` - The share asked for the vehicle pane or list, in
 ///                       per cent.
 ///
 /// # Returns
 ///
-/// The moc and vehicle shares, in per cent, each at least [`LEAST`] and
+/// The gateway and vehicle shares, in per cent, each at least [`LEAST`] and
 /// leaving the payload pane at least [`LEAST`].
-pub fn shares(moc_percent: i32, vehicle_percent: i32) -> (i32, i32) {
-    let moc = moc_percent.clamp(LEAST, MOST);
-    let vehicle = vehicle_percent.clamp(LEAST, MOST - moc + LEAST);
+pub fn shares(gateway_percent: i32, vehicle_percent: i32) -> (i32, i32) {
+    let gateway = gateway_percent.clamp(LEAST, MOST);
+    let vehicle = vehicle_percent.clamp(LEAST, MOST - gateway + LEAST);
     // And the payload pane's own floor, which the two above can still have
     // eaten between them.
-    let over = (moc + vehicle) - (100 - LEAST);
+    let over = (gateway + vehicle) - (100 - LEAST);
     if over > 0 {
-        (moc, (vehicle - over).max(LEAST))
+        (gateway, (vehicle - over).max(LEAST))
     } else {
-        (moc, vehicle)
+        (gateway, vehicle)
     }
 }
 
@@ -226,7 +227,7 @@ pub fn read() -> Read {
 /// `whose` names the file in anything said about it, because a complaint about
 /// a percentage is only useful with the file it came from.
 ///
-/// A file that says nothing about the moc working pane is a file written
+/// A file that says nothing about the gateway working pane is a file written
 /// before there was one. The default share is then taken out of the vehicle's
 /// rather than out of the payloads': the column somebody arranged was the
 /// payload column, and the vehicle pane is the one with room to give.
@@ -243,38 +244,38 @@ pub fn read() -> Read {
 fn settings_in(text: &str, whose: &str) -> Settings {
     let vehicle =
         percent_in(text, whose, "vehicle_pane_percent", DEFAULT_VEHICLE);
-    let (moc, vehicle) = match (
-        element(text, "moc_pane_percent"),
+    let (gateway, vehicle) = match (
+        element(text, "gateway_pane_percent"),
         element(text, "vehicle_pane_percent"),
     ) {
         // Both stated, which is every file this build writes.
         (Some(_), _) => (
-            percent_in(text, whose, "moc_pane_percent", DEFAULT_MOC),
+            percent_in(text, whose, "gateway_pane_percent", DEFAULT_GATEWAY),
             vehicle,
         ),
-        // A file written before there was a moc working pane: it arranged the
-        // other two, so the new pane's share comes out of the vehicle's.
-        (None, Some(_)) => (DEFAULT_MOC, vehicle - DEFAULT_MOC),
+        // A file written before there was a gateway working pane: it arranged
+        // the other two, so the new pane's share comes out of the vehicle's.
+        (None, Some(_)) => (DEFAULT_GATEWAY, vehicle - DEFAULT_GATEWAY),
         // And a file that says nothing about either -- or is not a settings
         // file at all -- which is the defaults and not arithmetic on them.
-        (None, None) => (DEFAULT_MOC, DEFAULT_VEHICLE),
+        (None, None) => (DEFAULT_GATEWAY, DEFAULT_VEHICLE),
     };
 
-    let (moc_percent, vehicle_percent) = shares(moc, vehicle);
+    let (gateway_percent, vehicle_percent) = shares(gateway, vehicle);
 
     // And the selection column, which is the same arithmetic down. A file
     // written before the lists could be resized says nothing about them,
     // which is the defaults -- not a share taken out of anything, because
     // nobody arranged these yet.
-    let (list_moc_percent, list_vehicle_percent) = shares(
-        percent_in(text, whose, "moc_list_percent", DEFAULT_LIST_MOC),
+    let (list_gateway_percent, list_vehicle_percent) = shares(
+        percent_in(text, whose, "gateway_list_percent", DEFAULT_LIST_GATEWAY),
         percent_in(text, whose, "vehicle_list_percent", DEFAULT_LIST_VEHICLE),
     );
 
     Settings {
-        moc_percent,
+        gateway_percent,
         vehicle_percent,
-        list_moc_percent,
+        list_gateway_percent,
         list_vehicle_percent,
     }
 }
@@ -324,18 +325,18 @@ fn percent_in(text: &str, whose: &str, name: &str, default: i32) -> i32 {
 ///
 /// # Arguments
 ///
-/// * `moc`          - The moc working pane's share, in per cent.
+/// * `gateway`      - The gateway working pane's share, in per cent.
 /// * `vehicle`      - The vehicle working pane's share, in per cent.
-/// * `list_moc`     - The moc selection list's share, in per cent.
+/// * `list_gateway` - The gateway selection list's share, in per cent.
 /// * `list_vehicle` - The vehicle selection list's share, in per cent.
 ///
 /// # Returns
 ///
 /// The file's text, XML with comments.
 pub fn written(
-    moc: i32,
+    gateway: i32,
     vehicle: i32,
-    list_moc: i32,
+    list_gateway: i32,
     list_vehicle: i32,
 ) -> String {
     format!(
@@ -347,29 +348,29 @@ pub fn written(
      This is not a configuration: nothing here flies. It is where the editor
      keeps what the person using it arranged. -->
 <settings>
-    <!-- How much of the working pane the moc and vehicle working panes
+    <!-- How much of the working pane the gateway and vehicle working panes
          take, as a percentage of the whole. The three are always in this
          order, left to right: the payload working pane, which holds what the
          vehicle carries; the vehicle working pane, which holds the graph
-         itself; and the moc working pane, which holds the ground link. The
+         itself; and the gateway working pane, which holds the ground link. The
          payload pane takes what is left, so {rest}% here.
 
          Each between {LEAST} and {MOST}, and every pane keeps at least
          {LEAST}%: a pane with nothing visible in it is a pane whose nodes
          cannot be reached. -->
-    <moc_pane_percent>{moc}</moc_pane_percent>
+    <gateway_pane_percent>{gateway}</gateway_pane_percent>
     <vehicle_pane_percent>{vehicle}</vehicle_pane_percent>
 
-    <!-- And how much of the selection column down the left the moc and
+    <!-- And how much of the selection column down the left the gateway and
          vehicle lists take, under the same rule and in the same order top
-         to bottom: the payload list, the vehicle list and the moc list, the
+         to bottom: the payload list, the vehicle list and the gateway list, the
          payload list taking what is left, so {list_rest}% here. -->
-    <moc_list_percent>{list_moc}</moc_list_percent>
+    <gateway_list_percent>{list_gateway}</gateway_list_percent>
     <vehicle_list_percent>{list_vehicle}</vehicle_list_percent>
 </settings>
 ",
-        rest = 100 - moc - vehicle,
-        list_rest = 100 - list_moc - list_vehicle
+        rest = 100 - gateway - vehicle,
+        list_rest = 100 - list_gateway - list_vehicle
     )
 }
 
@@ -409,10 +410,10 @@ mod tests {
     /// setting not being saved at all.
     #[test]
     fn a_percentage_written_is_the_percentage_read() {
-        for (moc, vehicle) in [
+        for (gateway, vehicle) in [
             (LEAST, LEAST),
             (10, 25),
-            (DEFAULT_MOC, DEFAULT_VEHICLE),
+            (DEFAULT_GATEWAY, DEFAULT_VEHICLE),
             (LEAST, MOST),
             (MOST, LEAST),
         ] {
@@ -420,24 +421,24 @@ mod tests {
             // beside the panes' and read back from the same file, so a reader
             // that took one for the other would be a session that remembered
             // the wrong thing.
-            let (list_moc, list_vehicle) = (vehicle, moc);
-            let text = written(moc, vehicle, list_moc, list_vehicle);
+            let (list_gateway, list_vehicle) = (vehicle, gateway);
+            let text = written(gateway, vehicle, list_gateway, list_vehicle);
             let said = |name| {
                 element(&text, name).and_then(|said| said.parse::<i32>().ok())
             };
-            assert_eq!(said("moc_pane_percent"), Some(moc));
+            assert_eq!(said("gateway_pane_percent"), Some(gateway));
             assert_eq!(said("vehicle_pane_percent"), Some(vehicle));
-            assert_eq!(said("moc_list_percent"), Some(list_moc));
+            assert_eq!(said("gateway_list_percent"), Some(list_gateway));
             assert_eq!(said("vehicle_list_percent"), Some(list_vehicle));
             // And through the reader, which is what the editor would use.
             let settings = settings_in(&text, "a test");
             assert_eq!(
-                (settings.moc_percent, settings.vehicle_percent),
-                (moc, vehicle)
+                (settings.gateway_percent, settings.vehicle_percent),
+                (gateway, vehicle)
             );
             assert_eq!(
-                (settings.list_moc_percent, settings.list_vehicle_percent),
-                (list_moc, list_vehicle)
+                (settings.list_gateway_percent, settings.list_vehicle_percent),
+                (list_gateway, list_vehicle)
             );
         }
 
@@ -445,17 +446,17 @@ mod tests {
         // them, and that is the defaults rather than nothing: a session that
         // read a nought would open with a list of no height.
         let older = written(
-            DEFAULT_MOC,
+            DEFAULT_GATEWAY,
             DEFAULT_VEHICLE,
-            DEFAULT_LIST_MOC,
+            DEFAULT_LIST_GATEWAY,
             DEFAULT_LIST_VEHICLE,
         )
-        .replace("<moc_list_percent>", "<was_moc_list_percent>")
+        .replace("<gateway_list_percent>", "<was_gateway_list_percent>")
         .replace("<vehicle_list_percent>", "<was_vehicle_list_percent>");
         let settings = settings_in(&older, "a file from before");
         assert_eq!(
-            (settings.list_moc_percent, settings.list_vehicle_percent),
-            (DEFAULT_LIST_MOC, DEFAULT_LIST_VEHICLE)
+            (settings.list_gateway_percent, settings.list_vehicle_percent),
+            (DEFAULT_LIST_GATEWAY, DEFAULT_LIST_VEHICLE)
         );
     }
 
@@ -486,21 +487,21 @@ mod tests {
         assert_eq!(shares(-3, -3), (LEAST, LEAST));
     }
 
-    /// A file written before there was a moc working pane keeps the payload
+    /// A file written before there was a gateway working pane keeps the payload
     /// column it arranged.
     ///
     /// The new pane's share comes out of the vehicle's, which is the one with
     /// room to give: taking it out of the payloads' would quietly narrow the
     /// column somebody had set.
     #[test]
-    fn a_file_with_no_moc_pane_takes_its_share_from_the_vehicle() {
+    fn a_file_with_no_gateway_pane_takes_its_share_from_the_vehicle() {
         let settings = settings_in(
             "<settings><vehicle_pane_percent>75\
              </vehicle_pane_percent></settings>",
             "a test",
         );
-        assert_eq!(settings.moc_percent, DEFAULT_MOC);
-        assert_eq!(settings.vehicle_percent, 75 - DEFAULT_MOC);
+        assert_eq!(settings.gateway_percent, DEFAULT_GATEWAY);
+        assert_eq!(settings.vehicle_percent, 75 - DEFAULT_GATEWAY);
     }
 
     /// An element that is not there is not an error.

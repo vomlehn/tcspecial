@@ -684,12 +684,12 @@ mod tests {
         // Written by hand, with the payload where a file from before the
         // canvas was divided would have put it.
         let by_hand = "\
-moc:
-  - name: moc
-    type: moc
+gateway:
+  - name: gateway
+    type: gateway_radio
     address: \"10.0.0.1\"
     port: \"5000\"
-    moc-out: temp_1
+    gateway-out: temp_1
 
 payloads:
   - name: temp_1
@@ -697,11 +697,11 @@ payloads:
     path: \"/dev/i2c-1\"
     address: \"0x48\"
     trigger: \"01\"
-    payload-out: moc
+    payload-out: gateway
 
 tcsgui:
   nodes:
-    - { name: moc, x: 240, y: 40 }
+    - { name: gateway, x: 240, y: 40 }
     - { name: temp_1, x: 400, y: 240 }
 ";
         std::fs::write(&path, by_hand).expect("a file");
@@ -723,14 +723,15 @@ tcsgui:
         // than this one.
         assert_eq!(sensor.at.1, crate::pane::on_node_grid(240));
         // And the ground link, which the file drew in the vehicle's pane: it
-        // belongs in the moc pane now, so it comes home at the same height.
-        let moc = editor.document().node("moc").expect("the ground link");
+        // belongs in the gateway pane now, so it comes home at the same height.
+        let gateway =
+            editor.document().node("gateway").expect("the ground link");
         assert!(
-            moc.at.0 >= dividers.vehicle,
+            gateway.at.0 >= dividers.vehicle,
             "the ground link opened at {:?}, outside its pane",
-            moc.at
+            gateway.at
         );
-        assert_eq!(moc.at.1, crate::pane::on_node_grid(40));
+        assert_eq!(gateway.at.1, crate::pane::on_node_grid(40));
 
         // The file is untouched.
         assert_eq!(
@@ -1401,13 +1402,13 @@ tcsgui:
             home: Some("cabin".into()),
         });
         editor.edit(Edit::AddNode {
-            name: "moc".into(),
-            node_type: "moc".into(),
+            name: "gateway".into(),
+            node_type: "gateway_radio".into(),
             home: None,
         });
         // A link that crosses the boundary, which was asked for.
         editor.edit(Edit::AddLink {
-            link: crate::journal::Link::new("cabin/temp_1", "moc", None),
+            link: crate::journal::Link::new("cabin/temp_1", "gateway", None),
         });
         assert!(editor.trouble().is_none(), "{:?}", editor.trouble());
 
@@ -1417,7 +1418,7 @@ tcsgui:
 
         // The top file names what it includes and holds its own nodes.
         assert!(top.contains("include:\n  - cabin"), "{top}");
-        assert!(top.contains("name: moc"), "{top}");
+        assert!(top.contains("name: gateway"), "{top}");
         assert!(
             !top.contains("name: temp_1"),
             "the subdiagram's node is in the top file too: {top}"
@@ -1428,10 +1429,10 @@ tcsgui:
         assert!(inner.contains("name: temp_1"), "{inner}");
         // A link is an attribute of the node it leaves, so a link that
         // crosses the boundary is written in the file its *source* is in --
-        // once, and with the far end plain, moc having no subdiagram to
+        // once, and with the far end plain, gateway having no subdiagram to
         // qualify it with.
         assert!(
-            inner.contains("payload-out:\n      - target: moc\n"),
+            inner.contains("payload-out:\n      - target: gateway\n"),
             "the crossing link should be written on the node it leaves: {inner}"
         );
         assert!(

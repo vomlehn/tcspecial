@@ -8,7 +8,7 @@
 // Arguments, all optional: --yaml or --xml, but not both, saying which of the
 // example's two configuration files to read (YAML where neither is given);
 // --restart, to arm a restart of the vehicle and restart it, which a station
-// does only when it means to; the configuration; the moc node to take data
+// does only when it means to; the configuration; the gateway node to take data
 // from; and the node to ask about. Run from the repository's root none need
 // be given, and it watches the ping example.
 //
@@ -58,7 +58,8 @@ using Configuration = std::unique_ptr<
 	Closer<tcs_configuration, tcs_configuration_close>>;
 using BeaconWatch =
 	std::unique_ptr<tcs_beacons, Closer<tcs_beacons, tcs_beacons_close>>;
-using MocNode = std::unique_ptr<tcs_moc, Closer<tcs_moc, tcs_moc_close>>;
+using GatewayNode =
+	std::unique_ptr<tcs_gateway, Closer<tcs_gateway, tcs_gateway_close>>;
 using Client =
 	std::unique_ptr<tcs_client, Closer<tcs_client, tcs_client_close>>;
 using PingerHandle =
@@ -112,7 +113,7 @@ int main(int argc, char **argv)
 			return 2;
 		} else if (named.size() == 3) {
 			std::cerr << arg
-				  << ": a configuration, a moc node and a "
+				  << ": a configuration, a gateway node and a "
 				     "node may be named, and nothing more\n";
 			return 2;
 		} else {
@@ -121,7 +122,8 @@ int main(int argc, char **argv)
 	}
 	const std::string path = named.size() > 0 ? named[0] :
 		STEM + "." + (spelling.empty() ? "yaml" : spelling);
-	const std::string moc_name = named.size() > 1 ? named[1] : "moc";
+	const std::string gateway_name =
+		named.size() > 1 ? named[1] : "gateway";
 	const std::string node_name = named.size() > 2 ? named[2] : "ping";
 
 	Configuration configuration(tcs_configuration_open(path.c_str()));
@@ -134,10 +136,11 @@ int main(int argc, char **argv)
 	// Bound before anything is asked, so that nothing the vehicle sends in
 	// answer arrives before there is anywhere for it to go.
 	BeaconWatch beacons(tcs_beacons_listen(configuration.get()));
-	MocNode moc(tcs_moc_open(configuration.get(), moc_name.c_str()));
+	GatewayNode gateway(
+		tcs_gateway_open(configuration.get(), gateway_name.c_str()));
 	Client client(tcs_client_open(configuration.get()));
 	PingerHandle pinger(tcs_pinger_open(configuration.get()));
-	if (!beacons || !moc || !client || !pinger) {
+	if (!beacons || !gateway || !client || !pinger) {
 		return fail("open");
 	}
 
@@ -248,8 +251,8 @@ int main(int argc, char **argv)
 				    : "no");
 	}
 
-	// The ping node, through its moc node, and the vehicle's data from
-	// that moc node: the answer to the ping is the ping node's data, so
+	// The ping node, through its gateway node, and the vehicle's data from
+	// that gateway node: the answer to the ping is the ping node's data, so
 	// the two come in together, and whatever else the node sends with
 	// it.
 	if (tcs_pinger_ping(pinger.get()) != 0) {
@@ -257,14 +260,15 @@ int main(int argc, char **argv)
 	}
 	std::printf("ping %s through %s: sent\n",
 		    tcs_pinger_node(pinger.get()),
-		    tcs_pinger_moc(pinger.get()));
+		    tcs_pinger_gateway(pinger.get()));
 
 	tcs_exchange exchange{};
 	bool data_seen = false;
 	for (int tries = 0; tries < 10 && !(data_seen && exchange.answered);
 	     tries++) {
 		tcs_datum datum{};
-		const int got = tcs_moc_receive(moc.get(), 2000, &datum);
+		const int got =
+			tcs_gateway_receive(gateway.get(), 2000, &datum);
 		if (got < 0) {
 			return fail("data");
 		}

@@ -76,14 +76,14 @@ impl AppPl {
                 Kind::Pl.node_type()
             ));
         }
-        // The MOC interface, which is the interface payload data is written
+        // The gateway interface, which is the interface payload data is written
         // on: what a payload sends is what it writes, and this kind writes and
-        // nothing else. See `tcsapp::parent::Supports::MOC`.
+        // nothing else. See `tcsapp::parent::Supports::GATEWAY`.
         Ok(AppPl {
             running: parent::start(
                 &params.executable_path()?,
                 &params.arguments(),
-                Supports::MOC,
+                Supports::GATEWAY,
             )?,
         })
     }
@@ -189,7 +189,7 @@ mod tests {
             kind: Kind::Pl,
             executable: executable.display().to_string(),
             payload_arg: Some("--bay-2".to_string()),
-            moc_arg: None,
+            gateway_arg: None,
             restart: Restart::Never,
         }
     }

@@ -5,16 +5,16 @@
  * configuration, wait for the vehicle's first beacon, which matches the
  * station for listening, connect, which matches it for commanding, and ping,
  * ask about a node and set one of its attributes, ping the vehicle's ping
- * node and time the answer, take the vehicle's data from a moc node, and say
- * what it has received. Each step prints one line, and the same program in
+ * node and time the answer, take the vehicle's data from a gateway node, and
+ * say what it has received. Each step prints one line, and the same program in
  * C++ -- ground.cpp -- prints the same lines.
  *
  * Arguments, all optional: --yaml or --xml, but not both, saying which of
  * the example's two configuration files to read (YAML where neither is
  * given); --restart, to arm a restart of the vehicle and restart it, which a
- * station does only when it means to; the configuration; the moc node to take
- * data from; and the node to ask about. Run from the repository's root none
- * need be given, and it watches the ping example.
+ * station does only when it means to; the configuration; the gateway node to
+ * take data from; and the node to ask about. Run from the repository's root
+ * none need be given, and it watches the ping example.
  *
  *     cc ground.c -Iinclude target/debug/libtcs.a -lpthread -ldl -lm
  */
@@ -96,8 +96,9 @@ int main(int argc, char **argv)
 			return 2;
 		} else if (count == 3) {
 			fprintf(stderr,
-				"%s: a configuration, a moc node and a node "
-				"may be named, and nothing more\n", argv[i]);
+				"%s: a configuration, a gateway node and a "
+				"node may be named, and nothing more\n",
+				argv[i]);
 			return 2;
 		} else {
 			named[count++] = argv[i];
@@ -109,7 +110,7 @@ int main(int argc, char **argv)
 		named[0] = stem_path;
 	}
 	const char *path = named[0];
-	const char *moc_name = named[1] ? named[1] : "moc";
+	const char *gateway_name = named[1] ? named[1] : "gateway";
 	const char *node_name = named[2] ? named[2] : "ping";
 
 	tcs_configuration *configuration = tcs_configuration_open(path);
@@ -122,10 +123,10 @@ int main(int argc, char **argv)
 	/* Bound before anything is asked, so that nothing the vehicle sends in
 	 * answer arrives before there is anywhere for it to go. */
 	tcs_beacons *beacons = tcs_beacons_listen(configuration);
-	tcs_moc *moc = tcs_moc_open(configuration, moc_name);
+	tcs_gateway *gateway = tcs_gateway_open(configuration, gateway_name);
 	tcs_client *client = tcs_client_open(configuration);
 	tcs_pinger *pinger = tcs_pinger_open(configuration);
-	if (beacons == NULL || moc == NULL || client == NULL ||
+	if (beacons == NULL || gateway == NULL || client == NULL ||
 	    pinger == NULL) {
 		return fail("open");
 	}
@@ -229,15 +230,15 @@ int main(int argc, char **argv)
 		       tcs_client_awaiting_restart(client) == 1 ? "yes" : "no");
 	}
 
-	/* The ping node, through its moc node, and the vehicle's data from
-	 * that moc node: the answer to the ping is the ping node's data, so
+	/* The ping node, through its gateway node, and the vehicle's data from
+	 * that gateway node: the answer to the ping is the ping node's data, so
 	 * the two come in together, and whatever else the node sends with
 	 * it. */
 	if (tcs_pinger_ping(pinger) != 0) {
 		return fail("ping node");
 	}
 	printf("ping %s through %s: sent\n", tcs_pinger_node(pinger),
-	       tcs_pinger_moc(pinger));
+	       tcs_pinger_gateway(pinger));
 
 	tcs_exchange exchange;
 	int data_seen = 0;
@@ -245,7 +246,7 @@ int main(int argc, char **argv)
 	for (int tries = 0; tries < 10 && !(data_seen && exchange.answered);
 	     tries++) {
 		tcs_datum datum;
-		int got = tcs_moc_receive(moc, 2000, &datum);
+		int got = tcs_gateway_receive(gateway, 2000, &datum);
 		if (got < 0) {
 			return fail("data");
 		}
@@ -290,7 +291,7 @@ int main(int argc, char **argv)
 
 	tcs_pinger_close(pinger);
 	tcs_client_close(client);
-	tcs_moc_close(moc);
+	tcs_gateway_close(gateway);
 	tcs_beacons_close(beacons);
 	tcs_configuration_close(configuration);
 	return 0;

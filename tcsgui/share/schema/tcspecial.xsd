@@ -91,9 +91,9 @@
        tests. xs:token, so that the whitespace around a word in an element
        is not part of it. -->
   <!-- A ground link. -->
-  <xs:simpleType name="mocType">
+  <xs:simpleType name="gatewayType">
     <xs:restriction base="xs:token">
-      <xs:enumeration value="moc"/>
+      <xs:enumeration value="gateway_radio"/>
       <xs:enumeration value="gateway_fprime"/>
     </xs:restriction>
   </xs:simpleType>
@@ -103,13 +103,13 @@
     <xs:restriction base="xs:token">
       <xs:enumeration value="compute"/>
       <xs:enumeration value="log"/>
-      <xs:enumeration value="null-moc"/>
+      <xs:enumeration value="null-gateway"/>
       <xs:enumeration value="null-payload"/>
-      <xs:enumeration value="tee-moc"/>
+      <xs:enumeration value="tee-gateway"/>
       <xs:enumeration value="tee-payload"/>
       <xs:enumeration value="ping"/>
       <xs:enumeration value="app_payload_veh"/>
-      <xs:enumeration value="app_moc_veh"/>
+      <xs:enumeration value="app_gateway_veh"/>
       <xs:enumeration value="app_all_veh"/>
     </xs:restriction>
   </xs:simpleType>
@@ -142,12 +142,12 @@
       <xs:element name="group" type="xs:string"/>
       <!-- The two data sources, which are where links are written. -->
       <xs:element name="payload-out" type="destination"/>
-      <xs:element name="moc-out" type="destination"/>
+      <xs:element name="gateway-out" type="destination"/>
       <!-- And the two data sinks, which say whether a line arrives there.
            A record of the links written at the other end rather than a link,
            and optional. See the `source` type above. -->
       <xs:element name="payload-in" type="source"/>
-      <xs:element name="moc-in" type="source"/>
+      <xs:element name="gateway-in" type="source"/>
       <!-- Where a node is. -->
       <xs:element name="path" type="xs:string"/>
       <xs:element name="address" type="xs:string"/>
@@ -247,14 +247,14 @@
            as its first argument. -->
       <xs:element name="executable" type="xs:string"/>
       <!-- What an app node's program is told about each stream its kind
-           handles: the payload argument first, then the MOC one.
+           handles: the payload argument first, then the gateway one.
            `app-payload-arg` is said by app_payload_veh, app_all_veh, app_pl
-           and app_all_pl, which handle payload data; `app-moc-arg` by
-           app_moc_veh, app_all_veh and app_all_pl, which handle MOC data.
-           Required of those kinds, the list a program is run with being a
+           and app_all_pl, which handle payload data; `app-gateway-arg` by
+           app_gateway_veh, app_all_veh and app_all_pl, which handle gateway
+           data. Required of those kinds, the list a program is run with being a
            fixed one. -->
       <xs:element name="app-payload-arg" type="xs:string"/>
-      <xs:element name="app-moc-arg" type="xs:string"/>
+      <xs:element name="app-gateway-arg" type="xs:string"/>
       <xs:element name="restart" type="xs:string"/>
       <!-- A log. -->
       <xs:element name="directory" type="xs:string"/>
@@ -266,9 +266,9 @@
 
   <!-- A node of each section: its type, from the section's list, and the
        rest of what a node may say. -->
-  <xs:complexType name="mocNode">
+  <xs:complexType name="gatewayNode">
     <xs:choice minOccurs="0" maxOccurs="unbounded">
-      <xs:element name="type" type="mocType"/>
+      <xs:element name="type" type="gatewayType"/>
       <xs:group ref="nodeWords"/>
     </xs:choice>
   </xs:complexType>
@@ -422,7 +422,7 @@
         <xs:element name="include" type="xs:string"/>
         <xs:element name="tcspecial" type="tcspecial"/>
         <xs:element name="payload_groups" type="payload_group"/>
-        <xs:element name="moc" type="mocNode"/>
+        <xs:element name="gateway" type="gatewayNode"/>
         <xs:element name="vehicle" type="vehicleNode"/>
         <xs:element name="payloads" type="payloadNode"/>
         <xs:element name="commands" type="command"/>

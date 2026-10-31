@@ -4,8 +4,8 @@
 //!
 //! An `app_payload_veh` that, once it holds its interfaces, prints to stdout
 //! and stderr and reads stdin, which is what a careless app does. It then
-//! says, as MOC data, how many bytes stdin gave, and echoes payload data as
-//! MOC data -- until a packet says `panic`, when it panics.
+//! says, as gateway data, how many bytes stdin gave, and echoes payload data as
+//! gateway data -- until a packet says `panic`, when it panics.
 
 use std::io::Read;
 use std::process::ExitCode;
@@ -32,14 +32,14 @@ fn main() -> ExitCode {
     let mut stdin = Vec::new();
     let read = std::io::stdin().read_to_end(&mut stdin);
     let report = format!("stdin gave {:?}", read.map(|_| stdin.len()).ok());
-    if app.payload.write_moc(report.as_bytes()).is_err() {
+    if app.payload.write_gateway(report.as_bytes()).is_err() {
         return ExitCode::FAILURE;
     }
     loop {
         match app.payload.read_payload() {
             Ok(Some(data)) if data == b"panic" => panic!("asked to panic"),
             Ok(Some(data)) => {
-                if app.payload.write_moc(&data).is_err() {
+                if app.payload.write_gateway(&data).is_err() {
                     return ExitCode::FAILURE;
                 }
             }

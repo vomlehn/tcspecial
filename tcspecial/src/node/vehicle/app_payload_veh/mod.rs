@@ -1,4 +1,4 @@
-//! The node that is a program reading payload data and writing MOC data.
+//! The node that is a program reading payload data and writing gateway data.
 //!
 //! An app node is a program of the vehicle's own, run by tcspecial, that takes
 //! part in the graph. What a file may say about one, and what is wrong with
@@ -8,10 +8,10 @@
 //! way each of them carries data.
 //!
 //! One interface, at descriptor 0 of the program: it reads payload data there
-//! and writes MOC data there. So this end writes payload data and reads MOC
-//! data, which is what the two methods below are. Descriptor 1 is not opened
-//! for it at all -- there is nothing here to reach it with, and `tcsapp` makes
-//! the program refuse to start if it finds one.
+//! and writes gateway data there. So this end writes payload data and reads
+//! gateway data, which is what the two methods below are. Descriptor 1 is not
+//! opened for it at all -- there is nothing here to reach it with, and `tcsapp`
+//! makes the program refuse to start if it finds one.
 //!
 //! Which makes a node of this kind the shape the ground link has: it takes
 //! what travels groundward and answers with what travels vehicleward.
@@ -85,25 +85,25 @@ impl AppPayloadVeh {
         self.running.write_payload(data)
     }
 
-    /// Whatever MOC data it has written, without waiting.
+    /// Whatever gateway data it has written, without waiting.
     ///
     /// What the fabric calls, every pass: [`Arrived::Nothing`] is a program
     /// with nothing to say, which is the ordinary answer.
-    pub fn take_moc_data_now(&mut self) -> Result<Arrived, String> {
-        self.running.read_moc_now()
+    pub fn take_gateway_data_now(&mut self) -> Result<Arrived, String> {
+        self.running.read_gateway_now()
     }
 
     /// The same, into the fabric's buffer, allocating nothing.
-    pub fn take_moc_data_now_into(
+    pub fn take_gateway_data_now_into(
         &mut self,
         out: &mut [u8],
     ) -> Result<ReadInto, String> {
-        self.running.read_moc_now_into(out)
+        self.running.read_gateway_now_into(out)
     }
 
-    /// Take a packet of MOC data from it, or `None` once it has ended.
-    pub fn take_moc_data(&mut self) -> Result<Option<Vec<u8>>, String> {
-        self.running.read_moc()
+    /// Take a packet of gateway data from it, or `None` once it has ended.
+    pub fn take_gateway_data(&mut self) -> Result<Option<Vec<u8>>, String> {
+        self.running.read_gateway()
     }
 
     /// What it said went wrong, or `None` once it has said all it will.
@@ -141,9 +141,9 @@ mod tests {
     ///
     /// `cat`, with its output sent to the one interface this kind is given: it
     /// reads payload data at descriptor 0 and writes what it read back to the
-    /// same descriptor, which is MOC data there. Five lines of shell rather
+    /// same descriptor, which is gateway data there. Five lines of shell rather
     /// than a crate of its own, because what is tested here is this node and
-    /// not an app -- the apps are `app_payload_veh`, `app_moc_veh` and
+    /// not an app -- the apps are `app_payload_veh`, `app_gateway_veh` and
     /// `app_all_veh`, which are crates and have tests of their own.
     ///
     /// # Arguments
@@ -182,7 +182,7 @@ mod tests {
             kind: Kind::PayloadVeh,
             executable: executable.display().to_string(),
             payload_arg: Some("--readings".to_string()),
-            moc_arg: None,
+            gateway_arg: None,
             restart: Restart::Never,
         }
     }
@@ -203,14 +203,17 @@ mod tests {
         node.give_payload_data(b"293.15")
             .expect("it takes a packet");
         assert_eq!(
-            node.take_moc_data().expect("an answer"),
+            node.take_gateway_data().expect("an answer"),
             Some(b"293.15".to_vec())
         );
 
         // A packet of no bytes is a packet, and comes back as one.
         node.give_payload_data(b"")
             .expect("it takes an empty packet");
-        assert_eq!(node.take_moc_data().expect("an answer"), Some(Vec::new()));
+        assert_eq!(
+            node.take_gateway_data().expect("an answer"),
+            Some(Vec::new())
+        );
 
         // Told that nothing more is coming, it finishes of its own accord.
         node.no_more().expect("the interfaces end");
@@ -243,11 +246,11 @@ mod tests {
     fn a_node_of_another_kind_is_not_opened_as_this_one() {
         let where_ = tempfile::tempdir().expect("a directory");
         let mut params = says(&stands_in(where_.path()));
-        params.kind = Kind::MocVeh;
+        params.kind = Kind::GatewayVeh;
 
         let said =
             AppPayloadVeh::of(&params).expect_err("a node of another kind");
-        assert!(said.contains(Kind::MocVeh.node_type()), "{said}");
+        assert!(said.contains(Kind::GatewayVeh.node_type()), "{said}");
         assert!(said.contains(Kind::PayloadVeh.node_type()), "{said}");
     }
 }

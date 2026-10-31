@@ -2,7 +2,7 @@
  * tcs.h -- tcslib for C and C++.
  *
  * What a ground station is built on, behind one header: the vehicle's beacons,
- * the vehicle's data from a moc node, and commands to the vehicle. The same
+ * the vehicle's data from a gateway node, and commands to the vehicle. The same
  * library the Rust ground programs use -- tcslib -- so a C or C++ station reads
  * the configuration, counts ports and ages beacons exactly as tcsmoc does.
  *
@@ -13,7 +13,7 @@
  *
  * Conventions, the same for every function:
  *
- *   - Each thing a station holds -- a configuration, a beacon watch, a moc
+ *   - Each thing a station holds -- a configuration, a beacon watch, a gateway
  *     node, a client -- is a handle, made by an _open (or _listen) function
  *     and freed by the matching _close. A _close of NULL does nothing.
  *   - A function that makes a handle returns NULL where it cannot; one that
@@ -109,7 +109,7 @@ int tcs_configuration_node_id(const tcs_configuration *configuration,
  * the match last ended. A beacon with the flag set or another checksum, or
  * one gone overdue, ends both.
  *
- * Until it is matched for listening, a moc node made from the configuration
+ * Until it is matched for listening, a gateway node made from the configuration
  * reads nothing: every datum is dropped and counted, and at the match
  * whatever was already queued is dropped and counted too. Until it is
  * matched for commanding, a client made from it sends nothing but CONNECT,
@@ -256,8 +256,8 @@ void tcs_beacons_close(tcs_beacons *beacons);
 
 /* ---- The vehicle's data ------------------------------------------------- */
 
-/* A moc node, open on the ground: a port for each node drawn into it. */
-typedef struct tcs_moc tcs_moc;
+/* A gateway node, open on the ground: a port for each node drawn into it. */
+typedef struct tcs_gateway tcs_gateway;
 
 /* One datum, and the node that produced it. */
 typedef struct tcs_datum {
@@ -266,29 +266,31 @@ typedef struct tcs_datum {
 	size_t length;
 } tcs_datum;
 
-/** Opens a moc node on the ground, which reads data only while the station
+/** Opens a gateway node on the ground, which reads data only while the station
  * is matched for listening: see tcs_configuration_matched().
  *
  * @param configuration  The configuration.
- * @param moc            The moc node's name.
- * @return               The moc node, or NULL where it cannot be opened. */
-tcs_moc *tcs_moc_open(const tcs_configuration *configuration, const char *moc);
+ * @param gateway        The gateway node's name.
+ * @return               The gateway node, or NULL where it cannot be opened. */
+tcs_gateway *tcs_gateway_open(const tcs_configuration *configuration,
+			      const char *gateway);
 
-/** Takes the next datum from any of the moc node's sources.
+/** Takes the next datum from any of the gateway node's sources.
  *
- * @param moc      The moc node.
+ * @param gateway  The gateway node.
  * @param wait_ms  How long to wait, in milliseconds, or for ever where it is
  *                 negative.
  * @param datum    Where the datum is written; its source and data are the
- *                 moc node's, good until the next receive.
+ *                 gateway node's, good until the next receive.
  * @return         1 for a datum, 0 for none in that time, -1 on an
  *                 error. */
-int tcs_moc_receive(tcs_moc *moc, int64_t wait_ms, tcs_datum *datum);
+int tcs_gateway_receive(tcs_gateway *gateway, int64_t wait_ms,
+			tcs_datum *datum);
 
-/** Closes a moc node.
+/** Closes a gateway node.
  *
- * @param moc  The moc node, or NULL to do nothing. */
-void tcs_moc_close(tcs_moc *moc);
+ * @param gateway  The gateway node, or NULL to do nothing. */
+void tcs_gateway_close(tcs_gateway *gateway);
 
 /* ---- Commands ----------------------------------------------------------- */
 
@@ -518,10 +520,10 @@ void tcs_client_close(tcs_client *client);
 
 /* ---- Pinging a ping node ------------------------------------------------ */
 
-/* A ping goes up to a moc node, which hands it to the vehicle's ping node;
+/* A ping goes up to a gateway node, which hands it to the vehicle's ping node;
  * the answer, with the vehicle's time on the end, comes down as that ping
- * node's data from the same moc node, which a station takes with
- * tcs_moc_receive and hands back here. */
+ * node's data from the same gateway node, which a station takes with
+ * tcs_gateway_receive and hands back here. */
 typedef struct tcs_pinger tcs_pinger;
 
 /* What there is to know of the pings, at one moment. Times are nanoseconds
@@ -541,25 +543,25 @@ typedef struct tcs_exchange {
 } tcs_exchange;
 
 /** Opens a way to ping the first ping node the configuration lets the
- * ground reach both ways, through its moc node.
+ * ground reach both ways, through its gateway node.
  *
  * @param configuration  The configuration.
  * @return               The pinger, or NULL where there is no such ping
- *                       node or its moc node cannot be reached. */
+ *                       node or its gateway node cannot be reached. */
 tcs_pinger *tcs_pinger_open(const tcs_configuration *configuration);
 
-/** Names the ping node, which a datum from tcs_moc_receive() is an answer
+/** Names the ping node, which a datum from tcs_gateway_receive() is an answer
  * from.
  *
  * @param pinger  The pinger.
  * @return        The ping node's name, or NULL on an error. */
 const char *tcs_pinger_node(const tcs_pinger *pinger);
 
-/** Names the moc node the ping node's answers are to be received from.
+/** Names the gateway node the ping node's answers are to be received from.
  *
  * @param pinger  The pinger.
- * @return        The moc node's name, or NULL on an error. */
-const char *tcs_pinger_moc(const tcs_pinger *pinger);
+ * @return        The gateway node's name, or NULL on an error. */
+const char *tcs_pinger_gateway(const tcs_pinger *pinger);
 
 /** Sends the next ping, numbered from one.
  *

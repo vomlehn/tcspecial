@@ -663,7 +663,7 @@ distclean: clean
 # the file or overwrites it on an upgrade. The test one goes in the same
 # bin, beside tcspecial, which is where tcspecial looks for it.
 FLIGHT_BIN := tcspecial tcsverify
-FLIGHT_LIBEXEC := app_pl app_all_pl app_moc_veh app_payload_veh app_all_veh
+FLIGHT_LIBEXEC := app_pl app_all_pl app_gateway_veh app_payload_veh app_all_veh
 GROUND_BIN := tcsgui
 TEST_BIN := tcsmoc tcssim segsend
 PACKAGES := tcspecial tcspecial-ground tcspecial-test

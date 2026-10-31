@@ -184,12 +184,13 @@ ping it, start, stop, set and query a node, arm and restart the vehicle,
 change how often it beacons. A mission control system such as YAMCS or
 MCT drives a <code>TcsClient</code> instead of speaking the command and
 telemetry protocol itself.</li>
-<li><strong>Receiving its data.</strong> <code>moc::Moc</code> is the
-ground’s end of a <code>moc</code> node in a configuration. Name the
-node, open it, and each call to <code>receive</code> returns one datum
-along with the name of the node that produced it. The ports the data
-arrive on are worked out from the configuration, the same way tcspecial
-works them out, so the two ends cannot disagree about them.</li>
+<li><strong>Receiving its data.</strong>
+<code>gateway::GatewayReceiver</code> is the ground’s end of a gateway
+node in a configuration. Name the node, open it, and each call to
+<code>receive</code> returns one datum along with the name of the node
+that produced it. The ports the data arrive on are worked out from the
+configuration, the same way tcspecial works them out, so the two ends
+cannot disagree about them.</li>
 <li><strong>Knowing it is there.</strong> <code>beacon</code> listens
 for the beacon tcspecial sends on its own, every
 <code>beacon.default_interval</code>, whether or not anyone has
@@ -224,8 +225,9 @@ of it, so a ground program needs only tcslib.</p>
 <li><code>tcsui</code>, the window pieces shared by the ground
 programs.</li>
 <li><code>examples/simple-app</code>, whose ground station
-<code>lorem_moc</code> gets its data with one call to
-<code>Moc::receive_into</code>, into a buffer it made beforehand.</li>
+<code>lorem_gateway</code> gets its data with one call to
+<code>GatewayReceiver::receive_into</code>, into a buffer it made
+beforehand.</li>
 <li><code>examples/beacon</code>, whose window watches the beacon
 through <code>beacon</code>.</li>
 </ul>

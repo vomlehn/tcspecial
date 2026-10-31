@@ -1,6 +1,6 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="900" height="450" viewBox="0 0 900 450" role="img" aria-labelledby="title desc">
   <title id="title">The fprime example</title>
-  <desc id="desc">The vehicle answers to an F´ flight computer rather than to the ground. The thermometer's readings go by its payload-out link to fsw, a gateway_fprime node, and so to the F´ deployment's TcsBridge component at 127.0.0.1:9702: fsw's bridge_base, 9700, plus the thermometer's device id, 2. The bridge gives each reading the F´ ID 0x3002: fsw's fprime_id_base, 0x3000, plus the same id. A command from the bridge goes up to fsw, which tcspecial binds at 127.0.0.1:9600, and leaves it by its moc-out link for the heater.</desc>
+  <desc id="desc">The vehicle answers to an F´ flight computer rather than to the ground. The thermometer's readings go by its payload-out link to fsw, a gateway_fprime node, and so to the F´ deployment's TcsBridge component at 127.0.0.1:9702: fsw's bridge_base, 9700, plus the thermometer's device id, 2. The bridge gives each reading the F´ ID 0x3002: fsw's fprime_id_base, 0x3000, plus the same id. A command from the bridge goes up to fsw, which tcspecial binds at 127.0.0.1:9600, and leaves it by its gateway-out link for the heater.</desc>
   <defs>
     <style>
       text { font-family: "DejaVu Sans", Helvetica, Arial, sans-serif; fill: #111827; }
@@ -67,7 +67,7 @@
   <path class="up" d="M636,140 L564,140" marker-end="url(#arrow-amber)"/>
   <text class="label" x="574" y="131">command</text>
   <path class="up" d="M340,130 L259,120" marker-end="url(#arrow-amber)"/>
-  <text class="label" x="268" y="112">moc-out</text>
+  <text class="label" x="268" y="112">gateway-out</text>
 
   <!-- Down: a reading, to fsw and on to the bridge -->
   <path class="down" d="M255,250 L336,240" marker-end="url(#arrow-blue)"/>

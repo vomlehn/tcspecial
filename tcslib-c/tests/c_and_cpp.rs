@@ -6,8 +6,8 @@
 //! and works: `examples/ground.c` with gcc and `examples/ground.cpp` with
 //! g++, each linked with the `libtcs.a` this crate builds, each run against a
 //! stand-in vehicle that sends beacons as tcspecial serializes them, answers
-//! CONNECT, PING and QUERY_NODE, and sends one datum to the moc node. The two
-//! must print the same lines, and the right ones: among them that a PING is
+//! CONNECT, PING and QUERY_NODE, and sends one datum to the gateway node. The
+//! two must print the same lines, and the right ones: among them that a PING is
 //! refused unsent before the station is matched, that it is matched for
 //! listening by the vehicle's beacon and for commanding by its Connect, and
 //! what it has counted of what the vehicle sent.
@@ -177,8 +177,8 @@ fn compiled(
 /// commands expected, or the program does not print the lines expected.
 fn against_a_vehicle(program: &Path) -> String {
     // The vehicle's sockets: where beacons come from, where commands are
-    // taken, where node commands are taken, where the moc node takes a ping,
-    // and where its data is sent from.
+    // taken, where node commands are taken, where the gateway node takes a
+    // ping, and where its data is sent from.
     let beacon = bound();
     let interpreter = bound();
     let nodes = bound();
@@ -218,21 +218,21 @@ fn against_a_vehicle(program: &Path) -> String {
   tcs_cmd:
     recv: \"127.0.0.1:{}\"
     send: \"127.0.0.1:{cmd_from}\"
-moc:
-  - name: moc
-    type: moc
+gateway:
+  - name: gateway
+    type: gateway_radio
     address: \"127.0.0.1\"
     port: \"{}\"
     ground_base: \"127.0.0.1:{}\"
     payload-in: true
-    moc-out:
+    gateway-out:
       - target: ping
 vehicle:
   - name: ping
     type: ping
-    moc-in: true
+    gateway-in: true
     payload-out:
-      - target: moc
+      - target: gateway
 ",
             port(&beacon),
             dir.path().display(),
@@ -411,7 +411,7 @@ vehicle:
         "sample ping: took \"ping\" of 6 bytes, gave nothing".to_string(),
         "restart: armed done, restarted done".to_string(),
         "restart: awaiting a beacon that starts again: yes".to_string(),
-        "ping ping through moc: sent".to_string(),
+        "ping ping through gateway: sent".to_string(),
         "data from ping: hello from ping".to_string(),
         "ping ping: answered, round trip timed, up and down summing to it \
         yes"

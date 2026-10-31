@@ -19,9 +19,10 @@
 //! that it states where its F´ channel IDs begin, `fprime_id_base`, which
 //! nothing aboard reads.
 //!
-//! The section the gateway nodes are written in, and the node type the radio
-//! is, are still `moc`: the rename to `gateway` changes configuration keys, and
-//! is held back to land with the `payload` rename.
+//! The gateway nodes are written in the `gateway` section, and the radio's
+//! node type is `gateway_radio`. Both were `moc` once, and a file that still
+//! says so is refused where it is read, told the new word: see
+//! [`crate::graph::renamed`].
 
 use std::fmt;
 
@@ -72,7 +73,7 @@ impl GatewayKind {
     /// The node type, or `None` for a kind that has no gateway nodes.
     pub fn node_type(self) -> Option<&'static str> {
         match self {
-            GatewayKind::Radio => Some("moc"),
+            GatewayKind::Radio => Some("gateway_radio"),
             GatewayKind::Fprime => Some("gateway_fprime"),
             GatewayKind::Cfs => None,
         }
@@ -151,7 +152,7 @@ impl GatewayKind {
     /// is not a gateway's.
     ///
     /// The one statement of which node type is which kind's, read from
-    /// [`GatewayKind::node_type`]. The radio's is still spelled `moc`.
+    /// [`GatewayKind::node_type`].
     pub fn of_node_type(node_type: &str) -> Option<GatewayKind> {
         GatewayKind::ALL
             .into_iter()
@@ -177,7 +178,7 @@ impl GatewayKind {
 /// Whether a node of this type is a gateway's: the vehicle's end of the link
 /// to whatever it answers to.
 ///
-/// What every rule that was about the `moc` node is now about, so that a
+/// What every rule that was about the radio's node is now about, so that a
 /// gateway node of any kind is opened, counted and checked as one.
 pub fn is_gateway(node_type: &str) -> bool {
     GatewayKind::of_node_type(node_type).is_some()
@@ -220,12 +221,15 @@ mod tests {
     /// gateway's.
     #[test]
     fn each_built_kind_has_its_node_type() {
-        assert_eq!(GatewayKind::of_node_type("moc"), Some(GatewayKind::Radio));
+        assert_eq!(
+            GatewayKind::of_node_type("gateway_radio"),
+            Some(GatewayKind::Radio)
+        );
         assert_eq!(
             GatewayKind::of_node_type("gateway_fprime"),
             Some(GatewayKind::Fprime)
         );
-        for other in ["log", "compute", "i2c", "tee-moc", "gateway_cfs"] {
+        for other in ["log", "compute", "i2c", "tee-gateway", "gateway_cfs"] {
             assert_eq!(GatewayKind::of_node_type(other), None, "{other}");
             assert!(!is_gateway(other), "{other}");
         }

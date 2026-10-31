@@ -1,12 +1,12 @@
-//! An app that reads payload data and writes MOC data.
+//! An app that reads payload data and writes gateway data.
 //!
 //! The node type `app_payload_veh`, and one of the three programs the app node
 //! types are tested with. What it does is answer: every packet of payload data
-//! that arrives comes back as a packet of MOC data holding the same bytes. An
-//! echo is the only shape available to this kind of app -- it has the one
-//! interface, on which payload data is read and MOC data written -- and it is
-//! the shape a test wants, because what arrives being exactly what was sent is
-//! a thing a test can assert without knowing anything about the app.
+//! that arrives comes back as a packet of gateway data holding the same bytes.
+//! An echo is the only shape available to this kind of app -- it has the one
+//! interface, on which payload data is read and gateway data written -- and it
+//! is the shape a test wants, because what arrives being exactly what was sent
+//! is a thing a test can assert without knowing anything about the app.
 //!
 //! Descriptor 1 is not open. Nothing here reaches for it, and `tcsapp` refuses
 //! to start if it is open anyway: a program run as a kind of app it is not
@@ -19,8 +19,8 @@ use std::process::ExitCode;
 
 use tcsapp::app::{complain, AppPayloadVeh};
 
-/// Writes every packet of payload data that arrives back as MOC data holding
-/// the same bytes, until the interface ends.
+/// Writes every packet of payload data that arrives back as gateway data
+/// holding the same bytes, until the interface ends.
 ///
 /// # Returns
 ///
@@ -50,12 +50,12 @@ fn main() -> ExitCode {
 
     loop {
         match payload.read_payload() {
-            // Answered with the same bytes, as MOC data.
+            // Answered with the same bytes, as gateway data.
             Ok(Some(data)) => {
-                if let Err(e) = payload.write_moc(&data) {
+                if let Err(e) = payload.write_gateway(&data) {
                     let _ = errors.say(&format!(
-                        "app_payload_veh {name}: {} bytes of MOC data could \
-                         not be written: {e}",
+                        "app_payload_veh {name}: {} bytes of gateway data \
+                         could not be written: {e}",
                         data.len()
                     ));
                     return ExitCode::FAILURE;

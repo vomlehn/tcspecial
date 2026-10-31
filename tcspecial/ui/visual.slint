@@ -35,7 +35,7 @@ export component VisualWindow inherits Window {
     in property <length> vehicle-divider;
     in property <color> payload-ground;
     in property <color> vehicle-ground;
-    in property <color> moc-ground;
+    in property <color> gateway-ground;
 
     // Said in the title as well as in the manual, because a window that looks
     // like the editor and is not one should say what it is where it is seen.
@@ -63,7 +63,7 @@ export component VisualWindow inherits Window {
                 vehicle-divider: root.vehicle-divider;
                 payload-ground: root.payload-ground;
                 vehicle-ground: root.vehicle-ground;
-                moc-ground: root.moc-ground;
+                gateway-ground: root.gateway-ground;
             }
 
             // The dividers, as lines. The editor's can be dragged; these are

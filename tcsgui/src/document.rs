@@ -70,7 +70,7 @@ pub struct Node {
 /// whose setpoint had quietly stopped being commandable.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Command {
-    /// The MOC node the command arrives on.
+    /// The gateway node the command arrives on.
     pub from: String,
     /// What it sets, as `node.attribute`.
     pub sets: String,
@@ -94,7 +94,7 @@ pub struct Command {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Concern {
     /// A node at the start of a stream whose data reaches nothing: a payload
-    /// whose readings go nowhere, a MOC link nothing is listening to.
+    /// whose readings go nowhere, a gateway link nothing is listening to.
     GoesNowhere { node: String, terminal: String },
     /// A vehicle node something arrives at and nothing leaves. The stream
     /// stops there, and a log is the one type that is allowed to stop one.
@@ -269,7 +269,7 @@ pub struct GroupField {
 /// # Errors
 ///
 /// The rules' own words for what is wrong: what an app node lacks, or why a
-/// payload's or the MOC link's way of being reached is refused.
+/// payload's or the gateway link's way of being reached is refused.
 fn reach_of_node(node: &Node) -> Result<(), String> {
     let theirs = tcslibgs::graph::Node {
         name: node.name.clone(),
@@ -310,7 +310,7 @@ fn reach_of_node(node: &Node) -> Result<(), String> {
 
     // Only the nodes that are opened. A computation and a log have rules of
     // their own, and this would tell them they are not interfaces.
-    if !theirs.is_payload() && theirs.node_type != "moc" {
+    if !theirs.is_payload() && theirs.node_type != "gateway_radio" {
         return Ok(());
     }
     tcslibgs::graph::reach::reach_of(&theirs).map(|_| ())
@@ -631,13 +631,13 @@ impl Document {
     ///
     /// Which rules apply to a node depends on which pane it is in, because the
     /// data flows one way through the panes: a payload is where the payload's
-    /// own data begins and a MOC link is where it ends, and the other stream
-    /// runs the other way. So a payload's `payload-out` with nothing on it is
-    /// a concern -- those readings reach nobody -- where a computation's is
-    /// not, a computation being free to send its result the other way or to be
-    /// read by nothing yet. What is asked of a vehicle node is that a stream
+    /// own data begins and a gateway link is where it ends, and the other
+    /// stream runs the other way. So a payload's `payload-out` with nothing on
+    /// it is a concern -- those readings reach nobody -- where a computation's
+    /// is not, a computation being free to send its result the other way or to
+    /// be read by nothing yet. What is asked of a vehicle node is that a stream
     /// passing through it comes out somewhere, which is the shape of the whole
-    /// graph: payload, vehicle nodes, MOC link.
+    /// graph: payload, vehicle nodes, gateway link.
     ///
     /// In the document's own order, so the list a person reads is the list in
     /// the file.
@@ -698,7 +698,7 @@ impl Document {
             match crate::pane::pane_of(&node.node_type) {
                 // Where a stream begins: what it sends has to reach
                 // something, or the node is a sensor nobody reads.
-                crate::pane::Pane::Payloads | crate::pane::Pane::Moc => {
+                crate::pane::Pane::Payloads | crate::pane::Pane::Gateway => {
                     for terminal in terminals.sources {
                         if !leaves(terminal) {
                             concerns.push(Concern::GoesNowhere {
@@ -1889,7 +1889,7 @@ impl Document {
         // The three sections, as the YAML writer does them: one file shape in
         // two spellings. Several destinations are several elements of one
         // name, which is how XML says a list.
-        for section in [Section::Moc, Section::Vehicle, Section::Payloads] {
+        for section in [Section::Gateway, Section::Vehicle, Section::Payloads] {
             for node in self
                 .nodes_in(home)
                 .into_iter()
@@ -2148,7 +2148,7 @@ impl Document {
         // a configuration with no payloads yet is a configuration somebody is
         // partway through, and `payloads:` with nothing under it reads back as
         // nothing anyway.
-        for section in [Section::Moc, Section::Vehicle, Section::Payloads] {
+        for section in [Section::Gateway, Section::Vehicle, Section::Payloads] {
             let theirs: Vec<&Node> = self
                 .nodes_in(home)
                 .into_iter()
@@ -2357,9 +2357,9 @@ impl Document {
     ///
     /// # Returns
     ///
-    /// For each data source with something on it, `payload-out` then `moc-out`:
-    /// the terminal's name, an entry per link, and the first comment found on
-    /// any of them.
+    /// For each data source with something on it, `payload-out` then
+    /// `gateway-out`: the terminal's name, an entry per link, and the first
+    /// comment found on any of them.
     fn leaving(
         &self,
         node: &Node,
@@ -2367,7 +2367,7 @@ impl Document {
     ) -> Vec<(&'static str, Vec<Bound>, Option<String>)> {
         let mut leaving: Vec<(&'static str, Vec<Bound>, Option<String>)> =
             Vec::new();
-        for terminal in ["payload-out", "moc-out"] {
+        for terminal in ["payload-out", "gateway-out"] {
             let mut destinations: Vec<Bound> = Vec::new();
             // One line carries one comment, so the attribute's comment is the
             // first thing written about any of the links under it. Nothing in
@@ -2430,11 +2430,11 @@ impl Document {
     ///
     /// # Returns
     ///
-    /// The sinks something arrives at, `payload-in` then `moc-in`.
+    /// The sinks something arrives at, `payload-in` then `gateway-in`.
     fn arriving(&self, node: &Node, home: &Home) -> Vec<&'static str> {
         let mut arriving: Vec<&'static str> = Vec::new();
         let ours = Qualified::of(&node.name, home).absolute();
-        for sink in ["payload-in", "moc-in"] {
+        for sink in ["payload-in", "gateway-in"] {
             let any = self.links.iter().filter(|l| l.to == ours).any(|link| {
                 // Which sink of this node the line arrives at, which needs the
                 // terminal it left by: the two are one stream read from either
@@ -2854,12 +2854,12 @@ pub fn thermostat_example() -> Document {
          the band.",
     );
 
-    place(&mut document, "moc", "moc", (790, 34));
-    set(&mut document, "moc", "address", "10.0.0.1");
-    set(&mut document, "moc", "port", "5000");
+    place(&mut document, "gateway", "gateway_radio", (790, 34));
+    set(&mut document, "gateway", "address", "10.0.0.1");
+    set(&mut document, "gateway", "port", "5000");
     // Where the ground station is: each node linked into this one sends to
     // this port plus its own device id, from the start.
-    set(&mut document, "moc", "ground_base", "10.0.0.2:5100");
+    set(&mut document, "gateway", "ground_base", "10.0.0.2:5100");
 
     for (name, at, lines) in [
         ("heaters_1", (34, 393), "3,4,5"),
@@ -2908,7 +2908,7 @@ pub fn thermostat_example() -> Document {
     // The "T": each converted reading goes to the ground, into the vote, and
     // into the log.
     for (from, input) in [("k_1", "in0"), ("k_2", "in1"), ("k_3", "in2")] {
-        link(&mut document, from, "payload-out", "moc", None);
+        link(&mut document, from, "payload-out", "gateway", None);
         link(
             &mut document,
             from,
@@ -2919,7 +2919,7 @@ pub fn thermostat_example() -> Document {
         link(&mut document, from, "payload-out", "housekeeping", None);
     }
 
-    link(&mut document, "cabin_temp", "payload-out", "moc", None);
+    link(&mut document, "cabin_temp", "payload-out", "gateway", None);
     link(
         &mut document,
         "cabin_temp",
@@ -2928,9 +2928,21 @@ pub fn thermostat_example() -> Document {
         None,
     );
     // The heaters are a payload, so what drives them leaves the thermostat by
-    // its moc-out: the vehicleward stream, which is what reaches a payload.
-    link(&mut document, "thermostat", "moc-out", "heaters_1", None);
-    link(&mut document, "thermostat", "moc-out", "heaters_2", None);
+    // its gateway-out: the vehicleward stream, which is what reaches a payload.
+    link(
+        &mut document,
+        "thermostat",
+        "gateway-out",
+        "heaters_1",
+        None,
+    );
+    link(
+        &mut document,
+        "thermostat",
+        "gateway-out",
+        "heaters_2",
+        None,
+    );
     link(
         &mut document,
         "thermostat",
@@ -2938,13 +2950,18 @@ pub fn thermostat_example() -> Document {
         "housekeeping",
         None,
     );
-    link(&mut document, "thermostat", "payload-out", "moc", None);
+    link(&mut document, "thermostat", "payload-out", "gateway", None);
     // The comment belongs to the terminal rather than to one link, so both
     // of the heaters carry it: that is what reading the file back gives, a
-    // comment above `moc-out` being about the block and not its first line.
+    // comment above `gateway-out` being about the block and not its first line.
     for heater in ["heaters_1", "heaters_2"] {
         document.apply(&Edit::SetLinkComment {
-            link: Link::joining("thermostat", Some("moc-out"), heater, None),
+            link: Link::joining(
+                "thermostat",
+                Some("gateway-out"),
+                heater,
+                None,
+            ),
             was: None,
             now: Some(
                 "asserted below the setpoint, unasserted above it. Two \
@@ -2960,7 +2977,7 @@ pub fn thermostat_example() -> Document {
     // and the diagram cannot show: the setpoint is commanded, and the rest of
     // the thermostat is not.
     document.commands.push(Command {
-        from: "moc".to_string(),
+        from: "gateway".to_string(),
         sets: "thermostat.setpoint".to_string(),
         comment: Some(
             "the cabin temperature the heaters are held at, in kelvin"
@@ -4532,14 +4549,14 @@ mod tests {
 
         let mut document = Document::new();
         document.apply(&add("temp_1", "i2c"));
-        document.apply(&add("moc", "moc"));
+        document.apply(&add("gateway", "gateway_radio"));
         document.apply(&Edit::AddLink {
-            link: Link::joining("temp_1", Some("payload-out"), "moc", None),
+            link: Link::joining("temp_1", Some("payload-out"), "gateway", None),
         });
 
         let yaml = document.to_yaml();
         assert!(
-            yaml.contains("    payload-out:\n      - target: moc\n"),
+            yaml.contains("    payload-out:\n      - target: gateway\n"),
             "{yaml}"
         );
         assert!(
@@ -4549,7 +4566,7 @@ mod tests {
 
         let xml = document.to_xml();
         assert!(
-            xml.contains("<payload-out><target>moc</target></payload-out>"),
+            xml.contains("<payload-out><target>gateway</target></payload-out>"),
             "{xml}"
         );
         assert!(
@@ -4560,13 +4577,13 @@ mod tests {
         // And the record is of the stream, not of the terminal somebody drew
         // from: what leaves by payload-out arrives at payload-in and nowhere
         // else, so the payload's own sink says nothing about this link.
-        assert!(!yaml.contains("moc-in"), "{yaml}");
+        assert!(!yaml.contains("gateway-in"), "{yaml}");
     }
 
     /// A sink several lines arrive at says what one line says: that they do.
     ///
     /// The ground's case, which is every configuration: each payload aboard
-    /// reports to the one moc node, told apart by the socket its id names.
+    /// reports to the one gateway node, told apart by the socket its id names.
     /// Which is the reason this is a flag rather than a name -- one name there
     /// would read as "and nothing else".
     #[test]
@@ -4574,11 +4591,11 @@ mod tests {
         use crate::journal::Link;
 
         let mut document = Document::new();
-        document.apply(&add("moc", "moc"));
+        document.apply(&add("gateway", "gateway_radio"));
         for name in ["temp_2", "temp_1"] {
             document.apply(&add(name, "i2c"));
             document.apply(&Edit::AddLink {
-                link: Link::joining(name, Some("payload-out"), "moc", None),
+                link: Link::joining(name, Some("payload-out"), "gateway", None),
             });
         }
 
@@ -4604,8 +4621,8 @@ mod tests {
         assert!(document.concerns().is_empty(), "nothing at all");
 
         document.apply(&Edit::AddNode {
-            name: "moc-1".to_string(),
-            node_type: "moc".to_string(),
+            name: "gateway-1".to_string(),
+            node_type: "gateway_radio".to_string(),
             home: None,
         });
         assert!(
@@ -4634,16 +4651,20 @@ mod tests {
     #[test]
     fn one_of_two_nodes_sharing_a_name_can_be_renamed() {
         let mut document = Document::new();
-        for name in ["i2c", "i2c", "moc"] {
+        for name in ["i2c", "i2c", "gateway"] {
             document.apply(&Edit::AddNode {
                 name: name.to_string(),
-                node_type: if name == "moc" { "moc" } else { "i2c" }
-                    .to_string(),
+                node_type: if name == "gateway" {
+                    "gateway_radio"
+                } else {
+                    "i2c"
+                }
+                .to_string(),
                 home: None,
             });
         }
         document.apply(&Edit::AddLink {
-            link: Link::new("i2c", "moc", None),
+            link: Link::new("i2c", "gateway", None),
         });
 
         // Both of them are offered, because the file does not say which was
@@ -4705,7 +4726,7 @@ mod tests {
     }
 
     /// Three shapes, and which rules apply depends on the pane: a payload is
-    /// where the payload's own data begins and a MOC link where it ends, so
+    /// where the payload's own data begins and a gateway link where it ends, so
     /// those two are asked whether what they send reaches anything, and a
     /// vehicle node is asked whether a stream passing through it comes out
     /// somewhere.
@@ -4716,7 +4737,7 @@ mod tests {
         let mut document = Document::new();
         for (name, node_type) in [
             ("sensor", "i2c"),
-            ("ground", "moc"),
+            ("ground", "gateway_radio"),
             ("cabin_temp", "compute"),
             ("housekeeping", "log"),
         ] {
@@ -4733,7 +4754,7 @@ mod tests {
             said,
             vec![
                 "payload-out-goes-nowhere".to_string(),
-                "moc-out-goes-nowhere".to_string()
+                "gateway-out-goes-nowhere".to_string()
             ],
             "{:?}",
             document.concerns()
@@ -4758,7 +4779,7 @@ mod tests {
         assert!(said.contains(&"nothing-leaves".to_string()), "{said:?}");
 
         // And on to the ground, which is the shape the whole graph is: a
-        // payload, vehicle nodes, a MOC link.
+        // payload, vehicle nodes, a gateway link.
         document.apply(&Edit::AddLink {
             link: Link::joining(
                 "cabin_temp",
@@ -4771,7 +4792,7 @@ mod tests {
             document.concerns().iter().map(|c| c.kind()).collect();
         assert_eq!(
             said,
-            vec!["moc-out-goes-nowhere".to_string()],
+            vec!["gateway-out-goes-nowhere".to_string()],
             "{:?}",
             document.concerns()
         );
@@ -4829,7 +4850,7 @@ mod tests {
 
         let mut document = Document::new();
         document.apply(&add("sensor", "i2c"));
-        document.apply(&add("ground", "moc"));
+        document.apply(&add("ground", "gateway_radio"));
         let concern = document
             .concerns()
             .into_iter()
@@ -4902,7 +4923,7 @@ mod tests {
         let dividers = crate::pane::default_dividers();
         let mut document = Document::new();
         for (name, node_type, at) in [
-            ("moc", "moc", (24, 1800)),
+            ("gateway", "gateway_radio", (24, 1800)),
             ("mean", "compute", (272, 288)),
             ("payload", "network", (744, 160)),
             ("sensor", "i2c", (720, 432)),
@@ -4971,7 +4992,7 @@ mod tests {
         let dividers = crate::pane::default_dividers();
         let mut document = Document::new();
         let before: Vec<(String, (i32, i32))> = [
-            ("moc", "moc", (24, 1800)),
+            ("gateway", "gateway_radio", (24, 1800)),
             ("sensor", "i2c", (720, 900)),
             ("other", "i2c", (800, 1400)),
         ]
@@ -5157,13 +5178,13 @@ mod tests {
             home: Some("cabin".into()),
         });
         document.apply(&Edit::AddNode {
-            name: "moc".into(),
-            node_type: "moc".into(),
+            name: "gateway".into(),
+            node_type: "gateway_radio".into(),
             home: None,
         });
 
         assert_eq!(document.subdiagrams(), vec!["cabin".to_string()]);
-        assert_eq!(document.nodes_in(&None).len(), 2, "cabin and moc");
+        assert_eq!(document.nodes_in(&None).len(), 2, "cabin and gateway");
         assert_eq!(document.nodes_in(&Some("cabin".into())).len(), 1);
 
         // Named through its home from outside, plainly from inside.
@@ -5220,8 +5241,8 @@ mod tests {
             home: None,
         });
         document.apply(&Edit::AddNode {
-            name: "moc".into(),
-            node_type: "moc".into(),
+            name: "gateway".into(),
+            node_type: "gateway_radio".into(),
             home: None,
         });
         for name in ["temp_1", "k_1"] {
@@ -5237,7 +5258,7 @@ mod tests {
             link: Link::new("cabin/temp_1", "cabin/k_1", None),
         });
         document.apply(&Edit::AddLink {
-            link: Link::new("cabin/k_1", "moc", None),
+            link: Link::new("cabin/k_1", "gateway", None),
         });
 
         assert_eq!(
@@ -5271,8 +5292,8 @@ mod tests {
             home: None,
         });
         document.apply(&Edit::AddNode {
-            name: "moc".into(),
-            node_type: "moc".into(),
+            name: "gateway".into(),
+            node_type: "gateway_radio".into(),
             home: None,
         });
         document.apply(&Edit::AddNode {
@@ -5281,7 +5302,7 @@ mod tests {
             home: Some("cabin".into()),
         });
         document.apply(&Edit::AddLink {
-            link: Link::new("cabin/temp_1", "moc", None),
+            link: Link::new("cabin/temp_1", "gateway", None),
         });
 
         let files = document
@@ -5325,12 +5346,12 @@ mod tests {
             home: None,
         });
         document.apply(&Edit::AddNode {
-            name: "moc".into(),
-            node_type: "moc".into(),
+            name: "gateway".into(),
+            node_type: "gateway_radio".into(),
             home: None,
         });
         document.apply(&Edit::AddLink {
-            link: Link::new("p", "moc", None),
+            link: Link::new("p", "gateway", None),
         });
 
         let files = document
@@ -5339,7 +5360,7 @@ mod tests {
         let (_, top) = &files[0];
         assert!(top.contains("payload-in: true"), "{top}");
         assert!(
-            !top.contains("moc-in"),
+            !top.contains("gateway-in"),
             "the line was recorded at the sink of cabin/p's stream: {top}"
         );
     }
@@ -5359,8 +5380,8 @@ mod tests {
             home: None,
         });
         document.apply(&Edit::AddNode {
-            name: "moc".into(),
-            node_type: "moc".into(),
+            name: "gateway".into(),
+            node_type: "gateway_radio".into(),
             home: None,
         });
         document.apply(&Edit::AddNode {
@@ -5369,7 +5390,7 @@ mod tests {
             home: Some("cabin".into()),
         });
         document.apply(&Edit::AddLink {
-            link: Link::new("cabin/temp_1", "moc", None),
+            link: Link::new("cabin/temp_1", "gateway", None),
         });
 
         let files = document
@@ -5379,21 +5400,21 @@ mod tests {
 
         let written: usize = files
             .iter()
-            .map(|(_, text)| text.matches("- target: moc").count())
+            .map(|(_, text)| text.matches("- target: gateway").count())
             .sum();
         assert_eq!(written, 1, "the crossing link was written {written} times");
 
         // In the subdiagram's file, where its source lives: a link is an
         // attribute of the node it leaves, so the file holding that node is
         // the only file that says anything about it. The far end is plain
-        // because `moc` is in the top diagram and has no subdiagram to
+        // because `gateway` is in the top diagram and has no subdiagram to
         // qualify it with.
         let (_, inner) = files
             .iter()
             .find(|(path, _)| path.ends_with("cabin.yaml"))
             .expect("the subdiagram's file");
         assert!(
-            inner.contains("payload-out:\n      - target: moc\n"),
+            inner.contains("payload-out:\n      - target: gateway\n"),
             "{inner}"
         );
 
@@ -5407,12 +5428,12 @@ mod tests {
     fn a_link_into_a_subdiagram_that_is_absent_is_reported() {
         let mut document = Document::new();
         document.apply(&Edit::AddNode {
-            name: "moc".into(),
-            node_type: "moc".into(),
+            name: "gateway".into(),
+            node_type: "gateway_radio".into(),
             home: None,
         });
         document.apply(&Edit::AddLink {
-            link: Link::new("moc", "cabin/temp_1", None),
+            link: Link::new("gateway", "cabin/temp_1", None),
         });
 
         assert!(

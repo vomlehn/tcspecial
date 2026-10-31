@@ -923,7 +923,7 @@ fn pace_of(node: &tcslibgs::graph::Node) -> Option<Pace> {
 ///
 /// *Its output goes somewhere.* A node read when nothing takes what it
 /// produces is a read whose result is discarded, and the one that matters here
-/// is a MOC link: what arrives on one is a command, which sets an attribute
+/// is a gateway link: what arrives on one is a command, which sets an attribute
 /// rather than travelling a link, so polling it would be taking commands off
 /// the socket and throwing them away. A ground link that *does* feed the graph
 /// says so with a link out of it, and is then polled like anything else.
@@ -956,7 +956,7 @@ fn is_polled(
         // is gone. (A null node produces nothing, and says so.)
         && !matches!(
             node.node_type.as_str(),
-            "compute" | "log" | "tee-moc" | "tee-payload" | "ping"
+            "compute" | "log" | "tee-gateway" | "tee-payload" | "ping"
         )
 }
 
@@ -1125,8 +1125,8 @@ pub fn open(
         "log" => Ok(Box::new(LogPort::of(LogNode::of(node, segsend)?))),
         // A node that drops the one stream it takes, and one that sends it on
         // both ways. Nothing is opened for either: neither is an interface.
-        "null-moc" | "null-payload" => Ok(Box::new(NullPort::of())),
-        "tee-moc" | "tee-payload" => Ok(Box::new(TeePort::of(&node.name))),
+        "null-gateway" | "null-payload" => Ok(Box::new(NullPort::of())),
+        "tee-gateway" | "tee-payload" => Ok(Box::new(TeePort::of(&node.name))),
         // A node that answers the ground's pings. Nothing is opened for it
         // either: what it hears and where its answers go are its links.
         "ping" => Ok(Box::new(PingPort::of(&node.name))),
@@ -1135,7 +1135,7 @@ pub fn open(
         // a link of its own to the node's ground_base, opened beside it --
         // see `open_ground_link`. So one that binds nothing, or that nothing
         // is read from, is held as a node that is never asked anything.
-        "moc"
+        "gateway_radio"
             if !tcslibgs::graph::reach::binds(node)
                 || Use::of(routes, &node.name).is_err() =>
         {
@@ -1177,8 +1177,10 @@ pub fn described(graph: &Graph) -> BTreeMap<String, String> {
         .map(|node| {
             let how = match node.node_type.as_str() {
                 "compute" | "log" => String::new(),
-                "null-moc" | "null-payload" => "drops what arrives".to_string(),
-                "tee-moc" | "tee-payload" => {
+                "null-gateway" | "null-payload" => {
+                    "drops what arrives".to_string()
+                }
+                "tee-gateway" | "tee-payload" => {
                     "sends what arrives both ways".to_string()
                 }
                 "ping" => "answers pings".to_string(),
@@ -1423,8 +1425,8 @@ mod tests {
         let where_ = tempfile::tempdir().expect("a directory");
         let path = where_.path().join("paced.yaml");
         let mut text = String::from(
-            "moc:
-  - { name: ground, type: moc, ground_base: \"127.0.0.1:5100\" }
+            "gateway:
+  - { name: ground, type: gateway_radio, ground_base: \"127.0.0.1:5100\" }
 payloads:
   - { name: exchanged, type: i2c, path: \"/dev/i2c-1\", address: \"0x48\",
       trigger: \"55\", trigger_interval: \"100 ms\", payload-out: ground }
@@ -1574,8 +1576,8 @@ payloads:
         let path = where_.path().join("quiet.yaml");
         std::fs::write(
             &path,
-            "moc:
-  - { name: ground, type: moc, ground_base: \"127.0.0.1:5100\" }
+            "gateway:
+  - { name: ground, type: gateway_radio, ground_base: \"127.0.0.1:5100\" }
 payloads:
   - { name: exchanged, type: i2c, path: \"/dev/i2c-1\", address: \"0x48\",
       trigger: \"55\", trigger_interval: \"100 ms\", payload-out: ground }
@@ -2184,9 +2186,10 @@ vehicle:
                     "gpio" => Ok(Box::new(Ground {
                         got: Arc::clone(&opening_heaters),
                     }) as Box<dyn Port>),
-                    "moc" => Ok(Box::new(Ground {
+                    "gateway_radio" => Ok(Box::new(Ground {
                         got: Arc::clone(&opening_ground),
-                    }) as Box<dyn Port>),
+                    })
+                        as Box<dyn Port>),
                     // And the ones that need nothing but a configuration, which
                     // are opened for real.
                     _ => open(node, routes, abandon, &SegSend::none()),
@@ -2194,12 +2197,12 @@ vehicle:
             },
             // What goes to the ground, watched rather than sent: there is no
             // ground station here to bind the other end. A line drawn into the
-            // moc node arrives at its source's own link, so those are what the
-            // ground is watched at; an untouched payload's link is watched
+            // gateway node arrives at its source's own link, so those are what
+            // the ground is watched at; an untouched payload's link is watched
             // apart.
             |link: &Telemetered| {
                 let got = match link.via {
-                    tcslibgs::graph::telemetry::Via::Moc(_) => {
+                    tcslibgs::graph::telemetry::Via::Gateway(_) => {
                         Arc::clone(&ground)
                     }
                     tcslibgs::graph::telemetry::Via::PayloadTelemetry => {
@@ -2534,9 +2537,10 @@ vehicle:
                 "spi" => Ok(Box::new(Steady {
                     reading: &[0x00, 0x10, 0x00],
                 }) as Box<dyn Port>),
-                "gpio" | "moc" => Ok(Box::new(Sink {
+                "gpio" | "gateway_radio" => Ok(Box::new(Sink {
                     got: Arc::clone(&opening),
-                }) as Box<dyn Port>),
+                })
+                    as Box<dyn Port>),
                 _ => open(node, routes, abandon, &SegSend::none()),
             },
             move |_: &Telemetered| {
@@ -2745,16 +2749,17 @@ vehicle:
     /// The ground link stands in for the socket the MOC sends to; the ping
     /// node is the real one. What reaches the ground is the ping, a space and
     /// the vehicle's time, over the link drawn from the ping node to the
-    /// `moc` node; and what is not a ping is refused and answers nothing.
+    /// gateway node; and what is not a ping is refused and answers nothing.
     #[test]
     fn a_ping_from_the_ground_is_answered_to_the_ground() {
         let where_ = tempfile::tempdir().expect("a directory");
         let path = where_.path().join("ping.yaml");
         std::fs::write(
             &path,
-            "moc:\n\
-             \x20 - { name: ground, type: moc, address: 127.0.0.1, port: \
-             \"5000\", ground_base: \"127.0.0.1:5100\", moc-out: pinger }\n\
+            "gateway:\n\
+             \x20 - { name: ground, type: gateway_radio, address: 127.0.0.1, \
+             port: \"5000\", ground_base: \"127.0.0.1:5100\", \
+             gateway-out: pinger }\n\
              vehicle:\n\
              \x20 - { name: pinger, type: ping, payload-out: ground }\n",
         )
@@ -2770,7 +2775,7 @@ vehicle:
             &graph,
             Instant::now(),
             move |node: &Node, routes: &Routes, abandon: &Abandon| {
-                if node.node_type == "moc" {
+                if node.node_type == "gateway_radio" {
                     Ok(Box::new(Sensor {
                         readings: Arc::clone(&pings),
                     }) as Box<dyn Port>)
@@ -2782,7 +2787,9 @@ vehicle:
                 assert_eq!(link.source, "pinger");
                 assert_eq!(
                     link.via,
-                    tcslibgs::graph::telemetry::Via::Moc("ground".to_string())
+                    tcslibgs::graph::telemetry::Via::Gateway(
+                        "ground".to_string()
+                    )
                 );
                 Ok(Box::new(Ground {
                     got: Arc::clone(&sent),
@@ -2860,7 +2867,7 @@ vehicle:
             vehicle.system.holds(),
             17,
             "twelve nodes in the example, and a link to the ground for each of \
-             the five nodes drawn into its moc node"
+             the five nodes drawn into its gateway node"
         );
     }
 
@@ -2909,7 +2916,7 @@ vehicle:
                     ));
                 }
                 match node.node_type.as_str() {
-                    "spi" | "gpio" | "moc" => {
+                    "spi" | "gpio" | "gateway_radio" => {
                         Ok(Box::new(Ground::default()) as Box<dyn Port>)
                     }
                     _ => open(node, routes, abandon, &SegSend::none()),
@@ -2939,7 +2946,7 @@ vehicle:
         assert_eq!(described["temp_1"], "i2c, read");
         assert_eq!(described["heaters_1"], "gpio, driven");
         assert_eq!(described["heaters_2"], "gpio, driven");
-        assert_eq!(described["moc"], "moc, read");
+        assert_eq!(described["gateway"], "gateway_radio, read");
         assert_eq!(described["k_1"], "compute");
         assert_eq!(described["housekeeping"], "log");
     }

@@ -7,15 +7,15 @@
 //! this kind of node: which of those interfaces it has, and which way each of
 //! them carries data.
 //!
-//! One interface, at descriptor 1 of the program: it reads MOC data there and
-//! writes payload data there. So this end writes MOC data and reads payload
-//! data. Descriptor 0 is not opened for it at all.
+//! One interface, at descriptor 1 of the program: it reads gateway data there
+//! and writes payload data there. So this end writes gateway data and reads
+//! payload data. Descriptor 0 is not opened for it at all.
 //!
 //! Which makes a node of this kind the shape every payload has: it is asked
 //! for a reading -- by a trigger, a command, whatever the mission sends -- and
-//! answers with one. The difference between this and an `app_moc_veh`, whose
-//! program holds the same interface and does the same two things with it, is
-//! which side of the graph the node stands on: this one is in the `payloads`
+//! answers with one. The difference between this and an `app_gateway_veh`,
+//! whose program holds the same interface and does the same two things with it,
+//! is which side of the graph the node stands on: this one is in the `payloads`
 //! section, is drawn on the payload pane, and is what the vehicle carries this
 //! flight.
 //!
@@ -82,14 +82,14 @@ impl AppAllPl {
             running: parent::start(
                 &params.executable_path()?,
                 &params.arguments(),
-                Supports::MOC,
+                Supports::GATEWAY,
             )?,
         })
     }
 
-    /// Hand it a packet of MOC data, which is what asks it for a reading.
-    pub fn give_moc_data(&mut self, data: &[u8]) -> Result<(), String> {
-        self.running.write_moc(data)
+    /// Hand it a packet of gateway data, which is what asks it for a reading.
+    pub fn give_gateway_data(&mut self, data: &[u8]) -> Result<(), String> {
+        self.running.write_gateway(data)
     }
 
     /// Whatever payload data it has written, without waiting.
@@ -186,7 +186,7 @@ mod tests {
             kind: Kind::AllPl,
             executable: executable.display().to_string(),
             payload_arg: Some("--bay-2".to_string()),
-            moc_arg: Some("--bay-2-commands".to_string()),
+            gateway_arg: Some("--bay-2-commands".to_string()),
             restart: Restart::Never,
         }
     }
@@ -203,13 +203,14 @@ mod tests {
         let mut node = crate::when_not_busy(|| AppAllPl::of(&says(&program)))
             .expect("it starts");
 
-        node.give_moc_data(b"READ").expect("it takes a packet");
+        node.give_gateway_data(b"READ").expect("it takes a packet");
         assert_eq!(
             node.take_payload_data().expect("an answer"),
             Some(b"READ".to_vec())
         );
 
-        node.give_moc_data(b"").expect("it takes an empty packet");
+        node.give_gateway_data(b"")
+            .expect("it takes an empty packet");
         assert_eq!(
             node.take_payload_data().expect("an answer"),
             Some(Vec::new())
@@ -238,10 +239,10 @@ mod tests {
     fn a_node_of_another_kind_is_not_opened_as_this_one() {
         let where_ = tempfile::tempdir().expect("a directory");
         let mut params = says(&stands_in(where_.path()));
-        params.kind = Kind::MocVeh;
+        params.kind = Kind::GatewayVeh;
 
         let said = AppAllPl::of(&params).expect_err("a node of another kind");
-        assert!(said.contains(Kind::MocVeh.node_type()), "{said}");
+        assert!(said.contains(Kind::GatewayVeh.node_type()), "{said}");
         assert!(said.contains(Kind::AllPl.node_type()), "{said}");
     }
 }

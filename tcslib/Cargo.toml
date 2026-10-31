@@ -5,7 +5,7 @@ edition = "2021"
 license.workspace = true
 description = """\
 The ground side of the TCSpecial link: commands to the vehicle's command \
-interpreter, the vehicle's data from a moc node, and its beacons"""
+interpreter, the vehicle's data from a gateway node, and its beacons"""
 
 [dependencies]
 tcslibgs = { path = "../tcslibgs" }

@@ -2,8 +2,8 @@
 #
 # Run with both file interfaces, which makes it the one kind of app that can
 # carry a stream through: payload data read on the one interface can be written
-# as payload data on the other, and MOC data likewise the other way about. So
-# it is what a null node is when somebody wants something done to what passes
+# as payload data on the other, and gateway data likewise the other way about.
+# So it is what a null node is when somebody wants something done to what passes
 # -- and it has all four terminals, as a null node does. The interfaces and the
 # packets they carry are tcsapp; its Rust is
 # tcspecial/src/node/vehicle/app_all_veh/.
@@ -13,8 +13,8 @@ about: >
   A program of its own, on both interfaces: it reads and writes both streams.
 payload-sink: true
 payload-source: true
-moc-sink: true
-moc-source: true
+gateway-sink: true
+gateway-source: true
 attributes:
   - name: executable
     required: true
@@ -32,11 +32,11 @@ attributes:
       What the program is told about the payload stream, as the argument after
       the node's name. Required: the arguments are a fixed list, so a node that
       said nothing would shift what the rest of the list means.
-  - name: app-moc-arg
+  - name: app-gateway-arg
     required: true
     about: >
-      What the program is told about the MOC stream, as the argument after the
-      payload one where this kind has both. Required, for the reason the
+      What the program is told about the gateway stream, as the argument after
+      the payload one where this kind has both. Required, for the reason the
       payload argument is.
   - name: restart
     required: false

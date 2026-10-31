@@ -190,8 +190,8 @@
         "additionalProperties": false
       }
     },
-    "moc": {
-      "description": "The ground links: what the editor's moc working pane holds.",
+    "gateway": {
+      "description": "The ground links: what the editor's gateway working pane holds.",
       "type": "array",
       "items": {
         "type": "object",
@@ -201,10 +201,10 @@
             "type": "string"
           },
           "type": {
-            "description": "What it is: the configuration's own word for the type. A link to the ground over the radio is moc; one to an F´ bridge component is gateway_fprime.",
+            "description": "What it is: the configuration's own word for the type. A link to the ground over the radio is gateway_radio; one to an F´ bridge component is gateway_fprime.",
             "type": "string",
             "enum": [
-              "moc",
+              "gateway_radio",
               "gateway_fprime"
             ]
           },
@@ -240,8 +240,8 @@
               }
             ]
           },
-          "moc-out": {
-            "description": "The lines that leave this node by its `moc-out`, one entry each. An entry names the node the line goes to as its `target`, and `input` where it feeds a named input of that node. The short spellings are read too: the destination as a string, `node` or `node.terminal`, alone or in a list.",
+          "gateway-out": {
+            "description": "The lines that leave this node by its `gateway-out`, one entry each. An entry names the node the line goes to as its `target`, and `input` where it feeds a named input of that node. The short spellings are read too: the destination as a string, `node` or `node.terminal`, alone or in a list.",
             "oneOf": [
               {
                 "description": "One line, written as an entry.",
@@ -272,8 +272,8 @@
             "description": "Whether a line arrives at this node's `payload-in` sink. A record of the links written on the nodes they leave, and not a link: which node a line comes from is written on that node. A file may leave it out; one that disagrees with the links is refused where it is read.",
             "type": "boolean"
           },
-          "moc-in": {
-            "description": "Whether a line arrives at this node's `moc-in` sink. A record of the links written on the nodes they leave, and not a link: which node a line comes from is written on that node. A file may leave it out; one that disagrees with the links is refused where it is read.",
+          "gateway-in": {
+            "description": "Whether a line arrives at this node's `gateway-in` sink. A record of the links written on the nodes they leave, and not a link: which node a line comes from is written on that node. A file may leave it out; one that disagrees with the links is refused where it is read.",
             "type": "boolean"
           },
           "path": {
@@ -301,7 +301,7 @@
             ]
           },
           "ground_base": {
-            "description": "Where the ground station is, as address:port. What each node linked into this moc node produces is sent to that address, at that port plus the node's device id.",
+            "description": "Where the ground station is, as address:port. What each node linked into this gateway node produces is sent to that address, at that port plus the node's device id.",
             "type": [
               "string",
               "number",
@@ -842,13 +842,13 @@
             "enum": [
               "compute",
               "log",
-              "null-moc",
+              "null-gateway",
               "null-payload",
-              "tee-moc",
+              "tee-gateway",
               "tee-payload",
               "ping",
               "app_payload_veh",
-              "app_moc_veh",
+              "app_gateway_veh",
               "app_all_veh"
             ]
           },
@@ -884,8 +884,8 @@
               }
             ]
           },
-          "moc-out": {
-            "description": "The lines that leave this node by its `moc-out`, one entry each. An entry names the node the line goes to as its `target`, and `input` where it feeds a named input of that node. The short spellings are read too: the destination as a string, `node` or `node.terminal`, alone or in a list.",
+          "gateway-out": {
+            "description": "The lines that leave this node by its `gateway-out`, one entry each. An entry names the node the line goes to as its `target`, and `input` where it feeds a named input of that node. The short spellings are read too: the destination as a string, `node` or `node.terminal`, alone or in a list.",
             "oneOf": [
               {
                 "description": "One line, written as an entry.",
@@ -916,8 +916,8 @@
             "description": "Whether a line arrives at this node's `payload-in` sink. A record of the links written on the nodes they leave, and not a link: which node a line comes from is written on that node. A file may leave it out; one that disagrees with the links is refused where it is read.",
             "type": "boolean"
           },
-          "moc-in": {
-            "description": "Whether a line arrives at this node's `moc-in` sink. A record of the links written on the nodes they leave, and not a link: which node a line comes from is written on that node. A file may leave it out; one that disagrees with the links is refused where it is read.",
+          "gateway-in": {
+            "description": "Whether a line arrives at this node's `gateway-in` sink. A record of the links written on the nodes they leave, and not a link: which node a line comes from is written on that node. A file may leave it out; one that disagrees with the links is refused where it is read.",
             "type": "boolean"
           },
           "path": {
@@ -1412,8 +1412,8 @@
               "null"
             ]
           },
-          "app-moc-arg": {
-            "description": "And what it is told about the MOC stream, as the argument after the payload one where a kind has both. Said by the kinds that handle MOC data -- app_moc_veh, app_all_veh, app_all_pl -- and required of them.",
+          "app-gateway-arg": {
+            "description": "And what it is told about the gateway stream, as the argument after the payload one where a kind has both. Said by the kinds that handle gateway data -- app_gateway_veh, app_all_veh, app_all_pl -- and required of them.",
             "type": [
               "string",
               "number",
@@ -1521,8 +1521,8 @@
               }
             ]
           },
-          "moc-out": {
-            "description": "The lines that leave this node by its `moc-out`, one entry each. An entry names the node the line goes to as its `target`, and `input` where it feeds a named input of that node. The short spellings are read too: the destination as a string, `node` or `node.terminal`, alone or in a list.",
+          "gateway-out": {
+            "description": "The lines that leave this node by its `gateway-out`, one entry each. An entry names the node the line goes to as its `target`, and `input` where it feeds a named input of that node. The short spellings are read too: the destination as a string, `node` or `node.terminal`, alone or in a list.",
             "oneOf": [
               {
                 "description": "One line, written as an entry.",
@@ -1553,8 +1553,8 @@
             "description": "Whether a line arrives at this node's `payload-in` sink. A record of the links written on the nodes they leave, and not a link: which node a line comes from is written on that node. A file may leave it out; one that disagrees with the links is refused where it is read.",
             "type": "boolean"
           },
-          "moc-in": {
-            "description": "Whether a line arrives at this node's `moc-in` sink. A record of the links written on the nodes they leave, and not a link: which node a line comes from is written on that node. A file may leave it out; one that disagrees with the links is refused where it is read.",
+          "gateway-in": {
+            "description": "Whether a line arrives at this node's `gateway-in` sink. A record of the links written on the nodes they leave, and not a link: which node a line comes from is written on that node. A file may leave it out; one that disagrees with the links is refused where it is read.",
             "type": "boolean"
           },
           "path": {
@@ -2049,8 +2049,8 @@
               "null"
             ]
           },
-          "app-moc-arg": {
-            "description": "And what it is told about the MOC stream, as the argument after the payload one where a kind has both. Said by the kinds that handle MOC data -- app_moc_veh, app_all_veh, app_all_pl -- and required of them.",
+          "app-gateway-arg": {
+            "description": "And what it is told about the gateway stream, as the argument after the payload one where a kind has both. Said by the kinds that handle gateway data -- app_gateway_veh, app_all_veh, app_all_pl -- and required of them.",
             "type": [
               "string",
               "number",
@@ -2105,7 +2105,7 @@
         "type": "object",
         "properties": {
           "from": {
-            "description": "The MOC link it arrives on.",
+            "description": "The gateway link it arrives on.",
             "type": "string"
           },
           "sets": {

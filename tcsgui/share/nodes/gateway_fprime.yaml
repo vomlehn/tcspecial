@@ -2,9 +2,9 @@
 # the ground: a TcsBridge component in the F´ deployment, built on tcslib-c,
 # plays the ground station's part and passes what arrives on as F´ telemetry.
 #
-# The radio's own protocol, so it is opened, counted and driven as a moc node
-# is, and like that node it has no Rust of its own: it is served by the
-# network payload code, tcspecial/src/node/payload/network/. See
+# The radio's own protocol, so it is opened, counted and driven as a
+# gateway_radio node is, and like that node it has no Rust of its own: it is
+# served by the network payload code, tcspecial/src/node/payload/network/. See
 # tcslibgs::gateway, and "Gateways" in docs/design.rst.
 node: gateway_fprime
 type: gateway_fprime
@@ -13,8 +13,8 @@ about: >
   place of the ground.
 payload-sink: true
 payload-source: false
-moc-sink: false
-moc-source: true
+gateway-sink: false
+gateway-source: true
 attributes:
   - name: bridge_base
     required: true

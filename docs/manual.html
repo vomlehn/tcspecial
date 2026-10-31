@@ -550,8 +550,8 @@ build.</p>
 that were used loosely.</p>
 <dl class="docutils">
 <dt>node</dt>
-<dd>Anything the configuration can name and a link can join: a device, a MOC
-link, or a compute element. The generic term.</dd>
+<dd>Anything the configuration can name and a link can join: a device, a
+gateway, or a compute element. The generic term.</dd>
 <dt>device</dt>
 <dd>A node that is real hardware, reached over one of the interfaces. These
 were called <em>payloads</em>, which said what they were for rather than what they
@@ -562,8 +562,17 @@ pipe, a file a program writes. The word <em>device</em> was used for this as wel
 as for hardware, which made &quot;device&quot; ambiguous in exactly the places it had
 to be exact.</dd>
 <dt>MOC</dt>
-<dd>The mission operations center, on the ground. A MOC node is a network link
-carrying telemetry down and commands up. Earlier text calls this the OC.</dd>
+<dd>The mission operations center, on the ground. Earlier text calls this the
+OC.</dd>
+<dt>gateway</dt>
+<dd>The node the vehicle reaches what it answers to through -- the ground,
+over the radio, as a <tt class="docutils literal">gateway_radio</tt> node, or an F´ flight computer, as
+a <tt class="docutils literal">gateway_fprime</tt> -- written in the <tt class="docutils literal">gateway</tt> section: a network link
+carrying telemetry down and commands up. It was called <tt class="docutils literal">moc</tt> while the
+ground was the only thing at the other end, and a configuration that still
+says <tt class="docutils literal">moc</tt>, <tt class="docutils literal"><span class="pre">moc-in</span></tt>, <tt class="docutils literal"><span class="pre">moc-out</span></tt>, <tt class="docutils literal"><span class="pre">tee-moc</span></tt>, <tt class="docutils literal"><span class="pre">null-moc</span></tt>,
+<tt class="docutils literal">app_moc_veh</tt> or <tt class="docutils literal"><span class="pre">app-moc-arg</span></tt> is refused, naming the line and the
+word to write instead.</dd>
 <dt>compute element</dt>
 <dd>A node that transforms what it is given. It may keep state between
 arrivals, which is what makes a control loop possible: an average over
@@ -608,27 +617,28 @@ entry says it is connected both ways.</dd>
 and a <strong>data sink</strong> is where data arrives. A terminal has a name, and the
 name says whose data it is and whether it arrives or leaves, not what is
 at the other end of it: <tt class="docutils literal">payload-</tt> is the payload's own data on its way
-to the ground, <tt class="docutils literal">moc-</tt> is what the ground sends on its way to a payload,
-and <tt class="docutils literal"><span class="pre">-in</span></tt> arrives where <tt class="docutils literal"><span class="pre">-out</span></tt> leaves. So every <tt class="docutils literal"><span class="pre">-out</span></tt> is a data
-source and every <tt class="docutils literal"><span class="pre">-in</span></tt> a data sink. There are four of them, two per
+to the ground, <tt class="docutils literal">gateway-</tt> is what the ground sends on its way to a
+payload, and <tt class="docutils literal"><span class="pre">-in</span></tt> arrives where <tt class="docutils literal"><span class="pre">-out</span></tt> leaves. So every <tt class="docutils literal"><span class="pre">-out</span></tt> is a
+data source and every <tt class="docutils literal"><span class="pre">-in</span></tt> a data sink. There are four of them, two per
 stream:</p>
 <p><tt class="docutils literal"><span class="pre">payload-out</span></tt> is where a payload's readings leave and <tt class="docutils literal"><span class="pre">payload-in</span></tt> is
-where they arrive; <tt class="docutils literal"><span class="pre">moc-out</span></tt> is where what the ground sends leaves and
-<tt class="docutils literal"><span class="pre">moc-in</span></tt> is where it arrives. A payload has <tt class="docutils literal"><span class="pre">moc-in</span></tt> and
-<tt class="docutils literal"><span class="pre">payload-out</span></tt>; a MOC link has <tt class="docutils literal"><span class="pre">payload-in</span></tt> and <tt class="docutils literal"><span class="pre">moc-out</span></tt>; a
-<tt class="docutils literal"><span class="pre">null-moc</span></tt> has <tt class="docutils literal"><span class="pre">moc-in</span></tt> alone and a <tt class="docutils literal"><span class="pre">null-payload</span></tt> <tt class="docutils literal"><span class="pre">payload-in</span></tt>
-alone; a <tt class="docutils literal"><span class="pre">tee-moc</span></tt> has <tt class="docutils literal"><span class="pre">moc-in</span></tt>, <tt class="docutils literal"><span class="pre">moc-out</span></tt> and <tt class="docutils literal"><span class="pre">payload-out</span></tt>, and a
-<tt class="docutils literal"><span class="pre">tee-payload</span></tt> <tt class="docutils literal"><span class="pre">payload-in</span></tt>, <tt class="docutils literal"><span class="pre">payload-out</span></tt> and <tt class="docutils literal"><span class="pre">moc-out</span></tt>; an
-<tt class="docutils literal">app_all_veh</tt> has all four; and a <tt class="docutils literal">ping</tt> node has a payload's pair,
-<tt class="docutils literal"><span class="pre">moc-in</span></tt> and <tt class="docutils literal"><span class="pre">payload-out</span></tt>. With no vehicle node in the way, a payload's <tt class="docutils literal"><span class="pre">payload-out</span></tt>
-connects to a MOC link's <tt class="docutils literal"><span class="pre">payload-in</span></tt>.</p>
+where they arrive; <tt class="docutils literal"><span class="pre">gateway-out</span></tt> is where what the ground sends leaves and
+<tt class="docutils literal"><span class="pre">gateway-in</span></tt> is where it arrives. A payload has <tt class="docutils literal"><span class="pre">gateway-in</span></tt> and
+<tt class="docutils literal"><span class="pre">payload-out</span></tt>; a gateway link has <tt class="docutils literal"><span class="pre">payload-in</span></tt> and <tt class="docutils literal"><span class="pre">gateway-out</span></tt>; a
+<tt class="docutils literal"><span class="pre">null-gateway</span></tt> has <tt class="docutils literal"><span class="pre">gateway-in</span></tt> alone and a <tt class="docutils literal"><span class="pre">null-payload</span></tt>
+<tt class="docutils literal"><span class="pre">payload-in</span></tt> alone; a <tt class="docutils literal"><span class="pre">tee-gateway</span></tt> has <tt class="docutils literal"><span class="pre">gateway-in</span></tt>, <tt class="docutils literal"><span class="pre">gateway-out</span></tt>
+and <tt class="docutils literal"><span class="pre">payload-out</span></tt>, and a <tt class="docutils literal"><span class="pre">tee-payload</span></tt> <tt class="docutils literal"><span class="pre">payload-in</span></tt>, <tt class="docutils literal"><span class="pre">payload-out</span></tt>
+and <tt class="docutils literal"><span class="pre">gateway-out</span></tt>; an <tt class="docutils literal">app_all_veh</tt> has all four; and a <tt class="docutils literal">ping</tt> node
+has a payload's pair, <tt class="docutils literal"><span class="pre">gateway-in</span></tt> and <tt class="docutils literal"><span class="pre">payload-out</span></tt>. With no vehicle
+node in the way, a payload's <tt class="docutils literal"><span class="pre">payload-out</span></tt> connects to a gateway link's
+<tt class="docutils literal"><span class="pre">payload-in</span></tt>.</p>
 <p>A link is written as an attribute of the node it leaves, named after the
 data source it leaves by, with one entry per line:</p>
 <pre class="code yaml literal-block">
 <span class="punctuation indicator">-</span><span class="whitespace"> </span><span class="name tag">name</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">k_fore</span><span class="whitespace">
   </span><span class="name tag">type</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">compute</span><span class="whitespace">
   </span><span class="name tag">payload-out</span><span class="punctuation">:</span><span class="whitespace">
-    </span><span class="punctuation indicator">-</span><span class="whitespace"> </span><span class="name tag">target</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">moc</span><span class="whitespace">
+    </span><span class="punctuation indicator">-</span><span class="whitespace"> </span><span class="name tag">target</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">gateway</span><span class="whitespace">
     </span><span class="punctuation indicator">-</span><span class="whitespace"> </span><span class="name tag">target</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">mean_temp</span><span class="whitespace">
       </span><span class="name tag">input</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">in0</span>
 </pre>
@@ -639,9 +649,10 @@ one data sink, which is every type but <tt class="docutils literal">app_all_veh<
 with two data sources -- a tee, an <tt class="docutils literal">app_all_veh</tt> -- is written under the
 one it leaves by, which says which. The short spelling is read
 as well, the destination written as <tt class="docutils literal">node</tt> or <tt class="docutils literal">node.terminal</tt>, alone or
-in a list: <tt class="docutils literal"><span class="pre">payload-out:</span> k_fore</tt>, or <tt class="docutils literal"><span class="pre">payload-out:</span> [moc, mean_temp.in0]</tt>.</p>
+in a list: <tt class="docutils literal"><span class="pre">payload-out:</span> k_fore</tt>, or <tt class="docutils literal"><span class="pre">payload-out:</span> [gateway,
+mean_temp.in0]</tt>.</p>
 <p>A data sink takes one data source; a data source may reach several sinks;
-and a MOC link's sink takes as many as the configuration gives it, every
+and a gateway link's sink takes as many as the configuration gives it, every
 payload's telemetry arriving at the ground on its own socket.</p>
 <p>The node at the arriving end says so under the data sink the line arrives
 at: <tt class="docutils literal"><span class="pre">payload-in:</span> true</tt>, and <tt class="docutils literal">false</tt> for a sink nothing arrives at.
@@ -652,56 +663,57 @@ here: that is written on the node it leaves, and at a sink several lines
 arrive at, one name would read as the only one. A flag that disagrees with
 the links is refused where the file is read. tcsgui writes them.</p>
 <p class="last">Each terminal may be linked to one other: a <tt class="docutils literal"><span class="pre">payload-out</span></tt> to a
-<tt class="docutils literal"><span class="pre">payload-in</span></tt>, a <tt class="docutils literal"><span class="pre">payload-in</span></tt> to a <tt class="docutils literal"><span class="pre">payload-out</span></tt>, a <tt class="docutils literal"><span class="pre">moc-out</span></tt> to a
-<tt class="docutils literal"><span class="pre">moc-in</span></tt>, a <tt class="docutils literal"><span class="pre">moc-in</span></tt> to a <tt class="docutils literal"><span class="pre">moc-out</span></tt>. Anything else would carry
-one stream into the other. In tcsgui the terminals are drawn as small boxes
-in a node's corners, each with an arrow saying which way its data goes: the
-payload's own data along the top pointing right, towards the ground, and
-what the ground sends along the bottom pointing left, towards the
-payloads -- the canvas having the payloads on the left, the vehicle in the
-middle and the MOC on the right. A link is made by dragging from one of
-them onto the node the line is to reach: anywhere on that node will do,
+<tt class="docutils literal"><span class="pre">payload-in</span></tt>, a <tt class="docutils literal"><span class="pre">payload-in</span></tt> to a <tt class="docutils literal"><span class="pre">payload-out</span></tt>, a <tt class="docutils literal"><span class="pre">gateway-out</span></tt> to
+a <tt class="docutils literal"><span class="pre">gateway-in</span></tt>, a <tt class="docutils literal"><span class="pre">gateway-in</span></tt> to a <tt class="docutils literal"><span class="pre">gateway-out</span></tt>. Anything else would
+carry one stream into the other. In tcsgui the terminals are drawn as small
+boxes in a node's corners, each with an arrow saying which way its data
+goes: the payload's own data along the top pointing right, towards the
+ground, and what the ground sends along the bottom pointing left, towards
+the payloads -- the canvas having the payloads on the left, the vehicle in
+the middle and the gateway on the right. A link is made by dragging from one
+of them onto the node the line is to reach: anywhere on that node will do,
 and the line is drawn to whichever of its terminals the stream arrives at.
-A node with no terminal of that stream takes nothing, and a MOC link has
+A node with no terminal of that stream takes nothing, and a gateway link has
 none on its right at all: the payload data it receives arrives at the
 <tt class="docutils literal"><span class="pre">payload-in</span></tt> in its upper left, and what it sends leaves by the
-<tt class="docutils literal"><span class="pre">moc-out</span></tt> in its lower left.</p>
+<tt class="docutils literal"><span class="pre">gateway-out</span></tt> in its lower left.</p>
 </dd>
-<dt><tt class="docutils literal"><span class="pre">null-moc</span></tt> and <tt class="docutils literal"><span class="pre">null-payload</span></tt> nodes</dt>
-<dd>Vehicle nodes that take one stream and drop it: a <tt class="docutils literal"><span class="pre">null-moc</span></tt> takes what
-the ground sends at its <tt class="docutils literal"><span class="pre">moc-in</span></tt>, and a <tt class="docutils literal"><span class="pre">null-payload</span></tt> takes a
+<dt><tt class="docutils literal"><span class="pre">null-gateway</span></tt> and <tt class="docutils literal"><span class="pre">null-payload</span></tt> nodes</dt>
+<dd>Vehicle nodes that take one stream and drop it: a <tt class="docutils literal"><span class="pre">null-gateway</span></tt> takes
+what the ground sends at its <tt class="docutils literal"><span class="pre">gateway-in</span></tt>, and a <tt class="docutils literal"><span class="pre">null-payload</span></tt> takes a
 payload's data at its <tt class="docutils literal"><span class="pre">payload-in</span></tt>. Neither has a data source, so nothing
 can be linked out of one. For a stream that has to go somewhere and has
 nowhere to go yet. They take no attributes.</dd>
-<dt><tt class="docutils literal"><span class="pre">tee-moc</span></tt> and <tt class="docutils literal"><span class="pre">tee-payload</span></tt> nodes</dt>
+<dt><tt class="docutils literal"><span class="pre">tee-gateway</span></tt> and <tt class="docutils literal"><span class="pre">tee-payload</span></tt> nodes</dt>
 <dd><p class="first">Vehicle nodes that take one stream and send each datum on both ways. A
-<tt class="docutils literal"><span class="pre">tee-moc</span></tt> takes what the ground sends at its <tt class="docutils literal"><span class="pre">moc-in</span></tt> and sends it on by
-its <tt class="docutils literal"><span class="pre">moc-out</span></tt>, as it was going, and again by its <tt class="docutils literal"><span class="pre">payload-out</span></tt>, as
-payload data. A <tt class="docutils literal"><span class="pre">tee-payload</span></tt> takes a payload's data at its
-<tt class="docutils literal"><span class="pre">payload-in</span></tt> and sends it on by its <tt class="docutils literal"><span class="pre">payload-out</span></tt> and again by its
-<tt class="docutils literal"><span class="pre">moc-out</span></tt>, as MOC data. A link cannot carry one stream into the other, so
-a tee is how what the ground sends reaches a <tt class="docutils literal"><span class="pre">payload-in</span></tt> -- the ground's
-own, to see what it sent, or a log's -- and how a payload's reading reaches
-a <tt class="docutils literal"><span class="pre">moc-in</span></tt>. Each data source may reach as many sinks as any other, so
-every link out of a tee gets a copy. A link out of one names the source it
-leaves by, there being two:</p>
+<tt class="docutils literal"><span class="pre">tee-gateway</span></tt> takes what the ground sends at its <tt class="docutils literal"><span class="pre">gateway-in</span></tt> and sends
+it on by its <tt class="docutils literal"><span class="pre">gateway-out</span></tt>, as it was going, and again by its
+<tt class="docutils literal"><span class="pre">payload-out</span></tt>, as payload data. A <tt class="docutils literal"><span class="pre">tee-payload</span></tt> takes a payload's data
+at its <tt class="docutils literal"><span class="pre">payload-in</span></tt> and sends it on by its <tt class="docutils literal"><span class="pre">payload-out</span></tt> and again by
+its <tt class="docutils literal"><span class="pre">gateway-out</span></tt>, as gateway data. A link cannot carry one stream into
+the other, so a tee is how what the ground sends reaches a <tt class="docutils literal"><span class="pre">payload-in</span></tt> --
+the ground's own, to see what it sent, or a log's -- and how a payload's
+reading reaches a <tt class="docutils literal"><span class="pre">gateway-in</span></tt>. Each data source may reach as many sinks
+as any other, so every link out of a tee gets a copy. A link out of one
+names the source it leaves by, there being two:</p>
 <pre class="code yaml literal-block">
 <span class="punctuation indicator">-</span><span class="whitespace"> </span><span class="name tag">name</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">echo</span><span class="whitespace">
-  </span><span class="name tag">type</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">tee-moc</span><span class="whitespace">
-  </span><span class="name tag">moc-out</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="punctuation indicator">[</span><span class="name variable">heater</span><span class="punctuation indicator">]</span><span class="whitespace">
-  </span><span class="name tag">payload-out</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="punctuation indicator">[</span><span class="name variable">moc</span><span class="punctuation indicator">]</span>
+  </span><span class="name tag">type</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">tee-gateway</span><span class="whitespace">
+  </span><span class="name tag">gateway-out</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="punctuation indicator">[</span><span class="name variable">heater</span><span class="punctuation indicator">]</span><span class="whitespace">
+  </span><span class="name tag">payload-out</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="punctuation indicator">[</span><span class="name variable">gateway</span><span class="punctuation indicator">]</span>
 </pre>
 <p class="last">They take no attributes.</p>
 </dd>
 <dt><tt class="docutils literal">ping</tt> node</dt>
-<dd>A vehicle node that answers the ground. Link a MOC link's <tt class="docutils literal"><span class="pre">moc-out</span></tt> to
-it and its <tt class="docutils literal"><span class="pre">payload-out</span></tt> back to the MOC link. Each ping the ground sends,
-<tt class="docutils literal">ping #&lt;count&gt; &lt;time&gt;</tt>, comes back with a space and the vehicle's time on
-the end. Each time is seconds since the UNIX epoch with nine digits after
-the point, such as <tt class="docutils literal">1760900000.000000001</tt>, and the count starts at one.
-A message that is not a ping is refused and logged aboard, not answered.
-A ping node takes no attributes, and it cannot be stopped or started from
-the ground: both commands are answered <tt class="docutils literal">InvalidCommand</tt>.</dd>
+<dd>A vehicle node that answers the ground. Link a gateway link's
+<tt class="docutils literal"><span class="pre">gateway-out</span></tt> to it and its <tt class="docutils literal"><span class="pre">payload-out</span></tt> back to the gateway link. Each
+ping the ground sends, <tt class="docutils literal">ping #&lt;count&gt; &lt;time&gt;</tt>, comes back with a space and
+the vehicle's time on the end. Each time is seconds since the UNIX epoch
+with nine digits after the point, such as <tt class="docutils literal">1760900000.000000001</tt>, and the
+count starts at one. A message that is not a ping is refused and logged
+aboard, not answered. A ping node takes no attributes, and it cannot be
+stopped or started from the ground: both commands are answered
+<tt class="docutils literal">InvalidCommand</tt>.</dd>
 <dt>command binding</dt>
 <dd>A statement that a named command from the MOC sets a named attribute of a
 node. It is how a setpoint reaches a control loop in flight.</dd>
@@ -711,10 +723,10 @@ node. It is how a setpoint reaches a control loop in flight.</dd>
 <p class="last"><strong>What runs today.</strong> The architecture above is what TCSpecial is being
 built into, and this manual describes it as the thing to configure against.
 What is in flight-ready shape at the time of writing is narrower: a node may
-be a device or a MOC link, and the links the software builds are the pair
-that joins one device to one MOC link in each direction. Compute elements,
-links with several destinations, groups with a shared interval, discrete
-lines driven as outputs are specified in <tt class="docutils literal">design.rst</tt> and are being
+be a device or a gateway link, and the links the software builds are the
+pair that joins one device to one gateway link in each direction. Compute
+elements, links with several destinations, groups with a shared interval,
+discrete lines driven as outputs are specified in <tt class="docutils literal">design.rst</tt> and are being
 implemented in that order. Command bindings run: the ground sets a bound
 attribute of a node with a <tt class="docutils literal">SET_NODE</tt>. Where this manual
 describes something not yet running it says so in a note like this one, and
@@ -762,7 +774,7 @@ in the design, says which parts are Linux-only and how they might be
 carried to a real-time operating system.</dd>
 <dt>Number of nodes</dt>
 <dd>A node's id is its position among all the configuration's nodes -- the
-moc, vehicle and payload sections, the top file first and then the files
+gateway, vehicle and payload sections, the top file first and then the files
 it includes -- counting from nought, and it is 32 bits. A node's
 telemetry port is a base plus its id, so a base of <em>B</em> leaves room for
 ids up to 65535 - <em>B</em>, counting every node, not only payloads. A
@@ -821,7 +833,7 @@ are suggestions, nothing more.</p>
 <dd>Everything tcspecial is configured with. Its <tt class="docutils literal">tcspecial</tt> section is the
 command interpreter's own settings -- the ports it takes commands on,
 where beacons go and how often, and where the telemetry log goes -- and
-its <tt class="docutils literal">moc</tt>, <tt class="docutils literal">vehicle</tt> and <tt class="docutils literal">payloads</tt> sections say which nodes there
+its <tt class="docutils literal">gateway</tt>, <tt class="docutils literal">vehicle</tt> and <tt class="docutils literal">payloads</tt> sections say which nodes there
 are, what each of them does and how the lines between them run. Named on
 the command line of every program that reads it, which is tcspecial,
 tcsmoc, tcssim and tcsverify.</dd>
@@ -1077,7 +1089,7 @@ frames half arrives when one of them is lost, and nothing in the file says how
 to put the halves back together.</p>
 <p><em>A program.</em> An <tt class="docutils literal">app_pl</tt> is a program that writes its readings when it
 chooses and is never asked; an <tt class="docutils literal">app_all_pl</tt> answers whatever arrives on its
-MOC interface, so the data that arrives is the question. Neither states a
+gateway interface, so the data that arrives is the question. Neither states a
 trigger.</p>
 <p><strong>When tcspecial reads.</strong> The main loop works in passes.</p>
 <ul class="simple">
@@ -1250,7 +1262,7 @@ transaction on every pass. Give such a payload a group or a rate.</p>
 <td>One packet</td>
 </tr>
 <tr><td><tt class="docutils literal">app_all_pl</tt></td>
-<td>When MOC data arrives</td>
+<td>When gateway data arrives</td>
 <td>By the data that arrives</td>
 <td>One packet</td>
 </tr>
@@ -2060,7 +2072,7 @@ may be depends on counts no file states.</li>
 started; two on one device file, serial line or SPI peripheral is worse,
 each taking part of the one stream and reporting it as though it were the
 whole. Every node that is opened is compared with every other -- the
-payloads and the <tt class="docutils literal">moc</tt> node -- since a port is a port whatever claims it,
+payloads and the gateway node -- since a port is a port whatever claims it,
 and <tt class="docutils literal">localhost</tt>, <tt class="docutils literal">127.0.0.1</tt> and <tt class="docutils literal">::1</tt> count as one host. A Unix
 socket collides by its path, its port meaning nothing, and so does a device
 file opened twice. The exceptions are the things that are shared by design:
@@ -2121,14 +2133,14 @@ which is what a panel in the MOC shows.</p>
     </span><span class="name tag">direction</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal string">&quot;output&quot;</span><span class="whitespace">
     </span><span class="name tag">lines</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal string">&quot;3,4,5&quot;</span><span class="whitespace">
     </span><span class="name tag">path</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal string">&quot;/dev/gpiochip0&quot;</span><span class="whitespace">
-    </span><span class="name tag">moc-in</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">true</span><span class="whitespace">
+    </span><span class="name tag">gateway-in</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">true</span><span class="whitespace">
 
   </span><span class="punctuation indicator">-</span><span class="whitespace"> </span><span class="name tag">name</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">heaters_2</span><span class="whitespace">
     </span><span class="name tag">type</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">gpio</span><span class="whitespace">
     </span><span class="name tag">direction</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal string">&quot;output&quot;</span><span class="whitespace">
     </span><span class="name tag">lines</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal string">&quot;6,7,8&quot;</span><span class="whitespace">
     </span><span class="name tag">path</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal string">&quot;/dev/gpiochip0&quot;</span><span class="whitespace">
-    </span><span class="name tag">moc-in</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">true</span>
+    </span><span class="name tag">gateway-in</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">true</span>
 </pre>
 <p>The same configuration in the other spelling is
 <tt class="docutils literal">examples/thermostat/thermostat.xml</tt>, which a test holds to saying the same
@@ -2209,20 +2221,21 @@ counting from nought, in the order the file writes them -- whatever the
 sections are, and in the XML spelling however they interleave -- the top file
 first and then the files it includes. The ids say which port each node's data
 reaches the ground on.</p>
-<p>A <tt class="docutils literal">moc</tt> node is the ground's end of the vehicle's data. tcspecial sends what
-each node drawn into a <tt class="docutils literal">moc</tt> node produces as UDP datagrams to the address in
-the <tt class="docutils literal">moc</tt> node's <tt class="docutils literal">ground_base</tt>, at its port plus the source node's device
+<p>A gateway node is the ground's end of the vehicle's data. tcspecial sends what
+each node drawn into a gateway node produces as UDP datagrams to the address in
+the gateway node's <tt class="docutils literal">ground_base</tt>, at its port plus the source node's device
 id, so each source arrives on a port of its own. Ground software does not open
-those ports itself: it gets the data from the <tt class="docutils literal">moc</tt> node with a function
-call, <tt class="docutils literal"><span class="pre">tcslib::moc::Moc::receive</span></tt>, which works the ports out from the same
-configuration and says which node each datum came from. A loop that does not
-keep each datum takes it with <tt class="docutils literal"><span class="pre">Moc::receive_into</span></tt>, into a buffer of
-<tt class="docutils literal"><span class="pre">tcslib::moc::DATUM_BYTES</span></tt> it made before it started, and allocates nothing.
-What it does with the data then -- process it, display it, log it -- is its own business. A <tt class="docutils literal">moc</tt>
-node that the ground sends commands or other data through also states the
-<tt class="docutils literal">address</tt> and <tt class="docutils literal">port</tt> tcspecial binds to receive them.</p>
+those ports itself: it gets the data from the gateway node with a function
+call, <tt class="docutils literal"><span class="pre">tcslib::gateway::GatewayReceiver::receive</span></tt>, which works the ports out
+from the same configuration and says which node each datum came from. A loop
+that does not keep each datum takes it with <tt class="docutils literal"><span class="pre">GatewayReceiver::receive_into</span></tt>,
+into a buffer of <tt class="docutils literal"><span class="pre">tcslib::gateway::DATUM_BYTES</span></tt> it made before it started, and
+allocates nothing. What it does with the data then -- process it, display it,
+log it -- is its own business. A gateway node that the ground sends commands or
+other data through also states the <tt class="docutils literal">address</tt> and <tt class="docutils literal">port</tt> tcspecial binds to
+receive them.</p>
 <p>tcsmoc runs a configuration as a ground station for that data: one
-panel per source, filled through <tt class="docutils literal"><span class="pre">tcslib::moc</span></tt>, with tcspecial started on
+panel per source, filled through <tt class="docutils literal"><span class="pre">tcslib::gateway</span></tt>, with tcspecial started on
 the same file and tcssim where the simulator file simulates anything. Both
 it and tcspecial digest the configuration files they read, and tcspecial
 sends its digest in every beacon. If tcspecial's digest is not the one tcsmoc
@@ -2268,7 +2281,7 @@ say and nowhere else.</p>
 <p>In the diagrams, blue lines carry data toward the ground and orange lines
 carry it toward the vehicle; a dotted orange line is a command binding; a
 dashed blue line is a payload's <tt class="docutils literal">payload_telemetry</tt> link; and a heavy grey
-arrow is the function call that gets data from a <tt class="docutils literal">moc</tt> node. The dashed box
+arrow is the function call that gets data from a gateway node. The dashed box
 in the middle of each diagram is what runs inside tcspecial, and the one on
 the right is the ground.</p>
 <p><tt class="docutils literal">make help</tt> in the <tt class="docutils literal">examples</tt> directory lists the targets that run them.</p>
@@ -2314,7 +2327,7 @@ signed bytes on theirs, so that no one bus and no one part number can take the
 whole trio out.</p>
 <p>Each reading is converted to kelvin by its own <tt class="docutils literal">to_kelvin</tt> node, <tt class="docutils literal">k_1</tt>,
 <tt class="docutils literal">k_2</tt> or <tt class="docutils literal">k_3</tt>, and each converted reading goes three ways: to the ground
-through the <tt class="docutils literal">moc</tt> node -- at its <tt class="docutils literal">ground_base</tt>, <tt class="docutils literal">127.0.0.1:5100</tt>, plus
+through the gateway node -- at its <tt class="docutils literal">ground_base</tt>, <tt class="docutils literal">127.0.0.1:5100</tt>, plus
 each source's device id, so <tt class="docutils literal">k_1</tt>, <tt class="docutils literal">k_2</tt> and <tt class="docutils literal">k_3</tt>, ids 1 to 3, arrive on
 ports 5101 to 5103 -- into <tt class="docutils literal">cabin_temp</tt> as the input <tt class="docutils literal">in0</tt>, <tt class="docutils literal">in1</tt> or
 <tt class="docutils literal">in2</tt>, and into the log <tt class="docutils literal">housekeeping</tt>.</p>
@@ -2345,7 +2358,7 @@ is the transitions alone.</p>
 sensors' readings reach the ground through their conversions, and the heaters
 are driven and never read. Tcssim watches the heaters' lines on the
 <tt class="docutils literal"><span class="pre">gpio-sim</span></tt> chip and counts each time the vehicle switches them.</p>
-<p>The command binding on the <tt class="docutils literal">moc</tt> node says the ground may set the
+<p>The command binding on the gateway node says the ground may set the
 thermostat's setpoint, and the running vehicle applies it: a <tt class="docutils literal">SET_NODE</tt>
 naming that node and that attribute is taken on the node command link, the
 value reaches the thermostat between stages of a pass, and the next pass
@@ -2367,8 +2380,8 @@ mkstubs</tt> provides stand-ins for some of them where there is no hardware.</p>
 <h2><a class="toc-backref" href="#toc-entry-35">The simple-app example</a></h2>
 <div class="figure">
 <object data="../examples/simple-app/simple-app.svg" style="width: 100%;" type="image/svg+xml">The simple-app example: a payload that is a program, lorem, sending
-a line of text one word per packet through the moc node moc-1 to the
-ground station program lorem_moc.</object>
+a line of text one word per packet through the gateway node gateway-1
+to the ground station program lorem_gateway.</object>
 <p class="caption"><tt class="docutils literal"><span class="pre">examples/simple-app</span></tt>: a payload that is a program, and a ground station
 that prints what it sends.</p>
 </div>
@@ -2378,12 +2391,13 @@ configuration with the argument
 <tt class="docutils literal">1</tt> and talks to over the file interfaces an app node is run with. It sends
 the first line of the lorem ipsum text one word per packet, then a packet
 holding the line terminator.</p>
-<p>tcspecial sends the words to the <tt class="docutils literal">moc</tt> node on the ground, <tt class="docutils literal"><span class="pre">moc-1</span></tt>, at its
-<tt class="docutils literal">ground_base</tt>, <tt class="docutils literal">127.0.0.1:5100</tt>, plus <tt class="docutils literal">lorem</tt>'s device id, 1: port 5101.
-The ground is <tt class="docutils literal">lorem_moc</tt>, the example's second program. It gets the words
-from <tt class="docutils literal"><span class="pre">moc-1</span></tt> with <tt class="docutils literal"><span class="pre">tcslib::moc::Moc::receive_into</span></tt>, into a buffer it made
+<p>tcspecial sends the words to the gateway node on the ground, <tt class="docutils literal"><span class="pre">gateway-1</span></tt>, at
+its <tt class="docutils literal">ground_base</tt>, <tt class="docutils literal">127.0.0.1:5100</tt>, plus <tt class="docutils literal">lorem</tt>'s device id, 1: port
+5101. The ground is <tt class="docutils literal">lorem_gateway</tt>, the example's second program. It gets
+the words from <tt class="docutils literal"><span class="pre">gateway-1</span></tt> with
+<tt class="docutils literal"><span class="pre">tcslib::gateway::GatewayReceiver::receive_into</span></tt>, into a buffer it made
 before it started listening, prints each with one space
-between them, and stops at the end of the line. <tt class="docutils literal"><span class="pre">moc-1</span></tt> states no
+between them, and stops at the end of the line. <tt class="docutils literal"><span class="pre">gateway-1</span></tt> states no
 <tt class="docutils literal">address</tt> or <tt class="docutils literal">port</tt>, because nothing goes back up to the vehicle.</p>
 <p>Both programs are beside the configuration: the payload is a Python 3 script
 that uses only the standard library, and the ground station is a Rust crate.
@@ -2470,23 +2484,23 @@ watcher opens a window, so it wants a display.</p>
 <div class="section" id="the-ping-example">
 <h2><a class="toc-backref" href="#toc-entry-37">The ping example</a></h2>
 <div class="figure">
-<object data="../examples/ping/ping.svg" style="width: 100%;" type="image/svg+xml">The ping example: the ground station ping_moc.py sends a ping up to
-the moc node, which hands it to the ping node by its moc-out link;
-the ping node answers with the vehicle's time on the end, and the
-answer comes back down through the moc node to the ground, beside
+<object data="../examples/ping/ping.svg" style="width: 100%;" type="image/svg+xml">The ping example: the ground station ping_gateway.py sends a ping up to
+the gateway node, which hands it to the ping node by its gateway-out
+link; the ping node answers with the vehicle's time on the end, and the
+answer comes back down through the gateway node to the ground, beside
 the beacon panel.</object>
 <p class="caption"><tt class="docutils literal">examples/ping</tt>: a ping, answered by the vehicle and timed by the ground.</p>
 </div>
 <p>The one exchange that shows how long the link takes each way, and how far the
 two ends' clocks are apart. The ground station sends <tt class="docutils literal">ping #&lt;count&gt; &lt;time&gt;</tt>
-up to the <tt class="docutils literal">moc</tt> node, which binds <tt class="docutils literal">address:port</tt> aboard and hands it by its
-<tt class="docutils literal"><span class="pre">moc-out</span></tt> link to the <tt class="docutils literal">ping</tt> node. The <tt class="docutils literal">ping</tt> node answers with the ping,
-a space, and the vehicle's time, and sends that by its <tt class="docutils literal"><span class="pre">payload-out</span></tt> link
-back to the <tt class="docutils literal">moc</tt> node and so down to the ground, at <tt class="docutils literal">ground_base</tt> plus its
-device id. Each time is seconds since the UNIX epoch to the nanosecond:
+up to the gateway node, which binds <tt class="docutils literal">address:port</tt> aboard and hands it by its
+<tt class="docutils literal"><span class="pre">gateway-out</span></tt> link to the <tt class="docutils literal">ping</tt> node. The <tt class="docutils literal">ping</tt> node answers with the
+ping, a space, and the vehicle's time, and sends that by its <tt class="docutils literal"><span class="pre">payload-out</span></tt>
+link back to the gateway node and so down to the ground, at <tt class="docutils literal">ground_base</tt> plus
+its device id. Each time is seconds since the UNIX epoch to the nanosecond:
 <tt class="docutils literal">1760900000.000000001</tt>. What a ping and its answer say is
 <tt class="docutils literal"><span class="pre">tcslibgs::node::vehicle::ping</span></tt>.</p>
-<p>The ground station is a Python 3 program, <tt class="docutils literal">ping_moc.py</tt>, that uses nothing
+<p>The ground station is a Python 3 program, <tt class="docutils literal">ping_gateway.py</tt>, that uses nothing
 outside the standard library to read the XML spelling of its configuration --
 its window is tkinter -- and PyYAML to read the YAML one. A beacon is text and
 needs nothing to read; the interface digest it is compared with is worked
@@ -2539,21 +2553,21 @@ the same configuration -- and kills it when it exits, however it exits: if the
 ground station is killed or crashes, the kernel kills tcspecial. So a vehicle
 is running exactly while its ground station is. <tt class="docutils literal"><span class="pre">--no-vehicle</span></tt> starts none,
 for a tcspecial run in another terminal.</p>
-<p>Every example program -- <tt class="docutils literal">beacon</tt>, <tt class="docutils literal">ping_moc.py</tt> and <tt class="docutils literal">lorem_moc</tt> -- takes
-<tt class="docutils literal"><span class="pre">--yaml</span></tt> or <tt class="docutils literal"><span class="pre">--xml</span></tt>, but not both, saying which of its example's two
-configuration files to read: they say the same thing. With neither, <tt class="docutils literal">beacon</tt>
-and <tt class="docutils literal">lorem_moc</tt> read the YAML and <tt class="docutils literal">ping_moc.py</tt> the XML. A file named on
-the command line beside one of the two has to be the spelling it asks for, and
-the vehicle the program starts reads the same file.</p>
+<p>Every example program -- <tt class="docutils literal">beacon</tt>, <tt class="docutils literal">ping_gateway.py</tt> and <tt class="docutils literal">lorem_gateway</tt>
+-- takes <tt class="docutils literal"><span class="pre">--yaml</span></tt> or <tt class="docutils literal"><span class="pre">--xml</span></tt>, but not both, saying which of its example's
+two configuration files to read: they say the same thing. With neither,
+<tt class="docutils literal">beacon</tt> and <tt class="docutils literal">lorem_gateway</tt> read the YAML and <tt class="docutils literal">ping_gateway.py</tt> the XML.
+A file named on the command line beside one of the two has to be the spelling it
+asks for, and the vehicle the program starts reads the same file.</p>
 <p><tt class="docutils literal">make <span class="pre">-C</span> examples <span class="pre">run-ping</span></tt> checks for Python 3 and tkinter, builds the
 vehicle and tcsverify, and runs the ground station, which starts the vehicle
 and stops it when the window is closed. With no display, <tt class="docutils literal">python3
-examples/ping/ping_moc.py <span class="pre">--pings</span> 3</tt> starts the vehicle, sends three pings,
+examples/ping/ping_gateway.py <span class="pre">--pings</span> 3</tt> starts the vehicle, sends three pings,
 prints each answer and its times, and stops both. Every port the example uses is in
 the seven thousands, which no other example uses.</p>
 <p>tcsmoc pings it too. <tt class="docutils literal">make runmocy TCSPECIAL_CONFIG_FILE=examples/ping/ping</tt>
 runs the MOC on the example, and a configuration with a <tt class="docutils literal">ping</tt> node the
-ground can reach both ways -- a <tt class="docutils literal">moc</tt> node binding an address and port with a
+ground can reach both ways -- a gateway node binding an address and port with a
 link to it, and its link back down -- gives the MOC a <tt class="docutils literal">Ping node</tt> button
 beside <tt class="docutils literal">Command</tt>. It opens the same panel, in a window of its own: the
 button, the ping sent and the answer, and the three times. Both ground stations
@@ -2563,24 +2577,24 @@ Python.</p>
 <div class="section" id="the-tees-example">
 <h2><a class="toc-backref" href="#toc-entry-38">The tees example</a></h2>
 <div class="figure">
-<object data="../examples/tees/tees.svg" style="width: 100%;" type="image/svg+xml">The tees example: a command from the ground goes up to the moc node
-ground and on to echo, a tee-moc, which sends it to the heater and
+<object data="../examples/tees/tees.svg" style="width: 100%;" type="image/svg+xml">The tees example: a command from the ground goes up to the gateway node
+ground and on to echo, a tee-gateway, which sends it to the heater and
 back down to the ground; the sensor's readings go to readings, a
 tee-payload, which sends them down to the ground and on to dropped,
-a null-moc; the spare payload's data goes to unheard, a
+a null-gateway; the spare payload's data goes to unheard, a
 null-payload.</object>
 <p class="caption"><tt class="docutils literal">examples/tees</tt>: a command copied back to the ground, a reading copied
 aboard, and data dropped.</p>
 </div>
 <p>The four nodes that do nothing to what passes, each taking one stream. What
-the ground sends goes up to the <tt class="docutils literal">moc</tt> node <tt class="docutils literal">ground</tt>, which binds
-<tt class="docutils literal">127.0.0.1:8600</tt> aboard, and leaves it for <tt class="docutils literal">echo</tt>, a <tt class="docutils literal"><span class="pre">tee-moc</span></tt>. The tee
-sends each command on by its <tt class="docutils literal"><span class="pre">moc-out</span></tt> to the <tt class="docutils literal">heater</tt>, as it was going,
-and again by its <tt class="docutils literal"><span class="pre">payload-out</span></tt> back to <tt class="docutils literal">ground</tt> -- so the ground sees what
-the vehicle was told, arriving at <tt class="docutils literal">ground_base</tt> plus <tt class="docutils literal">echo</tt>'s device id,
-<tt class="docutils literal">127.0.0.1:8704</tt>. The <tt class="docutils literal">sensor</tt>'s readings go to <tt class="docutils literal">readings</tt>, a
+the ground sends goes up to the gateway node <tt class="docutils literal">ground</tt>, which binds
+<tt class="docutils literal">127.0.0.1:8600</tt> aboard, and leaves it for <tt class="docutils literal">echo</tt>, a <tt class="docutils literal"><span class="pre">tee-gateway</span></tt>. The
+tee sends each command on by its <tt class="docutils literal"><span class="pre">gateway-out</span></tt> to the <tt class="docutils literal">heater</tt>, as it was
+going, and again by its <tt class="docutils literal"><span class="pre">payload-out</span></tt> back to <tt class="docutils literal">ground</tt> -- so the ground sees
+what the vehicle was told, arriving at <tt class="docutils literal">ground_base</tt> plus <tt class="docutils literal">echo</tt>'s device
+id, <tt class="docutils literal">127.0.0.1:8704</tt>. The <tt class="docutils literal">sensor</tt>'s readings go to <tt class="docutils literal">readings</tt>, a
 <tt class="docutils literal"><span class="pre">tee-payload</span></tt>, which sends each down to the ground at <tt class="docutils literal">127.0.0.1:8705</tt> and
-again by its <tt class="docutils literal"><span class="pre">moc-out</span></tt> to <tt class="docutils literal">dropped</tt>, a <tt class="docutils literal"><span class="pre">null-moc</span></tt>, standing where
+again by its <tt class="docutils literal"><span class="pre">gateway-out</span></tt> to <tt class="docutils literal">dropped</tt>, a <tt class="docutils literal"><span class="pre">null-gateway</span></tt>, standing where
 something aboard that took readings as commands would be. The <tt class="docutils literal">spare</tt>
 payload's data goes to <tt class="docutils literal">unheard</tt>, a <tt class="docutils literal"><span class="pre">null-payload</span></tt>: nobody wants it yet.</p>
 <p>A link cannot carry one stream into the other, so the tees are what the
@@ -2607,15 +2621,15 @@ from the bridge goes up to fsw and on to the heater.</object>
 deployment, <tt class="docutils literal">TcsBridge</tt>, built on tcslib-c: as far as tcspecial can tell it is
 a ground station, so every link is the radio's, UDP in the radio's protocol,
 and everything in the <tt class="docutils literal">tcspecial</tt> section is written as it is for a radio.</p>
-<p>What differs is the gateway node. Where a <tt class="docutils literal">moc</tt> node says where the ground
+<p>What differs is the gateway node. Where a gateway node says where the ground
 station is as <tt class="docutils literal">ground_base</tt>, a <tt class="docutils literal">gateway_fprime</tt> node says where the bridge
 is as <tt class="docutils literal">bridge_base</tt>, counted on the same way: the <tt class="docutils literal">thermometer</tt>, device id
 2, reports to <tt class="docutils literal">127.0.0.1:9702</tt>. It also states <tt class="docutils literal">fprime_id_base</tt>, the first
 of the F´ IDs the bridge gives what arrives, counted on by the same device id
 -- the thermometer's readings are F´ channel <tt class="docutils literal">0x3002</tt> -- which the bridge's
 model is made from and nothing aboard reads. A command the bridge sends up to
-<tt class="docutils literal">fsw</tt>, which binds <tt class="docutils literal">127.0.0.1:9600</tt>, leaves it by its <tt class="docutils literal"><span class="pre">moc-out</span></tt> for the
-<tt class="docutils literal">heater</tt>.</p>
+<tt class="docutils literal">fsw</tt>, which binds <tt class="docutils literal">127.0.0.1:9600</tt>, leaves it by its <tt class="docutils literal"><span class="pre">gateway-out</span></tt> for
+the <tt class="docutils literal">heater</tt>.</p>
 <p><tt class="docutils literal">make <span class="pre">-C</span> examples <span class="pre">run-fprime</span></tt> runs tcsmoc on the example, which starts
 tcspecial and tcssim; tcsmoc plays the bridge's part, the two speaking the one
 protocol. <tt class="docutils literal">tcspecial/tests/fprime.rs</tt> flies it, with its sockets moved to
@@ -3483,11 +3497,11 @@ refused, saying which kinds to write instead.
 A configuration that says nothing is refused too, rather than given <tt class="docutils literal">radio</tt>:
 what a vehicle answers to is a fact about the mission, and the kind decides
 how every link below is written.</p>
-<p>The gateway nodes are still written in the <tt class="docutils literal">moc</tt> section: a radio's with
-<tt class="docutils literal">type: moc</tt>, an F´ bridge's with <tt class="docutils literal">type: gateway_fprime</tt>. Every node there is
-of the kind <tt class="docutils literal">gateway</tt> names, and one of another kind is refused, naming both,
-because a vehicle answers to one: commands, beacons and data all go the one
-way.</p>
+<p>The gateway nodes are written in the <tt class="docutils literal">gateway</tt> section: a radio's with
+<tt class="docutils literal">type: gateway_radio</tt>, an F´ bridge's with <tt class="docutils literal">type: gateway_fprime</tt>. Every
+node there is of the kind <tt class="docutils literal">tcspecial.gateway</tt> names, and one of another kind is refused,
+naming both, because a vehicle answers to one: commands, beacons and data all go
+the one way.</p>
 </div>
 <div class="section" id="where-the-links-are">
 <h2><a class="toc-backref" href="#toc-entry-55">Where the links are</a></h2>

@@ -12,10 +12,10 @@
 //! Every node type has one, and the tree's families are the code's: a
 //! description at `vehicle/compute/mean.yaml` is about the Rust at
 //! `tcspecial/src/node/vehicle/compute/mean.rs`, and one at
-//! `payload/i2c.yaml` about `node/payload/i2c/`. `moc.yaml` is at the root
-//! because the ground station has no Rust of its own -- it is the other end of
-//! the link rather than part of the vehicle, and the code that serves one is
-//! the network payload's.
+//! `payload/i2c.yaml` about `node/payload/i2c/`. `gateway_radio.yaml` is at the
+//! root because the ground station has no Rust of its own -- it is the other
+//! end of the link rather than part of the vehicle, and the code that serves
+//! one is the network payload's.
 //!
 //! Two trees rather than one, which was a decision and is worth the reason.
 //! The descriptions are data the editor reads at run time and will be able to
@@ -109,10 +109,10 @@ pub struct Terminals {
     pub payload_sink: bool,
     /// And where it leaves: `payload-out`.
     pub payload_source: bool,
-    /// Where what the ground sends arrives: `moc-in`.
-    pub moc_sink: bool,
-    /// And where it leaves: `moc-out`.
-    pub moc_source: bool,
+    /// Where what the ground sends arrives: `gateway-in`.
+    pub gateway_sink: bool,
+    /// And where it leaves: `gateway-out`.
+    pub gateway_source: bool,
 }
 
 impl Terminals {
@@ -133,8 +133,8 @@ impl Terminals {
         [
             ("payload-in", self.payload_sink),
             ("payload-out", self.payload_source),
-            ("moc-in", self.moc_sink),
-            ("moc-out", self.moc_source),
+            ("gateway-in", self.gateway_sink),
+            ("gateway-out", self.gateway_source),
         ]
     }
 }
@@ -219,10 +219,10 @@ struct Said {
     payload_sink: Option<Scalar>,
     #[serde(default, rename = "payload-source")]
     payload_source: Option<Scalar>,
-    #[serde(default, rename = "moc-sink")]
-    moc_sink: Option<Scalar>,
-    #[serde(default, rename = "moc-source")]
-    moc_source: Option<Scalar>,
+    #[serde(default, rename = "gateway-sink")]
+    gateway_sink: Option<Scalar>,
+    #[serde(default, rename = "gateway-source")]
+    gateway_source: Option<Scalar>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -450,8 +450,8 @@ fn read_one(root: &Path, path: &Path) -> Result<Described, String> {
     let terminals = Terminals {
         payload_sink: flag("payload-sink", said.payload_sink.as_ref())?,
         payload_source: flag("payload-source", said.payload_source.as_ref())?,
-        moc_sink: flag("moc-sink", said.moc_sink.as_ref())?,
-        moc_source: flag("moc-source", said.moc_source.as_ref())?,
+        gateway_sink: flag("gateway-sink", said.gateway_sink.as_ref())?,
+        gateway_source: flag("gateway-source", said.gateway_source.as_ref())?,
     };
 
     Ok(Described {
@@ -797,7 +797,7 @@ mod tests {
                 // no Rust of their own, then the two families in the order
                 // the code tree holds them.
                 "gateway_fprime",
-                "moc",
+                "gateway_radio",
                 // What the vehicle carries: the two that are programs first,
                 // the tree being sorted by path.
                 "app_all_pl",
@@ -815,17 +815,17 @@ mod tests {
                 // The vehicle's own, and the three programs among them come
                 // first because the tree is sorted by path.
                 "app_all_veh",
-                "app_moc_veh",
+                "app_gateway_veh",
                 "app_payload_veh",
                 "hysteresis",
                 "process",
                 "to_kelvin",
                 "vote",
                 "log",
-                "null-moc",
+                "null-gateway",
                 "null-payload",
                 "ping",
-                "tee-moc",
+                "tee-gateway",
                 "tee-payload",
             ],
             "sorted by path, which puts a family's descriptions together"
@@ -1065,10 +1065,10 @@ mod tests {
     /// `tcspecial/src/node/vehicle/compute/mean.rs`, and one at
     /// `payload/i2c.yaml` about `node/payload/i2c/`.
     ///
-    /// `moc.yaml` is the exception, and sits at the root because of it: the
-    /// ground station has no Rust of its own. It is not part of the vehicle at
-    /// all -- it is the other end of the link -- and the code that serves one
-    /// is the network payload's.
+    /// `gateway_radio.yaml` is the exception, and sits at the root because of
+    /// it: the ground station has no Rust of its own. It is not part of the
+    /// vehicle at all -- it is the other end of the link -- and the code that
+    /// serves one is the network payload's.
     ///
     /// The second direction is asked only of the directories the descriptions
     /// cover: once a family has one description in it, all of its files need
@@ -1083,7 +1083,7 @@ mod tests {
         let mut families: Vec<PathBuf> = Vec::new();
         for one in &described {
             // The gateway nodes, which have none: see above.
-            if one.path == Path::new("moc.yaml")
+            if one.path == Path::new("gateway_radio.yaml")
                 || one.path == Path::new("gateway_fprime.yaml")
             {
                 continue;
@@ -1231,9 +1231,9 @@ mod tests {
 
         // A type described without answering anything matches whatever it is
         // told, there being nothing to disagree with.
-        let null = matching(&described, "null-moc", &said(&[]))
-            .expect("the null-moc node");
-        assert_eq!(null.node, "null-moc");
+        let null = matching(&described, "null-gateway", &said(&[]))
+            .expect("the null-gateway node");
+        assert_eq!(null.node, "null-gateway");
         assert!(null.asked().is_empty(), "a null node says nothing");
 
         // And a payload is described as itself: one kind, one description, no
@@ -1241,8 +1241,12 @@ mod tests {
         let sensor = matching(&described, "i2c", &said(&[("address", "0x48")]))
             .expect("an i2c node is described");
         assert_eq!(sensor.node, "i2c");
-        assert!(sensor.terminals.payload_source && sensor.terminals.moc_sink);
-        assert!(!sensor.terminals.payload_sink && !sensor.terminals.moc_source);
+        assert!(
+            sensor.terminals.payload_source && sensor.terminals.gateway_sink
+        );
+        assert!(
+            !sensor.terminals.payload_sink && !sensor.terminals.gateway_source
+        );
     }
 
     /// A description that is not one is refused by name, and the rest are read.

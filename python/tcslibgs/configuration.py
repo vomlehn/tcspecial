@@ -1,7 +1,7 @@
 """What a ground station reads out of a tcspecial configuration.
 
 The Python spelling of what the Rust ground programs ask ``tcslibgs`` for:
-where the beacons are (``graph::parameters::beacon_of``), where a ``moc``
+where the beacons are (``graph::parameters::beacon_of``), where a ``gateway``
 node is bound aboard, which port a source's data reaches the ground at
 (``graph::order`` and ``graph::telemetry``), whether a datagram came from where
 the configuration says (``types::came_from``), and the configuration's digest.
@@ -36,13 +36,16 @@ from pathlib import Path
 #: The sections whose entries are nodes, in which a node's device id is
 #: counted: a node's id is its position among every node the file writes, in
 #: the order it writes them, whatever section each is in.
-NODE_SECTIONS = ("moc", "vehicle", "payloads")
+NODE_SECTIONS = ("gateway", "vehicle", "payloads")
 
 #: Each gateway node type, and the attribute it says where its data goes
 #: with: a radio's ``ground_base``, an F´ gateway's ``bridge_base``. The Python
 #: spelling of ``tcslibgs::gateway::GatewayKind::base_attribute``, for the
 #: kinds that have a node type.
-GATEWAY_BASES = {"moc": "ground_base", "gateway_fprime": "bridge_base"}
+GATEWAY_BASES = {
+    "gateway_radio": "ground_base",
+    "gateway_fprime": "bridge_base",
+}
 
 
 @dataclass(frozen=True)
@@ -108,7 +111,7 @@ class Node:
     #: links.
     attributes: dict = field(default_factory=dict)
     #: The nodes each of its terminals is linked to, by terminal:
-    #: ``{"payload-out": ["moc"]}``.
+    #: ``{"payload-out": ["gateway"]}``.
     links: dict = field(default_factory=dict)
 
 
@@ -178,42 +181,42 @@ class Configuration:
         ``tcslib.beacon.Schedule.for_interval``."""
         return parse_interval(self._said("beacon.default_interval"))
 
-    def moc_nodes(self):
+    def gateway_nodes(self):
         """The gateway nodes -- the links to what the vehicle answers to -- in
         the order written."""
         return [node for node in self.nodes if node.node_type in GATEWAY_BASES]
 
-    def uplink(self, moc):
-        """Where the ground sends to the ``moc`` node called ``moc``.
+    def uplink(self, gateway):
+        """Where the ground sends to the ``gateway`` node called ``gateway``.
 
         Args:
-            moc: The gateway node's name.
+            gateway: The gateway node's name.
 
         Returns:
             The :class:`HostPort` it binds aboard, which is what leaves it by
-            its ``moc-out`` links.
+            its ``gateway-out`` links.
 
         Raises:
             ValueError: There is no such gateway node, or it states no address
                         and port, or they are not a valid address and port.
         """
-        node = self._moc(moc)
+        node = self._gateway(gateway)
         address = node.attributes.get("address")
         port = node.attributes.get("port")
         if address is None or port is None:
             raise ValueError(
-                f'{self.path}: "{moc}" states no address and port, so it binds '
-                "nothing aboard and the ground has nowhere to send to it"
+                f'{self.path}: "{gateway}" states no address and port, so it '
+                "binds nothing aboard and the ground has nowhere to send to it"
             )
-        return HostPort.of(f'"{moc}" address:port', f"{address}:{port}")
+        return HostPort.of(f'"{gateway}" address:port', f"{address}:{port}")
 
-    def downlink(self, moc, source):
+    def downlink(self, gateway, source):
         """Where the ground receives what ``source`` sends to the gateway node
-        called ``moc``.
+        called ``gateway``.
 
         Args:
-            moc:    The gateway node's name.
-            source: The name of the node whose data is received.
+            gateway: The gateway node's name.
+            source:  The name of the node whose data is received.
 
         Returns:
             The :class:`HostPort`: the gateway's ``ground_base`` -- or
@@ -222,30 +225,30 @@ class Configuration:
             own.
 
         Raises:
-            ValueError: Either node is missing, ``moc`` is not a gateway,
+            ValueError: Either node is missing, ``gateway`` is not a gateway,
                         ``source`` has no ``payload-out`` link to it, the base
                         is not an address and a port, or the port counted on
                         is past 65535.
         """
-        node = self._moc(moc)
+        node = self._gateway(gateway)
         attribute = GATEWAY_BASES[node.node_type]
-        if moc not in self.node(source).links.get("payload-out", []):
+        if gateway not in self.node(source).links.get("payload-out", []):
             raise ValueError(
-                f'{self.path}: "{source}" sends nothing to "{moc}": it has no '
-                "payload-out link to it"
+                f'{self.path}: "{source}" sends nothing to "{gateway}": it has '
+                "no payload-out link to it"
             )
         base = HostPort.of(
-            f'"{moc}" {attribute}', node.attributes.get(attribute, "")
+            f'"{gateway}" {attribute}', node.attributes.get(attribute, "")
         )
         port = base.port + self.device_id(source)
         if port > 65535:
             raise ValueError(
-                f'{self.path}: "{moc}" {attribute} {base} plus {source}\'s '
+                f'{self.path}: "{gateway}" {attribute} {base} plus {source}\'s '
                 f"device id is port {port}, and a port is at most 65535"
             )
         return HostPort(base.address, port)
 
-    def _moc(self, name):
+    def _gateway(self, name):
         """The gateway node called ``name``.
 
         Args:

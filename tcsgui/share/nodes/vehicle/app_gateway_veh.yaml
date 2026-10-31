@@ -1,19 +1,19 @@
 # A program of the vehicle's own that is asked and answers.
 #
 # The mirror of app_payload_veh: it is run with one file interface, on which it
-# reads MOC data and writes payload data, so it takes what travels vehicleward
-# and answers with what travels groundward. Which is the shape a payload has,
-# and what an app of this kind stands in for: something that is asked for a
-# reading and produces one. The interfaces and the packets they carry are
-# tcsapp; its Rust is tcspecial/src/node/vehicle/app_moc_veh/.
-node: app_moc_veh
-type: app_moc_veh
+# reads gateway data and writes payload data, so it takes what travels
+# vehicleward and answers with what travels groundward. Which is the shape a
+# payload has, and what an app of this kind stands in for: something that is
+# asked for a reading and produces one. The interfaces and the packets they
+# carry are tcsapp; its Rust is tcspecial/src/node/vehicle/app_gateway_veh/.
+node: app_gateway_veh
+type: app_gateway_veh
 about: >
-  A program of its own: it reads MOC data and writes payload data.
+  A program of its own: it reads gateway data and writes payload data.
 payload-sink: false
 payload-source: true
-moc-sink: true
-moc-source: false
+gateway-sink: true
+gateway-source: false
 attributes:
   - name: executable
     required: true
@@ -25,11 +25,11 @@ attributes:
       and `$HOME` are expanded as a shell would expand them, against the home
       directory of whatever runs the application: so the value is kept as
       written and what it stands for is settled aboard.
-  - name: app-moc-arg
+  - name: app-gateway-arg
     required: true
     about: >
-      What the program is told about the MOC stream, as the argument after the
-      payload one where this kind has both. Required, for the reason the
+      What the program is told about the gateway stream, as the argument after
+      the payload one where this kind has both. Required, for the reason the
       payload argument is.
   - name: restart
     required: false

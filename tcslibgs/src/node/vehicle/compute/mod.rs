@@ -942,7 +942,9 @@ mod tests {
         // until then it does not have its data read as a temperature.
         assert!(!node_sends_a_value("compute", &node(&[])));
         // And nothing else makes one, whatever it says.
-        for node_type in ["i2c", "gpio", "network", "log", "moc", "app_pl"] {
+        for node_type in
+            ["i2c", "gpio", "network", "log", "gateway_radio", "app_pl"]
+        {
             assert!(
                 !node_sends_a_value(node_type, &node(&[("function", "vote")])),
                 "{node_type}"

@@ -9,9 +9,9 @@
 //!
 //! Each of the two data interfaces is a socket pair, not a pipe, because each
 //! is read *and* written at both ends: the app reads payload data and writes
-//! MOC data on the one descriptor, so this end writes payload data and reads
-//! MOC data on its own. The names here are the app's, turned around -- what
-//! [`Running::write_payload`] writes is what the app reads with
+//! gateway data on the one descriptor, so this end writes payload data and
+//! reads gateway data on its own. The names here are the app's, turned around
+//! -- what [`Running::write_payload`] writes is what the app reads with
 //! `read_payload` -- so that both ends of a sentence about an interface use
 //! the same words.
 //!
@@ -21,7 +21,7 @@
 //!
 //! A short, fixed list, built by `tcslibgs::node::app`: the name of the node
 //! it is, and then the argument the configuration states for each stream its
-//! kind handles, payload before MOC. See [`start`].
+//! kind handles, payload before gateway. See [`start`].
 //!
 //! An interface the app does not support is not opened for it at all: the
 //! descriptor is closed in the child between the fork and the exec, so the
@@ -39,9 +39,9 @@
 //! keeps the packet that has half arrived until the rest of it comes.
 //!
 //! The waiting kind is here as well, for a tool and for a test, which have
-//! nothing else to do until the program answers: [`Running::read_moc`] and its
-//! neighbours wait up to [`Running::waits`], and the `_now` forms beside them
-//! are what the fabric calls.
+//! nothing else to do until the program answers: [`Running::read_gateway`] and
+//! its neighbours wait up to [`Running::waits`], and the `_now` forms beside
+//! them are what the fabric calls.
 
 use std::io::{self, Read, Write};
 use std::net::Shutdown;
@@ -72,33 +72,33 @@ pub const WAITS: Duration = Duration::from_secs(5);
 /// The error interface is not here because every app has it.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct Supports {
-    /// Reads payload data and writes MOC data, at descriptor 0.
+    /// Reads payload data and writes gateway data, at descriptor 0.
     pub payload: bool,
-    /// Reads MOC data and writes payload data, at descriptor 1.
-    pub moc: bool,
+    /// Reads gateway data and writes payload data, at descriptor 1.
+    pub gateway: bool,
 }
 
 impl Supports {
     /// What an `app_payload_veh` supports.
     pub const PAYLOAD: Supports = Supports {
         payload: true,
-        moc: false,
+        gateway: false,
     };
-    /// What an `app_moc_veh` supports, and the payload-side pair with it.
+    /// What an `app_gateway_veh` supports, and the payload-side pair with it.
     ///
     /// An `app_pl` and an `app_all_pl` are run with this interface too: a
     /// payload's readings are what it writes, and this is the interface payload
     /// data is written on. What tells the three apart is what each does with
     /// it, which is the app's end of the arrangement and not this one's -- see
     /// [`crate::app`].
-    pub const MOC: Supports = Supports {
+    pub const GATEWAY: Supports = Supports {
         payload: false,
-        moc: true,
+        gateway: true,
     };
     /// And an `app_all_veh`.
     pub const ALL: Supports = Supports {
         payload: true,
-        moc: true,
+        gateway: true,
     };
 }
 
@@ -503,10 +503,10 @@ impl End {
 pub struct Running {
     child: Child,
     /// This end of the payload interface, where it has one: payload data is
-    /// written here and MOC data read from it.
+    /// written here and gateway data read from it.
     payload: Option<End>,
-    /// And of the MOC interface: MOC data written, payload data read.
-    moc: Option<End>,
+    /// And of the gateway interface: gateway data written, payload data read.
+    gateway: Option<End>,
     /// This end of the error interface, which is only read.
     errors: End,
     /// How long a waiting read waits. See [`WAITS`].
@@ -519,9 +519,9 @@ pub struct Running {
 /// a short, fixed list and are the one thing an app is told other than over
 /// its interfaces: the name of the node it is, and then what the
 /// configuration says about each stream its kind handles -- payload before
-/// MOC. `tcslibgs::node::app::AppParams::arguments` is what builds the list,
-/// and the order is fixed by the kind rather than by what a file happened to
-/// state, so a program reads argument two without counting.
+/// gateway. `tcslibgs::node::app::AppParams::arguments` is what builds the
+/// list, and the order is fixed by the kind rather than by what a file happened
+/// to state, so a program reads argument two without counting.
 ///
 /// The name is first because a program may be several nodes at once: three
 /// `app_pl` nodes running one program are three processes which otherwise
@@ -562,9 +562,11 @@ pub fn start(
             UnixStream::pair().map_err(|e| named("the payload interface", e))
         })
         .transpose()?;
-    let moc = supports
-        .moc
-        .then(|| UnixStream::pair().map_err(|e| named("the MOC interface", e)))
+    let gateway = supports
+        .gateway
+        .then(|| {
+            UnixStream::pair().map_err(|e| named("the gateway interface", e))
+        })
         .transpose()?;
     let errors =
         UnixStream::pair().map_err(|e| named("the error interface", e))?;
@@ -578,7 +580,7 @@ pub fn start(
         Some((_, theirs)) => command.stdin(childs_half(theirs)),
         None => command.stdin(Stdio::null()),
     };
-    match &moc {
+    match &gateway {
         Some((_, theirs)) => command.stdout(childs_half(theirs)),
         None => command.stdout(Stdio::null()),
     };
@@ -590,7 +592,7 @@ pub fn start(
     // between a fork and an exec, and it is all that is wanted.
     let shut: Vec<i32> = [
         (!supports.payload).then_some(Interface::Payload.fd()),
-        (!supports.moc).then_some(Interface::Moc.fd()),
+        (!supports.gateway).then_some(Interface::Gateway.fd()),
     ]
     .into_iter()
     .flatten()
@@ -628,8 +630,8 @@ pub fn start(
         payload: payload
             .map(|(mine, _)| end(mine, "the payload interface"))
             .transpose()?,
-        moc: moc
-            .map(|(mine, _)| end(mine, "the MOC interface"))
+        gateway: gateway
+            .map(|(mine, _)| end(mine, "the gateway interface"))
             .transpose()?,
         errors: end(errors.0, "the error interface")?,
         waits: Some(WAITS),
@@ -679,18 +681,18 @@ impl Running {
             .map_err(|e| said(Interface::Payload, "written", e))
     }
 
-    /// Whatever MOC data has arrived from the app, without waiting.
+    /// Whatever gateway data has arrived from the app, without waiting.
     ///
     /// What the flight software calls: [`Arrived::Nothing`] is a program with
     /// nothing to say, which is the ordinary answer and not a failure.
-    pub fn read_moc_now(&mut self) -> Result<Arrived, String> {
+    pub fn read_gateway_now(&mut self) -> Result<Arrived, String> {
         let end = Self::held(&mut self.payload, Interface::Payload)?;
         end.read_now()
             .map_err(|e| said(Interface::Payload, "read", e))
     }
 
     /// The same, into `out`, allocating nothing: what the fabric reads with.
-    pub fn read_moc_now_into(
+    pub fn read_gateway_now_into(
         &mut self,
         out: &mut [u8],
     ) -> Result<ReadInto, String> {
@@ -700,23 +702,24 @@ impl Running {
     }
 
     /// And the same, waiting up to [`Running::waits`] for a packet.
-    pub fn read_moc(&mut self) -> Result<Option<Vec<u8>>, String> {
+    pub fn read_gateway(&mut self) -> Result<Option<Vec<u8>>, String> {
         let waits = self.waits;
         let end = Self::held(&mut self.payload, Interface::Payload)?;
         waited(end.read_waiting(waits), Interface::Payload)
     }
 
-    /// Write a packet of MOC data, which the app reads as MOC data.
-    pub fn write_moc(&mut self, data: &[u8]) -> Result<(), String> {
-        let end = Self::held(&mut self.moc, Interface::Moc)?;
+    /// Write a packet of gateway data, which the app reads as gateway data.
+    pub fn write_gateway(&mut self, data: &[u8]) -> Result<(), String> {
+        let end = Self::held(&mut self.gateway, Interface::Gateway)?;
         end.write_all(data)
-            .map_err(|e| said(Interface::Moc, "written", e))
+            .map_err(|e| said(Interface::Gateway, "written", e))
     }
 
     /// Whatever payload data has arrived from the app, without waiting.
     pub fn read_payload_now(&mut self) -> Result<Arrived, String> {
-        let end = Self::held(&mut self.moc, Interface::Moc)?;
-        end.read_now().map_err(|e| said(Interface::Moc, "read", e))
+        let end = Self::held(&mut self.gateway, Interface::Gateway)?;
+        end.read_now()
+            .map_err(|e| said(Interface::Gateway, "read", e))
     }
 
     /// The same, into `out`, allocating nothing: what the fabric reads with.
@@ -724,16 +727,16 @@ impl Running {
         &mut self,
         out: &mut [u8],
     ) -> Result<ReadInto, String> {
-        let end = Self::held(&mut self.moc, Interface::Moc)?;
+        let end = Self::held(&mut self.gateway, Interface::Gateway)?;
         end.read_now_into(out)
-            .map_err(|e| said(Interface::Moc, "read", e))
+            .map_err(|e| said(Interface::Gateway, "read", e))
     }
 
     /// And the same, waiting up to [`Running::waits`] for a packet.
     pub fn read_payload(&mut self) -> Result<Option<Vec<u8>>, String> {
         let waits = self.waits;
-        let end = Self::held(&mut self.moc, Interface::Moc)?;
-        waited(end.read_waiting(waits), Interface::Moc)
+        let end = Self::held(&mut self.gateway, Interface::Gateway)?;
+        waited(end.read_waiting(waits), Interface::Gateway)
     }
 
     /// Whatever the app has said went wrong, without waiting.
@@ -766,7 +769,7 @@ impl Running {
     ///
     /// A sentence saying so if a data interface would not be shut down.
     pub fn no_more(&mut self) -> Result<(), String> {
-        for end in [self.payload.as_ref(), self.moc.as_ref()]
+        for end in [self.payload.as_ref(), self.gateway.as_ref()]
             .into_iter()
             .flatten()
         {

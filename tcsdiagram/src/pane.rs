@@ -2,8 +2,8 @@
 //!
 //! The canvas is divided into three columns, left to right: the payload working
 //! pane, which holds everything the vehicle carries; the vehicle working pane,
-//! which holds the vehicle's own graph; and the moc working pane, which holds
-//! the ground link. `design.rst` says why, and the short of it
+//! which holds the vehicle's own graph; and the gateway working pane, which
+//! holds the ground link. `design.rst` says why, and the short of it
 //! is that the three parts change on different schedules -- the ground is the
 //! other end of the link and not the vehicle at all, the vehicle's own graph
 //! persists, and what it carries changes between flights -- so a drawing that
@@ -261,7 +261,7 @@ pub const WORKING_HEIGHT: i32 = 2400;
 /// file holds.
 ///
 /// `payloads` is where the payload working pane ends and the vehicle's
-/// begins, and `vehicle` is where the vehicle's ends and the moc working
+/// begins, and `vehicle` is where the vehicle's ends and the gateway working
 /// pane's begins. Together they say where all three are, the first starting
 /// at nought and the last ending at [`WORKING_WIDTH`].
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -272,12 +272,12 @@ pub struct Dividers {
 
 /// Where the dividers fall, for panes of these percentages of the whole.
 ///
-/// `moc_percent` and `vehicle_percent` are the moc and vehicle panes' shares;
-/// the payload working pane takes what is left. Kept by pane rather than by
-/// position, so the settings say the same thing whichever order the panes are
-/// drawn in: the payloads on the left, then the vehicle, then the moc. The
-/// dividers are movable, so this is arithmetic rather than a pair of
-/// constants. What is kept is the percentages -- see `settings.rs`, which
+/// `gateway_percent` and `vehicle_percent` are the gateway and vehicle panes'
+/// shares; the payload working pane takes what is left. Kept by pane rather
+/// than by position, so the settings say the same thing whichever order the
+/// panes are drawn in: the payloads on the left, then the vehicle, then the
+/// gateway. The dividers are movable, so this is arithmetic rather than a pair
+/// of constants. What is kept is the percentages -- see `settings.rs`, which
 /// says why those and not pixel counts -- and this is the one place they
 /// become positions.
 ///
@@ -287,7 +287,7 @@ pub struct Dividers {
 ///
 /// # Arguments
 ///
-/// * `moc_percent`     - The moc pane's share of the working width, in
+/// * `gateway_percent` - The gateway pane's share of the working width, in
 ///                       per cent; brought inside the limits
 ///                       `settings::shares` keeps.
 /// * `vehicle_percent` - The vehicle pane's share, likewise.
@@ -295,12 +295,12 @@ pub struct Dividers {
 /// # Returns
 ///
 /// The two dividers, on the grid.
-pub fn dividers_for(moc_percent: i32, vehicle_percent: i32) -> Dividers {
-    let (moc_percent, vehicle_percent) =
-        settings::shares(moc_percent, vehicle_percent);
+pub fn dividers_for(gateway_percent: i32, vehicle_percent: i32) -> Dividers {
+    let (gateway_percent, vehicle_percent) =
+        settings::shares(gateway_percent, vehicle_percent);
     Dividers {
-        payloads: at_percent(100 - moc_percent - vehicle_percent),
-        vehicle: at_percent(100 - moc_percent),
+        payloads: at_percent(100 - gateway_percent - vehicle_percent),
+        vehicle: at_percent(100 - gateway_percent),
     }
 }
 
@@ -310,7 +310,7 @@ pub fn dividers_for(moc_percent: i32, vehicle_percent: i32) -> Dividers {
 /// moving a line between them. A running editor reads them from the settings
 /// instead -- see `settings::load` -- because somebody may have moved them.
 pub fn default_dividers() -> Dividers {
-    dividers_for(settings::DEFAULT_MOC, settings::DEFAULT_VEHICLE)
+    dividers_for(settings::DEFAULT_GATEWAY, settings::DEFAULT_VEHICLE)
 }
 
 /// A position in the working pane, snapped to the grid.
@@ -318,8 +318,8 @@ fn at_percent(percent: i32) -> i32 {
     on_grid(WORKING_WIDTH * percent / 100)
 }
 
-/// And back: what percentages of the working pane these dividers leave the moc
-/// and vehicle panes.
+/// And back: what percentages of the working pane these dividers leave the
+/// gateway and vehicle panes.
 ///
 /// Rounded to whole percents, which is what is written. The round trip is
 /// stable -- a percent is a little over a grid step, so dividers snapped to
@@ -332,7 +332,7 @@ fn at_percent(percent: i32) -> i32 {
 ///
 /// # Returns
 ///
-/// The moc and vehicle panes' shares of the working width, in whole per
+/// The gateway and vehicle panes' shares of the working width, in whole per
 /// cent, brought inside the limits `settings::shares` keeps.
 pub fn percents_for(dividers: Dividers) -> (i32, i32) {
     let whole =
@@ -378,13 +378,15 @@ pub fn is_payload(node_type: &str) -> bool {
 ///
 /// # Returns
 ///
-/// Whether the type is `moc` or `gateway_fprime`, the known ground link
+/// Whether the type is `gateway` or `gateway_fprime`, the known ground link
 /// types.
-pub fn is_moc(node_type: &str) -> bool {
+pub fn is_gateway(node_type: &str) -> bool {
     NodeType::ALL
         .iter()
         .find(|t| t.spelling() == node_type)
-        .is_some_and(|t| matches!(t, NodeType::Moc | NodeType::GatewayFprime))
+        .is_some_and(|t| {
+            matches!(t, NodeType::GatewayRadio | NodeType::GatewayFprime)
+        })
 }
 
 /// Which working pane a node of this type belongs in.
@@ -395,7 +397,7 @@ pub fn is_moc(node_type: &str) -> bool {
 pub enum Pane {
     Payloads,
     Vehicle,
-    Moc,
+    Gateway,
 }
 
 impl Pane {
@@ -407,10 +409,10 @@ impl Pane {
     ///
     /// # Returns
     ///
-    /// The pane's name: `MOC`, `Vehicle` or `Payloads`.
+    /// The pane's name: `Gateway`, `Vehicle` or `Payloads`.
     pub fn label(self) -> &'static str {
         match self {
-            Pane::Moc => "MOC",
+            Pane::Gateway => "Gateway",
             Pane::Vehicle => "Vehicle",
             Pane::Payloads => "Payloads",
         }
@@ -430,8 +432,8 @@ impl Pane {
 pub fn pane_of(node_type: &str) -> Pane {
     if is_payload(node_type) {
         Pane::Payloads
-    } else if is_moc(node_type) {
-        Pane::Moc
+    } else if is_gateway(node_type) {
+        Pane::Gateway
     } else {
         Pane::Vehicle
     }
@@ -479,10 +481,10 @@ pub const NAMES: (i32, i32) = (0, 30);
 /// # Returns
 ///
 /// Each band's left, top, width and height, in pixels, for the payload,
-/// vehicle and moc panes in that order.
+/// vehicle and gateway panes in that order.
 fn names_bands(dividers: Dividers) -> [(i32, i32, u32, u32); 3] {
     let (top, height) = NAMES;
-    [Pane::Payloads, Pane::Vehicle, Pane::Moc].map(|pane| {
+    [Pane::Payloads, Pane::Vehicle, Pane::Gateway].map(|pane| {
         let (left, right) = edges_of(pane, dividers);
         (left, top, (right - left).max(0) as u32, height as u32)
     })
@@ -530,7 +532,7 @@ pub fn edges_of(pane: Pane, dividers: Dividers) -> (i32, i32) {
     match pane {
         Pane::Payloads => (0, dividers.payloads),
         Pane::Vehicle => (dividers.payloads, dividers.vehicle),
-        Pane::Moc => (dividers.vehicle, WORKING_WIDTH),
+        Pane::Gateway => (dividers.vehicle, WORKING_WIDTH),
     }
 }
 
@@ -801,7 +803,9 @@ mod tests {
             // Each band is its pane's, from its left edge to the next
             // divider, at the top of the sheet and of the one depth.
             for (band, pane) in
-                bands.iter().zip([Pane::Payloads, Pane::Vehicle, Pane::Moc])
+                bands
+                    .iter()
+                    .zip([Pane::Payloads, Pane::Vehicle, Pane::Gateway])
             {
                 let (left, right) = edges_of(pane, dividers);
                 assert_eq!(

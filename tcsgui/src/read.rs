@@ -289,7 +289,7 @@ fn comments_of(path: &Path) -> Said {
 /// opening tag instead, since what identifies one of those is its children
 /// rather than a name of its own.
 fn line_opens_an_entry(line: &str) -> bool {
-    matches!(line, "<moc>" | "<vehicle>" | "<payloads>")
+    matches!(line, "<gateway>" | "<vehicle>" | "<payloads>")
 }
 
 /// Which data source this line writes, if it writes one.
@@ -306,10 +306,10 @@ fn line_opens_an_entry(line: &str) -> bool {
 ///
 /// # Returns
 ///
-/// The terminal's name, `payload-out` or `moc-out`, or `None` if the line
+/// The terminal's name, `payload-out` or `gateway-out`, or `None` if the line
 /// writes neither.
 fn source_named(line: &str, xml: bool) -> Option<String> {
-    for terminal in ["payload-out", "moc-out"] {
+    for terminal in ["payload-out", "gateway-out"] {
         let is = if xml {
             line.starts_with(&format!("<{terminal}>"))
         } else {
@@ -550,7 +550,7 @@ mod tests {
         for (name, node_type) in [
             ("sensor", "i2c"),
             ("through", "tee-payload"),
-            ("ground", "moc"),
+            ("ground", "gateway_radio"),
         ] {
             document.apply(&Edit::AddNode {
                 name: name.into(),
@@ -564,7 +564,7 @@ mod tests {
         for link in [
             Link::joining("sensor", Some("payload-out"), "through", None),
             Link::joining("through", Some("payload-out"), "ground", None),
-            Link::joining("through", Some("moc-out"), "sensor", None),
+            Link::joining("through", Some("gateway-out"), "sensor", None),
         ] {
             document.apply(&Edit::AddLink { link });
         }
@@ -761,12 +761,12 @@ mod tests {
             );
 
             // And a node with nothing said about it says nothing.
-            let moc = document
+            let gateway = document
                 .nodes
                 .iter()
-                .find(|n| n.name == "moc")
+                .find(|n| n.name == "gateway")
                 .expect("the ground link");
-            assert_eq!(moc.comment, None, "{extension}");
+            assert_eq!(gateway.comment, None, "{extension}");
         }
     }
 

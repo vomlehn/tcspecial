@@ -23,7 +23,7 @@ members = [
     # vehicle's own and two are payloads.
     "tcsapp",
     "app_payload_veh",
-    "app_moc_veh",
+    "app_gateway_veh",
     "app_all_veh",
     "app_pl",
     "app_all_pl",

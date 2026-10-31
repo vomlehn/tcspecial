@@ -1,0 +1,13 @@
+# A vehicle node that takes what the ground sends and sends each datum on both
+# ways: as gateway data by its gateway-out, and again as payload data by its
+# payload-out.
+#
+# A link cannot carry one stream into the other, so this is how what the
+# ground sends reaches a payload-in. Its Rust is
+# tcspecial/src/node/vehicle/tee_gateway/.
+node: tee-gateway
+type: tee-gateway
+about: Sends what the ground sends on as gateway data and again as payload data.
+gateway-sink: true
+gateway-source: true
+payload-source: true

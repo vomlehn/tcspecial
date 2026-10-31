@@ -13,7 +13,7 @@
 //!
 //! `network` is here and serves two sections: a network payload and the ground
 //! link are the same endpoint code, a socket being a socket whichever end of
-//! the mission is at the other end of it. That is why there is no `moc`
+//! the mission is at the other end of it. That is why there is no `gateway`
 //! directory -- see `tcslibgs::node`.
 //!
 //! Which of the types are here is chosen when tcspecial is built: each is a

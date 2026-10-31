@@ -1,6 +1,6 @@
 //! It answers what arrives, and cannot reach the interface it has not got.
 //!
-//! The mirror of `app_payload_veh`'s tests: MOC data in, payload data out.
+//! The mirror of `app_payload_veh`'s tests: gateway data in, payload data out.
 //! Driven through `tcsapp::parent`, which is how tcspecial runs an app.
 
 use std::path::PathBuf;
@@ -9,28 +9,32 @@ use tcsapp::parent::{self, Supports};
 
 /// The program this crate builds.
 fn app() -> PathBuf {
-    PathBuf::from(env!("CARGO_BIN_EXE_app_moc_veh"))
+    PathBuf::from(env!("CARGO_BIN_EXE_app_gateway_veh"))
 }
 
-/// The arguments an `app_moc_veh` is run with: its name, then the argument
+/// The arguments an `app_gateway_veh` is run with: its name, then the argument
 /// for the one stream its kind handles.
 fn arguments() -> Vec<String> {
     vec!["back".to_string(), "--commands".to_string()]
 }
 
-/// MOC data in, the same bytes out as payload data.
+/// Gateway data in, the same bytes out as payload data.
 #[test]
-fn a_packet_of_moc_data_comes_back_as_payload_data() {
-    let mut running =
-        parent::start(&app(), &arguments(), Supports::MOC).expect("it starts");
+fn a_packet_of_gateway_data_comes_back_as_payload_data() {
+    let mut running = parent::start(&app(), &arguments(), Supports::GATEWAY)
+        .expect("it starts");
 
-    running.write_moc(b"SET 300").expect("it takes a packet");
+    running
+        .write_gateway(b"SET 300")
+        .expect("it takes a packet");
     assert_eq!(
         running.read_payload().expect("an answer"),
         Some(b"SET 300".to_vec())
     );
 
-    running.write_moc(b"").expect("an empty packet is a packet");
+    running
+        .write_gateway(b"")
+        .expect("an empty packet is a packet");
     assert_eq!(running.read_payload().expect("an answer"), Some(Vec::new()));
 
     running.no_more().expect("the interfaces end");
@@ -40,8 +44,8 @@ fn a_packet_of_moc_data_comes_back_as_payload_data() {
 /// The payload interface is not this kind of app's.
 #[test]
 fn the_interface_it_has_not_got_cannot_be_reached() {
-    let mut running =
-        parent::start(&app(), &arguments(), Supports::MOC).expect("it starts");
+    let mut running = parent::start(&app(), &arguments(), Supports::GATEWAY)
+        .expect("it starts");
 
     let said = running
         .write_payload(b"293.15")
@@ -63,7 +67,7 @@ fn run_as_a_kind_it_is_not_it_refuses_and_says_why() {
         .read_complaint()
         .expect("it complains")
         .expect("a message");
-    assert!(said.contains("app_moc_veh"), "{said}");
+    assert!(said.contains("app_gateway_veh"), "{said}");
     assert!(said.contains("the payload interface"), "{said}");
 
     assert!(!running.waited_for().expect("it stops").success());
@@ -78,14 +82,14 @@ fn run_as_a_kind_it_is_not_it_refuses_and_says_why() {
 #[test]
 fn run_with_the_wrong_arguments_it_refuses_and_says_why() {
     let mut running =
-        parent::start(&app(), &["back".to_string()], Supports::MOC)
+        parent::start(&app(), &["back".to_string()], Supports::GATEWAY)
             .expect("it starts");
 
     let said = running
         .read_complaint()
         .expect("it complains")
         .expect("a message");
-    assert!(said.contains("app_moc_veh"), "{said}");
+    assert!(said.contains("app_gateway_veh"), "{said}");
     assert!(said.contains("argument"), "{said}");
 
     assert!(!running.waited_for().expect("it stops").success());

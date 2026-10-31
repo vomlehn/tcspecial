@@ -1,6 +1,6 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="1300" height="900" viewBox="0 0 1300 900" role="img" aria-labelledby="title desc">
   <title id="title">The thermostat example</title>
-  <desc id="desc">Three temperature sensors of one place, temp_1 and temp_2 on I2C and temp_3 on SPI, read together ten times a second as the group cabin_temps. Three of them, and on two different buses, so that the temperature survives one sensor or one bus going wrong. Each reading is converted to kelvin by k_1, k_2 and k_3, and each converted reading goes to the moc node on the ground, to cabin_temp as input in0, in1 or in2, and to the log housekeeping. cabin_temp votes over the three, by the median, and produces one temperature on every arrival: a sensor that has gone wrong is outvoted, and one that stops reporting is outvoted too rather than stopping the vehicle from deciding anything. Its value goes to the moc node and to thermostat, a hysteresis holding 293.15 K within a half-band of 2.0, whose decision drives two GPIO heaters, is logged, and goes to the ground. Two heaters, because one failing must not leave the thermal mass with no way to be warmed. tcspecial sends what each of k_1, k_2, k_3, cabin_temp and thermostat produces as UDP datagrams to the moc node's ground_base, 127.0.0.1:5100, plus the source's device id: ports 5101 to 5105. Ground software gets that data from the moc node with a function call, tcslib's Moc::receive. The ground sets the thermostat's setpoint through a command binding on the moc node, sent to 127.0.0.1:5000.</desc>
+  <desc id="desc">Three temperature sensors of one place, temp_1 and temp_2 on I2C and temp_3 on SPI, read together ten times a second as the group cabin_temps. Three of them, and on two different buses, so that the temperature survives one sensor or one bus going wrong. Each reading is converted to kelvin by k_1, k_2 and k_3, and each converted reading goes to the gateway node on the ground, to cabin_temp as input in0, in1 or in2, and to the log housekeeping. cabin_temp votes over the three, by the median, and produces one temperature on every arrival: a sensor that has gone wrong is outvoted, and one that stops reporting is outvoted too rather than stopping the vehicle from deciding anything. Its value goes to the gateway node and to thermostat, a hysteresis holding 293.15 K within a half-band of 2.0, whose decision drives two GPIO heaters, is logged, and goes to the ground. Two heaters, because one failing must not leave the thermal mass with no way to be warmed. tcspecial sends what each of k_1, k_2, k_3, cabin_temp and thermostat produces as UDP datagrams to the gateway node's ground_base, 127.0.0.1:5100, plus the source's device id: ports 5101 to 5105. Ground software gets that data from the gateway node with a function call, tcslib's GatewayReceiver::receive. The ground sets the thermostat's setpoint through a command binding on the gateway node, sent to 127.0.0.1:5000.</desc>
   <defs>
     <style>
       text { font-family: "DejaVu Sans", Helvetica, Arial, sans-serif; fill: #111827; }
@@ -13,7 +13,7 @@
       .note { font-size: 12px; fill: #4b5563; }
       .payload { fill: #eaf2fb; stroke: #2f6db5; stroke-width: 1.6; }
       .vehicle { fill: #f5f0fc; stroke: #7e57c2; stroke-width: 1.6; }
-      .moc { fill: #e9f6ee; stroke: #2e7d4f; stroke-width: 1.6; }
+      .gateway { fill: #e9f6ee; stroke: #2e7d4f; stroke-width: 1.6; }
       .ground { fill: #f3f4f6; stroke: #4b5563; stroke-width: 1.6; }
       .groundside { fill: #f8faf8; stroke: #94a3b8; stroke-width: 1.4; stroke-dasharray: 7 5; }
       .call { fill: none; stroke: #374151; stroke-width: 2.4; }
@@ -117,9 +117,9 @@
   <rect class="groundside" x="1010" y="52" width="270" height="580" rx="16"/>
   <text class="heading" x="1028" y="78">GROUND</text>
 
-  <!-- The moc node, on the ground -->
-  <rect class="moc" x="1030" y="96" width="230" height="96" rx="10"/>
-  <text class="name" x="1044" y="120">moc</text>
+  <!-- The gateway node, on the ground -->
+  <rect class="gateway" x="1030" y="96" width="230" height="96" rx="10"/>
+  <text class="name" x="1044" y="120">gateway</text>
   <text class="kind" x="1044" y="140">receives what tcspecial sends</text>
   <text class="detail" x="1044" y="158">ground_base 127.0.0.1:5100</text>
   <text class="detail" x="1044" y="176">commands to 127.0.0.1:5000</text>
@@ -161,7 +161,7 @@
   <!-- The thermostat drives both heaters: one decision, two circuits -->
   <path class="vehicleward" d="M865,414 L865,586 L145,586 L145,578" marker-end="url(#arrow-orange)"/>
   <path class="vehicleward" d="M865,586 L865,706 L145,706 L145,698" marker-end="url(#arrow-orange)"/>
-  <text class="label" x="672" y="578">moc-out: on below the band</text>
+  <text class="label" x="672" y="578">gateway-out: on below the band</text>
   <text class="label" x="672" y="698">and to the second heater</text>
 
   <!-- Each source's port on the ground: ground_base plus its device id -->
@@ -178,7 +178,8 @@
 
   <!-- The ground software gets the data with a function call -->
   <path class="call" d="M1145,192 L1145,426" marker-end="url(#arrow-call)"/>
-  <text class="code" x="1155" y="312">Moc::receive()</text>
+  <text class="code" x="1155" y="304">GatewayReceiver::</text>
+  <text class="code" x="1155" y="320">receive()</text>
 
   <!-- Legend -->
   <line x1="50" y1="678" x2="1260" y2="678" stroke="#e5e7eb" stroke-width="1"/>
@@ -189,13 +190,13 @@
   <path class="command" d="M610,710 L660,710" marker-end="url(#arrow-orange)"/>
   <text class="label" x="670" y="714">command binding</text>
   <path class="call" d="M830,710 L880,710" marker-end="url(#arrow-call)"/>
-  <text class="label" x="890" y="714">function call, from tcslib::moc</text>
+  <text class="label" x="890" y="714">function call, from tcslib::gateway</text>
   <rect class="payload" x="50" y="740" width="22" height="16" rx="4"/>
   <text class="label" x="80" y="753">payload</text>
   <rect class="vehicle" x="170" y="740" width="22" height="16" rx="4"/>
   <text class="label" x="200" y="753">vehicle node</text>
-  <rect class="moc" x="320" y="740" width="22" height="16" rx="4"/>
-  <text class="label" x="350" y="753">moc node</text>
+  <rect class="gateway" x="320" y="740" width="22" height="16" rx="4"/>
+  <text class="label" x="350" y="753">gateway node</text>
   <rect class="ground" x="450" y="740" width="22" height="16" rx="4"/>
   <text class="label" x="480" y="753">ground program</text>
   <rect class="group" x="620" y="740" width="22" height="16" rx="4"/>

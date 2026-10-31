@@ -159,8 +159,9 @@ pub fn digest_of_file<P: AsRef<Path>>(path: P) -> TcsResult<ConfigDigest> {
 /// spellings of one configuration digest alike. In it: the `tcspecial`
 /// section, the payload groups, the nodes in the order the files declare them
 /// -- which is what a node's device id is, and so which port its data reaches
-/// the ground on -- with their attributes, the links, and the command
-/// bindings. Not in it: the editor's own section, where the nodes are drawn,
+/// the ground on -- with their attributes, the links, the command
+/// bindings, and the names its include list gives its other files. Not in
+/// it: the editor's own section, where the nodes are drawn,
 /// and the description, neither of which changes what anything does.
 pub fn digest_of_graph(graph: &crate::graph::Graph) -> TcsResult<ConfigDigest> {
     digest_of_value(&interpretation_of_graph(graph))
@@ -257,14 +258,23 @@ pub fn interpretation_of_graph(
         .map(|binding| json!({ "from": binding.from, "sets": binding.sets }))
         .collect();
 
-    json!({
+    let mut interpretation = json!({
         "version": crate::graph::VERSION,
         "tcspecial": tcspecial,
         "payload_groups": groups,
         "nodes": nodes,
         "links": links,
         "commands": commands,
-    })
+    });
+    // The names of the files it includes, so that the checksum a kept
+    // configuration is named by says the shape of its tree too: see
+    // `crate::store`. Only where there are some, so that a configuration
+    // of one file keeps the checksum it always had.
+    let included = graph.included();
+    if !included.is_empty() {
+        interpretation["include"] = json!(included);
+    }
+    interpretation
 }
 
 /// Digests any document that can be written out as a value tree.

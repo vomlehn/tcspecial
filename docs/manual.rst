@@ -4125,11 +4125,25 @@ Ping
   spacecraft made the answer, which every response carries -- and if nothing
   came back within the client's timeout it says when it stopped waiting.
 
+Restart target
+  The row under ``Command`` says which configuration ``ARM Restart`` and
+  ``Initiate restart`` restart onto. Left empty, it is the configuration
+  this tcsmoc read: a plain restart, onto what the vehicle is running. Type
+  a configuration file's path to restart onto that configuration: tcsmoc
+  checks it with tcsverify's checks, refuses it with the problems found if
+  any, and otherwise takes its checksum. Or type the checksum itself, as 32
+  lower-case hex digits, for a configuration the vehicle holds that is not
+  on this desk. Beside the field is what it comes to -- the checksum, and
+  the file where there is one -- before anything is sent, and each answer
+  says it again.
+
 ARM Restart
-  Arms a restart onto the configuration this tcsmoc read, whose checksum
-  it carries: a plain restart, onto what the vehicle is running. A vehicle
-  that does not hold the configuration an arm names refuses it
-  ``NotFound`` and arms nothing. An arm lasts 20
+  Arms a restart onto the restart target, whose checksum it carries. A
+  vehicle that does not hold the configuration an arm names refuses it
+  ``NotFound`` and arms nothing. ``Initiate restart`` goes onto the target
+  the arm was given: change the target after arming, and it is refused
+  unsent until ``ARM Restart`` is pressed again for the new one. An arm
+  lasts 20
   minutes from when the vehicle takes it unless the ``tcspecial`` section's
   ``restart_arm_valid`` says otherwise, as a length of time --
   ``restart_arm_valid: "45 min"`` -- and a restart after that is refused until
@@ -4144,7 +4158,10 @@ Initiate restart
   does. The arm is used up by it; a restart with the wrong key or another
   checksum is refused and leaves the arm standing, and one naming a
   configuration the vehicle can no longer load is refused ``NotFound`` and
-  restarts nothing. tcspecial
+  restarts nothing. After a restart onto another configuration than this
+  tcsmoc's, ``Last Response`` says which checksum the vehicle will run, and
+  that tcsmoc must be run with that configuration to ``Connect`` to it:
+  this tcsmoc does not load another configuration itself. tcspecial
   answers, stops as it does when it is told to -- the pass finished, the
   links closed, the log flushed -- and runs itself again in the same process,
   loading the configuration the restart named: see `Configurations kept on

@@ -1258,6 +1258,30 @@ mod tests {
         }
     }
 
+    /// RESTART_ARM and RESTART carry the target they are given, which need
+    /// not be the station's own configuration.
+    #[test]
+    fn the_arm_and_the_restart_carry_their_target() {
+        let other = ConfigDigest([0x77; 16]);
+        let (connection, asked) = Canned::recording(Telemetry::RestartArm(
+            tcslibgs::RestartArmTelemetry::new(1, CommandStatus::Success),
+        ));
+        let mut client = TcsClient::spacecraft_only(connection, commanding());
+        client.restart_arm(ArmKey(9), other).expect("answered");
+        let _ = client.restart(ArmKey(9), other);
+        let asked = asked.lock().unwrap();
+        match (&asked[0], &asked[1]) {
+            (Command::RestartArm(arm), Command::Restart(restart)) => {
+                assert_eq!((arm.target, arm.arm_key), (other, ArmKey(9)));
+                assert_eq!(
+                    (restart.target, restart.arm_key),
+                    (other, ArmKey(9))
+                );
+            }
+            other => panic!("an arm and a restart: {other:?}"),
+        }
+    }
+
     /// A RESTART refused ends the wait it began, and one sent again during
     /// a wait and refused does not: the first may have been taken.
     #[test]

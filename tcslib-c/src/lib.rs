@@ -1884,6 +1884,32 @@ pub unsafe extern "C" fn tcs_pinger_close(pinger: *mut tcs_pinger) {
 
 #[cfg(test)]
 mod tests {
+    /// A restart's target from C: NULL is this configuration's checksum, 32
+    /// lower-case hex digits are that checksum, and anything else is refused
+    /// with a reason saying what to give.
+    #[test]
+    fn a_target_from_c_is_null_or_a_checksum() {
+        use super::*;
+
+        let ours = ConfigDigest([0x5a; 16]);
+        // SAFETY: NULL, and NUL-terminated literals.
+        unsafe {
+            assert_eq!(target_of(std::ptr::null(), ours).ok(), Some(ours));
+            let other = c"0123456789abcdef0123456789abcdef";
+            assert_eq!(
+                target_of(other.as_ptr(), ours).ok().map(|d| d.to_string()),
+                Some("0123456789abcdef0123456789abcdef".to_string())
+            );
+            assert!(target_of(c"ping.yaml".as_ptr(), ours).is_err());
+            assert!(target_of(
+                c"0123456789ABCDEF0123456789ABCDEF".as_ptr(),
+                ours
+            )
+            .is_err());
+            let why = CStr::from_ptr(tcs_last_error()).to_string_lossy();
+            assert!(why.contains("32 lower-case hex digits"), "{why}");
+        }
+    }
     use super::*;
 
     /// The words the header promises are the library's own: Stage::label

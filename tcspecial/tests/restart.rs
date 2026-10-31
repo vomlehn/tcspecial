@@ -2,7 +2,9 @@
 //! descriptors it was started with and none it opened itself.
 //!
 //! Through tcspecial itself, as the ground commands it: armed, restarted, and
-//! watched by its beacons, which start again at #1 when it comes back. Started
+//! watched by its beacons, which start again at #1 when it comes back, each
+//! start with the restart flag set until a CONNECT carrying the
+//! configuration's checksum. Started
 //! with one end of a pipe beyond the standard three, which is what a
 //! supervisor hands a process, and which the process that comes back must
 //! still hold.
@@ -14,6 +16,8 @@ use std::time::{Duration, Instant};
 use tcslibgs::{
     ArmKey, Beacon, CommandStatus, RestartArmCommand, RestartCommand, Telemetry,
 };
+
+mod common;
 
 /// Binds a socket on a loopback port nothing else holds, kept so that it
 /// stays that way.
@@ -201,9 +205,49 @@ fn an_armed_restart_runs_tcspecial_again_keeping_what_it_was_given() {
 
     // Running, and settled: a second beacon is sent after everything opened.
     beacon(&beacons);
+    let first = beacon(&beacons);
+    assert!(first.sequence >= 2, "beacon #{}", first.sequence);
+    assert!(first.restart_flag, "a first start begins with the flag set");
+
+    // A CONNECT carrying another configuration's checksum is answered and
+    // changes nothing: the flag stays set, and a PING is not acted on.
+    let connect = |sequence, digest| {
+        tcslibgs::Command::Connect(tcslibgs::ConnectCommand::new(
+            sequence,
+            tcslibgs::ConfigVersion::of_this_build(),
+            digest,
+        ))
+    };
+    let ours = common::checksum_of(&configuration);
+    assert_eq!(
+        ask(
+            &commands,
+            take_at,
+            &connect(1, tcslibgs::ConfigDigest([0; 16]))
+        ),
+        CommandStatus::Success
+    );
+    let ping = |sequence| {
+        tcslibgs::Command::Ping(tcslibgs::PingCommand::new(sequence))
+    };
+    assert_eq!(ask(&commands, take_at, &ping(2)), CommandStatus::Unmatched);
+    beacon(&beacons);
+    assert!(
+        beacon(&beacons).restart_flag,
+        "a mismatched CONNECT clears nothing"
+    );
+
+    // One carrying this configuration's clears it: the first beacon after
+    // its answer may have been on its way, and the one after does not carry
+    // it. And the PING is taken.
+    assert_eq!(
+        ask(&commands, take_at, &connect(3, ours)),
+        CommandStatus::Success
+    );
+    beacon(&beacons);
     let before = beacon(&beacons);
-    assert!(before.sequence >= 2, "beacon #{}", before.sequence);
-    assert!(!before.commanded_restart, "nobody commanded a first start");
+    assert!(!before.restart_flag, "cleared by the matching CONNECT");
+    assert_eq!(ask(&commands, take_at, &ping(4)), CommandStatus::Success);
     let open_before = descriptors(pid);
     assert!(
         open_before.contains(&handed),
@@ -216,7 +260,7 @@ fn an_armed_restart_runs_tcspecial_again_keeping_what_it_was_given() {
         ask(
             &commands,
             take_at,
-            &tcslibgs::Command::RestartArm(RestartArmCommand::new(1, key))
+            &tcslibgs::Command::RestartArm(RestartArmCommand::new(5, key))
         ),
         CommandStatus::Success
     );
@@ -224,14 +268,14 @@ fn an_armed_restart_runs_tcspecial_again_keeping_what_it_was_given() {
         ask(
             &commands,
             take_at,
-            &tcslibgs::Command::Restart(RestartCommand::new(2, key))
+            &tcslibgs::Command::Restart(RestartCommand::new(6, key))
         ),
         CommandStatus::Success
     );
 
-    // The old start's beacons carry the commanded-restart bit from the
-    // moment the RESTART is taken; the new start's number from one again,
-    // and the first of them already carries it too.
+    // The old start's beacons carry the restart flag from the moment the
+    // RESTART is taken; the new start's number from one again, and the
+    // first of them already carries it too.
     let by = Instant::now() + Duration::from_secs(10);
     let mut last = before.sequence;
     let mut ending = false;
@@ -240,20 +284,17 @@ fn an_armed_restart_runs_tcspecial_again_keeping_what_it_was_given() {
         let heard = beacon(&beacons);
         if heard.sequence > last {
             // One sent before the RESTART was taken may still be arriving;
-            // once one carries the bit, every one after it does.
-            assert!(
-                heard.commanded_restart || !ending,
-                "the old start, ending"
-            );
-            ending |= heard.commanded_restart;
+            // once one carries the flag, every one after it does.
+            assert!(heard.restart_flag || !ending, "the old start, ending");
+            ending |= heard.restart_flag;
             last = heard.sequence;
             continue;
         }
         break heard;
     };
-    assert!(ending, "the old start's last beacons carried the bit");
+    assert!(ending, "the old start's last beacons carried the flag");
     assert_eq!(back.sequence, 1, "the first beacon of the new start");
-    assert!(back.commanded_restart, "the start the RESTART asked for");
+    assert!(back.restart_flag, "every start begins with the flag set");
     // Said once, and no more: a crash of this start would not be commanded.
     let kept = std::fs::read_to_string(&state).expect("the state file");
     assert!(kept.contains("\ngeneration 2\n"), "{kept}");
@@ -262,19 +303,15 @@ fn an_armed_restart_runs_tcspecial_again_keeping_what_it_was_given() {
     beacon(&beacons);
     beacon(&beacons);
 
-    // A CONNECT clears the bit: the first beacon after its answer may have
-    // been on its way, and the one after does not carry it. Whatever the
-    // digests say, the ground has connected.
-    let connect = tcslibgs::Command::Connect(tcslibgs::ConnectCommand::new(
-        3,
-        tcslibgs::ConfigVersion::of_this_build(),
-        tcslibgs::ConfigDigest([0; 16]),
-    ));
-    assert_eq!(ask(&commands, take_at, &connect), CommandStatus::Success);
+    // The new start is matched as the first was.
+    assert_eq!(
+        ask(&commands, take_at, &connect(7, ours)),
+        CommandStatus::Success
+    );
     beacon(&beacons);
     assert!(
-        !beacon(&beacons).commanded_restart,
-        "cleared by the CONNECT"
+        !beacon(&beacons).restart_flag,
+        "cleared by the matching CONNECT"
     );
 
     assert_eq!(

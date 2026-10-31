@@ -8,7 +8,8 @@
 //! What is left here is this window's own: a thread to run the loop on, the
 //! window to put the answers in, the question to ask the operator when the
 //! beacons announce a configuration this MOC did not read, the contact flag
-//! the panels act on, and handing each beacon to the window's commands.
+//! the panels act on, handing each beacon to the window's commands, and
+//! keeping the window's match with the vehicle, which tcslib decides.
 //!
 //! It used to be the whole of it -- the socket, the digest comparison, the
 //! sequence counting, the colours and the blink schedule, in one file with
@@ -23,6 +24,7 @@ use std::thread;
 use slint::{SharedString, Weak};
 
 use tcslib::beacon::{Arrived, Beacons, Contact, Link, Schedule};
+use tcslib::matched::Matched;
 use tcslibgs::ConfigDigest;
 use tcsui::Shown;
 
@@ -40,28 +42,32 @@ pub type Ask = Arc<dyn Fn(String) + Send + Sync>;
 pub type OnContact = Arc<dyn Fn() + Send + Sync>;
 
 /// What the beacons decide and the rest of the window reads: whether the
-/// spacecraft is being heard from, which the panels act on, and each beacon
-/// that arrives, which the commands wait on.
+/// spacecraft is being heard from, which the panels act on, each beacon
+/// that arrives, which the commands wait on, and whether the window is
+/// matched with the vehicle, which its commands and its data wait on.
 pub struct Decided {
     pub contact: Arc<Mutex<Contact>>,
     /// Given, for each beacon that arrives, whether it says tcspecial has
-    /// started again and whether a commanded restart is under way: what
-    /// ends the window's wait after an Initiate restart.
+    /// started again: what ends the window's wait after an Initiate
+    /// restart.
     pub heard: Option<OnBeacon>,
+    /// Whether the window is matched with the vehicle, which every pass is
+    /// handed to.
+    pub matched: Matched,
 }
 
 /// What to do with each beacon that arrives: whether it says tcspecial has
-/// started again, and whether a commanded restart is under way. Called from
-/// the beacon thread, as [`OnContact`] is.
-pub type OnBeacon = Arc<dyn Fn(bool, bool) + Send + Sync>;
+/// started again. Called from the beacon thread, as [`OnContact`] is.
+pub type OnBeacon = Arc<dyn Fn(bool) + Send + Sync>;
 
 /// What the window does as contact is lost and as it is made.
 #[derive(Clone, Default)]
 pub struct Contacts {
     /// As contact is lost: every node's status goes stale.
     pub lost: Option<OnContact>,
-    /// As contact is made, on the first beacon and at the end of an outage:
-    /// the spacecraft is asked what each node is doing.
+    /// As contact is made, on the first beacon and at the end of an outage,
+    /// and as the window becomes matched for commanding: the spacecraft is
+    /// asked what each node is doing, where it may be.
     pub made: Option<OnContact>,
 }
 
@@ -128,7 +134,11 @@ impl BeaconReceive {
         ask: Option<Ask>,
         contacts: Contacts,
     ) -> Option<BeaconReceive> {
-        let Decided { contact, heard } = decided;
+        let Decided {
+            contact,
+            heard,
+            matched,
+        } = decided;
         let mut beacons = match Beacons::listening(link, schedule, expected) {
             Ok(beacons) => beacons,
             Err(e) => {
@@ -141,12 +151,18 @@ impl BeaconReceive {
         thread::spawn(move || loop {
             let pass = beacons.pass();
 
+            // Every pass to the window's match, which a beacon begins and
+            // ends, and a beacon going overdue ends.
+            let was_commanding = matched.for_commanding();
+            matched.heard(pass);
+            let now_commanding = matched.for_commanding();
+
             // Every beacon to the window's commands, whose wait after an
             // Initiate restart only a beacon ends.
             if let (Arrived::Beacon, Some(heard)) =
                 (&pass.arrived, heard.as_ref())
             {
-                heard(pass.restarted, pass.commanded_restart);
+                heard(pass.restarted);
             }
 
             // Said on the console: a configuration that differs, beacons that
@@ -180,9 +196,15 @@ impl BeaconReceive {
             // loss: every status a panel shows is what the spacecraft said
             // while it was being heard from, and none of it can be taken as
             // true now. Contact made: the spacecraft can be asked again.
+            // A match for commanding that begins on this pass is asked about
+            // as contact made is: the clear beacon that follows a Connect
+            // may arrive after the Connect's answer, and the nodes could not
+            // be asked until it had.
             let then = if contact_lost(was, pass.contact) {
                 contacts.lost.as_ref()
-            } else if contact_made(was, pass.contact) {
+            } else if contact_made(was, pass.contact)
+                || (!was_commanding && now_commanding)
+            {
                 contacts.made.as_ref()
             } else {
                 None

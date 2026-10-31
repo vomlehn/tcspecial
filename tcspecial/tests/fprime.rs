@@ -15,6 +15,8 @@ use std::time::{Duration, Instant};
 use tcslibgs::graph::telemetry;
 use tcslibgs::graph::Graph;
 
+mod common;
+
 /// Binds a socket on a loopback port nothing holds.
 ///
 /// # Returns
@@ -141,6 +143,9 @@ fn a_vehicle_answering_to_fprime_reports_to_the_bridge_and_takes_its_commands()
     // the test is the heater, bound where the configuration says it is.
     let heater = bound();
     let (thermometer, uplink, base) = (free(), free(), free());
+    // The ground's command link: where tcs_cmd.send says it sends from,
+    // and where tcs_cmd.recv says tcspecial takes them.
+    let (commands, take_at) = (bound(), free());
     let mut text = text;
     for (was, now) in [
         ("\"9001\"", format!("\"{}\"", port(&heater))),
@@ -153,8 +158,8 @@ fn a_vehicle_answering_to_fprime_reports_to_the_bridge_and_takes_its_commands()
         ("127.0.0.1:9310", format!("127.0.0.1:{}", free())),
         ("127.0.0.1:9410", format!("127.0.0.1:{}", free())),
         ("0.0.0.0:9400", format!("127.0.0.1:{}", free())),
-        ("0.0.0.0:9200", format!("127.0.0.1:{}", free())),
-        ("127.0.0.1:9210", format!("127.0.0.1:{}", free())),
+        ("0.0.0.0:9200", format!("127.0.0.1:{take_at}")),
+        ("127.0.0.1:9210", format!("127.0.0.1:{}", port(&commands))),
         (
             "/tmp/telemetry",
             dir.path().join("telemetry").display().to_string(),
@@ -195,6 +200,12 @@ fn a_vehicle_answering_to_fprime_reports_to_the_bridge_and_takes_its_commands()
             .spawn()
             .expect("tcspecial starts"),
     );
+
+    // Nothing comes down until the ground has matched the start, with a
+    // CONNECT carrying the configuration's checksum.
+    let take: SocketAddr =
+        format!("127.0.0.1:{take_at}").parse().expect("an address");
+    common::connect(&commands, take, 1, common::checksum_of(&configuration));
 
     // A reading: from the thermometer to the bridge.
     let sensor = bound();

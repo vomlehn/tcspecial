@@ -7,7 +7,7 @@ reading a packet capture or a log reads it as it is, with no decoder::
     tcspecial:1.2.3:d41d8cd98f00b204e9800998ecf8427e:42:normal:0123...cdef
 
 which is the name, the version, the configuration's digest, the beacon's
-number, ``restart`` or ``normal`` for the commanded-restart flag, and the
+number, ``restart`` or ``normal`` for the restart flag, and the
 interface's digest, numbers in decimal and digests in lower-case hex. It is
 read strictly, as the Rust reads it. A beacon carries no check of its own:
 the transport under it checks it, as UDP's checksum does here.
@@ -19,8 +19,8 @@ from . import interface as _interface
 
 #: The name every beacon starts with.
 BEACON_NAME = "tcspecial"
-#: What the commanded-restart field says when a commanded restart is under
-#: way, and when none is.
+#: What the restart flag's field says when the flag is set -- the start has
+#: not yet been matched, or has taken a RESTART -- and when it is clear.
 RESTART_FLAG = "restart"
 NORMAL_FLAG = "normal"
 #: The longest a beacon is: the name, a version of three parts of up to three
@@ -109,11 +109,10 @@ class Beacon:
     version: tuple
     #: The digest of the configuration file the sender read: sixteen bytes.
     digest: bytes
-    #: Whether a restart the ground commanded is under way: set from an armed
-    #: RESTART being taken, through the start it asked for, until that start
-    #: takes a CONNECT. A start nobody commanded begins with it clear, and
-    #: runs with the definitions it had.
-    commanded_restart: bool = False
+    #: The restart flag: set at every start of tcspecial and from a RESTART
+    #: being taken, and clear once the start has taken a CONNECT whose
+    #: configuration checksum is the one it runs.
+    restart_flag: bool = False
     #: The interface the sender speaks: the digest of the XTCE documents it
     #: was built from, sixteen bytes. This tree's, where none is given.
     interface: bytes = None
@@ -173,7 +172,7 @@ class Beacon:
             sequence=sequence,
             version=version,
             digest=digest,
-            commanded_restart=flag == RESTART_FLAG,
+            restart_flag=flag == RESTART_FLAG,
             interface=interface,
         )
 
@@ -184,7 +183,7 @@ class Beacon:
             The beacon packed as tcspecial packs it, ``BEACON_BYTES`` long.
         """
         major, minor, patch = self.version
-        flag = RESTART_FLAG if self.commanded_restart else NORMAL_FLAG
+        flag = RESTART_FLAG if self.restart_flag else NORMAL_FLAG
         return (
             f"{BEACON_NAME}:{major}.{minor}.{patch}:{self.digest.hex()}:"
             f"{self.sequence}:{flag}:{self.interface.hex()}"

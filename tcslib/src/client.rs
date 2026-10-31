@@ -26,6 +26,7 @@ use tcslibgs::{
 };
 
 use crate::connection::Connection;
+use crate::matched::Matched;
 
 /// Default timeout for command responses
 const DEFAULT_TIMEOUT: Duration = Duration::from_secs(5);
@@ -130,6 +131,18 @@ pub struct TcsClient {
     /// What a RESTART that went out is waiting for, until a beacon says it
     /// came: see [`RestartWait`].
     restart_wait: Option<RestartWait>,
+    /// Whether the station is matched with the vehicle, which its beacon
+    /// watch keeps: until it is matched for commanding, nothing but
+    /// CONNECT, RESTART_ARM and RESTART is sent. Every answer that arrives
+    /// is counted here, with the station's data.
+    ///
+    /// Nothing is queued here to throw away when the match ends. A command
+    /// is built when its method is called and sent at once, so "a command
+    /// built under the old configuration" is a node id or an attribute the
+    /// caller took from that configuration and has not yet passed in: the
+    /// caller takes it again from the configuration it now uses, and the
+    /// refusal here stops it in the meantime.
+    matched: Matched,
 }
 
 /// A RESTART went out, and nothing but what [`RestartWait::lets`] may follow
@@ -140,42 +153,23 @@ pub struct TcsClient {
 /// back is another start, possibly with other definitions -- a command sent
 /// in between would be read by whichever of the two it reached. See "What
 /// the ground may send meanwhile" in `docs/design.rst`.
+///
+/// It no longer says how the restart ended: every start of tcspecial begins
+/// with the restart flag set, so the flag says nothing of whether the start
+/// that came back is the one the RESTART asked for. The checksum in its
+/// beacons says which configuration it runs, and matching it is what lets
+/// the station command it again.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub struct RestartWait {
-    /// The generation flying when the RESTART went.
-    from: Option<u32>,
-    /// Whether a CONNECT sent during the wait was answered by a start other
-    /// than `from`. That start took it, and a CONNECT clears the
-    /// commanded-restart flag, so a beacon with the flag clear no longer says
-    /// that start was not the one commanded.
-    flag_cleared: bool,
-}
-
-/// How a wait for a restart ended: whether the start of tcspecial that came
-/// back was the one the RESTART commanded.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub struct RestartEnded {
-    /// Whether its beacon said a commanded restart is under way. Where it
-    /// did not, the vehicle started again for some other reason -- it
-    /// crashed, or lost power -- before the RESTART was taken, and is running
-    /// with the definitions it had: the RESTART did not happen, and may be
-    /// sent again once the station has looked into why the vehicle
-    /// restarted. `None` where the beacon cannot say, because a CONNECT sent
-    /// during the wait reached the new start and cleared the flag: the
-    /// station finds out what is flying before it sends the RESTART again.
-    pub commanded: Option<bool>,
-}
+pub struct RestartWait;
 
 impl RestartWait {
     /// Says whether a command of this kind may go while the wait lasts.
     ///
-    /// CONNECT, because it changes nothing the restart depends on and is how
-    /// an operator asks what is flying; RESTART_ARM and RESTART, because
-    /// they are how an operator sends again a RESTART that may not have
-    /// arrived. A RESTART that reaches the start that came back restarts it
-    /// again, which is why it still needs the generation known, as every
-    /// command but PING and CONNECT does: an answer from another start
-    /// forgets it.
+    /// The three that go before a match, because the vehicle is ending and
+    /// the start that comes back is not yet matched:
+    /// [`tcslibgs::CommandType::taken_unmatched`]. A RESTART that reaches
+    /// the start that came back restarts it again, which is why it still
+    /// needs the generation known: an answer from another start forgets it.
     ///
     /// # Arguments
     ///
@@ -185,12 +179,7 @@ impl RestartWait {
     ///
     /// `true` where it may go.
     pub fn lets(&self, command: CommandType) -> bool {
-        matches!(
-            command,
-            CommandType::Connect
-                | CommandType::RestartArm
-                | CommandType::Restart
-        )
+        command.taken_unmatched()
     }
 
     /// Says why a command is refused while this lasts.
@@ -226,6 +215,8 @@ impl TcsClient {
     ///
     /// * `connection` - The spacecraft's own link.
     /// * `nodes`      - The one link every node is commanded on.
+    /// * `matched`    - Whether the station is matched with the vehicle,
+    ///                  which its beacon watch keeps.
     ///
     /// # Returns
     ///
@@ -234,6 +225,7 @@ impl TcsClient {
     pub fn of_a_graph(
         connection: Box<dyn Connection>,
         nodes: Box<dyn Connection>,
+        matched: Matched,
     ) -> Self {
         Self {
             connection,
@@ -246,6 +238,7 @@ impl TcsClient {
             answers_dropped: 0,
             generation: None,
             restart_wait: None,
+            matched,
         }
     }
 
@@ -253,8 +246,10 @@ impl TcsClient {
     ///
     /// # Arguments
     ///
-    /// * `links` - Where each link is sent from and goes to, as
-    ///             [`command_links_of`] reads them.
+    /// * `links`   - Where each link is sent from and goes to, as
+    ///               [`command_links_of`] reads them.
+    /// * `matched` - Whether the station is matched with the vehicle, which
+    ///               its beacon watch keeps.
     ///
     /// # Returns
     ///
@@ -264,14 +259,18 @@ impl TcsClient {
     ///
     /// `TcsError::Io` if a link's address cannot be bound, and
     /// `TcsError::Config` if where one goes is not a socket address.
-    pub fn open(links: &CommandLinks) -> TcsResult<Self> {
+    pub fn open(links: &CommandLinks, matched: Matched) -> TcsResult<Self> {
         let connection =
             crate::UdpConnection::new(&links.from, &links.interpreter)?;
         let nodes = crate::UdpConnection::new(
             &links.nodes_from.to_string(),
             &links.nodes_to.to_string(),
         )?;
-        Ok(Self::of_a_graph(Box::new(connection), Box::new(nodes)))
+        Ok(Self::of_a_graph(
+            Box::new(connection),
+            Box::new(nodes),
+            matched,
+        ))
     }
 
     /// A client with the spacecraft's link and no node link.
@@ -283,12 +282,17 @@ impl TcsClient {
     /// # Arguments
     ///
     /// * `connection` - The spacecraft's own link.
+    /// * `matched`    - Whether the station is matched with the vehicle,
+    ///                  which its beacon watch keeps.
     ///
     /// # Returns
     ///
     /// The client, with the default timeout, counting from sequence 1 and
     /// knowing no generation yet.
-    pub fn spacecraft_only(connection: Box<dyn Connection>) -> Self {
+    pub fn spacecraft_only(
+        connection: Box<dyn Connection>,
+        matched: Matched,
+    ) -> Self {
         Self {
             connection,
             nodes: None,
@@ -300,48 +304,41 @@ impl TcsClient {
             answers_dropped: 0,
             generation: None,
             restart_wait: None,
+            matched,
         }
     }
 
     /// Takes note that a beacon has arrived: whether its number says
-    /// tcspecial has started again since the one before it, and whether it
-    /// says a commanded restart is under way -- what
-    /// [`crate::beacon::Pass`] says of it.
+    /// tcspecial has started again since the one before it -- what
+    /// [`crate::beacon::Pass::restarted`] says of it.
     ///
     /// A station that sends RESTART passes on every beacon it hears, because
     /// a beacon is what ends the wait a RESTART begins. A start, waited for or
     /// not, also makes this station forget which generation is flying, so
-    /// that nothing but PING and CONNECT goes until a CONNECT says.
+    /// that nothing but CONNECT goes until a CONNECT says. Whether the
+    /// station is matched is its [`Matched`]'s, which the beacon watch keeps
+    /// from the same beacons.
     ///
     /// # Arguments
     ///
     /// * `restarted` - Whether the beacon's number says tcspecial started
     ///                 again.
-    /// * `commanded` - Whether it says a commanded restart is under way.
     ///
     /// # Returns
     ///
-    /// How the wait for a restart ended, if this ended one, for the station
-    /// to say so; otherwise `None`.
-    pub fn beacon_heard(
-        &mut self,
-        restarted: bool,
-        commanded: bool,
-    ) -> Option<RestartEnded> {
+    /// Whether this ended a wait for a restart, for the station to say so.
+    pub fn beacon_heard(&mut self, restarted: bool) -> bool {
         if !restarted {
-            return None;
+            return false;
         }
         self.generation = None;
-        let wait = self.restart_wait.take()?;
-        // A flag that is set says the start was commanded whatever else was
-        // sent; one that is clear says nothing where a CONNECT may have
-        // cleared it.
-        let commanded = match (commanded, wait.flag_cleared) {
-            (true, _) => Some(true),
-            (false, false) => Some(false),
-            (false, true) => None,
-        };
-        Some(RestartEnded { commanded })
+        self.restart_wait.take().is_some()
+    }
+
+    /// Whether the station is matched with the vehicle, which this client's
+    /// commands wait for, and what it has received.
+    pub fn matched(&self) -> &Matched {
+        &self.matched
     }
 
     /// What a RESTART that went out is waiting for, if one is.
@@ -351,7 +348,7 @@ impl TcsClient {
 
     /// End a wait by hand, for an operator who knows the RESTART was never
     /// taken -- the beacons go on counting up, at their interval, with the
-    /// commanded-restart bit clear -- and returns it so that the station can
+    /// restart flag clear -- and returns it so that the station can
     /// record that it did. Nothing else ends a wait but a beacon or a refusal.
     pub fn end_restart_wait(&mut self) -> Option<RestartWait> {
         self.restart_wait.take()
@@ -434,9 +431,11 @@ impl TcsClient {
         self.generation
     }
 
-    /// Says whether `command` may go: only where this station knows which
-    /// generation is flying, but for a PING or a CONNECT, which go either
-    /// way because they are how it finds out.
+    /// Says whether `command` may go: only where this station is matched
+    /// for commanding, but for CONNECT, RESTART_ARM and RESTART, which go
+    /// either way because they are how it matches and how it rescues a
+    /// vehicle that will not; and only where it knows which generation is
+    /// flying, but for a PING or a CONNECT.
     ///
     /// # Arguments
     ///
@@ -444,9 +443,15 @@ impl TcsClient {
     ///
     /// # Errors
     ///
+    /// `TcsError::Unmatched` where the station is not matched for
+    /// commanding and the command is not one of the three;
     /// `TcsError::GenerationUnknown` where no generation is known and the
     /// command is not one that is always taken.
     fn may_send(&self, command: &Command) -> TcsResult<()> {
+        let kind = command.cmd_type();
+        if !kind.taken_unmatched() && !self.matched.for_commanding() {
+            return Err(TcsError::Unmatched(kind));
+        }
         match self.generation {
             Some(_) => Ok(()),
             None if command.cmd_type().always_taken() => Ok(()),
@@ -486,7 +491,8 @@ impl TcsClient {
     ///
     /// `TcsError::AwaitingRestart` while a RESTART is awaited and the wait
     /// does not let this command go, `TcsError::Config` if the client has no
-    /// link for it, `TcsError::GenerationUnknown` if no generation is known
+    /// link for it, `TcsError::Unmatched` if the station is not matched for
+    /// commanding, `TcsError::GenerationUnknown` if no generation is known
     /// to send it for, and `TcsError::Io` if it cannot be sent or no answer
     /// comes in time.
     fn send_command(&mut self, command: Command) -> TcsResult<Telemetry> {
@@ -508,11 +514,13 @@ impl TcsClient {
         self.sent += 1;
 
         let mut dropped = 0;
+        let matched = self.matched.clone();
         let answer = answer_to(
             self.link_for(&command)?,
             command.sequence(),
             timeout,
             &mut dropped,
+            &matched,
         );
         self.answers_dropped += dropped;
         if let Ok(answer) = &answer {
@@ -632,9 +640,11 @@ impl TcsClient {
     /// newest command the vehicle has taken.
     ///
     /// It goes during a wait for a restart too, without ending it: see
-    /// [`RestartWait::lets`]. One answered then by a start other than the
-    /// one the RESTART went to has cleared that start's commanded-restart
-    /// flag, and the wait remembers so.
+    /// [`RestartWait::lets`]. And it goes before the station is matched,
+    /// which is what it is for: answered with the station's own checksum,
+    /// it makes the station matched for commanding once it is matched for
+    /// listening -- see [`Matched::connect_answered`]. Answered with
+    /// another, it matches nothing, and the vehicle changes nothing.
     ///
     /// # Arguments
     ///
@@ -659,6 +669,7 @@ impl TcsClient {
             Command::Connect(ConnectCommand::new(seq, version, digest));
         let timeout = self.timeout;
         self.may_send(&command)?;
+        let mark = self.matched.before_connect();
 
         // The spacecraft's own link, and only that one. A CONNECT is about
         // having a connection to the vehicle, which is what this link is; a
@@ -669,8 +680,13 @@ impl TcsClient {
         self.last_sent = Some(Timestamp::now());
 
         let mut dropped = 0;
-        let answer =
-            answer_to(&mut self.connection, seq, timeout, &mut dropped);
+        let answer = answer_to(
+            &mut self.connection,
+            seq,
+            timeout,
+            &mut dropped,
+            &self.matched,
+        );
         self.answers_dropped += dropped;
         let answer = answer?;
         self.last_received = Some(Timestamp::now());
@@ -683,11 +699,7 @@ impl TcsClient {
                 if tm.header.status.is_success() {
                     self.generation = Some(tm.header.generation);
                     self.count_past(tm.newest_taken);
-                    if let Some(wait) = &mut self.restart_wait {
-                        if wait.from != self.generation {
-                            wait.flag_cleared = true;
-                        }
-                    }
+                    self.matched.connect_answered(tm.digest, mark);
                 }
                 Ok((tm.version, tm.digest))
             }
@@ -727,15 +739,11 @@ impl TcsClient {
         let cmd = Command::Restart(RestartCommand::new(seq, arm_key));
         let sent = self.sent;
         let waiting = self.restart_wait.is_some();
-        let from = self.generation;
         let response = self.send_command(cmd);
         // Begun once it has gone, whatever comes back -- an answer lost is a
         // RESTART that may have been taken -- and not where it never went.
         if self.sent != sent && !waiting {
-            self.restart_wait = Some(RestartWait {
-                from,
-                flag_cleared: false,
-            });
+            self.restart_wait = Some(RestartWait);
         }
 
         match response? {
@@ -1028,8 +1036,9 @@ impl TcsClientBuilder {
         self,
         connection: Box<dyn Connection>,
         nodes: Box<dyn Connection>,
+        matched: Matched,
     ) -> TcsClient {
-        let mut client = TcsClient::of_a_graph(connection, nodes);
+        let mut client = TcsClient::of_a_graph(connection, nodes, matched);
         client.set_timeout(self.timeout);
         client
     }
@@ -1051,12 +1060,17 @@ impl Default for TcsClientBuilder {
 /// meaning to, so it is counted and dropped rather than read as this one's.
 /// See "On the ground" in `docs/design.rst`.
 ///
+/// Every answer that arrives is counted in `matched` once: processed where
+/// it is the one waited for, dropped for a mismatch where it is another's,
+/// malformed where it cannot be read as one of the link's packets.
+///
 /// # Arguments
 ///
 /// * `link`     - The link the command went on.
 /// * `sequence` - The command's sequence number.
 /// * `timeout`  - How long to wait in all, however many are dropped.
 /// * `dropped`  - Counts the answers dropped, for the caller to keep.
+/// * `matched`  - Where every answer that arrives is counted.
 ///
 /// # Returns
 ///
@@ -1072,6 +1086,7 @@ fn answer_to(
     sequence: u32,
     timeout: Duration,
     dropped: &mut u64,
+    matched: &Matched,
 ) -> TcsResult<Telemetry> {
     let deadline = Instant::now() + timeout;
     loop {
@@ -1082,10 +1097,22 @@ fn answer_to(
                 format!("no answer to command #{sequence} came in time"),
             )));
         }
-        let answer = link.receive_timeout(left)?;
+        let answer = match link.receive_timeout(left) {
+            Ok(answer) => answer,
+            // Nothing arrived, or the socket failed: no packet to count.
+            Err(TcsError::Io(e)) => return Err(TcsError::Io(e)),
+            // A packet from where the command went that is not one of the
+            // link's.
+            Err(e) => {
+                matched.malformed();
+                return Err(e);
+            }
+        };
         if answer.sequence() == sequence {
+            matched.processed();
             return Ok(answer);
         }
+        matched.mismatched(1);
         *dropped += 1;
     }
 }
@@ -1093,65 +1120,179 @@ fn answer_to(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::beacon::Stage;
+
+    /// The checksum of the configuration the stations in these tests use.
+    const OURS: ConfigDigest = ConfigDigest([0x5A; 16]);
+
+    /// A station matched for listening only: its last beacon was clear,
+    /// carried its checksum and is recent, and no CONNECT of its own has
+    /// been answered.
+    ///
+    /// # Returns
+    ///
+    /// The station's state.
+    fn listening() -> Matched {
+        let matched = Matched::for_configuration(OURS);
+        matched.beacon(false, Some(OURS), Stage::Heard, false);
+        matched
+    }
+
+    /// A station matched for commanding: [`listening`], and a CONNECT of its
+    /// own answered with its checksum. What most of these tests are about
+    /// comes after the match.
+    ///
+    /// # Returns
+    ///
+    /// The station's state.
+    fn commanding() -> Matched {
+        let matched = listening();
+        let mark = matched.before_connect();
+        matched.connect_answered(OURS, mark);
+        matched
+    }
 
     /// A wait ends at a beacon whose number says tcspecial has started
-    /// again, and says whether that start was commanded; a beacon of the
-    /// old start, commanded bit and all, does not end it.
+    /// again; a beacon of the old start does not end it.
     #[test]
     fn a_restart_wait_ends_at_the_next_start() {
-        let mut client =
-            TcsClient::spacecraft_only(Canned::answering(Telemetry::Ping(
-                tcslibgs::PingTelemetry::new(1, CommandStatus::Success),
-            )));
-        let wait = RestartWait {
-            from: Some(7),
-            flag_cleared: false,
-        };
-        client.restart_wait = Some(wait);
-        assert_eq!(client.beacon_heard(false, true), None, "the old start");
-        assert_eq!(client.restart_wait(), Some(wait));
-        assert_eq!(
-            client.beacon_heard(true, false),
-            Some(RestartEnded {
-                commanded: Some(false)
-            }),
-            "a start nobody commanded ends it, and says so"
+        let mut client = TcsClient::spacecraft_only(
+            Canned::answering(Telemetry::Ping(tcslibgs::PingTelemetry::new(
+                1,
+                CommandStatus::Success,
+            ))),
+            commanding(),
         );
+        client.restart_wait = Some(RestartWait);
+        assert!(!client.beacon_heard(false), "the old start");
+        assert_eq!(client.restart_wait(), Some(RestartWait));
+        assert!(client.beacon_heard(true), "a new start ends it");
         assert_eq!(client.restart_wait(), None);
     }
 
-    /// A CONNECT answered during a wait by a start other than the one the
-    /// RESTART went to has cleared that start's commanded-restart flag, so a
-    /// beacon with the flag clear cannot say whether it was commanded; one
-    /// with it set still can, and a CONNECT answered by the old start clears
-    /// nothing.
+    /// While the station is not matched for commanding, every command but
+    /// CONNECT, RESTART_ARM and RESTART is refused unsent, saying the
+    /// configurations are not yet matched; the three go, and a CONNECT
+    /// answered with the station's checksum makes it matched for commanding
+    /// once it is matched for listening.
     #[test]
-    fn a_connect_to_another_start_leaves_a_clear_flag_unread() {
-        let mut client = TcsClient::spacecraft_only(Canned::answering(
-            an_answer(ConfigVersion::of_this_build()),
+    fn an_unmatched_station_sends_only_the_three() {
+        let (connection, asked) = Canned::recording(an_answer(a_version(1)));
+        let (nodes, node_asked) = Canned::recording(
+            Telemetry::StopNode(tcslibgs::NodeTelemetry::stopped(
+                1,
+                CommandStatus::Success,
+                NodeId(2),
+            ))
+            .for_generation(7),
+        );
+        let matched = Matched::for_configuration(OURS);
+        let mut client =
+            TcsClient::of_a_graph(connection, nodes, matched.clone());
+
+        let refused = client.ping().expect_err("not matched");
+        assert!(matches!(refused, TcsError::Unmatched(CommandType::Ping)));
+        let said = refused.to_string();
+        assert!(said.contains("not yet matched"), "{said}");
+        assert!(said.contains("checksum"), "{said}");
+        assert!(matches!(
+            client.stop_node(NodeId(2)),
+            Err(TcsError::Unmatched(CommandType::StopNode))
         ));
-        let cases = [
-            (Some(6), false, None),
-            (Some(6), true, Some(true)),
-            (Some(7), false, Some(false)),
-        ];
-        for (from, flag, said) in cases {
-            client.restart_wait = Some(RestartWait {
-                from,
-                flag_cleared: false,
-            });
-            client
-                .connect(
-                    ConfigVersion::of_this_build(),
-                    ConfigDigest([0x5A; 16]),
-                )
-                .expect("answered, though a restart is waited on");
-            assert!(client.restart_wait().is_some(), "and the wait goes on");
-            assert_eq!(
-                client.beacon_heard(true, flag),
-                Some(RestartEnded { commanded: said }),
-                "from generation {from:?}, the flag {flag}"
-            );
+        assert!(asked.lock().unwrap().is_empty(), "none of it was sent");
+        assert!(node_asked.lock().unwrap().is_empty());
+
+        // CONNECT goes, and is answered with ours; flagged beacons still
+        // keep the station from commanding.
+        client
+            .connect(ConfigVersion::of_this_build(), OURS)
+            .expect("CONNECT goes unmatched");
+        assert_eq!(asked.lock().unwrap().len(), 1);
+        assert!(matches!(
+            client.stop_node(NodeId(2)),
+            Err(TcsError::Unmatched(_))
+        ));
+
+        // A clear beacon of ours: matched, and the node command goes.
+        matched.beacon(false, Some(OURS), Stage::Heard, false);
+        client.stop_node(NodeId(2)).expect("sent once matched");
+        assert_eq!(node_asked.lock().unwrap().len(), 1);
+
+        // A flagged beacon ends it again.
+        matched.beacon(true, Some(OURS), Stage::Heard, false);
+        assert!(matches!(
+            client.stop_node(NodeId(2)),
+            Err(TcsError::Unmatched(_))
+        ));
+    }
+
+    /// A CONNECT answered with another configuration's checksum does not
+    /// make the station matched for commanding.
+    #[test]
+    fn a_connect_answered_with_another_checksum_does_not_match() {
+        let theirs = Telemetry::Connect(tcslibgs::ConnectTelemetry::new(
+            1,
+            a_version(1),
+            ConfigDigest([0x11; 16]),
+            40,
+        ))
+        .for_generation(7);
+        let mut client =
+            TcsClient::spacecraft_only(Canned::answering(theirs), listening());
+        client
+            .connect(ConfigVersion::of_this_build(), OURS)
+            .expect("answered");
+        assert!(!client.matched().for_commanding());
+        assert!(matches!(client.ping(), Err(TcsError::Unmatched(_))));
+    }
+
+    /// Every answer that arrives is counted once: the one waited for as
+    /// processed, the others as dropped for a mismatch, and one that is not
+    /// a packet of the link as malformed.
+    #[test]
+    fn every_answer_is_counted_once() {
+        let matched = commanding();
+        let mut client = TcsClient::spacecraft_only(
+            Scripted::answering(&[-1, 3, 0]),
+            matched.clone(),
+        );
+        client.ping().expect("its own answer, third");
+        let counts = matched.counts();
+        assert_eq!((counts.processed, counts.mismatched), (1, 2));
+
+        let mut client =
+            TcsClient::spacecraft_only(Box::new(Unreadable), matched.clone());
+        assert!(client.ping().is_err());
+        let counts = matched.counts();
+        assert_eq!(counts.malformed, 1);
+        assert_eq!(counts.received(), 4);
+    }
+
+    /// A link whose every answer is a packet that is not one of the link's.
+    struct Unreadable;
+
+    impl Connection for Unreadable {
+        fn send(&mut self, _command: &Command) -> TcsResult<()> {
+            Ok(())
+        }
+
+        fn receive(&mut self) -> TcsResult<Telemetry> {
+            self.receive_timeout(Duration::ZERO)
+        }
+
+        fn receive_timeout(
+            &mut self,
+            _timeout: Duration,
+        ) -> TcsResult<Telemetry> {
+            Ok(Telemetry::read(b"not a packet")?)
+        }
+
+        fn has_data(&self) -> TcsResult<bool> {
+            Ok(true)
+        }
+
+        fn close(&mut self) -> TcsResult<()> {
+            Ok(())
         }
     }
 
@@ -1159,10 +1300,12 @@ mod tests {
     /// a wait and refused does not: the first may have been taken.
     #[test]
     fn only_the_restart_that_began_a_wait_ends_it_by_a_refusal() {
-        let mut client =
-            TcsClient::spacecraft_only(Canned::answering(Telemetry::Restart(
+        let mut client = TcsClient::spacecraft_only(
+            Canned::answering(Telemetry::Restart(
                 tcslibgs::RestartTelemetry::new(1, CommandStatus::NotArmed),
-            )));
+            )),
+            commanding(),
+        );
         client.generation = Some(7);
         assert_eq!(
             client.restart(ArmKey(1)).expect("answered"),
@@ -1170,16 +1313,16 @@ mod tests {
         );
         assert_eq!(client.restart_wait(), None, "nothing was initiated");
 
-        let wait = RestartWait {
-            from: Some(7),
-            flag_cleared: false,
-        };
-        client.restart_wait = Some(wait);
+        client.restart_wait = Some(RestartWait);
         assert_eq!(
             client.restart(ArmKey(1)).expect("sent during the wait"),
             CommandStatus::NotArmed
         );
-        assert_eq!(client.restart_wait(), Some(wait), "the first may stand");
+        assert_eq!(
+            client.restart_wait(),
+            Some(RestartWait),
+            "the first may stand"
+        );
     }
 
     #[test]
@@ -1347,8 +1490,10 @@ mod tests {
     /// counted, and the client goes on waiting for its own.
     #[test]
     fn an_answer_to_another_command_is_dropped_and_counted() {
-        let mut client =
-            TcsClient::spacecraft_only(Scripted::answering(&[-1, 3, 0]));
+        let mut client = TcsClient::spacecraft_only(
+            Scripted::answering(&[-1, 3, 0]),
+            commanding(),
+        );
         let sent = client.sequence.load(Ordering::SeqCst);
         let answer = client.ping().expect("its own answer, third");
         assert_eq!(answer.header.sequence, sent);
@@ -1359,8 +1504,10 @@ mod tests {
     /// another command's answer.
     #[test]
     fn only_answers_to_other_commands_is_no_answer() {
-        let mut client =
-            TcsClient::spacecraft_only(Scripted::answering(&[-2, -1]));
+        let mut client = TcsClient::spacecraft_only(
+            Scripted::answering(&[-2, -1]),
+            commanding(),
+        );
         assert!(matches!(client.ping(), Err(TcsError::Io(_))));
         assert_eq!(client.answers_dropped(), 2);
     }
@@ -1416,6 +1563,7 @@ mod tests {
                 CommandStatus::Success,
             ))),
             Canned::answering(an_answer(a_version(1))),
+            commanding(),
         );
 
         assert_eq!(client.last_sent(), None, "nothing has been sent yet");
@@ -1450,6 +1598,7 @@ mod tests {
                 1,
                 CommandStatus::Success,
             ))),
+            commanding(),
         );
 
         let (version, _) = client
@@ -1477,6 +1626,7 @@ mod tests {
         let mut client = TcsClient::of_a_graph(
             Canned::answering(an_answer(a_version(1))),
             nodes,
+            commanding(),
         );
 
         assert_eq!(client.generation(), None);
@@ -1512,9 +1662,9 @@ mod tests {
             .connect(ConfigVersion::of_this_build(), ConfigDigest([0x5A; 16]))
             .expect("connected");
         assert_eq!(client.generation(), Some(7));
-        client.beacon_heard(false, false);
+        client.beacon_heard(false);
         assert_eq!(client.generation(), Some(7), "the same start goes on");
-        client.beacon_heard(true, true);
+        client.beacon_heard(true);
         assert_eq!(client.generation(), None, "a start");
     }
 
@@ -1524,7 +1674,7 @@ mod tests {
     #[test]
     fn the_count_goes_on_from_past_the_newest_the_vehicle_took() {
         let (connection, asked) = Canned::recording(an_answer(a_version(1)));
-        let mut client = TcsClient::spacecraft_only(connection);
+        let mut client = TcsClient::spacecraft_only(connection, commanding());
         client
             .connect(ConfigVersion::of_this_build(), ConfigDigest([0x5A; 16]))
             .expect("connected");

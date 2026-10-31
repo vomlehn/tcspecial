@@ -24,18 +24,33 @@ linkage throughout, and nothing in it that C++ will not compile.
   showing it is lit, whether the spacecraft is being heard from, when the last
   beacon arrived and what it said. It also says whether this pass's beacon
   started the count again, which is how a restart is known, and whether its
-  commanded-restart flag said `restart`, which it does from a restart the
-  ground commanded until the MOC connects. Each pass also gives remarks,
-  which are news, and warnings, which are to be said whether or not anybody
-  asked.
+  restart flag said `restart`, which it does from every start of the vehicle
+  and from its taking a restart, until it takes a connect carrying its
+  configuration's checksum. Each pass also gives remarks, which are news, and
+  warnings, which are to be said whether or not anybody asked.
+- **Matching.** Each pass keeps the configuration's *match* with the
+  vehicle, which every beacon watch, client and moc node made from that
+  configuration shares. The station is matched for listening while the last
+  beacon is recent, has the restart flag clear and carries the
+  configuration's checksum, and for commanding once, besides, its own
+  connect has been answered with that checksum. `tcs_configuration_matched`
+  says which; `tcs_configuration_counts` says how many packets have come
+  from the vehicle, data and answers, and how many of them were processed,
+  malformed or dropped for a configuration mismatch, which add up.
 - **The vehicle's data.** `tcs_moc_open` opens a `moc` node, and each
   `tcs_moc_receive` returns one datum and the name of the node that produced
-  it.
+  it. A moc node reads data only while the station is matched for listening:
+  what arrives before is dropped and counted, as is whatever is waiting when
+  the match begins. So a station that reads data passes its beacons too.
 - **Commands.** `tcs_client_open` opens the two command links the
   configuration states. `tcs_client_connect` says whether the vehicle is
   flying this configuration; then ping; start, stop or query a node by its
   id, set one of its attributes, or ask for the last datum it moved each way;
-  and arm a restart and restart the vehicle. The client
+  and arm a restart and restart the vehicle. Until the station is matched
+  for commanding, every command but connect, arm and restart fails, unsent,
+  saying the configurations are not yet matched; the vehicle itself answers
+  any other command that reaches it before a match `TCS_STATUS_UNMATCHED`,
+  and does not act on it. The client
   learns which generation of tcspecial is flying from the answer to connect,
   so until one is answered, and again after a beacon whose number went back
   or an answer from another generation, it refuses every command but ping

@@ -25,6 +25,7 @@ use tcslibgs::simulate::{judge, refusals, Host, Judged, Mode};
 use crate::beacon_send::BeaconSend;
 use crate::runtime::command::{Commands, Flying};
 use crate::runtime::fabric::Moved;
+use crate::runtime::matched::Matched;
 use crate::runtime::restart;
 use crate::runtime::system::{described, System};
 use crate::segsend::{self, SegSend};
@@ -164,7 +165,15 @@ pub fn run_graph(path: &str, mode: Mode) -> Result<(), Vec<String>> {
     let segsend =
         segsend_for(&graph).map_err(|why| vec![format!("{path}: {why}")])?;
 
-    let mut system = System::of(&graph, Instant::now(), segsend.clone())?;
+    // Whether the ground has matched this start, which every start begins
+    // without: the beacons carry the restart flag, the links to the ground
+    // send nothing and the commands but three are refused until a CONNECT
+    // carrying this configuration's checksum. Made before anything that
+    // asks it.
+    let matched = Matched::at_a_start();
+
+    let mut system =
+        System::of(&graph, Instant::now(), segsend.clone(), matched.clone())?;
     // What was opened, which the line above already says the shape of: for
     // somebody looking at how the running system is put together.
     debug!("{path}: {system:?}");
@@ -178,8 +187,9 @@ pub fn run_graph(path: &str, mode: Mode) -> Result<(), Vec<String>> {
 
     // Beacons, once everything has opened: a vehicle that will not start has
     // nothing to announce. Held until the vehicle stops.
-    let (beacon, generation) = beacons(&graph, digest, telemetry_log.clone())
-        .map_err(|why| vec![format!("{path}: {why}")])?;
+    let (beacon, generation) =
+        beacons(&graph, digest, telemetry_log.clone(), matched.clone())
+            .map_err(|why| vec![format!("{path}: {why}")])?;
 
     // And the ground's commands, on a thread of their own. After the beacons
     // because a CONNECT or a RESTART retimes them, and after the ports
@@ -198,6 +208,7 @@ pub fn run_graph(path: &str, mode: Mode) -> Result<(), Vec<String>> {
         flying,
         beacon.clone(),
         telemetry_log.clone(),
+        matched,
     )
     .map_err(|why| vec![format!("{path}: {why}")])?;
 
@@ -389,10 +400,10 @@ fn segsend_for(graph: &Graph) -> Result<SegSend, String> {
 /// says.
 ///
 /// From `beacon.send` to `beacon.recv`, carrying this build's version, the
-/// configuration's digest and whether this start was commanded -- read from
-/// `state_file` here, before the first beacon goes, so that the first beacon
-/// already says it. Every `beacon.reset_interval` until the MOC connects, as
-/// every start is, and every `beacon.default_interval` after that: see
+/// configuration's digest and the restart flag, which every start begins
+/// with. The state file is counted here, before the first beacon goes. Every
+/// `beacon.reset_interval` until the MOC connects, as every start is, and
+/// every `beacon.default_interval` after that: see
 /// [`BeaconSend::connected`].
 /// An interval of nought sends none. Recorded in the telemetry log, which is
 /// the vehicle's own account of what it sent.
@@ -407,6 +418,8 @@ fn segsend_for(graph: &Graph) -> Result<SegSend, String> {
 /// * `digest`        - The configuration's digest, which every beacon
 ///                     carries.
 /// * `telemetry_log` - Where each beacon sent is recorded.
+/// * `matched`       - Whether the ground has matched this start, which the
+///                     restart flag says the opposite of.
 ///
 /// # Returns
 ///
@@ -424,6 +437,7 @@ fn beacons(
     graph: &Graph,
     digest: ConfigDigest,
     telemetry_log: TelemetryLog,
+    matched: Matched,
 ) -> Result<(Option<BeaconSend>, u32), String> {
     let Some(section) = graph.tcspecial.as_ref() else {
         return Ok((None, 0));
@@ -461,7 +475,7 @@ fn beacons(
         telemetry_log,
         ConfigVersion::of_this_build(),
         digest,
-        &started,
+        matched,
     )
     .map_err(|e| e.to_string())?;
     if sending.is_some() {
@@ -496,6 +510,8 @@ fn beacons(
 /// * `beacon`        - The beacon sender, which a CONNECT and a RESTART
 ///                     retime.
 /// * `telemetry_log` - Where answers to the ground are recorded.
+/// * `matched`       - Whether the ground has matched this start, which a
+///                     matching CONNECT sets and a RESTART clears.
 ///
 /// # Returns
 ///
@@ -513,6 +529,7 @@ fn command_links(
     flying: Flying,
     beacon: Option<BeaconSend>,
     telemetry_log: TelemetryLog,
+    matched: Matched,
 ) -> Result<Option<Commands>, String> {
     let Some(section) = graph.tcspecial.as_ref() else {
         return Ok(None);
@@ -529,6 +546,7 @@ fn command_links(
         flying,
         beacon,
         telemetry_log,
+        matched,
         restart_when_stopped,
     )
     .map_err(|e| e.to_string())?;

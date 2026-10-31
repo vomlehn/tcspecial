@@ -3,7 +3,9 @@
 //! For now that is the generation number, which every start of tcspecial adds
 //! one to before it sends its first beacon, so that the ground can tell from a
 //! beacon alone that the vehicle has started again, and whether the next start
-//! is one the ground commanded, which its beacons then say. It is kept in the
+//! is one the ground commanded, which the startup summary then says. (The
+//! beacon's restart flag no longer depends on it: every start begins with the
+//! flag set.) It is kept in the
 //! file the `tcspecial` section's `state_file` names, on storage that survives
 //! a power cycle, because a count kept in memory would start again at every
 //! crash and every power cycle -- which are the restarts the ground most needs
@@ -39,8 +41,10 @@ pub struct Started {
     /// This start's generation, already written to the file.
     pub generation: u32,
     /// Whether the ground commanded this start: the start before took an
-    /// armed RESTART and said so in the file before it went. Every beacon
-    /// of this start says it. See [`commanded_restart`].
+    /// armed RESTART and said so in the file before it went. See
+    /// [`commanded_restart`]. The startup summary says it, for somebody
+    /// reading a log after a restart; the beacon's restart flag does not
+    /// depend on it, since every start begins with the flag set.
     pub commanded: bool,
     /// What was wrong with the file that was there, where something was: the
     /// generation then started again from one, and this says why, for the
@@ -119,8 +123,8 @@ pub fn start(path: &Path) -> Result<Started, String> {
 ///
 /// Written before the RESTART is answered and before anything stops, so that
 /// a RESTART the file cannot say is refused and nothing restarts: a vehicle
-/// that came back saying it had not been commanded would tell the ground the
-/// RESTART had not taken, when it had.
+/// that came back saying in its log that it had not been commanded would
+/// tell whoever reads it the RESTART had not taken, when it had.
 ///
 /// Allocates, in the command loop: the file's text is made, and the path is
 /// formatted into a refusal. Once, for a RESTART, after which the process

@@ -2251,7 +2251,7 @@ mod tests {
         for (name, value) in [
             ("gateway", "cfs"),
             ("sbn.release", "v7.0.1"),
-            ("sbn.ident", "0653995939d714ac94906f867b4397e9953ca66a"),
+            ("sbn.ident", "3b339a5e0f686cef822a5d6ea95004222ab7af33"),
             ("sbn.spacecraft_id", "0x42"),
             ("sbn.processor_id", "2"),
             ("sbn.local", "0.0.0.0:2234"),

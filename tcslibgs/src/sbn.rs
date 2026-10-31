@@ -519,7 +519,7 @@ impl Liveness {
 mod tests {
     use super::*;
 
-    const HASH: &str = "0653995939d714ac94906f867b4397e9953ca66a";
+    const HASH: &str = "3b339a5e0f686cef822a5d6ea95004222ab7af33";
 
     /// A header written and read back is the header, with the message after
     /// it, laid out as SBN lays it.

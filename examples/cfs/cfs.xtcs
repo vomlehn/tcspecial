@@ -53,7 +53,7 @@
              port. The ident is the hash SBN prints in its start-up
              event. -->
         <sbn>
-            <ident>0653995939d714ac94906f867b4397e9953ca66a</ident>
+            <ident>3b339a5e0f686cef822a5d6ea95004222ab7af33</ident>
             <local>0.0.0.0:8634</local>
             <max_message>32768</max_message>
             <peer>127.0.0.1:2234</peer>

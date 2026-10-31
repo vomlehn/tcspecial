@@ -898,7 +898,7 @@ mod tests {
             ("gateway", "cfs"),
             ("interface", "ad9aac4dd5a6d88dd5e78824ba8a83ac"),
             ("sbn.release", "v7.0.1"),
-            ("sbn.ident", "0653995939d714ac94906f867b4397e9953ca66a"),
+            ("sbn.ident", "3b339a5e0f686cef822a5d6ea95004222ab7af33"),
             ("sbn.spacecraft_id", "0x42"),
             ("sbn.processor_id", "2"),
             ("sbn.local", "0.0.0.0:2234"),
@@ -945,7 +945,7 @@ mod tests {
         assert_eq!(bus.sbn.release.protocol_version, 11);
         assert_eq!(
             &bus.sbn.ident[5..45],
-            b"0653995939d714ac94906f867b4397e9953ca66a"
+            b"3b339a5e0f686cef822a5d6ea95004222ab7af33"
         );
         assert_eq!(bus.sbn.spacecraft_id, 0x42);
         assert_eq!((bus.sbn.processor_id, bus.sbn.peer_processor_id), (2, 1));

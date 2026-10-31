@@ -11,11 +11,19 @@ number, ``restart`` or ``normal`` for the restart flag, and the
 interface's digest, numbers in decimal and digests in lower-case hex. It is
 read strictly, as the Rust reads it. A beacon carries no check of its own:
 the transport under it checks it, as UDP's checksum does here.
+
+Its layout -- six text fields, each but the last ended by a colon, the last
+32 characters that end the datagram -- is in ``tcslibgs/xtce/fixed.xml``
+beside the three fixed commands, and is packed and unpacked here by the code
+tcs-xtce generates from it, :class:`tcslibgs.fixed_packet.Beacon`. What the
+text must say, and turning it into numbers and digests and back, is here.
 """
 
 from dataclasses import dataclass
 
+from . import fixed_packet as _fixed
 from . import interface as _interface
+from ._xtce.packet import PacketError as _PacketError
 
 #: The name every beacon starts with.
 BEACON_NAME = "tcspecial"
@@ -25,8 +33,20 @@ RESTART_FLAG = "restart"
 NORMAL_FLAG = "normal"
 #: The longest a beacon is: the name, a version of three parts of up to three
 #: digits, two digests of thirty-two hex digits, a number of up to ten digits
-#: and the longer flag, with the five colons between them.
+#: and the longer flag, with the five colons between them -- the longest the
+#: XTCE's layout allows.
 BEACON_BYTES = 9 + 11 + 32 + 10 + 7 + 32 + 5
+assert BEACON_BYTES == _fixed.Beacon.MAX_BYTES
+
+#: What each field's being longer than its room says, by the field's name in
+#: the XTCE.
+_TOO_LONG = {
+    "BeaconName": 'it does not start "tcspecial:"',
+    "BeaconVersion": "the version is not three numbers",
+    "BeaconDigest": "the configuration digest is not 32 hex digits",
+    "BeaconNumber": "the number is not a number",
+    "BeaconFlag": 'the restart flag is neither "restart" nor "normal"',
+}
 
 _HEX = set("0123456789abcdef")
 
@@ -147,10 +167,27 @@ class Beacon:
             text = datagram.decode("utf-8")
         except UnicodeDecodeError:
             raise _refused("it is not text") from None
-        fields = text.split(":")
-        if len(fields) != 6:
-            raise _refused(f"it has {len(fields)} fields, not six")
-        name, version, digest, sequence, flag, interface = fields
+        count = text.count(":") + 1
+        try:
+            fields, used = _fixed.Beacon.decode_prefix(bytes(datagram))
+        except _PacketError as why:
+            field = why.what[0] if why.what else ""
+            if why.kind == "TooLong" and field in _TOO_LONG:
+                raise _refused(_TOO_LONG[field]) from None
+            if field == "BeaconName":
+                raise _refused('it does not start "tcspecial:"') from None
+            if field == "BeaconInterface" and count == 6:
+                raise _refused(
+                    "the interface digest is not 32 hex digits") from None
+            raise _refused(f"it has {count} fields, not six") from None
+        if used != len(datagram):
+            raise _refused(f"it has {count} fields, not six")
+        name = fields.beacon_name
+        version = fields.beacon_version
+        digest = fields.beacon_digest
+        sequence = fields.beacon_number
+        flag = fields.beacon_flag
+        interface = fields.beacon_interface
         if name != BEACON_NAME:
             raise _refused('it does not start "tcspecial:"')
         version = _version(version)
@@ -183,8 +220,11 @@ class Beacon:
             The beacon packed as tcspecial packs it, ``BEACON_BYTES`` long.
         """
         major, minor, patch = self.version
-        flag = RESTART_FLAG if self.restart_flag else NORMAL_FLAG
-        return (
-            f"{BEACON_NAME}:{major}.{minor}.{patch}:{self.digest.hex()}:"
-            f"{self.sequence}:{flag}:{self.interface.hex()}"
-        ).encode("ascii")
+        return _fixed.Beacon(
+            beacon_name=BEACON_NAME,
+            beacon_version=f"{major}.{minor}.{patch}",
+            beacon_digest=self.digest.hex(),
+            beacon_number=str(self.sequence),
+            beacon_flag=RESTART_FLAG if self.restart_flag else NORMAL_FLAG,
+            beacon_interface=self.interface.hex(),
+        ).to_bytes()

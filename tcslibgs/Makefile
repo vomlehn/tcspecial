@@ -3,7 +3,8 @@
 # Cargo builds the crate itself, from the repository's root: see README.md.
 # This builds the page, and regenerates the code that packs and unpacks the
 # commands and answers from the XTCE that describes them. The beacon is text,
-# written and read by hand in src/beacon.rs, and has no XTCE.
+# and its layout is in xtce/fixed.xml beside the three fixed commands, as
+# text fields: see src/beacon.rs.
 
 .PHONY: all
 all:	docs

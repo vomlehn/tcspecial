@@ -7,6 +7,7 @@
 //!     tests/manual/tcspecial2sim.yaml
 //! tcsverify --digest tests/manual/tcspecial2.yaml
 //! tcsverify --interface-digest
+//! tcsverify --set-interface examples/*/*.yaml examples/*/*.xml
 //! tcsverify --keep=/var/lib/tcspecial/configurations vehicle.yaml
 //! ```
 //!
@@ -33,6 +34,7 @@ usage: tcsverify [options] <tcspecial configuration file> \
        tcsverify [options] <configuration> <configuration> \
 <payload simulator file>
        tcsverify --interface-digest
+       tcsverify --set-interface <configuration>...
        tcsverify -h | --help
 
 Checks the files and prints the problems it finds, each as
@@ -88,6 +90,13 @@ configuration.
                      build was made from, which every beacon carries, and
                      a configuration naming another is refused by this
                      build's tcsverify, tcspecial and ground programs
+  --set-interface    with one or more configurations and nothing else:
+                     write this build's interface digest into each, as
+                     its tcspecial section's interface, in place, every
+                     other byte of the file left as it was, and say for
+                     each what was changed; a file that names it already
+                     is not written. For when tcslibgs/xtce/link.xml has
+                     changed and every configuration is to follow it
   -h, --help         print this message and exit
 
 Exit status: 0 no error was printed -- a run that stopped before it found
@@ -116,6 +125,10 @@ const TYPES_FLAG: &str = "--types=";
 /// Takes no value, where the other two do: there is one digest of a
 /// configuration and nothing to choose about it.
 const DIGEST_FLAG: &str = "--digest";
+
+/// Writes this build's interface digest into each configuration named: see
+/// `tcsverify::set_interface`. A shape of its own.
+const SET_INTERFACE_FLAG: &str = "--set-interface";
 
 /// Keeps the configuration, once checked, in the directory given: see
 /// `tcslibgs::store`.
@@ -154,6 +167,9 @@ fn main() -> ExitCode {
         }
         println!("{}", tcslibgs::InterfaceDigest::of_this_build());
         return ExitCode::SUCCESS;
+    }
+    if args.first().is_some_and(|arg| arg == SET_INTERFACE_FLAG) {
+        return set_interfaces(&args[1..]);
     }
     for arg in args {
         let said = arg.to_string_lossy();
@@ -331,6 +347,58 @@ fn main() -> ExitCode {
     }
 
     ExitCode::from(u8::try_from(report.status()).unwrap_or(1))
+}
+
+/// Sets the interface of every configuration named to this build's, and
+/// says what was done to each.
+///
+/// # Arguments
+///
+/// * `files` - The configurations.
+///
+/// # Returns
+///
+/// 0 when every one names this build's interface now, 1 when one could
+/// not be set, said on stderr, and 2 for no files or another option.
+fn set_interfaces(files: &[std::ffi::OsString]) -> ExitCode {
+    use tcsverify::set_interface::{set_in_file, Set};
+
+    if files.is_empty()
+        || files.iter().any(|f| f.to_string_lossy().starts_with('-'))
+    {
+        eprintln!(
+            "tcsverify: {SET_INTERFACE_FLAG} is given configurations and \
+             nothing else\n\n{USAGE}"
+        );
+        return ExitCode::from(2);
+    }
+    let ours = tcslibgs::InterfaceDigest::of_this_build();
+    let mut failed = false;
+    for file in files {
+        let path = std::path::Path::new(file);
+        match set_in_file(path) {
+            Ok(Set::Already) => {
+                println!("{}: interface is {ours} already", path.display())
+            }
+            Ok(Set::Changed(was)) => println!(
+                "{}: interface set to {ours}, from {was}",
+                path.display()
+            ),
+            Ok(Set::Added) => println!(
+                "{}: interface set to {ours}, where it named none",
+                path.display()
+            ),
+            Err(why) => {
+                eprintln!("tcsverify: {why}");
+                failed = true;
+            }
+        }
+    }
+    if failed {
+        ExitCode::from(1)
+    } else {
+        ExitCode::SUCCESS
+    }
 }
 
 /// Picks the configurations among the pathnames: every one but the simulator

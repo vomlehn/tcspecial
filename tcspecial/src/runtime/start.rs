@@ -673,6 +673,13 @@ fn report(moved: &Moved) {
 /// console and a service manager: a loop that answered only one of them would
 /// be killed outright by the other, with a log part way through a record.
 fn listen_for_stop() {
+    // Taken by the signal thread where `main` started one, which from now
+    // stops the loop rather than ending the process.
+    if crate::runtime::signals::listening() {
+        return;
+    }
+    // Where none was started, as in a test, by a handler.
+    //
     // SAFETY: the handler does one thing -- an atomic store -- which is
     // async-signal-safe. `libc::signal` is used rather than `sigaction`
     // because that is all this needs and it is what is available here.

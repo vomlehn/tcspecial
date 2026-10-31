@@ -158,7 +158,7 @@ impl Sizes {
             panel_height: 204.0,
             grid_spacing: 10.0,
             chrome_width: 36.0,
-            chrome_height: 436.0,
+            chrome_height: 476.0,
         }
     }
 
@@ -1666,6 +1666,7 @@ mod tests {
         use crate::vehicle::tests as vehicle;
         vehicle::pressing_connect_and_enable_commands_the_vehicle();
         vehicle::pressing_send_ping_pings_the_node_and_times_its_answer();
+        vehicle::the_restart_controls_go_onto_the_restart_target();
     }
 
     /// The question about a configuration that differs is asked inside the

@@ -225,6 +225,29 @@ class LayoutTest(unittest.TestCase):
                                                           source))
         self.assertEqual(interface.of_this_tree(), rust)
 
+    def test_the_beacon_is_what_the_hand_written_packer_wrote(self):
+        # What the hand-written packer that came before the generated code
+        # wrote for these beacons, which tcslibgs/src/beacon.rs holds the
+        # Rust to as well.
+        digest = bytes.fromhex("d41d8cd98f00b204e9800998ecf8427e")
+        face = bytes([0xAB] * 16)
+        for beacon, written in [
+            (Beacon(0x01020304, (1, 2, 3), digest, True, face),
+             b"tcspecial:1.2.3:d41d8cd98f00b204e9800998ecf8427e:16909060:"
+             b"restart:abababababababababababababababab"),
+            (Beacon(1, (0, 1, 0), digest, False, face),
+             b"tcspecial:0.1.0:d41d8cd98f00b204e9800998ecf8427e:1:normal:"
+             b"abababababababababababababababab"),
+            (Beacon(2 ** 32 - 1, (255, 255, 255), bytes(16), True, face),
+             b"tcspecial:255.255.255:00000000000000000000000000000000:"
+             b"4294967295:restart:abababababababababababababababab"),
+        ]:
+            self.assertEqual(beacon.to_bytes(), written)
+            self.assertEqual(Beacon.read(written), beacon)
+        self.assertEqual(len(
+            Beacon(2 ** 32 - 1, (255, 255, 255), bytes(16), True, face)
+            .to_bytes()), BEACON_BYTES)
+
     def test_a_beacon_reads_back_as_itself(self):
         sent = Beacon(sequence=7, version=(1, 2, 3), digest=bytes(range(16)),
                       restart_flag=True)

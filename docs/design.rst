@@ -6320,11 +6320,8 @@ Configurations named by their checksum
    and Cancel sending nothing. A press with the link down says Connect, as
    before, since that is what to press.
 
-   *Not yet built:* the read-only directory and the immutable attribute of
-   first provisioning, which are the provisioner's to set -- ``tcsverify
-   --keep`` makes the files it writes 0444 and leaves the directory as it
-   is, so that it can keep more; and removing what `What this replaces`_
-   lists as still standing.
+   *Not yet built:* removing what `What this replaces`_ lists as still
+   standing.
 
 A configuration is known by its *checksum*: the MD5 ``tcsverify``
 computes of it, the configuration digest (``tcslibgs::config_digest``).
@@ -6417,7 +6414,12 @@ Requirement
     ground, is written once and read-only from then on: mode ``0444`` in a
     directory of mode ``0555``, and immutable where the file system allows
     it (``FS_IMMUTABLE_FL``). Nothing in flight can then overwrite it, even
-    by mistake.
+    by mistake. It is left so by the procedure that provisions the vehicle,
+    outside tcspecial, as every other file is managed from the ground:
+    ``tcsverify --keep`` writes the files it keeps ``0444``, and leaves the
+    directory as it is so that it can keep more, and making the directory
+    read-only and setting the immutable attribute once every configuration
+    is in it are the procedure's last steps.
 
 Starting, and the restart flag
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

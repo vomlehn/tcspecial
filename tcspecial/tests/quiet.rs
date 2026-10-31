@@ -37,7 +37,7 @@ fn said(args: &[&str]) -> String {
 
 #[test]
 fn quiet_leaves_the_summary_unsaid_and_still_says_why_it_stopped() {
-    let missing = "/nonexistent/tcspecial-quiet-test.yaml";
+    let missing = "/nonexistent/tcspecial-quiet-test.ytcs";
 
     let talking = said(&[missing]);
     assert!(talking.contains("payload configuration:"), "{talking}");

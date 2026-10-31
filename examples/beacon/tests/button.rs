@@ -108,7 +108,7 @@ fn a_vehicle_that_stops_by_itself_puts_the_button_back() {
 fn a_vehicle_that_cannot_start_leaves_the_button_saying_start() {
     let vehicle = Rc::new(RefCell::new(Vehicle::new(
         "/nonexistent/tcspecial",
-        &["beacon.yaml"],
+        &["beacon.ytcs"],
     )));
     let window = window_for(&vehicle);
 

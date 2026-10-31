@@ -34,7 +34,7 @@ fn types_prints_what_was_built_in_the_words_tcsverify_takes() {
 #[test]
 fn the_summary_says_which_types_were_built() {
     let ran = Command::new(env!("CARGO_BIN_EXE_tcspecial"))
-        .arg("/nonexistent/tcspecial-types-test.yaml")
+        .arg("/nonexistent/tcspecial-types-test.ytcs")
         .env_remove("RUST_LOG")
         .output()
         .expect("tcspecial runs");

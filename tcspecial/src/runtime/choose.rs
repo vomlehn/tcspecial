@@ -435,7 +435,7 @@ mod tests {
         fn new(trials: u32) -> Desk {
             let dir = tempfile::tempdir().expect("a directory");
             std::fs::create_dir(dir.path().join("kept")).expect("a store");
-            let command_line = dir.path().join("vehicle.yaml");
+            let command_line = dir.path().join("vehicle.ytcs");
             std::fs::write(&command_line, Desk::configuration(&dir, 0, trials))
                 .expect("written");
             Desk { dir, command_line }
@@ -492,7 +492,7 @@ vehicle:
         ///
         /// Its checksum.
         fn keep(&self, n: u32) -> ConfigDigest {
-            let path = self.dir.path().join(format!("other{n}.yaml"));
+            let path = self.dir.path().join(format!("other{n}.ytcs"));
             std::fs::write(&path, Desk::configuration(&self.dir, n, 3))
                 .expect("written");
             Store::at(self.dir.path().join("kept"))
@@ -551,7 +551,7 @@ vehicle:
         assert_eq!(chosen.loaded.digest, other);
         assert_eq!(
             chosen.loaded.path,
-            desk.dir.path().join(format!("kept/{other}.yaml"))
+            desk.dir.path().join(format!("kept/{other}.ytcs"))
         );
         assert!(chosen.commanded);
         assert!(chosen.why.contains("RESTART"), "{}", chosen.why);
@@ -681,7 +681,7 @@ vehicle:
         assert!(!boot.holds(missing));
         assert!(boot.load(missing).is_err());
 
-        let kept = desk.dir.path().join(format!("kept/{other}.yaml"));
+        let kept = desk.dir.path().join(format!("kept/{other}.ytcs"));
         let mut perms = std::fs::metadata(&kept).unwrap().permissions();
         #[allow(clippy::permissions_set_readonly_false)]
         perms.set_readonly(false);

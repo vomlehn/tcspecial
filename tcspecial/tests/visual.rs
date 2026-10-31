@@ -38,7 +38,7 @@ fn a_window_asked_of_a_build_without_one_is_refused_saying_why() {
     let (ran, said) = tcspecial(&[
         "--visual",
         "--simulate=all",
-        "/nonexistent/tcspecial-visual-test.yaml",
+        "/nonexistent/tcspecial-visual-test.ytcs",
     ]);
     assert!(!ran, "refused");
     assert!(said.contains("--features visual"), "{said}");
@@ -54,7 +54,7 @@ fn a_window_asked_of_the_flight_setting_is_refused_saying_why() {
     for simulate in [&["--simulate=none"][..], &[]] {
         let mut args = vec!["--visual"];
         args.extend_from_slice(simulate);
-        args.push("/nonexistent/tcspecial-visual-test.yaml");
+        args.push("/nonexistent/tcspecial-visual-test.ytcs");
         let (ran, said) = tcspecial(&args);
         assert!(!ran, "refused");
         assert!(
@@ -70,7 +70,7 @@ fn a_window_asked_of_the_flight_setting_is_refused_saying_why() {
 fn a_mistaken_mode_is_refused_naming_the_three() {
     let (ran, said) = tcspecial(&[
         "--simulate=most",
-        "/nonexistent/tcspecial-visual-test.yaml",
+        "/nonexistent/tcspecial-visual-test.ytcs",
     ]);
     assert!(!ran, "refused");
     assert!(said.contains("none, some, all"), "{said}");

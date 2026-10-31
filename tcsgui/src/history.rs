@@ -24,7 +24,7 @@
 //! The name is the configuration's stem and a digest of its absolute path:
 //! `graph-3f91c2d4e5f60718.yaml`. The stem so that a person looking in the
 //! directory can tell what belongs to what, the digest so that two
-//! configurations called `graph.yaml` in two directories are two histories.
+//! configurations called `graph.ytcs` in two directories are two histories.
 //!
 //! The digest is FNV-1a, written out here, and the reason is stability: a
 //! history is found again by recomputing its name, so the function must give
@@ -184,7 +184,7 @@ pub fn journal_in(directory: &Path, configuration: &Path) -> PathBuf {
 /// The configuration's path, made absolute without asking the disk.
 ///
 /// Absolute because the digest is of a path and two names for one file must
-/// digest alike: `graph.yaml` and `./graph.yaml` in one directory are one
+/// digest alike: `graph.ytcs` and `./graph.ytcs` in one directory are one
 /// configuration and must find one history. Not canonicalised, which would
 /// ask the disk and fail for a configuration that does not exist yet -- which
 /// is exactly the case of a new one.
@@ -207,8 +207,8 @@ fn absolute(path: &Path) -> PathBuf {
         }
     };
 
-    // And tidied, because the digest is of the text: `graph.yaml`,
-    // `./graph.yaml` and `vehicles/../graph.yaml` are one configuration, and
+    // And tidied, because the digest is of the text: `graph.ytcs`,
+    // `./graph.ytcs` and `vehicles/../graph.ytcs` are one configuration, and
     // three histories for it would be three answers to one question. Tidied
     // here rather than by asking the disk, which is what canonicalising does
     // and which fails for a configuration that does not exist yet -- exactly
@@ -444,8 +444,8 @@ mod tests {
     fn a_history_is_kept_away_from_the_configuration_and_pruned() {
         let where_ = tempfile::tempdir().expect("a directory");
         let state = where_.path().join("state");
-        let one = where_.path().join("vehicles/aurora/graph.yaml");
-        let two = where_.path().join("vehicles/borealis/graph.yaml");
+        let one = where_.path().join("vehicles/aurora/graph.ytcs");
+        let two = where_.path().join("vehicles/borealis/graph.ytcs");
 
         // Named after the configuration, so a person can tell what is what,
         // and digested so that two files of one name are two histories.
@@ -467,8 +467,8 @@ mod tests {
         // digest is of the absolute path.
         let here = std::env::current_dir().expect("somewhere to stand");
         assert_eq!(
-            journal_in(&state, Path::new("./graph.yaml")),
-            journal_in(&state, &here.join("graph.yaml"))
+            journal_in(&state, Path::new("./graph.ytcs")),
+            journal_in(&state, &here.join("graph.ytcs"))
         );
 
         // Nothing to read before anything is written, and a history written
@@ -584,7 +584,7 @@ mod tests {
     /// the change would be losing exactly what the history is kept for.
     #[test]
     fn a_history_serde_yaml_wrote_still_reads() {
-        const WRITTEN: &str = r#"configuration: /home/operator/vehicle.yaml
+        const WRITTEN: &str = r#"configuration: /home/operator/vehicle.ytcs
 journal:
   done:
   - !AddNode
@@ -614,7 +614,7 @@ journal:
         let kept: Kept = serde_norway::from_str(WRITTEN).expect("it reads");
         assert_eq!(
             kept.configuration,
-            PathBuf::from("/home/operator/vehicle.yaml")
+            PathBuf::from("/home/operator/vehicle.ytcs")
         );
         assert_eq!(
             kept.journal.depth(),

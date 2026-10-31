@@ -110,7 +110,9 @@ int main(int argc, char **argv)
 	for (int i = 1; i < argc; i++) {
 		const std::string arg = argv[i];
 		if (arg == "--yaml" || arg == "--xml") {
-			const std::string asked = arg.substr(2);
+			// The extension of the spelling asked for.
+			const std::string asked =
+				arg == "--xml" ? "xtcs" : "ytcs";
 			if (!spelling.empty() && spelling != asked) {
 				std::cerr << "--yaml and --xml each say which "
 					     "configuration to read: give one "
@@ -135,7 +137,7 @@ int main(int argc, char **argv)
 		}
 	}
 	const std::string path = named.size() > 0 ? named[0] :
-		STEM + "." + (spelling.empty() ? "yaml" : spelling);
+		STEM + "." + (spelling.empty() ? "ytcs" : spelling);
 	const std::string gateway_name =
 		named.size() > 1 ? named[1] : "gateway";
 	const std::string node_name = named.size() > 2 ? named[2] : "ping";

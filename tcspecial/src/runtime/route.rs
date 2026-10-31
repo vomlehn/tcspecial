@@ -408,7 +408,7 @@ mod tests {
     /// The shipped thermostat, as the routing sees it.
     fn thermostat() -> Graph {
         let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("..");
-        Graph::load(root.join("tests/manual/thermostat.yaml"))
+        Graph::load(root.join("tests/manual/thermostat.ytcs"))
             .expect("the example reads")
     }
 

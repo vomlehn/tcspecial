@@ -808,17 +808,23 @@ most 4096.</dd>
 <p>A configuration file may be written in YAML or XML. Both describe the same
 settings and are read into the same values, so the choice is one of local
 preference and tooling rather than of capability.</p>
-<p>The format is taken from the file's extension:</p>
+<p>The format is taken from the file's extension, which is a configuration's
+own rather than its language's:</p>
 <pre class="code text literal-block">
-.yaml, .yml     YAML
-.xml            XML
+.ytcs           YAML
+.xtcs           XML
 anything else   refused
 </pre>
-<p>A file whose extension is none of those is refused, naming the file and what a
-configuration file is called. JSON was read as well, and was what a file with
-no extension or an unfamiliar one was assumed to be, which made a misspelled
-extension not an error but a file parsed as the wrong language. Nothing was
-written in it that was not also written in YAML.</p>
+<p>A file whose extension is neither is refused, naming the file and what a
+configuration file is called. Configurations were once named <tt class="docutils literal">.yaml</tt>,
+<tt class="docutils literal">.yml</tt> or <tt class="docutils literal">.xml</tt>; one still named so is refused with the name to give it,
+<tt class="docutils literal">vehicle.yaml</tt> being told to become <tt class="docutils literal">vehicle.ytcs</tt>. A payload simulator
+file is not a tcspecial configuration and keeps its language's extension,
+<tt class="docutils literal">.yaml</tt>.</p>
+<p>JSON was read as well, and was what a file with no extension or an
+unfamiliar one was assumed to be, which made a misspelled extension not an
+error but a file parsed as the wrong language. Nothing was written in it
+that was not also written in YAML.</p>
 <p>(The command link carries packets stated in XTCE: the three fixed commands
 in <tt class="docutils literal">tcslibgs/xtce/fixed.xtce</tt> and the rest in <tt class="docutils literal">tcslibgs/xtce/link.xtce</tt>.
 Those are not configuration files and are unaffected; a configuration names
@@ -827,7 +833,7 @@ the second, as its <tt class="docutils literal">interface</tt>: see <a class="re
 <div class="section" id="which-files-there-are">
 <h1><a class="toc-backref" href="#toc-entry-7">Which Files There Are</a></h1>
 <p>Two configuration files, and neither of them has a name of its own. Any name
-will do so long as it ends in <tt class="docutils literal">.yaml</tt> or <tt class="docutils literal">.xml</tt>, which is what says how to
+will do so long as it ends in <tt class="docutils literal">.ytcs</tt> or <tt class="docutils literal">.xtcs</tt>, which is what says how to
 read it; the names used throughout this manual are the shipped examples' and
 are suggestions, nothing more.</p>
 <dl class="docutils">
@@ -2091,7 +2097,7 @@ produced them, so it applies to every type of payload alike.</p>
 </div>
 <div class="section" id="an-example">
 <h2><a class="toc-backref" href="#toc-entry-27">An Example</a></h2>
-<p>This is the shipped <tt class="docutils literal">examples/thermostat/thermostat.yaml</tt>, without its
+<p>This is the shipped <tt class="docutils literal">examples/thermostat/thermostat.ytcs</tt>, without its
 <tt class="docutils literal">tcspecial</tt> section: three sensors of one place, two on an I<sup>2</sup>C
 bus and one on SPI, read together as a group, and two sets of heater lines
 driven by what the vehicle decides. Each payload is named for what it is,
@@ -2145,7 +2151,7 @@ which is what a panel in the MOC shows.</p>
     </span><span class="name tag">gateway-in</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">true</span>
 </pre>
 <p>The same configuration in the other spelling is
-<tt class="docutils literal">examples/thermostat/thermostat.xml</tt>, which a test holds to saying the same
+<tt class="docutils literal">examples/thermostat/thermostat.xtcs</tt>, which a test holds to saying the same
 thing. What the nodes above feed -- the conversions, the vote and the
 thermostat -- is in the <tt class="docutils literal">vehicle</tt> section; see <a class="reference internal" href="#the-thermostat-example">The thermostat example</a>.</p>
 </div>
@@ -2201,9 +2207,9 @@ place of the settings.</p>
 <div class="section" id="the-shipped-examples">
 <h1><a class="toc-backref" href="#toc-entry-31">The shipped examples</a></h1>
 <p>What is shipped is the examples, under <tt class="docutils literal">examples</tt>, and one fixture:
-<tt class="docutils literal">tests/manual/thermostat.yaml</tt>, which the programs fall back to when nothing
-names a file. Each example is a configuration in both spellings -- <tt class="docutils literal">.yaml</tt>
-and <tt class="docutils literal">.xml</tt>, which a test holds to describing the same thing -- and the
+<tt class="docutils literal">tests/manual/thermostat.ytcs</tt>, which the programs fall back to when nothing
+names a file. Each example is a configuration in both spellings -- <tt class="docutils literal">.ytcs</tt>
+and <tt class="docutils literal">.xtcs</tt>, which a test holds to describing the same thing -- and the
 simulator file beside it, which is YAML alone. The YAML is the one to read: it
 carries the comments. See <a class="reference internal" href="#the-examples">The Examples</a>, which says what each one is for.</p>
 <p>Which spelling a run reads is the last letter of the MOC's target, <tt class="docutils literal">runmocy</tt>
@@ -2213,7 +2219,7 @@ or <tt class="docutils literal">runmocx</tt>; every other target takes the file 
 <div class="section" id="the-examples">
 <h1><a class="toc-backref" href="#toc-entry-32">The Examples</a></h1>
 <p>The <tt class="docutils literal">examples</tt> directory holds one directory per example, each a
-configuration in both formats -- <tt class="docutils literal"><span class="pre">&lt;name&gt;.yaml</span></tt> and <tt class="docutils literal"><span class="pre">&lt;name&gt;.xml</span></tt>, which a
+configuration in both formats -- <tt class="docutils literal"><span class="pre">&lt;name&gt;.ytcs</span></tt> and <tt class="docutils literal"><span class="pre">&lt;name&gt;.xtcs</span></tt>, which a
 test holds to describing the same configuration -- and the simulator
 configuration beside it, <tt class="docutils literal"><span class="pre">&lt;name&gt;-sim.yaml</span></tt>. Every example is checked by
 <tt class="docutils literal">tcsverify</tt> on every test run and must pass with no errors and no warnings,
@@ -2560,7 +2566,7 @@ digest it compares each beacon's with rather than working it out a second
 time. The rules are then written twice, in Rust and in Python, and the
 example's tests hold them to one another: the Python's own tests use the Rust
 tests' examples, one test checks that the Python reads the same ports from
-<tt class="docutils literal">ping.xml</tt> as the Rust does from <tt class="docutils literal">ping.yaml</tt>, and one plays the vehicle with
+<tt class="docutils literal">ping.xtcs</tt> as the Rust does from <tt class="docutils literal">ping.ytcs</tt>, and one plays the vehicle with
 the Rust -- the ping answered by the function the <tt class="docutils literal">ping</tt> node answers with,
 the beacon packed as tcspecial packs it -- against the ground station.
 <tt class="docutils literal">cargo test</tt> runs them all.</p>
@@ -2930,7 +2936,7 @@ device on a bus, where the master's own read is the request and a second master
 cannot see it.</p>
 <p>This is the shipped <tt class="docutils literal"><span class="pre">examples/thermostat/thermostat-sim.yaml</span></tt>.</p>
 <pre class="code yaml literal-block">
-<span class="name tag">description</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">Simulator settings for the payloads of thermostat.yaml</span><span class="whitespace">
+<span class="name tag">description</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">Simulator settings for the payloads of thermostat.ytcs</span><span class="whitespace">
 
 </span><span class="name tag">thermal_mass</span><span class="punctuation">:</span><span class="whitespace">
   </span><span class="punctuation indicator">-</span><span class="whitespace"> </span><span class="name tag">name</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">cabin</span><span class="whitespace">
@@ -3176,7 +3182,7 @@ names it and what it needs besides:</p>
 <p>tcspecial relies on a supervisor to start it again whenever it exits: a
 restart that cannot run itself again, and a crash, both end the process.
 The <tt class="docutils literal">tcspecial</tt> package's systemd unit is that supervisor. It runs
-<tt class="docutils literal">/opt/tcs/bin/tcspecial /etc/opt/tcs/tcspecial/tcspecial.yaml</tt> in
+<tt class="docutils literal">/opt/tcs/bin/tcspecial /etc/opt/tcs/tcspecial/tcspecial.ytcs</tt> in
 <tt class="docutils literal">/var/opt/tcs/tcspecial</tt>, with no <tt class="docutils literal"><span class="pre">--simulate</span></tt> and so the flight
 setting, and starts it again a second after it exits, however often it
 does. It is installed and not enabled, and does nothing until a
@@ -3184,14 +3190,14 @@ configuration is at that path: no package ships one, because a vehicle that
 flew an example in place of its own would be flying the wrong payloads.
 So, as root:</p>
 <pre class="code console literal-block">
-<span class="generic prompt"># </span>cp<span class="whitespace"> </span>vehicle.yaml<span class="whitespace"> </span>/etc/opt/tcs/tcspecial/tcspecial.yaml<span class="whitespace">
-</span><span class="generic prompt"># </span>tcsverify<span class="whitespace"> </span>--types<span class="operator">=</span><span class="keyword">$(</span>tcspecial<span class="whitespace"> </span>--types<span class="keyword">)</span><span class="whitespace"> </span>/etc/opt/tcs/tcspecial/tcspecial.yaml<span class="whitespace">
+<span class="generic prompt"># </span>cp<span class="whitespace"> </span>vehicle.ytcs<span class="whitespace"> </span>/etc/opt/tcs/tcspecial/tcspecial.ytcs<span class="whitespace">
+</span><span class="generic prompt"># </span>tcsverify<span class="whitespace"> </span>--types<span class="operator">=</span><span class="keyword">$(</span>tcspecial<span class="whitespace"> </span>--types<span class="keyword">)</span><span class="whitespace"> </span>/etc/opt/tcs/tcspecial/tcspecial.ytcs<span class="whitespace">
 </span><span class="generic prompt"># </span>systemctl<span class="whitespace"> </span><span class="name builtin">enable</span><span class="whitespace"> </span>--now<span class="whitespace"> </span>tcspecial
 </pre>
 <p>The configuration's <tt class="docutils literal">state_file</tt> and <tt class="docutils literal">log.directory</tt> belong under
 <tt class="docutils literal">/var/opt/tcs/tcspecial</tt>, on storage that survives a power cycle. An XML
 configuration is named with <tt class="docutils literal">systemctl edit tcspecial</tt>, in a drop-in
-that sets <tt class="docutils literal">ExecStart</tt> and <tt class="docutils literal">ConditionPathExists</tt> to the <tt class="docutils literal">.xml</tt> file.</p>
+that sets <tt class="docutils literal">ExecStart</tt> and <tt class="docutils literal">ConditionPathExists</tt> to the <tt class="docutils literal">.xtcs</tt> file.</p>
 </div>
 </div>
 <div class="section" id="running-the-programs">
@@ -3203,7 +3209,7 @@ so a program
 reading a different one would serve or simulate payloads the panels do not
 describe.</p>
 <p><tt class="docutils literal">TCSPECIAL_CONFIG_FILE</tt> is the configuration, named without a suffix:
-<tt class="docutils literal"><span class="pre">$(TCSPECIAL_CONFIG_FILE).yaml</span></tt> is the tcspecial configuration, which
+<tt class="docutils literal"><span class="pre">$(TCSPECIAL_CONFIG_FILE).ytcs</span></tt> is the tcspecial configuration, which
 reaches every program as a command line argument. It defaults to
 <tt class="docutils literal">tests/manual/thermostat</tt>. <tt class="docutils literal">TCSPECIAL_SIM_FILE</tt> is the simulator
 configuration, which reaches tcssim through the environment -- and tcsmoc
@@ -3293,10 +3299,10 @@ spellings the same way.</p>
 opening a socket or a device node. It takes one file, two or three, the
 tcspecial configuration first, and <tt class="docutils literal"><span class="pre">-h</span></tt> or <tt class="docutils literal"><span class="pre">--help</span></tt> prints how:</p>
 <pre class="code console literal-block">
-<span class="generic prompt">$ </span>cargo<span class="whitespace"> </span>run<span class="whitespace"> </span>--bin<span class="whitespace"> </span>tcsverify<span class="whitespace"> </span>--<span class="whitespace"> </span>examples/minimal/minimal.yaml<span class="whitespace">
-</span><span class="generic prompt">$ </span>cargo<span class="whitespace"> </span>run<span class="whitespace"> </span>--bin<span class="whitespace"> </span>tcsverify<span class="whitespace"> </span>--<span class="whitespace"> </span>examples/minimal/minimal.yaml<span class="whitespace"> </span><span class="literal string escape">\
+<span class="generic prompt">$ </span>cargo<span class="whitespace"> </span>run<span class="whitespace"> </span>--bin<span class="whitespace"> </span>tcsverify<span class="whitespace"> </span>--<span class="whitespace"> </span>examples/minimal/minimal.ytcs<span class="whitespace">
+</span><span class="generic prompt">$ </span>cargo<span class="whitespace"> </span>run<span class="whitespace"> </span>--bin<span class="whitespace"> </span>tcsverify<span class="whitespace"> </span>--<span class="whitespace"> </span>examples/minimal/minimal.ytcs<span class="whitespace"> </span><span class="literal string escape">\
 </span><span class="whitespace">    </span>examples/minimal/minimal-sim.yaml<span class="whitespace">
-</span><span class="generic prompt">$ </span>cargo<span class="whitespace"> </span>run<span class="whitespace"> </span>--bin<span class="whitespace"> </span>tcsverify<span class="whitespace"> </span>--<span class="whitespace"> </span>examples/minimal/minimal.xml<span class="whitespace"> </span><span class="literal string escape">\
+</span><span class="generic prompt">$ </span>cargo<span class="whitespace"> </span>run<span class="whitespace"> </span>--bin<span class="whitespace"> </span>tcsverify<span class="whitespace"> </span>--<span class="whitespace"> </span>examples/minimal/minimal.xtcs<span class="whitespace"> </span><span class="literal string escape">\
 </span><span class="whitespace">    </span>examples/minimal/minimal-sim.yaml
 </pre>
 <p>Either spelling of the configuration will do -- the last line reads the XML of
@@ -3305,8 +3311,8 @@ worked out from the first file's name.</p>
 <p>Three files are both spellings of one configuration and its simulator file:
 an XML file and a YAML file, in either order, and then the simulator file.</p>
 <pre class="code console literal-block">
-<span class="generic prompt">$ </span>cargo<span class="whitespace"> </span>run<span class="whitespace"> </span>--bin<span class="whitespace"> </span>tcsverify<span class="whitespace"> </span>--<span class="whitespace"> </span>examples/thermostat/thermostat.xml<span class="whitespace"> </span><span class="literal string escape">\
-</span><span class="whitespace">    </span>examples/thermostat/thermostat.yaml<span class="whitespace"> </span><span class="literal string escape">\
+<span class="generic prompt">$ </span>cargo<span class="whitespace"> </span>run<span class="whitespace"> </span>--bin<span class="whitespace"> </span>tcsverify<span class="whitespace"> </span>--<span class="whitespace"> </span>examples/thermostat/thermostat.xtcs<span class="whitespace"> </span><span class="literal string escape">\
+</span><span class="whitespace">    </span>examples/thermostat/thermostat.ytcs<span class="whitespace"> </span><span class="literal string escape">\
 </span><span class="whitespace">    </span>examples/thermostat/thermostat-sim.yaml
 </pre>
 <p>Each spelling is checked with the simulator file, the first named first, and
@@ -3316,17 +3322,17 @@ so two spellings this finds no difference between are two that tcspecial and
 tcsmoc agree on. A difference is reported at the line of the second file it is
 on, saying what each file says:</p>
 <pre class="code console literal-block">
-<span class="generic output">examples/thermostat/thermostat.yaml:87: error: nodes / thermostat / attributes / setpoint: examples/thermostat/thermostat.xml says &quot;290&quot; and examples/thermostat/thermostat.yaml says &quot;293.15&quot;</span>
+<span class="generic output">examples/thermostat/thermostat.ytcs:87: error: nodes / thermostat / attributes / setpoint: examples/thermostat/thermostat.xtcs says &quot;290&quot; and examples/thermostat/thermostat.ytcs says &quot;293.15&quot;</span>
 </pre>
 <p>The order nodes are written in is compared too, a node's place in the file
 being its device id. A file that cannot be read is not compared, and says so.</p>
 <p>A good set prints nothing. A bad one prints a line per problem, each naming
 the file, the line and what is wrong there:</p>
 <pre class="code console literal-block">
-<span class="generic prompt">$ </span>cargo<span class="whitespace"> </span>run<span class="whitespace"> </span>--bin<span class="whitespace"> </span>tcsverify<span class="whitespace"> </span>--<span class="whitespace"> </span>/tmp/draft.yaml<span class="whitespace">
-</span><span class="generic output">/tmp/draft.yaml:33: error: &quot;both&quot; states poll_interval and a trigger: a node that is asked is read when it has been asked, so say trigger_interval
-/tmp/draft.yaml:23: warning: &quot;udp-steady&quot;: read_size must be more than nought -- a read of no bytes is not a read, and a node that is not read says nothing about it
-/tmp/draft.yaml:29: warning: &quot;random-device&quot; is a device-file node, so port does not locate it: it is located by path</span>
+<span class="generic prompt">$ </span>cargo<span class="whitespace"> </span>run<span class="whitespace"> </span>--bin<span class="whitespace"> </span>tcsverify<span class="whitespace"> </span>--<span class="whitespace"> </span>/tmp/draft.ytcs<span class="whitespace">
+</span><span class="generic output">/tmp/draft.ytcs:33: error: &quot;both&quot; states poll_interval and a trigger: a node that is asked is read when it has been asked, so say trigger_interval
+/tmp/draft.ytcs:23: warning: &quot;udp-steady&quot;: read_size must be more than nought -- a read of no bytes is not a read, and a node that is not read says nothing about it
+/tmp/draft.ytcs:29: warning: &quot;random-device&quot; is a device-file node, so port does not locate it: it is located by path</span>
 </pre>
 <p>Each line says which kind it is. An <strong>error</strong> is a configuration that says
 something wrong -- two nodes of one name, a link to a node that is not there,
@@ -3351,14 +3357,14 @@ the ones those programs use -- for all of their answers at once.</p>
 <p>It prints everything it finds, in the order it finds it. Two options change
 that:</p>
 <pre class="literal-block">
-$ cargo run --bin tcsverify -- --error-limit=unlimited example.yaml
-$ cargo run --bin tcsverify -- --warnings=off --error-limit=1 example.yaml
+$ cargo run --bin tcsverify -- --error-limit=unlimited example.ytcs
+$ cargo run --bin tcsverify -- --warnings=off --error-limit=1 example.ytcs
 </pre>
 <p><tt class="docutils literal"><span class="pre">--digest</span></tt> asks for each configuration's digest as well, one line per file
 and before the problems:</p>
 <pre class="literal-block">
-$ cargo run --bin tcsverify -- --digest examples/thermostat/thermostat.yaml
-examples/thermostat/thermostat.yaml: md5 292a329b534cb88156e1a52870469c4a
+$ cargo run --bin tcsverify -- --digest examples/thermostat/thermostat.ytcs
+examples/thermostat/thermostat.ytcs: md5 292a329b534cb88156e1a52870469c4a
 </pre>
 <p>That is the digest tcspecial prints as it starts and puts in every beacon, and
 the MOC compares with its own: two ends whose digests agree have read one
@@ -3376,7 +3382,7 @@ type as that tcspecial would refuse it. It takes what <tt class="docutils litera
 prints, so a configuration can be held to the binary that will fly:</p>
 <pre class="literal-block">
 $ cargo run --bin tcsverify -- --types=$(tcspecial --types) \
-    examples/thermostat/thermostat.yaml
+    examples/thermostat/thermostat.ytcs
 </pre>
 <p>Without it, every type is taken to be built. See <a class="reference internal" href="#building-tcspecial-for-a-vehicle">Building tcspecial for a
 vehicle</a>.</p>
@@ -3416,20 +3422,20 @@ than leaving it unsaid.</p>
 <div class="section" id="what-the-programs-take-without-the-makefile">
 <h2><a class="toc-backref" href="#toc-entry-53">What the programs take without the Makefile</a></h2>
 <pre class="code console literal-block">
-<span class="generic prompt">$ </span>cargo<span class="whitespace"> </span>run<span class="whitespace"> </span>--bin<span class="whitespace"> </span>tcspecial<span class="whitespace"> </span>--<span class="whitespace"> </span>--simulate<span class="operator">=</span>all<span class="whitespace"> </span>tests/manual/thermostat.yaml<span class="whitespace">
+<span class="generic prompt">$ </span>cargo<span class="whitespace"> </span>run<span class="whitespace"> </span>--bin<span class="whitespace"> </span>tcspecial<span class="whitespace"> </span>--<span class="whitespace"> </span>--simulate<span class="operator">=</span>all<span class="whitespace"> </span>tests/manual/thermostat.ytcs<span class="whitespace">
 </span><span class="generic prompt">$ </span><span class="name variable">PAYLOAD_SIM_YAML</span><span class="operator">=</span>examples/thermostat/thermostat-sim.yaml<span class="whitespace"> </span><span class="literal string escape">\
-</span><span class="whitespace">    </span>cargo<span class="whitespace"> </span>run<span class="whitespace"> </span>--bin<span class="whitespace"> </span>tcssim<span class="whitespace"> </span>--<span class="whitespace"> </span>--simulate<span class="operator">=</span>all<span class="whitespace"> </span>tests/manual/thermostat.yaml<span class="whitespace">
+</span><span class="whitespace">    </span>cargo<span class="whitespace"> </span>run<span class="whitespace"> </span>--bin<span class="whitespace"> </span>tcssim<span class="whitespace"> </span>--<span class="whitespace"> </span>--simulate<span class="operator">=</span>all<span class="whitespace"> </span>tests/manual/thermostat.ytcs<span class="whitespace">
 </span><span class="generic prompt">$ </span><span class="name variable">PAYLOAD_SIM_YAML</span><span class="operator">=</span>examples/thermostat/thermostat-sim.yaml<span class="whitespace"> </span><span class="literal string escape">\
-</span><span class="whitespace">    </span>cargo<span class="whitespace"> </span>run<span class="whitespace"> </span>--bin<span class="whitespace"> </span>tcsmoc<span class="whitespace"> </span>--<span class="whitespace"> </span>--simulate<span class="operator">=</span>all<span class="whitespace"> </span>tests/manual/thermostat.yaml
+</span><span class="whitespace">    </span>cargo<span class="whitespace"> </span>run<span class="whitespace"> </span>--bin<span class="whitespace"> </span>tcsmoc<span class="whitespace"> </span>--<span class="whitespace"> </span>--simulate<span class="operator">=</span>all<span class="whitespace"> </span>tests/manual/thermostat.ytcs
 </pre>
-<p>Every tcspecial configuration above may end in <tt class="docutils literal">.xml</tt> instead, and the same
+<p>Every tcspecial configuration above may end in <tt class="docutils literal">.xtcs</tt> instead, and the same
 commands then run the same set in the other format:</p>
 <pre class="code console literal-block">
-<span class="generic prompt">$ </span>cargo<span class="whitespace"> </span>run<span class="whitespace"> </span>--bin<span class="whitespace"> </span>tcspecial<span class="whitespace"> </span>--<span class="whitespace"> </span>--simulate<span class="operator">=</span>all<span class="whitespace"> </span>tests/manual/thermostat.xml<span class="whitespace">
+<span class="generic prompt">$ </span>cargo<span class="whitespace"> </span>run<span class="whitespace"> </span>--bin<span class="whitespace"> </span>tcspecial<span class="whitespace"> </span>--<span class="whitespace"> </span>--simulate<span class="operator">=</span>all<span class="whitespace"> </span>tests/manual/thermostat.xtcs<span class="whitespace">
 </span><span class="generic prompt">$ </span><span class="name variable">PAYLOAD_SIM_YAML</span><span class="operator">=</span>examples/thermostat/thermostat-sim.yaml<span class="whitespace"> </span><span class="literal string escape">\
-</span><span class="whitespace">    </span>cargo<span class="whitespace"> </span>run<span class="whitespace"> </span>--bin<span class="whitespace"> </span>tcssim<span class="whitespace"> </span>--<span class="whitespace"> </span>--simulate<span class="operator">=</span>all<span class="whitespace"> </span>tests/manual/thermostat.xml<span class="whitespace">
+</span><span class="whitespace">    </span>cargo<span class="whitespace"> </span>run<span class="whitespace"> </span>--bin<span class="whitespace"> </span>tcssim<span class="whitespace"> </span>--<span class="whitespace"> </span>--simulate<span class="operator">=</span>all<span class="whitespace"> </span>tests/manual/thermostat.xtcs<span class="whitespace">
 </span><span class="generic prompt">$ </span><span class="name variable">PAYLOAD_SIM_YAML</span><span class="operator">=</span>examples/thermostat/thermostat-sim.yaml<span class="whitespace"> </span><span class="literal string escape">\
-</span><span class="whitespace">    </span>cargo<span class="whitespace"> </span>run<span class="whitespace"> </span>--bin<span class="whitespace"> </span>tcsmoc<span class="whitespace"> </span>--<span class="whitespace"> </span>--simulate<span class="operator">=</span>all<span class="whitespace"> </span>tests/manual/thermostat.xml
+</span><span class="whitespace">    </span>cargo<span class="whitespace"> </span>run<span class="whitespace"> </span>--bin<span class="whitespace"> </span>tcsmoc<span class="whitespace"> </span>--<span class="whitespace"> </span>--simulate<span class="operator">=</span>all<span class="whitespace"> </span>tests/manual/thermostat.xtcs
 </pre>
 <p>The extension is what says how to read a file -- see <a class="reference internal" href="#configuration-file-formats">Configuration File
 Formats</a> -- and it is read rather than guessed at, so a name ending in
@@ -3442,11 +3448,11 @@ than that.</p>
 naming one.
 Failing an argument, tcspecial reads <tt class="docutils literal">PAYLOAD_CONFIG_PATH</tt> and tcssim reads
 <tt class="docutils literal">SIM_PAYLOAD_CONFIG_PATH</tt>; failing that, every program reads
-<tt class="docutils literal">tests/manual/thermostat.yaml</tt>. Tcsmoc has no variable of its own, because the programs it
+<tt class="docutils literal">tests/manual/thermostat.ytcs</tt>. Tcsmoc has no variable of its own, because the programs it
 starts inherit its environment: a variable naming tcsmoc's file would name
 theirs as well.</p>
 <p>The configuration file is the only argument tcspecial takes. Where it serves
-commands is in <tt class="docutils literal">tcspecial.yaml</tt>:</p>
+commands is in <tt class="docutils literal">tcspecial.ytcs</tt>:</p>
 <pre class="code yaml literal-block">
 <span class="name tag">tcs_cmd</span><span class="punctuation">:</span><span class="whitespace">
   </span><span class="name tag">recv</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal string">&quot;0.0.0.0:4000&quot;</span><span class="whitespace">           </span><span class="comment single"># commands about the spacecraft</span><span class="whitespace">
@@ -3500,7 +3506,7 @@ is sending on from a link whose two ends have been given different files.</p>
 <span class="generic output">Connected to 127.0.0.1:4000, payload commands to 127.0.0.1:4001</span>
 </pre>
 <p>The address box is the host and the spacecraft's command port, as before;
-payload commands go to the same host on the port <tt class="docutils literal">tcspecial.yaml</tt> states,
+payload commands go to the same host on the port <tt class="docutils literal">tcspecial.ytcs</tt> states,
 so moving the link moves both by typing one address. The MOC sends each
 command on the link it belongs on, and asks <tt class="docutils literal">CONNECT</tt> of the spacecraft's:
 what comes back is what that end read, and <tt class="docutils literal">Last Response</tt> says whether it
@@ -3557,7 +3563,7 @@ command line, and a restart may name any of them, by its checksum:</p>
   </span><span class="name tag">load_trials</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal string">&quot;3&quot;</span>
 </pre>
 <p><tt class="docutils literal">configurations</tt> is the directory they are kept in, each under its
-checksum: <tt class="docutils literal"><span class="pre">&lt;checksum&gt;.yaml</span></tt> or <tt class="docutils literal"><span class="pre">&lt;checksum&gt;.xml</span></tt>. Left out, the vehicle
+checksum: <tt class="docutils literal"><span class="pre">&lt;checksum&gt;.ytcs</span></tt> or <tt class="docutils literal"><span class="pre">&lt;checksum&gt;.xtcs</span></tt>. Left out, the vehicle
 keeps none, and a restart may name only the configuration it runs. A
 configuration kept there is a single file: one that includes another is
 refused. Its checksum is computed again each time it is loaded, and one
@@ -3566,9 +3572,9 @@ whose checksum is not its name -- cut short as it was written, or damaged
 <p>To put one there, on the ground or at first provisioning, check and keep it
 with tcsverify:</p>
 <pre class="code text literal-block">
-$ tcsverify --keep=/var/lib/tcspecial/configurations vehicle.yaml
-vehicle.yaml: md5 0123456789abcdef0123456789abcdef, kept as
-/var/lib/tcspecial/configurations/0123456789abcdef0123456789abcdef.yaml
+$ tcsverify --keep=/var/lib/tcspecial/configurations vehicle.ytcs
+vehicle.ytcs: md5 0123456789abcdef0123456789abcdef, kept as
+/var/lib/tcspecial/configurations/0123456789abcdef0123456789abcdef.ytcs
 </pre>
 <p>It keeps nothing that has an error, writes nothing for a checksum already
 kept, and makes the file it writes read-only. Making the directory
@@ -3614,9 +3620,9 @@ sends, so a person with only a packet capture can read it there too.</p>
 <p>To write it into a configuration, rather than copy it by hand, give the
 configuration to the build that is to fly it:</p>
 <pre class="code text literal-block">
-$ tcsverify --set-interface vehicle.yaml vehicle.xml
-vehicle.yaml: interface set to ad9aac4dd5a6d88dd5e78824ba8a83ac, from 0123...
-vehicle.xml: interface is ad9aac4dd5a6d88dd5e78824ba8a83ac already
+$ tcsverify --set-interface vehicle.ytcs vehicle.xtcs
+vehicle.ytcs: interface set to ad9aac4dd5a6d88dd5e78824ba8a83ac, from 0123...
+vehicle.xtcs: interface is ad9aac4dd5a6d88dd5e78824ba8a83ac already
 </pre>
 <p>It changes that one value -- or adds the attribute where the section has
 none -- and leaves every other byte of the file as it was, comments and
@@ -3703,7 +3709,7 @@ and an attribute for it would be one that could say something untrue.</p>
 <p>All three are required of every command interpreter configuration, with no
 defaults: beacons are how the ground knows the spacecraft is alive, and a
 configuration that has not been asked where to send them has not answered.
-<tt class="docutils literal">tcspecial.yaml</tt> states them too, and a set's section wins over it; the
+<tt class="docutils literal">tcspecial.ytcs</tt> states them too, and a set's section wins over it; the
 file's are what place a set whose configuration states no section at all.</p>
 <p><tt class="docutils literal">beacon.send</tt> is where beacons come from: tcspecial makes the socket it
 sends them on out of it, binding that address and port, so every beacon leaves
@@ -3740,7 +3746,7 @@ starts tcspecial to show something else: the examples' ground stations start
 it quiet unless they are given <tt class="docutils literal"><span class="pre">-v</span></tt> themselves. What stops a start is said
 either way.</p>
 <pre class="code console literal-block">
-<span class="generic prompt">$ </span>tcspecial<span class="whitespace"> </span>--quiet<span class="whitespace"> </span>examples/ping/ping.xml
+<span class="generic prompt">$ </span>tcspecial<span class="whitespace"> </span>--quiet<span class="whitespace"> </span>examples/ping/ping.xtcs
 </pre>
 <p>A beacon address tcspecial cannot bind, or a <tt class="docutils literal">beacon.recv</tt> that names no
 address, stops it before it starts, saying which setting to change: a vehicle
@@ -3770,7 +3776,7 @@ overrides the quieter default as well.</p>
 <pre class="code console literal-block">
 <span class="generic prompt">$ </span>make<span class="whitespace"> </span>runmocy<span class="whitespace"> </span><span class="name variable">RUST_LOG</span><span class="operator">=</span>debug<span class="whitespace">
 </span><span class="generic prompt">$ </span><span class="name variable">RUST_LOG</span><span class="operator">=</span>tcspecial::ci<span class="operator">=</span>trace<span class="whitespace"> </span><span class="literal string escape">\
-</span><span class="whitespace">    </span>cargo<span class="whitespace"> </span>run<span class="whitespace"> </span>--bin<span class="whitespace"> </span>tcspecial<span class="whitespace"> </span>--<span class="whitespace"> </span>--simulate<span class="operator">=</span>all<span class="whitespace"> </span>tests/manual/thermostat.yaml
+</span><span class="whitespace">    </span>cargo<span class="whitespace"> </span>run<span class="whitespace"> </span>--bin<span class="whitespace"> </span>tcspecial<span class="whitespace"> </span>--<span class="whitespace"> </span>--simulate<span class="operator">=</span>all<span class="whitespace"> </span>tests/manual/thermostat.ytcs
 </pre>
 </div>
 <div class="section" id="stand-ins-or-hardware-simulate">
@@ -3852,8 +3858,8 @@ else is refused, saying what differs, and otherwise tcsmoc starts tcssim and
 waits for it. Under <tt class="docutils literal">none</tt> it starts tcspecial alone. For a run started by
 hand, <tt class="docutils literal">tcssim <span class="pre">--wait</span></tt> is the waiting:</p>
 <pre class="code console literal-block">
-<span class="generic prompt">$ </span>tcssim<span class="whitespace"> </span>--simulate<span class="operator">=</span>all<span class="whitespace"> </span>x.yaml<span class="whitespace"> </span><span class="punctuation">&amp;</span><span class="whitespace">
-</span><span class="generic prompt">$ </span>tcssim<span class="whitespace"> </span>--wait<span class="whitespace"> </span>--simulate<span class="operator">=</span>all<span class="whitespace"> </span>x.yaml<span class="whitespace"> </span><span class="operator">&amp;&amp;</span><span class="whitespace"> </span>tcspecial<span class="whitespace"> </span>--simulate<span class="operator">=</span>all<span class="whitespace"> </span>x.yaml
+<span class="generic prompt">$ </span>tcssim<span class="whitespace"> </span>--simulate<span class="operator">=</span>all<span class="whitespace"> </span>x.ytcs<span class="whitespace"> </span><span class="punctuation">&amp;</span><span class="whitespace">
+</span><span class="generic prompt">$ </span>tcssim<span class="whitespace"> </span>--wait<span class="whitespace"> </span>--simulate<span class="operator">=</span>all<span class="whitespace"> </span>x.ytcs<span class="whitespace"> </span><span class="operator">&amp;&amp;</span><span class="whitespace"> </span>tcspecial<span class="whitespace"> </span>--simulate<span class="operator">=</span>all<span class="whitespace"> </span>x.ytcs
 </pre>
 <p><tt class="docutils literal"><span class="pre">--wait</span></tt> waits thirty seconds, or as many as <tt class="docutils literal"><span class="pre">--wait=&lt;seconds&gt;</span></tt> says, and
 exits with a failure saying what it last heard: nothing, which is a tcssim
@@ -3905,7 +3911,7 @@ build a tcspecial that flies this way: the feature is for a vehicle on a desk.</
 <pre class="code console literal-block">
 <span class="generic prompt">$ </span>cargo<span class="whitespace"> </span>build<span class="whitespace"> </span>-p<span class="whitespace"> </span>tcspecial<span class="whitespace"> </span>--features<span class="whitespace"> </span>visual<span class="whitespace">
 </span><span class="generic prompt">$ </span>target/debug/tcspecial<span class="whitespace"> </span>--visual<span class="whitespace"> </span>--simulate<span class="operator">=</span>all<span class="whitespace"> </span><span class="literal string escape">\
-</span><span class="whitespace">    </span>examples/simple-app/simple-app.yaml
+</span><span class="whitespace">    </span>examples/simple-app/simple-app.ytcs
 </pre>
 <p>The window draws the configuration as tcsgui does -- the three working panes,
 every node where the editor puts it, every link along its route -- and lights
@@ -4325,7 +4331,7 @@ or from when a restart is initiated, until it takes a <tt class="docutils litera
 its configuration's checksum, and every
 <tt class="docutils literal">beacon.default_interval</tt> after that (see Initiate restart, above), from the
 address the payload set's <tt class="docutils literal">tcspecial</tt> section names to the address beside it,
-or <tt class="docutils literal">tcspecial.yaml</tt>'s pair for a set with no section. Tcsmoc binds that same
+or <tt class="docutils literal">tcspecial.ytcs</tt>'s pair for a set with no section. Tcsmoc binds that same
 receiving address, having read the same files. Tcsmoc displays the
 following beacon colors:</p>
 <dl class="docutils">

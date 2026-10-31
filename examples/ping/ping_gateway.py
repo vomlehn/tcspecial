@@ -48,8 +48,8 @@ missed, a vehicle that restarted, a configuration that differs -- and a
 tcspecial that stopped by itself. Errors and warnings are said either way, and
 so is what ``--pings`` and ``--describe`` print, which is what they are for.
 
-The configuration is ``examples/ping/ping.xml`` unless another is named:
-``--yaml`` reads ``ping.yaml`` instead, and ``--xml`` says the default. One
+The configuration is ``examples/ping/ping.xtcs`` unless another is named:
+``--yaml`` reads ``ping.ytcs`` instead, and ``--xml`` says the default. One
 of the two at most, and a file named beside one has to be that spelling.
 Reading XML it uses nothing outside the standard library; reading YAML it
 needs PyYAML. Python 3.7 or later.
@@ -77,8 +77,8 @@ from tcslibgs import configuration  # noqa: E402
 from tcslibgs.configuration import find_built  # noqa: E402
 from ping_ground import NO_MESSAGE, Pinger, interval, precise_time  # noqa: E402
 
-#: The example's configuration, without its extension: ``.xml``, which is
-#: read where nobody says otherwise, or ``.yaml``, the two saying the same
+#: The example's configuration, without its extension: ``.xtcs``, which is
+#: read where nobody says otherwise, or ``.ytcs``, the two saying the same
 #: thing.
 STEM = HERE / "ping"
 
@@ -107,8 +107,8 @@ def arguments(argv):
         "configuration",
         nargs="?",
         help=(
-            f"the configuration (default: {STEM}.xml, or with --yaml "
-            f"{STEM}.yaml)"
+            f"the configuration (default: {STEM}.xtcs, or with --yaml "
+            f"{STEM}.ytcs)"
         ),
     )
     # Which of the example's two files: one, or neither, and never both.

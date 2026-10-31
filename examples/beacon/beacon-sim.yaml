@@ -1,11 +1,11 @@
 # yaml-language-server: $schema=../../tcsgui/share/schema/tcspecial-sim.schema.json
 
-# How tcssim stands in for the one payload of beacon.yaml.
+# How tcssim stands in for the one payload of beacon.ytcs.
 #
 # Nothing here is about beacons: a beacon comes from tcspecial itself and no
 # simulator has a part in one. The payload is simulated so that the example
 # can be run with tcssim as any other is.
-description: Simulator settings for the payload of beacon.yaml
+description: Simulator settings for the payload of beacon.ytcs
 
 # Where tcssim answers whether it has made its stand-ins, which whatever
 # starts the run asks before it starts tcspecial. A port no other example

@@ -31,7 +31,7 @@ fn configuration() -> (tempfile::TempDir, PathBuf, u16) {
         .expect("its address")
         .port();
     let dir = tempfile::tempdir().expect("a directory");
-    let path = dir.path().join("simple-app.yaml");
+    let path = dir.path().join("simple-app.ytcs");
     std::fs::write(
         &path,
         format!(
@@ -184,7 +184,7 @@ fn it_connects_until_matched_and_then_prints_the_line() {
     let take_at = vehicle_commands.local_addr().expect("where").port();
     let port = free();
     let dir = tempfile::tempdir().expect("a directory");
-    let path = dir.path().join("simple-app.yaml");
+    let path = dir.path().join("simple-app.ytcs");
     std::fs::write(
         &path,
         format!(

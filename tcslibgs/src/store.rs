@@ -3,7 +3,7 @@
 //! The vehicle keeps each configuration it holds in the directory the
 //! `tcspecial` section's `configurations` attribute names, under its
 //! checksum in hex and the extension that says how to read it:
-//! `<checksum>.yaml` or `<checksum>.xml`. A RESTART names the configuration
+//! `<checksum>.ytcs` or `<checksum>.xtcs`. A RESTART names the configuration
 //! to restart onto by that checksum, and a start loads one by it. See
 //! "Keeping configurations on board" in `docs/design.rst`.
 //!
@@ -32,7 +32,7 @@ use crate::graph::Graph;
 
 /// The extensions a kept configuration may have, which say how it is read:
 /// the configuration formats, as [`crate::ConfigFormat`] takes them.
-const EXTENSIONS: [&str; 2] = ["yaml", "xml"];
+const EXTENSIONS: [&str; 2] = ["ytcs", "xtcs"];
 
 /// The directory configurations are kept in.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -123,7 +123,7 @@ impl Store {
     ///
     /// # Returns
     ///
-    /// The file, `<checksum>.yaml` or `<checksum>.xml`, or `None` where
+    /// The file, `<checksum>.ytcs` or `<checksum>.xtcs`, or `None` where
     /// neither is there. A store holds a checksum once, so where both are,
     /// the YAML is the one found.
     pub fn find(&self, digest: ConfigDigest) -> Option<PathBuf> {
@@ -176,7 +176,7 @@ impl Store {
         let path = self.find(digest).ok_or_else(|| {
             format!(
                 "no configuration {digest} is kept in {}: there is no \
-                 {digest}.yaml or {digest}.xml there",
+                 {digest}.ytcs or {digest}.xtcs there",
                 self.dir.display()
             )
         })?;
@@ -213,7 +213,7 @@ impl Store {
     ///
     /// # Arguments
     ///
-    /// * `path` - The configuration file, `.yaml` or `.xml`.
+    /// * `path` - The configuration file, `.ytcs` or `.xtcs`.
     ///
     /// # Returns
     ///
@@ -237,17 +237,10 @@ impl Store {
             .extension()
             .and_then(|ext| ext.to_str())
             .map(str::to_ascii_lowercase)
-            .map(|ext| {
-                if ext == "yml" {
-                    "yaml".to_string()
-                } else {
-                    ext
-                }
-            })
             .filter(|ext| EXTENSIONS.contains(&ext.as_str()))
             .ok_or_else(|| {
                 format!(
-                    "{}: a configuration is kept as .yaml or .xml, and this \
+                    "{}: a configuration is kept as .ytcs or .xtcs, and this \
                      is neither",
                     path.display()
                 )
@@ -384,14 +377,14 @@ mod tests {
     ///
     /// * `dir` - Where to write it.
     /// * `n`   - Which one.
-    /// * `ext` - `yaml` or `xml`.
+    /// * `ext` - `ytcs` or `xtcs`.
     ///
     /// # Returns
     ///
     /// Its path.
     fn written(dir: &Path, n: u32, ext: &str) -> PathBuf {
         let path = dir.join(format!("vehicle{n}.{ext}"));
-        let text = if ext == "xml" {
+        let text = if ext == "xtcs" {
             format!(
                 "<configuration><description>{n}</description>\
                  <vehicle><name>p{n}</name><type>ping</type></vehicle>\
@@ -416,13 +409,13 @@ mod tests {
         let from = tempfile::tempdir().expect("a directory");
         let store_dir = tempfile::tempdir().expect("a store");
         let store = Store::at(store_dir.path());
-        let path = written(from.path(), 1, "yaml");
+        let path = written(from.path(), 1, "ytcs");
         let digest = crate::config_digest::digest_of_file(&path).unwrap();
 
         assert!(!store.holds(digest));
         let (kept_as, kept) = store.keep(&path).expect("kept");
         assert_eq!(kept_as, digest, "the checksum computed from it");
-        let at = store_dir.path().join(format!("{digest}.yaml"));
+        let at = store_dir.path().join(format!("{digest}.ytcs"));
         assert_eq!(kept, Kept::Written(at.clone()));
         assert!(store.holds(digest));
         let mode = std::fs::metadata(&at).unwrap().permissions().mode();
@@ -437,14 +430,14 @@ mod tests {
         // nothing is written, since the one held means the same.
         let again = store.keep(&path).expect("kept");
         assert_eq!(again, (digest, Kept::Already(at.clone())));
-        let xml = written(from.path(), 1, "xml");
+        let xml = written(from.path(), 1, "xtcs");
         assert_eq!(
             crate::config_digest::digest_of_file(&xml).unwrap(),
             digest,
             "the two spellings say the same"
         );
         assert_eq!(store.keep(&xml).unwrap(), (digest, Kept::Already(at)));
-        assert!(!store_dir.path().join(format!("{digest}.xml")).exists());
+        assert!(!store_dir.path().join(format!("{digest}.xtcs")).exists());
     }
 
     /// A file kept under a name that is not its checksum -- damaged, cut
@@ -454,10 +447,10 @@ mod tests {
         let from = tempfile::tempdir().expect("a directory");
         let store_dir = tempfile::tempdir().expect("a store");
         let store = Store::at(store_dir.path());
-        let one = written(from.path(), 1, "yaml");
-        let two = written(from.path(), 2, "yaml");
+        let one = written(from.path(), 1, "ytcs");
+        let two = written(from.path(), 2, "ytcs");
         let digest = crate::config_digest::digest_of_file(&one).unwrap();
-        std::fs::copy(&two, store_dir.path().join(format!("{digest}.yaml")))
+        std::fs::copy(&two, store_dir.path().join(format!("{digest}.ytcs")))
             .unwrap();
 
         assert!(store.holds(digest), "a file of the name is there");
@@ -478,11 +471,11 @@ mod tests {
         let store_dir = tempfile::tempdir().expect("a store");
         let store = Store::at(store_dir.path());
         std::fs::write(
-            from.path().join("cabin.yaml"),
+            from.path().join("cabin.ytcs"),
             "vehicle:\n  - { name: p, type: ping }\n",
         )
         .unwrap();
-        let top = from.path().join("top.yaml");
+        let top = from.path().join("top.ytcs");
         std::fs::write(&top, "include:\n  - cabin\n").unwrap();
 
         let why = store.keep(&top).expect_err("more than one file");
@@ -499,7 +492,7 @@ mod tests {
         let store_dir = tempfile::tempdir().expect("a store");
         let store = Store::at(store_dir.path());
         let digests: Vec<ConfigDigest> = (1..=3)
-            .map(|n| store.keep(&written(from.path(), n, "yaml")).unwrap().0)
+            .map(|n| store.keep(&written(from.path(), n, "ytcs")).unwrap().0)
             .collect();
 
         let why = store

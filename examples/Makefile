@@ -66,13 +66,13 @@ help:
 define runexample_on
 	( \
 		set -eu; \
-		echo "Running tcsmoc on examples/$(1)/$(1).yaml..."; \
+		echo "Running tcsmoc on examples/$(1)/$(1).ytcs..."; \
 		cd $(ROOT); \
 		rm -rf $(TELEMETRY); \
 		mkdir $(TELEMETRY); \
 		cargo build -q --bin tcspecial --bin tcssim --bin tcsmoc; \
 		RUST_LOG=$(RUST_LOG) cargo run -q --bin tcsmoc -- \
-			--simulate=$(SIMULATE) examples/$(1)/$(1).yaml \
+			--simulate=$(SIMULATE) examples/$(1)/$(1).ytcs \
 	)
 endef
 
@@ -133,13 +133,13 @@ run-simple-app: check-python3
 	( \
 		set -eu; \
 		echo "Running $(PROJECT_NAME) on" \
-			"examples/simple-app/simple-app.yaml..."; \
+			"examples/simple-app/simple-app.ytcs..."; \
 		cd $(ROOT); \
 		rm -rf $(TELEMETRY); \
 		mkdir $(TELEMETRY); \
 		RUST_LOG=$(RUST_LOG) target/debug/tcspecial --quiet \
 			--simulate=$(SIMULATE) \
-			examples/simple-app/simple-app.yaml & \
+			examples/simple-app/simple-app.ytcs & \
 		vehicle=$$!; \
 		trap 'pkill -P $$vehicle || true; \
 			kill -INT $$vehicle 2>/dev/null || true; \
@@ -168,12 +168,12 @@ run-beacon:
 	( \
 		set -eu; \
 		echo "Watching $(PROJECT_NAME)'s beacon from" \
-			"examples/beacon/beacon.yaml..."; \
+			"examples/beacon/beacon.ytcs..."; \
 		cd $(ROOT); \
 		rm -rf $(TELEMETRY); \
 		mkdir $(TELEMETRY); \
 		RUST_LOG=$(RUST_LOG) target/debug/beacon \
-			examples/beacon/beacon.yaml \
+			examples/beacon/beacon.ytcs \
 	)
 
 # Run the ping example: tcspecial answering pings, and a window sending them.
@@ -196,12 +196,12 @@ run-ping: check-tkinter
 	cd $(ROOT) && cargo build -q --bin tcspecial --bin tcsverify
 	( \
 		set -eu; \
-		echo "Running $(PROJECT_NAME) on examples/ping/ping.xml..."; \
+		echo "Running $(PROJECT_NAME) on examples/ping/ping.xtcs..."; \
 		cd $(ROOT); \
 		rm -rf $(TELEMETRY); \
 		mkdir $(TELEMETRY); \
 		RUST_LOG=$(RUST_LOG) python3 examples/ping/ping_gateway.py \
-			examples/ping/ping.xml \
+			examples/ping/ping.xtcs \
 	)
 
 # Whether there is a tkinter for the ping example's window to be drawn with.

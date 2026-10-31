@@ -1,7 +1,7 @@
 //! The tees example, flown: each command the ground sends reaches the heater
 //! and comes back to the ground, and each reading reaches the ground.
 //!
-//! What is run is `examples/tees/tees.yaml` itself, with each of its sockets
+//! What is run is `examples/tees/tees.ytcs` itself, with each of its sockets
 //! moved to a port nothing holds -- so that this runs beside anything else,
 //! the example included -- and its log moved to a directory of the test's.
 //! Everything else is the example's, so a change to it that stops a tee
@@ -137,7 +137,7 @@ fn heard(at: &UdpSocket) -> Option<Vec<u8>> {
 #[test]
 fn a_tee_sends_each_datum_both_ways() {
     let example = Path::new(env!("CARGO_MANIFEST_DIR"))
-        .join("../examples/tees/tees.yaml");
+        .join("../examples/tees/tees.ytcs");
     let text = std::fs::read_to_string(&example).expect("the example reads");
 
     // Where the example's own ground hears each tee, which its diagram and
@@ -187,7 +187,7 @@ fn a_tee_sends_each_datum_both_ways() {
     ] {
         text = moved(&text, was, &now);
     }
-    let configuration = dir.path().join("tees.yaml");
+    let configuration = dir.path().join("tees.ytcs");
     std::fs::write(&configuration, &text).expect("written");
 
     // Where the ground hears each tee, as the vehicle works it out: the gateway

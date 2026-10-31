@@ -63,7 +63,7 @@ Written twice, a rule can drift, so each one here is held to its Rust:
 
 - `tests/` are the Rust tests said again, with the same figures.
 - `examples/ping/tests/agrees.rs` checks that what `configuration.py` reads
-  out of `ping.xml` is what the Rust reads out of `ping.yaml`.
+  out of `ping.xtcs` is what the Rust reads out of `ping.ytcs`.
 - `examples/ping/tests/pings.rs` plays the vehicle with the Rust -- each ping
   answered by the function the `ping` node answers with, each beacon
   serialized as tcspecial serializes it -- against a ground station built on

@@ -6,6 +6,11 @@ root = true
 max_line_length = 80
 tab_width = 8
 
+# And the YAML spelling of a configuration, which is YAML named .ytcs.
+[*.ytcs]
+max_line_length = 80
+tab_width = 8
+
 # C and C++ indent with hard tabs, one per block level, and use spaces
 # only to align a continuation line under something on the line above.
 [*.{c,h,cpp,hpp}]

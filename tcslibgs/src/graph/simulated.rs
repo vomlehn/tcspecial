@@ -244,7 +244,7 @@ mod tests {
     fn example(name: &str) -> (Graph, SimConfigFile) {
         let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("..");
         let graph =
-            Graph::load(root.join(format!("examples/{name}/{name}.yaml")))
+            Graph::load(root.join(format!("examples/{name}/{name}.ytcs")))
                 .expect("the example reads");
         let sim = SimConfigFile::load(
             root.join(format!("examples/{name}/{name}-sim.yaml")),

@@ -152,7 +152,7 @@ fn an_armed_restart_runs_tcspecial_again_keeping_what_it_was_given() {
     let commands_at = commands.local_addr().expect("where").port();
     let take_at = free();
 
-    let configuration = dir.path().join("vehicle.yaml");
+    let configuration = dir.path().join("vehicle.ytcs");
     let state = dir.path().join("tcspecial.state").display().to_string();
     let at = || format!("127.0.0.1:{}", free());
     std::fs::write(
@@ -451,8 +451,8 @@ fn a_restart_runs_the_configuration_it_names() {
     std::fs::create_dir(&kept).expect("a store");
     let state = dir.path().join("tcspecial.state");
 
-    let first = dir.path().join("first.yaml");
-    let second = dir.path().join("second.yaml");
+    let first = dir.path().join("first.ytcs");
+    let second = dir.path().join("second.ytcs");
     for (path, arm) in [(&first, "20 min"), (&second, "30 min")] {
         written(path, &state, &kept, take_at, commands_at, beacons_at, arm);
     }
@@ -576,7 +576,7 @@ fn a_stop_during_a_restart_stops_the_vehicle() {
     let kept = dir.path().join("kept");
     std::fs::create_dir(&kept).expect("a store");
     let state = dir.path().join("tcspecial.state");
-    let configuration = dir.path().join("vehicle.yaml");
+    let configuration = dir.path().join("vehicle.ytcs");
     written(
         &configuration,
         &state,

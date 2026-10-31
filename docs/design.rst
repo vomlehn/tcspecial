@@ -144,8 +144,8 @@ link
 tcspecial configuration file
     The file tcspecial is configured by: the command interpreter's own
     settings in its ``tcspecial`` section, and the payload configuration
-    section beside them. No name of its own -- any name ending ``.yaml`` or
-    ``.xml`` -- the shipped examples being ``examples/minimal/minimal.yaml``
+    section beside them. No name of its own -- any name ending ``.ytcs`` or
+    ``.xtcs`` -- the shipped examples being ``examples/minimal/minimal.ytcs``
     and the rest.
 
 payload configuration section
@@ -3409,11 +3409,11 @@ type of data is in it:
 
 .. code-block:: text
 
-   platform.yaml   what hardware exists and how it is reached -- bus,
+   platform.ytcs   what hardware exists and how it is reached -- bus,
                    address, chip, lines, paths. Changes when the vehicle does.
-   graph.yaml      nodes, groups, links, command bindings. Changes when the
+   graph.ytcs      nodes, groups, links, command bindings. Changes when the
                    control strategy does.
-   tuning.yaml     setpoints, intervals, thresholds: the values the MOC may
+   tuning.ytcs     setpoints, intervals, thresholds: the values the MOC may
                    also change in flight.
 
 
@@ -3426,8 +3426,8 @@ performs them again aboard. One command, on one file:
 
 .. code-block:: console
 
-   $ tcsverify tests/manual/thermostat.yaml
-   $ make verify TCSGUI_FILE=tests/manual/thermostat.yaml
+   $ tcsverify tests/manual/thermostat.ytcs
+   $ make verify TCSGUI_FILE=tests/manual/thermostat.ytcs
 
 The editor reads what it writes. A configuration opened in tcsgui comes up on
 the canvas -- nodes where their ``editor`` positions put them, links between
@@ -4488,9 +4488,9 @@ review and in release tarballs -- and nobody has ever wanted to undo an edit on
 a machine they copied a file to.
 
 Each history is named for the configuration's own name and a digest of its
-absolute path -- ``graph-3f91c2d4e5f60718.yaml`` -- so that a person looking in
+absolute path -- ``graph-3f91c2d4e5f60718.ytcs`` -- so that a person looking in
 the directory can tell what belongs to what and two configurations called
-``graph.yaml`` in two directories are two histories. The file says which
+``graph.ytcs`` in two directories are two histories. The file says which
 configuration it is the history of, because a digest cannot be read backwards.
 The digest is FNV-1a written out in the source rather than the standard
 library's hasher, which does not promise the same answer across Rust releases:
@@ -4576,10 +4576,10 @@ What node types there are is data rather than code in the editor. A node type
 arrives as two files: Rust in tcspecial, and a description tcsgui reads.
 
 Two trees with one structure, family by family. A description at
-``vehicle/compute/vote.yaml`` has its Rust at
-``tcspecial/src/node/vehicle/compute/vote.rs``; one at ``payload/i2c.yaml``
+``vehicle/compute/vote.ytcs`` has its Rust at
+``tcspecial/src/node/vehicle/compute/vote.rs``; one at ``payload/i2c.ytcs``
 has ``node/payload/i2c/``, a directory with as many files under it as it takes.
-``gateway_radio.yaml`` and ``gateway_fprime.yaml`` sit at the root of the
+``gateway_radio.ytcs`` and ``gateway_fprime.ytcs`` sit at the root of the
 tree because a gateway node has no Rust of its own: it is the vehicle's end of
 the link to what it answers to rather than part of the vehicle, and the code
 that serves one is the network payload's.
@@ -4807,9 +4807,9 @@ unfinished", which the person at the keyboard already knows.
 Requiring that it all be entered is ``tcsverify``'s and the flight software's,
 where the complaint can name the file, the line and the attribute::
 
-   vehicle.yaml:11: "temp_fore" is an i2c node, so it needs the device it is
+   vehicle.ytcs:11: "temp_fore" is an i2c node, so it needs the device it is
    reached through: say path
-   vehicle.yaml:13: "gateway" is a network node, so it needs the host it is at:
+   vehicle.ytcs:13: "gateway" is a network node, so it needs the host it is at:
    say address
 
 That check is new, and the editor's laziness rests on it: before it, a node
@@ -4860,7 +4860,7 @@ Requirement
 Requirement
     ``-r``, ``--read-only`` or ``--readonly``, anywhere on the command line,
     starts a session that shows the configuration and changes nothing:
-    ``tcsgui --read-only thermostat.yaml``. The window is the editor's, with
+    ``tcsgui --read-only thermostat.ytcs``. The window is the editor's, with
     the controls that would change something greyed rather than hidden -- Edit
     and Delete on a node and in the window about the file's problems,
     renaming, Undo, Redo, Save, arranging, placing a node, drawing a line,
@@ -4965,8 +4965,8 @@ field and goes nowhere else. Renaming a group renames it on every node in it,
 as one edit, for the same reason: a rename that left the members behind would
 silently unschedule them.
 
-A configuration that exists in two spellings is written in both. ``vehicle.yaml``
-beside ``vehicle.xml`` is one configuration written twice, and two files meant
+A configuration that exists in two spellings is written in both. ``vehicle.ytcs``
+beside ``vehicle.xtcs`` is one configuration written twice, and two files meant
 to say the same thing drift the moment only one of them is written -- the
 shipped example is such a pair, and keeping it a pair by hand meant a command
 to remember after every session. Only where the sibling is already there:
@@ -6005,7 +6005,7 @@ Requirement
 
 Requirement
     The fallback interface is its own XTCE document,
-    ``tcslibgs/xtce/fallback.xml``: its own ``SpaceSystem``, sharing no type,
+    ``tcslibgs/xtce/fallback.xtcs``: its own ``SpaceSystem``, sharing no type,
     parameter or container with the full interface, so that no change to the
     full interface can change it. It is compiled into every build, and no
     upload replaces it.
@@ -6349,8 +6349,8 @@ Requirement
     file is refused when it is uplinked and when it is loaded, saying so.
     A configuration spread across several files is to be handled later.
 
-As built, a configuration is kept as ``<checksum>.yaml`` or
-``<checksum>.xml`` -- its checksum in 32 lower-case hex digits, and the
+As built, a configuration is kept as ``<checksum>.ytcs`` or
+``<checksum>.xtcs`` -- its checksum in 32 lower-case hex digits, and the
 extension that says how it is read, the one it was given -- in the
 directory the ``tcspecial`` section's ``configurations`` names. A section
 that names none is a vehicle that keeps no configurations: it runs the one
@@ -7390,16 +7390,26 @@ Requirement
     local preference and tooling and never of capability.
 
 Requirement
-    The format is taken from the file's extension and from nothing else.
-    ``.yaml`` and ``.yml`` are YAML, ``.xml`` is XML, and a file whose
-    extension is neither is refused, naming the file and what a configuration
-    file is called.
+    The format is taken from the file's extension and from nothing else. A
+    tcspecial configuration's extension is its own: ``.ytcs`` is YAML and
+    ``.xtcs`` is XML, and a configuration whose extension is neither is
+    refused, naming the file and what a configuration file is called -- one
+    named ``.yaml``, ``.yml`` or ``.xml``, as configurations once were, with
+    the name to give it. A simulator configuration keeps its language's
+    extension: ``.yaml`` and ``.yml`` are YAML and ``.xml`` is XML.
 
 Refused rather than assumed. JSON was read as well and was what an
 extensionless or unfamiliar name was taken to be, so a misspelled extension
 was not an error but a file parsed as the wrong language -- a ``.yam`` file
 "describing no payloads" rather than a file whose name was wrong. Nothing was
 written in JSON that was not also written in YAML.
+
+A configuration's extensions are its own, ``.ytcs`` and ``.xtcs``, so that a
+name says what the file is and not only what language it is in: a ``.yaml``
+file beside a configuration may be its simulator file, a node description, or
+any other YAML. One named as configurations once were is refused with the
+name to give it rather than read, so that nothing goes on being named two
+ways.
 
 The structs the files parse into are the single description of the data, in
 ``tcslibgs``; a format is a spelling of it. Adding a third would be a variant
@@ -7452,7 +7462,7 @@ line too, by ``--simulate``, and is not part of the configuration; see
 Which payload types it can reach at all is decided when it is built; see
 `Which Node Types Are Built`_.
 
-It read two. The second was its own, ``tcspecial/src/tcspecial.yaml``, named
+It read two. The second was its own, ``tcspecial/src/tcspecial.ytcs``, named
 by ``TCSPECIAL_CONFIG_PATH``. A configuration must have the section, so a
 second file could only disagree with the one being flown.
 
@@ -7461,7 +7471,7 @@ the project does, so either may be written in YAML or XML; see `Configuration
 Files`_. The shipped one is YAML because that is what the rest of the
 project's configuration is written in.
 
-This is the ``tcspecial`` section of the shipped ``tests/manual/thermostat.yaml``:
+This is the ``tcspecial`` section of the shipped ``tests/manual/thermostat.ytcs``:
 
 .. code-block:: yaml
 
@@ -7943,7 +7953,7 @@ Requirement
     are named by, in the form ``tcspecial --types`` prints, so that one can
     be handed to the other::
 
-       tcsverify --types=$(tcspecial --types) x.yaml
+       tcsverify --types=$(tcspecial --types) x.ytcs
 
     A word that names no type is refused, listing those that do. Without
     ``--types``, every type is taken to be built.
@@ -9861,7 +9871,7 @@ The tcspecial configuration describes payloads. Simulating one takes more than
 that description holds, and the extra is not payload configuration: how often a
 payload produces a packet, and how it divides a packet into segments, are
 choices about a simulation. They are stated in a separate file, which only
-tcssim acts on. A shipped pair is ``examples/minimal/minimal.yaml`` and
+tcssim acts on. A shipped pair is ``examples/minimal/minimal.ytcs`` and
 ``minimal-sim.yaml`` beside it; the parser is ``tcslibgs::sim_config``.
 
 Requirement
@@ -10311,7 +10321,7 @@ Requirement
 Example
 -------
 This is the shipped ``examples/thermostat/thermostat-sim.yaml``, which
-simulates the three sensors of ``thermostat.yaml``. All three are read together
+simulates the three sensors of ``thermostat.ytcs``. All three are read together
 and so share a group, which carries their rate and the thermal mass they
 report; the mass is what makes three sensors agree about a temperature. The
 heaters are not simulated: they are discrete lines, which the simulator drives
@@ -10319,7 +10329,7 @@ rather than being driven through.
 
 .. code-block:: yaml
 
-   description: Simulator settings for the payloads of thermostat.yaml
+   description: Simulator settings for the payloads of thermostat.ytcs
 
    thermal_mass:
      - name: cabin
@@ -10813,9 +10823,9 @@ Requirement
     saying why, on ``failed``, on a difference, or when its time runs out.
     This is the harness for a run started by hand::
 
-       tcssim --simulate=all x.yaml x-sim.yaml &
-       tcssim --wait --simulate=all x.yaml x-sim.yaml &&
-           tcspecial --simulate=all x.yaml
+       tcssim --simulate=all x.ytcs x-sim.yaml &
+       tcssim --wait --simulate=all x.ytcs x-sim.yaml &&
+           tcspecial --simulate=all x.ytcs
 
 Requirement
     Under ``none`` there is nothing to wait for: tcssim refuses to start, and
@@ -11708,7 +11718,7 @@ it was about to send to, so that the end that listens and the end that sends
 could not differ. One address in one place is the simpler rule, and it is the
 rule now; what it gives up is that agreement. The MOC and a tcspecial it starts
 agree about the command address by reading the same default, and about the
-beacon address the same way, so a ``tcspecial.yaml`` that moves either moves it
+beacon address the same way, so a ``tcspecial.ytcs`` that moves either moves it
 for tcspecial alone -- commands then go to a port nothing is bound to, which no
 error on either end reports, since a UDP datagram sent where nobody is
 listening is not refused. What the two ends do check on connecting is each
@@ -11783,7 +11793,7 @@ pointed at. Tcsmoc reads that file as well, but only to show what it says; it
 acts on none of it and so has nothing to say about which one is right.
 
 The Makefile names a set once for this reason, and names it as a stem:
-``TCSPECIAL_CONFIG_FILE`` is the set, ``$(TCSPECIAL_CONFIG_FILE).yaml`` the
+``TCSPECIAL_CONFIG_FILE`` is the set, ``$(TCSPECIAL_CONFIG_FILE).ytcs`` the
 tcspecial configuration that reaches every program as its argument, and
 ``$(TCSPECIAL_CONFIG_FILE)sim.yaml`` the simulator file that reaches tcssim in
 the environment. One target then runs a whole set, and its last letter is the

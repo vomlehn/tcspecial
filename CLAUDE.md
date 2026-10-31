@@ -76,7 +76,7 @@ attributes and checks in `tcslibgs::node`, the flight-side node in
   is built, tested and documented as C/C++.
 - Configurations are YAML or XML, chosen by the file's extension. The two
   spellings of a configuration must say the same thing, so change both
-  together. `tcsverify a.xml a.yaml a-sim.yaml` compares them.
+  together. `tcsverify a.xtcs a.ytcs a-sim.yaml` compares them.
 
 ## Building and testing
 

@@ -189,8 +189,9 @@
 <h1 id="examples">Examples</h1>
 <p>Each example is a directory holding three files:</p>
 <ul>
-<li><code>&lt;name&gt;.yaml</code> is a tcspecial configuration.</li>
-<li><code>&lt;name&gt;.xml</code> is the same configuration in XML.</li>
+<li><code>&lt;name&gt;.ytcs</code> is a tcspecial configuration.</li>
+<li><code>&lt;name&gt;.xtcs</code> is the same configuration in
+XML.</li>
 <li><code>&lt;name&gt;-sim.yaml</code> is the tcssim configuration that
 simulates its payloads.</li>
 </ul>
@@ -396,8 +397,8 @@ display.</p>
 <p>That builds tcspecial and the watcher and opens the window, and
 tcspecial starts when the button is pressed. Without make:</p>
 <pre><code>cargo build --bin tcspecial --bin beacon
-cargo run --bin beacon               # beacon.yaml
-cargo run --bin beacon -- --xml      # beacon.xml</code></pre>
+cargo run --bin beacon               # beacon.ytcs
+cargo run --bin beacon -- --xml      # beacon.xtcs</code></pre>
 <p>Languages:</p>
 <ul>
 <li>MOC: Rust – the <code>beacon</code> program, on
@@ -435,7 +436,7 @@ part, with no window. The Rust crate beside them is the tests that hold
 the Python to the Rust; <code>cargo test</code> runs them.</p>
 <pre><code>make run-ping                                   # the vehicle and the window
 python3 examples/ping/ping_gateway.py --pings 3 # no window: three pings
-python3 examples/ping/ping_gateway.py --yaml    # ping.yaml, not ping.xml</code></pre>
+python3 examples/ping/ping_gateway.py --yaml    # ping.ytcs, not ping.xtcs</code></pre>
 <p>It sends a CONNECT of its own as soon as the vehicle is started,
 carrying the configuration’s checksum, with
 <code>python/tcslib/listening.py</code>, and again each second until the
@@ -452,7 +453,7 @@ kill tcspecial – so a vehicle is running exactly while its ground
 station is. Build tcspecial first (<code>make run-ping</code> does). To
 run the vehicle yourself, in another terminal, say
 <code>--no-vehicle</code>:</p>
-<pre><code>cargo run --bin tcspecial -- examples/ping/ping.xml   # in one terminal
+<pre><code>cargo run --bin tcspecial -- examples/ping/ping.xtcs   # in one terminal
 python3 examples/ping/ping_gateway.py --no-vehicle    # in another</code></pre>
 <p>Its ports are all in the seven thousands, which no other example
 uses.</p>
@@ -577,7 +578,7 @@ prints the line, and then stops the vehicle. To watch the two
 separately, run them in two terminals instead, in either order:</p>
 <pre><code>cargo build                   # lorem_gateway and tcspecial
 cargo run --bin lorem_gateway # in one terminal: the ground (--xml for XML)
-cargo run --bin tcspecial -- examples/simple-app/simple-app.yaml   # in another</code></pre>
+cargo run --bin tcspecial -- examples/simple-app/simple-app.ytcs   # in another</code></pre>
 <p>Run the vehicle from the repository’s root, where the configuration’s
 <code>executable</code> path starts. Either order works because the
 payload waits a couple of seconds before its first word: the vehicle

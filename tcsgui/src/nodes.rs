@@ -331,7 +331,7 @@ fn walk(
         // Only the two formats, and silently: a tree people edit has a README
         // in it and an editor's leftovers beside it, and a complaint about
         // every one of those would bury the complaint that matters.
-        if tcslibgs::ConfigFormat::from_path(&path).is_none() {
+        if tcslibgs::ConfigFormat::from_data_path(&path).is_none() {
             continue;
         }
         match path.strip_prefix(root) {
@@ -361,7 +361,7 @@ fn walk(
 /// that is not `true` or `false`.
 fn read_one(root: &Path, path: &Path) -> Result<Described, String> {
     let whole = root.join(path);
-    let said: Said = tcslibgs::load_config_file(&whole)
+    let said: Said = tcslibgs::load_data_file(&whole)
         .map_err(|e| format!("{}: {e}", whole.display()))?;
 
     let named = |what: &str| format!("{}: {what}", whole.display());

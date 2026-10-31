@@ -15,6 +15,13 @@
 //! misspelled extension was not an error but a file parsed as the wrong
 //! language. Nothing was written in it that was not also written in YAML, so
 //! it is gone, and a file this cannot place by its extension is refused.
+//!
+//! A configuration's extension is its own, so that the name says what the
+//! file is and not only how it is spelled: `.ytcs` for the YAML spelling and
+//! `.xtcs` for the XML. A configuration still named `.yaml`, `.yml` or
+//! `.xml`, as they all once were, is refused with the name it should have,
+//! rather than read: those extensions are any YAML's and any XML's, and the
+//! simulator files beside a configuration are still `.yaml`.
 //! (Nothing here is about the command link, whose packets are stated in
 //! XTCE and are no part of configuration: see [`crate::link`].)
 
@@ -41,13 +48,40 @@ impl ConfigFormat {
     ///
     /// # Returns
     ///
-    /// The format, or nothing for an extension this does not recognise.
+    /// The format: YAML for `.ytcs`, XML for `.xtcs`, in either case; or
+    /// nothing for any other extension, `.yaml` and `.xml` included.
     /// Nothing rather than a default: a file whose extension is not one of
     /// these is more likely a mistake about which file is being read than a
     /// file meaning to be read some other way, and the one default there ever
     /// was -- JSON -- turned a misspelled extension into a file parsed as the
     /// wrong language.
     pub fn from_path<P: AsRef<Path>>(path: P) -> Option<Self> {
+        match path
+            .as_ref()
+            .extension()
+            .and_then(|e| e.to_str())
+            .map(str::to_ascii_lowercase)
+            .as_deref()
+        {
+            Some("ytcs") => Some(ConfigFormat::Yaml),
+            Some("xtcs") => Some(ConfigFormat::Xml),
+            _ => None,
+        }
+    }
+
+    /// Finds the format a path's extension names, for a file that is YAML
+    /// or XML but not a configuration: a payload simulator file, or one of
+    /// tcsgui's node descriptions, which keep their languages' extensions.
+    ///
+    /// # Arguments
+    ///
+    /// * `path` - The file's path.
+    ///
+    /// # Returns
+    ///
+    /// YAML for `.yaml` or `.yml`, XML for `.xml`, in either case; or
+    /// nothing for any other extension.
+    pub fn from_data_path<P: AsRef<Path>>(path: P) -> Option<Self> {
         match path
             .as_ref()
             .extension()
@@ -73,16 +107,30 @@ impl ConfigFormat {
     ///
     /// # Errors
     ///
-    /// [`TcsError::Config`] if the path is not named `.yaml`, `.yml` or
-    /// `.xml`.
+    /// [`TcsError::Config`] if the path is not named `.ytcs` or `.xtcs`.
+    /// One named `.yaml`, `.yml` or `.xml`, as configurations once were, is
+    /// told the name to give it instead.
     pub fn of_file<P: AsRef<Path>>(path: P) -> TcsResult<Self> {
         let path = path.as_ref();
         Self::from_path(path).ok_or_else(|| {
-            TcsError::Config(format!(
-                "{}: a configuration file is named .yaml, .yml or .xml, and \
-                 this is none of those",
-                path.display()
-            ))
+            TcsError::Config(match Self::from_data_path(path) {
+                Some(format) => format!(
+                    "{}: a configuration in {} is named .{} now, not .{}: \
+                     rename it {}",
+                    path.display(),
+                    format.name(),
+                    format.extension(),
+                    path.extension()
+                        .and_then(|e| e.to_str())
+                        .unwrap_or_default(),
+                    path.with_extension(format.extension()).display()
+                ),
+                None => format!(
+                    "{}: a configuration file is named .ytcs, for YAML, or \
+                     .xtcs, for XML, and this is neither",
+                    path.display()
+                ),
+            })
         })
     }
 
@@ -167,7 +215,7 @@ fn xml_position(
 /// `--xml`, or neither.
 ///
 /// Every example program takes the two, and one of them at most: they say
-/// which of the example's two files -- `<name>.yaml` or `<name>.xml`, which
+/// which of the example's two files -- `<name>.ytcs` or `<name>.xtcs`, which
 /// say the same thing -- is read, and a command line naming both says two
 /// things at once. One reading of them, here, so that every program refuses
 /// the same mistakes in the same words.
@@ -212,7 +260,7 @@ impl Spelling {
     /// Chooses the configuration to read.
     ///
     /// The one `named`, where one was; a flag beside it has to agree with its
-    /// extension, because a file named `.xml` read as asked for in YAML is a
+    /// extension, because a file named `.xtcs` read as asked for in YAML is a
     /// command line that cannot both be right. Otherwise `stem` in the
     /// spelling asked for, or in `default` where neither was.
     ///
@@ -259,11 +307,11 @@ impl ConfigFormat {
     ///
     /// # Returns
     ///
-    /// `yaml` or `xml`.
+    /// `ytcs` or `xtcs`.
     pub fn extension(self) -> &'static str {
         match self {
-            ConfigFormat::Yaml => "yaml",
-            ConfigFormat::Xml => "xml",
+            ConfigFormat::Yaml => "ytcs",
+            ConfigFormat::Xml => "xtcs",
         }
     }
 
@@ -318,6 +366,41 @@ pub fn load_config_file<T: DeserializeOwned, P: AsRef<Path>>(
     format.parse(&text)
 }
 
+/// Reads and parses a file that is YAML or XML but not a configuration,
+/// choosing the parser from its extension: a payload simulator file, or one
+/// of tcsgui's node descriptions.
+///
+/// Those keep the extensions of their languages, `.yaml` or `.yml` and
+/// `.xml`, which a configuration no longer has: see [`ConfigFormat::of_file`]
+/// for why a configuration's are its own.
+///
+/// # Arguments
+///
+/// * `path` - The file's path.
+///
+/// # Returns
+///
+/// What the file says, as `T`.
+///
+/// # Errors
+///
+/// An extension that is neither language's, a file that cannot be read, and
+/// what [`ConfigFormat::parse`] refuses.
+pub fn load_data_file<T: DeserializeOwned, P: AsRef<Path>>(
+    path: P,
+) -> TcsResult<T> {
+    let path = path.as_ref();
+    let format = ConfigFormat::from_data_path(path).ok_or_else(|| {
+        TcsError::Config(format!(
+            "{}: a simulator file or a node description is named .yaml, \
+             .yml or .xml, and this is none of those",
+            path.display()
+        ))
+    })?;
+    let text = fs::read_to_string(path)?;
+    format.parse(&text)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -339,11 +422,11 @@ mod tests {
         let neither = chosen(&[]).unwrap();
         assert_eq!(
             neither.configuration(None, stem, ConfigFormat::Yaml),
-            Ok(format!("{stem}.yaml"))
+            Ok(format!("{stem}.ytcs"))
         );
         assert_eq!(
             neither.configuration(None, stem, ConfigFormat::Xml),
-            Ok(format!("{stem}.xml"))
+            Ok(format!("{stem}.xtcs"))
         );
         assert_eq!(
             chosen(&["--xml"]).unwrap().configuration(
@@ -351,7 +434,7 @@ mod tests {
                 stem,
                 ConfigFormat::Yaml
             ),
-            Ok(format!("{stem}.xml"))
+            Ok(format!("{stem}.xtcs"))
         );
         assert_eq!(
             chosen(&["--yaml", "--yaml"]).unwrap().configuration(
@@ -359,7 +442,7 @@ mod tests {
                 stem,
                 ConfigFormat::Xml
             ),
-            Ok(format!("{stem}.yaml"))
+            Ok(format!("{stem}.ytcs"))
         );
 
         // Both is two answers to one question.
@@ -372,29 +455,53 @@ mod tests {
         // A file named is read, and a flag beside it must agree with it.
         let xml = chosen(&["--xml"]).unwrap();
         assert_eq!(
-            xml.configuration(Some("a.xml".into()), stem, ConfigFormat::Yaml),
-            Ok("a.xml".to_string())
+            xml.configuration(Some("a.xtcs".into()), stem, ConfigFormat::Yaml),
+            Ok("a.xtcs".to_string())
         );
         assert!(xml
-            .configuration(Some("a.yaml".into()), stem, ConfigFormat::Yaml)
+            .configuration(Some("a.ytcs".into()), stem, ConfigFormat::Yaml)
             .is_err());
         assert_eq!(
             neither.configuration(
-                Some("a.yaml".into()),
+                Some("a.ytcs".into()),
                 stem,
                 ConfigFormat::Xml
             ),
-            Ok("a.yaml".to_string())
+            Ok("a.ytcs".to_string())
         );
     }
 
     #[test]
     fn test_format_from_extension() {
-        assert_eq!(ConfigFormat::from_path("a.yaml"), Some(ConfigFormat::Yaml));
-        assert_eq!(ConfigFormat::from_path("a.yml"), Some(ConfigFormat::Yaml));
-        assert_eq!(ConfigFormat::from_path("a.YML"), Some(ConfigFormat::Yaml));
-        assert_eq!(ConfigFormat::from_path("a.xml"), Some(ConfigFormat::Xml));
-        assert_eq!(ConfigFormat::from_path("a.XML"), Some(ConfigFormat::Xml));
+        assert_eq!(ConfigFormat::from_path("a.ytcs"), Some(ConfigFormat::Yaml));
+        assert_eq!(ConfigFormat::from_path("a.YTCS"), Some(ConfigFormat::Yaml));
+        assert_eq!(ConfigFormat::from_path("a.xtcs"), Some(ConfigFormat::Xml));
+        assert_eq!(ConfigFormat::from_path("a.XTCS"), Some(ConfigFormat::Xml));
+
+        // And a simulator file or a node description keeps its language's
+        // extension, which names no configuration.
+        let data = ConfigFormat::from_data_path;
+        assert_eq!(data("a-sim.yaml"), Some(ConfigFormat::Yaml));
+        assert_eq!(data("mean.yml"), Some(ConfigFormat::Yaml));
+        assert_eq!(data("i2c.xml"), Some(ConfigFormat::Xml));
+        assert_eq!(data("a.ytcs"), None);
+        assert_eq!(ConfigFormat::from_path("a-sim.yaml"), None);
+    }
+
+    /// A configuration named as they all once were is refused, and told the
+    /// name to give it.
+    #[test]
+    fn an_old_extension_is_refused_with_the_new_name() {
+        for (name, new) in [
+            ("a.yaml", "a.ytcs"),
+            ("a.yml", "a.ytcs"),
+            ("b/a.YAML", "b/a.ytcs"),
+            ("a.xml", "a.xtcs"),
+        ] {
+            assert_eq!(ConfigFormat::from_path(name), None, "{name}");
+            let said = ConfigFormat::of_file(name).expect_err(name).to_string();
+            assert!(said.contains(&format!("rename it {new}")), "{said}");
+        }
     }
 
     /// An extension this does not know is refused, and the refusal says what
@@ -411,7 +518,7 @@ mod tests {
             let said = ConfigFormat::of_file(name).expect_err(name).to_string();
             assert!(said.contains(name), "{name}: {said}");
             assert!(
-                said.contains(".yaml") && said.contains(".xml"),
+                said.contains(".ytcs") && said.contains(".xtcs"),
                 "{name}: the refusal does not say what is read: {said}"
             );
         }

@@ -1138,7 +1138,7 @@ mod tests {
     /// tcsmoc finds it.
     #[test]
     fn an_example_is_simulated() {
-        let payload = repo_file("examples/minimal/minimal.yaml");
+        let payload = repo_file("examples/minimal/minimal.ytcs");
         let payload = payload.to_str().expect("a path");
         let sim = tcslibgs::config::sim_path_beside(payload)
             .expect("its simulator file");
@@ -1161,7 +1161,7 @@ mod tests {
     fn simulate_is_held_to_what_is_at_the_endpoint() {
         let dir = tempfile::tempdir().unwrap();
         let configuration = |address: &str| {
-            let path = dir.path().join("set.yaml");
+            let path = dir.path().join("set.ytcs");
             std::fs::write(
                 &path,
                 format!(
@@ -1185,21 +1185,21 @@ mod tests {
         assert!(stand_ins_refused(
             &configuration("127.0.0.1"),
             &sim(true),
-            "s.yaml",
+            "s.ytcs",
             Mode::All
         )
         .is_empty());
         let said = stand_ins_refused(
             &configuration("10.0.0.5"),
             &sim(true),
-            "s.yaml",
+            "s.ytcs",
             Mode::All,
         );
         assert!(said[0].contains("says simulate: true"), "{said:?}");
         let said = stand_ins_refused(
             &configuration("127.0.0.1"),
             &sim(false),
-            "s.yaml",
+            "s.ytcs",
             Mode::Some,
         );
         assert!(
@@ -1211,7 +1211,7 @@ mod tests {
         assert!(stand_ins_refused(
             &configuration("10.0.0.5"),
             &sim(false),
-            "s.yaml",
+            "s.ytcs",
             Mode::Some
         )
         .iter()
@@ -1222,7 +1222,7 @@ mod tests {
     /// nothing for a simulator to be.
     #[test]
     fn an_example_with_nothing_simulated_is_refused() {
-        let payload = repo_file("examples/simple-app/simple-app.yaml");
+        let payload = repo_file("examples/simple-app/simple-app.ytcs");
         let payload = payload.to_str().expect("a path");
         let sim = tcslibgs::config::sim_path_beside(payload)
             .expect("its simulator file");
@@ -1272,7 +1272,7 @@ mod tests {
             .join("docs/design.rst");
         let text = std::fs::read_to_string(&doc).unwrap();
 
-        // The four payloads of tcspecial1.yaml, which is the set the document
+        // The four payloads of tcspecial1.ytcs, which is the set the document
         // describes.
         // The fixture rather than a window: the Slint backend belongs to one
         // thread and one test, and what keeps the fixture equal to the markup
@@ -2028,7 +2028,7 @@ mod tests {
     ///
     /// # Returns
     ///
-    /// Each example's `<name>.yaml` and `<name>-sim.yaml`, sorted.
+    /// Each example's `<name>.ytcs` and `<name>-sim.yaml`, sorted.
     ///
     /// # Panics
     ///
@@ -2049,7 +2049,7 @@ mod tests {
                 continue;
             }
 
-            let configuration = path.join(format!("{name}.yaml"));
+            let configuration = path.join(format!("{name}.ytcs"));
             let sim_path = path.join(format!("{name}-sim.yaml"));
             if !configuration.is_file() {
                 continue;

@@ -45,7 +45,7 @@ fn filled_segments_are_handed_to_segsend_and_leave_the_directory() {
     let dir = tempfile::tempdir().expect("a directory");
     let logs = dir.path().join("telemetry");
     std::fs::create_dir(&logs).expect("the log directory");
-    let configuration = dir.path().join("vehicle.yaml");
+    let configuration = dir.path().join("vehicle.ytcs");
     let state = dir.path().join("tcspecial.state").display().to_string();
     let at = || format!("127.0.0.1:{}", free());
     std::fs::write(

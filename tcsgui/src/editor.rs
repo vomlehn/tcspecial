@@ -598,7 +598,7 @@ mod tests {
     #[test]
     fn an_edit_is_on_disk_before_the_next_one_is_made() {
         let where_ = tempfile::tempdir().expect("a directory");
-        let path = where_.path().join("graph.yaml");
+        let path = where_.path().join("graph.ytcs");
         let mut editor = Editor::new(&path);
 
         editor.edit(add("temp_1", "i2c"));
@@ -623,7 +623,7 @@ mod tests {
     #[test]
     fn a_read_only_session_changes_nothing() {
         let where_ = tempfile::tempdir().expect("a directory");
-        let path = where_.path().join("vehicle.yaml");
+        let path = where_.path().join("vehicle.ytcs");
         let by_hand = "\npayloads:\n  - name: temp_1\n    type: i2c\n";
         std::fs::write(&path, by_hand).expect("a file");
         let journal = crate::history::journal_for(&path);
@@ -679,7 +679,7 @@ mod tests {
     fn opening_settles_the_panes_without_writing_the_file() {
         let dividers = crate::pane::default_dividers();
         let where_ = tempfile::tempdir().expect("a directory");
-        let path = where_.path().join("vehicle.yaml");
+        let path = where_.path().join("vehicle.ytcs");
 
         // Written by hand, with the payload where a file from before the
         // canvas was divided would have put it.
@@ -769,7 +769,7 @@ tcsgui:
     #[test]
     fn saving_writes_every_file_whether_or_not_anything_is_owed() {
         let where_ = tempfile::tempdir().expect("a directory");
-        let path = where_.path().join("vehicle.yaml");
+        let path = where_.path().join("vehicle.ytcs");
         let mut editor = Editor::new(&path);
 
         editor.edit(add("temp_1", "i2c"));
@@ -797,7 +797,7 @@ tcsgui:
         let where_ = tempfile::tempdir().expect("a directory");
         let locked = where_.path().join("locked");
         std::fs::create_dir(&locked).unwrap();
-        let path = locked.join("vehicle.yaml");
+        let path = locked.join("vehicle.ytcs");
         let mut editor = Editor::new(&path);
 
         let shut = |mode: u32| {
@@ -836,7 +836,7 @@ tcsgui:
     #[test]
     fn the_simulator_file_is_written_beside_the_configuration() {
         let where_ = tempfile::tempdir().expect("a directory");
-        let path = where_.path().join("vehicle.yaml");
+        let path = where_.path().join("vehicle.ytcs");
         let sim = where_.path().join("vehiclesim.yaml");
 
         let mut editor = Editor::open(&path, crate::pane::default_dividers());
@@ -891,7 +891,7 @@ tcsgui:
         std::fs::write(&sim, "simulated_payloads: [[[\n").expect("a file");
 
         let mut editor = Editor::open(
-            &where_.path().join("vehicle.yaml"),
+            &where_.path().join("vehicle.ytcs"),
             crate::pane::default_dividers(),
         );
         editor.open_simulator(&sim);
@@ -914,7 +914,7 @@ tcsgui:
     #[test]
     fn a_simulator_file_that_does_not_join_up_is_refused() {
         let where_ = tempfile::tempdir().expect("a directory");
-        let path = where_.path().join("vehicle.yaml");
+        let path = where_.path().join("vehicle.ytcs");
         std::fs::write(
             &path,
             "payloads:\n  - name: payload\n    type: network\n",
@@ -990,7 +990,7 @@ tcsgui:
     #[test]
     fn a_duplicate_name_is_settled_outside_the_history() {
         let where_ = tempfile::tempdir().expect("a directory");
-        let path = where_.path().join("vehicle.yaml");
+        let path = where_.path().join("vehicle.ytcs");
         std::fs::write(
             &path,
             "payloads:\n  - name: i2c\n    type: i2c\n  \
@@ -1026,7 +1026,7 @@ tcsgui:
     #[test]
     fn a_simulated_payloads_setting_reaches_the_file() {
         let where_ = tempfile::tempdir().expect("a directory");
-        let path = where_.path().join("vehicle.yaml");
+        let path = where_.path().join("vehicle.ytcs");
         let sim = where_.path().join("vehiclesim.yaml");
         std::fs::write(
             &path,
@@ -1063,7 +1063,7 @@ tcsgui:
     #[test]
     fn a_new_simulator_configuration_is_written_as_a_form() {
         let where_ = tempfile::tempdir().expect("a directory");
-        let path = where_.path().join("vehicle.yaml");
+        let path = where_.path().join("vehicle.ytcs");
         let sim = where_.path().join("vehiclesim.yaml");
         // Two payloads and something that is not one: a computation has
         // nothing standing in for it, so it has no settings to offer.
@@ -1146,7 +1146,7 @@ tcsgui:
             .expect("a file");
 
             let mut editor = Editor::open(
-                &where_.path().join("vehicle.yaml"),
+                &where_.path().join("vehicle.ytcs"),
                 crate::pane::default_dividers(),
             );
             editor.open_simulator(&sim);
@@ -1169,7 +1169,7 @@ tcsgui:
         for name in ["vehiclesim.yaml", "VEHICLESIM.YAML", "not-yet.yaml"] {
             let sim = where_.path().join(name);
             let mut editor = Editor::open(
-                &where_.path().join("vehicle.yaml"),
+                &where_.path().join("vehicle.ytcs"),
                 crate::pane::default_dividers(),
             );
             editor.open_simulator(&sim);
@@ -1191,7 +1191,7 @@ tcsgui:
     #[test]
     fn a_group_made_in_the_editor_is_written_and_read_back() {
         let where_ = tempfile::tempdir().expect("a directory");
-        let path = where_.path().join("vehicle.yaml");
+        let path = where_.path().join("vehicle.ytcs");
         let mut editor = Editor::new(&path);
 
         editor.edit(Edit::AddGroup {
@@ -1238,7 +1238,7 @@ tcsgui:
     #[test]
     fn a_recovered_session_can_still_undo_past_the_crash() {
         let where_ = tempfile::tempdir().expect("a directory");
-        let path = where_.path().join("graph.yaml");
+        let path = where_.path().join("graph.ytcs");
 
         {
             let mut editor = Editor::new(&path);
@@ -1274,7 +1274,7 @@ tcsgui:
     #[test]
     fn an_undo_reaches_the_disk_too() {
         let where_ = tempfile::tempdir().expect("a directory");
-        let path = where_.path().join("graph.yaml");
+        let path = where_.path().join("graph.ytcs");
         let mut editor = Editor::new(&path);
 
         editor.edit(add("a", "i2c"));
@@ -1303,7 +1303,7 @@ tcsgui:
         let where_ = tempfile::tempdir().expect("a directory");
         let locked = where_.path().join("locked");
         std::fs::create_dir(&locked).unwrap();
-        let path = locked.join("graph.yaml");
+        let path = locked.join("graph.ytcs");
 
         let mut editor = Editor::new(&path);
         editor.edit(add("a", "i2c"));
@@ -1355,7 +1355,7 @@ tcsgui:
         let where_ = tempfile::tempdir().expect("a directory");
         let locked = where_.path().join("locked");
         std::fs::create_dir(&locked).unwrap();
-        let path = locked.join("graph.yaml");
+        let path = locked.join("graph.ytcs");
 
         let mut editor = Editor::new(&path);
         editor.edit(add("a", "i2c"));
@@ -1388,7 +1388,7 @@ tcsgui:
     #[test]
     fn a_subdiagram_is_written_to_its_own_file() {
         let where_ = tempfile::tempdir().expect("a directory");
-        let path = where_.path().join("vehicle.yaml");
+        let path = where_.path().join("vehicle.ytcs");
         let mut editor = Editor::new(&path);
 
         editor.edit(Edit::AddNode {
@@ -1413,7 +1413,7 @@ tcsgui:
         assert!(editor.trouble().is_none(), "{:?}", editor.trouble());
 
         let top = std::fs::read_to_string(&path).expect("the top diagram");
-        let inner = std::fs::read_to_string(where_.path().join("cabin.yaml"))
+        let inner = std::fs::read_to_string(where_.path().join("cabin.ytcs"))
             .expect("the subdiagram");
 
         // The top file names what it includes and holds its own nodes.
@@ -1445,7 +1445,7 @@ tcsgui:
     #[test]
     fn subdiagrams_follow_the_parent_into_xml() {
         let where_ = tempfile::tempdir().expect("a directory");
-        let path = where_.path().join("vehicle.xml");
+        let path = where_.path().join("vehicle.xtcs");
         let mut editor = Editor::new(&path);
 
         editor.edit(Edit::AddNode {
@@ -1460,7 +1460,7 @@ tcsgui:
         });
 
         let top = std::fs::read_to_string(&path).expect("the top diagram");
-        let inner = std::fs::read_to_string(where_.path().join("cabin.xml"))
+        let inner = std::fs::read_to_string(where_.path().join("cabin.xtcs"))
             .expect("the subdiagram, in XML as its parent is");
         assert!(top.contains("<include>cabin</include>"), "{top}");
         assert!(inner.starts_with("<?xml"), "{inner}");
@@ -1471,7 +1471,7 @@ tcsgui:
     #[test]
     fn a_configuration_named_xml_is_written_as_xml() {
         let where_ = tempfile::tempdir().expect("a directory");
-        let path = where_.path().join("graph.xml");
+        let path = where_.path().join("graph.xtcs");
         let mut editor = Editor::new(&path);
 
         editor.edit(add("temp_1", "i2c"));
@@ -1497,7 +1497,7 @@ tcsgui:
 
         editor.edit(add("a", "i2c"));
         let said = editor.trouble().expect("this should be refused");
-        assert!(said.contains(".yaml"), "{said}");
+        assert!(said.contains(".ytcs"), "{said}");
         // The edit is still in the document: the person at the keyboard has
         // lost nothing but the saving, and can say where to put it.
         assert_eq!(editor.document().nodes.len(), 1);
@@ -1511,7 +1511,7 @@ tcsgui:
     /// test in the process: the editor writes a history on every edit.
     #[test]
     fn the_history_is_named_after_the_document() {
-        let editor = Editor::new(Path::new("/var/lib/tcs/graph.yaml"));
+        let editor = Editor::new(Path::new("/var/lib/tcs/graph.ytcs"));
         let named = match editor.journal_path() {
             Some(named) => named,
             // Neither XDG_STATE_HOME nor HOME on this machine, which is a
@@ -1526,7 +1526,7 @@ tcsgui:
             named,
             crate::history::journal_in(
                 &crate::history::state_dir().expect("somewhere"),
-                Path::new("/var/lib/tcs/graph.yaml")
+                Path::new("/var/lib/tcs/graph.ytcs")
             )
         );
         assert!(

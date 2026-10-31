@@ -2,8 +2,8 @@
 
 Each example is a directory holding three files:
 
-- `<name>.yaml` is a tcspecial configuration.
-- `<name>.xml` is the same configuration in XML.
+- `<name>.ytcs` is a tcspecial configuration.
+- `<name>.xtcs` is the same configuration in XML.
 - `<name>-sim.yaml` is the tcssim configuration that simulates its payloads.
 
 An example whose payload is a program of its own holds that program too,
@@ -171,8 +171,8 @@ starts when the button is pressed. Without make:
 
 ```
 cargo build --bin tcspecial --bin beacon
-cargo run --bin beacon               # beacon.yaml
-cargo run --bin beacon -- --xml      # beacon.xml
+cargo run --bin beacon               # beacon.ytcs
+cargo run --bin beacon -- --xml      # beacon.xtcs
 ```
 
 Languages:
@@ -216,7 +216,7 @@ Python to the Rust; `cargo test` runs them.
 ```
 make run-ping                                   # the vehicle and the window
 python3 examples/ping/ping_gateway.py --pings 3 # no window: three pings
-python3 examples/ping/ping_gateway.py --yaml    # ping.yaml, not ping.xml
+python3 examples/ping/ping_gateway.py --yaml    # ping.ytcs, not ping.xtcs
 ```
 
 It sends a CONNECT of its own as soon as the vehicle is started, carrying the
@@ -235,7 +235,7 @@ run-ping` does). To run the vehicle yourself, in another terminal, say
 `--no-vehicle`:
 
 ```
-cargo run --bin tcspecial -- examples/ping/ping.xml   # in one terminal
+cargo run --bin tcspecial -- examples/ping/ping.xtcs   # in one terminal
 python3 examples/ping/ping_gateway.py --no-vehicle    # in another
 ```
 
@@ -340,7 +340,7 @@ terminals instead, in either order:
 ```
 cargo build                   # lorem_gateway and tcspecial
 cargo run --bin lorem_gateway # in one terminal: the ground (--xml for XML)
-cargo run --bin tcspecial -- examples/simple-app/simple-app.yaml   # in another
+cargo run --bin tcspecial -- examples/simple-app/simple-app.ytcs   # in another
 ```
 
 Run the vehicle from the repository's root, where the configuration's

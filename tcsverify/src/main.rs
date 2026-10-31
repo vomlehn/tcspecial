@@ -1,14 +1,14 @@
 //! Check a tcspecial configuration file, and the simulator file beside it.
 //!
 //! ```text
-//! tcsverify tests/manual/tcspecial2.yaml
-//! tcsverify tests/manual/tcspecial2.yaml tests/manual/tcspecial2sim.yaml
-//! tcsverify tests/manual/tcspecial2.xml tests/manual/tcspecial2.yaml \
+//! tcsverify tests/manual/tcspecial2.ytcs
+//! tcsverify tests/manual/tcspecial2.ytcs tests/manual/tcspecial2sim.yaml
+//! tcsverify tests/manual/tcspecial2.xtcs tests/manual/tcspecial2.ytcs \
 //!     tests/manual/tcspecial2sim.yaml
-//! tcsverify --digest tests/manual/tcspecial2.yaml
+//! tcsverify --digest tests/manual/tcspecial2.ytcs
 //! tcsverify --interface-digest
-//! tcsverify --set-interface examples/*/*.yaml examples/*/*.xml
-//! tcsverify --keep=/var/lib/tcspecial/configurations vehicle.yaml
+//! tcsverify --set-interface examples/*/*.ytcs examples/*/*.xtcs
+//! tcsverify --keep=/var/lib/tcspecial/configurations vehicle.ytcs
 //! ```
 //!
 //! Prints one line per problem -- file, line, and what is wrong -- and exits
@@ -76,7 +76,7 @@ configuration.
                      file if it has one: once it is checked and nothing is
                      wrong with it, keep it in <directory>, the directory a
                      tcspecial section's configurations attribute names,
-                     under its checksum -- <checksum>.yaml or .xml, mode
+                     under its checksum -- <checksum>.ytcs or .xtcs, mode
                      0444 -- as the vehicle keeps a configuration it may
                      restart onto. One that includes another file is
                      refused; one whose checksum is kept already is not

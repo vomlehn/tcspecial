@@ -1,7 +1,7 @@
 //! The examples in `examples/` are checked as tcsverify checks any pair.
 //!
 //! Each example is a directory of `examples/` holding a tcspecial
-//! configuration, `<name>.yaml` and the same in XML, `<name>.xml`, and the
+//! configuration, `<name>.ytcs` and the same in XML, `<name>.xtcs`, and the
 //! simulator configuration beside it, `<name>-sim.yaml`. They are discovered
 //! rather than listed, so an example added to the directory is checked
 //! without anyone having to remember to name it here.
@@ -42,8 +42,25 @@ fn example_files(extension: &str) -> Vec<PathBuf> {
     files
 }
 
+/// Lists the examples' configurations in YAML.
+///
+/// # Returns
+///
+/// Every `.ytcs` file there, sorted.
 fn yaml_files() -> Vec<PathBuf> {
+    example_files("ytcs")
+}
+
+/// Lists the examples' simulator files.
+///
+/// # Returns
+///
+/// The `-sim.yaml` files beside their configurations, sorted.
+fn sim_files() -> Vec<PathBuf> {
     example_files("yaml")
+        .into_iter()
+        .filter(|p| is_sim(p))
+        .collect()
 }
 
 fn is_sim(path: &Path) -> bool {
@@ -61,22 +78,21 @@ fn sim_for(config: &Path) -> PathBuf {
 #[test]
 fn every_shipped_configuration_names_this_builds_interface() {
     let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("..");
-    let mut files: Vec<PathBuf> = example_files("yaml")
+    let mut files: Vec<PathBuf> = example_files("ytcs")
         .into_iter()
-        .chain(example_files("xml"))
-        .filter(|path| !is_sim(path))
+        .chain(example_files("xtcs"))
         .collect();
-    for top in ["example.yaml", "example.xml"] {
+    for top in ["example.ytcs", "example.xtcs"] {
         files.push(root.join(top));
     }
     files.extend(entries(&root.join("tests/manual")).filter(|path| {
-        path.extension().is_some_and(|e| e == "yaml" || e == "xml")
+        path.extension().is_some_and(|e| e == "ytcs" || e == "xtcs")
     }));
     let ours = tcslibgs::InterfaceDigest::of_this_build().to_string();
     let mut stale = Vec::new();
     for path in &files {
         let text = std::fs::read_to_string(path).expect("it reads");
-        let xml = path.extension().is_some_and(|e| e == "xml");
+        let xml = path.extension().is_some_and(|e| e == "xtcs");
         let (_, set) = tcsverify::set_interface::set_in_text(&text, xml, &ours)
             .unwrap_or_else(|why| panic!("{}: {why}", path.display()));
         if set != tcsverify::set_interface::Set::Already {
@@ -96,8 +112,7 @@ fn every_shipped_configuration_names_this_builds_interface() {
 /// that is not finished teaches somebody to leave theirs unfinished.
 #[test]
 fn every_example_verifies() {
-    let configs: Vec<PathBuf> =
-        yaml_files().into_iter().filter(|p| !is_sim(p)).collect();
+    let configs: Vec<PathBuf> = yaml_files().into_iter().collect();
     assert!(
         !configs.is_empty(),
         "no examples in {}",
@@ -138,8 +153,8 @@ fn every_example_verifies() {
 /// other leaves both files valid: nothing but this notices.
 #[test]
 fn every_example_reads_the_same_in_both_formats() {
-    for yaml in yaml_files().into_iter().filter(|p| !is_sim(p)) {
-        let xml = yaml.with_extension("xml");
+    for yaml in yaml_files().into_iter() {
+        let xml = yaml.with_extension("xtcs");
         assert!(
             xml.is_file(),
             "{} has no {} beside it: an example is written in both formats",
@@ -170,8 +185,8 @@ fn every_example_reads_the_same_in_both_formats() {
 /// tests above discover examples by.
 #[test]
 fn every_xml_example_has_its_yaml() {
-    for xml in example_files("xml") {
-        let yaml = xml.with_extension("yaml");
+    for xml in example_files("xtcs") {
+        let yaml = xml.with_extension("ytcs");
         assert!(
             yaml.is_file(),
             "{} has no {}",
@@ -185,10 +200,10 @@ fn every_xml_example_has_its_yaml() {
 /// usually a configuration renamed without its partner.
 #[test]
 fn every_simulator_file_has_its_configuration() {
-    for sim in yaml_files().into_iter().filter(|p| is_sim(p)) {
+    for sim in sim_files() {
         let name = sim.to_str().expect("a UTF-8 path");
         let config = PathBuf::from(format!(
-            "{}.yaml",
+            "{}.ytcs",
             &name[..name.len() - SIM_SUFFIX.len()]
         ));
         assert!(
@@ -207,7 +222,7 @@ fn every_simulator_file_has_its_configuration() {
 /// added to an example and not to its picture fails here, naming both.
 #[test]
 fn every_example_has_a_diagram_of_its_nodes() {
-    for config in yaml_files().into_iter().filter(|p| !is_sim(p)) {
+    for config in yaml_files().into_iter() {
         let svg = config.with_extension("svg");
         let drawn = std::fs::read_to_string(&svg).unwrap_or_else(|e| {
             panic!(
@@ -237,7 +252,7 @@ fn every_example_is_in_the_manual() {
         Path::new(env!("CARGO_MANIFEST_DIR")).join("../docs/manual.rst");
     let text = std::fs::read_to_string(&manual)
         .unwrap_or_else(|e| panic!("{}: {e}", manual.display()));
-    for config in yaml_files().into_iter().filter(|p| !is_sim(p)) {
+    for config in yaml_files().into_iter() {
         let name = config.file_stem().and_then(|s| s.to_str()).expect("a name");
         let figure = format!(".. figure:: ../examples/{name}/{name}.svg");
         assert!(
@@ -268,7 +283,7 @@ fn every_node_in_the_manual_verifies() {
     let text = std::fs::read_to_string(&manual)
         .unwrap_or_else(|e| panic!("{}: {e}", manual.display()));
     let worked =
-        std::fs::read_to_string(root.join("tests/manual/thermostat.yaml"))
+        std::fs::read_to_string(root.join("tests/manual/thermostat.ytcs"))
             .expect("the worked example");
     let section = top_level_section(&worked, "tcspecial");
     let dir = tempfile::tempdir().expect("a directory");
@@ -297,7 +312,7 @@ fn every_node_in_the_manual_verifies() {
             continue;
         }
 
-        let path = dir.path().join(format!("manual-{line}.yaml"));
+        let path = dir.path().join(format!("manual-{line}.ytcs"));
         std::fs::write(&path, &file).unwrap();
         let report = verify(&path, None, tcsverify::Limits::EVERYTHING);
         assert!(

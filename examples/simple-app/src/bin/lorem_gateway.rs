@@ -244,21 +244,21 @@ mod tests {
     fn verbose_is_asked_for() {
         let quiet = of(&[]).expect("nothing is fine");
         assert!(!quiet.verbose);
-        assert_eq!(quiet.configuration, "examples/simple-app/simple-app.yaml");
+        assert_eq!(quiet.configuration, "examples/simple-app/simple-app.ytcs");
         assert_eq!(quiet.gateway_name, GATEWAY);
 
         for args in [
             &["-v"][..],
             &["--verbose"],
-            &["a.yaml", "-v", "m"],
-            &["a.yaml", "m", "--verbose"],
+            &["a.ytcs", "-v", "m"],
+            &["a.ytcs", "m", "--verbose"],
         ] {
             assert!(of(args).expect("they read").verbose, "{args:?}");
         }
-        let both = of(&["-v", "a.yaml", "m"]).expect("they read");
+        let both = of(&["-v", "a.ytcs", "m"]).expect("they read");
         assert_eq!(
             (both.configuration.as_str(), both.gateway_name.as_str()),
-            ("a.yaml", "m")
+            ("a.ytcs", "m")
         );
 
         assert!(of(&["-x"])
@@ -272,9 +272,9 @@ mod tests {
     fn the_spelling_is_yaml_unless_xml_is_asked_for() {
         assert_eq!(
             of(&["--xml"]).expect("it reads").configuration,
-            "examples/simple-app/simple-app.xml"
+            "examples/simple-app/simple-app.xtcs"
         );
         assert!(of(&["--yaml", "--xml"]).is_err());
-        assert!(of(&["--xml", "a.yaml"]).is_err());
+        assert!(of(&["--xml", "a.ytcs"]).is_err());
     }
 }

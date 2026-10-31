@@ -4,8 +4,8 @@
 //! library having no YAML; the vehicle and every Rust ground program read
 //! through `tcslibgs`. Where the beacons are and how often they come, where a
 //! ping goes up and where its answer comes down are worked out on both sides,
-//! so this holds the Python's answers for `ping.xml` to the Rust's for
-//! `ping.yaml` -- which is also the two spellings being held to one another.
+//! so this holds the Python's answers for `ping.xtcs` to the Rust's for
+//! `ping.ytcs` -- which is also the two spellings being held to one another.
 
 use std::path::{Path, PathBuf};
 use std::process::Command;
@@ -35,7 +35,7 @@ fn described() -> Vec<(String, String)> {
     let ran = Command::new("python3")
         .arg(here().join("ping_gateway.py"))
         .arg("--describe")
-        .arg(here().join("ping.xml"))
+        .arg(here().join("ping.xtcs"))
         .output()
         .expect("python3 runs");
     assert!(
@@ -65,7 +65,7 @@ fn described() -> Vec<(String, String)> {
 ///
 /// The example's configuration does not read or lacks any of these.
 fn worked_out() -> Vec<(String, String)> {
-    let path = here().join("ping.yaml");
+    let path = here().join("ping.ytcs");
     let graph = Graph::load(&path).expect("the example reads");
 
     let link = beacon_of(&graph)

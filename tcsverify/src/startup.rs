@@ -136,17 +136,17 @@ mod tests {
     #[test]
     fn errors_stop_a_program_and_warnings_do_not() {
         let mut warned = Report::default();
-        warned.findings.push(finding("a.yaml", Severity::Warning));
+        warned.findings.push(finding("a.ytcs", Severity::Warning));
         let mut startup = Startup::default();
         startup.report(&warned, true);
         assert!(!startup.fatal());
         assert_eq!(
             startup.lines(),
-            &[(false, "a.yaml:1: warning: wrong".to_string())]
+            &[(false, "a.ytcs:1: warning: wrong".to_string())]
         );
 
         let mut wrong = Report::default();
-        wrong.findings.push(finding("a.yaml", Severity::Error));
+        wrong.findings.push(finding("a.ytcs", Severity::Error));
         startup.report(&wrong, true);
         assert!(startup.fatal());
     }
@@ -155,11 +155,11 @@ mod tests {
     #[test]
     fn what_is_copied_is_the_heading_and_every_line() {
         let mut startup = Startup::default();
-        startup.warning("a.yaml:1: warning: unfinished");
+        startup.warning("a.ytcs:1: warning: unfinished");
         startup.error("cannot listen on 10.0.0.1:5000");
         assert_eq!(
             startup.copied("Something is wrong."),
-            "Something is wrong.\na.yaml:1: warning: unfinished\n\
+            "Something is wrong.\na.ytcs:1: warning: unfinished\n\
              cannot listen on 10.0.0.1:5000"
         );
     }
@@ -174,7 +174,7 @@ mod tests {
         assert!(!startup.fatal());
         assert!(!startup.is_empty());
 
-        report.findings.push(finding("set.yaml", Severity::Error));
+        report.findings.push(finding("set.ytcs", Severity::Error));
         let mut startup = Startup::default();
         startup.report_loosely(&report, Path::new("sim.yaml"));
         assert!(startup.fatal());

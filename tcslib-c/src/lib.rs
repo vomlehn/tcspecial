@@ -42,7 +42,9 @@ use std::panic::{catch_unwind, AssertUnwindSafe};
 use std::path::PathBuf;
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
-use tcslib::beacon::{Beacons, Contact, Schedule, Stage, STANDARD_INTERVAL};
+use tcslib::beacon::{
+    Beacons, Contact, Schedule, Stage, Waker, STANDARD_INTERVAL,
+};
 use tcslib::gateway::{GatewayReceiver, DATUM_BYTES};
 use tcslib::matched::Matched;
 use tcslib::ping::{route_of, Pinger, Uplink, NO_MESSAGE};
@@ -843,6 +845,89 @@ pub unsafe extern "C" fn tcs_beacons_warning(
 pub unsafe extern "C" fn tcs_beacons_close(beacons: *mut tcs_beacons) {
     if !beacons.is_null() {
         drop(Box::from_raw(beacons));
+    }
+}
+
+/// What ends a beacon watch's pass from another thread.
+///
+/// A handle of its own, not a call on the watch's, because the thread waking
+/// a watch is not the one in its pass, and a watch is used from one thread
+/// at a time.
+pub struct tcs_beacons_waker {
+    waker: Waker,
+}
+
+/// Makes what wakes a beacon watch's pass from another thread.
+///
+/// # Arguments
+///
+/// * `beacons` - The beacon watch.
+///
+/// # Returns
+///
+/// The waker, or NULL where `beacons` is NULL or its socket cannot be
+/// copied.
+///
+/// # Safety
+///
+/// `beacons` as [`tcs_beacons_pass`], and not in a pass on another thread.
+#[no_mangle]
+pub unsafe extern "C" fn tcs_beacons_waker_open(
+    beacons: *const tcs_beacons,
+) -> *mut tcs_beacons_waker {
+    guard(std::ptr::null_mut(), || {
+        let watch = handle_of(beacons, "the beacons")?;
+        let waker = watch.beacons.waker().map_err(|e| {
+            fail(format_args!("the beacon watch cannot be woken: {e}"))
+        })?;
+        // Allocates, once, before the watch's thread is started.
+        Ok(Box::into_raw(Box::new(tcs_beacons_waker { waker })))
+    })
+}
+
+/// Ends the pass the watch is in, or its next one: the pass finds nothing.
+///
+/// # Arguments
+///
+/// * `waker` - The waker of the watch.
+///
+/// # Returns
+///
+/// 0, or -1 where `waker` is NULL or the wakeup could not be sent.
+///
+/// # Safety
+///
+/// `waker` NULL or made by `tcs_beacons_waker_open` and not yet closed. Any
+/// thread may call it, at any time, while the watch is open.
+#[no_mangle]
+pub unsafe extern "C" fn tcs_beacons_wake(
+    waker: *const tcs_beacons_waker,
+) -> c_int {
+    guard(-1, || {
+        let waker = handle_of(waker, "the waker")?;
+        waker.waker.wake().map_err(|e| {
+            fail(format_args!("the beacon watch was not woken: {e}"))
+        })?;
+        Ok(0)
+    })
+}
+
+/// Frees a waker.
+///
+/// # Arguments
+///
+/// * `waker` - The waker, or NULL to do nothing.
+///
+/// # Safety
+///
+/// `waker` NULL or made by `tcs_beacons_waker_open` and not yet closed, and
+/// not in a `tcs_beacons_wake` on another thread.
+#[no_mangle]
+pub unsafe extern "C" fn tcs_beacons_waker_close(
+    waker: *mut tcs_beacons_waker,
+) {
+    if !waker.is_null() {
+        drop(Box::from_raw(waker));
     }
 }
 
@@ -1981,6 +2066,16 @@ mod tests {
             tcs_gateway_close(std::ptr::null_mut());
             tcs_client_close(std::ptr::null_mut());
             tcs_pinger_close(std::ptr::null_mut());
+            tcs_beacons_waker_close(std::ptr::null_mut());
+        }
+
+        // Nor is there a waker of no watch, or a wakeup from no waker.
+        //
+        // SAFETY: each takes NULL or a live handle of its kind, and is given
+        // NULL.
+        unsafe {
+            assert!(tcs_beacons_waker_open(std::ptr::null()).is_null());
+            assert_eq!(tcs_beacons_wake(std::ptr::null()), -1);
         }
     }
 

@@ -321,7 +321,11 @@ thread at a time; nothing in the library locks one.
 <code>tcs_last_error()</code> is per thread.</li>
 <li><strong>A beacon pass may wait for ever.</strong> Before any beacon
 has arrived, <code>tcs_beacons_pass</code> waits for one, with no
-timeout: run it on a thread of its own, as tcsmoc does.</li>
+timeout: run it on a thread of its own, as tcsmoc does. To stop that
+thread, make a waker with <code>tcs_beacons_waker_open</code> before
+starting it, and call <code>tcs_beacons_wake</code> from the thread
+stopping it, then join it: the pass it is in ends, finding nothing. The
+F´ bridge stops its beacon thread this way.</li>
 <li><strong>Strings are borrowed.</strong> A string a function returns
 is good until the next call on the same handle or its
 <code>_close</code>. Copy it to keep it.</li>

@@ -204,7 +204,7 @@ tcs_beacons *tcs_beacons_listen(const tcs_configuration *configuration);
 
 /** Waits for a beacon, or for the moment the stage or the indicator would
  * change by itself, and says what is so now. Before any beacon has arrived
- * it waits for one.
+ * it waits for one, unless it is woken: see tcs_beacons_wake().
  *
  * @param beacons  The beacon watch.
  * @param pass     Where what the pass found is written.
@@ -253,6 +253,29 @@ const char *tcs_beacons_warning(const tcs_beacons *beacons, size_t index);
  *
  * @param beacons  The beacon watch, or NULL to do nothing. */
 void tcs_beacons_close(tcs_beacons *beacons);
+
+/* What ends a beacon watch's pass from another thread, so that a thread
+ * waiting for a beacon that may never come can be stopped and joined. A
+ * handle of its own, because the watch is used from one thread at a time. */
+typedef struct tcs_beacons_waker tcs_beacons_waker;
+
+/** Makes what wakes a beacon watch's pass, before its thread is started.
+ *
+ * @param beacons  The beacon watch, not in a pass on another thread.
+ * @return         The waker, or NULL on an error. */
+tcs_beacons_waker *tcs_beacons_waker_open(const tcs_beacons *beacons);
+
+/** Ends the pass the watch is in, or its next one if it is in none: that
+ * pass finds nothing. Any thread may call it while the watch is open.
+ *
+ * @param waker  The waker.
+ * @return       0, or -1 on an error. */
+int tcs_beacons_wake(const tcs_beacons_waker *waker);
+
+/** Frees a waker, before or after the watch it wakes is closed.
+ *
+ * @param waker  The waker, or NULL to do nothing. */
+void tcs_beacons_waker_close(tcs_beacons_waker *waker);
 
 /* ---- The vehicle's data ------------------------------------------------- */
 

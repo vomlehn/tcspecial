@@ -39,7 +39,7 @@
 
 use std::fmt::Write as _;
 use std::io;
-use std::net::{SocketAddr, UdpSocket};
+use std::net::{IpAddr, Ipv4Addr, Ipv6Addr, SocketAddr, UdpSocket};
 use std::time::{Duration, SystemTime};
 
 use tcslibgs::{
@@ -902,6 +902,36 @@ pub struct Beacons {
     /// datagram, which would bury everything else on the console. A stranger
     /// at another address is warned of again.
     stranger: Option<SocketAddr>,
+    /// The socket every [`Waker`] is a copy of, aimed at this one, and where
+    /// what it sends comes from: a datagram from there is a wakeup and not
+    /// a stranger's.
+    wake: UdpSocket,
+    wake_from: SocketAddr,
+}
+
+/// What ends a pass early, from another thread.
+///
+/// A pass waits for a beacon, and before the first one -- or after the last
+/// stage of the schedule, which does not end -- it has nothing else to wait
+/// for, so a thread running the loop could not be stopped and joined until
+/// the spacecraft spoke. A wakeup is an empty datagram from a socket of the
+/// watch's own, sent to the watch: the pass it ends finds nothing, and the
+/// thread then sees whatever it was woken to see. Kept apart from
+/// [`Beacons`] because the thread waking it is not the one in the pass.
+#[derive(Debug)]
+pub struct Waker {
+    socket: UdpSocket,
+}
+
+impl Waker {
+    /// End the pass the watch is in, or the next one if it is in none.
+    ///
+    /// # Errors
+    ///
+    /// The `io::Error` from sending the wakeup.
+    pub fn wake(&self) -> io::Result<()> {
+        self.socket.send(&[]).map(|_| ())
+    }
 }
 
 impl Beacons {
@@ -933,6 +963,19 @@ impl Beacons {
         expected: Option<ConfigDigest>,
     ) -> io::Result<Beacons> {
         let socket = UdpSocket::bind(link.recv.to_string())?;
+        // Aimed at the address the watch is bound to, which is loopback
+        // where it is bound to every interface: there is no sending to the
+        // unspecified address.
+        let mut at = socket.local_addr()?;
+        if at.ip().is_unspecified() {
+            at.set_ip(match at.ip() {
+                IpAddr::V4(_) => IpAddr::V4(Ipv4Addr::LOCALHOST),
+                IpAddr::V6(_) => IpAddr::V6(Ipv6Addr::LOCALHOST),
+            });
+        }
+        let wake = UdpSocket::bind(SocketAddr::new(at.ip(), 0))?;
+        wake.connect(at)?;
+        let wake_from = wake.local_addr()?;
         let mut said = String::with_capacity(SAID_BYTES);
         said.push_str(NO_BEACON_MESSAGE);
         let last = Pass {
@@ -957,6 +1000,19 @@ impl Beacons {
             count: None,
             differed: false,
             stranger: None,
+            wake,
+            wake_from,
+        })
+    }
+
+    /// What wakes this watch from another thread: see [`Waker`].
+    ///
+    /// # Errors
+    ///
+    /// The `io::Error` from copying the socket a waker sends from.
+    pub fn waker(&self) -> io::Result<Waker> {
+        Ok(Waker {
+            socket: self.wake.try_clone()?,
         })
     }
 
@@ -974,8 +1030,9 @@ impl Beacons {
     ///
     /// One pass of the loop. It returns on a datagram, on the socket's
     /// timeout -- which is [`Showing::until`], so that an indicator blinks
-    /// whether or not anything arrives -- or on a failure of the socket,
-    /// which is reported as [`Arrived::Broken`] and says nothing about the
+    /// whether or not anything arrives -- on a [`Waker`]'s wakeup, which is
+    /// [`Arrived::Nothing`], or on a failure of the socket, which is
+    /// reported as [`Arrived::Broken`] and says nothing about the
     /// spacecraft.
     ///
     /// # Returns
@@ -997,6 +1054,8 @@ impl Beacons {
 
         let mut buffer = [0u8; 65535];
         let arrived = match self.socket.recv_from(&mut buffer) {
+            // A wakeup, which ends the pass and is nothing heard.
+            Ok((_, from)) if from == self.wake_from => Arrived::Nothing,
             // Only from where the configuration says beacons come from. A
             // datagram from anywhere else at this address is somebody else's
             // traffic, and treating it as a beacon would be reporting the
@@ -1697,6 +1756,43 @@ mod tests {
             "the socket failed, and the last beacon is what says whether the \
              spacecraft is being heard from"
         );
+    }
+
+    /// A pass before any beacon, which would wait for one for ever, ends
+    /// when it is woken from another thread, and finds nothing.
+    ///
+    /// What lets a thread running the loop be stopped and joined. Bound to
+    /// every interface, so that the wakeup has to find its way to loopback,
+    /// and woken twice, so that the second wakeup is seen to be no
+    /// stranger's either.
+    #[test]
+    fn a_pass_before_any_beacon_ends_when_it_is_woken() {
+        let link = Link {
+            send: HostPort {
+                address: "127.0.0.1".to_string(),
+                port: 9,
+            },
+            recv: HostPort {
+                address: "0.0.0.0".to_string(),
+                port: 0,
+            },
+        };
+        let mut beacons = Beacons::listening(link, Schedule::standard(), None)
+            .expect("a socket on a port of its own");
+        let waker = beacons.waker().expect("a waker");
+
+        for _ in 0..2 {
+            let woken = std::thread::scope(|scope| {
+                let pass = scope.spawn(|| beacons.pass().clone());
+                std::thread::sleep(Duration::from_millis(50));
+                waker.wake().expect("the wakeup is sent");
+                pass.join().expect("the pass ended")
+            });
+            assert_eq!(woken.arrived, Arrived::Nothing);
+            assert_eq!(woken.at, None, "a wakeup is not a beacon");
+            assert!(woken.warnings.is_empty(), "{:?}", woken.warnings);
+            assert!(woken.remarks.is_empty(), "{:?}", woken.remarks);
+        }
     }
 
     /// A beacon from somewhere else is not a beacon.

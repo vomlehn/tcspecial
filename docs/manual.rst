@@ -1112,9 +1112,11 @@ regular file at ``path`` and adds a packet of lorem ipsum to it every packet
 interval, at the pace and with the faults its simulator file gives, until the
 text runs out, about 2900 bytes of it. tcspecial reads what has been added
 each time it looks, so the data comes for a while and then stops. The file
-is removed when the payload stops. Where something else is already at
-``path`` -- a real device, or a file the simulator did not write -- the
-simulator leaves it alone and says so, rather than standing in for it.
+is removed when the simulator stops, whether by its ``Quit All`` button or by
+a signal (see `The tcssim window`_); a file left by one killed outright holds
+a prefix of the text, and the next start replaces it. Where something else is
+already at ``path`` -- a real device, or a file the simulator did not write --
+the simulator leaves it alone and says so, rather than standing in for it.
 
 Three other types are reached through a device file too and are not devices in
 this sense: a serial line, a bus and a SPI peripheral each have terms of their
@@ -4659,6 +4661,12 @@ One panel per simulated payload, in a grid, and a ``Quit All`` button at the
 foot of the window. Nothing in the window names a payload or fixes how many
 there are: the two configuration files decide that, so a payload added to or
 removed from them adds or removes a panel.
+
+SIGHUP, SIGINT and SIGTERM do what ``Quit All`` does: every payload stops and
+its stand-in is cleared, and then tcssim exits with the status a shell gives
+a program the signal ended, 128 more than the signal's number -- 130 for
+SIGINT. A second signal, for a stop that is taking too long, ends tcssim at
+once with status 1 and clears nothing.
 
 Each panel shows, from the top:
 

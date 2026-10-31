@@ -5699,6 +5699,175 @@ Requirement
     string or a binary field is a fixed-capacity buffer whose capacity the
     XTCE states, and decoding a command in the main loop touches no heap.
 
+The link without a header
+-------------------------
+
+.. note::
+   **Designed, not yet built** (2026-10-31). Once built it replaces the
+   CCSDS layout in `Every packet is XTCE`_, above, and settles what was left
+   open in `Configurations named by their checksum`_: what of the link
+   never changes. Until then `Every packet is XTCE`_ describes what runs.
+   What it replaces is under `What the headerless link replaces`_.
+
+A packet on tcspecial's command links carries what the protocol uses and
+nothing else. There is no CCSDS primary header, no packet type, no APID and
+no generation. What those did is done by what is already there:
+
+- **Which way a packet goes** is said by who sends it and who receives it.
+  The vehicle reads commands from its command links and sends answers back;
+  a ground station does the reverse. Neither reads the other's packets, so
+  nothing in a packet needs to say which it is.
+- **What layout a packet has** is said by the configuration: the two ends
+  have matched their configurations' checksums before anything but the
+  three fixed commands goes, and the configuration names the interface
+  (see `The configuration names its interface`_).
+- **Whether a datagram is tcspecial's at all** is said by where it came
+  from -- each end takes packets only from the address its configuration
+  names -- and by its length, which must be exactly the length its opcode's
+  layout gives.
+- **Whether it arrived whole** is said by the transport beneath it: UDP's
+  checksum here, and a gateway's own framing where there is one (see
+  `What is assumed`_).
+
+Where data leaves tcspecial, a gateway may wrap it in whatever framing the
+far side needs -- CCSDS Space Packets for a cFS software bus, a radio's
+transfer frames, or nothing for a program on the vehicle that takes plain
+datagrams. That framing belongs to the kind of gateway, and is never part
+of tcspecial's own packets: see `Framing is a gateway's`_.
+
+Packets without a header
+~~~~~~~~~~~~~~~~~~~~~~~~
+
+Requirement
+    A command is its opcode, one byte; its sequence, four bytes; then what
+    that command carries. An answer is the opcode of the command it
+    answers, one byte; that command's sequence, four bytes; its status, one
+    byte; the time it was made, eight bytes of microseconds since the UNIX
+    epoch, all ones where the vehicle could not tell the time; then what
+    the answer carries. Every number is most significant byte first.
+
+Requirement
+    An answer carries its command's opcode, not a kind of its own. The
+    values 129 to 132 that told an answer from a command when both shared a
+    header are not used.
+
+Requirement
+    A datagram is taken only from the address the configuration says its
+    sender sends from, and only if its length is exactly what its opcode's
+    layout gives. One that is not -- from elsewhere, of an unknown opcode,
+    too short or too long -- is not answered, not acted on, and is logged
+    and counted as malformed. A packet that is taken but refused is
+    answered, as now.
+
+Requirement
+    There is no generation number anywhere: not in an answer, not in the
+    state file, and not in ``tcslib``. A start is told by the beacon's
+    restart flag, and which configuration it runs by its checksum.
+
+The three fixed commands
+~~~~~~~~~~~~~~~~~~~~~~~~
+
+CONNECT, RESTART_ARM and RESTART are taken at any time, whatever either end
+is running, so that two ends that agree on nothing else can still agree on
+these. Their opcodes and layouts, and those of their answers, are fixed for
+ever: no build and no configuration changes them.
+
+Requirement
+    Opcodes 0x00 to 0x0F belong to the fixed commands for ever. Three are
+    used; the rest are kept so that a fixed command could be added without
+    taking an opcode another command has had. No other command uses them.
+
+Requirement
+    The fixed commands and their answers are laid out as below. They carry
+    nothing else, and are never given another field: a change to one is a
+    new fixed command with an opcode of its own.
+
+    ============  ======  =====================================================
+    Packet        Opcode  Layout (bytes)
+    ============  ======  =====================================================
+    RESTART_ARM   0x02    opcode 1, sequence 4, arm key 8, target checksum 16
+    its answer    0x02    opcode 1, sequence 4, status 1, time 8
+    RESTART       0x03    opcode 1, sequence 4, arm key 8, target checksum 16
+    its answer    0x03    opcode 1, sequence 4, status 1, time 8
+    CONNECT       0x04    opcode 1, sequence 4, checksum 16 (the ground's)
+    its answer    0x04    opcode 1, sequence 4, status 1, time 8,
+                          running checksum 16, build version 3 (major, minor,
+                          patch), newest sequence taken 4
+    ============  ======  =====================================================
+
+Requirement
+    The status values the fixed answers use keep their meanings for ever:
+    0 Success, 1 Failure, 2 InvalidCommand, 3 InvalidParameter, 4 NotArmed,
+    5 NotFound, 9 Stale, 10 Unmatched. New values may be added; a station
+    reads a value it does not know as a refusal for a reason it cannot name,
+    and says so with the number.
+
+Requirement
+    The beacon's layout is fixed for ever too: its text fields, in their
+    order, as `Asynchronous Telemetry`_ gives them.
+
+PING keeps opcode 0x01 for now, but is an ordinary command: it is refused
+before a match like any other, and moves out of the fixed range when the
+ordinary commands are renumbered, if they ever are.
+
+The configuration names its interface
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+The layouts of the ordinary commands and answers -- everything but the
+fixed three -- are stated in XTCE, compiled into each build by tcs-xtce. A
+build can only speak the interface it was compiled from, so what a
+configuration can do is say which interface it is written for, and be
+refused by a build that speaks another.
+
+Requirement
+    The ``tcspecial`` section's ``interface`` attribute, required, is the
+    interface digest -- 32 hex digits, ``tcslibgs::interface`` -- of the XTCE
+    the configuration was written against. tcsverify, tcspecial and every
+    ground program refuse a configuration whose ``interface`` is not their
+    build's own, saying both digests. The configuration's checksum covers
+    it, so matching checksums means matching interfaces as well.
+
+Requirement
+    The fixed commands are not in that XTCE: they are in a document of their
+    own, ``fixed.xml``, whose digest never changes, so that no change to the
+    ordinary interface can touch them.
+
+Framing is a gateway's
+~~~~~~~~~~~~~~~~~~~~~~
+
+Requirement
+    How what a gateway carries is framed outside tcspecial is part of what
+    that kind of gateway node is, and is not stated in the configuration:
+    choosing the node type chooses the framing. ``gateway_radio`` sends and
+    takes tcspecial's packets as they are, one to a datagram;
+    ``gateway_cfs`` wraps each in the CCSDS Space Packet the cFS software
+    bus carries; ``gateway_fprime`` frames them as F´ does. A far side that
+    needs another framing is a gateway node type of its own. A gateway
+    strips its framing from what it takes, and refuses what is not framed
+    as its type frames it, logging and counting it as malformed.
+
+There is then nothing about framing for a configuration to get wrong, or
+for two configurations to disagree about: the node type a configuration
+names, which its checksum covers, says it all.
+
+What the headerless link replaces
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Once built:
+
+- In `Every packet is XTCE`_: the CCSDS base container, the command and
+  answer headers with their constants, and the packet type that told an
+  answer from a command. Layouts are still stated in XTCE.
+- In `The generation number and the state file`_, and wherever an answer
+  carries a generation: there is none.
+- In `Configurations named by their checksum`_, under `Still to be
+  decided`_: the frozen layout of the three commands, settled here.
+- In `The Interface, the Fallback and Switching Over`_: the fallback
+  interface becomes ``fixed.xml``, holding only the three fixed commands.
+- CONNECT no longer carries the ground station's build version: the
+  vehicle acts on the checksum alone. The answer still carries the
+  vehicle's build version, for the station to show.
+
 Two interfaces
 --------------
 
@@ -6382,9 +6551,10 @@ Still to be decided
 ~~~~~~~~~~~~~~~~~~~
 
 The frozen layout of the three commands
-    Freezing the three commands, their answers and the beacon freezes the
-    packet header they share. Whether the header is frozen with them, or
-    the three get a layout of their own, is open.
+    Settled, though not yet built, in `The link without a header`_: there
+    is no shared header, and the three are fixed commands whose opcodes and
+    layouts never change, with the target checksum in RESTART_ARM and
+    RESTART.
 
 In-flight data across a restart
 -------------------------------

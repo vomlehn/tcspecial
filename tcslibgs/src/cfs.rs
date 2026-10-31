@@ -470,6 +470,16 @@ pub fn epoch_of(said: &str) -> Result<i64, String> {
 
 /// Days since 1970-01-01 of a date in the proleptic Gregorian calendar:
 /// Howard Hinnant's `days_from_civil`.
+///
+/// # Arguments
+///
+/// * `year`  - The year, as written: 2026 is 2026.
+/// * `month` - The month, 1 for January to 12 for December.
+/// * `day`   - The day of the month, from 1.
+///
+/// # Returns
+///
+/// How many days the date is after 1970-01-01, negative for one before it.
 fn days_from_civil(year: i64, month: i64, day: i64) -> i64 {
     let y = if month <= 2 { year - 1 } else { year };
     let era = if y >= 0 { y } else { y - 399 } / 400;

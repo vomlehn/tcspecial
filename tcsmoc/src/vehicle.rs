@@ -859,6 +859,14 @@ fn hear_what_the_vehicle_read(
 /// which is what the query is for and what the panels cannot otherwise know
 /// -- and the counts go in the panel's Configuration popup, beside the rest
 /// of what is known about that node.
+///
+/// # Arguments
+///
+/// * `ui`     - The window, whose Last Response says what was found.
+/// * `link`   - The link the queries go on.
+/// * `agreed` - Whether the vehicle has agreed which configuration it is
+///              flying.
+/// * `model`  - The panels, whose statuses and popups are updated.
 fn query_every_node(
     ui: &MainWindow,
     link: &Arc<Mutex<CiLink>>,

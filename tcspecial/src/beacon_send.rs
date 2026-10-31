@@ -227,6 +227,22 @@ impl BeaconSend {
     }
 
     /// Starts the thread that sends, out of `out`.
+    ///
+    /// # Arguments
+    ///
+    /// * `timing`    - How often beacons go, normally and across a restart.
+    /// * `out`       - What they go out of: a socket, or the bus.
+    /// * `from_addr` - Where they come from, for saying so in the log.
+    /// * `dest_addr` - Where they go, for saying so in the log.
+    /// * `log`       - The telemetry log every beacon is recorded in.
+    /// * `version`   - What this build is, carried in every beacon.
+    /// * `digest`    - The digest of the configuration read.
+    /// * `matched`   - Whether the ground has matched this start.
+    ///
+    /// # Returns
+    ///
+    /// The sender, whose thread is already sending, at the restart
+    /// interval until a matching CONNECT is taken.
     //
     // Eight, each a different thing the sender is made of: a structure
     // holding them would only be these arguments again.

@@ -401,6 +401,11 @@ impl Liveness {
     /// # Arguments
     ///
     /// * `now` - The time.
+    ///
+    /// # Returns
+    ///
+    /// The peer, not connected and due an announcement at once, its
+    /// silence and the time since it last sent both counted from `now`.
     pub fn new(now: Instant) -> Liveness {
         Liveness {
             connected: false,

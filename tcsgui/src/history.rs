@@ -109,6 +109,11 @@ pub fn state_dir() -> Option<PathBuf> {
 /// leaves nothing behind it. A run that never got that far -- killed, or
 /// aborted -- leaves its directory, and the first test process after it
 /// removes every one whose process is gone.
+///
+/// # Returns
+///
+/// The directory's path. It is named, not made: whatever writes a history
+/// there makes it.
 #[cfg(test)]
 fn tests_state_dir() -> &'static PathBuf {
     static DIRECTORY: std::sync::OnceLock<PathBuf> = std::sync::OnceLock::new();

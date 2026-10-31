@@ -104,6 +104,11 @@ impl Shared {
     }
 
     /// Notes the peer's subscribing to `msgid`, or unsubscribing.
+    ///
+    /// # Arguments
+    ///
+    /// * `msgid`  - The message ID the peer has subscribed or unsubscribed to.
+    /// * `wanted` - Whether it subscribed (`true`) or unsubscribed.
     fn want(&self, msgid: u16, wanted: bool) {
         let at = usize::from(msgid);
         let bit = 1u64 << (at % 64);
@@ -124,6 +129,14 @@ impl Shared {
     }
 
     /// Sends a datagram to the peer, noting when for the heartbeat.
+    ///
+    /// # Arguments
+    ///
+    /// * `datagram` - The whole datagram, SBN's header included.
+    ///
+    /// # Errors
+    ///
+    /// The socket's error, where the datagram cannot be sent.
     fn send(&self, datagram: &[u8]) -> std::io::Result<()> {
         self.socket.send_to(datagram, self.peer)?;
         let since = self.opened.elapsed().as_micros();
@@ -285,6 +298,11 @@ impl Bus {
     ///
     /// Allocates the room, so it is made at startup by whatever will
     /// publish, never in a loop.
+    ///
+    /// # Returns
+    ///
+    /// A publisher with room for the longest datagram the bus carries, and
+    /// its packet sequence count at zero.
     pub fn publisher(&self) -> Publisher {
         Publisher {
             shared: self.shared.clone(),
@@ -362,6 +380,21 @@ impl Publisher {
     }
 
     /// Publishes as [`Publisher::publish`] does, stamped with `at`.
+    ///
+    /// # Arguments
+    ///
+    /// * `msgid` - The message ID.
+    /// * `data`  - What the packet carries.
+    /// * `at`    - The time the packet is stamped with, turned into cFE's.
+    ///
+    /// # Returns
+    ///
+    /// Whether it was sent, as for [`Publisher::publish`].
+    ///
+    /// # Errors
+    ///
+    /// A message where `data` is too long for the bus, or the send fails,
+    /// as for [`Publisher::publish`].
     pub fn publish_at(
         &mut self,
         msgid: u16,
@@ -641,6 +674,16 @@ impl BusReader {
 
     /// Where the answer to a command is published: `tcs_cmd.response_msgid`,
     /// or the node's `payload_command.response_base` plus its id.
+    ///
+    /// # Arguments
+    ///
+    /// * `arrival` - The command being answered, as [`BusReader::take`]
+    ///               handed it back.
+    ///
+    /// # Returns
+    ///
+    /// The message ID the answer is published under: the node's, for a
+    /// node command, and the spacecraft's for any other.
     pub fn answer_msgid(&self, arrival: &Arrival) -> u16 {
         match arrival.node {
             Some(id) => self
@@ -663,6 +706,10 @@ impl BusReader {
     }
 
     /// Reads the peer's protocol version, refusing a peer of another.
+    ///
+    /// # Arguments
+    ///
+    /// * `body` - Where the message, after SBN's header, is in the room.
     fn protocol(&mut self, body: std::ops::Range<usize>) {
         let said = &self.room[body];
         let expected = self.shared.release.protocol_version;
@@ -690,6 +737,13 @@ impl BusReader {
 
     /// Notes a subscription or an unsubscription, refusing a peer whose
     /// ident is not the one the configuration states.
+    ///
+    /// # Arguments
+    ///
+    /// * `subscribe` - Whether the message subscribes (`true`) or
+    ///                 unsubscribes.
+    /// * `body`      - Where the message, after SBN's header, is in the
+    ///                 room.
     fn subscriptions_of(
         &mut self,
         subscribe: bool,
@@ -734,6 +788,18 @@ impl BusReader {
 
     /// Reads an application's message: a command, for the interpreter or a
     /// `gateway_cfs` node.
+    ///
+    /// What is not taken is logged and counted as malformed, as is what a
+    /// full inbox drops.
+    ///
+    /// # Arguments
+    ///
+    /// * `body` - Where the message, after SBN's header, is in the room.
+    ///
+    /// # Returns
+    ///
+    /// The command, for the interpreter, or `None` where it was not taken
+    /// or was put in a `gateway_cfs` node's inbox.
     fn application(&mut self, body: std::ops::Range<usize>) -> Option<Arrival> {
         let shared = self.shared.clone();
         if !shared.verified.load(Ordering::SeqCst) {
@@ -836,6 +902,12 @@ impl BusReader {
 
     /// Sends what is in `out` after its header, a message of `length`
     /// bytes of this type.
+    ///
+    /// # Arguments
+    ///
+    /// * `what`   - The SBN message type, one of [`kind`]'s.
+    /// * `length` - How many bytes of `out`, after the header, the message
+    ///              is.
     fn say(&mut self, what: u8, length: usize) {
         Header {
             kind: what,
@@ -872,6 +944,19 @@ struct Ring {
 }
 
 impl Inbox {
+    /// Makes an empty inbox, with room for each datagram the bus may send
+    /// the node: the longest message on the bus, or the longest datum,
+    /// whichever is shorter.
+    ///
+    /// Allocates every slot, so it is made when the bus is opened.
+    ///
+    /// # Arguments
+    ///
+    /// * `sbn` - The bus's SBN settings, which give the longest message.
+    ///
+    /// # Returns
+    ///
+    /// The inbox, with nothing waiting in it.
     fn new(sbn: &tcslibgs::Sbn) -> Inbox {
         let room = (sbn.max_message as usize).min(tcslibgs::DATUM_BYTES);
         Inbox {
@@ -884,6 +969,10 @@ impl Inbox {
     }
 
     /// Puts a datagram in, unless the inbox is full or it is too long.
+    ///
+    /// # Arguments
+    ///
+    /// * `data` - What the bus sent the node.
     ///
     /// # Returns
     ///
@@ -907,6 +996,10 @@ impl Inbox {
     }
 
     /// Takes the oldest datagram out, into `buffer`.
+    ///
+    /// # Arguments
+    ///
+    /// * `buffer` - Where it is copied to; what does not fit is dropped.
     ///
     /// # Returns
     ///
@@ -1021,6 +1114,14 @@ mod tests {
         }
 
         /// Sends a message from `socket`, as processor `processor`.
+        ///
+        /// # Arguments
+        ///
+        /// * `socket`    - The socket it is sent from, which need not be the
+        ///                 peer's.
+        /// * `processor` - The processor ID its header says it is from.
+        /// * `what`      - The SBN message type.
+        /// * `message`   - The message, after SBN's header.
         fn say_as(
             &self,
             socket: &UdpSocket,
@@ -1040,6 +1141,12 @@ mod tests {
         }
 
         /// Publishes a command, as the cFS side does.
+        ///
+        /// # Arguments
+        ///
+        /// * `msgid`         - The message ID it is published under.
+        /// * `function_code` - The command's function code.
+        /// * `data`          - What the command carries.
         fn command(&self, msgid: u16, function_code: u8, data: &[u8]) {
             let mut room = [0u8; 512];
             let size = cfs::write_command(
@@ -1055,6 +1162,11 @@ mod tests {
         }
 
         /// Subscribes to `msgids`, with the ident `ident`.
+        ///
+        /// # Arguments
+        ///
+        /// * `ident`  - The ident the subscription opens with.
+        /// * `msgids` - The message IDs subscribed to.
         fn subscribe(&self, ident: &[u8; sbn::IDENT_BYTES], msgids: &[u16]) {
             let mut room = [0u8; 512];
             let size = sbn::write_subscriptions(
@@ -1068,6 +1180,10 @@ mod tests {
 
         /// What tcspecial sends next, or `None` where nothing comes within
         /// the socket's timeout.
+        ///
+        /// # Returns
+        ///
+        /// The header of what came, and the message after it.
         fn heard(&self) -> Option<(Header, Vec<u8>)> {
             let mut room = [0u8; 65536];
             let (size, from) = self.socket.recv_from(&mut room).ok()?;
@@ -1083,6 +1199,14 @@ mod tests {
         }
 
         /// What tcspecial sends next, which must be of type `what`.
+        ///
+        /// # Arguments
+        ///
+        /// * `what` - The SBN message type it must be.
+        ///
+        /// # Returns
+        ///
+        /// The message, after SBN's header.
         fn expect(&self, what: u8) -> Vec<u8> {
             let (header, message) =
                 self.heard().unwrap_or_else(|| panic!("no {what:#04x}"));
@@ -1092,6 +1216,10 @@ mod tests {
     }
 
     /// A port nothing holds, for the bus to bind.
+    ///
+    /// # Returns
+    ///
+    /// The port's number, free when it was found.
     fn free() -> u16 {
         UdpSocket::bind("127.0.0.1:0")
             .expect("a port")
@@ -1137,6 +1265,16 @@ mod tests {
     }
 
     /// Takes one datagram, waiting for it to arrive.
+    ///
+    /// # Arguments
+    ///
+    /// * `reader` - The bus's reader.
+    /// * `now`    - The time the reader is told it is.
+    ///
+    /// # Returns
+    ///
+    /// What the reader found, or [`Took::Empty`] where nothing came in two
+    /// seconds.
     fn take(reader: &mut BusReader, now: Instant) -> Took {
         let until = Instant::now() + Duration::from_secs(2);
         loop {
@@ -1151,6 +1289,11 @@ mod tests {
 
     /// Announces, and is answered with the right protocol version, so the
     /// peer is connected and verified.
+    ///
+    /// # Returns
+    ///
+    /// The bus, its reader, the peer, and the time the reader was told it
+    /// is.
     fn connected() -> (Bus, BusReader, Peer, Instant) {
         let (bus, mut reader, peer) = opened();
         let now = Instant::now();

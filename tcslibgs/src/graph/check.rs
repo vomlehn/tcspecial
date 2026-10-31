@@ -2279,6 +2279,18 @@ mod tests {
 
     /// Whether a check says something about `node_name` containing every
     /// one of `wanted`.
+    ///
+    /// # Arguments
+    ///
+    /// * `g`         - The configuration checked.
+    /// * `node_name` - The node the problem must be about, or `None` for a
+    ///                 problem with the `tcspecial` section.
+    /// * `wanted`    - Words every one of which the problem must say.
+    ///
+    /// # Returns
+    ///
+    /// `true` where some problem the check finds is about that node, or the
+    /// section, and says every one of `wanted`.
     fn says(g: &Graph, node_name: Option<&str>, wanted: &[&str]) -> bool {
         g.check().iter().any(|p| match (p, node_name) {
             (Problem::BadNode { node, why }, Some(name)) => {

@@ -40,6 +40,10 @@ const NODE_COMMANDS: u16 = 0x4290;
 const NODE_ANSWERS: u16 = 0x4210;
 
 /// Binds a socket on a loopback port nothing holds.
+///
+/// # Returns
+///
+/// The socket, whose reads give up after a tenth of a second.
 fn bound() -> UdpSocket {
     let socket = UdpSocket::bind("127.0.0.1:0").expect("a port of its own");
     socket
@@ -68,6 +72,16 @@ impl Drop for Flying {
 }
 
 /// Writes `was` as `now` in `text`, where it appears exactly once.
+///
+/// # Arguments
+///
+/// * `text` - The example's text.
+/// * `was`  - What the example says, which it must say once.
+/// * `now`  - What it is to say instead.
+///
+/// # Returns
+///
+/// The text, with `was` changed to `now`.
 fn moved(text: &str, was: &str, now: &str) -> String {
     assert_eq!(
         text.matches(was).count(),
@@ -88,6 +102,11 @@ struct Peer {
 
 impl Peer {
     /// Sends a message of `what` type to tcspecial, as the peer.
+    ///
+    /// # Arguments
+    ///
+    /// * `what`    - The SBN message type.
+    /// * `message` - The message, after SBN's header.
     fn say(&self, what: u8, message: &[u8]) {
         let mut room = vec![0u8; sbn::HEADER_BYTES + message.len()];
         let size = Header {
@@ -103,6 +122,14 @@ impl Peer {
 
     /// Publishes a command for tcspecial, its checksum made, or broken
     /// where `broken`.
+    ///
+    /// # Arguments
+    ///
+    /// * `msgid`  - The message ID it is published under.
+    /// * `code`   - The command's function code.
+    /// * `data`   - What the command carries.
+    /// * `broken` - Whether its checksum is made wrong, by changing its
+    ///              last byte.
     fn command(&mut self, msgid: u16, code: u8, data: &[u8], broken: bool) {
         let mut room = [0u8; 1024];
         let size = cfs::write_command(
@@ -130,6 +157,10 @@ impl Peer {
 
     /// What tcspecial sends next, or `None` where nothing comes in the
     /// socket's timeout.
+    ///
+    /// # Returns
+    ///
+    /// The header of what came, and the message after it.
     fn heard(&mut self) -> Option<(Header, Vec<u8>)> {
         let mut room = [0u8; 65536];
         let (size, from) = self.socket.recv_from(&mut room).ok()?;
@@ -146,6 +177,15 @@ impl Peer {
 
     /// Waits for tcspecial to send a message of `what` type, passing over
     /// any other.
+    ///
+    /// # Arguments
+    ///
+    /// * `what`   - The SBN message type waited for.
+    /// * `within` - How long to wait before the test fails.
+    ///
+    /// # Returns
+    ///
+    /// The message, after SBN's header.
     fn until(&mut self, what: u8, within: Duration) -> Vec<u8> {
         let deadline = Instant::now() + within;
         while Instant::now() < deadline {
@@ -159,6 +199,16 @@ impl Peer {
     }
 
     /// Waits for a telemetry packet under `msgid`, passing over the rest.
+    ///
+    /// # Arguments
+    ///
+    /// * `msgid`  - The message ID waited for.
+    /// * `within` - How long to wait.
+    ///
+    /// # Returns
+    ///
+    /// What the packet carries, after its headers, or `None` where none
+    /// came in time.
     fn published(&mut self, msgid: u16, within: Duration) -> Option<Vec<u8>> {
         let deadline = Instant::now() + within;
         while Instant::now() < deadline {
@@ -179,6 +229,14 @@ impl Peer {
 
     /// Sends a CONNECT carrying `digest` until it is answered, as a ground
     /// station does once tcspecial is up.
+    ///
+    /// # Arguments
+    ///
+    /// * `digest` - The digest of the configuration the ground says it has.
+    ///
+    /// # Returns
+    ///
+    /// tcspecial's answer to the CONNECT.
     fn connect(&mut self, digest: ConfigDigest) -> Telemetry {
         let connect = Command::Connect(ConnectCommand::new(1, digest));
         for _ in 0..20 {
@@ -240,6 +298,14 @@ fn example() -> (tempfile::TempDir, std::path::PathBuf, Peer, UdpSocket, u16) {
 }
 
 /// Starts tcspecial on `configuration`.
+///
+/// # Arguments
+///
+/// * `configuration` - The configuration's path.
+///
+/// # Returns
+///
+/// tcspecial, flying, which is stopped when this is dropped.
 fn fly(configuration: &Path) -> Flying {
     Flying(
         Process::new(env!("CARGO_BIN_EXE_tcspecial"))
@@ -256,6 +322,10 @@ fn fly(configuration: &Path) -> Flying {
 
 /// Connects the peer: waits for tcspecial's announcement, answers it with
 /// the release's protocol version, and checks what tcspecial says back.
+///
+/// # Arguments
+///
+/// * `peer` - The cFS end, which learns where tcspecial is as it hears it.
 ///
 /// # Returns
 ///

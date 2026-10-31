@@ -1667,6 +1667,7 @@ mod tests {
         vehicle::pressing_connect_and_enable_commands_the_vehicle();
         vehicle::pressing_send_ping_pings_the_node_and_times_its_answer();
         vehicle::the_restart_controls_go_onto_the_restart_target();
+        vehicle::a_command_pressed_unmatched_is_said_in_a_pop_up();
     }
 
     /// The question about a configuration that differs is asked inside the

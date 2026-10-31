@@ -417,6 +417,73 @@ component DiffersPanel inherits Rectangle {
     }
 }
 
+// What the window says of a command pressed when it should not go, or should
+// be thought about first: an error, closed with OK, for a command refused
+// unsent while this station is not matched with the vehicle; or an advisory,
+// with Go on and Cancel, for a restart pressed before a CONNECT has been
+// answered. What it says is Rust's: see `vehicle::refused_unmatched` and
+// `vehicle::advise_before_restart`.
+//
+// Asked inside the main window, in front of the veil, as DiffersPanel is and
+// for its reason: a window of its own cannot be kept in front of this one on
+// every desktop. Copyable, as every popup is.
+component NoticePanel inherits Rectangle {
+    background: Colors.window;
+    border-width: 1px;
+    border-color: #808080;
+    border-radius: 4px;
+    drop-shadow-blur: 16px;
+    drop-shadow-color: #00000040;
+    drop-shadow-offset-y: 4px;
+    min-width: 420px;
+    preferred-width: 560px;
+
+    in property <string> heading: "";
+    in property <string> message: "";
+    // Whether it asks -- Go on or Cancel -- rather than tells, with OK.
+    in property <bool> asks: false;
+
+    callback go-on();
+    callback cancel();
+
+    VerticalLayout {
+        padding: 16px;
+        spacing: 10px;
+
+        Copyable {
+            text: root.heading;
+            font-size: Fonts.window;
+            font-weight: 700;
+            // Red for an error and amber for an advisory, and never the
+            // colour alone: the heading and the buttons say which it is.
+            color: root.asks ? #b45309 : #c0392b;
+        }
+        Copyable {
+            text: root.message;
+            font-size: Fonts.window;
+        }
+        HorizontalLayout {
+            spacing: 8px;
+            CopyButton {
+                said: root.heading + "\n" + root.message;
+            }
+            Rectangle { }
+            if root.asks: Button {
+                text: "Cancel";
+                clicked => { root.cancel(); }
+            }
+            if root.asks: Button {
+                text: "Go on";
+                clicked => { root.go-on(); }
+            }
+            if !root.asks: Button {
+                text: "OK";
+                clicked => { root.cancel(); }
+            }
+        }
+    }
+}
+
 // What a panel comes to, asked of a window that is never opened.
 //
 // A panel laid out alone reports what it wants; one in the grid is stretched
@@ -462,6 +529,22 @@ export component MainWindow inherits Window {
     in property <string> differs-message: "";
     callback differs-continue-anyway();
     callback differs-quit();
+
+    // What a command pressed while this station is not matched comes to,
+    // said in front of the panels inside this window: see NoticePanel. The
+    // veil is up with it, so that nothing else is pressed meanwhile.
+    in property <bool> notice-up: false;
+    in property <string> notice-heading: "";
+    in property <string> notice-message: "";
+    in property <bool> notice-asks: false;
+    callback notice-go-on();
+    callback notice-cancel();
+
+    // The checksum the last beacon carried, in the form the window shows a
+    // checksum, or nothing until a beacon has: kept by the beacon watch, for
+    // the pop-ups to name beside this station's own. Not shown by itself,
+    // the beacon's panel saying it already.
+    in-out property <string> beacon-checksum: "";
 
     in-out property <string> ci-status: "Disconnected";
     in-out property <string> ci-address: "127.0.0.1:4000";
@@ -917,7 +1000,7 @@ export component MainWindow inherits Window {
     // and does nothing with them, there only while it is wanted. Grey and
     // part clear, so that everything under it is greyed: still there to be
     // read, and plainly not taking presses.
-    if root.inert: Rectangle {
+    if root.inert || root.notice-up: Rectangle {
         x: 0;
         y: 0;
         width: 100%;
@@ -925,6 +1008,20 @@ export component MainWindow inherits Window {
         background: #e5e7ebb3;
 
         TouchArea { }
+    }
+
+    // A notice about a command, in front of the veil and behind the question
+    // below, which is about the whole window and so comes first.
+    if root.notice-up: NoticePanel {
+        width: min(self.preferred-width, root.width - 32px);
+        height: self.preferred-height;
+        x: (root.width - self.width) / 2;
+        y: (root.height - self.height) / 2;
+        heading: root.notice-heading;
+        message: root.notice-message;
+        asks: root.notice-asks;
+        go-on => { root.notice-go-on(); }
+        cancel => { root.notice-cancel(); }
     }
 
     // And in front of the veil, the question it is waiting for: never behind

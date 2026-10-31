@@ -449,19 +449,20 @@ ul.auto-toc {
 <li><a class="reference internal" href="#when-data-last-arrived" id="toc-entry-64">When data last arrived</a></li>
 <li><a class="reference internal" href="#a-triggered-payload-on-the-console" id="toc-entry-65">A triggered payload on the console</a></li>
 <li><a class="reference internal" href="#what-each-end-read" id="toc-entry-66">What each end read</a></li>
-<li><a class="reference internal" href="#commands" id="toc-entry-67">Commands</a></li>
-<li><a class="reference internal" href="#beaconing" id="toc-entry-68">Beaconing</a></li>
+<li><a class="reference internal" href="#matching-the-configurations" id="toc-entry-67">Matching the configurations</a></li>
+<li><a class="reference internal" href="#commands" id="toc-entry-68">Commands</a></li>
+<li><a class="reference internal" href="#beaconing" id="toc-entry-69">Beaconing</a></li>
 </ul>
 </li>
-<li><a class="reference internal" href="#tcssim" id="toc-entry-69">tcssim</a><ul>
-<li><a class="reference internal" href="#the-tcssim-window" id="toc-entry-70">The tcssim window</a></li>
+<li><a class="reference internal" href="#tcssim" id="toc-entry-70">tcssim</a><ul>
+<li><a class="reference internal" href="#the-tcssim-window" id="toc-entry-71">The tcssim window</a></li>
 </ul>
 </li>
 </ul>
 </li>
-<li><a class="reference internal" href="#crates-used" id="toc-entry-71">Crates Used</a></li>
-<li><a class="reference internal" href="#license" id="toc-entry-72">License</a></li>
-<li><a class="reference internal" href="#see-also" id="toc-entry-73">See Also</a></li>
+<li><a class="reference internal" href="#crates-used" id="toc-entry-72">Crates Used</a></li>
+<li><a class="reference internal" href="#license" id="toc-entry-73">License</a></li>
+<li><a class="reference internal" href="#see-also" id="toc-entry-74">See Also</a></li>
 </ul>
 </div>
 <div class="section" id="introduction">
@@ -2231,7 +2232,10 @@ continue anyway, in front of its panels, which are greyed and take no presses
 until it is answered; Quit stops tcspecial and tcssim and exits.</p>
 <p>It also commands the vehicle, on the two links the <tt class="docutils literal">tcspecial</tt> section
 states. Connect brings the link up and sends a <tt class="docutils literal">CONNECT</tt>, which is how the
-two ends compare what they read; Ping says the link reaches the vehicle,
+two ends compare what they read and how they are <em>matched</em>: see <a class="reference internal" href="#matching-the-configurations">Matching
+the configurations</a>. Until they are, tcspecial sends nothing down but its
+beacons and its answers, and tcsmoc sends nothing but <tt class="docutils literal">CONNECT</tt>, <tt class="docutils literal">ARM
+Restart</tt> and <tt class="docutils literal">Initiate restart</tt>. Ping says the link reaches the vehicle,
 which is a different fact from the beacon's. Each panel's Enable and Disable
 start and stop that panel's node -- any node, so a computation and a log are
 each something to stop as much as a sensor is -- and a Disable is answered
@@ -2427,10 +2431,11 @@ each pass in the window.</li>
 <p>A beacon is a line of text, at most 106 bytes and with no newline at the
 end: six fields with a colon between each -- the name <tt class="docutils literal">tcspecial</tt>, the
 version as <tt class="docutils literal">major.minor.patch</tt>, the configuration's MD5 digest as 32
-lower-case hex digits, the beacon's number in decimal, the commanded-restart
-flag, written <tt class="docutils literal">restart</tt> while a restart the ground commanded is under way
-and the MOC has not connected since and <tt class="docutils literal">normal</tt> otherwise, and the
-interface's digest, also as 32 hex digits:</p>
+lower-case hex digits, the beacon's number in decimal, the restart flag,
+written <tt class="docutils literal">restart</tt> from every start of tcspecial -- the first included --
+and from its taking a restart, until it takes a <tt class="docutils literal">CONNECT</tt> carrying its
+configuration's checksum, and <tt class="docutils literal">normal</tt> otherwise, and the interface's
+digest, also as 32 hex digits:</p>
 <pre class="code text literal-block">
 tcspecial:0.1.0:36999e46a4bf436854442d8f97a2248d:42:normal:0123...cdef
 </pre>
@@ -3802,24 +3807,28 @@ spacecraft, and the MOC says on the console what the numbers say about the
 beacons between them:</p>
 <pre class="code console literal-block">
 <span class="generic output">2 beacons did not arrive: #9 came after #6
-the beacons start again at #1, so tcspecial has restarted as commanded</span>
+the beacons start again at #1, so tcspecial has restarted</span>
 </pre>
 <p>A beacon says only that the spacecraft is alive, so without the number a
 beacon that was lost on the way reads exactly like one that was never sent.
 The radio delivers in order, so a number lower than the last one heard
 means tcspecial has started again and is counting from one; the same
 number as the last is the radio delivering a beacon twice, and counts for
-nothing. A restart nobody commanded is said as <tt class="docutils literal">the beacons start again
-at #1, so tcspecial has restarted without being commanded to, with the
-definitions it had</tt>.</p>
+nothing. Whether the restart was one the ground commanded is not said:
+every start sets the restart flag, and the checksum in the beacon says
+which configuration the start is running.</p>
 <p>To the right of the indicator is a field that reads <tt class="docutils literal">Restarted—connect</tt>
-while the last beacon's commanded-restart flag said <tt class="docutils literal">restart</tt>, and is
-empty while it said <tt class="docutils literal">normal</tt>. The flag is set from the moment tcspecial
-takes an
-<tt class="docutils literal">Initiate restart</tt> until it takes a <tt class="docutils literal">Connect</tt> from the MOC, so the
-field is telling the operator what to do next: press <tt class="docutils literal">Connect</tt>, which
-clears it. While the flag is set the message line also ends
-<tt class="docutils literal">, COMMANDED RESTART</tt>, which is how the window writes it. The
+while the last beacon's restart flag said <tt class="docutils literal">restart</tt>, and is empty while
+it said <tt class="docutils literal">normal</tt>. The flag is set at every start of tcspecial -- the
+first, an <tt class="docutils literal">Initiate restart</tt>, a crash its supervisor restarted, a power
+cycle -- and from the moment it takes an <tt class="docutils literal">Initiate restart</tt>, until it
+takes a <tt class="docutils literal">Connect</tt> carrying the checksum of the configuration it is
+running. So the field shows whenever the vehicle has not been matched,
+and is telling the operator what to do next: press <tt class="docutils literal">Connect</tt>, with the
+configuration whose checksum the beacons carry, which clears it. A
+<tt class="docutils literal">Connect</tt> carrying another checksum leaves it set. While the flag is set
+the message line also ends <tt class="docutils literal">, RESTARTED, NOT YET MATCHED</tt>, which is how
+the window writes it. The
 <tt class="docutils literal">beacon</tt> example's window has the panel without this field, since it
 sends no commands and so cannot connect.</p>
 <p>A datagram that reaches the beacon address from anywhere but where the
@@ -3848,14 +3857,23 @@ sending to the group is worth seeing beside a green indicator.</p>
 <dd><p class="first">What the last command answered, under the two boxes. The first thing it says
 in a session is whether tcspecial read the same configuration this MOC did:
 see <a class="reference internal" href="#what-each-end-read">What each end read</a>.</p>
-<p>Under it, when the last command went out and when its answer came back:</p>
+<p>Under it, when the last command went out and when its answer came back,
+and how many packets have come from the vehicle:</p>
 <pre class="code text literal-block">
 Last Response: START_DH OK
-Last sent: 14:22:31   Last rcvd: 14:22:31
+Last sent: 14:22:31   Last rcvd: 14:22:31   Packets: 12 received = 10 processed + 0 malformed + 2 mismatched
 </pre>
-<p class="last">The ground's own clock, and the window's own commands -- what was pressed.
+<p>The ground's own clock, and the window's own commands -- what was pressed.
 A response that is slow to come and one that never comes read alike until
 those two times are beside it.</p>
+<p class="last">The packets are everything that has arrived from the vehicle since the
+window started, data and answers alike, each counted once: <em>processed</em>,
+read and shown; <em>malformed</em>, not readable with this configuration's
+definitions; or <em>mismatched</em>, dropped because the two ends may not have
+been using the same configuration -- data that arrived while the window
+was not matched, or was waiting when the match began, and answers to
+anything but the command waited for. The last three add up to the first.
+See <a class="reference internal" href="#matching-the-configurations">Matching the configurations</a>.</p>
 </dd>
 </dl>
 <p>Below that is one panel per data handler, filled across the window before
@@ -3979,8 +3997,47 @@ is a tcspecial left running from an earlier one, which tcsmoc attaches to
 rather than replacing; stopping it and letting tcsmoc start a fresh one is the
 fix.</p>
 </div>
+<div class="section" id="matching-the-configurations">
+<h3><a class="toc-backref" href="#toc-entry-67">Matching the configurations</a></h3>
+<p>Neither end acts on what the other made with a different configuration. The
+digest is the configuration's <em>checksum</em>, and the two ends are matched once
+the vehicle has taken a <tt class="docutils literal">CONNECT</tt> carrying the checksum of the
+configuration it runs.</p>
+<p>On the vehicle, every start of tcspecial begins unmatched, with the restart
+flag set in its beacons. Until a <tt class="docutils literal">CONNECT</tt> carrying its configuration's
+checksum, it sends the ground nothing but beacons and command answers --
+what its nodes produce still goes to its logs -- and it acts on no command
+but <tt class="docutils literal">CONNECT</tt>, <tt class="docutils literal">RESTART_ARM</tt> and <tt class="docutils literal">RESTART</tt>. Every other command, a
+<tt class="docutils literal">PING</tt> among them, is answered <tt class="docutils literal">Unmatched</tt> and not acted on. A
+<tt class="docutils literal">CONNECT</tt> carrying another checksum is answered with the vehicle's own,
+and changes nothing else. A matching one clears the flag, sends a beacon at
+once, slows the beacons to <tt class="docutils literal">beacon.default_interval</tt>, opens the downlink
+and the other commands, and drops every command already waiting on the node
+command link unread, since all of it was sent before the match. Taking a
+restart ends the match at once, and no <tt class="docutils literal">CONNECT</tt> matches again until the
+start that comes back.</p>
+<p>On the ground, tcsmoc -- and any station built on tcslib or the C/C++
+library -- is <em>matched for listening</em> while the last beacon it has heard is
+recent (the indicator says the vehicle is heard from), has the flag clear and
+carries the checksum of the configuration this station read. A clear flag
+says some station's <tt class="docutils literal">CONNECT</tt> matched the vehicle, so a station that only
+listens is matched as surely as one that commands. It reads the vehicle's
+data only while matched for listening: everything else is dropped and
+counted, and as a match begins whatever was already waiting is dropped and
+counted too. It is <em>matched for commanding</em> once, besides, its own
+<tt class="docutils literal">Connect</tt> has been answered with its checksum; until then every command but
+<tt class="docutils literal">Connect</tt>, <tt class="docutils literal">ARM Restart</tt> and <tt class="docutils literal">Initiate restart</tt> is refused before it
+is sent, and <tt class="docutils literal">Last Response</tt> says why:</p>
+<pre class="literal-block">
+PING failed: Ping not sent: the configurations are not yet matched. Check that the checksum in the vehicle's beacon is this station's configuration's, and Connect
+</pre>
+<p>A beacon with the flag set, one carrying another checksum, or the beacons
+going overdue ends both, and the next <tt class="docutils literal">Connect</tt> after the beacons say the
+vehicle is matched again makes the station matched for commanding once more.
+So after an outage, or a restart, press <tt class="docutils literal">Connect</tt> before commanding.</p>
+</div>
 <div class="section" id="commands">
-<h3><a class="toc-backref" href="#toc-entry-67">Commands</a></h3>
+<h3><a class="toc-backref" href="#toc-entry-68">Commands</a></h3>
 <p>From the <tt class="docutils literal">Command</tt> menu. Three of the seven items send a command:</p>
 <dl class="docutils">
 <dt>Ping</dt>
@@ -4011,29 +4068,28 @@ where it cannot do that -- one with neither <tt class="docutils literal">/proc/s
 output and exits, so run tcspecial under a supervisor that starts it again
 when it exits.</p>
 <p>The beacons are how the ground learns the restart happened. The moment
-the restart is taken tcspecial sets the <em>commanded-restart</em> flag in its
-beacons, which then say <tt class="docutils literal">restart</tt> where they said <tt class="docutils literal">normal</tt> -- the
-Beacon box's field beside the indicator reads
-<tt class="docutils literal">Restarted—connect</tt>, and the message line ends <tt class="docutils literal">, COMMANDED RESTART</tt>
--- and sends one beacon at once and the rest every
+the restart is taken tcspecial sets the restart flag in its beacons,
+which then say <tt class="docutils literal">restart</tt> where they said <tt class="docutils literal">normal</tt> -- the Beacon box's
+field beside the indicator reads <tt class="docutils literal">Restarted—connect</tt>, and the message
+line ends <tt class="docutils literal">, RESTARTED, NOT YET MATCHED</tt> -- stops sending anything down
+but beacons and answers, and sends one beacon at once and the rest every
 <tt class="docutils literal">beacon.reset_interval</tt>. The tcspecial that comes back counts itself a
 new <em>generation</em>, one more than the last, which it keeps in the file the
 <tt class="docutils literal">tcspecial</tt> section's <tt class="docutils literal">state_file</tt> names; its beacons start again at
-#1 with the flag still set, saying it is the start the restart asked for.
-Every start beacons every <tt class="docutils literal">beacon.reset_interval</tt> until the MOC
-connects. When tcspecial takes a <tt class="docutils literal">Connect</tt> it clears the flag, sends a
-beacon at once, and from then on beacons every
-<tt class="docutils literal">beacon.default_interval</tt>. A
+#1 with the flag still set, as every start's do. Every start beacons
+every <tt class="docutils literal">beacon.reset_interval</tt> until it takes a <tt class="docutils literal">Connect</tt> carrying its
+configuration's checksum. When it does it clears the flag, sends a beacon
+at once, and from then on beacons every <tt class="docutils literal">beacon.default_interval</tt>. A
 <tt class="docutils literal">Connect</tt> taken after the restart is initiated and before the old
 tcspecial has gone neither clears the flag nor slows the beacons: the
 restart is still under way.</p>
 <p>A tcspecial that starts again for any other reason -- it crashed and its
 supervisor started it, or the vehicle lost power -- also counts a new
-generation and starts its beacons again at #1, but they say <tt class="docutils literal">normal</tt>,
-and it runs with the configuration it had. A station waiting on a
-restart that sees the beacons start again without the flag says so: the
-restart it sent did not happen, and the vehicle restarted for a reason of
-its own, which is worth finding out before the restart is sent again.</p>
+generation and starts its beacons again at #1 with the flag set, and runs
+with the configuration it had. The beacons do not say which kind of start
+it was: the checksum they carry says which configuration it is running,
+and the startup summary on tcspecial's error output says whether the
+start was commanded.</p>
 <p>Once a station has sent a restart it sends nothing more to the vehicle
 but <tt class="docutils literal">Connect</tt>, <tt class="docutils literal">Arm restart</tt> and <tt class="docutils literal">Initiate restart</tt> until a beacon
 arrives whose number has gone back: the vehicle that comes back may read
@@ -4049,21 +4105,19 @@ not end it, refused or not, since the first may have been taken.</p>
 <p>Any beacon whose number has gone back, waited for or not, takes the
 command link down: the status beside the address reads <tt class="docutils literal">Disconnected</tt>,
 what the last <tt class="docutils literal">Connect</tt> agreed is forgotten, and the next thing to press
-is <tt class="docutils literal">Connect</tt>. When the beacon also ends the wait, <tt class="docutils literal">Last Response</tt> says
-which start came back -- <tt class="docutils literal">tcspecial has started again as commanded:
-press Connect</tt>, or <tt class="docutils literal">tcspecial started again without being commanded
-to, so the restart initiated here did not happen: press Connect</tt>. A
-<tt class="docutils literal">Connect</tt> answered during the wait by the start that came back clears
-that start's flag, so its beacons can no longer say whether it was the
-start commanded; then <tt class="docutils literal">Last Response</tt> says that this cannot be told,
-and to find out before initiating another restart.</p>
+is <tt class="docutils literal">Connect</tt>, which every start needs before anything else is sent.
+<tt class="docutils literal">Last Response</tt> says <tt class="docutils literal">tcspecial has started again: press Connect</tt>, or,
+where the beacon also ends the wait, <tt class="docutils literal">tcspecial has started again after
+the restart initiated here: press Connect</tt>. It does not say whether the
+start that came back is the one the restart asked for.</p>
 <p>A command carries its sequence number and no generation. Every answer
 says the generation that made it, and the station learns which
 generation is flying from the answer to <tt class="docutils literal">Connect</tt>, since the beacons do
 not say. So an answer from a vehicle that has restarted since, or a
 beacon whose number has gone back, is noticed: from then on the station
 refuses every command but a ping and a Connect, unsent, until a
-<tt class="docutils literal">Connect</tt> is answered.</p>
+<tt class="docutils literal">Connect</tt> is answered. (A ping is refused besides until the station is
+matched: see <a class="reference internal" href="#matching-the-configurations">Matching the configurations</a>.)</p>
 <p>A command older than one the vehicle has already taken -- sent by a
 station whose count has gone back, or overtaken on the way should the
 link ever deliver out of order -- is answered <tt class="docutils literal">Stale</tt> and not acted on:
@@ -4086,9 +4140,10 @@ is done from its own panel, and the panels show what a query would ask for
 without anyone asking.</p>
 </div>
 <div class="section" id="beaconing">
-<h3><a class="toc-backref" href="#toc-entry-68">Beaconing</a></h3>
+<h3><a class="toc-backref" href="#toc-entry-69">Beaconing</a></h3>
 <p>TCSpecial sends a beacon every <tt class="docutils literal">beacon.reset_interval</tt> from when it starts,
-or from when a restart is initiated, until it takes a <tt class="docutils literal">Connect</tt>, and every
+or from when a restart is initiated, until it takes a <tt class="docutils literal">Connect</tt> carrying
+its configuration's checksum, and every
 <tt class="docutils literal">beacon.default_interval</tt> after that (see Initiate restart, above), from the
 address the payload set's <tt class="docutils literal">tcspecial</tt> section names to the address beside it,
 or <tt class="docutils literal">tcspecial.yaml</tt>'s pair for a set with no section. Tcsmoc binds that same
@@ -4212,9 +4267,9 @@ arrived and leaves the status to the commands and to the beacon.</p>
 </div>
 </div>
 <div class="section" id="tcssim">
-<h2><a class="toc-backref" href="#toc-entry-69">tcssim</a></h2>
+<h2><a class="toc-backref" href="#toc-entry-70">tcssim</a></h2>
 <div class="section" id="the-tcssim-window">
-<h3><a class="toc-backref" href="#toc-entry-70">The tcssim window</a></h3>
+<h3><a class="toc-backref" href="#toc-entry-71">The tcssim window</a></h3>
 <p>One panel per simulated payload, in a grid, and a <tt class="docutils literal">Quit All</tt> button at the
 foot of the window. Nothing in the window names a payload or fixes how many
 there are: the two configuration files decide that, so a payload added to or
@@ -4277,7 +4332,7 @@ both are shown the same way.</p>
 </div>
 </div>
 <div class="section" id="crates-used">
-<h1><a class="toc-backref" href="#toc-entry-71">Crates Used</a></h1>
+<h1><a class="toc-backref" href="#toc-entry-72">Crates Used</a></h1>
 <p>These are the crates the workspace's <tt class="docutils literal">Cargo.toml</tt> files name directly --
 every one of the nineteen manifests, the root and each crate under it. The
 crates they depend on in turn are not listed: <tt class="docutils literal">cargo tree</tt> shows the whole
@@ -4452,7 +4507,7 @@ $ cargo metadata --format-version 1
 </pre>
 </div>
 <div class="section" id="license">
-<h1><a class="toc-backref" href="#toc-entry-72">License</a></h1>
+<h1><a class="toc-backref" href="#toc-entry-73">License</a></h1>
 <p>TCSpecial -- the flight software, the libraries, the ground programs and the
 examples -- is licensed under either of the Apache License, Version 2.0
 (<tt class="docutils literal"><span class="pre">LICENSE-APACHE</span></tt>, or <a class="reference external" href="http://www.apache.org/licenses/LICENSE-2.0">http://www.apache.org/licenses/LICENSE-2.0</a>) or the MIT
@@ -4465,7 +4520,7 @@ dual licensed as above, without any additional terms or conditions.</p>
 <a class="reference internal" href="#crates-used">Crates Used</a>.</p>
 </div>
 <div class="section" id="see-also">
-<h1><a class="toc-backref" href="#toc-entry-73">See Also</a></h1>
+<h1><a class="toc-backref" href="#toc-entry-74">See Also</a></h1>
 <dl class="docutils">
 <dt><a class="reference external" href="https://vomlehn.github.io/tcs-xtce/docs/manual.html">tcs-xtce manual</a></dt>
 <dd>tcs-xtce turns an XTCE description of telemetry and command packets

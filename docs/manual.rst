@@ -3493,6 +3493,14 @@ every configuration shipped in the tree. The
 configuration's checksum covers ``interface``, so a vehicle and a ground
 station whose checksums match are reading the same interface as well.
 
+Every digest you will see on the link stands for ``link.xtce``: the
+beacon's last field is its digest, and the checksums in the beacon, in
+CONNECT and its answer, and in RESTART_ARM and RESTART are configuration
+checksums, which cover ``interface``. None covers
+``tcslibgs/xtce/fixed.xtce``, where CONNECT, RESTART_ARM, RESTART and the
+beacon are laid out. It is the same in every build, so there is nothing to
+compare, and a test in ``tcslibgs`` fails if it is ever changed.
+
 Where the links are
 -------------------
 

@@ -6093,6 +6093,18 @@ one of them is stale.</p>
 <dd>The fixed commands are not in that XTCE: they are in a document of their
 own, <tt class="docutils literal">fixed.xtce</tt>, whose digest never changes, so that no change to the
 ordinary interface can touch them.</dd>
+<dt>Requirement</dt>
+<dd>No digest that goes over the link covers <tt class="docutils literal">fixed.xtce</tt>; every one of
+them stands for <tt class="docutils literal">link.xtce</tt>. The beacon's <tt class="docutils literal">interface</tt> field is the
+digest of <tt class="docutils literal">link.xtce</tt>. Its <tt class="docutils literal">digest</tt> field, the checksum CONNECT
+carries and its answer gives back, and the target checksum of
+RESTART_ARM and of RESTART are configuration checksums, and a
+configuration's checksum covers its <tt class="docutils literal">interface</tt>, the same digest of
+<tt class="docutils literal">link.xtce</tt>. <tt class="docutils literal">fixed.xtce</tt> needs no name for the two ends to agree
+on, because it is the same in every build: what holds it so is the
+test <tt class="docutils literal">the_fixed_commands_document_never_changes</tt> in
+<tt class="docutils literal">tcslibgs/src/link.rs</tt>, which pins its digest and fails at any change
+to it.</dd>
 </dl>
 </div>
 <div class="section" id="framing-is-a-gateway-s">
@@ -6482,23 +6494,31 @@ below that drop what is queued at a match are what make up for that.</p>
 <h3><a class="toc-backref" href="#toc-entry-72">Keeping configurations on board</a></h3>
 <dl class="docutils">
 <dt>Requirement</dt>
-<dd>For now a configuration is a single file. One that includes another
-file is refused when it is uplinked and when it is loaded, saying so.
-A configuration spread across several files is to be handled later.</dd>
+<dd>A configuration is kept as a tree: a directory named by its checksum,
+holding its top file, named by the checksum too, and each file the top
+file includes, under the name its include list gives it. The checksum
+takes in those names, so that it says the shape of the tree as well as
+what is in it, and two configurations that each include a <tt class="docutils literal">cabin</tt>
+of their own are kept apart. An include name that is a path, begins
+with a dot or is the checksum is refused when the configuration is
+kept and when it is loaded, saying so.</dd>
 </dl>
-<p>As built, a configuration is kept as <tt class="docutils literal"><span class="pre">&lt;checksum&gt;.ytcs</span></tt> or
-<tt class="docutils literal"><span class="pre">&lt;checksum&gt;.xtcs</span></tt> -- its checksum in 32 lower-case hex digits, and the
-extension that says how it is read, the one it was given -- in the
-directory the <tt class="docutils literal">tcspecial</tt> section's <tt class="docutils literal">configurations</tt> names. A section
-that names none is a vehicle that keeps no configurations: it runs the one
-on its command line, and a RESTART may name only that and the one running.
+<p>As built, a configuration is kept as <tt class="docutils literal"><span class="pre">&lt;checksum&gt;/&lt;checksum&gt;.ytcs</span></tt> or
+<tt class="docutils literal"><span class="pre">&lt;checksum&gt;/&lt;checksum&gt;.xtcs</span></tt> -- its checksum in 32 lower-case hex digits,
+and the extension that says how it is read, the one it was given -- with
+each file it includes beside it, in the directory the <tt class="docutils literal">tcspecial</tt>
+section's <tt class="docutils literal">configurations</tt> names. It is written to a hidden directory
+beside its name and renamed into place, and removed by being renamed out
+of the way first, so that a power failure leaves the whole of it or none.
+A section that names none is a vehicle that keeps no configurations: it
+runs the one on its command line, and a RESTART may name only that and the
+one running.
 The rules are <tt class="docutils literal"><span class="pre">tcslibgs::store</span></tt>'s, which tcspecial loads through and
 <tt class="docutils literal">tcsverify <span class="pre">--keep=&lt;directory&gt;</span></tt> keeps through, so the two cannot disagree
 about what a kept configuration is. <tt class="docutils literal">tcsverify <span class="pre">--keep</span></tt> checks the
 configuration as tcsverify checks any, keeps it only if nothing is wrong
 with it, and is for testing and for first provisioning; uplinking is not
-built. tcspecial refuses a configuration that includes another as it loads
-it, the one on its command line among them.</p>
+built.</p>
 <dl class="docutils">
 <dt>Requirement</dt>
 <dd>The vehicle keeps each configuration it holds under its checksum, in
@@ -12200,9 +12220,9 @@ it has one, checks it as tcsverify checks any and, where nothing is
 wrong with it, keeps it in <tt class="docutils literal">&lt;directory&gt;</tt> under its checksum, as the
 vehicle keeps a configuration a RESTART may name: see <a class="reference internal" href="#keeping-configurations-on-board">Keeping
 configurations on board</a>. It prints where it is kept, or that it was
-kept already, which writes nothing. One that includes another file is
-refused. It is how a configuration is put on board for testing and at
-first provisioning, until configurations are uplinked.</dd>
+kept already, which writes nothing. One of several files is kept with
+each file it includes. It is how a configuration is put on board for
+testing and at first provisioning, until configurations are uplinked.</dd>
 <dt>Requirement</dt>
 <dd><tt class="docutils literal"><span class="pre">--set-interface</span> <span class="pre">&lt;configuration&gt;...</span></tt>, given configurations and
 nothing else, writes this build's interface digest into each as its

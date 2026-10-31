@@ -5936,6 +5936,19 @@ Requirement
     own, ``fixed.xtce``, whose digest never changes, so that no change to the
     ordinary interface can touch them.
 
+Requirement
+    No digest that goes over the link covers ``fixed.xtce``; every one of
+    them stands for ``link.xtce``. The beacon's ``interface`` field is the
+    digest of ``link.xtce``. Its ``digest`` field, the checksum CONNECT
+    carries and its answer gives back, and the target checksum of
+    RESTART_ARM and of RESTART are configuration checksums, and a
+    configuration's checksum covers its ``interface``, the same digest of
+    ``link.xtce``. ``fixed.xtce`` needs no name for the two ends to agree
+    on, because it is the same in every build: what holds it so is the
+    test ``the_fixed_commands_document_never_changes`` in
+    ``tcslibgs/src/link.rs``, which pins its digest and fails at any change
+    to it.
+
 Framing is a gateway's
 ~~~~~~~~~~~~~~~~~~~~~~
 

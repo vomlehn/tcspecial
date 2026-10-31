@@ -6459,11 +6459,8 @@ station's; ARM Restart and Initiate restart pressed, with the link up,
 before a CONNECT has been answered ask first, Go on sending the command
 and Cancel sending nothing. A press with the link down says Connect, as
 before, since that is what to press.</p>
-<p class="last"><em>Not yet built:</em> the read-only directory and the immutable attribute of
-first provisioning, which are the provisioner's to set -- <tt class="docutils literal">tcsverify
-<span class="pre">--keep</span></tt> makes the files it writes 0444 and leaves the directory as it
-is, so that it can keep more; and removing what <a class="reference internal" href="#what-this-replaces">What this replaces</a>
-lists as still standing.</p>
+<p class="last"><em>Not yet built:</em> removing what <a class="reference internal" href="#what-this-replaces">What this replaces</a> lists as still
+standing.</p>
 </div>
 <p>A configuration is known by its <em>checksum</em>: the MD5 <tt class="docutils literal">tcsverify</tt>
 computes of it, the configuration digest (<tt class="docutils literal"><span class="pre">tcslibgs::config_digest</span></tt>).
@@ -6548,7 +6545,12 @@ configuration running or the one a taken RESTART named.</dd>
 ground, is written once and read-only from then on: mode <tt class="docutils literal">0444</tt> in a
 directory of mode <tt class="docutils literal">0555</tt>, and immutable where the file system allows
 it (<tt class="docutils literal">FS_IMMUTABLE_FL</tt>). Nothing in flight can then overwrite it, even
-by mistake.</dd>
+by mistake. It is left so by the procedure that provisions the vehicle,
+outside tcspecial, as every other file is managed from the ground:
+<tt class="docutils literal">tcsverify <span class="pre">--keep</span></tt> writes the files it keeps <tt class="docutils literal">0444</tt>, and leaves the
+directory as it is so that it can keep more, and making the directory
+read-only and setting the immutable attribute once every configuration
+is in it are the procedure's last steps.</dd>
 </dl>
 </div>
 <div class="section" id="starting-and-the-restart-flag">

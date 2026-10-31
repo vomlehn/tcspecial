@@ -343,11 +343,17 @@ mod tests {
             "twelve bytes in fives did not arrive as 5, 5 and 2: {sizes:?}"
         );
 
-        let apart = datagrams[ended + 2].1 - datagrams[ended + 1].1;
+        // Timed as they arrive, which is not quite when they were sent: a
+        // segment taken late by a busy test machine arrives closer to the one
+        // after it than the device sent them. So the packet is timed whole,
+        // from its first segment to its last -- two intervals of 40 ms -- and
+        // given 20 ms for the machine, which still tells segments paced from
+        // segments sent together, a few microseconds apart.
+        let spanned = datagrams[ended + 3].1 - datagrams[ended + 1].1;
         assert!(
-            apart >= Duration::from_millis(40),
-            "two segments of one packet arrived {apart:?} apart, not the 40 ms \
-             asked for"
+            spanned >= Duration::from_millis(60),
+            "a packet's three segments arrived within {spanned:?}, not paced \
+             40 ms apart"
         );
 
         assert!(

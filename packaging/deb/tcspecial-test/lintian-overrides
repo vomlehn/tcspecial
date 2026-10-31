@@ -1,0 +1,15 @@
+# This is an add-on package, not one of the distribution's, so it lives
+# under /opt/tcs, as FHS 3.0 section 3.13 lays out /opt/<package>; every
+# TCS package shares the one tree.
+tcspecial-test: dir-or-file-in-opt
+
+# The YAML parser compiled in is unsafe-libyaml-norway, by way of
+# serde_norway: libyaml translated mechanically from C into Rust, built
+# from source with the rest of the program and updated through Cargo.lock.
+# There is no C library in it that could be linked against the system's
+# libyaml instead.
+tcspecial-test: embedded-library libyaml *
+
+# The package is not uploaded to Debian, so its first changelog entry has
+# no bug asking for it to close.
+tcspecial-test: initial-upload-closes-no-bugs

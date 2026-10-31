@@ -1,6 +1,7 @@
 Name:           tcspecial-ground
 %include %{_sourcedir}/common.inc
-Summary:        tcspecial's ground libraries and configuration editor
+Summary:        Ground libraries and configuration editor for tcspecial
+Group:          Development/Libraries
 Requires:       python3
 Recommends:     python3-pyyaml, python3-tkinter, pkgconf-pkg-config
 
@@ -27,6 +28,9 @@ rm -rf %{buildroot}/usr/lib/python3
 install -d %{buildroot}%{python3_sitelib}
 echo /opt/tcs/lib/python3/site-packages \
 	> %{buildroot}%{python3_sitelib}/tcspecial-ground.pth
+# RPM finds what a shared library provides only in an executable file,
+# where Debian wants one that is not.
+chmod 755 %{buildroot}/opt/tcs/lib/libtcs.so.[0-9]*
 
 %post -p /sbin/ldconfig
 %postun -p /sbin/ldconfig
@@ -49,8 +53,10 @@ fi
 /opt/tcs/lib/pkgconfig/tcs.pc
 /opt/tcs/lib/python3/site-packages
 /opt/tcs/share/tcsgui
-/opt/tcs/share/doc/tcspecial-ground
+%doc /opt/tcs/share/doc/tcspecial-ground
 %config(noreplace) /etc/ld.so.conf.d/tcspecial-ground.conf
 %config(noreplace) /etc/profile.d/tcspecial-ground.sh
 %{python3_sitelib}/tcspecial-ground.pth
 /opt/tcs/sbin/tcspecial-ground-links
+
+%include %{_sourcedir}/changelog.inc

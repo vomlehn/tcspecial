@@ -1,6 +1,7 @@
 Name:           tcspecial-test
 %include %{_sourcedir}/common.inc
-Summary:        tcspecial's test ground station and payload simulator
+Summary:        Test ground station and payload simulator for tcspecial
+Group:          Applications/Engineering
 Requires:       tcspecial = %{version}-%{release}
 
 %description
@@ -27,6 +28,8 @@ fi
 /opt/tcs/bin/tcsmoc
 /opt/tcs/bin/tcssim
 /opt/tcs/bin/segsend
-/opt/tcs/share/doc/tcspecial-test
+%doc /opt/tcs/share/doc/tcspecial-test
 %config(noreplace) /etc/profile.d/tcspecial-test.sh
 /opt/tcs/sbin/tcspecial-test-links
+
+%include %{_sourcedir}/changelog.inc

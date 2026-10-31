@@ -1,3 +1,4 @@
+# shellcheck shell=sh
 # Puts @PREFIX@/bin on the search path, and @PREFIX@/lib/pkgconfig on
 # pkg-config's, for @PACKAGE@: the second is what lets a C or C++ ground
 # station be built with `pkg-config --cflags --libs tcs`.

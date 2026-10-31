@@ -1891,7 +1891,10 @@ until it is answered; Quit stops tcspecial and tcssim and exits.
 
 It also commands the vehicle, on the two links the ``tcspecial`` section
 states. Connect brings the link up and sends a ``CONNECT``, which is how the
-two ends compare what they read; Ping says the link reaches the vehicle,
+two ends compare what they read and how they are *matched*: see `Matching
+the configurations`_. Until they are, tcspecial sends nothing down but its
+beacons and its answers, and tcsmoc sends nothing but ``CONNECT``, ``ARM
+Restart`` and ``Initiate restart``. Ping says the link reaches the vehicle,
 which is a different fact from the beacon's. Each panel's Enable and Disable
 start and stop that panel's node -- any node, so a computation and a log are
 each something to stop as much as a sensor is -- and a Disable is answered
@@ -2117,10 +2120,11 @@ none of it is the program's own:
 A beacon is a line of text, at most 106 bytes and with no newline at the
 end: six fields with a colon between each -- the name ``tcspecial``, the
 version as ``major.minor.patch``, the configuration's MD5 digest as 32
-lower-case hex digits, the beacon's number in decimal, the commanded-restart
-flag, written ``restart`` while a restart the ground commanded is under way
-and the MOC has not connected since and ``normal`` otherwise, and the
-interface's digest, also as 32 hex digits:
+lower-case hex digits, the beacon's number in decimal, the restart flag,
+written ``restart`` from every start of tcspecial -- the first included --
+and from its taking a restart, until it takes a ``CONNECT`` carrying its
+configuration's checksum, and ``normal`` otherwise, and the interface's
+digest, also as 32 hex digits:
 
 .. code-block:: text
 
@@ -3701,25 +3705,29 @@ the beacon box
   .. code-block:: console
 
      2 beacons did not arrive: #9 came after #6
-     the beacons start again at #1, so tcspecial has restarted as commanded
+     the beacons start again at #1, so tcspecial has restarted
 
   A beacon says only that the spacecraft is alive, so without the number a
   beacon that was lost on the way reads exactly like one that was never sent.
   The radio delivers in order, so a number lower than the last one heard
   means tcspecial has started again and is counting from one; the same
   number as the last is the radio delivering a beacon twice, and counts for
-  nothing. A restart nobody commanded is said as ``the beacons start again
-  at #1, so tcspecial has restarted without being commanded to, with the
-  definitions it had``.
+  nothing. Whether the restart was one the ground commanded is not said:
+  every start sets the restart flag, and the checksum in the beacon says
+  which configuration the start is running.
 
   To the right of the indicator is a field that reads ``Restarted—connect``
-  while the last beacon's commanded-restart flag said ``restart``, and is
-  empty while it said ``normal``. The flag is set from the moment tcspecial
-  takes an
-  ``Initiate restart`` until it takes a ``Connect`` from the MOC, so the
-  field is telling the operator what to do next: press ``Connect``, which
-  clears it. While the flag is set the message line also ends
-  ``, COMMANDED RESTART``, which is how the window writes it. The
+  while the last beacon's restart flag said ``restart``, and is empty while
+  it said ``normal``. The flag is set at every start of tcspecial -- the
+  first, an ``Initiate restart``, a crash its supervisor restarted, a power
+  cycle -- and from the moment it takes an ``Initiate restart``, until it
+  takes a ``Connect`` carrying the checksum of the configuration it is
+  running. So the field shows whenever the vehicle has not been matched,
+  and is telling the operator what to do next: press ``Connect``, with the
+  configuration whose checksum the beacons carry, which clears it. A
+  ``Connect`` carrying another checksum leaves it set. While the flag is set
+  the message line also ends ``, RESTARTED, NOT YET MATCHED``, which is how
+  the window writes it. The
   ``beacon`` example's window has the panel without this field, since it
   sends no commands and so cannot connect.
 
@@ -3754,16 +3762,26 @@ the ``Command`` menu
   in a session is whether tcspecial read the same configuration this MOC did:
   see `What each end read`_.
 
-  Under it, when the last command went out and when its answer came back:
+  Under it, when the last command went out and when its answer came back,
+  and how many packets have come from the vehicle:
 
   .. code-block:: text
 
      Last Response: START_DH OK
-     Last sent: 14:22:31   Last rcvd: 14:22:31
+     Last sent: 14:22:31   Last rcvd: 14:22:31   Packets: 12 received = 10 processed + 0 malformed + 2 mismatched
 
   The ground's own clock, and the window's own commands -- what was pressed.
   A response that is slow to come and one that never comes read alike until
   those two times are beside it.
+
+  The packets are everything that has arrived from the vehicle since the
+  window started, data and answers alike, each counted once: *processed*,
+  read and shown; *malformed*, not readable with this configuration's
+  definitions; or *mismatched*, dropped because the two ends may not have
+  been using the same configuration -- data that arrived while the window
+  was not matched, or was waiting when the match began, and answers to
+  anything but the command waited for. The last three add up to the first.
+  See `Matching the configurations`_.
 
 Below that is one panel per data handler, filled across the window before
 another row is started under it, and a ``Quit`` button at the foot of the
@@ -3905,6 +3923,47 @@ is a tcspecial left running from an earlier one, which tcsmoc attaches to
 rather than replacing; stopping it and letting tcsmoc start a fresh one is the
 fix.
 
+Matching the configurations
+^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Neither end acts on what the other made with a different configuration. The
+digest is the configuration's *checksum*, and the two ends are matched once
+the vehicle has taken a ``CONNECT`` carrying the checksum of the
+configuration it runs.
+
+On the vehicle, every start of tcspecial begins unmatched, with the restart
+flag set in its beacons. Until a ``CONNECT`` carrying its configuration's
+checksum, it sends the ground nothing but beacons and command answers --
+what its nodes produce still goes to its logs -- and it acts on no command
+but ``CONNECT``, ``RESTART_ARM`` and ``RESTART``. Every other command, a
+``PING`` among them, is answered ``Unmatched`` and not acted on. A
+``CONNECT`` carrying another checksum is answered with the vehicle's own,
+and changes nothing else. A matching one clears the flag, sends a beacon at
+once, slows the beacons to ``beacon.default_interval``, opens the downlink
+and the other commands, and drops every command already waiting on the node
+command link unread, since all of it was sent before the match. Taking a
+restart ends the match at once, and no ``CONNECT`` matches again until the
+start that comes back.
+
+On the ground, tcsmoc -- and any station built on tcslib or the C/C++
+library -- is *matched for listening* while the last beacon it has heard is
+recent (the indicator says the vehicle is heard from), has the flag clear and
+carries the checksum of the configuration this station read. A clear flag
+says some station's ``CONNECT`` matched the vehicle, so a station that only
+listens is matched as surely as one that commands. It reads the vehicle's
+data only while matched for listening: everything else is dropped and
+counted, and as a match begins whatever was already waiting is dropped and
+counted too. It is *matched for commanding* once, besides, its own
+``Connect`` has been answered with its checksum; until then every command but
+``Connect``, ``ARM Restart`` and ``Initiate restart`` is refused before it
+is sent, and ``Last Response`` says why::
+
+   PING failed: Ping not sent: the configurations are not yet matched. Check that the checksum in the vehicle's beacon is this station's configuration's, and Connect
+
+A beacon with the flag set, one carrying another checksum, or the beacons
+going overdue ends both, and the next ``Connect`` after the beacons say the
+vehicle is matched again makes the station matched for commanding once more.
+So after an outage, or a restart, press ``Connect`` before commanding.
+
 Commands
 ^^^^^^^^
 From the ``Command`` menu. Three of the seven items send a command:
@@ -3940,30 +3999,29 @@ Initiate restart
   when it exits.
 
   The beacons are how the ground learns the restart happened. The moment
-  the restart is taken tcspecial sets the *commanded-restart* flag in its
-  beacons, which then say ``restart`` where they said ``normal`` -- the
-  Beacon box's field beside the indicator reads
-  ``Restarted—connect``, and the message line ends ``, COMMANDED RESTART``
-  -- and sends one beacon at once and the rest every
+  the restart is taken tcspecial sets the restart flag in its beacons,
+  which then say ``restart`` where they said ``normal`` -- the Beacon box's
+  field beside the indicator reads ``Restarted—connect``, and the message
+  line ends ``, RESTARTED, NOT YET MATCHED`` -- stops sending anything down
+  but beacons and answers, and sends one beacon at once and the rest every
   ``beacon.reset_interval``. The tcspecial that comes back counts itself a
   new *generation*, one more than the last, which it keeps in the file the
   ``tcspecial`` section's ``state_file`` names; its beacons start again at
-  #1 with the flag still set, saying it is the start the restart asked for.
-  Every start beacons every ``beacon.reset_interval`` until the MOC
-  connects. When tcspecial takes a ``Connect`` it clears the flag, sends a
-  beacon at once, and from then on beacons every
-  ``beacon.default_interval``. A
+  #1 with the flag still set, as every start's do. Every start beacons
+  every ``beacon.reset_interval`` until it takes a ``Connect`` carrying its
+  configuration's checksum. When it does it clears the flag, sends a beacon
+  at once, and from then on beacons every ``beacon.default_interval``. A
   ``Connect`` taken after the restart is initiated and before the old
   tcspecial has gone neither clears the flag nor slows the beacons: the
   restart is still under way.
 
   A tcspecial that starts again for any other reason -- it crashed and its
   supervisor started it, or the vehicle lost power -- also counts a new
-  generation and starts its beacons again at #1, but they say ``normal``,
-  and it runs with the configuration it had. A station waiting on a
-  restart that sees the beacons start again without the flag says so: the
-  restart it sent did not happen, and the vehicle restarted for a reason of
-  its own, which is worth finding out before the restart is sent again.
+  generation and starts its beacons again at #1 with the flag set, and runs
+  with the configuration it had. The beacons do not say which kind of start
+  it was: the checksum they carry says which configuration it is running,
+  and the startup summary on tcspecial's error output says whether the
+  start was commanded.
 
   Once a station has sent a restart it sends nothing more to the vehicle
   but ``Connect``, ``Arm restart`` and ``Initiate restart`` until a beacon
@@ -3981,14 +4039,11 @@ Initiate restart
   Any beacon whose number has gone back, waited for or not, takes the
   command link down: the status beside the address reads ``Disconnected``,
   what the last ``Connect`` agreed is forgotten, and the next thing to press
-  is ``Connect``. When the beacon also ends the wait, ``Last Response`` says
-  which start came back -- ``tcspecial has started again as commanded:
-  press Connect``, or ``tcspecial started again without being commanded
-  to, so the restart initiated here did not happen: press Connect``. A
-  ``Connect`` answered during the wait by the start that came back clears
-  that start's flag, so its beacons can no longer say whether it was the
-  start commanded; then ``Last Response`` says that this cannot be told,
-  and to find out before initiating another restart.
+  is ``Connect``, which every start needs before anything else is sent.
+  ``Last Response`` says ``tcspecial has started again: press Connect``, or,
+  where the beacon also ends the wait, ``tcspecial has started again after
+  the restart initiated here: press Connect``. It does not say whether the
+  start that came back is the one the restart asked for.
 
   A command carries its sequence number and no generation. Every answer
   says the generation that made it, and the station learns which
@@ -3996,7 +4051,8 @@ Initiate restart
   not say. So an answer from a vehicle that has restarted since, or a
   beacon whose number has gone back, is noticed: from then on the station
   refuses every command but a ping and a Connect, unsent, until a
-  ``Connect`` is answered.
+  ``Connect`` is answered. (A ping is refused besides until the station is
+  matched: see `Matching the configurations`_.)
 
   A command older than one the vehicle has already taken -- sent by a
   station whose count has gone back, or overtaken on the way should the
@@ -4022,7 +4078,8 @@ without anyone asking.
 Beaconing
 ^^^^^^^^^
 TCSpecial sends a beacon every ``beacon.reset_interval`` from when it starts,
-or from when a restart is initiated, until it takes a ``Connect``, and every
+or from when a restart is initiated, until it takes a ``Connect`` carrying
+its configuration's checksum, and every
 ``beacon.default_interval`` after that (see Initiate restart, above), from the
 address the payload set's ``tcspecial`` section names to the address beside it,
 or ``tcspecial.yaml``'s pair for a set with no section. Tcsmoc binds that same

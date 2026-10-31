@@ -194,26 +194,44 @@ stage (Unheard, Heard, Aging or Waiting), whether an indicator showing
 it is lit, whether the spacecraft is being heard from, when the last
 beacon arrived and what it said. It also says whether this pass’s beacon
 started the count again, which is how a restart is known, and whether
-its commanded-restart flag said <code>restart</code>, which it does from
-a restart the ground commanded until the MOC connects. Each pass also
-gives remarks, which are news, and warnings, which are to be said
-whether or not anybody asked.</li>
+its restart flag said <code>restart</code>, which it does from every
+start of the vehicle and from its taking a restart, until it takes a
+connect carrying its configuration’s checksum. Each pass also gives
+remarks, which are news, and warnings, which are to be said whether or
+not anybody asked.</li>
+<li><strong>Matching.</strong> Each pass keeps the configuration’s
+<em>match</em> with the vehicle, which every beacon watch, client and
+moc node made from that configuration shares. The station is matched for
+listening while the last beacon is recent, has the restart flag clear
+and carries the configuration’s checksum, and for commanding once,
+besides, its own connect has been answered with that checksum.
+<code>tcs_configuration_matched</code> says which;
+<code>tcs_configuration_counts</code> says how many packets have come
+from the vehicle, data and answers, and how many of them were processed,
+malformed or dropped for a configuration mismatch, which add up.</li>
 <li><strong>The vehicle’s data.</strong> <code>tcs_moc_open</code> opens
 a <code>moc</code> node, and each <code>tcs_moc_receive</code> returns
-one datum and the name of the node that produced it.</li>
+one datum and the name of the node that produced it. A moc node reads
+data only while the station is matched for listening: what arrives
+before is dropped and counted, as is whatever is waiting when the match
+begins. So a station that reads data passes its beacons too.</li>
 <li><strong>Commands.</strong> <code>tcs_client_open</code> opens the
 two command links the configuration states.
 <code>tcs_client_connect</code> says whether the vehicle is flying this
 configuration; then ping; start, stop or query a node by its id, set one
 of its attributes, or ask for the last datum it moved each way; and arm
-a restart and restart the vehicle. The client learns which generation of
-tcspecial is flying from the answer to connect, so until one is
-answered, and again after a beacon whose number went back or an answer
-from another generation, it refuses every command but ping and connect,
-unsent. <code>tcs_client_beacon_heard</code> tells it of each pass’s
-beacon; after a restart is sent it is what ends the wait for the vehicle
-to come back, during which nothing but connect, arm and restart
-goes.</li>
+a restart and restart the vehicle. Until the station is matched for
+commanding, every command but connect, arm and restart fails, unsent,
+saying the configurations are not yet matched; the vehicle itself
+answers any other command that reaches it before a match
+<code>TCS_STATUS_UNMATCHED</code>, and does not act on it. The client
+learns which generation of tcspecial is flying from the answer to
+connect, so until one is answered, and again after a beacon whose number
+went back or an answer from another generation, it refuses every command
+but ping and connect, unsent. <code>tcs_client_beacon_heard</code> tells
+it of each pass’s beacon; after a restart is sent it is what ends the
+wait for the vehicle to come back, during which nothing but connect, arm
+and restart goes.</li>
 <li><strong>Pinging a ping node.</strong> <code>tcs_pinger_open</code>
 finds the first <code>ping</code> node the ground can reach both ways
 and its <code>moc</code> node. <code>tcs_pinger_ping</code> sends a ping

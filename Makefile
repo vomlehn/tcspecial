@@ -1064,6 +1064,10 @@ LINKDIR ?= /usr/local/bin
 STAGE_TARGET = install-$$package
 STAGE_VARS   = SYSCONFDIR=/etc/opt/tcs LOCALSTATEDIR=/var/opt/tcs
 RPM_DEFINES  = --define "_sourcedir $(CURDIR)/packaging/rpm"
+# The scripts in bin/ that make and remove the stand-in devices are not
+# packaged, but lint-packages checks them with shellcheck as well, so that
+# they are held to what the packaged scripts are.
+LINT_SCRIPTS = $(wildcard bin/*)
 ifneq ($(wildcard $(TCS_HELPERS)/packaging/packaging.mk),)
 include $(TCS_HELPERS)/packaging/packaging.mk
 stage: install-build

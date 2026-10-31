@@ -31,6 +31,15 @@ if [ "$1" = 0 ]; then
 fi
 
 %files
+%dir /opt/tcs
+%dir /opt/tcs/bin
+%dir /opt/tcs/sbin
+%dir /opt/tcs/libexec
+%dir /opt/tcs/share
+%dir /opt/tcs/share/doc
+%dir /opt/tcs/share/examples
+%dir /etc/opt/tcs
+%dir /var/opt/tcs
 /opt/tcs/bin/tcspecial
 /opt/tcs/bin/tcsverify
 /opt/tcs/libexec/app_pl

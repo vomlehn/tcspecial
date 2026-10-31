@@ -148,12 +148,18 @@ impl SerialEndpoint {
 }
 
 /// Sets the line's data rate, byte length, stop bits and parity, and its
-/// RS-485 mode where the configuration gives one.
+/// RS-485 mode where the configuration gives one and the line is not a
+/// stand-in.
 ///
 /// Raw rather than canonical: a device link carries bytes, and the line
 /// discipline's editing, echo and newline translation would corrupt them. The
 /// parity is read back once set, because a port may take the call and keep
 /// less than it was given.
+///
+/// A stand-in -- a pseudo-terminal, which tcssim makes -- has no transceiver
+/// and no RTS to drive, so the RS-485 terms are left unapplied there and the
+/// bytes go both ways as on any line: the bus is simulated by what is at the
+/// far end, and only its electrical turnaround is not.
 ///
 /// A rate the platform cannot express is reported with the rate in hand,
 /// because the alternative is a line running at a rate nobody chose.
@@ -299,9 +305,19 @@ fn apply_line_terms(
     // two-wire bus. After the termios terms, because the mode is a property
     // of the port rather than of the line discipline and the driver wants the
     // line already set up; and refused rather than reported, for the reason
-    // serial::rs485::apply gives.
+    // serial::rs485::apply gives. Not on a stand-in: under the flight
+    // setting none is allowed to start, so a pseudo-terminal here is a run
+    // against tcssim, which carries the bus's bytes and has no turnaround.
     if let Some(terms) = &config.rs485 {
-        crate::node::payload::serial::rs485::apply(fd, what, terms)?;
+        if tcslibgs::node::payload::serial::judged(&config.path).is_stand_in() {
+            log::info!(
+                "{what}: {} is a stand-in, so its RS-485 terms are not \
+                 applied",
+                config.path
+            );
+        } else {
+            crate::node::payload::serial::rs485::apply(fd, what, terms)?;
+        }
     }
 
     Ok(())
@@ -619,13 +635,19 @@ mod tests {
     /// terms are stored and ignored by the kernel -- a pty has no cable to run
     /// at 9600 -- so what this shows is that a handler configured for a line
     /// opens one, sets it, and reads what the far end sends, with no hardware
-    /// in it anywhere.
-    #[test]
-    fn a_pty_slave_is_a_line_this_endpoint_can_open() {
-        use std::io::Write;
+    /// Makes a pseudo-terminal, as tcssim makes one for a serial payload.
+    ///
+    /// # Returns
+    ///
+    /// The master, which is the device's end, and the slave's path, which is
+    /// the handler's.
+    ///
+    /// # Panics
+    ///
+    /// If no pseudo-terminal can be made.
+    fn a_pty() -> (File, String) {
         use std::os::unix::io::FromRawFd;
 
-        // A pty, as tcssim makes one.
         // SAFETY: posix_openpt takes only flags and has no preconditions;
         // its result is checked before it is used.
         let master_fd =
@@ -639,7 +661,7 @@ mod tests {
         // `master_fd` was just opened, is checked above, and nothing else
         // takes ownership of it; the uses below only borrow it while the File
         // is alive.
-        let mut master = unsafe { File::from_raw_fd(master_fd) };
+        let master = unsafe { File::from_raw_fd(master_fd) };
         // SAFETY: grantpt needs an open pty master, which `master_fd` is,
         // owned by the File above for the rest of the test.
         assert_eq!(unsafe { libc::grantpt(master_fd) }, 0);
@@ -663,15 +685,28 @@ mod tests {
         let slave = unsafe { std::ffi::CStr::from_ptr(name.as_ptr()) }
             .to_string_lossy()
             .into_owned();
+        (master, slave)
+    }
 
+    /// A pty's slave is a port as far as this endpoint is concerned: it takes
+    /// the terms and carries the bytes.
+    ///
+    /// Which is the whole of what tcssim stands in for a serial line with. The
+    /// terms are stored and ignored by the kernel -- a pty has no cable to run
+    /// at 9600 -- so what this shows is that a handler configured for a line
+    /// opens one, sets it, and reads what the far end sends, with no hardware
+    /// in it anywhere.
+    #[test]
+    fn a_pty_slave_is_a_line_this_endpoint_can_open() {
+        use std::io::Write;
+
+        let (mut master, slave) = a_pty();
         let config = SerialConfig {
             path: slave.clone(),
             datarate: 9600,
             parity: Parity::None,
             stop_bits: StopBits::One,
             byte_length: 8,
-            // Not an RS-485 bus: a pty takes no turnaround, as it takes no
-            // parity.
             rs485: None,
         };
         let mut endpoint = SerialEndpoint::new("telemetry", &config)
@@ -706,6 +741,54 @@ mod tests {
             "what came up the line was {:?}",
             String::from_utf8_lossy(&got)
         );
+    }
+
+    /// A line that states RS-485 is stood in for by a pty as any line is: the
+    /// terms are left unapplied there, rather than refused, and the bytes go
+    /// both ways.
+    ///
+    /// A pty has no transceiver and no RTS to drive, and refuses the mode
+    /// (see rs485's own test), so a handler that applied it would never open
+    /// against tcssim; the far end, not the kernel, is what simulates the bus.
+    #[test]
+    fn a_pty_stands_in_for_an_rs485_line() {
+        use std::io::{Read, Write};
+        use std::time::{Duration, Instant};
+
+        let (mut master, slave) = a_pty();
+        let config = SerialConfig {
+            path: slave.clone(),
+            datarate: 9600,
+            parity: Parity::None,
+            stop_bits: StopBits::One,
+            byte_length: 8,
+            rs485: Some(tcslibgs::Rs485Params {
+                rts_on_send: true,
+                delay_before_send: Duration::from_millis(2),
+                delay_after_send: Duration::from_millis(2),
+            }),
+        };
+        let mut endpoint =
+            SerialEndpoint::new("bus", &config).unwrap_or_else(|e| {
+                panic!("{slave} would not stand in for a bus: {e}")
+            });
+
+        master.write_all(b"up").expect("the far end writes");
+        let mut buffer = [0u8; 16];
+        let deadline = Instant::now() + Duration::from_secs(5);
+        let mut got = Vec::new();
+        while got.len() < 2 && Instant::now() < deadline {
+            match endpoint.read(&mut buffer) {
+                Ok(n) if n > 0 => got.extend_from_slice(&buffer[..n]),
+                _ => std::thread::sleep(Duration::from_millis(10)),
+            }
+        }
+        assert_eq!(got, b"up", "what came up the bus");
+
+        endpoint.write(b"down").expect("the handler writes");
+        let mut down = [0u8; 4];
+        master.read_exact(&mut down).expect("the far end reads");
+        assert_eq!(&down, b"down", "what went down the bus");
     }
 
     /// A file that is not a serial port is reported as one that cannot be set,

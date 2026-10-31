@@ -9218,10 +9218,13 @@ Requirement
     including the payload this handler is trying to read.
 
 Requirement
-    A simulated line cannot be an RS-485 bus and says so. A pseudo-terminal
-    has no transceiver and no RTS to drive, so it refuses the mode, and a set
-    meant to be run against tcssim states no ``rs485`` -- as it states
-    ``parity: none`` for the same reason.
+    A simulated line can be an RS-485 bus. A pseudo-terminal has no
+    transceiver and no RTS to drive, so it would refuse the mode; on a line
+    judged a stand-in the RS-485 terms are left unapplied, which is said as
+    tcspecial starts, and the simulator at the far end receives and sends
+    the bus's bytes. Only the turnaround and its delays go unexercised.
+    Under ``--simulate=none`` no stand-in starts, so a flight line always
+    has the mode applied and read back.
 
 **A line's terms**
 

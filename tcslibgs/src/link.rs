@@ -5,8 +5,8 @@
 //! answer the opcode and sequence of the command it answers, a status, a
 //! time and what it carries. The layouts are stated once, in XTCE: the three
 //! fixed commands -- CONNECT, RESTART_ARM and RESTART -- in
-//! `tcslibgs/xtce/fixed.xml`, whose layouts never change, and every other
-//! command in `tcslibgs/xtce/link.xml`. Each is packed and unpacked by the
+//! `tcslibgs/xtce/fixed.xtce`, whose layouts never change, and every other
+//! command in `tcslibgs/xtce/link.xtce`. Each is packed and unpacked by the
 //! code tcs-xtce generates from it, `fixed_packet.rs` and `link_packet.rs`,
 //! which allocates nothing. This module is the one place that turns those
 //! packets into the [`Command`] and [`Telemetry`] the rest of the software
@@ -136,7 +136,7 @@ impl std::error::Error for LinkError {}
 
 /// Reads which command a datagram is, or answers, by its opcode. The three
 /// [`CommandType::taken_unmatched`] names are the fixed commands, which
-/// `xtce/fixed.xml` states; every other opcode is read by `xtce/link.xml`'s
+/// `xtce/fixed.xtce` states; every other opcode is read by `xtce/link.xtce`'s
 /// layouts.
 ///
 /// # Arguments
@@ -763,17 +763,17 @@ impl Default for AnswerPacker {
 mod tests {
     use super::*;
 
-    /// The tcs-xtce digest of `xtce/fixed.xml`, which must never change.
+    /// The tcs-xtce digest of `xtce/fixed.xtce`, which must never change.
     ///
     /// The fixed commands are what two ends that agree on nothing else still
     /// agree on, so a change to their document is a change to every ground
     /// station and every vehicle at once, including the ones already flying.
     /// A test that fails here is not a constant to update: the change to
-    /// `fixed.xml` is to be undone, and a new fixed command made instead,
+    /// `fixed.xtce` is to be undone, and a new fixed command made instead,
     /// with an opcode of its own and a document of its own.
     ///
     /// It changed once, deliberately, when the beacon's layout was moved
-    /// into `fixed.xml` beside the three fixed commands, before the first
+    /// into `fixed.xtce` beside the three fixed commands, before the first
     /// release that carries the document: it was `87aa3a5d...`. From that
     /// release on it never changes.
     const FIXED_DIGEST: &str = "47fa3ffdcbdb9038b5434469114b113f";
@@ -927,13 +927,13 @@ mod tests {
     #[test]
     fn the_fixed_commands_document_never_changes() {
         let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
-            .join("xtce/fixed.xml");
+            .join("xtce/fixed.xtce");
         let digest = tcs_xtce::digest::digest_files_bytes(&[path])
-            .expect("fixed.xml digests");
+            .expect("fixed.xtce digests");
         let said: String = digest.iter().map(|b| format!("{b:02x}")).collect();
         assert_eq!(
             said, FIXED_DIGEST,
-            "tcslibgs/xtce/fixed.xml has changed, and it must never change: \
+            "tcslibgs/xtce/fixed.xtce has changed, and it must never change: \
              the layouts of CONNECT, RESTART_ARM, RESTART and the beacon are \
              what every ground station and every vehicle agree on whatever \
              else they run. Undo the change, and make a new fixed command, with an \

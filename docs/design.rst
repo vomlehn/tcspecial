@@ -5532,7 +5532,7 @@ Beacon
 
 The beacon answers no command and has a form of its own: a line of text, six
 fields with a colon between each, and no newline at the end. Its layout is
-stated in XTCE in ``tcslibgs/xtce/fixed.xml``, beside the three fixed
+stated in XTCE in ``tcslibgs/xtce/fixed.xtce``, beside the three fixed
 commands: six string fields of UTF-8, each but the last ended by the
 termination character ``:`` (``0x3A``) and no longer than its field can be,
 and the last 32 characters that end the datagram. It is packed and
@@ -5698,13 +5698,13 @@ one it follows.
    done, and the beacon watches in Rust and Python judge a restart by the
    beacon's number alone. Commands and answers have no header, as `The link
    without a header`_ says: the three fixed commands are stated in
-   ``tcslibgs/xtce/fixed.xml`` and every other in
-   ``tcslibgs/xtce/link.xml``, packed and unpacked by ``tcslibgs::link``
+   ``tcslibgs/xtce/fixed.xtce`` and every other in
+   ``tcslibgs/xtce/link.xtce``, packed and unpacked by ``tcslibgs::link``
    without allocating; nothing on the link is JSON. The vehicle counts the
    datagrams its command links do not take, and logs each. Every
    configuration names its interface, and every program refuses one that
    is not its build's. Not yet built: the fallback interface and its link
-   (``fixed.xml`` takes its place, holding only the three fixed commands),
+   (``fixed.xtce`` takes its place, holding only the three fixed commands),
    load sets, uploads, SWITCH, the golden build, and ``tcsverify
    --interface`` on a set of documents.
 
@@ -5725,10 +5725,10 @@ Requirement
     tcspecial has a layout stated in XTCE and is packed and unpacked by the
     code tcs-xtce generates from that statement. Nothing on a link is JSON,
     and nothing that packs or unpacks a command, an answer or the beacon is
-    written by hand. The beacon's layout is in ``fixed.xml`` beside the
+    written by hand. The beacon's layout is in ``fixed.xtce`` beside the
     three fixed commands, as text fields, because it is to be read by a
     person as it is -- see `Asynchronous Telemetry`_ -- and it is not in
-    the interface: no change to ``link.xml`` can touch it.
+    the interface: no change to ``link.xtce`` can touch it.
 
 Replaced
     Commands and answers are built on a base container that holds the CCSDS
@@ -5758,7 +5758,7 @@ Requirement
     ``tcslib`` and through it the C/C++ library and tcsmoc, and every test's
     stand-in. A ground station in Python sends CONNECT through
     ``tcslibgs.fixed``, which packs it with the code tcs-xtce generates from
-    ``fixed.xml``.
+    ``fixed.xtce``.
 
 No packet carries a check of its own: the transport beneath it checks it,
 which is one of the things `What is assumed`_ assumes.
@@ -5784,7 +5784,7 @@ The link without a header
    CCSDS layout in `Every packet is XTCE`_, above, and settles what was left
    open in `Configurations named by their checksum`_: what of the link
    never changes. What it replaced is under `What the headerless link
-   replaces`_. The fixed commands are ``tcslibgs/xtce/fixed.xml``, and a
+   replaces`_. The fixed commands are ``tcslibgs/xtce/fixed.xtce``, and a
    test in ``tcslibgs::link`` pins its digest, failing, saying it must never
    change, if it does. The vehicle counts and logs every datagram its
    command links do not take (``Commands::malformed``); the ground counts
@@ -5888,7 +5888,7 @@ Requirement
 Requirement
     The beacon's layout is fixed for ever too: its text fields, in their
     order, as `Asynchronous Telemetry`_ gives them. It is stated in
-    ``fixed.xml`` beside the three, so that the one document every end
+    ``fixed.xtce`` beside the three, so that the one document every end
     agrees on holds everything that never changes. The document's digest
     is pinned by a test, and changed once, deliberately, when the beacon
     was moved into it, before the first release to carry it; from that
@@ -5920,8 +5920,8 @@ which every Rust program and the C/C++ library read the section through, and
 again in Python, in ``tcslibgs.interface.of_configuration``, which
 ``tcslibgs.configuration.load`` calls. The value a configuration is to give
 is what ``tcsverify --interface-digest`` prints: the digest of the
-``link.xml`` that build was made from, which is also the last field of every
-beacon it sends. A change to ``link.xml`` is a new interface, after which
+``link.xtce`` that build was made from, which is also the last field of every
+beacon it sends. A change to ``link.xtce`` is a new interface, after which
 ``make interface-digest`` in ``tcslibgs/`` is run and every configuration
 given the new digest; a build refuses the old ones until it is. ``tcsverify
 --set-interface <configuration>...`` gives a configuration its build's
@@ -5933,7 +5933,7 @@ one of them is stale.
 
 Requirement
     The fixed commands are not in that XTCE: they are in a document of their
-    own, ``fixed.xml``, whose digest never changes, so that no change to the
+    own, ``fixed.xtce``, whose digest never changes, so that no change to the
     ordinary interface can touch them.
 
 Framing is a gateway's
@@ -5978,7 +5978,7 @@ stands:
 - In `Configurations named by their checksum`_, under `Still to be
   decided`_: the frozen layout of the three commands, settled here.
 - In `The Interface, the Fallback and Switching Over`_: the fallback
-  interface becomes ``fixed.xml``, holding only the three fixed commands.
+  interface becomes ``fixed.xtce``, holding only the three fixed commands.
 - CONNECT no longer carries the ground station's build version: the
   vehicle acts on the checksum alone. The answer still carries the
   vehicle's build version, for the station to show.
@@ -5995,7 +5995,7 @@ Requirement
     The *interface digest* of an interface is the tcs-xtce digest of its set
     of XTCE documents, which state the commands and answers and not the
     beacon -- for the full interface today, the documents in
-    ``tcslibgs/xtce/``, which is ``link.xml`` alone, as ``make
+    ``tcslibgs/xtce/``, which is ``link.xtce`` alone, as ``make
     interface-digest`` there takes them. It is the MD5 of what the
     documents mean, which leaves out comments, whitespace, attribute order
     and the order of the members of a set, and which tcs-xtce computes

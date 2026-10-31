@@ -22,7 +22,7 @@ pub mod display;
 pub mod endpoint_config;
 pub mod error;
 /// The fixed commands' and answers' packing code, which tcs-xtce generated
-/// from `xtce/fixed.xml`: used through [`link`].
+/// from `xtce/fixed.xtce`: used through [`link`].
 mod fixed_packet;
 pub mod format;
 /// What the vehicle answers to: the ground by radio, cFS, or F´.
@@ -32,12 +32,12 @@ pub mod graph;
 /// that says which of them a program speaks.
 pub mod interface;
 /// The digest of this build's interface, which `make interface-digest`
-/// generated from `xtce/link.xml`: used through [`interface`].
+/// generated from `xtce/link.xtce`: used through [`interface`].
 mod interface_digest;
 /// Commands and answers, as they go on the link.
 pub mod link;
 /// The ordinary commands' and answers' packing code, which tcs-xtce
-/// generated from `xtce/link.xml`: used through [`link`].
+/// generated from `xtce/link.xtce`: used through [`link`].
 mod link_packet;
 pub mod node;
 pub mod parameters;

@@ -2,7 +2,7 @@
 <!-- Every ordinary command the MOC sends tcspecial and every answer
      tcspecial sends back, as they go on the link: the whole of each
      datagram. CONNECT, RESTART_ARM and RESTART are not here: they are the
-     fixed commands, whose layouts never change, and are in xtce/fixed.xml.
+     fixed commands, whose layouts never change, and are in xtce/fixed.xtce.
 
      A command is
 
@@ -285,7 +285,7 @@
         </CommandContainer>
       </MetaCommand>
       <!-- Opcodes 0x00 to 0x0F belong to the fixed commands, in
-           fixed.xml, and no command here takes another of them. PING keeps
+           fixed.xtce, and no command here takes another of them. PING keeps
            0x01, which it had before there were fixed commands, and is an
            ordinary command all the same. -->
       <!-- Opcode 32, and answer kind 160, are not used: they were CONFIG,

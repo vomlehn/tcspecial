@@ -56,7 +56,7 @@ fn sim_for(config: &Path) -> PathBuf {
 }
 
 /// Every shipped configuration names this build's interface: a change to
-/// `tcslibgs/xtce/link.xml` that left one behind fails here, saying the one
+/// `tcslibgs/xtce/link.xtce` that left one behind fails here, saying the one
 /// command that brings them all up to date.
 #[test]
 fn every_shipped_configuration_names_this_builds_interface() {

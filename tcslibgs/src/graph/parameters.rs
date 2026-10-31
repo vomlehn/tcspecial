@@ -529,7 +529,7 @@ pub fn interface_of(said: &str) -> Result<crate::InterfaceDigest, String> {
     if named != ours {
         return Err(format!(
             "interface is {named}, and this build speaks interface {ours}, \
-             the digest of the tcslibgs/xtce/link.xml it was built from: \
+             the digest of the tcslibgs/xtce/link.xtce it was built from: \
              fly this configuration with a build of interface {named}, or, \
              once its commands have been checked against this build's, write \
              interface: \"{ours}\""
@@ -753,7 +753,7 @@ mod tests {
                 .expect("this build's")
                 .interface,
             ours,
-            "the examples' interface is this build's: when link.xml changes, \
+            "the examples' interface is this build's: when link.xtce changes, \
              every configuration is given the new digest"
         );
 

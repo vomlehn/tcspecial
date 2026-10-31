@@ -50,7 +50,7 @@
           ]
         },
         "interface": {
-          "description": "The interface the configuration was written for: the digest of the tcslibgs/xtce/link.xml its commands are laid out by, as 32 lower-case hex digits, which `tcsverify --interface-digest` prints. Required, and refused unless it is the build's own.",
+          "description": "The interface the configuration was written for: the digest of the tcslibgs/xtce/link.xtce its commands are laid out by, as 32 lower-case hex digits, which `tcsverify --interface-digest` prints. Required, and refused unless it is the build's own.",
           "type": "string",
           "pattern": "^[0-9a-f]{32}$"
         },

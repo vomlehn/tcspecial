@@ -1767,7 +1767,7 @@ pub struct CIConfigJson {
     /// for commands where nobody sends them.
     pub gateway: crate::gateway::GatewayKind,
     /// The interface the configuration was written for: the digest of the
-    /// `xtce/link.xml` its commands are laid out by, which must be this
+    /// `xtce/link.xtce` its commands are laid out by, which must be this
     /// build's. Required, with no default: see
     /// [`crate::graph::parameters::interface_of`], which reads it.
     pub interface: crate::InterfaceDigest,
@@ -2167,8 +2167,8 @@ impl CommandStatus {
     /// Gives the status's number on the link.
     ///
     /// The one table of them, read by the link's packing, by the C/C++
-    /// library and by whatever shows a status: `xtce/fixed.xml` and
-    /// `xtce/link.xml` give the same numbers, and a test in [`crate::link`]
+    /// library and by whatever shows a status: `xtce/fixed.xtce` and
+    /// `xtce/link.xtce` give the same numbers, and a test in [`crate::link`]
     /// holds the three to each other.
     ///
     /// # Returns

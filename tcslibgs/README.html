@@ -201,31 +201,31 @@ file with.</p>
 <li><code>link</code>: the commands and their answers, with no header:
 an opcode, a sequence and what each carries. The three fixed commands –
 CONNECT, RESTART_ARM and RESTART – are described in XTCE in
-<code>xtce/fixed.xml</code>, which never changes, and every other
-command in <code>xtce/link.xml</code>. The code that packs and unpacks
+<code>xtce/fixed.xtce</code>, which never changes, and every other
+command in <code>xtce/link.xtce</code>. The code that packs and unpacks
 them, <code>src/fixed_packet.rs</code> and
 <code>src/link_packet.rs</code>, is generated from those files, and the
 Python <code>../python/tcslibgs/fixed_packet.py</code> from
-<code>fixed.xml</code>: run <code>make link-packet</code> here after
-changing <code>link.xml</code>, and <code>make interface-digest</code>.
-A test pins <code>fixed.xml</code>’s digest, and fails, saying it must
+<code>fixed.xtce</code>: run <code>make link-packet</code> here after
+changing <code>link.xtce</code>, and <code>make interface-digest</code>.
+A test pins <code>fixed.xtce</code>’s digest, and fails, saying it must
 never change, if it does.</li>
 <li><code>beacon</code>: the beacon, a line of text with six fields
 between colons,
 <code>tcspecial:1.2.3:&lt;md5&gt;:42:normal:&lt;interface&gt;</code>, at
 most 106 bytes, so that a person can read it in a capture or a log with
-no decoder. Its layout is in <code>xtce/fixed.xml</code> beside the
+no decoder. Its layout is in <code>xtce/fixed.xtce</code> beside the
 fixed commands, as text fields, packed and unpacked by the generated
 code; what each field says is checked here and in
 <code>../python/tcslibgs/beacon.py</code>, held to each other by the
 same examples in their tests.</li>
-<li><code>interface</code>: the digest of <code>xtce/link.xml</code>,
+<li><code>interface</code>: the digest of <code>xtce/link.xtce</code>,
 which every beacon carries, and which every configuration names as its
 <code>tcspecial</code> section’s <code>interface</code>, so that a
 configuration written for another interface is refused by every program.
 <code>tcsverify --interface-digest</code> prints it.
 <code>make interface-digest</code> here regenerates
-<code>src/interface_digest.rs</code> after <code>link.xml</code>
+<code>src/interface_digest.rs</code> after <code>link.xtce</code>
 changes; every configuration is then given the new digest.</li>
 <li><code>crc</code>: the CCSDS CRC-16, for what is kept on storage
 rather than carried by a transport that checks it, such as tcspecial’s

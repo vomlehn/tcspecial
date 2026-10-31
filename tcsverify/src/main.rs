@@ -86,7 +86,7 @@ configuration.
   --interface-digest print the digest of the interface this build speaks,
                      the 32 lower-case hex digits a configuration's
                      tcspecial section gives as its interface, and exit.
-                     It is the digest of the tcslibgs/xtce/link.xml the
+                     It is the digest of the tcslibgs/xtce/link.xtce the
                      build was made from, which every beacon carries, and
                      a configuration naming another is refused by this
                      build's tcsverify, tcspecial and ground programs
@@ -95,7 +95,7 @@ configuration.
                      its tcspecial section's interface, in place, every
                      other byte of the file left as it was, and say for
                      each what was changed; a file that names it already
-                     is not written. For when tcslibgs/xtce/link.xml has
+                     is not written. For when tcslibgs/xtce/link.xtce has
                      changed and every configuration is to follow it
   -h, --help         print this message and exit
 

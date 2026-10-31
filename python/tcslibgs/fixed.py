@@ -2,7 +2,7 @@
 
 CONNECT, RESTART_ARM and RESTART are taken at any time, whatever either end
 is running, and their layouts never change: they are stated in
-``tcslibgs/xtce/fixed.xml``, apart from every other command, and packed and
+``tcslibgs/xtce/fixed.xtce``, apart from every other command, and packed and
 unpacked here by the code tcs-xtce generates from it,
 :mod:`tcslibgs.fixed_packet`. The Python spelling of the fixed half of
 ``tcslibgs/src/link.rs``: a datagram is taken as an answer only if its length

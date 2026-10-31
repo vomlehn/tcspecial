@@ -5664,7 +5664,7 @@ another interval flies a configuration that says so.</p>
 <p>Beacon</p>
 <p>The beacon answers no command and has a form of its own: a line of text, six
 fields with a colon between each, and no newline at the end. Its layout is
-stated in XTCE in <tt class="docutils literal">tcslibgs/xtce/fixed.xml</tt>, beside the three fixed
+stated in XTCE in <tt class="docutils literal">tcslibgs/xtce/fixed.xtce</tt>, beside the three fixed
 commands: six string fields of UTF-8, each but the last ended by the
 termination character <tt class="docutils literal">:</tt> (<tt class="docutils literal">0x3A</tt>) and no longer than its field can be,
 and the last 32 characters that end the datagram. It is packed and
@@ -5837,13 +5837,13 @@ commands from a RESTART until a beacon whose number went back says it is
 done, and the beacon watches in Rust and Python judge a restart by the
 beacon's number alone. Commands and answers have no header, as <a class="reference internal" href="#the-link-without-a-header">The link
 without a header</a> says: the three fixed commands are stated in
-<tt class="docutils literal">tcslibgs/xtce/fixed.xml</tt> and every other in
-<tt class="docutils literal">tcslibgs/xtce/link.xml</tt>, packed and unpacked by <tt class="docutils literal"><span class="pre">tcslibgs::link</span></tt>
+<tt class="docutils literal">tcslibgs/xtce/fixed.xtce</tt> and every other in
+<tt class="docutils literal">tcslibgs/xtce/link.xtce</tt>, packed and unpacked by <tt class="docutils literal"><span class="pre">tcslibgs::link</span></tt>
 without allocating; nothing on the link is JSON. The vehicle counts the
 datagrams its command links do not take, and logs each. Every
 configuration names its interface, and every program refuses one that
 is not its build's. Not yet built: the fallback interface and its link
-(<tt class="docutils literal">fixed.xml</tt> takes its place, holding only the three fixed commands),
+(<tt class="docutils literal">fixed.xtce</tt> takes its place, holding only the three fixed commands),
 load sets, uploads, SWITCH, the golden build, and <tt class="docutils literal">tcsverify
 <span class="pre">--interface</span></tt> on a set of documents.</p>
 </div>
@@ -5865,10 +5865,10 @@ replaced.</p>
 tcspecial has a layout stated in XTCE and is packed and unpacked by the
 code tcs-xtce generates from that statement. Nothing on a link is JSON,
 and nothing that packs or unpacks a command, an answer or the beacon is
-written by hand. The beacon's layout is in <tt class="docutils literal">fixed.xml</tt> beside the
+written by hand. The beacon's layout is in <tt class="docutils literal">fixed.xtce</tt> beside the
 three fixed commands, as text fields, because it is to be read by a
 person as it is -- see <a class="reference internal" href="#asynchronous-telemetry">Asynchronous Telemetry</a> -- and it is not in
-the interface: no change to <tt class="docutils literal">link.xml</tt> can touch it.</dd>
+the interface: no change to <tt class="docutils literal">link.xtce</tt> can touch it.</dd>
 <dt>Replaced</dt>
 <dd>Commands and answers are built on a base container that holds the CCSDS
 primary header, so that a ground system that reads CCSDS Space Packets
@@ -5895,7 +5895,7 @@ into a packet and back, and every program goes through it: tcspecial,
 <tt class="docutils literal">tcslib</tt> and through it the C/C++ library and tcsmoc, and every test's
 stand-in. A ground station in Python sends CONNECT through
 <tt class="docutils literal">tcslibgs.fixed</tt>, which packs it with the code tcs-xtce generates from
-<tt class="docutils literal">fixed.xml</tt>.</dd>
+<tt class="docutils literal">fixed.xtce</tt>.</dd>
 </dl>
 <p>No packet carries a check of its own: the transport beneath it checks it,
 which is one of the things <a class="reference internal" href="#what-is-assumed">What is assumed</a> assumes.</p>
@@ -5921,7 +5921,7 @@ gateway is not built: see <a class="reference internal" href="#framing-is-a-gate
 CCSDS layout in <a class="reference internal" href="#every-packet-is-xtce">Every packet is XTCE</a>, above, and settles what was left
 open in <a class="reference internal" href="#configurations-named-by-their-checksum">Configurations named by their checksum</a>: what of the link
 never changes. What it replaced is under <a class="reference internal" href="#what-the-headerless-link-replaces">What the headerless link
-replaces</a>. The fixed commands are <tt class="docutils literal">tcslibgs/xtce/fixed.xml</tt>, and a
+replaces</a>. The fixed commands are <tt class="docutils literal">tcslibgs/xtce/fixed.xtce</tt>, and a
 test in <tt class="docutils literal"><span class="pre">tcslibgs::link</span></tt> pins its digest, failing, saying it must never
 change, if it does. The vehicle counts and logs every datagram its
 command links do not take (<tt class="docutils literal"><span class="pre">Commands::malformed</span></tt>); the ground counts
@@ -6047,7 +6047,7 @@ and says so with the number.</dd>
 <dt>Requirement</dt>
 <dd>The beacon's layout is fixed for ever too: its text fields, in their
 order, as <a class="reference internal" href="#asynchronous-telemetry">Asynchronous Telemetry</a> gives them. It is stated in
-<tt class="docutils literal">fixed.xml</tt> beside the three, so that the one document every end
+<tt class="docutils literal">fixed.xtce</tt> beside the three, so that the one document every end
 agrees on holds everything that never changes. The document's digest
 is pinned by a test, and changed once, deliberately, when the beacon
 was moved into it, before the first release to carry it; from that
@@ -6078,8 +6078,8 @@ which every Rust program and the C/C++ library read the section through, and
 again in Python, in <tt class="docutils literal">tcslibgs.interface.of_configuration</tt>, which
 <tt class="docutils literal">tcslibgs.configuration.load</tt> calls. The value a configuration is to give
 is what <tt class="docutils literal">tcsverify <span class="pre">--interface-digest</span></tt> prints: the digest of the
-<tt class="docutils literal">link.xml</tt> that build was made from, which is also the last field of every
-beacon it sends. A change to <tt class="docutils literal">link.xml</tt> is a new interface, after which
+<tt class="docutils literal">link.xtce</tt> that build was made from, which is also the last field of every
+beacon it sends. A change to <tt class="docutils literal">link.xtce</tt> is a new interface, after which
 <tt class="docutils literal">make <span class="pre">interface-digest</span></tt> in <tt class="docutils literal">tcslibgs/</tt> is run and every configuration
 given the new digest; a build refuses the old ones until it is. <tt class="docutils literal">tcsverify
 <span class="pre">--set-interface</span> <span class="pre">&lt;configuration&gt;...</span></tt> gives a configuration its build's
@@ -6091,7 +6091,7 @@ one of them is stale.</p>
 <dl class="docutils">
 <dt>Requirement</dt>
 <dd>The fixed commands are not in that XTCE: they are in a document of their
-own, <tt class="docutils literal">fixed.xml</tt>, whose digest never changes, so that no change to the
+own, <tt class="docutils literal">fixed.xtce</tt>, whose digest never changes, so that no change to the
 ordinary interface can touch them.</dd>
 </dl>
 </div>
@@ -6135,7 +6135,7 @@ and wherever an answer carried a generation: there is none.</li>
 <li>In <a class="reference internal" href="#configurations-named-by-their-checksum">Configurations named by their checksum</a>, under <a class="reference internal" href="#still-to-be-decided">Still to be
 decided</a>: the frozen layout of the three commands, settled here.</li>
 <li>In <a class="reference internal" href="#the-interface-the-fallback-and-switching-over">The Interface, the Fallback and Switching Over</a>: the fallback
-interface becomes <tt class="docutils literal">fixed.xml</tt>, holding only the three fixed commands.</li>
+interface becomes <tt class="docutils literal">fixed.xtce</tt>, holding only the three fixed commands.</li>
 <li>CONNECT no longer carries the ground station's build version: the
 vehicle acts on the checksum alone. The answer still carries the
 vehicle's build version, for the station to show.</li>
@@ -6153,7 +6153,7 @@ a new full interface on the vehicle and switch to it.</p>
 <dd>The <em>interface digest</em> of an interface is the tcs-xtce digest of its set
 of XTCE documents, which state the commands and answers and not the
 beacon -- for the full interface today, the documents in
-<tt class="docutils literal">tcslibgs/xtce/</tt>, which is <tt class="docutils literal">link.xml</tt> alone, as <tt class="docutils literal">make
+<tt class="docutils literal">tcslibgs/xtce/</tt>, which is <tt class="docutils literal">link.xtce</tt> alone, as <tt class="docutils literal">make
 <span class="pre">interface-digest</span></tt> there takes them. It is the MD5 of what the
 documents mean, which leaves out comments, whitespace, attribute order
 and the order of the members of a set, and which tcs-xtce computes

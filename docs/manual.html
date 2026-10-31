@@ -820,7 +820,7 @@ no extension or an unfamiliar one was assumed to be, which made a misspelled
 extension not an error but a file parsed as the wrong language. Nothing was
 written in it that was not also written in YAML.</p>
 <p>(The command link carries packets stated in XTCE: the three fixed commands
-in <tt class="docutils literal">tcslibgs/xtce/fixed.xml</tt> and the rest in <tt class="docutils literal">tcslibgs/xtce/link.xml</tt>.
+in <tt class="docutils literal">tcslibgs/xtce/fixed.xtce</tt> and the rest in <tt class="docutils literal">tcslibgs/xtce/link.xtce</tt>.
 Those are not configuration files and are unaffected; a configuration names
 the second, as its <tt class="docutils literal">interface</tt>: see <a class="reference internal" href="#which-interface-it-is-written-for">Which interface it is written for</a>.)</p>
 </div>
@@ -2468,7 +2468,7 @@ tcspecial:0.1.0:36999e46a4bf436854442d8f97a2248d:42:normal:0123...cdef
 </pre>
 <p>It is text so that it can be read as it is, in a packet capture, a log or
 with any UDP listener, with nothing to decode it. Its layout is stated in
-XTCE, in <tt class="docutils literal">tcslibgs/xtce/fixed.xml</tt> beside the three commands that always
+XTCE, in <tt class="docutils literal">tcslibgs/xtce/fixed.xtce</tt> beside the three commands that always
 go, as six text fields -- each but the last ended by its colon -- and
 nothing else, so a ground system that reads XTCE can read it too. That is what goes on the
 wire; what the window shows on its <tt class="docutils literal">Last msg:</tt> line is written for the
@@ -3597,7 +3597,7 @@ for, and every configuration states it:</p>
 <span class="name tag">tcspecial</span><span class="punctuation">:</span><span class="whitespace">
   </span><span class="name tag">interface</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal string">&quot;ad9aac4dd5a6d88dd5e78824ba8a83ac&quot;</span>
 </pre>
-<p>It is the digest of the <tt class="docutils literal">tcslibgs/xtce/link.xml</tt> a build was made from --
+<p>It is the digest of the <tt class="docutils literal">tcslibgs/xtce/link.xtce</tt> a build was made from --
 the layouts of every command but CONNECT, RESTART_ARM and RESTART -- as 32
 lower-case hex digits. A build speaks only the interface it was made from, so
 tcsverify, tcspecial, tcsmoc and the libraries all refuse a configuration
@@ -3621,7 +3621,7 @@ vehicle.xml: interface is ad9aac4dd5a6d88dd5e78824ba8a83ac already
 <p>It changes that one value -- or adds the attribute where the section has
 none -- and leaves every other byte of the file as it was, comments and
 layout included; a file that is right already is not written. After a
-change to <tt class="docutils literal">tcslibgs/xtce/link.xml</tt>, <tt class="docutils literal">make <span class="pre">set-interfaces</span></tt> does it to
+change to <tt class="docutils literal">tcslibgs/xtce/link.xtce</tt>, <tt class="docutils literal">make <span class="pre">set-interfaces</span></tt> does it to
 every configuration shipped in the tree. The
 configuration's checksum covers <tt class="docutils literal">interface</tt>, so a vehicle and a ground
 station whose checksums match are reading the same interface as well.</p>

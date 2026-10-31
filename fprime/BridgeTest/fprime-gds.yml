@@ -1,0 +1,7 @@
+# What F´'s ground system is told when it is run here, as bridge-test runs
+# it and as the tests in test/ read it: BridgeTest frames what it sends as
+# CCSDS space packets in space data link frames, as F´'s Ref deployment
+# does, its communications being Ref's.
+
+command-line-options:
+  framing-selection: space-packet-space-data-link

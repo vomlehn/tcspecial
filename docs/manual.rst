@@ -52,9 +52,9 @@ project brings to them, what has to change to fit, and in what order, is in
 
 .. note::
    Integration with cFS and F´ is a work in progress. A vehicle can answer to
-   either -- see `The fprime example`_ and `The cfs example`_ -- and the rest
-   of what ``third-party.rst`` describes is not built yet; nothing else in
-   this manual depends on it.
+   either -- see `The fprime example`_, `The F´ bridge`_ and `The cfs
+   example`_ -- and the rest of what ``third-party.rst`` describes is not
+   built yet; nothing else in this manual depends on it.
 
 What that buys
 --------------
@@ -2385,6 +2385,78 @@ ports nothing holds: a reading reaches the bridge, and a command from the
 bridge reaches the heater. Every port the example uses is in the nine
 thousands, which no other example uses.
 
+The F´ bridge
+^^^^^^^^^^^^^
+
+The bridge itself is in ``fprime/``: ``TcsBridge``, an F´ component built on
+tcslib-c, and ``BridgeTest``, an F´ deployment it is tested in. F´'s own tools
+build them, not cargo, from an F´ checkout (v4.4.1 or later) and a Python
+environment holding F´'s tools, ``fprime-util`` among them:
+
+.. code-block:: console
+
+   $ make fprime-build FPRIME_FRAMEWORK=$HOME/fprime FPRIME_VENV=$HOME/fprime-venv
+   $ make fprime-test FPRIME_FRAMEWORK=$HOME/fprime FPRIME_VENV=$HOME/fprime-venv
+
+Left out, the two are looked for in ``../fprime-scratch``, beside this tree, as
+``fprime`` and ``venv``; ``FPRIME_SCRATCH`` names another such directory.
+``make help`` in ``fprime/`` says the rest.
+
+Which channels the bridge has is the configuration's, and is never written by
+hand. ``fprime-build`` writes the bridge's model from ``FPRIME_CONFIG``, the
+fprime example unless told otherwise, with
+
+.. code-block:: console
+
+   $ tcsverify --fprime-model=fprime/Tcs/TcsBridge/model examples/fprime/fprime.ytcs
+
+which checks the configuration first and writes nothing from one with errors.
+Each node drawn into the ``gateway_fprime`` node is a channel named after it,
+at ``fprime_id_base`` plus its device id -- ``thermometer``, ``0x3002`` --
+holding a datum's length and its first 64 bytes. A node drawn into it must be
+named as F´ names things, with letters, digits and underscores, and every
+program that checks a configuration refuses one that is not, as it refuses
+two ``gateway_fprime`` nodes whose F´ IDs overlap. The bridge's own channels
+follow every device id: ``BeaconStage``, ``RestartFlag``,
+``ListeningMatched``, ``CommandingMatched``, ``PacketsReceived``,
+``PacketsProcessed``, ``PacketsMalformed``, ``PacketsMismatched`` and
+``DataCutShort``.
+
+The bridge is built for that configuration and runs on no other: given
+another, it says so in a ``ModelDiffers`` event and does nothing. It sends
+CONNECT itself, once for each beacon heard while it is unmatched, and says
+``Matched`` when the vehicle answers with the configuration's checksum, or
+``ConfigurationDiffers`` when it does not. Its commands are ``PING``, and
+``START_NODE``, ``STOP_NODE`` and ``QUERY_NODE``, each given a node's name;
+each is answered as tcspecial answers it, with an event saying what tcspecial
+said. What the vehicle's beacon says is the ``BeaconSaid`` event, each time
+it changes.
+
+In a deployment of your own, give the instance the base ID the model states,
+and the configuration it was built for as it is set up:
+
+.. code-block:: text
+
+   instance tcsBridge: Tcs.TcsBridge base id Tcs.TcsBridge.ID_BASE \
+     queue size 10 stack size 2 * 1024 * 1024 priority 30
+
+and ``tcsBridge.configure("<configuration>")`` before the tasks start, with
+its ``schedIn`` on a rate group: each tick takes what has arrived and writes
+the channels. ``fprime/BridgeTest`` is a deployment that does all of that.
+
+``fprime-test`` starts tcssim on the fprime example with every payload sending
+(``tcssim --sending``), waits for it, starts tcspecial and F´'s ground system,
+and runs the tests in ``fprime/BridgeTest/test``, which start ``BridgeTest``
+and hold it to connecting and matching, hearing beacons, a simulated reading
+arriving as the thermometer's channel, a ``PING`` answered, a node stopped and
+started again, an unknown node refused unsent, and stopping cleanly. tcssim's
+window is open while it runs. What a run leaves -- each program's log, and
+F´'s ground system's -- is in ``fprime/build-test``. F´'s ground system
+listens on TCP port 50000.
+
+The bridge does not yet send data up to the gateway node, so the example's
+heater is not driven from F´; nor does it offer the restart commands.
+
 The cfs example
 ---------------
 .. figure:: ../examples/cfs/cfs.svg
@@ -3921,6 +3993,10 @@ exits with a failure saying what it last heard: nothing, which is a tcssim
 not running or an address that is wrong, or a simulator still starting, or one
 that failed or is set up for another run. A ground station of its own waits
 through ``tcslib::simulator::wait``, or ``tcslib.simulator.wait`` in Python.
+
+Each payload starts silent, until its panel's button is pressed. ``tcssim
+--sending`` starts every one sending instead, for a test with nobody at the
+window: the F´ bridge's is one (see `The F´ bridge`_).
 
 Building tcspecial for a vehicle
 --------------------------------

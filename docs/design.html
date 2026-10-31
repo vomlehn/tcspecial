@@ -453,7 +453,7 @@ ul.auto-toc {
 <li><a class="reference internal" href="#two-interfaces" id="toc-entry-64">Two interfaces</a></li>
 <li><a class="reference internal" href="#reading-writing-and-checking-an-interface" id="toc-entry-65">Reading, writing and checking an interface</a></li>
 <li><a class="reference internal" href="#the-load-set" id="toc-entry-66">The load set</a></li>
-<li><a class="reference internal" href="#uploading-and-keeping-what-was-uploaded" id="toc-entry-67">Uploading, and keeping what was uploaded</a></li>
+<li><a class="reference internal" href="#keeping-load-sets-on-the-vehicle" id="toc-entry-67">Keeping load sets on the vehicle</a></li>
 <li><a class="reference internal" href="#restarting-onto-a-load-set" id="toc-entry-68">Restarting onto a load set</a></li>
 </ul>
 </li>
@@ -5815,7 +5815,7 @@ is running.</dd>
 <h1><a class="toc-backref" href="#toc-entry-56">The Interface, the Fallback and Switching Over</a></h1>
 <p>This section is the whole of what was asked for when the link was moved from
 JSON to XTCE: what every packet is, the two interfaces the vehicle speaks,
-how a new interface and everything it needs is uploaded and protected, how
+how a new interface and everything it needs is laid out on the vehicle,
 and how the vehicle restarts onto it. What the beacon says across a restart,
 what the ground may send meanwhile, and everything else about surviving a
 fault are in <a class="reference internal" href="#fault-resiliency">Fault Resiliency</a>, which follows. Each requirement is stated
@@ -5844,7 +5844,7 @@ datagrams its command links do not take, and logs each. Every
 configuration names its interface, and every program refuses one that
 is not its build's. Not yet built: the fallback interface and its link
 (<tt class="docutils literal">fixed.xtce</tt> takes its place, holding only the three fixed commands),
-load sets, uploads, SWITCH, the golden build, and <tt class="docutils literal">tcsverify
+load sets, SWITCH, the golden build, and <tt class="docutils literal">tcsverify
 <span class="pre">--interface</span></tt> on a set of documents.</p>
 </div>
 <div class="section" id="every-packet-is-xtce">
@@ -6158,8 +6158,9 @@ vehicle's build version, for the station to show.</li>
 <h2><a class="toc-backref" href="#toc-entry-64">Two interfaces</a></h2>
 <p>The vehicle speaks two interfaces, each a set of XTCE documents with a
 digest of its own: the <em>full</em> interface, which is everything the ground can
-ask of the vehicle, and the <em>fallback</em> interface, which is just enough to put
-a new full interface on the vehicle and switch to it.</p>
+ask of the vehicle, and the <em>fallback</em> interface, which is just enough to
+reach the vehicle and switch it to a new full interface, whatever state the
+full interface is in.</p>
 <dl class="docutils">
 <dt>Requirement</dt>
 <dd>The <em>interface digest</em> of an interface is the tcs-xtce digest of its set
@@ -6174,10 +6175,10 @@ Two programs speak the same interface when, and only when, their digests
 are the same.</dd>
 <dt>Requirement</dt>
 <dd>The fallback interface is its own XTCE document,
-<tt class="docutils literal">tcslibgs/xtce/fallback.xtcs</tt>: its own <tt class="docutils literal">SpaceSystem</tt>, sharing no type,
+<tt class="docutils literal">tcslibgs/xtce/fallback.xtce</tt>: its own <tt class="docutils literal">SpaceSystem</tt>, sharing no type,
 parameter or container with the full interface, so that no change to the
 full interface can change it. It is compiled into every build, and no
-upload replaces it.</dd>
+load set replaces it.</dd>
 <dt>Requirement</dt>
 <dd>The fallback interface is taken on a link of its own -- <tt class="docutils literal">fallback.recv</tt>
 and <tt class="docutils literal">fallback.send</tt> in the <tt class="docutils literal">tcspecial</tt> section, required -- and is
@@ -6186,11 +6187,10 @@ cannot be decoded, or that the ground and the vehicle disagree about, then
 still leaves a way in.</dd>
 <dt>Requirement</dt>
 <dd>The fallback interface is PING; CONNECT, whose answer carries the build,
-the configuration digest and the interface digest;
-the upload commands below; and SWITCH_ARM and SWITCH. It has nothing that
-starts, stops or sets a node, changes the beacon interval or changes what
-any payload does: what it can do to the vehicle is put files in the
-staging area and switch to them.</dd>
+the configuration digest and the interface digest; and SWITCH_ARM and
+SWITCH. It has nothing that starts, stops or sets a node, changes the
+beacon interval or changes what any payload does: what it can do to the
+vehicle is switch it to a load set already there.</dd>
 <dt>Requirement</dt>
 <dd>The full interface is read and write: every command the vehicle takes,
 the fallback's among them.</dd>
@@ -6213,8 +6213,8 @@ all go through it:</p>
 <li><em>read</em>: the documents of an interface and the manifest they hold, and
 their interface digest;</li>
 <li><em>write</em>: a load set into a directory -- the documents, the build and
-every file the manifest names -- and the upload commands that carry it
-to the vehicle, a piece at a time;</li>
+every file the manifest names -- for whatever carries it to the
+vehicle;</li>
 <li><em>check</em>: that a directory holds exactly the load set its manifest
 describes, every file of the size and digest it states, and that the
 configuration in it passes <tt class="docutils literal">tcsverify</tt>'s <tt class="docutils literal">verify</tt> against the
@@ -6264,38 +6264,31 @@ start from a load set whose documents have another: a load set holding
 one build and another build's documents is a load set the ground would
 misread.</dd>
 <dt>Requirement</dt>
-<dd>The vehicle keeps each load set in a directory of its own, named by its
+<dd>Each load set on the vehicle is in a directory of its own, named by its
 interface digest in hex, under the directory the <tt class="docutils literal">loads</tt> attribute of
-the <tt class="docutils literal">tcspecial</tt> section names. Uploads go to a staging directory beside
-them, and the running load set is never written to.</dd>
+the <tt class="docutils literal">tcspecial</tt> section names. tcspecial reads load sets there and
+never writes to one.</dd>
 </dl>
 </div>
-<div class="section" id="uploading-and-keeping-what-was-uploaded">
-<h2><a class="toc-backref" href="#toc-entry-67">Uploading, and keeping what was uploaded</a></h2>
+<div class="section" id="keeping-load-sets-on-the-vehicle">
+<h2><a class="toc-backref" href="#toc-entry-67">Keeping load sets on the vehicle</a></h2>
 <dl class="docutils">
 <dt>Requirement</dt>
-<dd>A file is uploaded with FILE_OPEN, naming the load set, the path and the
-size and MD5 the whole file will have; FILE_WRITE, carrying an offset and
-up to one packet of bytes; and FILE_CLOSE, which is answered <tt class="docutils literal">Success</tt>
-only when the bytes written are the size and the MD5 FILE_OPEN stated.
-Each is safe to send again: a FILE_WRITE repeated writes the same bytes
-to the same place, a FILE_OPEN of a file already complete and correct
-answers <tt class="docutils literal">Success</tt> and changes nothing, and so does a FILE_CLOSE of one
-already accepted.</dd>
+<dd>Which load sets the vehicle holds is managed from the ground. Getting a
+load set's files onto the vehicle, checking them as they arrive,
+protecting them and removing them are done outside tcspecial: tcspecial
+transfers no files, and has no command that writes, unlocks or removes
+a load set. What tcspecial does with one is check it and switch to it,
+as <a class="reference internal" href="#restarting-onto-a-load-set">Restarting onto a load set</a> says.</dd>
 <dt>Requirement</dt>
-<dd>LOAD_CHECK checks a staged load set as <tt class="docutils literal">tcsverify</tt> does and, when it
-passes, moves it from staging to its own directory under <tt class="docutils literal">loads</tt>, in one
-rename. A LOAD_CHECK of a load set already in its own directory, and
-passing its check there, answers <tt class="docutils literal">Success</tt>: it is a repeat of one whose
-answer was lost.</dd>
-<dt>Requirement</dt>
-<dd>Every file uploaded is made read-only as FILE_CLOSE accepts it -- mode
-<tt class="docutils literal">0444</tt>, or <tt class="docutils literal">0555</tt> for an <tt class="docutils literal">executable</tt> or <tt class="docutils literal">app_program</tt> -- and a load
-set's directory is made read-only (<tt class="docutils literal">0555</tt>) as LOAD_CHECK accepts it, so
-that nothing in it can be removed, renamed or written. Where the file
-system allows it, each is also made immutable (<tt class="docutils literal">FS_IMMUTABLE_FL</tt>, what
-<tt class="docutils literal">chattr +i</tt> sets), which a process running as root cannot get round
-by accident; where it does not, the log says so once, at start.</dd>
+<dd>Whatever puts a load set on the vehicle makes each of its files
+read-only -- mode <tt class="docutils literal">0444</tt>, or <tt class="docutils literal">0555</tt> for an <tt class="docutils literal">executable</tt> or
+<tt class="docutils literal">app_program</tt> -- and its directory read-only (<tt class="docutils literal">0555</tt>), so that
+nothing in it can be removed, renamed or written, and where the file
+system allows it makes each immutable as well (<tt class="docutils literal">FS_IMMUTABLE_FL</tt>, what
+<tt class="docutils literal">chattr +i</tt> sets), which a process running as root cannot get round by
+accident. It never removes the running load set or the one the vehicle
+would fall back to.</dd>
 </dl>
 <p>Whether a file can be deleted is decided by the directory it is in, not by
 the file: a file of mode <tt class="docutils literal">0444</tt> in a directory that can be written is
@@ -6303,15 +6296,6 @@ removed by <tt class="docutils literal">rm <span class="pre">-f</span></tt> with
 read-only as well as the files, and why the immutable attribute is used
 where there is one: an operator logged in as root has every permission,
 and the immutable attribute is the one thing that asks first.</p>
-<dl class="docutils">
-<dt>Requirement</dt>
-<dd>LOAD_UNLOCK makes a load set's directory and files writable again, so
-that it can be replaced or removed, and LOAD_REMOVE removes one. Both
-refuse the running load set and the one the vehicle would fall back to,
-answering <tt class="docutils literal">InvalidParameter</tt> and saying which it is. A LOAD_UNLOCK of
-one already writable, and a LOAD_REMOVE of one that is not there,
-answer <tt class="docutils literal">Success</tt>: what was asked for is so.</dd>
-</dl>
 </div>
 <div class="section" id="restarting-onto-a-load-set">
 <h2><a class="toc-backref" href="#toc-entry-68">Restarting onto a load set</a></h2>
@@ -6323,9 +6307,11 @@ the switch except what is on disk, so nothing the old interface left in
 memory can be read with the new one.</dd>
 <dt>Requirement</dt>
 <dd>SWITCH_ARM and SWITCH are armed as RESTART_ARM and RESTART are, and
-SWITCH carries the interface digest of the load set to switch to. A
-SWITCH is refused, <tt class="docutils literal">NotFound</tt>, unless that load set has passed
-LOAD_CHECK, and is checked again -- every size and every MD5 -- just
+each carries the interface digest of the load set to switch to. Each
+is refused, <tt class="docutils literal">NotFound</tt>, unless that load set is in its directory under
+<tt class="docutils literal">loads</tt> and passes the check <a class="reference internal" href="#reading-writing-and-checking-an-interface">Reading, writing and checking an
+interface</a> describes -- every size and every MD5, and its configuration
+verified against its interface -- and the SWITCH checks it again just
 before the restart, because storage can change between the two.</dd>
 </dl>
 <p>Which build starts, what is done with a load set that will not start, and
@@ -6349,9 +6335,9 @@ use or more flexible is not taken where it would be less sure.</p>
 <dt>Requirement</dt>
 <dd><strong>The golden configuration always works.</strong> The build and configuration
 the vehicle is installed with -- the golden build, see <a class="reference internal" href="#kinds-of-restart">Kinds of
-restart</a> -- always start, and always work well enough to receive a new
-operating configuration and switch to it. Everything below rests on
-this: it is the one way in that no upload, switch or fault can take
+restart</a> -- always start, and always work well enough to be switched
+to a new operating configuration. Everything below rests on this: it
+is the one way in that no new load set, switch or fault can take
 away, so it is proved before launch rather than trusted in flight, and
 nothing in flight replaces it.</dd>
 <dt>Requirement</dt>
@@ -7098,12 +7084,10 @@ did. START_NODE and
 STOP_NODE answer <tt class="docutils literal">Success</tt> for a node already in the state asked for, and
 every attribute SET_NODE may set is a value, not a step. RESTART_ARM with the
 key of the arm already standing leaves that arm as it was -- see
-<a class="reference internal" href="#restarting">Restarting</a> -- and the upload commands answer a repeat <tt class="docutils literal">Success</tt> once
-what was asked for is done: see <a class="reference internal" href="#uploading-and-keeping-what-was-uploaded">Uploading, and keeping what was uploaded</a>.
-A repeated RESTART is refused <tt class="docutils literal">NotArmed</tt>, because the first used the arm up
-or because the start that took it has gone and the one that came back holds
-no arm; it changes nothing, and it is not how the ground learns what
-happened.</p>
+<a class="reference internal" href="#restarting">Restarting</a>. A repeated RESTART is refused <tt class="docutils literal">NotArmed</tt>, because the
+first used the arm up or because the start that took it has gone and the
+one that came back holds no arm; it changes nothing, and it is not how the
+ground learns what happened.</p>
 </div>
 <div class="section" id="the-state-file">
 <h2><a class="toc-backref" href="#toc-entry-86">The state file</a></h2>
@@ -7346,7 +7330,7 @@ arrival already says.</dd>
 <h2><a class="toc-backref" href="#toc-entry-90">Holes in this, and what closes them</a></h2>
 <p>What was looked for: any way the ground and the vehicle could come to
 disagree about which definitions are in use, any way a vehicle could be left
-with no way in, and any way an upload could be lost or damaged. Each is
+with no way in, and any way a load set could be lost or damaged. Each is
 paired with the requirement above that closes it.</p>
 <dl class="docutils">
 <dt>UDP may carry no checksum</dt>
@@ -7358,8 +7342,9 @@ over IPv6, where the checksum is mandatory and Linux drops a datagram
 without one, the link is closed against that too.</dd>
 <dt>A read-only file can still be deleted</dt>
 <dd>Deleting is permitted by the directory, not the file, and root is
-permitted everything. The load set's directory is made read-only too, and
-the immutable attribute is set where the file system has one.</dd>
+permitted everything. What puts a load set on the vehicle makes its
+directory read-only too, and sets the immutable attribute where the file
+system has one: see <a class="reference internal" href="#keeping-load-sets-on-the-vehicle">Keeping load sets on the vehicle</a>.</dd>
 <dt>A new build that cannot start</dt>
 <dd>An executable that crashes at start cannot roll itself back. The golden
 build always starts first, counts each load set's starts, and stops
@@ -7410,15 +7395,16 @@ checksum, slows the beacons or clears the restart flag; no other command
 does either.</dd>
 <dt>A load set that is incomplete, or not what the ground meant</dt>
 <dd>The manifest names every file with its size and MD5, the SWITCH names the
-interface digest, and the vehicle checks the set at LOAD_CHECK and again
-at the SWITCH. A build refuses documents of another digest.</dd>
+interface digest, and the vehicle checks the set at SWITCH_ARM and
+again at the SWITCH. A build refuses documents of another digest.</dd>
 <dt>A configuration the new build would refuse</dt>
-<dd>LOAD_CHECK runs <tt class="docutils literal">verify</tt> on the load set's configuration with the load
-set's interface, so a configuration refused when it is loaded is refused
-before the vehicle switches to it, not after.</dd>
+<dd>The check at SWITCH_ARM and SWITCH runs <tt class="docutils literal">verify</tt> on the load set's
+configuration with the load set's interface, so a configuration
+refused when it is loaded is refused before the vehicle switches to it,
+not after.</dd>
 <dt>The full interface breaking the way in</dt>
 <dd>The fallback interface has its own document and its own link, and no
-upload replaces it.</dd>
+load set replaces it.</dd>
 <dt>A restart whose first beacons are all lost</dt>
 <dd>A restart is judged from the beacons by their number going back alone,
 so one is missed where every beacon of the new start up to the old
@@ -7448,7 +7434,8 @@ was confirmed or not, and <tt class="docutils literal">load_trials</tt> of them 
 <a class="reference internal" href="#kinds-of-restart">Kinds of restart</a>.</dd>
 <dt>Still open</dt>
 <dd>The command link carries no authentication. Anyone who can reach it can
-arm and restart the vehicle, upload a load set and switch to it; an arm
+arm and restart the vehicle, or switch it to any load set it holds; an
+arm
 key on an open link is a guard against mistakes, not against anybody.
 CCSDS SDLS, or authentication at the radio, is the remedy, and it is not
 designed here.</dd>

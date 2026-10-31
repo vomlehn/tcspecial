@@ -30,8 +30,11 @@ static const char *const STEM = "examples/ping/ping";
 /* The key a restart is armed with, which the restart must carry. */
 static const uint64_t ARM_KEY = 0x1234;
 
-/* Say whether the station is matched with the vehicle, for listening and
- * for commanding. */
+/** Says whether the station is matched with the vehicle, for listening and
+ * for commanding.
+ *
+ * @param configuration  The configuration the station uses.
+ * @return               0, or -1 where it cannot be asked. */
 static int say_matched(const tcs_configuration *configuration)
 {
 	int listening = 0, commanding = 0;

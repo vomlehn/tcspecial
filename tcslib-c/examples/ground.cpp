@@ -32,8 +32,11 @@ const std::string STEM = "examples/ping/ping";
 // The key a restart is armed with, which the restart must carry.
 const std::uint64_t ARM_KEY = 0x1234;
 
-// Says whether the station is matched with the vehicle, for listening and
-// for commanding; false where it cannot be asked.
+/** Says whether the station is matched with the vehicle, for listening and
+ * for commanding.
+ *
+ * @param configuration  The configuration the station uses.
+ * @return               true, or false where it cannot be asked. */
 bool say_matched(const tcs_configuration *configuration)
 {
 	int listening = 0, commanding = 0;

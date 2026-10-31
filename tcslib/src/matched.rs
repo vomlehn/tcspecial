@@ -120,7 +120,15 @@ impl Matched {
         Matched::of(None)
     }
 
-    /// The shared state for a station whose checksum is `ours`.
+    /// Makes the shared state for a station whose checksum is `ours`.
+    ///
+    /// # Arguments
+    ///
+    /// * `ours` - The checksum, or `None` for a station that has none.
+    ///
+    /// # Returns
+    ///
+    /// The shared state, matched for nothing yet.
     fn of(ours: Option<ConfigDigest>) -> Matched {
         Matched(Arc::new(Inner {
             ours,
@@ -305,7 +313,12 @@ impl Matched {
         }
     }
 
-    /// What the station has received from the vehicle so far.
+    /// Says what the station has received from the vehicle so far.
+    ///
+    /// # Returns
+    ///
+    /// The counts, each read on its own: a packet counted while this reads
+    /// may be in one and not yet in the sum of another read later.
     pub fn counts(&self) -> Counts {
         Counts {
             processed: self.0.processed.load(Ordering::Relaxed),

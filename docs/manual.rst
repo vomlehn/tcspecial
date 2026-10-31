@@ -2218,8 +2218,8 @@ The ground station is a Python 3 program, ``ping_gateway.py``, that uses nothing
 outside the standard library to read the XML spelling of its configuration --
 its window is tkinter -- and PyYAML to read the YAML one. A beacon is text and
 needs nothing to read; the interface digest it is compared with is worked
-out with tcs-xtce's Python runtime, which is in this tree, in
-``vendor/tcs-xtce``, and found from there. It shows the beacon
+out with tcs-xtce's Python runtime, which is taken from the tcs-xtce
+checkout beside this tree, ``../tcs-xtce``. It shows the beacon
 panel, the last ping sent and when, the last answer received and when, and
 three times:
 
@@ -2799,25 +2799,50 @@ shipped.
 ``make install``
 ----------------
 
-``make install`` builds what is installed, with cargo's release profile, and
-installs all three packages under ``PREFIX``, ``/opt/tcs`` unless it is
-given another. ``DESTDIR`` is put in front of every path, for staging, and
-is not part of any path a program looks in. ``HOOKS=1`` installs the files
-outside the prefix as well, which a developer's install leaves alone unless
-asked. ``make install-build`` and ``make install-files`` are its two halves,
-so that nothing is built as root, and ``make install-tcspecial``,
-``install-tcspecial-ground`` and ``install-tcspecial-test`` install one
-package. ``make uninstall``, with the same variables, takes away what was
-installed, leaving the configuration and the state, which are the mission's.
+Building, installing and packaging from a checkout need two more checkouts
+beside this one: `tcs-helpers <https://github.com/vomlehn/tcs-helpers>`__,
+the packaging scripts and make rules the TCS projects share, and
+`tcs-xtce <https://github.com/vomlehn/tcs-xtce>`__, whose Python package
+generates the link's codecs and holds the runtime the Python ground
+packages use. ``make tcs-helpers`` and ``make tcs-xtce`` check that they
+are there and at the versions this tree needs, and the targets that use
+them do so first:
 
 .. code-block:: console
 
+   $ cd ..
+   $ git clone https://github.com/vomlehn/tcs-helpers.git
+   $ git clone https://github.com/vomlehn/tcs-xtce.git
+   $ make -C tcs-xtce python/tcs_xtce/generated.py
+
+``make install`` builds the packages, as whoever ran it, and installs those
+of the kind this system takes with its usual installer, under sudo: apt-get
+on Debian and Ubuntu, dnf on Fedora and Red Hat's, zypper on SUSE's, read
+from ``/etc/os-release``. ``SIMULATE=1`` has the installer show what it
+would do and change nothing. ``make uninstall`` removes the packages the
+same way, leaving the configuration and the state, which are the mission's.
+
+``make install-files`` copies the files into place instead, under
+``PREFIX``, ``/opt/tcs`` unless it is given another, from a build ``make
+install-build`` made, so that nothing is built as root. ``DESTDIR`` is put
+in front of every path, for staging, and is not part of any path a program
+looks in. ``HOOKS=1`` installs the files outside the prefix as well, which
+a developer's copy leaves alone unless asked. ``make install-tcspecial``,
+``install-tcspecial-ground`` and ``install-tcspecial-test`` copy one
+package. ``make uninstall-files``, with the same variables, takes away what
+was copied.
+
+.. code-block:: console
+
+   $ make install SIMULATE=1
+   $ make install
    $ make install-build
    $ sudo make install-files HOOKS=1
    $ sudo ldconfig
-   $ make install PREFIX=$HOME/tcs
+   $ make install-files PREFIX=$HOME/tcs
 
-Everything ``make install`` installs, and so everything in the packages, is
+Everything ``make install-files`` installs, and so everything in the
+packages, is
 stripped: the programs and ``libtcs.so.1`` with ``strip --strip-unneeded``,
 which leaves what they need to be run and linked with, and ``libtcs.a``
 with ``strip --strip-debug``, which keeps the symbols a program linked with
@@ -2862,8 +2887,8 @@ linked the rest. A directory that is not there is not made. To undo it:
 
 which takes away only links to the package's own programs. Removing a
 package does this itself, in ``/usr/local/bin`` and ``/opt/bin``, so no
-link is left pointing at nothing. After a ``make install``, ``make links``
-and ``make unlinks`` run every package's script, with ``LINKDIR`` for
+link is left pointing at nothing. After a ``make install-files``, ``make
+links`` and ``make unlinks`` run every package's script, with ``LINKDIR`` for
 another directory.
 
 The Python alone
@@ -4560,7 +4585,7 @@ that satisfies both.
      - =0.4.0
      - `0.4.0 <https://docs.rs/tcs-xtce/0.4.0>`__
      - tcslibgs
-     - The runtime the generated link packet code calls to pack and unpack the commands and answers, and the interface digest. Its generator and Python runtime are in ``vendor/tcs-xtce``, at the same version.
+     - The runtime the generated link packet code calls to pack and unpack the commands and answers, and the interface digest. Its generator and Python runtime are taken from a checkout of it beside this tree, ``../tcs-xtce``, at the same version.
      - `repository <https://github.com/vomlehn/tcs-xtce>`__
    * - `tcslog <https://crates.io/crates/tcslog>`__
      - 0.3.1

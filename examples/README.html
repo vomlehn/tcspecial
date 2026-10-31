@@ -429,11 +429,10 @@ after <code>tcslib::beacon</code>,
 <code>python/tcsui/beacon_panel.py</code> after <code>tcsui</code>, and
 <code>python/tcslibgs</code> for the ping format, the beacon and the
 configuration. The interface digest beacons are checked against is
-worked out with tcs-xtce’s Python runtime, from
-<code>vendor/tcs-xtce</code> in this tree. <code>ping_ground.py</code>
-here is the ping’s own part, with no window. The Rust crate beside them
-is the tests that hold the Python to the Rust; <code>cargo test</code>
-runs them.</p>
+worked out with tcs-xtce’s Python runtime, from the tcs-xtce checkout
+beside this tree. <code>ping_ground.py</code> here is the ping’s own
+part, with no window. The Rust crate beside them is the tests that hold
+the Python to the Rust; <code>cargo test</code> runs them.</p>
 <pre><code>make run-ping                                   # the vehicle and the window
 python3 examples/ping/ping_gateway.py --pings 3 # no window: three pings
 python3 examples/ping/ping_gateway.py --yaml    # ping.yaml, not ping.xml</code></pre>

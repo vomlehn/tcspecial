@@ -2520,8 +2520,8 @@ its device id. Each time is seconds since the UNIX epoch to the nanosecond:
 outside the standard library to read the XML spelling of its configuration --
 its window is tkinter -- and PyYAML to read the YAML one. A beacon is text and
 needs nothing to read; the interface digest it is compared with is worked
-out with tcs-xtce's Python runtime, which is in this tree, in
-<tt class="docutils literal"><span class="pre">vendor/tcs-xtce</span></tt>, and found from there. It shows the beacon
+out with tcs-xtce's Python runtime, which is taken from the tcs-xtce
+checkout beside this tree, <tt class="docutils literal"><span class="pre">../tcs-xtce</span></tt>. It shows the beacon
 panel, the last ping sent and when, the last answer received and when, and
 three times:</p>
 <ul class="simple">
@@ -3041,23 +3041,45 @@ shipped.</p>
 </div>
 <div class="section" id="make-install">
 <h2><a class="toc-backref" href="#toc-entry-43"><tt class="docutils literal">make install</tt></a></h2>
-<p><tt class="docutils literal">make install</tt> builds what is installed, with cargo's release profile, and
-installs all three packages under <tt class="docutils literal">PREFIX</tt>, <tt class="docutils literal">/opt/tcs</tt> unless it is
-given another. <tt class="docutils literal">DESTDIR</tt> is put in front of every path, for staging, and
-is not part of any path a program looks in. <tt class="docutils literal">HOOKS=1</tt> installs the files
-outside the prefix as well, which a developer's install leaves alone unless
-asked. <tt class="docutils literal">make <span class="pre">install-build</span></tt> and <tt class="docutils literal">make <span class="pre">install-files</span></tt> are its two halves,
-so that nothing is built as root, and <tt class="docutils literal">make <span class="pre">install-tcspecial</span></tt>,
-<tt class="docutils literal"><span class="pre">install-tcspecial-ground</span></tt> and <tt class="docutils literal"><span class="pre">install-tcspecial-test</span></tt> install one
-package. <tt class="docutils literal">make uninstall</tt>, with the same variables, takes away what was
-installed, leaving the configuration and the state, which are the mission's.</p>
+<p>Building, installing and packaging from a checkout need two more checkouts
+beside this one: <a class="reference external" href="https://github.com/vomlehn/tcs-helpers">tcs-helpers</a>,
+the packaging scripts and make rules the TCS projects share, and
+<a class="reference external" href="https://github.com/vomlehn/tcs-xtce">tcs-xtce</a>, whose Python package
+generates the link's codecs and holds the runtime the Python ground
+packages use. <tt class="docutils literal">make <span class="pre">tcs-helpers</span></tt> and <tt class="docutils literal">make <span class="pre">tcs-xtce</span></tt> check that they
+are there and at the versions this tree needs, and the targets that use
+them do so first:</p>
 <pre class="code console literal-block">
-<span class="generic prompt">$ </span>make<span class="whitespace"> </span>install-build<span class="whitespace">
+<span class="generic prompt">$ </span><span class="name builtin">cd</span><span class="whitespace"> </span>..<span class="whitespace">
+</span><span class="generic prompt">$ </span>git<span class="whitespace"> </span>clone<span class="whitespace"> </span>https://github.com/vomlehn/tcs-helpers.git<span class="whitespace">
+</span><span class="generic prompt">$ </span>git<span class="whitespace"> </span>clone<span class="whitespace"> </span>https://github.com/vomlehn/tcs-xtce.git<span class="whitespace">
+</span><span class="generic prompt">$ </span>make<span class="whitespace"> </span>-C<span class="whitespace"> </span>tcs-xtce<span class="whitespace"> </span>python/tcs_xtce/generated.py
+</pre>
+<p><tt class="docutils literal">make install</tt> builds the packages, as whoever ran it, and installs those
+of the kind this system takes with its usual installer, under sudo: apt-get
+on Debian and Ubuntu, dnf on Fedora and Red Hat's, zypper on SUSE's, read
+from <tt class="docutils literal"><span class="pre">/etc/os-release</span></tt>. <tt class="docutils literal">SIMULATE=1</tt> has the installer show what it
+would do and change nothing. <tt class="docutils literal">make uninstall</tt> removes the packages the
+same way, leaving the configuration and the state, which are the mission's.</p>
+<p><tt class="docutils literal">make <span class="pre">install-files</span></tt> copies the files into place instead, under
+<tt class="docutils literal">PREFIX</tt>, <tt class="docutils literal">/opt/tcs</tt> unless it is given another, from a build <tt class="docutils literal">make
+<span class="pre">install-build</span></tt> made, so that nothing is built as root. <tt class="docutils literal">DESTDIR</tt> is put
+in front of every path, for staging, and is not part of any path a program
+looks in. <tt class="docutils literal">HOOKS=1</tt> installs the files outside the prefix as well, which
+a developer's copy leaves alone unless asked. <tt class="docutils literal">make <span class="pre">install-tcspecial</span></tt>,
+<tt class="docutils literal"><span class="pre">install-tcspecial-ground</span></tt> and <tt class="docutils literal"><span class="pre">install-tcspecial-test</span></tt> copy one
+package. <tt class="docutils literal">make <span class="pre">uninstall-files</span></tt>, with the same variables, takes away what
+was copied.</p>
+<pre class="code console literal-block">
+<span class="generic prompt">$ </span>make<span class="whitespace"> </span>install<span class="whitespace"> </span><span class="name variable">SIMULATE</span><span class="operator">=</span><span class="literal number">1</span><span class="whitespace">
+</span><span class="generic prompt">$ </span>make<span class="whitespace"> </span>install<span class="whitespace">
+</span><span class="generic prompt">$ </span>make<span class="whitespace"> </span>install-build<span class="whitespace">
 </span><span class="generic prompt">$ </span>sudo<span class="whitespace"> </span>make<span class="whitespace"> </span>install-files<span class="whitespace"> </span><span class="name variable">HOOKS</span><span class="operator">=</span><span class="literal number">1</span><span class="whitespace">
 </span><span class="generic prompt">$ </span>sudo<span class="whitespace"> </span>ldconfig<span class="whitespace">
-</span><span class="generic prompt">$ </span>make<span class="whitespace"> </span>install<span class="whitespace"> </span><span class="name variable">PREFIX</span><span class="operator">=</span><span class="name variable">$HOME</span>/tcs
+</span><span class="generic prompt">$ </span>make<span class="whitespace"> </span>install-files<span class="whitespace"> </span><span class="name variable">PREFIX</span><span class="operator">=</span><span class="name variable">$HOME</span>/tcs
 </pre>
-<p>Everything <tt class="docutils literal">make install</tt> installs, and so everything in the packages, is
+<p>Everything <tt class="docutils literal">make <span class="pre">install-files</span></tt> installs, and so everything in the
+packages, is
 stripped: the programs and <tt class="docutils literal">libtcs.so.1</tt> with <tt class="docutils literal">strip <span class="pre">--strip-unneeded</span></tt>,
 which leaves what they need to be run and linked with, and <tt class="docutils literal">libtcs.a</tt>
 with <tt class="docutils literal">strip <span class="pre">--strip-debug</span></tt>, which keeps the symbols a program linked with
@@ -3096,8 +3118,8 @@ linked the rest. A directory that is not there is not made. To undo it:</p>
 </pre>
 <p>which takes away only links to the package's own programs. Removing a
 package does this itself, in <tt class="docutils literal">/usr/local/bin</tt> and <tt class="docutils literal">/opt/bin</tt>, so no
-link is left pointing at nothing. After a <tt class="docutils literal">make install</tt>, <tt class="docutils literal">make links</tt>
-and <tt class="docutils literal">make unlinks</tt> run every package's script, with <tt class="docutils literal">LINKDIR</tt> for
+link is left pointing at nothing. After a <tt class="docutils literal">make <span class="pre">install-files</span></tt>, <tt class="docutils literal">make
+links</tt> and <tt class="docutils literal">make unlinks</tt> run every package's script, with <tt class="docutils literal">LINKDIR</tt> for
 another directory.</p>
 </div>
 <div class="section" id="the-python-alone">
@@ -4627,7 +4649,7 @@ with <tt class="docutils literal">visual</tt></td>
 <td>=0.4.0</td>
 <td><a class="reference external" href="https://docs.rs/tcs-xtce/0.4.0">0.4.0</a></td>
 <td>tcslibgs</td>
-<td>The runtime the generated link packet code calls to pack and unpack the commands and answers, and the interface digest. Its generator and Python runtime are in <tt class="docutils literal"><span class="pre">vendor/tcs-xtce</span></tt>, at the same version.</td>
+<td>The runtime the generated link packet code calls to pack and unpack the commands and answers, and the interface digest. Its generator and Python runtime are taken from a checkout of it beside this tree, <tt class="docutils literal"><span class="pre">../tcs-xtce</span></tt>, at the same version.</td>
 <td><a class="reference external" href="https://github.com/vomlehn/tcs-xtce">repository</a></td>
 </tr>
 <tr><td><a class="reference external" href="https://crates.io/crates/tcslog">tcslog</a></td>

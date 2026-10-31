@@ -35,11 +35,13 @@ two consequences:
   on the day the first changes.
 
 The interface digest every beacon carries is worked out with tcs-xtce's
-Python runtime, which is not the standard library either but is in this tree,
-in `vendor/tcs-xtce/python`. The three modules of it the digest needs are
-linked into `tcslibgs/_xtce`, and the XTCE documents it is taken over into
-`tcslibgs/xtce`, a link to the crate's `tcslibgs/xtce`: so there is one copy
-of each in the tree, and installing the package installs them, and an
+Python runtime, which is not the standard library either and is not
+published, so it is taken from a checkout of
+[tcs-xtce](https://github.com/vomlehn/tcs-xtce) beside this tree,
+`../tcs-xtce`. The modules of it the digest and the fixed commands' packing
+need are linked into `tcslibgs/_xtce`, and the XTCE documents it is taken
+over into `tcslibgs/xtce`, a link to the crate's `tcslibgs/xtce`: so there
+is one copy of each, and installing the package installs them, and an
 installed station needs nothing from the source tree. A beacon itself is
 plain text and needs nothing to read.
 

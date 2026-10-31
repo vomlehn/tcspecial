@@ -2,11 +2,13 @@
 #
 # The packages are cut from what `make stage` installed, one directory per
 # package, so a spec's %install copies its stage and its %files says which
-# of those files it owns. `make rpm` defines tcs_version, tcs_stage, and
-# tcs_date, the date of the commit built, for the %changelog that each spec
-# ends with by reading changelog.inc.
+# of those files it owns. `make rpm` defines tcs_version; tcs_release, the
+# Debian revision, so that the RPMs and the .debs are named alike;
+# tcs_stage; and tcs_date, the date of the commit built, for the %changelog
+# that each spec ends with by reading changelog.inc.
 
 %{!?tcs_version: %{error: tcs_version is not defined: build with make rpm}}
+%{!?tcs_release: %{error: tcs_release is not defined: build with make rpm}}
 %{!?tcs_stage: %{error: tcs_stage is not defined: build with make rpm}}
 %{!?tcs_date: %{error: tcs_date is not defined: build with make rpm}}
 
@@ -23,7 +25,7 @@
 %global __brp_python_bytecompile %{nil}
 
 Version:        %{tcs_version}
-Release:        1%{?dist}
+Release:        %{tcs_release}%{?dist}
 License:        MIT OR Apache-2.0
 URL:            https://github.com/vomlehn/tcspecial
 %global tcs_maintainer David VomLehn <dvomlehn@gmail.com>

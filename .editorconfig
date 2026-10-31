@@ -20,10 +20,3 @@ indent_size = 4
 # Recipes must start with a tab.
 [Makefile]
 indent_style = tab
-
-# The vendored copy of tcs-xtce keeps that repository's own style.
-[vendor/**]
-max_line_length = unset
-indent_style = unset
-indent_size = unset
-tab_width = unset

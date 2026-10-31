@@ -16,9 +16,9 @@ serde_norway = "0.9.42"
 quick-xml = { version = "0.42", features = ["serialize"] }
 md5 = "0.8"
 # Packs and unpacks the commands and answers, from the code tcs-xtce generated
-# from xtce/link.xml. The version is the one the generator in vendor/tcs-xtce
-# was taken from, as the code it writes calls this runtime: see
-# vendor/tcs-xtce/README.md.
+# from xtce/link.xml. The version is the one the tcs-xtce checkout beside
+# this tree, whose generator wrote that code, must be at, as the code calls
+# this runtime: see the tcs-xtce target in Makefile.
 tcs-xtce = "=0.4.0"
 
 [dev-dependencies]

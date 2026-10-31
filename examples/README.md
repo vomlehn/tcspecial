@@ -208,7 +208,8 @@ in Python: `python/tcslib/beacon.py` after `tcslib::beacon`,
 `python/tcsui/beacon_panel.py` after `tcsui`, and `python/tcslibgs` for the
 ping format, the beacon and the configuration. The interface digest beacons
 are checked against is worked out with tcs-xtce's Python runtime, from
-`vendor/tcs-xtce` in this tree. `ping_ground.py` here is the ping's own
+the tcs-xtce checkout beside this tree. `ping_ground.py` here is the ping's
+own
 part, with no window. The Rust crate beside them is the tests that hold the
 Python to the Rust; `cargo test` runs them.
 

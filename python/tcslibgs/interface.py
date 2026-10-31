@@ -9,8 +9,8 @@ carries.
 
 from pathlib import Path
 
-# tcs-xtce's digest, vendored in this tree until it is published: see
-# _xtce/__init__.py.
+# tcs-xtce's digest, from the tcs-xtce checkout beside this tree until it
+# is published: see _xtce/__init__.py.
 from ._xtce import digest as _digest
 
 #: Where this tree's interface is stated: ``link.xml``, as ``make

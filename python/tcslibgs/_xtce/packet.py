@@ -1,1 +1,1 @@
-../../../vendor/tcs-xtce/python/tcs_xtce/packet.py
+../../../../tcs-xtce/python/tcs_xtce/packet.py

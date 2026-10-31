@@ -94,14 +94,69 @@ pub fn state_dir() -> Option<PathBuf> {
     // would be pointing it there for every other test in the process.
     #[cfg(test)]
     {
-        Some(
-            std::env::temp_dir()
-                .join(format!("tcsgui-tests-{}", std::process::id())),
-        )
+        Some(tests_state_dir().clone())
     }
 
     #[cfg(not(test))]
     said_by(std::env::var_os("XDG_STATE_HOME"), std::env::var_os("HOME"))
+}
+
+/// The state directory of a test process: `tcsgui-tests-<pid>` in the
+/// temporary directory, the same one for every test in the process, because
+/// the editor's tests reopen a history one editor wrote in another.
+///
+/// Removed when the process exits, after its last test, so that a test run
+/// leaves nothing behind it. A run that never got that far -- killed, or
+/// aborted -- leaves its directory, and the first test process after it
+/// removes every one whose process is gone.
+#[cfg(test)]
+fn tests_state_dir() -> &'static PathBuf {
+    static DIRECTORY: std::sync::OnceLock<PathBuf> = std::sync::OnceLock::new();
+
+    extern "C" fn remove_at_exit() {
+        if let Some(directory) = DIRECTORY.get() {
+            let _ = std::fs::remove_dir_all(directory);
+        }
+    }
+
+    DIRECTORY.get_or_init(|| {
+        let temp = std::env::temp_dir();
+        remove_abandoned(&temp, Path::new("/proc"));
+        // SAFETY: atexit is given a function that takes nothing, returns
+        // nothing and never unwinds, which is all it asks; it is called once,
+        // here, under the OnceLock.
+        unsafe {
+            libc::atexit(remove_at_exit);
+        }
+        temp.join(format!("tcsgui-tests-{}", std::process::id()))
+    })
+}
+
+/// Removes the state directories of test processes that have gone.
+///
+/// # Arguments
+///
+/// * `temp`  - Where they are: the temporary directory.
+/// * `procs` - Where the running processes are, one directory each, named
+///             by its id: `/proc`.
+#[cfg(test)]
+fn remove_abandoned(temp: &Path, procs: &Path) {
+    let Ok(entries) = std::fs::read_dir(temp) else {
+        return;
+    };
+    for entry in entries.flatten() {
+        let name = entry.file_name();
+        let Some(pid) = name
+            .to_str()
+            .and_then(|name| name.strip_prefix("tcsgui-tests-"))
+            .and_then(|pid| pid.parse::<u32>().ok())
+        else {
+            continue;
+        };
+        if pid != std::process::id() && !procs.join(pid.to_string()).exists() {
+            let _ = std::fs::remove_dir_all(entry.path());
+        }
+    }
 }
 
 /// The rule itself, given what the environment says.
@@ -431,6 +486,46 @@ pub fn prune_in(directory: &Path, now: SystemTime) -> usize {
 mod tests {
     use super::*;
     use crate::journal::Edit;
+
+    /// A test process removes the state directories of test processes that
+    /// have gone, and only those: not its own, not a running one's, and
+    /// nothing that is not one.
+    ///
+    /// Asked of a temporary directory and a stand-in for `/proc` of the test's
+    /// own, so that what is running is what the test says.
+    #[test]
+    fn a_test_process_removes_the_directories_of_those_gone() {
+        let temp = tempfile::tempdir().expect("a directory");
+        let procs = tempfile::tempdir().expect("a directory");
+        let running = 4242;
+        std::fs::create_dir(procs.path().join(running.to_string()))
+            .expect("a process");
+        for name in [
+            "tcsgui-tests-4241".to_string(),
+            format!("tcsgui-tests-{running}"),
+            format!("tcsgui-tests-{}", std::process::id()),
+            "tcsgui-tests-notapid".to_string(),
+            "other".to_string(),
+        ] {
+            std::fs::create_dir(temp.path().join(name)).expect("made");
+        }
+
+        remove_abandoned(temp.path(), procs.path());
+
+        let mut left: Vec<String> = std::fs::read_dir(temp.path())
+            .expect("read")
+            .map(|e| e.expect("entry").file_name().into_string().unwrap())
+            .collect();
+        left.sort();
+        let mut expected = vec![
+            "other".to_string(),
+            format!("tcsgui-tests-{}", std::process::id()),
+            format!("tcsgui-tests-{running}"),
+            "tcsgui-tests-notapid".to_string(),
+        ];
+        expected.sort();
+        assert_eq!(left, expected, "only the one whose process is gone goes");
+    }
 
     /// A history is kept away from the configuration, named after it, and
     /// thrown away when nobody is coming back for it.

@@ -2086,6 +2086,12 @@ vehicle:
         /// of something that happens *between* passes has to give the sensors
         /// something to say on the second one.
         sensors: BTreeMap<String, Kept>,
+        /// The directory `log` is, removed when the vehicle is dropped. The
+        /// last field, because fields are dropped in the order they are
+        /// declared: the system writing into it is dropped first, so the
+        /// directory outlives every write, and nothing is left behind in the
+        /// temporary directory once the test is done.
+        _log_directory: tempfile::TempDir,
     }
 
     impl Vehicle {
@@ -2136,11 +2142,9 @@ vehicle:
             .expect("the example reads");
 
         // The log writes into a directory of this test's own; the example's is
-        // a place on a vehicle. Leaked on purpose: the directory must outlive
-        // the system that is writing into it, and a test that tidied it up
-        // first would be a test of a log with nowhere to write.
-        let where_ =
-            Box::leak(Box::new(tempfile::tempdir().expect("a directory")));
+        // a place on a vehicle. The vehicle keeps it, so that it outlives the
+        // system writing into it and goes when the vehicle does.
+        let where_ = tempfile::tempdir().expect("a directory");
         for node in graph.nodes.iter_mut() {
             if node.node_type == "log" {
                 node.attributes.insert(
@@ -2221,6 +2225,7 @@ vehicle:
             telemetry,
             log,
             sensors,
+            _log_directory: where_,
         }
     }
 
@@ -2701,6 +2706,17 @@ vehicle:
             written[0].metadata().expect("its size").len() > 0,
             "the pass should have flushed the log"
         );
+    }
+
+    /// The directory a test's log writes into goes with the vehicle, rather
+    /// than being left in the temporary directory by every run of the tests.
+    #[test]
+    fn a_vehicles_log_directory_goes_with_it() {
+        let vehicle = vehicle(Instant::now(), &[]);
+        let log = vehicle.log.clone();
+        assert!(log.is_dir(), "the log's directory is there to write into");
+        drop(vehicle);
+        assert!(!log.exists(), "{} was left behind", log.display());
     }
 
     /// A payload nothing in the drawing touches is read, and what it reads

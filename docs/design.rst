@@ -4357,7 +4357,8 @@ what the question is about. What goes wrong *while somebody works* is still
 said in the alert's own window, the main window not waiting for it. tcsmoc
 does the same for the question it asks when tcspecial serves a different
 configuration: asked inside its main window, in front of a veil that greys the
-panels. tcsmoc and tcssim show what they found at startup in a window that
+panels. Its pop-ups about a command pressed before the station is matched --
+the error and the advisory of `On the ground`_ -- are put there the same way. tcsmoc and tcssim show what they found at startup in a window that
 stays on top and is closed before their main windows open.
 
 **Everything a popup says can be copied.** A message is often the thing
@@ -6276,7 +6277,8 @@ Configurations named by their checksum
    other commands, one with another checksum changes nothing else, one
    after a RESTART changes nothing, and the ground takes a CONNECT as
    matched only when its answer carries the station's checksum. In `On the
-   ground`_, every requirement but tcsmoc's pop-ups: the station's match
+   ground`_, every requirement but tcsmoc's pop-ups, which are built since:
+   the station's match
    (``tcslib::matched``), data dropped and counted while not matched and
    what is queued dropped and counted as a match begins, a match ended by a
    flagged beacon, another checksum or an overdue beacon, answers taken
@@ -6309,7 +6311,14 @@ Configurations named by their checksum
    functions a restart calls (``choose::Boot::load`` and ``start::clean_up``
    in tcspecial). A configuration is put into the store, for testing and for
    first provisioning, by ``tcsverify --keep=<directory>``, which checks it
-   first.
+   first. In `On the ground`_, tcsmoc's pop-ups: a command other than the
+   three pressed while the station is not matched for commanding is refused
+   in an error pop-up, which says the client's own refusal
+   (``TcsClient::may_go``) and names the beacon's checksum and the
+   station's; ARM Restart and Initiate restart pressed, with the link up,
+   before a CONNECT has been answered ask first, Go on sending the command
+   and Cancel sending nothing. A press with the link down says Connect, as
+   before, since that is what to press.
 
    *Not yet built:* uplinking a configuration by CFDP to a staging area,
    checking it there and keeping it, and the provisioning crate on
@@ -6317,7 +6326,7 @@ Configurations named by their checksum
    read-only directory and the immutable attribute of first provisioning,
    which are the provisioner's to set -- ``tcsverify --keep`` makes the file
    it writes 0444 and leaves the directory as it is, so that it can keep
-   more; tcsmoc's pop-ups; and removing what `What this replaces`_ lists as
+   more; and removing what `What this replaces`_ lists as
    still standing.
 
 A configuration is known by its *checksum*: the MD5 ``tcsverify``

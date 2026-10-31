@@ -4531,7 +4531,8 @@ what the question is about. What goes wrong <em>while somebody works</em> is sti
 said in the alert's own window, the main window not waiting for it. tcsmoc
 does the same for the question it asks when tcspecial serves a different
 configuration: asked inside its main window, in front of a veil that greys the
-panels. tcsmoc and tcssim show what they found at startup in a window that
+panels. Its pop-ups about a command pressed before the station is matched --
+the error and the advisory of <a class="reference internal" href="#on-the-ground">On the ground</a> -- are put there the same way. tcsmoc and tcssim show what they found at startup in a window that
 stays on top and is closed before their main windows open.</p>
 <p><strong>Everything a popup says can be copied.</strong> A message is often the thing
 somebody has to pass on, and one that can only be read has to be typed out
@@ -6419,7 +6420,8 @@ sends a beacon at once, slows the beacons and opens the downlink and the
 other commands, one with another checksum changes nothing else, one
 after a RESTART changes nothing, and the ground takes a CONNECT as
 matched only when its answer carries the station's checksum. In <a class="reference internal" href="#on-the-ground">On the
-ground</a>, every requirement but tcsmoc's pop-ups: the station's match
+ground</a>, every requirement but tcsmoc's pop-ups, which are built since:
+the station's match
 (<tt class="docutils literal"><span class="pre">tcslib::matched</span></tt>), data dropped and counted while not matched and
 what is queued dropped and counted as a match begins, a match ended by a
 flagged beacon, another checksum or an overdue beacon, answers taken
@@ -6450,14 +6452,21 @@ RESTART naming the running configuration a plain restart, and the two
 functions a restart calls (<tt class="docutils literal"><span class="pre">choose::Boot::load</span></tt> and <tt class="docutils literal"><span class="pre">start::clean_up</span></tt>
 in tcspecial). A configuration is put into the store, for testing and for
 first provisioning, by <tt class="docutils literal">tcsverify <span class="pre">--keep=&lt;directory&gt;</span></tt>, which checks it
-first.</p>
+first. In <a class="reference internal" href="#on-the-ground">On the ground</a>, tcsmoc's pop-ups: a command other than the
+three pressed while the station is not matched for commanding is refused
+in an error pop-up, which says the client's own refusal
+(<tt class="docutils literal"><span class="pre">TcsClient::may_go</span></tt>) and names the beacon's checksum and the
+station's; ARM Restart and Initiate restart pressed, with the link up,
+before a CONNECT has been answered ask first, Go on sending the command
+and Cancel sending nothing. A press with the link down says Connect, as
+before, since that is what to press.</p>
 <p class="last"><em>Not yet built:</em> uplinking a configuration by CFDP to a staging area,
 checking it there and keeping it, and the provisioning crate on
 <tt class="docutils literal"><span class="pre">cfdp-rs</span></tt> that does it and removes configurations in flight; the
 read-only directory and the immutable attribute of first provisioning,
 which are the provisioner's to set -- <tt class="docutils literal">tcsverify <span class="pre">--keep</span></tt> makes the file
 it writes 0444 and leaves the directory as it is, so that it can keep
-more; tcsmoc's pop-ups; and removing what <a class="reference internal" href="#what-this-replaces">What this replaces</a> lists as
+more; and removing what <a class="reference internal" href="#what-this-replaces">What this replaces</a> lists as
 still standing.</p>
 </div>
 <p>A configuration is known by its <em>checksum</em>: the MD5 <tt class="docutils literal">tcsverify</tt>
@@ -6482,23 +6491,31 @@ below that drop what is queued at a match are what make up for that.</p>
 <h3><a class="toc-backref" href="#toc-entry-72">Keeping configurations on board</a></h3>
 <dl class="docutils">
 <dt>Requirement</dt>
-<dd>For now a configuration is a single file. One that includes another
-file is refused when it is uplinked and when it is loaded, saying so.
-A configuration spread across several files is to be handled later.</dd>
+<dd>A configuration is kept as a tree: a directory named by its checksum,
+holding its top file, named by the checksum too, and each file the top
+file includes, under the name its include list gives it. The checksum
+takes in those names, so that it says the shape of the tree as well as
+what is in it, and two configurations that each include a <tt class="docutils literal">cabin</tt>
+of their own are kept apart. An include name that is a path, begins
+with a dot or is the checksum is refused when the configuration is
+kept and when it is loaded, saying so.</dd>
 </dl>
-<p>As built, a configuration is kept as <tt class="docutils literal"><span class="pre">&lt;checksum&gt;.ytcs</span></tt> or
-<tt class="docutils literal"><span class="pre">&lt;checksum&gt;.xtcs</span></tt> -- its checksum in 32 lower-case hex digits, and the
-extension that says how it is read, the one it was given -- in the
-directory the <tt class="docutils literal">tcspecial</tt> section's <tt class="docutils literal">configurations</tt> names. A section
-that names none is a vehicle that keeps no configurations: it runs the one
-on its command line, and a RESTART may name only that and the one running.
+<p>As built, a configuration is kept as <tt class="docutils literal"><span class="pre">&lt;checksum&gt;/&lt;checksum&gt;.ytcs</span></tt> or
+<tt class="docutils literal"><span class="pre">&lt;checksum&gt;/&lt;checksum&gt;.xtcs</span></tt> -- its checksum in 32 lower-case hex digits,
+and the extension that says how it is read, the one it was given -- with
+each file it includes beside it, in the directory the <tt class="docutils literal">tcspecial</tt>
+section's <tt class="docutils literal">configurations</tt> names. It is written to a hidden directory
+beside its name and renamed into place, and removed by being renamed out
+of the way first, so that a power failure leaves the whole of it or none.
+A section that names none is a vehicle that keeps no configurations: it
+runs the one on its command line, and a RESTART may name only that and the
+one running.
 The rules are <tt class="docutils literal"><span class="pre">tcslibgs::store</span></tt>'s, which tcspecial loads through and
 <tt class="docutils literal">tcsverify <span class="pre">--keep=&lt;directory&gt;</span></tt> keeps through, so the two cannot disagree
 about what a kept configuration is. <tt class="docutils literal">tcsverify <span class="pre">--keep</span></tt> checks the
 configuration as tcsverify checks any, keeps it only if nothing is wrong
 with it, and is for testing and for first provisioning; uplinking is not
-built. tcspecial refuses a configuration that includes another as it loads
-it, the one on its command line among them.</p>
+built.</p>
 <dl class="docutils">
 <dt>Requirement</dt>
 <dd>The vehicle keeps each configuration it holds under its checksum, in
@@ -12200,9 +12217,9 @@ it has one, checks it as tcsverify checks any and, where nothing is
 wrong with it, keeps it in <tt class="docutils literal">&lt;directory&gt;</tt> under its checksum, as the
 vehicle keeps a configuration a RESTART may name: see <a class="reference internal" href="#keeping-configurations-on-board">Keeping
 configurations on board</a>. It prints where it is kept, or that it was
-kept already, which writes nothing. One that includes another file is
-refused. It is how a configuration is put on board for testing and at
-first provisioning, until configurations are uplinked.</dd>
+kept already, which writes nothing. One of several files is kept with
+each file it includes. It is how a configuration is put on board for
+testing and at first provisioning, until configurations are uplinked.</dd>
 <dt>Requirement</dt>
 <dd><tt class="docutils literal"><span class="pre">--set-interface</span> <span class="pre">&lt;configuration&gt;...</span></tt>, given configurations and
 nothing else, writes this build's interface digest into each as its

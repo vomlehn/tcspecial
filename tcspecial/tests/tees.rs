@@ -150,7 +150,7 @@ fn a_tee_sends_each_datum_both_ways() {
             .iter()
             .find(|link| link.source == source)
             .unwrap_or_else(|| panic!("{source} sends to the ground"));
-        assert_eq!(link.ground.port, at, "{source}");
+        assert_eq!(link.ground().expect("over UDP").port, at, "{source}");
     }
     let dir = tempfile::tempdir().expect("a directory");
     // tcspecial writes its log into a directory that is there, and does not
@@ -200,11 +200,10 @@ fn a_tee_sends_each_datum_both_ways() {
             .iter()
             .find(|link| link.source == source)
             .unwrap_or_else(|| panic!("{source} sends to the ground"));
-        let socket = UdpSocket::bind(format!(
-            "{}:{}",
-            link.ground.address, link.ground.port
-        ))
-        .expect("the ground's port");
+        let ground = link.ground().expect("over UDP");
+        let socket =
+            UdpSocket::bind(format!("{}:{}", ground.address, ground.port))
+                .expect("the ground's port");
         socket
             .set_read_timeout(Some(Duration::from_millis(100)))
             .expect("a timeout");

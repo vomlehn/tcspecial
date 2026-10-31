@@ -378,14 +378,19 @@ pub fn is_payload(node_type: &str) -> bool {
 ///
 /// # Returns
 ///
-/// Whether the type is `gateway` or `gateway_fprime`, the known ground link
-/// types.
+/// Whether the type is `gateway_radio`, `gateway_fprime` or `gateway_cfs`,
+/// the known ground link types.
 pub fn is_gateway(node_type: &str) -> bool {
     NodeType::ALL
         .iter()
         .find(|t| t.spelling() == node_type)
         .is_some_and(|t| {
-            matches!(t, NodeType::GatewayRadio | NodeType::GatewayFprime)
+            matches!(
+                t,
+                NodeType::GatewayRadio
+                    | NodeType::GatewayFprime
+                    | NodeType::GatewayCfs
+            )
         })
 }
 

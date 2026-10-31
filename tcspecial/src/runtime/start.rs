@@ -21,8 +21,10 @@ use log::{debug, error, info, warn};
 use tcslibgs::config_digest::{ConfigDigest, ConfigVersion};
 use tcslibgs::graph::Graph;
 use tcslibgs::simulate::{judge, refusals, Host, Judged, Mode};
+use tcslibgs::Links;
 
 use crate::beacon_send::BeaconSend;
+use crate::runtime::bus::{Bus, BusReader};
 use crate::runtime::choose;
 use crate::runtime::command::{Commands, Flying};
 use crate::runtime::fabric::Moved;
@@ -181,8 +183,18 @@ pub fn run_graph(path: &str, mode: Mode) -> Result<(), Vec<String>> {
     // asks it.
     let matched = Matched::at_a_start();
 
-    let system =
-        System::of(graph, Instant::now(), segsend.clone(), matched.clone())?;
+    // The software bus, for a configuration that answers to cFS: every link
+    // below is carried over it, so it is opened before any of them.
+    let bus = open_bus(graph).map_err(|why| vec![format!("{path}: {why}")])?;
+    let shared = bus.as_ref().map(|(bus, _)| bus.clone());
+
+    let system = System::of(
+        graph,
+        Instant::now(),
+        segsend.clone(),
+        matched.clone(),
+        shared.clone(),
+    )?;
     // What was opened, which the line above already says the shape of: for
     // somebody looking at how the running system is put together.
     debug!("{path}: {system:?}");
@@ -196,8 +208,14 @@ pub fn run_graph(path: &str, mode: Mode) -> Result<(), Vec<String>> {
 
     // Beacons, once everything has opened: a vehicle that will not start has
     // nothing to announce. Held until the vehicle stops.
-    let beacon = beacons(graph, digest, telemetry_log.clone(), matched.clone())
-        .map_err(|why| vec![format!("{path}: {why}")])?;
+    let beacon = beacons(
+        graph,
+        digest,
+        telemetry_log.clone(),
+        matched.clone(),
+        shared.as_ref(),
+    )
+    .map_err(|why| vec![format!("{path}: {why}")])?;
 
     // And the ground's commands, on a thread of their own. After the beacons
     // because a CONNECT or a RESTART retimes them, and after the ports
@@ -218,6 +236,7 @@ pub fn run_graph(path: &str, mode: Mode) -> Result<(), Vec<String>> {
         telemetry_log.clone(),
         matched,
         chosen.boot.state_file.as_deref(),
+        bus,
     )
     .map_err(|why| vec![format!("{path}: {why}")])?;
 
@@ -450,6 +469,51 @@ fn segsend_for(graph: &Graph) -> Result<SegSend, String> {
     Ok(started)
 }
 
+/// Opens the software bus a configuration that answers to cFS is on: binds
+/// `sbn.local`, and works out what tcspecial subscribes to and where each
+/// command it takes goes, from every message ID the configuration uses.
+///
+/// # Arguments
+///
+/// * `graph` - The checked configuration.
+///
+/// # Returns
+///
+/// The bus and its one reader, or `None` for a configuration whose links
+/// are sockets, or that has no `tcspecial` section.
+///
+/// # Errors
+///
+/// The section's parameters not making a configuration, its message IDs
+/// not being sound, or `sbn.local` not binding, as a message.
+fn open_bus(graph: &Graph) -> Result<Option<(Bus, BusReader)>, String> {
+    let Some(section) = graph.tcspecial.as_ref() else {
+        return Ok(None);
+    };
+    let ci = tcslibgs::graph::parameters::ci_config_of(
+        &tcslibgs::graph::parameters::flatten(section),
+    )?
+    .to_ci_config()?;
+    let Some(settled) = ci.bus() else {
+        return Ok(None);
+    };
+    let used = tcslibgs::graph::telemetry::msgids(graph)
+        .map_err(|refused| refused.why)?;
+    let opened = Bus::open(settled, &used)?;
+    summary(format!(
+        "cFS software bus: SBN {} peer at {}, from {} as processor {} of \
+         spacecraft {}, message IDs {:#06x} to {:#06x}",
+        settled.sbn.release.name,
+        settled.sbn.peer,
+        settled.sbn.local,
+        settled.sbn.processor_id,
+        settled.sbn.spacecraft_id,
+        settled.first,
+        settled.last
+    ));
+    Ok(Some(opened))
+}
+
 /// Starts sending beacons where the configuration's `tcspecial` section
 /// says.
 ///
@@ -475,6 +539,9 @@ fn segsend_for(graph: &Graph) -> Result<SegSend, String> {
 /// * `telemetry_log` - Where each beacon sent is recorded.
 /// * `matched`       - Whether the ground has matched this start, which the
 ///                     restart flag says the opposite of.
+/// * `bus`           - The software bus, for a configuration that answers
+///                     over one: the beacon is published there, under
+///                     `beacon.tlm_msgid`.
 ///
 /// # Returns
 ///
@@ -490,6 +557,7 @@ fn beacons(
     digest: ConfigDigest,
     telemetry_log: TelemetryLog,
     matched: Matched,
+    bus: Option<&Bus>,
 ) -> Result<Option<BeaconSend>, String> {
     let Some(section) = graph.tcspecial.as_ref() else {
         return Ok(None);
@@ -498,25 +566,49 @@ fn beacons(
         &tcslibgs::graph::parameters::flatten(section),
     )?
     .to_ci_config()?;
-    let sending = BeaconSend::new(
-        crate::beacon_send::BeaconTiming {
-            default_interval: ci.beacon_interval,
-            reset_interval: ci.reset_interval,
-        },
-        ci.beacon_send.clone(),
-        ci.beacon_recv.clone(),
-        telemetry_log,
-        ConfigVersion::of_this_build(),
-        digest,
-        matched,
-    )
-    .map_err(|e| e.to_string())?;
+    let timing = crate::beacon_send::BeaconTiming {
+        default_interval: ci.beacon_interval,
+        reset_interval: ci.reset_interval,
+    };
+    let (sending, way) = match (&ci.links, bus) {
+        (Links::Sockets(sockets), _) => (
+            BeaconSend::new(
+                timing,
+                sockets.beacon_send.clone(),
+                sockets.beacon_recv.clone(),
+                telemetry_log,
+                ConfigVersion::of_this_build(),
+                digest,
+                matched,
+            )
+            .map_err(|e| e.to_string())?,
+            format!("{} to {}", sockets.beacon_send, sockets.beacon_recv),
+        ),
+        (Links::Bus(settled), Some(bus)) => (
+            BeaconSend::on_bus(
+                timing,
+                bus.publisher(),
+                settled.beacon_msgid,
+                telemetry_log,
+                ConfigVersion::of_this_build(),
+                digest,
+                matched,
+            ),
+            format!(
+                "published on the software bus as {:#06x}",
+                settled.beacon_msgid
+            ),
+        ),
+        (Links::Bus(_), None) => {
+            return Err("this configuration answers over a software bus, \
+                 and no bus was opened for its beacon"
+                .to_string())
+        }
+    };
     if sending.is_some() {
         summary(format!(
-            "{} ms beacon: {} to {}",
-            ci.beacon_interval.as_millis(),
-            ci.beacon_send,
-            ci.beacon_recv
+            "{} ms beacon: {way}",
+            ci.beacon_interval.as_millis()
         ));
     }
     Ok(sending)
@@ -547,6 +639,8 @@ fn beacons(
 ///                     matching CONNECT sets and a RESTART clears.
 /// * `state_file`    - The state file the command line's configuration
 ///                     names, which a matching CONNECT and a RESTART write.
+/// * `bus`           - The software bus and its reader, for a configuration
+///                     that answers over one.
 ///
 /// # Returns
 ///
@@ -571,6 +665,7 @@ fn command_links(
     telemetry_log: TelemetryLog,
     matched: Matched,
     state_file: Option<&std::path::Path>,
+    bus: Option<(Bus, BusReader)>,
 ) -> Result<Option<Commands>, String> {
     let Some(section) = graph.tcspecial.as_ref() else {
         return Ok(None);
@@ -604,17 +699,27 @@ fn command_links(
         telemetry_log,
         matched,
         restart_when_stopped,
+        bus,
     )
     .map_err(|e| e.to_string())?;
     // Where they are taken, as the sockets were bound: a configuration may ask
     // for port 0, and then the socket is the only statement of which port that
     // is. On stderr as the beacon line is, because it is what somebody
     // standing at a console reads to find out where to send.
-    summary(format!(
-        "commands: spacecraft on {}, nodes on {}",
-        commands.spacecraft_address(),
-        commands.node_address()
-    ));
+    match ci.bus() {
+        None => summary(format!(
+            "commands: spacecraft on {}, nodes on {}",
+            commands.spacecraft_address(),
+            commands.node_address()
+        )),
+        Some(settled) => summary(format!(
+            "commands: on the software bus through {}, the spacecraft's as \
+             {:#06x} and each node's from {:#06x}",
+            commands.spacecraft_address(),
+            settled.cmd_msgid,
+            settled.cmd_base
+        )),
+    }
     Ok(Some(commands))
 }
 

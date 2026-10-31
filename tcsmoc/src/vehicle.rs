@@ -49,7 +49,7 @@ use tcslib::gateway::DATUM_BYTES;
 use tcslib::matched::Matched;
 use tcslib::ping::{Pinger, Uplink};
 use tcslib::simulator;
-use tcslibgs::graph::telemetry::{self, Telemetered, Via};
+use tcslibgs::graph::telemetry::{self, Reaches, Telemetered, Via};
 use tcslibgs::graph::Graph;
 use tcslibgs::ready::SetUpFor;
 use tcslibgs::sim_config::SimConfigFile;
@@ -356,14 +356,19 @@ pub fn panels(
                 Via::Gateway(gateway) => format!("to {gateway}"),
                 Via::PayloadTelemetry => "over payload_telemetry".to_string(),
             };
+            // Where the ground hears it: a socket, or a message ID on a
+            // software bus.
+            let at = match &link.reaches {
+                Reaches::Socket { ground, .. } => {
+                    format!("{}:{}", ground.address, ground.port)
+                }
+                Reaches::Bus(msgid) => format!("message ID {msgid:#06x}"),
+            };
             DHInfo {
                 name: SharedString::from(link.source.clone()),
                 // The node's device id, which is what its port is counted on.
                 dev_id: i32::try_from(link.id).unwrap_or(i32::MAX),
-                config: SharedString::from(format!(
-                    "{via}, at {}:{}",
-                    link.ground.address, link.ground.port
-                )),
+                config: SharedString::from(format!("{via}, at {at}")),
                 packet_size: 0,
                 status: SharedString::from(UNKNOWN_STATUS),
                 oc_time: SharedString::from(NO_TRANSFER_TIME),
@@ -371,8 +376,8 @@ pub fn panels(
                 packets_recv: 0,
                 parameters: SharedString::from(format!(
                     "{} (device id {})\nsends {via}\nthe ground receives at \
-                     {}:{}",
-                    link.source, link.id, link.ground.address, link.ground.port
+                     {at}",
+                    link.source, link.id
                 )),
                 // What the ground may set on this node: all of them for the
                 // line that says so, and the first for the field to start

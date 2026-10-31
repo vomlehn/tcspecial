@@ -18,6 +18,7 @@ use std::time::{Duration, SystemTime};
 use log::{error, info, trace};
 use tcslibgs::{Beacon, BeaconPacker, ConfigDigest, ConfigVersion, TcsResult};
 
+use crate::runtime::bus::Publisher;
 use crate::runtime::matched::Matched;
 use crate::telemetry_log::TelemetryLog;
 
@@ -55,9 +56,10 @@ pub struct BeaconSend {
     /// taken also keeps the beacons fast until the process ends: see
     /// [`BeaconSend::restart_initiated`].
     matched: Matched,
-    /// Where beacons go: `beacon_recv`, which is what tcsmoc makes its
-    /// receiving socket out of.
-    dest_addr: tcslibgs::HostPort,
+    /// Where beacons go, for saying so: `beacon_recv`, which is what tcsmoc
+    /// makes its receiving socket out of, or the message ID they are
+    /// published under on a software bus.
+    dest_addr: String,
     /// Where they come from: `beacon_send`, which is what the socket below is
     /// bound to, so every beacon this sends leaves from there.
     ///
@@ -67,8 +69,8 @@ pub struct BeaconSend {
     /// describe the link. Before this it was a multicast group and the name of
     /// a local interface to join it on -- which bought any number of ground
     /// stations and cost an attribute whose being wrong lost every beacon in
-    /// silence.
-    from_addr: tcslibgs::HostPort,
+    /// silence. On a software bus, the SBN peer they go through.
+    from_addr: String,
     /// The telemetry log every beacon is recorded in, shared with the
     /// command interpreter so that one log holds all of the telemetry.
     log: TelemetryLog,
@@ -140,7 +142,6 @@ impl BeaconSend {
         if timing.default_interval == Duration::from_secs(0) {
             return Ok(None);
         }
-        let interval = timing.reset_interval;
 
         // Bound where the configuration says beacons come from, port and all.
         // A port the system chose would work -- the datagram carries its
@@ -172,6 +173,75 @@ impl BeaconSend {
             .next()
             .ok_or_else(unresolved)?;
 
+        Ok(Some(BeaconSend::sending(
+            timing,
+            Out::Socket { socket, dest },
+            from_addr.to_string(),
+            dest_addr.to_string(),
+            log,
+            version,
+            digest,
+            matched,
+        )))
+    }
+
+    /// Starts sending beacons on a cFS software bus, published under
+    /// `beacon.tlm_msgid`, as [`BeaconSend::new`] sends them over UDP.
+    ///
+    /// # Arguments
+    ///
+    /// * `timing`    - How often beacons go, normally and across a restart.
+    /// * `publisher` - What they are published with, made for them.
+    /// * `msgid`     - The message ID they are published under.
+    /// * `log`       - The telemetry log every beacon is recorded in.
+    /// * `version`   - What this build is, carried in every beacon.
+    /// * `digest`    - The digest of the configuration read.
+    /// * `matched`   - Whether the ground has matched this start.
+    ///
+    /// # Returns
+    ///
+    /// The sender, whose thread is already sending; `None` where
+    /// `timing.default_interval` is nought.
+    pub fn on_bus(
+        timing: BeaconTiming,
+        publisher: Publisher,
+        msgid: u16,
+        log: TelemetryLog,
+        version: ConfigVersion,
+        digest: ConfigDigest,
+        matched: Matched,
+    ) -> Option<BeaconSend> {
+        if timing.default_interval == Duration::from_secs(0) {
+            return None;
+        }
+        Some(BeaconSend::sending(
+            timing,
+            Out::Bus { publisher, msgid },
+            "the SBN peer".to_string(),
+            format!("message ID {msgid:#06x}"),
+            log,
+            version,
+            digest,
+            matched,
+        ))
+    }
+
+    /// Starts the thread that sends, out of `out`.
+    //
+    // Eight, each a different thing the sender is made of: a structure
+    // holding them would only be these arguments again.
+    #[allow(clippy::too_many_arguments)]
+    fn sending(
+        timing: BeaconTiming,
+        out: Out,
+        from_addr: String,
+        dest_addr: String,
+        log: TelemetryLog,
+        version: ConfigVersion,
+        digest: ConfigDigest,
+        matched: Matched,
+    ) -> BeaconSend {
+        let interval = timing.reset_interval;
         let expiration_time = SystemTime::now() + interval;
         let pair = Arc::new(CondPair {
             lock: Mutex::new(expiration_time),
@@ -193,9 +263,8 @@ impl BeaconSend {
         };
 
         let b_clone = b.clone();
-        thread::spawn(move || b_clone.beacon_send(socket, dest));
-
-        Ok(Some(b))
+        thread::spawn(move || b_clone.beacon_send(out));
+        b
     }
 
     /// Sends a beacon now, and then one every interval, for as long as the
@@ -209,15 +278,13 @@ impl BeaconSend {
     ///
     /// # Arguments
     ///
-    /// * `socket` - The socket bound to `beacon.send`, which beacons go out
-    ///              of.
-    /// * `dest`   - Where they go, already resolved.
-    fn beacon_send(&self, socket: UdpSocket, dest: SocketAddr) {
+    /// * `out` - What beacons go out of.
+    fn beacon_send(&self, mut out: Out) {
         // What each beacon is packed with, buffer and all, made once.
         let mut packer = BeaconPacker::new();
         let mut failing = Failing::default();
 
-        let outcome = self.send_beacon(&socket, dest, &mut packer);
+        let outcome = self.send_beacon(&mut out, &mut packer);
         failing.after(outcome, &self.from_addr, &self.dest_addr);
 
         loop {
@@ -238,7 +305,7 @@ impl BeaconSend {
                 }
             }
 
-            let outcome = self.send_beacon(&socket, dest, &mut packer);
+            let outcome = self.send_beacon(&mut out, &mut packer);
             failing.after(outcome, &self.from_addr, &self.dest_addr);
 
             // Calculate next expiration time
@@ -248,13 +315,12 @@ impl BeaconSend {
         }
     }
 
-    /// Sends the next beacon to `dest`, recording it in the telemetry log
+    /// Sends the next beacon out of `out`, recording it in the telemetry log
     /// first.
     ///
     /// # Arguments
     ///
-    /// * `socket` - The socket the beacon goes out of.
-    /// * `dest`   - Where it goes.
+    /// * `out`    - What the beacon goes out of.
     /// * `packer` - What it is packed with, which is the thread's own and is
     ///              reused.
     ///
@@ -265,10 +331,9 @@ impl BeaconSend {
     /// # Errors
     ///
     /// `TcsError::Io` where the send fails.
-    pub fn send_beacon(
+    fn send_beacon(
         &self,
-        socket: &UdpSocket,
-        dest: SocketAddr,
+        out: &mut Out,
         packer: &mut BeaconPacker,
     ) -> TcsResult<()> {
         // From one: the first beacon is the first beacon, and nought is what
@@ -278,11 +343,22 @@ impl BeaconSend {
         let beacon = Beacon::new(sequence, self.version, self.digest)
             .restart_flag(!self.matched.is_matched());
         let data = packer.pack(&beacon);
-        trace!("send_beacon: sending to {dest}");
+        trace!("send_beacon: sending to {}", self.dest_addr);
         // Recorded before it is sent, as a command response is, so that a
         // beacon the send fails on is still known to have been produced.
         self.log.record(data);
-        socket.send_to(data, dest)?;
+        match out {
+            Out::Socket { socket, dest } => {
+                socket.send_to(data, *dest)?;
+            }
+            // Not sent, and not a failure, where the peer is not connected
+            // or has not subscribed: SBN sends a peer only what it asked for.
+            Out::Bus { publisher, msgid } => {
+                publisher
+                    .publish(*msgid, data)
+                    .map_err(tcslibgs::TcsError::Config)?;
+            }
+        }
         Ok(())
     }
 
@@ -329,6 +405,14 @@ impl BeaconSend {
     }
 }
 
+/// What beacons go out of.
+enum Out {
+    /// A UDP socket bound to `beacon.send`, sending to `beacon.recv`.
+    Socket { socket: UdpSocket, dest: SocketAddr },
+    /// A cFS software bus, under `beacon.tlm_msgid`.
+    Bus { publisher: Publisher, msgid: u16 },
+}
+
 type ArcCondPair<T> = Arc<CondPair<T>>;
 
 struct CondPair<T> {
@@ -352,12 +436,7 @@ impl Failing {
     /// * `outcome` - How the send went.
     /// * `from`    - Where beacons are sent from, for saying so.
     /// * `to`      - Where they go, for saying so.
-    fn after(
-        &mut self,
-        outcome: TcsResult<()>,
-        from: &tcslibgs::HostPort,
-        to: &tcslibgs::HostPort,
-    ) {
+    fn after(&mut self, outcome: TcsResult<()>, from: &str, to: &str) {
         match outcome {
             Ok(()) => {
                 if self.since > 0 {
@@ -424,38 +503,40 @@ mod tests {
 
         let log = TelemetryLog::open(
             &CIConfig {
-                address: "127.0.0.1".to_string(),
-                port: 0,
-                payload_command_source_base: tcslibgs::HostPort {
+                links: tcslibgs::Links::Sockets(tcslibgs::Sockets {
                     address: "127.0.0.1".to_string(),
                     port: 0,
-                },
-                payload_command_dest_base: tcslibgs::HostPort {
-                    address: "127.0.0.1".to_string(),
-                    port: 0,
-                },
-                moc_cmd_send: tcslibgs::HostPort {
-                    address: "127.0.0.1".to_string(),
-                    port: 4100,
-                },
-                payload_source_base: tcslibgs::HostPort {
-                    address: "0.0.0.0".to_string(),
-                    port: 6000,
-                },
-                payload_dest_base: tcslibgs::HostPort {
-                    address: "127.0.0.1".to_string(),
-                    port: 6100,
-                },
+                    payload_command_source_base: tcslibgs::HostPort {
+                        address: "127.0.0.1".to_string(),
+                        port: 0,
+                    },
+                    payload_command_dest_base: tcslibgs::HostPort {
+                        address: "127.0.0.1".to_string(),
+                        port: 0,
+                    },
+                    moc_cmd_send: tcslibgs::HostPort {
+                        address: "127.0.0.1".to_string(),
+                        port: 4100,
+                    },
+                    payload_source_base: tcslibgs::HostPort {
+                        address: "0.0.0.0".to_string(),
+                        port: 6000,
+                    },
+                    payload_dest_base: tcslibgs::HostPort {
+                        address: "127.0.0.1".to_string(),
+                        port: 6100,
+                    },
+                    beacon_send: tcslibgs::HostPort {
+                        address: "127.0.0.1".to_string(),
+                        port: 0,
+                    },
+                    beacon_recv: tcslibgs::HostPort {
+                        address: at.ip().to_string(),
+                        port: at.port(),
+                    },
+                }),
                 beacon_interval: Duration::from_millis(50),
                 reset_interval: Duration::from_millis(50),
-                beacon_send: tcslibgs::HostPort {
-                    address: "127.0.0.1".to_string(),
-                    port: 0,
-                },
-                beacon_recv: tcslibgs::HostPort {
-                    address: at.ip().to_string(),
-                    port: at.port(),
-                },
                 // Nothing to write: what is being tested is what goes out.
                 log_dir: None,
                 log_segment_bytes: 65_536,

@@ -176,6 +176,23 @@ pub fn reach_of(node: &Node) -> Result<Reach, String> {
     let what = node.name.as_str();
     let kind = kind_of(node)?;
 
+    // A gateway on a software bus is reached through the SBN peer the
+    // section states, and has no socket of its own: an address on one is
+    // somewhere somebody expects to be listened on, and nothing will be.
+    if on_bus(node) {
+        for socket in ["address", "port", "protocol"] {
+            if node.attributes.contains_key(socket) {
+                return Err(format!(
+                    "\"{what}\" is a {} node, which is on the cFS software \
+                     bus through the tcspecial section's sbn peer and has no \
+                     socket of its own: take {socket} out, and say cmd_msgid \
+                     for where what it sends on is published",
+                    node.node_type
+                ));
+            }
+        }
+    }
+
     let mut said = Said::default();
     for (attribute, value) in &node.attributes {
         if !take(&mut said, node, kind, attribute, value)? {
@@ -663,6 +680,21 @@ fn take(
                 }
             }
         }
+        // Where what the bus sends to a gateway on it is published, which only
+        // such a node has: read below.
+        "cmd_msgid" if on_bus(node) => {
+            crate::types::msgid_of("cmd_msgid", value.as_str())
+                .map_err(|why| format!("\"{what}\": {why}"))?;
+        }
+        "cmd_msgid" => {
+            return Err(format!(
+                "\"{what}\" is {} {} node, and cmd_msgid is the message ID a \
+                 gateway_cfs node takes from the cFS software bus: only that \
+                 node has one",
+                kind.article(),
+                node.node_type
+            ))
+        }
         // Where the F´ IDs of what goes to an F´ bridge begin, which the
         // bridge's model is made from and nothing aboard reads: read below.
         "fprime_id_base"
@@ -932,6 +964,12 @@ fn fits_one_read(
     Ok(())
 }
 
+/// Whether a node is a gateway on a software bus, which is reached through the
+/// section's SBN peer rather than over a socket of its own.
+pub fn on_bus(node: &Node) -> bool {
+    GatewayKind::of_node_type(&node.node_type).is_some_and(GatewayKind::on_bus)
+}
+
 /// What a gateway node that binds nothing is given as its address: see
 /// [`binds`].
 const UNBOUND: &str = "0.0.0.0";
@@ -975,6 +1013,21 @@ fn ground_of(what: &str, node: &Node) -> Result<Option<HostPort>, String> {
         return Ok(None);
     };
     let base = kind.base_attribute();
+    // On a bus the base is a message ID, and the vehicle reaches the far end
+    // through the section's SBN peer, so there is no socket to give.
+    if kind.on_bus() {
+        let stated = required(
+            what,
+            node,
+            base,
+            "a link to the cFS software bus",
+            "the first of the message IDs what arrives is published under -- \
+             each node linked into it is that ID plus its own device id",
+        )?;
+        crate::types::msgid_of(base, stated.as_str())
+            .map_err(|why| format!("\"{what}\": {why}"))?;
+        return Ok(None);
+    }
     let stated = required(
         what,
         node,
@@ -1100,7 +1153,8 @@ fn kind_of(node: &Node) -> Result<DHType, String> {
         other => Err(format!(
             "\"{}\": there is no node type called \"{other}\". The interfaces \
              are i2c, spi, serial, hdlc, can, iio, rpmsg, gpio, device-file \
-             and network; a ground link is gateway_radio; and compute, log, \
+             and network; a gateway is gateway_radio, gateway_fprime or \
+             gateway_cfs; and compute, log, \
              null-gateway, null-payload, tee-gateway, tee-payload, ping and \
              the app nodes are the rest",
             node.name

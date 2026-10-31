@@ -796,6 +796,7 @@ mod tests {
                 // The gateway nodes, which are at the root because they have
                 // no Rust of their own, then the two families in the order
                 // the code tree holds them.
+                "gateway_cfs",
                 "gateway_fprime",
                 "gateway_radio",
                 // What the vehicle carries: the two that are programs first,
@@ -1085,6 +1086,7 @@ mod tests {
             // The gateway nodes, which have none: see above.
             if one.path == Path::new("gateway_radio.yaml")
                 || one.path == Path::new("gateway_fprime.yaml")
+                || one.path == Path::new("gateway_cfs.yaml")
             {
                 continue;
             }

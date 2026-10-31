@@ -307,6 +307,16 @@ deployment’s bridge component at its <code>bridge_base</code>, and takes
 the bridge’s commands on to a heater.
 <code>tcspecial/tests/fprime.rs</code> flies it.</td>
 </tr>
+<tr>
+<td><code>cfs</code></td>
+<td>A vehicle that answers to a cFS flight computer: tcspecial joins its
+software bus as an SBN peer, a <code>gateway_cfs</code> node publishes
+each reading as its <code>tlm_base</code> plus the reading’s device id,
+and a command published as its <code>cmd_msgid</code> goes on to a
+heater. Every link is carried over the one peer, as message IDs.
+<code>tcspecial/tests/cfs.rs</code> flies it against a test playing the
+cFS side.</td>
+</tr>
 </tbody>
 </table>
 <h3 id="minimal">minimal</h3>

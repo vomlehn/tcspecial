@@ -34,13 +34,14 @@ use std::sync::mpsc::{Receiver, SyncSender};
 use std::sync::Mutex;
 use std::time::{Duration, Instant};
 
-use tcslibgs::graph::telemetry::Telemetered;
+use tcslibgs::graph::telemetry::{Reaches, Telemetered};
 use tcslibgs::graph::Graph;
 
 use std::sync::Arc;
 
 use crate::endpoint::bind_oc_pair;
 use crate::node::vehicle::log::LogNode;
+use crate::runtime::bus::{Bus, BusDownlink, BusGatewayPort};
 use crate::runtime::fabric::{Arriving, Fabric, Moved, Port, Read, Taken};
 use crate::runtime::matched::Matched;
 use crate::runtime::node_state::{Abandon, NodeStates, Nudge};
@@ -332,6 +333,9 @@ impl System {
     ///               paced node is first due.
     /// * `segsend` - What each log hands its filled segments to.
     /// * `matched` - Whether the ground has matched this start.
+    /// * `bus`     - The software bus, for a configuration that answers over
+    ///               one: each link to the ground publishes on it, and each
+    ///               `gateway_cfs` node takes what it sends from it.
     ///
     /// # Returns
     ///
@@ -346,13 +350,17 @@ impl System {
         now: Instant,
         segsend: SegSend,
         matched: Matched,
+        bus: Option<Bus>,
     ) -> Result<System, Vec<String>> {
+        let nodes_bus = bus.clone();
         System::of_opening(
             graph,
             now,
-            move |node, routes, abandon| open(node, routes, abandon, &segsend),
+            move |node, routes, abandon| {
+                open(node, routes, abandon, &segsend, nodes_bus.as_ref())
+            },
             |link| {
-                open_ground_link(link).map(|port| {
+                open_ground_link(link, bus.as_ref()).map(|port| {
                     Box::new(Downlink::of(port, matched.clone()))
                         as Box<dyn Port>
                 })
@@ -966,9 +974,14 @@ fn is_polled(
 /// Written to and never read. The ground's end is written down, so this sends
 /// there from the first reading rather than waiting to be spoken to.
 ///
+/// On a software bus, what it is given is published under its message ID
+/// instead, with a publisher of its own.
+///
 /// # Arguments
 ///
-/// * `link` - The link: its name and its vehicle and ground addresses.
+/// * `link` - The link: its name and its vehicle and ground addresses, or
+///            its message ID.
+/// * `bus`  - The software bus, for a link on one.
 ///
 /// # Returns
 ///
@@ -977,16 +990,28 @@ fn is_polled(
 /// # Errors
 ///
 /// Why tcspecial's end could not be bound to send to the ground's.
-pub fn open_ground_link(link: &Telemetered) -> Result<Box<dyn Port>, String> {
+pub fn open_ground_link(
+    link: &Telemetered,
+    bus: Option<&Bus>,
+) -> Result<Box<dyn Port>, String> {
     let what = link.name.as_str();
+    let (vehicle, ground) = match &link.reaches {
+        Reaches::Socket { vehicle, ground } => (vehicle, ground),
+        Reaches::Bus(msgid) => {
+            let bus = bus.ok_or_else(|| {
+                format!(
+                    "{what}: is published on a software bus, and none was \
+                     opened"
+                )
+            })?;
+            return Ok(Box::new(BusDownlink::of(bus.publisher(), *msgid)));
+        }
+    };
     let (reader, writer) =
-        bind_oc_pair(what, &link.vehicle, Some(&link.ground)).map_err(|e| {
+        bind_oc_pair(what, vehicle, Some(ground)).map_err(|e| {
             format!(
                 "{what}: cannot send from {}:{} to the ground at {}:{}: {e}",
-                link.vehicle.address,
-                link.vehicle.port,
-                link.ground.address,
-                link.ground.port
+                vehicle.address, vehicle.port, ground.address, ground.port
             )
         })?;
     Ok(Box::new(EndpointPort::of(
@@ -1103,6 +1128,8 @@ impl Port for Downlink {
 /// * `abandon` - What ends a wait inside one of its operations when the
 ///               ground disables it.
 /// * `segsend` - What a log hands its filled segments to.
+/// * `bus`     - The software bus, for a configuration that answers over
+///               one.
 ///
 /// # Returns
 ///
@@ -1116,6 +1143,7 @@ pub fn open(
     routes: &Routes,
     abandon: &Abandon,
     segsend: &SegSend,
+    bus: Option<&Bus>,
 ) -> Result<Box<dyn Port>, String> {
     match node.node_type.as_str() {
         "compute" => {
@@ -1140,6 +1168,19 @@ pub fn open(
                 || Use::of(routes, &node.name).is_err() =>
         {
             Ok(Box::new(NullPort::of()))
+        }
+        // A gateway on a software bus takes what the bus sends it from the
+        // inbox the bus's reader puts it in. One the bus sends nothing to --
+        // it states no cmd_msgid -- or that nothing is read from is held as
+        // a node that is never asked anything, as a radio's is.
+        "gateway_cfs" => {
+            let inbox = bus.and_then(|bus| bus.inbox(&node.name));
+            match inbox {
+                Some(inbox) if Use::of(routes, &node.name).is_ok() => {
+                    Ok(Box::new(BusGatewayPort::of(inbox)))
+                }
+                _ => Ok(Box::new(NullPort::of())),
+            }
         }
         // A node whose work is a program, started here and talked to over the
         // file interfaces `tcsapp` describes. Three of the five kinds are the
@@ -2192,7 +2233,7 @@ vehicle:
                         as Box<dyn Port>),
                     // And the ones that need nothing but a configuration, which
                     // are opened for real.
-                    _ => open(node, routes, abandon, &SegSend::none()),
+                    _ => open(node, routes, abandon, &SegSend::none(), None),
                 }
             },
             // What goes to the ground, watched rather than sent: there is no
@@ -2541,7 +2582,7 @@ vehicle:
                     got: Arc::clone(&opening),
                 })
                     as Box<dyn Port>),
-                _ => open(node, routes, abandon, &SegSend::none()),
+                _ => open(node, routes, abandon, &SegSend::none(), None),
             },
             move |_: &Telemetered| {
                 Ok(Box::new(Sink {
@@ -2780,7 +2821,7 @@ vehicle:
                         readings: Arc::clone(&pings),
                     }) as Box<dyn Port>)
                 } else {
-                    open(node, routes, abandon, &SegSend::none())
+                    open(node, routes, abandon, &SegSend::none(), None)
                 }
             },
             |link: &Telemetered| {
@@ -2919,7 +2960,7 @@ vehicle:
                     "spi" | "gpio" | "gateway_radio" => {
                         Ok(Box::new(Ground::default()) as Box<dyn Port>)
                     }
-                    _ => open(node, routes, abandon, &SegSend::none()),
+                    _ => open(node, routes, abandon, &SegSend::none(), None),
                 }
             },
             |_link| Ok(Box::new(Ground::default()) as Box<dyn Port>),

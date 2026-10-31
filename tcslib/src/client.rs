@@ -69,7 +69,9 @@ pub struct CommandLinks {
 /// # Errors
 ///
 /// A message saying what is wrong with the `tcspecial` section's command
-/// interpreter settings.
+/// interpreter settings, and for a configuration that answers to cFS, whose
+/// commands are published on its software bus and which tcslib has no
+/// transport for yet.
 pub fn command_links_of(
     graph: &tcslibgs::graph::Graph,
 ) -> Result<Option<CommandLinks>, String> {
@@ -79,11 +81,19 @@ pub fn command_links_of(
         return Ok(None);
     };
     let ci = ci_config_of(&flatten(section))?.to_ci_config()?;
+    let Some(ci) = ci.sockets() else {
+        return Err(format!(
+            "this configuration answers to {}, whose commands go over its \
+             software bus, and tcslib speaks only UDP so far: command it from \
+             the cFS side",
+            ci.gateway
+        ));
+    };
     Ok(Some(CommandLinks {
         from: ci.moc_cmd_send.to_string(),
         interpreter: format!("{}:{}", ci.address, ci.port),
-        nodes_from: ci.payload_command_source_base,
-        nodes_to: ci.payload_command_dest_base,
+        nodes_from: ci.payload_command_source_base.clone(),
+        nodes_to: ci.payload_command_dest_base.clone(),
     }))
 }
 

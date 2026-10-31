@@ -718,6 +718,92 @@ fn gateway_stray(
 }
 
 impl Graph {
+    /// What would not fit in a cFS packet on the bus a configuration answers
+    /// to: a source whose largest datum, with the packet's headers, is more
+    /// than `sbn.max_message`, or the longest command, answer or beacon.
+    ///
+    /// Refused where the file is read rather than cut short or dropped as it
+    /// is sent: SBN drops a message longer than this on arrival, and says so
+    /// only in an event on the cFS side.
+    ///
+    /// # Returns
+    ///
+    /// Each node, or `None` for what is the section's, with what to say
+    /// about it. Nothing for a configuration whose links are sockets.
+    fn too_large_for_the_bus(&self) -> Vec<(Option<String>, String)> {
+        let Some(section) = self.tcspecial.as_ref() else {
+            return Vec::new();
+        };
+        let Ok(ci) = crate::graph::parameters::ci_config_of(
+            &crate::graph::parameters::flatten(section),
+        )
+        .and_then(|json| json.to_ci_config()) else {
+            return Vec::new();
+        };
+        let Some(bus) = ci.bus() else {
+            return Vec::new();
+        };
+        let most = bus.sbn.max_message as usize;
+        let header = crate::cfs::HEADER_BYTES;
+        let mut too_large = Vec::new();
+        let mut seen = BTreeSet::new();
+        for link in crate::graph::telemetry::of(self).unwrap_or_default() {
+            if link.msgid().is_none() || !seen.insert(link.source.clone()) {
+                continue;
+            }
+            let Some(node) = self.node(&link.source) else {
+                continue;
+            };
+            // What one read of it can be: what it asks for, where it says,
+            // the most a line of it is, where it is a stream, and the most a
+            // datum carries otherwise.
+            let largest = crate::graph::reach::reach_of(node)
+                .ok()
+                .and_then(|reach| {
+                    reach
+                        .read_size
+                        .map(|size| size as usize)
+                        .or(reach.stream.map(|rule| rule.max_length as usize))
+                })
+                .unwrap_or(crate::types::DATUM_BYTES);
+            if largest + header > most {
+                too_large.push((
+                    Some(node.name.clone()),
+                    format!(
+                        "\"{}\" can produce {largest} bytes at once, which \
+                         with the {header} bytes of a cFS packet's headers is \
+                         {} bytes, and sbn.max_message is {most}: SBN drops \
+                         a message longer than that on arrival, so give the \
+                         node a smaller read_size or max_length, or check \
+                         that sbn.max_message is the cFS build's \
+                         CFE_MISSION_SB_MAX_SB_MSG_SIZE",
+                        node.name,
+                        largest + header
+                    ),
+                ));
+            }
+        }
+        for (what, size) in [
+            ("the longest command", crate::link::COMMAND_BYTES),
+            ("the longest answer", crate::link::ANSWER_BYTES),
+            ("the beacon", crate::beacon::BEACON_BYTES),
+        ] {
+            if size + header > most {
+                too_large.push((
+                    None,
+                    format!(
+                        "sbn.max_message is {most}, and {what} is {} bytes \
+                         with a cFS packet's headers: give the cFS build's \
+                         CFE_MISSION_SB_MAX_SB_MSG_SIZE, which is 32768 in \
+                         cFE's example",
+                        size + header
+                    ),
+                ));
+            }
+        }
+        too_large
+    }
+
     /// Whether the `tcspecial` section is there and reads, which is what
     /// decides whether a refusal that names no node is the section's own
     /// complaint said a second time.
@@ -1166,6 +1252,29 @@ impl Graph {
             }
         }
 
+        // On a software bus: every message ID inside the allotment, of the
+        // type its use needs and used once, and every source's largest datum
+        // small enough for the bus to carry. Asked only where the section
+        // reads, which is complained about where it is checked.
+        if self.tcspecial_reads() {
+            if let Err(refused) = crate::graph::telemetry::msgids(self) {
+                match refused.node {
+                    Some(node) => problems.push(Problem::BadNode {
+                        node,
+                        why: refused.why,
+                    }),
+                    None => problems
+                        .push(Problem::BadTcspecial { why: refused.why }),
+                }
+            }
+            for (node, why) in self.too_large_for_the_bus() {
+                problems.push(match node {
+                    Some(node) => Problem::BadNode { node, why },
+                    None => Problem::BadTcspecial { why },
+                });
+            }
+        }
+
         // A ground link that receives -- commands, or a line out of it --
         // says where aboard the ground sends them: both its address and its
         // port. One that only sends to its ground_base binds nothing.
@@ -1176,6 +1285,29 @@ impl Graph {
         {
             let commanded = self.commands.iter().any(|b| b.from == node.name);
             let feeds = self.links.iter().any(|l| l.origin().node == node.name);
+            // On a software bus, what it receives is published under its
+            // cmd_msgid, as a socket's arrives at its address and port.
+            if crate::graph::reach::on_bus(node) {
+                if (commanded || feeds)
+                    && !node.attributes.contains_key("cmd_msgid")
+                {
+                    problems.push(Problem::BadNode {
+                        node: node.name.clone(),
+                        why: format!(
+                            "\"{}\" receives from the cFS software bus -- {} \
+                             -- so it needs the message ID that is published \
+                             under: say cmd_msgid",
+                            node.name,
+                            if commanded {
+                                "a command binding comes from it"
+                            } else {
+                                "a line leaves it"
+                            }
+                        ),
+                    });
+                }
+                continue;
+            }
             if (commanded || feeds) && !crate::graph::reach::binds(node) {
                 problems.push(Problem::BadNode {
                     node: node.name.clone(),
@@ -1971,6 +2103,7 @@ mod tests {
                 ("bridge_base", "10.0.0.3:7700"),
                 ("fprime_id_base", "0x3000"),
             ],
+            "gateway_cfs" => &[("cmd_msgid", "0x4281"), ("tlm_base", "0x4240")],
             // An app node is the program it names, and the argument for each
             // stream its kind handles: see `crate::node::app`.
             "app_payload_veh" | "app_pl" => &[
@@ -2096,6 +2229,206 @@ mod tests {
         let g =
             graph(vec![node("a", "i2c"), ground], vec![link("a", &["ground"])]);
         refused(&g, "ground", "only a gateway_fprime node");
+    }
+
+    /// A graph that answers to cFS, its section the design's example.
+    ///
+    /// # Arguments
+    ///
+    /// * `nodes` - Its nodes.
+    /// * `links` - Its links.
+    ///
+    /// # Returns
+    ///
+    /// The graph, its `tcspecial.gateway` being `cfs`.
+    fn answering_cfs(nodes: Vec<Node>, links: Vec<Link>) -> Graph {
+        let mut said = crate::graph::parameters::flatten(&tcspecial());
+        said.retain(|name, _| {
+            crate::graph::parameters::needed(name).is_some_and(|needed| {
+                needed.belongs(crate::gateway::GatewayKind::Cfs)
+            })
+        });
+        for (name, value) in [
+            ("gateway", "cfs"),
+            ("sbn.release", "v7.0.1"),
+            ("sbn.ident", "3b339a5e0f686cef822a5d6ea95004222ab7af33"),
+            ("sbn.spacecraft_id", "0x42"),
+            ("sbn.processor_id", "2"),
+            ("sbn.local", "0.0.0.0:2234"),
+            ("sbn.peer", "10.0.0.1:2234"),
+            ("sbn.peer_processor_id", "1"),
+            ("sbn.max_message", "32768"),
+            ("msgid_range.first", "0x4200"),
+            ("msgid_range.last", "0x42FF"),
+            ("tcs_cmd.cmd_msgid", "0x4280"),
+            ("tcs_cmd.response_msgid", "0x4200"),
+            ("payload_command.cmd_base", "0x4290"),
+            ("payload_command.response_base", "0x4210"),
+            ("payload_telemetry.tlm_base", "0x4220"),
+            ("beacon.tlm_msgid", "0x4201"),
+            ("cfe_time.epoch", "1980-01-01T00:00:00"),
+            ("cfe_time.scale", "tai"),
+            ("cfe_time.leap_seconds", "37"),
+        ] {
+            said.insert(name.to_string(), Scalar::of(value));
+        }
+        let mut g = graph(nodes, links);
+        g.tcspecial = Some(crate::graph::parameters::nest(&said));
+        g
+    }
+
+    /// Whether a check says something about `node_name` containing every
+    /// one of `wanted`.
+    fn says(g: &Graph, node_name: Option<&str>, wanted: &[&str]) -> bool {
+        g.check().iter().any(|p| match (p, node_name) {
+            (Problem::BadNode { node, why }, Some(name)) => {
+                node == name && wanted.iter().all(|w| why.contains(w))
+            }
+            (Problem::BadTcspecial { why }, None) => {
+                wanted.iter().all(|w| why.contains(w))
+            }
+            _ => false,
+        })
+    }
+
+    /// A configuration that answers to cFS, through a `gateway_cfs` node
+    /// that sends on to a heater, is sound, and its message IDs are those
+    /// the design lays out.
+    #[test]
+    fn a_graph_answering_to_cfs_is_sound() {
+        let mut heater = node("heater", "network");
+        heater.attributes.insert("port".into(), Scalar::of("5101"));
+        let g = answering_cfs(
+            vec![node("a", "i2c"), node("fsw", "gateway_cfs"), heater],
+            vec![link("a", &["fsw"]), link("fsw", &["heater"])],
+        );
+        assert_eq!(g.check(), Vec::new());
+        let used = crate::graph::telemetry::msgids(&g).expect("sound");
+        let id_of = |carries: &crate::graph::telemetry::Carries| {
+            used.iter().find(|u| &u.carries == carries).map(|u| u.msgid)
+        };
+        use crate::graph::telemetry::Carries;
+        assert_eq!(id_of(&Carries::SpacecraftCommands), Some(0x4280));
+        assert_eq!(id_of(&Carries::NodeCommands(1)), Some(0x4291));
+        assert_eq!(id_of(&Carries::NodeAnswers(2)), Some(0x4212));
+        assert_eq!(id_of(&Carries::Gateway("fsw".into())), Some(0x4281));
+        // "a" is device id 0, drawn into fsw: its tlm_base plus nought.
+        assert_eq!(id_of(&Carries::Telemetry("a to fsw".into())), Some(0x4240));
+    }
+
+    /// A gateway_cfs node has no socket, says where what it sends on is
+    /// published when it sends anything on, and states its tlm_base; and
+    /// cmd_msgid is a gateway_cfs node's alone.
+    #[test]
+    fn a_cfs_gateway_states_message_ids_and_no_socket() {
+        let mut fsw = node("fsw", "gateway_cfs");
+        fsw.attributes
+            .insert("address".into(), Scalar::of("10.0.0.1"));
+        let g = answering_cfs(vec![node("a", "i2c"), fsw], vec![]);
+        assert!(says(&g, Some("fsw"), &["take address out", "cmd_msgid"]));
+
+        let mut fsw = node("fsw", "gateway_cfs");
+        fsw.attributes.remove("cmd_msgid");
+        let mut heater = node("heater", "network");
+        heater.attributes.insert("port".into(), Scalar::of("5101"));
+        let g =
+            answering_cfs(vec![fsw, heater], vec![link("fsw", &["heater"])]);
+        assert!(says(
+            &g,
+            Some("fsw"),
+            &["a line leaves it", "say cmd_msgid"]
+        ));
+
+        let mut fsw = node("fsw", "gateway_cfs");
+        fsw.attributes.remove("tlm_base");
+        let g = answering_cfs(vec![node("a", "i2c"), fsw], vec![]);
+        assert!(says(&g, Some("fsw"), &["say tlm_base"]));
+
+        let mut ground = node("ground", "gateway_radio");
+        ground
+            .attributes
+            .insert("cmd_msgid".into(), Scalar::of("0x4281"));
+        let g = graph(vec![node("a", "i2c"), ground], vec![]);
+        assert!(says(&g, Some("ground"), &["only that node has one"]));
+    }
+
+    /// A message ID outside the allotment, of the wrong type for its use, or
+    /// used twice, is refused naming what it is for and the ID.
+    #[test]
+    fn the_allotment_is_held_to() {
+        let with_fsw = |cmd: &str, tlm: &str| {
+            let mut fsw = node("fsw", "gateway_cfs");
+            fsw.attributes.insert("cmd_msgid".into(), Scalar::of(cmd));
+            fsw.attributes.insert("tlm_base".into(), Scalar::of(tlm));
+            answering_cfs(
+                vec![node("a", "i2c"), fsw],
+                vec![link("a", &["fsw"])],
+            )
+        };
+        // Outside the range.
+        let g = with_fsw("0x4381", "0x4240");
+        assert!(says(
+            &g,
+            Some("fsw"),
+            &["cmd_msgid of \"fsw\"", "0x4381", "msgid_range"]
+        ));
+        // Telemetry's where a command's is wanted.
+        let g = with_fsw("0x4241", "0x4240");
+        assert!(says(&g, Some("fsw"), &["0x4241", "reads as telemetry"]));
+        // A command's where telemetry's is.
+        let g = with_fsw("0x4281", "0x42C0");
+        assert!(says(&g, Some("a"), &["0x42c0", "reads as a command"]));
+        // Two uses of one: the spacecraft's command ID.
+        let g = with_fsw("0x4280", "0x4240");
+        assert!(says(
+            &g,
+            Some("fsw"),
+            &["tcs_cmd.cmd_msgid", "both message ID 0x4280"]
+        ));
+        // A source landing on the beacon's.
+        let g = with_fsw("0x4281", "0x4201");
+        assert!(says(&g, Some("a"), &["beacon.tlm_msgid", "0x4201"]));
+    }
+
+    /// A source whose largest datum would not fit in a cFS packet of
+    /// `sbn.max_message` is refused naming the node and both sizes.
+    #[test]
+    fn a_datum_too_large_for_the_bus_is_refused() {
+        let g = answering_cfs(
+            vec![node("a", "i2c"), node("fsw", "gateway_cfs")],
+            vec![link("a", &["fsw"])],
+        );
+        let mut said =
+            crate::graph::parameters::flatten(g.tcspecial.as_ref().unwrap());
+        said.insert("sbn.max_message".into(), Scalar::of("1000"));
+        let mut g = g;
+        g.tcspecial = Some(crate::graph::parameters::nest(&said));
+        assert!(says(&g, Some("a"), &["4096 bytes", "4112", "1000"]));
+
+        let mut small = node("a", "i2c");
+        small.attributes.insert("read_size".into(), Scalar::of("2"));
+        let mut g2 = answering_cfs(
+            vec![small, node("fsw", "gateway_cfs")],
+            vec![link("a", &["fsw"])],
+        );
+        g2.tcspecial = g.tcspecial.clone();
+        assert!(!says(&g2, Some("a"), &["bytes at once"]));
+    }
+
+    /// A cFS gateway under the radio, and a radio under cFS, are refused
+    /// naming both kinds.
+    #[test]
+    fn a_cfs_gateway_under_the_radio_is_refused() {
+        let g = graph(
+            vec![node("a", "i2c"), node("fsw", "gateway_cfs")],
+            vec![link("a", &["fsw"])],
+        );
+        assert!(says(&g, Some("fsw"), &["cfs", "radio"]));
+        let g = answering_cfs(
+            vec![node("a", "i2c"), node("ground", "gateway_radio")],
+            vec![link("a", &["ground"])],
+        );
+        assert!(says(&g, Some("ground"), &["radio", "cfs"]));
     }
 
     /// An F´ gateway in a configuration that answers to the radio is a

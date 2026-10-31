@@ -1,0 +1,110 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<configuration
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:noNamespaceSchemaLocation="../../tcsgui/share/schema/tcspecial.xsd">
+    <description>Answering to a cFS flight computer: a reading published on its software bus, and a command from it to a heater</description>
+    <tcspecial>
+        <!-- The vehicle answers to a cFS flight computer rather than to the
+             ground. It is one more peer of the computer's Software Bus
+             Network, over SBN's UDP module, and everything it takes and
+             sends crosses that one link as cFS packets: there is no command
+             socket and no beacon socket. The far end's SBN table must list
+             tcspecial as processor 2 of spacecraft 0x42, at the address and
+             port of sbn.local.
+
+             The payloads' ports are in the eighty-six hundreds, which no
+             other example uses, so this one can be left running while
+             another is looked at. -->
+        <beacon>
+            <default_interval>5 s</default_interval>
+            <reset_interval>1 s</reset_interval>
+            <tlm_msgid>0x4201</tlm_msgid>
+        </beacon>
+        <!-- Copied from the cFS build: its epoch, its time scale, and TAI
+             less UTC. -->
+        <cfe_time>
+            <epoch>1980-01-01T00:00:00</epoch>
+            <leap_seconds>37</leap_seconds>
+            <scale>tai</scale>
+        </cfe_time>
+        <gateway>cfs</gateway>
+        <interface>ad9aac4dd5a6d88dd5e78824ba8a83ac</interface>
+        <log>
+            <directory>/tmp/telemetry</directory>
+            <segment_size>65536</segment_size>
+        </log>
+        <!-- The block of message IDs the mission allotted tcspecial:
+             subsystem 0x42, its telemetry below 0x4280 and its commands from
+             there. -->
+        <msgid_range>
+            <first>0x4200</first>
+            <last>0x42FF</last>
+        </msgid_range>
+        <!-- Node k's commands are published as 0x4290 plus k, and their
+             answers as 0x4210 plus k. -->
+        <payload_command>
+            <cmd_base>0x4290</cmd_base>
+            <response_base>0x4210</response_base>
+        </payload_command>
+        <payload_telemetry>
+            <tlm_base>0x4220</tlm_base>
+        </payload_telemetry>
+        <!-- The far end: SBN v7.0.1 on processor 1, listening on SBN's own
+             port. The ident is the hash SBN prints in its start-up
+             event. -->
+        <sbn>
+            <ident>3b339a5e0f686cef822a5d6ea95004222ab7af33</ident>
+            <local>0.0.0.0:8634</local>
+            <max_message>32768</max_message>
+            <peer>127.0.0.1:2234</peer>
+            <peer_processor_id>1</peer_processor_id>
+            <processor_id>2</processor_id>
+            <release>v7.0.1</release>
+            <spacecraft_id>0x42</spacecraft_id>
+        </sbn>
+        <!-- tcspecial counts its starts in this file, which must be on
+             storage that survives a power cycle on a vehicle. -->
+        <state_file>/tmp/tcspecial-cfs.state</state_file>
+        <tcs_cmd>
+            <cmd_msgid>0x4280</cmd_msgid>
+            <response_msgid>0x4200</response_msgid>
+        </tcs_cmd>
+    </tcspecial>
+    <!-- The software bus's end of the link, both ways. What the bus
+         publishes as cmd_msgid, 0x4281, is taken by this node and leaves it
+         by gateway-out for the heater. What comes down is published as
+         tlm_base plus the device id of the node that sent it: the
+         thermometer, device id 2, as 0x4242. -->
+    <gateway>
+        <name>fsw</name>
+        <type>gateway_cfs</type>
+        <cmd_msgid>0x4281</cmd_msgid>
+        <tlm_base>0x4240</tlm_base>
+        <payload-in>true</payload-in>
+        <gateway-out><target>heater</target></gateway-out>
+    </gateway>
+    <!-- A heater, driven by what the flight computer sends: the far end of a
+         UDP socket. -->
+    <payloads>
+        <name>heater</name>
+        <type>network</type>
+        <protocol>udp</protocol>
+        <address>127.0.0.1</address>
+        <port>8601</port>
+        <gateway-in>true</gateway-in>
+    </payloads>
+    <!-- A thermometer whose readings go to the flight computer. -->
+    <payloads>
+        <name>thermometer</name>
+        <type>network</type>
+        <protocol>udp</protocol>
+        <address>127.0.0.1</address>
+        <port>8602</port>
+        <payload-out><target>fsw</target></payload-out>
+    </payloads>
+    <tcsgui>
+        <nodes><name>fsw</name><x>469</x><y>34</y></nodes>
+        <nodes><name>heater</name><x>34</x><y>34</y></nodes>
+        <nodes><name>thermometer</name><x>34</x><y>134</y></nodes>
+    </tcsgui>
+</configuration>

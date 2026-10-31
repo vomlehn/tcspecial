@@ -1,0 +1,95 @@
+# yaml-language-server: $schema=../../tcsgui/share/schema/tcspecial.schema.json
+
+description: "Answering to a cFS flight computer: a reading published on its
+  software bus, and a command from it to a heater"
+
+tcspecial:
+  # The vehicle answers to a cFS flight computer rather than to the ground.
+  # It is one more peer of the computer's Software Bus Network, over SBN's
+  # UDP module, and everything it takes and sends crosses that one link as
+  # cFS packets: there is no command socket and no beacon socket. The far
+  # end's SBN table must list tcspecial as processor 2 of spacecraft 0x42,
+  # at the address and port of sbn.local.
+  #
+  # The payloads' ports are in the eighty-six hundreds, which no other
+  # example uses, so this one can be left running while another is looked at.
+  beacon:
+    default_interval: "5 s"
+    reset_interval: "1 s"
+    tlm_msgid: "0x4201"
+  # Copied from the cFS build: its epoch, its time scale, and TAI less UTC.
+  cfe_time:
+    epoch: "1980-01-01T00:00:00"
+    leap_seconds: "37"
+    scale: "tai"
+  gateway: "cfs"
+  interface: "ad9aac4dd5a6d88dd5e78824ba8a83ac"
+  log:
+    directory: "/tmp/telemetry"
+    segment_size: "65536"
+  # The block of message IDs the mission allotted tcspecial: subsystem 0x42,
+  # its telemetry below 0x4280 and its commands from there.
+  msgid_range:
+    first: "0x4200"
+    last: "0x42FF"
+  # Node k's commands are published as 0x4290 plus k, and their answers as
+  # 0x4210 plus k.
+  payload_command:
+    cmd_base: "0x4290"
+    response_base: "0x4210"
+  payload_telemetry:
+    tlm_base: "0x4220"
+  # The far end: SBN v7.0.1 on processor 1, listening on SBN's own port. The
+  # ident is the hash SBN prints in its start-up event.
+  sbn:
+    ident: "3b339a5e0f686cef822a5d6ea95004222ab7af33"
+    local: "0.0.0.0:8634"
+    max_message: "32768"
+    peer: "127.0.0.1:2234"
+    peer_processor_id: "1"
+    processor_id: "2"
+    release: "v7.0.1"
+    spacecraft_id: "0x42"
+  # tcspecial counts its starts in this file, which must be on storage
+  # that survives a power cycle on a vehicle.
+  state_file: "/tmp/tcspecial-cfs.state"
+  tcs_cmd:
+    cmd_msgid: "0x4280"
+    response_msgid: "0x4200"
+
+gateway:
+  # The software bus's end of the link, both ways. What the bus publishes as
+  # cmd_msgid, 0x4281, is taken by this node and leaves it by gateway-out for
+  # the heater. What comes down is published as tlm_base plus the device id
+  # of the node that sent it: the thermometer, device id 2, as 0x4242.
+  - name: fsw
+    type: gateway_cfs
+    cmd_msgid: "0x4281"
+    tlm_base: "0x4240"
+    payload-in: true
+    gateway-out:
+      - target: heater
+
+payloads:
+  # A heater, driven by what the flight computer sends: the far end of a UDP
+  # socket.
+  - name: heater
+    type: network
+    protocol: "udp"
+    address: "127.0.0.1"
+    port: "8601"
+    gateway-in: true
+  # A thermometer whose readings go to the flight computer.
+  - name: thermometer
+    type: network
+    protocol: "udp"
+    address: "127.0.0.1"
+    port: "8602"
+    payload-out:
+      - target: fsw
+
+tcsgui:
+  nodes:
+    - { name: fsw, x: 469, y: 34 }
+    - { name: heater, x: 34, y: 34 }
+    - { name: thermometer, x: 34, y: 134 }

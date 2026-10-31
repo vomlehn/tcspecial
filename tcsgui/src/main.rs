@@ -3544,15 +3544,21 @@ where
 /// * `editor` - The session whose parameters are shown.
 fn put_parameters(window: &ParametersWindow, editor: &Editor) {
     let said = &editor.document().tcspecial;
+    // Which must be stated depends on what the vehicle answers to, which
+    // decides how its links are written: until it says, only what every
+    // configuration needs is marked.
+    let kind = said
+        .get("gateway")
+        .and_then(|said| tcslibgs::gateway::GatewayKind::of(said).ok());
     let fields: Vec<FieldView> = tcslibgs::graph::parameters::ATTRIBUTES
         .iter()
-        .map(|(attribute, required)| {
+        .map(|(attribute, needed)| {
             let value = said.get(*attribute).cloned().unwrap_or_default();
             FieldView {
                 about: Default::default(),
                 name: (*attribute).into(),
                 value: value.clone().into(),
-                required: *required,
+                required: needed.required(kind),
                 is_heading: false,
                 simulated: false,
                 // The section's own parameters are not described in the tree,
@@ -11476,7 +11482,7 @@ mod tests {
             fields.iter().filter(|f| f.required).count(),
             tcslibgs::graph::parameters::ATTRIBUTES
                 .iter()
-                .filter(|(_, required)| *required)
+                .filter(|(_, needed)| needed.required(None))
                 .count()
         );
         assert_eq!(window.get_complaint(), "", "nothing is wrong yet");

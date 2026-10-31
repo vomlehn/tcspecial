@@ -1236,15 +1236,20 @@ winner decided by the order the files happened to be read in.</p>
 </div>
 <div class="section" id="gateways-what-the-vehicle-answers-to">
 <h2><a class="toc-backref" href="#toc-entry-10">Gateways: what the vehicle answers to</a></h2>
-<p><strong>Specified, and built as far as the F´ gateway node.</strong> <tt class="docutils literal">tcspecial.gateway</tt>
-is read and required; <tt class="docutils literal">radio</tt> and <tt class="docutils literal">fprime</tt> are the kinds it accepts, and a
-configuration naming <tt class="docutils literal">cfs</tt> is refused as specified but not yet built --
+<p><strong>Specified, and built but for the far ends.</strong> <tt class="docutils literal">tcspecial.gateway</tt> is read
+and required, and <tt class="docutils literal">radio</tt>, <tt class="docutils literal">cfs</tt> and <tt class="docutils literal">fprime</tt> are all accepted --
 <tt class="docutils literal"><span class="pre">tcslibgs::gateway</span></tt> is the one place that says which kinds are built, which
-node type is which kind's, and what each calls its far end. The radio is the
-<tt class="docutils literal">gateway_radio</tt> node; the F´ gateway is the <tt class="docutils literal">gateway_fprime</tt> node, opened,
-counted and driven as the radio's is, and <tt class="docutils literal">examples/fprime</tt> flies it. Not yet
-built: the bridge's F´ model generated from the configuration, and the
-<tt class="docutils literal">TcsBridge</tt> component itself.</p>
+node type is which kind's, which are on a bus, and what each calls its far
+end. The radio is the <tt class="docutils literal">gateway_radio</tt> node; the F´ gateway is the
+<tt class="docutils literal">gateway_fprime</tt> node, opened, counted and driven as the radio's is, and
+<tt class="docutils literal">examples/fprime</tt> flies it. cFS is the <tt class="docutils literal">gateway_cfs</tt> node, with every link
+of the vehicle carried over one SBN peer (<tt class="docutils literal"><span class="pre">tcspecial::runtime::bus</span></tt>, on
+<tt class="docutils literal"><span class="pre">tcslibgs::sbn</span></tt> and <tt class="docutils literal"><span class="pre">tcslibgs::cfs</span></tt>), and <tt class="docutils literal">examples/cfs</tt> flies it
+against a test playing the cFS end. Not yet built: the bridge's F´ model
+generated from the configuration, the <tt class="docutils literal">TcsBridge</tt> component itself, tcssim
+standing in for the cFS end and tcslib's SBN transport, so that tcsmoc cannot
+yet command a vehicle that answers to cFS (see <a class="reference internal" href="#what-crosses-the-bus">What crosses the bus</a>), and
+the run against cFS's own Linux build.</p>
 <p>The gateway nodes are written in the <tt class="docutils literal">gateway</tt> section, linked through
 <tt class="docutils literal"><span class="pre">gateway-in</span></tt> and <tt class="docutils literal"><span class="pre">gateway-out</span></tt>, with <tt class="docutils literal"><span class="pre">tee-gateway</span></tt>, <tt class="docutils literal"><span class="pre">null-gateway</span></tt> and
 <tt class="docutils literal">app_gateway_veh</tt> beside them. Each of those was named for the MOC while the
@@ -1415,7 +1420,7 @@ is stated once, in <tt class="docutils literal">tcspecial</tt>:</p>
   </span><span class="name tag">gateway</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">cfs</span><span class="whitespace">
   </span><span class="name tag">sbn</span><span class="punctuation">:</span><span class="whitespace">
     </span><span class="name tag">release</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal string">&quot;v7.0.1&quot;</span><span class="whitespace">
-    </span><span class="name tag">ident</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal string">&quot;0653995939d714ac94906f867b4397e9953ca66a&quot;</span><span class="whitespace">
+    </span><span class="name tag">ident</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal string">&quot;3b339a5e0f686cef822a5d6ea95004222ab7af33&quot;</span><span class="whitespace">
     </span><span class="name tag">spacecraft_id</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal string">&quot;0x42&quot;</span><span class="whitespace">
     </span><span class="name tag">processor_id</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal string">&quot;2&quot;</span><span class="whitespace">
     </span><span class="name tag">local</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal string">&quot;0.0.0.0:2234&quot;</span><span class="whitespace">
@@ -1426,7 +1431,8 @@ is stated once, in <tt class="docutils literal">tcspecial</tt>:</p>
   </span><span class="name tag">tcs_cmd</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="punctuation indicator">{</span><span class="name tag"> cmd_msgid</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal string">&quot;0x4280&quot;</span><span class="punctuation indicator">,</span><span class="name tag"> response_msgid</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal string">&quot;0x4200&quot;</span><span class="whitespace"> </span><span class="punctuation indicator">}</span><span class="whitespace">
   </span><span class="name tag">payload_command</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="punctuation indicator">{</span><span class="name tag"> cmd_base</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal string">&quot;0x4290&quot;</span><span class="punctuation indicator">,</span><span class="name tag"> response_base</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal string">&quot;0x4210&quot;</span><span class="whitespace"> </span><span class="punctuation indicator">}</span><span class="whitespace">
   </span><span class="name tag">payload_telemetry</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="punctuation indicator">{</span><span class="name tag"> tlm_base</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal string">&quot;0x4220&quot;</span><span class="whitespace"> </span><span class="punctuation indicator">}</span><span class="whitespace">
-  </span><span class="name tag">beacon</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="punctuation indicator">{</span><span class="name tag"> default_interval</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal string">&quot;5</span><span class="name variable"> </span><span class="literal string">s&quot;</span><span class="punctuation indicator">,</span><span class="name tag"> tlm_msgid</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal string">&quot;0x4201&quot;</span><span class="whitespace"> </span><span class="punctuation indicator">}</span><span class="whitespace">
+  </span><span class="name tag">beacon</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="punctuation indicator">{</span><span class="name tag"> default_interval</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal string">&quot;5</span><span class="name variable"> </span><span class="literal string">s&quot;</span><span class="punctuation indicator">,</span><span class="name tag"> reset_interval</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal string">&quot;1</span><span class="name variable"> </span><span class="literal string">s&quot;</span><span class="punctuation indicator">,</span><span class="whitespace">
+</span><span class="name tag">            tlm_msgid</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal string">&quot;0x4201&quot;</span><span class="whitespace"> </span><span class="punctuation indicator">}</span><span class="whitespace">
 
 </span><span class="name tag">gateway</span><span class="punctuation">:</span><span class="whitespace">
   </span><span class="punctuation indicator">-</span><span class="whitespace"> </span><span class="name tag">name</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">fsw</span><span class="whitespace">
@@ -1436,16 +1442,32 @@ is stated once, in <tt class="docutils literal">tcspecial</tt>:</p>
     </span><span class="name tag">payload-in</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">true</span>
 </pre>
 <p>(The numbers are illustrative, and laid out for the message-ID mapping below;
-the allotment is the mission's.)</p>
+the allotment is the mission's. <tt class="docutils literal">beacon.reset_interval</tt> is required here as
+everywhere: it times beacons, not a socket. <tt class="docutils literal">examples/cfs</tt> is this
+configuration whole.)</p>
+<p><tt class="docutils literal">payload_command</tt>'s bases count by every node's id, not only a payload's:
+the link is the one commands about a node arrive on, and a node command may
+be about a computation or a log as well. A node command published under one
+node's message ID that names another node is answered <tt class="docutils literal">InvalidCommand</tt> and
+not acted on, as a command on the wrong UDP link is: one end is not reading
+the configuration the other is.</p>
 <div class="section" id="what-sbn-is-on-the-wire">
 <h4><a class="toc-backref" href="#toc-entry-14">What SBN is, on the wire</a></h4>
 <p>Every SBN message over UDP is one datagram: a 13-byte header -- the length of
 what follows as four bytes, the message type as one, the sender's processor
 ID as four and its spacecraft ID as four, all most significant byte first --
-and then the message. The types are a subscription, an unsubscription, an
-application's message (a cFS packet, carried whole), and SBN's protocol
-version; the UDP module adds a heartbeat, an announcement and a disconnect of
-its own. A peer is connected by the first datagram that arrives from it, sends
+and then the message. The types are a subscription (1), an unsubscription
+(2), an application's message (3, a cFS packet, carried whole), and SBN's
+protocol version (4, one byte); the UDP module adds a heartbeat (<tt class="docutils literal">0xA0</tt>), an
+announcement (<tt class="docutils literal">0xA1</tt>) and a disconnect (<tt class="docutils literal">0xA2</tt>) of its own, each carrying
+nothing. A subscription and an unsubscription are laid out alike: the
+48-byte ident, a count of two bytes, and for each message ID four bytes of it
+and a byte each of priority and reliability, which tcspecial sends as nought.
+(Each of those numbers, and the layout, was read again from SBN v7.0.1's
+own source, <tt class="docutils literal">sbn_types.h</tt>, <tt class="docutils literal">sbn_interfaces.h</tt>, <tt class="docutils literal">sbn_subs.c</tt> and the UDP
+module's <tt class="docutils literal">sbn_udp_if.h</tt> and <tt class="docutils literal">sbn_udp_if.c</tt>, on 31 October 2026, after the
+gateway was built, and each is what was built.) <tt class="docutils literal"><span class="pre">tcslibgs::sbn</span></tt> is the one
+statement of all of it. A peer is connected by the first datagram that arrives from it, sends
 a heartbeat when it has sent nothing for five seconds, and is disconnected by
 ten seconds of silence. Each of those numbers is compiled into SBN and none
 can be configured from this side.</p>
@@ -1462,7 +1484,14 @@ subscription message, and a subscription whose bytes are not the receiver's
 own is refused. Those bytes are git's <tt class="docutils literal">$Id$</tt> of <tt class="docutils literal">sbn_types.h</tt> -- the
 hash of that one file as it was checked out -- so they differ between
 releases, and between a release and a mission's copy of it with that file
-changed.</li>
+changed. Written out they are <tt class="docutils literal">$Id:</tt>, a space, the 40-digit hash, a space
+and <tt class="docutils literal">$</tt>, and the C string's terminating nought: 48 bytes.
+For v7.0.1 checked out by git the hash is
+<tt class="docutils literal">3b339a5e0f686cef822a5d6ea95004222ab7af33</tt>. The file holds only
+<tt class="docutils literal">$Id$</tt>, which git fills in as it checks the file out (SBN's
+<tt class="docutils literal">.gitattributes</tt> asks it to), so an SBN taken any other way -- a release
+archive, a copy -- is built with <tt class="docutils literal">$Id$</tt> as it stands, which no
+<tt class="docutils literal">sbn.ident</tt> can match: such a far end is rebuilt from a git checkout.</li>
 </ul>
 <dl class="docutils">
 <dt>Requirement</dt>
@@ -1532,16 +1561,36 @@ running one cannot use tcspecial until it builds with the extended
 header. One header is one packing to build and test, and none to state
 wrongly: the configuration says nothing about it, because there is
 nothing it could choose.</dd>
+</dl>
+<p>In that header a a command's secondary header is followed by the four spare bytes cFE's
+<tt class="docutils literal">CFE_MSG_CommandHeader_t</tt> pads itself with (<tt class="docutils literal">default_cfe_msg_hdr_priext.h</tt>),
+so that a command's data begins sixteen bytes in, where a cFS application
+reads it; a telemetry packet's begins sixteen bytes in too, after its six
+bytes of time. tcspecial writes the spare bytes as nought, the extended
+header's EDS version as cFE's default, 1, and its system ID as
+<tt class="docutils literal">sbn.spacecraft_id</tt>, cut to sixteen bits as cFE cuts it.</p>
+<dl class="docutils">
 <dt>Requirement</dt>
 <dd>A cFS function code is seven bits, so every tcspecial command code is
 below 128. <tt class="docutils literal">tcslibgs</tt> holds the codes to that where they are listed,
 in a test, rather than leaving it to be found by the first code that
 is not.</dd>
 <dt>Requirement</dt>
-<dd>A command's checksum is checked as it arrives, as cFS's own applications
+<dd><p class="first">A command's checksum is checked as it arrives, as cFS's own applications
 check theirs, and a command whose checksum is wrong is answered as one
 that could not be read; every command and response tcspecial sends
-carries a correct one.</dd>
+carries a correct one.</p>
+<p class="last">As built, &quot;answered as one that could not be read&quot; is what the UDP links
+do with a datagram that is not a command: not answered, not acted on, and
+logged and counted as malformed. So is a command whose function code is
+not its command's code, and a packet that is not one whole command --
+another CCSDS version, no secondary header, a segment, a length its
+primary header does not say. Only what the peer has subscribed to is
+published, as SBN itself sends a peer only what it asked for, and nothing
+is published until the peer has been heard and its protocol version
+checked: tcspecial only answers, and publishes telemetry, so it never
+sends a command, and so carries the checksum only where it checks one.</p>
+</dd>
 <dt>Requirement</dt>
 <dd>At start tcspecial subscribes to its command message IDs --
 <tt class="docutils literal">tcs_cmd.cmd_msgid</tt>, each payload's <tt class="docutils literal">payload_command.cmd_base</tt> plus
@@ -1571,11 +1620,19 @@ comes from it, or a line leaves it -- states <tt class="docutils literal">cmd_ms
 drawn into it produces is published at <tt class="docutils literal">tlm_base</tt> plus the source's
 device id.</dd>
 <dt>Requirement</dt>
-<dd>tcssim stands in for the cFS end as an SBN peer, and tcslib gains an SBN
+<dd><p class="first">tcssim stands in for the cFS end as an SBN peer, and tcslib gains an SBN
 transport, so that tcsmoc can test a configuration that answers to cFS as
 it tests one that answers to the ground. A run against cFS's own Linux
 build, with SBN, is the test that the wire format is SBN's and not only
-ours.</dd>
+ours.</p>
+<p class="last"><strong>Not yet built.</strong> Until it is, <tt class="docutils literal">tcspecial/tests/cfs.rs</tt> plays the cFS
+end -- a UDP socket speaking SBN's wire format from <tt class="docutils literal"><span class="pre">tcslibgs::sbn</span></tt> --
+against the vehicle flying <tt class="docutils literal">examples/cfs</tt>, and tcslib, tcsmoc and the
+C/C++ library refuse a configuration that answers to cFS, saying it is
+to be commanded from the cFS side. A <tt class="docutils literal">gateway_cfs</tt> node, like the other
+gateway nodes, has no stand-in of its own in tcssim: it is the far end
+that is stood in for, not the node.</p>
+</dd>
 <dt>Requirement</dt>
 <dd>A message ID is read and written by cFE's version 2 mapping, which a cFS
 built with <tt class="docutils literal">MISSION_MSGID_V2</tt> uses, and by no other: the low seven bits
@@ -1599,7 +1656,7 @@ build was compiled with, which the configuration states:</p>
     </span><span class="name tag">scale</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">tai</span><span class="whitespace">
     </span><span class="name tag">leap_seconds</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal string">&quot;37&quot;</span>
 </pre>
-<p class="last"><tt class="docutils literal">epoch</tt> is a UTC date and time, <tt class="docutils literal">scale</tt> is <tt class="docutils literal">tai</tt> or <tt class="docutils literal">utc</tt>, and
+<p><tt class="docutils literal">epoch</tt> is a UTC date and time, <tt class="docutils literal">scale</tt> is <tt class="docutils literal">tai</tt> or <tt class="docutils literal">utc</tt>, and
 <tt class="docutils literal">leap_seconds</tt> -- TAI less UTC -- is stated where the scale is TAI and
 refused where it is UTC. None has a default: each copies a compile-time
 setting of the far end -- <tt class="docutils literal">CFE_MISSION_TIME_EPOCH_*</tt>,
@@ -1607,6 +1664,10 @@ setting of the far end -- <tt class="docutils literal">CFE_MISSION_TIME_EPOCH_*<
 stamped wrong by the same amount, which nothing downstream can see.
 The leap-second count is fixed for as long as the configuration is, and
 a change is a new configuration; none has been added since 2017.</p>
+<p class="last">As built, a datum carries no time of its own through the vehicle, so a
+reading is stamped as the pass that read it delivers it to its link to
+the bus -- the same pass, before anything else is read -- and an answer
+and a beacon as they are published.</p>
 </dd>
 <dt>Requirement</dt>
 <dd>Commands are carried tunnelled, as stated above, for now. A cFS ground
@@ -1678,6 +1739,8 @@ which refuse in the same words wherever the node is written.</p>
 <pre class="code text literal-block">
 network, gateway_radio, gateway_fprime
                 address, port, and for network the protocol
+gateway_cfs     nothing: it is reached through the tcspecial section's
+                sbn peer, and states message IDs instead
 i2c             path (the bus) and address (the device on it)
 can             interface and can_id
 everything else path
@@ -5919,8 +5982,8 @@ XTCE states, and decoding a command in the main loop touches no heap.</dd>
 <h2><a class="toc-backref" href="#toc-entry-58">The link without a header</a></h2>
 <div class="admonition note">
 <p class="first admonition-title">Note</p>
-<p class="last"><strong>Built</strong> (2026-10-31), but for the framing of <tt class="docutils literal">gateway_cfs</tt>, whose
-gateway is not built: see <a class="reference internal" href="#framing-is-a-gateway-s">Framing is a gateway's</a>. It replaces the
+<p class="last"><strong>Built</strong> (2026-10-31), with the framing of <tt class="docutils literal">gateway_cfs</tt> since: see
+<a class="reference internal" href="#framing-is-a-gateway-s">Framing is a gateway's</a>. It replaces the
 CCSDS layout in <a class="reference internal" href="#every-packet-is-xtce">Every packet is XTCE</a>, above, and settles what was left
 open in <a class="reference internal" href="#configurations-named-by-their-checksum">Configurations named by their checksum</a>: what of the link
 never changes. What it replaced is under <a class="reference internal" href="#what-the-headerless-link-replaces">What the headerless link
@@ -6158,8 +6221,9 @@ playing the MOC, and what F´ itself frames is what the bridge passes on to
 the rest of its deployment, not what crosses the link to tcspecial. The
 framing of <tt class="docutils literal">gateway_cfs</tt> -- the CCSDS primary header, cFS's extended
 header and its secondary header, around exactly what the UDP link carries
--- is specified in <a class="reference internal" href="#what-crosses-the-bus">What crosses the bus</a> and not built, because the
-<tt class="docutils literal">gateway_cfs</tt> node is not: a configuration naming <tt class="docutils literal">cfs</tt> is refused.</p>
+-- is specified in <a class="reference internal" href="#what-crosses-the-bus">What crosses the bus</a> and built in <tt class="docutils literal"><span class="pre">tcslibgs::cfs</span></tt>,
+which the vehicle frames and strips with, refusing and counting as
+malformed whatever arrives on the bus not framed so.</p>
 <p>There is then nothing about framing for a configuration to get wrong, or
 for two configurations to disagree about: the node type a configuration
 names, which its checksum covers, says it all.</p>

@@ -94,6 +94,7 @@
   <xs:simpleType name="gatewayType">
     <xs:restriction base="xs:token">
       <xs:enumeration value="gateway_radio"/>
+      <xs:enumeration value="gateway_cfs"/>
       <xs:enumeration value="gateway_fprime"/>
     </xs:restriction>
   </xs:simpleType>
@@ -159,6 +160,12 @@
       <xs:element name="bridge_base" type="xs:string"/>
       <!-- Where the F´ IDs of what reaches an F´ gateway begin. -->
       <xs:element name="fprime_id_base" type="xs:string"/>
+      <!-- The message ID what a gateway_cfs node sends on is published
+           under on the cFS software bus. -->
+      <xs:element name="cmd_msgid" type="xs:string"/>
+      <!-- Where the message IDs of what reaches a gateway_cfs node begin,
+           counted on by each source node's device id. -->
+      <xs:element name="tlm_base" type="xs:string"/>
       <xs:element name="protocol" type="xs:string"/>
       <!-- The IP protocol number of a raw socket: `protocol` raw. -->
       <xs:element name="ip_protocol" type="xs:string"/>
@@ -339,12 +346,15 @@
   <xs:complexType name="tcspecial">
     <xs:all>
       <!-- What the vehicle answers to: radio, the ground over UDP; fprime,
-           an F´ flight computer's bridge component, over the same. cfs is
-           specified in the design and not yet built. -->
+           an F´ flight computer's bridge component, over the same; cfs, a
+           cFS flight computer's software bus, as a peer of its SBN. It
+           decides how the links below are written: sockets for radio and
+           fprime, message IDs for cfs. -->
       <xs:element name="gateway" minOccurs="0">
         <xs:simpleType>
           <xs:restriction base="xs:string">
             <xs:enumeration value="radio"/>
+            <xs:enumeration value="cfs"/>
             <xs:enumeration value="fprime"/>
           </xs:restriction>
         </xs:simpleType>
@@ -366,6 +376,11 @@
           <xs:all>
             <xs:element name="recv" type="socket" minOccurs="0"/>
             <xs:element name="send" type="socket" minOccurs="0"/>
+            <!-- On a cFS software bus: the message IDs commands about the
+                 spacecraft and their answers are published under. -->
+            <xs:element name="cmd_msgid" type="xs:string" minOccurs="0"/>
+            <xs:element name="response_msgid" type="xs:string"
+                        minOccurs="0"/>
           </xs:all>
         </xs:complexType>
       </xs:element>
@@ -374,6 +389,11 @@
           <xs:all>
             <xs:element name="source_base" type="socket" minOccurs="0"/>
             <xs:element name="dest_base" type="socket" minOccurs="0"/>
+            <!-- On a cFS software bus: where node commands' message IDs
+                 and their answers' are counted from, by the node's id. -->
+            <xs:element name="cmd_base" type="xs:string" minOccurs="0"/>
+            <xs:element name="response_base" type="xs:string"
+                        minOccurs="0"/>
           </xs:all>
         </xs:complexType>
       </xs:element>
@@ -382,6 +402,9 @@
           <xs:all>
             <xs:element name="source_base" type="socket" minOccurs="0"/>
             <xs:element name="dest_base" type="socket" minOccurs="0"/>
+            <!-- On a cFS software bus: where an untouched payload's message
+                 ID is counted from, by its id. -->
+            <xs:element name="tlm_base" type="xs:string" minOccurs="0"/>
           </xs:all>
         </xs:complexType>
       </xs:element>
@@ -396,6 +419,63 @@
                         minOccurs="0"/>
             <xs:element name="send" type="socket" minOccurs="0"/>
             <xs:element name="recv" type="socket" minOccurs="0"/>
+            <!-- On a cFS software bus: the message ID the beacon is
+                 published under. -->
+            <xs:element name="tlm_msgid" type="xs:string" minOccurs="0"/>
+          </xs:all>
+        </xs:complexType>
+      </xs:element>
+      <!-- The SBN peer a vehicle that answers to cfs is on the software
+           bus through. The far end's SBN table must list tcspecial with
+           the same spacecraft_id, processor_id and address, which nothing
+           on this side can check. -->
+      <xs:element name="sbn" minOccurs="0">
+        <xs:complexType>
+          <xs:all>
+            <xs:element name="release" type="xs:string" minOccurs="0"/>
+            <xs:element name="ident" minOccurs="0">
+              <xs:simpleType>
+                <xs:restriction base="xs:string">
+                  <xs:pattern value="[0-9a-fA-F]{40}"/>
+                </xs:restriction>
+              </xs:simpleType>
+            </xs:element>
+            <xs:element name="spacecraft_id" type="xs:string"
+                        minOccurs="0"/>
+            <xs:element name="processor_id" type="xs:string"
+                        minOccurs="0"/>
+            <xs:element name="local" type="socket" minOccurs="0"/>
+            <xs:element name="peer" type="socket" minOccurs="0"/>
+            <xs:element name="peer_processor_id" type="xs:string"
+                        minOccurs="0"/>
+            <xs:element name="max_message" type="xs:string" minOccurs="0"/>
+          </xs:all>
+        </xs:complexType>
+      </xs:element>
+      <!-- The block of cFS message IDs the mission allotted tcspecial. -->
+      <xs:element name="msgid_range" minOccurs="0">
+        <xs:complexType>
+          <xs:all>
+            <xs:element name="first" type="xs:string" minOccurs="0"/>
+            <xs:element name="last" type="xs:string" minOccurs="0"/>
+          </xs:all>
+        </xs:complexType>
+      </xs:element>
+      <!-- How the cFS build counts time: its UTC epoch, its scale, and TAI
+           less UTC where the scale is tai. -->
+      <xs:element name="cfe_time" minOccurs="0">
+        <xs:complexType>
+          <xs:all>
+            <xs:element name="epoch" type="xs:string" minOccurs="0"/>
+            <xs:element name="scale" minOccurs="0">
+              <xs:simpleType>
+                <xs:restriction base="xs:string">
+                  <xs:enumeration value="tai"/>
+                  <xs:enumeration value="utc"/>
+                </xs:restriction>
+              </xs:simpleType>
+            </xs:element>
+            <xs:element name="leap_seconds" type="xs:string" minOccurs="0"/>
           </xs:all>
         </xs:complexType>
       </xs:element>

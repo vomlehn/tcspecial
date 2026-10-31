@@ -97,7 +97,10 @@ fn worked_out() -> Vec<(String, String)> {
             link.source == "ping"
                 && link.via == Via::Gateway("gateway".to_string())
         })
-        .map(|link| format!("{}:{}", link.ground.address, link.ground.port))
+        .map(|link| {
+            let ground = link.ground().expect("a link over UDP");
+            format!("{}:{}", ground.address, ground.port)
+        })
         .expect("ping sends to the gateway node");
 
     vec![

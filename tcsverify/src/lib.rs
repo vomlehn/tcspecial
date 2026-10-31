@@ -41,6 +41,7 @@ use std::path::{Path, PathBuf};
 use tcslibgs::graph::check::Severity;
 use tcslibgs::{ConfigFormat, SimConfigFile, TcsError};
 
+pub mod fprime_model;
 pub mod locate;
 pub mod set_interface;
 pub mod startup;

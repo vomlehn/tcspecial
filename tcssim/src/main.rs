@@ -735,6 +735,50 @@ fn take_wait(
     Ok((waiting, rest))
 }
 
+/// What has every payload send from the start, as though each panel's
+/// button had been pressed.
+const SENDING_FLAG: &str = "--sending";
+
+/// Takes `--sending` out of the arguments.
+///
+/// For a run with nobody at the window: a test harness that starts tcssim
+/// and holds the ground to what the payloads send. Without it every payload
+/// is silent until its panel is pressed, which is the run a person watches.
+///
+/// # Arguments
+///
+/// * `args` - The command line's arguments.
+///
+/// # Returns
+///
+/// Whether it was given, and the arguments left.
+///
+/// # Errors
+///
+/// A message if it is given twice, or given a value.
+fn take_sending(args: Vec<String>) -> Result<(bool, Vec<String>), String> {
+    let mut sending = false;
+    let mut rest = Vec::with_capacity(args.len());
+    for arg in args {
+        if arg == SENDING_FLAG {
+            if sending {
+                return Err(format!(
+                    "{SENDING_FLAG} is given twice: give it once"
+                ));
+            }
+            sending = true;
+        } else if arg.starts_with(&format!("{SENDING_FLAG}=")) {
+            return Err(format!(
+                "{arg}: {SENDING_FLAG} takes no value -- give it alone to \
+                 have every payload send from the start"
+            ));
+        } else {
+            rest.push(arg);
+        }
+    }
+    Ok((sending, rest))
+}
+
 /// Does `--wait`: waits for a simulator started on these files under a mode
 /// to be ready, and says what to exit with. Nothing is stood in for and no
 /// window opens: this is the harness for a run started by hand.
@@ -859,6 +903,13 @@ fn main() {
             }
         };
     let (waiting, args) = match take_wait(args) {
+        Ok(taken) => taken,
+        Err(e) => {
+            eprintln!("tcssim: {e}");
+            process::exit(1);
+        }
+    };
+    let (sending, args) = match take_sending(args) {
         Ok(taken) => taken,
         Err(e) => {
             eprintln!("tcssim: {e}");
@@ -996,9 +1047,16 @@ fn main() {
     );
     let mut made: Vec<SimulatedPayload> =
         configs.into_iter().map(SimulatedPayload::new).collect();
-    for payload in &mut made {
+    for (row, payload) in made.iter_mut().enumerate() {
         // A payload not yet running, so this cannot be refused.
         let _ = payload.start();
+        // As though its button had been pressed, where --sending asks.
+        if sending {
+            payload.send(true);
+            update_row(&model, row, |info| {
+                info.status = SharedString::from(RUNNING_STATUS);
+            });
+        }
     }
     let payloads: Arc<Mutex<Vec<SimulatedPayload>>> =
         Arc::new(Mutex::new(made));
@@ -1128,6 +1186,29 @@ mod tests {
     use std::path::Path;
     use std::time::Duration;
     use tcslibgs::{DHName, EndpointConfig, NetworkConfig, NetworkProtocol};
+
+    /// `--sending` is taken out wherever it is, once, and nothing else is;
+    /// twice, or with a value, is refused saying so.
+    #[test]
+    fn sending_is_a_flag_given_once() {
+        let args = |said: &[&str]| -> Vec<String> {
+            said.iter().map(|s| s.to_string()).collect()
+        };
+        assert_eq!(
+            take_sending(args(&["tcssim", "x.ytcs"])),
+            Ok((false, args(&["tcssim", "x.ytcs"])))
+        );
+        assert_eq!(
+            take_sending(args(&["tcssim", "--sending", "x.ytcs"])),
+            Ok((true, args(&["tcssim", "x.ytcs"])))
+        );
+        let twice = take_sending(args(&["--sending", "x", "--sending"]))
+            .expect_err("twice");
+        assert!(twice.contains("twice"), "{twice}");
+        let valued =
+            take_sending(args(&["--sending=yes"])).expect_err("a value");
+        assert!(valued.contains("takes no value"), "{valued}");
+    }
 
     fn repo_file(name: &str) -> std::path::PathBuf {
         Path::new(env!("CARGO_MANIFEST_DIR")).join("..").join(name)

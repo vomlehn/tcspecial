@@ -1191,8 +1191,11 @@ const SECOND_SIGNAL_STATUS: i32 = 1;
 ///
 /// # Returns
 ///
-/// The number of the signal that came, which is 0 until one has; or, where
-/// a signal could not be handled, why.
+/// The number of the signal that came, which is 0 until one has.
+///
+/// # Errors
+///
+/// Why a signal could not be handled, naming it.
 fn note_quit_signals() -> Result<Arc<AtomicUsize>, String> {
     let came = Arc::new(AtomicBool::new(false));
     let signalled = Arc::new(AtomicUsize::new(0));

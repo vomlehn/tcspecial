@@ -1511,9 +1511,16 @@ and the line is read back after being set: a driver that does not support the
 mode may take the call and clear the flag, and a line left in
 point-to-point mode on a two-wire bus transmits into other transmitters. A
 line that will not take what the file asked for is refused rather than
-started. A simulated line is a pseudo-terminal, which will not take it at all,
-so a set meant to be run against tcssim does not state ``rs485`` -- as it
-states ``parity: none`` for the same type of reason.
+started.
+
+A simulated line is a pseudo-terminal, which has no transceiver and no RTS
+and would refuse the mode. On a line that is a stand-in tcspecial leaves the
+RS-485 terms unapplied, and says so as it starts; tcssim, at the far end,
+receives and sends the bus's bytes as on any line. So a set that states
+``rs485`` runs against tcssim as it is, and what goes unexercised is only the
+turnaround and its delays, which are the transceiver's. Parity is another
+matter: a pseudo-terminal takes no parity but ``none``, so a set meant to be
+run against tcssim states ``parity: none``.
 
 **Where a read ends**
 

@@ -1893,9 +1893,15 @@ and the line is read back after being set: a driver that does not support the
 mode may take the call and clear the flag, and a line left in
 point-to-point mode on a two-wire bus transmits into other transmitters. A
 line that will not take what the file asked for is refused rather than
-started. A simulated line is a pseudo-terminal, which will not take it at all,
-so a set meant to be run against tcssim does not state <tt class="docutils literal">rs485</tt> -- as it
-states <tt class="docutils literal">parity: none</tt> for the same type of reason.</p>
+started.</p>
+<p>A simulated line is a pseudo-terminal, which has no transceiver and no RTS
+and would refuse the mode. On a line that is a stand-in tcspecial leaves the
+RS-485 terms unapplied, and says so as it starts; tcssim, at the far end,
+receives and sends the bus's bytes as on any line. So a set that states
+<tt class="docutils literal">rs485</tt> runs against tcssim as it is, and what goes unexercised is only the
+turnaround and its delays, which are the transceiver's. Parity is another
+matter: a pseudo-terminal takes no parity but <tt class="docutils literal">none</tt>, so a set meant to be
+run against tcssim states <tt class="docutils literal">parity: none</tt>.</p>
 <p><strong>Where a read ends</strong></p>
 <p>A line delivers bytes with no frame boundaries of its own, so a node on one
 says where one read of it ends. The vehicle holds what has arrived until the

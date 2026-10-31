@@ -14,6 +14,7 @@
 //! that there was no longer a connection: taking the client away from one
 //! holder would have left the others talking to a socket that was closed.
 
+use tcslib::matched::Matched;
 use tcslib::{TcsClient, UdpConnection};
 use tcslibgs::{HostPort, TcsResult, Timestamp};
 
@@ -68,6 +69,10 @@ pub struct CiLink {
     /// life of the link, as the file states it, and Connect moves only the
     /// spacecraft link's host.
     commanded: Commanded,
+    /// Whether this window is matched with the vehicle, which its beacon
+    /// watch keeps: every client the link makes is handed it, so that
+    /// nothing but CONNECT, RESTART_ARM and RESTART goes before a match.
+    matched: Matched,
     client: Option<TcsClient>,
 }
 
@@ -82,17 +87,28 @@ impl CiLink {
     /// * `from`      - The local address the spacecraft link binds, which
     ///                 is `tcs_cmd.send`.
     /// * `commanded` - Where every node's commands are sent from and to.
+    /// * `matched`   - Whether this window is matched with the vehicle.
     ///
     /// # Returns
     ///
     /// The link, down until [`CiLink::connect`] brings it up.
-    pub fn down_commanding(from: &str, commanded: Commanded) -> Self {
+    pub fn down_commanding(
+        from: &str,
+        commanded: Commanded,
+        matched: Matched,
+    ) -> Self {
         Self {
             address: String::new(),
             from: from.to_string(),
             commanded,
+            matched,
             client: None,
         }
+    }
+
+    /// Whether this window is matched with the vehicle, up or down.
+    pub fn matched(&self) -> &Matched {
+        &self.matched
     }
 
     /// Where this link goes, up or down.
@@ -154,8 +170,11 @@ impl CiLink {
         let connection = UdpConnection::new(&self.from, address)?;
         let Commanded { from, to } = &self.commanded;
         let nodes = UdpConnection::new(&from.to_string(), &to.to_string())?;
-        self.client =
-            Some(TcsClient::of_a_graph(Box::new(connection), Box::new(nodes)));
+        self.client = Some(TcsClient::of_a_graph(
+            Box::new(connection),
+            Box::new(nodes),
+            self.matched.clone(),
+        ));
         Ok(())
     }
 
@@ -206,7 +225,8 @@ mod tests {
             spacecraft.send_to(&data, from).expect("the answer is sent");
         });
 
-        let mut link = CiLink::down_commanding(LOCAL_BIND_ANY, commanding());
+        let mut link =
+            CiLink::down_commanding(LOCAL_BIND_ANY, commanding(), matched());
         assert_eq!(
             link.command_times(),
             None,
@@ -235,6 +255,22 @@ mod tests {
         // it, and the next Connect starts a fresh one.
         link.disconnect();
         assert_eq!(link.command_times(), None);
+    }
+
+    /// What a test's link is matched by: a window matched for commanding,
+    /// as though its beacon watch had heard a clear beacon of its checksum
+    /// and a CONNECT of its own had been answered with it.
+    ///
+    /// # Returns
+    ///
+    /// The window's state.
+    fn matched() -> Matched {
+        let ours = tcslibgs::ConfigDigest([0x5A; 16]);
+        let matched = Matched::for_configuration(ours);
+        matched.beacon(false, Some(ours), tcslib::beacon::Stage::Heard, false);
+        let mark = matched.before_connect();
+        matched.connect_answered(ours, mark);
+        matched
     }
 
     /// The node link a test's link carries beside the spacecraft's.
@@ -267,7 +303,8 @@ mod tests {
     /// having to be there.
     #[test]
     fn a_link_hands_out_a_client_only_while_it_is_up() {
-        let mut link = CiLink::down_commanding(LOCAL_BIND_ANY, commanding());
+        let mut link =
+            CiLink::down_commanding(LOCAL_BIND_ANY, commanding(), matched());
         assert!(link.client().is_none());
         assert!(link.client().is_none());
 
@@ -285,7 +322,8 @@ mod tests {
     /// make, leaves a link that works.
     #[test]
     fn a_link_can_be_brought_back_up() {
-        let mut link = CiLink::down_commanding(LOCAL_BIND_ANY, commanding());
+        let mut link =
+            CiLink::down_commanding(LOCAL_BIND_ANY, commanding(), matched());
         link.connect("127.0.0.1:4000").unwrap();
         link.disconnect();
         link.connect("127.0.0.1:4000").unwrap();
@@ -295,7 +333,8 @@ mod tests {
     /// Connecting somewhere else moves the link rather than adding one.
     #[test]
     fn connecting_elsewhere_moves_the_link() {
-        let mut link = CiLink::down_commanding(LOCAL_BIND_ANY, commanding());
+        let mut link =
+            CiLink::down_commanding(LOCAL_BIND_ANY, commanding(), matched());
         link.connect("127.0.0.1:4000").unwrap();
 
         link.connect("127.0.0.1:4001").unwrap();
@@ -307,7 +346,8 @@ mod tests {
     /// the address that was asked for.
     #[test]
     fn an_address_that_cannot_be_used_leaves_the_link_down() {
-        let mut link = CiLink::down_commanding(LOCAL_BIND_ANY, commanding());
+        let mut link =
+            CiLink::down_commanding(LOCAL_BIND_ANY, commanding(), matched());
         link.connect("127.0.0.1:4000").unwrap();
 
         assert!(link.connect("this is not an address").is_err());
@@ -332,6 +372,7 @@ mod tests {
                 from: here(0),
                 to: here(4200),
             },
+            matched(),
         );
 
         link.connect("127.0.0.1:4000").expect("the link comes up");
@@ -353,7 +394,8 @@ mod tests {
     /// button can be pressed twice.
     #[test]
     fn disconnecting_twice_is_harmless() {
-        let mut link = CiLink::down_commanding(LOCAL_BIND_ANY, commanding());
+        let mut link =
+            CiLink::down_commanding(LOCAL_BIND_ANY, commanding(), matched());
         link.connect("127.0.0.1:4000").unwrap();
         link.disconnect();
         link.disconnect();

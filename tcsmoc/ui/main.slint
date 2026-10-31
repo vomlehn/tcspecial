@@ -476,6 +476,11 @@ export component MainWindow inherits Window {
     // been a command to time.
     in-out property <string> cmd-sent-time: "--:--:--";
     in-out property <string> cmd-recv-time: "--:--:--";
+    // How many packets have come from the vehicle, data and answers, and how
+    // many of them were processed, malformed or dropped for a configuration
+    // mismatch: see `packets_said` in vehicle.rs. In the row the two times
+    // are in, so that it costs the window no height.
+    in-out property <string> vehicle-packets: "Packets: 0 received";
     in-out property <color> indicator-color: #c0c0c0;
 
     // The data handlers, read from the tcspecial configuration file by Rust.
@@ -808,6 +813,7 @@ export component MainWindow inherits Window {
                     Text { text: cmd-sent-time; font-size: Fonts.window; }
                     Text { text: "Last rcvd:"; font-size: Fonts.window; }
                     Text { text: cmd-recv-time; font-size: Fonts.window; }
+                    Text { text: vehicle-packets; font-size: Fonts.window; }
                 }
             }
         }

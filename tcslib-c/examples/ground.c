@@ -2,10 +2,12 @@
  * A ground station in C, on tcs.h.
  *
  * What a ground station does, in the order it does it: read the
- * configuration, wait for the vehicle's first beacon, connect and ping, ask
- * about a node and set one of its attributes, ping the vehicle's ping node
- * and time the answer, and take the vehicle's data from a moc node. Each step prints one line, and the same program in C++ --
- * ground.cpp -- prints the same lines.
+ * configuration, wait for the vehicle's first beacon, which matches the
+ * station for listening, connect, which matches it for commanding, and ping,
+ * ask about a node and set one of its attributes, ping the vehicle's ping
+ * node and time the answer, take the vehicle's data from a moc node, and say
+ * what it has received. Each step prints one line, and the same program in
+ * C++ -- ground.cpp -- prints the same lines.
  *
  * Arguments, all optional: --yaml or --xml, but not both, saying which of
  * the example's two configuration files to read (YAML where neither is
@@ -27,6 +29,20 @@ static const char *const STEM = "examples/ping/ping";
 
 /* The key a restart is armed with, which the restart must carry. */
 static const uint64_t ARM_KEY = 0x1234;
+
+/* Say whether the station is matched with the vehicle, for listening and
+ * for commanding. */
+static int say_matched(const tcs_configuration *configuration)
+{
+	int listening = 0, commanding = 0;
+	if (tcs_configuration_matched(configuration, &listening,
+				      &commanding) != 0) {
+		return -1;
+	}
+	printf("matched: listening %s, commanding %s\n",
+	       listening ? "yes" : "no", commanding ? "yes" : "no");
+	return 0;
+}
 
 /* Say what failed, and stop. */
 static int fail(const char *what)
@@ -111,6 +127,13 @@ int main(int argc, char **argv)
 		return fail("open");
 	}
 
+	/* Nothing but CONNECT, RESTART_ARM and RESTART goes before a match,
+	 * and this station has heard no beacon yet. */
+	printf("ping before a match: %s\n",
+	       tcs_client_ping(client) != 0 &&
+	       strstr(tcs_last_error(), "not yet matched") != NULL ?
+	       "refused, unsent" : "sent");
+
 	/* The first beacon: what the vehicle is flying, before anything has
 	 * been asked of it. */
 	tcs_pass pass;
@@ -129,12 +152,18 @@ int main(int argc, char **argv)
 	       "" : " (not in contact)",
 	       tcs_beacons_said(beacons));
 
+	if (say_matched(configuration) != 0) {
+		return fail("matched");
+	}
 	int agrees = 0;
 	if (tcs_client_connect(client, &agrees) != 0) {
 		return fail("connect");
 	}
 	printf("connect: %s\n",
 	       agrees ? "agrees" : "a different configuration");
+	if (say_matched(configuration) != 0) {
+		return fail("matched");
+	}
 	if (tcs_client_ping(client) != 0) {
 		return fail("ping");
 	}
@@ -242,6 +271,19 @@ int main(int argc, char **argv)
 	if (!data_seen || !exchange.answered) {
 		printf("data: not everything arrived\n");
 	}
+
+	/* Every packet from the vehicle, data and answers, in exactly one of
+	 * the three counts. */
+	tcs_counts counts;
+	if (tcs_configuration_counts(configuration, &counts) != 0) {
+		return fail("counts");
+	}
+	printf("packets: %llu received = %llu processed + %llu malformed + "
+	       "%llu mismatched\n",
+	       (unsigned long long)counts.received,
+	       (unsigned long long)counts.processed,
+	       (unsigned long long)counts.malformed,
+	       (unsigned long long)counts.mismatched);
 
 	tcs_pinger_close(pinger);
 	tcs_client_close(client);

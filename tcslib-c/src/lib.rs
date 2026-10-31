@@ -43,6 +43,7 @@ use std::path::PathBuf;
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
 use tcslib::beacon::{Beacons, Contact, Schedule, Stage, STANDARD_INTERVAL};
+use tcslib::matched::Matched;
 use tcslib::moc::{Moc, DATUM_BYTES};
 use tcslib::ping::{route_of, Pinger, Uplink, NO_MESSAGE};
 use tcslib::{command_links_of, CommandStatus, TcsClient};
@@ -331,6 +332,12 @@ pub struct tcs_configuration {
     digest: ConfigDigest,
     /// Thirty-two hex digits and a NUL.
     digest_text: Text<33>,
+    /// Whether the station using this configuration is matched with the
+    /// vehicle, and what it has received: kept by every beacon watch made
+    /// from this configuration, and read by every client and moc node made
+    /// from it, which each hold a clone. The station is the configuration's
+    /// holder, so this is where its match is.
+    matched: Matched,
 }
 
 /// Reads and checks the configuration at `path`, as the vehicle does.
@@ -378,6 +385,7 @@ pub unsafe extern "C" fn tcs_configuration_open(
             graph,
             digest,
             digest_text,
+            matched: Matched::for_configuration(digest),
         })))
     })
 }
@@ -464,6 +472,89 @@ pub unsafe extern "C" fn tcs_configuration_node_id(
     })
 }
 
+/// What the header's `tcs_counts` is: the same fields in the same order.
+#[repr(C)]
+pub struct tcs_counts {
+    received: u64,
+    processed: u64,
+    malformed: u64,
+    mismatched: u64,
+}
+
+/// Says whether the station using this configuration is matched with the
+/// vehicle, for listening and for commanding.
+///
+/// # Arguments
+///
+/// * `configuration` - The configuration.
+/// * `listening`     - Where 1 is written when the last beacon heard, since
+///                     the configuration was opened, is recent, has its
+///                     restart flag clear and carries this configuration's
+///                     checksum; 0 when not.
+/// * `commanding`    - Where 1 is written when it is matched for listening
+///                     and a Connect of its own has been answered with its
+///                     checksum since the match last ended; 0 when not.
+///
+/// # Returns
+///
+/// 0, or -1 where an argument is NULL.
+///
+/// # Safety
+///
+/// `configuration` as [`tcs_configuration_digest`]; `listening` and
+/// `commanding` NULL or writable.
+#[no_mangle]
+pub unsafe extern "C" fn tcs_configuration_matched(
+    configuration: *const tcs_configuration,
+    listening: *mut c_int,
+    commanding: *mut c_int,
+) -> c_int {
+    guard(-1, || {
+        let configuration = handle_of(configuration, "the configuration")?;
+        let listening = out_of(listening, "listening")?;
+        let commanding = out_of(commanding, "commanding")?;
+        *listening = c_int::from(configuration.matched.for_listening());
+        *commanding = c_int::from(configuration.matched.for_commanding());
+        Ok(0)
+    })
+}
+
+/// Says what the station using this configuration has received from the
+/// vehicle, data and answers: every packet in exactly one of processed,
+/// malformed and dropped for a configuration mismatch.
+///
+/// # Arguments
+///
+/// * `configuration` - The configuration.
+/// * `counts`        - Where the counts are written.
+///
+/// # Returns
+///
+/// 0, or -1 where an argument is NULL.
+///
+/// # Safety
+///
+/// `configuration` as [`tcs_configuration_digest`]; `counts` NULL or
+/// writable.
+#[no_mangle]
+pub unsafe extern "C" fn tcs_configuration_counts(
+    configuration: *const tcs_configuration,
+    counts: *mut tcs_counts,
+) -> c_int {
+    guard(-1, || {
+        let configuration = handle_of(configuration, "the configuration")?;
+        let out = out_of(counts, "the counts")?;
+        let counted = configuration.matched.counts();
+        *out = tcs_counts {
+            received: counted.received(),
+            processed: counted.processed,
+            malformed: counted.malformed,
+            mismatched: counted.mismatched,
+        };
+        Ok(0)
+    })
+}
+
 // ---- Beacons ----------------------------------------------------------------
 
 /// Numbers a stage as the header's `tcs_stage` does.
@@ -527,9 +618,10 @@ pub struct tcs_beacons {
     remarks: Notes,
     warnings: Notes,
     /// Whether the beacon the last pass heard says tcspecial started again,
-    /// and whether it says a commanded restart is under way, for
-    /// `tcs_client_beacon_heard`: `None` where the last pass heard none.
-    last: Option<(bool, bool)>,
+    /// for `tcs_client_beacon_heard`: `None` where the last pass heard none.
+    last: Option<bool>,
+    /// The configuration's match, which every pass is handed to.
+    matched: Matched,
 }
 
 /// Listens where the configuration says beacons arrive.
@@ -583,6 +675,7 @@ pub unsafe extern "C" fn tcs_beacons_listen(
             remarks: Notes::EMPTY,
             warnings: Notes::EMPTY,
             last: None,
+            matched: configuration.matched.clone(),
         })))
     })
 }
@@ -615,6 +708,9 @@ pub unsafe extern "C" fn tcs_beacons_pass(
         // the pass where something changed. What the pass holds is copied
         // into the handle's fixed buffers.
         let found = watch.beacons.pass();
+        // Every pass to the station's match, which a beacon begins and ends
+        // and a beacon going overdue ends.
+        watch.matched.heard(found);
         let at = found
             .at
             .and_then(|at| at.duration_since(UNIX_EPOCH).ok())
@@ -630,7 +726,7 @@ pub unsafe extern "C" fn tcs_beacons_pass(
             restart_flag: c_int::from(found.restart_flag),
         };
         watch.last = (found.arrived == tcslib::beacon::Arrived::Beacon)
-            .then_some((found.restarted, found.restart_flag));
+            .then_some(found.restarted);
         watch.said.set(&found.said);
         watch.remarks.set(&found.remarks);
         watch.warnings.set(&found.warnings);
@@ -795,9 +891,12 @@ pub unsafe extern "C" fn tcs_moc_open(
     guard(std::ptr::null_mut(), || {
         let configuration = handle_of(configuration, "the configuration")?;
         let name = text_of(moc, "the moc node's name")?;
-        let moc = Moc::open(&configuration.graph, name).map_err(|e| {
+        let mut moc = Moc::open(&configuration.graph, name).map_err(|e| {
             fail(format_args!("{}: {e}", configuration.path.display()))
         })?;
+        // Read only while the station is matched with the vehicle, which
+        // its beacon watch keeps, and counted with what else it receives.
+        moc.gated_by(configuration.matched.clone());
         // Allocates, once, at startup: the handle, which outlives this call;
         // the names of the node's sources, which are known now and read by
         // every receive after; and the buffer every datum is received in.
@@ -970,7 +1069,7 @@ pub unsafe extern "C" fn tcs_client_open(
                     "{place} has no tcspecial section, so names no command link"
                 ))
             })?;
-        let client = TcsClient::open(&links)
+        let client = TcsClient::open(&links, configuration.matched.clone())
             .map_err(|e| fail(format_args!("{place}: {e}")))?;
         // Allocates, once, at startup: the handle, which outlives this call,
         // and the client's two links.
@@ -1250,10 +1349,8 @@ pub unsafe extern "C" fn tcs_client_restart(
 ///
 /// # Returns
 ///
-/// 1 when this ended a wait with the start the RESTART commanded, 2 when it
-/// ended one with a start nobody commanded, 3 when it ended one with a start
-/// the beacon cannot say of, because a Connect during the wait reached it and
-/// cleared its flag; 0 when it did not end one, -1 on an error.
+/// 1 when this ended a wait, because the beacon's number says tcspecial has
+/// started again; 0 when it did not end one, -1 on an error.
 ///
 /// # Safety
 ///
@@ -1267,17 +1364,10 @@ pub unsafe extern "C" fn tcs_client_beacon_heard(
     guard(-1, || {
         let link = handle_of_mut(client, "the client")?;
         let watch = handle_of(beacons, "the beacons")?;
-        let Some((restarted, commanded)) = watch.last else {
+        let Some(restarted) = watch.last else {
             return Ok(0);
         };
-        Ok(match link.client.beacon_heard(restarted, commanded) {
-            Some(ended) => match ended.commanded {
-                Some(true) => 1,
-                Some(false) => 2,
-                None => 3,
-            },
-            None => 0,
-        })
+        Ok(c_int::from(link.client.beacon_heard(restarted)))
     })
 }
 

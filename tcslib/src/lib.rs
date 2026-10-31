@@ -8,10 +8,14 @@
 //! one thing it can know without asking: see [`beacon`] -- and how it pings a
 //! `ping` node and times the answer: see [`ping`]. A harness that starts
 //! tcssim before tcspecial waits for it to be ready through [`simulator`].
+//! Whether a station and the vehicle are using the same configuration, which
+//! its commands and its data wait for, and what it has received, are
+//! [`matched`]'s.
 
 pub mod beacon;
 pub mod client;
 pub mod connection;
+pub mod matched;
 pub mod moc;
 pub mod ping;
 pub mod simulator;

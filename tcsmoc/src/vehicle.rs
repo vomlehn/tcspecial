@@ -44,6 +44,7 @@ use std::thread;
 
 use slint::{ComponentHandle, Model, ModelRc, SharedString, VecModel};
 
+use tcslib::matched::Matched;
 use tcslib::moc::Moc;
 use tcslib::moc::DATUM_BYTES;
 use tcslib::ping::{Pinger, Uplink};
@@ -560,8 +561,8 @@ fn query_every_node(
 /// Not a poll: nothing is asked while contact simply holds. A node whose last
 /// press was Disable is left out, because the operator said to stop it and
 /// there is nothing to ask. And where nothing may be asked -- the link is
-/// down, or the vehicle has not agreed which configuration it is flying --
-/// nothing is, and nothing is said: the panels keep what they show until
+/// down, the vehicle has not agreed which configuration it is flying, or the
+/// window is not matched for commanding -- nothing is, and nothing is said: the panels keep what they show until
 /// contact is next made or somebody presses Query all.
 ///
 /// # Arguments
@@ -582,7 +583,9 @@ fn contact_made(
 ) {
     let connected = link
         .lock()
-        .map(|mut guard| guard.client().is_some())
+        .map(|mut guard| {
+            guard.client().is_some() && guard.matched().for_commanding()
+        })
         .unwrap_or(false);
     if connected && may_command_nodes(agreed) {
         ask_nodes(ui, link, agreed, model, Some(declined));
@@ -1338,16 +1341,13 @@ fn no_command_link(ui: &MainWindow) {
 /// * `link`      - The command link, whose client is handed the beacon.
 /// * `agreed`    - What the last Connect agreed, forgotten with the link.
 /// * `restarted` - Whether the beacon's number says tcspecial started again.
-/// * `commanded` - Whether it says a commanded restart is under way.
 fn beacon_to_commands(
     weak: &slint::Weak<MainWindow>,
     link: &Arc<Mutex<CiLink>>,
     agreed: &Agreed,
     restarted: bool,
-    commanded: bool,
 ) {
-    let Some((address, said)) =
-        take_down_at_a_start(link, agreed, restarted, commanded)
+    let Some((address, said)) = take_down_at_a_start(link, agreed, restarted)
     else {
         return;
     };
@@ -1373,17 +1373,18 @@ fn beacon_to_commands(
 /// The start that came back knows nothing of this window, and may be flying
 /// other definitions, so what was agreed was agreed with a start that has
 /// gone: the window shows Disconnected, and the next thing to press is
-/// Connect, as it is for the client, which sends nothing but a PING or a
-/// CONNECT until one is answered. Where the beacon also ends the wait an
-/// Initiate restart began, what is said is whether the start that came back
-/// was the one it commanded.
+/// Connect, which every start now needs -- it begins with the restart flag
+/// set, and nothing but CONNECT, RESTART_ARM and RESTART goes until a Connect
+/// carrying this window's checksum is answered with it. Whether the start
+/// that came back is the one an Initiate restart asked for is not said: the
+/// flag is set at every start, and the checksum in the beacons says which
+/// configuration it runs.
 ///
 /// # Arguments
 ///
 /// * `link`      - The command link, whose client is handed the beacon.
 /// * `agreed`    - What the last Connect agreed, forgotten with the link.
 /// * `restarted` - Whether the beacon's number says tcspecial started again.
-/// * `commanded` - Whether it says a commanded restart is under way.
 ///
 /// # Returns
 ///
@@ -1393,12 +1394,11 @@ fn take_down_at_a_start(
     link: &Arc<Mutex<CiLink>>,
     agreed: &Agreed,
     restarted: bool,
-    commanded: bool,
 ) -> Option<(String, &'static str)> {
     let (ended, address) = {
         let mut guard = link.lock().ok()?;
         // A link that is down has nothing to take down, and no wait.
-        let ended = guard.client()?.beacon_heard(restarted, commanded);
+        let ended = guard.client()?.beacon_heard(restarted);
         if !restarted {
             return None;
         }
@@ -1409,23 +1409,34 @@ fn take_down_at_a_start(
     if let Ok(mut held) = agreed.lock() {
         *held = None;
     }
-    let said = match ended.map(|ended| ended.commanded) {
-        Some(Some(true)) => {
-            "tcspecial has started again as commanded: press Connect"
-        }
-        Some(Some(false)) => {
-            "tcspecial started again without being commanded to, so the \
-             restart initiated here did not happen: press Connect"
-        }
-        Some(None) => {
-            "tcspecial has started again, and a Connect sent while it was \
-             awaited cleared its restart flag, so whether this is the \
-             restart initiated here cannot be told: press Connect, and find \
-             out before initiating another"
-        }
-        None => "tcspecial has started again: press Connect",
+    let said = if ended {
+        "tcspecial has started again after the restart initiated here: \
+         press Connect"
+    } else {
+        "tcspecial has started again: press Connect"
     };
     Some((address, said))
+}
+
+/// What the window says of the packets that have come from the vehicle:
+/// how many, and how many of them were processed, malformed or dropped for
+/// a configuration mismatch, which add up to the first.
+///
+/// # Arguments
+///
+/// * `counts` - The window's counts.
+///
+/// # Returns
+///
+/// The line.
+pub(crate) fn packets_said(counts: &tcslib::matched::Counts) -> String {
+    format!(
+        "Packets: {} received = {} processed + {} malformed + {} mismatched",
+        counts.received(),
+        counts.processed,
+        counts.malformed,
+        counts.mismatched
+    )
 }
 
 /// The key a window arms a restart with: made from the time and the process
@@ -1775,6 +1786,39 @@ pub fn run(
     ui.window().set_size(window_size(&sizes, &shape, count));
     eprintln!("{payload_path}: {count} source(s) sending to the ground");
 
+    // Whether the vehicle is serving the configuration this MOC read. This
+    // MOC digests the configuration files it read, with the function
+    // tcspecial digests the files it read with; tcspecial sends its digest in
+    // every beacon, and a beacon whose digest differs asks the operator
+    // whether to continue anyway -- the panels say where each source's data
+    // arrives, and a different configuration may send it somewhere else.
+    let digest = match tcslibgs::config_digest::digest_of_graph(&graph) {
+        Ok(digest) => {
+            eprintln!(
+                "tcsmoc v{} md5 {digest}",
+                tcslibgs::config_digest::ConfigVersion::of_this_build()
+            );
+            Some(digest)
+        }
+        Err(e) => {
+            startup.warning(format!(
+                "{payload_path} cannot be digested, so tcspecial's beacons \
+                 cannot be checked against it: {e}"
+            ));
+            None
+        }
+    };
+    // Whether this window is matched with the vehicle: whether the last
+    // beacon, heard since this window read its configuration, is recent,
+    // clear of the restart flag and carries this configuration's checksum,
+    // and whether a Connect of this window's has been answered with it.
+    // The beacon watch keeps it; the command link, the data receivers and
+    // the counts under Last Response read it. See `tcslib::matched`.
+    let matched = match digest {
+        Some(digest) => Matched::for_configuration(digest),
+        None => Matched::with_no_checksum(),
+    };
+
     // The two command links, both ends of each from the file. A configuration
     // with no `tcspecial` section states no ports, so there is nothing to
     // connect to and the buttons say so.
@@ -1786,7 +1830,9 @@ pub fn run(
             );
             (
                 Some(Arc::new(Mutex::new(CiLink::down_commanding(
-                    &from, commanded,
+                    &from,
+                    commanded,
+                    matched.clone(),
                 )))),
                 to,
             )
@@ -1849,28 +1895,6 @@ pub fn run(
     let pm_tcspecial = Arc::new(ProcessManager::new());
     pm_tcspecial.start_child(tcspecial, payload_path, mode);
 
-    // Whether the vehicle is serving the configuration this MOC read. This
-    // MOC digests the configuration files it read, with the function
-    // tcspecial digests the files it read with; tcspecial sends its digest in
-    // every beacon, and a beacon whose digest differs asks the operator
-    // whether to continue anyway -- the panels say where each source's data
-    // arrives, and a different configuration may send it somewhere else.
-    let digest = match tcslibgs::config_digest::digest_of_graph(&graph) {
-        Ok(digest) => {
-            eprintln!(
-                "tcsmoc v{} md5 {digest}",
-                tcslibgs::config_digest::ConfigVersion::of_this_build()
-            );
-            Some(digest)
-        }
-        Err(e) => {
-            startup.warning(format!(
-                "{payload_path} cannot be digested, so tcspecial's beacons \
-                 cannot be checked against it: {e}"
-            ));
-            None
-        }
-    };
     let contact = Arc::new(Mutex::new(tcslib::beacon::Contact::Lost));
     // The interval the configuration sends beacons at, which is what says how
     // late one is; a configuration whose interval cannot be read gets the
@@ -1902,13 +1926,12 @@ pub fn run(
                     heard: link.clone().map(|link| {
                         let weak = ui.as_weak();
                         let agreed = agreed.clone();
-                        Arc::new(move |restarted, commanded| {
-                            beacon_to_commands(
-                                &weak, &link, &agreed, restarted, commanded,
-                            )
+                        Arc::new(move |restarted| {
+                            beacon_to_commands(&weak, &link, &agreed, restarted)
                         })
                             as crate::beacon_receive::OnBeacon
                     }),
+                    matched: matched.clone(),
                 },
                 digest,
                 Some(crate::ask_whether_to_continue(
@@ -2007,7 +2030,10 @@ pub fn run(
         Ok(None) => {}
         Err(e) => startup.warning(e),
     }
-    for moc in receivers {
+    for mut moc in receivers {
+        // Read only while this window is matched with the vehicle, and
+        // counted in the window's counts whether read or dropped.
+        moc.gated_by(matched.clone());
         eprintln!(
             "receiving at {} from {}",
             moc.name(),
@@ -2034,12 +2060,21 @@ pub fn run(
         let stopping = (pm_tcssim.clone(), Some(pm_tcspecial.clone()));
         let times = link.clone();
         let ui_weak = ui.as_weak();
+        let counted = matched.clone();
         timer.start(
             slint::TimerMode::Repeated,
             PANEL_REFRESH_INTERVAL,
             move || {
                 crate::stop_if_asked(&stopping.0, stopping.1.as_ref());
                 show_arrivals(&model, &arrivals);
+
+                // What has come from the vehicle, and what became of it:
+                // atomics, so nothing here waits for the threads that count.
+                if let Some(ui) = ui_weak.upgrade() {
+                    ui.set_vehicle_packets(SharedString::from(packets_said(
+                        &counted.counts(),
+                    )));
+                }
 
                 // When the last command went out and when its answer came back,
                 // which the window shows under the link's own status.
@@ -2432,6 +2467,21 @@ payloads:
         assert!(may_command_nodes(&agreed));
     }
 
+    /// The window's line of counts says all four, and the three that say
+    /// what became of each packet add up to the first.
+    #[test]
+    fn the_packets_line_says_all_four_counts() {
+        let said = packets_said(&tcslib::matched::Counts {
+            processed: 7,
+            malformed: 1,
+            mismatched: 4,
+        });
+        assert_eq!(
+            said,
+            "Packets: 12 received = 7 processed + 1 malformed + 4 mismatched"
+        );
+    }
+
     /// A beacon whose number says tcspecial started again takes the link
     /// down and forgets what was agreed, because the start that came back
     /// knows nothing of this window; one of the same start leaves both.
@@ -2449,22 +2499,23 @@ payloads:
                     port: 1,
                 },
             },
+            Matched::for_configuration(tcslibgs::ConfigDigest([0x5A; 16])),
         )));
         let agreed: Agreed = Arc::new(Mutex::new(Some(true)));
         link.lock().unwrap().connect("127.0.0.1:1").expect("up");
 
-        assert_eq!(take_down_at_a_start(&link, &agreed, false, true), None);
+        assert_eq!(take_down_at_a_start(&link, &agreed, false), None);
         assert!(link.lock().unwrap().client().is_some(), "still up");
         assert!(may_command_nodes(&agreed));
 
-        let (address, said) = take_down_at_a_start(&link, &agreed, true, false)
-            .expect("taken down");
+        let (address, said) =
+            take_down_at_a_start(&link, &agreed, true).expect("taken down");
         assert_eq!(address, "127.0.0.1:1");
         assert!(said.contains("press Connect"), "{said}");
         assert!(link.lock().unwrap().client().is_none(), "down");
         assert!(!may_command_nodes(&agreed), "nothing agreed");
         assert_eq!(
-            take_down_at_a_start(&link, &agreed, true, false),
+            take_down_at_a_start(&link, &agreed, true),
             None,
             "a link already down has nothing to take down"
         );
@@ -2603,6 +2654,11 @@ payloads:
         };
 
         let ours = ConfigDigest([0x5Au8; 16]);
+        // This window has heard a clear beacon of its own configuration, as
+        // the beacon thread would say: matched for listening, so that a
+        // Connect answered with its checksum matches it for commanding.
+        let matched = Matched::for_configuration(ours);
+        matched.beacon(false, Some(ours), tcslib::beacon::Stage::Heard, false);
 
         // A stand-in vehicle: one socket for both links, since what is being
         // tested is that a press gets an answer back and not which socket it
@@ -2718,6 +2774,7 @@ payloads:
                     })
                     .expect("an address"),
             },
+            matched.clone(),
         )));
         let agreed: Agreed = Arc::new(Mutex::new(None));
         let declined = declined_for(model.row_count());

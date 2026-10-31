@@ -583,7 +583,8 @@ pub struct Heard {
     pub message: String,
     /// The beacon's own number, if it was a beacon this build can read.
     pub sequence: Option<u32>,
-    /// Whether it said a restart the ground commanded is under way.
+    /// Whether its restart flag was set: the vehicle has started, or taken a
+    /// RESTART, and has not been matched since.
     pub restart_flag: bool,
     /// What is wrong with the configuration it announces, if anything: see
     /// [`differs`].
@@ -736,7 +737,7 @@ fn write_message(
         Ok(beacon) => {
             write_what_it_read(beacon.version, beacon.digest, out);
             if beacon.restart_flag {
-                out.push_str(", COMMANDED RESTART");
+                out.push_str(RESTART_FLAG_SAID);
             }
         }
         Err(_) => {
@@ -805,6 +806,11 @@ pub fn counted(last: Option<u32>, now: u32) -> Counted {
     }
 }
 
+/// What a beacon's message says after what the vehicle read while its
+/// restart flag is set: that it has started, or taken a RESTART, and has not
+/// been matched since.
+pub const RESTART_FLAG_SAID: &str = ", RESTARTED, NOT YET MATCHED";
+
 /// What a pass of the loop found.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Arrived {
@@ -836,9 +842,12 @@ pub struct Pass {
     /// since the one before it: its number went back. False on a pass that
     /// heard none.
     pub restarted: bool,
-    /// Whether the last beacon said a restart the ground commanded is under
-    /// way. Kept as `at` is.
+    /// Whether the last beacon's restart flag was set. Kept as `at` is.
     pub restart_flag: bool,
+    /// The configuration checksum the last beacon carried, if one has
+    /// arrived. Kept as `at` is: with the flag and the stage it is what says
+    /// whether a station is matched -- see [`crate::matched`].
+    pub digest: Option<ConfigDigest>,
     /// Whether the spacecraft is being heard from, which is the same reading
     /// as the stage in the form a program acts on.
     pub contact: Contact,
@@ -933,6 +942,7 @@ impl Beacons {
             said,
             restarted: false,
             restart_flag: false,
+            digest: None,
             contact: Contact::Lost,
             remarks: Vec::with_capacity(REMARKS_AT_ONCE),
             warnings: Vec::with_capacity(REMARKS_AT_ONCE),
@@ -1041,9 +1051,7 @@ impl Beacons {
                             if missed == 1 { "" } else { "s" },
                             last.unwrap_or(0)
                         )),
-                        Counted::Restarted => {
-                            remarks.push(restarted(now, beacon.restart_flag))
-                        }
+                        Counted::Restarted => remarks.push(restarted(now)),
                         // The radio's doing, not the spacecraft's: what is
                         // known is what the first of the two said, and it
                         // is not said again.
@@ -1055,6 +1063,7 @@ impl Beacons {
                     self.count = Some(now);
                     self.last.restarted = kind == Counted::Restarted;
                     self.last.restart_flag = beacon.restart_flag;
+                    self.last.digest = Some(beacon.digest);
                 }
 
                 Arrived::Beacon
@@ -1115,28 +1124,19 @@ impl Beacons {
 
 /// Says what to say of a restart: the beacons start again at `now`.
 ///
-/// And which kind of restart it was. A commanded one is the ground's own
-/// doing, and may have brought other definitions; one nobody commanded is a
-/// crash or a power cycle, which the ground has to look into, and which runs
-/// with the definitions it had.
+/// Not which kind of restart it was: every start begins with the restart
+/// flag set, so the flag says nothing of whether the ground commanded it, and
+/// the checksum in the beacon says which configuration the start is running.
 ///
 /// # Arguments
 ///
-/// * `now`       - The number the beacons start again at.
-/// * `commanded` - Whether the beacon says the ground commanded the start.
+/// * `now` - The number the beacons start again at.
 ///
 /// # Returns
 ///
 /// The sentence.
-fn restarted(now: u32, commanded: bool) -> String {
-    let how = if commanded {
-        "as commanded"
-    } else {
-        "without being commanded to, with the definitions it had"
-    };
-    format!(
-        "the beacons start again at #{now}, so tcspecial has restarted {how}"
-    )
+fn restarted(now: u32) -> String {
+    format!("the beacons start again at #{now}, so tcspecial has restarted")
 }
 
 /// What to say of a datagram from `from` on the beacon link, which beacons
@@ -1508,15 +1508,15 @@ mod tests {
         // two lines cannot come to disagree about how to say it.
         assert_eq!(what_it_read(version, digest), read);
 
-        // A beacon sent while a commanded restart is under way says so.
-        let commanded = Beacon::new(4, version, digest)
+        // A beacon sent with the restart flag set says so.
+        let flagged = Beacon::new(4, version, digest)
             .restart_flag(true)
             .to_bytes();
         assert_eq!(
-            message_of(&commanded),
-            format!("{read}, COMMANDED RESTART")
+            message_of(&flagged),
+            format!("{read}, RESTARTED, NOT YET MATCHED")
         );
-        let heard = hear(&commanded, None);
+        let heard = hear(&flagged, None);
         assert!(heard.restart_flag);
         assert!(!hear(&datagram, None).restart_flag);
 
@@ -1585,14 +1585,8 @@ mod tests {
         assert_eq!(counted(Some(1), 1), Counted::Repeated);
 
         assert_eq!(
-            restarted(1, true),
-            "the beacons start again at #1, so tcspecial has restarted as \
-             commanded"
-        );
-        assert_eq!(
-            restarted(3, false),
-            "the beacons start again at #3, so tcspecial has restarted \
-             without being commanded to, with the definitions it had"
+            restarted(3),
+            "the beacons start again at #3, so tcspecial has restarted"
         );
     }
 

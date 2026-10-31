@@ -1275,6 +1275,19 @@ impl Graph {
             }
         }
 
+        // Every F´ bridge's model can be made: each source drawn into a
+        // gateway_fprime node named as F´ can name its channel, and no ID
+        // past 32 bits or shared with another bridge's. Refused here, as the
+        // file is read, because the model is made from the file on the
+        // ground and a model that could not be made is a bridge that could
+        // not be built. See `crate::graph::fprime`.
+        if let Err(refused) = crate::graph::fprime::every(self) {
+            problems.push(Problem::BadNode {
+                node: refused.node,
+                why: refused.why,
+            });
+        }
+
         // A ground link that receives -- commands, or a line out of it --
         // says where aboard the ground sends them: both its address and its
         // port. One that only sends to its ground_base binds nothing.
@@ -2441,6 +2454,46 @@ mod tests {
             vec![link("a", &["ground"])],
         );
         assert!(says(&g, Some("ground"), &["radio", "cfs"]));
+    }
+
+    /// A configuration whose F´ bridge model could not be made is refused as
+    /// it is checked: a source drawn into the gateway_fprime node under a
+    /// name F´ cannot give a channel, and two bridges whose IDs overlap.
+    #[test]
+    fn an_fprime_model_that_cannot_be_made_is_refused() {
+        let named = |g: &Graph, node_name: &str, wanted: &str| {
+            let problems = g.check();
+            assert!(
+                problems.iter().any(|p| matches!(
+                    p,
+                    Problem::BadNode { node, why }
+                        if node == node_name && why.contains(wanted)
+                )),
+                "{node_name} should be told about {wanted}: {problems:?}"
+            );
+        };
+
+        let g = answering_fprime(
+            vec![node("cabin-temp", "i2c"), node("fsw", "gateway_fprime")],
+            vec![link("cabin-temp", &["fsw"])],
+        );
+        named(&g, "cabin-temp", "letters, digits and underscores");
+
+        let mut second = node("fsw2", "gateway_fprime");
+        second
+            .attributes
+            .insert("bridge_base".to_string(), Scalar::of("10.0.0.3:7800"));
+        second
+            .attributes
+            .insert("fprime_id_base".to_string(), Scalar::of("0x3004"));
+        second
+            .attributes
+            .insert("port".to_string(), Scalar::of("5001"));
+        let g = answering_fprime(
+            vec![node("a", "i2c"), node("fsw", "gateway_fprime"), second],
+            vec![link("a", &["fsw", "fsw2"])],
+        );
+        named(&g, "fsw2", "share an ID");
     }
 
     /// An F´ gateway in a configuration that answers to the radio is a

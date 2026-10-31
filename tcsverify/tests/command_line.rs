@@ -172,6 +172,55 @@ fn a_checked_configuration_is_kept_under_its_checksum() {
     assert_eq!(status, 2, "a directory is named");
 }
 
+/// `--fprime-model=<directory>` writes the fprime example's bridge model,
+/// says which files it wrote, and again writes nothing and says so. A
+/// configuration with no gateway_fprime node has no model, and one with
+/// errors is not written from.
+#[test]
+fn the_fprime_example_has_its_bridge_model_written() {
+    let dir = tempfile::tempdir().expect("a directory");
+    let model = dir.path().join("model");
+    let flag = format!("--fprime-model={}", model.display());
+    let example = Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("../examples/fprime/fprime.ytcs");
+    let example = example.to_str().expect("a path");
+
+    let (lines, status) = run(&[&flag, example]);
+    assert_eq!(status, 0, "{lines:?}");
+    assert_eq!(lines.len(), 2, "{lines:?}");
+    assert!(lines[0].contains("the F´ model of fsw"), "{lines:?}");
+    let fppi = std::fs::read_to_string(model.join("TcsBridgeModel.fppi"))
+        .expect("the FPP is written");
+    let checksum =
+        tcslibgs::config_digest::digest_of_file(example).expect("it digests");
+    assert!(
+        fppi.contains(&format!("CONFIGURATION_DIGEST = \"{checksum}\"")),
+        "{fppi}"
+    );
+    assert!(
+        fppi.contains("telemetry $thermometer: Datum id 2"),
+        "{fppi}"
+    );
+    assert!(model.join("TcsBridgeModel.cpp").is_file());
+
+    let (lines, status) = run(&[&flag, example]);
+    assert_eq!(status, 0);
+    assert_eq!(lines.len(), 1, "{lines:?}");
+    assert!(lines[0].contains("says this already"), "{lines:?}");
+
+    let ping = Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("../examples/ping/ping.ytcs");
+    let (_, status) = run(&[&flag, ping.to_str().expect("a path")]);
+    assert_eq!(status, 1, "no gateway_fprime node");
+
+    let wrong = with_errors(dir.path(), 1);
+    let (_, status) = run(&[&flag, wrong.to_str().expect("a path")]);
+    assert_eq!(status, 1, "a configuration with errors");
+
+    let (_, status) = run(&["--fprime-model=", example]);
+    assert_eq!(status, 2, "a directory is named");
+}
+
 /// `--set-interface` writes this build's interface into a stale
 /// configuration, changing that and nothing else, says what it changed, and
 /// changes nothing in one that is current.

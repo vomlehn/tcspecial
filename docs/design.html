@@ -4531,7 +4531,8 @@ what the question is about. What goes wrong <em>while somebody works</em> is sti
 said in the alert's own window, the main window not waiting for it. tcsmoc
 does the same for the question it asks when tcspecial serves a different
 configuration: asked inside its main window, in front of a veil that greys the
-panels. tcsmoc and tcssim show what they found at startup in a window that
+panels. Its pop-ups about a command pressed before the station is matched --
+the error and the advisory of <a class="reference internal" href="#on-the-ground">On the ground</a> -- are put there the same way. tcsmoc and tcssim show what they found at startup in a window that
 stays on top and is closed before their main windows open.</p>
 <p><strong>Everything a popup says can be copied.</strong> A message is often the thing
 somebody has to pass on, and one that can only be read has to be typed out
@@ -6417,7 +6418,8 @@ sends a beacon at once, slows the beacons and opens the downlink and the
 other commands, one with another checksum changes nothing else, one
 after a RESTART changes nothing, and the ground takes a CONNECT as
 matched only when its answer carries the station's checksum. In <a class="reference internal" href="#on-the-ground">On the
-ground</a>, every requirement but tcsmoc's pop-ups: the station's match
+ground</a>, every requirement but tcsmoc's pop-ups, which are built since:
+the station's match
 (<tt class="docutils literal"><span class="pre">tcslib::matched</span></tt>), data dropped and counted while not matched and
 what is queued dropped and counted as a match begins, a match ended by a
 flagged beacon, another checksum or an overdue beacon, answers taken
@@ -6449,12 +6451,19 @@ RESTART naming the running configuration a plain restart, and the two
 functions a restart calls (<tt class="docutils literal"><span class="pre">choose::Boot::load</span></tt> and <tt class="docutils literal"><span class="pre">start::clean_up</span></tt>
 in tcspecial). A configuration is put into the store, for testing and for
 first provisioning, by <tt class="docutils literal">tcsverify <span class="pre">--keep=&lt;directory&gt;</span></tt>, which checks it
-first.</p>
+first. In <a class="reference internal" href="#on-the-ground">On the ground</a>, tcsmoc's pop-ups: a command other than the
+three pressed while the station is not matched for commanding is refused
+in an error pop-up, which says the client's own refusal
+(<tt class="docutils literal"><span class="pre">TcsClient::may_go</span></tt>) and names the beacon's checksum and the
+station's; ARM Restart and Initiate restart pressed, with the link up,
+before a CONNECT has been answered ask first, Go on sending the command
+and Cancel sending nothing. A press with the link down says Connect, as
+before, since that is what to press.</p>
 <p class="last"><em>Not yet built:</em> the read-only directory and the immutable attribute of
 first provisioning, which are the provisioner's to set -- <tt class="docutils literal">tcsverify
 <span class="pre">--keep</span></tt> makes the files it writes 0444 and leaves the directory as it
-is, so that it can keep more; tcsmoc's pop-ups; and removing what <a class="reference internal" href="#what-this-replaces">What
-this replaces</a> lists as still standing.</p>
+is, so that it can keep more; and removing what <a class="reference internal" href="#what-this-replaces">What this replaces</a>
+lists as still standing.</p>
 </div>
 <p>A configuration is known by its <em>checksum</em>: the MD5 <tt class="docutils literal">tcsverify</tt>
 computes of it, the configuration digest (<tt class="docutils literal"><span class="pre">tcslibgs::config_digest</span></tt>).

@@ -4204,10 +4204,24 @@ counted, and as a match begins whatever was already waiting is dropped and
 counted too. It is <em>matched for commanding</em> once, besides, its own
 <tt class="docutils literal">Connect</tt> has been answered with its checksum; until then every command but
 <tt class="docutils literal">Connect</tt>, <tt class="docutils literal">ARM Restart</tt> and <tt class="docutils literal">Initiate restart</tt> is refused before it
-is sent, and <tt class="docutils literal">Last Response</tt> says why:</p>
+is sent. tcsmoc says why in an error pop-up in front of the panels, headed
+<em>Not sent: the match between the ground's and the vehicle's configurations
+is still in progress</em>, and in <tt class="docutils literal">Last Response</tt>:</p>
 <pre class="literal-block">
-PING failed: Ping not sent: the configurations are not yet matched. Check that the checksum in the vehicle's beacon is this station's configuration's, and Connect
+Ping not sent: the configurations are not yet matched. Check that the checksum in the vehicle's beacon is this station's configuration's, and Connect
 </pre>
+<p>The pop-up goes on to name the checksum the vehicle's last beacon carried
+and this station's own, so that the two can be compared: where they differ,
+the vehicle is running another configuration, and tcsmoc has to be run with
+that one to command it. <tt class="docutils literal">OK</tt> closes it. With the link down, a press says
+to press <tt class="docutils literal">Connect</tt> instead, as it always has.</p>
+<p><tt class="docutils literal">ARM Restart</tt> and <tt class="docutils literal">Initiate restart</tt> are never refused, being how a
+vehicle that will not match is restarted onto a configuration that will.
+Pressed with the link up before a <tt class="docutils literal">CONNECT</tt> has been answered, though,
+they ask first, in an advisory pop-up headed <em>No CONNECT has been answered
+yet</em> that names the same two checksums: <tt class="docutils literal">Go on</tt> sends the command as it
+would have gone, and <tt class="docutils literal">Cancel</tt> sends nothing. Every pop-up's text can be
+selected and copied, and its <tt class="docutils literal">Copy</tt> button copies all of it.</p>
 <p>A beacon with the flag set, one carrying another checksum, or the beacons
 going overdue ends both, and the next <tt class="docutils literal">Connect</tt> after the beacons say the
 vehicle is matched again makes the station matched for commanding once more.

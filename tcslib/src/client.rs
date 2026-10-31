@@ -411,10 +411,10 @@ impl TcsClient {
         }
     }
 
-    /// Says whether `command` may go: only where this station is matched
-    /// for commanding, but for CONNECT, RESTART_ARM and RESTART, which go
-    /// either way because they are how it matches and how it rescues a
-    /// vehicle that will not.
+    /// Says whether a command of kind `kind` may go: only where this station
+    /// is matched for commanding, but for CONNECT, RESTART_ARM and RESTART,
+    /// which go either way because they are how it matches and how it
+    /// rescues a vehicle that will not.
     ///
     /// Matched for commanding is what says which start of tcspecial is
     /// flying, and with which configuration: its last beacon is recent,
@@ -424,20 +424,36 @@ impl TcsClient {
     /// nothing but the three goes until the station has matched the start
     /// that came back. There is no generation to know beside it.
     ///
+    /// Public so that a station can ask before it builds a command, and say
+    /// the refusal its own way -- tcsmoc in a pop-up -- by the one rule
+    /// every command sent here is held to.
+    ///
+    /// # Arguments
+    ///
+    /// * `kind` - What kind of command is to be sent.
+    ///
+    /// # Errors
+    ///
+    /// `TcsError::Unmatched` where the station is not matched for
+    /// commanding and the command is not one of the three.
+    pub fn may_go(&self, kind: CommandType) -> TcsResult<()> {
+        if !kind.taken_unmatched() && !self.matched.for_commanding() {
+            return Err(TcsError::Unmatched(kind));
+        }
+        Ok(())
+    }
+
+    /// [`TcsClient::may_go`], for a command that has been built.
+    ///
     /// # Arguments
     ///
     /// * `command` - The command to be sent.
     ///
     /// # Errors
     ///
-    /// `TcsError::Unmatched` where the station is not matched for
-    /// commanding and the command is not one of the three.
+    /// `TcsError::Unmatched` as [`TcsClient::may_go`] says.
     fn may_send(&self, command: &Command) -> TcsResult<()> {
-        let kind = command.cmd_type();
-        if !kind.taken_unmatched() && !self.matched.for_commanding() {
-            return Err(TcsError::Unmatched(kind));
-        }
-        Ok(())
+        self.may_go(command.cmd_type())
     }
 
     /// Says whether `command` may go while a RESTART is waited on, if one

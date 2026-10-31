@@ -2401,6 +2401,17 @@ the words from <tt class="docutils literal"><span class="pre">gateway-1</span></
 before it started listening, prints each with one space
 between them, and stops at the end of the line. <tt class="docutils literal"><span class="pre">gateway-1</span></tt> states no
 <tt class="docutils literal">address</tt> or <tt class="docutils literal">port</tt>, because nothing goes back up to the vehicle.</p>
+<p>Before its first word, <tt class="docutils literal">lorem_gateway</tt> sends a <tt class="docutils literal">CONNECT</tt> of its own,
+carrying the configuration's checksum, and sends it again each second until
+the vehicle answers with that checksum: a vehicle sends nothing down until it
+has taken one, and a station that only listens cannot count on another
+station's having sent it. It sends from the configuration's <tt class="docutils literal">tcs_cmd.send</tt>,
+so tcsmoc cannot be run on the same configuration beside it. <tt class="docutils literal"><span class="pre">-v</span></tt> says when
+it is matched; a vehicle answering with another configuration's checksum is
+said whatever the flag. <tt class="docutils literal">ping_gateway.py</tt> does the same as soon as it has
+started the vehicle, and <tt class="docutils literal"><span class="pre">--pings</span></tt> waits for the match before its first
+ping. Through <tt class="docutils literal"><span class="pre">tcslib::listening</span></tt> in Rust and <tt class="docutils literal">tcslib.listening</tt> in
+Python, either of which a station of your own that only listens can use.</p>
 <p>Both programs are beside the configuration: the payload is a Python 3 script
 that uses only the standard library, and the ground station is a Rust crate.
 <tt class="docutils literal">make <span class="pre">-C</span> examples <span class="pre">run-simple-app</span></tt> checks that <tt class="docutils literal">python3</tt> is installed -- 3.6

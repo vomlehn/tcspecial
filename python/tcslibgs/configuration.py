@@ -103,6 +103,15 @@ class BeaconLink:
     recv: HostPort
 
 
+@dataclass(frozen=True)
+class CommandLink:
+    """The spacecraft command link: where the ground sends from, ``send``,
+    and where the vehicle takes commands, ``recv``."""
+
+    send: HostPort
+    recv: HostPort
+
+
 @dataclass
 class Node:
     """One node, as the file writes it."""
@@ -174,6 +183,21 @@ class Configuration:
         return BeaconLink(
             send=HostPort.of("beacon.send", self._said("beacon.send")),
             recv=HostPort.of("beacon.recv", self._said("beacon.recv")),
+        )
+
+    def command_link(self):
+        """The spacecraft command link: ``tcs_cmd.send`` and
+        ``tcs_cmd.recv``.
+
+        Returns:
+            The :class:`CommandLink`.
+
+        Raises:
+            ValueError: Either is missing or is not an address and a port.
+        """
+        return CommandLink(
+            send=HostPort.of("tcs_cmd.send", self._said("tcs_cmd.send")),
+            recv=HostPort.of("tcs_cmd.recv", self._said("tcs_cmd.recv")),
         )
 
     def beacon_interval(self):

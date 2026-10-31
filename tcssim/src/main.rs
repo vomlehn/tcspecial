@@ -27,13 +27,24 @@
 //! mode, it waits for a simulator already started on them to be ready, and
 //! exits successfully when it is, or with a failure saying why. Thirty
 //! seconds unless told otherwise.
+//!
+//! SIGHUP, SIGINT and SIGTERM stop tcssim as its Quit button does: every
+//! payload stops and its stand-in is cleared before tcssim exits, with the
+//! status a shell gives a process the signal ended, 128 more than its number.
+//! A second one, for a stop that is taking too long, ends tcssim at once.
 
 use slint::{Model, ModelRc, SharedString, VecModel};
+use std::cell::Cell;
 use std::env;
 use std::path::Path;
 use std::process;
 use std::rc::Rc;
+use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 use std::sync::{Arc, Mutex};
+use std::time::Duration;
+
+use signal_hook::consts::{SIGHUP, SIGINT, SIGTERM};
+use signal_hook::flag;
 
 use tcslibgs::config::{payload_path_from_args, SIM_PAYLOAD_CONFIG_PATH_VAR};
 use tcslibgs::{
@@ -1034,6 +1045,15 @@ fn main() {
     ui.window()
         .set_size(grid::window_size(&sizes, &shape, configs.len()));
 
+    // Before any stand-in is made, so that none is left behind by a signal.
+    let signalled = match note_quit_signals() {
+        Ok(signalled) => signalled,
+        Err(e) => {
+            eprintln!("{e}");
+            process::exit(1);
+        }
+    };
+
     // Every stand-in made now, and each payload silent until its panel says
     // otherwise: what tcspecial finds is then the same whatever anyone has
     // pressed, and the readiness socket can say when all of it is there.
@@ -1100,12 +1120,12 @@ fn main() {
 
     handle_config_edits(&ui, payloads.clone(), model.clone());
 
-    // Quit handler
-    {
+    // What the Quit button does, and a signal: every payload stopped, which
+    // clears its stand-in, and the window closed, which ends the event loop.
+    let quit: Rc<dyn Fn()> = {
         let payloads = payloads.clone();
         let ui_weak = ui_weak.clone();
-        ui.on_quit_clicked(move || {
-            // Stop all payloads
+        Rc::new(move || {
             let mut guard = payloads.lock().unwrap();
             for payload in guard.iter_mut() {
                 payload.stop();
@@ -1114,8 +1134,13 @@ fn main() {
 
             let ui = ui_weak.unwrap();
             ui.hide().unwrap();
-        });
+        })
+    };
+    {
+        let quit = quit.clone();
+        ui.on_quit_clicked(move || quit());
     }
+    quit_when_signalled(signalled.clone(), quit);
 
     // Periodic update timer
     {
@@ -1142,6 +1167,70 @@ fn main() {
     ask_for_the_edge(&ui, Edge::Bottom);
 
     ui.run().unwrap();
+
+    let signal = signalled.load(Ordering::SeqCst);
+    if signal != 0 {
+        eprintln!("tcssim: stopped by signal {signal}");
+        process::exit(128 + signal as i32);
+    }
+}
+
+/// The signals that stop tcssim as its Quit button does.
+const QUIT_SIGNALS: [i32; 3] = [SIGHUP, SIGINT, SIGTERM];
+
+/// How often the event loop looks for one of `QUIT_SIGNALS`.
+const SIGNAL_POLL: Duration = Duration::from_millis(100);
+
+/// The status tcssim exits with on a second of `QUIT_SIGNALS`, which does
+/// not wait for the payloads to stop.
+const SECOND_SIGNAL_STATUS: i32 = 1;
+
+/// Has each of `QUIT_SIGNALS` be noted rather than end tcssim, so that the
+/// event loop can stop the payloads and clear their stand-ins first. A
+/// second, should that take too long, ends tcssim at once.
+///
+/// # Returns
+///
+/// The number of the signal that came, which is 0 until one has; or, where
+/// a signal could not be handled, why.
+fn note_quit_signals() -> Result<Arc<AtomicUsize>, String> {
+    let came = Arc::new(AtomicBool::new(false));
+    let signalled = Arc::new(AtomicUsize::new(0));
+    for signal in QUIT_SIGNALS {
+        // The exit first: it looks at whether a signal had already come,
+        // and the first one is to find that none had.
+        flag::register_conditional_shutdown(
+            signal,
+            SECOND_SIGNAL_STATUS,
+            came.clone(),
+        )
+        .and_then(|_| flag::register(signal, came.clone()))
+        .and_then(|_| {
+            flag::register_usize(signal, signalled.clone(), signal as usize)
+        })
+        .map_err(|e| format!("tcssim: cannot handle signal {signal}: {e}"))?;
+    }
+    Ok(signalled)
+}
+
+/// Runs `quit` from the event loop once a signal has come, and only once.
+///
+/// # Arguments
+///
+/// * `signalled` - The number of the signal that came, or 0; see
+///                 `note_quit_signals`.
+/// * `quit`      - What the Quit button does.
+fn quit_when_signalled(signalled: Arc<AtomicUsize>, quit: Rc<dyn Fn()>) {
+    let done = Cell::new(false);
+    let timer = slint::Timer::default();
+    timer.start(slint::TimerMode::Repeated, SIGNAL_POLL, move || {
+        if !done.get() && signalled.load(Ordering::SeqCst) != 0 {
+            done.set(true);
+            quit();
+        }
+    });
+    // For as long as the event loop runs, as the update timer is kept.
+    std::mem::forget(timer);
 }
 
 /// Asks for this window to be put against one edge of the display.

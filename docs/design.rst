@@ -6734,15 +6734,15 @@ A CONNECT from a station that has not matched
     nothing on the vehicle. A station whose configuration has the same
     checksum reads everything the same, so its CONNECT is as good as any.
 
-Still open
-    The command link carries no authentication: anyone who can reach it
-    can connect, arm a restart and restart the vehicle into any
-    configuration it holds. The arm key guards against mistakes, not
-    against anybody. CCSDS SDLS, or authentication at the radio, is the
-    remedy, and it is not designed here. A MOC built elsewhere that sends
-    UDP without its checksum is open as it is today: see `Holes in this,
-    and what closes them`_ under `Fault Resiliency`_, which this scheme
-    leaves as it is.
+Who may command the vehicle
+    TCSpecial does not enforce security. Anyone who can reach the command
+    link can connect, arm a restart and restart the vehicle into any
+    configuration it holds; the arm key guards against mistakes, not
+    against anybody. Deciding who reaches the link is left to software
+    outside tcspecial -- CCSDS SDLS, or authentication at the radio. A MOC
+    built elsewhere that sends UDP without its checksum is open as it is
+    today: see `Holes in this, and what closes them`_ under `Fault
+    Resiliency`_, which this scheme leaves as it is.
 
 What this replaces
 ~~~~~~~~~~~~~~~~~~
@@ -7404,10 +7404,12 @@ A confirmed configuration that later fails at every start
     confirmed or not, and ``load_trials`` of them give it up: see
     `Starting, and the restart flag`_.
 
-Still open The command link carries no authentication. Anyone who can reach it
-can arm and restart the vehicle; an arm key on an open link is a guard against
-mistakes, not against anybody. CCSDS SDLS, or authentication at the radio, is
-the remedy, and it is not designed here.
+Who may command the vehicle
+    TCSpecial does not enforce security. Anyone who can reach the command
+    link can arm and restart the vehicle; an arm key on an open link is a
+    guard against mistakes, not against anybody. Deciding who reaches the
+    link is left to software outside tcspecial -- CCSDS SDLS, or
+    authentication at the radio.
 
 TCSpecial
 =========

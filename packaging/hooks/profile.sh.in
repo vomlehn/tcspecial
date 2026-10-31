@@ -1,3 +1,4 @@
+# shellcheck shell=sh
 # Puts @PREFIX@/bin on the search path, for @PACKAGE@.
 #
 # Each TCS package installs one of these, named after itself, so that no two

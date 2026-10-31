@@ -1,6 +1,7 @@
 Name:           tcspecial
 %include %{_sourcedir}/common.inc
 Summary:        Telemetry and control, special: spacecraft flight software
+Group:          Applications/System
 
 %description
 tcspecial runs a spacecraft's payloads as nodes in a configured graph and
@@ -37,10 +38,12 @@ fi
 /opt/tcs/libexec/app_moc_veh
 /opt/tcs/libexec/app_payload_veh
 /opt/tcs/libexec/app_all_veh
-/opt/tcs/share/doc/tcspecial
+%doc /opt/tcs/share/doc/tcspecial
 /opt/tcs/share/examples/tcspecial
 %dir /etc/opt/tcs/tcspecial
 %dir /var/opt/tcs/tcspecial
 %config(noreplace) /etc/profile.d/tcspecial.sh
 /usr/lib/systemd/system/tcspecial.service
 /opt/tcs/sbin/tcspecial-links
+
+%include %{_sourcedir}/changelog.inc

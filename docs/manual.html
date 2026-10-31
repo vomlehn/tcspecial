@@ -2983,6 +2983,26 @@ Debian, <tt class="docutils literal"><span class="pre">/usr/lib/python3.&lt;mino
 directory every python3 reads -- which puts the Python on python3's path;
 and <tt class="docutils literal">/usr/lib/systemd/system/tcspecial.service</tt> (see <a class="reference internal" href="#running-tcspecial-under-a-supervisor">Running tcspecial
 under a supervisor</a>).</p>
+<p>Each .deb also carries what Debian expects of every package, outside
+<tt class="docutils literal">/opt/tcs</tt> as the files above are: <tt class="docutils literal"><span class="pre">/usr/share/doc/&lt;package&gt;/copyright</span></tt>,
+in Debian's machine-readable format, and <tt class="docutils literal">changelog.Debian.gz</tt>, both made
+as the package is built, from <tt class="docutils literal"><span class="pre">LICENSE-MIT</span></tt> and the version; and
+lintian's overrides, in <tt class="docutils literal"><span class="pre">/usr/share/lintian/overrides/&lt;package&gt;</span></tt>. The
+ground package also has a trigger that has dpkg run <tt class="docutils literal">ldconfig</tt> once
+<tt class="docutils literal">libtcs.so.1</tt> is installed or removed. The RPMs say the same in their own
+<tt class="docutils literal">License</tt>, <tt class="docutils literal">%changelog</tt>, <tt class="docutils literal">%post</tt> and <tt class="docutils literal">%postun</tt>. <tt class="docutils literal">libtcs.so.1</tt> is
+not executable in the .deb, as Debian wants a shared library to be, and is
+in the RPM, where rpm reads what a library provides only from an executable
+file; otherwise the two hold the same files under <tt class="docutils literal">/opt/tcs</tt>.</p>
+<p><tt class="docutils literal">make <span class="pre">lint-packages</span></tt> checks the packages <tt class="docutils literal">make packages</tt> built with
+lintian and rpmlint, and the shell scripts they run or install with
+shellcheck: the profile.d hooks and the links scripts as the stage has
+them, the .debs' maintainer scripts and the packaging scripts. It skips, in
+a line, any of the three that is not installed, and fails on any finding
+that is not overridden. What is overridden is intended, and says why: for
+lintian in <tt class="docutils literal"><span class="pre">packaging/deb/&lt;package&gt;/lintian-overrides</span></tt>, which each .deb
+carries, and for rpmlint in <tt class="docutils literal">packaging/rpm/rpmlint.toml</tt>, which is not
+shipped.</p>
 </div>
 <div class="section" id="make-install">
 <h2><a class="toc-backref" href="#toc-entry-43"><tt class="docutils literal">make install</tt></a></h2>

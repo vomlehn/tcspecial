@@ -67,6 +67,12 @@ To build them, or to install without them:
 `HOOKS=1`, which the packages have, also installs what puts `/opt/tcs` on
 the search paths: `/etc/profile.d/<package>.sh`,
 `/etc/ld.so.conf.d/tcspecial-ground.conf` and a `.pth` file for python3.
+Each .deb also carries what Debian expects of every package:
+`/usr/share/doc/<package>/copyright` and `changelog.Debian.gz`, made as it
+is built, and lintian's overrides in `/usr/share/lintian/overrides`.
+`make lint-packages` checks the packages with lintian and rpmlint, and
+their shell scripts with shellcheck, and fails on any finding that is not
+overridden with its reason.
 
 The profile.d scripts put `/opt/tcs/bin` on `PATH` for login shells only:
 sudo, cron and other minimal environments do not see it. To make a

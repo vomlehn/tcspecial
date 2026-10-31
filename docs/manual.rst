@@ -2740,6 +2740,28 @@ directory every python3 reads -- which puts the Python on python3's path;
 and ``/usr/lib/systemd/system/tcspecial.service`` (see `Running tcspecial
 under a supervisor`_).
 
+Each .deb also carries what Debian expects of every package, outside
+``/opt/tcs`` as the files above are: ``/usr/share/doc/<package>/copyright``,
+in Debian's machine-readable format, and ``changelog.Debian.gz``, both made
+as the package is built, from ``LICENSE-MIT`` and the version; and
+lintian's overrides, in ``/usr/share/lintian/overrides/<package>``. The
+ground package also has a trigger that has dpkg run ``ldconfig`` once
+``libtcs.so.1`` is installed or removed. The RPMs say the same in their own
+``License``, ``%changelog``, ``%post`` and ``%postun``. ``libtcs.so.1`` is
+not executable in the .deb, as Debian wants a shared library to be, and is
+in the RPM, where rpm reads what a library provides only from an executable
+file; otherwise the two hold the same files under ``/opt/tcs``.
+
+``make lint-packages`` checks the packages ``make packages`` built with
+lintian and rpmlint, and the shell scripts they run or install with
+shellcheck: the profile.d hooks and the links scripts as the stage has
+them, the .debs' maintainer scripts and the packaging scripts. It skips, in
+a line, any of the three that is not installed, and fails on any finding
+that is not overridden. What is overridden is intended, and says why: for
+lintian in ``packaging/deb/<package>/lintian-overrides``, which each .deb
+carries, and for rpmlint in ``packaging/rpm/rpmlint.toml``, which is not
+shipped.
+
 ``make install``
 ----------------
 

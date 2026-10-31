@@ -4,7 +4,7 @@
 //! header: a command is its opcode, its sequence and what it carries, and an
 //! answer the opcode and sequence of the command it answers, a status, a
 //! time and what it carries. The layouts are stated once, in XTCE: the fixed
-//! commands -- CONNECT, RESTART_ARM, RESTART, SWITCH_ARM and SWITCH -- in
+//! commands -- CONNECT, RESTART_ARM and RESTART -- in
 //! `tcslibgs/xtce/fixed.xtce`, whose layouts never change, and every other
 //! command in `tcslibgs/xtce/link.xtce`. Each is packed and unpacked by the
 //! code tcs-xtce generates from it, `fixed_packet.rs` and `link_packet.rs`,
@@ -35,17 +35,15 @@ use tcs_xtce::packet::{Codec, FixedBytes, FixedString, Packet, PacketError};
 use crate::commands::{
     Attribute, Command, CommandHeader, CommandType, ConnectCommand,
     NodeCommand, PingCommand, RestartArmCommand, RestartCommand,
-    SetNodeCommand, SwitchArmCommand, SwitchCommand, Value,
+    SetNodeCommand, Value,
 };
 use crate::config_digest::{ConfigDigest, ConfigVersion};
 use crate::fixed_packet as fixed;
-use crate::interface::InterfaceDigest;
 use crate::link_packet as packet;
 use crate::telemetry::{
     ConnectTelemetry, NodeTelemetry, PingTelemetry, QueryNodeSampleTelemetry,
     QueryNodeTelemetry, Reason, RestartArmTelemetry, RestartTelemetry,
-    SetNodeTelemetry, SwitchArmTelemetry, SwitchTelemetry, Telemetry,
-    TelemetryHeader, TelemetryType,
+    SetNodeTelemetry, Telemetry, TelemetryHeader, TelemetryType,
 };
 use crate::types::{
     ArmKey, CommandStatus, DHSample, NodeCounts, NodeId, Timestamp,
@@ -256,16 +254,6 @@ impl Command {
                     header: header(p.sequence, CommandType::Connect),
                     digest: digest_of(&p.checksum),
                 }),
-                F::SwitchArm(p) => Command::SwitchArm(SwitchArmCommand {
-                    header: header(p.sequence, CommandType::SwitchArm),
-                    arm_key: ArmKey(p.arm_key),
-                    target: InterfaceDigest(digest_of(&p.target).0),
-                }),
-                F::Switch(p) => Command::Switch(SwitchCommand {
-                    header: header(p.sequence, CommandType::Switch),
-                    arm_key: ArmKey(p.arm_key),
-                    target: InterfaceDigest(digest_of(&p.target).0),
-                }),
             });
         }
         use packet::TcsCommandKind as K;
@@ -373,26 +361,6 @@ impl CommandPacker {
                     &F::Connect(fixed::Connect {
                         sequence,
                         checksum: fixed_bytes(&c.digest.0),
-                    }),
-                )
-            }
-            Command::SwitchArm(c) => {
-                return encoded(
-                    &mut self.fixed,
-                    &F::SwitchArm(fixed::SwitchArm {
-                        sequence,
-                        arm_key: c.arm_key.0,
-                        target: fixed_bytes(&c.target.0),
-                    }),
-                )
-            }
-            Command::Switch(c) => {
-                return encoded(
-                    &mut self.fixed,
-                    &F::Switch(fixed::Switch {
-                        sequence,
-                        arm_key: c.arm_key.0,
-                        target: fixed_bytes(&c.target.0),
                     }),
                 )
             }
@@ -565,14 +533,6 @@ impl Telemetry {
                 F::RestartAnswer(p) => Telemetry::Restart(RestartTelemetry {
                     header: head!(p, TelemetryType::Restart),
                 }),
-                F::SwitchArmAnswer(p) => {
-                    Telemetry::SwitchArm(SwitchArmTelemetry {
-                        header: head!(p, TelemetryType::SwitchArm),
-                    })
-                }
-                F::SwitchAnswer(p) => Telemetry::Switch(SwitchTelemetry {
-                    header: head!(p, TelemetryType::Switch),
-                }),
                 F::ConnectAnswer(p) => Telemetry::Connect(ConnectTelemetry {
                     header: head!(p, TelemetryType::Connect),
                     version: ConfigVersion {
@@ -712,18 +672,6 @@ impl AnswerPacker {
                     F::RestartAnswer(fill!(fixed, RestartAnswer, t.header;));
                 return encoded(&mut self.fixed, &p);
             }
-            Telemetry::SwitchArm(t) => {
-                let p = F::SwitchArmAnswer(fill!(
-                    fixed,
-                    SwitchArmAnswer,
-                    t.header;
-                ));
-                return encoded(&mut self.fixed, &p);
-            }
-            Telemetry::Switch(t) => {
-                let p = F::SwitchAnswer(fill!(fixed, SwitchAnswer, t.header;));
-                return encoded(&mut self.fixed, &p);
-            }
             Telemetry::Connect(t) => {
                 let p = F::ConnectAnswer(fill!(
                     fixed,
@@ -824,12 +772,12 @@ mod tests {
     /// `fixed.xtce` is to be undone, and a new fixed command made instead,
     /// with an opcode of its own and a document of its own.
     ///
-    /// It changed twice, deliberately, before the first release that is not
-    /// a release candidate: when the beacon's layout was moved into it,
-    /// from `87aa3a5d...`, and when the beacon was moved out again, into
-    /// `beacon.xtce`, and SWITCH_ARM and SWITCH were added, from
-    /// `47fa3ffd...`. From that release on it never changes.
-    const FIXED_DIGEST: &str = "f25414a706ee2c0f82957a092504bf28";
+    /// It changed, deliberately, before the first release that is not a
+    /// release candidate, when the beacon's layout was moved into it, to
+    /// `47fa3ffd...`, and changed back when the beacon was moved out again,
+    /// into `beacon.xtce`: it is what it was before either. From that
+    /// release on it never changes.
+    const FIXED_DIGEST: &str = "87aa3a5da4546803bba49afe56c66ba8";
 
     /// The tcs-xtce digest of `xtce/beacon.xtce`, which must never change,
     /// for the reason [`FIXED_DIGEST`] must not: every ground station reads
@@ -854,16 +802,6 @@ mod tests {
                 4,
                 ArmKey(0x1234),
                 ConfigDigest([0x22; 16]),
-            )),
-            Command::SwitchArm(SwitchArmCommand::new(
-                11,
-                ArmKey(0x5678),
-                InterfaceDigest([0x33; 16]),
-            )),
-            Command::Switch(SwitchCommand::new(
-                12,
-                ArmKey(0x5678),
-                InterfaceDigest([0x44; 16]),
             )),
             Command::StartNode(NodeCommand::start(6, NodeId(7))),
             Command::StopNode(NodeCommand::stop(7, NodeId(7))),
@@ -930,14 +868,6 @@ mod tests {
             Telemetry::RestartArm(RestartArmTelemetry::new(
                 12,
                 CommandStatus::NotFound,
-            )),
-            Telemetry::SwitchArm(SwitchArmTelemetry::new(
-                14,
-                CommandStatus::NotFound,
-            )),
-            Telemetry::Switch(SwitchTelemetry::new(
-                15,
-                CommandStatus::NotArmed,
             )),
             Telemetry::Ping(PingTelemetry::new(13, CommandStatus::Unmatched)),
             Telemetry::StartNode(NodeTelemetry::started(
@@ -1024,9 +954,9 @@ mod tests {
             digest_of_document("fixed.xtce"),
             FIXED_DIGEST,
             "tcslibgs/xtce/fixed.xtce has changed, and it must never change: \
-             the layouts of CONNECT, RESTART_ARM, RESTART, SWITCH_ARM and \
-             SWITCH are what every ground station and every vehicle agree on \
-             whatever else they run. Undo the change, and make a new fixed \
+             the layouts of CONNECT, RESTART_ARM and RESTART are what every \
+             ground station and every vehicle agree on whatever else they \
+             run. Undo the change, and make a new fixed \
              command, with an opcode of its own from 0x00 to 0x0F, in a \
              document of its own"
         );
@@ -1070,24 +1000,6 @@ mod tests {
         .to_bytes();
         want[0] = 0x03;
         assert_eq!(restart, want, "RESTART: as RESTART_ARM, opcode 0x03");
-
-        let interface = InterfaceDigest(target.0);
-        let switch_arm = Command::SwitchArm(SwitchArmCommand::new(
-            0x0102_0304,
-            ArmKey(0x1122_3344_5566_7788),
-            interface,
-        ))
-        .to_bytes();
-        want[0] = 0x05;
-        assert_eq!(switch_arm, want, "SWITCH_ARM: as RESTART_ARM, 0x05");
-        let switch = Command::Switch(SwitchCommand::new(
-            0x0102_0304,
-            ArmKey(0x1122_3344_5566_7788),
-            interface,
-        ))
-        .to_bytes();
-        want[0] = 0x06;
-        assert_eq!(switch, want, "SWITCH: as RESTART_ARM, opcode 0x06");
 
         let connect =
             Command::Connect(ConnectCommand::new(7, target)).to_bytes();
@@ -1133,20 +1045,6 @@ mod tests {
                     CommandStatus::NotFound,
                 )),
                 0x03,
-            ),
-            (
-                Telemetry::SwitchArm(SwitchArmTelemetry::new(
-                    9,
-                    CommandStatus::NotFound,
-                )),
-                0x05,
-            ),
-            (
-                Telemetry::Switch(SwitchTelemetry::new(
-                    9,
-                    CommandStatus::NotFound,
-                )),
-                0x06,
             ),
         ] {
             let packed = answer.to_bytes();
@@ -1202,7 +1100,7 @@ mod tests {
         }
         assert_eq!(Command::read(b""), Err(LinkError::Empty));
         assert_eq!(Telemetry::read(b""), Err(LinkError::Empty));
-        for opcode in [0x00, 0x07, 0x0f, 0x20, 0x81, 0x84, 0xff] {
+        for opcode in [0x00, 0x05, 0x0f, 0x20, 0x81, 0x84, 0xff] {
             let datagram = [opcode, 0, 0, 0, 1];
             assert_eq!(
                 Command::read(&datagram),

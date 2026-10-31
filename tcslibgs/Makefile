@@ -103,9 +103,8 @@ $(LINK_RS): $(LINK_XML) | tcs-xtce
 		--source-name tcslibgs/$(LINK_XML)
 	rustfmt --edition 2021 $(LINK_RS)
 
-# The fixed commands -- CONNECT, RESTART_ARM, RESTART, SWITCH_ARM and
-# SWITCH -- and their answers are stated in xtce/fixed.xtce, which never
-# changes, and packed and
+# The fixed commands -- CONNECT, RESTART_ARM and RESTART -- and their
+# answers are stated in xtce/fixed.xtce, which never changes, and packed and
 # unpacked by the Rust and the Python tcs-xtce generates from it. The Python
 # is for the ground stations written in Python; it imports the runtime
 # through python/tcslibgs/_xtce, whose links into the tcs-xtce checkout

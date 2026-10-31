@@ -70,10 +70,6 @@ pub enum TelemetryType {
     Connect,
     RestartArm,
     Restart,
-    /// The answer to a SWITCH_ARM: see [`SwitchArmTelemetry`].
-    SwitchArm,
-    /// And to a SWITCH.
-    Switch,
     /// The answer to a START_NODE: see [`NodeTelemetry`].
     StartNode,
     /// And to a STOP_NODE.
@@ -99,8 +95,6 @@ impl TelemetryType {
             TelemetryType::Connect => CommandType::Connect,
             TelemetryType::RestartArm => CommandType::RestartArm,
             TelemetryType::Restart => CommandType::Restart,
-            TelemetryType::SwitchArm => CommandType::SwitchArm,
-            TelemetryType::Switch => CommandType::Switch,
             TelemetryType::StartNode => CommandType::StartNode,
             TelemetryType::StopNode => CommandType::StopNode,
             TelemetryType::SetNode => CommandType::SetNode,
@@ -138,8 +132,6 @@ impl TelemetryType {
             CommandType::Connect => TelemetryType::Connect,
             CommandType::RestartArm => TelemetryType::RestartArm,
             CommandType::Restart => TelemetryType::Restart,
-            CommandType::SwitchArm => TelemetryType::SwitchArm,
-            CommandType::Switch => TelemetryType::Switch,
             CommandType::StartNode => TelemetryType::StartNode,
             CommandType::StopNode => TelemetryType::StopNode,
             CommandType::SetNode => TelemetryType::SetNode,
@@ -213,62 +205,6 @@ impl RestartTelemetry {
             header: TelemetryHeader::new(
                 sequence,
                 TelemetryType::Restart,
-                status,
-            ),
-        }
-    }
-}
-
-/// SWITCH_ARM telemetry response
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub struct SwitchArmTelemetry {
-    pub header: TelemetryHeader,
-}
-
-impl SwitchArmTelemetry {
-    /// Makes the answer to a SWITCH_ARM, made now.
-    ///
-    /// # Arguments
-    ///
-    /// * `sequence` - The sequence number of the command it answers.
-    /// * `status`   - How the command went.
-    ///
-    /// # Returns
-    ///
-    /// The answer.
-    pub fn new(sequence: u32, status: CommandStatus) -> Self {
-        Self {
-            header: TelemetryHeader::new(
-                sequence,
-                TelemetryType::SwitchArm,
-                status,
-            ),
-        }
-    }
-}
-
-/// SWITCH telemetry response
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub struct SwitchTelemetry {
-    pub header: TelemetryHeader,
-}
-
-impl SwitchTelemetry {
-    /// Makes the answer to a SWITCH, made now.
-    ///
-    /// # Arguments
-    ///
-    /// * `sequence` - The sequence number of the command it answers.
-    /// * `status`   - How the command went.
-    ///
-    /// # Returns
-    ///
-    /// The answer.
-    pub fn new(sequence: u32, status: CommandStatus) -> Self {
-        Self {
-            header: TelemetryHeader::new(
-                sequence,
-                TelemetryType::Switch,
                 status,
             ),
         }
@@ -717,12 +653,6 @@ pub fn answer_to(
         Command::Restart(_) => {
             Telemetry::Restart(RestartTelemetry::new(sequence, status))
         }
-        Command::SwitchArm(_) => {
-            Telemetry::SwitchArm(SwitchArmTelemetry::new(sequence, status))
-        }
-        Command::Switch(_) => {
-            Telemetry::Switch(SwitchTelemetry::new(sequence, status))
-        }
         // The id the command carried, refused or not: an answer about a node
         // says which node, and an id out of range is exactly the case where
         // the ground needs to see which one it sent.
@@ -759,8 +689,6 @@ pub enum Telemetry {
     Connect(ConnectTelemetry),
     RestartArm(RestartArmTelemetry),
     Restart(RestartTelemetry),
-    SwitchArm(SwitchArmTelemetry),
-    Switch(SwitchTelemetry),
     StartNode(NodeTelemetry),
     StopNode(NodeTelemetry),
     SetNode(SetNodeTelemetry),
@@ -780,8 +708,6 @@ impl Telemetry {
             Telemetry::Connect(tm) => &tm.header,
             Telemetry::RestartArm(tm) => &tm.header,
             Telemetry::Restart(tm) => &tm.header,
-            Telemetry::SwitchArm(tm) => &tm.header,
-            Telemetry::Switch(tm) => &tm.header,
             Telemetry::StartNode(tm) | Telemetry::StopNode(tm) => &tm.header,
             Telemetry::SetNode(tm) => &tm.header,
             Telemetry::QueryNode(tm) => &tm.header,
@@ -800,8 +726,6 @@ impl Telemetry {
             Telemetry::Connect(tm) => &mut tm.header,
             Telemetry::RestartArm(tm) => &mut tm.header,
             Telemetry::Restart(tm) => &mut tm.header,
-            Telemetry::SwitchArm(tm) => &mut tm.header,
-            Telemetry::Switch(tm) => &mut tm.header,
             Telemetry::StartNode(tm) | Telemetry::StopNode(tm) => {
                 &mut tm.header
             }
@@ -958,11 +882,6 @@ mod tests {
                 4,
                 CommandStatus::Success,
             )),
-            Telemetry::SwitchArm(SwitchArmTelemetry::new(
-                5,
-                CommandStatus::Success,
-            )),
-            Telemetry::Switch(SwitchTelemetry::new(6, CommandStatus::Success)),
             Telemetry::StartNode(NodeTelemetry::started(
                 11,
                 CommandStatus::Success,

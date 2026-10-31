@@ -330,256 +330,6 @@ impl fmt::Display for RestartAnswer {
     }
 }
 
-/// Sequence container `/TcsFixed/SwitchArmAnswer`.
-///
-/// Fixed by its inheritance: `Opcode` = 5.
-#[derive(Debug, Clone, PartialEq, Default)]
-pub struct SwitchArmAnswer {
-    /// `/TcsFixed/Sequence` (/TcsFixed/U32Type)
-    pub sequence: u32,
-    /// `/TcsFixed/Status` (/TcsFixed/StatusType)
-    pub status: StatusType,
-    /// `/TcsFixed/Timestamp` (/TcsFixed/U64Type)
-    pub timestamp: u64,
-}
-
-impl SwitchArmAnswer {
-    /// The number of fields with an alarm.
-    pub const ALARMS: usize = 0;
-
-    /// Evaluates the alarms of this `/TcsFixed/SwitchArmAnswer` packet's
-    /// fields. Alarms that depend on earlier samples count only this one (see
-    /// `monitor`).
-    ///
-    /// # Returns
-    ///
-    /// The alarm level of each field with an alarm, `None` when the field is
-    /// absent.
-    pub fn alarms(&self) -> pk::Alarms<0> {
-        let mut a = pk::Alarms::new();
-        a
-    }
-
-    /// Evaluates the alarms of this `/TcsFixed/SwitchArmAnswer` packet's fields
-    /// like `alarms()`, counting the earlier samples for change ranges,
-    /// minViolations and minConformance.
-    ///
-    /// # Arguments
-    ///
-    /// * `m` - The state of the alarms that depend on earlier samples, which
-    ///         the method reads and updates.
-    /// * `t` - This sample's time, in seconds.
-    ///
-    /// # Returns
-    ///
-    /// The alarm level of each field with an alarm, `None` when the field is
-    /// absent.
-    pub fn monitor(&self, m: &mut AlarmMonitor, t: f64) -> pk::Alarms<0> {
-        let mut a = pk::Alarms::new();
-        a
-    }
-
-    /// The number of MathAlgorithms this packet triggers.
-    pub const ALGORITHMS: usize = 0;
-
-    /// Evaluates the MathAlgorithms that a `/TcsFixed/SwitchArmAnswer` packet
-    /// triggers, from this one's values.
-    ///
-    /// # Returns
-    ///
-    /// The output of each, `None` when an input is absent or a custom
-    /// algorithm's function isn't set or fails.
-    pub fn algorithms(&self) -> pk::Outputs<0> {
-        let mut o = pk::Outputs::new();
-        o
-    }
-}
-
-impl Packet for SwitchArmAnswer {
-    const NAME: &'static str = "/TcsFixed/SwitchArmAnswer";
-    const MAX_BYTES: usize = 14;
-
-    fn decode_prefix(data: &[u8]) -> Result<(Self, usize)> {
-        let mut r = BitReader::new(data);
-        let v1 = r.uint_order(8, false, "Opcode")? as u8;
-        let v2 = r.uint_order(32, false, "Sequence")? as u32;
-        let v3 = StatusType(r.uint_order(8, false, "Status")? as i64);
-        let v4 = r.uint_order(64, false, "Timestamp")? as u64;
-        if !((v1 as i128) == 5) {
-            return Err(PacketError::Mismatch {
-                container: "/TcsFixed/SwitchArmAnswer",
-                criterion: "/TcsFixed/Opcode == 5",
-            });
-        }
-        Ok((
-            SwitchArmAnswer {
-                sequence: v2,
-                status: v3,
-                timestamp: v4,
-            },
-            r.used(),
-        ))
-    }
-
-    fn encode_into(&self, w: &mut BitWriter<'_>) -> Result<()> {
-        w.uint_order(8, false, pk::from_unsigned(5 as u64, 8, "Opcode")?);
-        w.uint_order(
-            32,
-            false,
-            pk::from_unsigned(self.sequence as u64, 32, "Sequence")?,
-        );
-        w.uint_order(
-            8,
-            false,
-            pk::from_signed(self.status.0, 8, IntEncoding::Unsigned, "Status")?,
-        );
-        w.uint_order(
-            64,
-            false,
-            pk::from_unsigned(self.timestamp as u64, 64, "Timestamp")?,
-        );
-        Ok(())
-    }
-}
-
-impl fmt::Display for SwitchArmAnswer {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        f.write_str("SwitchArmAnswer{")?;
-        f.write_str("sequence=")?;
-        write!(f, "{}", self.sequence)?;
-        f.write_str(", status=")?;
-        write!(f, "{}", self.status)?;
-        f.write_str(", timestamp=")?;
-        write!(f, "{}", self.timestamp)?;
-        f.write_char('}')
-    }
-}
-
-/// Sequence container `/TcsFixed/SwitchAnswer`.
-///
-/// Fixed by its inheritance: `Opcode` = 6.
-#[derive(Debug, Clone, PartialEq, Default)]
-pub struct SwitchAnswer {
-    /// `/TcsFixed/Sequence` (/TcsFixed/U32Type)
-    pub sequence: u32,
-    /// `/TcsFixed/Status` (/TcsFixed/StatusType)
-    pub status: StatusType,
-    /// `/TcsFixed/Timestamp` (/TcsFixed/U64Type)
-    pub timestamp: u64,
-}
-
-impl SwitchAnswer {
-    /// The number of fields with an alarm.
-    pub const ALARMS: usize = 0;
-
-    /// Evaluates the alarms of this `/TcsFixed/SwitchAnswer` packet's fields.
-    /// Alarms that depend on earlier samples count only this one (see
-    /// `monitor`).
-    ///
-    /// # Returns
-    ///
-    /// The alarm level of each field with an alarm, `None` when the field is
-    /// absent.
-    pub fn alarms(&self) -> pk::Alarms<0> {
-        let mut a = pk::Alarms::new();
-        a
-    }
-
-    /// Evaluates the alarms of this `/TcsFixed/SwitchAnswer` packet's fields
-    /// like `alarms()`, counting the earlier samples for change ranges,
-    /// minViolations and minConformance.
-    ///
-    /// # Arguments
-    ///
-    /// * `m` - The state of the alarms that depend on earlier samples, which
-    ///         the method reads and updates.
-    /// * `t` - This sample's time, in seconds.
-    ///
-    /// # Returns
-    ///
-    /// The alarm level of each field with an alarm, `None` when the field is
-    /// absent.
-    pub fn monitor(&self, m: &mut AlarmMonitor, t: f64) -> pk::Alarms<0> {
-        let mut a = pk::Alarms::new();
-        a
-    }
-
-    /// The number of MathAlgorithms this packet triggers.
-    pub const ALGORITHMS: usize = 0;
-
-    /// Evaluates the MathAlgorithms that a `/TcsFixed/SwitchAnswer` packet
-    /// triggers, from this one's values.
-    ///
-    /// # Returns
-    ///
-    /// The output of each, `None` when an input is absent or a custom
-    /// algorithm's function isn't set or fails.
-    pub fn algorithms(&self) -> pk::Outputs<0> {
-        let mut o = pk::Outputs::new();
-        o
-    }
-}
-
-impl Packet for SwitchAnswer {
-    const NAME: &'static str = "/TcsFixed/SwitchAnswer";
-    const MAX_BYTES: usize = 14;
-
-    fn decode_prefix(data: &[u8]) -> Result<(Self, usize)> {
-        let mut r = BitReader::new(data);
-        let v1 = r.uint_order(8, false, "Opcode")? as u8;
-        let v2 = r.uint_order(32, false, "Sequence")? as u32;
-        let v3 = StatusType(r.uint_order(8, false, "Status")? as i64);
-        let v4 = r.uint_order(64, false, "Timestamp")? as u64;
-        if !((v1 as i128) == 6) {
-            return Err(PacketError::Mismatch {
-                container: "/TcsFixed/SwitchAnswer",
-                criterion: "/TcsFixed/Opcode == 6",
-            });
-        }
-        Ok((
-            SwitchAnswer {
-                sequence: v2,
-                status: v3,
-                timestamp: v4,
-            },
-            r.used(),
-        ))
-    }
-
-    fn encode_into(&self, w: &mut BitWriter<'_>) -> Result<()> {
-        w.uint_order(8, false, pk::from_unsigned(6 as u64, 8, "Opcode")?);
-        w.uint_order(
-            32,
-            false,
-            pk::from_unsigned(self.sequence as u64, 32, "Sequence")?,
-        );
-        w.uint_order(
-            8,
-            false,
-            pk::from_signed(self.status.0, 8, IntEncoding::Unsigned, "Status")?,
-        );
-        w.uint_order(
-            64,
-            false,
-            pk::from_unsigned(self.timestamp as u64, 64, "Timestamp")?,
-        );
-        Ok(())
-    }
-}
-
-impl fmt::Display for SwitchAnswer {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        f.write_str("SwitchAnswer{")?;
-        f.write_str("sequence=")?;
-        write!(f, "{}", self.sequence)?;
-        f.write_str(", status=")?;
-        write!(f, "{}", self.status)?;
-        f.write_str(", timestamp=")?;
-        write!(f, "{}", self.timestamp)?;
-        f.write_char('}')
-    }
-}
-
 /// Sequence container `/TcsFixed/ConnectAnswer`.
 ///
 /// Fixed by its inheritance: `Opcode` = 4.
@@ -1106,254 +856,11 @@ impl fmt::Display for Connect {
     }
 }
 
-/// Meta-command `/TcsFixed/SwitchArm`.
-///
-/// Fixed by its inheritance: `Opcode` = 5.
-#[derive(Debug, Clone, PartialEq, Default)]
-pub struct SwitchArm {
-    /// `/TcsFixed/FixedCommand#Sequence` (/TcsFixed/U32Arg)
-    pub sequence: u32,
-    /// `/TcsFixed/SwitchArm#ArmKey` (/TcsFixed/U64Arg)
-    pub arm_key: u64,
-    /// `/TcsFixed/SwitchArm#Target` (/TcsFixed/ChecksumArg)
-    pub target: pk::FixedBytes<16>,
-}
-
-impl SwitchArm {
-    /// The number of fields with an alarm.
-    pub const ALARMS: usize = 0;
-
-    /// Evaluates the alarms of this `/TcsFixed/SwitchArm` packet's fields.
-    /// Alarms that depend on earlier samples count only this one (see
-    /// `monitor`).
-    ///
-    /// # Returns
-    ///
-    /// The alarm level of each field with an alarm, `None` when the field is
-    /// absent.
-    pub fn alarms(&self) -> pk::Alarms<0> {
-        let mut a = pk::Alarms::new();
-        a
-    }
-
-    /// Evaluates the alarms of this `/TcsFixed/SwitchArm` packet's fields like
-    /// `alarms()`, counting the earlier samples for change ranges,
-    /// minViolations and minConformance.
-    ///
-    /// # Arguments
-    ///
-    /// * `m` - The state of the alarms that depend on earlier samples, which
-    ///         the method reads and updates.
-    /// * `t` - This sample's time, in seconds.
-    ///
-    /// # Returns
-    ///
-    /// The alarm level of each field with an alarm, `None` when the field is
-    /// absent.
-    pub fn monitor(&self, m: &mut AlarmMonitor, t: f64) -> pk::Alarms<0> {
-        let mut a = pk::Alarms::new();
-        a
-    }
-
-    /// The number of MathAlgorithms this packet triggers.
-    pub const ALGORITHMS: usize = 0;
-
-    /// Evaluates the MathAlgorithms that a `/TcsFixed/SwitchArm` packet
-    /// triggers, from this one's values.
-    ///
-    /// # Returns
-    ///
-    /// The output of each, `None` when an input is absent or a custom
-    /// algorithm's function isn't set or fails.
-    pub fn algorithms(&self) -> pk::Outputs<0> {
-        let mut o = pk::Outputs::new();
-        o
-    }
-}
-
-impl Packet for SwitchArm {
-    const NAME: &'static str = "/TcsFixed/SwitchArm";
-    const MAX_BYTES: usize = 29;
-
-    fn decode_prefix(data: &[u8]) -> Result<(Self, usize)> {
-        let mut r = BitReader::new(data);
-        let v10 = r.uint_order(8, false, "Opcode")? as u8;
-        let v11 = r.uint_order(32, false, "Sequence")? as u32;
-        if !((v10 as i128) == 5) {
-            return Err(PacketError::Mismatch {
-                container: "/TcsFixed/SwitchArm",
-                criterion: "Opcode = 5",
-            });
-        }
-        let v17 = r.uint_order(64, false, "ArmKey")? as u64;
-        let v18 = r.fixed_bytes::<16>(16, "Target")?;
-        Ok((
-            SwitchArm {
-                sequence: v11,
-                arm_key: v17,
-                target: v18,
-            },
-            r.used(),
-        ))
-    }
-
-    fn encode_into(&self, w: &mut BitWriter<'_>) -> Result<()> {
-        w.uint_order(8, false, pk::from_unsigned(5 as u64, 8, "Opcode")?);
-        w.uint_order(
-            32,
-            false,
-            pk::from_unsigned(self.sequence as u64, 32, "Sequence")?,
-        );
-        w.uint_order(
-            64,
-            false,
-            pk::from_unsigned(self.arm_key as u64, 64, "ArmKey")?,
-        );
-        pk::write_binary(w, &self.target, 16, "Target")?;
-        Ok(())
-    }
-}
-
-impl fmt::Display for SwitchArm {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        f.write_str("SwitchArm{")?;
-        f.write_str("sequence=")?;
-        write!(f, "{}", self.sequence)?;
-        f.write_str(", arm_key=")?;
-        write!(f, "{}", self.arm_key)?;
-        f.write_str(", target=")?;
-        pk::describe_bytes(&self.target, f)?;
-        f.write_char('}')
-    }
-}
-
-/// Meta-command `/TcsFixed/Switch`.
-///
-/// Fixed by its inheritance: `Opcode` = 6.
-#[derive(Debug, Clone, PartialEq, Default)]
-pub struct Switch {
-    /// `/TcsFixed/FixedCommand#Sequence` (/TcsFixed/U32Arg)
-    pub sequence: u32,
-    /// `/TcsFixed/Switch#ArmKey` (/TcsFixed/U64Arg)
-    pub arm_key: u64,
-    /// `/TcsFixed/Switch#Target` (/TcsFixed/ChecksumArg)
-    pub target: pk::FixedBytes<16>,
-}
-
-impl Switch {
-    /// The number of fields with an alarm.
-    pub const ALARMS: usize = 0;
-
-    /// Evaluates the alarms of this `/TcsFixed/Switch` packet's fields. Alarms
-    /// that depend on earlier samples count only this one (see `monitor`).
-    ///
-    /// # Returns
-    ///
-    /// The alarm level of each field with an alarm, `None` when the field is
-    /// absent.
-    pub fn alarms(&self) -> pk::Alarms<0> {
-        let mut a = pk::Alarms::new();
-        a
-    }
-
-    /// Evaluates the alarms of this `/TcsFixed/Switch` packet's fields like
-    /// `alarms()`, counting the earlier samples for change ranges,
-    /// minViolations and minConformance.
-    ///
-    /// # Arguments
-    ///
-    /// * `m` - The state of the alarms that depend on earlier samples, which
-    ///         the method reads and updates.
-    /// * `t` - This sample's time, in seconds.
-    ///
-    /// # Returns
-    ///
-    /// The alarm level of each field with an alarm, `None` when the field is
-    /// absent.
-    pub fn monitor(&self, m: &mut AlarmMonitor, t: f64) -> pk::Alarms<0> {
-        let mut a = pk::Alarms::new();
-        a
-    }
-
-    /// The number of MathAlgorithms this packet triggers.
-    pub const ALGORITHMS: usize = 0;
-
-    /// Evaluates the MathAlgorithms that a `/TcsFixed/Switch` packet triggers,
-    /// from this one's values.
-    ///
-    /// # Returns
-    ///
-    /// The output of each, `None` when an input is absent or a custom
-    /// algorithm's function isn't set or fails.
-    pub fn algorithms(&self) -> pk::Outputs<0> {
-        let mut o = pk::Outputs::new();
-        o
-    }
-}
-
-impl Packet for Switch {
-    const NAME: &'static str = "/TcsFixed/Switch";
-    const MAX_BYTES: usize = 29;
-
-    fn decode_prefix(data: &[u8]) -> Result<(Self, usize)> {
-        let mut r = BitReader::new(data);
-        let v10 = r.uint_order(8, false, "Opcode")? as u8;
-        let v11 = r.uint_order(32, false, "Sequence")? as u32;
-        if !((v10 as i128) == 6) {
-            return Err(PacketError::Mismatch {
-                container: "/TcsFixed/Switch",
-                criterion: "Opcode = 6",
-            });
-        }
-        let v19 = r.uint_order(64, false, "ArmKey")? as u64;
-        let v20 = r.fixed_bytes::<16>(16, "Target")?;
-        Ok((
-            Switch {
-                sequence: v11,
-                arm_key: v19,
-                target: v20,
-            },
-            r.used(),
-        ))
-    }
-
-    fn encode_into(&self, w: &mut BitWriter<'_>) -> Result<()> {
-        w.uint_order(8, false, pk::from_unsigned(6 as u64, 8, "Opcode")?);
-        w.uint_order(
-            32,
-            false,
-            pk::from_unsigned(self.sequence as u64, 32, "Sequence")?,
-        );
-        w.uint_order(
-            64,
-            false,
-            pk::from_unsigned(self.arm_key as u64, 64, "ArmKey")?,
-        );
-        pk::write_binary(w, &self.target, 16, "Target")?;
-        Ok(())
-    }
-}
-
-impl fmt::Display for Switch {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        f.write_str("Switch{")?;
-        f.write_str("sequence=")?;
-        write!(f, "{}", self.sequence)?;
-        f.write_str(", arm_key=")?;
-        write!(f, "{}", self.arm_key)?;
-        f.write_str(", target=")?;
-        pk::describe_bytes(&self.target, f)?;
-        f.write_char('}')
-    }
-}
-
 /// Every concrete packet derived from `/TcsFixed/FixedAnswer`.
 #[derive(Debug, Clone, PartialEq)]
 pub enum FixedAnswerKind {
     RestartArmAnswer(RestartArmAnswer),
     RestartAnswer(RestartAnswer),
-    SwitchArmAnswer(SwitchArmAnswer),
-    SwitchAnswer(SwitchAnswer),
     ConnectAnswer(ConnectAnswer),
 }
 
@@ -1382,26 +889,6 @@ impl Packet for FixedAnswerKind {
         if (v1 as i128) == 3 {
             return Ok((
                 Self::RestartAnswer(RestartAnswer {
-                    sequence: v2,
-                    status: v3,
-                    timestamp: v4,
-                }),
-                r.used(),
-            ));
-        }
-        if (v1 as i128) == 5 {
-            return Ok((
-                Self::SwitchArmAnswer(SwitchArmAnswer {
-                    sequence: v2,
-                    status: v3,
-                    timestamp: v4,
-                }),
-                r.used(),
-            ));
-        }
-        if (v1 as i128) == 6 {
-            return Ok((
-                Self::SwitchAnswer(SwitchAnswer {
                     sequence: v2,
                     status: v3,
                     timestamp: v4,
@@ -1438,8 +925,6 @@ impl Packet for FixedAnswerKind {
         match self {
             Self::RestartArmAnswer(p) => p.encode_into(w),
             Self::RestartAnswer(p) => p.encode_into(w),
-            Self::SwitchArmAnswer(p) => p.encode_into(w),
-            Self::SwitchAnswer(p) => p.encode_into(w),
             Self::ConnectAnswer(p) => p.encode_into(w),
         }
     }
@@ -1450,8 +935,6 @@ impl fmt::Display for FixedAnswerKind {
         match self {
             Self::RestartArmAnswer(p) => p.fmt(f),
             Self::RestartAnswer(p) => p.fmt(f),
-            Self::SwitchArmAnswer(p) => p.fmt(f),
-            Self::SwitchAnswer(p) => p.fmt(f),
             Self::ConnectAnswer(p) => p.fmt(f),
         }
     }
@@ -1477,16 +960,6 @@ impl FixedAnswerKind {
                 }
             }
             Self::RestartAnswer(p) => {
-                for a in p.alarms().as_slice() {
-                    out.push(a.field, a.level);
-                }
-            }
-            Self::SwitchArmAnswer(p) => {
-                for a in p.alarms().as_slice() {
-                    out.push(a.field, a.level);
-                }
-            }
-            Self::SwitchAnswer(p) => {
                 for a in p.alarms().as_slice() {
                     out.push(a.field, a.level);
                 }
@@ -1518,16 +991,6 @@ impl FixedAnswerKind {
                 }
             }
             Self::RestartAnswer(p) => {
-                for o in p.algorithms().as_slice() {
-                    out.push(o.name, o.value);
-                }
-            }
-            Self::SwitchArmAnswer(p) => {
-                for o in p.algorithms().as_slice() {
-                    out.push(o.name, o.value);
-                }
-            }
-            Self::SwitchAnswer(p) => {
                 for o in p.algorithms().as_slice() {
                     out.push(o.name, o.value);
                 }
@@ -1567,16 +1030,6 @@ impl FixedAnswerKind {
                     out.push(a.field, a.level);
                 }
             }
-            Self::SwitchArmAnswer(p) => {
-                for a in p.monitor(m, t).as_slice() {
-                    out.push(a.field, a.level);
-                }
-            }
-            Self::SwitchAnswer(p) => {
-                for a in p.monitor(m, t).as_slice() {
-                    out.push(a.field, a.level);
-                }
-            }
             Self::ConnectAnswer(p) => {
                 for a in p.monitor(m, t).as_slice() {
                     out.push(a.field, a.level);
@@ -1599,18 +1052,6 @@ impl From<RestartAnswer> for FixedAnswerKind {
     }
 }
 
-impl From<SwitchArmAnswer> for FixedAnswerKind {
-    fn from(p: SwitchArmAnswer) -> Self {
-        Self::SwitchArmAnswer(p)
-    }
-}
-
-impl From<SwitchAnswer> for FixedAnswerKind {
-    fn from(p: SwitchAnswer) -> Self {
-        Self::SwitchAnswer(p)
-    }
-}
-
 impl From<ConnectAnswer> for FixedAnswerKind {
     fn from(p: ConnectAnswer) -> Self {
         Self::ConnectAnswer(p)
@@ -1623,8 +1064,6 @@ pub enum FixedCommandKind {
     RestartArm(RestartArm),
     Restart(Restart),
     Connect(Connect),
-    SwitchArm(SwitchArm),
-    Switch(Switch),
 }
 
 impl Packet for FixedCommandKind {
@@ -1671,30 +1110,6 @@ impl Packet for FixedCommandKind {
                 r.used(),
             ));
         }
-        if (v10 as i128) == 5 {
-            let v17 = r.uint_order(64, false, "ArmKey")? as u64;
-            let v18 = r.fixed_bytes::<16>(16, "Target")?;
-            return Ok((
-                Self::SwitchArm(SwitchArm {
-                    sequence: v11,
-                    arm_key: v17,
-                    target: v18,
-                }),
-                r.used(),
-            ));
-        }
-        if (v10 as i128) == 6 {
-            let v19 = r.uint_order(64, false, "ArmKey")? as u64;
-            let v20 = r.fixed_bytes::<16>(16, "Target")?;
-            return Ok((
-                Self::Switch(Switch {
-                    sequence: v11,
-                    arm_key: v19,
-                    target: v20,
-                }),
-                r.used(),
-            ));
-        }
         return Err(PacketError::NoMatch {
             container: "/TcsFixed/FixedCommand",
         });
@@ -1705,8 +1120,6 @@ impl Packet for FixedCommandKind {
             Self::RestartArm(p) => p.encode_into(w),
             Self::Restart(p) => p.encode_into(w),
             Self::Connect(p) => p.encode_into(w),
-            Self::SwitchArm(p) => p.encode_into(w),
-            Self::Switch(p) => p.encode_into(w),
         }
     }
 }
@@ -1717,8 +1130,6 @@ impl fmt::Display for FixedCommandKind {
             Self::RestartArm(p) => p.fmt(f),
             Self::Restart(p) => p.fmt(f),
             Self::Connect(p) => p.fmt(f),
-            Self::SwitchArm(p) => p.fmt(f),
-            Self::Switch(p) => p.fmt(f),
         }
     }
 }
@@ -1752,16 +1163,6 @@ impl FixedCommandKind {
                     out.push(a.field, a.level);
                 }
             }
-            Self::SwitchArm(p) => {
-                for a in p.alarms().as_slice() {
-                    out.push(a.field, a.level);
-                }
-            }
-            Self::Switch(p) => {
-                for a in p.alarms().as_slice() {
-                    out.push(a.field, a.level);
-                }
-            }
         }
         out
     }
@@ -1789,16 +1190,6 @@ impl FixedCommandKind {
                 }
             }
             Self::Connect(p) => {
-                for o in p.algorithms().as_slice() {
-                    out.push(o.name, o.value);
-                }
-            }
-            Self::SwitchArm(p) => {
-                for o in p.algorithms().as_slice() {
-                    out.push(o.name, o.value);
-                }
-            }
-            Self::Switch(p) => {
                 for o in p.algorithms().as_slice() {
                     out.push(o.name, o.value);
                 }
@@ -1838,16 +1229,6 @@ impl FixedCommandKind {
                     out.push(a.field, a.level);
                 }
             }
-            Self::SwitchArm(p) => {
-                for a in p.monitor(m, t).as_slice() {
-                    out.push(a.field, a.level);
-                }
-            }
-            Self::Switch(p) => {
-                for a in p.monitor(m, t).as_slice() {
-                    out.push(a.field, a.level);
-                }
-            }
         }
         out
     }
@@ -1868,17 +1249,5 @@ impl From<Restart> for FixedCommandKind {
 impl From<Connect> for FixedCommandKind {
     fn from(p: Connect) -> Self {
         Self::Connect(p)
-    }
-}
-
-impl From<SwitchArm> for FixedCommandKind {
-    fn from(p: SwitchArm) -> Self {
-        Self::SwitchArm(p)
-    }
-}
-
-impl From<Switch> for FixedCommandKind {
-    fn from(p: Switch) -> Self {
-        Self::Switch(p)
     }
 }

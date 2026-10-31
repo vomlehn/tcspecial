@@ -3636,10 +3636,9 @@ configuration's checksum covers ``interface``, so a vehicle and a ground
 station whose checksums match are reading the same interface as well.
 
 Every digest you will see on the link stands for ``link.xtce``: the
-beacon's last field is its digest, the checksums in the beacon, in CONNECT
-and its answer, and in RESTART_ARM and RESTART are configuration
-checksums, which cover ``interface``, and the target of SWITCH_ARM and
-SWITCH is the digest of a load set's ``link.xtce``. None covers
+beacon's last field is its digest, and the checksums in the beacon, in
+CONNECT and its answer, and in RESTART_ARM and RESTART are configuration
+checksums, which cover ``interface``. None covers
 ``tcslibgs/xtce/fixed.xtce``, where the fixed commands are laid out, or
 ``tcslibgs/xtce/beacon.xtce``, where the beacon is. Each is the same in
 every build, so there is nothing to compare, and a test in ``tcslibgs``

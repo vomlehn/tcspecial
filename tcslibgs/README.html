@@ -198,11 +198,18 @@ file with.</p>
 <ul>
 <li><code>commands</code>, <code>telemetry</code>,
 <code>protocol</code>: the command and telemetry protocol.</li>
-<li><code>link</code>: the commands and their answers, each a CCSDS
-Space Packet, described in XTCE in <code>xtce/link.xml</code>. The code
-that packs and unpacks them, <code>src/link_packet.rs</code>, is
-generated from that file: run <code>make link-packet</code> here after
-changing it, and <code>make interface-digest</code>.</li>
+<li><code>link</code>: the commands and their answers, with no header:
+an opcode, a sequence and what each carries. The three fixed commands –
+CONNECT, RESTART_ARM and RESTART – are described in XTCE in
+<code>xtce/fixed.xml</code>, which never changes, and every other
+command in <code>xtce/link.xml</code>. The code that packs and unpacks
+them, <code>src/fixed_packet.rs</code> and
+<code>src/link_packet.rs</code>, is generated from those files, and the
+Python <code>../python/tcslibgs/fixed_packet.py</code> from
+<code>fixed.xml</code>: run <code>make link-packet</code> here after
+changing <code>link.xml</code>, and <code>make interface-digest</code>.
+A test pins <code>fixed.xml</code>’s digest, and fails, saying it must
+never change, if it does.</li>
 <li><code>beacon</code>: the beacon, a line of text with six fields
 between colons,
 <code>tcspecial:1.2.3:&lt;md5&gt;:42:normal:&lt;interface&gt;</code>, at
@@ -210,12 +217,14 @@ most 106 bytes, so that a person can read it in a capture or a log with
 no decoder. It is written and read by hand, here and in
 <code>../python/tcslibgs/beacon.py</code>, and the two are held to each
 other by the same examples in their tests; it has no XTCE.</li>
-<li><code>interface</code>: the digest of the XTCE documents the
-commands and answers are stated in, which every beacon carries so that a
-ground station can tell whether it read the documents tcspecial was
-built from. <code>make interface-digest</code> here regenerates
-<code>src/interface_digest.rs</code> after an XTCE document
-changes.</li>
+<li><code>interface</code>: the digest of <code>xtce/link.xml</code>,
+which every beacon carries, and which every configuration names as its
+<code>tcspecial</code> section’s <code>interface</code>, so that a
+configuration written for another interface is refused by every program.
+<code>tcsverify --interface-digest</code> prints it.
+<code>make interface-digest</code> here regenerates
+<code>src/interface_digest.rs</code> after <code>link.xml</code>
+changes; every configuration is then given the new digest.</li>
 <li><code>crc</code>: the CCSDS CRC-16, for what is kept on storage
 rather than carried by a transport that checks it, such as tcspecial’s
 state file.</li>

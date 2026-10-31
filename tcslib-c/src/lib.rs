@@ -47,7 +47,7 @@ use tcslib::gateway::{GatewayReceiver, DATUM_BYTES};
 use tcslib::matched::Matched;
 use tcslib::ping::{route_of, Pinger, Uplink, NO_MESSAGE};
 use tcslib::{command_links_of, CommandStatus, TcsClient};
-use tcslibgs::config_digest::{digest_of_graph, ConfigDigest, ConfigVersion};
+use tcslibgs::config_digest::{digest_of_graph, ConfigDigest};
 use tcslibgs::graph::parameters::{beacon_interval_of, beacon_of};
 use tcslibgs::graph::{telemetry, Graph};
 use tcslibgs::{ArmKey, DHSample, NodeId, DH_SAMPLE_BYTES};
@@ -981,7 +981,9 @@ pub unsafe extern "C" fn tcs_gateway_close(gateway: *mut tcs_gateway) {
 
 // ---- Commands ---------------------------------------------------------------
 
-/// Numbers a status as the header's `tcs_status` does.
+/// Numbers a status as the header's `tcs_status` does: as the link does,
+/// by [`CommandStatus::number`], a status this build does not know by the
+/// number it came as.
 ///
 /// # Arguments
 ///
@@ -989,20 +991,9 @@ pub unsafe extern "C" fn tcs_gateway_close(gateway: *mut tcs_gateway) {
 ///
 /// # Returns
 ///
-/// Its number, 0 to 10.
+/// Its number, 0 to 255.
 fn status_number(status: CommandStatus) -> c_int {
-    match status {
-        CommandStatus::Success => 0,
-        CommandStatus::Failure => 1,
-        CommandStatus::InvalidCommand => 2,
-        CommandStatus::InvalidParameter => 3,
-        CommandStatus::NotArmed => 4,
-        CommandStatus::NotFound => 5,
-        CommandStatus::AlreadyExists => 6,
-        CommandStatus::Timeout => 7,
-        CommandStatus::Stale => 9,
-        CommandStatus::Unmatched => 10,
-    }
+    c_int::from(status.number())
 }
 
 /// Names a status.
@@ -1013,8 +1004,9 @@ fn status_number(status: CommandStatus) -> c_int {
 ///
 /// # Returns
 ///
-/// "Success", "NotFound" and so on, or "" for a number that is no status;
-/// static.
+/// "Success", "NotFound" and so on, or "" for a number that is no status
+/// this build knows -- a refusal all the same, which a station says by its
+/// number; static.
 #[no_mangle]
 pub extern "C" fn tcs_status_name(status: c_int) -> *const c_char {
     let name: &'static CStr = match status {
@@ -1116,7 +1108,7 @@ pub unsafe extern "C" fn tcs_client_connect(
         let out = out_of(agrees, "agrees")?;
         let (_, theirs) = link
             .client
-            .connect(ConfigVersion::of_this_build(), link.digest)
+            .connect(link.digest)
             .map_err(|e| fail(format_args!("CONNECT: {e}")))?;
         *out = c_int::from(theirs == link.digest);
         Ok(0)
@@ -1282,6 +1274,8 @@ pub unsafe extern "C" fn tcs_client_close(client: *mut tcs_client) {
 ///
 /// * `client` - The client.
 /// * `key`    - The key, which the RESTART that follows must carry.
+/// * `target` - The checksum of the configuration to restart onto, as 32
+///              lower-case hex digits, or NULL for this configuration's.
 /// * `status` - Where what the vehicle answered is written.
 ///
 /// # Returns
@@ -1290,19 +1284,22 @@ pub unsafe extern "C" fn tcs_client_close(client: *mut tcs_client) {
 ///
 /// # Safety
 ///
-/// As [`tcs_client_connect`]; `status` NULL or writable.
+/// As [`tcs_client_connect`]; `target` NULL or a NUL-terminated string;
+/// `status` NULL or writable.
 #[no_mangle]
 pub unsafe extern "C" fn tcs_client_restart_arm(
     client: *mut tcs_client,
     key: u64,
+    target: *const c_char,
     status: *mut c_int,
 ) -> c_int {
     guard(-1, || {
         let link = handle_of_mut(client, "the client")?;
         let out = out_of(status, "the status")?;
+        let target = target_of(target, link.digest)?;
         let answered = link
             .client
-            .restart_arm(ArmKey(key))
+            .restart_arm(ArmKey(key), target)
             .map_err(|e| fail(format_args!("RESTART_ARM: {e}")))?;
         *out = status_number(answered);
         Ok(0)
@@ -1315,6 +1312,8 @@ pub unsafe extern "C" fn tcs_client_restart_arm(
 ///
 /// * `client` - The client.
 /// * `key`    - The key the last RESTART_ARM armed the restart with.
+/// * `target` - The checksum the last RESTART_ARM carried, as 32 lower-case
+///              hex digits, or NULL for this configuration's.
 /// * `status` - Where what the vehicle answered is written.
 ///
 /// # Returns
@@ -1328,17 +1327,56 @@ pub unsafe extern "C" fn tcs_client_restart_arm(
 pub unsafe extern "C" fn tcs_client_restart(
     client: *mut tcs_client,
     key: u64,
+    target: *const c_char,
     status: *mut c_int,
 ) -> c_int {
     guard(-1, || {
         let link = handle_of_mut(client, "the client")?;
         let out = out_of(status, "the status")?;
+        let target = target_of(target, link.digest)?;
         let answered = link
             .client
-            .restart(ArmKey(key))
+            .restart(ArmKey(key), target)
             .map_err(|e| fail(format_args!("RESTART: {e}")))?;
         *out = status_number(answered);
         Ok(0)
+    })
+}
+
+/// Reads the target checksum a RESTART_ARM or a RESTART is given from C.
+///
+/// # Arguments
+///
+/// * `target` - 32 lower-case hex digits, or NULL.
+/// * `ours`   - This configuration's checksum, which NULL means: a plain
+///              restart, onto what the vehicle is running.
+///
+/// # Returns
+///
+/// The checksum.
+///
+/// # Errors
+///
+/// `Failed`, its reason left for [`tcs_last_error`], where `target` is not
+/// UTF-8 or not a checksum.
+///
+/// # Safety
+///
+/// `target` is NULL or points to a NUL-terminated string.
+unsafe fn target_of(
+    target: *const c_char,
+    ours: ConfigDigest,
+) -> Result<ConfigDigest, Failed> {
+    if target.is_null() {
+        return Ok(ours);
+    }
+    let said = text_of(target, "the target checksum")?;
+    ConfigDigest::of_hex(said).ok_or_else(|| {
+        fail(format_args!(
+            "the target checksum is \"{said}\", which is not one: give the \
+             32 lower-case hex digits tcsverify prints for the configuration \
+             to restart onto, or NULL for this configuration's"
+        ))
     })
 }
 

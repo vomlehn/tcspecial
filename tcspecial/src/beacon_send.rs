@@ -461,6 +461,7 @@ mod tests {
                 log_segment_bytes: 65_536,
                 restart_arm_valid: tcslibgs::RESTART_ARM_VALID_DEFAULT,
                 gateway: tcslibgs::gateway::GatewayKind::Radio,
+                interface: tcslibgs::InterfaceDigest::of_this_build(),
                 state_file: String::new(),
             },
             &crate::segsend::SegSend::none(),

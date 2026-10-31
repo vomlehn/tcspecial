@@ -6,6 +6,7 @@
 //! tcsverify tests/manual/tcspecial2.xml tests/manual/tcspecial2.yaml \
 //!     tests/manual/tcspecial2sim.yaml
 //! tcsverify --digest tests/manual/tcspecial2.yaml
+//! tcsverify --interface-digest
 //! ```
 //!
 //! Prints one line per problem -- file, line, and what is wrong -- and exits
@@ -30,6 +31,7 @@ usage: tcsverify [options] <tcspecial configuration file> \
 [payload simulator file]
        tcsverify [options] <configuration> <configuration> \
 <payload simulator file>
+       tcsverify --interface-digest
        tcsverify -h | --help
 
 Checks the files and prints the problems it finds, each as
@@ -67,6 +69,13 @@ configuration.
                      what `tcspecial --types` prints -- reporting each
                      node of another type as that tcspecial would refuse
                      it. Without it, every type is taken to be built
+  --interface-digest print the digest of the interface this build speaks,
+                     the 32 lower-case hex digits a configuration's
+                     tcspecial section gives as its interface, and exit.
+                     It is the digest of the tcslibgs/xtce/link.xml the
+                     build was made from, which every beacon carries, and
+                     a configuration naming another is refused by this
+                     build's tcsverify, tcspecial and ground programs
   -h, --help         print this message and exit
 
 Exit status: 0 no error was printed -- a run that stopped before it found
@@ -96,6 +105,13 @@ const TYPES_FLAG: &str = "--types=";
 /// configuration and nothing to choose about it.
 const DIGEST_FLAG: &str = "--digest";
 
+/// Asks for the interface digest of this build, alone on the command line.
+///
+/// A shape of its own, with nothing beside it: it is a fact about this
+/// build, not about any file, and a file named with it would be a file the
+/// run did not check.
+const INTERFACE_DIGEST_FLAG: &str = "--interface-digest";
+
 /// Reads the command line, checks the files it names and prints what it
 /// found, and each configuration's digest where `--digest` asks for it.
 ///
@@ -109,7 +125,20 @@ fn main() -> ExitCode {
     let mut limits = tcsverify::Limits::EVERYTHING;
     let mut digest = false;
     let mut built: Vec<&str> = tcslibgs::graph::built::OPTIONAL_TYPES.to_vec();
-    for arg in std::env::args_os().skip(1) {
+    let args: Vec<_> = std::env::args_os().skip(1).collect();
+    if args.iter().any(|arg| arg == INTERFACE_DIGEST_FLAG) {
+        if args.len() != 1 {
+            eprintln!(
+                "tcsverify: {INTERFACE_DIGEST_FLAG} is given alone: it says \
+                 which interface this build speaks, and checks no file\n\n\
+                 {USAGE}"
+            );
+            return ExitCode::from(2);
+        }
+        println!("{}", tcslibgs::InterfaceDigest::of_this_build());
+        return ExitCode::SUCCESS;
+    }
+    for arg in args {
         let said = arg.to_string_lossy();
         // Asked for, so on stdout and a success: the message is the answer.
         if said == "-h" || said == "--help" {

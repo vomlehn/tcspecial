@@ -7,10 +7,15 @@
 //! station in any of them can compare its copy with what the vehicle speaks.
 //!
 //! The vehicle says which interface it speaks in every beacon, from
-//! [`InterfaceDigest::of_this_build`]: the digest of the documents in
-//! `tcslibgs/xtce/` this build was generated from. A ground station reads its
-//! own copy with [`InterfaceDigest::of_files`] and compares the two. See "The
-//! Interface, the Fallback and Switching Over" in `docs/design.rst`.
+//! [`InterfaceDigest::of_this_build`]: the digest of `tcslibgs/xtce/link.xml`
+//! this build was generated from, which states every command but the three
+//! fixed ones. The fixed commands are in `tcslibgs/xtce/fixed.xml`, which is
+//! not part of the interface: no change to the interface can touch them. A
+//! configuration names the interface it was written for as the `tcspecial`
+//! section's `interface`, and every program refuses one that is not its
+//! build's own; `tcsverify --interface-digest` prints it. A ground station
+//! reads its own copy with [`InterfaceDigest::of_files`] and compares the
+//! two. See "The configuration names its interface" in `docs/design.rst`.
 
 use std::fmt;
 use std::path::Path;
@@ -19,7 +24,16 @@ use crate::error::{TcsError, TcsResult};
 use crate::interface_digest::INTERFACE_DIGEST;
 
 /// The tcs-xtce digest of a set of XTCE documents.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[derive(
+    Debug,
+    Clone,
+    Copy,
+    PartialEq,
+    Eq,
+    Hash,
+    serde::Serialize,
+    serde::Deserialize,
+)]
 pub struct InterfaceDigest(pub [u8; 16]);
 
 impl InterfaceDigest {
@@ -93,6 +107,41 @@ impl InterfaceDigest {
     }
 }
 
+impl InterfaceDigest {
+    /// Reads an interface digest as a configuration writes it: 32 lower-case
+    /// hex digits. A configuration's checksum is read by the same rule, in
+    /// [`crate::ConfigDigest::of_hex`].
+    ///
+    /// Lower-case only, as tcsverify prints it and the beacon carries it, so
+    /// that one interface has one spelling and a search of the files for it
+    /// finds every one.
+    ///
+    /// # Arguments
+    ///
+    /// * `said` - The digits.
+    ///
+    /// # Returns
+    ///
+    /// The digest, or `None` for anything that is not 32 lower-case hex
+    /// digits.
+    pub fn of_hex(said: &str) -> Option<InterfaceDigest> {
+        let bytes = said.as_bytes();
+        if bytes.len() != 32
+            || !bytes
+                .iter()
+                .all(|b| b.is_ascii_digit() || (b'a'..=b'f').contains(b))
+        {
+            return None;
+        }
+        let mut digest = [0u8; 16];
+        for (i, pair) in bytes.chunks(2).enumerate() {
+            let pair = std::str::from_utf8(pair).ok()?;
+            digest[i] = u8::from_str_radix(pair, 16).ok()?;
+        }
+        Some(InterfaceDigest(digest))
+    }
+}
+
 impl fmt::Display for InterfaceDigest {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         for byte in self.0 {
@@ -106,25 +155,15 @@ impl fmt::Display for InterfaceDigest {
 mod tests {
     use super::*;
 
-    /// Lists the documents this build's interface is stated in: every XTCE
-    /// document in `tcslibgs/xtce/`, as `make interface-digest` takes them.
+    /// Lists the documents this build's interface is stated in:
+    /// `tcslibgs/xtce/link.xml`, as `make interface-digest` takes it. Not
+    /// `fixed.xml`, which no change to the interface may touch.
     ///
     /// # Returns
     ///
-    /// Their paths, sorted.
-    ///
-    /// # Panics
-    ///
-    /// If the directory cannot be read.
+    /// Their paths.
     fn documents() -> Vec<std::path::PathBuf> {
-        let dir = Path::new(env!("CARGO_MANIFEST_DIR")).join("xtce");
-        let mut found: Vec<_> = std::fs::read_dir(&dir)
-            .expect("tcslibgs/xtce")
-            .map(|entry| entry.expect("an entry").path())
-            .filter(|path| path.extension().is_some_and(|ext| ext == "xml"))
-            .collect();
-        found.sort();
-        found
+        vec![Path::new(env!("CARGO_MANIFEST_DIR")).join("xtce/link.xml")]
     }
 
     /// The constant is the digest of the documents as they are now, so a
@@ -135,9 +174,29 @@ mod tests {
         assert_eq!(
             InterfaceDigest::of_files(&documents()).expect("they read"),
             InterfaceDigest::of_this_build(),
-            "an XTCE document in tcslibgs/xtce/ has changed: run `make \
-             interface-digest` in tcslibgs/ and commit what it writes"
+            "tcslibgs/xtce/link.xml has changed: run `make interface-digest` \
+             in tcslibgs/ and commit what it writes, and give every \
+             configuration the new digest as its interface"
         );
+    }
+
+    /// An interface digest is read only as 32 lower-case hex digits, and
+    /// reads back as it was written.
+    #[test]
+    fn a_digest_is_read_as_thirty_two_lower_case_hex_digits() {
+        let ours = InterfaceDigest::of_this_build();
+        assert_eq!(InterfaceDigest::of_hex(&ours.to_string()), Some(ours));
+        let upper = ours.to_string().to_uppercase();
+        for wrong in [
+            "",
+            "0123",
+            upper.as_str(),
+            "0123456789abcdef0123456789abcdeg",
+            "0123456789abcdef0123456789abcdef0",
+            " 123456789abcdef0123456789abcdef",
+        ] {
+            assert_eq!(InterfaceDigest::of_hex(wrong), None, "{wrong:?}");
+        }
     }
 
     #[test]

@@ -349,6 +349,18 @@
           </xs:restriction>
         </xs:simpleType>
       </xs:element>
+      <!-- The interface the configuration was written for: the digest of
+           the tcslibgs/xtce/link.xml its commands are laid out by, as 32
+           lower-case hex digits, which tcsverify prints when asked with
+           its interface-digest option. Required, and refused unless it is
+           the build's own. -->
+      <xs:element name="interface" minOccurs="0">
+        <xs:simpleType>
+          <xs:restriction base="xs:string">
+            <xs:pattern value="[0-9a-f]{32}"/>
+          </xs:restriction>
+        </xs:simpleType>
+      </xs:element>
       <xs:element name="tcs_cmd" minOccurs="0">
         <xs:complexType>
           <xs:all>
@@ -398,8 +410,8 @@
       <!-- How long a RESTART_ARM licenses a RESTART for, as a length of
            time: 20 min. Twenty minutes where it is not stated. -->
       <xs:element name="restart_arm_valid" type="xs:string" minOccurs="0"/>
-      <!-- The file tcspecial counts its starts in, on storage that
-           survives a power cycle. -->
+      <!-- The file tcspecial keeps what must survive a restart in, on
+           storage that survives a power cycle. -->
       <xs:element name="state_file" type="xs:string" minOccurs="0"/>
       <!-- Where tcsgui writes the Rust it generates from this configuration.
            The one attribute of this section about building the software rather

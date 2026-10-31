@@ -160,6 +160,7 @@ fn an_armed_restart_runs_tcspecial_again_keeping_what_it_was_given() {
         format!(
             "tcspecial:
   gateway: radio
+  interface: \"ad9aac4dd5a6d88dd5e78824ba8a83ac\"
   beacon: {{ default_interval: \"100 ms\", reset_interval: \"100 ms\", \
   recv: \"127.0.0.1:{}\", send: \"{}\" }}
   payload_command: {{ dest_base: \"{}\", source_base: \"{}\" }}
@@ -213,9 +214,7 @@ fn an_armed_restart_runs_tcspecial_again_keeping_what_it_was_given() {
     // changes nothing: the flag stays set, and a PING is not acted on.
     let connect = |sequence, digest| {
         tcslibgs::Command::Connect(tcslibgs::ConnectCommand::new(
-            sequence,
-            tcslibgs::ConfigVersion::of_this_build(),
-            digest,
+            sequence, digest,
         ))
     };
     let ours = common::checksum_of(&configuration);
@@ -255,12 +254,28 @@ fn an_armed_restart_runs_tcspecial_again_keeping_what_it_was_given() {
          {open_before:?}"
     );
 
+    // A restart onto a configuration the vehicle does not hold is refused
+    // NotFound, and nothing restarts; onto the running one, it is a plain
+    // restart.
     let key = ArmKey(0x5eed);
+    let elsewhere = tcslibgs::ConfigDigest([0x77; 16]);
     assert_eq!(
         ask(
             &commands,
             take_at,
-            &tcslibgs::Command::RestartArm(RestartArmCommand::new(5, key))
+            &tcslibgs::Command::RestartArm(RestartArmCommand::new(
+                5, key, elsewhere
+            ))
+        ),
+        CommandStatus::NotFound
+    );
+    assert_eq!(
+        ask(
+            &commands,
+            take_at,
+            &tcslibgs::Command::RestartArm(RestartArmCommand::new(
+                6, key, ours
+            ))
         ),
         CommandStatus::Success
     );
@@ -268,7 +283,7 @@ fn an_armed_restart_runs_tcspecial_again_keeping_what_it_was_given() {
         ask(
             &commands,
             take_at,
-            &tcslibgs::Command::Restart(RestartCommand::new(6, key))
+            &tcslibgs::Command::Restart(RestartCommand::new(7, key, ours))
         ),
         CommandStatus::Success
     );
@@ -297,7 +312,7 @@ fn an_armed_restart_runs_tcspecial_again_keeping_what_it_was_given() {
     assert!(back.restart_flag, "every start begins with the flag set");
     // Said once, and no more: a crash of this start would not be commanded.
     let kept = std::fs::read_to_string(&state).expect("the state file");
-    assert!(kept.contains("\ngeneration 2\n"), "{kept}");
+    assert!(!kept.contains("generation"), "{kept}");
     assert!(!kept.contains("next_start"), "{kept}");
     // And settled again, as it was when it was counted the first time.
     beacon(&beacons);
@@ -305,7 +320,7 @@ fn an_armed_restart_runs_tcspecial_again_keeping_what_it_was_given() {
 
     // The new start is matched as the first was.
     assert_eq!(
-        ask(&commands, take_at, &connect(7, ours)),
+        ask(&commands, take_at, &connect(8, ours)),
         CommandStatus::Success
     );
     beacon(&beacons);

@@ -119,15 +119,6 @@ pub struct TcsClient {
     /// How many answers arrived that were not to the command being waited
     /// for, and were dropped: see [`answer_to`].
     answers_dropped: u64,
-    /// The generation this station knows is flying: the one the last
-    /// CONNECT's answer said. `None` until one has, and again once a beacon
-    /// says tcspecial has started again or an answer has come from another
-    /// start, when every command but PING and CONNECT is refused here until a
-    /// CONNECT says again. A command carries no
-    /// generation, only its sequence; this is what keeps a station from
-    /// sending one to a start whose definitions it has not seen. See
-    /// [`tcslibgs::CommandType::always_taken`].
-    generation: Option<u32>,
     /// What a RESTART that went out is waiting for, until a beacon says it
     /// came: see [`RestartWait`].
     restart_wait: Option<RestartWait>,
@@ -167,9 +158,9 @@ impl RestartWait {
     ///
     /// The three that go before a match, because the vehicle is ending and
     /// the start that comes back is not yet matched:
-    /// [`tcslibgs::CommandType::taken_unmatched`]. A RESTART that reaches
-    /// the start that came back restarts it again, which is why it still
-    /// needs the generation known: an answer from another start forgets it.
+    /// [`tcslibgs::CommandType::taken_unmatched`]. A RESTART sent again that
+    /// reaches the start that came back is refused `NotArmed` there, since
+    /// that start holds no arm, and restarts nothing.
     ///
     /// # Arguments
     ///
@@ -220,8 +211,7 @@ impl TcsClient {
     ///
     /// # Returns
     ///
-    /// The client, with the default timeout, counting from sequence 1 and
-    /// knowing no generation yet.
+    /// The client, with the default timeout, counting from sequence 1.
     pub fn of_a_graph(
         connection: Box<dyn Connection>,
         nodes: Box<dyn Connection>,
@@ -236,7 +226,6 @@ impl TcsClient {
             last_received: None,
             sent: 0,
             answers_dropped: 0,
-            generation: None,
             restart_wait: None,
             matched,
         }
@@ -287,8 +276,7 @@ impl TcsClient {
     ///
     /// # Returns
     ///
-    /// The client, with the default timeout, counting from sequence 1 and
-    /// knowing no generation yet.
+    /// The client, with the default timeout, counting from sequence 1.
     pub fn spacecraft_only(
         connection: Box<dyn Connection>,
         matched: Matched,
@@ -302,7 +290,6 @@ impl TcsClient {
             last_received: None,
             sent: 0,
             answers_dropped: 0,
-            generation: None,
             restart_wait: None,
             matched,
         }
@@ -313,11 +300,11 @@ impl TcsClient {
     /// [`crate::beacon::Pass::restarted`] says of it.
     ///
     /// A station that sends RESTART passes on every beacon it hears, because
-    /// a beacon is what ends the wait a RESTART begins. A start, waited for or
-    /// not, also makes this station forget which generation is flying, so
-    /// that nothing but CONNECT goes until a CONNECT says. Whether the
-    /// station is matched is its [`Matched`]'s, which the beacon watch keeps
-    /// from the same beacons.
+    /// a beacon is what ends the wait a RESTART begins. Whether the station
+    /// is matched is its [`Matched`]'s, which the beacon watch keeps from the
+    /// same beacons: a start's beacons carry the restart flag, which ends
+    /// the match, so nothing but the three goes until a CONNECT of the
+    /// station's own is answered with its checksum again.
     ///
     /// # Arguments
     ///
@@ -331,7 +318,6 @@ impl TcsClient {
         if !restarted {
             return false;
         }
-        self.generation = None;
         self.restart_wait.take().is_some()
     }
 
@@ -425,17 +411,18 @@ impl TcsClient {
         }
     }
 
-    /// The generation this station knows is flying, as the last CONNECT's
-    /// answer said, or `None` where none has since the last start.
-    pub fn generation(&self) -> Option<u32> {
-        self.generation
-    }
-
     /// Says whether `command` may go: only where this station is matched
     /// for commanding, but for CONNECT, RESTART_ARM and RESTART, which go
     /// either way because they are how it matches and how it rescues a
-    /// vehicle that will not; and only where it knows which generation is
-    /// flying, but for a PING or a CONNECT.
+    /// vehicle that will not.
+    ///
+    /// Matched for commanding is what says which start of tcspecial is
+    /// flying, and with which configuration: its last beacon is recent,
+    /// clear of the restart flag and carries the station's checksum, and a
+    /// CONNECT of its own has been answered with that checksum since. A
+    /// start's beacons carry the flag, so a start ends the match, and
+    /// nothing but the three goes until the station has matched the start
+    /// that came back. There is no generation to know beside it.
     ///
     /// # Arguments
     ///
@@ -444,19 +431,13 @@ impl TcsClient {
     /// # Errors
     ///
     /// `TcsError::Unmatched` where the station is not matched for
-    /// commanding and the command is not one of the three;
-    /// `TcsError::GenerationUnknown` where no generation is known and the
-    /// command is not one that is always taken.
+    /// commanding and the command is not one of the three.
     fn may_send(&self, command: &Command) -> TcsResult<()> {
         let kind = command.cmd_type();
         if !kind.taken_unmatched() && !self.matched.for_commanding() {
             return Err(TcsError::Unmatched(kind));
         }
-        match self.generation {
-            Some(_) => Ok(()),
-            None if command.cmd_type().always_taken() => Ok(()),
-            None => Err(TcsError::GenerationUnknown(command.cmd_type())),
-        }
+        Ok(())
     }
 
     /// Says whether `command` may go while a RESTART is waited on, if one
@@ -476,8 +457,7 @@ impl TcsClient {
         }
     }
 
-    /// Sends a command on its link, for the generation flying, and waits for
-    /// the answer, timing both.
+    /// Sends a command on its link, and waits for the answer, timing both.
     ///
     /// # Arguments
     ///
@@ -492,13 +472,12 @@ impl TcsClient {
     /// `TcsError::AwaitingRestart` while a RESTART is awaited and the wait
     /// does not let this command go, `TcsError::Config` if the client has no
     /// link for it, `TcsError::Unmatched` if the station is not matched for
-    /// commanding, `TcsError::GenerationUnknown` if no generation is known
-    /// to send it for, and `TcsError::Io` if it cannot be sent or no answer
+    /// commanding, and `TcsError::Io` if it cannot be sent or no answer
     /// comes in time.
     fn send_command(&mut self, command: Command) -> TcsResult<Telemetry> {
         self.wait_lets(&command)?;
         // A command with no link to go on says so before anything is said
-        // of the generation: that is the client's own configuration, and no
+        // of the match: that is the client's own configuration, and no
         // beacon would change it.
         self.link_for(&command)?;
         self.may_send(&command)?;
@@ -523,32 +502,10 @@ impl TcsClient {
             &matched,
         );
         self.answers_dropped += dropped;
-        if let Ok(answer) = &answer {
+        if answer.is_ok() {
             self.last_received = Some(Timestamp::now());
-            self.heard_generation_of(answer);
         }
         answer
-    }
-
-    /// What an answer says of the generation flying.
-    ///
-    /// A vehicle that answered as another start than the one this station
-    /// thought it was has started again since: nothing more goes until a
-    /// beacon or a CONNECT says which start it is, because the definitions it
-    /// started with may not be the ones this station is reading. Learning the
-    /// generation from the answer instead would carry on as though nothing
-    /// had happened. An answer of generation nought, which no start is, says
-    /// nothing of it.
-    ///
-    /// # Arguments
-    ///
-    /// * `answer` - The answer to a command this client sent.
-    fn heard_generation_of(&mut self, answer: &Telemetry) {
-        let other = answer.generation() != 0
-            && Some(answer.generation()) != self.generation;
-        if other {
-            self.generation = None;
-        }
     }
 
     /// Start the count again past `newest`, the newest command the vehicle
@@ -582,8 +539,8 @@ impl TcsClient {
     /// # Errors
     ///
     /// `TcsError::AwaitingRestart` while a RESTART is awaited,
-    /// `TcsError::GenerationUnknown` if no generation is known to send it
-    /// for, `TcsError::Io` if it cannot be sent or no answer comes in time,
+    /// `TcsError::Unmatched` if the station is not matched for commanding,
+    /// `TcsError::Io` if it cannot be sent or no answer comes in time,
     /// and `TcsError::Protocol` if the answer is not this command's.
     pub fn ping(&mut self) -> TcsResult<tcslibgs::PingTelemetry> {
         let seq = self.next_sequence();
@@ -600,9 +557,15 @@ impl TcsClient {
 
     /// Sends a RESTART_ARM and waits for its answer.
     ///
+    /// The vehicle refuses one whose target it does not hold `NotFound`,
+    /// and arms nothing.
+    ///
     /// # Arguments
     ///
     /// * `arm_key` - The key the RESTART that follows must carry.
+    /// * `target`  - The checksum of the configuration to restart onto,
+    ///               which the RESTART must carry too: the running
+    ///               configuration's for a plain restart.
     ///
     /// # Returns
     ///
@@ -611,12 +574,17 @@ impl TcsClient {
     /// # Errors
     ///
     /// `TcsError::AwaitingRestart` while a RESTART is awaited,
-    /// `TcsError::GenerationUnknown` if no generation is known to send it
-    /// for, `TcsError::Io` if it cannot be sent or no answer comes in time,
+    /// `TcsError::Unmatched` if the station is not matched for commanding,
+    /// `TcsError::Io` if it cannot be sent or no answer comes in time,
     /// and `TcsError::Protocol` if the answer is not this command's.
-    pub fn restart_arm(&mut self, arm_key: ArmKey) -> TcsResult<CommandStatus> {
+    pub fn restart_arm(
+        &mut self,
+        arm_key: ArmKey,
+        target: ConfigDigest,
+    ) -> TcsResult<CommandStatus> {
         let seq = self.next_sequence();
-        let cmd = Command::RestartArm(RestartArmCommand::new(seq, arm_key));
+        let cmd =
+            Command::RestartArm(RestartArmCommand::new(seq, arm_key, target));
         let response = self.send_command(cmd)?;
 
         match response {
@@ -627,17 +595,17 @@ impl TcsClient {
         }
     }
 
-    /// Say what this end read, and hear what the other end read.
+    /// Say which configuration this end read, and hear which the other end
+    /// is running.
     ///
     /// Sent when a link is opened. What comes back is the spacecraft's own
-    /// version and the digest of the configuration it is serving, for the
-    /// caller to hold against the two it sent: this returns both rather than
+    /// version and the checksum of the configuration it is serving, for the
+    /// caller to hold against the one it sent: this returns both rather than
     /// a verdict, because the caller is the end that knows which file it read
     /// and can say so.
     ///
-    /// Where the answer is a success its generation is the one commands are
-    /// sent for from then on, and the sequence count goes on from past the
-    /// newest command the vehicle has taken.
+    /// Where the answer is a success the sequence count goes on from past
+    /// the newest command the vehicle has taken.
     ///
     /// It goes during a wait for a restart too, without ending it: see
     /// [`RestartWait::lets`]. And it goes before the station is matched,
@@ -648,12 +616,11 @@ impl TcsClient {
     ///
     /// # Arguments
     ///
-    /// * `version` - The version of the configuration this end read.
-    /// * `digest`  - The digest of that configuration.
+    /// * `digest` - The checksum of the configuration this end read.
     ///
     /// # Returns
     ///
-    /// The spacecraft's version and digest.
+    /// The spacecraft's version and the checksum of what it runs.
     ///
     /// # Errors
     ///
@@ -661,12 +628,10 @@ impl TcsClient {
     /// and `TcsError::Protocol` if the answer is not this command's.
     pub fn connect(
         &mut self,
-        version: ConfigVersion,
         digest: ConfigDigest,
     ) -> TcsResult<(ConfigVersion, ConfigDigest)> {
         let seq = self.next_sequence();
-        let command =
-            Command::Connect(ConnectCommand::new(seq, version, digest));
+        let command = Command::Connect(ConnectCommand::new(seq, digest));
         let timeout = self.timeout;
         self.may_send(&command)?;
         let mark = self.matched.before_connect();
@@ -692,12 +657,10 @@ impl TcsClient {
         self.last_received = Some(Timestamp::now());
 
         match answer {
-            // The generation it answers with is the one this station knows
-            // is flying from here on, where it answered at all, and the count
-            // goes on from past the newest command it has taken.
+            // Where it answered at all, the count goes on from past the
+            // newest command it has taken.
             Telemetry::Connect(tm) => {
                 if tm.header.status.is_success() {
-                    self.generation = Some(tm.header.generation);
                     self.count_past(tm.newest_taken);
                     self.matched.connect_answered(tm.digest, mark);
                 }
@@ -723,6 +686,7 @@ impl TcsClient {
     /// # Arguments
     ///
     /// * `arm_key` - The key the RESTART_ARM before it gave.
+    /// * `target`  - The checksum the RESTART_ARM before it gave.
     ///
     /// # Returns
     ///
@@ -731,12 +695,16 @@ impl TcsClient {
     /// # Errors
     ///
     /// `TcsError::AwaitingRestart` while a RESTART is awaited,
-    /// `TcsError::GenerationUnknown` if no generation is known to send it
-    /// for, `TcsError::Io` if it cannot be sent or no answer comes in time,
+    /// `TcsError::Unmatched` if the station is not matched for commanding,
+    /// `TcsError::Io` if it cannot be sent or no answer comes in time,
     /// and `TcsError::Protocol` if the answer is not this command's.
-    pub fn restart(&mut self, arm_key: ArmKey) -> TcsResult<CommandStatus> {
+    pub fn restart(
+        &mut self,
+        arm_key: ArmKey,
+        target: ConfigDigest,
+    ) -> TcsResult<CommandStatus> {
         let seq = self.next_sequence();
-        let cmd = Command::Restart(RestartCommand::new(seq, arm_key));
+        let cmd = Command::Restart(RestartCommand::new(seq, arm_key, target));
         let sent = self.sent;
         let waiting = self.restart_wait.is_some();
         let response = self.send_command(cmd);
@@ -785,8 +753,8 @@ impl TcsClient {
     ///
     /// `TcsError::Config` if the client has no node link,
     /// `TcsError::AwaitingRestart` while a RESTART is awaited,
-    /// `TcsError::GenerationUnknown` if no generation is known to send it
-    /// for, `TcsError::Io` if it cannot be sent or no answer comes in time,
+    /// `TcsError::Unmatched` if the station is not matched for commanding,
+    /// `TcsError::Io` if it cannot be sent or no answer comes in time,
     /// and `TcsError::Protocol` if the answer is not this command's.
     pub fn start_node(
         &mut self,
@@ -819,8 +787,8 @@ impl TcsClient {
     ///
     /// `TcsError::Config` if the client has no node link,
     /// `TcsError::AwaitingRestart` while a RESTART is awaited,
-    /// `TcsError::GenerationUnknown` if no generation is known to send it
-    /// for, `TcsError::Io` if it cannot be sent or no answer comes in time,
+    /// `TcsError::Unmatched` if the station is not matched for commanding,
+    /// `TcsError::Io` if it cannot be sent or no answer comes in time,
     /// and `TcsError::Protocol` if the answer is not this command's.
     pub fn stop_node(
         &mut self,
@@ -869,8 +837,8 @@ impl TcsClient {
     /// would refuse it unanswered. Otherwise
     /// `TcsError::Config` if the client has no node link,
     /// `TcsError::AwaitingRestart` while a RESTART is awaited,
-    /// `TcsError::GenerationUnknown` if no generation is known to send it
-    /// for, `TcsError::Io` if it cannot be sent or no answer comes in time,
+    /// `TcsError::Unmatched` if the station is not matched for commanding,
+    /// `TcsError::Io` if it cannot be sent or no answer comes in time,
     /// and `TcsError::Protocol` if the answer is not this command's.
     pub fn set_node(
         &mut self,
@@ -914,8 +882,8 @@ impl TcsClient {
     ///
     /// `TcsError::Config` if the client has no node link,
     /// `TcsError::AwaitingRestart` while a RESTART is awaited,
-    /// `TcsError::GenerationUnknown` if no generation is known to send it
-    /// for, `TcsError::Io` if it cannot be sent or no answer comes in time,
+    /// `TcsError::Unmatched` if the station is not matched for commanding,
+    /// `TcsError::Io` if it cannot be sent or no answer comes in time,
     /// and `TcsError::Protocol` if the answer is not this command's.
     pub fn query_node(
         &mut self,
@@ -953,8 +921,8 @@ impl TcsClient {
     ///
     /// `TcsError::Config` if the client has no node link,
     /// `TcsError::AwaitingRestart` while a RESTART is awaited,
-    /// `TcsError::GenerationUnknown` if no generation is known to send it
-    /// for, `TcsError::Io` if it cannot be sent or no answer comes in time,
+    /// `TcsError::Unmatched` if the station is not matched for commanding,
+    /// `TcsError::Io` if it cannot be sent or no answer comes in time,
     /// and `TcsError::Protocol` if the answer is not this command's.
     pub fn query_node_sample(
         &mut self,
@@ -1178,14 +1146,13 @@ mod tests {
     #[test]
     fn an_unmatched_station_sends_only_the_three() {
         let (connection, asked) = Canned::recording(an_answer(a_version(1)));
-        let (nodes, node_asked) = Canned::recording(
-            Telemetry::StopNode(tcslibgs::NodeTelemetry::stopped(
+        let (nodes, node_asked) = Canned::recording(Telemetry::StopNode(
+            tcslibgs::NodeTelemetry::stopped(
                 1,
                 CommandStatus::Success,
                 NodeId(2),
-            ))
-            .for_generation(7),
-        );
+            ),
+        ));
         let matched = Matched::for_configuration(OURS);
         let mut client =
             TcsClient::of_a_graph(connection, nodes, matched.clone());
@@ -1204,9 +1171,7 @@ mod tests {
 
         // CONNECT goes, and is answered with ours; flagged beacons still
         // keep the station from commanding.
-        client
-            .connect(ConfigVersion::of_this_build(), OURS)
-            .expect("CONNECT goes unmatched");
+        client.connect(OURS).expect("CONNECT goes unmatched");
         assert_eq!(asked.lock().unwrap().len(), 1);
         assert!(matches!(
             client.stop_node(NodeId(2)),
@@ -1235,13 +1200,10 @@ mod tests {
             a_version(1),
             ConfigDigest([0x11; 16]),
             40,
-        ))
-        .for_generation(7);
+        ));
         let mut client =
             TcsClient::spacecraft_only(Canned::answering(theirs), listening());
-        client
-            .connect(ConfigVersion::of_this_build(), OURS)
-            .expect("answered");
+        client.connect(OURS).expect("answered");
         assert!(!client.matched().for_commanding());
         assert!(matches!(client.ping(), Err(TcsError::Unmatched(_))));
     }
@@ -1306,16 +1268,17 @@ mod tests {
             )),
             commanding(),
         );
-        client.generation = Some(7);
         assert_eq!(
-            client.restart(ArmKey(1)).expect("answered"),
+            client.restart(ArmKey(1), OURS).expect("answered"),
             CommandStatus::NotArmed
         );
         assert_eq!(client.restart_wait(), None, "nothing was initiated");
 
         client.restart_wait = Some(RestartWait);
         assert_eq!(
-            client.restart(ArmKey(1)).expect("sent during the wait"),
+            client
+                .restart(ArmKey(1), OURS)
+                .expect("sent during the wait"),
             CommandStatus::NotArmed
         );
         assert_eq!(
@@ -1512,8 +1475,8 @@ mod tests {
         assert_eq!(client.answers_dropped(), 2);
     }
 
-    /// Makes a CONNECT's answer from generation 7, which has taken up to
-    /// command 40.
+    /// Makes a CONNECT's answer from a vehicle which has taken up to command
+    /// 40.
     ///
     /// # Arguments
     ///
@@ -1523,14 +1486,12 @@ mod tests {
     ///
     /// The answer.
     fn an_answer(version: ConfigVersion) -> Telemetry {
-        // Generation 7, which has taken up to command 40.
         Telemetry::Connect(tcslibgs::ConnectTelemetry::new(
             1,
             version,
             ConfigDigest([0x5A; 16]),
             40,
         ))
-        .for_generation(7)
     }
 
     /// Makes a configuration version of `major`.0.0.
@@ -1602,70 +1563,52 @@ mod tests {
         );
 
         let (version, _) = client
-            .connect(ConfigVersion::of_this_build(), ConfigDigest([0x5A; 16]))
+            .connect(ConfigDigest([0x5A; 16]))
             .expect("the spacecraft's link is the one that answers it");
         assert_eq!(version, a_version(1));
     }
 
-    /// A node command waits for the station to know which generation is
-    /// flying, and goes once a CONNECT's answer has said. A vehicle that
-    /// answers as another start, or whose beacons start again, is one the
-    /// station no longer knows, until a CONNECT says again.
+    /// A start ends the station's match, so a node command waits for a
+    /// CONNECT of the station's own to be answered again with its checksum:
+    /// there is no generation for an answer to carry, and the beacons and
+    /// the CONNECT say which start is flying. A beacon of the same start
+    /// changes nothing.
     #[test]
-    fn a_command_waits_for_the_station_to_know_the_generation() {
-        let stopped = |status| {
-            Telemetry::StopNode(tcslibgs::NodeTelemetry::stopped(
+    fn a_start_ends_the_match_until_a_connect_is_answered_again() {
+        let (nodes, asked) = Canned::recording(Telemetry::StopNode(
+            tcslibgs::NodeTelemetry::stopped(
                 1,
-                status,
+                CommandStatus::Success,
                 NodeId(2),
-            ))
-        };
-        let (nodes, asked) = Canned::recording(
-            stopped(CommandStatus::Success).for_generation(7),
-        );
+            ),
+        ));
+        let matched = commanding();
         let mut client = TcsClient::of_a_graph(
             Canned::answering(an_answer(a_version(1))),
             nodes,
-            commanding(),
+            matched.clone(),
         );
-
-        assert_eq!(client.generation(), None);
-        assert!(matches!(
-            client.stop_node(NodeId(2)),
-            Err(TcsError::GenerationUnknown(_))
-        ));
-        assert!(asked.lock().unwrap().is_empty(), "and it was not sent");
-
-        client
-            .connect(ConfigVersion::of_this_build(), ConfigDigest([0x5A; 16]))
-            .expect("connected");
-        assert_eq!(client.generation(), Some(7), "the CONNECT's answer");
-        client.stop_node(NodeId(2)).expect("sent");
-        assert_eq!(asked.lock().unwrap().len(), 1);
-        assert_eq!(client.generation(), Some(7), "an answer of the same");
-
-        // An answer made by another start, done or not, is a vehicle that
-        // has started again since: forgotten, and nothing more goes.
-        let (nodes, _) = Canned::recording(
-            stopped(CommandStatus::Success).for_generation(8),
-        );
-        client.nodes = Some(nodes);
-        client.stop_node(NodeId(2)).expect("answered");
-        assert_eq!(client.generation(), None);
-        assert!(matches!(
-            client.stop_node(NodeId(2)),
-            Err(TcsError::GenerationUnknown(_))
-        ));
-
-        // A CONNECT says again, and a beacon that starts again forgets.
-        client
-            .connect(ConfigVersion::of_this_build(), ConfigDigest([0x5A; 16]))
-            .expect("connected");
-        assert_eq!(client.generation(), Some(7));
+        client.stop_node(NodeId(2)).expect("matched, so sent");
         client.beacon_heard(false);
-        assert_eq!(client.generation(), Some(7), "the same start goes on");
+        client.stop_node(NodeId(2)).expect("the same start goes on");
+        assert_eq!(asked.lock().unwrap().len(), 2);
+
+        // The start that came back: its beacon carries the flag.
         client.beacon_heard(true);
-        assert_eq!(client.generation(), None, "a start");
+        matched.beacon(true, Some(OURS), Stage::Heard, true);
+        assert!(matches!(
+            client.stop_node(NodeId(2)),
+            Err(TcsError::Unmatched(_))
+        ));
+        assert_eq!(asked.lock().unwrap().len(), 2, "and it was not sent");
+
+        // Matched again: its flag clear, and a CONNECT answered with ours.
+        matched.beacon(false, Some(OURS), Stage::Heard, false);
+        client.connect(OURS).expect("connected");
+        client
+            .stop_node(NodeId(2))
+            .expect("sent once matched again");
+        assert_eq!(asked.lock().unwrap().len(), 3);
     }
 
     /// A CONNECT's answer says the newest command the vehicle has taken, and
@@ -1675,9 +1618,7 @@ mod tests {
     fn the_count_goes_on_from_past_the_newest_the_vehicle_took() {
         let (connection, asked) = Canned::recording(an_answer(a_version(1)));
         let mut client = TcsClient::spacecraft_only(connection, commanding());
-        client
-            .connect(ConfigVersion::of_this_build(), ConfigDigest([0x5A; 16]))
-            .expect("connected");
+        client.connect(ConfigDigest([0x5A; 16])).expect("connected");
         // Answered with the canned CONNECT, which a PING takes for an
         // answer of the wrong kind: what is asked here is what was sent.
         let _ = client.ping();
@@ -1688,9 +1629,7 @@ mod tests {
         );
 
         client.sequence.store(100, Ordering::SeqCst);
-        client
-            .connect(ConfigVersion::of_this_build(), ConfigDigest([0x5A; 16]))
-            .expect("connected");
+        client.connect(ConfigDigest([0x5A; 16])).expect("connected");
         let _ = client.ping();
         assert_eq!(asked.lock().unwrap()[3].sequence(), 101, "not back");
     }

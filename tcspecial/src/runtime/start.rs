@@ -25,6 +25,7 @@ use tcslibgs::simulate::{judge, refusals, Host, Judged, Mode};
 use crate::beacon_send::BeaconSend;
 use crate::runtime::command::{Commands, Flying};
 use crate::runtime::fabric::Moved;
+use crate::runtime::held::Held;
 use crate::runtime::matched::Matched;
 use crate::runtime::restart;
 use crate::runtime::system::{described, System};
@@ -187,7 +188,7 @@ pub fn run_graph(path: &str, mode: Mode) -> Result<(), Vec<String>> {
 
     // Beacons, once everything has opened: a vehicle that will not start has
     // nothing to announce. Held until the vehicle stops.
-    let (beacon, generation) =
+    let beacon =
         beacons(&graph, digest, telemetry_log.clone(), matched.clone())
             .map_err(|why| vec![format!("{path}: {why}")])?;
 
@@ -199,7 +200,7 @@ pub fn run_graph(path: &str, mode: Mode) -> Result<(), Vec<String>> {
     let flying = Flying {
         version: ConfigVersion::of_this_build(),
         digest,
-        generation,
+        held: Held::running_only(digest),
     };
     let mut commands = command_links(
         &graph,
@@ -401,7 +402,8 @@ fn segsend_for(graph: &Graph) -> Result<SegSend, String> {
 ///
 /// From `beacon.send` to `beacon.recv`, carrying this build's version, the
 /// configuration's digest and the restart flag, which every start begins
-/// with. The state file is counted here, before the first beacon goes. Every
+/// with. The state file is read and written here, before the first beacon
+/// goes. Every
 /// `beacon.reset_interval` until the MOC connects, as every start is, and
 /// every `beacon.default_interval` after that: see
 /// [`BeaconSend::connected`].
@@ -423,10 +425,8 @@ fn segsend_for(graph: &Graph) -> Result<SegSend, String> {
 ///
 /// # Returns
 ///
-/// The beacon sender, `None` where none is sent, and this start's
-/// generation, which every answer carries. The generation is nought, which
-/// no start is, where there is no `tcspecial` section, which takes no
-/// commands either.
+/// The beacon sender, `None` where none is sent: where there is no
+/// `tcspecial` section, which takes no commands either.
 ///
 /// # Errors
 ///
@@ -438,9 +438,9 @@ fn beacons(
     digest: ConfigDigest,
     telemetry_log: TelemetryLog,
     matched: Matched,
-) -> Result<(Option<BeaconSend>, u32), String> {
+) -> Result<Option<BeaconSend>, String> {
     let Some(section) = graph.tcspecial.as_ref() else {
-        return Ok((None, 0));
+        return Ok(None);
     };
     let ci = tcslibgs::graph::parameters::ci_config_of(
         &tcslibgs::graph::parameters::flatten(section),
@@ -449,15 +449,24 @@ fn beacons(
     let started = crate::state::start(std::path::Path::new(&ci.state_file))?;
     if let Some(why) = &started.damaged {
         log::warn!(
-            "the state file was not one tcspecial can read ({why}), so the \
-             generation starts again from 1"
+            "the state file was not one tcspecial can read ({why}), so it \
+             says nothing of this start, which is taken for one nobody \
+             commanded"
+        );
+    }
+    if let Some(generation) = started.dropped_generation {
+        log::warn!(
+            "the state file {} was written by a build that counted \
+             generations, and said generation {generation}: there is no \
+             generation now, so it was dropped, and the file written again \
+             without it",
+            ci.state_file
         );
     }
     // Which kind of start this is goes in the summary, because it is the
     // first thing somebody reading a log after an unexpected restart asks.
     summary(format!(
-        "generation {}, {}: {}",
-        started.generation,
+        "{}: {}",
         if started.commanded {
             "a commanded restart"
         } else {
@@ -486,7 +495,7 @@ fn beacons(
             ci.beacon_recv
         ));
     }
-    Ok((sending, started.generation))
+    Ok(sending)
 }
 
 /// Starts taking the ground's commands where the configuration's

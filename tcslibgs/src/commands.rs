@@ -2,7 +2,7 @@
 //!
 //! Commands are sent from ground to space and are idempotent.
 
-use crate::config_digest::{ConfigDigest, ConfigVersion};
+use crate::config_digest::ConfigDigest;
 use crate::types::{ArmKey, NodeId};
 
 /// Command message header
@@ -125,18 +125,15 @@ impl CommandType {
     }
 
     /// Tells whether a command of this kind is taken however old its
-    /// sequence is, and sent by a ground station that does not yet know
-    /// which generation of tcspecial is flying.
+    /// sequence is.
     ///
-    /// PING and CONNECT, and nothing else: they are how a ground station that
-    /// has heard no beacon finds out what is flying, and where one whose count
-    /// has gone back learns where to start it again, and neither changes
-    /// anything aboard, so neither can do harm by reaching a vehicle that is
-    /// not the one it was meant for or by arriving late. Every other command
-    /// acts on definitions a restart may have changed, so a ground station
-    /// sends none until it knows which start it is talking to; and one older
-    /// than a command already taken is not acted on, because the later one
-    /// is what the ground meant last.
+    /// PING and CONNECT, and nothing else: CONNECT is where a ground station
+    /// whose count has gone back -- started again, or a second station --
+    /// learns where to start it again, and neither changes anything aboard
+    /// that a later command could have meant otherwise, so neither can do
+    /// harm by arriving late. Every other command older than a command
+    /// already taken is not acted on, because the later one is what the
+    /// ground meant last.
     ///
     /// # Returns
     ///
@@ -173,6 +170,12 @@ impl CommandType {
     /// The vehicle's command interpreter and the ground's client both ask
     /// this, so the two cannot come to disagree about which commands go.
     ///
+    /// They are also the three *fixed* commands, and for the same reason:
+    /// taken whatever either end is running, their layouts can never
+    /// change, and they are stated apart from every other command, in
+    /// `xtce/fixed.xml`, with opcodes from [`FIXED_OPCODES`]. See "The three
+    /// fixed commands" in `docs/design.rst`.
+    ///
     /// # Returns
     ///
     /// `true` for CONNECT, RESTART_ARM and RESTART, `false` for every other
@@ -192,9 +195,11 @@ impl CommandType {
         }
     }
 
-    /// Gives the opcode a command of this kind carries. What goes on the link
-    /// is stated in `xtce/link.xml`, and a test in [`crate::link`] holds this
-    /// to it, so the two cannot come to differ.
+    /// Gives the opcode a command of this kind carries, which its answer
+    /// carries back. What goes on the link is stated in `xtce/fixed.xml` for
+    /// the three fixed commands and in `xtce/link.xml` for the rest, and a
+    /// test in [`crate::link`] holds this to them, so the two cannot come to
+    /// differ.
     ///
     /// # Returns
     ///
@@ -241,6 +246,14 @@ impl CommandType {
     }
 }
 
+/// The opcodes that belong to the fixed commands for ever: see
+/// [`CommandType::taken_unmatched`]. Three are used -- RESTART_ARM 0x02,
+/// RESTART 0x03 and CONNECT 0x04 -- and the rest are kept so that a fixed
+/// command could be added without taking an opcode another command has had.
+/// No other command takes one of them but PING, which had 0x01 before there
+/// were fixed commands, and is an ordinary command all the same.
+pub const FIXED_OPCODES: std::ops::RangeInclusive<u8> = 0x00..=0x0F;
+
 /// PING command - verify TCSpecial is able to process commands
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct PingCommand {
@@ -248,7 +261,7 @@ pub struct PingCommand {
 }
 
 impl PingCommand {
-    /// Makes a PING, its generation not yet stamped.
+    /// Makes a PING.
     ///
     /// # Arguments
     ///
@@ -281,101 +294,116 @@ pub const RESTART_ARM_VALID_DEFAULT: std::time::Duration =
     std::time::Duration::from_secs(20 * 60);
 
 /// RESTART_ARM command - enable a restart for the next `restart_arm_valid`
+///
+/// Onto the configuration whose checksum is `target`, which the vehicle must
+/// hold: one it does not is refused `NotFound`, and arms nothing.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct RestartArmCommand {
     pub header: CommandHeader,
     pub arm_key: ArmKey,
+    /// The checksum of the configuration the vehicle is to run after the
+    /// restart: the running one's for a plain restart.
+    pub target: ConfigDigest,
 }
 
 impl RestartArmCommand {
-    /// Makes a RESTART_ARM, its generation not yet stamped.
+    /// Makes a RESTART_ARM.
     ///
     /// # Arguments
     ///
     /// * `sequence` - The command's sequence number.
     /// * `arm_key`  - The key the RESTART that follows must carry.
+    /// * `target`   - The checksum of the configuration to restart onto,
+    ///                which the RESTART must carry too.
     ///
     /// # Returns
     ///
     /// The command.
-    pub fn new(sequence: u32, arm_key: ArmKey) -> Self {
+    pub fn new(sequence: u32, arm_key: ArmKey, target: ConfigDigest) -> Self {
         Self {
             header: CommandHeader {
                 sequence,
                 cmd_type: CommandType::RestartArm,
             },
             arm_key,
+            target,
         }
     }
 }
 
 /// RESTART command - restart TCSpecial if armed
+///
+/// With the key and the target checksum of the arm it uses: one whose
+/// target is not the arm's is refused `NotArmed`, and one whose target the
+/// vehicle no longer holds, or cannot load, is refused `NotFound`.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct RestartCommand {
     pub header: CommandHeader,
     pub arm_key: ArmKey,
+    /// The checksum of the configuration the vehicle is to run after the
+    /// restart, as the arm named it.
+    pub target: ConfigDigest,
 }
 
 impl RestartCommand {
-    /// Makes a RESTART, its generation not yet stamped.
+    /// Makes a RESTART.
     ///
     /// # Arguments
     ///
     /// * `sequence` - The command's sequence number.
     /// * `arm_key`  - The key the RESTART_ARM before it carried.
+    /// * `target`   - The checksum the RESTART_ARM before it carried.
     ///
     /// # Returns
     ///
     /// The command.
-    pub fn new(sequence: u32, arm_key: ArmKey) -> Self {
+    pub fn new(sequence: u32, arm_key: ArmKey, target: ConfigDigest) -> Self {
         Self {
             header: CommandHeader {
                 sequence,
                 cmd_type: CommandType::Restart,
             },
             arm_key,
+            target,
         }
     }
 }
 
-/// CONNECT command - say what the ground read before anything else
+/// CONNECT command - say which configuration the ground is using
 ///
-/// Sent when a link is opened. It carries the version of the software at the
-/// ground end and a digest of the configuration it read, and the answer
-/// carries the same two from the spacecraft: nothing else in the protocol
-/// makes the two ends prove they are talking about the same payload set, and
-/// when they were not, the only sign was a command answered `NotFound` for a
-/// payload the operator could see on the screen.
+/// Sent when a link is opened. It carries the checksum of the configuration
+/// the ground end read, and the answer carries the running configuration's
+/// and the vehicle's build: nothing else in the protocol makes the two ends
+/// prove they are talking about the same payload set, and when they were
+/// not, the only sign was a command answered `NotFound` for a payload the
+/// operator could see on the screen.
+///
+/// It carries no build version of the ground's: the vehicle acts on the
+/// checksum alone, and two builds that read a configuration differently
+/// have different checksums for it.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct ConnectCommand {
     pub header: CommandHeader,
-    pub version: ConfigVersion,
     pub digest: ConfigDigest,
 }
 
 impl ConnectCommand {
-    /// Makes a CONNECT, its generation not yet stamped.
+    /// Makes a CONNECT.
     ///
     /// # Arguments
     ///
     /// * `sequence` - The command's sequence number.
-    /// * `version`  - The version of the ground end's build.
-    /// * `digest`   - The digest of the configuration the ground end read.
+    /// * `digest`   - The checksum of the configuration the ground end read.
     ///
     /// # Returns
     ///
     /// The command.
-    pub fn new(
-        sequence: u32,
-        version: ConfigVersion,
-        digest: ConfigDigest,
-    ) -> Self {
+    pub fn new(sequence: u32, digest: ConfigDigest) -> Self {
         Self {
             header: CommandHeader {
                 sequence,
                 cmd_type: CommandType::Connect,
             },
-            version,
             digest,
         }
     }
@@ -423,8 +451,7 @@ impl NodeCommand {
         Self::of(sequence, CommandType::QueryNodeSample, node)
     }
 
-    /// Makes a node command of any of the four kinds, its generation not yet
-    /// stamped.
+    /// Makes a node command of any of the four kinds.
     ///
     /// # Arguments
     ///
@@ -481,7 +508,7 @@ pub struct SetNodeCommand {
 }
 
 impl SetNodeCommand {
-    /// Makes a SET_NODE, its generation not yet stamped.
+    /// Makes a SET_NODE.
     ///
     /// # Arguments
     ///
@@ -854,8 +881,6 @@ mod tests {
         let mut too_long = longest[..length_at].to_vec();
         too_long.extend(((VALUE_BYTES + 1) as u16).to_be_bytes());
         too_long.extend([7; VALUE_BYTES + 1]);
-        let packet_length = (too_long.len() - 7) as u16;
-        too_long[4..6].copy_from_slice(&packet_length.to_be_bytes());
         assert!(Command::read(&too_long).is_err());
     }
 
@@ -947,6 +972,24 @@ mod tests {
         assert_eq!(CommandType::Connect.link(), CommandLink::Spacecraft);
         assert!(CommandType::Connect.may_arrive_on(CommandLink::Spacecraft));
         assert!(!CommandType::Connect.may_arrive_on(CommandLink::Payload));
+    }
+
+    /// The fixed commands take opcodes from the fixed range, and no other
+    /// command does but PING, which had 0x01 before there were fixed
+    /// commands: RESTART_ARM 0x02, RESTART 0x03 and CONNECT 0x04.
+    #[test]
+    fn the_fixed_opcodes_are_the_fixed_commands() {
+        assert_eq!(CommandType::RestartArm.to_u8(), 0x02);
+        assert_eq!(CommandType::Restart.to_u8(), 0x03);
+        assert_eq!(CommandType::Connect.to_u8(), 0x04);
+        for kind in (0u8..=255).filter_map(CommandType::from_u8) {
+            let fixed = FIXED_OPCODES.contains(&kind.to_u8());
+            assert_eq!(
+                fixed,
+                kind.taken_unmatched() || kind == CommandType::Ping,
+                "{kind:?}"
+            );
+        }
     }
 
     #[test]

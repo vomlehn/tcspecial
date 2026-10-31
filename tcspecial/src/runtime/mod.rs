@@ -34,6 +34,7 @@
 pub mod command;
 pub mod fabric;
 pub mod frame;
+pub mod held;
 pub mod matched;
 pub mod node_state;
 pub mod port;

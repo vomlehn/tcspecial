@@ -67,19 +67,22 @@ fn stub_spacecraft(count: usize) -> (String, thread::JoinHandle<()>) {
             let command = Command::read(&buffer[..size])
                 .expect("the client sent a valid command");
             let seq = command.sequence();
-            // Answered as generation 1, the one start this stand-in is.
-            let generation = 1;
 
             let answer = match command {
                 Command::Ping(_) => Telemetry::Ping(PingTelemetry::new(
                     seq,
                     CommandStatus::Success,
                 )),
-                // The stub answers with the ground's own two, which is a
-                // spacecraft reading the same configuration.
-                Command::Connect(cmd) => Telemetry::Connect(
-                    ConnectTelemetry::new(seq, cmd.version, cmd.digest, seq),
-                ),
+                // The stub answers with the ground's own checksum, which is
+                // a spacecraft reading the same configuration.
+                Command::Connect(cmd) => {
+                    Telemetry::Connect(ConnectTelemetry::new(
+                        seq,
+                        ConfigVersion::of_this_build(),
+                        cmd.digest,
+                        seq,
+                    ))
+                }
                 Command::RestartArm(_) => Telemetry::RestartArm(
                     RestartArmTelemetry::new(seq, CommandStatus::Success),
                 ),
@@ -141,7 +144,7 @@ fn stub_spacecraft(count: usize) -> (String, thread::JoinHandle<()>) {
                 }
             };
 
-            let data = answer.for_generation(generation).to_bytes();
+            let data = answer.to_bytes();
             socket.send_to(&data, from).expect("answer");
         }
     });
@@ -163,8 +166,7 @@ fn stub_spacecraft(count: usize) -> (String, thread::JoinHandle<()>) {
 ///
 /// # Returns
 ///
-/// The client, with a ten-second timeout and a beacon of generation 1
-/// already heard.
+/// The client, with a ten-second timeout, matched for commanding.
 ///
 /// # Panics
 ///
@@ -179,12 +181,9 @@ fn client_to(addr: &str) -> TcsClient {
         listening(),
     );
     client.set_timeout(Duration::from_secs(10));
-    // A station that has connected, so that it knows which generation is
-    // flying and is matched for commanding, and its node commands are sent
-    // rather than refused unsent.
-    client
-        .connect(ConfigVersion::of_this_build(), ConfigDigest([0x5A; 16]))
-        .expect("connected");
+    // A station that has connected, so that it is matched for commanding,
+    // and its node commands are sent rather than refused unsent.
+    client.connect(ConfigDigest([0x5A; 16])).expect("connected");
     client
 }
 
@@ -327,7 +326,7 @@ fn a_client_with_no_node_link_refuses_a_node_command() {
 
 #[test]
 fn every_operation_reaches_the_spacecraft_and_comes_back() {
-    let (addr, stub) = stub_spacecraft(10);
+    let (addr, stub) = stub_spacecraft(9);
     let mut client = client_to(&addr);
 
     assert!(client.ping().unwrap().header.status.is_success());
@@ -337,20 +336,19 @@ fn every_operation_reaches_the_spacecraft_and_comes_back() {
     // configuration difference rather than being handed a verdict.
     let version = ConfigVersion::of_this_build();
     let digest = ConfigDigest([0x5A; 16]);
-    assert_eq!(client.connect(version, digest).unwrap(), (version, digest));
+    assert_eq!(client.connect(digest).unwrap(), (version, digest));
     assert_eq!(
-        client.restart_arm(ArmKey(0x1234)).unwrap(),
+        client.restart_arm(ArmKey(0x1234), digest).unwrap(),
         CommandStatus::Success
     );
     assert_eq!(
-        client.restart(ArmKey(0x1234)).unwrap(),
+        client.restart(ArmKey(0x1234), digest).unwrap(),
         CommandStatus::Success
     );
 
     // Nothing but a CONNECT, an arm and a restart may follow a RESTART
     // until a beacon says it is done: the rest are refused here, unsent, so
-    // the stand-in is not asked them. A PING among them, which goes
-    // regardless of the generation but not during the wait.
+    // the stand-in is not asked them. A PING among them.
     let start = |client: &mut tcslib::TcsClient| {
         client.start_node(NodeId::of(2)).map(|(status, _)| status)
     };
@@ -364,13 +362,13 @@ fn every_operation_reaches_the_spacecraft_and_comes_back() {
     // The three that go, none of them ending the wait: the CONNECT is
     // answered by the start the RESTART went to, and the second RESTART
     // says nothing of whether the first was taken.
-    assert_eq!(client.connect(version, digest).unwrap(), (version, digest));
+    assert_eq!(client.connect(digest).unwrap(), (version, digest));
     assert_eq!(
-        client.restart_arm(ArmKey(0x5678)).unwrap(),
+        client.restart_arm(ArmKey(0x5678), digest).unwrap(),
         CommandStatus::Success
     );
     assert_eq!(
-        client.restart(ArmKey(0x5678)).unwrap(),
+        client.restart(ArmKey(0x5678), digest).unwrap(),
         CommandStatus::Success
     );
     assert!(client.restart_wait().is_some());
@@ -380,15 +378,9 @@ fn every_operation_reaches_the_spacecraft_and_comes_back() {
     // By the next start.
     assert!(client.beacon_heard(true), "it ends the wait");
     assert!(client.restart_wait().is_none());
-    // And then a CONNECT, before anything but the three. (Here the
-    // station's match is not fed the beacons, so what refuses the command
-    // is the generation; at a real station the new start's flagged beacons
-    // refuse it first, as not matched.)
-    assert!(matches!(
-        start(&mut client),
-        Err(TcsError::GenerationUnknown(_))
-    ));
-    client.connect(version, digest).unwrap();
+    // Here the station's match is not fed the beacons, so the command
+    // goes; at a real station the new start's flagged beacons end the
+    // match, and nothing but the three goes until a CONNECT is answered.
     assert_eq!(start(&mut client).unwrap(), CommandStatus::Success);
 
     stub.join().expect("the stand-in answered every command");

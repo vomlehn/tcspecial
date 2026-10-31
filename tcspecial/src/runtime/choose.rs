@@ -411,14 +411,16 @@ pub fn choose(path: &Path) -> Result<Chosen, Vec<String>> {
 }
 
 #[cfg(test)]
-mod tests {
+pub(crate) mod tests {
     use super::*;
 
     /// A vehicle on a desk: a command-line configuration naming a state file
-    /// and a store, both in a directory of the test's.
-    struct Desk {
+    /// and a store, both in a directory of the test's. The command
+    /// interpreter's tests use it too, for a vehicle that holds more than
+    /// it runs.
+    pub(crate) struct Desk {
         dir: tempfile::TempDir,
-        command_line: PathBuf,
+        pub(crate) command_line: PathBuf,
     }
 
     impl Desk {
@@ -432,7 +434,7 @@ mod tests {
         /// # Returns
         ///
         /// The desk.
-        fn new(trials: u32) -> Desk {
+        pub(crate) fn new(trials: u32) -> Desk {
             let dir = tempfile::tempdir().expect("a directory");
             std::fs::create_dir(dir.path().join("kept")).expect("a store");
             let command_line = dir.path().join("vehicle.ytcs");
@@ -491,7 +493,7 @@ vehicle:
         /// # Returns
         ///
         /// Its checksum.
-        fn keep(&self, n: u32) -> ConfigDigest {
+        pub(crate) fn keep(&self, n: u32) -> ConfigDigest {
             let path = self.dir.path().join(format!("other{n}.ytcs"));
             std::fs::write(&path, Desk::configuration(&self.dir, n, 3))
                 .expect("written");

@@ -629,6 +629,37 @@ pub(crate) fn a_packet(
     sent: u64,
     rng: &mut impl Rng,
 ) -> Produce {
+    a_packet_from(config, pacing, sent, rng, |rng, size| {
+        (0..size).map(|_| rng.gen()).collect()
+    })
+}
+
+/// Makes the packet this pass should send from bytes `generate` gives, and
+/// does to it whatever the faults ask, as [`a_packet`] does with random
+/// bytes.
+///
+/// `generate` is asked only for a packet that is to go: a dropped packet, or
+/// one from a payload gone quiet, takes nothing from it.
+///
+/// # Arguments
+///
+/// * `config`   - The payload's configuration, which gives its faults and
+///                any thermal mass it reads or heats.
+/// * `pacing`   - What the window has the payload's packet size at.
+/// * `sent`     - How many packets have gone so far.
+/// * `rng`      - Where the random faults come from.
+/// * `generate` - Makes a packet's bytes, given `rng` and the packet size.
+///
+/// # Returns
+///
+/// The bytes to send, or nothing.
+pub(crate) fn a_packet_from<R: Rng>(
+    config: &PayloadConfig,
+    pacing: &Pacing,
+    sent: u64,
+    rng: &mut R,
+    generate: impl FnOnce(&mut R, usize) -> Vec<u8>,
+) -> Produce {
     let faults = &config.faults;
 
     // A heater sends nothing. What it is for is being driven: the vehicle
@@ -664,7 +695,7 @@ pub(crate) fn a_packet(
         Some(crate::thermal::Thermal::Reads { mass, reading }) => {
             crate::thermal::encode(reading, mass.temperature())
         }
-        _ => (0..pacing.packet_size).map(|_| rng.gen()).collect(),
+        _ => generate(rng, pacing.packet_size),
     };
 
     // A packet of one byte is left alone: there is no length that is both

@@ -624,7 +624,7 @@ is taken and a vehicle that can never be restarted.
 out too. ``configurations`` is the directory the vehicle keeps
 configurations in, each under its checksum, and absent is a vehicle that
 keeps none, which is a configuration somebody may mean as a vehicle with no
-log is. ``configurations_kept`` is the fewest that provisioning may leave
+log is. ``configurations_kept`` is the fewest that removing one may leave
 there, two where it says nothing: the one running and one to go back to.
 ``load_trials`` is how many starts of a configuration may end before a
 matching CONNECT before it is given up, three where it says nothing, as
@@ -6304,13 +6304,14 @@ Configurations named by their checksum
    go`_, the frozen layout of the three, and the checksums in RESTART_ARM
    and RESTART.
 
-   Built since (2026-10-31): in `Keeping configurations on board`_, the
-   single-file rule, kept and loaded; configurations kept under their
-   checksum in the directory ``configurations`` names; keeping one already
-   held writing nothing; the checksum computed again at every load and a
-   mismatch refused; and ``configurations_kept`` read and enforced by the
-   store's removal (``tcslibgs::store``), which nothing in flight calls
-   yet. In `Starting, and the restart flag`_, every requirement: the state
+   Built since (2026-10-31): in `Keeping configurations on board`_,
+   configurations kept as trees under their checksum in the directory
+   ``configurations`` names, the checksum taking in the include names;
+   keeping one already held writing nothing; the checksum computed again
+   at every load and a mismatch refused; and ``configurations_kept`` read
+   and enforced by the store's removal (``tcslibgs::store``), which
+   nothing in tcspecial calls: configurations are managed from the
+   ground. In `Starting, and the restart flag`_, every requirement: the state
    file naming the next start's configuration and the confirmed one, a
    matching CONNECT confirming, the order a start loads them in and saying
    which and why, a damaged or missing state file loading the command
@@ -6324,14 +6325,11 @@ Configurations named by their checksum
    first provisioning, by ``tcsverify --keep=<directory>``, which checks it
    first.
 
-   *Not yet built:* uplinking a configuration by CFDP to a staging area,
-   checking it there and keeping it, and the provisioning crate on
-   ``cfdp-rs`` that does it and removes configurations in flight; the
-   read-only directory and the immutable attribute of first provisioning,
-   which are the provisioner's to set -- ``tcsverify --keep`` makes the file
-   it writes 0444 and leaves the directory as it is, so that it can keep
-   more; tcsmoc's pop-ups; and removing what `What this replaces`_ lists as
-   still standing.
+   *Not yet built:* the read-only directory and the immutable attribute of
+   first provisioning, which are the provisioner's to set -- ``tcsverify
+   --keep`` makes the files it writes 0444 and leaves the directory as it
+   is, so that it can keep more; tcsmoc's pop-ups; and removing what `What
+   this replaces`_ lists as still standing.
 
 A configuration is known by its *checksum*: the MD5 ``tcsverify``
 computes of it, the configuration digest (``tcslibgs::config_digest``).
@@ -6381,24 +6379,23 @@ The rules are ``tcslibgs::store``'s, which tcspecial loads through and
 ``tcsverify --keep=<directory>`` keeps through, so the two cannot disagree
 about what a kept configuration is. ``tcsverify --keep`` checks the
 configuration as tcsverify checks any, keeps it only if nothing is wrong
-with it, and is for testing and for first provisioning; uplinking is not
-built.
+with it, and is for testing and for first provisioning.
 
 Requirement
     The vehicle keeps each configuration it holds under its checksum, in
     hex, in the directory the ``tcspecial`` section's ``configurations``
-    attribute names. A configuration is uplinked by CFDP (CCSDS 727.0-B-5),
-    using the ``cfdp-rs`` crate, to a staging area beside that directory,
-    and is checked with ``tcsverify``'s ``verify`` before it is kept. One
-    that fails is not kept, and why is reported. The checksum ``verify``
-    computes is the name it is kept under; a name the ground gives it is
-    not trusted.
+    attribute names. A configuration is checked as ``tcsverify`` checks
+    one before it is kept, and one that fails is not kept, and why is
+    reported. The checksum computed from it is the name it is kept under;
+    a name anybody gives it is not trusted.
 
 Requirement
-    Configuration provisioning -- receiving uplinked configurations,
-    checking them, keeping them and removing them -- is a crate of its own
-    within tcspecial, built on ``cfdp-rs``. tcspecial writes no CFDP of its
-    own.
+    Which configurations the vehicle holds is managed from the ground.
+    Getting a configuration's files onto the vehicle, and asking for one
+    to be kept or removed, is done outside tcspecial: tcspecial transfers
+    no files, and has no CFDP, nor any other file transfer, of its own.
+    What tcspecial does with a kept configuration is load it, at a start
+    or a RESTART, by its checksum.
 
 Requirement
     Keeping a configuration under a checksum already held writes nothing,
@@ -6415,7 +6412,7 @@ Requirement
     Which configurations are kept, and which may never be removed, is the
     operators' policy, not the protocol's. A configuration they mean never
     to lose -- what was called the golden configuration -- is simply one
-    they do not remove. Provisioning in flight enforces the minimum number
+    they do not remove. The store's removal enforces the minimum number
     of configurations to keep, which the ``tcspecial`` section's
     ``configurations_kept`` attribute states, and never removes the
     configuration running or the one a taken RESTART named.
@@ -6672,16 +6669,6 @@ A CONNECT from a station that has not matched
     the flag or opens the downlink, and one whose checksum differs changes
     nothing on the vehicle. A station whose configuration has the same
     checksum reads everything the same, so its CONNECT is as good as any.
-
-The CFDP crate's own faults
-    ``cfdp-rs`` 0.3.0 allocates dynamically in one place, where tcspecial
-    allows no allocation once running, and its receiver panics on a
-    Metadata PDU that carries a message to user. Both are to be fixed, and
-    the fixes offered to its authors, before configurations are uplinked
-    in flight. Until then the provisioning crate sends no message to user,
-    and looks at every Metadata PDU before ``cfdp-rs`` does, dropping one
-    that carries a message to user, since the panic comes as ``cfdp-rs``
-    reads it.
 
 Still open
     The command link carries no authentication: anyone who can reach it
@@ -12167,7 +12154,7 @@ Requirement
     configurations on board`_. It prints where it is kept, or that it was
     kept already, which writes nothing. One of several files is kept with
     each file it includes. It is how a configuration is put on board for
-    testing and at first provisioning, until configurations are uplinked.
+    testing and at first provisioning.
 
 Requirement
     ``--set-interface <configuration>...``, given configurations and

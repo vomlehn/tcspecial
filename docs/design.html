@@ -1152,7 +1152,7 @@ is taken and a vehicle that can never be restarted.</p>
 out too. <tt class="docutils literal">configurations</tt> is the directory the vehicle keeps
 configurations in, each under its checksum, and absent is a vehicle that
 keeps none, which is a configuration somebody may mean as a vehicle with no
-log is. <tt class="docutils literal">configurations_kept</tt> is the fewest that provisioning may leave
+log is. <tt class="docutils literal">configurations_kept</tt> is the fewest that removing one may leave
 there, two where it says nothing: the one running and one to go back to.
 <tt class="docutils literal">load_trials</tt> is how many starts of a configuration may end before a
 matching CONNECT before it is given up, three where it says nothing, as
@@ -6444,13 +6444,14 @@ for as long as it runs, so a node id is never taken from another.</p>
 flag</a>, there being no generation; in <a class="reference internal" href="#the-three-commands-that-always-go">The three commands that always
 go</a>, the frozen layout of the three, and the checksums in RESTART_ARM
 and RESTART.</p>
-<p>Built since (2026-10-31): in <a class="reference internal" href="#keeping-configurations-on-board">Keeping configurations on board</a>, the
-single-file rule, kept and loaded; configurations kept under their
-checksum in the directory <tt class="docutils literal">configurations</tt> names; keeping one already
-held writing nothing; the checksum computed again at every load and a
-mismatch refused; and <tt class="docutils literal">configurations_kept</tt> read and enforced by the
-store's removal (<tt class="docutils literal"><span class="pre">tcslibgs::store</span></tt>), which nothing in flight calls
-yet. In <a class="reference internal" href="#starting-and-the-restart-flag">Starting, and the restart flag</a>, every requirement: the state
+<p>Built since (2026-10-31): in <a class="reference internal" href="#keeping-configurations-on-board">Keeping configurations on board</a>,
+configurations kept as trees under their checksum in the directory
+<tt class="docutils literal">configurations</tt> names, the checksum taking in the include names;
+keeping one already held writing nothing; the checksum computed again
+at every load and a mismatch refused; and <tt class="docutils literal">configurations_kept</tt> read
+and enforced by the store's removal (<tt class="docutils literal"><span class="pre">tcslibgs::store</span></tt>), which
+nothing in tcspecial calls: configurations are managed from the
+ground. In <a class="reference internal" href="#starting-and-the-restart-flag">Starting, and the restart flag</a>, every requirement: the state
 file naming the next start's configuration and the confirmed one, a
 matching CONNECT confirming, the order a start loads them in and saying
 which and why, a damaged or missing state file loading the command
@@ -6463,14 +6464,11 @@ functions a restart calls (<tt class="docutils literal"><span class="pre">choose
 in tcspecial). A configuration is put into the store, for testing and for
 first provisioning, by <tt class="docutils literal">tcsverify <span class="pre">--keep=&lt;directory&gt;</span></tt>, which checks it
 first.</p>
-<p class="last"><em>Not yet built:</em> uplinking a configuration by CFDP to a staging area,
-checking it there and keeping it, and the provisioning crate on
-<tt class="docutils literal"><span class="pre">cfdp-rs</span></tt> that does it and removes configurations in flight; the
-read-only directory and the immutable attribute of first provisioning,
-which are the provisioner's to set -- <tt class="docutils literal">tcsverify <span class="pre">--keep</span></tt> makes the file
-it writes 0444 and leaves the directory as it is, so that it can keep
-more; tcsmoc's pop-ups; and removing what <a class="reference internal" href="#what-this-replaces">What this replaces</a> lists as
-still standing.</p>
+<p class="last"><em>Not yet built:</em> the read-only directory and the immutable attribute of
+first provisioning, which are the provisioner's to set -- <tt class="docutils literal">tcsverify
+<span class="pre">--keep</span></tt> makes the files it writes 0444 and leaves the directory as it
+is, so that it can keep more; tcsmoc's pop-ups; and removing what <a class="reference internal" href="#what-this-replaces">What
+this replaces</a> lists as still standing.</p>
 </div>
 <p>A configuration is known by its <em>checksum</em>: the MD5 <tt class="docutils literal">tcsverify</tt>
 computes of it, the configuration digest (<tt class="docutils literal"><span class="pre">tcslibgs::config_digest</span></tt>).
@@ -6517,23 +6515,22 @@ The rules are <tt class="docutils literal"><span class="pre">tcslibgs::store</sp
 <tt class="docutils literal">tcsverify <span class="pre">--keep=&lt;directory&gt;</span></tt> keeps through, so the two cannot disagree
 about what a kept configuration is. <tt class="docutils literal">tcsverify <span class="pre">--keep</span></tt> checks the
 configuration as tcsverify checks any, keeps it only if nothing is wrong
-with it, and is for testing and for first provisioning; uplinking is not
-built.</p>
+with it, and is for testing and for first provisioning.</p>
 <dl class="docutils">
 <dt>Requirement</dt>
 <dd>The vehicle keeps each configuration it holds under its checksum, in
 hex, in the directory the <tt class="docutils literal">tcspecial</tt> section's <tt class="docutils literal">configurations</tt>
-attribute names. A configuration is uplinked by CFDP (CCSDS 727.0-B-5),
-using the <tt class="docutils literal"><span class="pre">cfdp-rs</span></tt> crate, to a staging area beside that directory,
-and is checked with <tt class="docutils literal">tcsverify</tt>'s <tt class="docutils literal">verify</tt> before it is kept. One
-that fails is not kept, and why is reported. The checksum <tt class="docutils literal">verify</tt>
-computes is the name it is kept under; a name the ground gives it is
-not trusted.</dd>
+attribute names. A configuration is checked as <tt class="docutils literal">tcsverify</tt> checks
+one before it is kept, and one that fails is not kept, and why is
+reported. The checksum computed from it is the name it is kept under;
+a name anybody gives it is not trusted.</dd>
 <dt>Requirement</dt>
-<dd>Configuration provisioning -- receiving uplinked configurations,
-checking them, keeping them and removing them -- is a crate of its own
-within tcspecial, built on <tt class="docutils literal"><span class="pre">cfdp-rs</span></tt>. tcspecial writes no CFDP of its
-own.</dd>
+<dd>Which configurations the vehicle holds is managed from the ground.
+Getting a configuration's files onto the vehicle, and asking for one
+to be kept or removed, is done outside tcspecial: tcspecial transfers
+no files, and has no CFDP, nor any other file transfer, of its own.
+What tcspecial does with a kept configuration is load it, at a start
+or a RESTART, by its checksum.</dd>
 <dt>Requirement</dt>
 <dd>Keeping a configuration under a checksum already held writes nothing,
 since the configuration held already means the same, and is answered
@@ -6547,7 +6544,7 @@ that does not match its name, and is refused rather than flown.</dd>
 <dd>Which configurations are kept, and which may never be removed, is the
 operators' policy, not the protocol's. A configuration they mean never
 to lose -- what was called the golden configuration -- is simply one
-they do not remove. Provisioning in flight enforces the minimum number
+they do not remove. The store's removal enforces the minimum number
 of configurations to keep, which the <tt class="docutils literal">tcspecial</tt> section's
 <tt class="docutils literal">configurations_kept</tt> attribute states, and never removes the
 configuration running or the one a taken RESTART named.</dd>
@@ -6780,15 +6777,6 @@ too: nothing changes it while tcspecial runs.</dd>
 the flag or opens the downlink, and one whose checksum differs changes
 nothing on the vehicle. A station whose configuration has the same
 checksum reads everything the same, so its CONNECT is as good as any.</dd>
-<dt>The CFDP crate's own faults</dt>
-<dd><tt class="docutils literal"><span class="pre">cfdp-rs</span></tt> 0.3.0 allocates dynamically in one place, where tcspecial
-allows no allocation once running, and its receiver panics on a
-Metadata PDU that carries a message to user. Both are to be fixed, and
-the fixes offered to its authors, before configurations are uplinked
-in flight. Until then the provisioning crate sends no message to user,
-and looks at every Metadata PDU before <tt class="docutils literal"><span class="pre">cfdp-rs</span></tt> does, dropping one
-that carries a message to user, since the panic comes as <tt class="docutils literal"><span class="pre">cfdp-rs</span></tt>
-reads it.</dd>
 <dt>Still open</dt>
 <dd>The command link carries no authentication: anyone who can reach it
 can connect, arm a restart and restart the vehicle into any
@@ -12222,7 +12210,7 @@ vehicle keeps a configuration a RESTART may name: see <a class="reference intern
 configurations on board</a>. It prints where it is kept, or that it was
 kept already, which writes nothing. One of several files is kept with
 each file it includes. It is how a configuration is put on board for
-testing and at first provisioning, until configurations are uplinked.</dd>
+testing and at first provisioning.</dd>
 <dt>Requirement</dt>
 <dd><tt class="docutils literal"><span class="pre">--set-interface</span> <span class="pre">&lt;configuration&gt;...</span></tt>, given configurations and
 nothing else, writes this build's interface digest into each as its

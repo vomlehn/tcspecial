@@ -23,10 +23,22 @@
 //! check of its own: the transport under it checks it, as UDP's checksum
 //! does here.
 //!
-//! Stated here and in `python/tcslibgs/beacon.py`, which are held to each
-//! other by the same examples in their tests.
+//! Its layout -- six text fields, each but the last ended by a colon, the
+//! last 32 characters that end the datagram -- is stated in XTCE in
+//! `xtce/fixed.xml`, beside the three fixed commands, and packed and
+//! unpacked by the code tcs-xtce generates from it, which allocates
+//! nothing. What the text must say -- the name, digits only, lower-case hex
+//! -- and turning it into numbers and digests and back, is here, and in
+//! `python/tcslibgs/beacon.py` over the Python tcs-xtce generates from the
+//! same document; the two are held to each other by the same examples in
+//! their tests.
 
 use std::fmt;
+use std::fmt::Write as _;
+
+use tcs_xtce::packet::{Codec, FixedString, Packet, PacketError};
+
+use crate::fixed_packet as fixed;
 
 use crate::config_digest::{ConfigDigest, ConfigVersion};
 use crate::interface::InterfaceDigest;
@@ -145,35 +157,39 @@ impl Beacon {
         if datagram.len() > BEACON_BYTES {
             return Err(BeaconError::Length(datagram.len()));
         }
-        let text = std::str::from_utf8(datagram)
-            .map_err(|_| BeaconError::Field("it is not text"))?;
-        let mut fields = text.split(':');
-        let mut next = |what| fields.next().ok_or(BeaconError::Field(what));
+        if datagram.is_empty() {
+            return Err(BeaconError::Field("it is empty"));
+        }
+        if std::str::from_utf8(datagram).is_err() {
+            return Err(BeaconError::Field("it is not text"));
+        }
+        let (fields, used) = fixed::Beacon::decode_prefix(datagram)
+            .map_err(|why| BeaconError::Field(missing(&why)))?;
+        if used != datagram.len() {
+            return Err(BeaconError::Field("it has more than six fields"));
+        }
 
-        if next("it is empty")? != BEACON_NAME {
+        if fields.beacon_name.as_str() != BEACON_NAME {
             return Err(BeaconError::Field("it does not start \"tcspecial:\""));
         }
-        let version = version_of(next("it has no version")?)
+        let version = version_of(&fields.beacon_version)
             .ok_or(BeaconError::Field("the version is not three numbers"))?;
-        let digest = hex_of(next("it has no configuration digest")?).ok_or(
+        let digest = hex_of(&fields.beacon_digest).ok_or(
             BeaconError::Field("the configuration digest is not 32 hex digits"),
         )?;
-        let sequence = decimal_of(next("it has no number")?)
+        let sequence = decimal_of(&fields.beacon_number)
             .ok_or(BeaconError::Field("the number is not a number"))?;
         let restart_flag =
-            match next("it has no restart flag")? {
+            match fields.beacon_flag.as_str() {
                 RESTART_FLAG => true,
                 NORMAL_FLAG => false,
                 _ => return Err(BeaconError::Field(
                     "the restart flag is neither \"restart\" nor \"normal\"",
                 )),
             };
-        let interface = hex_of(next("it has no interface digest")?).ok_or(
+        let interface = hex_of(&fields.beacon_interface).ok_or(
             BeaconError::Field("the interface digest is not 32 hex digits"),
         )?;
-        if fields.next().is_some() {
-            return Err(BeaconError::Field("it has more than six fields"));
-        }
         Ok(Beacon {
             sequence,
             version,
@@ -190,6 +206,43 @@ impl Beacon {
     /// nothing after it is made.
     pub fn to_bytes(&self) -> Vec<u8> {
         BeaconPacker::new().pack(self).to_vec()
+    }
+}
+
+/// Says what a beacon that the generated code could not read is missing,
+/// in the words a beacon's refusal uses: a field that does not end in its
+/// colon, or runs past its room, is the next field missing or the field
+/// itself out of its form.
+///
+/// # Arguments
+///
+/// * `why` - What the generated code refused, naming the field.
+///
+/// # Returns
+///
+/// The first thing wrong, as [`BeaconError::Field`] says it.
+fn missing(why: &PacketError) -> &'static str {
+    let (field, too_long) = match why {
+        PacketError::TooLong { field } => (*field, true),
+        PacketError::Truncated { field } => (*field, false),
+        PacketError::InvalidString { .. } => return "it is not text",
+        _ => ("", false),
+    };
+    match (field, too_long) {
+        ("BeaconName", _) => "it does not start \"tcspecial:\"",
+        ("BeaconVersion", true) => "the version is not three numbers",
+        ("BeaconVersion", false) => "it has no configuration digest",
+        ("BeaconDigest", true) => {
+            "the configuration digest is not 32 hex digits"
+        }
+        ("BeaconDigest", false) => "it has no number",
+        ("BeaconNumber", true) => "the number is not a number",
+        ("BeaconNumber", false) => "it has no restart flag",
+        ("BeaconFlag", true) => {
+            "the restart flag is neither \"restart\" nor \"normal\""
+        }
+        ("BeaconFlag", false) => "it has no interface digest",
+        _ => "the interface digest is not 32 hex digits",
     }
 }
 
@@ -263,22 +316,23 @@ fn hex_of(text: &str) -> Option<[u8; 16]> {
 
 /// Packs beacons into a buffer it keeps, for a loop that sends them.
 ///
-/// The buffer is made here, once, as long as the longest beacon, and every
-/// beacon is written into it in place.
-#[derive(Debug, Clone)]
+/// The buffer is the generated codec's, made here, once, as long as the
+/// longest beacon, and every beacon is written into it in place: each field
+/// is formatted into the room the generated packet holds for it, and
+/// neither allocates.
 pub struct BeaconPacker {
-    buffer: [u8; BEACON_BYTES],
+    codec: Codec,
 }
 
 impl BeaconPacker {
-    /// Makes a packer, with its buffer and packet, ready to pack beacons.
+    /// Makes a packer, with its buffer, ready to pack beacons.
     ///
     /// # Returns
     ///
     /// The packer.
     pub fn new() -> Self {
         Self {
-            buffer: [0u8; BEACON_BYTES],
+            codec: Codec::for_packet::<fixed::Beacon>(),
         }
     }
 
@@ -292,52 +346,35 @@ impl BeaconPacker {
     ///
     /// The beacon's text, in the packer's buffer, good until the next call.
     pub fn pack(&mut self, beacon: &Beacon) -> &[u8] {
-        let mut out = Cursor {
-            buffer: &mut self.buffer,
-            at: 0,
+        // Every field fits: each has the room of the longest it can say, so
+        // none of the writes can fail, and `fmt` into a fixed string
+        // allocates nothing.
+        fn text<const N: usize>(said: impl fmt::Display) -> FixedString<N> {
+            let mut out = FixedString::new();
+            let _ = write!(out, "{said}");
+            out
+        }
+        let packet = fixed::Beacon {
+            beacon_name: text(BEACON_NAME),
+            beacon_version: text(beacon.version),
+            beacon_digest: text(beacon.digest),
+            beacon_number: text(beacon.sequence),
+            beacon_flag: text(if beacon.restart_flag {
+                RESTART_FLAG
+            } else {
+                NORMAL_FLAG
+            }),
+            beacon_interface: text(beacon.interface),
         };
-        // Every field fits: the buffer is as long as the longest beacon, so
-        // the write cannot fail, and `fmt` into a fixed buffer allocates
-        // nothing.
-        let _ = fmt::write(
-            &mut out,
-            format_args!(
-                "{BEACON_NAME}:{}:{}:{}:{}:{}",
-                beacon.version,
-                beacon.digest,
-                beacon.sequence,
-                if beacon.restart_flag {
-                    RESTART_FLAG
-                } else {
-                    NORMAL_FLAG
-                },
-                beacon.interface
-            ),
-        );
-        let at = out.at;
-        &self.buffer[..at]
+        self.codec
+            .encode(&packet)
+            .expect("every beacon fits its layout")
     }
 }
 
 impl Default for BeaconPacker {
     fn default() -> Self {
         Self::new()
-    }
-}
-
-/// A place in a fixed buffer that `fmt` writes into.
-struct Cursor<'a> {
-    buffer: &'a mut [u8],
-    at: usize,
-}
-
-impl fmt::Write for Cursor<'_> {
-    fn write_str(&mut self, s: &str) -> fmt::Result {
-        let end = self.at + s.len();
-        let room = self.buffer.get_mut(self.at..end).ok_or(fmt::Error)?;
-        room.copy_from_slice(s.as_bytes());
-        self.at = end;
-        Ok(())
     }
 }
 
@@ -425,6 +462,60 @@ mod tests {
         let packed = longest.to_bytes();
         assert_eq!(packed.len(), BEACON_BYTES);
         assert_eq!(Beacon::read(&packed), Ok(longest));
+        assert_eq!(
+            BEACON_BYTES,
+            <fixed::Beacon as Packet>::MAX_BYTES,
+            "the XTCE's longest beacon is the one this says"
+        );
+    }
+
+    /// The beacon the generated code packs is byte for byte the one the
+    /// hand-written packer that came before it wrote, for the same beacons:
+    /// these are what it wrote.
+    #[test]
+    fn the_beacon_is_what_the_hand_written_packer_wrote() {
+        let interface = InterfaceDigest([0xab; 16]);
+        for (beacon, written) in [
+            (
+                Beacon::new(0x01020304, version(), digest()).restart_flag(true),
+                "tcspecial:1.2.3:d41d8cd98f00b204e9800998ecf8427e:16909060:\
+                 restart:abababababababababababababababab",
+            ),
+            (
+                Beacon::new(
+                    1,
+                    ConfigVersion::of_text("0.1.0").unwrap(),
+                    digest(),
+                ),
+                "tcspecial:0.1.0:d41d8cd98f00b204e9800998ecf8427e:1:normal:\
+                 abababababababababababababababab",
+            ),
+            (
+                Beacon::new(
+                    u32::MAX,
+                    ConfigVersion {
+                        major: 255,
+                        minor: 255,
+                        patch: 255,
+                    },
+                    ConfigDigest([0; 16]),
+                )
+                .restart_flag(true),
+                "tcspecial:255.255.255:00000000000000000000000000000000:\
+                 4294967295:restart:abababababababababababababababab",
+            ),
+        ] {
+            let beacon = Beacon {
+                interface,
+                ..beacon
+            };
+            assert_eq!(
+                String::from_utf8(beacon.to_bytes()).unwrap(),
+                written,
+                "{beacon:?}"
+            );
+            assert_eq!(Beacon::read(written.as_bytes()), Ok(beacon));
+        }
     }
 
     #[test]

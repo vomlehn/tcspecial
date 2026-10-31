@@ -49,18 +49,6 @@ impl Drop for Running {
     fn drop(&mut self) {
         // SAFETY: a signal to a child this test started.
         unsafe { libc::kill(self.0.id() as libc::pid_t, libc::SIGTERM) };
-        // Killed outright if it has not stopped in five seconds: a SIGTERM
-        // that arrives while a restart is between taking a RESTART and its
-        // exec is lost with the image that caught it, and a test that failed
-        // there would otherwise wait for ever.
-        let by = Instant::now() + Duration::from_secs(5);
-        while Instant::now() < by {
-            if matches!(self.0.try_wait(), Ok(Some(_))) {
-                return;
-            }
-            std::thread::sleep(Duration::from_millis(50));
-        }
-        let _ = self.0.kill();
         let _ = self.0.wait();
     }
 }
@@ -571,4 +559,103 @@ fn a_restart_runs_the_configuration_it_names() {
         "{said}"
     );
     assert!(said.contains(&format!("confirmed {theirs}\n")), "{said}");
+}
+
+/// A SIGTERM that arrives after a RESTART is taken and before the process
+/// runs itself again stops the vehicle rather than being lost: the process
+/// ends, with success, and no start comes back. The state file names the
+/// RESTART's target for the next start, as a commanded one.
+#[test]
+fn a_stop_during_a_restart_stops_the_vehicle() {
+    let dir = tempfile::tempdir().expect("a directory");
+    let beacons = socket();
+    let commands = socket();
+    let commands_at = commands.local_addr().expect("where").port();
+    let beacons_at = beacons.local_addr().expect("where").port();
+    let take_at = free();
+    let kept = dir.path().join("kept");
+    std::fs::create_dir(&kept).expect("a store");
+    let state = dir.path().join("tcspecial.state");
+    let configuration = dir.path().join("vehicle.yaml");
+    written(
+        &configuration,
+        &state,
+        &kept,
+        take_at,
+        commands_at,
+        beacons_at,
+        "20 min",
+    );
+    let ours = common::checksum_of(&configuration);
+
+    let mut vehicle = Command::new(env!("CARGO_BIN_EXE_tcspecial"))
+        .arg(&configuration)
+        .arg("--quiet")
+        .arg("--simulate=all")
+        .env_remove("RUST_LOG")
+        .stdout(Stdio::null())
+        .stderr(Stdio::null())
+        .spawn()
+        .expect("tcspecial runs");
+    let pid = vehicle.id() as libc::pid_t;
+    let first = beacon(&beacons);
+    assert_eq!(first.digest, ours);
+
+    let key = ArmKey(0x5eed);
+    assert_eq!(
+        ask(
+            &commands,
+            take_at,
+            &tcslibgs::Command::RestartArm(RestartArmCommand::new(
+                1, key, ours
+            ))
+        ),
+        CommandStatus::Success
+    );
+    assert_eq!(
+        ask(
+            &commands,
+            take_at,
+            &tcslibgs::Command::Restart(RestartCommand::new(2, key, ours))
+        ),
+        CommandStatus::Success
+    );
+    // At once, as the restart is under way: the answer goes before the
+    // vehicle stops to run itself again.
+    // SAFETY: a signal to a child this test started.
+    unsafe { libc::kill(pid, libc::SIGTERM) };
+
+    let by = Instant::now() + Duration::from_secs(10);
+    let status = loop {
+        if let Some(status) = vehicle.try_wait().expect("it can be asked") {
+            break Some(status);
+        }
+        if Instant::now() > by {
+            break None;
+        }
+        std::thread::sleep(Duration::from_millis(20));
+    };
+    let Some(status) = status else {
+        let _ = vehicle.kill();
+        let _ = vehicle.wait();
+        panic!("the stop was lost: tcspecial restarted rather than stopping");
+    };
+    assert!(status.success(), "it stopped as a stop stops it: {status}");
+
+    // No start came back: nothing beacons after it has gone.
+    beacons
+        .set_read_timeout(Some(Duration::from_millis(500)))
+        .expect("a timeout");
+    let mut buffer = [0u8; 256];
+    while let Ok((size, _)) = beacons.recv_from(&mut buffer) {
+        let heard = Beacon::read(&buffer[..size]).expect("a beacon");
+        assert!(
+            heard.sequence > first.sequence,
+            "a start came back: beacon #{}",
+            heard.sequence
+        );
+    }
+    let said = std::fs::read_to_string(&state).expect("the state file");
+    assert!(said.contains(&format!("next {ours}\ntrials 0\n")), "{said}");
+    assert!(said.contains("next_start commanded"), "{said}");
 }

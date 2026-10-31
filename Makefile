@@ -155,6 +155,8 @@ help:
 		"the same thing"
 	@echo "  make comparespellings - Do that for every shipped" \
 		"configuration"
+	@echo "  make set-interfaces - Write this build's interface digest into" \
+		"every shipped configuration"
 	@echo "  make verify      - Check one version 2 configuration"
 	@echo "  make mkvcan      - Make the virtual CAN bus a CAN payload" \
 		"needs"
@@ -369,6 +371,23 @@ SPELLINGS = \
 	examples/simple-app/simple-app:examples/simple-app/simple-app-sim.yaml \
 	examples/beacon/beacon:examples/beacon/beacon-sim.yaml \
 	example:example-sim.yaml
+
+# Every shipped configuration, both spellings: the examples, the thermostat
+# fixture and the top-level example, but not the simulator files, which
+# name no interface.
+SHIPPED_CONFIGURATIONS = example.yaml example.xml \
+	tests/manual/thermostat.yaml tests/manual/thermostat.xml \
+	$(filter-out %-sim.yaml,$(wildcard examples/*/*.yaml)) \
+	$(wildcard examples/*/*.xml)
+
+# Write this build's interface digest into every shipped configuration, in
+# place and changing nothing else, after tcslibgs/xtce/link.xml changes:
+# tcsverify --set-interface, which says what it changed. A test in
+# tcsverify/tests/examples.rs fails while one is stale.
+.PHONY: set-interfaces
+set-interfaces:
+	cd $(RUST) && cargo run -q --bin tcsverify -- --set-interface \
+		$(SHIPPED_CONFIGURATIONS)
 
 # Compare the two spellings of every one of them.
 #

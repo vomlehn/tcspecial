@@ -39,10 +39,11 @@ the editor is the one the vehicle would have refused the file with.
   if it does.
 - `beacon`: the beacon, a line of text with six fields between colons,
   `tcspecial:1.2.3:<md5>:42:normal:<interface>`, at most 106 bytes, so that
-  a person can read it in a capture or a log with no decoder. It is written
-  and read by hand, here and in `../python/tcslibgs/beacon.py`, and the two
-  are held to each other by the same examples in their tests; it has no
-  XTCE.
+  a person can read it in a capture or a log with no decoder. Its layout is
+  in `xtce/fixed.xml` beside the fixed commands, as text fields, packed and
+  unpacked by the generated code; what each field says is checked here and
+  in `../python/tcslibgs/beacon.py`, held to each other by the same examples
+  in their tests.
 - `interface`: the digest of `xtce/link.xml`, which every beacon carries,
   and which every configuration names as its `tcspecial` section's
   `interface`, so that a configuration written for another interface is

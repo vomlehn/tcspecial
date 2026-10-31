@@ -2467,7 +2467,10 @@ digest, also as 32 hex digits:</p>
 tcspecial:0.1.0:36999e46a4bf436854442d8f97a2248d:42:normal:0123...cdef
 </pre>
 <p>It is text so that it can be read as it is, in a packet capture, a log or
-with any UDP listener, with nothing to decode it. That is what goes on the
+with any UDP listener, with nothing to decode it. Its layout is stated in
+XTCE, in <tt class="docutils literal">tcslibgs/xtce/fixed.xml</tt> beside the three commands that always
+go, as six text fields -- each but the last ended by its colon -- and
+nothing else, so a ground system that reads XTCE can read it too. That is what goes on the
 wire; what the window shows on its <tt class="docutils literal">Last msg:</tt> line is written for the
 window, as <tt class="docutils literal">tcspecial v0.1.0 md5</tt> and the digest. tcspecial writes each
 beacon, and <tt class="docutils literal"><span class="pre">tcslib::beacon</span></tt> reads it, with <tt class="docutils literal"><span class="pre">tcslibgs::Beacon</span></tt>, which
@@ -3585,7 +3588,19 @@ $ tcsverify --interface-digest
 ad9aac4dd5a6d88dd5e78824ba8a83ac
 </pre>
 <p>The same digest is the last field of every beacon that build's tcspecial
-sends, so a person with only a packet capture can read it there too. The
+sends, so a person with only a packet capture can read it there too.</p>
+<p>To write it into a configuration, rather than copy it by hand, give the
+configuration to the build that is to fly it:</p>
+<pre class="code text literal-block">
+$ tcsverify --set-interface vehicle.yaml vehicle.xml
+vehicle.yaml: interface set to ad9aac4dd5a6d88dd5e78824ba8a83ac, from 0123...
+vehicle.xml: interface is ad9aac4dd5a6d88dd5e78824ba8a83ac already
+</pre>
+<p>It changes that one value -- or adds the attribute where the section has
+none -- and leaves every other byte of the file as it was, comments and
+layout included; a file that is right already is not written. After a
+change to <tt class="docutils literal">tcslibgs/xtce/link.xml</tt>, <tt class="docutils literal">make <span class="pre">set-interfaces</span></tt> does it to
+every configuration shipped in the tree. The
 configuration's checksum covers <tt class="docutils literal">interface</tt>, so a vehicle and a ground
 station whose checksums match are reading the same interface as well.</p>
 </div>
@@ -4165,11 +4180,24 @@ So after an outage, or a restart, press <tt class="docutils literal">Connect</tt
 sent, then what came back -- <tt class="docutils literal">PING OK at 14:22:31</tt>, the time the
 spacecraft made the answer, which every response carries -- and if nothing
 came back within the client's timeout it says when it stopped waiting.</dd>
+<dt>Restart target</dt>
+<dd>The row under <tt class="docutils literal">Command</tt> says which configuration <tt class="docutils literal">ARM Restart</tt> and
+<tt class="docutils literal">Initiate restart</tt> restart onto. Left empty, it is the configuration
+this tcsmoc read: a plain restart, onto what the vehicle is running. Type
+a configuration file's path to restart onto that configuration: tcsmoc
+checks it with tcsverify's checks, refuses it with the problems found if
+any, and otherwise takes its checksum. Or type the checksum itself, as 32
+lower-case hex digits, for a configuration the vehicle holds that is not
+on this desk. Beside the field is what it comes to -- the checksum, and
+the file where there is one -- before anything is sent, and each answer
+says it again.</dd>
 <dt>ARM Restart</dt>
-<dd>Arms a restart onto the configuration this tcsmoc read, whose checksum
-it carries: a plain restart, onto what the vehicle is running. A vehicle
-that does not hold the configuration an arm names refuses it
-<tt class="docutils literal">NotFound</tt> and arms nothing. An arm lasts 20
+<dd>Arms a restart onto the restart target, whose checksum it carries. A
+vehicle that does not hold the configuration an arm names refuses it
+<tt class="docutils literal">NotFound</tt> and arms nothing. <tt class="docutils literal">Initiate restart</tt> goes onto the target
+the arm was given: change the target after arming, and it is refused
+unsent until <tt class="docutils literal">ARM Restart</tt> is pressed again for the new one. An arm
+lasts 20
 minutes from when the vehicle takes it unless the <tt class="docutils literal">tcspecial</tt> section's
 <tt class="docutils literal">restart_arm_valid</tt> says otherwise, as a length of time --
 <tt class="docutils literal">restart_arm_valid: &quot;45 min&quot;</tt> -- and a restart after that is refused until
@@ -4183,7 +4211,10 @@ key and the same configuration's checksum within the time an arm lasts
 does. The arm is used up by it; a restart with the wrong key or another
 checksum is refused and leaves the arm standing, and one naming a
 configuration the vehicle can no longer load is refused <tt class="docutils literal">NotFound</tt> and
-restarts nothing. tcspecial
+restarts nothing. After a restart onto another configuration than this
+tcsmoc's, <tt class="docutils literal">Last Response</tt> says which checksum the vehicle will run, and
+that tcsmoc must be run with that configuration to <tt class="docutils literal">Connect</tt> to it:
+this tcsmoc does not load another configuration itself. tcspecial
 answers, stops as it does when it is told to -- the pass finished, the
 links closed, the log flushed -- and runs itself again in the same process,
 loading the configuration the restart named: see <a class="reference internal" href="#configurations-kept-on-board">Configurations kept on

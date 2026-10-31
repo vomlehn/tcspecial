@@ -55,6 +55,42 @@ fn sim_for(config: &Path) -> PathBuf {
     config.with_file_name(format!("{stem}{SIM_SUFFIX}"))
 }
 
+/// Every shipped configuration names this build's interface: a change to
+/// `tcslibgs/xtce/link.xml` that left one behind fails here, saying the one
+/// command that brings them all up to date.
+#[test]
+fn every_shipped_configuration_names_this_builds_interface() {
+    let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("..");
+    let mut files: Vec<PathBuf> = example_files("yaml")
+        .into_iter()
+        .chain(example_files("xml"))
+        .filter(|path| !is_sim(path))
+        .collect();
+    for top in ["example.yaml", "example.xml"] {
+        files.push(root.join(top));
+    }
+    files.extend(entries(&root.join("tests/manual")).filter(|path| {
+        path.extension().is_some_and(|e| e == "yaml" || e == "xml")
+    }));
+    let ours = tcslibgs::InterfaceDigest::of_this_build().to_string();
+    let mut stale = Vec::new();
+    for path in &files {
+        let text = std::fs::read_to_string(path).expect("it reads");
+        let xml = path.extension().is_some_and(|e| e == "xml");
+        let (_, set) = tcsverify::set_interface::set_in_text(&text, xml, &ours)
+            .unwrap_or_else(|why| panic!("{}: {why}", path.display()));
+        if set != tcsverify::set_interface::Set::Already {
+            stale.push(path.display().to_string());
+        }
+    }
+    assert!(files.len() >= 18, "{files:?}");
+    assert!(
+        stale.is_empty(),
+        "these do not name this build's interface, {ours}: run `make \
+         set-interfaces` (tcsverify --set-interface) and commit them: {stale:?}"
+    );
+}
+
 /// Every example is a pair, and nothing is found wrong or unfinished in
 /// either file. Warnings count: an example is something to copy, and one
 /// that is not finished teaches somebody to leave theirs unfinished.

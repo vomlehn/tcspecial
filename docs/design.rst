@@ -5909,7 +5909,13 @@ is what ``tcsverify --interface-digest`` prints: the digest of the
 ``link.xml`` that build was made from, which is also the last field of every
 beacon it sends. A change to ``link.xml`` is a new interface, after which
 ``make interface-digest`` in ``tcslibgs/`` is run and every configuration
-given the new digest; a build refuses the old ones until it is.
+given the new digest; a build refuses the old ones until it is. ``tcsverify
+--set-interface <configuration>...`` gives a configuration its build's
+digest in place, rewriting that one value -- or adding the attribute where
+the section has none -- and every other byte of the file as it was, in YAML
+and XML alike; ``make set-interfaces`` does it to every shipped
+configuration, and a test in ``tcsverify/tests/examples.rs`` fails while
+one of them is stale.
 
 Requirement
     The fixed commands are not in that XTCE: they are in a document of their
@@ -12117,6 +12123,15 @@ Requirement
     kept already, which writes nothing. One that includes another file is
     refused. It is how a configuration is put on board for testing and at
     first provisioning, until configurations are uplinked.
+
+Requirement
+    ``--set-interface <configuration>...``, given configurations and
+    nothing else, writes this build's interface digest into each as its
+    ``tcspecial`` section's ``interface``, in place, leaving every other
+    byte as it was -- comments, order, layout and quoting -- and says for
+    each what it changed. One that names it already is not written. The
+    file written is read back, and must name this build's interface,
+    before it replaces the old one.
 
 Requirement
     ``--interface-digest``, given alone, prints the digest of the interface

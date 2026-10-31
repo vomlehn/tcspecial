@@ -6067,7 +6067,13 @@ is what <tt class="docutils literal">tcsverify <span class="pre">--interface-dig
 <tt class="docutils literal">link.xml</tt> that build was made from, which is also the last field of every
 beacon it sends. A change to <tt class="docutils literal">link.xml</tt> is a new interface, after which
 <tt class="docutils literal">make <span class="pre">interface-digest</span></tt> in <tt class="docutils literal">tcslibgs/</tt> is run and every configuration
-given the new digest; a build refuses the old ones until it is.</p>
+given the new digest; a build refuses the old ones until it is. <tt class="docutils literal">tcsverify
+<span class="pre">--set-interface</span> <span class="pre">&lt;configuration&gt;...</span></tt> gives a configuration its build's
+digest in place, rewriting that one value -- or adding the attribute where
+the section has none -- and every other byte of the file as it was, in YAML
+and XML alike; <tt class="docutils literal">make <span class="pre">set-interfaces</span></tt> does it to every shipped
+configuration, and a test in <tt class="docutils literal">tcsverify/tests/examples.rs</tt> fails while
+one of them is stale.</p>
 <dl class="docutils">
 <dt>Requirement</dt>
 <dd>The fixed commands are not in that XTCE: they are in a document of their
@@ -12174,6 +12180,14 @@ configurations on board</a>. It prints where it is kept, or that it was
 kept already, which writes nothing. One that includes another file is
 refused. It is how a configuration is put on board for testing and at
 first provisioning, until configurations are uplinked.</dd>
+<dt>Requirement</dt>
+<dd><tt class="docutils literal"><span class="pre">--set-interface</span> <span class="pre">&lt;configuration&gt;...</span></tt>, given configurations and
+nothing else, writes this build's interface digest into each as its
+<tt class="docutils literal">tcspecial</tt> section's <tt class="docutils literal">interface</tt>, in place, leaving every other
+byte as it was -- comments, order, layout and quoting -- and says for
+each what it changed. One that names it already is not written. The
+file written is read back, and must name this build's interface,
+before it replaces the old one.</dd>
 <dt>Requirement</dt>
 <dd><tt class="docutils literal"><span class="pre">--interface-digest</span></tt>, given alone, prints the digest of the interface
 this build speaks and nothing else: the 32 lower-case hex digits a

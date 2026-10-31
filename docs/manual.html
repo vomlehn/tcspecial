@@ -3585,7 +3585,19 @@ $ tcsverify --interface-digest
 ad9aac4dd5a6d88dd5e78824ba8a83ac
 </pre>
 <p>The same digest is the last field of every beacon that build's tcspecial
-sends, so a person with only a packet capture can read it there too. The
+sends, so a person with only a packet capture can read it there too.</p>
+<p>To write it into a configuration, rather than copy it by hand, give the
+configuration to the build that is to fly it:</p>
+<pre class="code text literal-block">
+$ tcsverify --set-interface vehicle.yaml vehicle.xml
+vehicle.yaml: interface set to ad9aac4dd5a6d88dd5e78824ba8a83ac, from 0123...
+vehicle.xml: interface is ad9aac4dd5a6d88dd5e78824ba8a83ac already
+</pre>
+<p>It changes that one value -- or adds the attribute where the section has
+none -- and leaves every other byte of the file as it was, comments and
+layout included; a file that is right already is not written. After a
+change to <tt class="docutils literal">tcslibgs/xtce/link.xml</tt>, <tt class="docutils literal">make <span class="pre">set-interfaces</span></tt> does it to
+every configuration shipped in the tree. The
 configuration's checksum covers <tt class="docutils literal">interface</tt>, so a vehicle and a ground
 station whose checksums match are reading the same interface as well.</p>
 </div>

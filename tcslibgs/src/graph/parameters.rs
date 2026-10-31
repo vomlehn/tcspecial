@@ -924,6 +924,21 @@ mod tests {
 
     /// Settles a section on the bus with some attributes changed: those
     /// given an empty value are taken out.
+    ///
+    /// # Arguments
+    ///
+    /// * `change` - Attributes by flat name, each with the value it is given
+    ///              in place of [`on_the_bus`]'s, or an empty value to take
+    ///              it out; a name not there is added.
+    ///
+    /// # Returns
+    ///
+    /// The section, settled as the command interpreter takes it.
+    ///
+    /// # Errors
+    ///
+    /// What reading or settling the section says is wrong with it, as a
+    /// configuration's check would say it.
     fn bus_with(
         change: &[(&'static str, &'static str)],
     ) -> Result<crate::CIConfig, String> {

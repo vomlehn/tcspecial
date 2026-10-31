@@ -2215,6 +2215,11 @@ impl CIConfigJson {
 
     /// Settles the links of a configuration whose links are UDP sockets.
     ///
+    /// # Returns
+    ///
+    /// Where each link's socket is: the command interpreter's, the beacon's
+    /// and the bases each node's links are counted from.
+    ///
     /// # Errors
     ///
     /// A message naming the attribute, for one not stated or not an
@@ -2292,6 +2297,11 @@ impl CIConfigJson {
     /// type its use needs. What is counted from a base by a node's id is
     /// checked where the nodes are known: see
     /// [`crate::graph::telemetry::msgids`].
+    ///
+    /// # Returns
+    ///
+    /// The bus's settled links: the peer, the allotment, every message ID
+    /// and base, and cFE's time.
     ///
     /// # Errors
     ///

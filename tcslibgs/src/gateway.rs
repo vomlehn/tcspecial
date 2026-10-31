@@ -64,6 +64,11 @@ impl GatewayKind {
     ///
     /// The one place that says which kinds are built, so that the section's
     /// reader and its tests agree about it, and building one is a line here.
+    ///
+    /// # Returns
+    ///
+    /// `true` for a kind this build answers to, `false` for one a
+    /// configuration may name but this build cannot fly.
     pub fn is_built(self) -> bool {
         matches!(
             self,

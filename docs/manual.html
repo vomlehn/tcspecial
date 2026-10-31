@@ -3772,10 +3772,9 @@ every configuration shipped in the tree. The
 configuration's checksum covers <tt class="docutils literal">interface</tt>, so a vehicle and a ground
 station whose checksums match are reading the same interface as well.</p>
 <p>Every digest you will see on the link stands for <tt class="docutils literal">link.xtce</tt>: the
-beacon's last field is its digest, the checksums in the beacon, in CONNECT
-and its answer, and in RESTART_ARM and RESTART are configuration
-checksums, which cover <tt class="docutils literal">interface</tt>, and the target of SWITCH_ARM and
-SWITCH is the digest of a load set's <tt class="docutils literal">link.xtce</tt>. None covers
+beacon's last field is its digest, and the checksums in the beacon, in
+CONNECT and its answer, and in RESTART_ARM and RESTART are configuration
+checksums, which cover <tt class="docutils literal">interface</tt>. None covers
 <tt class="docutils literal">tcslibgs/xtce/fixed.xtce</tt>, where the fixed commands are laid out, or
 <tt class="docutils literal">tcslibgs/xtce/beacon.xtce</tt>, where the beacon is. Each is the same in
 every build, so there is nothing to compare, and a test in <tt class="docutils literal">tcslibgs</tt>

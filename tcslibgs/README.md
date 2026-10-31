@@ -29,8 +29,7 @@ the editor is the one the vehicle would have refused the file with.
 - `commands`, `telemetry`, `protocol`: the command and telemetry protocol.
 - `link`: the commands and their answers, with no header: an opcode, a
   sequence and what each carries. The fixed commands -- CONNECT,
-  RESTART_ARM, RESTART, SWITCH_ARM and SWITCH -- are described in XTCE in
-  `xtce/fixed.xtce`,
+  RESTART_ARM and RESTART -- are described in XTCE in `xtce/fixed.xtce`,
   which never changes, and every other command in `xtce/link.xtce`. The
   code that packs and unpacks them, `src/fixed_packet.rs` and
   `src/link_packet.rs`, is generated from those files, and the Python

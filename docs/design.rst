@@ -5736,17 +5736,16 @@ Requirement
     and the checksum the beacon carries says which configuration the start
     is running.
 
-The Interface, the Fallback and Switching Over
-==============================================
+The Interface and the Link
+==========================
 
 This section is the whole of what was asked for when the link was moved from
-JSON to XTCE: what every packet is, the two interfaces the vehicle speaks,
-how a new interface and everything it needs is laid out on the vehicle,
-and how the vehicle restarts onto it. What the beacon says across a restart,
-what the ground may send meanwhile, and everything else about surviving a
-fault are in `Fault Resiliency`_, which follows. Each requirement is stated
-once; where another section says the same thing, the one stating it is the
-one it follows.
+JSON to XTCE: what every packet is, the fixed commands and the interface the
+vehicle speaks, and what of them goes on the vehicle. What the beacon says
+across a restart, what the ground may send meanwhile, and everything else about
+surviving a fault are in `Fault Resiliency`_, which follows. Each requirement
+is stated once; where another section says the same thing, the one stating it
+is the one it follows.
 
 .. note::
    **What runs today.** The beacon is text, carries the restart flag and
@@ -5769,11 +5768,8 @@ one it follows.
    vehicle counts the datagrams its command links do not take, and logs each.
    Every configuration names its interface, and every program refuses one that
    is not its build's. There is no fallback interface apart from the fixed
-   commands, and no link of its own for one: SWITCH_ARM and SWITCH are fixed
-   commands, read and answered, and since no load set is held yet, every
-   SWITCH_ARM is refused ``NotFound`` and every SWITCH ``NotArmed``. Not yet
-   built: load sets, switching to one, the golden build, and ``tcsverify
-   --interface`` on a set of documents.
+   commands, and no link of its own for one, and nothing aboard reads XTCE:
+   see `What goes on the vehicle`_.
 
 Every packet is XTCE
 --------------------
@@ -5918,13 +5914,13 @@ Requirement
 The fixed commands
 ~~~~~~~~~~~~~~~~~~
 
-CONNECT, RESTART_ARM, RESTART, SWITCH_ARM and SWITCH are taken at any time,
-whatever either end is running, so that two ends that agree on nothing else can
+CONNECT, RESTART_ARM and RESTART are taken at any time, whatever either end
+is running, so that two ends that agree on nothing else can
 still agree on these. Their opcodes and layouts, and those of their answers, are
 fixed for ever: no build and no configuration changes them.
 
 Requirement
-    Opcodes 0x00 to 0x0F belong to the fixed commands for ever. Five are
+    Opcodes 0x00 to 0x0F belong to the fixed commands for ever. Three are
     used; the rest are kept so that a fixed command could be added without
     taking an opcode another command has had. No other command uses them.
 
@@ -5944,12 +5940,6 @@ Requirement
     its answer    0x04    opcode 1, sequence 4, status 1, time 8,
                           running checksum 16, build version 3 (major, minor,
                           patch), newest sequence taken 4
-    SWITCH_ARM    0x05    opcode 1, sequence 4, arm key 8, target interface
-                          digest 16
-    its answer    0x05    opcode 1, sequence 4, status 1, time 8
-    SWITCH        0x06    opcode 1, sequence 4, arm key 8, target interface
-                          digest 16
-    its answer    0x06    opcode 1, sequence 4, status 1, time 8
     ============  ======  =====================================================
 
 Requirement
@@ -5967,11 +5957,11 @@ Requirement
 
 Requirement
     The digests of ``fixed.xtce`` and of ``beacon.xtce`` are pinned by a
-    test, which fails at any change to either. ``fixed.xtce``'s changed
-    twice, deliberately, before the first release that is not a release
-    candidate: when the beacon was moved into it, and when the beacon was
-    moved out again, into ``beacon.xtce``, and SWITCH_ARM and SWITCH were
-    added. From that release on neither changes.
+    test, which fails at any change to either. ``fixed.xtce``'s changed,
+    deliberately, before the first release that is not a release
+    candidate, when the beacon was moved into it, and changed back when the
+    beacon was moved out again, into ``beacon.xtce``. From that release on
+    neither changes.
 
 PING keeps opcode 0x01 for now, but is an ordinary command: it is refused
 before a match like any other, and moves out of the fixed range when the
@@ -6023,9 +6013,7 @@ Requirement
     ``digest`` field, the checksum CONNECT carries and its answer gives
     back, and the target checksum of RESTART_ARM and of RESTART are
     configuration checksums, and a configuration's checksum covers its
-    ``interface``, the same digest of ``link.xtce``. The target of
-    SWITCH_ARM and of SWITCH is an interface digest: the digest of the
-    ``link.xtce`` of the load set to switch to. ``fixed.xtce`` and
+    ``interface``, the same digest of ``link.xtce``. ``fixed.xtce`` and
     ``beacon.xtce`` need no name for the two ends to agree on, because each
     is the same in every build: what holds them so is the tests
     ``the_fixed_commands_document_never_changes`` and
@@ -6074,10 +6062,10 @@ stands:
   and wherever an answer carried a generation: there is none.
 - In `Configurations named by their checksum`_, under `Still to be
   decided`_: the frozen layout of the three commands, settled here.
-- In `The Interface, the Fallback and Switching Over`_: the fallback
+- In `The Interface and the Link`_: the fallback
   interface, with a document and a link of its own, becomes the fixed
-  commands, in ``fixed.xtce`` on the command link, SWITCH_ARM and SWITCH
-  among them; the beacon is in ``beacon.xtce``.
+  commands, in ``fixed.xtce`` on the command link; the beacon is in
+  ``beacon.xtce``.
 - CONNECT no longer carries the ground station's build version: the
   vehicle acts on the checksum alone. The answer still carries the
   vehicle's build version, for the station to show.
@@ -6090,7 +6078,7 @@ The vehicle speaks the *fixed commands*, which never change, and an
 with the build. The fixed commands are the way in: whatever interface is
 running, and whether or not the ground and the vehicle agree about it, they
 are taken, and they are enough to restart the vehicle onto another
-configuration or switch it to another load set. There is no fallback
+configuration. There is no fallback
 interface apart from them, and no link of its own for one: every command
 goes on the command link, and the beacon on a link of its own.
 
@@ -6106,12 +6094,12 @@ Requirement
     are the same.
 
 Requirement
-    The fixed commands are CONNECT, RESTART_ARM, RESTART, SWITCH_ARM and
-    SWITCH, stated in ``fixed.xtce`` as `The fixed commands`_ says, compiled
-    into every build, and replaced by no load set. None of them starts,
-    stops or sets a node, changes the beacon interval or changes what any
-    payload does: what they can do to the vehicle is match it, and restart
-    it onto a configuration or a load set already there.
+    The fixed commands are CONNECT, RESTART_ARM and RESTART, stated in
+    ``fixed.xtce`` as `The fixed commands`_ says and compiled into every
+    build. None of them starts, stops or sets a node, changes the beacon
+    interval or changes what any payload does: what they can do to the
+    vehicle is match it, and restart it onto a configuration already
+    there.
 
 Requirement
     The ground compares interface digests before it sends a command of the
@@ -6121,122 +6109,35 @@ Requirement
     commands are never refused for this, because they are how a mismatch is
     fixed.
 
-Reading, writing and checking an interface
-------------------------------------------
+What goes on the vehicle
+------------------------
+
+An interface is compiled into the build that speaks it: tcs-xtce generates
+code from XTCE and does not interpret it. So the XTCE is needed where
+tcspecial and the programs that talk to it are built, and nowhere else, and
+a new interface is a new build of tcspecial.
 
 Requirement
-    ``tcslibgs::interface`` is the one place an interface is read, written
-    and checked, and the vehicle, ``tcslib``, ``tcsverify`` and ``tcsgui``
-    all go through it:
-
-    * *read*: the documents of an interface and the manifest they hold, and
-      their interface digest;
-    * *write*: a load set into a directory -- the documents, the build and
-      every file the manifest names -- for whatever carries it to the
-      vehicle;
-    * *check*: that a directory holds exactly the load set its manifest
-      describes, every file of the size and digest it states, and that the
-      configuration in it passes ``tcsverify``'s ``verify`` against the
-      interface in it.
+    XTCE documents do not go on the vehicle. They are only for building
+    tcspecial and the files that go with it -- its generated code, and the
+    ground's -- and nothing aboard reads them: a build carries its interface
+    digest, and the fixed commands' and the beacon's layouts, in its code.
 
 Requirement
-    ``tcsverify --interface <documents>`` prints an interface's digest and
-    every problem with its manifest, with the file and line of each, and
-    ``tcsverify --interface <documents> --load-set <directory>`` checks a load
-    set as the vehicle will check it before switching to it.
-
-The load set
-------------
-
-An interface is compiled into the build that speaks it: tcs-xtce
-generates code from XTCE and does not interpret it. A new interface is
-therefore a new build, and a new build is only useful with the configuration
-it serves and the programs and data of the app nodes in that configuration.
-All of them together are a *load set*, and a load set is switched to whole or
-not at all.
+    Configuration files, ``.ytcs`` and ``.xtcs``, are what go on the
+    vehicle besides the software, and are kept there as `Keeping
+    configurations on board`_ says.
 
 Requirement
-    The interface's XTCE states its load set, in ``AncillaryData`` named
-    ``tcspecial.load``, one entry for every file in it: its role, its path
-    within the load set, its size in bytes and its MD5. The roles are
-    ``executable`` (exactly one: the tcspecial built from these documents),
-    ``configuration`` (exactly one), ``app_program`` and ``app_data``. An app
-    entry names the app node it belongs to, by the node's name in the
-    configuration.
+    Which software and which configurations the vehicle holds is managed
+    from the ground. tcspecial transfers no files and has no command that
+    changes its own build: a new build is installed from the ground, outside
+    tcspecial, as any software is, and a new configuration is put on board
+    the same way and restarted onto with RESTART_ARM and RESTART.
 
-Requirement
-    A load set is refused, by ``tcsverify`` on the ground and by the vehicle
-    before it switches, unless the manifest and the configuration agree:
-    every app node in the configuration has its program in the manifest, and
-    every file each app node's attributes name is in it; every app entry
-    names an app node the configuration has; and no file is in the manifest
-    twice or in the directory without being in the manifest.
-
-The XTCE documents cannot list themselves -- a document cannot hold its own
-digest -- so they are named by the interface digest instead: the SWITCH that
-starts a load set carries the interface digest it means, and the vehicle
-switches only to the set with that digest.
-
-Requirement
-    A build knows the interface digest it was generated from, and refuses to
-    start from a load set whose documents have another: a load set holding
-    one build and another build's documents is a load set the ground would
-    misread.
-
-Requirement
-    Each load set on the vehicle is in a directory of its own, named by its
-    interface digest in hex, under the directory the ``loads`` attribute of
-    the ``tcspecial`` section names. tcspecial reads load sets there and
-    never writes to one.
-
-Keeping load sets on the vehicle
---------------------------------
-
-Requirement
-    Which load sets the vehicle holds is managed from the ground. Getting a
-    load set's files onto the vehicle, checking them as they arrive,
-    protecting them and removing them are done outside tcspecial: tcspecial
-    transfers no files, and has no command that writes, unlocks or removes
-    a load set. What tcspecial does with one is check it and switch to it,
-    as `Restarting onto a load set`_ says.
-
-Requirement
-    Whatever puts a load set on the vehicle makes each of its files
-    read-only -- mode ``0444``, or ``0555`` for an ``executable`` or
-    ``app_program`` -- and its directory read-only (``0555``), so that
-    nothing in it can be removed, renamed or written, and where the file
-    system allows it makes each immutable as well (``FS_IMMUTABLE_FL``, what
-    ``chattr +i`` sets), which a process running as root cannot get round by
-    accident. It never removes the running load set or the one the vehicle
-    would fall back to.
-
-Whether a file can be deleted is decided by the directory it is in, not by
-the file: a file of mode ``0444`` in a directory that can be written is
-removed by ``rm -f`` without a question. That is why the directory is made
-read-only as well as the files, and why the immutable attribute is used
-where there is one: an operator logged in as root has every permission,
-and the immutable attribute is the one thing that asks first.
-
-Restarting onto a load set
---------------------------
-
-Requirement
-    A switch is a full restart, never a change made in place: every node
-    stopped, the log flushed, the process run again. Nothing then survives
-    the switch except what is on disk, so nothing the old interface left in
-    memory can be read with the new one.
-
-Requirement
-    SWITCH_ARM and SWITCH are armed as RESTART_ARM and RESTART are, and
-    each carries the interface digest of the load set to switch to. Each
-    is refused, ``NotFound``, unless that load set is in its directory under
-    ``loads`` and passes the check `Reading, writing and checking an
-    interface`_ describes -- every size and every MD5, and its configuration
-    verified against its interface -- and the SWITCH checks it again just
-    before the restart, because storage can change between the two.
-
-Which build starts, what is done with a load set that will not start, and
-what both rest on are in `Kinds of restart`_.
+Still open
+    There needs to be a way to name the items that are to be loaded on the
+    vehicle and where each of them goes. It is not designed here.
 
 Fault Resiliency
 ================
@@ -6245,7 +6146,7 @@ What tcspecial and the ground do about faults, in one place: what is
 assumed, how each kind of start is handled, how commands survive a link that
 loses and repeats them and what is done should one arrive out of order, what
 the beacon says across a restart, how downlinked data is read across a
-switch, and what is still open. The sections before say as much of this as
+restart, and what is still open. The sections before say as much of this as
 they need to explain how something works, and point here for the rule.
 
 The order the qualities are ranked in decides what is here: a fault is
@@ -6256,13 +6157,13 @@ What is assumed
 ---------------
 
 Requirement
-    **The golden configuration always works.** The build and configuration
-    the vehicle is installed with -- the golden build, see `Kinds of
-    restart`_ -- always start, and always work well enough to be switched
-    to a new operating configuration. Everything below rests on this: it
-    is the one way in that no new load set, switch or fault can take
-    away, so it is proved before launch rather than trusted in flight, and
-    nothing in flight replaces it.
+    **The command line's configuration always works.** The build the
+    vehicle is installed with, and the configuration on tcspecial's command
+    line, which is installed with it and read-only, always start, and
+    always work well enough to be restarted onto another configuration.
+    Everything below rests on this: it is the one way in that no restart
+    or fault can take away, so it is proved before launch rather than
+    trusted in flight, and nothing in flight replaces it.
 
 Requirement
     **Every configuration can be retrieved.** The MOC can retrieve every
@@ -6272,15 +6173,14 @@ Requirement
     that configuration and no other.
 
 Requirement
-    A golden build that fails is started again as the golden build. Falling
-    back to the golden configuration and then failing falls back to the
-    golden configuration, never to anything else, because there is nothing
-    surer to go to.
+    A start that falls back to the command line's configuration and then
+    fails falls back to it again, never to anything else, because there is
+    nothing surer to go to.
 
 Requirement
     tcspecial runs under a supervisor that starts it again when it exits.
     Every failure that ends the process -- a restart that cannot ``exec``, a
-    load set that fails its check, a crash -- relies on that, and the manual
+    crash -- relies on that, and the manual
     says how to set one up.
 
 Requirement
@@ -6764,7 +6664,7 @@ Replaced already, and rewritten where they stand to say what runs:
   station's sending PING before it is matched. Being matched decides what
   the ground may send beside the three; the wait for a beacon whose number
   went back still refuses all but the three meanwhile.
-- `Downlinked data across a switch`_: reading each datum with the last
+- `Downlinked data across a restart`_: reading each datum with the last
   beacon's definitions. The ground reads data only while matched.
 - `The state file`_, once `The generation number and the state file`, and
   every requirement that an answer carries a generation or that the ground
@@ -6781,16 +6681,15 @@ Replaced once the rest is built, and describing what runs until then:
   number went back, and the commands allowed during it.
 - In `Holes in this, and what closes them`_ under `Fault Resiliency`_: the
   entries on the generation, the state file, downlinked data and commands
-  across a switch, a restart nobody commanded, a wait that never ends, a
+  across a restart, a restart nobody commanded, a wait that never ends, a
   stray packet, and a restart whose first beacons are lost. The holes of
   this scheme are those in `Holes in the checksum scheme, and what closes
   them`_.
 
-The load sets, SWITCH, and the golden build, in `The Interface, the
-Fallback and Switching Over`_, were set aside from this scheme, and are now
-built on top of it: SWITCH_ARM and SWITCH are fixed commands, armed as
-RESTART_ARM and RESTART are, and the fallback interface is the fixed
-commands.
+The load sets, SWITCH, the golden build and the fallback interface, once in
+`The Interface and the Link`_, are dropped: a new build is installed from
+the ground, outside tcspecial, XTCE does not go on the vehicle, and the
+fixed commands are the way in.
 
 Still to be decided
 ~~~~~~~~~~~~~~~~~~~
@@ -6798,8 +6697,7 @@ Still to be decided
 The frozen layout of the three commands
     Settled, and built, in `The link without a header`_: there is no shared
     header, and the three are fixed commands whose opcodes and layouts never
-    change, with the target checksum in RESTART_ARM and RESTART. SWITCH_ARM
-    and SWITCH have since joined them.
+    change, with the target checksum in RESTART_ARM and RESTART.
 
 In-flight data across a restart
 -------------------------------
@@ -6989,40 +6887,14 @@ named by their checksum`_ -- and the startup summary says which it was.
 
 Requirement
     A start is *commanded* when the state file says so: the start before
-    took an armed RESTART or SWITCH with the right key. A commanded start
+    took an armed RESTART with the right key. A commanded start
     may change the definitions it runs with. A start nobody commanded -- a
     crash, a power cycle, a supervisor's restart -- runs with the
     definitions it had. Either begins with the restart flag set, and the
     checksum in its beacons says which configuration it runs.
 
-Requirement
-    The executable the vehicle is installed with is the *golden* build. It is
-    always what starts: on every start it reads the state file and, where a
-    load set is chosen, checks it and runs that load set's executable with
-    that load set's configuration. A golden build carries the fixed
-    commands and an interface of its own, and runs with them when no
-    load set is chosen or the chosen one fails its check.
-
-Requirement
-    A load set starts on trial. The state file counts its starts, and it is
-    confirmed by the first valid packet from the MOC that reaches it. A load
-    set that has started ``load_trials`` times -- three where the
-    configuration does not say -- without being confirmed is not started
-    again: the golden build falls back to the last confirmed load set, or to
-    itself, and says so in the log and in the answer to CONNECT. The fallback
-    is the one start nobody commanded that may change the definitions, and
-    the interface digest in its beacons says that it has.
-
-Requirement
-    A load set is given up after failing to be heard from, not only on trial.
-    The state file counts the starts of the chosen load set in a row that
-    ended -- crashed, lost power, or failed their check -- before a valid
-    packet from the MOC arrived, and the count goes back to nought with each
-    one that is heard from. A load set whose count reaches ``load_trials``,
-    confirmed or not, is not started again, and the golden build falls back
-    as it does for one on trial. A load set confirmed once that later fails
-    at every start is then given up as surely as one that never worked, and
-    a crash that keeps its definitions cannot keep them for ever.
+Which configuration a start runs, and when one is given up for failing to
+be heard from, is in `Starting, and the restart flag`_.
 
 Lost, late and repeated commands
 --------------------------------
@@ -7041,9 +6913,9 @@ Requirement
     keeps a record of the answers it gave to make a repeat safe. So every
     command is written so that a repeat changes nothing a first one did not:
     it asks for a state, not an action, and a repeat answers with the state
-    reached rather than with a failure. RESTART and SWITCH are the two
-    exceptions, and are not sent again on a timeout alone: the beacon, not
-    an answer, says whether one was taken. An operator who has looked at
+    reached rather than with a failure. RESTART is the one exception, and is
+    not sent again on a timeout alone: the beacon, not an answer, says
+    whether one was taken. An operator who has looked at
     the beacons may send a RESTART again during the wait; one that reaches
     the start that came back is refused ``NotArmed`` there, since that start
     holds no arm, and restarts nothing. See `What the ground may send
@@ -7085,7 +6957,7 @@ Requirement
     names, as `Starting, and the restart flag`_ says.
 
 Requirement
-    An armed RESTART or SWITCH that is taken writes to the state file that
+    An armed RESTART that is taken writes to the state file that
     the next start is commanded, before it is answered. The start that
     reads it says so in its startup summary, and writes the file again
     without it, so that a later start of its own -- a crash -- is not taken
@@ -7137,8 +7009,8 @@ Requirement
     been matched by the ground: see `Configurations named by their
     checksum`_. Every start begins with it set -- a first start, a commanded
     restart, a crash the supervisor restarted, a power cycle -- and
-    tcspecial sets it again the moment it takes an armed RESTART or SWITCH
-    with the right key. It is cleared when the start takes a CONNECT
+    tcspecial sets it again the moment it takes an armed RESTART with the
+    right key. It is cleared when the start takes a CONNECT
     carrying the running configuration's checksum, and by nothing else.
 
 Requirement
@@ -7151,9 +7023,10 @@ Requirement
     Only a commanded start may change the definitions the vehicle runs with.
     A start nobody commanded runs with the definitions the start before it
     had, so that the format of what crosses the link never changes under a
-    ground station that did not ask for it to. The one exception is the
-    fallback to the golden build, which a load set that will not start
-    forces: see `Restarting onto a load set`_.
+    ground station that did not ask for it to. The exceptions are the
+    starts that give up a configuration that will not load, or has failed
+    to be heard from ``load_trials`` times, for the confirmed one or the
+    command line's: see `Starting, and the restart flag`_.
 
 Requirement
     The beacon has two intervals, both required and both lengths of time:
@@ -7204,18 +7077,17 @@ connect.
 What the ground may send meanwhile
 ----------------------------------
 
-The beacon is the acknowledgement of a RESTART or a SWITCH, not the answer to
-it. The answer is a packet like any other on a link that loses them, and the
-vehicle may be gone before it is sent again, so the ground may never hear one;
-the beacons keep coming whatever happens to the answer. A beacon
-whose number has gone back says the old start has gone; its restart flag is
-set, as every start's is, so it does not say whether the start that replaced
-it is the one the RESTART asked for. Until
-that beacon, the ground cannot know which definitions a packet it sends would
-be read with, so it sends none.
+The beacon is the acknowledgement of a RESTART, not the answer to it. The
+answer is a packet like any other on a link that loses them, and the vehicle
+may be gone before it is sent again, so the ground may never hear one; the
+beacons keep coming whatever happens to the answer. A beacon whose number has
+gone back says the old start has gone; its restart flag is set, as every
+start's is, so it does not say whether the start that replaced it is the one
+the RESTART asked for. Until that beacon, the ground cannot know which
+definitions a packet it sends would be read with, so it sends none.
 
 Requirement
-    Once the MOC has sent a SWITCH -- or a RESTART -- it sends no command
+    Once the MOC has sent a RESTART it sends no command
     but CONNECT, RESTART_ARM and RESTART until it has a beacon whose number
     is lower than the one before it: a beacon saying that tcspecial has
     started again, and is using the definitions it has started with. Then
@@ -7239,8 +7111,8 @@ Requirement
 
 Requirement
     The wait says that it ended, and not how. Every start begins with the
-    restart flag set, so the flag cannot tell the start the SWITCH or
-    RESTART asked for from one nobody commanded -- the vehicle crashed or
+    restart flag set, so the flag cannot tell the start the RESTART asked
+    for from one nobody commanded -- the vehicle crashed or
     lost power before the command was taken. The checksum in the new
     start's beacons says which configuration it runs, and matching it is
     what lets the station command it again; the vehicle's own log says
@@ -7309,21 +7181,22 @@ Requirement
     start it does not command. After a CONNECT its count goes on from past
     the newest command the vehicle says it has taken, forward only.
 
-Downlinked data across a switch
--------------------------------
+Downlinked data across a restart
+--------------------------------
 
 What the vehicle downlinks from a node is the node's bytes and nothing else:
 no header, no generation, no time. Which node sent a datum is the port it
-arrives at, and how to read it is that node's configuration. A switch of
-configuration -- commanded, or a fallback to the golden build -- can give a
-port to another node, or a node another format.
+arrives at, and how to read it is that node's configuration. A change of
+configuration -- commanded, or a start that gives one up for the confirmed
+or the command line's -- can give a port to another node, or a node
+another format.
 
 Requirement
     The ground reads every datum with the definitions of the last beacon
     before it, and holds nothing back. A datum the old start sent arrives
     before the first beacon of the new one, because the radio delivers in
     order and everything either side of it uses reliable datagrams: see
-    `What is assumed`_. Nothing on the path needs purging at a switch, and
+    `What is assumed`_. Nothing on the path needs purging at a restart, and
     a mark on every datum would pay on every datum for what the order of
     arrival already says.
 
@@ -7332,7 +7205,8 @@ Holes in this, and what closes them
 
 What was looked for: any way the ground and the vehicle could come to
 disagree about which definitions are in use, any way a vehicle could be left
-with no way in, and any way a load set could be lost or damaged. Each is
+with no way in, and any way a configuration could be lost or damaged.
+Each is
 paired with the requirement above that closes it.
 
 UDP may carry no checksum
@@ -7345,14 +7219,10 @@ UDP may carry no checksum
 
 A read-only file can still be deleted
     Deleting is permitted by the directory, not the file, and root is
-    permitted everything. What puts a load set on the vehicle makes its
-    directory read-only too, and sets the immutable attribute where the file
-    system has one: see `Keeping load sets on the vehicle`_.
-
-A new build that cannot start
-    An executable that crashes at start cannot roll itself back. The golden
-    build always starts first, counts each load set's starts, and stops
-    starting one that has not been confirmed within ``load_trials``.
+    permitted everything. What installs a configuration at first
+    provisioning makes its directory read-only too, and sets the immutable
+    attribute where the file system has one: see `Keeping configurations on
+    board`_.
 
 A restart that never comes back
     A restart whose ``exec`` fails ends the process. The supervisor starts it
@@ -7364,10 +7234,10 @@ A damaged or half-written state file
     ground judges a restart from the beacons by their number going back and
     by their restart flag, which a damaged state file does not touch.
 
-Downlinked data from before a switch
+Downlinked data from before a restart
     A datum carries nothing that says which configuration wrote it. It is
     told apart by when it arrives: before the new start's first beacon, in
-    order, as `Downlinked data across a switch`_ says. Should a path that
+    order, as `Downlinked data across a restart`_ says. Should a path that
     reorders ever be flown -- a relay that stores and forwards, or a
     recorder played back -- the remedy is a mark of a byte on every datum:
     a count of changes of format, kept in the state file and carried in
@@ -7379,22 +7249,22 @@ A restart nobody commanded changing the format
     runs with the definitions it had, so nothing the ground sends is read
     differently. Its beacons carry the restart flag, as every start's do,
     and the checksum of the configuration it runs, which the ground matches
-    before it reads anything of it. The fallback to the golden build
-    is the exception, and the interface digest in its beacons says so.
+    before it reads anything of it.
 
-Commands in flight across the switch
-    A command sent before the SWITCH arrives before it, because the link
+Commands in flight across the restart
+    A command sent before the RESTART arrives before it, because the link
     delivers in order, and the ground sends none after it until the new
     start's beacon. What is left open is a start nobody commanded that
-    changes the definitions -- a fallback to the golden build -- with
+    changes the definitions -- one that gives up a configuration for the
+    confirmed or the command line's -- with
     commands already on their way: they arrive at the new start and are
     read with its definitions. Should that matter, the remedy is the
     ground's: send nothing but PING and CONNECT while the beacons are
     overdue enough to say the vehicle may be starting again.
 
 A wait that never ends
-    If the SWITCH was refused, or never arrived, no beacon starts again.
-    A refusal ends the wait; a SWITCH that never arrived shows as beacons
+    If the RESTART was refused, or never arrived, no beacon starts again.
+    A refusal ends the wait; a RESTART that never arrived shows as beacons
     that go on counting at their own interval, not every
     ``reset_interval``, and without the restart flag, and the operator may
     end the wait by hand.
@@ -7405,20 +7275,9 @@ A stray packet slowing the beacons or clearing the flag
     checksum, slows the beacons or clears the restart flag; no other command
     does either.
 
-A load set that is incomplete, or not what the ground meant
-    The manifest names every file with its size and MD5, the SWITCH names the
-    interface digest, and the vehicle checks the set at SWITCH_ARM and
-    again at the SWITCH. A build refuses documents of another digest.
-
-A configuration the new build would refuse
-    The check at SWITCH_ARM and SWITCH runs ``verify`` on the load set's
-    configuration with the load set's interface, so a configuration
-    refused when it is loaded is refused before the vehicle switches to it,
-    not after.
-
 The interface breaking the way in
-    The fixed commands have their own document, whose digest is pinned, and
-    no load set replaces it.
+    The fixed commands have their own document, and the beacon another,
+    whose digests are pinned, and no build changes either.
 
 A restart whose first beacons are all lost
     A restart is judged from the beacons by their number going back alone,
@@ -7442,20 +7301,17 @@ A restart whose first beacons are all lost
     count of starts in the beacon, as a field of its own, at the cost of up
     to ten more digits in every beacon.
 
-A confirmed load set that later fails at every start
-    A crash keeps the definitions it had, so a load set that fails at every
-    start would be started for ever. Every start of a load set that ends
-    before the MOC is heard from is counted, in a row and whether the set
-    was confirmed or not, and ``load_trials`` of them give it up: see
-    `Kinds of restart`_.
+A confirmed configuration that later fails at every start
+    A crash keeps the definitions it had, so a configuration that fails at
+    every start would be started for ever. Every start of it that ends
+    before a matching CONNECT is counted, in a row and whether it was
+    confirmed or not, and ``load_trials`` of them give it up: see
+    `Starting, and the restart flag`_.
 
-Still open
-    The command link carries no authentication. Anyone who can reach it can
-    arm and restart the vehicle, or switch it to any load set it holds; an
-    arm
-    key on an open link is a guard against mistakes, not against anybody.
-    CCSDS SDLS, or authentication at the radio, is the remedy, and it is not
-    designed here.
+Still open The command link carries no authentication. Anyone who can reach it
+can arm and restart the vehicle; an arm key on an open link is a guard against
+mistakes, not against anybody. CCSDS SDLS, or authentication at the radio, is
+the remedy, and it is not designed here.
 
 TCSpecial
 =========

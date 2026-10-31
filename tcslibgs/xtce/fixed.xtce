@@ -2,16 +2,15 @@
 <!-- The fixed commands and their answers, as they go on the command link:
      the whole of each datagram.
 
-     CONNECT, RESTART_ARM, RESTART, SWITCH_ARM and SWITCH are taken at any
-     time, whatever either end is running, so that a ground station and a
-     vehicle that agree about nothing else can still agree about these.
-     Their opcodes and layouts are fixed for ever: no build and no
-     configuration changes them, and nothing in this document is ever
-     changed. A change to one of them is a new fixed command, with an
-     opcode of its own from 0x00 to 0x0F, in a document of its own. A test
-     in tcslibgs/src/link.rs pins the digest of this document, and fails,
-     saying so, if it is changed. The beacon is in beacon.xtce, which is
-     fixed for ever too.
+     CONNECT, RESTART_ARM and RESTART are taken at any time, whatever either
+     end is running, so that a ground station and a vehicle that agree about
+     nothing else can still agree about these. Their opcodes and layouts are
+     fixed for ever: no build and no configuration changes them, and nothing
+     in this document is ever changed. A change to one of them is a new fixed
+     command, with an opcode of its own from 0x00 to 0x0F, in a document of
+     its own. A test in tcslibgs/src/link.rs pins the digest of this
+     document, and fails, saying so, if it is changed. The beacon is in
+     beacon.xtce, which is fixed for ever too.
 
      A command is
 
@@ -120,22 +119,6 @@
           </RestrictionCriteria>
         </BaseContainer>
       </SequenceContainer>
-      <SequenceContainer name="SwitchArmAnswer">
-        <EntryList/>
-        <BaseContainer containerRef="FixedAnswer">
-          <RestrictionCriteria>
-            <Comparison parameterRef="Opcode" value="5"/>
-          </RestrictionCriteria>
-        </BaseContainer>
-      </SequenceContainer>
-      <SequenceContainer name="SwitchAnswer">
-        <EntryList/>
-        <BaseContainer containerRef="FixedAnswer">
-          <RestrictionCriteria>
-            <Comparison parameterRef="Opcode" value="6"/>
-          </RestrictionCriteria>
-        </BaseContainer>
-      </SequenceContainer>
       <SequenceContainer name="ConnectAnswer">
         <EntryList>
           <ParameterRefEntry parameterRef="Running"/>
@@ -238,46 +221,6 @@
         <CommandContainer name="ConnectContainer">
           <EntryList>
             <ArgumentRefEntry argumentRef="Checksum"/>
-          </EntryList>
-          <BaseContainer containerRef="FixedCommandContainer"/>
-        </CommandContainer>
-      </MetaCommand>
-      <!-- Arms a switch onto the load set whose interface digest is
-           Target, with this key, which the SWITCH must carry too. -->
-      <MetaCommand name="SwitchArm">
-        <BaseMetaCommand metaCommandRef="FixedCommand">
-          <ArgumentAssignmentList>
-            <ArgumentAssignment argumentName="Opcode" argumentValue="5"/>
-          </ArgumentAssignmentList>
-        </BaseMetaCommand>
-        <ArgumentList>
-          <Argument name="ArmKey" argumentTypeRef="U64Arg"/>
-          <Argument name="Target" argumentTypeRef="ChecksumArg"/>
-        </ArgumentList>
-        <CommandContainer name="SwitchArmContainer">
-          <EntryList>
-            <ArgumentRefEntry argumentRef="ArmKey"/>
-            <ArgumentRefEntry argumentRef="Target"/>
-          </EntryList>
-          <BaseContainer containerRef="FixedCommandContainer"/>
-        </CommandContainer>
-      </MetaCommand>
-      <!-- Restarts onto the load set whose interface digest is Target,
-           which must be the arm's, as the key must. -->
-      <MetaCommand name="Switch">
-        <BaseMetaCommand metaCommandRef="FixedCommand">
-          <ArgumentAssignmentList>
-            <ArgumentAssignment argumentName="Opcode" argumentValue="6"/>
-          </ArgumentAssignmentList>
-        </BaseMetaCommand>
-        <ArgumentList>
-          <Argument name="ArmKey" argumentTypeRef="U64Arg"/>
-          <Argument name="Target" argumentTypeRef="ChecksumArg"/>
-        </ArgumentList>
-        <CommandContainer name="SwitchContainer">
-          <EntryList>
-            <ArgumentRefEntry argumentRef="ArmKey"/>
-            <ArgumentRefEntry argumentRef="Target"/>
           </EntryList>
           <BaseContainer containerRef="FixedCommandContainer"/>
         </CommandContainer>

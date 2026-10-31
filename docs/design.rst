@@ -1300,9 +1300,10 @@ due and writes the channels -- and a second waits on the beacon watch,
 whose pass waits for a beacon, for ever before the first, and leaves what it
 heard under a lock for the next tick. Each handle and buffer is made when the
 component is configured, as the topology is set up, and nothing is allocated
-after; the beacon watch's thread is not joined as the deployment stops,
-since a pass nothing has answered cannot be interrupted, and ends with the
-process. Both threads are given the stack a Rust thread has, 2 MiB:
+after; as the deployment stops, the beacon watch's thread is woken from its
+pass by ``tcs_beacons_wake`` -- which ends a pass from another thread, finding
+nothing -- and joined, so that it is gone before the handles it uses are
+freed, beacon or no beacon. Both threads are given the stack a Rust thread has, 2 MiB:
 tcslib-c's calls need more than F´'s usual 64 KiB.
 
 The test is ``make fprime-test``: tcssim, waited for, standing in for the

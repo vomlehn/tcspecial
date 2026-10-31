@@ -5,8 +5,8 @@
  * each tick: on a tick it takes the data that has arrived, sends CONNECT
  * while the bridge is not matched, and writes the channels. The beacon
  * watch's, which waits on tcs_beacons_pass(): a pass waits for a beacon,
- * for ever before the first, so it cannot be a tick's work. It leaves what
- * it heard under a lock for the next tick to read.
+ * for ever before the first unless it is woken, so it cannot be a tick's
+ * work. It leaves what it heard under a lock for the next tick to read.
  */
 
 #include <cstring>
@@ -67,7 +67,8 @@ Stage stageOf(tcs_stage stage)
 
 TcsBridge::TcsBridge(const char *name)
 	: TcsBridgeComponentBase(name), m_configuration(nullptr),
-	  m_beacons(nullptr), m_gateway(nullptr), m_client(nullptr),
+	  m_beacons(nullptr), m_waker(nullptr), m_gateway(nullptr),
+	  m_client(nullptr),
 	  m_open(false), m_heard(), m_stopping(false), m_tick(),
 	  m_connectedAt(0), m_connectedNs(0), m_connected(Connected::NEVER),
 	  m_datum(), m_cutShort(0), m_said()
@@ -76,13 +77,11 @@ TcsBridge::TcsBridge(const char *name)
 
 TcsBridge::~TcsBridge()
 {
-	// The beacon watch, and the configuration it was made from, are left
-	// for the process's end to free where its thread may still be in a
-	// pass, which nothing can interrupt: see stop().
-	if (m_beaconTask.getState() != Os::Task::State::RUNNING) {
-		tcs_beacons_close(m_beacons);
-		tcs_configuration_close(m_configuration);
-	}
+	// The beacon watch's thread has been joined by stop(), or was never
+	// started.
+	tcs_beacons_waker_close(m_waker);
+	tcs_beacons_close(m_beacons);
+	tcs_configuration_close(m_configuration);
 }
 
 void TcsBridge::configure(const char *configuration)
@@ -110,6 +109,9 @@ void TcsBridge::configure(const char *configuration)
 	// sends in answer arrives before there is anywhere for it to go.
 	m_beacons = tcs_beacons_listen(m_configuration);
 	if (m_beacons != nullptr) {
+		m_waker = tcs_beacons_waker_open(m_beacons);
+	}
+	if (m_waker != nullptr) {
 		m_gateway = tcs_gateway_open(m_configuration,
 					     TcsBridge_GATEWAY_NODE);
 	}
@@ -135,12 +137,14 @@ void TcsBridge::configure(const char *configuration)
 
 void TcsBridge::stop()
 {
-	// The beacon watch's thread is told to stop, and stops at the end of
-	// the pass it is in. It is not joined: a pass before any beacon has
-	// arrived waits for one for ever, and a deployment that could not stop
-	// until the vehicle spoke would be worse than one whose last thread
-	// ends with the process.
+	// The beacon watch's thread is told to stop, woken from the pass it is
+	// in, which before any beacon would wait for one for ever, and joined,
+	// so that nothing is left running on the handles the destructor frees.
 	m_stopping = true;
+	if (m_beaconTask.getState() != Os::Task::State::NOT_STARTED) {
+		(void)tcs_beacons_wake(m_waker);
+		(void)m_beaconTask.join();
+	}
 	tcs_client_close(m_client);
 	m_client = nullptr;
 	tcs_gateway_close(m_gateway);

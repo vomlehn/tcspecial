@@ -34,7 +34,7 @@ public:
 	 * @param name  The component instance's name. */
 	explicit TcsBridge(const char *name);
 
-	/** Frees what stop() leaves: see there. */
+	/** Frees the handles configure() made. */
 	~TcsBridge() override;
 
 	/** Opens the configuration, holds it to the model, and starts taking
@@ -49,8 +49,8 @@ public:
 	 *                       from. */
 	void configure(const char *configuration);
 
-	/** Stops taking beacons, and closes the command links and the gateway
-	 * node. Called as the topology is taken down, once the component's own
+	/** Stops taking beacons, joining the beacon watch's thread, and closes
+	 * the command links and the gateway node. Called as the topology is taken down, once the component's own
 	 * thread has stopped. */
 	void stop();
 
@@ -161,9 +161,10 @@ private:
 
 	// The handles, made by configure(). The configuration is read from
 	// both threads, as tcs.h allows; the beacon watch only from its own,
-	// and the rest only from the component's.
+	// its waker from stop(), and the rest only from the component's.
 	tcs_configuration *m_configuration;
 	tcs_beacons *m_beacons;
+	tcs_beacons_waker *m_waker;
 	tcs_gateway *m_gateway;
 	tcs_client *m_client;
 

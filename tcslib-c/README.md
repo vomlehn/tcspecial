@@ -147,7 +147,10 @@ The header alone is also compiled as C99 and as C++11.
   nothing in the library locks one. `tcs_last_error()` is per thread.
 - **A beacon pass may wait for ever.** Before any beacon has arrived,
   `tcs_beacons_pass` waits for one, with no timeout: run it on a thread of
-  its own, as tcsmoc does.
+  its own, as tcsmoc does. To stop that thread, make a waker with
+  `tcs_beacons_waker_open` before starting it, and call `tcs_beacons_wake`
+  from the thread stopping it, then join it: the pass it is in ends,
+  finding nothing. The F´ bridge stops its beacon thread this way.
 - **Strings are borrowed.** A string a function returns is good until the
   next call on the same handle or its `_close`. Copy it to keep it.
 - **Linking.** On Linux, `libtcs.a` needs `-lpthread -ldl -lm` beside it,

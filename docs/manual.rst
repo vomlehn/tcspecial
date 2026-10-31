@@ -3430,7 +3430,9 @@ with tcsverify:
 It keeps nothing that has an error, writes nothing for a checksum already
 kept, and makes the files it writes read-only. Making the directory
 read-only, or immutable, once every configuration is in it is the
-provisioner's to do. Configurations cannot yet be uplinked.
+provisioner's to do. In flight, which configurations the vehicle holds
+is managed from the ground, outside tcspecial: tcspecial transfers no
+files.
 
 Every start loads the first of these that passes its checks, and says in
 its startup summary and its log which it loaded and why: the configuration

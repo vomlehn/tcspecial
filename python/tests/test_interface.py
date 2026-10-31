@@ -2,7 +2,7 @@
 
 A configuration's ``tcspecial`` section names, as ``interface``, the digest
 of the ``link.xtce`` its commands are laid out by, and a ground station in
-Python refuses one that is not this tree's as the Rust does. The three fixed
+Python refuses one that is not this tree's as the Rust does. The fixed
 commands are in ``fixed.xtce``, apart from the interface, and are packed by
 the code tcs-xtce generates from it: these hold that code to the layouts the
 design's table gives.
@@ -42,15 +42,15 @@ def section(said):
 
 class InterfaceTest(unittest.TestCase):
     def test_the_interface_is_link_xml_alone(self):
-        # Not fixed.xtce beside it: no change to the interface may touch the
-        # fixed commands.
+        # Not fixed.xtce or beacon.xtce beside it: no change to the interface
+        # may touch the fixed commands or the beacon.
         self.assertEqual(
             interface.of_this_tree(),
             interface.of_files([interface.DOCUMENTS / "link.xtce"]),
         )
         self.assertNotEqual(
             interface.of_this_tree(),
-            interface.of_files(sorted(interface.DOCUMENTS.glob("*.xtcs"))),
+            interface.of_files(sorted(interface.DOCUMENTS.glob("*.xtce"))),
         )
 
     def test_this_trees_interface_is_what_the_examples_name(self):

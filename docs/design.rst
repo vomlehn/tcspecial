@@ -5497,7 +5497,7 @@ and target match the values from the last RESTART_ARM command. Otherwise it
 is answered ``NotArmed``. A target the vehicle no longer holds, or that would
 not load, is answered ``NotFound``, and nothing restarts. See `Restarting`_
 for what a restart does. The layouts of the three on the link are in `The
-three fixed commands`_.
+fixed commands`_.
 
 +----------------+-------------------------------------------------------------+
 | Name           | Parameters                                                  |
@@ -5533,8 +5533,8 @@ Beacon
 
 The beacon answers no command and has a form of its own: a line of text, six
 fields with a colon between each, and no newline at the end. Its layout is
-stated in XTCE in ``tcslibgs/xtce/fixed.xtce``, beside the three fixed
-commands: six string fields of UTF-8, each but the last ended by the
+stated in XTCE in ``tcslibgs/xtce/beacon.xtce``, a document of its own:
+six string fields of UTF-8, each but the last ended by the
 termination character ``:`` (``0x3A``) and no longer than its field can be,
 and the last 32 characters that end the datagram. It is packed and
 unpacked by the code tcs-xtce generates from that document, in Rust without
@@ -5698,15 +5698,17 @@ one it follows.
    commands from a RESTART until a beacon whose number went back says it is
    done, and the beacon watches in Rust and Python judge a restart by the
    beacon's number alone. Commands and answers have no header, as `The link
-   without a header`_ says: the three fixed commands are stated in
-   ``tcslibgs/xtce/fixed.xtce`` and every other in
-   ``tcslibgs/xtce/link.xtce``, packed and unpacked by ``tcslibgs::link``
-   without allocating; nothing on the link is JSON. The vehicle counts the
-   datagrams its command links do not take, and logs each. Every
-   configuration names its interface, and every program refuses one that
-   is not its build's. Not yet built: the fallback interface and its link
-   (``fixed.xtce`` takes its place, holding only the three fixed commands),
-   load sets, SWITCH, the golden build, and ``tcsverify
+   without a header`_ says: the fixed commands are stated in
+   ``tcslibgs/xtce/fixed.xtce``, the beacon in ``tcslibgs/xtce/beacon.xtce``
+   and every other command in ``tcslibgs/xtce/link.xtce``, packed and unpacked
+   by ``tcslibgs::link`` without allocating; nothing on the link is JSON. The
+   vehicle counts the datagrams its command links do not take, and logs each.
+   Every configuration names its interface, and every program refuses one that
+   is not its build's. There is no fallback interface apart from the fixed
+   commands, and no link of its own for one: SWITCH_ARM and SWITCH are fixed
+   commands, read and answered, and since no load set is held yet, every
+   SWITCH_ARM is refused ``NotFound`` and every SWITCH ``NotArmed``. Not yet
+   built: load sets, switching to one, the golden build, and ``tcsverify
    --interface`` on a set of documents.
 
 Every packet is XTCE
@@ -5726,10 +5728,10 @@ Requirement
     tcspecial has a layout stated in XTCE and is packed and unpacked by the
     code tcs-xtce generates from that statement. Nothing on a link is JSON,
     and nothing that packs or unpacks a command, an answer or the beacon is
-    written by hand. The beacon's layout is in ``fixed.xtce`` beside the
-    three fixed commands, as text fields, because it is to be read by a
-    person as it is -- see `Asynchronous Telemetry`_ -- and it is not in
-    the interface: no change to ``link.xtce`` can touch it.
+    written by hand. The beacon's layout is in ``beacon.xtce``, as text
+    fields, because it is to be read by a person as it is -- see
+    `Asynchronous Telemetry`_ -- and it is not in the interface: no change
+    to ``link.xtce`` can touch it.
 
 Replaced
     Commands and answers are built on a base container that holds the CCSDS
@@ -5785,9 +5787,10 @@ The link without a header
    CCSDS layout in `Every packet is XTCE`_, above, and settles what was left
    open in `Configurations named by their checksum`_: what of the link
    never changes. What it replaced is under `What the headerless link
-   replaces`_. The fixed commands are ``tcslibgs/xtce/fixed.xtce``, and a
-   test in ``tcslibgs::link`` pins its digest, failing, saying it must never
-   change, if it does. The vehicle counts and logs every datagram its
+   replaces`_. The fixed commands are ``tcslibgs/xtce/fixed.xtce`` and the
+   beacon ``tcslibgs/xtce/beacon.xtce``, and a test in ``tcslibgs::link``
+   pins the digest of each, failing, saying it must never change, if it
+   does. The vehicle counts and logs every datagram its
    command links do not take (``Commands::malformed``); the ground counts
    them as malformed, as it did. A station shows a status it does not know
    as a refusal with its number, in Rust as ``CommandStatus::Unknown`` and
@@ -5803,7 +5806,7 @@ no generation. What those did is done by what is already there:
   nothing in a packet needs to say which it is.
 - **What layout a packet has** is said by the configuration: the two ends
   have matched their configurations' checksums before anything but the
-  three fixed commands goes, and the configuration names the interface
+  fixed commands goes, and the configuration names the interface
   (see `The configuration names its interface`_).
 - **Whether a datagram is tcspecial's at all** is said by where it came
   from -- each end takes packets only from the address its configuration
@@ -5848,16 +5851,16 @@ Requirement
     state file, and not in ``tcslib``. A start is told by the beacon's
     restart flag, and which configuration it runs by its checksum.
 
-The three fixed commands
-~~~~~~~~~~~~~~~~~~~~~~~~
+The fixed commands
+~~~~~~~~~~~~~~~~~~
 
-CONNECT, RESTART_ARM and RESTART are taken at any time, whatever either end
-is running, so that two ends that agree on nothing else can still agree on
-these. Their opcodes and layouts, and those of their answers, are fixed for
-ever: no build and no configuration changes them.
+CONNECT, RESTART_ARM, RESTART, SWITCH_ARM and SWITCH are taken at any time,
+whatever either end is running, so that two ends that agree on nothing else can
+still agree on these. Their opcodes and layouts, and those of their answers, are
+fixed for ever: no build and no configuration changes them.
 
 Requirement
-    Opcodes 0x00 to 0x0F belong to the fixed commands for ever. Three are
+    Opcodes 0x00 to 0x0F belong to the fixed commands for ever. Five are
     used; the rest are kept so that a fixed command could be added without
     taking an opcode another command has had. No other command uses them.
 
@@ -5877,6 +5880,12 @@ Requirement
     its answer    0x04    opcode 1, sequence 4, status 1, time 8,
                           running checksum 16, build version 3 (major, minor,
                           patch), newest sequence taken 4
+    SWITCH_ARM    0x05    opcode 1, sequence 4, arm key 8, target interface
+                          digest 16
+    its answer    0x05    opcode 1, sequence 4, status 1, time 8
+    SWITCH        0x06    opcode 1, sequence 4, arm key 8, target interface
+                          digest 16
+    its answer    0x06    opcode 1, sequence 4, status 1, time 8
     ============  ======  =====================================================
 
 Requirement
@@ -5888,12 +5897,17 @@ Requirement
 
 Requirement
     The beacon's layout is fixed for ever too: its text fields, in their
-    order, as `Asynchronous Telemetry`_ gives them. It is stated in
-    ``fixed.xtce`` beside the three, so that the one document every end
-    agrees on holds everything that never changes. The document's digest
-    is pinned by a test, and changed once, deliberately, when the beacon
-    was moved into it, before the first release to carry it; from that
-    release on it never changes.
+    order, as `Asynchronous Telemetry`_ gives them. It is stated in a
+    document of its own, ``beacon.xtce``, because it goes on a link of its
+    own, apart from the commands and their answers.
+
+Requirement
+    The digests of ``fixed.xtce`` and of ``beacon.xtce`` are pinned by a
+    test, which fails at any change to either. ``fixed.xtce``'s changed
+    twice, deliberately, before the first release that is not a release
+    candidate: when the beacon was moved into it, and when the beacon was
+    moved out again, into ``beacon.xtce``, and SWITCH_ARM and SWITCH were
+    added. From that release on neither changes.
 
 PING keeps opcode 0x01 for now, but is an ordinary command: it is refused
 before a match like any other, and moves out of the fixed range when the
@@ -5903,7 +5917,7 @@ The configuration names its interface
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 The layouts of the ordinary commands and answers -- everything but the
-fixed three -- are stated in XTCE, compiled into each build by tcs-xtce. A
+fixed ones -- are stated in XTCE, compiled into each build by tcs-xtce. A
 build can only speak the interface it was compiled from, so what a
 configuration can do is say which interface it is written for, and be
 refused by a build that speaks another.
@@ -5934,21 +5948,25 @@ one of them is stale.
 
 Requirement
     The fixed commands are not in that XTCE: they are in a document of their
-    own, ``fixed.xtce``, whose digest never changes, so that no change to the
-    ordinary interface can touch them.
+    own, ``fixed.xtce``, and the beacon in another, ``beacon.xtce``, whose
+    digests never change, so that no change to the ordinary interface can
+    touch them.
 
 Requirement
-    No digest that goes over the link covers ``fixed.xtce``; every one of
-    them stands for ``link.xtce``. The beacon's ``interface`` field is the
-    digest of ``link.xtce``. Its ``digest`` field, the checksum CONNECT
-    carries and its answer gives back, and the target checksum of
-    RESTART_ARM and of RESTART are configuration checksums, and a
-    configuration's checksum covers its ``interface``, the same digest of
-    ``link.xtce``. ``fixed.xtce`` needs no name for the two ends to agree
-    on, because it is the same in every build: what holds it so is the
-    test ``the_fixed_commands_document_never_changes`` in
-    ``tcslibgs/src/link.rs``, which pins its digest and fails at any change
-    to it.
+    No digest that goes over the link covers ``fixed.xtce`` or
+    ``beacon.xtce``; every one of them stands for ``link.xtce``. The
+    beacon's ``interface`` field is the digest of ``link.xtce``. Its
+    ``digest`` field, the checksum CONNECT carries and its answer gives
+    back, and the target checksum of RESTART_ARM and of RESTART are
+    configuration checksums, and a configuration's checksum covers its
+    ``interface``, the same digest of ``link.xtce``. The target of
+    SWITCH_ARM and of SWITCH is an interface digest: the digest of the
+    ``link.xtce`` of the load set to switch to. ``fixed.xtce`` and
+    ``beacon.xtce`` need no name for the two ends to agree on, because each
+    is the same in every build: what holds them so is the tests
+    ``the_fixed_commands_document_never_changes`` and
+    ``the_beacon_document_never_changes`` in ``tcslibgs/src/link.rs``,
+    which pin their digests and fail at any change to either.
 
 Framing is a gateway's
 ~~~~~~~~~~~~~~~~~~~~~~
@@ -5992,63 +6010,51 @@ stands:
 - In `Configurations named by their checksum`_, under `Still to be
   decided`_: the frozen layout of the three commands, settled here.
 - In `The Interface, the Fallback and Switching Over`_: the fallback
-  interface becomes ``fixed.xtce``, holding only the three fixed commands.
+  interface, with a document and a link of its own, becomes the fixed
+  commands, in ``fixed.xtce`` on the command link, SWITCH_ARM and SWITCH
+  among them; the beacon is in ``beacon.xtce``.
 - CONNECT no longer carries the ground station's build version: the
   vehicle acts on the checksum alone. The answer still carries the
   vehicle's build version, for the station to show.
 
-Two interfaces
---------------
+The way in, and the interface
+-----------------------------
 
-The vehicle speaks two interfaces, each a set of XTCE documents with a
-digest of its own: the *full* interface, which is everything the ground can
-ask of the vehicle, and the *fallback* interface, which is just enough to
-reach the vehicle and switch it to a new full interface, whatever state the
-full interface is in.
+The vehicle speaks the *fixed commands*, which never change, and an
+*interface*, which is everything else the ground can ask of it and changes
+with the build. The fixed commands are the way in: whatever interface is
+running, and whether or not the ground and the vehicle agree about it, they
+are taken, and they are enough to restart the vehicle onto another
+configuration or switch it to another load set. There is no fallback
+interface apart from them, and no link of its own for one: every command
+goes on the command link, and the beacon on a link of its own.
 
 Requirement
     The *interface digest* of an interface is the tcs-xtce digest of its set
     of XTCE documents, which state the commands and answers and not the
-    beacon -- for the full interface today, the documents in
-    ``tcslibgs/xtce/``, which is ``link.xtce`` alone, as ``make
-    interface-digest`` there takes them. It is the MD5 of what the
-    documents mean, which leaves out comments, whitespace, attribute order
-    and the order of the members of a set, and which tcs-xtce computes
-    identically in Rust, C/C++ and Python.
+    beacon -- for the interface today, the documents in ``tcslibgs/xtce/``,
+    which is ``link.xtce`` alone, as ``make interface-digest`` there takes
+    them. It is the MD5 of what the documents mean, which leaves out
+    comments, whitespace, attribute order and the order of the members of a
+    set, and which tcs-xtce computes identically in Rust, C/C++ and Python.
     Two programs speak the same interface when, and only when, their digests
     are the same.
 
 Requirement
-    The fallback interface is its own XTCE document,
-    ``tcslibgs/xtce/fallback.xtce``: its own ``SpaceSystem``, sharing no type,
-    parameter or container with the full interface, so that no change to the
-    full interface can change it. It is compiled into every build, and no
-    load set replaces it.
+    The fixed commands are CONNECT, RESTART_ARM, RESTART, SWITCH_ARM and
+    SWITCH, stated in ``fixed.xtce`` as `The fixed commands`_ says, compiled
+    into every build, and replaced by no load set. None of them starts,
+    stops or sets a node, changes the beacon interval or changes what any
+    payload does: what they can do to the vehicle is match it, and restart
+    it onto a configuration or a load set already there.
 
 Requirement
-    The fallback interface is taken on a link of its own -- ``fallback.recv``
-    and ``fallback.send`` in the ``tcspecial`` section, required -- and is
-    always taken, whichever full interface is running. A full interface that
-    cannot be decoded, or that the ground and the vehicle disagree about, then
-    still leaves a way in.
-
-Requirement
-    The fallback interface is PING; CONNECT, whose answer carries the build,
-    the configuration digest and the interface digest; and SWITCH_ARM and
-    SWITCH. It has nothing that starts, stops or sets a node, changes the
-    beacon interval or changes what any payload does: what it can do to the
-    vehicle is switch it to a load set already there.
-
-Requirement
-    The full interface is read and write: every command the vehicle takes,
-    the fallback's among them.
-
-Requirement
-    The ground compares interface digests before it sends a full-interface
-    command: ``tcslib`` refuses to send one while the last beacon's
+    The ground compares interface digests before it sends a command of the
+    interface: ``tcslib`` refuses to send one while the last beacon's
     interface digest differs from the digest of the documents the ground
-    read, and says which documents and which two digests. Fallback commands
-    are never refused for this, because they are how a mismatch is fixed.
+    read, and says which documents and which two digests. The fixed
+    commands are never refused for this, because they are how a mismatch is
+    fixed.
 
 Reading, writing and checking an interface
 ------------------------------------------
@@ -6077,7 +6083,7 @@ Requirement
 The load set
 ------------
 
-A full interface is compiled into the build that speaks it: tcs-xtce
+An interface is compiled into the build that speaks it: tcs-xtce
 generates code from XTCE and does not interpret it. A new interface is
 therefore a new build, and a new build is only useful with the configuration
 it serves and the programs and data of the app nodes in that configuration.
@@ -6085,7 +6091,7 @@ All of them together are a *load set*, and a load set is switched to whole or
 not at all.
 
 Requirement
-    The full interface's XTCE states its load set, in ``AncillaryData`` named
+    The interface's XTCE states its load set, in ``AncillaryData`` named
     ``tcspecial.load``, one entry for every file in it: its role, its path
     within the load set, its size in bytes and its MD5. The roles are
     ``executable`` (exactly one: the tcspecial built from these documents),
@@ -6715,9 +6721,11 @@ Replaced once the rest is built, and describing what runs until then:
   this scheme are those in `Holes in the checksum scheme, and what closes
   them`_.
 
-The load sets, SWITCH, the golden build and the fallback interface, in `The
-Interface, the Fallback and Switching Over`_, are set aside: they are not
-part of this scheme, and are not to be built for now.
+The load sets, SWITCH, and the golden build, in `The Interface, the
+Fallback and Switching Over`_, were set aside from this scheme, and are now
+built on top of it: SWITCH_ARM and SWITCH are fixed commands, armed as
+RESTART_ARM and RESTART are, and the fallback interface is the fixed
+commands.
 
 Still to be decided
 ~~~~~~~~~~~~~~~~~~~
@@ -6725,7 +6733,8 @@ Still to be decided
 The frozen layout of the three commands
     Settled, and built, in `The link without a header`_: there is no shared
     header, and the three are fixed commands whose opcodes and layouts never
-    change, with the target checksum in RESTART_ARM and RESTART.
+    change, with the target checksum in RESTART_ARM and RESTART. SWITCH_ARM
+    and SWITCH have since joined them.
 
 In-flight data across a restart
 -------------------------------
@@ -6925,8 +6934,8 @@ Requirement
     The executable the vehicle is installed with is the *golden* build. It is
     always what starts: on every start it reads the state file and, where a
     load set is chosen, checks it and runs that load set's executable with
-    that load set's configuration. A golden build carries the fallback
-    interface and a full interface of its own, and runs with them when no
+    that load set's configuration. A golden build carries the fixed
+    commands and an interface of its own, and runs with them when no
     load set is chosen or the chosen one fails its check.
 
 Requirement
@@ -7342,9 +7351,9 @@ A configuration the new build would refuse
     refused when it is loaded is refused before the vehicle switches to it,
     not after.
 
-The full interface breaking the way in
-    The fallback interface has its own document and its own link, and no
-    load set replaces it.
+The interface breaking the way in
+    The fixed commands have their own document, whose digest is pinned, and
+    no load set replaces it.
 
 A restart whose first beacons are all lost
     A restart is judged from the beacons by their number going back alone,

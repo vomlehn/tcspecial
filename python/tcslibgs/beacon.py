@@ -13,15 +13,15 @@ read strictly, as the Rust reads it. A beacon carries no check of its own:
 the transport under it checks it, as UDP's checksum does here.
 
 Its layout -- six text fields, each but the last ended by a colon, the last
-32 characters that end the datagram -- is in ``tcslibgs/xtce/fixed.xtce``
-beside the three fixed commands, and is packed and unpacked here by the code
-tcs-xtce generates from it, :class:`tcslibgs.fixed_packet.Beacon`. What the
+32 characters that end the datagram -- is in ``tcslibgs/xtce/beacon.xtce``,
+and is packed and unpacked here by the code tcs-xtce generates from it,
+:class:`tcslibgs.beacon_packet.Beacon`. What the
 text must say, and turning it into numbers and digests and back, is here.
 """
 
 from dataclasses import dataclass
 
-from . import fixed_packet as _fixed
+from . import beacon_packet as _packet
 from . import interface as _interface
 from ._xtce.packet import PacketError as _PacketError
 
@@ -36,7 +36,7 @@ NORMAL_FLAG = "normal"
 #: and the longer flag, with the five colons between them -- the longest the
 #: XTCE's layout allows.
 BEACON_BYTES = 9 + 11 + 32 + 10 + 7 + 32 + 5
-assert BEACON_BYTES == _fixed.Beacon.MAX_BYTES
+assert BEACON_BYTES == _packet.Beacon.MAX_BYTES
 
 #: What each field's being longer than its room says, by the field's name in
 #: the XTCE.
@@ -169,7 +169,7 @@ class Beacon:
             raise _refused("it is not text") from None
         count = text.count(":") + 1
         try:
-            fields, used = _fixed.Beacon.decode_prefix(bytes(datagram))
+            fields, used = _packet.Beacon.decode_prefix(bytes(datagram))
         except _PacketError as why:
             field = why.what[0] if why.what else ""
             if why.kind == "TooLong" and field in _TOO_LONG:
@@ -220,7 +220,7 @@ class Beacon:
             The beacon packed as tcspecial packs it, ``BEACON_BYTES`` long.
         """
         major, minor, patch = self.version
-        return _fixed.Beacon(
+        return _packet.Beacon(
             beacon_name=BEACON_NAME,
             beacon_version=f"{major}.{minor}.{patch}",
             beacon_digest=self.digest.hex(),

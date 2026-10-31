@@ -404,9 +404,10 @@ unfamiliar one was assumed to be, which made a misspelled extension not an
 error but a file parsed as the wrong language. Nothing was written in it
 that was not also written in YAML.
 
-(The command link carries packets stated in XTCE: the three fixed commands
-in ``tcslibgs/xtce/fixed.xtce`` and the rest in ``tcslibgs/xtce/link.xtce``.
-Those are not configuration files and are unaffected; a configuration names
+(The links carry packets stated in XTCE: the fixed commands in
+``tcslibgs/xtce/fixed.xtce``, the beacon in ``tcslibgs/xtce/beacon.xtce``
+and the rest in ``tcslibgs/xtce/link.xtce``. Those are not configuration
+files and are unaffected; a configuration names
 the second, as its ``interface``: see `Which interface it is written for`_.)
 
 Which Files There Are
@@ -2166,17 +2167,16 @@ digest, also as 32 hex digits:
 
 It is text so that it can be read as it is, in a packet capture, a log or
 with any UDP listener, with nothing to decode it. Its layout is stated in
-XTCE, in ``tcslibgs/xtce/fixed.xtce`` beside the three commands that always
-go, as six text fields -- each but the last ended by its colon -- and
-nothing else, so a ground system that reads XTCE can read it too. That is what goes on the
-wire; what the window shows on its ``Last msg:`` line is written for the
-window, as ``tcspecial v0.1.0 md5`` and the digest. tcspecial writes each
-beacon, and ``tcslib::beacon`` reads it, with ``tcslibgs::Beacon``, which
-the Python in ``python/tcslibgs/beacon.py`` says again, held to it by the
-same examples in their tests. The example's test writes the beacon it sends
-the same way. A beacon is read strictly: anything with a field out of its
-form, a seventh field, a trailing colon or newline, or more than 106 bytes,
-is not a beacon.
+XTCE, in ``tcslibgs/xtce/beacon.xtce``, as six text fields -- each but the
+last ended by its colon -- and nothing else, so a ground system that reads
+XTCE can read it too. That is what goes on the wire; what the window shows on
+its ``Last msg:`` line is written for the window, as ``tcspecial v0.1.0 md5``
+and the digest. tcspecial writes each beacon, and ``tcslib::beacon`` reads it,
+with ``tcslibgs::Beacon``, which the Python in ``python/tcslibgs/beacon.py``
+says again, held to it by the same examples in their tests. The example's test
+writes the beacon it sends the same way. A beacon is read strictly: anything
+with a field out of its form, a seventh field, a trailing colon or newline, or
+more than 106 bytes, is not a beacon.
 
 tcsmoc shows that same panel from that same library, in a row beside its
 command link. That is the point of their being apart: what a beacon means is
@@ -3496,12 +3496,14 @@ configuration's checksum covers ``interface``, so a vehicle and a ground
 station whose checksums match are reading the same interface as well.
 
 Every digest you will see on the link stands for ``link.xtce``: the
-beacon's last field is its digest, and the checksums in the beacon, in
-CONNECT and its answer, and in RESTART_ARM and RESTART are configuration
-checksums, which cover ``interface``. None covers
-``tcslibgs/xtce/fixed.xtce``, where CONNECT, RESTART_ARM, RESTART and the
-beacon are laid out. It is the same in every build, so there is nothing to
-compare, and a test in ``tcslibgs`` fails if it is ever changed.
+beacon's last field is its digest, the checksums in the beacon, in CONNECT
+and its answer, and in RESTART_ARM and RESTART are configuration
+checksums, which cover ``interface``, and the target of SWITCH_ARM and
+SWITCH is the digest of a load set's ``link.xtce``. None covers
+``tcslibgs/xtce/fixed.xtce``, where the fixed commands are laid out, or
+``tcslibgs/xtce/beacon.xtce``, where the beacon is. Each is the same in
+every build, so there is nothing to compare, and a test in ``tcslibgs``
+fails if either is ever changed.
 
 Where the links are
 -------------------

@@ -1,0 +1,103 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- The beacon, as it goes on the beacon link: the whole of each datagram.
+
+     The vehicle sends it every beacon interval, whatever else it is doing,
+     on a link of its own, apart from the commands and their answers, which
+     are in fixed.xtce and link.xtce. Its layout is fixed for ever: no build
+     and no configuration changes it, and nothing in this document is ever
+     changed. A test in tcslibgs/src/link.rs pins the digest of this
+     document, and fails, saying so, if it is changed.
+
+     The beacon is text, and only text, so that a person can read it as it
+     is, in a capture or a log, with no decoder:
+
+       tcspecial:1.2.3:d41d8cd98f00b204e9800998ecf8427e:42:normal:0123...cdef
+
+     six fields of UTF-8: the name, the version, the configuration's digest,
+     the beacon's number, the restart flag and the interface's digest, each
+     but the last ended by a colon, and the last 32 characters that end the
+     datagram. Numbers are decimal digits and digests lower-case hex: what
+     the text must say, and turning it into numbers and digests and back,
+     is tcslibgs/src/beacon.rs's and python/tcslibgs/beacon.py's. At most
+     106 bytes.
+
+     The Rust in tcslibgs/src/beacon_packet.rs and the Python in
+     python/tcslibgs/beacon_packet.py are generated from this file by
+     `make beacon-packet` in tcslibgs/. See "The fixed commands" in
+     docs/design.rst. -->
+<SpaceSystem xmlns="http://www.omg.org/spec/XTCE/20250214" name="TcsBeacon">
+  <TelemetryMetaData>
+    <ParameterTypeSet>
+      <!-- The beacon's fields: each but the last ended by a colon, and no
+           longer than the field can be, the colon counted. -->
+      <StringParameterType name="BeaconNameType">
+        <StringDataEncoding encoding="UTF-8">
+          <Variable maxSizeInBits="80">
+            <TerminationChar>3A</TerminationChar>
+          </Variable>
+        </StringDataEncoding>
+      </StringParameterType>
+      <StringParameterType name="BeaconVersionType">
+        <StringDataEncoding encoding="UTF-8">
+          <Variable maxSizeInBits="96">
+            <TerminationChar>3A</TerminationChar>
+          </Variable>
+        </StringDataEncoding>
+      </StringParameterType>
+      <StringParameterType name="BeaconDigestType">
+        <StringDataEncoding encoding="UTF-8">
+          <Variable maxSizeInBits="264">
+            <TerminationChar>3A</TerminationChar>
+          </Variable>
+        </StringDataEncoding>
+      </StringParameterType>
+      <StringParameterType name="BeaconNumberType">
+        <StringDataEncoding encoding="UTF-8">
+          <Variable maxSizeInBits="88">
+            <TerminationChar>3A</TerminationChar>
+          </Variable>
+        </StringDataEncoding>
+      </StringParameterType>
+      <StringParameterType name="BeaconFlagType">
+        <StringDataEncoding encoding="UTF-8">
+          <Variable maxSizeInBits="64">
+            <TerminationChar>3A</TerminationChar>
+          </Variable>
+        </StringDataEncoding>
+      </StringParameterType>
+      <!-- The last: 32 characters, which end the datagram. -->
+      <StringParameterType name="BeaconInterfaceType">
+        <StringDataEncoding encoding="UTF-8">
+          <SizeInBits>
+            <Fixed>
+              <FixedValue>256</FixedValue>
+            </Fixed>
+          </SizeInBits>
+        </StringDataEncoding>
+      </StringParameterType>
+    </ParameterTypeSet>
+    <ParameterSet>
+      <Parameter name="BeaconName" parameterTypeRef="BeaconNameType"/>
+      <Parameter name="BeaconVersion" parameterTypeRef="BeaconVersionType"/>
+      <Parameter name="BeaconDigest" parameterTypeRef="BeaconDigestType"/>
+      <Parameter name="BeaconNumber" parameterTypeRef="BeaconNumberType"/>
+      <Parameter name="BeaconFlag" parameterTypeRef="BeaconFlagType"/>
+      <Parameter name="BeaconInterface"
+                 parameterTypeRef="BeaconInterfaceType"/>
+    </ParameterSet>
+    <ContainerSet>
+      <!-- The beacon, which answers nothing: the vehicle sends it every
+           beacon interval, whatever else it is doing. -->
+      <SequenceContainer name="Beacon">
+        <EntryList>
+          <ParameterRefEntry parameterRef="BeaconName"/>
+          <ParameterRefEntry parameterRef="BeaconVersion"/>
+          <ParameterRefEntry parameterRef="BeaconDigest"/>
+          <ParameterRefEntry parameterRef="BeaconNumber"/>
+          <ParameterRefEntry parameterRef="BeaconFlag"/>
+          <ParameterRefEntry parameterRef="BeaconInterface"/>
+        </EntryList>
+      </SequenceContainer>
+    </ContainerSet>
+  </TelemetryMetaData>
+</SpaceSystem>

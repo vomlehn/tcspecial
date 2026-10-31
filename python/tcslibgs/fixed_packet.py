@@ -21,8 +21,9 @@ def _describe_bool(v: bool) -> str:
 
 
 __all__ = ["StatusType", "AlarmMonitor", "RestartArmAnswer", "RestartAnswer",
-           "ConnectAnswer", "Beacon", "RestartArm", "Restart", "Connect",
-           "FixedAnswerKind", "FixedCommandKind"]
+           "SwitchArmAnswer", "SwitchAnswer", "ConnectAnswer", "RestartArm",
+           "Restart", "Connect", "SwitchArm", "Switch", "FixedAnswerKind",
+           "FixedCommandKind"]
 
 
 class StatusType(enum.IntEnum):
@@ -306,6 +307,228 @@ class RestartAnswer(pk.Packet):
 
 
 @dataclass(slots=True)
+class SwitchArmAnswer(pk.Packet):
+    """Sequence container ``/TcsFixed/SwitchArmAnswer``.
+
+    Fixed by its inheritance: ``Opcode`` = 5.
+    """
+
+    NAME: ClassVar[str] = "/TcsFixed/SwitchArmAnswer"
+    MAX_BYTES: ClassVar[int] = 14
+
+    sequence: int = 0
+    """``/TcsFixed/Sequence`` (/TcsFixed/U32Type)"""
+    status: StatusType = pk.enum_value(StatusType, 0)
+    """``/TcsFixed/Status`` (/TcsFixed/StatusType)"""
+    timestamp: int = 0
+    """``/TcsFixed/Timestamp`` (/TcsFixed/U64Type)"""
+
+    @classmethod
+    def decode_prefix(cls, data) -> tuple[SwitchArmAnswer, int]:
+        """Decodes a ``/TcsFixed/SwitchArmAnswer`` packet that starts at the
+        first byte of ``data``.
+
+        Args:
+            data: The packet's bytes, and any after it.
+
+        Returns:
+            The packet and the number of bytes it takes.
+
+        Raises:
+            pk.PacketError: The bytes aren't such a packet, or it can't be
+                decoded; its ``kind`` says why.
+        """
+        r = pk.BitReader(data)
+        v1 = r.uint_order(8, False, "Opcode")
+        v2 = r.uint_order(32, False, "Sequence")
+        v3 = pk.enum_value(StatusType, r.uint_order(8, False, "Status"))
+        v4 = r.uint_order(64, False, "Timestamp")
+        if not (v1 == 5):
+            raise pk.PacketError("Mismatch", "/TcsFixed/SwitchArmAnswer",
+                                 "/TcsFixed/Opcode == 5")
+        return SwitchArmAnswer(sequence=v2, status=v3, timestamp=v4), r.used()
+
+    def encode_into(self, w: pk.BitWriter) -> None:
+        """Encodes this ``/TcsFixed/SwitchArmAnswer`` packet with a writer,
+        after what it has written.
+
+        Args:
+            w: The writer.
+
+        Raises:
+            pk.PacketError: A field's value can't be encoded; its ``kind`` says
+                why.
+        """
+        w.uint_order(8, False, pk.from_signed(5, 8, 'unsigned', "Opcode"))
+        w.uint_order(32, False,
+                     pk.from_signed(self.sequence, 32, "unsigned", "Sequence"))
+        w.uint_order(8, False,
+                     pk.from_signed(int(self.status), 8, "unsigned", "Status"))
+        w.uint_order(64, False,
+                     pk.from_signed(self.timestamp, 64, "unsigned",
+                                    "Timestamp"))
+
+    def alarms(self) -> list:
+        """Evaluates the alarms of this ``/TcsFixed/SwitchArmAnswer`` packet's
+        fields. Alarms that depend on earlier samples count only this one (see
+        ``monitor``).
+
+        Returns:
+            (field, alarm level) for each field with an alarm; the level is None
+            when the field is absent.
+        """
+        return []
+
+    def monitor(self, m: AlarmMonitor, t: float = 0.0) -> list:
+        """Evaluates the alarms of this ``/TcsFixed/SwitchArmAnswer`` packet's
+        fields like ``alarms()``, counting the earlier samples for change
+        ranges, minViolations and minConformance.
+
+        Args:
+            m: The state of the alarms that depend on earlier samples, which the
+               method reads and updates.
+            t: This sample's time, in seconds.
+
+        Returns:
+            (field, alarm level) for each field with an alarm; the level is None
+            when the field is absent.
+        """
+        return []
+
+    def algorithms(self) -> list:
+        """Evaluates the MathAlgorithms that a ``/TcsFixed/SwitchArmAnswer``
+        packet triggers, from this one's values.
+
+        Returns:
+            (output, value) for each; the value is None when an input is absent
+            or a custom algorithm's function isn't set or fails.
+        """
+        return []
+
+    def describe(self) -> str:
+        """Describes this ``/TcsFixed/SwitchArmAnswer`` packet.
+
+        Returns:
+            Its canonical text form, identical in every generated language.
+        """
+        return ("SwitchArmAnswer{"
+                + ", ".join(("sequence=" + str(self.sequence),
+                             "status=" + _DESCRIBE_StatusType(self.status),
+                             "timestamp=" + str(self.timestamp))) + "}")
+
+
+@dataclass(slots=True)
+class SwitchAnswer(pk.Packet):
+    """Sequence container ``/TcsFixed/SwitchAnswer``.
+
+    Fixed by its inheritance: ``Opcode`` = 6.
+    """
+
+    NAME: ClassVar[str] = "/TcsFixed/SwitchAnswer"
+    MAX_BYTES: ClassVar[int] = 14
+
+    sequence: int = 0
+    """``/TcsFixed/Sequence`` (/TcsFixed/U32Type)"""
+    status: StatusType = pk.enum_value(StatusType, 0)
+    """``/TcsFixed/Status`` (/TcsFixed/StatusType)"""
+    timestamp: int = 0
+    """``/TcsFixed/Timestamp`` (/TcsFixed/U64Type)"""
+
+    @classmethod
+    def decode_prefix(cls, data) -> tuple[SwitchAnswer, int]:
+        """Decodes a ``/TcsFixed/SwitchAnswer`` packet that starts at the first
+        byte of ``data``.
+
+        Args:
+            data: The packet's bytes, and any after it.
+
+        Returns:
+            The packet and the number of bytes it takes.
+
+        Raises:
+            pk.PacketError: The bytes aren't such a packet, or it can't be
+                decoded; its ``kind`` says why.
+        """
+        r = pk.BitReader(data)
+        v1 = r.uint_order(8, False, "Opcode")
+        v2 = r.uint_order(32, False, "Sequence")
+        v3 = pk.enum_value(StatusType, r.uint_order(8, False, "Status"))
+        v4 = r.uint_order(64, False, "Timestamp")
+        if not (v1 == 6):
+            raise pk.PacketError("Mismatch", "/TcsFixed/SwitchAnswer",
+                                 "/TcsFixed/Opcode == 6")
+        return SwitchAnswer(sequence=v2, status=v3, timestamp=v4), r.used()
+
+    def encode_into(self, w: pk.BitWriter) -> None:
+        """Encodes this ``/TcsFixed/SwitchAnswer`` packet with a writer, after
+        what it has written.
+
+        Args:
+            w: The writer.
+
+        Raises:
+            pk.PacketError: A field's value can't be encoded; its ``kind`` says
+                why.
+        """
+        w.uint_order(8, False, pk.from_signed(6, 8, 'unsigned', "Opcode"))
+        w.uint_order(32, False,
+                     pk.from_signed(self.sequence, 32, "unsigned", "Sequence"))
+        w.uint_order(8, False,
+                     pk.from_signed(int(self.status), 8, "unsigned", "Status"))
+        w.uint_order(64, False,
+                     pk.from_signed(self.timestamp, 64, "unsigned",
+                                    "Timestamp"))
+
+    def alarms(self) -> list:
+        """Evaluates the alarms of this ``/TcsFixed/SwitchAnswer`` packet's
+        fields. Alarms that depend on earlier samples count only this one (see
+        ``monitor``).
+
+        Returns:
+            (field, alarm level) for each field with an alarm; the level is None
+            when the field is absent.
+        """
+        return []
+
+    def monitor(self, m: AlarmMonitor, t: float = 0.0) -> list:
+        """Evaluates the alarms of this ``/TcsFixed/SwitchAnswer`` packet's
+        fields like ``alarms()``, counting the earlier samples for change
+        ranges, minViolations and minConformance.
+
+        Args:
+            m: The state of the alarms that depend on earlier samples, which the
+               method reads and updates.
+            t: This sample's time, in seconds.
+
+        Returns:
+            (field, alarm level) for each field with an alarm; the level is None
+            when the field is absent.
+        """
+        return []
+
+    def algorithms(self) -> list:
+        """Evaluates the MathAlgorithms that a ``/TcsFixed/SwitchAnswer`` packet
+        triggers, from this one's values.
+
+        Returns:
+            (output, value) for each; the value is None when an input is absent
+            or a custom algorithm's function isn't set or fails.
+        """
+        return []
+
+    def describe(self) -> str:
+        """Describes this ``/TcsFixed/SwitchAnswer`` packet.
+
+        Returns:
+            Its canonical text form, identical in every generated language.
+        """
+        return ("SwitchAnswer{"
+                + ", ".join(("sequence=" + str(self.sequence),
+                             "status=" + _DESCRIBE_StatusType(self.status),
+                             "timestamp=" + str(self.timestamp))) + "}")
+
+
+@dataclass(slots=True)
 class ConnectAnswer(pk.Packet):
     """Sequence container ``/TcsFixed/ConnectAnswer``.
 
@@ -449,131 +672,6 @@ class ConnectAnswer(pk.Packet):
 
 
 @dataclass(slots=True)
-class Beacon(pk.Packet):
-    """Sequence container ``/TcsFixed/Beacon``.
-    """
-
-    NAME: ClassVar[str] = "/TcsFixed/Beacon"
-    MAX_BYTES: ClassVar[int] = 106
-
-    beacon_name: str = ""
-    """``/TcsFixed/BeaconName`` (/TcsFixed/BeaconNameType)"""
-    beacon_version: str = ""
-    """``/TcsFixed/BeaconVersion`` (/TcsFixed/BeaconVersionType)"""
-    beacon_digest: str = ""
-    """``/TcsFixed/BeaconDigest`` (/TcsFixed/BeaconDigestType)"""
-    beacon_number: str = ""
-    """``/TcsFixed/BeaconNumber`` (/TcsFixed/BeaconNumberType)"""
-    beacon_flag: str = ""
-    """``/TcsFixed/BeaconFlag`` (/TcsFixed/BeaconFlagType)"""
-    beacon_interface: str = ""
-    """``/TcsFixed/BeaconInterface`` (/TcsFixed/BeaconInterfaceType)"""
-
-    @classmethod
-    def decode_prefix(cls, data) -> tuple[Beacon, int]:
-        """Decodes a ``/TcsFixed/Beacon`` packet that starts at the first byte
-        of ``data``.
-
-        Args:
-            data: The packet's bytes, and any after it.
-
-        Returns:
-            The packet and the number of bytes it takes.
-
-        Raises:
-            pk.PacketError: The bytes aren't such a packet, or it can't be
-                decoded; its ``kind`` says why.
-        """
-        r = pk.BitReader(data)
-        v10 = pk.read_string(r, (None, 80, b':', 0, 'UTF-8'), "BeaconName")
-        v11 = pk.read_string(r, (None, 96, b':', 0, 'UTF-8'), "BeaconVersion")
-        v12 = pk.read_string(r, (None, 264, b':', 0, 'UTF-8'), "BeaconDigest")
-        v13 = pk.read_string(r, (None, 88, b':', 0, 'UTF-8'), "BeaconNumber")
-        v14 = pk.read_string(r, (None, 64, b':', 0, 'UTF-8'), "BeaconFlag")
-        v15 = pk.read_string(r, (256, 256, b"\x00", 0, "UTF-8"),
-                             "BeaconInterface")
-        return (Beacon(beacon_name=v10, beacon_version=v11, beacon_digest=v12,
-                       beacon_number=v13, beacon_flag=v14,
-                       beacon_interface=v15), r.used())
-
-    def encode_into(self, w: pk.BitWriter) -> None:
-        """Encodes this ``/TcsFixed/Beacon`` packet with a writer, after what it
-        has written.
-
-        Args:
-            w: The writer.
-
-        Raises:
-            pk.PacketError: A field's value can't be encoded; its ``kind`` says
-                why.
-        """
-        pk.write_string(w, (None, 80, b":", 0, "UTF-8"), self.beacon_name,
-                        "BeaconName")
-        pk.write_string(w, (None, 96, b":", 0, "UTF-8"), self.beacon_version,
-                        "BeaconVersion")
-        pk.write_string(w, (None, 264, b":", 0, "UTF-8"), self.beacon_digest,
-                        "BeaconDigest")
-        pk.write_string(w, (None, 88, b":", 0, "UTF-8"), self.beacon_number,
-                        "BeaconNumber")
-        pk.write_string(w, (None, 64, b":", 0, "UTF-8"), self.beacon_flag,
-                        "BeaconFlag")
-        pk.write_string(w, (256, 256, b"\x00", 0, "UTF-8"),
-                        self.beacon_interface, "BeaconInterface")
-
-    def alarms(self) -> list:
-        """Evaluates the alarms of this ``/TcsFixed/Beacon`` packet's fields.
-        Alarms that depend on earlier samples count only this one (see
-        ``monitor``).
-
-        Returns:
-            (field, alarm level) for each field with an alarm; the level is None
-            when the field is absent.
-        """
-        return []
-
-    def monitor(self, m: AlarmMonitor, t: float = 0.0) -> list:
-        """Evaluates the alarms of this ``/TcsFixed/Beacon`` packet's fields
-        like ``alarms()``, counting the earlier samples for change ranges,
-        minViolations and minConformance.
-
-        Args:
-            m: The state of the alarms that depend on earlier samples, which the
-               method reads and updates.
-            t: This sample's time, in seconds.
-
-        Returns:
-            (field, alarm level) for each field with an alarm; the level is None
-            when the field is absent.
-        """
-        return []
-
-    def algorithms(self) -> list:
-        """Evaluates the MathAlgorithms that a ``/TcsFixed/Beacon`` packet
-        triggers, from this one's values.
-
-        Returns:
-            (output, value) for each; the value is None when an input is absent
-            or a custom algorithm's function isn't set or fails.
-        """
-        return []
-
-    def describe(self) -> str:
-        """Describes this ``/TcsFixed/Beacon`` packet.
-
-        Returns:
-            Its canonical text form, identical in every generated language.
-        """
-        return "Beacon{" + ", ".join(
-            ("beacon_name=" + pk.describe_str(self.beacon_name),
-             "beacon_version=" + pk.describe_str(self.beacon_version),
-             "beacon_digest=" + pk.describe_str(self.beacon_digest),
-             "beacon_number=" + pk.describe_str(self.beacon_number),
-             "beacon_flag=" + pk.describe_str(self.beacon_flag),
-             "beacon_interface="
-             + pk.describe_str(self.beacon_interface))) + "}"
-
-
-@dataclass(slots=True)
 class RestartArm(pk.Packet):
     """Meta-command ``/TcsFixed/RestartArm``.
 
@@ -606,14 +704,14 @@ class RestartArm(pk.Packet):
                 decoded; its ``kind`` says why.
         """
         r = pk.BitReader(data)
-        v16 = r.uint_order(8, False, "Opcode")
-        v17 = r.uint_order(32, False, "Sequence")
-        if not (v16 == 2):
+        v10 = r.uint_order(8, False, "Opcode")
+        v11 = r.uint_order(32, False, "Sequence")
+        if not (v10 == 2):
             raise pk.PacketError("Mismatch", "/TcsFixed/RestartArm",
                                  "Opcode = 2")
-        v18 = r.uint_order(64, False, "ArmKey")
-        v19 = r.bytes(16, "Target")
-        return RestartArm(sequence=v17, arm_key=v18, target=v19), r.used()
+        v12 = r.uint_order(64, False, "ArmKey")
+        v13 = r.bytes(16, "Target")
+        return RestartArm(sequence=v11, arm_key=v12, target=v13), r.used()
 
     def encode_into(self, w: pk.BitWriter) -> None:
         """Encodes this ``/TcsFixed/RestartArm`` packet with a writer, after
@@ -715,13 +813,13 @@ class Restart(pk.Packet):
                 decoded; its ``kind`` says why.
         """
         r = pk.BitReader(data)
-        v16 = r.uint_order(8, False, "Opcode")
-        v17 = r.uint_order(32, False, "Sequence")
-        if not (v16 == 3):
+        v10 = r.uint_order(8, False, "Opcode")
+        v11 = r.uint_order(32, False, "Sequence")
+        if not (v10 == 3):
             raise pk.PacketError("Mismatch", "/TcsFixed/Restart", "Opcode = 3")
-        v20 = r.uint_order(64, False, "ArmKey")
-        v21 = r.bytes(16, "Target")
-        return Restart(sequence=v17, arm_key=v20, target=v21), r.used()
+        v14 = r.uint_order(64, False, "ArmKey")
+        v15 = r.bytes(16, "Target")
+        return Restart(sequence=v11, arm_key=v14, target=v15), r.used()
 
     def encode_into(self, w: pk.BitWriter) -> None:
         """Encodes this ``/TcsFixed/Restart`` packet with a writer, after what
@@ -821,12 +919,12 @@ class Connect(pk.Packet):
                 decoded; its ``kind`` says why.
         """
         r = pk.BitReader(data)
-        v16 = r.uint_order(8, False, "Opcode")
-        v17 = r.uint_order(32, False, "Sequence")
-        if not (v16 == 4):
+        v10 = r.uint_order(8, False, "Opcode")
+        v11 = r.uint_order(32, False, "Sequence")
+        if not (v10 == 4):
             raise pk.PacketError("Mismatch", "/TcsFixed/Connect", "Opcode = 4")
-        v22 = r.bytes(16, "Checksum")
-        return Connect(sequence=v17, checksum=v22), r.used()
+        v16 = r.bytes(16, "Checksum")
+        return Connect(sequence=v11, checksum=v16), r.used()
 
     def encode_into(self, w: pk.BitWriter) -> None:
         """Encodes this ``/TcsFixed/Connect`` packet with a writer, after what
@@ -893,15 +991,234 @@ class Connect(pk.Packet):
                 + "}")
 
 
+@dataclass(slots=True)
+class SwitchArm(pk.Packet):
+    """Meta-command ``/TcsFixed/SwitchArm``.
+
+    Fixed by its inheritance: ``Opcode`` = 5.
+    """
+
+    NAME: ClassVar[str] = "/TcsFixed/SwitchArm"
+    MAX_BYTES: ClassVar[int] = 29
+
+    sequence: int = 0
+    """``/TcsFixed/FixedCommand#Sequence`` (/TcsFixed/U32Arg)"""
+    arm_key: int = 0
+    """``/TcsFixed/SwitchArm#ArmKey`` (/TcsFixed/U64Arg)"""
+    target: bytes = b""
+    """``/TcsFixed/SwitchArm#Target`` (/TcsFixed/ChecksumArg)"""
+
+    @classmethod
+    def decode_prefix(cls, data) -> tuple[SwitchArm, int]:
+        """Decodes a ``/TcsFixed/SwitchArm`` packet that starts at the first
+        byte of ``data``.
+
+        Args:
+            data: The packet's bytes, and any after it.
+
+        Returns:
+            The packet and the number of bytes it takes.
+
+        Raises:
+            pk.PacketError: The bytes aren't such a packet, or it can't be
+                decoded; its ``kind`` says why.
+        """
+        r = pk.BitReader(data)
+        v10 = r.uint_order(8, False, "Opcode")
+        v11 = r.uint_order(32, False, "Sequence")
+        if not (v10 == 5):
+            raise pk.PacketError("Mismatch", "/TcsFixed/SwitchArm",
+                                 "Opcode = 5")
+        v17 = r.uint_order(64, False, "ArmKey")
+        v18 = r.bytes(16, "Target")
+        return SwitchArm(sequence=v11, arm_key=v17, target=v18), r.used()
+
+    def encode_into(self, w: pk.BitWriter) -> None:
+        """Encodes this ``/TcsFixed/SwitchArm`` packet with a writer, after what
+        it has written.
+
+        Args:
+            w: The writer.
+
+        Raises:
+            pk.PacketError: A field's value can't be encoded; its ``kind`` says
+                why.
+        """
+        w.uint_order(8, False, pk.from_signed(5, 8, 'unsigned', "Opcode"))
+        w.uint_order(32, False,
+                     pk.from_signed(self.sequence, 32, "unsigned", "Sequence"))
+        w.uint_order(64, False,
+                     pk.from_signed(self.arm_key, 64, "unsigned", "ArmKey"))
+        pk.write_binary(w, self.target, 16, "Target")
+
+    def alarms(self) -> list:
+        """Evaluates the alarms of this ``/TcsFixed/SwitchArm`` packet's fields.
+        Alarms that depend on earlier samples count only this one (see
+        ``monitor``).
+
+        Returns:
+            (field, alarm level) for each field with an alarm; the level is None
+            when the field is absent.
+        """
+        return []
+
+    def monitor(self, m: AlarmMonitor, t: float = 0.0) -> list:
+        """Evaluates the alarms of this ``/TcsFixed/SwitchArm`` packet's fields
+        like ``alarms()``, counting the earlier samples for change ranges,
+        minViolations and minConformance.
+
+        Args:
+            m: The state of the alarms that depend on earlier samples, which the
+               method reads and updates.
+            t: This sample's time, in seconds.
+
+        Returns:
+            (field, alarm level) for each field with an alarm; the level is None
+            when the field is absent.
+        """
+        return []
+
+    def algorithms(self) -> list:
+        """Evaluates the MathAlgorithms that a ``/TcsFixed/SwitchArm`` packet
+        triggers, from this one's values.
+
+        Returns:
+            (output, value) for each; the value is None when an input is absent
+            or a custom algorithm's function isn't set or fails.
+        """
+        return []
+
+    def describe(self) -> str:
+        """Describes this ``/TcsFixed/SwitchArm`` packet.
+
+        Returns:
+            Its canonical text form, identical in every generated language.
+        """
+        return ("SwitchArm{"
+                + ", ".join(("sequence=" + str(self.sequence),
+                             "arm_key=" + str(self.arm_key),
+                             "target=" + pk.describe_bytes(self.target))) + "}")
+
+
+@dataclass(slots=True)
+class Switch(pk.Packet):
+    """Meta-command ``/TcsFixed/Switch``.
+
+    Fixed by its inheritance: ``Opcode`` = 6.
+    """
+
+    NAME: ClassVar[str] = "/TcsFixed/Switch"
+    MAX_BYTES: ClassVar[int] = 29
+
+    sequence: int = 0
+    """``/TcsFixed/FixedCommand#Sequence`` (/TcsFixed/U32Arg)"""
+    arm_key: int = 0
+    """``/TcsFixed/Switch#ArmKey`` (/TcsFixed/U64Arg)"""
+    target: bytes = b""
+    """``/TcsFixed/Switch#Target`` (/TcsFixed/ChecksumArg)"""
+
+    @classmethod
+    def decode_prefix(cls, data) -> tuple[Switch, int]:
+        """Decodes a ``/TcsFixed/Switch`` packet that starts at the first byte
+        of ``data``.
+
+        Args:
+            data: The packet's bytes, and any after it.
+
+        Returns:
+            The packet and the number of bytes it takes.
+
+        Raises:
+            pk.PacketError: The bytes aren't such a packet, or it can't be
+                decoded; its ``kind`` says why.
+        """
+        r = pk.BitReader(data)
+        v10 = r.uint_order(8, False, "Opcode")
+        v11 = r.uint_order(32, False, "Sequence")
+        if not (v10 == 6):
+            raise pk.PacketError("Mismatch", "/TcsFixed/Switch", "Opcode = 6")
+        v19 = r.uint_order(64, False, "ArmKey")
+        v20 = r.bytes(16, "Target")
+        return Switch(sequence=v11, arm_key=v19, target=v20), r.used()
+
+    def encode_into(self, w: pk.BitWriter) -> None:
+        """Encodes this ``/TcsFixed/Switch`` packet with a writer, after what it
+        has written.
+
+        Args:
+            w: The writer.
+
+        Raises:
+            pk.PacketError: A field's value can't be encoded; its ``kind`` says
+                why.
+        """
+        w.uint_order(8, False, pk.from_signed(6, 8, 'unsigned', "Opcode"))
+        w.uint_order(32, False,
+                     pk.from_signed(self.sequence, 32, "unsigned", "Sequence"))
+        w.uint_order(64, False,
+                     pk.from_signed(self.arm_key, 64, "unsigned", "ArmKey"))
+        pk.write_binary(w, self.target, 16, "Target")
+
+    def alarms(self) -> list:
+        """Evaluates the alarms of this ``/TcsFixed/Switch`` packet's fields.
+        Alarms that depend on earlier samples count only this one (see
+        ``monitor``).
+
+        Returns:
+            (field, alarm level) for each field with an alarm; the level is None
+            when the field is absent.
+        """
+        return []
+
+    def monitor(self, m: AlarmMonitor, t: float = 0.0) -> list:
+        """Evaluates the alarms of this ``/TcsFixed/Switch`` packet's fields
+        like ``alarms()``, counting the earlier samples for change ranges,
+        minViolations and minConformance.
+
+        Args:
+            m: The state of the alarms that depend on earlier samples, which the
+               method reads and updates.
+            t: This sample's time, in seconds.
+
+        Returns:
+            (field, alarm level) for each field with an alarm; the level is None
+            when the field is absent.
+        """
+        return []
+
+    def algorithms(self) -> list:
+        """Evaluates the MathAlgorithms that a ``/TcsFixed/Switch`` packet
+        triggers, from this one's values.
+
+        Returns:
+            (output, value) for each; the value is None when an input is absent
+            or a custom algorithm's function isn't set or fails.
+        """
+        return []
+
+    def describe(self) -> str:
+        """Describes this ``/TcsFixed/Switch`` packet.
+
+        Returns:
+            Its canonical text form, identical in every generated language.
+        """
+        return ("Switch{"
+                + ", ".join(("sequence=" + str(self.sequence),
+                             "arm_key=" + str(self.arm_key),
+                             "target=" + pk.describe_bytes(self.target))) + "}")
+
+
 class FixedAnswerKind(pk.PacketKind):
     """Every concrete packet derived from ``/TcsFixed/FixedAnswer``."""
 
     NAME: ClassVar[str] = "/TcsFixed/FixedAnswer"
     MAX_BYTES: ClassVar[int] = 37
-    MEMBERS: ClassVar[tuple] = (RestartArmAnswer, RestartAnswer, ConnectAnswer,)
+    MEMBERS: ClassVar[tuple] = (RestartArmAnswer, RestartAnswer,
+                                SwitchArmAnswer, SwitchAnswer, ConnectAnswer)
 
     @staticmethod
     def decode_prefix(data) -> tuple[Union[RestartArmAnswer, RestartAnswer,
+                                           SwitchArmAnswer, SwitchAnswer,
                                            ConnectAnswer], int]:
         """Decodes a packet derived from ``/TcsFixed/FixedAnswer`` that starts
         at the first byte of ``data``: reads the root's entries, then picks the
@@ -928,6 +1245,11 @@ class FixedAnswerKind(pk.PacketKind):
                     r.used())
         if (v1 == 3):
             return RestartAnswer(sequence=v2, status=v3, timestamp=v4), r.used()
+        if (v1 == 5):
+            return (SwitchArmAnswer(sequence=v2, status=v3, timestamp=v4),
+                    r.used())
+        if (v1 == 6):
+            return SwitchAnswer(sequence=v2, status=v3, timestamp=v4), r.used()
         if (v1 == 4):
             v5 = r.bytes(16, "Running")
             v6 = r.uint_order(8, False, "Major")
@@ -945,10 +1267,11 @@ class FixedCommandKind(pk.PacketKind):
 
     NAME: ClassVar[str] = "/TcsFixed/FixedCommand"
     MAX_BYTES: ClassVar[int] = 29
-    MEMBERS: ClassVar[tuple] = (RestartArm, Restart, Connect,)
+    MEMBERS: ClassVar[tuple] = (RestartArm, Restart, Connect, SwitchArm, Switch)
 
     @staticmethod
-    def decode_prefix(data) -> tuple[Union[RestartArm, Restart, Connect], int]:
+    def decode_prefix(data) -> tuple[Union[RestartArm, Restart, Connect,
+                                           SwitchArm, Switch], int]:
         """Decodes a packet derived from ``/TcsFixed/FixedCommand`` that starts
         at the first byte of ``data``: reads the root's entries, then picks the
         first child (in document order) whose criteria match, recursively.
@@ -965,17 +1288,25 @@ class FixedCommandKind(pk.PacketKind):
                 ``kind`` if the packet can't be decoded.
         """
         r = pk.BitReader(data)
-        v16 = r.uint_order(8, False, "Opcode")
-        v17 = r.uint_order(32, False, "Sequence")
-        if (v16 == 2):
-            v18 = r.uint_order(64, False, "ArmKey")
-            v19 = r.bytes(16, "Target")
-            return RestartArm(sequence=v17, arm_key=v18, target=v19), r.used()
-        if (v16 == 3):
-            v20 = r.uint_order(64, False, "ArmKey")
-            v21 = r.bytes(16, "Target")
-            return Restart(sequence=v17, arm_key=v20, target=v21), r.used()
-        if (v16 == 4):
-            v22 = r.bytes(16, "Checksum")
-            return Connect(sequence=v17, checksum=v22), r.used()
+        v10 = r.uint_order(8, False, "Opcode")
+        v11 = r.uint_order(32, False, "Sequence")
+        if (v10 == 2):
+            v12 = r.uint_order(64, False, "ArmKey")
+            v13 = r.bytes(16, "Target")
+            return RestartArm(sequence=v11, arm_key=v12, target=v13), r.used()
+        if (v10 == 3):
+            v14 = r.uint_order(64, False, "ArmKey")
+            v15 = r.bytes(16, "Target")
+            return Restart(sequence=v11, arm_key=v14, target=v15), r.used()
+        if (v10 == 4):
+            v16 = r.bytes(16, "Checksum")
+            return Connect(sequence=v11, checksum=v16), r.used()
+        if (v10 == 5):
+            v17 = r.uint_order(64, False, "ArmKey")
+            v18 = r.bytes(16, "Target")
+            return SwitchArm(sequence=v11, arm_key=v17, target=v18), r.used()
+        if (v10 == 6):
+            v19 = r.uint_order(64, False, "ArmKey")
+            v20 = r.bytes(16, "Target")
+            return Switch(sequence=v11, arm_key=v19, target=v20), r.used()
         raise pk.PacketError("NoMatch", "/TcsFixed/FixedCommand")

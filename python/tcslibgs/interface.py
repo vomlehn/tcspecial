@@ -15,8 +15,8 @@ from ._xtce import digest as _digest
 
 #: Where this tree's interface is stated: ``link.xtce``, as ``make
 #: interface-digest`` in tcslibgs/ takes it. ``fixed.xtce`` beside it holds the
-#: three fixed commands, which are not part of the interface: no change to the
-#: interface can touch them. Beside this module rather than found in the
+#: fixed commands, and ``beacon.xtce`` the beacon, which are not part of the
+#: interface: no change to the interface can touch them. Beside this module rather than found in the
 #: source tree, so that an installed package has them too: ``xtce`` here is a
 #: link to the crate's ``tcslibgs/xtce``, which is the one copy, and installing
 #: the package copies what it links to.

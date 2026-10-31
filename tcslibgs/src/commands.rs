@@ -3,6 +3,7 @@
 //! Commands are sent from ground to space and are idempotent.
 
 use crate::config_digest::ConfigDigest;
+use crate::interface::InterfaceDigest;
 use crate::types::{ArmKey, NodeId};
 
 /// Command message header
@@ -26,6 +27,10 @@ pub enum CommandType {
     Connect,
     RestartArm,
     Restart,
+    /// Arms a switch onto another load set: see [`SwitchArmCommand`].
+    SwitchArm,
+    /// Switches onto it: see [`SwitchCommand`].
+    Switch,
     /// Enable a node.
     ///
     /// The five below are what answer for a node, which a command names by
@@ -103,7 +108,9 @@ impl CommandType {
             CommandType::Ping
             | CommandType::Connect
             | CommandType::RestartArm
-            | CommandType::Restart => CommandLink::Spacecraft,
+            | CommandType::Restart
+            | CommandType::SwitchArm
+            | CommandType::Switch => CommandLink::Spacecraft,
 
             CommandType::StartNode
             | CommandType::StopNode
@@ -144,6 +151,8 @@ impl CommandType {
 
             CommandType::RestartArm
             | CommandType::Restart
+            | CommandType::SwitchArm
+            | CommandType::Switch
             | CommandType::StartNode
             | CommandType::StopNode
             | CommandType::SetNode
@@ -157,9 +166,10 @@ impl CommandType {
     /// tcspecial, and from its taking a RESTART, until it takes a CONNECT
     /// whose configuration checksum is the one it is running.
     ///
-    /// CONNECT, RESTART_ARM and RESTART, and nothing else. CONNECT is how
-    /// the two ends match; RESTART_ARM and RESTART are how the ground
-    /// rescues a vehicle that will not match, and none of the three carries
+    /// CONNECT, RESTART_ARM, RESTART, SWITCH_ARM and SWITCH, and nothing
+    /// else. CONNECT is how the two ends match; the other four are how the
+    /// ground rescues a vehicle that will not match, onto another
+    /// configuration or another load set, and none of the five carries
     /// anything a configuration gives a meaning to. Every other command
     /// names a node, an attribute or a value that means what one
     /// configuration says, so the vehicle answers it `Unmatched` and does
@@ -170,21 +180,23 @@ impl CommandType {
     /// The vehicle's command interpreter and the ground's client both ask
     /// this, so the two cannot come to disagree about which commands go.
     ///
-    /// They are also the three *fixed* commands, and for the same reason:
-    /// taken whatever either end is running, their layouts can never
-    /// change, and they are stated apart from every other command, in
-    /// `xtce/fixed.xtce`, with opcodes from [`FIXED_OPCODES`]. See "The three
+    /// They are also the *fixed* commands, and for the same reason: taken
+    /// whatever either end is running, their layouts can never change, and
+    /// they are stated apart from every other command, in
+    /// `xtce/fixed.xtce`, with opcodes from [`FIXED_OPCODES`]. See "The
     /// fixed commands" in `docs/design.rst`.
     ///
     /// # Returns
     ///
-    /// `true` for CONNECT, RESTART_ARM and RESTART, `false` for every other
-    /// kind.
+    /// `true` for CONNECT, RESTART_ARM, RESTART, SWITCH_ARM and SWITCH,
+    /// `false` for every other kind.
     pub fn taken_unmatched(&self) -> bool {
         match self {
             CommandType::Connect
             | CommandType::RestartArm
-            | CommandType::Restart => true,
+            | CommandType::Restart
+            | CommandType::SwitchArm
+            | CommandType::Switch => true,
 
             CommandType::Ping
             | CommandType::StartNode
@@ -197,7 +209,7 @@ impl CommandType {
 
     /// Gives the opcode a command of this kind carries, which its answer
     /// carries back. What goes on the link is stated in `xtce/fixed.xtce` for
-    /// the three fixed commands and in `xtce/link.xtce` for the rest, and a
+    /// the fixed commands and in `xtce/link.xtce` for the rest, and a
     /// test in [`crate::link`] holds this to them, so the two cannot come to
     /// differ.
     ///
@@ -210,6 +222,8 @@ impl CommandType {
             CommandType::Connect => 0x04,
             CommandType::RestartArm => 0x02,
             CommandType::Restart => 0x03,
+            CommandType::SwitchArm => 0x05,
+            CommandType::Switch => 0x06,
             // 0x20 is not used: it was CONFIG, which set the beacon
             // interval. The interval is the configuration's alone.
             CommandType::StartNode => 0x30,
@@ -236,6 +250,8 @@ impl CommandType {
             0x04 => Some(CommandType::Connect),
             0x02 => Some(CommandType::RestartArm),
             0x03 => Some(CommandType::Restart),
+            0x05 => Some(CommandType::SwitchArm),
+            0x06 => Some(CommandType::Switch),
             0x30 => Some(CommandType::StartNode),
             0x31 => Some(CommandType::StopNode),
             0x32 => Some(CommandType::SetNode),
@@ -247,8 +263,9 @@ impl CommandType {
 }
 
 /// The opcodes that belong to the fixed commands for ever: see
-/// [`CommandType::taken_unmatched`]. Three are used -- RESTART_ARM 0x02,
-/// RESTART 0x03 and CONNECT 0x04 -- and the rest are kept so that a fixed
+/// [`CommandType::taken_unmatched`]. Five are used -- RESTART_ARM 0x02,
+/// RESTART 0x03, CONNECT 0x04, SWITCH_ARM 0x05 and SWITCH 0x06 -- and the
+/// rest are kept so that a fixed
 /// command could be added without taking an opcode another command has had.
 /// No other command takes one of them but PING, which had 0x01 before there
 /// were fixed commands, and is an ordinary command all the same.
@@ -362,6 +379,95 @@ impl RestartCommand {
             header: CommandHeader {
                 sequence,
                 cmd_type: CommandType::Restart,
+            },
+            arm_key,
+            target,
+        }
+    }
+}
+
+/// SWITCH_ARM command - enable a switch for the next `restart_arm_valid`
+///
+/// Onto the load set whose interface digest is `target`, which the vehicle
+/// must hold and which must pass its check: one that does not is refused
+/// `NotFound`, and arms nothing. Armed as a RESTART_ARM is, and lasting as
+/// long; the two arms are one, so a SWITCH_ARM replaces a RESTART_ARM
+/// standing and the other way about.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct SwitchArmCommand {
+    pub header: CommandHeader,
+    pub arm_key: ArmKey,
+    /// The interface digest of the load set the vehicle is to run after
+    /// the switch.
+    pub target: InterfaceDigest,
+}
+
+impl SwitchArmCommand {
+    /// Makes a SWITCH_ARM.
+    ///
+    /// # Arguments
+    ///
+    /// * `sequence` - The command's sequence number.
+    /// * `arm_key`  - The key the SWITCH that follows must carry.
+    /// * `target`   - The interface digest of the load set to switch to,
+    ///                which the SWITCH must carry too.
+    ///
+    /// # Returns
+    ///
+    /// The command.
+    pub fn new(
+        sequence: u32,
+        arm_key: ArmKey,
+        target: InterfaceDigest,
+    ) -> Self {
+        Self {
+            header: CommandHeader {
+                sequence,
+                cmd_type: CommandType::SwitchArm,
+            },
+            arm_key,
+            target,
+        }
+    }
+}
+
+/// SWITCH command - restart onto another load set, if armed
+///
+/// With the key and the target of the SWITCH_ARM it uses: one whose target
+/// is not the arm's is refused `NotArmed`, and one whose load set the
+/// vehicle no longer holds, or that no longer passes its check, is refused
+/// `NotFound`.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct SwitchCommand {
+    pub header: CommandHeader,
+    pub arm_key: ArmKey,
+    /// The interface digest of the load set to switch to, as the arm named
+    /// it.
+    pub target: InterfaceDigest,
+}
+
+impl SwitchCommand {
+    /// Makes a SWITCH.
+    ///
+    /// # Arguments
+    ///
+    /// * `sequence` - The command's sequence number.
+    /// * `arm_key`  - The key the SWITCH_ARM before it carried.
+    /// * `target`   - The interface digest the SWITCH_ARM before it
+    ///                carried.
+    ///
+    /// # Returns
+    ///
+    /// The command.
+    pub fn new(
+        sequence: u32,
+        arm_key: ArmKey,
+        target: InterfaceDigest,
+    ) -> Self {
+        Self {
+            header: CommandHeader {
+                sequence,
+                cmd_type: CommandType::Switch,
             },
             arm_key,
             target,
@@ -717,6 +823,8 @@ pub enum Command {
     Connect(ConnectCommand),
     RestartArm(RestartArmCommand),
     Restart(RestartCommand),
+    SwitchArm(SwitchArmCommand),
+    Switch(SwitchCommand),
     StartNode(NodeCommand),
     StopNode(NodeCommand),
     SetNode(SetNodeCommand),
@@ -736,6 +844,8 @@ impl Command {
             Command::Connect(cmd) => cmd.header.sequence,
             Command::RestartArm(cmd) => cmd.header.sequence,
             Command::Restart(cmd) => cmd.header.sequence,
+            Command::SwitchArm(cmd) => cmd.header.sequence,
+            Command::Switch(cmd) => cmd.header.sequence,
             Command::StartNode(cmd)
             | Command::StopNode(cmd)
             | Command::QueryNode(cmd)
@@ -761,7 +871,9 @@ impl Command {
             Command::Ping(_)
             | Command::Connect(_)
             | Command::RestartArm(_)
-            | Command::Restart(_) => None,
+            | Command::Restart(_)
+            | Command::SwitchArm(_)
+            | Command::Switch(_) => None,
         }
     }
 
@@ -781,6 +893,8 @@ impl Command {
             Command::Connect(cmd) => cmd.header.cmd_type,
             Command::RestartArm(cmd) => cmd.header.cmd_type,
             Command::Restart(cmd) => cmd.header.cmd_type,
+            Command::SwitchArm(cmd) => cmd.header.cmd_type,
+            Command::Switch(cmd) => cmd.header.cmd_type,
             Command::StartNode(cmd)
             | Command::StopNode(cmd)
             | Command::QueryNode(cmd)
@@ -897,6 +1011,8 @@ mod tests {
             CommandType::Connect,
             CommandType::RestartArm,
             CommandType::Restart,
+            CommandType::SwitchArm,
+            CommandType::Switch,
         ];
         let payload = [
             // A node's commands go on this link because what the ground
@@ -943,11 +1059,11 @@ mod tests {
         assert_eq!(all, known, "a command was left out of both lists");
     }
 
-    /// Before the configurations are matched only CONNECT, RESTART_ARM and
-    /// RESTART are taken: PING and every command about a node wait for the
-    /// match.
+    /// Before the configurations are matched only the fixed commands are
+    /// taken -- CONNECT, RESTART_ARM, RESTART, SWITCH_ARM and SWITCH -- and
+    /// PING and every command about a node wait for the match.
     #[test]
-    fn only_the_three_commands_go_before_a_match() {
+    fn only_the_fixed_commands_go_before_a_match() {
         let taken: Vec<CommandType> = (0u8..=255)
             .filter_map(CommandType::from_u8)
             .filter(|kind| kind.taken_unmatched())
@@ -957,7 +1073,9 @@ mod tests {
             vec![
                 CommandType::RestartArm,
                 CommandType::Restart,
-                CommandType::Connect
+                CommandType::Connect,
+                CommandType::SwitchArm,
+                CommandType::Switch,
             ]
         );
     }
@@ -976,12 +1094,15 @@ mod tests {
 
     /// The fixed commands take opcodes from the fixed range, and no other
     /// command does but PING, which had 0x01 before there were fixed
-    /// commands: RESTART_ARM 0x02, RESTART 0x03 and CONNECT 0x04.
+    /// commands: RESTART_ARM 0x02, RESTART 0x03, CONNECT 0x04, SWITCH_ARM
+    /// 0x05 and SWITCH 0x06.
     #[test]
     fn the_fixed_opcodes_are_the_fixed_commands() {
         assert_eq!(CommandType::RestartArm.to_u8(), 0x02);
         assert_eq!(CommandType::Restart.to_u8(), 0x03);
         assert_eq!(CommandType::Connect.to_u8(), 0x04);
+        assert_eq!(CommandType::SwitchArm.to_u8(), 0x05);
+        assert_eq!(CommandType::Switch.to_u8(), 0x06);
         for kind in (0u8..=255).filter_map(CommandType::from_u8) {
             let fixed = FIXED_OPCODES.contains(&kind.to_u8());
             assert_eq!(

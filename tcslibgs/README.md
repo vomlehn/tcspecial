@@ -28,8 +28,9 @@ the editor is the one the vehicle would have refused the file with.
 
 - `commands`, `telemetry`, `protocol`: the command and telemetry protocol.
 - `link`: the commands and their answers, with no header: an opcode, a
-  sequence and what each carries. The three fixed commands -- CONNECT,
-  RESTART_ARM and RESTART -- are described in XTCE in `xtce/fixed.xtce`,
+  sequence and what each carries. The fixed commands -- CONNECT,
+  RESTART_ARM, RESTART, SWITCH_ARM and SWITCH -- are described in XTCE in
+  `xtce/fixed.xtce`,
   which never changes, and every other command in `xtce/link.xtce`. The
   code that packs and unpacks them, `src/fixed_packet.rs` and
   `src/link_packet.rs`, is generated from those files, and the Python
@@ -40,8 +41,10 @@ the editor is the one the vehicle would have refused the file with.
 - `beacon`: the beacon, a line of text with six fields between colons,
   `tcspecial:1.2.3:<md5>:42:normal:<interface>`, at most 106 bytes, so that
   a person can read it in a capture or a log with no decoder. Its layout is
-  in `xtce/fixed.xtce` beside the fixed commands, as text fields, packed and
-  unpacked by the generated code; what each field says is checked here and
+  in `xtce/beacon.xtce`, as text fields, packed and unpacked by the code
+  generated from it, `src/beacon_packet.rs` and
+  `../python/tcslibgs/beacon_packet.py` (`make beacon-packet`), and a test
+  pins its digest as it does `fixed.xtce`'s; what each field says is checked here and
   in `../python/tcslibgs/beacon.py`, held to each other by the same examples
   in their tests.
 - `interface`: the digest of `xtce/link.xtce`, which every beacon carries,

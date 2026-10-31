@@ -3,8 +3,8 @@
 //! What the MOC sends tcspecial and what tcspecial sends back, with no
 //! header: a command is its opcode, its sequence and what it carries, and an
 //! answer the opcode and sequence of the command it answers, a status, a
-//! time and what it carries. The layouts are stated once, in XTCE: the three
-//! fixed commands -- CONNECT, RESTART_ARM and RESTART -- in
+//! time and what it carries. The layouts are stated once, in XTCE: the fixed
+//! commands -- CONNECT, RESTART_ARM, RESTART, SWITCH_ARM and SWITCH -- in
 //! `tcslibgs/xtce/fixed.xtce`, whose layouts never change, and every other
 //! command in `tcslibgs/xtce/link.xtce`. Each is packed and unpacked by the
 //! code tcs-xtce generates from it, `fixed_packet.rs` and `link_packet.rs`,
@@ -35,15 +35,17 @@ use tcs_xtce::packet::{Codec, FixedBytes, FixedString, Packet, PacketError};
 use crate::commands::{
     Attribute, Command, CommandHeader, CommandType, ConnectCommand,
     NodeCommand, PingCommand, RestartArmCommand, RestartCommand,
-    SetNodeCommand, Value,
+    SetNodeCommand, SwitchArmCommand, SwitchCommand, Value,
 };
 use crate::config_digest::{ConfigDigest, ConfigVersion};
 use crate::fixed_packet as fixed;
+use crate::interface::InterfaceDigest;
 use crate::link_packet as packet;
 use crate::telemetry::{
     ConnectTelemetry, NodeTelemetry, PingTelemetry, QueryNodeSampleTelemetry,
     QueryNodeTelemetry, Reason, RestartArmTelemetry, RestartTelemetry,
-    SetNodeTelemetry, Telemetry, TelemetryHeader, TelemetryType,
+    SetNodeTelemetry, SwitchArmTelemetry, SwitchTelemetry, Telemetry,
+    TelemetryHeader, TelemetryType,
 };
 use crate::types::{
     ArmKey, CommandStatus, DHSample, NodeCounts, NodeId, Timestamp,
@@ -134,7 +136,7 @@ impl fmt::Display for LinkError {
 
 impl std::error::Error for LinkError {}
 
-/// Reads which command a datagram is, or answers, by its opcode. The three
+/// Reads which command a datagram is, or answers, by its opcode. The kinds
 /// [`CommandType::taken_unmatched`] names are the fixed commands, which
 /// `xtce/fixed.xtce` states; every other opcode is read by `xtce/link.xtce`'s
 /// layouts.
@@ -254,6 +256,16 @@ impl Command {
                     header: header(p.sequence, CommandType::Connect),
                     digest: digest_of(&p.checksum),
                 }),
+                F::SwitchArm(p) => Command::SwitchArm(SwitchArmCommand {
+                    header: header(p.sequence, CommandType::SwitchArm),
+                    arm_key: ArmKey(p.arm_key),
+                    target: InterfaceDigest(digest_of(&p.target).0),
+                }),
+                F::Switch(p) => Command::Switch(SwitchCommand {
+                    header: header(p.sequence, CommandType::Switch),
+                    arm_key: ArmKey(p.arm_key),
+                    target: InterfaceDigest(digest_of(&p.target).0),
+                }),
             });
         }
         use packet::TcsCommandKind as K;
@@ -361,6 +373,26 @@ impl CommandPacker {
                     &F::Connect(fixed::Connect {
                         sequence,
                         checksum: fixed_bytes(&c.digest.0),
+                    }),
+                )
+            }
+            Command::SwitchArm(c) => {
+                return encoded(
+                    &mut self.fixed,
+                    &F::SwitchArm(fixed::SwitchArm {
+                        sequence,
+                        arm_key: c.arm_key.0,
+                        target: fixed_bytes(&c.target.0),
+                    }),
+                )
+            }
+            Command::Switch(c) => {
+                return encoded(
+                    &mut self.fixed,
+                    &F::Switch(fixed::Switch {
+                        sequence,
+                        arm_key: c.arm_key.0,
+                        target: fixed_bytes(&c.target.0),
                     }),
                 )
             }
@@ -533,6 +565,14 @@ impl Telemetry {
                 F::RestartAnswer(p) => Telemetry::Restart(RestartTelemetry {
                     header: head!(p, TelemetryType::Restart),
                 }),
+                F::SwitchArmAnswer(p) => {
+                    Telemetry::SwitchArm(SwitchArmTelemetry {
+                        header: head!(p, TelemetryType::SwitchArm),
+                    })
+                }
+                F::SwitchAnswer(p) => Telemetry::Switch(SwitchTelemetry {
+                    header: head!(p, TelemetryType::Switch),
+                }),
                 F::ConnectAnswer(p) => Telemetry::Connect(ConnectTelemetry {
                     header: head!(p, TelemetryType::Connect),
                     version: ConfigVersion {
@@ -672,6 +712,18 @@ impl AnswerPacker {
                     F::RestartAnswer(fill!(fixed, RestartAnswer, t.header;));
                 return encoded(&mut self.fixed, &p);
             }
+            Telemetry::SwitchArm(t) => {
+                let p = F::SwitchArmAnswer(fill!(
+                    fixed,
+                    SwitchArmAnswer,
+                    t.header;
+                ));
+                return encoded(&mut self.fixed, &p);
+            }
+            Telemetry::Switch(t) => {
+                let p = F::SwitchAnswer(fill!(fixed, SwitchAnswer, t.header;));
+                return encoded(&mut self.fixed, &p);
+            }
             Telemetry::Connect(t) => {
                 let p = F::ConnectAnswer(fill!(
                     fixed,
@@ -772,11 +824,17 @@ mod tests {
     /// `fixed.xtce` is to be undone, and a new fixed command made instead,
     /// with an opcode of its own and a document of its own.
     ///
-    /// It changed once, deliberately, when the beacon's layout was moved
-    /// into `fixed.xtce` beside the three fixed commands, before the first
-    /// release that carries the document: it was `87aa3a5d...`. From that
-    /// release on it never changes.
-    const FIXED_DIGEST: &str = "47fa3ffdcbdb9038b5434469114b113f";
+    /// It changed twice, deliberately, before the first release that is not
+    /// a release candidate: when the beacon's layout was moved into it,
+    /// from `87aa3a5d...`, and when the beacon was moved out again, into
+    /// `beacon.xtce`, and SWITCH_ARM and SWITCH were added, from
+    /// `47fa3ffd...`. From that release on it never changes.
+    const FIXED_DIGEST: &str = "f25414a706ee2c0f82957a092504bf28";
+
+    /// The tcs-xtce digest of `xtce/beacon.xtce`, which must never change,
+    /// for the reason [`FIXED_DIGEST`] must not: every ground station reads
+    /// the beacon of every vehicle.
+    const BEACON_DIGEST: &str = "36c964e123aa9e8ace3fde97576aa441";
 
     /// Makes one command of every kind, and a SET_NODE as long as one can be.
     ///
@@ -796,6 +854,16 @@ mod tests {
                 4,
                 ArmKey(0x1234),
                 ConfigDigest([0x22; 16]),
+            )),
+            Command::SwitchArm(SwitchArmCommand::new(
+                11,
+                ArmKey(0x5678),
+                InterfaceDigest([0x33; 16]),
+            )),
+            Command::Switch(SwitchCommand::new(
+                12,
+                ArmKey(0x5678),
+                InterfaceDigest([0x44; 16]),
             )),
             Command::StartNode(NodeCommand::start(6, NodeId(7))),
             Command::StopNode(NodeCommand::stop(7, NodeId(7))),
@@ -863,6 +931,14 @@ mod tests {
                 12,
                 CommandStatus::NotFound,
             )),
+            Telemetry::SwitchArm(SwitchArmTelemetry::new(
+                14,
+                CommandStatus::NotFound,
+            )),
+            Telemetry::Switch(SwitchTelemetry::new(
+                15,
+                CommandStatus::NotArmed,
+            )),
             Telemetry::Ping(PingTelemetry::new(13, CommandStatus::Unmatched)),
             Telemetry::StartNode(NodeTelemetry::started(
                 6,
@@ -922,22 +998,50 @@ mod tests {
         }
     }
 
+    /// The tcs-xtce digest of one of the documents in `xtce/`, in hex.
+    ///
+    /// # Arguments
+    ///
+    /// * `name` - The document's file name.
+    ///
+    /// # Returns
+    ///
+    /// Its digest.
+    fn digest_of_document(name: &str) -> String {
+        let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+            .join("xtce")
+            .join(name);
+        let digest = tcs_xtce::digest::digest_files_bytes(&[path])
+            .expect("the document digests");
+        digest.iter().map(|b| format!("{b:02x}")).collect()
+    }
+
     /// The fixed commands' document is the one their layouts are pinned
     /// by: see [`FIXED_DIGEST`].
     #[test]
     fn the_fixed_commands_document_never_changes() {
-        let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
-            .join("xtce/fixed.xtce");
-        let digest = tcs_xtce::digest::digest_files_bytes(&[path])
-            .expect("fixed.xtce digests");
-        let said: String = digest.iter().map(|b| format!("{b:02x}")).collect();
         assert_eq!(
-            said, FIXED_DIGEST,
+            digest_of_document("fixed.xtce"),
+            FIXED_DIGEST,
             "tcslibgs/xtce/fixed.xtce has changed, and it must never change: \
-             the layouts of CONNECT, RESTART_ARM, RESTART and the beacon are \
-             what every ground station and every vehicle agree on whatever \
-             else they run. Undo the change, and make a new fixed command, with an \
-             opcode of its own from 0x00 to 0x0F, in a document of its own"
+             the layouts of CONNECT, RESTART_ARM, RESTART, SWITCH_ARM and \
+             SWITCH are what every ground station and every vehicle agree on \
+             whatever else they run. Undo the change, and make a new fixed \
+             command, with an opcode of its own from 0x00 to 0x0F, in a \
+             document of its own"
+        );
+    }
+
+    /// The beacon's document is the one its layout is pinned by: see
+    /// [`BEACON_DIGEST`].
+    #[test]
+    fn the_beacon_document_never_changes() {
+        assert_eq!(
+            digest_of_document("beacon.xtce"),
+            BEACON_DIGEST,
+            "tcslibgs/xtce/beacon.xtce has changed, and it must never \
+             change: the beacon's layout is what every ground station reads \
+             of every vehicle, whatever else either runs. Undo the change"
         );
     }
 
@@ -966,6 +1070,24 @@ mod tests {
         .to_bytes();
         want[0] = 0x03;
         assert_eq!(restart, want, "RESTART: as RESTART_ARM, opcode 0x03");
+
+        let interface = InterfaceDigest(target.0);
+        let switch_arm = Command::SwitchArm(SwitchArmCommand::new(
+            0x0102_0304,
+            ArmKey(0x1122_3344_5566_7788),
+            interface,
+        ))
+        .to_bytes();
+        want[0] = 0x05;
+        assert_eq!(switch_arm, want, "SWITCH_ARM: as RESTART_ARM, 0x05");
+        let switch = Command::Switch(SwitchCommand::new(
+            0x0102_0304,
+            ArmKey(0x1122_3344_5566_7788),
+            interface,
+        ))
+        .to_bytes();
+        want[0] = 0x06;
+        assert_eq!(switch, want, "SWITCH: as RESTART_ARM, opcode 0x06");
 
         let connect =
             Command::Connect(ConnectCommand::new(7, target)).to_bytes();
@@ -1011,6 +1133,20 @@ mod tests {
                     CommandStatus::NotFound,
                 )),
                 0x03,
+            ),
+            (
+                Telemetry::SwitchArm(SwitchArmTelemetry::new(
+                    9,
+                    CommandStatus::NotFound,
+                )),
+                0x05,
+            ),
+            (
+                Telemetry::Switch(SwitchTelemetry::new(
+                    9,
+                    CommandStatus::NotFound,
+                )),
+                0x06,
             ),
         ] {
             let packed = answer.to_bytes();
@@ -1066,7 +1202,7 @@ mod tests {
         }
         assert_eq!(Command::read(b""), Err(LinkError::Empty));
         assert_eq!(Telemetry::read(b""), Err(LinkError::Empty));
-        for opcode in [0x00, 0x05, 0x0f, 0x20, 0x81, 0x84, 0xff] {
+        for opcode in [0x00, 0x07, 0x0f, 0x20, 0x81, 0x84, 0xff] {
             let datagram = [opcode, 0, 0, 0, 1];
             assert_eq!(
                 Command::read(&datagram),

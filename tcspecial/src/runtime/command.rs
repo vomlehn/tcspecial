@@ -776,6 +776,27 @@ impl Serving {
                 }
             },
 
+            // A switch onto another load set. This build holds no load sets
+            // yet, so every SWITCH_ARM names one the vehicle does not hold,
+            // and is refused NotFound and arms nothing; and with nothing
+            // armed, every SWITCH is refused NotArmed and restarts nothing.
+            Command::SwitchArm(cmd) => {
+                warn!(
+                    "a SWITCH_ARM named load set {}, which this vehicle does \
+                     not hold: refused NotFound, and nothing armed",
+                    cmd.target
+                );
+                answer_to(command, CommandStatus::NotFound)
+            }
+            Command::Switch(cmd) => {
+                warn!(
+                    "a SWITCH onto load set {} came with no SWITCH_ARM \
+                     standing: refused NotArmed, and nothing switched",
+                    cmd.target
+                );
+                answer_to(command, CommandStatus::NotArmed)
+            }
+
             // Armed for the next restart_arm_valid, with this key, onto this
             // target, which the vehicle must hold: one it does not is
             // refused NotFound and arms nothing, so that an arm cannot stand

@@ -25,8 +25,7 @@
 //!
 //! Its layout -- six text fields, each but the last ended by a colon, the
 //! last 32 characters that end the datagram -- is stated in XTCE in
-//! `xtce/fixed.xtce`, beside the three fixed commands, and packed and
-//! unpacked by the code tcs-xtce generates from it, which allocates
+//! `xtce/beacon.xtce`, which never changes, and packed and unpacked by the code tcs-xtce generates from it, which allocates
 //! nothing. What the text must say -- the name, digits only, lower-case hex
 //! -- and turning it into numbers and digests and back, is here, and in
 //! `python/tcslibgs/beacon.py` over the Python tcs-xtce generates from the
@@ -38,7 +37,7 @@ use std::fmt::Write as _;
 
 use tcs_xtce::packet::{Codec, FixedString, Packet, PacketError};
 
-use crate::fixed_packet as fixed;
+use crate::beacon_packet as packet;
 
 use crate::config_digest::{ConfigDigest, ConfigVersion};
 use crate::interface::InterfaceDigest;
@@ -163,7 +162,7 @@ impl Beacon {
         if std::str::from_utf8(datagram).is_err() {
             return Err(BeaconError::Field("it is not text"));
         }
-        let (fields, used) = fixed::Beacon::decode_prefix(datagram)
+        let (fields, used) = packet::Beacon::decode_prefix(datagram)
             .map_err(|why| BeaconError::Field(missing(&why)))?;
         if used != datagram.len() {
             return Err(BeaconError::Field("it has more than six fields"));
@@ -332,7 +331,7 @@ impl BeaconPacker {
     /// The packer.
     pub fn new() -> Self {
         Self {
-            codec: Codec::for_packet::<fixed::Beacon>(),
+            codec: Codec::for_packet::<packet::Beacon>(),
         }
     }
 
@@ -354,7 +353,7 @@ impl BeaconPacker {
             let _ = write!(out, "{said}");
             out
         }
-        let packet = fixed::Beacon {
+        let packet = packet::Beacon {
             beacon_name: text(BEACON_NAME),
             beacon_version: text(beacon.version),
             beacon_digest: text(beacon.digest),
@@ -464,7 +463,7 @@ mod tests {
         assert_eq!(Beacon::read(&packed), Ok(longest));
         assert_eq!(
             BEACON_BYTES,
-            <fixed::Beacon as Packet>::MAX_BYTES,
+            <packet::Beacon as Packet>::MAX_BYTES,
             "the XTCE's longest beacon is the one this says"
         );
     }

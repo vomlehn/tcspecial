@@ -1004,13 +1004,16 @@ pub enum NodeType {
     /// A link to an F´ flight computer's bridge component, which the vehicle
     /// answers to in place of the ground: see `tcslibgs::gateway`.
     GatewayFprime,
+    /// A link to a cFS flight computer's software bus, as a peer of its SBN:
+    /// see `tcslibgs::gateway`.
+    GatewayCfs,
     /// A diagram of its own, kept in its own file and shown here as one box.
     Subdiagram,
 }
 
 impl NodeType {
     /// Every type, for the palette and for the tests.
-    pub const ALL: [NodeType; 25] = [
+    pub const ALL: [NodeType; 26] = [
         NodeType::I2c,
         NodeType::Spi,
         NodeType::Serial,
@@ -1035,6 +1038,7 @@ impl NodeType {
         NodeType::AppAllPl,
         NodeType::GatewayRadio,
         NodeType::GatewayFprime,
+        NodeType::GatewayCfs,
         NodeType::Subdiagram,
     ];
 
@@ -1071,6 +1075,7 @@ impl NodeType {
             NodeType::AppAllPl => "app_all_pl",
             NodeType::GatewayRadio => "gateway_radio",
             NodeType::GatewayFprime => "gateway_fprime",
+            NodeType::GatewayCfs => "gateway_cfs",
             NodeType::Subdiagram => "subdiagram",
         }
     }
@@ -1308,6 +1313,7 @@ impl NodeType {
                 ("address", false),
                 ("port", false),
             ],
+            NodeType::GatewayCfs => &[("tlm_base", true), ("cmd_msgid", false)],
             NodeType::Subdiagram => &[("file", true)],
         }
     }
@@ -1456,6 +1462,7 @@ impl NodeType {
             NodeType::AppPl | NodeType::AppAllPl => "Payloads of their own",
             NodeType::GatewayRadio => "The ground station",
             NodeType::GatewayFprime => "An F´ flight computer",
+            NodeType::GatewayCfs => "A cFS flight computer",
             NodeType::Subdiagram => "Pages",
         }
     }
@@ -1511,6 +1518,7 @@ impl NodeType {
             | NodeType::AppAllVeh
             | NodeType::GatewayRadio
             | NodeType::GatewayFprime
+            | NodeType::GatewayCfs
             | NodeType::Subdiagram => false,
         }
     }
@@ -1846,6 +1854,21 @@ impl NodeType {
                 label_italic: false,
                 outline: Square,
                 edge: Double,
+                weight: Wide,
+                size: (WIDTH, HEIGHT),
+            },
+            // The cFS gateway likewise: the ground station's rectangle, wide
+            // and set large, told from the other two by a broken line -- a
+            // bus it is one peer on rather than a link of its own -- and a
+            // monospaced upright label, its attributes being message IDs
+            // written in hexadecimal.
+            NodeType::GatewayCfs => Appearance {
+                face: Face::Mono,
+                label_size: 16,
+                label_weight: 700,
+                label_italic: false,
+                outline: Square,
+                edge: Dashed,
                 weight: Wide,
                 size: (WIDTH, HEIGHT),
             },

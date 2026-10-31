@@ -36,6 +36,7 @@
 //! against a configuration with no vehicle present, where a fault in either
 //! would otherwise look like a fault in a device.
 
+pub mod bus;
 pub mod choose;
 pub mod command;
 pub mod fabric;

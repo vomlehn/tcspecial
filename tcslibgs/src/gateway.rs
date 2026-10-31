@@ -8,9 +8,11 @@
 //! payload telemetry and the beacon all go the one way. See "Gateways: what the
 //! vehicle answers to" in `docs/design.rst`.
 //!
-//! The radio and F´ are built. cFS is specified, and a configuration naming
-//! it is refused where it is read, saying so, rather than accepted and found
-//! to have nothing to talk to when it flies.
+//! All three are built. The radio and F´ are reached over UDP sockets, and
+//! cFS over its software bus, as a peer of its Software Bus Network: see
+//! [`crate::sbn`] for the wire and [`crate::cfs`] for the packets on it.
+//! [`GatewayKind::on_bus`] says which a kind is, and the rest of the section
+//! is written accordingly.
 //!
 //! F´ is the radio's own protocol with a component of an F´ deployment at the
 //! far end in place of a ground station, so a `gateway_fprime` node is opened,
@@ -63,7 +65,19 @@ impl GatewayKind {
     /// The one place that says which kinds are built, so that the section's
     /// reader and its tests agree about it, and building one is a line here.
     pub fn is_built(self) -> bool {
-        matches!(self, GatewayKind::Radio | GatewayKind::Fprime)
+        matches!(
+            self,
+            GatewayKind::Radio | GatewayKind::Cfs | GatewayKind::Fprime
+        )
+    }
+
+    /// Whether the kind is reached over a software bus, its links message
+    /// IDs, rather than over UDP sockets.
+    ///
+    /// The one statement of which kinds are which, read wherever the links
+    /// are written or opened.
+    pub fn on_bus(self) -> bool {
+        self == GatewayKind::Cfs
     }
 
     /// Names the node type of the kind's gateway nodes.
@@ -75,15 +89,17 @@ impl GatewayKind {
         match self {
             GatewayKind::Radio => Some("gateway_radio"),
             GatewayKind::Fprime => Some("gateway_fprime"),
-            GatewayKind::Cfs => None,
+            GatewayKind::Cfs => Some("gateway_cfs"),
         }
     }
 
     /// Names the attribute a gateway node of the kind says where its data
-    /// goes with: an `address:port`, counted on by each source's device id.
+    /// goes with, counted on by each source's device id: an `address:port`
+    /// for a kind on sockets, a message ID for one on a bus.
     ///
     /// Named for what is there: the ground for a radio, the bridge
-    /// component for F´. One rule counts on from either.
+    /// component for F´, the first telemetry message ID for cFS. One rule
+    /// counts on from each.
     ///
     /// # Returns
     ///
@@ -194,24 +210,28 @@ impl fmt::Display for GatewayKind {
 mod tests {
     use super::*;
 
-    /// Each kind reads back from the name it writes, where it is built.
+    /// Each kind is built, and reads back from the name it writes.
     #[test]
-    fn a_built_kind_reads_from_its_name() {
-        for kind in GatewayKind::ALL.into_iter().filter(|k| k.is_built()) {
+    fn every_kind_is_built_and_reads_from_its_name() {
+        for kind in GatewayKind::ALL {
+            assert!(kind.is_built(), "{kind}");
             assert_eq!(GatewayKind::of(kind.name()), Ok(kind));
         }
         assert_eq!(GatewayKind::of(" radio "), Ok(GatewayKind::Radio));
+        assert_eq!(GatewayKind::of("cfs"), Ok(GatewayKind::Cfs));
     }
 
-    /// A kind that is specified and not built is refused saying so, and
-    /// a word that is no kind is refused as one, each offering what to say.
+    /// Only cFS is on a bus.
     #[test]
-    fn an_unbuilt_kind_and_a_non_kind_are_refused_differently() {
-        for kind in GatewayKind::ALL.into_iter().filter(|k| !k.is_built()) {
-            let why = GatewayKind::of(kind.name()).expect_err(kind.name());
-            assert!(why.contains("not yet built"), "{why}");
-            assert!(why.contains("radio"), "{why}");
-        }
+    fn only_cfs_is_on_a_bus() {
+        assert!(GatewayKind::Cfs.on_bus());
+        assert!(!GatewayKind::Radio.on_bus());
+        assert!(!GatewayKind::Fprime.on_bus());
+    }
+
+    /// A word that is no kind is refused as one, offering what to say.
+    #[test]
+    fn a_non_kind_is_refused() {
         let why = GatewayKind::of("ground").expect_err("not a kind");
         assert!(why.contains("not a kind of gateway"), "{why}");
         assert!(why.contains("radio"), "{why}");
@@ -229,7 +249,11 @@ mod tests {
             GatewayKind::of_node_type("gateway_fprime"),
             Some(GatewayKind::Fprime)
         );
-        for other in ["log", "compute", "i2c", "tee-gateway", "gateway_cfs"] {
+        assert_eq!(
+            GatewayKind::of_node_type("gateway_cfs"),
+            Some(GatewayKind::Cfs)
+        );
+        for other in ["log", "compute", "i2c", "tee-gateway", "gateway_moc"] {
             assert_eq!(GatewayKind::of_node_type(other), None, "{other}");
             assert!(!is_gateway(other), "{other}");
         }

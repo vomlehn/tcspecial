@@ -131,7 +131,7 @@ fn a_vehicle_answering_to_fprime_reports_to_the_bridge_and_takes_its_commands()
         .iter()
         .find(|link| link.source == "thermometer")
         .expect("the thermometer reports");
-    assert_eq!(reading.ground.port, 9702);
+    assert_eq!(reading.ground().expect("over UDP").port, 9702);
 
     let dir = tempfile::tempdir().expect("a directory");
     // tcspecial writes its log into a directory that is there, and does not
@@ -179,12 +179,10 @@ fn a_vehicle_answering_to_fprime_reports_to_the_bridge_and_takes_its_commands()
         .iter()
         .find(|link| link.source == "thermometer")
         .expect("the thermometer reports");
-    assert_eq!(link.ground.port, base + 2);
-    let bridge = UdpSocket::bind(format!(
-        "{}:{}",
-        link.ground.address, link.ground.port
-    ))
-    .expect("the bridge's port");
+    let ground = link.ground().expect("over UDP");
+    assert_eq!(ground.port, base + 2);
+    let bridge = UdpSocket::bind(format!("{}:{}", ground.address, ground.port))
+        .expect("the bridge's port");
     bridge
         .set_read_timeout(Some(Duration::from_millis(100)))
         .expect("a timeout");

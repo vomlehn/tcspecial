@@ -16,6 +16,8 @@ pub mod beacon;
 /// The beacon's packing code, which tcs-xtce generated from
 /// `xtce/beacon.xtce`: used through [`beacon`].
 mod beacon_packet;
+/// What crosses a cFS software bus: the cFS packet around a tcspecial one.
+pub mod cfs;
 pub mod commands;
 pub mod config;
 pub mod config_digest;
@@ -48,6 +50,8 @@ pub mod protocol;
 /// Whether the simulator is ready: what a harness and tcssim say on tcssim's
 /// readiness socket.
 pub mod ready;
+/// SBN, the Software Bus Network, as one peer of a cFS software bus speaks it.
+pub mod sbn;
 /// The simulator's own configuration language.
 ///
 /// Here with the other three rather than in tcssim: both GUIs read it now --

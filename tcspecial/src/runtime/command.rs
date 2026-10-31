@@ -37,6 +37,17 @@
 //! timeout would be a wakeup every two hundred milliseconds per link to ask a
 //! question whose answer is almost always no.
 //!
+//! # On a software bus
+//!
+//! A vehicle that answers to cFS has no command sockets: both links are
+//! message IDs on the one SBN peer of [`crate::runtime::bus`], and this
+//! thread is that peer's one reader. It waits on the bus's socket and the
+//! stop, and on the clock for the peer's next announcement or heartbeat, and
+//! answers what the bus hands it exactly as it answers a datagram, the
+//! answer published under the command's answer message ID. What differs is
+//! only how a command arrives and where its answer goes: see
+//! `Serving::serve`, which both transports end in.
+//!
 //! # What it does not do on this thread
 //!
 //! A node's work. Disabling a node is a store and a poke -- see
@@ -66,6 +77,7 @@ use tcslibgs::{
 };
 
 use crate::beacon_send::BeaconSend;
+use crate::runtime::bus::{Arrival, Bus, BusReader, Publisher, Took};
 use crate::runtime::held::Held;
 use crate::runtime::matched::Matched;
 use crate::runtime::node_state::{NodeStates, Wakeup};
@@ -175,6 +187,9 @@ impl Commands {
     ///               CONNECT carrying this configuration's checksum sets and
     ///               a RESTART taken clears.
     /// * `restart` - What an armed RESTART calls once it has been answered.
+    /// * `bus`     - The software bus and its reader, for a configuration
+    ///               that answers over one: its commands arrive there, and
+    ///               nothing is bound here.
     ///
     /// # Returns
     ///
@@ -185,7 +200,7 @@ impl Commands {
     /// `TcsError::Config` for a link that will not bind; an I/O error where
     /// a bound socket's address or the stop descriptor cannot be had.
     //
-    // Eight, each a different thing the interpreter is handed by whatever
+    // Nine, each a different thing the interpreter is handed by whatever
     // started the vehicle and none of them belonging with another: a
     // structure holding them would only be these arguments again, named a
     // second time.
@@ -199,7 +214,55 @@ impl Commands {
         log: TelemetryLog,
         matched: Matched,
         restart: fn(),
+        bus: Option<(Bus, BusReader)>,
     ) -> TcsResult<Commands> {
+        let stopping = Arc::new(AtomicBool::new(false));
+        let wakeup = Arc::new(Wakeup::new()?);
+        let serving = |malformed: Arc<AtomicU64>| Serving {
+            states,
+            bench,
+            flying,
+            beacon,
+            log,
+            matched,
+            stopping: stopping.clone(),
+            wakeup: wakeup.clone(),
+            malformed,
+            answer: AnswerPacker::new(),
+            armed: None,
+            arm_valid: ci.restart_arm_valid,
+            restart,
+            restarting: false,
+            newest: None,
+            state_file: std::path::PathBuf::from(&ci.state_file),
+        };
+
+        let Some(ci) = ci.sockets() else {
+            // On the bus: one socket, the bus's, which both links are
+            // carried over and which this thread is the one reader of.
+            let Some((bus, reader)) = bus else {
+                return Err(TcsError::Config(
+                    "this configuration answers over a software bus, and no \
+                     bus was opened for it"
+                        .to_string(),
+                ));
+            };
+            let at = bus.local_addr()?;
+            let malformed = bus.malformed();
+            let serving = serving(malformed.clone());
+            let answers = bus.publisher();
+            let thread =
+                std::thread::spawn(move || serving.run_on_bus(reader, answers));
+            return Ok(Commands {
+                spacecraft_at: at,
+                nodes_at: at,
+                thread: Some(thread),
+                stopping,
+                wakeup,
+                malformed,
+            });
+        };
+
         let spacecraft = Link {
             socket: bound(
                 "the spacecraft command link",
@@ -226,28 +289,8 @@ impl Commands {
         let spacecraft_at = spacecraft.socket.local_addr()?;
         let nodes_at = nodes.socket.local_addr()?;
 
-        let stopping = Arc::new(AtomicBool::new(false));
-        let wakeup = Arc::new(Wakeup::new()?);
         let malformed = Arc::new(AtomicU64::new(0));
-
-        let serving = Serving {
-            states,
-            bench,
-            flying,
-            beacon,
-            log,
-            matched,
-            stopping: stopping.clone(),
-            wakeup: wakeup.clone(),
-            malformed: malformed.clone(),
-            answer: AnswerPacker::new(),
-            armed: None,
-            arm_valid: ci.restart_arm_valid,
-            restart,
-            restarting: false,
-            newest: None,
-            state_file: std::path::PathBuf::from(&ci.state_file),
-        };
+        let serving = serving(malformed.clone());
         let thread = std::thread::spawn(move || serving.run(spacecraft, nodes));
 
         Ok(Commands {
@@ -490,6 +533,189 @@ impl Serving {
         }
     }
 
+    /// Waits for what arrives on the bus, and for the peer's next
+    /// announcement, heartbeat or disconnect to come due, and does each,
+    /// until told to stop or the wait itself fails.
+    ///
+    /// # Arguments
+    ///
+    /// * `reader`  - The bus's one reader.
+    /// * `answers` - What answers are published with.
+    fn run_on_bus(mut self, mut reader: BusReader, mut answers: Publisher) {
+        while !self.stopping.load(Ordering::SeqCst) {
+            let now = Instant::now();
+            reader.tick(now);
+            // Rounded up, so that a wait does not end just short of what it
+            // waits for and spin until it comes.
+            let until = reader.until_due(now);
+            let timeout =
+                i32::try_from(until.as_millis() + 1).unwrap_or(i32::MAX);
+
+            // SAFETY: the bus's socket is owned by the reader and the wakeup
+            // by the Arc this holds, both of which outlive the poll.
+            //
+            // On the stack, as the UDP links' set is: waiting allocates
+            // nothing.
+            let borrowed: [BorrowedFd; 2] = unsafe {
+                [
+                    BorrowedFd::borrow_raw(reader.fd()),
+                    BorrowedFd::borrow_raw(self.wakeup.io_fd()),
+                ]
+            };
+            let mut set: [PollFd; 2] = [
+                PollFd::new(&borrowed[0], PollFlags::POLLIN),
+                PollFd::new(&borrowed[1], PollFlags::POLLIN),
+            ];
+            match poll(&mut set, timeout) {
+                Ok(_) => {}
+                Err(nix::errno::Errno::EINTR) => continue,
+                Err(e) => {
+                    error!("the software bus cannot be waited on: {e}");
+                    return;
+                }
+            }
+            if self.stopping.load(Ordering::SeqCst) {
+                return;
+            }
+            let ready = set[0]
+                .revents()
+                .is_some_and(|events| events.contains(PollFlags::POLLIN));
+            if !ready {
+                continue;
+            }
+            if let Took::Command(arrival) = reader.take(Instant::now()) {
+                if self.take_from_bus(&reader, &arrival, &mut answers) {
+                    self.drop_queued_on_bus(&mut reader, &mut answers);
+                }
+            }
+        }
+    }
+
+    /// Answers a command the bus has taken, publishing the answer under its
+    /// answer message ID.
+    ///
+    /// One that is not a command, or whose function code is not its
+    /// command's code, is not answered and not acted on, and is logged and
+    /// counted as malformed, as a datagram on the UDP links is. One about a
+    /// node published under another node's message ID is answered
+    /// `InvalidCommand`, as a command on the wrong UDP link is: one end is
+    /// not reading the configuration the other is.
+    ///
+    /// # Arguments
+    ///
+    /// * `reader`  - The bus's reader, which holds the command's data.
+    /// * `arrival` - The command, as it arrived.
+    /// * `answers` - What answers are published with.
+    ///
+    /// # Returns
+    ///
+    /// Whether the command was a CONNECT that matched this start, which it
+    /// had not been before.
+    fn take_from_bus(
+        &mut self,
+        reader: &BusReader,
+        arrival: &Arrival,
+        answers: &mut Publisher,
+    ) -> bool {
+        let data = reader.data(arrival);
+        let command = match Command::read(data) {
+            Ok(command) => command,
+            Err(why) => {
+                let count = self.malformed.fetch_add(1, Ordering::Relaxed) + 1;
+                error!(
+                    "{}: {} bytes from the software bus that are not a \
+                     command ({why}) -- not answered, not acted on, and \
+                     counted as malformed ({count})",
+                    spelling(arrival.link),
+                    data.len()
+                );
+                return false;
+            }
+        };
+        let code = command.cmd_type().to_u8();
+        if arrival.function_code != code {
+            let count = self.malformed.fetch_add(1, Ordering::Relaxed) + 1;
+            error!(
+                "{}: a {:?} whose cFS function code is {:#04x}, and over the \
+                 bus a command's function code is its code, {code:#04x} -- \
+                 not answered, not acted on, and counted as malformed \
+                 ({count})",
+                spelling(arrival.link),
+                command.cmd_type(),
+                arrival.function_code
+            );
+            return false;
+        }
+        trace!("{} on the bus: {command:?}", spelling(arrival.link));
+        let msgid = reader.answer_msgid(arrival);
+        let publish = |answers: &mut Publisher, data: &[u8]| {
+            if let Err(why) = answers.publish(msgid, data) {
+                error!("an answer cannot be published as {msgid:#06x}: {why}");
+            }
+        };
+
+        // A node command under another node's message ID.
+        if let (Some(id), Some(named)) = (arrival.node, command.node_id()) {
+            if named.0 as usize != id {
+                error!(
+                    "{:?} about node {} was published under the message ID of \
+                     node {id}: the two ends are not reading the same \
+                     configuration",
+                    command.cmd_type(),
+                    named.0
+                );
+                let answer = answer_to(&command, CommandStatus::InvalidCommand);
+                let data = self.answer.pack(&answer);
+                self.log.record(data);
+                publish(answers, data);
+                return false;
+            }
+        }
+        self.serve(arrival.link, &command, |data| publish(answers, data))
+    }
+
+    /// Takes everything already queued on the bus once a CONNECT has
+    /// matched this start, dropping the node commands among it unread.
+    ///
+    /// Everything queued was sent before the ground knew it was matched, and
+    /// it sends nothing but the three fixed commands until it is, as over
+    /// the UDP links; on the bus the two links share one socket, so what is
+    /// not a node command is still taken.
+    ///
+    /// # Arguments
+    ///
+    /// * `reader`  - The bus's reader.
+    /// * `answers` - What answers are published with.
+    fn drop_queued_on_bus(
+        &mut self,
+        reader: &mut BusReader,
+        answers: &mut Publisher,
+    ) {
+        let mut dropped = 0u32;
+        loop {
+            match reader.take(Instant::now()) {
+                Took::Empty => break,
+                Took::Done => {}
+                Took::Command(arrival)
+                    if arrival.link == CommandLink::Payload =>
+                {
+                    dropped = dropped.saturating_add(1)
+                }
+                Took::Command(arrival) => {
+                    let _ = self.take_from_bus(reader, &arrival, answers);
+                }
+            }
+        }
+        if dropped > 0 {
+            // Allocates, where the log formats the line: once a start, at the
+            // match, as on the UDP links.
+            warn!(
+                "node commands: {dropped} queued on the bus before the match \
+                 dropped unread"
+            );
+        }
+    }
+
     /// Takes one datagram from this link and answers it.
     ///
     /// A datagram from anywhere but the link's one address, or one that is
@@ -561,18 +787,46 @@ impl Serving {
         };
 
         trace!("{}: {command:?}", spelling(link.which));
+        // Back to the address it came from, because a datagram's sender is
+        // the only statement of where the ground is, and a configuration
+        // that stated it as well would be a second answer that can disagree.
+        self.serve(link.which, &command, |data| {
+            let _ = link.socket.send_to(data, from);
+        })
+    }
+
+    /// Answers a command that has been taken, hands the answer to `send`,
+    /// and carries out an armed RESTART once it has gone.
+    ///
+    /// What either transport does once it has a command: the UDP links and
+    /// the software bus differ in how a command arrives and where its answer
+    /// goes, and in nothing about what it is answered.
+    ///
+    /// # Arguments
+    ///
+    /// * `which`   - The link the command arrived on.
+    /// * `command` - The command.
+    /// * `send`    - What sends the packed answer.
+    ///
+    /// # Returns
+    ///
+    /// Whether the command was a CONNECT that matched this start, which it
+    /// had not been before.
+    fn serve(
+        &mut self,
+        which: CommandLink,
+        command: &Command,
+        send: impl FnOnce(&[u8]),
+    ) -> bool {
         let was_matched = self.matched.is_matched();
-        let answer = self.answer(link.which, &command);
+        let answer = self.answer(which, command);
 
         // Into the thread's own packer, which keeps its buffer.
         let data = self.answer.pack(&answer);
         // Recorded before it is sent, as a beacon is, so that an answer the
         // send fails on is still known to have been produced.
         self.log.record(data);
-        // Back to the address it came from, because a datagram's sender is
-        // the only statement of where the ground is, and a configuration
-        // that stated it as well would be a second answer that can disagree.
-        let _ = link.socket.send_to(data, from);
+        send(data);
 
         // After the answer has gone, so that the ground hears the RESTART was
         // taken before the links close under it.
@@ -1144,19 +1398,21 @@ mod tests {
             port,
         };
         CIConfig {
-            address: "127.0.0.1".to_string(),
-            port: 0,
-            // Both links take commands from the one socket this test sends
-            // from, which is what a ground station is here.
-            moc_cmd_send: here(at.port()),
-            payload_command_source_base: here(at.port()),
-            payload_command_dest_base: here(0),
-            payload_source_base: here(0),
-            payload_dest_base: here(0),
+            links: tcslibgs::Links::Sockets(tcslibgs::Sockets {
+                address: "127.0.0.1".to_string(),
+                port: 0,
+                // Both links take commands from the one socket this test
+                // sends from, which is what a ground station is here.
+                moc_cmd_send: here(at.port()),
+                payload_command_source_base: here(at.port()),
+                payload_command_dest_base: here(0),
+                payload_source_base: here(0),
+                payload_dest_base: here(0),
+                beacon_send: here(0),
+                beacon_recv: here(0),
+            }),
             beacon_interval: Duration::from_secs(5),
             reset_interval: Duration::from_secs(1),
-            beacon_send: here(0),
-            beacon_recv: here(0),
             // Nothing to write: what is being tested is what goes out.
             log_dir: None,
             log_segment_bytes: 65_536,
@@ -1358,6 +1614,7 @@ mod tests {
             TelemetryLog::disabled(),
             matched,
             || {},
+            None,
         )
         .expect("both links bind");
         (ground, commands)
@@ -2070,6 +2327,7 @@ mod tests {
             TelemetryLog::disabled(),
             Matched::at_a_start(),
             counted,
+            None,
         )
         .expect("both links bind");
         let at = commands.spacecraft_address();
@@ -2180,6 +2438,7 @@ mod tests {
             TelemetryLog::disabled(),
             Matched::at_a_start(),
             counted,
+            None,
         )
         .expect("both links bind");
         let at = commands.spacecraft_address();

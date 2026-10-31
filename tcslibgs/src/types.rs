@@ -990,12 +990,14 @@ impl BeaconLink {
     ///
     /// # Returns
     ///
-    /// Its `beacon_send` and `beacon_recv`, as the two ends of the link.
-    pub fn of(ci: &CIConfig) -> BeaconLink {
-        BeaconLink {
-            send: ci.beacon_send.clone(),
-            recv: ci.beacon_recv.clone(),
-        }
+    /// Its `beacon_send` and `beacon_recv`, as the two ends of the link, or
+    /// `None` for one that answers over a software bus, whose beacon has no
+    /// socket.
+    pub fn of(ci: &CIConfig) -> Option<BeaconLink> {
+        ci.sockets().map(|sockets| BeaconLink {
+            send: sockets.beacon_send.clone(),
+            recv: sockets.beacon_recv.clone(),
+        })
     }
 }
 
@@ -1598,11 +1600,16 @@ pub fn host_port_of(attribute: &str, stated: &str) -> Result<HostPort, String> {
 
 /// The spacecraft command link, as a file states it.
 ///
-/// One conversation and two sockets, each named for the end it belongs to and
-/// written `address:port`. Both ends are in one file because both ends read
-/// this file: a configuration that stated only its own end would leave the
-/// other to be told separately, and two places to say one thing is one place
-/// for them to disagree.
+/// One conversation. Over UDP it is two sockets, each named for the end it
+/// belongs to and written `address:port`; over a software bus it is two
+/// message IDs, one the commands are published under and one the answers
+/// are. Both ends are in one file because both ends read this file: a
+/// configuration that stated only its own end would leave the other to be
+/// told separately, and two places to say one thing is one place for them to
+/// disagree.
+///
+/// Each attribute is `None` in a configuration of the other kind of link,
+/// which [`crate::graph::parameters::ci_config_of`] refuses it in by name.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct TcsCmdJson {
     /// tcspecial's own socket: it receives commands from the MOC here, and
@@ -1612,27 +1619,36 @@ pub struct TcsCmdJson {
     /// response goes back out of the socket the command arrived on, to the
     /// address it arrived from.
     ///
-    /// The protocol is not stated and cannot be: every link in this section is
-    /// UDP. A configuration that could say otherwise would be a configuration
-    /// that could say something untrue.
-    pub recv: String,
+    /// The protocol is not stated and cannot be: every socket in this
+    /// section is UDP. A configuration that could say otherwise would be a
+    /// configuration that could say something untrue.
+    #[serde(default)]
+    pub recv: Option<String>,
     /// The MOC's own socket: it sends commands to tcspecial from here, and
     /// receives tcspecial's responses here.
     ///
     /// The names say which end and which way, which an attribute saying only
     /// *where* a link is does not: a reader is left to work out which of the
     /// two ends it belongs to.
-    pub send: String,
+    #[serde(default)]
+    pub send: Option<String>,
+    /// The message ID commands about the spacecraft are published under, on
+    /// a software bus.
+    #[serde(default)]
+    pub cmd_msgid: Option<String>,
+    /// And the one their answers are published under.
+    #[serde(default)]
+    pub response_msgid: Option<String>,
 }
 
 /// The beacon link and its timing, as a file states it.
 ///
-/// All three are required of every command interpreter configuration, with no
-/// defaults: beacons are how the ground knows the spacecraft is alive, so
-/// where they come from, where they go and how often is not something to be
-/// left to a default that a file silently takes. A payload set's `tcspecial`
-/// section states them for the set, and the command interpreter's own file
-/// states them for a set that has no section.
+/// Required of every command interpreter configuration, with no defaults:
+/// beacons are how the ground knows the spacecraft is alive, so where they
+/// come from, where they go and how often is not something to be left to a
+/// default that a file silently takes. A payload set's `tcspecial` section
+/// states them for the set, and the command interpreter's own file states
+/// them for a set that has no section.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct BeaconJson {
     /// How long between beacons, as a length of time: `5 s`, `500 ms`.
@@ -1662,12 +1678,13 @@ pub struct BeaconJson {
     /// how often it does is not something a file should be silently given.
     /// See "The beacon across a restart" in `docs/design.rst`.
     pub reset_interval: String,
-    /// Where beacons originate, as `address:port`.
+    /// Where beacons originate over UDP, as `address:port`.
     ///
     /// tcspecial makes the socket it sends beacons on out of this: it is the
     /// address and port that socket is bound to, so every beacon leaves from
     /// here.
-    pub send: String,
+    #[serde(default)]
+    pub send: Option<String>,
     /// And where they are received, as `address:port`.
     ///
     /// tcsmoc makes the socket it receives beacons on out of this: it is the
@@ -1681,25 +1698,36 @@ pub struct BeaconJson {
     /// it on, whose being wrong lost every beacon silently. One named sender
     /// and one named listener is what a configuration can state plainly and a
     /// firewall rule can describe.
-    pub recv: String,
+    #[serde(default)]
+    pub recv: Option<String>,
+    /// The message ID the beacon is published under, on a software bus.
+    #[serde(default)]
+    pub tlm_msgid: Option<String>,
 }
 
 /// Where a payload's telemetry goes, as a file states it.
 ///
-/// Two bases and one arithmetic rule. Each payload has a UDP interface of its
-/// own for exchanging data with the ground, and its port on each side is that
-/// side's base plus the payload's own id -- the position it has in the
-/// configuration. One base and a rule rather than an address and a port
-/// written on every payload: forty payloads were forty chances to repeat a
-/// port, and a repeated port is two payloads whose data arrives interleaved.
+/// Bases and one arithmetic rule. Over UDP each payload has a link of its own
+/// for its data, and its port on each side is that side's base plus the
+/// payload's own id -- the position it has in the configuration. Over a
+/// software bus it has a message ID of its own, counted from `tlm_base` the
+/// same way. One base and a rule rather than an address and a port written on
+/// every payload: forty payloads were forty chances to repeat a port, and a
+/// repeated port is two payloads whose data arrives interleaved.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct PayloadTelemetryJson {
     /// Where the telemetry comes from: the base for the vehicle's side of
     /// those links, as `address:port`.
-    pub source_base: String,
+    #[serde(default)]
+    pub source_base: Option<String>,
     /// And where it goes: the base for the MOC's side, counted the same way by
     /// the payload's id.
-    pub dest_base: String,
+    #[serde(default)]
+    pub dest_base: Option<String>,
+    /// The first of the message IDs it is published under, on a software
+    /// bus, counted the same way.
+    #[serde(default)]
+    pub tlm_base: Option<String>,
 }
 
 /// The telemetry log, as a file states it.
@@ -1729,36 +1757,90 @@ impl Default for LogJson {
     }
 }
 
-/// Where payload commands go, as a file states it.
+/// Where commands about a node go, as a file states it.
 ///
-/// One socket per payload on each side, counted from a base by the payload's
-/// own id, exactly as its telemetry is: a command about a payload goes to that
-/// payload's socket and the answer comes back on it. One base and an
-/// arithmetic rule rather than a socket written on every payload.
+/// Over UDP, one socket on each side: a command about a node goes to the
+/// vehicle's socket at `dest_base` with nothing added, the node's id being in
+/// the message, and the answer comes back on it. Over a software bus, a
+/// message ID per node, counted from `cmd_base` by the node's id, and its
+/// answers' from `response_base` the same way.
 ///
 /// It was one socket for all of them -- `payload_interface` -- which worked
-/// and left two things undone. Nothing said which socket the ground sent from,
+/// and left one thing undone: nothing said which socket the ground sent from,
 /// so tcspecial could not be told what a payload command should come from the
-/// way it is told about every other link; and one socket meant one queue, so a
-/// command about a slow payload was ahead of a command about a quick one.
+/// way it is told about every other link.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct PayloadCommandJson {
-    /// Where payload commands come from, as `address:port`: the ground's end,
-    /// which the MOC binds, payload *k* at the port plus *k*.
-    pub source_base: String,
-    /// And where they go: the vehicle's end, which tcspecial binds, counted
-    /// the same way by the payload's id.
-    pub dest_base: String,
+    /// Where node commands come from, as `address:port`: the ground's end,
+    /// which the MOC binds.
+    #[serde(default)]
+    pub source_base: Option<String>,
+    /// And where they go: the vehicle's end, which tcspecial binds.
+    #[serde(default)]
+    pub dest_base: Option<String>,
+    /// The first of the message IDs node commands are published under, on a
+    /// software bus: node *k*'s at this plus *k*.
+    #[serde(default)]
+    pub cmd_base: Option<String>,
+    /// And the first of their answers', counted the same way.
+    #[serde(default)]
+    pub response_base: Option<String>,
+}
+
+/// The SBN peer the vehicle is on a cFS software bus through, as a file
+/// states it: see "cFS: gateway_cfs" in `docs/design.rst`, and
+/// [`crate::sbn`].
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub struct SbnJson {
+    /// The SBN release the far end was built from.
+    pub release: String,
+    /// The hash in the far end's `SBN_IDENT`.
+    pub ident: String,
+    /// The spacecraft ID SBN identifies both peers by.
+    pub spacecraft_id: String,
+    /// tcspecial's processor ID.
+    pub processor_id: String,
+    /// tcspecial's socket, as `address:port`.
+    pub local: String,
+    /// The far end's, as `address:port`.
+    pub peer: String,
+    /// The far end's processor ID.
+    pub peer_processor_id: String,
+    /// The cFS build's `CFE_MISSION_SB_MAX_SB_MSG_SIZE`.
+    pub max_message: String,
+}
+
+/// The block of message IDs the mission allotted tcspecial, as a file states
+/// it.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub struct MsgIdRangeJson {
+    /// The first.
+    pub first: String,
+    /// And the last, which is in the block.
+    pub last: String,
+}
+
+/// How the cFS build counts time, as a file states it.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub struct CfeTimeJson {
+    /// Its epoch, a UTC date and time.
+    pub epoch: String,
+    /// `tai` or `utc`.
+    pub scale: String,
+    /// TAI less UTC, stated where the scale is TAI.
+    #[serde(default)]
+    pub leap_seconds: Option<String>,
 }
 
 /// The file-level form of the command interpreter's configuration
 ///
-/// All but one of its entries are subsections -- `tcs_cmd`,
-/// `payload_telemetry`, `beacon` and `log` -- because each is one thing with
-/// more than one attribute to it, and a prefix repeated on two or three flat
-/// names is a subsection somebody declined to write. The names under one are
-/// short for the same reason: `beacon.send` says what `beacon_send` said, and
-/// says it where the reader is already looking at the beacon.
+/// Most of its entries are subsections -- `tcs_cmd`, `payload_telemetry`,
+/// `beacon`, `log` and, on a software bus, `sbn`, `msgid_range` and
+/// `cfe_time` -- because each is one thing with more than one attribute to
+/// it, and a prefix repeated on two or three flat names is a subsection
+/// somebody declined to write. The names under one are short for the same
+/// reason: `beacon.send` says what `beacon_send` said, and says it where the
+/// reader is already looking at the beacon.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct CIConfigJson {
     /// What the vehicle answers to, which decides how every link below is
@@ -1778,9 +1860,8 @@ pub struct CIConfigJson {
     /// Where commands about a node are taken, which is not the link above.
     ///
     /// A command about a node -- start it, stop it, set an attribute, ask what
-    /// it has moved -- arrives here, at `dest_base` with nothing added, the
-    /// node's id being in the message; a command about the spacecraft -- ping
-    /// it, arm it, restart it -- arrives on `tcs_cmd.recv`. See
+    /// it has moved -- arrives here; a command about the spacecraft -- ping
+    /// it, arm it, restart it -- arrives on `tcs_cmd`. See
     /// [`crate::CommandType::link`], which is the one table that says which is
     /// which, read by both ends.
     ///
@@ -1788,8 +1869,9 @@ pub struct CIConfigJson {
     /// queued behind what it asked for at leisure: a RESTART waiting behind a
     /// node's statistics is a spacecraft that cannot be rescued while it is
     /// busy. On a space link these become virtual channels, which is where the
-    /// priority between them is really decided; here they are ports, which is
-    /// what an IP network has to divide traffic with.
+    /// priority between them is really decided; here they are ports, or
+    /// message IDs, which is what an IP network or a software bus has to
+    /// divide traffic with.
     ///
     /// Required, with no default, for the reason the beacon attributes are:
     /// where commands are taken is not a question to be answered by whatever
@@ -1797,6 +1879,15 @@ pub struct CIConfigJson {
     pub payload_command: PayloadCommandJson,
     /// The beacon link and how often it carries one.
     pub beacon: BeaconJson,
+    /// The SBN peer, for a configuration that answers to cFS.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub sbn: Option<SbnJson>,
+    /// The message IDs allotted, for a configuration that answers to cFS.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub msgid_range: Option<MsgIdRangeJson>,
+    /// How cFS counts time, for a configuration that answers to cFS.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub cfe_time: Option<CfeTimeJson>,
     /// Where the telemetry log is written, and in what sized pieces.
     #[serde(default)]
     pub log: LogJson,
@@ -1867,9 +1958,10 @@ pub fn restart_arm_valid_of(said: &str) -> Result<Duration, String> {
     Ok(valid)
 }
 
-/// Command interpreter configuration
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct CIConfig {
+/// The links over UDP sockets: what a vehicle that answers to the radio or
+/// to F´ binds, and where it takes and sends.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Sockets {
     /// The address the command links are taken on, from `tcs_cmd.recv`.
     pub address: String,
     /// And the port of it, for commands about the spacecraft.
@@ -1882,14 +1974,10 @@ pub struct CIConfig {
     /// From [`PayloadTelemetryJson`]; see [`HostPort::at`].
     pub payload_source_base: HostPort,
     pub payload_dest_base: HostPort,
-    /// The bases each payload's command socket is counted from: the ground's
-    /// side, which commands come from, and the vehicle's, which they go to.
-    /// From [`PayloadCommandJson`]; see [`HostPort::at`].
+    /// Where node commands come from, and where they go: the ground's end
+    /// and the vehicle's. From [`PayloadCommandJson`].
     pub payload_command_source_base: HostPort,
     pub payload_command_dest_base: HostPort,
-    pub beacon_interval: Duration,
-    /// How often beacons go across a restart: `beacon.reset_interval`.
-    pub reset_interval: Duration,
     /// Where beacons originate: tcspecial binds this and sends from it.
     ///
     /// Settled when the file is read rather than where the beacon is sent,
@@ -1900,6 +1988,69 @@ pub struct CIConfig {
     /// And where they are received: the MOC binds this and tcspecial sends to
     /// it.
     pub beacon_recv: HostPort,
+}
+
+/// The SBN peer, settled: see [`crate::sbn`].
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Sbn {
+    /// The release the far end was built from, which this build speaks.
+    pub release: crate::sbn::Release,
+    /// The far end's `SBN_IDENT`, which every subscription opens with.
+    pub ident: [u8; crate::sbn::IDENT_BYTES],
+    /// The spacecraft both peers are on.
+    pub spacecraft_id: u32,
+    /// tcspecial's processor ID.
+    pub processor_id: u32,
+    /// tcspecial's socket, which it binds.
+    pub local: HostPort,
+    /// The far end's, which it announces to and takes from.
+    pub peer: HostPort,
+    /// The far end's processor ID.
+    pub peer_processor_id: u32,
+    /// The most a cFS packet may be on that bus.
+    pub max_message: u32,
+}
+
+/// The links over a cFS software bus: one SBN peer, and message IDs.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Bus {
+    /// The peer.
+    pub sbn: Sbn,
+    /// The block of message IDs allotted tcspecial, first and last.
+    pub first: u16,
+    pub last: u16,
+    /// Commands about the spacecraft, and their answers.
+    pub cmd_msgid: u16,
+    pub response_msgid: u16,
+    /// Where node commands and their answers are counted from, by the node's
+    /// id.
+    pub cmd_base: u16,
+    pub response_base: u16,
+    /// Where the telemetry of a payload nothing touches is counted from.
+    pub tlm_base: u16,
+    /// The beacon's.
+    pub beacon_msgid: u16,
+    /// How cFS counts time, which every telemetry packet is stamped in.
+    pub cfe_time: crate::cfs::CfeTime,
+}
+
+/// How the vehicle reaches what it answers to.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum Links {
+    /// UDP sockets: the radio, and F´.
+    Sockets(Sockets),
+    /// A cFS software bus.
+    Bus(Bus),
+}
+
+/// Command interpreter configuration
+#[derive(Debug, Clone)]
+pub struct CIConfig {
+    /// How the links are reached, as the gateway kind decides.
+    pub links: Links,
+    pub beacon_interval: Duration,
+    /// How often beacons go across a restart: `beacon.reset_interval`.
+    pub reset_interval: Duration,
     /// Directory holding the telemetry log's segment files, or `None` to
     /// run without a telemetry log.
     pub log_dir: Option<String>,
@@ -1923,6 +2074,67 @@ pub struct CIConfig {
     pub load_trials: u32,
 }
 
+impl CIConfig {
+    /// The UDP sockets, for a configuration whose links are sockets.
+    ///
+    /// # Returns
+    ///
+    /// The sockets, or `None` for one that answers over a software bus.
+    pub fn sockets(&self) -> Option<&Sockets> {
+        match &self.links {
+            Links::Sockets(sockets) => Some(sockets),
+            Links::Bus(_) => None,
+        }
+    }
+
+    /// The software bus, for a configuration that answers over one.
+    ///
+    /// # Returns
+    ///
+    /// The bus, or `None` for one whose links are sockets.
+    pub fn bus(&self) -> Option<&Bus> {
+        match &self.links {
+            Links::Bus(bus) => Some(bus),
+            Links::Sockets(_) => None,
+        }
+    }
+}
+
+/// Reads a message ID the section states.
+///
+/// # Arguments
+///
+/// * `name` - The attribute's flat name, for the message.
+/// * `said` - Its value, as written.
+///
+/// # Returns
+///
+/// The message ID.
+///
+/// # Errors
+///
+/// A message naming the attribute, if it is not a whole number of sixteen
+/// bits.
+pub fn msgid_of(name: &str, said: &str) -> Result<u16, String> {
+    crate::whole::whole_u32(said.trim())
+        .map_err(|why| format!("{name} is {why}"))
+        .and_then(|value| {
+            u16::try_from(value).map_err(|_| {
+                format!(
+                    "{name} is {}, and a message ID is sixteen bits, at most \
+                     0xFFFF",
+                    said.trim()
+                )
+            })
+        })
+}
+
+/// Reads one of the whole numbers SBN identifies peers by.
+fn sbn_number(name: &str, said: &str) -> Result<u32, String> {
+    crate::whole::whole_u32(said.trim())
+        .map_err(|why| format!("{name} is {why}"))
+}
+
 impl CIConfigJson {
     /// Settles the command interpreter's configuration from what the file says.
     ///
@@ -1933,33 +2145,17 @@ impl CIConfigJson {
     /// # Errors
     ///
     /// A message naming the attribute, if an address is not an
-    /// `address:port`, a beacon interval is written with a retired name, is
-    /// not a length of time or is out of range, `restart_arm_valid` is not a
-    /// length of time or is nought, `state_file` is empty, or `tcs_cmd.recv`
-    /// and `payload_command.dest_base` are one socket.
+    /// `address:port`, a message ID is not one, a beacon interval is written
+    /// with a retired name, is not a length of time or is out of range,
+    /// `restart_arm_valid` is not a length of time or is nought, `state_file`
+    /// is empty, `tcs_cmd.recv` and `payload_command.dest_base` are one
+    /// socket, or what the SBN peer, the allotment or cFE's time say is not
+    /// sound.
     pub fn to_ci_config(&self) -> Result<CIConfig, String> {
-        let command = host_port_of("tcs_cmd.recv", &self.tcs_cmd.recv)?;
-        let (address, port) = (command.address, command.port);
-        let payload_command_source_base = host_port_of(
-            "payload_command.source_base",
-            &self.payload_command.source_base,
-        )?;
-        let payload_command_dest_base = host_port_of(
-            "payload_command.dest_base",
-            &self.payload_command.dest_base,
-        )?;
-        let moc_cmd_send = host_port_of("tcs_cmd.send", &self.tcs_cmd.send)?;
-        let payload_source_base = host_port_of(
-            "payload_telemetry.source_base",
-            &self.payload_telemetry.source_base,
-        )?;
-        let payload_dest_base = host_port_of(
-            "payload_telemetry.dest_base",
-            &self.payload_telemetry.dest_base,
-        )?;
-
-        let beacon_send = host_port_of("beacon.send", &self.beacon.send)?;
-        let beacon_recv = host_port_of("beacon.recv", &self.beacon.recv)?;
+        let links = match self.gateway.on_bus() {
+            false => Links::Sockets(self.sockets()?),
+            true => Links::Bus(self.bus()?),
+        };
 
         // The attribute's old names, said by name rather than by its
         // absence.
@@ -1996,40 +2192,10 @@ impl CIConfigJson {
             );
         }
 
-        // One socket cannot be two links. A file that put both at the same
-        // place would describe a split it has not made, and the half that
-        // bound second would fail at startup with the other half's address.
-        //
-        // The whole interface and not only the port, now that each says where
-        // it is: two links may share a port on different interfaces, which is
-        // a configuration somebody may mean.
-        // The first payload's command socket is the base itself, so a base
-        // equal to the spacecraft link is a file that has put two links in one
-        // socket. The rest of the sum is checked where the payloads are known
-        // and the ids with them -- see `interpreter_collisions`.
-        if payload_command_dest_base.address == address
-            && payload_command_dest_base.port == port
-        {
-            return Err(format!(
-                "tcs_cmd.recv and payload_command.dest_base are both \
-                 {address}:{port}, and the two links cannot be one socket: \
-                 spacecraft commands are taken on the one and the first \
-                 payload's commands on the other"
-            ));
-        }
-
         Ok(CIConfig {
-            address,
-            port,
-            payload_command_source_base,
-            payload_command_dest_base,
-            moc_cmd_send,
-            payload_source_base,
-            payload_dest_base,
+            links,
             beacon_interval,
             reset_interval,
-            beacon_send,
-            beacon_recv,
             log_dir: self.log.directory.clone(),
             log_segment_bytes: self.log.segment_size,
             restart_arm_valid: match &self.restart_arm_valid {
@@ -2045,6 +2211,280 @@ impl CIConfigJson {
                 .unwrap_or(CONFIGURATIONS_KEPT_DEFAULT),
             load_trials: self.load_trials.unwrap_or(LOAD_TRIALS_DEFAULT),
         })
+    }
+
+    /// Settles the links of a configuration whose links are UDP sockets.
+    ///
+    /// # Errors
+    ///
+    /// A message naming the attribute, for one not stated or not an
+    /// `address:port`, and for `tcs_cmd.recv` and
+    /// `payload_command.dest_base` being one socket.
+    fn sockets(&self) -> Result<Sockets, String> {
+        let socket = |name: &str, said: &Option<String>| {
+            let said = said.as_deref().ok_or_else(|| {
+                format!(
+                    "{name} is not stated, and a configuration whose gateway \
+                     is {} must state it",
+                    self.gateway
+                )
+            })?;
+            host_port_of(name, said)
+        };
+        let command = socket("tcs_cmd.recv", &self.tcs_cmd.recv)?;
+        let (address, port) = (command.address, command.port);
+        let payload_command_source_base = socket(
+            "payload_command.source_base",
+            &self.payload_command.source_base,
+        )?;
+        let payload_command_dest_base = socket(
+            "payload_command.dest_base",
+            &self.payload_command.dest_base,
+        )?;
+        let moc_cmd_send = socket("tcs_cmd.send", &self.tcs_cmd.send)?;
+        let payload_source_base = socket(
+            "payload_telemetry.source_base",
+            &self.payload_telemetry.source_base,
+        )?;
+        let payload_dest_base = socket(
+            "payload_telemetry.dest_base",
+            &self.payload_telemetry.dest_base,
+        )?;
+        let beacon_send = socket("beacon.send", &self.beacon.send)?;
+        let beacon_recv = socket("beacon.recv", &self.beacon.recv)?;
+
+        // One socket cannot be two links. A file that put both at the same
+        // place would describe a split it has not made, and the half that
+        // bound second would fail at startup with the other half's address.
+        //
+        // The whole interface and not only the port, now that each says where
+        // it is: two links may share a port on different interfaces, which is
+        // a configuration somebody may mean.
+        if payload_command_dest_base.address == address
+            && payload_command_dest_base.port == port
+        {
+            return Err(format!(
+                "tcs_cmd.recv and payload_command.dest_base are both \
+                 {address}:{port}, and the two links cannot be one socket: \
+                 spacecraft commands are taken on the one and node commands \
+                 on the other"
+            ));
+        }
+
+        Ok(Sockets {
+            address,
+            port,
+            moc_cmd_send,
+            payload_source_base,
+            payload_dest_base,
+            payload_command_source_base,
+            payload_command_dest_base,
+            beacon_send,
+            beacon_recv,
+        })
+    }
+
+    /// Settles the links of a configuration that answers over a software
+    /// bus: the SBN peer, the allotment, the message IDs and cFE's time.
+    ///
+    /// What can be checked without the nodes is checked here: each message
+    /// ID is one, and each one stated is inside the allotment and of the
+    /// type its use needs. What is counted from a base by a node's id is
+    /// checked where the nodes are known: see
+    /// [`crate::graph::telemetry::msgids`].
+    ///
+    /// # Errors
+    ///
+    /// A message naming the attribute, for one not stated or not sound.
+    fn bus(&self) -> Result<Bus, String> {
+        let missing = |name: &str| {
+            format!(
+                "{name} is not stated, and a configuration whose gateway is \
+                 cfs must state it"
+            )
+        };
+        let sbn = self.sbn.as_ref().ok_or_else(|| missing("sbn"))?;
+        let processor_id = sbn_number("sbn.processor_id", &sbn.processor_id)?;
+        let peer_processor_id =
+            sbn_number("sbn.peer_processor_id", &sbn.peer_processor_id)?;
+        if processor_id == peer_processor_id {
+            return Err(format!(
+                "sbn.processor_id and sbn.peer_processor_id are both \
+                 {processor_id}, and SBN tells its peers apart by processor \
+                 ID: give tcspecial a processor ID of its own, the one the \
+                 far end's SBN table lists it with"
+            ));
+        }
+        let max_message = sbn_number("sbn.max_message", &sbn.max_message)?;
+        let smallest = crate::cfs::HEADER_BYTES as u32;
+        if max_message <= smallest {
+            return Err(format!(
+                "sbn.max_message is {max_message}, which leaves no room for \
+                 anything after a cFS packet's headers: give the cFS build's \
+                 CFE_MISSION_SB_MAX_SB_MSG_SIZE, which is 32768 in cFE's \
+                 example"
+            ));
+        }
+        let local = host_port_of("sbn.local", &sbn.local)?;
+        let peer = host_port_of("sbn.peer", &sbn.peer)?;
+        let sbn = Sbn {
+            release: crate::sbn::release_of(&sbn.release)?,
+            ident: crate::sbn::ident_of(&sbn.ident)?,
+            spacecraft_id: sbn_number("sbn.spacecraft_id", &sbn.spacecraft_id)?,
+            processor_id,
+            local,
+            peer,
+            peer_processor_id,
+            max_message,
+        };
+
+        let range = self
+            .msgid_range
+            .as_ref()
+            .ok_or_else(|| missing("msgid_range"))?;
+        let first = msgid_of("msgid_range.first", &range.first)?;
+        let last = msgid_of("msgid_range.last", &range.last)?;
+        if last < first {
+            return Err(format!(
+                "msgid_range runs from {first:#06x} to {last:#06x}, which is \
+                 backwards: first is the lowest message ID allotted and last \
+                 the highest"
+            ));
+        }
+        let allotted = MsgIdRange { first, last };
+
+        // A stated message ID: one, in the allotment, and a command's or
+        // telemetry's as its use is.
+        let stated = |name: &str, said: &Option<String>, command: bool| {
+            let said = said.as_deref().ok_or_else(|| missing(name))?;
+            let msgid = msgid_of(name, said)?;
+            allotted.holds(name, msgid, command)?;
+            Ok::<u16, String>(msgid)
+        };
+        let cmd_msgid =
+            stated("tcs_cmd.cmd_msgid", &self.tcs_cmd.cmd_msgid, true)?;
+        let response_msgid = stated(
+            "tcs_cmd.response_msgid",
+            &self.tcs_cmd.response_msgid,
+            false,
+        )?;
+        let cmd_base = stated(
+            "payload_command.cmd_base",
+            &self.payload_command.cmd_base,
+            true,
+        )?;
+        let response_base = stated(
+            "payload_command.response_base",
+            &self.payload_command.response_base,
+            false,
+        )?;
+        let tlm_base = stated(
+            "payload_telemetry.tlm_base",
+            &self.payload_telemetry.tlm_base,
+            false,
+        )?;
+        let beacon_msgid =
+            stated("beacon.tlm_msgid", &self.beacon.tlm_msgid, false)?;
+
+        let time = self.cfe_time.as_ref().ok_or_else(|| missing("cfe_time"))?;
+        let epoch = crate::cfs::epoch_of(&time.epoch)
+            .map_err(|why| format!("cfe_time.epoch: {why}"))?;
+        let scale = match (time.scale.trim(), &time.leap_seconds) {
+            ("tai", Some(leap)) => crate::cfs::Scale::Tai {
+                leap_seconds: crate::whole::whole_u32(leap.trim())
+                    .map_err(|why| format!("cfe_time.leap_seconds is {why}"))?,
+            },
+            ("tai", None) => {
+                return Err("cfe_time.scale is tai, so cfe_time.leap_seconds \
+                     must say how far TAI is ahead of UTC: 37 since 2017"
+                    .to_string())
+            }
+            ("utc", None) => crate::cfs::Scale::Utc,
+            ("utc", Some(_)) => {
+                return Err("cfe_time.scale is utc, which counts no leap \
+                     seconds: take cfe_time.leap_seconds out"
+                    .to_string())
+            }
+            (other, _) => {
+                return Err(format!(
+                    "cfe_time.scale is \"{other}\", which is not a time \
+                     scale: say tai or utc, as the cFS build's \
+                     CFE_MISSION_TIME_CFG_DEFAULT_TAI has it"
+                ))
+            }
+        };
+
+        Ok(Bus {
+            sbn,
+            first,
+            last,
+            cmd_msgid,
+            response_msgid,
+            cmd_base,
+            response_base,
+            tlm_base,
+            beacon_msgid,
+            cfe_time: crate::cfs::CfeTime { epoch, scale },
+        })
+    }
+}
+
+/// The block of message IDs allotted tcspecial, which every one it uses is
+/// held to.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct MsgIdRange {
+    /// The first.
+    pub first: u16,
+    /// And the last.
+    pub last: u16,
+}
+
+impl MsgIdRange {
+    /// Refuses a message ID outside the block, or one of the wrong type for
+    /// its use.
+    ///
+    /// # Arguments
+    ///
+    /// * `what`    - What the message ID is, for the message: the attribute,
+    ///               or what it was counted for.
+    /// * `msgid`   - The message ID.
+    /// * `command` - Whether it is a command's (`true`) or telemetry's.
+    ///
+    /// # Returns
+    ///
+    /// `Ok(())` where it is in the block and of the right type.
+    ///
+    /// # Errors
+    ///
+    /// A message naming `what`, the message ID and the block.
+    pub fn holds(
+        &self,
+        what: &str,
+        msgid: u16,
+        command: bool,
+    ) -> Result<(), String> {
+        if msgid < self.first || msgid > self.last {
+            return Err(format!(
+                "{what} is message ID {msgid:#06x}, outside msgid_range, \
+                 {:#06x} to {:#06x}, the block the mission allotted \
+                 tcspecial: an ID outside it may be another application's",
+                self.first, self.last
+            ));
+        }
+        if crate::cfs::is_command(msgid) != command {
+            return Err(format!(
+                "{what} is message ID {msgid:#06x}, which cFE reads as {}, \
+                 and it is {}: in cFE's version 2 mapping a command's ID has \
+                 0x80 set and telemetry's has it clear",
+                if command { "telemetry" } else { "a command" },
+                if command {
+                    "a command's"
+                } else {
+                    "telemetry's"
+                },
+            ));
+        }
+        Ok(())
     }
 }
 

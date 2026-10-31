@@ -197,7 +197,16 @@ impl GatewayReceiver {
     ) -> Result<GatewayReceiver, String> {
         let mut ports = Vec::new();
         for link in links {
-            let at = format!("{}:{}", link.ground.address, link.ground.port);
+            // A link on a software bus has no ground socket to bind, and
+            // tcslib has no transport for one yet.
+            let Some(ground) = link.ground() else {
+                return Err(format!(
+                    "\"{name}\": \"{}\" is published on a cFS software bus, \
+                     which tcslib cannot listen on yet",
+                    link.source
+                ));
+            };
+            let at = format!("{}:{}", ground.address, ground.port);
             let socket = UdpSocket::bind(&at).map_err(|e| {
                 format!(
                     "\"{name}\": cannot listen for \"{}\" on {at}: {e}",

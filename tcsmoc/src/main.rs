@@ -1767,8 +1767,8 @@ mod tests {
             &tcslibgs::graph::parameters::flatten(section),
         )
         .expect("the section reads");
-        assert_eq!(mine.send.to_string(), said.beacon.send);
-        assert_eq!(mine.recv.to_string(), said.beacon.recv);
+        assert_eq!(Some(mine.send.to_string()), said.beacon.send);
+        assert_eq!(Some(mine.recv.to_string()), said.beacon.recv);
 
         // And the two ends are two sockets. One address for both would be a
         // sender bound where the listener is, which is the listener's port

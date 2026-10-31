@@ -31,10 +31,12 @@ use serde::de::{self, MapAccess, Visitor};
 use serde::{Deserialize, Deserializer, Serialize};
 
 use crate::endpoint_config::Scalar;
+use crate::gateway::GatewayKind;
 use crate::graph::Graph;
 use crate::types::{
-    default_log_segment_bytes, BeaconJson, CIConfigJson, LogJson,
-    PayloadCommandJson, PayloadTelemetryJson, TcsCmdJson,
+    default_log_segment_bytes, BeaconJson, CIConfigJson, CfeTimeJson, LogJson,
+    MsgIdRangeJson, PayloadCommandJson, PayloadTelemetryJson, SbnJson,
+    TcsCmdJson,
 };
 
 /// One entry of the section: a value, or a subsection of values.
@@ -190,36 +192,138 @@ pub fn nest(flat: &BTreeMap<String, Scalar>) -> BTreeMap<String, Parameter> {
     said
 }
 
-/// Every attribute of the section, and whether it must be stated.
+/// Which configurations an attribute belongs to, and whether it must be
+/// stated in them.
+///
+/// The gateway kind decides how the links are written -- UDP sockets for the
+/// radio and F´, software bus message IDs for cFS -- so an attribute of the
+/// one is required of a configuration of that kind and refused, by name, in
+/// one of the other: see "One kind per configuration" in `docs/design.rst`.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Needed {
+    /// Required of every configuration.
+    Always,
+    /// Optional in every configuration.
+    Optional,
+    /// Required where the links are UDP sockets, and refused where they are
+    /// not.
+    Sockets,
+    /// Required where the links are software bus message IDs, and refused
+    /// where they are not.
+    Bus,
+    /// Allowed only where the links are software bus message IDs, and
+    /// required or refused there by a rule of its own:
+    /// `cfe_time.leap_seconds`, stated on the TAI scale and not on UTC.
+    BusByRule,
+}
+
+impl Needed {
+    /// Whether an attribute so needed may be stated in a configuration that
+    /// answers to `kind`.
+    ///
+    /// # Arguments
+    ///
+    /// * `kind` - The kind of gateway the configuration answers to.
+    ///
+    /// # Returns
+    ///
+    /// `true` where it belongs.
+    pub fn belongs(self, kind: GatewayKind) -> bool {
+        match self {
+            Needed::Always | Needed::Optional => true,
+            Needed::Sockets => !kind.on_bus(),
+            Needed::Bus | Needed::BusByRule => kind.on_bus(),
+        }
+    }
+
+    /// Whether an attribute so needed must be stated in a configuration that
+    /// answers to `kind`, for a window to mark.
+    ///
+    /// # Arguments
+    ///
+    /// * `kind` - The kind of gateway the configuration answers to, or
+    ///            `None` where it does not yet say: only what every
+    ///            configuration needs is required of that.
+    ///
+    /// # Returns
+    ///
+    /// `true` where it must be stated.
+    pub fn required(self, kind: Option<GatewayKind>) -> bool {
+        match (self, kind) {
+            (Needed::Always, _) => true,
+            (Needed::Sockets, Some(kind)) => !kind.on_bus(),
+            (Needed::Bus, Some(kind)) => kind.on_bus(),
+            _ => false,
+        }
+    }
+}
+
+/// Every attribute of the section, and which configurations need it.
 ///
 /// The one list of them. The ground check reads it to refuse a name that
-/// belongs to nothing, and the editor reads it to know which fields to offer
-/// and which to mark when they are empty -- so an attribute is added here
-/// and appears in both.
+/// belongs to nothing, or to another kind of gateway, and the editor reads it
+/// to know which fields to offer and which to mark when they are empty -- so
+/// an attribute is added here and appears in both.
 ///
-/// Required ones first, so a panel built from this asks for what it must have
-/// before what it may.
-pub const ATTRIBUTES: &[(&str, bool)] = &[
-    ("gateway", true),
-    ("interface", true),
-    ("tcs_cmd.recv", true),
-    ("tcs_cmd.send", true),
-    ("payload_command.source_base", true),
-    ("payload_command.dest_base", true),
-    ("payload_telemetry.source_base", true),
-    ("payload_telemetry.dest_base", true),
-    ("beacon.default_interval", true),
-    ("beacon.reset_interval", true),
-    ("beacon.send", true),
-    ("beacon.recv", true),
-    ("state_file", true),
-    ("log.directory", false),
-    ("log.segment_size", false),
-    ("restart_arm_valid", false),
-    ("configurations", false),
-    ("configurations_kept", false),
-    ("load_trials", false),
+/// What every configuration must state first, then the radio's and F´'s, then
+/// cFS's, so a panel built from this asks for what it must have before what it
+/// may.
+pub const ATTRIBUTES: &[(&str, Needed)] = &[
+    ("gateway", Needed::Always),
+    ("interface", Needed::Always),
+    ("beacon.default_interval", Needed::Always),
+    ("beacon.reset_interval", Needed::Always),
+    ("state_file", Needed::Always),
+    ("tcs_cmd.recv", Needed::Sockets),
+    ("tcs_cmd.send", Needed::Sockets),
+    ("payload_command.source_base", Needed::Sockets),
+    ("payload_command.dest_base", Needed::Sockets),
+    ("payload_telemetry.source_base", Needed::Sockets),
+    ("payload_telemetry.dest_base", Needed::Sockets),
+    ("beacon.send", Needed::Sockets),
+    ("beacon.recv", Needed::Sockets),
+    ("sbn.release", Needed::Bus),
+    ("sbn.ident", Needed::Bus),
+    ("sbn.spacecraft_id", Needed::Bus),
+    ("sbn.processor_id", Needed::Bus),
+    ("sbn.local", Needed::Bus),
+    ("sbn.peer", Needed::Bus),
+    ("sbn.peer_processor_id", Needed::Bus),
+    ("sbn.max_message", Needed::Bus),
+    ("msgid_range.first", Needed::Bus),
+    ("msgid_range.last", Needed::Bus),
+    ("tcs_cmd.cmd_msgid", Needed::Bus),
+    ("tcs_cmd.response_msgid", Needed::Bus),
+    ("payload_command.cmd_base", Needed::Bus),
+    ("payload_command.response_base", Needed::Bus),
+    ("payload_telemetry.tlm_base", Needed::Bus),
+    ("beacon.tlm_msgid", Needed::Bus),
+    ("cfe_time.epoch", Needed::Bus),
+    ("cfe_time.scale", Needed::Bus),
+    ("cfe_time.leap_seconds", Needed::BusByRule),
+    ("log.directory", Needed::Optional),
+    ("log.segment_size", Needed::Optional),
+    ("restart_arm_valid", Needed::Optional),
+    ("configurations", Needed::Optional),
+    ("configurations_kept", Needed::Optional),
+    ("load_trials", Needed::Optional),
 ];
+
+/// Says which configurations an attribute of the section belongs to.
+///
+/// # Arguments
+///
+/// * `attribute` - The attribute's flat name.
+///
+/// # Returns
+///
+/// How it is needed, or `None` for a name the section does not have.
+pub fn needed(attribute: &str) -> Option<Needed> {
+    ATTRIBUTES
+        .iter()
+        .find(|(name, _)| *name == attribute)
+        .map(|(_, needed)| *needed)
+}
 
 /// Gives what a new configuration is given for an attribute, where anything.
 ///
@@ -367,26 +471,95 @@ pub fn ci_config_of(
         crate::whole::whole_u32(&said).map_err(|why| format!("{name} is {why}"))
     };
 
+    // First, because it decides how the rest is written: a configuration
+    // that answers to a gateway this build cannot is refused here, by name,
+    // before anything is said about its links.
+    let gateway = GatewayKind::of(&text("gateway")?)?;
+
+    // Then every link attribute that is another kind's. A `recv` in a
+    // configuration that answers to cFS is an address somebody expects to
+    // be listened on, and nothing will be, so it is refused by name rather
+    // than ignored.
+    for (name, value) in said {
+        if value.as_str().trim().is_empty() {
+            continue;
+        }
+        if let Some(needed) = needed(name) {
+            if !needed.belongs(gateway) {
+                return Err(misplaced(name, gateway));
+            }
+        }
+    }
+
+    // An attribute of this kind's links, which every configuration of the
+    // kind states, and `None` for the other kind's, which it cannot: any
+    // that was written has been refused above.
+    let link = |name: &str| -> Result<Option<String>, String> {
+        match needed(name) {
+            Some(needed) if needed.required(Some(gateway)) => {
+                text(name).map(Some)
+            }
+            _ => Ok(None),
+        }
+    };
+    let stated = |name: &str| {
+        said.get(name)
+            .map(|value| value.as_str().trim().to_string())
+            .filter(|value| !value.is_empty())
+    };
+
     Ok(CIConfigJson {
-        // First, because it decides how the rest is written: a configuration
-        // that answers to a gateway this build cannot is refused here, by
-        // name, before anything is said about its sockets.
-        gateway: crate::gateway::GatewayKind::of(&text("gateway")?)?,
+        gateway,
         // Second, because a configuration written for another interface is
         // one whose commands this build would read with other layouts, and
         // nothing else it says is worth reading until that is settled.
         interface: interface_of(&text("interface")?)?,
         tcs_cmd: TcsCmdJson {
-            recv: text("tcs_cmd.recv")?,
-            send: text("tcs_cmd.send")?,
+            recv: link("tcs_cmd.recv")?,
+            send: link("tcs_cmd.send")?,
+            cmd_msgid: link("tcs_cmd.cmd_msgid")?,
+            response_msgid: link("tcs_cmd.response_msgid")?,
         },
         payload_command: PayloadCommandJson {
-            source_base: text("payload_command.source_base")?,
-            dest_base: text("payload_command.dest_base")?,
+            source_base: link("payload_command.source_base")?,
+            dest_base: link("payload_command.dest_base")?,
+            cmd_base: link("payload_command.cmd_base")?,
+            response_base: link("payload_command.response_base")?,
         },
         payload_telemetry: PayloadTelemetryJson {
-            source_base: text("payload_telemetry.source_base")?,
-            dest_base: text("payload_telemetry.dest_base")?,
+            source_base: link("payload_telemetry.source_base")?,
+            dest_base: link("payload_telemetry.dest_base")?,
+            tlm_base: link("payload_telemetry.tlm_base")?,
+        },
+        // The peer, the allotment and the clock, which only a configuration
+        // that answers to cFS has, and which it must state whole.
+        sbn: match gateway.on_bus() {
+            true => Some(SbnJson {
+                release: text("sbn.release")?,
+                ident: text("sbn.ident")?,
+                spacecraft_id: text("sbn.spacecraft_id")?,
+                processor_id: text("sbn.processor_id")?,
+                local: text("sbn.local")?,
+                peer: text("sbn.peer")?,
+                peer_processor_id: text("sbn.peer_processor_id")?,
+                max_message: text("sbn.max_message")?,
+            }),
+            false => None,
+        },
+        msgid_range: match gateway.on_bus() {
+            true => Some(MsgIdRangeJson {
+                first: text("msgid_range.first")?,
+                last: text("msgid_range.last")?,
+            }),
+            false => None,
+        },
+        cfe_time: match gateway.on_bus() {
+            true => Some(CfeTimeJson {
+                epoch: text("cfe_time.epoch")?,
+                scale: text("cfe_time.scale")?,
+                leap_seconds: stated("cfe_time.leap_seconds"),
+            }),
+            false => None,
         },
         beacon: BeaconJson {
             // Kept as the file wrote it, a length of time, and turned into
@@ -415,8 +588,9 @@ pub fn ci_config_of(
                     .map_err(|why| format!("beacon.reset_interval: {why}"))?;
                 said
             },
-            send: text("beacon.send")?,
-            recv: text("beacon.recv")?,
+            send: link("beacon.send")?,
+            recv: link("beacon.recv")?,
+            tlm_msgid: link("beacon.tlm_msgid")?,
         },
         // Absent is the twenty minutes an arm has always lasted. Read here
         // all the same, as the beacon's interval is, so that a length of time
@@ -466,6 +640,48 @@ pub fn ci_config_of(
             },
         },
     })
+}
+
+/// Says why an attribute of one kind's links is refused in a configuration
+/// that answers to another, and what that kind states instead.
+///
+/// # Arguments
+///
+/// * `name` - The attribute's flat name.
+/// * `kind` - The kind the configuration answers to.
+///
+/// # Returns
+///
+/// The complaint.
+fn misplaced(name: &str, kind: GatewayKind) -> String {
+    let what = if kind.on_bus() {
+        format!(
+            "{name} is a UDP socket's, and this configuration's gateway is \
+             {kind}, whose links are software bus message IDs: take it out"
+        )
+    } else {
+        format!(
+            "{name} is said only where the gateway is cfs, and this \
+             configuration's is {kind}, whose links are UDP sockets: take it \
+             out"
+        )
+    };
+    // What the same subsection says for this kind, where it says anything.
+    let parent = name.split_once('.').map(|(parent, _)| parent);
+    let instead: Vec<&str> = ATTRIBUTES
+        .iter()
+        .filter(|(other, needed)| {
+            parent.is_some()
+                && other.split_once('.').map(|(p, _)| p) == parent
+                && matches!(needed, Needed::Sockets | Needed::Bus)
+                && needed.belongs(kind)
+        })
+        .map(|(other, _)| *other)
+        .collect();
+    match instead.is_empty() {
+        true => what,
+        false => format!("{what}, and state {} instead", instead.join(" and ")),
+    }
 }
 
 /// Reads a count the section states that may not be nought.
@@ -555,7 +771,8 @@ pub fn interface_of(said: &str) -> Result<crate::InterfaceDigest, String> {
 ///
 /// Both ends of the beacon link. `None` for a configuration with no
 /// section, which sends no beacons -- the section is where the two
-/// addresses are written down.
+/// addresses are written down -- and for one that answers to cFS, whose
+/// beacon is published on the software bus and has no socket.
 ///
 /// # Errors
 ///
@@ -566,7 +783,7 @@ pub fn beacon_of(graph: &Graph) -> Result<Option<crate::BeaconLink>, String> {
         return Ok(None);
     };
     let ci = ci_config_of(&flatten(section))?.to_ci_config()?;
-    Ok(Some(crate::BeaconLink::of(&ci)))
+    Ok(crate::BeaconLink::of(&ci))
 }
 
 /// Finds how often tcspecial beacons: the `tcspecial` section's
@@ -670,18 +887,228 @@ mod tests {
         ]
     }
 
+    /// Gives a section that answers to cFS and states every attribute it
+    /// must, laid out as the design's example is.
+    ///
+    /// # Returns
+    ///
+    /// Each attribute's flat name, with a value that reads.
+    fn on_the_bus() -> Vec<(&'static str, &'static str)> {
+        vec![
+            ("gateway", "cfs"),
+            ("interface", "ad9aac4dd5a6d88dd5e78824ba8a83ac"),
+            ("sbn.release", "v7.0.1"),
+            ("sbn.ident", "3b339a5e0f686cef822a5d6ea95004222ab7af33"),
+            ("sbn.spacecraft_id", "0x42"),
+            ("sbn.processor_id", "2"),
+            ("sbn.local", "0.0.0.0:2234"),
+            ("sbn.peer", "10.0.0.1:2234"),
+            ("sbn.peer_processor_id", "1"),
+            ("sbn.max_message", "32768"),
+            ("msgid_range.first", "0x4200"),
+            ("msgid_range.last", "0x42FF"),
+            ("tcs_cmd.cmd_msgid", "0x4280"),
+            ("tcs_cmd.response_msgid", "0x4200"),
+            ("payload_command.cmd_base", "0x4290"),
+            ("payload_command.response_base", "0x4210"),
+            ("payload_telemetry.tlm_base", "0x4220"),
+            ("beacon.default_interval", "5 s"),
+            ("beacon.reset_interval", "1 s"),
+            ("beacon.tlm_msgid", "0x4201"),
+            ("cfe_time.epoch", "1980-01-01T00:00:00"),
+            ("cfe_time.scale", "tai"),
+            ("cfe_time.leap_seconds", "37"),
+            ("state_file", "/var/lib/tcspecial/state"),
+        ]
+    }
+
+    /// Settles a section on the bus with some attributes changed: those
+    /// given an empty value are taken out.
+    fn bus_with(
+        change: &[(&'static str, &'static str)],
+    ) -> Result<crate::CIConfig, String> {
+        let mut all: Vec<_> = on_the_bus()
+            .into_iter()
+            .filter(|(name, _)| !change.iter().any(|(n, _)| n == name))
+            .collect();
+        all.extend(change.iter().filter(|(_, value)| !value.is_empty()));
+        ci_config_of(&said(&all)).and_then(|config| config.to_ci_config())
+    }
+
+    /// A section that answers to cFS reads as its peer, its allotment, its
+    /// message IDs and its clock.
+    #[test]
+    fn a_section_on_the_bus_is_what_the_command_interpreter_takes() {
+        let settled = bus_with(&[]).expect("the whole section");
+        assert!(settled.sockets().is_none());
+        let bus = settled.bus().expect("on the bus");
+        assert_eq!(bus.sbn.release.protocol_version, 11);
+        assert_eq!(
+            &bus.sbn.ident[5..45],
+            b"3b339a5e0f686cef822a5d6ea95004222ab7af33"
+        );
+        assert_eq!(bus.sbn.spacecraft_id, 0x42);
+        assert_eq!((bus.sbn.processor_id, bus.sbn.peer_processor_id), (2, 1));
+        assert_eq!(bus.sbn.peer.to_string(), "10.0.0.1:2234");
+        assert_eq!(bus.sbn.max_message, 32768);
+        assert_eq!((bus.first, bus.last), (0x4200, 0x42FF));
+        assert_eq!((bus.cmd_msgid, bus.response_msgid), (0x4280, 0x4200));
+        assert_eq!((bus.cmd_base, bus.response_base), (0x4290, 0x4210));
+        assert_eq!((bus.tlm_base, bus.beacon_msgid), (0x4220, 0x4201));
+        assert_eq!(
+            bus.cfe_time.scale,
+            crate::cfs::Scale::Tai { leap_seconds: 37 }
+        );
+        assert_eq!(bus.cfe_time.epoch, 315_532_800);
+        assert_eq!(
+            bus_with(&[
+                ("cfe_time.scale", "utc"),
+                ("cfe_time.leap_seconds", "")
+            ])
+            .expect("on UTC")
+            .bus()
+            .unwrap()
+            .cfe_time
+            .scale,
+            crate::cfs::Scale::Utc
+        );
+    }
+
+    /// Every attribute a section on the bus must state is complained about
+    /// by name when it is left out, and the rest may be.
+    #[test]
+    fn a_missing_attribute_on_the_bus_is_named() {
+        for (name, needed) in ATTRIBUTES {
+            if !needed.belongs(GatewayKind::Cfs) {
+                continue;
+            }
+            let outcome = bus_with(&[(name, "")]);
+            match needed {
+                Needed::Always | Needed::Bus => {
+                    let why = outcome.expect_err(name);
+                    assert!(why.contains(name), "{name}: {why}");
+                }
+                // Stated on TAI, which the whole section is on.
+                Needed::BusByRule => {
+                    let why = outcome.expect_err(name);
+                    assert!(why.contains(name), "{name}: {why}");
+                }
+                Needed::Optional | Needed::Sockets => {
+                    outcome.unwrap_or_else(|why| panic!("{name}: {why}"));
+                }
+            }
+        }
+    }
+
+    /// What a section on the bus states wrong is refused, saying which
+    /// attribute and what to do.
+    #[test]
+    fn what_is_wrong_on_the_bus_is_refused_by_name() {
+        for (change, says) in [
+            (("sbn.release", "v6.4.0"), &["sbn.release", "v7.0.1"][..]),
+            (("sbn.ident", "v7.0.1"), &["sbn.ident", "40 hexadecimal"]),
+            (("sbn.processor_id", "1"), &["sbn.peer_processor_id", "own"]),
+            (("sbn.spacecraft_id", "many"), &["sbn.spacecraft_id"]),
+            (("sbn.peer", "10.0.0.1"), &["sbn.peer", "address:port"]),
+            (("sbn.local", "0.0.0.0:0"), &["sbn.local", "port 0"]),
+            (("sbn.max_message", "16"), &["sbn.max_message", "32768"]),
+            (
+                ("msgid_range.last", "0x41FF"),
+                &["msgid_range", "backwards"],
+            ),
+            (
+                ("msgid_range.first", "0x10000"),
+                &["msgid_range.first", "0xFFFF"],
+            ),
+            (
+                ("tcs_cmd.cmd_msgid", "0x4300"),
+                &["tcs_cmd.cmd_msgid", "0x4300", "msgid_range", "0x4200"],
+            ),
+            (
+                ("tcs_cmd.cmd_msgid", "0x4270"),
+                &["tcs_cmd.cmd_msgid", "telemetry", "0x80"],
+            ),
+            (
+                ("tcs_cmd.response_msgid", "0x4281"),
+                &["tcs_cmd.response_msgid", "a command"],
+            ),
+            (
+                ("payload_telemetry.tlm_base", "0x42A0"),
+                &["payload_telemetry.tlm_base", "a command"],
+            ),
+            (
+                ("beacon.tlm_msgid", "0x4100"),
+                &["beacon.tlm_msgid", "outside"],
+            ),
+            (("cfe_time.epoch", "1980"), &["cfe_time.epoch", "YYYY"]),
+            (("cfe_time.scale", "gps"), &["cfe_time.scale", "tai or utc"]),
+            (
+                ("cfe_time.leap_seconds", "a few"),
+                &["cfe_time.leap_seconds"],
+            ),
+        ] {
+            let why = bus_with(&[change]).expect_err(change.0);
+            for said in says {
+                assert!(why.contains(said), "{change:?}: {why}");
+            }
+        }
+        let why = bus_with(&[("cfe_time.scale", "utc")])
+            .expect_err("leap seconds on UTC");
+        assert!(why.contains("take cfe_time.leap_seconds out"), "{why}");
+    }
+
+    /// A link attribute of the other kind is refused by name, and told what
+    /// this kind says instead: a `recv` on the bus is an address somebody
+    /// expects to be listened on.
+    #[test]
+    fn a_link_of_the_other_kind_is_refused_by_name() {
+        let why = bus_with(&[("tcs_cmd.recv", "0.0.0.0:4000")])
+            .expect_err("a socket on the bus");
+        assert!(why.contains("tcs_cmd.recv"), "{why}");
+        assert!(why.contains("cfs"), "{why}");
+        assert!(why.contains("tcs_cmd.cmd_msgid"), "{why}");
+
+        let mut all = whole();
+        all.push(("sbn.peer", "10.0.0.1:2234"));
+        let why = ci_config_of(&said(&all)).expect_err("a peer on the radio");
+        assert!(why.contains("sbn.peer"), "{why}");
+        assert!(why.contains("radio"), "{why}");
+        let mut all = whole();
+        all.push(("beacon.tlm_msgid", "0x4201"));
+        let why = ci_config_of(&said(&all)).expect_err("a message ID");
+        assert!(why.contains("beacon.send and beacon.recv"), "{why}");
+    }
+
+    /// Which attributes each kind requires, as a window marks them.
+    #[test]
+    fn what_is_required_depends_on_the_kind() {
+        assert!(Needed::Always.required(None));
+        assert!(!Needed::Sockets.required(None));
+        assert!(Needed::Sockets.required(Some(GatewayKind::Fprime)));
+        assert!(!Needed::Sockets.required(Some(GatewayKind::Cfs)));
+        assert!(Needed::Bus.required(Some(GatewayKind::Cfs)));
+        assert!(!Needed::BusByRule.required(Some(GatewayKind::Cfs)));
+        assert!(!Needed::Bus.belongs(GatewayKind::Radio));
+    }
+
     /// A section with everything in it reads as what the command interpreter
     /// wants.
     #[test]
     fn a_whole_section_is_what_the_command_interpreter_takes() {
         let config =
             ci_config_of(&said(&whole())).expect("this one is complete");
-        assert_eq!(config.tcs_cmd.recv, "0.0.0.0:4000");
-        assert_eq!(config.tcs_cmd.send, "127.0.0.1:4100");
-        assert_eq!(config.payload_command.source_base, "127.0.0.1:4300");
-        assert_eq!(config.payload_command.dest_base, "0.0.0.0:4200");
+        assert_eq!(config.tcs_cmd.recv.as_deref(), Some("0.0.0.0:4000"));
+        assert_eq!(config.tcs_cmd.send.as_deref(), Some("127.0.0.1:4100"));
+        assert_eq!(
+            config.payload_command.source_base.as_deref(),
+            Some("127.0.0.1:4300")
+        );
+        assert_eq!(
+            config.payload_command.dest_base.as_deref(),
+            Some("0.0.0.0:4200")
+        );
         assert_eq!(config.beacon.default_interval, "5 s");
-        assert_eq!(config.beacon.send, "0.0.0.0:5550");
+        assert_eq!(config.beacon.send.as_deref(), Some("0.0.0.0:5550"));
         assert_eq!(config.log.directory.as_deref(), Some("/var/log/tcspecial"));
         assert_eq!(config.log.segment_size, 65536);
 
@@ -689,6 +1116,7 @@ mod tests {
         // knows them -- which is also where the one address and the one port
         // come out of the one attribute.
         let settled = config.to_ci_config().expect("and sound");
+        let settled = settled.sockets().expect("the radio's are sockets");
         assert_eq!(settled.address, "0.0.0.0");
         assert_eq!(settled.port, 4000);
         assert_eq!(settled.moc_cmd_send.to_string(), "127.0.0.1:4100");
@@ -864,11 +1292,14 @@ mod tests {
     /// wrong" is a sentence that sends somebody to read all ten.
     #[test]
     fn a_missing_attribute_is_named() {
-        for (name, required) in ATTRIBUTES {
+        for (name, needed) in ATTRIBUTES {
+            if !needed.belongs(GatewayKind::Radio) {
+                continue;
+            }
             let left_out: Vec<(&str, &str)> =
                 whole().into_iter().filter(|(had, _)| had != name).collect();
             let outcome = ci_config_of(&said(&left_out));
-            if *required {
+            if needed.required(Some(GatewayKind::Radio)) {
                 let why = outcome.expect_err(&format!("{name} is required"));
                 assert!(why.contains(name), "{why}");
             } else {

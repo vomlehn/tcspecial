@@ -51,8 +51,10 @@ project brings to them, what has to change to fit, and in what order, is in
 ``third-party.rst``, beside this manual.
 
 .. note::
-   Integration with cFS and F´ is a work in progress. None of it is built
-   yet, and nothing else in this manual depends on it.
+   Integration with cFS and F´ is a work in progress. A vehicle can answer to
+   either -- see `The fprime example`_ and `The cfs example`_ -- and the rest
+   of what ``third-party.rst`` describes is not built yet; nothing else in
+   this manual depends on it.
 
 What that buys
 --------------
@@ -119,9 +121,10 @@ MOC
 
 gateway
     The node the vehicle reaches what it answers to through -- the ground,
-    over the radio, as a ``gateway_radio`` node, or an F´ flight computer, as
-    a ``gateway_fprime`` -- written in the ``gateway`` section: a network link
-    carrying telemetry down and commands up. It was called ``moc`` while the
+    over the radio, as a ``gateway_radio`` node, an F´ flight computer, as a
+    ``gateway_fprime``, or a cFS flight computer's software bus, as a
+    ``gateway_cfs`` -- written in the ``gateway`` section: a link carrying
+    telemetry down and commands up. It was called ``moc`` while the
     ground was the only thing at the other end, and a configuration that still
     says ``moc``, ``moc-in``, ``moc-out``, ``tee-moc``, ``null-moc``,
     ``app_moc_veh`` or ``app-moc-arg`` is refused, naming the line and the
@@ -2373,6 +2376,128 @@ ports nothing holds: a reading reaches the bridge, and a command from the
 bridge reaches the heater. Every port the example uses is in the nine
 thousands, which no other example uses.
 
+The cfs example
+---------------
+.. figure:: ../examples/cfs/cfs.svg
+   :alt: The cfs example: the thermometer's readings go to fsw, a gateway_cfs
+         node, and are published on the cFS software bus as fsw's tlm_base
+         plus the thermometer's device id; a command the bus publishes as
+         fsw's cmd_msgid goes to fsw and on to the heater.
+   :width: 100%
+
+   ``examples/cfs``: a vehicle that answers to a cFS flight computer.
+
+The vehicle answers to a cFS flight computer rather than to the ground, so the
+``tcspecial`` section says ``gateway: "cfs"`` and the one gateway node,
+``fsw``, is a ``gateway_cfs``. tcspecial joins the computer's software bus as
+one more peer of its Software Bus Network, SBN, over SBN's UDP protocol
+module, and nothing has to be built into the cFS side for it: the mission adds
+tcspecial to its SBN table and allots it a block of message IDs.
+
+Everything the vehicle takes and sends crosses that one link, as cFS packets
+told apart by message ID, so the ``tcspecial`` section has no sockets for
+commands, beacons or telemetry. It states the peer once, under ``sbn``, and a
+message ID or a base where a radio's configuration has a socket:
+
+.. code-block:: yaml
+
+   tcspecial:
+     gateway: "cfs"
+     sbn:
+       release: "v7.0.1"
+       ident: "3b339a5e0f686cef822a5d6ea95004222ab7af33"
+       spacecraft_id: "0x42"
+       processor_id: "2"
+       local: "0.0.0.0:8634"
+       peer: "127.0.0.1:2234"
+       peer_processor_id: "1"
+       max_message: "32768"
+     msgid_range: { first: "0x4200", last: "0x42FF" }
+     tcs_cmd: { cmd_msgid: "0x4280", response_msgid: "0x4200" }
+     payload_command: { cmd_base: "0x4290", response_base: "0x4210" }
+     payload_telemetry: { tlm_base: "0x4220" }
+     beacon: { default_interval: "5 s", reset_interval: "1 s",
+               tlm_msgid: "0x4201" }
+     cfe_time: { epoch: "1980-01-01T00:00:00", scale: "tai",
+                 leap_seconds: "37" }
+
+- ``sbn.release`` is the SBN release the cFS side was built from, and must be
+  one this build speaks -- v7.0.1 -- because the release decides the layout
+  of every message. ``sbn.ident`` is the 40-digit hash SBN prints in its
+  start-up event on the cFS side: tcspecial puts it in every subscription,
+  and SBN refuses a subscription that carries another, so a wrong one is a
+  link that connects and carries nothing. For SBN v7.0.1 checked out by git
+  it is ``3b339a5e0f686cef822a5d6ea95004222ab7af33``, which the example
+  gives. git fills the hash in as it checks SBN out; an SBN built from an
+  archive or a copy instead has no hash in it, and cannot be matched: build
+  the cFS side from a git checkout of SBN.
+- ``sbn.local`` is where tcspecial binds and ``sbn.peer`` where the cFS side's
+  SBN listens; ``spacecraft_id``, ``processor_id`` and ``peer_processor_id``
+  are the numbers SBN tells peers apart by, and tcspecial's processor ID may
+  not be the peer's. ``sbn.max_message`` is the cFS build's
+  ``CFE_MISSION_SB_MAX_SB_MSG_SIZE``: a node that could produce more than
+  that, with a cFS packet's sixteen bytes of headers, is refused.
+- ``msgid_range`` is the block the mission allotted tcspecial. Every message
+  ID the configuration states, or counts to from a base, must lie in it, be
+  used once, and be a command's (``0x80`` set) where tcspecial takes it and
+  telemetry's (``0x80`` clear) where it publishes it; tcsverify says which
+  one is not, and why.
+- Commands about the spacecraft are published for tcspecial as
+  ``tcs_cmd.cmd_msgid`` and answered as ``tcs_cmd.response_msgid``. A command
+  about node *k* is published as ``payload_command.cmd_base`` plus *k* and
+  answered as ``response_base`` plus *k*. A payload nothing in the drawing
+  touches is published as ``payload_telemetry.tlm_base`` plus its id, and the
+  beacon as ``beacon.tlm_msgid``.
+- ``cfe_time`` copies how the cFS build counts time -- its epoch, and ``tai``
+  or ``utc`` -- with ``leap_seconds``, TAI less UTC, where the scale is TAI.
+  Every telemetry packet is stamped in it.
+
+.. warning::
+   The cFS side's SBN table must list tcspecial with the same spacecraft ID,
+   processor ID and address that ``sbn.spacecraft_id``, ``sbn.processor_id``
+   and ``sbn.local`` give it, and must be the side at ``sbn.peer`` with
+   ``sbn.peer_processor_id``. Nothing on this side can check that table: a
+   mismatch is a vehicle that announces itself to a bus that does not answer,
+   or whose every datagram is refused as from a stranger, with nothing in
+   tcsverify's report to say so. Check the two against each other whenever
+   either changes.
+
+The gateway node says where what is drawn into it is published, ``tlm_base``,
+counted on by each source's device id: the ``thermometer``, device id 2, is
+published as ``0x4242``. It has no address and no port, and one written on it
+is refused: it is reached through the peer. A command the bus publishes as its
+``cmd_msgid``, ``0x4281``, is taken by ``fsw`` and leaves it by its
+``gateway-out`` for the ``heater``; ``cmd_msgid`` is required where a line or
+a command binding leaves the node.
+
+Each tcspecial packet is wrapped in a cFS packet as it goes -- the CCSDS
+primary header, cFS's extended header, and for a command a function code (the
+tcspecial command code) and a checksum, for telemetry a time -- and nothing in
+the configuration says how. A command whose checksum is wrong, whose function
+code is not its code, or that is not one whole cFS command is not answered,
+not acted on, and is logged and counted as malformed. The cFS side must be
+built with ``MISSION_INCLUDE_CCSDSEXT_HEADER`` and ``MISSION_MSGID_V2``, the
+two cFE settings the framing and the message IDs are read by.
+
+tcspecial speaks first: it announces itself to ``sbn.peer`` once a second
+until it is answered, sends SBN's protocol version and its subscriptions once
+it is, and publishes only what the peer has subscribed to and only once the
+peer's protocol version has been checked. It sends a heartbeat after five
+seconds of sending nothing, and a peer silent for ten seconds is disconnected
+and announced to again. A peer of another protocol version, or one whose
+subscriptions carry another ident, is refused and disconnected, and the
+refusal is logged with what was expected and what arrived each time it
+connects again.
+
+tcsmoc cannot command a vehicle that answers to cFS yet, nor tcssim stand in
+for the cFS side, so there is no ``run-cfs`` target: the cFS side commands
+it. ``tcspecial/tests/cfs.rs`` flies the example against a test that plays
+the cFS side's SBN: tcspecial subscribes, the beacon and a reading are
+published, a CONNECT and a node command are answered under their answer IDs,
+a command whose checksum is wrong is not, and a command for ``fsw`` reaches
+the heater. The payloads' ports are in the eighty-six hundreds, which no
+other example uses.
+
 The Simulator Configuration
 ===========================
 What simulating a payload takes, which is not a property of the payload: how
@@ -3373,16 +3498,20 @@ telemetry, and every configuration states it:
 
 ``radio`` is the ground, over UDP through the vehicle's radio. ``fprime`` is an
 F´ flight computer, through a bridge component in its deployment, over the
-same links in the same protocol: see `The fprime example`_. ``cfs`` -- a cFS
-flight computer's software bus -- is designed (see "Gateways" in
-``docs/design.rst``) and not yet built, and a configuration naming it is
-refused, saying which kinds to write instead.
+same links in the same protocol: see `The fprime example`_. ``cfs`` is a cFS
+flight computer's software bus, which tcspecial joins as a peer of its SBN,
+every link carried over that one peer as message IDs rather than sockets: see
+`The cfs example`_, which says what such a section states. An attribute of
+the other kind's links -- a ``tcs_cmd.recv`` in a configuration that answers
+to cFS, an ``sbn`` in one that answers to the radio -- is refused by name,
+saying what that kind states instead.
 A configuration that says nothing is refused too, rather than given ``radio``:
 what a vehicle answers to is a fact about the mission, and the kind decides
 how every link below is written.
 
 The gateway nodes are written in the ``gateway`` section: a radio's with
-``type: gateway_radio``, an F´ bridge's with ``type: gateway_fprime``. Every
+``type: gateway_radio``, an F´ bridge's with ``type: gateway_fprime``, a cFS
+software bus's with ``type: gateway_cfs``. Every
 node there is of the kind ``tcspecial.gateway`` names, and one of another kind is refused,
 naming both, because a vehicle answers to one: commands, beacons and data all go
 the one way.
@@ -3390,8 +3519,9 @@ the one way.
 Nothing in the configuration says how what crosses a gateway is framed: the
 node type does. ``gateway_radio`` and ``gateway_fprime`` both carry
 tcspecial's packets as they are, one to a datagram, the F´ bridge speaking
-the radio's own protocol; ``gateway_cfs``, when it is built, wraps each in
-the CCSDS Space Packet the cFS software bus carries.
+the radio's own protocol; ``gateway_cfs`` wraps each in the cFS packet the
+cFS software bus carries, and strips it from each it takes, refusing and
+counting as malformed what is not framed so.
 
 Configurations kept on board
 ----------------------------

@@ -32,6 +32,14 @@
 //! Two links landing on one port of one host would be two sources whose data
 //! arrived interleaved with nothing to tell them apart, so that is refused.
 //!
+//! # On a software bus
+//!
+//! A configuration that answers to cFS has message IDs where these have
+//! ports, counted the same way: a gateway node's `tlm_base`, or the
+//! section's `payload_telemetry.tlm_base`, plus the source's id. [`msgids`]
+//! is every message ID such a configuration uses, telemetry and commands
+//! alike, and holds each to the mission's allotment.
+//!
 //! This is the one place that says all of it. The flight software routes by
 //! it, the checking judges a configuration by it, and a ground station or
 //! simulator working from the same file finds the same ports by it.
@@ -40,7 +48,9 @@ use std::collections::{BTreeMap, BTreeSet};
 
 use super::parameters::{ci_config_of, flatten};
 use super::{Destination, Graph};
-use crate::types::{host_port_of, NetworkConfig, NetworkProtocol};
+use crate::types::{
+    host_port_of, msgid_of, Links, MsgIdRange, NetworkConfig, NetworkProtocol,
+};
 
 /// Which kind of link to the ground this is.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -49,6 +59,22 @@ pub enum Via {
     Gateway(String),
     /// A payload nothing touches, over the section's `payload_telemetry`.
     PayloadTelemetry,
+}
+
+/// How a link to the ground is reached: over UDP, or on a software bus.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum Reaches {
+    /// Over UDP, from one socket to another.
+    Socket {
+        /// tcspecial's end, which it binds and sends from. Port nought for a
+        /// link into a gateway node, whose vehicle end is whatever the
+        /// system gives.
+        vehicle: NetworkConfig,
+        /// The ground's end, which the ground binds and tcspecial sends to.
+        ground: NetworkConfig,
+    },
+    /// Published on a cFS software bus, under this message ID.
+    Bus(u16),
 }
 
 /// One source's link to the ground.
@@ -62,11 +88,46 @@ pub struct Telemetered {
     pub id: usize,
     /// Which kind of link it is.
     pub via: Via,
-    /// tcspecial's end, which it binds and sends from. Port nought for a link
-    /// into a gateway node, whose vehicle end is whatever the system gives.
-    pub vehicle: NetworkConfig,
-    /// The ground's end, which the ground binds and tcspecial sends to.
-    pub ground: NetworkConfig,
+    /// How it is reached.
+    pub reaches: Reaches,
+}
+
+impl Telemetered {
+    /// tcspecial's end of a link over UDP.
+    ///
+    /// # Returns
+    ///
+    /// The socket, or `None` for a link on a software bus.
+    pub fn vehicle(&self) -> Option<&NetworkConfig> {
+        match &self.reaches {
+            Reaches::Socket { vehicle, .. } => Some(vehicle),
+            Reaches::Bus(_) => None,
+        }
+    }
+
+    /// The ground's end of a link over UDP.
+    ///
+    /// # Returns
+    ///
+    /// The socket, or `None` for a link on a software bus.
+    pub fn ground(&self) -> Option<&NetworkConfig> {
+        match &self.reaches {
+            Reaches::Socket { ground, .. } => Some(ground),
+            Reaches::Bus(_) => None,
+        }
+    }
+
+    /// The message ID a link on a software bus is published under.
+    ///
+    /// # Returns
+    ///
+    /// The message ID, or `None` for a link over UDP.
+    pub fn msgid(&self) -> Option<u16> {
+        match self.reaches {
+            Reaches::Bus(msgid) => Some(msgid),
+            Reaches::Socket { .. } => None,
+        }
+    }
 }
 
 /// What is wrong with a configuration's links to the ground.
@@ -93,6 +154,39 @@ pub fn ids(graph: &Graph) -> BTreeMap<String, usize> {
         .enumerate()
         .map(|(id, node)| (node.name.clone(), id))
         .collect()
+}
+
+/// A message ID base, counted on by a node's device id.
+///
+/// The one place the sum is taken for message IDs, as [`HostPort::at`] is
+/// for ports, so that both ends of a software bus work out the same ID from
+/// the same file.
+///
+/// # Arguments
+///
+/// * `base` - The base.
+/// * `id`   - The node's device id.
+///
+/// # Returns
+///
+/// The message ID.
+///
+/// # Errors
+///
+/// A message where the sum is more than a message ID's sixteen bits.
+///
+/// [`HostPort::at`]: crate::types::HostPort::at
+pub fn counted(base: u16, id: usize) -> Result<u16, String> {
+    usize::from(base)
+        .checked_add(id)
+        .and_then(|sum| u16::try_from(sum).ok())
+        .ok_or_else(|| {
+            format!(
+                "{base:#06x} plus {id} is more than a message ID's sixteen \
+                 bits: a base this high leaves no room for the nodes counted \
+                 from it"
+            )
+        })
 }
 
 /// What a source's link into a gateway node is called.
@@ -122,9 +216,9 @@ pub fn payload_link_name(payload: &str) -> String {
 ///
 /// # Errors
 ///
-/// [`Refused`] when a link's port cannot be counted on to from its base, the
-/// `tcspecial` section does not read, or two links land on one port of one
-/// host.
+/// [`Refused`] when a link's port or message ID cannot be counted on to from
+/// its base, the `tcspecial` section does not read, or two links land on one
+/// port of one host or on one message ID.
 pub fn of(graph: &Graph) -> Result<Vec<Telemetered>, Refused> {
     let ids = ids(graph);
     let mut links = Vec::new();
@@ -142,17 +236,13 @@ pub fn of(graph: &Graph) -> Result<Vec<Telemetered>, Refused> {
                 continue;
             };
             // Each kind names its far end by what is there: a radio's
-            // ground_base, an F´ gateway's bridge_base. One rule counts on
-            // from either.
-            let attribute =
+            // ground_base, an F´ gateway's bridge_base, cFS's tlm_base. One
+            // rule counts on from each.
+            let kind =
                 crate::gateway::GatewayKind::of_node_type(&gateway.node_type)
-                    .expect("a gateway node")
-                    .base_attribute();
-            let Some(base) = gateway
-                .attributes
-                .get(attribute)
-                .and_then(|b| host_port_of(attribute, b.as_str()).ok())
-            else {
+                    .expect("a gateway node");
+            let attribute = kind.base_attribute();
+            let Some(said) = gateway.attributes.get(attribute) else {
                 continue;
             };
             if !seen.insert((source.clone(), to.clone())) {
@@ -161,21 +251,34 @@ pub fn of(graph: &Graph) -> Result<Vec<Telemetered>, Refused> {
             let Some(&id) = ids.get(&source) else {
                 continue;
             };
-            let ground = base.at(id).map_err(|why| Refused {
+            let refused = |why: String| Refused {
                 node: Some(to.clone()),
                 why: format!("\"{to}\": {attribute} {why}"),
-            })?;
+            };
+            let reaches = if kind.on_bus() {
+                let Ok(base) = msgid_of(attribute, said.as_str()) else {
+                    continue;
+                };
+                Reaches::Bus(counted(base, id).map_err(refused)?)
+            } else {
+                let Ok(base) = host_port_of(attribute, said.as_str()) else {
+                    continue;
+                };
+                Reaches::Socket {
+                    vehicle: NetworkConfig {
+                        protocol: NetworkProtocol::Udp,
+                        address: "0.0.0.0".to_string(),
+                        port: 0,
+                    },
+                    ground: base.at(id).map_err(refused)?,
+                }
+            };
             links.push(Telemetered {
                 name: gateway_link_name(&source, &to),
                 source: source.clone(),
                 id,
                 via: Via::Gateway(to.clone()),
-                vehicle: NetworkConfig {
-                    protocol: NetworkProtocol::Udp,
-                    address: "0.0.0.0".to_string(),
-                    port: 0,
-                },
-                ground,
+                reaches,
             });
         }
     }
@@ -193,38 +296,268 @@ pub fn of(graph: &Graph) -> Result<Vec<Telemetered>, Refused> {
                 continue;
             }
             let id = ids[&node.name];
+            let reaches = match &ci.links {
+                Links::Sockets(sockets) => Reaches::Socket {
+                    vehicle: sockets
+                        .payload_source_base
+                        .at(id)
+                        .map_err(refused)?,
+                    ground: sockets
+                        .payload_dest_base
+                        .at(id)
+                        .map_err(refused)?,
+                },
+                Links::Bus(bus) => Reaches::Bus(
+                    counted(bus.tlm_base, id)
+                        .map_err(|why| {
+                            format!("payload_telemetry.tlm_base {why}")
+                        })
+                        .map_err(refused)?,
+                ),
+            };
             links.push(Telemetered {
                 name: payload_link_name(&node.name),
                 source: node.name.clone(),
                 id,
                 via: Via::PayloadTelemetry,
-                vehicle: ci.payload_source_base.at(id).map_err(refused)?,
-                ground: ci.payload_dest_base.at(id).map_err(refused)?,
+                reaches,
             });
         }
     }
 
-    // No two sources on one port of one host.
+    // No two sources on one port of one host, nor on one message ID.
     let mut landed: BTreeMap<(String, u16), &Telemetered> = BTreeMap::new();
     for link in &links {
-        let at = (link.ground.address.clone(), link.ground.port);
+        let (at, said) = match &link.reaches {
+            Reaches::Socket { ground, .. } => (
+                (ground.address.clone(), ground.port),
+                format!(
+                    "send to the ground at {}:{}",
+                    ground.address, ground.port
+                ),
+            ),
+            Reaches::Bus(msgid) => (
+                (String::new(), *msgid),
+                format!("be published as message ID {msgid:#06x}"),
+            ),
+        };
         if let Some(first) = landed.insert(at, link) {
             return Err(Refused {
                 node: Some(link.source.clone()),
                 why: format!(
-                    "\"{}\" and \"{}\" would both send to the ground at {}:{}, \
-                     and their data would arrive interleaved with nothing to \
-                     tell it apart: move a base so the ports do not overlap",
-                    first.source,
-                    link.source,
-                    link.ground.address,
-                    link.ground.port,
+                    "\"{}\" and \"{}\" would both {said}, and their data \
+                     would arrive interleaved with nothing to tell it apart: \
+                     move a base so they do not overlap",
+                    first.source, link.source,
                 ),
             });
         }
     }
 
     Ok(links)
+}
+
+/// One message ID a configuration that answers over a software bus uses.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct MsgIdUse {
+    /// The message ID.
+    pub msgid: u16,
+    /// Whether it is one tcspecial takes commands on (`true`), or one it
+    /// publishes telemetry on.
+    pub command: bool,
+    /// What it is for, as a complaint names it.
+    pub what: String,
+    /// Which node it is about, where it is a node's.
+    pub node: Option<String>,
+    /// What it carries.
+    pub carries: Carries,
+}
+
+/// What a message ID carries.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum Carries {
+    /// Commands about the spacecraft.
+    SpacecraftCommands,
+    /// Their answers.
+    SpacecraftAnswers,
+    /// Commands about the node of this device id.
+    NodeCommands(usize),
+    /// Their answers.
+    NodeAnswers(usize),
+    /// The beacon.
+    Beacon,
+    /// What a gateway node sends on along its lines and command bindings:
+    /// the gateway node's own `cmd_msgid`.
+    Gateway(String),
+    /// A source's data: one of [`of`]'s links.
+    Telemetry(String),
+}
+
+/// Every message ID a configuration that answers over a software bus uses,
+/// each checked: inside `msgid_range`, a command's where tcspecial takes it
+/// and telemetry's where it publishes, and used once.
+///
+/// The one statement of what tcspecial subscribes to and publishes, which
+/// the vehicle opens its subscriptions from and the ground check judges the
+/// allotment by: the spacecraft's command ID and its answers', each node's
+/// command and answer IDs counted from `payload_command`'s bases, each
+/// `gateway_cfs` node's `cmd_msgid`, the beacon's, and every link [`of`]
+/// finds.
+///
+/// # Arguments
+///
+/// * `graph` - The configuration.
+///
+/// # Returns
+///
+/// Every message ID used, or nothing for a configuration whose links are
+/// sockets or that has no section.
+///
+/// # Errors
+///
+/// [`Refused`] naming what the message ID is for, the ID and the range, or
+/// the two uses an ID is given.
+pub fn msgids(graph: &Graph) -> Result<Vec<MsgIdUse>, Refused> {
+    let Some(section) = graph.tcspecial.as_ref() else {
+        return Ok(Vec::new());
+    };
+    let refused = |why: String| Refused { node: None, why };
+    let ci = ci_config_of(&flatten(section))
+        .map_err(refused)?
+        .to_ci_config()
+        .map_err(refused)?;
+    let Some(bus) = ci.bus() else {
+        return Ok(Vec::new());
+    };
+    let range = MsgIdRange {
+        first: bus.first,
+        last: bus.last,
+    };
+
+    let mut used = vec![
+        MsgIdUse {
+            msgid: bus.cmd_msgid,
+            command: true,
+            what: "tcs_cmd.cmd_msgid".to_string(),
+            node: None,
+            carries: Carries::SpacecraftCommands,
+        },
+        MsgIdUse {
+            msgid: bus.response_msgid,
+            command: false,
+            what: "tcs_cmd.response_msgid".to_string(),
+            node: None,
+            carries: Carries::SpacecraftAnswers,
+        },
+        MsgIdUse {
+            msgid: bus.beacon_msgid,
+            command: false,
+            what: "beacon.tlm_msgid".to_string(),
+            node: None,
+            carries: Carries::Beacon,
+        },
+    ];
+    for (id, node) in graph.nodes.iter().enumerate() {
+        let counted_for = |name: &str, base: u16| {
+            counted(base, id).map_err(|why| Refused {
+                node: Some(node.name.clone()),
+                why: format!(
+                    "\"{}\"'s message ID, {name} plus its device id {id}: {why}",
+                    node.name
+                ),
+            })
+        };
+        used.push(MsgIdUse {
+            msgid: counted_for("payload_command.cmd_base", bus.cmd_base)?,
+            command: true,
+            what: format!(
+                "the command message ID of \"{}\", payload_command.cmd_base \
+                 plus its device id {id}",
+                node.name
+            ),
+            node: Some(node.name.clone()),
+            carries: Carries::NodeCommands(id),
+        });
+        used.push(MsgIdUse {
+            msgid: counted_for(
+                "payload_command.response_base",
+                bus.response_base,
+            )?,
+            command: false,
+            what: format!(
+                "the answer message ID of \"{}\", \
+                 payload_command.response_base plus its device id {id}",
+                node.name
+            ),
+            node: Some(node.name.clone()),
+            carries: Carries::NodeAnswers(id),
+        });
+        if crate::gateway::GatewayKind::of_node_type(&node.node_type)
+            .is_some_and(|kind| kind.on_bus())
+        {
+            if let Some(said) = node.attributes.get("cmd_msgid") {
+                let msgid =
+                    msgid_of("cmd_msgid", said.as_str()).map_err(|why| {
+                        Refused {
+                            node: Some(node.name.clone()),
+                            why: format!("\"{}\": {why}", node.name),
+                        }
+                    })?;
+                used.push(MsgIdUse {
+                    msgid,
+                    command: true,
+                    what: format!("the cmd_msgid of \"{}\"", node.name),
+                    node: Some(node.name.clone()),
+                    carries: Carries::Gateway(node.name.clone()),
+                });
+            }
+        }
+    }
+    for link in of(graph)? {
+        if let Some(msgid) = link.msgid() {
+            let what = match &link.via {
+                Via::Gateway(gateway) => format!(
+                    "the message ID of what \"{}\" sends to \"{gateway}\", \
+                     its tlm_base plus the device id {}",
+                    link.source, link.id
+                ),
+                Via::PayloadTelemetry => format!(
+                    "the message ID of \"{}\"'s telemetry, \
+                     payload_telemetry.tlm_base plus its device id {}",
+                    link.source, link.id
+                ),
+            };
+            used.push(MsgIdUse {
+                msgid,
+                command: false,
+                what,
+                node: Some(link.source.clone()),
+                carries: Carries::Telemetry(link.name.clone()),
+            });
+        }
+    }
+
+    let mut first_use: BTreeMap<u16, &MsgIdUse> = BTreeMap::new();
+    for one in &used {
+        range
+            .holds(&one.what, one.msgid, one.command)
+            .map_err(|why| Refused {
+                node: one.node.clone(),
+                why,
+            })?;
+        if let Some(before) = first_use.insert(one.msgid, one) {
+            return Err(Refused {
+                node: one.node.clone(),
+                why: format!(
+                    "{} and {} are both message ID {:#06x}: two kinds of \
+                     packet under one ID would each be read as the other, so \
+                     move a base or an ID",
+                    before.what, one.what, one.msgid
+                ),
+            });
+        }
+    }
+    Ok(used)
 }
 
 /// Finds every node the drawing touches: an end of a link, or of a command
@@ -276,11 +609,12 @@ mod tests {
         links
             .iter()
             .map(|l| {
+                let ground = l.ground().expect("a link over UDP");
                 (
                     l.source.as_str(),
                     l.id,
-                    l.ground.address.as_str(),
-                    l.ground.port,
+                    ground.address.as_str(),
+                    ground.port,
                 )
             })
             .collect()
@@ -330,10 +664,8 @@ mod tests {
         let links = of(&example("minimal")).expect("it reads");
         assert_eq!(summary(&links), vec![("sensor", 0, "127.0.0.1", 6100)]);
         assert_eq!(links[0].via, Via::PayloadTelemetry);
-        assert_eq!(
-            (links[0].vehicle.address.as_str(), links[0].vehicle.port),
-            ("0.0.0.0", 6000)
-        );
+        let vehicle = links[0].vehicle().expect("a link over UDP");
+        assert_eq!((vehicle.address.as_str(), vehicle.port), ("0.0.0.0", 6000));
     }
 
     /// A payload the drawing touches goes only where it is drawn.

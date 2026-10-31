@@ -52,11 +52,12 @@ attributes and checks in `tcslibgs::node`, the flight-side node in
   gateway, a computation, a log, an app.
 - **gateway**: the side of the graph that commands tcspecial and takes its
   telemetry, and the node it is reached through: `gateway_radio` for the
-  ground, `gateway_fprime` for an F´ computer, `gateway_cfs` to come. Its
-  section is `gateway:`, its links `gateway-in` and `gateway-out`, and
-  `tee-gateway`, `null-gateway` and `app_gateway_veh` stand beside it. All
-  of these were `moc` once; a file still saying so is refused, told the
-  new word (`tcslibgs::graph::renamed`).
+  ground, `gateway_fprime` for an F´ computer, `gateway_cfs` for cFS's
+  software bus, joined as an SBN peer. Its section is `gateway:`, its links
+  `gateway-in` and `gateway-out`, and `tee-gateway`, `null-gateway` and
+  `app_gateway_veh` stand beside it. All of these were `moc` once; a file
+  still saying so is refused, told the new word
+  (`tcslibgs::graph::renamed`).
 - **MOC**: the mission operations center, on the ground. Still the word for
   the ground itself -- tcsmoc, "the MOC sends" -- but never for a node.
 - **device file**: a filesystem entry, `device_file` in code and `type:`.

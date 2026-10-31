@@ -1423,7 +1423,7 @@ mod tests {
     /// If the configuration cannot be written, read or opened.
     fn paced(now: Instant, every_pass: bool) -> (System, Counts) {
         let where_ = tempfile::tempdir().expect("a directory");
-        let path = where_.path().join("paced.yaml");
+        let path = where_.path().join("paced.ytcs");
         let mut text = String::from(
             "gateway:
   - { name: ground, type: gateway_radio, ground_base: \"127.0.0.1:5100\" }
@@ -1573,7 +1573,7 @@ payloads:
         // A configuration of only a quiet part on a timer and a floored one:
         // the wait is until the next is due.
         let where_ = tempfile::tempdir().expect("a directory");
-        let path = where_.path().join("quiet.yaml");
+        let path = where_.path().join("quiet.ytcs");
         std::fs::write(
             &path,
             "gateway:
@@ -1636,7 +1636,7 @@ payloads:
         // whose ask is a step of its own: stopping such a node has to stop the
         // trigger as well as the read, and the two are separate calls.
         let where_ = tempfile::tempdir().expect("a directory");
-        let path = where_.path().join("stopped.yaml");
+        let path = where_.path().join("stopped.ytcs");
         std::fs::write(
             &path,
             "payloads:
@@ -1751,7 +1751,7 @@ vehicle:
     fn a_node_counts_what_it_has_moved_and_keeps_it_through_a_stop() {
         let start = Instant::now();
         let where_ = tempfile::tempdir().expect("a directory");
-        let path = where_.path().join("counted.yaml");
+        let path = where_.path().join("counted.ytcs");
         std::fs::write(
             &path,
             "payloads:
@@ -1884,7 +1884,7 @@ vehicle:
     fn the_strangers_a_node_turned_away_are_counted() {
         let start = Instant::now();
         let where_ = tempfile::tempdir().expect("a directory");
-        let path = where_.path().join("besieged.yaml");
+        let path = where_.path().join("besieged.ytcs");
         std::fs::write(
             &path,
             "payloads:
@@ -1938,7 +1938,7 @@ vehicle:
     fn a_stopped_node_gives_up_what_it_held() {
         let start = Instant::now();
         let where_ = tempfile::tempdir().expect("a directory");
-        let path = where_.path().join("released.yaml");
+        let path = where_.path().join("released.ytcs");
         std::fs::write(
             &path,
             "payloads:
@@ -2026,7 +2026,7 @@ vehicle:
     fn work_handed_over_is_done_by_the_pass() {
         let start = Instant::now();
         let where_ = tempfile::tempdir().expect("a directory");
-        let path = where_.path().join("handed.yaml");
+        let path = where_.path().join("handed.ytcs");
         std::fs::write(
             &path,
             "payloads:
@@ -2132,7 +2132,7 @@ vehicle:
     /// If the example cannot be read or opened.
     fn vehicle(now: Instant, readings: &[(&str, &[u8])]) -> Vehicle {
         let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("..");
-        let mut graph = Graph::load(root.join("tests/manual/thermostat.yaml"))
+        let mut graph = Graph::load(root.join("tests/manual/thermostat.ytcs"))
             .expect("the example reads");
 
         // The log writes into a directory of this test's own; the example's is
@@ -2511,7 +2511,7 @@ vehicle:
         start: Instant,
     ) -> System {
         let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("..");
-        let mut graph = Graph::load(root.join("tests/manual/thermostat.yaml"))
+        let mut graph = Graph::load(root.join("tests/manual/thermostat.ytcs"))
             .expect("the example reads");
         for node in graph.nodes.iter_mut() {
             if node.node_type == "log" {
@@ -2708,7 +2708,7 @@ vehicle:
     #[test]
     fn an_undrawn_payload_reports_over_its_own_link() {
         let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("..");
-        let graph = Graph::load(root.join("examples/minimal/minimal.yaml"))
+        let graph = Graph::load(root.join("examples/minimal/minimal.ytcs"))
             .expect("the example reads");
 
         let sent = kept();
@@ -2753,7 +2753,7 @@ vehicle:
     #[test]
     fn a_ping_from_the_ground_is_answered_to_the_ground() {
         let where_ = tempfile::tempdir().expect("a directory");
-        let path = where_.path().join("ping.yaml");
+        let path = where_.path().join("ping.ytcs");
         std::fs::write(
             &path,
             "gateway:\n\
@@ -2896,7 +2896,7 @@ vehicle:
     #[test]
     fn a_vehicle_starts_only_if_everything_opens() {
         let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("..");
-        let graph = Graph::load(root.join("tests/manual/thermostat.yaml"))
+        let graph = Graph::load(root.join("tests/manual/thermostat.ytcs"))
             .expect("the example reads");
 
         let refused = System::of_opening(
@@ -2939,7 +2939,7 @@ vehicle:
     #[test]
     fn a_configuration_can_be_described_without_a_vehicle() {
         let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("..");
-        let graph = Graph::load(root.join("tests/manual/thermostat.yaml"))
+        let graph = Graph::load(root.join("tests/manual/thermostat.ytcs"))
             .expect("the example reads");
 
         let described = described(&graph);

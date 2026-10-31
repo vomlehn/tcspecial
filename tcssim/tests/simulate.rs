@@ -37,9 +37,9 @@ fn tcssim(args: &[&str]) -> (bool, String) {
 #[test]
 fn the_flight_setting_is_refused_before_anything_is_read() {
     for args in [
-        &["examples/minimal/minimal.yaml"][..],
-        &["--simulate=none", "examples/minimal/minimal.yaml"],
-        &["--wait", "examples/minimal/minimal.yaml"],
+        &["examples/minimal/minimal.ytcs"][..],
+        &["--simulate=none", "examples/minimal/minimal.ytcs"],
+        &["--wait", "examples/minimal/minimal.ytcs"],
     ] {
         let (ran, said) = tcssim(args);
         assert!(!ran, "{args:?}");
@@ -55,7 +55,7 @@ fn waiting_for_a_simulator_nobody_started_says_nothing_answered() {
     let (ran, said) = tcssim(&[
         "--simulate=all",
         "--wait=0.5",
-        "examples/minimal/minimal.yaml",
+        "examples/minimal/minimal.ytcs",
     ]);
     assert!(!ran, "{said}");
     assert!(

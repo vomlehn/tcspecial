@@ -259,7 +259,7 @@ mod tests {
 
     fn example(name: &str) -> Graph {
         let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("..");
-        Graph::load(root.join(format!("examples/{name}/{name}.yaml")))
+        Graph::load(root.join(format!("examples/{name}/{name}.ytcs")))
             .expect("the example reads")
     }
 

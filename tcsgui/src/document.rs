@@ -27,6 +27,7 @@ use crate::style::NodeType;
 use crate::subdiagram::{file_for, Home, Qualified};
 use tcslibgs::endpoint_config::Scalar;
 use tcslibgs::graph::{section_of, Section};
+use tcslibgs::ConfigFormat;
 
 /// One node as the editor holds it.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -1691,8 +1692,8 @@ impl Document {
     ///
     /// # Errors
     ///
-    /// A message naming the file if its extension is not `.yaml`, `.yml` or
-    /// `.xml`.
+    /// A message naming the file if its extension is not `.ytcs` or
+    /// `.xtcs`.
     pub fn files(
         &self,
         path: &std::path::Path,
@@ -1704,7 +1705,7 @@ impl Document {
 
         // And the same configuration in the other spelling, where one is
         // already there beside it. A configuration that exists as both
-        // `vehicle.yaml` and `vehicle.xml` is one configuration written twice,
+        // `vehicle.ytcs` and `vehicle.xtcs` is one configuration written twice,
         // and two files that are meant to say the same thing drift the moment
         // only one of them is written: the shipped example is a pair, and
         // keeping it a pair by hand meant a command to remember after every
@@ -1763,16 +1764,19 @@ impl Document {
     ///
     /// # Errors
     ///
-    /// A message naming the file if its extension is not `.yaml`, `.yml` or
-    /// `.xml`.
+    /// A message naming the file if its extension is not `.ytcs` or
+    /// `.xtcs`.
     fn text_for(
         &self,
         home: &Home,
         path: &std::path::Path,
     ) -> Result<String, String> {
-        match format_of(path)? {
-            Format::Yaml => Ok(self.to_yaml_for(home, path)),
-            Format::Xml => Ok(self.to_xml_for(home, path)),
+        // The extension decides, by the rule every program here follows:
+        // see tcslibgs::ConfigFormat, which refuses anything but .ytcs and
+        // .xtcs rather than guess at it.
+        match ConfigFormat::of_file(path).map_err(|e| e.to_string())? {
+            ConfigFormat::Yaml => Ok(self.to_yaml_for(home, path)),
+            ConfigFormat::Xml => Ok(self.to_xml_for(home, path)),
         }
     }
 
@@ -1794,7 +1798,7 @@ impl Document {
     /// element it belongs to, which is where it is in the YAML as well.
     #[cfg(test)]
     pub fn to_xml(&self) -> String {
-        self.to_xml_for(&None, std::path::Path::new("configuration.xml"))
+        self.to_xml_for(&None, std::path::Path::new("configuration.xtcs"))
     }
 
     /// One home's nodes and links, as XML.
@@ -2039,7 +2043,7 @@ impl Document {
     /// ignores, so that reopening the file finds the diagram as it was left.
     #[cfg(test)]
     pub fn to_yaml(&self) -> String {
-        self.to_yaml_for(&None, std::path::Path::new("configuration.yaml"))
+        self.to_yaml_for(&None, std::path::Path::new("configuration.ytcs"))
     }
 
     /// One home's nodes and links, as YAML.
@@ -2298,7 +2302,7 @@ impl Document {
 
     /// The same configuration's other spelling, where there is one.
     ///
-    /// `vehicle.yaml` beside `vehicle.xml`, in either direction, and `None`
+    /// `vehicle.ytcs` beside `vehicle.xtcs`, in either direction, and `None`
     /// where the sibling is not there -- which is every ordinary
     /// configuration. See [`Document::files`], which writes it.
     ///
@@ -2313,16 +2317,12 @@ impl Document {
         &self,
         path: &std::path::Path,
     ) -> Option<std::path::PathBuf> {
-        let said = path.extension().and_then(|e| e.to_str())?.to_lowercase();
-        let others: &[&str] = match said.as_str() {
-            "yaml" | "yml" => &["xml"],
-            "xml" => &["yaml", "yml"],
-            _ => &[],
+        let other = match ConfigFormat::from_path(path)? {
+            ConfigFormat::Yaml => ConfigFormat::Xml,
+            ConfigFormat::Xml => ConfigFormat::Yaml,
         };
-        others
-            .iter()
-            .map(|extension| path.with_extension(extension))
-            .find(|beside| beside.is_file())
+        Some(path.with_extension(other.extension()))
+            .filter(|beside| beside.is_file())
     }
 
     /// What leaves a node, by the data source it leaves by.
@@ -2468,53 +2468,6 @@ impl Document {
             }
         }
         arriving
-    }
-}
-
-/// Which language a file's name asks for.
-enum Format {
-    Yaml,
-    Xml,
-}
-
-/// The format `path` asks for, or why it asks for nothing.
-///
-/// The extension decides, which is the rule every configuration file in this
-/// project follows: anything that is neither .yaml, .yml nor .xml is refused
-/// rather than guessed at, because a guess is how a misspelled extension
-/// becomes a file parsed as the wrong language.
-///
-/// # Arguments
-///
-/// * `path` - The file's path.
-///
-/// # Returns
-///
-/// The format its extension names.
-///
-/// # Errors
-///
-/// A message naming the file if it has no extension or one that is not `.yaml`,
-/// `.yml` or `.xml`.
-fn format_of(path: &std::path::Path) -> Result<Format, String> {
-    match path
-        .extension()
-        .and_then(|e| e.to_str())
-        .map(|e| e.to_lowercase())
-        .as_deref()
-    {
-        Some("yaml") | Some("yml") => Ok(Format::Yaml),
-        Some("xml") => Ok(Format::Xml),
-        Some(other) => Err(format!(
-            "{}: \".{other}\" is not a configuration file -- a name ending in \
-             .yaml, .yml or .xml says how to read it",
-            path.display()
-        )),
-        None => Err(format!(
-            "{}: a configuration file's name says how to read it, and this one \
-             has no .yaml, .yml or .xml on it",
-            path.display()
-        )),
     }
 }
 
@@ -2700,7 +2653,7 @@ pub(crate) fn comment_lines(comment: &str, indent: usize) -> Vec<String> {
 /// The worked example from `design.rst`: a cabin thermostat.
 ///
 /// Built here rather than written out by hand in two formats, so that the
-/// shipped `tests/manual/thermostat.yaml` and `.xml` are what this editor
+/// shipped `tests/manual/thermostat.ytcs` and `.xtcs` are what this editor
 /// writes and not an approximation of it.
 /// `the_shipped_example_is_what_the_editor_writes` is what keeps the files and
 /// this agreeing.
@@ -4399,7 +4352,7 @@ mod tests {
         let mut document = Document::new();
         document.apply(&add("a", "i2c"));
 
-        let yaml = document.to_text(Path::new("graph.yaml")).expect("yaml");
+        let yaml = document.to_text(Path::new("graph.ytcs")).expect("yaml");
         // A YAML configuration opens by naming its schema, which is a
         // comment, and states no version: the loader would refuse one.
         assert!(
@@ -4407,24 +4360,25 @@ mod tests {
             "{yaml}"
         );
         assert!(!yaml.contains("version:"), "{yaml}");
-        assert_eq!(
-            document.to_text(Path::new("graph.yml")).expect("yml"),
-            yaml,
-            "the two YAML extensions wrote different files"
-        );
 
-        let xml = document.to_text(Path::new("graph.xml")).expect("xml");
+        let xml = document.to_text(Path::new("graph.xtcs")).expect("xml");
         assert!(xml.starts_with("<?xml"), "{xml}");
 
         // And anything else is refused rather than guessed at.
         let said = document
             .to_text(Path::new("graph.json"))
             .expect_err("an unknown extension should be refused");
-        assert!(said.contains(".yaml"), "{said}");
+        assert!(said.contains(".ytcs"), "{said}");
         let said = document
             .to_text(Path::new("graph"))
             .expect_err("no extension should be refused");
-        assert!(said.contains("no .yaml"), "{said}");
+        assert!(said.contains(".ytcs"), "{said}");
+        // A name of the kind every configuration once had is told the
+        // name it should have.
+        let said = document
+            .to_text(Path::new("graph.yaml"))
+            .expect_err(".yaml should be refused");
+        assert!(said.contains("rename it graph.ytcs"), "{said}");
     }
 
     /// The five characters XML cannot carry raw.
@@ -4453,8 +4407,8 @@ mod tests {
     #[test]
     fn a_configuration_in_two_spellings_is_written_in_both() {
         let where_ = tempfile::tempdir().expect("a directory");
-        let yaml = where_.path().join("vehicle.yaml");
-        let xml = where_.path().join("vehicle.xml");
+        let yaml = where_.path().join("vehicle.ytcs");
+        let xml = where_.path().join("vehicle.xtcs");
 
         let mut document = Document::new();
         document.apply(&add("sensor", "i2c"));
@@ -4525,7 +4479,7 @@ mod tests {
         assert!(xml.contains("<terminators>[03]</terminators>"), "{xml}");
 
         let where_ = tempfile::tempdir().expect("a directory");
-        for (name, text) in [("c.yaml", &yaml), ("c.xml", &xml)] {
+        for (name, text) in [("c.ytcs", &yaml), ("c.xtcs", &xml)] {
             let path = where_.path().join(name);
             std::fs::write(&path, text).expect("written");
             let graph = tcslibgs::graph::Graph::load(&path).expect("read back");
@@ -5049,8 +5003,8 @@ mod tests {
         let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("..");
 
         for name in [
-            "tests/manual/thermostat.yaml",
-            "tests/manual/thermostat.xml",
+            "tests/manual/thermostat.ytcs",
+            "tests/manual/thermostat.xtcs",
         ] {
             let path = root.join(name);
             // Written for the place it is going, which is what decides how it
@@ -5308,7 +5262,7 @@ mod tests {
         });
 
         let files = document
-            .files(Path::new("/tmp/vehicle.yaml"))
+            .files(Path::new("/tmp/vehicle.ytcs"))
             .expect("files");
         let (_, top) = &files[0];
         assert!(
@@ -5357,7 +5311,7 @@ mod tests {
         });
 
         let files = document
-            .files(Path::new("/tmp/vehicle.yaml"))
+            .files(Path::new("/tmp/vehicle.ytcs"))
             .expect("files");
         let (_, top) = &files[0];
         assert!(top.contains("payload-in: true"), "{top}");
@@ -5396,7 +5350,7 @@ mod tests {
         });
 
         let files = document
-            .files(Path::new("/tmp/vehicle.yaml"))
+            .files(Path::new("/tmp/vehicle.ytcs"))
             .expect("files");
         assert_eq!(files.len(), 2, "a top diagram and one subdiagram");
 
@@ -5413,7 +5367,7 @@ mod tests {
         // qualify it with.
         let (_, inner) = files
             .iter()
-            .find(|(path, _)| path.ends_with("cabin.yaml"))
+            .find(|(path, _)| path.ends_with("cabin.ytcs"))
             .expect("the subdiagram's file");
         assert!(
             inner.contains("payload-out:\n      - target: gateway\n"),

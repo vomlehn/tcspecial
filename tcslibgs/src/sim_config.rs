@@ -32,8 +32,9 @@
 //!
 //! A group carries what several simulated payloads have in common; a payload
 //! overrides any of it for itself. The format is chosen from the file extension
-//! by [`crate::load_config_file`], so the same configuration can be written
-//! in YAML or XML.
+//! by [`crate::load_data_file`], so the same configuration can be written
+//! in YAML or XML; a simulator file keeps its language's extension, `.yaml`,
+//! where a tcspecial configuration's is `.ytcs`.
 
 use std::collections::{BTreeMap, BTreeSet};
 use std::fmt;
@@ -42,7 +43,7 @@ use std::time::Duration;
 
 use crate::verify::About;
 use crate::{
-    load_config_file, one_host, DHConfig, DHType, EndpointConfig,
+    load_data_file, one_host, DHConfig, DHType, EndpointConfig,
     NetworkProtocol, TcsResult,
 };
 use serde::de::IgnoredAny;
@@ -1400,7 +1401,7 @@ impl Faults {
 impl SimConfigFile {
     /// Read a simulator configuration file.
     pub fn load<P: AsRef<Path>>(path: P) -> TcsResult<Self> {
-        load_config_file(path)
+        load_data_file(path)
     }
 
     /// Where tcssim answers whether it is ready: the `tcssim` section's

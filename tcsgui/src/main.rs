@@ -5914,26 +5914,26 @@ mod tests {
     fn the_command_line_takes_the_read_only_flag() {
         let said =
             |words: &[&str]| command_line(words.iter().map(|w| w.to_string()));
-        assert_eq!(said(&["a.yaml"]), Ok((vec!["a.yaml".to_string()], false)));
+        assert_eq!(said(&["a.ytcs"]), Ok((vec!["a.ytcs".to_string()], false)));
         for flag in ["-r", "--read-only", "--readonly"] {
             assert_eq!(
-                said(&[flag, "a.yaml"]),
-                Ok((vec!["a.yaml".to_string()], true))
+                said(&[flag, "a.ytcs"]),
+                Ok((vec!["a.ytcs".to_string()], true))
             );
             assert_eq!(
-                said(&["a.yaml", "a-sim.yaml", flag]),
+                said(&["a.ytcs", "a-sim.yaml", flag]),
                 Ok((
-                    vec!["a.yaml".to_string(), "a-sim.yaml".to_string()],
+                    vec!["a.ytcs".to_string(), "a-sim.yaml".to_string()],
                     true
                 ))
             );
         }
         assert!(
-            said(&["--readonley", "a.yaml"]).is_err(),
+            said(&["--readonley", "a.ytcs"]).is_err(),
             "a misspelled flag"
         );
-        assert!(said(&["-x", "a.yaml"]).is_err());
-        assert!(said(&["a.yaml", "b.yaml", "c.yaml"]).is_err());
+        assert!(said(&["-x", "a.ytcs"]).is_err());
+        assert!(said(&["a.ytcs", "b.ytcs", "c.ytcs"]).is_err());
     }
 
     /// In a read-only session the problems question's Edit and Delete are
@@ -6205,7 +6205,7 @@ mod tests {
     #[test]
     fn a_node_nobody_fixed_is_still_drawn_in_its_pane() {
         let where_ = tempfile::tempdir().expect("a directory");
-        let path = where_.path().join("vehicle.yaml");
+        let path = where_.path().join("vehicle.ytcs");
         std::fs::write(
             &path,
             "vehicle:\n  - name: odd\n    type: contraption\n",
@@ -6247,7 +6247,7 @@ mod tests {
     #[test]
     fn the_startup_list_says_what_tcsverify_says() {
         let where_ = tempfile::tempdir().expect("a directory");
-        let path = where_.path().join("vehicle.yaml");
+        let path = where_.path().join("vehicle.ytcs");
         std::fs::write(
             &path,
             "payload_groups:\n  - name: idle\n    interval: 3 s\n\
@@ -6302,7 +6302,7 @@ mod tests {
     #[test]
     fn a_new_configuration_starts_with_nothing_to_say() {
         let where_ = tempfile::tempdir().expect("a directory");
-        let editor = Editor::open(&where_.path().join("new.yaml"), dividers());
+        let editor = Editor::open(&where_.path().join("new.ytcs"), dividers());
         assert!(verified(&editor).is_empty());
     }
 
@@ -7195,7 +7195,7 @@ mod tests {
     #[test]
     fn the_panel_asks_for_what_the_type_needs() {
         let where_ = tempfile::tempdir().expect("a directory");
-        let mut editor = Editor::new(&where_.path().join("v.yaml"));
+        let mut editor = Editor::new(&where_.path().join("v.ytcs"));
         editor.edit(Edit::AddNode {
             name: "temp_1".into(),
             node_type: "i2c".into(),
@@ -7233,7 +7233,7 @@ mod tests {
     #[test]
     fn a_filled_field_shows_its_value() {
         let where_ = tempfile::tempdir().expect("a directory");
-        let mut editor = Editor::new(&where_.path().join("v.yaml"));
+        let mut editor = Editor::new(&where_.path().join("v.ytcs"));
         editor.edit(Edit::AddNode {
             name: "temp_1".into(),
             node_type: "i2c".into(),
@@ -7264,7 +7264,7 @@ mod tests {
     #[test]
     fn an_unrecognised_attribute_is_still_shown() {
         let where_ = tempfile::tempdir().expect("a directory");
-        let mut editor = Editor::new(&where_.path().join("v.yaml"));
+        let mut editor = Editor::new(&where_.path().join("v.ytcs"));
         editor.edit(Edit::AddNode {
             name: "temp_1".into(),
             node_type: "i2c".into(),
@@ -7297,7 +7297,7 @@ mod tests {
     #[test]
     fn the_panel_empties_when_its_node_goes() {
         let where_ = tempfile::tempdir().expect("a directory");
-        let mut editor = Editor::new(&where_.path().join("v.yaml"));
+        let mut editor = Editor::new(&where_.path().join("v.ytcs"));
         editor.edit(Edit::AddNode {
             name: "a".into(),
             node_type: "i2c".into(),
@@ -7321,7 +7321,7 @@ mod tests {
     #[test]
     fn the_panel_is_empty_until_something_is_chosen() {
         let where_ = tempfile::tempdir().expect("a directory");
-        let editor = Editor::new(&where_.path().join("v.yaml"));
+        let editor = Editor::new(&where_.path().join("v.ytcs"));
         for chosen in [None, Some(""), Some("nothing-here")] {
             let (name, _, _, fields, _) = panel_of(&editor, &None, chosen);
             assert!(name.is_empty(), "{chosen:?}");
@@ -7429,7 +7429,7 @@ mod tests {
     #[test]
     fn a_window_shows_only_what_lives_in_it() {
         let where_ = tempfile::tempdir().expect("a directory");
-        let mut editor = Editor::new(&where_.path().join("vehicle.yaml"));
+        let mut editor = Editor::new(&where_.path().join("vehicle.ytcs"));
 
         editor.edit(Edit::AddNode {
             name: "cabin".into(),
@@ -7474,7 +7474,7 @@ mod tests {
     #[test]
     fn a_crossing_link_is_drawn_to_a_stub_that_names_its_far_end() {
         let where_ = tempfile::tempdir().expect("a directory");
-        let mut editor = Editor::new(&where_.path().join("vehicle.yaml"));
+        let mut editor = Editor::new(&where_.path().join("vehicle.ytcs"));
 
         editor.edit(Edit::AddNode {
             name: "cabin".into(),
@@ -7584,7 +7584,7 @@ mod tests {
         });
 
         let where_ = tempfile::tempdir().expect("a directory");
-        let mut editor = Editor::new(&where_.path().join("v.yaml"));
+        let mut editor = Editor::new(&where_.path().join("v.ytcs"));
         for edit in [
             Edit::AddNode {
                 name: "a".into(),
@@ -7911,7 +7911,7 @@ mod tests {
         use journal::Edit;
 
         let where_ = tempfile::tempdir().expect("a directory");
-        let path = where_.path().join("vehicle.yaml");
+        let path = where_.path().join("vehicle.ytcs");
         let mut editor = Editor::open(&path, dividers());
         editor.edit(Edit::AddNode {
             name: "sensor".to_string(),
@@ -8698,7 +8698,7 @@ mod tests {
     #[test]
     fn a_fields_kind_reaches_the_window() {
         let where_ = tempfile::tempdir().expect("a directory");
-        let path = where_.path().join("vehicle.yaml");
+        let path = where_.path().join("vehicle.ytcs");
         std::fs::write(
             &path,
             "payloads:\n  - name: bay\n    type: app_pl\n    \
@@ -8751,7 +8751,7 @@ mod tests {
         use i_slint_backend_testing::ElementHandle;
 
         let where_ = tempfile::tempdir().expect("a directory");
-        let path = where_.path().join("vehicle.yaml");
+        let path = where_.path().join("vehicle.ytcs");
         std::fs::write(
             &path,
             "payloads:\n  - name: bay\n    type: app_pl\n    \
@@ -8988,7 +8988,7 @@ mod tests {
         // canvas out at once.
         let where_ = tempfile::tempdir().expect("a directory");
         let mut editor =
-            Editor::open(&where_.path().join("vehicle.yaml"), dividers());
+            Editor::open(&where_.path().join("vehicle.ytcs"), dividers());
         for (name, kind) in [
             ("a", "i2c"),
             ("b", "i2c"),
@@ -9266,7 +9266,7 @@ mod tests {
     #[test]
     fn a_new_configuration_starts_with_the_ground_station() {
         let where_ = tempfile::tempdir().expect("a directory");
-        let path = where_.path().join("vehicle.yaml");
+        let path = where_.path().join("vehicle.ytcs");
         let mut editor = Editor::open(&path, dividers());
         seed(&mut editor);
 
@@ -9349,7 +9349,7 @@ mod tests {
 
         // One that has something in it.
         let mut editor =
-            Editor::open(&where_.path().join("a.yaml"), dividers());
+            Editor::open(&where_.path().join("a.ytcs"), dividers());
         editor.edit(Edit::AddNode {
             name: "to_kelvin".into(),
             node_type: "compute".into(),
@@ -9360,7 +9360,7 @@ mod tests {
 
         // One somebody has emptied, which has a history behind it.
         let mut editor =
-            Editor::open(&where_.path().join("b.yaml"), dividers());
+            Editor::open(&where_.path().join("b.ytcs"), dividers());
         editor.edit(Edit::AddNode {
             name: "to_kelvin".into(),
             node_type: "compute".into(),
@@ -9376,7 +9376,7 @@ mod tests {
 
         // And one that could not be read, which is a file to repair rather
         // than a file to write over.
-        let damaged = where_.path().join("c.yaml");
+        let damaged = where_.path().join("c.ytcs");
         std::fs::write(&damaged, "nodes: [[[\n").expect("a file");
         let mut editor = Editor::open(&damaged, dividers());
         assert!(
@@ -9411,7 +9411,7 @@ mod tests {
         // The worked example, which is the shipped configuration with lines in
         // it: `example.*` is the one somebody opens the editor on and draws
         // their own, and it ships with none.
-        for extension in ["yaml", "xml"] {
+        for extension in ["ytcs", "xtcs"] {
             let editor = Editor::open(
                 &root.join(format!("tests/manual/thermostat.{extension}")),
                 dividers(),
@@ -9577,7 +9577,7 @@ mod tests {
         use std::rc::Rc;
 
         let where_ = tempfile::tempdir().expect("a directory");
-        let path = where_.path().join("vehicle.yaml");
+        let path = where_.path().join("vehicle.ytcs");
         std::fs::write(
             &path,
             "payloads:\n  - name: bay\n    type: app_pl\n    \
@@ -9703,7 +9703,7 @@ mod tests {
         use std::rc::Rc;
 
         let where_ = tempfile::tempdir().expect("a directory");
-        let path = where_.path().join("vehicle.yaml");
+        let path = where_.path().join("vehicle.ytcs");
         std::fs::write(
             &path,
             "payload_groups:\n  - name: idle\n    interval: 3 s\n",
@@ -9759,7 +9759,7 @@ mod tests {
         use std::rc::Rc;
 
         let where_ = tempfile::tempdir().expect("a directory");
-        let path = where_.path().join("vehicle.yaml");
+        let path = where_.path().join("vehicle.ytcs");
         std::fs::write(
             &path,
             "payload_groups:\n  - name: idle\n    interval: 3 s\n",
@@ -9799,7 +9799,7 @@ mod tests {
         use std::rc::Rc;
 
         let where_ = tempfile::tempdir().expect("a directory");
-        let path = where_.path().join("vehicle.yaml");
+        let path = where_.path().join("vehicle.ytcs");
         std::fs::write(
             &path,
             "payload_groups:\n  - name: idle\n    interval: 3 s\n",
@@ -9847,7 +9847,7 @@ mod tests {
         use std::rc::Rc;
 
         let where_ = tempfile::tempdir().expect("a directory");
-        let path = where_.path().join("vehicle.yaml");
+        let path = where_.path().join("vehicle.ytcs");
         std::fs::write(
             &path,
             "payload_groups:\n  - name: idle\n    interval: 3 s\n",
@@ -9898,7 +9898,7 @@ mod tests {
 
         let where_ = tempfile::tempdir().expect("a directory");
         let editor = Rc::new(RefCell::new(Editor::open(
-            &where_.path().join("vehicle.yaml"),
+            &where_.path().join("vehicle.ytcs"),
             dividers(),
         )));
         for (name, node_type) in
@@ -10037,7 +10037,7 @@ mod tests {
 
         let where_ = tempfile::tempdir().expect("a directory");
         let editor = Rc::new(RefCell::new(Editor::open(
-            &where_.path().join("drawn.yaml"),
+            &where_.path().join("drawn.ytcs"),
             dividers(),
         )));
         for (name, node_type, at) in [
@@ -10169,7 +10169,7 @@ mod tests {
 
         let where_ = tempfile::tempdir().expect("a directory");
         let editor = Rc::new(RefCell::new(Editor::open(
-            &where_.path().join("vehicle.yaml"),
+            &where_.path().join("vehicle.ytcs"),
             dividers(),
         )));
         for (name, node_type, at) in [
@@ -10268,7 +10268,7 @@ mod tests {
         let where_ = tempfile::tempdir().expect("a directory");
         let locked = where_.path().join("locked");
         std::fs::create_dir(&locked).unwrap();
-        let path = locked.join("vehicle.yaml");
+        let path = locked.join("vehicle.ytcs");
 
         let editor = Rc::new(RefCell::new(Editor::open(&path, dividers())));
         let ui = MainWindow::new().expect("a window");
@@ -10394,7 +10394,7 @@ mod tests {
 
         let where_ = tempfile::tempdir().expect("a directory");
         let editor = Rc::new(RefCell::new(Editor::open(
-            &where_.path().join("vehicle.yaml"),
+            &where_.path().join("vehicle.ytcs"),
             dividers(),
         )));
         for (name, node_type) in [
@@ -10520,7 +10520,7 @@ mod tests {
 
         let where_ = tempfile::tempdir().expect("a directory");
         let editor = Rc::new(RefCell::new(Editor::open(
-            &where_.path().join("pulled.yaml"),
+            &where_.path().join("pulled.ytcs"),
             dividers(),
         )));
         for (name, node_type, at) in [
@@ -10662,7 +10662,7 @@ mod tests {
 
         let where_ = tempfile::tempdir().expect("a directory");
         let editor = Rc::new(RefCell::new(Editor::open(
-            &where_.path().join("placed.yaml"),
+            &where_.path().join("placed.ytcs"),
             dividers(),
         )));
 
@@ -10838,7 +10838,7 @@ mod tests {
 
         let where_ = tempfile::tempdir().expect("a directory");
         let editor = Rc::new(RefCell::new(Editor::open(
-            &where_.path().join("drawn.yaml"),
+            &where_.path().join("drawn.ytcs"),
             dividers(),
         )));
         // A payload in the payload working pane and the ground link in its
@@ -11038,7 +11038,7 @@ mod tests {
 
         let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("..");
 
-        for extension in ["yaml", "xml"] {
+        for extension in ["ytcs", "xtcs"] {
             let path = root.join(format!("example.{extension}"));
             let editor = Rc::new(RefCell::new(Editor::open(&path, dividers())));
             assert_eq!(
@@ -11095,7 +11095,7 @@ mod tests {
         // The lines are the worked example's, and each is drawn with a head
         // and a marker: two of its lines run between one pair of nodes, one
         // each way, so the direction is the only thing that tells them apart.
-        for extension in ["yaml", "xml"] {
+        for extension in ["ytcs", "xtcs"] {
             let editor = Editor::open(
                 &root.join(format!("tests/manual/thermostat.{extension}")),
                 dividers(),
@@ -11145,7 +11145,7 @@ mod tests {
         // rewrote whatever it was pointed at.
         let where_ = tempfile::tempdir().expect("a directory");
         let editor = Rc::new(RefCell::new(Editor::open(
-            &where_.path().join("graph.yaml"),
+            &where_.path().join("graph.ytcs"),
             dividers(),
         )));
         // A compute rather than a device: a device is a payload and is held
@@ -11300,7 +11300,7 @@ mod tests {
 
         let where_ = tempfile::tempdir().expect("a directory");
         let editor = Rc::new(RefCell::new(Editor::open(
-            &where_.path().join("graph.yaml"),
+            &where_.path().join("graph.ytcs"),
             dividers(),
         )));
         editor.borrow_mut().edit(Edit::AddNode {
@@ -11409,7 +11409,7 @@ mod tests {
 
         let where_ = tempfile::tempdir().expect("a directory");
         let editor = Rc::new(RefCell::new(Editor::open(
-            &where_.path().join("vehicle.yaml"),
+            &where_.path().join("vehicle.ytcs"),
             dividers(),
         )));
 
@@ -11563,7 +11563,7 @@ mod tests {
 
         let where_ = tempfile::tempdir().expect("a directory");
         let editor = Rc::new(RefCell::new(Editor::open(
-            &where_.path().join("vehicle.yaml"),
+            &where_.path().join("vehicle.ytcs"),
             dividers(),
         )));
         for (name, interval) in [("cabin_temps", "3 s"), ("bay", "5 s")] {
@@ -11644,7 +11644,7 @@ mod tests {
         let where_ = tempfile::tempdir().expect("a directory");
         let locked = where_.path().join("locked");
         std::fs::create_dir(&locked).unwrap();
-        let path = locked.join("vehicle.yaml");
+        let path = locked.join("vehicle.ytcs");
 
         let editor = Rc::new(RefCell::new(Editor::open(&path, dividers())));
         let ui = MainWindow::new().expect("a window");
@@ -11768,7 +11768,7 @@ mod tests {
 
         let where_ = tempfile::tempdir().expect("a directory");
         let editor = Rc::new(RefCell::new(Editor::open(
-            &where_.path().join("vehicle.yaml"),
+            &where_.path().join("vehicle.ytcs"),
             dividers(),
         )));
         {
@@ -12013,7 +12013,7 @@ mod tests {
 
         let where_ = tempfile::tempdir().expect("a directory");
         let editor = Rc::new(RefCell::new(Editor::open(
-            &where_.path().join("vehicle.yaml"),
+            &where_.path().join("vehicle.ytcs"),
             dividers(),
         )));
         {
@@ -12149,7 +12149,7 @@ mod tests {
 
         let where_ = tempfile::tempdir().expect("a directory");
         let editor = Rc::new(RefCell::new(Editor::open(
-            &where_.path().join("vehicle.yaml"),
+            &where_.path().join("vehicle.ytcs"),
             dividers(),
         )));
         editor
@@ -12260,7 +12260,7 @@ mod tests {
 
         let where_ = tempfile::tempdir().expect("a directory");
         let editor = Rc::new(RefCell::new(Editor::open(
-            &where_.path().join("vehicle.yaml"),
+            &where_.path().join("vehicle.ytcs"),
             dividers(),
         )));
         {

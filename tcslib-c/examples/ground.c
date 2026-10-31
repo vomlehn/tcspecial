@@ -98,7 +98,9 @@ int main(int argc, char **argv)
 	for (int i = 1; i < argc; i++) {
 		if (strcmp(argv[i], "--yaml") == 0 ||
 		    strcmp(argv[i], "--xml") == 0) {
-			const char *asked = argv[i] + 2;
+			/* The extension of the spelling asked for. */
+			const char *asked =
+				strcmp(argv[i], "--xml") == 0 ? "xtcs" : "ytcs";
 			if (spelling != NULL && strcmp(spelling, asked) != 0) {
 				fprintf(stderr,
 					"--yaml and --xml each say which "
@@ -126,7 +128,7 @@ int main(int argc, char **argv)
 	}
 	if (named[0] == NULL) {
 		snprintf(stem_path, sizeof stem_path, "%s.%s", STEM,
-			 spelling ? spelling : "yaml");
+			 spelling ? spelling : "ytcs");
 		named[0] = stem_path;
 	}
 	const char *path = named[0];

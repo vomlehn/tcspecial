@@ -20,5 +20,5 @@ Description: telemetry and control, special: spacecraft flight software
  tcspecial: the mission's own, or the test one in tcspecial-test.
  .
  A systemd unit, tcspecial.service, is installed but not enabled: it runs
- /opt/tcs/bin/tcspecial on /etc/opt/tcs/tcspecial/tcspecial.yaml once
+ /opt/tcs/bin/tcspecial on /etc/opt/tcs/tcspecial/tcspecial.ytcs once
  one is put there, and starts it again whenever it exits.

@@ -2,7 +2,7 @@
 //! sends each reading to the bridge component at its `bridge_base`, and takes
 //! the bridge's commands on to the heater.
 //!
-//! What is run is `examples/fprime/fprime.yaml` itself, with each of its
+//! What is run is `examples/fprime/fprime.ytcs` itself, with each of its
 //! sockets moved to a port nothing holds -- so that this runs beside anything
 //! else, the example included -- and its log moved to a directory of the
 //! test's. The test is the bridge and both payloads.
@@ -118,7 +118,7 @@ fn until_heard(
 fn a_vehicle_answering_to_fprime_reports_to_the_bridge_and_takes_its_commands()
 {
     let example = Path::new(env!("CARGO_MANIFEST_DIR"))
-        .join("../examples/fprime/fprime.yaml");
+        .join("../examples/fprime/fprime.ytcs");
     let text = std::fs::read_to_string(&example).expect("the example reads");
 
     // Where the example's own bridge hears the thermometer, which its
@@ -167,7 +167,7 @@ fn a_vehicle_answering_to_fprime_reports_to_the_bridge_and_takes_its_commands()
     ] {
         text = moved(&text, was, &now);
     }
-    let configuration = dir.path().join("fprime.yaml");
+    let configuration = dir.path().join("fprime.ytcs");
     std::fs::write(&configuration, &text).expect("written");
 
     // Where the bridge hears the thermometer, as the vehicle works it out:

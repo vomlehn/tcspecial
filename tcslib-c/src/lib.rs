@@ -1900,7 +1900,7 @@ mod tests {
                 target_of(other.as_ptr(), ours).ok().map(|d| d.to_string()),
                 Some("0123456789abcdef0123456789abcdef".to_string())
             );
-            assert!(target_of(c"ping.yaml".as_ptr(), ours).is_err());
+            assert!(target_of(c"ping.ytcs".as_ptr(), ours).is_err());
             assert!(target_of(
                 c"0123456789ABCDEF0123456789ABCDEF".as_ptr(),
                 ours
@@ -1959,7 +1959,7 @@ mod tests {
         let why = unsafe { CStr::from_ptr(tcs_last_error()) };
         assert!(why.to_str().unwrap().contains("NULL"), "{why:?}");
 
-        let missing = CString::new("/nonexistent/tcs.yaml").unwrap();
+        let missing = CString::new("/nonexistent/tcs.ytcs").unwrap();
         // SAFETY: a CString is NUL-terminated, and `missing` outlives the
         // call.
         let none = unsafe { tcs_configuration_open(missing.as_ptr()) };
@@ -1967,7 +1967,7 @@ mod tests {
         // SAFETY: as for the first `why`.
         let why = unsafe { CStr::from_ptr(tcs_last_error()) };
         assert!(
-            why.to_str().unwrap().contains("/nonexistent/tcs.yaml"),
+            why.to_str().unwrap().contains("/nonexistent/tcs.ytcs"),
             "{why:?}"
         );
 

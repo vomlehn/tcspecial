@@ -455,7 +455,7 @@ mod tests {
         // and for nothing else.
         let dir = tempfile::tempdir().expect("a directory");
         for (extension, text) in
-            [("yaml", yaml_with("", "")), ("xml", xml_with("", ""))]
+            [("ytcs", yaml_with("", "")), ("xtcs", xml_with("", ""))]
         {
             let path = dir.path().join(format!("new.{extension}"));
             std::fs::write(&path, text).expect("written");
@@ -606,7 +606,7 @@ mod tests {
         let mut asked = 0;
         for said in RENAMED {
             for (extension, text) in
-                [("yaml", yaml_with_old(said)), ("xml", xml_with_old(said))]
+                [("ytcs", yaml_with_old(said)), ("xtcs", xml_with_old(said))]
             {
                 let path = dir.path().join(format!("old.{extension}"));
                 std::fs::write(&path, &text).expect("written");
@@ -640,16 +640,16 @@ mod tests {
     /// # Arguments
     ///
     /// * `said`      - The old word.
-    /// * `extension` - `yaml` or `xml`.
+    /// * `extension` - `ytcs` or `xtcs`.
     ///
     /// # Returns
     ///
     /// The piece, to be found in the file.
     fn old_piece(said: &Renamed, extension: &str) -> String {
         match (said.place, extension) {
-            (Place::Section, "yaml") => format!("{}:", said.old),
-            (Place::NodeType, "yaml") => format!("type: {}", said.old),
-            (Place::Key, "yaml") => format!("{}:", said.old),
+            (Place::Section, "ytcs") => format!("{}:", said.old),
+            (Place::NodeType, "ytcs") => format!("type: {}", said.old),
+            (Place::Key, "ytcs") => format!("{}:", said.old),
             (Place::Section, _) => format!("<{}>", said.old),
             (Place::NodeType, _) => format!("<type>{}</type>", said.old),
             (Place::Key, _) => format!("<{}", said.old),

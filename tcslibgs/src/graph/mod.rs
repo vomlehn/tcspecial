@@ -1506,7 +1506,7 @@ fn beside(top: &Path, name: &str) -> PathBuf {
     let extension = top
         .extension()
         .and_then(|e| e.to_str())
-        .unwrap_or("yaml")
+        .unwrap_or("ytcs")
         .to_string();
     let mut path = top.to_path_buf();
     path.set_file_name(format!("{name}.{extension}"));
@@ -1838,10 +1838,10 @@ mod tests {
         let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("..");
 
         for name in ["example", "tests/manual/thermostat"] {
-            let yaml = Graph::load(root.join(format!("{name}.yaml")))
-                .unwrap_or_else(|e| panic!("{name}.yaml: {e}"));
-            let xml = Graph::load(root.join(format!("{name}.xml")))
-                .unwrap_or_else(|e| panic!("{name}.xml: {e}"));
+            let yaml = Graph::load(root.join(format!("{name}.ytcs")))
+                .unwrap_or_else(|e| panic!("{name}.ytcs: {e}"));
+            let xml = Graph::load(root.join(format!("{name}.xtcs")))
+                .unwrap_or_else(|e| panic!("{name}.xtcs: {e}"));
 
             assert_eq!(
                 yaml.description, xml.description,
@@ -2035,7 +2035,7 @@ mod tests {
 
     /// The shipped example reads, in both formats, and says the same thing.
     ///
-    /// The real test of the reader: tests/manual/thermostat.yaml and .xml are
+    /// The real test of the reader: tests/manual/thermostat.ytcs and .xtcs are
     /// written by tcsgui, not by hand here, so this is the editor and the
     /// flight-side reader agreeing about a file rather than two pieces of this
     /// module agreeing with each other.
@@ -2043,9 +2043,9 @@ mod tests {
     fn the_shipped_example_reads_the_same_in_both_formats() {
         let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("..");
 
-        let yaml = Graph::load(root.join("tests/manual/thermostat.yaml"))
+        let yaml = Graph::load(root.join("tests/manual/thermostat.ytcs"))
             .expect("the YAML example reads");
-        let xml = Graph::load(root.join("tests/manual/thermostat.xml"))
+        let xml = Graph::load(root.join("tests/manual/thermostat.xtcs"))
             .expect("the XML example reads");
 
         assert_eq!(
@@ -2098,7 +2098,7 @@ mod tests {
     #[test]
     fn the_shipped_example_passes_its_own_checks() {
         let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("..");
-        let graph = Graph::load(root.join("tests/manual/thermostat.yaml"))
+        let graph = Graph::load(root.join("tests/manual/thermostat.ytcs"))
             .expect("it reads");
 
         let problems = graph.check();
@@ -2117,7 +2117,7 @@ mod tests {
     #[test]
     fn an_included_file_is_merged_into_the_one_that_named_it() {
         let where_ = tempfile::tempdir().expect("a directory");
-        let top = where_.path().join("vehicle.yaml");
+        let top = where_.path().join("vehicle.ytcs");
 
         // With a tcspecial section, which every configuration must have and
         // only the top file may: see Graph::tcspecial.
@@ -2160,7 +2160,7 @@ gateway:
         // the boundary between two files is written in the file the node is
         // in.
         std::fs::write(
-            where_.path().join("cabin.yaml"),
+            where_.path().join("cabin.ytcs"),
             "payloads:\n  \
              - { name: cabin_sensor, type: i2c, path: \"/dev/i2c-1\", \
              address: \"0x48\", payload-out: gateway }\n",
@@ -2177,8 +2177,8 @@ gateway:
 
         // Which file each node came from, so the digest can cover the set and
         // a complaint can say where to look.
-        assert!(graph.homes["cabin_sensor"].ends_with("cabin.yaml"));
-        assert!(graph.homes["gateway"].ends_with("vehicle.yaml"));
+        assert!(graph.homes["cabin_sensor"].ends_with("cabin.ytcs"));
+        assert!(graph.homes["gateway"].ends_with("vehicle.ytcs"));
 
         // And a link across the boundary is sound, which is what including a
         // file is for.
@@ -2195,7 +2195,7 @@ gateway:
     #[test]
     fn a_version_is_a_field_a_configuration_does_not_have() {
         let where_ = tempfile::tempdir().expect("a directory");
-        let path = where_.path().join("old.yaml");
+        let path = where_.path().join("old.ytcs");
 
         for version in ["1.0", "2.0"] {
             std::fs::write(
@@ -2219,9 +2219,9 @@ gateway:
     #[test]
     fn a_file_is_not_included_twice() {
         let where_ = tempfile::tempdir().expect("a directory");
-        let top = where_.path().join("vehicle.yaml");
+        let top = where_.path().join("vehicle.ytcs");
         std::fs::write(&top, "include:\n  - cabin\n  - cabin\n").unwrap();
-        std::fs::write(where_.path().join("cabin.yaml"), "payloads: []\n")
+        std::fs::write(where_.path().join("cabin.ytcs"), "payloads: []\n")
             .unwrap();
 
         let said =
@@ -2233,10 +2233,10 @@ gateway:
     #[test]
     fn an_include_does_not_nest() {
         let where_ = tempfile::tempdir().expect("a directory");
-        let top = where_.path().join("vehicle.yaml");
+        let top = where_.path().join("vehicle.ytcs");
         std::fs::write(&top, "include:\n  - cabin\n").unwrap();
         std::fs::write(
-            where_.path().join("cabin.yaml"),
+            where_.path().join("cabin.ytcs"),
             "include:\n  - deeper\n",
         )
         .unwrap();
@@ -2255,7 +2255,7 @@ gateway:
 
         let said =
             format!("{}", Graph::load(&path).expect_err("json is refused"));
-        assert!(said.contains(".yaml"), "{said}");
+        assert!(said.contains(".ytcs"), "{said}");
     }
 
     /// One destination or several, however the file wrote it.

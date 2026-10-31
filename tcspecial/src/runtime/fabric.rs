@@ -1967,14 +1967,14 @@ mod tests {
     ///
     /// # Returns
     ///
-    /// The graph of `tests/manual/thermostat.yaml`, so changed.
+    /// The graph of `tests/manual/thermostat.ytcs`, so changed.
     ///
     /// # Panics
     ///
     /// If the file cannot be read.
     fn drawn() -> Graph {
         let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("..");
-        let mut graph = Graph::load(root.join("tests/manual/thermostat.yaml"))
+        let mut graph = Graph::load(root.join("tests/manual/thermostat.ytcs"))
             .expect("it reads");
         graph.tcspecial = None;
         for node in graph
@@ -2034,7 +2034,7 @@ mod tests {
         use crate::runtime::port::{NullPort, TeePort};
 
         let dir = tempfile::tempdir().expect("a directory");
-        let path = dir.path().join("tees.yaml");
+        let path = dir.path().join("tees.ytcs");
         std::fs::write(
             &path,
             "gateway:

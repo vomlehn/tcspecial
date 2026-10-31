@@ -279,7 +279,7 @@ mod tests {
     #[test]
     fn a_file_written_holds_what_was_given() {
         let where_ = tempfile::tempdir().expect("a directory");
-        let path = where_.path().join("graph.yaml");
+        let path = where_.path().join("graph.ytcs");
 
         write_atomically(&path, b"nodes: []\n").expect("the first write");
         assert_eq!(fs::read(&path).unwrap(), b"nodes: []\n");
@@ -302,7 +302,7 @@ mod tests {
         let where_ = tempfile::tempdir().expect("a directory");
         // Two levels, because a path somebody typed may name more than one
         // that is not there.
-        let path = where_.path().join("bay/fore/graph.yaml");
+        let path = where_.path().join("bay/fore/graph.ytcs");
 
         write_atomically(&path, b"nodes: []\n").expect("the write");
         assert_eq!(fs::read(&path).unwrap(), b"nodes: []\n");
@@ -321,12 +321,12 @@ mod tests {
         let blocked = where_.path().join("notadirectory");
         fs::write(&blocked, b"a file").expect("a file");
 
-        let path = blocked.join("graph.yaml");
+        let path = blocked.join("graph.ytcs");
         let why = write_atomically(&path, b"nodes: []\n")
             .expect_err("a file is not a directory");
         let said = format!("{why}");
         assert!(
-            said.contains("graph.yaml"),
+            said.contains("graph.ytcs"),
             "it should name the file: {said}"
         );
         assert!(
@@ -344,7 +344,7 @@ mod tests {
     #[test]
     fn no_temporary_file_is_left_behind() {
         let where_ = tempfile::tempdir().expect("a directory");
-        let path = where_.path().join("graph.yaml");
+        let path = where_.path().join("graph.ytcs");
 
         for n in 0..5 {
             write_atomically(&path, format!("nodes: [{n}]\n").as_bytes())
@@ -355,7 +355,7 @@ mod tests {
             .unwrap()
             .filter_map(|e| e.ok())
             .map(|e| e.file_name().to_string_lossy().into_owned())
-            .filter(|name| name != "graph.yaml")
+            .filter(|name| name != "graph.ytcs")
             .collect();
         assert!(left.is_empty(), "left behind: {left:?}");
     }
@@ -369,14 +369,14 @@ mod tests {
     #[test]
     fn a_failed_write_leaves_the_old_file_alone() {
         let where_ = tempfile::tempdir().expect("a directory");
-        let path = where_.path().join("graph.yaml");
+        let path = where_.path().join("graph.ytcs");
         write_atomically(&path, b"the good contents\n")
             .expect("the good write");
 
         // A read-only directory: the temporary cannot be created in it.
         let locked = where_.path().join("locked");
         fs::create_dir(&locked).unwrap();
-        let target = locked.join("graph.yaml");
+        let target = locked.join("graph.ytcs");
         write_atomically(&target, b"first\n").expect("a file to overwrite");
         let mut permissions = fs::metadata(&locked).unwrap().permissions();
         {
@@ -415,14 +415,14 @@ mod tests {
     /// time a save returns.
     #[test]
     fn the_temporary_is_beside_the_target() {
-        let temporary = temporary_beside(Path::new("/var/lib/tcs/graph.yaml"));
+        let temporary = temporary_beside(Path::new("/var/lib/tcs/graph.ytcs"));
         assert_eq!(temporary.parent(), Some(Path::new("/var/lib/tcs")));
         assert!(
             temporary
                 .file_name()
                 .unwrap()
                 .to_string_lossy()
-                .starts_with(".graph.yaml.tcsgui-"),
+                .starts_with(".graph.ytcs.tcsgui-"),
             "{temporary:?}"
         );
     }
@@ -434,12 +434,12 @@ mod tests {
         let was = std::env::current_dir().expect("a working directory");
         std::env::set_current_dir(where_.path()).expect("to move there");
 
-        let result = write_atomically(Path::new("graph.yaml"), b"nodes: []\n");
+        let result = write_atomically(Path::new("graph.ytcs"), b"nodes: []\n");
 
         std::env::set_current_dir(was).expect("to move back");
         result.expect("a write with no directory in the path");
         assert_eq!(
-            fs::read(where_.path().join("graph.yaml")).unwrap(),
+            fs::read(where_.path().join("graph.ytcs")).unwrap(),
             b"nodes: []\n"
         );
     }

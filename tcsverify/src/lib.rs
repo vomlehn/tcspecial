@@ -940,7 +940,9 @@ fn check_graph_simulator(
     }
 }
 
-/// Reads a file, and the format its name says it is written in.
+/// Reads a simulator file, and the format its name says it is written in:
+/// its language's extension, `.yaml`, `.yml` or `.xml`, which is not a
+/// configuration's.
 ///
 /// # Arguments
 ///
@@ -951,12 +953,16 @@ fn check_graph_simulator(
 ///
 /// The file's text and its format, or `None` (with the reason in `report`).
 fn read(path: &Path, report: &mut Report) -> Option<(String, ConfigFormat)> {
-    let format = match ConfigFormat::of_file(path) {
-        Ok(format) => format,
-        Err(e) => {
-            report.add(path, THE_FILE_ITSELF, e.to_string());
-            return None;
-        }
+    let Some(format) = ConfigFormat::from_data_path(path) else {
+        report.add(
+            path,
+            THE_FILE_ITSELF,
+            format!(
+                "{}: a simulator file is named .yaml, and this is not",
+                path.display()
+            ),
+        );
+        return None;
     };
 
     match std::fs::read_to_string(path) {
@@ -1043,15 +1049,15 @@ mod tests {
             .join("../examples/thermostat");
         let dir = tempfile::tempdir().expect("a directory");
         let at = |name: &str| dir.path().join(name);
-        for name in ["thermostat.yaml", "thermostat-sim.yaml"] {
+        for name in ["thermostat.ytcs", "thermostat-sim.yaml"] {
             std::fs::copy(root.join(name), at(name)).expect("copied");
         }
-        let xml = std::fs::read_to_string(root.join("thermostat.xml"))
+        let xml = std::fs::read_to_string(root.join("thermostat.xtcs"))
             .expect("the XML");
-        std::fs::write(at("thermostat.xml"), change(xml)).expect("written");
+        std::fs::write(at("thermostat.xtcs"), change(xml)).expect("written");
         let (xml, yaml, sim) = (
-            at("thermostat.xml"),
-            at("thermostat.yaml"),
+            at("thermostat.xtcs"),
+            at("thermostat.ytcs"),
             at("thermostat-sim.yaml"),
         );
         (dir, xml, yaml, sim)
@@ -1064,7 +1070,7 @@ mod tests {
     fn a_node_of_a_type_not_built_is_reported_where_it_is_written() {
         let root = Path::new(env!("CARGO_MANIFEST_DIR"))
             .join("../examples/thermostat");
-        let yaml = root.join("thermostat.yaml");
+        let yaml = root.join("thermostat.ytcs");
         let report =
             verify_built(&yaml, None, Limits::EVERYTHING, &["i2c", "spi"]);
         let found: Vec<(usize, &str)> = report
@@ -1325,7 +1331,7 @@ simulated_payloads:
     protocol: udp
     packet_interval: 1 s
 ";
-        let set = written(".yaml", &configuration, sim);
+        let set = written(".ytcs", &configuration, sim);
         let report = verify(&set.payload, Some(&set.sim), Limits::EVERYTHING);
         let said: Vec<&Finding> = report
             .findings
@@ -1343,7 +1349,7 @@ simulated_payloads:
         // And without the interval, nothing: a driven payload is simulated,
         // its stand-in counting what the vehicle sends it.
         let set = written(
-            ".yaml",
+            ".ytcs",
             &configuration,
             &sim.replace(
                 "    protocol: udp\n    packet_interval: 1 s\n",
@@ -1361,7 +1367,7 @@ simulated_payloads:
     /// A sound configuration is accepted in silence.
     #[test]
     fn a_sound_graph_is_accepted() {
-        let (_dir, path) = graph_written(".yaml", SOUND_GRAPH);
+        let (_dir, path) = graph_written(".ytcs", SOUND_GRAPH);
         let report = verify(&path, None, Limits::EVERYTHING);
         assert!(
             !report.found_errors(),
@@ -1379,11 +1385,11 @@ simulated_payloads:
     /// file beside it.
     #[test]
     fn a_sound_configuration_is_accepted_alone_and_with_its_simulator_file() {
-        let (_dir, path) = graph_written(".yaml", SOUND_GRAPH);
+        let (_dir, path) = graph_written(".ytcs", SOUND_GRAPH);
         let report = verify(&path, None, Limits::EVERYTHING);
         assert!(!report.found_errors());
 
-        let set = written(".yaml", GOOD, GOOD_SIM);
+        let set = written(".ytcs", GOOD, GOOD_SIM);
         let report = verify(&set.payload, Some(&set.sim), Limits::EVERYTHING);
         assert!(!report.found_errors(), "{:?}", report.findings);
     }
@@ -1392,7 +1398,7 @@ simulated_payloads:
     #[test]
     fn a_graphs_problems_are_reported_with_their_lines() {
         let (_dir, path) = graph_written(
-            ".yaml",
+            ".ytcs",
             "\
 payload_groups:
   - name: temps
@@ -1430,7 +1436,7 @@ vehicle:
     #[test]
     fn an_old_word_is_reported_at_its_line_with_the_new_one() {
         let dir = tempfile::tempdir().expect("a directory");
-        let top = dir.path().join("vehicle.yaml");
+        let top = dir.path().join("vehicle.ytcs");
         std::fs::write(
             &top,
             "description: an old file\n\
@@ -1457,7 +1463,7 @@ vehicle:
     #[test]
     fn a_problem_is_reported_in_the_file_it_is_in() {
         let dir = tempfile::tempdir().expect("a directory");
-        let top = dir.path().join("vehicle.yaml");
+        let top = dir.path().join("vehicle.ytcs");
         std::fs::write(
             &top,
             "include:\n  - cabin\ngateway:\n  \
@@ -1466,7 +1472,7 @@ vehicle:
         .unwrap();
         // The included file holds a node nothing links to.
         std::fs::write(
-            dir.path().join("cabin.yaml"),
+            dir.path().join("cabin.ytcs"),
             "payloads:\n  - { name: lonely, type: i2c }\n",
         )
         .unwrap();
@@ -1478,7 +1484,7 @@ vehicle:
             .find(|f| f.message.contains("lonely"))
             .expect("the unconnected node should be reported");
         assert!(
-            lonely.file.ends_with("cabin.yaml"),
+            lonely.file.ends_with("cabin.ytcs"),
             "it should be reported in the file it is in, not {}",
             lonely.file.display()
         );
@@ -1492,7 +1498,7 @@ vehicle:
     /// is somebody's misspelling, and drives nothing.
     #[test]
     fn a_graphs_simulator_file_names_its_payloads() {
-        let (dir, path) = graph_written(".yaml", SOUND_GRAPH);
+        let (dir, path) = graph_written(".ytcs", SOUND_GRAPH);
         let sim = dir.path().join("vehiclesim.yaml");
 
         std::fs::write(
@@ -1532,7 +1538,7 @@ vehicle:
         let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("..");
         let sim = root.join("example-sim.yaml");
         let report =
-            verify(&root.join("example.yaml"), Some(&sim), Limits::EVERYTHING);
+            verify(&root.join("example.ytcs"), Some(&sim), Limits::EVERYTHING);
         assert!(report.joined);
         let about_sim: Vec<String> = report
             .findings
@@ -1547,7 +1553,7 @@ vehicle:
     #[test]
     fn a_graph_in_xml_is_checked_too() {
         let (_dir, path) = graph_written(
-            ".xml",
+            ".xtcs",
             "\
 <?xml version=\"1.0\" encoding=\"UTF-8\"?>
 <configuration>
@@ -1637,7 +1643,7 @@ simulated_payloads:
 
     #[test]
     fn a_good_set_has_nothing_to_say() {
-        let set = written(".yaml", GOOD, GOOD_SIM);
+        let set = written(".ytcs", GOOD, GOOD_SIM);
         let report = verify(&set.payload, Some(&set.sim), Limits::EVERYTHING);
         assert!(
             report.findings.is_empty(),
@@ -1684,7 +1690,7 @@ payloads:
       - target: anywhere
 # what GOOD's own payloads were:",
         );
-        let set = written(".yaml", &text, GOOD_SIM);
+        let set = written(".ytcs", &text, GOOD_SIM);
         let report = verify(&set.payload, None, Limits::EVERYTHING);
 
         assert_eq!(report.findings.len(), 3, "{:?}", report.findings);
@@ -1715,7 +1721,7 @@ payloads:
     #[test]
     fn a_finding_names_the_file_and_the_line() {
         let finding = Finding {
-            file: PathBuf::from("tests/manual/tcspecial2.yaml"),
+            file: PathBuf::from("tests/manual/tcspecial2.ytcs"),
             line: 7,
             message: "payload \"DH0\" has no packet_size".to_string(),
             severity: Severity::Error,
@@ -1723,7 +1729,7 @@ payloads:
         };
         assert_eq!(
             finding.to_string(),
-            "tests/manual/tcspecial2.yaml:7: error: payload \"DH0\" has no \
+            "tests/manual/tcspecial2.ytcs:7: error: payload \"DH0\" has no \
              packet_size"
         );
 
@@ -1740,7 +1746,7 @@ payloads:
 
         // And a real one is written the same way, by the same Display.
         let set = written(
-            ".yaml",
+            ".ytcs",
             &GOOD.replace("    path: /dev/zero\n", ""),
             GOOD_SIM,
         );
@@ -1767,7 +1773,7 @@ payloads:
     fn a_file_that_does_not_parse_says_where_it_stopped() {
         let text = GOOD
             .replace("payloads:", "payloads:\n  - name: bad\n   type: oops");
-        let set = written(".yaml", &text, GOOD_SIM);
+        let set = written(".ytcs", &text, GOOD_SIM);
         let report = verify(&set.payload, None, Limits::EVERYTHING);
         assert_eq!(report.findings.len(), 1, "{:?}", report.findings);
         assert!(
@@ -1786,7 +1792,7 @@ payloads:
     fn an_xml_file_that_does_not_parse_says_where_it_stopped() {
         let root =
             Path::new(env!("CARGO_MANIFEST_DIR")).join("../examples/minimal");
-        let good = std::fs::read_to_string(root.join("minimal.xml"))
+        let good = std::fs::read_to_string(root.join("minimal.xtcs"))
             .expect("the example");
         let line_holding = |text: &str, what: &str| {
             text.lines()
@@ -1801,7 +1807,7 @@ payloads:
             ("5 s</default_interval>", "5 s</default_intervl>"),
         ] {
             let text = good.replacen(from, to, 1);
-            let (_dir, path) = graph_written(".xml", &text);
+            let (_dir, path) = graph_written(".xtcs", &text);
             let report = verify(&path, None, Limits::EVERYTHING);
             assert_eq!(report.findings.len(), 1, "{to}: {:?}", report.findings);
             assert_eq!(
@@ -1821,7 +1827,7 @@ payloads:
                     endpoints:\n  - name: e\n    group: g\n    \
                     address: localhost\n    \
                     port: 5000\n";
-        let set = written(".yaml", text, GOOD_SIM);
+        let set = written(".ytcs", text, GOOD_SIM);
         let report = verify(&set.payload, None, Limits::EVERYTHING);
         assert_eq!(report.findings.len(), 1);
         assert!(
@@ -1840,15 +1846,15 @@ payloads:
         // Where the line goes: below the YAML schema comment, and below the
         // XML root's start tag, which runs over the file's second to fourth.
         for (file, line, at) in [
-            ("minimal.yaml", "version: \"2.0\"\n", 3),
-            ("minimal.xml", "    <version>2.0</version>\n", 5),
+            ("minimal.ytcs", "version: \"2.0\"\n", 3),
+            ("minimal.xtcs", "    <version>2.0</version>\n", 5),
         ] {
             let good =
                 std::fs::read_to_string(root.join(file)).expect("the example");
-            let extension = if file.ends_with(".xml") {
-                ".xml"
+            let extension = if file.ends_with(".xtcs") {
+                ".xtcs"
             } else {
-                ".yaml"
+                ".ytcs"
             };
             let mut lines: Vec<&str> = good.split_inclusive('\n').collect();
             lines.insert(at - 1, line);
@@ -1875,7 +1881,7 @@ payloads:
         let report = verify(&set.payload, None, Limits::EVERYTHING);
         assert_eq!(report.findings.len(), 1);
         assert!(
-            report.findings[0].message.contains(".yaml"),
+            report.findings[0].message.contains(".ytcs"),
             "{:?}",
             report.findings[0]
         );
@@ -1896,7 +1902,7 @@ simulated_payloads:
     type: device-file
     packet_interval: 1 s
 ";
-        let set = written(".yaml", GOOD, sim);
+        let set = written(".ytcs", GOOD, sim);
         let report = verify(&set.payload, Some(&set.sim), Limits::EVERYTHING);
 
         // "nobody" is no payload of the other file, which is the end of the
@@ -1932,7 +1938,7 @@ simulated_payloads:
         // and fails a check still says which payloads it has, so the two
         // files are still read against each other.
         let text = GOOD.replace("payloads:", "payloads: [oh dear");
-        let set = written(".yaml", &text, GOOD_SIM);
+        let set = written(".ytcs", &text, GOOD_SIM);
         let report = verify(&set.payload, Some(&set.sim), Limits::EVERYTHING);
 
         assert!(!report.joined);
@@ -1955,7 +1961,7 @@ simulated_payloads:
             "    payload-out:\n      - target: nowhere\n",
         );
         let set = written(
-            ".yaml",
+            ".ytcs",
             &text,
             "simulated_payloads:\n  - name: DH0\n   simulate: true\n   \
              type: device-file\n",
@@ -1993,7 +1999,7 @@ simulated_payloads:
             .split("payloads:")
             .next()
             .expect("GOOD states its payloads");
-        written(".yaml", &format!("{head}{payloads}"), GOOD_SIM)
+        written(".ytcs", &format!("{head}{payloads}"), GOOD_SIM)
     }
 
     /// Writes a sound graph with unfinished payloads added: warnings, and no
@@ -2015,7 +2021,7 @@ simulated_payloads:
             extra.push_str(&format!("  - {{ name: spare{id}, type: i2c }}\n"));
         }
         graph_written(
-            ".yaml",
+            ".ytcs",
             &SOUND_GRAPH.replace("gateway:\n", &format!("{extra}gateway:\n")),
         )
     }
@@ -2196,7 +2202,7 @@ simulated_payloads:
         // in progress, and saying so is the editor's business rather than a
         // test's.
         for name in ["tests/manual/thermostat"] {
-            for extension in ["yaml", "xml"] {
+            for extension in ["ytcs", "xtcs"] {
                 let graph = root.join(format!("{name}.{extension}"));
                 let report = verify(&graph, None, Limits::EVERYTHING);
                 assert!(
@@ -2207,7 +2213,7 @@ simulated_payloads:
             }
         }
 
-        for extension in ["yaml", "xml"] {
+        for extension in ["ytcs", "xtcs"] {
             let graph = root.join(format!("example.{extension}"));
             let report = verify(&graph, None, Limits::EVERYTHING);
             assert!(
@@ -2222,7 +2228,7 @@ simulated_payloads:
 
         // And the worked example is finished, warnings and all: it is the one
         // a reader is meant to learn the shape from.
-        for extension in ["yaml", "xml"] {
+        for extension in ["ytcs", "xtcs"] {
             let graph =
                 root.join(format!("tests/manual/thermostat.{extension}"));
             let report = verify(&graph, None, Limits::EVERYTHING);
@@ -2246,13 +2252,13 @@ simulated_payloads:
     fn an_unfinished_graph_warns_and_passes() {
         let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("..");
         let where_ = tempfile::tempdir().expect("a directory");
-        let path = where_.path().join("half_drawn.yaml");
+        let path = where_.path().join("half_drawn.ytcs");
 
         // The shipped example with one more payload on it, placed and not yet
         // told which device it is on or linked to anything -- which is what
         // the editor writes the moment somebody drops a node on the canvas.
         let said =
-            std::fs::read_to_string(root.join("tests/manual/thermostat.yaml"))
+            std::fs::read_to_string(root.join("tests/manual/thermostat.ytcs"))
                 .expect("the worked example");
         std::fs::write(
             &path,

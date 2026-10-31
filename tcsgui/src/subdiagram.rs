@@ -85,7 +85,7 @@ impl Qualified {
     ///
     /// Plain where the two are in the same file, qualified where they are not.
     /// This is the half that keeps a subdiagram's own links readable: inside
-    /// `cabin.yaml` a link says `temp_1`, and only a link reaching out of
+    /// `cabin.ytcs` a link says `temp_1`, and only a link reaching out of
     /// it says `cabin/temp_1`.
     ///
     /// # Arguments
@@ -140,7 +140,7 @@ impl Qualified {
 
 /// The file a subdiagram is kept in, given the name it goes by.
 ///
-/// The name is the file's stem, so `cabin` is `cabin.yaml` beside the diagram
+/// The name is the file's stem, so `cabin` is `cabin.ytcs` beside the diagram
 /// that includes it. Which extension is the including file's: a configuration
 /// written in XML keeps its subdiagrams in XML, because a set of files half in
 /// one language and half in the other is a thing nobody meant and everybody
@@ -159,7 +159,7 @@ pub fn file_for(name: &str, like: &std::path::Path) -> std::path::PathBuf {
     let extension = like
         .extension()
         .and_then(|e| e.to_str())
-        .unwrap_or("yaml")
+        .unwrap_or("ytcs")
         .to_string();
     let mut path = like.to_path_buf();
     path.set_file_name(format!("{name}.{extension}"));
@@ -247,14 +247,14 @@ mod tests {
     #[test]
     fn a_subdiagram_is_a_file_beside_its_parent() {
         assert_eq!(
-            file_for("cabin", Path::new("/var/lib/tcs/vehicle.yaml")),
-            Path::new("/var/lib/tcs/cabin.yaml")
+            file_for("cabin", Path::new("/var/lib/tcs/vehicle.ytcs")),
+            Path::new("/var/lib/tcs/cabin.ytcs")
         );
         // XML keeps XML: a set of files half in each language is a thing
         // nobody meant.
         assert_eq!(
-            file_for("cabin", Path::new("/var/lib/tcs/vehicle.xml")),
-            Path::new("/var/lib/tcs/cabin.xml")
+            file_for("cabin", Path::new("/var/lib/tcs/vehicle.xtcs")),
+            Path::new("/var/lib/tcs/cabin.xtcs")
         );
     }
 }

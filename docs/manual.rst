@@ -383,19 +383,26 @@ A configuration file may be written in YAML or XML. Both describe the same
 settings and are read into the same values, so the choice is one of local
 preference and tooling rather than of capability.
 
-The format is taken from the file's extension:
+The format is taken from the file's extension, which is a configuration's
+own rather than its language's:
 
 .. code-block:: text
 
-   .yaml, .yml     YAML
-   .xml            XML
+   .ytcs           YAML
+   .xtcs           XML
    anything else   refused
 
-A file whose extension is none of those is refused, naming the file and what a
-configuration file is called. JSON was read as well, and was what a file with
-no extension or an unfamiliar one was assumed to be, which made a misspelled
-extension not an error but a file parsed as the wrong language. Nothing was
-written in it that was not also written in YAML.
+A file whose extension is neither is refused, naming the file and what a
+configuration file is called. Configurations were once named ``.yaml``,
+``.yml`` or ``.xml``; one still named so is refused with the name to give it,
+``vehicle.yaml`` being told to become ``vehicle.ytcs``. A payload simulator
+file is not a tcspecial configuration and keeps its language's extension,
+``.yaml``.
+
+JSON was read as well, and was what a file with no extension or an
+unfamiliar one was assumed to be, which made a misspelled extension not an
+error but a file parsed as the wrong language. Nothing was written in it
+that was not also written in YAML.
 
 (The command link carries packets stated in XTCE: the three fixed commands
 in ``tcslibgs/xtce/fixed.xtce`` and the rest in ``tcslibgs/xtce/link.xtce``.
@@ -405,7 +412,7 @@ the second, as its ``interface``: see `Which interface it is written for`_.)
 Which Files There Are
 =====================
 Two configuration files, and neither of them has a name of its own. Any name
-will do so long as it ends in ``.yaml`` or ``.xml``, which is what says how to
+will do so long as it ends in ``.ytcs`` or ``.xtcs``, which is what says how to
 read it; the names used throughout this manual are the shipped examples' and
 are suggestions, nothing more.
 
@@ -1738,7 +1745,7 @@ produced them, so it applies to every type of payload alike.
 
 An Example
 ----------
-This is the shipped ``examples/thermostat/thermostat.yaml``, without its
+This is the shipped ``examples/thermostat/thermostat.ytcs``, without its
 ``tcspecial`` section: three sensors of one place, two on an I\ :superscript:`2`\ C
 bus and one on SPI, read together as a group, and two sets of heater lines
 driven by what the vehicle decides. Each payload is named for what it is,
@@ -1794,7 +1801,7 @@ which is what a panel in the MOC shows.
        gateway-in: true
 
 The same configuration in the other spelling is
-``examples/thermostat/thermostat.xml``, which a test holds to saying the same
+``examples/thermostat/thermostat.xtcs``, which a test holds to saying the same
 thing. What the nodes above feed -- the conversions, the vote and the
 thermostat -- is in the ``vehicle`` section; see `The thermostat example`_.
 
@@ -1854,9 +1861,9 @@ place of the settings.
 The shipped examples
 ====================
 What is shipped is the examples, under ``examples``, and one fixture:
-``tests/manual/thermostat.yaml``, which the programs fall back to when nothing
-names a file. Each example is a configuration in both spellings -- ``.yaml``
-and ``.xml``, which a test holds to describing the same thing -- and the
+``tests/manual/thermostat.ytcs``, which the programs fall back to when nothing
+names a file. Each example is a configuration in both spellings -- ``.ytcs``
+and ``.xtcs``, which a test holds to describing the same thing -- and the
 simulator file beside it, which is YAML alone. The YAML is the one to read: it
 carries the comments. See `The Examples`_, which says what each one is for.
 
@@ -1867,7 +1874,7 @@ or ``runmocx``; every other target takes the file named in
 The Examples
 ============
 The ``examples`` directory holds one directory per example, each a
-configuration in both formats -- ``<name>.yaml`` and ``<name>.xml``, which a
+configuration in both formats -- ``<name>.ytcs`` and ``<name>.xtcs``, which a
 test holds to describing the same configuration -- and the simulator
 configuration beside it, ``<name>-sim.yaml``. Every example is checked by
 ``tcsverify`` on every test run and must pass with no errors and no warnings,
@@ -2261,7 +2268,7 @@ digest it compares each beacon's with rather than working it out a second
 time. The rules are then written twice, in Rust and in Python, and the
 example's tests hold them to one another: the Python's own tests use the Rust
 tests' examples, one test checks that the Python reads the same ports from
-``ping.xml`` as the Rust does from ``ping.yaml``, and one plays the vehicle with
+``ping.xtcs`` as the Rust does from ``ping.ytcs``, and one plays the vehicle with
 the Rust -- the ping answered by the function the ``ping`` node answers with,
 the beacon packed as tcspecial packs it -- against the ground station.
 ``cargo test`` runs them all.
@@ -2681,7 +2688,7 @@ This is the shipped ``examples/thermostat/thermostat-sim.yaml``.
 
 .. code-block:: yaml
 
-   description: Simulator settings for the payloads of thermostat.yaml
+   description: Simulator settings for the payloads of thermostat.ytcs
 
    thermal_mass:
      - name: cabin
@@ -2956,7 +2963,7 @@ Running tcspecial under a supervisor
 tcspecial relies on a supervisor to start it again whenever it exits: a
 restart that cannot run itself again, and a crash, both end the process.
 The ``tcspecial`` package's systemd unit is that supervisor. It runs
-``/opt/tcs/bin/tcspecial /etc/opt/tcs/tcspecial/tcspecial.yaml`` in
+``/opt/tcs/bin/tcspecial /etc/opt/tcs/tcspecial/tcspecial.ytcs`` in
 ``/var/opt/tcs/tcspecial``, with no ``--simulate`` and so the flight
 setting, and starts it again a second after it exits, however often it
 does. It is installed and not enabled, and does nothing until a
@@ -2966,14 +2973,14 @@ So, as root:
 
 .. code-block:: console
 
-   # cp vehicle.yaml /etc/opt/tcs/tcspecial/tcspecial.yaml
-   # tcsverify --types=$(tcspecial --types) /etc/opt/tcs/tcspecial/tcspecial.yaml
+   # cp vehicle.ytcs /etc/opt/tcs/tcspecial/tcspecial.ytcs
+   # tcsverify --types=$(tcspecial --types) /etc/opt/tcs/tcspecial/tcspecial.ytcs
    # systemctl enable --now tcspecial
 
 The configuration's ``state_file`` and ``log.directory`` belong under
 ``/var/opt/tcs/tcspecial``, on storage that survives a power cycle. An XML
 configuration is named with ``systemctl edit tcspecial``, in a drop-in
-that sets ``ExecStart`` and ``ConditionPathExists`` to the ``.xml`` file.
+that sets ``ExecStart`` and ``ConditionPathExists`` to the ``.xtcs`` file.
 
 Running the Programs
 ====================
@@ -2985,7 +2992,7 @@ reading a different one would serve or simulate payloads the panels do not
 describe.
 
 ``TCSPECIAL_CONFIG_FILE`` is the configuration, named without a suffix:
-``$(TCSPECIAL_CONFIG_FILE).yaml`` is the tcspecial configuration, which
+``$(TCSPECIAL_CONFIG_FILE).ytcs`` is the tcspecial configuration, which
 reaches every program as a command line argument. It defaults to
 ``tests/manual/thermostat``. ``TCSPECIAL_SIM_FILE`` is the simulator
 configuration, which reaches tcssim through the environment -- and tcsmoc
@@ -3090,10 +3097,10 @@ tcspecial configuration first, and ``-h`` or ``--help`` prints how:
 
 .. code-block:: console
 
-   $ cargo run --bin tcsverify -- examples/minimal/minimal.yaml
-   $ cargo run --bin tcsverify -- examples/minimal/minimal.yaml \
+   $ cargo run --bin tcsverify -- examples/minimal/minimal.ytcs
+   $ cargo run --bin tcsverify -- examples/minimal/minimal.ytcs \
        examples/minimal/minimal-sim.yaml
-   $ cargo run --bin tcsverify -- examples/minimal/minimal.xml \
+   $ cargo run --bin tcsverify -- examples/minimal/minimal.xtcs \
        examples/minimal/minimal-sim.yaml
 
 Either spelling of the configuration will do -- the last line reads the XML of
@@ -3105,8 +3112,8 @@ an XML file and a YAML file, in either order, and then the simulator file.
 
 .. code-block:: console
 
-   $ cargo run --bin tcsverify -- examples/thermostat/thermostat.xml \
-       examples/thermostat/thermostat.yaml \
+   $ cargo run --bin tcsverify -- examples/thermostat/thermostat.xtcs \
+       examples/thermostat/thermostat.ytcs \
        examples/thermostat/thermostat-sim.yaml
 
 Each spelling is checked with the simulator file, the first named first, and
@@ -3118,7 +3125,7 @@ on, saying what each file says:
 
 .. code-block:: console
 
-   examples/thermostat/thermostat.yaml:87: error: nodes / thermostat / attributes / setpoint: examples/thermostat/thermostat.xml says "290" and examples/thermostat/thermostat.yaml says "293.15"
+   examples/thermostat/thermostat.ytcs:87: error: nodes / thermostat / attributes / setpoint: examples/thermostat/thermostat.xtcs says "290" and examples/thermostat/thermostat.ytcs says "293.15"
 
 The order nodes are written in is compared too, a node's place in the file
 being its device id. A file that cannot be read is not compared, and says so.
@@ -3128,10 +3135,10 @@ the file, the line and what is wrong there:
 
 .. code-block:: console
 
-   $ cargo run --bin tcsverify -- /tmp/draft.yaml
-   /tmp/draft.yaml:33: error: "both" states poll_interval and a trigger: a node that is asked is read when it has been asked, so say trigger_interval
-   /tmp/draft.yaml:23: warning: "udp-steady": read_size must be more than nought -- a read of no bytes is not a read, and a node that is not read says nothing about it
-   /tmp/draft.yaml:29: warning: "random-device" is a device-file node, so port does not locate it: it is located by path
+   $ cargo run --bin tcsverify -- /tmp/draft.ytcs
+   /tmp/draft.ytcs:33: error: "both" states poll_interval and a trigger: a node that is asked is read when it has been asked, so say trigger_interval
+   /tmp/draft.ytcs:23: warning: "udp-steady": read_size must be more than nought -- a read of no bytes is not a read, and a node that is not read says nothing about it
+   /tmp/draft.ytcs:29: warning: "random-device" is a device-file node, so port does not locate it: it is located by path
 
 Each line says which kind it is. An **error** is a configuration that says
 something wrong -- two nodes of one name, a link to a node that is not there,
@@ -3159,14 +3166,14 @@ the ones those programs use -- for all of their answers at once.
 It prints everything it finds, in the order it finds it. Two options change
 that::
 
-   $ cargo run --bin tcsverify -- --error-limit=unlimited example.yaml
-   $ cargo run --bin tcsverify -- --warnings=off --error-limit=1 example.yaml
+   $ cargo run --bin tcsverify -- --error-limit=unlimited example.ytcs
+   $ cargo run --bin tcsverify -- --warnings=off --error-limit=1 example.ytcs
 
 ``--digest`` asks for each configuration's digest as well, one line per file
 and before the problems::
 
-   $ cargo run --bin tcsverify -- --digest examples/thermostat/thermostat.yaml
-   examples/thermostat/thermostat.yaml: md5 292a329b534cb88156e1a52870469c4a
+   $ cargo run --bin tcsverify -- --digest examples/thermostat/thermostat.ytcs
+   examples/thermostat/thermostat.ytcs: md5 292a329b534cb88156e1a52870469c4a
 
 That is the digest tcspecial prints as it starts and puts in every beacon, and
 the MOC compares with its own: two ends whose digests agree have read one
@@ -3186,7 +3193,7 @@ type as that tcspecial would refuse it. It takes what ``tcspecial --types``
 prints, so a configuration can be held to the binary that will fly::
 
    $ cargo run --bin tcsverify -- --types=$(tcspecial --types) \
-       examples/thermostat/thermostat.yaml
+       examples/thermostat/thermostat.ytcs
 
 Without it, every type is taken to be built. See `Building tcspecial for a
 vehicle`_.
@@ -3232,22 +3239,22 @@ What the programs take without the Makefile
 -------------------------------------------
 .. code-block:: console
 
-   $ cargo run --bin tcspecial -- --simulate=all tests/manual/thermostat.yaml
+   $ cargo run --bin tcspecial -- --simulate=all tests/manual/thermostat.ytcs
    $ PAYLOAD_SIM_YAML=examples/thermostat/thermostat-sim.yaml \
-       cargo run --bin tcssim -- --simulate=all tests/manual/thermostat.yaml
+       cargo run --bin tcssim -- --simulate=all tests/manual/thermostat.ytcs
    $ PAYLOAD_SIM_YAML=examples/thermostat/thermostat-sim.yaml \
-       cargo run --bin tcsmoc -- --simulate=all tests/manual/thermostat.yaml
+       cargo run --bin tcsmoc -- --simulate=all tests/manual/thermostat.ytcs
 
-Every tcspecial configuration above may end in ``.xml`` instead, and the same
+Every tcspecial configuration above may end in ``.xtcs`` instead, and the same
 commands then run the same set in the other format:
 
 .. code-block:: console
 
-   $ cargo run --bin tcspecial -- --simulate=all tests/manual/thermostat.xml
+   $ cargo run --bin tcspecial -- --simulate=all tests/manual/thermostat.xtcs
    $ PAYLOAD_SIM_YAML=examples/thermostat/thermostat-sim.yaml \
-       cargo run --bin tcssim -- --simulate=all tests/manual/thermostat.xml
+       cargo run --bin tcssim -- --simulate=all tests/manual/thermostat.xtcs
    $ PAYLOAD_SIM_YAML=examples/thermostat/thermostat-sim.yaml \
-       cargo run --bin tcsmoc -- --simulate=all tests/manual/thermostat.xml
+       cargo run --bin tcsmoc -- --simulate=all tests/manual/thermostat.xtcs
 
 The extension is what says how to read a file -- see `Configuration File
 Formats`_ -- and it is read rather than guessed at, so a name ending in
@@ -3261,12 +3268,12 @@ An argument naming the configuration file beats any environment variable
 naming one.
 Failing an argument, tcspecial reads ``PAYLOAD_CONFIG_PATH`` and tcssim reads
 ``SIM_PAYLOAD_CONFIG_PATH``; failing that, every program reads
-``tests/manual/thermostat.yaml``. Tcsmoc has no variable of its own, because the programs it
+``tests/manual/thermostat.ytcs``. Tcsmoc has no variable of its own, because the programs it
 starts inherit its environment: a variable naming tcsmoc's file would name
 theirs as well.
 
 The configuration file is the only argument tcspecial takes. Where it serves
-commands is in ``tcspecial.yaml``:
+commands is in ``tcspecial.ytcs``:
 
 .. code-block:: yaml
 
@@ -3333,7 +3340,7 @@ The MOC opens both when it connects, and says so:
    Connected to 127.0.0.1:4000, payload commands to 127.0.0.1:4001
 
 The address box is the host and the spacecraft's command port, as before;
-payload commands go to the same host on the port ``tcspecial.yaml`` states,
+payload commands go to the same host on the port ``tcspecial.ytcs`` states,
 so moving the link moves both by typing one address. The MOC sends each
 command on the link it belongs on, and asks ``CONNECT`` of the spacecraft's:
 what comes back is what that end read, and ``Last Response`` says whether it
@@ -3400,7 +3407,7 @@ command line, and a restart may name any of them, by its checksum:
      load_trials: "3"
 
 ``configurations`` is the directory they are kept in, each under its
-checksum: ``<checksum>.yaml`` or ``<checksum>.xml``. Left out, the vehicle
+checksum: ``<checksum>.ytcs`` or ``<checksum>.xtcs``. Left out, the vehicle
 keeps none, and a restart may name only the configuration it runs. A
 configuration kept there is a single file: one that includes another is
 refused. Its checksum is computed again each time it is loaded, and one
@@ -3412,9 +3419,9 @@ with tcsverify:
 
 .. code-block:: text
 
-   $ tcsverify --keep=/var/lib/tcspecial/configurations vehicle.yaml
-   vehicle.yaml: md5 0123456789abcdef0123456789abcdef, kept as
-   /var/lib/tcspecial/configurations/0123456789abcdef0123456789abcdef.yaml
+   $ tcsverify --keep=/var/lib/tcspecial/configurations vehicle.ytcs
+   vehicle.ytcs: md5 0123456789abcdef0123456789abcdef, kept as
+   /var/lib/tcspecial/configurations/0123456789abcdef0123456789abcdef.ytcs
 
 It keeps nothing that has an error, writes nothing for a checksum already
 kept, and makes the file it writes read-only. Making the directory
@@ -3470,9 +3477,9 @@ configuration to the build that is to fly it:
 
 .. code-block:: text
 
-   $ tcsverify --set-interface vehicle.yaml vehicle.xml
-   vehicle.yaml: interface set to ad9aac4dd5a6d88dd5e78824ba8a83ac, from 0123...
-   vehicle.xml: interface is ad9aac4dd5a6d88dd5e78824ba8a83ac already
+   $ tcsverify --set-interface vehicle.ytcs vehicle.xtcs
+   vehicle.ytcs: interface set to ad9aac4dd5a6d88dd5e78824ba8a83ac, from 0123...
+   vehicle.xtcs: interface is ad9aac4dd5a6d88dd5e78824ba8a83ac already
 
 It changes that one value -- or adds the attribute where the section has
 none -- and leaves every other byte of the file as it was, comments and
@@ -3572,7 +3579,7 @@ and an attribute for it would be one that could say something untrue.
 All three are required of every command interpreter configuration, with no
 defaults: beacons are how the ground knows the spacecraft is alive, and a
 configuration that has not been asked where to send them has not answered.
-``tcspecial.yaml`` states them too, and a set's section wins over it; the
+``tcspecial.ytcs`` states them too, and a set's section wins over it; the
 file's are what place a set whose configuration states no section at all.
 
 ``beacon.send`` is where beacons come from: tcspecial makes the socket it
@@ -3618,7 +3625,7 @@ either way.
 
 .. code-block:: console
 
-   $ tcspecial --quiet examples/ping/ping.xml
+   $ tcspecial --quiet examples/ping/ping.xtcs
 
 A beacon address tcspecial cannot bind, or a ``beacon.recv`` that names no
 address, stops it before it starts, saying which setting to change: a vehicle
@@ -3655,7 +3662,7 @@ overrides the quieter default as well.
 
    $ make runmocy RUST_LOG=debug
    $ RUST_LOG=tcspecial::ci=trace \
-       cargo run --bin tcspecial -- --simulate=all tests/manual/thermostat.yaml
+       cargo run --bin tcspecial -- --simulate=all tests/manual/thermostat.ytcs
 
 Stand-ins or hardware: ``--simulate``
 -------------------------------------
@@ -3750,8 +3757,8 @@ hand, ``tcssim --wait`` is the waiting:
 
 .. code-block:: console
 
-   $ tcssim --simulate=all x.yaml &
-   $ tcssim --wait --simulate=all x.yaml && tcspecial --simulate=all x.yaml
+   $ tcssim --simulate=all x.ytcs &
+   $ tcssim --wait --simulate=all x.ytcs && tcspecial --simulate=all x.ytcs
 
 ``--wait`` waits thirty seconds, or as many as ``--wait=<seconds>`` says, and
 exits with a failure saying what it last heard: nothing, which is a tcssim
@@ -3814,7 +3821,7 @@ build a tcspecial that flies this way: the feature is for a vehicle on a desk.
 
    $ cargo build -p tcspecial --features visual
    $ target/debug/tcspecial --visual --simulate=all \
-       examples/simple-app/simple-app.yaml
+       examples/simple-app/simple-app.ytcs
 
 The window draws the configuration as tcsgui does -- the three working panes,
 every node where the editor puts it, every link along its route -- and lights
@@ -4284,7 +4291,7 @@ or from when a restart is initiated, until it takes a ``Connect`` carrying
 its configuration's checksum, and every
 ``beacon.default_interval`` after that (see Initiate restart, above), from the
 address the payload set's ``tcspecial`` section names to the address beside it,
-or ``tcspecial.yaml``'s pair for a set with no section. Tcsmoc binds that same
+or ``tcspecial.ytcs``'s pair for a set with no section. Tcsmoc binds that same
 receiving address, having read the same files. Tcsmoc displays the
 following beacon colors:
 

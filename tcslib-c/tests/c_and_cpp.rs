@@ -193,7 +193,7 @@ fn against_a_vehicle(program: &Path) -> String {
         (free(), free(), free(), free());
 
     let dir = tempfile::tempdir().expect("a directory");
-    let configuration = dir.path().join("ground.yaml");
+    let configuration = dir.path().join("ground.ytcs");
     let state = dir.path().join("tcspecial.state").display().to_string();
     std::fs::write(
         &configuration,

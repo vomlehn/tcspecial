@@ -1465,7 +1465,7 @@ mod tests {
     /// The shipped example, which is what this has to be able to open.
     fn thermostat() -> Graph {
         let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("..");
-        Graph::load(root.join("tests/manual/thermostat.yaml"))
+        Graph::load(root.join("tests/manual/thermostat.ytcs"))
             .expect("the example reads")
     }
 

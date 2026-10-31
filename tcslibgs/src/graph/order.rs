@@ -167,7 +167,7 @@ mod tests {
     #[test]
     fn yaml_sections_are_in_the_order_written() {
         let (_dir, path) = written(
-            "v.yaml",
+            "v.ytcs",
             "payloads:
   - { name: p1, type: i2c }
   - { name: p2, type: i2c }
@@ -184,7 +184,7 @@ vehicle:
     #[test]
     fn xml_elements_are_in_the_order_written() {
         let (_dir, path) = written(
-            "v.xml",
+            "v.xtcs",
             "<?xml version=\"1.0\"?>
 <configuration>
     <payloads><name>p1</name><type>i2c</type></payloads>

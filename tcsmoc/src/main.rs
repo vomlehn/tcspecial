@@ -1980,7 +1980,7 @@ mod tests {
             .join("docs/design.rst");
         let text = std::fs::read_to_string(&doc).unwrap();
 
-        // The four handlers of tcspecial1.yaml, which is the set the document
+        // The four handlers of tcspecial1.ytcs, which is the set the document
         // describes.
         let shape = grid_shape(&Sizes::for_tests(), 4);
         let size = window_size(&Sizes::for_tests(), &shape, 4);
@@ -2196,7 +2196,7 @@ mod tests {
     fn each_child_is_started_on_the_mocs_payload_file() {
         for name in CHILDREN {
             let command =
-                child_command(name, "tcspecial2.yaml", Mode::All, None)
+                child_command(name, "tcspecial2.ytcs", Mode::All, None)
                     .unwrap();
 
             assert_eq!(command.get_program(), "cargo", "{name}");
@@ -2209,7 +2209,7 @@ mod tests {
                     name,
                     "--",
                     "--simulate=all",
-                    "tcspecial2.yaml"
+                    "tcspecial2.ytcs"
                 ],
                 "{name}: with the MOC's own mode"
             );
@@ -2228,7 +2228,7 @@ mod tests {
     #[test]
     fn the_children_get_the_file_the_command_line_named() {
         let payload_path =
-            payload_path_from_args(args(&["tcspecial2.yaml"]), None).unwrap();
+            payload_path_from_args(args(&["tcspecial2.ytcs"]), None).unwrap();
 
         for name in CHILDREN {
             let command =
@@ -2236,7 +2236,7 @@ mod tests {
             let args: Vec<&OsStr> = command.get_args().collect();
             assert_eq!(
                 args.last(),
-                Some(&OsStr::new("tcspecial2.yaml")),
+                Some(&OsStr::new("tcspecial2.ytcs")),
                 "{name} was not given the file the command line named"
             );
         }
@@ -2270,7 +2270,7 @@ mod tests {
             std::fs::write(installed.path().join(name), "").expect("written");
             let command = child_command(
                 name,
-                "tcspecial2.yaml",
+                "tcspecial2.ytcs",
                 Mode::None,
                 Some(installed.path()),
             )
@@ -2282,7 +2282,7 @@ mod tests {
                 "{name}"
             );
             let args: Vec<&OsStr> = command.get_args().collect();
-            assert_eq!(args, ["--simulate=none", "tcspecial2.yaml"], "{name}");
+            assert_eq!(args, ["--simulate=none", "tcspecial2.ytcs"], "{name}");
         }
     }
 
@@ -2298,7 +2298,7 @@ mod tests {
         ] {
             let refused = child_command(
                 name,
-                "tcspecial2.yaml",
+                "tcspecial2.ytcs",
                 Mode::All,
                 Some(installed.path()),
             )

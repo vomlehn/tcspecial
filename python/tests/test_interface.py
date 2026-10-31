@@ -33,7 +33,7 @@ def section(said):
         when cleaned up, and the file's path.
     """
     directory = tempfile.TemporaryDirectory()
-    path = Path(directory.name) / "vehicle.xml"
+    path = Path(directory.name) / "vehicle.xtcs"
     path.write_text(
         f"<configuration><tcspecial>{said}</tcspecial></configuration>"
     )
@@ -50,11 +50,11 @@ class InterfaceTest(unittest.TestCase):
         )
         self.assertNotEqual(
             interface.of_this_tree(),
-            interface.of_files(sorted(interface.DOCUMENTS.glob("*.xml"))),
+            interface.of_files(sorted(interface.DOCUMENTS.glob("*.xtcs"))),
         )
 
     def test_this_trees_interface_is_what_the_examples_name(self):
-        named = configuration.load(ROOT / "examples" / "ping" / "ping.xml")
+        named = configuration.load(ROOT / "examples" / "ping" / "ping.xtcs")
         self.assertEqual(
             named.tcspecial["interface"], interface.of_this_tree().hex()
         )

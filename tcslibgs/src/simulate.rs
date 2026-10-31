@@ -779,10 +779,10 @@ mod tests {
 
     #[test]
     fn left_out_it_is_the_flight_setting() {
-        let (mode, rest) = take_mode(args(&["tcspecial", "x.yaml"])).unwrap();
+        let (mode, rest) = take_mode(args(&["tcspecial", "x.ytcs"])).unwrap();
         assert_eq!(mode, Mode::None);
         assert!(mode.is_flight());
-        assert_eq!(rest, args(&["tcspecial", "x.yaml"]));
+        assert_eq!(rest, args(&["tcspecial", "x.ytcs"]));
     }
 
     #[test]
@@ -790,11 +790,11 @@ mod tests {
         for name in Mode::NAMES {
             let flag = format!("--simulate={name}");
             let (mode, rest) =
-                take_mode(args(&["tcspecial", &flag, "x.yaml"])).unwrap();
+                take_mode(args(&["tcspecial", &flag, "x.ytcs"])).unwrap();
             assert_eq!(mode.name(), name);
-            assert_eq!(rest, args(&["tcspecial", "x.yaml"]));
+            assert_eq!(rest, args(&["tcspecial", "x.ytcs"]));
             let (after, _) =
-                take_mode(args(&["tcspecial", "x.yaml", &flag])).unwrap();
+                take_mode(args(&["tcspecial", "x.ytcs", &flag])).unwrap();
             assert_eq!(after, mode);
         }
     }

@@ -54,7 +54,7 @@ fn each_ping_is_answered_and_timed_and_the_beacon_is_heard() {
     let (answers, beacons, ground_commands) = (free(), free(), free());
 
     let dir = tempfile::tempdir().expect("a directory");
-    let configuration = dir.path().join("ping.xml");
+    let configuration = dir.path().join("ping.xtcs");
     std::fs::write(
         &configuration,
         format!(

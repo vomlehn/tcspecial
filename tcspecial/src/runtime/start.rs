@@ -749,7 +749,7 @@ mod tests {
     #[test]
     fn a_configuration_with_problems_is_refused_before_it_opens() {
         let where_ = tempfile::tempdir().expect("a directory");
-        let path = where_.path().join("wrong.yaml");
+        let path = where_.path().join("wrong.ytcs");
         std::fs::write(
             &path,
             "payloads:\n\
@@ -780,7 +780,7 @@ mod tests {
     #[test]
     fn the_shipped_example_is_a_checked_graph() {
         let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("..");
-        let path = root.join("tests/manual/thermostat.yaml");
+        let path = root.join("tests/manual/thermostat.ytcs");
         let path = path.to_str().expect("a path");
 
         let graph = Graph::load(path).expect("it reads");

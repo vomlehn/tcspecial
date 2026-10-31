@@ -86,7 +86,7 @@ class VehicleTest(unittest.TestCase):
         ping_gateway.find_built = lambda program: None
         try:
             with self.assertRaises(ValueError) as said:
-                ping_gateway.Vehicle.for_configuration("ping.xml")
+                ping_gateway.Vehicle.for_configuration("ping.xtcs")
         finally:
             ping_gateway.find_built = original
         self.assertIn("cargo build --bin tcspecial", str(said.exception))
@@ -175,21 +175,21 @@ class SpellingTest(unittest.TestCase):
 
         stem = str(ping_gateway.STEM)
         self.assertEqual(
-            ping_gateway.arguments([]).configuration, stem + ".xml"
+            ping_gateway.arguments([]).configuration, stem + ".xtcs"
         )
         self.assertEqual(
-            ping_gateway.arguments(["--xml"]).configuration, stem + ".xml"
+            ping_gateway.arguments(["--xml"]).configuration, stem + ".xtcs"
         )
         self.assertEqual(
-            ping_gateway.arguments(["--yaml"]).configuration, stem + ".yaml"
+            ping_gateway.arguments(["--yaml"]).configuration, stem + ".ytcs"
         )
         self.assertEqual(
-            ping_gateway.arguments(["a.yaml"]).configuration, "a.yaml"
+            ping_gateway.arguments(["a.ytcs"]).configuration, "a.ytcs"
         )
         for refused in (
             ["--yaml", "--xml"],
-            ["--yaml", "a.xml"],
-            ["--xml", "a.yaml"],
+            ["--yaml", "a.xtcs"],
+            ["--xml", "a.ytcs"],
         ):
             with contextlib.redirect_stderr(io.StringIO()), self.assertRaises(
                 SystemExit, msg=refused

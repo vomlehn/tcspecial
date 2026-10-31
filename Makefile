@@ -82,8 +82,8 @@ PTHDIR ?= /usr/lib/python3/dist-packages
 
 # The configuration to run, named without a suffix.
 #
-# TCSPECIAL_CONFIG_FILE is the stem, and `$(TCSPECIAL_CONFIG_FILE).yaml` or
-# `.xml` the configuration. So:
+# TCSPECIAL_CONFIG_FILE is the stem, and `$(TCSPECIAL_CONFIG_FILE).ytcs` or
+# `.xtcs` the configuration. So:
 #   make run     TCSPECIAL_CONFIG_FILE=examples/minimal/minimal
 #   make runmocy TCSPECIAL_CONFIG_FILE=examples/thermostat/thermostat
 #   make runsim  TCSPECIAL_CONFIG_FILE=examples/minimal/minimal
@@ -302,15 +302,15 @@ run:
 		echo "Running $(PROJECT_NAME)..."; \
 		cd $(RUST) && RUST_LOG=$(RUST_LOG) \
 			cargo run -q --bin tcspecial -- --simulate=$(SIMULATE) \
-			$(TCSPECIAL_CONFIG_FILE).yaml \
+			$(TCSPECIAL_CONFIG_FILE).ytcs \
 	)
 
 # Running tcsmoc on one spelling of the tcspecial configuration.
 #
-# $(1) is that spelling -- yaml or xml. A configuration may be written in
-# either and they describe the same payloads, so which one a run reads is a
-# choice, and a run that always read the YAML could not exercise the other at
-# all.
+# $(1) is that spelling, by its extension -- ytcs or xtcs. A configuration
+# may be written in either and they describe the same payloads, so which one
+# a run reads is a choice, and a run that always read the YAML could not
+# exercise the other at all.
 #
 # Only the suffix is given here. The stem comes from TCSPECIAL_CONFIG_FILE, so
 # a payload set is still chosen the way every other target chooses it, and the
@@ -334,15 +334,15 @@ endef
 # with nothing to remember about which variable selects it.
 .PHONY: runmocy
 runmocy:
-	$(call runmoc_on,yaml)
+	$(call runmoc_on,ytcs)
 
 .PHONY: runmocx
 runmocx:
-	$(call runmoc_on,xml)
+	$(call runmoc_on,xtcs)
 
 # Checking one spelling of a payload set without running anything.
 #
-# $(1) is that spelling -- yaml or xml -- as runmoc_on takes it, and for the
+# $(1) is that spelling -- ytcs or xtcs -- as runmoc_on takes it, and for the
 # same reason: a set may be written in either, the two are transcribed by hand,
 # and a check that only ever read the YAML would leave the XML unchecked.
 #
@@ -368,11 +368,11 @@ endef
 # about which variable selects it.
 .PHONY: runverifyy
 runverifyy:
-	$(call runverify_on,yaml)
+	$(call runverify_on,ytcs)
 
 .PHONY: runverifyx
 runverifyx:
-	$(call runverify_on,xml)
+	$(call runverify_on,xtcs)
 
 # Check that the two spellings of a payload set say the same thing.
 #
@@ -386,11 +386,11 @@ runverifyx:
 runcomparexy:
 	( \
 		set -eu; \
-		echo "Comparing $(TCSPECIAL_CONFIG_FILE).xml with" \
-			"$(TCSPECIAL_CONFIG_FILE).yaml..."; \
+		echo "Comparing $(TCSPECIAL_CONFIG_FILE).xtcs with" \
+			"$(TCSPECIAL_CONFIG_FILE).ytcs..."; \
 		cd $(RUST) && cargo run -q --bin tcsverify -- \
-			$(TCSPECIAL_CONFIG_FILE).xml \
-			$(TCSPECIAL_CONFIG_FILE).yaml \
+			$(TCSPECIAL_CONFIG_FILE).xtcs \
+			$(TCSPECIAL_CONFIG_FILE).ytcs \
 			$(TCSPECIAL_SIM_FILE) \
 	)
 
@@ -411,10 +411,10 @@ SPELLINGS = \
 # Every shipped configuration, both spellings: the examples, the thermostat
 # fixture and the top-level example, but not the simulator files, which
 # name no interface.
-SHIPPED_CONFIGURATIONS = example.yaml example.xml \
-	tests/manual/thermostat.yaml tests/manual/thermostat.xml \
-	$(filter-out %-sim.yaml,$(wildcard examples/*/*.yaml)) \
-	$(wildcard examples/*/*.xml)
+SHIPPED_CONFIGURATIONS = example.ytcs example.xtcs \
+	tests/manual/thermostat.ytcs tests/manual/thermostat.xtcs \
+	$(wildcard examples/*/*.ytcs) \
+	$(wildcard examples/*/*.xtcs)
 
 # Write this build's interface digest into every shipped configuration, in
 # place and changing nothing else, after tcslibgs/xtce/link.xtce changes:
@@ -438,9 +438,9 @@ comparespellings:
 		failed=""; \
 		for pair in $(SPELLINGS); do \
 			stem=$${pair%%:*}; sim=$${pair#*:}; \
-			echo "Comparing $$stem.xml with $$stem.yaml..."; \
+			echo "Comparing $$stem.xtcs with $$stem.ytcs..."; \
 			cargo run -q --bin tcsverify -- \
-				$$stem.xml $$stem.yaml $$sim \
+				$$stem.xtcs $$stem.ytcs $$sim \
 				|| failed="$$failed $$stem"; \
 		done; \
 		if [ -n "$$failed" ]; then \
@@ -461,7 +461,7 @@ runsim:
 		cd $(RUST) && RUST_LOG=$(RUST_LOG) \
 			PAYLOAD_SIM_YAML=$(TCSPECIAL_SIM_FILE) \
 			cargo run -q --bin tcssim -- --simulate=$(SIMULATE) \
-			$(TCSPECIAL_CONFIG_FILE).yaml \
+			$(TCSPECIAL_CONFIG_FILE).ytcs \
 	)
 
 # Make the virtual CAN bus a CAN payload needs.
@@ -576,13 +576,13 @@ verify:
 # tcsgui saves every edit as it is made, that being the point of it -- and
 # that is a thing the example can survive where a scratch file could not: it
 # is in the repository, so a stray edit shows up in `git status` and comes
-# back with `git checkout example.yaml`, where an editor opened on a name
+# back with `git checkout example.ytcs`, where an editor opened on a name
 # nobody keeps leaves its work somewhere nobody looks.
 #
 #   make runguiy
 #   make runguiy TCSGUI_FILE=tests/manual/thermostat
-#   make verify  TCSGUI_FILE=example.yaml
-TCSGUI_FILE = example.yaml
+#   make verify  TCSGUI_FILE=example.ytcs
+TCSGUI_FILE = example.ytcs
 
 # The simulator's own configuration, for the runsimgui targets.
 #
@@ -598,7 +598,7 @@ TCSGUI_SIM = $(basename $(TCSGUI_FILE))sim
 
 # Running tcsgui on one spelling of a configuration.
 #
-# $(1) is that spelling -- yaml or xml -- as runmoc_on takes it, and for the
+# $(1) is that spelling -- ytcs or xtcs -- as runmoc_on takes it, and for the
 # same reason: a configuration may be written in either, the two describe the
 # same graph, and the extension is what says which to write. An editor that
 # only ever opened the YAML would leave the XML to be written by hand.
@@ -647,22 +647,22 @@ endef
 # to remember about which variable selects it.
 .PHONY: runguiy
 runguiy:
-	$(call rungui_on,yaml)
+	$(call rungui_on,ytcs)
 
 .PHONY: runguix
 runguix:
-	$(call rungui_on,xml)
+	$(call rungui_on,xtcs)
 
 # And with the simulator's configuration beside it, which is what adds the
 # simulation settings to each payload's window and lights the menu entry for
 # the simulator's groups.
 .PHONY: runsimguiy
 runsimguiy:
-	$(call tcssimgui_on,yaml,$(TCSGUI_SIM))
+	$(call tcssimgui_on,ytcs,$(TCSGUI_SIM))
 
 .PHONY: runsimguix
 runsimguix:
-	$(call tcssimgui_on,xml,$(TCSGUI_SIM))
+	$(call tcssimgui_on,xtcs,$(TCSGUI_SIM))
 
 # Clean build artifacts
 .PHONY: clean
@@ -750,7 +750,8 @@ LIBTCS_SONAME := libtcs.so.$(LIBTCS_ABI)
 # well. Taken from git, so that a scratch file left in examples/ is not
 # shipped.
 EXAMPLE_FILES = examples/README.html $(shell git ls-files \
-		'examples/*/*.yaml' 'examples/*/*.xml' 'examples/*/*.svg')
+		'examples/*/*.ytcs' 'examples/*/*.xtcs' \
+		'examples/*/*-sim.yaml' 'examples/*/*.svg')
 
 # Whether what is installed is stripped: 1, the default, or 0.
 #

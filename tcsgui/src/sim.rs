@@ -252,7 +252,8 @@ pub fn read(path: &Path) -> Result<Simulator, Trouble> {
 
     let unreadable =
         |e: &dyn std::fmt::Display| Trouble::Unreadable(format!("{e}"));
-    let format = ConfigFormat::of_file(path).map_err(|e| unreadable(&e))?;
+    let format = ConfigFormat::from_data_path(path)
+        .ok_or_else(|| unreadable(&"not named .yaml"))?;
     let text = std::fs::read_to_string(path).map_err(|e| unreadable(&e))?;
     let file: File = format.parse(&text).map_err(|e| unreadable(&e))?;
 

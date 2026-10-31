@@ -371,7 +371,7 @@ mod tests {
     #[test]
     fn the_examples_log_is_what_it_says() {
         let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("..");
-        let graph = Graph::load(root.join("tests/manual/thermostat.yaml"))
+        let graph = Graph::load(root.join("tests/manual/thermostat.ytcs"))
             .expect("it reads");
         let housekeeping = graph.node("housekeeping").expect("the log");
 

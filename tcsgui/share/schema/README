@@ -29,6 +29,14 @@ relative where the schemas sit above the file, which is a source tree, and the
 installed path otherwise. What follows is for a file that does not say, or a
 tool that does not look.
 
+A configuration's name ends in `.ytcs`, for YAML, or `.xtcs`, for XML, which
+an editor does not know without being told: associate the two with YAML and
+XML first. In VS Code, for instance:
+
+    "files.associations": { "*.ytcs": "yaml", "*.xtcs": "xml" }
+
+The simulator's file is `.yaml`, and needs nothing.
+
 A JSON Schema for YAML is not a category error: every YAML document is a JSON
 document in another spelling, and JSON Schema is what editors and language
 servers actually read. Point yours at the file:
@@ -39,6 +47,6 @@ servers actually read. Point yours at the file:
 
 And for the XML spelling, xmllint will check a file against the XSD:
 
-    xmllint --noout --schema /usr/share/tcsgui/schema/tcspecial.xsd vehicle.xml
+    xmllint --noout --schema /usr/share/tcsgui/schema/tcspecial.xsd vehicle.xtcs
 
 Installed by `make install-data` under $(PREFIX)/share/tcsgui/schema.

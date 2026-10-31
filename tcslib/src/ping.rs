@@ -565,7 +565,7 @@ mod tests {
     #[test]
     fn the_example_is_routed_and_its_gateway_node_is_sent_to() {
         let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("..");
-        let graph = Graph::load(root.join("examples/ping/ping.yaml"))
+        let graph = Graph::load(root.join("examples/ping/ping.ytcs"))
             .expect("it reads");
         assert_eq!(
             route_of(&graph),
@@ -578,7 +578,7 @@ mod tests {
         assert_eq!(uplink.to().to_string(), "127.0.0.1:7600");
 
         // And a configuration whose gateway node binds nothing has no way up.
-        let beacon = Graph::load(root.join("examples/beacon/beacon.yaml"))
+        let beacon = Graph::load(root.join("examples/beacon/beacon.ytcs"))
             .expect("it reads");
         assert_eq!(route_of(&beacon), None);
     }
@@ -592,7 +592,7 @@ mod tests {
             .expect("a timeout");
         let port = vehicle.local_addr().expect("an address").port();
         let dir = tempfile::tempdir().expect("a directory");
-        let path = dir.path().join("vehicle.yaml");
+        let path = dir.path().join("vehicle.ytcs");
         std::fs::write(
             &path,
             format!(

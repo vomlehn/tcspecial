@@ -6,7 +6,7 @@
 # The configuration is the mission's own and no package ships one, so the
 # service does nothing until one is put at the path below. An XML
 # configuration is named in a drop-in (`systemctl edit tcspecial`) that sets
-# ExecStart and the condition to the .xml file.
+# ExecStart and the condition to the .xtcs file.
 #
 # No --simulate on the command line: left out it is none, the flight setting,
 # under which tcspecial refuses every stand-in.
@@ -14,7 +14,7 @@
 [Unit]
 Description=tcspecial flight software: the vehicle's payloads as a graph
 Documentation=file://@PREFIX@/share/doc/tcspecial/docs/manual.html
-ConditionPathExists=@SYSCONFDIR@/tcspecial/tcspecial.yaml
+ConditionPathExists=@SYSCONFDIR@/tcspecial/tcspecial.ytcs
 Wants=network-online.target
 After=network-online.target
 # Started again however often it ends. systemd's default gives up after five
@@ -27,7 +27,7 @@ Type=simple
 # Where a relative state_file or log.directory in the configuration lands:
 # the variable data the tcspecial package made for it.
 WorkingDirectory=@LOCALSTATEDIR@/tcspecial
-ExecStart=@PREFIX@/bin/tcspecial @SYSCONFDIR@/tcspecial/tcspecial.yaml
+ExecStart=@PREFIX@/bin/tcspecial @SYSCONFDIR@/tcspecial/tcspecial.ytcs
 Restart=always
 # Long enough that a start that fails at once does not spin a processor,
 # short enough to be nothing next to the link's own latency.

@@ -1717,7 +1717,7 @@ mod tests {
     ///
     /// # Returns
     ///
-    /// The routes of `tests/manual/thermostat.yaml`.
+    /// The routes of `tests/manual/thermostat.ytcs`.
     ///
     /// # Panics
     ///
@@ -1725,7 +1725,7 @@ mod tests {
     fn thermostat() -> Routes {
         let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("..");
         Routes::of(
-            &Graph::load(root.join("tests/manual/thermostat.yaml"))
+            &Graph::load(root.join("tests/manual/thermostat.ytcs"))
                 .expect("it reads"),
         )
     }
@@ -2427,7 +2427,7 @@ mod tests {
     #[test]
     fn a_node_is_opened_from_its_configuration() {
         let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("..");
-        let graph = Graph::load(root.join("tests/manual/thermostat.yaml"))
+        let graph = Graph::load(root.join("tests/manual/thermostat.ytcs"))
             .expect("it reads");
         let routes = Routes::of(&graph);
 

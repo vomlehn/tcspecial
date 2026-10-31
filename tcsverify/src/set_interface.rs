@@ -258,7 +258,7 @@ fn set_in_xml(text: &str, ours: &str) -> Result<(String, Set), String> {
 ///
 /// # Arguments
 ///
-/// * `path` - The configuration, `.yaml`, `.yml` or `.xml`.
+/// * `path` - The configuration, `.ytcs` or `.xtcs`.
 ///
 /// # Returns
 ///
@@ -395,9 +395,9 @@ mod tests {
     #[test]
     fn a_file_is_set_in_place() {
         let dir = tempfile::tempdir().unwrap();
-        let path = dir.path().join("v.yaml");
+        let path = dir.path().join("v.ytcs");
         let example = Path::new(env!("CARGO_MANIFEST_DIR"))
-            .join("../examples/ping/ping.yaml");
+            .join("../examples/ping/ping.ytcs");
         let good = std::fs::read_to_string(example).unwrap();
         let ours = InterfaceDigest::of_this_build().to_string();
         let stale = good.replace(&ours, OURS);

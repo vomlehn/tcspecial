@@ -192,7 +192,7 @@ fn a_beacon_pass_allocates_nothing() {
 fn a_datum_received_into_a_buffer_allocates_nothing() {
     let port = a_free_port();
     let dir = tempfile::tempdir().expect("a directory");
-    let path = dir.path().join("vehicle.yaml");
+    let path = dir.path().join("vehicle.ytcs");
     std::fs::write(
         &path,
         format!(
@@ -237,7 +237,7 @@ payloads:
 fn a_datum_longer_than_the_buffer_is_refused() {
     let port = a_free_port();
     let dir = tempfile::tempdir().expect("a directory");
-    let path = dir.path().join("vehicle.yaml");
+    let path = dir.path().join("vehicle.ytcs");
     std::fs::write(
         &path,
         format!(

@@ -835,7 +835,7 @@ mod tests {
     #[test]
     fn every_node_has_a_state_numbered_as_its_telemetry_is() {
         let where_ = tempfile::tempdir().expect("a directory");
-        let path = where_.path().join("two.yaml");
+        let path = where_.path().join("two.ytcs");
         std::fs::write(
             &path,
             "payloads:\n\

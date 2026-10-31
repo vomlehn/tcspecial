@@ -17,7 +17,7 @@ from tcslibgs import configuration  # noqa: E402
 from tcslibgs.configuration import HostPort, came_from  # noqa: E402
 
 ROOT = Path(__file__).resolve().parents[2]
-PING = ROOT / "examples" / "ping" / "ping.xml"
+PING = ROOT / "examples" / "ping" / "ping.xtcs"
 
 
 def written(text):
@@ -31,7 +31,7 @@ def written(text):
         when cleaned up, and the file's path.
     """
     directory = tempfile.TemporaryDirectory()
-    path = Path(directory.name) / "vehicle.xml"
+    path = Path(directory.name) / "vehicle.xtcs"
     path.write_text(f"<configuration>{text}</configuration>")
     return directory, path
 
@@ -120,14 +120,22 @@ class ConfigurationTest(unittest.TestCase):
         for example in ["ping", "beacon", "minimal", "thermostat",
                         "simple-app"]:
             stem = ROOT / "examples" / example / example
-            xml = configuration.load(stem.with_suffix(".xml"))
-            yaml = configuration.load(stem.with_suffix(".yaml"))
+            xml = configuration.load(stem.with_suffix(".xtcs"))
+            yaml = configuration.load(stem.with_suffix(".ytcs"))
             self.assertEqual(xml.tcspecial, yaml.tcspecial, example)
             self.assertEqual(xml.nodes, yaml.nodes, example)
 
     def test_a_file_that_is_neither_spelling_is_refused(self):
-        with self.assertRaisesRegex(ValueError, ".yaml, .yml or .xml"):
+        with self.assertRaisesRegex(ValueError, r"\.ytcs.*\.xtcs"):
             configuration.load(ROOT / "examples" / "ping" / "ping.svg")
+
+    def test_an_old_extension_is_refused_with_the_new_name(self):
+        # Every configuration was once named .yaml or .xml: one still named
+        # so is told the name to give it, rather than read.
+        for old, new in [("a.yaml", "a.ytcs"), ("a.yml", "a.ytcs"),
+                         ("a.xml", "a.xtcs")]:
+            with self.assertRaisesRegex(ValueError, f"rename it {new}"):
+                configuration.load(old)
 
     def test_a_datagram_is_taken_only_from_where_the_configuration_says(self):
         # types.rs's own cases.

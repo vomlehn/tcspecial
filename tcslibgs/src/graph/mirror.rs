@@ -226,7 +226,7 @@ mod tests {
     /// If the file cannot be written.
     fn pair(gateway_says: &str, payload_says: &str) -> TcsResult<Graph> {
         let where_ = tempfile::tempdir().expect("a directory");
-        let path = where_.path().join("vehicle.yaml");
+        let path = where_.path().join("vehicle.ytcs");
         std::fs::write(
             &path,
             format!(

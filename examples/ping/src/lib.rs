@@ -9,8 +9,8 @@
 //!
 //! * `tests/python.rs` runs the Python's own tests, which use the Rust tests'
 //!   examples;
-//! * `tests/agrees.rs` checks that what the Python reads out of `ping.xml` is
-//!   what the Rust reads out of `ping.yaml`;
+//! * `tests/agrees.rs` checks that what the Python reads out of `ping.xtcs` is
+//!   what the Rust reads out of `ping.ytcs`;
 //! * `tests/pings.rs` plays the vehicle with the Rust -- the ping answered by
 //!   `tcslibgs::node::vehicle::ping::reply`, the beacon serialized as
 //!   tcspecial serializes it -- and runs the ground station against it.

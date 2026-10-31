@@ -37,7 +37,7 @@ fn root() -> PathBuf {
 ///
 /// # Arguments
 ///
-/// * `ending` - The end of the file names wanted, such as `.yaml`.
+/// * `ending` - The end of the file names wanted, such as `.ytcs`.
 ///
 /// # Returns
 ///
@@ -83,17 +83,14 @@ fn examples(ending: &str) -> Vec<String> {
     found
 }
 
-/// The examples' tcspecial configurations in YAML, which is every YAML file
-/// there but the simulator's.
+/// The examples' tcspecial configurations in YAML, the `.ytcs` files: the
+/// simulator's beside them are `.yaml`.
 ///
 /// # Returns
 ///
 /// The paths, from the root, sorted.
 fn example_configurations() -> Vec<String> {
-    examples(".yaml")
-        .into_iter()
-        .filter(|name| !name.ends_with("-sim.yaml"))
-        .collect()
+    examples(".ytcs")
 }
 
 /// One schema, read.
@@ -451,11 +448,11 @@ fn every_shipped_xml_file_is_valid_against_its_schema() {
     }
 
     let mut files: Vec<(&str, String)> = vec![
-        ("tcspecial.xsd", "example.xml".to_string()),
-        ("tcspecial.xsd", "tests/manual/thermostat.xml".to_string()),
+        ("tcspecial.xsd", "example.xtcs".to_string()),
+        ("tcspecial.xsd", "tests/manual/thermostat.xtcs".to_string()),
     ];
     files.extend(
-        examples(".xml")
+        examples(".xtcs")
             .into_iter()
             .map(|file| ("tcspecial.xsd", file)),
     );
@@ -492,10 +489,11 @@ fn every_shipped_xml_file_is_well_formed() {
         return;
     }
 
-    let mut files: Vec<String> = ["example.xml", "tests/manual/thermostat.xml"]
-        .map(str::to_string)
-        .to_vec();
-    files.extend(examples(".xml"));
+    let mut files: Vec<String> =
+        ["example.xtcs", "tests/manual/thermostat.xtcs"]
+            .map(str::to_string)
+            .to_vec();
+    files.extend(examples(".xtcs"));
     for file in &files {
         let path = root().join(file);
         assert!(path.is_file(), "{file} is not there any more");
@@ -539,11 +537,11 @@ fn every_shipped_xml_file_is_well_formed() {
 fn every_shipped_configuration_says_which_schema_describes_it() {
     let mut shipped: Vec<(String, &str)> = [
         (
-            "tests/manual/thermostat.xml",
+            "tests/manual/thermostat.xtcs",
             "../../tcsgui/share/schema/tcspecial.xsd",
         ),
         (
-            "tests/manual/thermostat.yaml",
+            "tests/manual/thermostat.ytcs",
             "../../tcsgui/share/schema/tcspecial.schema.json",
         ),
         (
@@ -554,7 +552,7 @@ fn every_shipped_configuration_says_which_schema_describes_it() {
     .map(|(file, said)| (file.to_string(), said))
     .to_vec();
     // Each example is two directories below the root.
-    for file in examples(".xml") {
+    for file in examples(".xtcs") {
         shipped.push((file, "../../tcsgui/share/schema/tcspecial.xsd"));
     }
     for file in example_configurations() {
@@ -595,8 +593,8 @@ fn every_key_of_a_shipped_configuration_is_in_the_schema() {
     let schema = read("tcspecial.schema.json");
 
     let mut files = vec![
-        "example.yaml".to_string(),
-        "tests/manual/thermostat.yaml".to_string(),
+        "example.ytcs".to_string(),
+        "tests/manual/thermostat.ytcs".to_string(),
     ];
     files.extend(example_configurations());
     for file in &files {

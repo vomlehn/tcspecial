@@ -1165,7 +1165,7 @@ mod tests {
     /// back.
     fn two_nodes() -> Graph {
         let where_ = tempfile::tempdir().expect("a directory");
-        let path = where_.path().join("two.yaml");
+        let path = where_.path().join("two.ytcs");
         std::fs::write(
             &path,
             "payloads:\n\
@@ -1656,7 +1656,7 @@ mod tests {
     #[test]
     fn a_ping_node_is_neither_stopped_nor_started() {
         let where_ = tempfile::tempdir().expect("a directory");
-        let path = where_.path().join("ping.yaml");
+        let path = where_.path().join("ping.ytcs");
         std::fs::write(
             &path,
             "gateway:\n\

@@ -5,6 +5,10 @@
 		}
 	],
 	"settings": {
-		"makefile.configureOnOpen": false
+		"makefile.configureOnOpen": false,
+		"files.associations": {
+			"*.ytcs": "yaml",
+			"*.xtcs": "xml"
+		}
 	}
 }

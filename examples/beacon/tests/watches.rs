@@ -22,7 +22,7 @@ use tcslibgs::{Beacon, ConfigDigest, ConfigVersion};
 /// The example's configuration, found from this crate rather than from
 /// wherever the test was run.
 fn configuration() -> PathBuf {
-    Path::new(env!("CARGO_MANIFEST_DIR")).join("beacon.yaml")
+    Path::new(env!("CARGO_MANIFEST_DIR")).join("beacon.ytcs")
 }
 
 /// The example's configuration says where its beacons are, and the two ends
@@ -103,7 +103,7 @@ fn a_beacon_from_the_configured_address_is_heard() {
     };
 
     let version = ConfigVersion::of_this_build();
-    // Packed by tcs-xtce, from the layout in tcslibgs/xtce/beacon.xml, as
+    // Packed by tcs-xtce, from the layout in tcslibgs/xtce/beacon.xtcs, as
     // tcspecial packs every beacon it sends.
     let beacon = Beacon::new(7, version, ConfigDigest([0x5a; 16])).to_bytes();
     vehicle.send_to(&beacon, at).expect("the vehicle beacons");

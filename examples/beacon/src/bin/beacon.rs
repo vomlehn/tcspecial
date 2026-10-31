@@ -289,17 +289,17 @@ mod tests {
     fn verbose_is_asked_for() {
         let quiet = of(&[]).expect("no arguments are arguments");
         assert!(!quiet.verbose);
-        assert_eq!(quiet.path, "examples/beacon/beacon.yaml");
+        assert_eq!(quiet.path, "examples/beacon/beacon.ytcs");
 
         for args in [
             &["-v"][..],
             &["--verbose"],
-            &["a.yaml", "-v"],
-            &["-v", "a.yaml"],
+            &["a.ytcs", "-v"],
+            &["-v", "a.ytcs"],
         ] {
             assert!(of(args).expect("they read").verbose, "{args:?}");
         }
-        assert_eq!(of(&["-v", "a.yaml"]).expect("they read").path, "a.yaml");
+        assert_eq!(of(&["-v", "a.ytcs"]).expect("they read").path, "a.ytcs");
     }
 
     /// What is not an option, and a second configuration, are refused rather
@@ -307,7 +307,7 @@ mod tests {
     #[test]
     fn what_is_not_understood_is_refused() {
         assert!(of(&["-q"]).is_err());
-        assert!(of(&["a.yaml", "b.yaml"]).is_err());
+        assert!(of(&["a.ytcs", "b.ytcs"]).is_err());
     }
 
     /// YAML where nobody says, XML with --xml, and not both.
@@ -315,13 +315,13 @@ mod tests {
     fn the_spelling_is_yaml_unless_xml_is_asked_for() {
         assert_eq!(
             of(&["--xml"]).expect("it reads").path,
-            "examples/beacon/beacon.xml"
+            "examples/beacon/beacon.xtcs"
         );
         assert_eq!(
             of(&["--yaml", "-v"]).expect("it reads").path,
-            "examples/beacon/beacon.yaml"
+            "examples/beacon/beacon.ytcs"
         );
         assert!(of(&["--yaml", "--xml"]).is_err());
-        assert!(of(&["--yaml", "a.xml"]).is_err());
+        assert!(of(&["--yaml", "a.xtcs"]).is_err());
     }
 }

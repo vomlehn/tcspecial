@@ -503,7 +503,7 @@ mod tests {
     /// The configuration's graph.
     fn graph(port: u16) -> Graph {
         let dir = tempfile::tempdir().expect("a directory");
-        let path = dir.path().join("vehicle.yaml");
+        let path = dir.path().join("vehicle.ytcs");
         std::fs::write(
             &path,
             format!(
@@ -565,7 +565,7 @@ payloads:
     fn an_fprime_gateway_receives_at_its_bridge_base() {
         let port = a_free_port();
         let dir = tempfile::tempdir().expect("a directory");
-        let path = dir.path().join("vehicle.yaml");
+        let path = dir.path().join("vehicle.ytcs");
         std::fs::write(
             &path,
             format!(
@@ -665,7 +665,7 @@ payloads:
     #[test]
     fn untouched_payloads_are_received_over_payload_telemetry() {
         let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("..");
-        let mut graph = Graph::load(root.join("examples/minimal/minimal.yaml"))
+        let mut graph = Graph::load(root.join("examples/minimal/minimal.ytcs"))
             .expect("it reads");
         // Somewhere free instead of the example's 6100.
         let port = a_free_port();

@@ -1042,7 +1042,7 @@ mod tests {
     #[test]
     fn the_beacon_interval_is_the_sections() {
         let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("..");
-        let mut graph = Graph::load(root.join("examples/ping/ping.yaml"))
+        let mut graph = Graph::load(root.join("examples/ping/ping.ytcs"))
             .expect("the example reads");
         assert_eq!(
             beacon_interval_of(&graph),

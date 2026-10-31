@@ -25,7 +25,7 @@ use std::process::Command;
 ///
 /// If the file cannot be written.
 fn configuration(dir: &std::path::Path) -> std::path::PathBuf {
-    let path = dir.join("vehicle.yaml");
+    let path = dir.join("vehicle.ytcs");
     let missing = dir.join("telemetry");
     let state = dir.join("tcspecial.state").display().to_string();
     std::fs::write(
@@ -123,7 +123,7 @@ fn a_stand_in_is_allowed_where_the_mode_allows_it() {
 #[test]
 fn a_stand_in_is_where_a_simulated_channel_is_reached() {
     let dir = tempfile::tempdir().expect("a directory");
-    let path = dir.path().join("vehicle.yaml");
+    let path = dir.path().join("vehicle.ytcs");
     let state = dir.path().join("tcspecial.state").display().to_string();
     std::fs::write(
         &path,

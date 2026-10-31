@@ -34,15 +34,16 @@ pub const SIM_PAYLOAD_CONFIG_PATH_VAR: &str = "SIM_PAYLOAD_CONFIG_PATH";
 /// The shipped fixture. A default at all is for running the programs from
 /// the repository by hand -- every one of them takes the path as its
 /// argument, and that is what a real run names.
-pub const DEFAULT_PAYLOAD_CONFIG_PATH: &str = "tests/manual/thermostat.yaml";
+pub const DEFAULT_PAYLOAD_CONFIG_PATH: &str = "tests/manual/thermostat.ytcs";
 
 /// Finds the simulator file beside a configuration and named for it.
 ///
 /// Two spellings are looked for: `<stem>-sim.yaml`, which the examples use,
 /// and the older `<stem>sim.yaml`. The stem is the configuration's name
-/// without `.yaml`, `.yml` or `.xml`, so either spelling of a configuration
-/// finds the same simulator file. One function for every program that looks,
-/// so that tcsmoc and the tcssim it starts cannot pick different files.
+/// without `.ytcs` or `.xtcs`, so either spelling of a configuration finds
+/// the same simulator file, which is YAML and named `.yaml` whichever it is.
+/// One function for every program that looks, so that tcsmoc and the tcssim
+/// it starts cannot pick different files.
 ///
 /// # Arguments
 ///
@@ -51,9 +52,9 @@ pub const DEFAULT_PAYLOAD_CONFIG_PATH: &str = "tests/manual/thermostat.yaml";
 /// # Returns
 ///
 /// The simulator file's path, or `None` when the configuration's name has
-/// none of the three extensions or there is no such file.
+/// neither extension or there is no such file.
 pub fn sim_path_beside(payload_path: &str) -> Option<String> {
-    let stem = [".yaml", ".yml", ".xml"]
+    let stem = [".ytcs", ".xtcs"]
         .iter()
         .find_map(|ext| payload_path.strip_suffix(ext))?;
     [format!("{stem}-sim.yaml"), format!("{stem}sim.yaml")]
@@ -221,8 +222,8 @@ mod tests {
     #[test]
     fn an_argument_names_the_payload_file() {
         assert_eq!(
-            payload_path_from_args(args(&["tcspecial2.yaml"]), None).unwrap(),
-            "tcspecial2.yaml"
+            payload_path_from_args(args(&["tcspecial2.ytcs"]), None).unwrap(),
+            "tcspecial2.ytcs"
         );
     }
 
@@ -239,20 +240,20 @@ mod tests {
         // The argument is the unambiguous one: a variable set for one program
         // reaches the subprocesses it starts, and an argument does not.
         let var = "TCS_TEST_PAYLOAD_PATH_PRECEDENCE";
-        std::env::set_var(var, "from_the_environment.yaml");
+        std::env::set_var(var, "from_the_environment.ytcs");
 
         assert_eq!(
             payload_path_from_args(
-                args(&["from_the_argument.yaml"]),
+                args(&["from_the_argument.ytcs"]),
                 Some(var)
             )
             .unwrap(),
-            "from_the_argument.yaml"
+            "from_the_argument.ytcs"
         );
         // And with no argument the variable is what is left.
         assert_eq!(
             payload_path_from_args(args(&[]), Some(var)).unwrap(),
-            "from_the_environment.yaml"
+            "from_the_environment.ytcs"
         );
 
         std::env::remove_var(var);
@@ -261,10 +262,10 @@ mod tests {
     #[test]
     fn a_second_payload_file_is_refused_rather_than_ignored() {
         let message =
-            payload_path_from_args(args(&["one.yaml", "two.yaml"]), None)
+            payload_path_from_args(args(&["one.ytcs", "two.ytcs"]), None)
                 .expect_err("two paths must be refused");
         assert!(
-            message.contains("two.yaml"),
+            message.contains("two.ytcs"),
             "the error should name the extra argument, but said: {message}"
         );
     }

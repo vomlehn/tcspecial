@@ -12,7 +12,7 @@ use std::process::Command;
 ///
 /// # Arguments
 ///
-/// * `dir`   - The directory it is written in, as `set.yaml`.
+/// * `dir`   - The directory it is written in, as `set.ytcs`.
 /// * `count` - How many errors.
 ///
 /// # Returns
@@ -52,7 +52,7 @@ payloads:
              payload-out:\n      - target: nowhere{id}\n"
         ));
     }
-    let path = dir.join("set.yaml");
+    let path = dir.join("set.ytcs");
     std::fs::write(&path, text).expect("written");
     path
 }
@@ -104,14 +104,14 @@ fn the_interface_digest_is_printed_alone() {
 
     // And it is what the shipped configurations name.
     let example = Path::new(env!("CARGO_MANIFEST_DIR"))
-        .join("../examples/ping/ping.yaml");
+        .join("../examples/ping/ping.ytcs");
     let text = std::fs::read_to_string(example).expect("the example");
     assert!(
         text.contains(&format!("interface: \"{}\"", lines[0])),
         "the ping example names another interface"
     );
 
-    let (_, status) = run(&["--interface-digest", "a.yaml"]);
+    let (_, status) = run(&["--interface-digest", "a.ytcs"]);
     assert_eq!(status, 2, "given alone");
 }
 
@@ -128,11 +128,11 @@ fn a_checked_configuration_is_kept_under_its_checksum() {
     std::fs::create_dir(&store).expect("a store");
     let keep = format!("--keep={}", store.display());
     let example = Path::new(env!("CARGO_MANIFEST_DIR"))
-        .join("../examples/ping/ping.yaml");
+        .join("../examples/ping/ping.ytcs");
     let example = example.to_str().expect("a path");
     let checksum =
         tcslibgs::config_digest::digest_of_file(example).expect("it digests");
-    let kept = store.join(format!("{checksum}.yaml"));
+    let kept = store.join(format!("{checksum}.ytcs"));
 
     let (lines, status) = run(&[&keep, example]);
     assert_eq!(status, 0, "{lines:?}");
@@ -179,7 +179,7 @@ fn set_interface_rewrites_only_the_interface() {
     let ours = tcslibgs::InterfaceDigest::of_this_build().to_string();
     let stale = "0123456789abcdef0123456789abcdef";
     let mut paths = Vec::new();
-    for name in ["ping.yaml", "ping.xml"] {
+    for name in ["ping.ytcs", "ping.xtcs"] {
         let shipped = Path::new(env!("CARGO_MANIFEST_DIR"))
             .join("../examples/ping")
             .join(name);
@@ -276,8 +276,8 @@ fn the_digest_is_printed_for_the_configurations() {
             .to_string()
     };
     let (yaml, xml, sim) = (
-        example("thermostat.yaml"),
-        example("thermostat.xml"),
+        example("thermostat.ytcs"),
+        example("thermostat.xtcs"),
         example("thermostat-sim.yaml"),
     );
     let digest = |line: &str| line.split("md5 ").nth(1).map(str::to_string);
@@ -338,7 +338,7 @@ fn a_digest_that_cannot_be_taken_is_a_failed_run() {
     );
 
     // And one that does not parse has nothing to digest.
-    let unreadable = dir.path().join("unreadable.yaml");
+    let unreadable = dir.path().join("unreadable.ytcs");
     std::fs::write(&unreadable, "description: nonsense\npayloads: oops\n")
         .expect("written");
     let unreadable = unreadable.to_str().expect("a path");
@@ -378,7 +378,7 @@ fn a_bad_option_is_a_command_line_of_none_of_the_shapes() {
 ///
 /// # Arguments
 ///
-/// * `dir`  - The directory it is written in, as `one.yaml`.
+/// * `dir`  - The directory it is written in, as `one.ytcs`.
 /// * `node` - The node's attributes after its name, as indented YAML lines.
 ///
 /// # Returns
@@ -424,7 +424,7 @@ vehicle:
       - target: ground
 "
     );
-    let path = dir.join("one.yaml");
+    let path = dir.join("one.ytcs");
     std::fs::write(&path, text).expect("written");
     path
 }

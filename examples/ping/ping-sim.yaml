@@ -1,6 +1,6 @@
 # yaml-language-server: $schema=../../tcsgui/share/schema/tcspecial-sim.schema.json
 
-description: Simulator settings for ping.yaml, which has no payloads to stand
+description: Simulator settings for ping.ytcs, which has no payloads to stand
   in for
 
 # Where tcssim answers whether it has made its stand-ins, which whatever

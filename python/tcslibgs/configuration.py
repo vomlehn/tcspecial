@@ -371,7 +371,12 @@ def parse_interval(text):
 
 #: The two spellings, by the flag that asks for each and the extension it is
 #: written with: ``format::ConfigFormat`` in ``tcslibgs``.
-SPELLINGS = {"yaml": ".yaml", "xml": ".xml"}
+SPELLINGS = {"yaml": ".ytcs", "xml": ".xtcs"}
+
+#: The extensions every configuration once had, by the one each is named
+#: with now: a configuration still named so is refused, and told the name to
+#: give it.
+OLD_EXTENSIONS = {".yaml": ".ytcs", ".yml": ".ytcs", ".xml": ".xtcs"}
 
 
 def choose(named, stem, default, chosen=None):
@@ -379,7 +384,7 @@ def choose(named, stem, default, chosen=None):
 
     ``named`` where one was named, and then ``chosen`` -- ``"yaml"`` or
     ``"xml"``, from ``--yaml`` or ``--xml`` -- has to agree with its
-    extension, a file named ``.xml`` read as asked for in YAML being a command
+    extension, a file named ``.xtcs`` read as asked for in YAML being a command
     line that cannot both be right. Otherwise ``stem``, the example's path
     without an extension, in the spelling chosen, or in ``default`` where
     neither flag was given. The two flags together are refused before this,
@@ -403,11 +408,7 @@ def choose(named, stem, default, chosen=None):
     if named is not None:
         named = str(named)
         suffix = Path(named).suffix.lower()
-        spelled = (
-            "yaml"
-            if suffix in (".yaml", ".yml")
-            else "xml" if suffix == ".xml" else None
-        )
+        spelled = {".ytcs": "yaml", ".xtcs": "xml"}.get(suffix)
         if chosen is not None and spelled is not None and spelled != chosen:
             raise ValueError(
                 f"{named} is {spelled.upper()} and --{chosen} asks for "
@@ -426,26 +427,37 @@ def load(path):
     nothing about why.
 
     Args:
-        path: The configuration file, named ``.yaml``, ``.yml`` or ``.xml``.
+        path: The configuration file, named ``.ytcs``, for YAML, or
+              ``.xtcs``, for XML.
 
     Returns:
         The :class:`Configuration` it says.
 
     Raises:
-        ValueError: The extension is none of those, the file includes
+        ValueError: The extension is neither of those -- ``.yaml``, ``.yml``
+                    and ``.xml``, as configurations were once named,
+                    included, with the name to give the file -- the file
+                    includes
                     others, it is not a map of sections, or it is YAML and
                     PyYAML is not installed.
         OSError: The file cannot be read.
     """
     path = Path(path)
     suffix = path.suffix.lower()
-    if suffix == ".xml":
+    if suffix == ".xtcs":
         return _interface_checked(_load_xml(path))
-    if suffix in (".yaml", ".yml"):
+    if suffix == ".ytcs":
         return _interface_checked(_load_yaml(path))
+    if suffix in OLD_EXTENSIONS:
+        new = OLD_EXTENSIONS[suffix]
+        spelling = "YAML" if new == ".ytcs" else "XML"
+        raise ValueError(
+            f"{path}: a configuration in {spelling} is named {new} now, not "
+            f"{suffix}: rename it {path.with_suffix(new)}"
+        )
     raise ValueError(
-        f"{path}: a configuration file is named .yaml, .yml or .xml, and this "
-        "is none of those"
+        f"{path}: a configuration file is named .ytcs, for YAML, or .xtcs, "
+        "for XML, and this is neither"
     )
 
 

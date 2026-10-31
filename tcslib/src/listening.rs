@@ -199,7 +199,7 @@ mod tests {
                 .port()
         };
         let dir = tempfile::tempdir().expect("a directory");
-        let path = dir.path().join("listening.yaml");
+        let path = dir.path().join("listening.ytcs");
         std::fs::write(
             &path,
             format!(
@@ -283,7 +283,7 @@ mod tests {
     #[test]
     fn a_configuration_with_no_section_has_nothing_to_connect_to() {
         let dir = tempfile::tempdir().expect("a directory");
-        let path = dir.path().join("none.yaml");
+        let path = dir.path().join("none.ytcs");
         std::fs::write(&path, "vehicle:\n  - { name: p, type: ping }\n")
             .unwrap();
         let graph = Graph::load(&path).unwrap();

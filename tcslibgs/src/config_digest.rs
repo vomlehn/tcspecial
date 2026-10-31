@@ -427,14 +427,14 @@ mod tests {
     #[test]
     fn a_graph_digests_alike_in_both_spellings() {
         for name in ["minimal", "thermostat", "simple-app"] {
-            let yaml = digest_of_graph(&example_graph(name, "yaml"))
+            let yaml = digest_of_graph(&example_graph(name, "ytcs"))
                 .expect("it digests");
-            let xml = digest_of_graph(&example_graph(name, "xml"))
+            let xml = digest_of_graph(&example_graph(name, "xtcs"))
                 .expect("it digests");
             assert_eq!(yaml, xml, "{name}");
             let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("..");
             let file = digest_of_file(
-                root.join(format!("examples/{name}/{name}.yaml")),
+                root.join(format!("examples/{name}/{name}.ytcs")),
             )
             .expect("the file digests");
             assert_eq!(file, yaml, "{name}");
@@ -445,7 +445,7 @@ mod tests {
     /// attributes and its place in the order are.
     #[test]
     fn a_graph_digest_follows_what_the_vehicle_acts_on() {
-        let graph = example_graph("thermostat", "yaml");
+        let graph = example_graph("thermostat", "ytcs");
         let digest = digest_of_graph(&graph).expect("it digests");
 
         let mut moved = graph.clone();
@@ -505,7 +505,7 @@ mod tests {
     fn a_digest_is_sixteen_bytes_of_hex() {
         let said = format!(
             "{}",
-            digest_of_graph(&example_graph("minimal", "yaml"))
+            digest_of_graph(&example_graph("minimal", "ytcs"))
                 .expect("it digests")
         );
         assert_eq!(said.len(), 32, "{said}");

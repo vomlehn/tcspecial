@@ -2381,7 +2381,7 @@ pub(crate) mod tests {
         assert!(!checksum.own && checksum.file.is_none());
 
         let file = Path::new(env!("CARGO_MANIFEST_DIR"))
-            .join("../examples/ping/ping.yaml");
+            .join("../examples/ping/ping.ytcs");
         let target = restart_target_of(file.to_str().unwrap(), Some(ours))
             .expect("a configuration with nothing wrong with it");
         assert_eq!(
@@ -2391,10 +2391,10 @@ pub(crate) mod tests {
         assert_eq!(target.file.as_deref(), Some(file.as_path()));
         let said = target.said();
         assert!(said.contains(&target.digest.to_string()), "{said}");
-        assert!(said.contains("ping.yaml"), "{said}");
+        assert!(said.contains("ping.ytcs"), "{said}");
 
         let dir = tempfile::tempdir().expect("a directory");
-        let wrong = dir.path().join("wrong.yaml");
+        let wrong = dir.path().join("wrong.ytcs");
         std::fs::write(
             &wrong,
             "vehicle:\n  - { name: a, type: compute, function: mean }\n",
@@ -2404,7 +2404,7 @@ pub(crate) mod tests {
             .expect_err("a configuration with problems");
         assert!(why.contains("not a configuration the vehicle"), "{why}");
         let why =
-            restart_target_of("nowhere.yaml", Some(ours)).expect_err("neither");
+            restart_target_of("nowhere.ytcs", Some(ours)).expect_err("neither");
         assert!(why.contains("neither"), "{why}");
     }
 
@@ -2567,7 +2567,7 @@ pub(crate) mod tests {
             .expect("a free port")
             .port();
         let dir = tempfile::tempdir().expect("a directory");
-        let path = dir.path().join("vehicle.yaml");
+        let path = dir.path().join("vehicle.ytcs");
         // The ping node is the second node written, device id 1, so its
         // answers arrive at ground_base plus one: `port`.
         std::fs::write(
@@ -2649,7 +2649,7 @@ vehicle:
             .expect("a free port")
             .port();
         let dir = tempfile::tempdir().expect("a directory");
-        let path = dir.path().join("vehicle.yaml");
+        let path = dir.path().join("vehicle.ytcs");
         std::fs::write(
             &path,
             format!(
@@ -2743,7 +2743,7 @@ payloads:
 
     fn example(name: &str) -> Graph {
         let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("..");
-        Graph::load(root.join(format!("examples/{name}/{name}.yaml")))
+        Graph::load(root.join(format!("examples/{name}/{name}.ytcs")))
             .expect("the example reads")
     }
 
@@ -2961,7 +2961,7 @@ payloads:
             .expect("a timeout");
         let port = vehicle.local_addr().expect("where it is").port();
         let dir = tempfile::tempdir().expect("a directory");
-        let path = dir.path().join("ping.yaml");
+        let path = dir.path().join("ping.ytcs");
         std::fs::write(
             &path,
             format!(

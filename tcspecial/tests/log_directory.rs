@@ -28,7 +28,7 @@ fn free() -> u16 {
 fn a_missing_log_directory_is_named_with_what_to_do() {
     let dir = tempfile::tempdir().expect("a directory");
     let missing = dir.path().join("telemetry");
-    let configuration = dir.path().join("vehicle.yaml");
+    let configuration = dir.path().join("vehicle.ytcs");
     let state = dir.path().join("tcspecial.state").display().to_string();
     // Nothing to open but the log, which is opened before anything else.
     let at = || format!("127.0.0.1:{}", free());

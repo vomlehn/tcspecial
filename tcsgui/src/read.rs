@@ -219,7 +219,7 @@ fn comments_of(path: &Path) -> Said {
     let xml = path
         .extension()
         .and_then(|e| e.to_str())
-        .is_some_and(|e| e.eq_ignore_ascii_case("xml"));
+        .is_some_and(|e| e.eq_ignore_ascii_case("xtcs"));
 
     let mut waiting: Vec<String> = Vec::new();
     // Which node's entry the scan is inside, for the links written on it.
@@ -475,8 +475,8 @@ mod tests {
         let document = thermostat_example();
 
         for (name, text) in [
-            ("thermostat.yaml", document.to_yaml()),
-            ("thermostat.xml", document.to_xml()),
+            ("thermostat.ytcs", document.to_yaml()),
+            ("thermostat.xtcs", document.to_xml()),
         ] {
             let path = where_.path().join(name);
             std::fs::write(&path, &text).expect("the file is written");
@@ -511,7 +511,7 @@ mod tests {
                 // that ends one, so a run of them is folded to a single
                 // hyphen on the way out. See `document::comment_safe`.
                 let mut written = written.clone();
-                if name.ends_with(".xml") {
+                if name.ends_with(".xtcs") {
                     written.comment =
                         written.comment.as_deref().map(|comment| {
                             comment
@@ -570,8 +570,8 @@ mod tests {
         }
 
         for (name, text) in [
-            ("through.yaml", document.to_yaml()),
-            ("through.xml", document.to_xml()),
+            ("through.ytcs", document.to_yaml()),
+            ("through.xtcs", document.to_xml()),
         ] {
             let path = where_.path().join(name);
             std::fs::write(&path, &text).expect("the file is written");
@@ -602,7 +602,7 @@ mod tests {
         // `the_worked_example_is_the_configuration_it_describes` asserts them.
         for name in ["example", "tests/manual/thermostat"] {
             let mut read_as: Vec<(usize, usize)> = Vec::new();
-            for extension in ["yaml", "xml"] {
+            for extension in ["ytcs", "xtcs"] {
                 let path = root.join(format!("{name}.{extension}"));
                 let document =
                     read(&path).unwrap_or_else(|e| panic!("{name}: {e}"));
@@ -618,7 +618,7 @@ mod tests {
         // asked to be: a fault drawn in `example.*` is somebody's work in
         // progress, and the editor's business is to say so rather than a
         // test's to refuse it.
-        for extension in ["yaml", "xml"] {
+        for extension in ["ytcs", "xtcs"] {
             let path =
                 root.join(format!("tests/manual/thermostat.{extension}"));
             let document = read(&path).expect("the worked example");
@@ -640,7 +640,7 @@ mod tests {
     fn the_worked_example_is_the_configuration_it_describes() {
         let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("..");
 
-        for extension in ["yaml", "xml"] {
+        for extension in ["ytcs", "xtcs"] {
             let path =
                 root.join(format!("tests/manual/thermostat.{extension}"));
             let document = read(&path).expect("the worked example");
@@ -651,7 +651,7 @@ mod tests {
 
     /// The shipped example is one configuration in two spellings.
     ///
-    /// `example.xml` is written from `example.yaml` rather than kept beside it
+    /// `example.xtcs` is written from `example.ytcs` rather than kept beside it
     /// by hand: the YAML is the one a person edits -- it is the one carrying
     /// the prose -- and the XML is the same configuration in the other
     /// language, which is what the XSD is validated against and what
@@ -664,8 +664,8 @@ mod tests {
     fn the_shipped_example_is_the_same_in_both_spellings() {
         let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("..");
         let document =
-            read(&root.join("example.yaml")).expect("the example opens");
-        let path = root.join("example.xml");
+            read(&root.join("example.ytcs")).expect("the example opens");
+        let path = root.join("example.xtcs");
         // Written for the place it is going, which is what decides how it
         // names its schema: see `nodes::schema_reference`.
         let written = document
@@ -681,7 +681,7 @@ mod tests {
         assert_eq!(
             shipped,
             written,
-            "{} is not example.yaml in the other language any more. Run the \
+            "{} is not example.ytcs in the other language any more. Run the \
              tests with TCSGUI_WRITE_EXAMPLE=1 to write it out",
             path.display()
         );
@@ -692,7 +692,7 @@ mod tests {
     fn a_comment_is_read_back_with_what_it_is_about() {
         let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("..");
 
-        for extension in ["yaml", "xml"] {
+        for extension in ["ytcs", "xtcs"] {
             let path =
                 root.join(format!("tests/manual/thermostat.{extension}"));
             let document = read(&path).expect("the example opens");
@@ -774,7 +774,7 @@ mod tests {
     #[test]
     fn a_name_that_does_not_exist_yet_is_a_new_document() {
         let where_ = tempfile::tempdir().expect("a directory");
-        let document = read(&where_.path().join("nothing-here.yaml"))
+        let document = read(&where_.path().join("nothing-here.ytcs"))
             .expect("a new document");
         assert!(document.nodes.is_empty() && document.links.is_empty());
     }
@@ -784,7 +784,7 @@ mod tests {
     #[test]
     fn a_file_that_is_not_a_configuration_is_reported() {
         let where_ = tempfile::tempdir().expect("a directory");
-        let path = where_.path().join("notes.yaml");
+        let path = where_.path().join("notes.ytcs");
         std::fs::write(&path, "this is not a configuration\n")
             .expect("written");
 

@@ -491,7 +491,7 @@ mod tests {
     fn the_lines_are_numbered_as_the_routes_number_them() {
         let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("..");
         let graph =
-            Graph::load(root.join("examples/thermostat/thermostat.yaml"))
+            Graph::load(root.join("examples/thermostat/thermostat.ytcs"))
                 .expect("the example reads");
         let lines = lines_of(&graph);
         let routes = crate::runtime::route::Routes::of(&graph);
@@ -512,7 +512,7 @@ mod tests {
     fn every_line_of_a_configuration_in_one_file_is_drawn() {
         let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("..");
         let graph =
-            Graph::load(root.join("examples/thermostat/thermostat.yaml"))
+            Graph::load(root.join("examples/thermostat/thermostat.ytcs"))
                 .expect("the example reads");
         let lines = lines_of(&graph);
         let top = graph.files.first();

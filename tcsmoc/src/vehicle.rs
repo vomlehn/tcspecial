@@ -72,9 +72,133 @@ use crate::{
 /// What the window says of ARM Restart and Initiate restart pressed where
 /// its configuration could not be digested: they name the configuration to
 /// restart onto by its checksum, and there is none to name.
-const NO_TARGET: &str = "not sent: this window's configuration could not be \
-                         digested, so there is no checksum to name the \
-                         configuration to restart onto";
+const NO_TARGET: &str = "this window's configuration could not be digested, \
+                         so there is no checksum to restart onto: name a \
+                         configuration file or a checksum as the restart \
+                         target";
+
+/// What ARM Restart and Initiate restart restart onto.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) struct RestartTarget {
+    /// The configuration's checksum, which the two commands carry.
+    pub(crate) digest: tcslibgs::ConfigDigest,
+    /// The file it was read from, where the operator named one.
+    pub(crate) file: Option<std::path::PathBuf>,
+    /// Whether it is this window's own configuration.
+    pub(crate) own: bool,
+}
+
+impl RestartTarget {
+    /// Says what the target is, for the operator: its checksum, and its
+    /// file or that it is this window's own.
+    ///
+    /// # Returns
+    ///
+    /// The words.
+    pub(crate) fn said(&self) -> String {
+        match (&self.file, self.own) {
+            (_, true) => {
+                format!("md5 {}, this window's configuration", self.digest)
+            }
+            (Some(file), false) => {
+                format!("md5 {}, {}", self.digest, file.display())
+            }
+            (None, false) => format!("md5 {}", self.digest),
+        }
+    }
+}
+
+/// Reads the restart target the operator typed.
+///
+/// Nothing is this window's own configuration. 32 lower-case hex digits are
+/// a checksum, taken as it is: the vehicle refuses one it does not hold.
+/// Anything else is a configuration file, checked as tcsverify checks one --
+/// the checks tcspecial runs as it loads it -- and refused with the problems
+/// found, so that the operator does not arm a restart onto a configuration
+/// the vehicle would refuse; its checksum is then computed from it.
+///
+/// # Arguments
+///
+/// * `said` - What the target field holds.
+/// * `ours` - This window's configuration's checksum, where it has one.
+///
+/// # Returns
+///
+/// The target.
+///
+/// # Errors
+///
+/// Why it is not one: no checksum of this window's to default to, a file
+/// that cannot be read, or the problems the checks found.
+pub(crate) fn restart_target_of(
+    said: &str,
+    ours: Option<tcslibgs::ConfigDigest>,
+) -> Result<RestartTarget, String> {
+    let said = said.trim();
+    if said.is_empty() {
+        return ours
+            .map(|digest| RestartTarget {
+                digest,
+                file: None,
+                own: true,
+            })
+            .ok_or_else(|| NO_TARGET.to_string());
+    }
+    if let Some(digest) = tcslibgs::ConfigDigest::of_hex(said) {
+        return Ok(RestartTarget {
+            digest,
+            file: None,
+            own: Some(digest) == ours,
+        });
+    }
+    let path = std::path::Path::new(said);
+    if !path.is_file() {
+        return Err(format!(
+            "{said} is neither a configuration file nor a checksum of 32 \
+             lower-case hex digits"
+        ));
+    }
+    let report = tcsverify::verify(path, None, tcsverify::Limits::EVERYTHING);
+    if report.found_errors() {
+        let problems: Vec<String> = report
+            .lines()
+            .into_iter()
+            .filter(|(error, _)| *error)
+            .map(|(_, line)| line)
+            .collect();
+        return Err(format!(
+            "{said} is not a configuration the vehicle could run: {}",
+            problems.join("; ")
+        ));
+    }
+    let digest = tcslibgs::config_digest::digest_of_file(path)
+        .map_err(|e| format!("{said}: {e}"))?;
+    Ok(RestartTarget {
+        digest,
+        file: Some(path.to_path_buf()),
+        own: Some(digest) == ours,
+    })
+}
+
+/// Says what the restart target field comes to, for the line beside it.
+///
+/// # Arguments
+///
+/// * `said` - What the field holds.
+/// * `ours` - This window's configuration's checksum, where it has one.
+///
+/// # Returns
+///
+/// The target, or why what is typed is not one.
+fn restart_target_shown(
+    said: &str,
+    ours: Option<tcslibgs::ConfigDigest>,
+) -> String {
+    match restart_target_of(said, ours) {
+        Ok(target) => target.said(),
+        Err(why) => format!("not a target: {why}"),
+    }
+}
 
 /// What a panel's status says of a node the spacecraft says is running.
 pub const ACTIVE_STATUS: &str = "Active";
@@ -1135,6 +1259,25 @@ pub(crate) fn command_buttons(
         // made as it starts, so that its Restart is taken only after its own
         // ARM Restart and not after one some other station sent.
         let key = window_arm_key();
+        // What the last successful ARM Restart armed: the target the
+        // restart must name.
+        let armed: Rc<std::cell::RefCell<Option<RestartTarget>>> =
+            Rc::new(std::cell::RefCell::new(None));
+        // What the target field comes to, shown beside it as it is typed,
+        // and to begin with, before anything is sent.
+        {
+            let weak = ui.as_weak();
+            ui.set_restart_target_shown(SharedString::from(
+                restart_target_shown("", digest),
+            ));
+            ui.on_restart_target_edited(move |said| {
+                if let Some(ui) = weak.upgrade() {
+                    ui.set_restart_target_shown(SharedString::from(
+                        restart_target_shown(said.as_str(), digest),
+                    ));
+                }
+            });
+        }
         ui.on_menu_action(move |action| {
             let Some(ui) = weak.upgrade() else {
                 return;
@@ -1163,50 +1306,112 @@ pub(crate) fn command_buttons(
                         None => crate::ci_link::NOT_CONNECTED.to_string(),
                     }));
                 }
-                // Onto the configuration this window read, which is the
-                // one the vehicle is matched to run: a plain restart. A
-                // window with no checksum has nothing to name.
+                // Onto the restart target: this window's configuration
+                // unless the operator named another. What it comes to is
+                // said with the answer, and kept as the arm's, so that the
+                // restart goes onto the same one.
                 MenuAction::ArmRestart => {
-                    let Some(target) = digest else {
-                        ui.set_last_response(SharedString::from(NO_TARGET));
-                        return;
+                    let target = match restart_target_of(
+                        ui.get_restart_target().as_str(),
+                        digest,
+                    ) {
+                        Ok(target) => target,
+                        Err(why) => {
+                            *armed.borrow_mut() = None;
+                            ui.set_last_response(SharedString::from(format!(
+                                "ARM Restart not sent: {why}"
+                            )));
+                            return;
+                        }
                     };
                     let answer = link
                         .lock()
                         .unwrap()
                         .client()
-                        .map(|client| client.restart_arm(key, target));
+                        .map(|client| client.restart_arm(key, target.digest));
+                    let onto = target.said();
+                    // Armed only by a success: a refused arm, or one whose
+                    // answer never came, is one the restart cannot count on.
+                    *armed.borrow_mut() = match &answer {
+                        Some(Ok(status)) if status.is_success() => Some(target),
+                        _ => None,
+                    };
                     ui.set_last_response(SharedString::from(match answer {
-                        Some(Ok(status)) => format!("ARM Restart: {status}"),
-                        Some(Err(e)) => format!("ARM Restart failed: {e}"),
+                        Some(Ok(status)) => {
+                            format!("ARM Restart onto {onto}: {status}")
+                        }
+                        Some(Err(e)) => {
+                            format!("ARM Restart onto {onto} failed: {e}")
+                        }
                         None => crate::ci_link::NOT_CONNECTED.to_string(),
                     }));
                 }
                 // Answered, if the answer comes, before the vehicle goes;
                 // the beacons say when it is back, and until then the
-                // window's commands are refused unsent.
+                // window's commands are refused unsent. Onto the target the
+                // arm was given: one changed since is refused unsent, since
+                // the vehicle would refuse it NotArmed and the operator is
+                // owed the reason.
                 MenuAction::Restart => {
-                    let Some(target) = digest else {
-                        ui.set_last_response(SharedString::from(NO_TARGET));
-                        return;
+                    let target = match restart_target_of(
+                        ui.get_restart_target().as_str(),
+                        digest,
+                    ) {
+                        Ok(target) => target,
+                        Err(why) => {
+                            ui.set_last_response(SharedString::from(format!(
+                                "Initiate restart not sent: {why}"
+                            )));
+                            return;
+                        }
                     };
+                    if let Some(was) = armed.borrow().as_ref() {
+                        if was.digest != target.digest {
+                            ui.set_last_response(SharedString::from(format!(
+                                "Initiate restart not sent: the restart \
+                                 target is {}, and ARM Restart armed {}: press \
+                                 ARM Restart again for the new target",
+                                target.said(),
+                                was.said()
+                            )));
+                            return;
+                        }
+                    }
                     let answer = link
                         .lock()
                         .unwrap()
                         .client()
-                        .map(|client| client.restart(key, target));
+                        .map(|client| client.restart(key, target.digest));
+                    let next = if target.own {
+                        "waiting for a beacon of the next start".to_string()
+                    } else {
+                        format!(
+                            "the vehicle will run configuration md5 {}, which \
+                             is not this window's: run tcsmoc with that \
+                             configuration{} to Connect to it",
+                            target.digest,
+                            target
+                                .file
+                                .as_ref()
+                                .map(|file| format!(", {}", file.display()))
+                                .unwrap_or_default()
+                        )
+                    };
+                    if matches!(&answer, Some(Ok(status)) if status.is_success())
+                    {
+                        // The arm is used up by the restart.
+                        *armed.borrow_mut() = None;
+                    }
                     ui.set_last_response(SharedString::from(match answer {
                         Some(Ok(status)) if status.is_success() => {
-                            "Initiate restart: Success -- waiting for a beacon \
-                             of the next start"
-                                .to_string()
+                            format!("Initiate restart: Success -- {next}")
                         }
                         Some(Ok(status)) => {
                             format!("Initiate restart: {status}")
                         }
                         Some(Err(e)) => format!(
-                            "Initiate restart: no answer ({e}) -- waiting for \
-                             a beacon of the next start"
+                            "Initiate restart: no answer ({e}) -- if it was \
+                             taken, {next}"
                         ),
                         None => crate::ci_link::NOT_CONNECTED.to_string(),
                     }));
@@ -2152,6 +2357,196 @@ pub(crate) mod tests {
     use super::*;
     use std::path::Path;
 
+    /// A restart target is this window's configuration where nothing is
+    /// typed, a checksum where 32 lower-case hex digits are, and otherwise a
+    /// configuration file, checked first: one with problems is refused with
+    /// them, and one without is its checksum and its file.
+    #[test]
+    fn a_restart_target_is_a_file_or_a_checksum_or_this_windows() {
+        use tcslibgs::ConfigDigest;
+
+        let ours = ConfigDigest([0x5A; 16]);
+        let own = restart_target_of("", Some(ours)).expect("this window's");
+        assert_eq!(own.digest, ours);
+        assert!(own.own && own.said().contains("this window's"));
+        assert!(
+            restart_target_of("", None).is_err(),
+            "no checksum of its own"
+        );
+
+        let typed = "0123456789abcdef0123456789abcdef";
+        let checksum =
+            restart_target_of(typed, Some(ours)).expect("a checksum");
+        assert_eq!(checksum.digest.to_string(), typed);
+        assert!(!checksum.own && checksum.file.is_none());
+
+        let file = Path::new(env!("CARGO_MANIFEST_DIR"))
+            .join("../examples/ping/ping.yaml");
+        let target = restart_target_of(file.to_str().unwrap(), Some(ours))
+            .expect("a configuration with nothing wrong with it");
+        assert_eq!(
+            target.digest,
+            tcslibgs::config_digest::digest_of_file(&file).unwrap()
+        );
+        assert_eq!(target.file.as_deref(), Some(file.as_path()));
+        let said = target.said();
+        assert!(said.contains(&target.digest.to_string()), "{said}");
+        assert!(said.contains("ping.yaml"), "{said}");
+
+        let dir = tempfile::tempdir().expect("a directory");
+        let wrong = dir.path().join("wrong.yaml");
+        std::fs::write(
+            &wrong,
+            "vehicle:\n  - { name: a, type: compute, function: mean }\n",
+        )
+        .unwrap();
+        let why = restart_target_of(wrong.to_str().unwrap(), Some(ours))
+            .expect_err("a configuration with problems");
+        assert!(why.contains("not a configuration the vehicle"), "{why}");
+        let why =
+            restart_target_of("nowhere.yaml", Some(ours)).expect_err("neither");
+        assert!(why.contains("neither"), "{why}");
+    }
+
+    /// ARM Restart and Initiate restart go onto the restart target, the
+    /// same one: changing it after the arm refuses the restart unsent,
+    /// until ARM Restart is pressed again; a restart onto another
+    /// configuration says the vehicle will run it and that tcsmoc must be
+    /// run with it to Connect.
+    ///
+    /// Not a test of its own, for the reason
+    /// [`pressing_connect_and_enable_commands_the_vehicle`] is not: called
+    /// from `crate::tests::every_panels_data_is_inside_the_window`.
+    pub(crate) fn the_restart_controls_go_onto_the_restart_target() {
+        use std::net::UdpSocket;
+        use tcslibgs::{
+            Command, ConfigDigest, ConfigVersion, ConnectTelemetry, HostPort,
+            Telemetry,
+        };
+
+        let vehicle = UdpSocket::bind("127.0.0.1:0").expect("a stub socket");
+        vehicle
+            .set_read_timeout(Some(std::time::Duration::from_secs(10)))
+            .expect("a timeout");
+        let at = vehicle.local_addr().expect("where it is").to_string();
+        let ours = ConfigDigest([0x5Au8; 16]);
+        let other = ConfigDigest([0x77u8; 16]);
+        let asked = std::thread::spawn(move || {
+            let mut buffer = [0u8; 256];
+            let mut seen = Vec::new();
+            for _ in 0..4 {
+                let Ok((size, from)) = vehicle.recv_from(&mut buffer) else {
+                    return seen;
+                };
+                let command =
+                    Command::read(&buffer[..size]).expect("a command");
+                let seq = command.sequence();
+                let answer = match &command {
+                    Command::Connect(_) => {
+                        Telemetry::Connect(ConnectTelemetry::new(
+                            seq,
+                            ConfigVersion::of_this_build(),
+                            ours,
+                            1,
+                        ))
+                    }
+                    Command::RestartArm(cmd) => {
+                        seen.push(("arm", cmd.target));
+                        tcslibgs::answer_to(
+                            &command,
+                            tcslibgs::CommandStatus::Success,
+                        )
+                    }
+                    Command::Restart(cmd) => {
+                        seen.push(("restart", cmd.target));
+                        tcslibgs::answer_to(
+                            &command,
+                            tcslibgs::CommandStatus::Success,
+                        )
+                    }
+                    other => panic!("the window sent {:?}", other.cmd_type()),
+                };
+                vehicle
+                    .send_to(&answer.to_bytes(), from)
+                    .expect("an answer");
+            }
+            seen
+        });
+
+        let ui = MainWindow::new().expect("a window");
+        let model: Rc<VecModel<DHInfo>> = Rc::new(VecModel::default());
+        ui.set_ci_status(SharedString::from(DISCONNECTED_STATUS));
+        ui.set_ci_address(SharedString::from(at.clone()));
+        let matched = tcslib::matched::Matched::for_configuration(ours);
+        let link = Arc::new(Mutex::new(CiLink::down_commanding(
+            "127.0.0.1:0",
+            Commanded {
+                from: HostPort {
+                    address: "127.0.0.1".to_string(),
+                    port: 0,
+                },
+                to: HostPort {
+                    address: "127.0.0.1".to_string(),
+                    port: 1,
+                },
+            },
+            matched,
+        )));
+        let agreed: Agreed = Arc::new(Mutex::new(None));
+        let declined = declined_for(0);
+        let contact = Arc::new(Mutex::new(tcslib::beacon::Contact::Lost));
+        command_buttons(
+            &ui,
+            &link,
+            &agreed,
+            Some(ours),
+            &model,
+            &declined,
+            &contact,
+        );
+        assert!(
+            ui.get_restart_target_shown().contains("this window's"),
+            "the default, shown before anything is sent: {}",
+            ui.get_restart_target_shown()
+        );
+        ui.invoke_link_clicked();
+        assert_eq!(ui.get_ci_status().as_str(), CONNECTED_STATUS);
+
+        // Another configuration, by its checksum: shown, armed onto.
+        let typed = other.to_string();
+        ui.set_restart_target(SharedString::from(typed.clone()));
+        ui.invoke_restart_target_edited(SharedString::from(typed.clone()));
+        assert!(ui.get_restart_target_shown().contains(&typed));
+        ui.invoke_menu_action(MenuAction::ArmRestart);
+        let said = ui.get_last_response().to_string();
+        assert!(said.contains(&typed) && said.contains("Success"), "{said}");
+
+        // Changed since the arm: refused unsent.
+        ui.set_restart_target(SharedString::from(""));
+        ui.invoke_menu_action(MenuAction::Restart);
+        let said = ui.get_last_response().to_string();
+        assert!(said.contains("ARM Restart again"), "{said}");
+
+        // Back to the armed one: the restart goes onto it, and says what
+        // the operator has to do next.
+        ui.set_restart_target(SharedString::from(typed.clone()));
+        ui.invoke_menu_action(MenuAction::Restart);
+        let said = ui.get_last_response().to_string();
+        assert!(said.contains("Success"), "{said}");
+        assert!(said.contains(&format!("will run configuration md5 {typed}")));
+        assert!(
+            said.contains("run tcsmoc with that configuration"),
+            "{said}"
+        );
+
+        link.lock().unwrap().disconnect();
+        assert_eq!(
+            asked.join().expect("the stand-in"),
+            vec![("arm", other), ("restart", other)],
+            "both onto the target, and nothing sent while it differed"
+        );
+    }
+
     /// What a refused node command says is one sentence, spaced as one: a
     /// line continuation inside the literal drops the next line's leading
     /// spaces, and text before it that ended in spaces would leave a run.
@@ -2915,6 +3310,12 @@ payloads:
         // filled in from the binding and the value does not.
         let fields: Vec<ElementHandle> =
             ElementHandle::find_by_element_type_name(&ui, "LineEdit")
+                // Not the restart target's, which starts empty too.
+                .filter(|field| {
+                    field
+                        .accessible_label()
+                        .is_none_or(|label| label != "Restart target")
+                })
                 .filter(|field| {
                     field.accessible_value().is_some_and(|held| {
                         held == "setpoint" || held.is_empty()

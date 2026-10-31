@@ -11908,7 +11908,7 @@ window.
 
 So the shape follows from the count alone: three handlers are one row of three,
 and the five of the shipped thermostat are a row of three and a row of
-one, in a 977x1068 window. A test reads that size out of this document and
+one, in a 977x1108 window. A test reads that size out of this document and
 checks it against the one the program opens at, as one does for tcssim.
 
 This replaced a rule that chose the shape nearest square among those at least

@@ -113,7 +113,7 @@ class Beacon:
     #: RESTART being taken, through the start it asked for, until that start
     #: takes a CONNECT. A start nobody commanded begins with it clear, and
     #: runs with the definitions it had.
-    commanded_restart: bool = False
+    restart_flag: bool = False
     #: The interface the sender speaks: the digest of the XTCE documents it
     #: was built from, sixteen bytes. This tree's, where none is given.
     interface: bytes = None
@@ -173,7 +173,7 @@ class Beacon:
             sequence=sequence,
             version=version,
             digest=digest,
-            commanded_restart=flag == RESTART_FLAG,
+            restart_flag=flag == RESTART_FLAG,
             interface=interface,
         )
 
@@ -184,7 +184,7 @@ class Beacon:
             The beacon packed as tcspecial packs it, ``BEACON_BYTES`` long.
         """
         major, minor, patch = self.version
-        flag = RESTART_FLAG if self.commanded_restart else NORMAL_FLAG
+        flag = RESTART_FLAG if self.restart_flag else NORMAL_FLAG
         return (
             f"{BEACON_NAME}:{major}.{minor}.{patch}:{self.digest.hex()}:"
             f"{self.sequence}:{flag}:{self.interface.hex()}"

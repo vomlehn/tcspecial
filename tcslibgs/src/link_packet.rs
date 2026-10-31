@@ -41,6 +41,7 @@ impl StatusType {
     pub const ALREADY_EXISTS: Self = Self(6);
     pub const TIMEOUT: Self = Self(7);
     pub const STALE: Self = Self(9);
+    pub const UNMATCHED: Self = Self(10);
 
     /// Names this value of enumeration `/TcsLink/StatusType`.
     ///
@@ -58,6 +59,7 @@ impl StatusType {
             6 => Some("AlreadyExists"),
             7 => Some("Timeout"),
             9 => Some("Stale"),
+            10 => Some("Unmatched"),
             _ => None,
         }
     }

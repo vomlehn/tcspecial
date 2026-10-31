@@ -72,6 +72,19 @@ pub enum TcsError {
     )]
     GenerationUnknown(crate::commands::CommandType),
 
+    /// A command refused by the ground's own client, unsent: the station is
+    /// not matched for commanding -- the last beacon it heard does not
+    /// carry its configuration's checksum with the restart flag clear, is
+    /// no longer recent, or no CONNECT of its own has been answered with
+    /// that checksum since -- and only CONNECT, RESTART_ARM and RESTART go
+    /// until it is. See `tcslibgs::CommandType::taken_unmatched`.
+    #[error(
+        "{0:?} not sent: the configurations are not yet matched. Check that \
+         the checksum in the vehicle's beacon is this station's \
+         configuration's, and Connect"
+    )]
+    Unmatched(crate::commands::CommandType),
+
     #[error("Invalid arm key")]
     InvalidArmKey,
 

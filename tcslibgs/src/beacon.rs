@@ -2,8 +2,8 @@
 //!
 //! What tcspecial sends every `beacon.default_interval`, whether or not
 //! anything has connected to it: the build it is, the digest of the
-//! configuration it read, the beacon's own number, whether a restart the
-//! ground commanded is under way, and which interface it speaks. A ground
+//! configuration it read, the beacon's own number, whether this start has
+//! yet been matched by the ground, and which interface it speaks. A ground
 //! station that is only listening can then see which software is flying,
 //! which payload set it is serving and whether it has just come back, rather
 //! than having to ask before it can know.
@@ -17,7 +17,7 @@
 //! ```
 //!
 //! which is the name, the version, the configuration's digest, the beacon's
-//! number, `restart` or `normal` for the commanded-restart flag, and the
+//! number, `restart` or `normal` for the restart flag, and the
 //! interface's digest. It is read strictly: anything else at the beacon
 //! port, or a field out of its form, is not a beacon. A beacon carries no
 //! check of its own: the transport under it checks it, as UDP's checksum
@@ -34,8 +34,8 @@ use crate::interface::InterfaceDigest;
 /// The name every beacon starts with.
 pub const BEACON_NAME: &str = "tcspecial";
 
-/// What the commanded-restart field says when a commanded restart is under
-/// way.
+/// What the restart flag's field says when the flag is set: this start has
+/// not yet been matched, or has taken a RESTART.
 pub const RESTART_FLAG: &str = "restart";
 /// What it says when none is.
 pub const NORMAL_FLAG: &str = "normal";
@@ -63,24 +63,21 @@ pub struct Beacon {
     /// says which payload set it is serving: a configuration states no version
     /// of its own.
     pub digest: ConfigDigest,
-    /// Whether a restart the ground commanded is under way: set from the
-    /// moment an armed RESTART -- or, once there are load sets, a SWITCH --
-    /// is taken, through the start it asked for, until that start takes a
-    /// CONNECT from the MOC. Which is how a new set of definitions is taken
-    /// up.
-    ///
-    /// Clear in every beacon of a start nobody commanded -- a crash the
-    /// supervisor restarted, a power cycle -- which runs with the
-    /// definitions it had, so that the interface does not change under a
-    /// ground station that did not ask for it to.
-    pub commanded_restart: bool,
+    /// The restart flag: set at every start of tcspecial -- the first, a
+    /// commanded restart, a crash the supervisor restarted, a power cycle --
+    /// and from the moment a RESTART is taken, and clear only once the start
+    /// has taken a CONNECT whose configuration checksum is the one it runs.
+    /// While it is set the vehicle sends the ground nothing but beacons and
+    /// answers, and acts on no command but CONNECT, RESTART_ARM and RESTART.
+    /// See "Configurations named by their checksum" in `docs/design.rst`.
+    pub restart_flag: bool,
     /// The interface the sender speaks: the digest of the XTCE documents it
     /// was built from. See [`crate::interface`].
     pub interface: InterfaceDigest,
 }
 
 impl Beacon {
-    /// Makes a beacon with no commanded restart under way, speaking the
+    /// Makes a beacon with its restart flag clear, speaking the
     /// interface this build was generated from.
     ///
     /// # Arguments
@@ -91,7 +88,7 @@ impl Beacon {
     ///
     /// # Returns
     ///
-    /// The beacon, with `commanded_restart` clear.
+    /// The beacon, with `restart_flag` clear.
     pub fn new(
         sequence: u32,
         version: ConfigVersion,
@@ -101,24 +98,24 @@ impl Beacon {
             sequence,
             version,
             digest,
-            commanded_restart: false,
+            restart_flag: false,
             interface: InterfaceDigest::of_this_build(),
         }
     }
 
-    /// Says whether a commanded restart is under way.
+    /// Says whether the restart flag is set.
     ///
     /// # Arguments
     ///
-    /// * `commanded_restart` - Whether an armed RESTART has been taken and no
-    ///                         Connect has followed it.
+    /// * `restart_flag` - Whether this start has not yet taken a matching
+    ///                    CONNECT, or has taken a RESTART.
     ///
     /// # Returns
     ///
-    /// This beacon, with `commanded_restart` set to the value given.
-    pub fn commanded_restart(self, commanded_restart: bool) -> Self {
+    /// This beacon, with `restart_flag` set to the value given.
+    pub fn restart_flag(self, restart_flag: bool) -> Self {
         Self {
-            commanded_restart,
+            restart_flag,
             ..self
         }
     }
@@ -163,7 +160,7 @@ impl Beacon {
         )?;
         let sequence = decimal_of(next("it has no number")?)
             .ok_or(BeaconError::Field("the number is not a number"))?;
-        let commanded_restart =
+        let restart_flag =
             match next("it has no restart flag")? {
                 RESTART_FLAG => true,
                 NORMAL_FLAG => false,
@@ -181,7 +178,7 @@ impl Beacon {
             sequence,
             version,
             digest: ConfigDigest(digest),
-            commanded_restart,
+            restart_flag,
             interface: InterfaceDigest(interface),
         })
     }
@@ -309,7 +306,7 @@ impl BeaconPacker {
                 beacon.version,
                 beacon.digest,
                 beacon.sequence,
-                if beacon.commanded_restart {
+                if beacon.restart_flag {
                     RESTART_FLAG
                 } else {
                     NORMAL_FLAG
@@ -397,8 +394,8 @@ mod tests {
     /// The fields in order, as text, a colon between each.
     #[test]
     fn a_beacon_is_its_fields_in_order_as_text() {
-        let beacon = Beacon::new(0x01020304, version(), digest())
-            .commanded_restart(true);
+        let beacon =
+            Beacon::new(0x01020304, version(), digest()).restart_flag(true);
         let want = format!(
             "tcspecial:1.2.3:d41d8cd98f00b204e9800998ecf8427e:16909060:\
              restart:{}",
@@ -424,7 +421,7 @@ mod tests {
             },
             digest(),
         )
-        .commanded_restart(true);
+        .restart_flag(true);
         let packed = longest.to_bytes();
         assert_eq!(packed.len(), BEACON_BYTES);
         assert_eq!(Beacon::read(&packed), Ok(longest));
@@ -434,8 +431,8 @@ mod tests {
     fn a_beacon_reads_back_as_itself() {
         let beacon = Beacon::new(7, version(), digest());
         assert_eq!(Beacon::read(&beacon.to_bytes()), Ok(beacon));
-        let commanded = beacon.commanded_restart(true);
-        assert_eq!(Beacon::read(&commanded.to_bytes()), Ok(commanded));
+        let flagged = beacon.restart_flag(true);
+        assert_eq!(Beacon::read(&flagged.to_bytes()), Ok(flagged));
     }
 
     #[test]

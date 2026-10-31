@@ -2099,6 +2099,12 @@ pub enum CommandStatus {
     /// count has gone back starts again. See
     /// [`crate::CommandType::always_taken`].
     Stale,
+    /// The command was not acted on, because this start of tcspecial has
+    /// not taken a CONNECT whose configuration checksum is the one it is
+    /// running since it started, or has taken a RESTART since: until then
+    /// the configurations at the two ends have not been matched, and only
+    /// the commands [`crate::CommandType::taken_unmatched`] names are taken.
+    Unmatched,
 }
 
 impl CommandStatus {

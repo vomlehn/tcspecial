@@ -387,7 +387,7 @@ class Heard:
     #: The beacon's own number, if it was a beacon this can read.
     sequence: int = None
     #: Whether it said a restart the ground commanded is under way.
-    commanded_restart: bool = False
+    restart_flag: bool = False
     #: What is wrong with the configuration it announces, if anything.
     differs: str = None
 
@@ -400,7 +400,7 @@ def _beacon_of(datagram):
 
     Returns:
         A dict of the beacon's ``sequence``, ``version`` and ``digest`` (as
-        text) and ``commanded_restart``, or ``None`` if the datagram is not a
+        text) and ``restart_flag``, or ``None`` if the datagram is not a
         beacon this can read.
     """
     try:
@@ -411,7 +411,7 @@ def _beacon_of(datagram):
         "sequence": beacon.sequence,
         "version": version_text(beacon.version),
         "digest": digest_text(beacon.digest),
-        "commanded_restart": beacon.commanded_restart,
+        "restart_flag": beacon.restart_flag,
     }
 
 
@@ -436,8 +436,8 @@ def hear(datagram, expected):
     return Heard(
         message=f"{why} -- {message}" if why else message,
         sequence=None if beacon is None else beacon["sequence"],
-        commanded_restart=(beacon is not None
-                           and beacon["commanded_restart"]),
+        restart_flag=(beacon is not None
+                           and beacon["restart_flag"]),
         differs=why,
     )
 
@@ -491,7 +491,7 @@ def message_of(datagram):
     beacon = _beacon_of(datagram)
     if beacon is not None:
         said = what_it_read(beacon["version"], beacon["digest"])
-        return (said + ", COMMANDED RESTART" if beacon["commanded_restart"]
+        return (said + ", COMMANDED RESTART" if beacon["restart_flag"]
                 else said)
     text = datagram.decode("utf-8", errors="replace")
     head = text[:40]
@@ -706,7 +706,7 @@ class Beacons:
                     f"arrive: #{now} came after #{last}"
                 )
             elif kind is Counted.RESTARTED:
-                remarks.append(restarted(now, heard.commanded_restart))
+                remarks.append(restarted(now, heard.restart_flag))
             # A repeat is the radio's, and says nothing new.
             self._count = now
 

@@ -22,6 +22,9 @@
 //!   their own so that a command never waits for the pass.
 //! * [`restart`] is what an armed RESTART does: tcspecial runs itself again,
 //!   keeping only the descriptors it was started with.
+//! * [`matched`] is whether the ground has matched this start's
+//!   configuration, which the beacons, the commands and every link to the
+//!   ground ask.
 //!
 //! The first two open nothing. They are the arithmetic of the graph, and they
 //! are separate from the moving of bytes on purpose: both can be tested
@@ -31,6 +34,7 @@
 pub mod command;
 pub mod fabric;
 pub mod frame;
+pub mod matched;
 pub mod node_state;
 pub mod port;
 pub mod restart;

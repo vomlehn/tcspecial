@@ -13,8 +13,10 @@ Work is under way on integrating TCSpecial, with its telemetry log
 [tcs-xtce](https://github.com/vomlehn/tcs-xtce), with NASA's core Flight System
 (cFS) and JPL's F´ (F Prime): see docs/third-party.rst.
 
-> **Note:** integration with cFS and F´ is a work in progress. None of it is
-> built yet, and the plan may change as it is.
+> **Note:** integration with cFS and F´ is a work in progress, and the plan
+> may change as it is. A vehicle can answer to an F´ flight computer through
+> the bridge component in fprime/ (`make fprime-test` tests it); none of the
+> cFS integration is built yet.
 
 # To Run
 

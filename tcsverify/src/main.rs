@@ -9,6 +9,7 @@
 //! tcsverify --interface-digest
 //! tcsverify --set-interface examples/*/*.ytcs examples/*/*.xtcs
 //! tcsverify --keep=/var/lib/tcspecial/configurations vehicle.ytcs
+//! tcsverify --fprime-model=fprime/Tcs/TcsBridge/model fprime.ytcs
 //! ```
 //!
 //! Prints one line per problem -- file, line, and what is wrong -- and exits
@@ -84,6 +85,18 @@ configuration.
                      Prints where it is kept. For first
                      provisioning and for testing: making the directory
                      read-only afterwards is the provisioner's
+  --fprime-model=<directory>
+                     with one configuration, and its payload simulator
+                     file if it has one: once it is checked and nothing is
+                     wrong with it, write the F´ model of the bridge at
+                     the far end of its one gateway_fprime node into
+                     <directory> -- TcsBridgeModel.fppi, the channels and
+                     constants the TcsBridge component includes, and
+                     TcsBridgeModel.cpp, which says which channel each
+                     source's data is written to -- and say which files
+                     were written. A file that already says what would be
+                     written is left alone. See \"F´: gateway_fprime\" in
+                     docs/design.rst
   --interface-digest print the digest of the interface this build speaks,
                      the 32 lower-case hex digits a configuration's
                      tcspecial section gives as its interface, and exit.
@@ -135,6 +148,10 @@ const SET_INTERFACE_FLAG: &str = "--set-interface";
 /// `tcslibgs::store`.
 const KEEP_FLAG: &str = "--keep=";
 
+/// Writes the F´ model of the configuration's bridge, once checked, into
+/// the directory given: see `tcsverify::fprime_model`.
+const FPRIME_MODEL_FLAG: &str = "--fprime-model=";
+
 /// Asks for the interface digest of this build, alone on the command line.
 ///
 /// A shape of its own, with nothing beside it: it is a fact about this
@@ -155,6 +172,7 @@ fn main() -> ExitCode {
     let mut limits = tcsverify::Limits::EVERYTHING;
     let mut digest = false;
     let mut keep: Option<PathBuf> = None;
+    let mut fprime_model: Option<PathBuf> = None;
     let mut built: Vec<&str> = tcslibgs::graph::built::OPTIONAL_TYPES.to_vec();
     let args: Vec<_> = std::env::args_os().skip(1).collect();
     if args.iter().any(|arg| arg == INTERFACE_DIGEST_FLAG) {
@@ -194,6 +212,17 @@ fn main() -> ExitCode {
             keep = Some(PathBuf::from(value));
             continue;
         }
+        if let Some(value) = said.strip_prefix(FPRIME_MODEL_FLAG) {
+            if value.is_empty() {
+                eprintln!(
+                    "tcsverify: {FPRIME_MODEL_FLAG} names the directory to \
+                     write the F´ model in, and names none\n\n{USAGE}"
+                );
+                return ExitCode::from(2);
+            }
+            fprime_model = Some(PathBuf::from(value));
+            continue;
+        }
         let asked = if let Some(value) = said.strip_prefix(ERROR_LIMIT_FLAG) {
             error_limit(value).map(|limit| limits.error_limit = limit)
         } else if let Some(value) = said.strip_prefix(WARNINGS_FLAG) {
@@ -218,6 +247,16 @@ fn main() -> ExitCode {
         eprintln!(
             "tcsverify: {KEEP_FLAG} keeps one configuration, given with its \
              payload simulator file or alone\n\n{USAGE}"
+        );
+        return ExitCode::from(2);
+    }
+    // A model is of one configuration's bridge, so it is made from one
+    // configuration and not from a pair of spellings of it.
+    if fprime_model.is_some() && !matches!(files.len(), 1 | 2) {
+        eprintln!(
+            "tcsverify: {FPRIME_MODEL_FLAG} writes the model of one \
+             configuration, given with its payload simulator file or \
+             alone\n\n{USAGE}"
         );
         return ExitCode::from(2);
     }
@@ -342,6 +381,48 @@ fn main() -> ExitCode {
             }
             Err(why) => {
                 eprintln!("tcsverify: not kept: {why}");
+                return ExitCode::from(1);
+            }
+        }
+    }
+
+    // Written only once nothing is wrong with it, as a configuration is
+    // kept: a bridge is built from a configuration the vehicle would load.
+    if let Some(dir) = fprime_model {
+        if report.found_errors() {
+            eprintln!(
+                "tcsverify: {} has errors, so no F´ model is written from it",
+                payload.display()
+            );
+            return ExitCode::from(1);
+        }
+        match tcsverify::fprime_model::write(payload, &dir) {
+            Ok((gateway, written)) => {
+                let said = if written.is_empty() {
+                    writeln!(
+                        out,
+                        "{}: the F´ model of {gateway} in {} says this \
+                         already",
+                        payload.display(),
+                        dir.display()
+                    )
+                } else {
+                    written.iter().try_for_each(|path| {
+                        writeln!(
+                            out,
+                            "{}: the F´ model of {gateway} written to {}",
+                            payload.display(),
+                            path.display()
+                        )
+                    })
+                };
+                if let Err(e) = said {
+                    eprintln!("tcsverify: cannot write what was written: {e}");
+                    return ExitCode::from(2);
+                }
+            }
+            Err(why) => {
+                eprintln!("tcsverify: no F´ model: {why}");
                 return ExitCode::from(1);
             }
         }

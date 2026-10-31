@@ -176,6 +176,12 @@ help:
 		"virtual CAN"
 	@echo "  make rmvcan      - Remove the virtual CAN buses"
 	@echo "  make rmstubs     - Remove every stand-in those made"
+	@echo "  make fprime-build - Build the F´ bridge and its test" \
+		"deployment, with F´'s tools"
+	@echo "  make fprime-test  - Build them and test the bridge against" \
+		"tcspecial and tcssim"
+	@echo "                     (FPRIME_SCRATCH, or FPRIME_FRAMEWORK and" \
+		"FPRIME_VENV: see fprime/Makefile)"
 	@echo "  make check       - cargo check, clippy, and a format check"
 	@echo "  make format      - Reformat the source"
 	@echo "  make release     - Build with optimizations"
@@ -1125,6 +1131,22 @@ check:
 	cd $(RUST) && cargo test -q -p $(PROJECT_NAME) --features visual \
 		--test visual
 	cd $(RUST) && cargo fmt -- --check
+
+# The F´ bridge, which F´'s own tools build rather than cargo: see
+# fprime/Makefile, which says where it looks for F´ and how to say
+# otherwise. Whatever is given here -- FPRIME_SCRATCH, FPRIME_FRAMEWORK,
+# FPRIME_VENV, FPRIME_CONFIG -- is passed on.
+.PHONY: fprime-build
+fprime-build:
+	$(MAKE) -C fprime build
+
+# Build the bridge and run its test: tcssim standing in for the fprime
+# example's payloads, tcspecial flying it, and F´'s ground system commanding
+# the bridge in an F´ deployment and reading its channels. tcssim's window
+# opens for the length of the test.
+.PHONY: fprime-test
+fprime-test:
+	$(MAKE) -C fprime test
 
 # Format code
 .PHONY: format

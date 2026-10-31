@@ -44,3 +44,13 @@ claude-resume
 # `pip install ./python` builds the distribution there.
 /python/build/
 /python/*.egg-info/
+
+# What the F´ bridge's build writes in fprime/: the settings that say where
+# the framework is, the model written from the configuration, F´'s build
+# cache and what it installs, and what a test run leaves. See fprime/Makefile.
+/fprime/settings.ini
+/fprime/settings.ini.new
+/fprime/Tcs/TcsBridge/model/
+/fprime/build-fprime-automatic-*/
+/fprime/build-artifacts/
+/fprime/build-test/

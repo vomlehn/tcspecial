@@ -48,6 +48,7 @@
 
 pub mod built;
 pub mod check;
+pub mod fprime;
 pub mod interface;
 pub mod mirror;
 pub mod order;

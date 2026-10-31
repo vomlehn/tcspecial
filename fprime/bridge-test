@@ -1,0 +1,112 @@
+#!/bin/bash
+#
+# bridge-test -- runs the F´ bridge against tcspecial and tcssim, and tests
+# it from F´'s own ground system.
+#
+#   FPRIME_BIN=<venv>/bin bridge-test <tree> <configuration> \
+#       <simulator file> <deployment> <run directory>
+#
+# <tree> is the tcspecial tree, whose target/debug holds tcssim and
+# tcspecial; <deployment> is where F´ installed BridgeTest, its bin/ and
+# dict/; <run directory> is where what the run leaves is kept, emptied
+# first. `make test` in fprime/ runs this with the right arguments.
+#
+# Started in the order a test harness starts a run (see "Waiting for the
+# Simulator" in docs/design.rst): tcssim, which is waited for until it has
+# made its stand-ins; tcspecial on the configuration, --simulate=all; and
+# F´'s ground system. Then pytest, with F´'s test API, starts BridgeTest,
+# which opens the same configuration and connects to the ground system, and
+# holds the bridge to what docs/design.rst asks of it: see BridgeTest/test.
+# Whatever was started is stopped however the run ends, so that nothing is
+# left holding the ports.
+
+set -eu
+
+if [ $# -ne 5 ] || [ -z "${FPRIME_BIN:-}" ]; then
+	echo "usage: FPRIME_BIN=<venv>/bin $0 <tree> <configuration>" \
+		"<simulator file> <deployment> <run directory>" >&2
+	exit 2
+fi
+top=$1
+configuration=$2
+sim=$3
+deployment=$4
+run=$5
+here=$(cd "$(dirname "$0")" && pwd)
+dictionary=$deployment/dict/BridgeTestTopologyDictionary.json
+
+# Where F´'s ground system listens for the deployment, which is its own
+# default, and how long each program has to come up.
+gds_port=50000
+patience=60
+
+# Where the ground system's processes and the tests meet: sockets in the run
+# directory rather than F´'s default, in /tmp, so that a run leaves nothing
+# outside it.
+zmq=("ipc://$run/zmq-in" "ipc://$run/zmq-out")
+
+rm -rf "$run"
+mkdir -p "$run"
+
+started=()
+
+# Starts a program in the background in a process group of its own, in a
+# directory, its output to a log: started so, it and whatever it starts --
+# F´'s ground system is several processes -- are stopped together.
+#
+#   start <directory> <log> <program> [argument...]
+start() {
+	local dir=$1 log=$2
+	shift 2
+	(cd "$dir" && exec setsid "$@" >"$log" 2>&1) &
+	started+=($!)
+}
+
+# Stops everything this run started, the last first, and waits for it.
+# Each group is told to stop and then, once its first process has gone,
+# killed: a process of F´'s ground system has been seen to outlive the rest
+# of its group, holding the port the next run binds.
+stop_all() {
+	local i pid
+	for ((i = ${#started[@]} - 1; i >= 0; i--)); do
+		kill -TERM -- "-${started[$i]}" 2>/dev/null || true
+	done
+	for pid in "${started[@]}"; do
+		wait "$pid" 2>/dev/null || true
+		kill -KILL -- "-$pid" 2>/dev/null || true
+	done
+}
+trap stop_all EXIT
+
+echo "tcssim, on $configuration..."
+export PAYLOAD_SIM_YAML=$sim
+# Every payload sending from the start, there being nobody at its window to
+# press its button.
+start "$run" "$run/tcssim.log" "$top/target/debug/tcssim" \
+	--simulate=all --sending "$configuration"
+"$top/target/debug/tcssim" --simulate=all --wait="$patience" \
+	"$configuration"
+
+echo "tcspecial, on $configuration..."
+start "$run" "$run/tcspecial.log" "$top/target/debug/tcspecial" \
+	--simulate=all "$configuration"
+
+# From BridgeTest/, whose fprime-gds.yml says how BridgeTest frames what it
+# sends, as the tests that read it there do.
+echo "F´'s ground system..."
+start "$here/BridgeTest" "$run/fprime-gds.log" "$FPRIME_BIN/fprime-gds" \
+	--no-app --gui none --dictionary "$dictionary" \
+	--ip-port "$gds_port" --logs "$run/gds-logs" \
+	--file-storage-directory "$run/files" --zmq-transport "${zmq[@]}"
+
+echo "The bridge's tests..."
+digest=$("$top/target/debug/tcsverify" --digest "$configuration" |
+	sed -n 's/.*: md5 //p')
+# BridgeTest is started by the tests, once they are listening: see
+# BridgeTest/test/conftest.py.
+(cd "$here/BridgeTest" && TCS_CONFIGURATION_DIGEST=$digest \
+	TCS_BRIDGE_DEPLOYMENT=$deployment/bin/BridgeTest \
+	TCS_CONFIGURATION=$configuration TCS_GDS_PORT=$gds_port TCS_RUN=$run \
+	"$FPRIME_BIN/pytest" -p no:cacheprovider -v test \
+	--dictionary "$dictionary" --logs "$run/test-logs" \
+	--zmq-transport "${zmq[@]}")

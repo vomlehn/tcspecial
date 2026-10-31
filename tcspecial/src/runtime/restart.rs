@@ -79,9 +79,18 @@ pub fn asked() -> bool {
 /// Runs tcspecial again, if a restart was asked for, and otherwise returns.
 ///
 /// Does not return when one was: the process becomes the new tcspecial, or
-/// says why it could not and exits.
+/// says why it could not and exits. Unless a stop was asked for as the
+/// restart was under way -- a SIGINT or a SIGTERM since the RESTART was
+/// taken -- when it returns, and the process stops: a vehicle somebody
+/// asked to stop must stop, and the restart is the one to give way. See
+/// [`crate::runtime::signals::before_exec`]. The state file already names
+/// the RESTART's target for the next start, which is what that start then
+/// loads, as a commanded one.
 pub fn if_asked() {
     if !asked() {
+        return;
+    }
+    if crate::runtime::signals::before_exec() {
         return;
     }
     let why = match STARTED.get() {

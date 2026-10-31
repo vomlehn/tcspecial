@@ -3118,6 +3118,26 @@ Requirement
     tells a restart from a gap: see `The beacon across a restart`_.
 
 Requirement
+    A stop asked for while a restart is under way -- a SIGINT or a SIGTERM
+    that arrives after the RESTART is taken and before the ``exec`` -- stops
+    the vehicle: it is not lost with the process image that took it, and the
+    vehicle does not restart instead. The state file already names the
+    RESTART's target for the next start, as a commanded one, so whatever
+    starts tcspecial next runs that target, as a restart would have.
+
+The two signals are blocked in every thread from the first moment of
+``main``, before any thread is made, and one thread of their own takes them
+with ``sigtimedwait`` (``runtime::signals``). A handler could not do it: it
+runs in whichever thread the kernel picks, and the flag it sets is in an
+image the ``exec`` is about to replace. Before the ``exec`` the restart ends
+that thread, so that nothing takes either signal from then on, and looks
+whether one was taken or is pending: if so the process stops rather than
+restarting. One that arrives after that look stays pending, blocked in every
+thread, is carried pending through the ``exec``, and is the first thing the
+new image's thread takes: before its loop is running, which ends the process
+at once, as an unhandled stop signal would. Either way the vehicle stops.
+
+Requirement
     Where that cannot be done -- neither directory could be read as the
     process started, or the ``exec`` fails -- tcspecial says why on its error
     output and exits. A restart that cannot keep what it was handed is not

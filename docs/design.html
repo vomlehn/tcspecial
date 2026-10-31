@@ -3437,6 +3437,26 @@ The process id stays the same, so a supervisor sees one process
 throughout, and the beacons start again at #1, which is how the ground
 tells a restart from a gap: see <a class="reference internal" href="#the-beacon-across-a-restart">The beacon across a restart</a>.</dd>
 <dt>Requirement</dt>
+<dd>A stop asked for while a restart is under way -- a SIGINT or a SIGTERM
+that arrives after the RESTART is taken and before the <tt class="docutils literal">exec</tt> -- stops
+the vehicle: it is not lost with the process image that took it, and the
+vehicle does not restart instead. The state file already names the
+RESTART's target for the next start, as a commanded one, so whatever
+starts tcspecial next runs that target, as a restart would have.</dd>
+</dl>
+<p>The two signals are blocked in every thread from the first moment of
+<tt class="docutils literal">main</tt>, before any thread is made, and one thread of their own takes them
+with <tt class="docutils literal">sigtimedwait</tt> (<tt class="docutils literal"><span class="pre">runtime::signals</span></tt>). A handler could not do it: it
+runs in whichever thread the kernel picks, and the flag it sets is in an
+image the <tt class="docutils literal">exec</tt> is about to replace. Before the <tt class="docutils literal">exec</tt> the restart ends
+that thread, so that nothing takes either signal from then on, and looks
+whether one was taken or is pending: if so the process stops rather than
+restarting. One that arrives after that look stays pending, blocked in every
+thread, is carried pending through the <tt class="docutils literal">exec</tt>, and is the first thing the
+new image's thread takes: before its loop is running, which ends the process
+at once, as an unhandled stop signal would. Either way the vehicle stops.</p>
+<dl class="docutils">
+<dt>Requirement</dt>
 <dd>Where that cannot be done -- neither directory could be read as the
 process started, or the <tt class="docutils literal">exec</tt> fails -- tcspecial says why on its error
 output and exits. A restart that cannot keep what it was handed is not

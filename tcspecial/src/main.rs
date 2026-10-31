@@ -40,6 +40,12 @@ fn main() {
     // process was started with and nothing it opened itself.
     runtime::restart::note_how_started();
 
+    // And before any thread is made, so that every thread inherits the
+    // block on SIGINT and SIGTERM and one thread of their own takes them: a
+    // stop that arrives as a RESTART is under way is then not lost. See
+    // `runtime::signals`.
+    runtime::signals::start(runtime::start::stop_as_signalled);
+
     // What this build contains, asked of the binary rather than recalled
     // from how it was built: on stdout, because it is the answer, and nothing
     // else is done. Before anything is read, so that it can be asked of a

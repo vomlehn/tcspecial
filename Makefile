@@ -417,7 +417,7 @@ SHIPPED_CONFIGURATIONS = example.yaml example.xml \
 	$(wildcard examples/*/*.xml)
 
 # Write this build's interface digest into every shipped configuration, in
-# place and changing nothing else, after tcslibgs/xtce/link.xml changes:
+# place and changing nothing else, after tcslibgs/xtce/link.xtce changes:
 # tcsverify --set-interface, which says what it changed. A test in
 # tcsverify/tests/examples.rs fails while one is stale.
 .PHONY: set-interfaces
@@ -883,6 +883,13 @@ install-tcspecial: tcs-helpers
 # The Python is installed by pip into a directory of its own, without
 # compiling it, so that the path names no Python version and any python3 can
 # read it; the .pth hook is what puts that directory on python3's path.
+# pip is given a copy of python/ made for the purpose, with the links in it
+# followed: setuptools builds in the directory it is given and keeps what
+# it built there, so a file renamed or removed in the tree would otherwise
+# go on being installed from python/build, and a build left in the tree by
+# `sudo make install-files` would be root's. The direct_url.json pip
+# writes names that copy, which is gone by then, so it is removed, with its
+# line in RECORD.
 .PHONY: install-tcspecial-ground
 install-tcspecial-ground: install-data tcs-helpers tcs-xtce
 	@echo "Installing tcspecial-ground under $(DESTDIR)$(PREFIX)..."
@@ -901,9 +908,19 @@ install-tcspecial-ground: install-data tcs-helpers tcs-xtce
 	$(call install_links,tcspecial-ground,$(GROUND_BIN))
 	$(SUBST) packaging/tcs.pc.in > $(DESTDIR)$(LIBDIR)/pkgconfig/tcs.pc
 	chmod 644 $(DESTDIR)$(LIBDIR)/pkgconfig/tcs.pc
+	set -e; \
+	tmp=$$(mktemp -d -t tcspecial-py.XXXXXXXXXX); \
+	trap 'rm -rf "$$tmp"' EXIT; \
+	cp -RL python "$$tmp/"; \
+	rm -rf "$$tmp/python/build" "$$tmp"/python/*.egg-info; \
+	find "$$tmp" -name __pycache__ -type d -prune -exec rm -rf {} +; \
 	python3 -m pip install --quiet --upgrade --no-deps \
 		--no-build-isolation --no-compile \
-		--target $(DESTDIR)$(PYTHONDIR) ./python
+		--target $(DESTDIR)$(PYTHONDIR) "$$tmp/python"; \
+	dist=$$(echo $(DESTDIR)$(PYTHONDIR)/tcspecial_ground-*.dist-info); \
+	rm -f "$$dist/direct_url.json"; \
+	sed -i '/^tcspecial_ground-[^/]*\.dist-info\/direct_url\.json,/d' \
+		"$$dist/RECORD"
 	install -d -m 755 $(DESTDIR)$(DOCDIR)/tcspecial-ground/tcslib-c \
 		$(DESTDIR)$(DOCDIR)/tcspecial-ground/python
 	install -m 644 README.md LICENSE-APACHE LICENSE-MIT \

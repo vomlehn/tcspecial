@@ -7,9 +7,9 @@
 //! station in any of them can compare its copy with what the vehicle speaks.
 //!
 //! The vehicle says which interface it speaks in every beacon, from
-//! [`InterfaceDigest::of_this_build`]: the digest of `tcslibgs/xtce/link.xml`
+//! [`InterfaceDigest::of_this_build`]: the digest of `tcslibgs/xtce/link.xtce`
 //! this build was generated from, which states every command but the three
-//! fixed ones. The fixed commands are in `tcslibgs/xtce/fixed.xml`, which is
+//! fixed ones. The fixed commands are in `tcslibgs/xtce/fixed.xtce`, which is
 //! not part of the interface: no change to the interface can touch them. A
 //! configuration names the interface it was written for as the `tcspecial`
 //! section's `interface`, and every program refuses one that is not its
@@ -156,14 +156,14 @@ mod tests {
     use super::*;
 
     /// Lists the documents this build's interface is stated in:
-    /// `tcslibgs/xtce/link.xml`, as `make interface-digest` takes it. Not
-    /// `fixed.xml`, which no change to the interface may touch.
+    /// `tcslibgs/xtce/link.xtce`, as `make interface-digest` takes it. Not
+    /// `fixed.xtce`, which no change to the interface may touch.
     ///
     /// # Returns
     ///
     /// Their paths.
     fn documents() -> Vec<std::path::PathBuf> {
-        vec![Path::new(env!("CARGO_MANIFEST_DIR")).join("xtce/link.xml")]
+        vec![Path::new(env!("CARGO_MANIFEST_DIR")).join("xtce/link.xtce")]
     }
 
     /// The constant is the digest of the documents as they are now, so a
@@ -174,7 +174,7 @@ mod tests {
         assert_eq!(
             InterfaceDigest::of_files(&documents()).expect("they read"),
             InterfaceDigest::of_this_build(),
-            "tcslibgs/xtce/link.xml has changed: run `make interface-digest` \
+            "tcslibgs/xtce/link.xtce has changed: run `make interface-digest` \
              in tcslibgs/ and commit what it writes, and give every \
              configuration the new digest as its interface"
         );
@@ -201,10 +201,10 @@ mod tests {
 
     #[test]
     fn documents_that_cannot_be_read_say_which() {
-        let why = InterfaceDigest::of_files(&["/nonexistent/fallback.xml"])
+        let why = InterfaceDigest::of_files(&["/nonexistent/fallback.xtce"])
             .expect_err("there is no such file");
         assert!(
-            why.to_string().contains("/nonexistent/fallback.xml"),
+            why.to_string().contains("/nonexistent/fallback.xtce"),
             "{why}"
         );
     }

@@ -13,15 +13,15 @@ from pathlib import Path
 # is published: see _xtce/__init__.py.
 from ._xtce import digest as _digest
 
-#: Where this tree's interface is stated: ``link.xml``, as ``make
-#: interface-digest`` in tcslibgs/ takes it. ``fixed.xml`` beside it holds the
+#: Where this tree's interface is stated: ``link.xtce``, as ``make
+#: interface-digest`` in tcslibgs/ takes it. ``fixed.xtce`` beside it holds the
 #: three fixed commands, which are not part of the interface: no change to the
 #: interface can touch them. Beside this module rather than found in the
 #: source tree, so that an installed package has them too: ``xtce`` here is a
 #: link to the crate's ``tcslibgs/xtce``, which is the one copy, and installing
 #: the package copies what it links to.
 DOCUMENTS = Path(__file__).resolve().parent / "xtce"
-INTERFACE = (DOCUMENTS / "link.xml",)
+INTERFACE = (DOCUMENTS / "link.xtce",)
 
 
 def of_files(paths):
@@ -85,7 +85,7 @@ def of_configuration(said):
     if named != ours:
         raise ValueError(
             f"interface is {said}, and this build speaks interface "
-            f"{ours.hex()}, the digest of the tcslibgs/xtce/link.xml it was "
+            f"{ours.hex()}, the digest of the tcslibgs/xtce/link.xtce it was "
             f"built from: fly this configuration with a build of interface "
             f"{said}, or, once its commands have been checked against this "
             f'build\'s, write interface: "{ours.hex()}"'

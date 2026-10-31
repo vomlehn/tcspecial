@@ -13,7 +13,7 @@ read strictly, as the Rust reads it. A beacon carries no check of its own:
 the transport under it checks it, as UDP's checksum does here.
 
 Its layout -- six text fields, each but the last ended by a colon, the last
-32 characters that end the datagram -- is in ``tcslibgs/xtce/fixed.xml``
+32 characters that end the datagram -- is in ``tcslibgs/xtce/fixed.xtce``
 beside the three fixed commands, and is packed and unpacked here by the code
 tcs-xtce generates from it, :class:`tcslibgs.fixed_packet.Beacon`. What the
 text must say, and turning it into numbers and digests and back, is here.

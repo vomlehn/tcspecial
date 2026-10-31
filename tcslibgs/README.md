@@ -29,27 +29,27 @@ the editor is the one the vehicle would have refused the file with.
 - `commands`, `telemetry`, `protocol`: the command and telemetry protocol.
 - `link`: the commands and their answers, with no header: an opcode, a
   sequence and what each carries. The three fixed commands -- CONNECT,
-  RESTART_ARM and RESTART -- are described in XTCE in `xtce/fixed.xml`,
-  which never changes, and every other command in `xtce/link.xml`. The
+  RESTART_ARM and RESTART -- are described in XTCE in `xtce/fixed.xtce`,
+  which never changes, and every other command in `xtce/link.xtce`. The
   code that packs and unpacks them, `src/fixed_packet.rs` and
   `src/link_packet.rs`, is generated from those files, and the Python
-  `../python/tcslibgs/fixed_packet.py` from `fixed.xml`: run `make
-  link-packet` here after changing `link.xml`, and `make interface-digest`.
-  A test pins `fixed.xml`'s digest, and fails, saying it must never change,
+  `../python/tcslibgs/fixed_packet.py` from `fixed.xtce`: run `make
+  link-packet` here after changing `link.xtce`, and `make interface-digest`.
+  A test pins `fixed.xtce`'s digest, and fails, saying it must never change,
   if it does.
 - `beacon`: the beacon, a line of text with six fields between colons,
   `tcspecial:1.2.3:<md5>:42:normal:<interface>`, at most 106 bytes, so that
   a person can read it in a capture or a log with no decoder. Its layout is
-  in `xtce/fixed.xml` beside the fixed commands, as text fields, packed and
+  in `xtce/fixed.xtce` beside the fixed commands, as text fields, packed and
   unpacked by the generated code; what each field says is checked here and
   in `../python/tcslibgs/beacon.py`, held to each other by the same examples
   in their tests.
-- `interface`: the digest of `xtce/link.xml`, which every beacon carries,
+- `interface`: the digest of `xtce/link.xtce`, which every beacon carries,
   and which every configuration names as its `tcspecial` section's
   `interface`, so that a configuration written for another interface is
   refused by every program. `tcsverify --interface-digest` prints it. `make
   interface-digest` here regenerates `src/interface_digest.rs` after
-  `link.xml` changes; every configuration is then given the new digest.
+  `link.xtce` changes; every configuration is then given the new digest.
 - `crc`: the CCSDS CRC-16, for what is kept on storage rather than carried
   by a transport that checks it, such as tcspecial's state file.
 - `config_digest`: the digest of a configuration, which both ends report, so

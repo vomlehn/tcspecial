@@ -173,7 +173,7 @@ impl CommandType {
     /// They are also the three *fixed* commands, and for the same reason:
     /// taken whatever either end is running, their layouts can never
     /// change, and they are stated apart from every other command, in
-    /// `xtce/fixed.xml`, with opcodes from [`FIXED_OPCODES`]. See "The three
+    /// `xtce/fixed.xtce`, with opcodes from [`FIXED_OPCODES`]. See "The three
     /// fixed commands" in `docs/design.rst`.
     ///
     /// # Returns
@@ -196,8 +196,8 @@ impl CommandType {
     }
 
     /// Gives the opcode a command of this kind carries, which its answer
-    /// carries back. What goes on the link is stated in `xtce/fixed.xml` for
-    /// the three fixed commands and in `xtce/link.xml` for the rest, and a
+    /// carries back. What goes on the link is stated in `xtce/fixed.xtce` for
+    /// the three fixed commands and in `xtce/link.xtce` for the rest, and a
     /// test in [`crate::link`] holds this to them, so the two cannot come to
     /// differ.
     ///
@@ -490,7 +490,7 @@ impl NodeCommand {
 /// Both are held in room of a fixed size, [`ATTRIBUTE_BYTES`] and
 /// [`VALUE_BYTES`], so that the vehicle reads one without allocating. On the
 /// link the attribute is a byte of length and its text, and the value two
-/// bytes of length and its bytes: see `xtce/link.xml`.
+/// bytes of length and its bytes: see `xtce/link.xtce`.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct SetNodeCommand {
     pub header: CommandHeader,

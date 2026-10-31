@@ -3,7 +3,7 @@
 //! Telemetry is sent from space to ground.
 //!
 //! These are the answers to commands, which go on the link as the packets
-//! `xtce/fixed.xml` and `xtce/link.xml` state: see [`crate::link`]. The beacon, which answers
+//! `xtce/fixed.xtce` and `xtce/link.xtce` state: see [`crate::link`]. The beacon, which answers
 //! nothing and has a layout of its own, is in [`crate::beacon`].
 
 use crate::config_digest::{ConfigDigest, ConfigVersion};

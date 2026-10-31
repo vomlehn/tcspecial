@@ -40,4 +40,4 @@ packages = ["tcslibgs", "tcslibgs._xtce", "tcslib", "tcsui"]
 [tool.setuptools.package-data]
 # The XTCE documents the interface digest is taken over: see
 # tcslibgs/interface.py.
-tcslibgs = ["xtce/*.xml"]
+tcslibgs = ["xtce/*.xtce"]

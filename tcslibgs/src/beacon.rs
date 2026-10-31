@@ -25,7 +25,7 @@
 //!
 //! Its layout -- six text fields, each but the last ended by a colon, the
 //! last 32 characters that end the datagram -- is stated in XTCE in
-//! `xtce/fixed.xml`, beside the three fixed commands, and packed and
+//! `xtce/fixed.xtce`, beside the three fixed commands, and packed and
 //! unpacked by the code tcs-xtce generates from it, which allocates
 //! nothing. What the text must say -- the name, digits only, lower-case hex
 //! -- and turning it into numbers and digests and back, is here, and in

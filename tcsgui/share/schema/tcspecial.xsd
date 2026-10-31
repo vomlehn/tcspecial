@@ -350,7 +350,7 @@
         </xs:simpleType>
       </xs:element>
       <!-- The interface the configuration was written for: the digest of
-           the tcslibgs/xtce/link.xml its commands are laid out by, as 32
+           the tcslibgs/xtce/link.xtce its commands are laid out by, as 32
            lower-case hex digits, which tcsverify prints when asked with
            its interface-digest option. Required, and refused unless it is
            the build's own. -->

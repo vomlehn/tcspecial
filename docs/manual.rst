@@ -398,7 +398,7 @@ extension not an error but a file parsed as the wrong language. Nothing was
 written in it that was not also written in YAML.
 
 (The command link carries packets stated in XTCE: the three fixed commands
-in ``tcslibgs/xtce/fixed.xml`` and the rest in ``tcslibgs/xtce/link.xml``.
+in ``tcslibgs/xtce/fixed.xtce`` and the rest in ``tcslibgs/xtce/link.xtce``.
 Those are not configuration files and are unaffected; a configuration names
 the second, as its ``interface``: see `Which interface it is written for`_.)
 
@@ -2159,7 +2159,7 @@ digest, also as 32 hex digits:
 
 It is text so that it can be read as it is, in a packet capture, a log or
 with any UDP listener, with nothing to decode it. Its layout is stated in
-XTCE, in ``tcslibgs/xtce/fixed.xml`` beside the three commands that always
+XTCE, in ``tcslibgs/xtce/fixed.xtce`` beside the three commands that always
 go, as six text fields -- each but the last ended by its colon -- and
 nothing else, so a ground system that reads XTCE can read it too. That is what goes on the
 wire; what the window shows on its ``Last msg:`` line is written for the
@@ -3447,7 +3447,7 @@ for, and every configuration states it:
    tcspecial:
      interface: "ad9aac4dd5a6d88dd5e78824ba8a83ac"
 
-It is the digest of the ``tcslibgs/xtce/link.xml`` a build was made from --
+It is the digest of the ``tcslibgs/xtce/link.xtce`` a build was made from --
 the layouts of every command but CONNECT, RESTART_ARM and RESTART -- as 32
 lower-case hex digits. A build speaks only the interface it was made from, so
 tcsverify, tcspecial, tcsmoc and the libraries all refuse a configuration
@@ -3477,7 +3477,7 @@ configuration to the build that is to fly it:
 It changes that one value -- or adds the attribute where the section has
 none -- and leaves every other byte of the file as it was, comments and
 layout included; a file that is right already is not written. After a
-change to ``tcslibgs/xtce/link.xml``, ``make set-interfaces`` does it to
+change to ``tcslibgs/xtce/link.xtce``, ``make set-interfaces`` does it to
 every configuration shipped in the tree. The
 configuration's checksum covers ``interface``, so a vehicle and a ground
 station whose checksums match are reading the same interface as well.

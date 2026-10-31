@@ -295,6 +295,181 @@ fn may_command_nodes(agreed: &Agreed) -> bool {
     matches!(agreed.lock().as_deref(), Ok(Some(true)))
 }
 
+/// The heading of the pop-up a command refused unmatched is said in.
+///
+/// One wording for every command, as `NOT_CONNECTED` is, because the reason
+/// is the same whichever was pressed; what follows it is the client's own
+/// refusal, `TcsError::Unmatched`, so that the window and the library say one
+/// thing.
+const UNMATCHED_HEADING: &str = "Not sent: the match between the ground's \
+                                 and the vehicle's configurations is still \
+                                 in progress";
+
+/// The heading of the pop-up a restart pressed before a CONNECT has been
+/// answered asks in.
+const UNANSWERED_HEADING: &str = "No CONNECT has been answered yet";
+
+/// Names the two checksums the operator is to compare, where the window
+/// knows them: the one the vehicle's last beacon carried, and this
+/// station's.
+///
+/// # Arguments
+///
+/// * `ui`   - The window, which keeps the beacon's.
+/// * `ours` - This station's configuration's checksum, where it has one.
+///
+/// # Returns
+///
+/// A sentence to follow what a pop-up says, with a space before it, or
+/// nothing where neither is known.
+fn checksums_said(
+    ui: &MainWindow,
+    ours: Option<tcslibgs::ConfigDigest>,
+) -> String {
+    let theirs = ui.get_beacon_checksum();
+    match (theirs.is_empty(), ours) {
+        (false, Some(ours)) => format!(
+            " The vehicle's beacon carries md5 {theirs}; this station's \
+             configuration is md5 {ours}."
+        ),
+        (false, None) => format!(
+            " The vehicle's beacon carries md5 {theirs}; this station's \
+             configuration has no checksum."
+        ),
+        (true, Some(ours)) => format!(
+            " No beacon has been heard yet; this station's configuration is \
+             md5 {ours}."
+        ),
+        (true, None) => String::new(),
+    }
+}
+
+/// Puts a notice in front of the panels: see `NoticePanel` in main.slint.
+///
+/// # Arguments
+///
+/// * `ui`      - The window.
+/// * `heading` - What it is about.
+/// * `message` - What it says.
+/// * `asks`    - Whether it asks, with Go on and Cancel, rather than tells.
+fn show_notice(ui: &MainWindow, heading: &str, message: &str, asks: bool) {
+    ui.set_notice_heading(SharedString::from(heading));
+    ui.set_notice_message(SharedString::from(message));
+    ui.set_notice_asks(asks);
+    ui.set_notice_up(true);
+}
+
+/// Refuses a command pressed while this station is not matched for
+/// commanding, in a pop-up, and says whether it did.
+///
+/// Asked of the link's client, whose rule it is -- every command but
+/// CONNECT, RESTART_ARM and RESTART waits for the match -- so that the
+/// window cannot come to think otherwise than the client that would refuse
+/// it. A link that is down refuses nothing here: what to press then is
+/// Connect, which `NOT_CONNECTED` says where the command would have gone.
+/// What the pop-up says goes in Last Response too, the record of what the
+/// last press came to.
+///
+/// # Arguments
+///
+/// * `ui`   - The window.
+/// * `link` - The link the command would go on.
+/// * `kind` - What kind of command was pressed.
+///
+/// # Returns
+///
+/// True where the command is refused and nothing is to be sent.
+///
+/// # Panics
+///
+/// If the lock on the link is poisoned.
+fn refused_unmatched(
+    ui: &MainWindow,
+    link: &Mutex<CiLink>,
+    kind: tcslibgs::CommandType,
+) -> bool {
+    let refused = {
+        let mut guard = link.lock().unwrap();
+        let ours = guard.matched().ours();
+        guard
+            .client()
+            .and_then(|client| client.may_go(kind).err())
+            .map(|e| (e, ours))
+    };
+    let Some((e, ours)) = refused else {
+        return false;
+    };
+    let said = format!("{e}.{}", checksums_said(ui, ours));
+    eprintln!("{UNMATCHED_HEADING}: {said}");
+    ui.set_last_response(SharedString::from(e.to_string()));
+    show_notice(ui, UNMATCHED_HEADING, &said, false);
+    true
+}
+
+/// Asks before ARM Restart or Initiate restart goes where no CONNECT has
+/// been answered on this link, and says whether it asked.
+///
+/// They go unmatched, being how a vehicle that will not match is rescued,
+/// so they are not refused. But until a CONNECT is answered nothing but the
+/// beacon says which configuration the vehicle runs, and a restart is
+/// usually wanted once that is known: the operator is asked to go on or
+/// cancel. What Go on is to send is left in `pending`. A link that is down
+/// asks nothing, the press then coming to `NOT_CONNECTED` as any other.
+///
+/// # Arguments
+///
+/// * `ui`      - The window.
+/// * `link`    - The link the command would go on.
+/// * `agreed`  - What the last CONNECT's answer said, `None` for none.
+/// * `action`  - Which of the two was pressed.
+/// * `pending` - Where the press waits for Go on.
+///
+/// # Returns
+///
+/// True where the operator was asked, and nothing is to be sent yet.
+///
+/// # Panics
+///
+/// If the lock on the link is poisoned.
+fn advise_before_restart(
+    ui: &MainWindow,
+    link: &Mutex<CiLink>,
+    agreed: &Agreed,
+    action: MenuAction,
+    pending: &Pending,
+) -> bool {
+    let (up, ours) = {
+        let mut guard = link.lock().unwrap();
+        let ours = guard.matched().ours();
+        (guard.client().is_some(), ours)
+    };
+    let answered = !matches!(agreed.lock().as_deref(), Ok(None));
+    if !up || answered {
+        return false;
+    }
+    let what = match action {
+        MenuAction::ArmRestart => "ARM Restart",
+        _ => "Initiate restart",
+    };
+    let said = format!(
+        "{what} is about to go before a CONNECT of this station's has been \
+         answered, so nothing but the beacon says which configuration the \
+         vehicle is running.{} A restart is usually sent once Connect has \
+         said so; a vehicle that will not match is the reason to send one \
+         without. Go on sends {what} as it is; Cancel sends nothing.",
+        checksums_said(ui, ours)
+    );
+    *pending.borrow_mut() = Some(action);
+    show_notice(ui, UNANSWERED_HEADING, &said, true);
+    true
+}
+
+/// A restart pressed and waiting for the operator's Go on, or nothing.
+type Pending = Rc<std::cell::RefCell<Option<MenuAction>>>;
+
+/// What sends ARM Restart or Initiate restart, at the press or at Go on.
+type SendRestart = Rc<dyn Fn(&MainWindow, MenuAction)>;
+
 /// Which attributes of each node the configuration lets the ground set.
 ///
 /// From the `commands` section, in the order it is written: `{ from: gateway,
@@ -685,6 +860,9 @@ fn query_every_node(
     agreed: &Agreed,
     model: &impl Model<Data = DHInfo>,
 ) {
+    if refused_unmatched(ui, link, tcslibgs::CommandType::QueryNode) {
+        return;
+    }
     ask_nodes(ui, link, agreed, model, None);
 }
 
@@ -949,6 +1127,9 @@ fn set_a_nodes_attribute(
         return;
     }
 
+    if refused_unmatched(ui, link, tcslibgs::CommandType::SetNode) {
+        return;
+    }
     if !may_command_nodes(agreed) {
         ui.set_last_response(SharedString::from(NOT_AGREED));
         return;
@@ -1048,6 +1229,14 @@ fn command_a_node(
     let name = info.name.to_string();
     let verb = if enable { "START_NODE" } else { "STOP_NODE" };
 
+    let kind = if enable {
+        tcslibgs::CommandType::StartNode
+    } else {
+        tcslibgs::CommandType::StopNode
+    };
+    if refused_unmatched(ui, link, kind) {
+        return;
+    }
     if !may_command_nodes(agreed) {
         ui.set_last_response(SharedString::from(NOT_AGREED));
         return;
@@ -1222,6 +1411,9 @@ pub(crate) fn command_buttons(
         let link = link.clone();
         ui.on_ping_clicked(move || {
             let ui = weak.unwrap();
+            if refused_unmatched(&ui, &link, tcslibgs::CommandType::Ping) {
+                return;
+            }
             let answer =
                 link.lock().unwrap().client().map(|client| client.ping());
             let said = match answer {
@@ -1278,34 +1470,12 @@ pub(crate) fn command_buttons(
                 }
             });
         }
-        ui.on_menu_action(move |action| {
-            let Some(ui) = weak.upgrade() else {
-                return;
-            };
-            match action {
-                // The two the menu can do something about. Each is the same
-                // command the button beside it sends, by the same function:
-                // one place decides what a press means.
-                MenuAction::Query => {
-                    query_every_node(&ui, &link, &agreed, &model)
-                }
-                MenuAction::Ping => {
-                    let answer = link
-                        .lock()
-                        .unwrap()
-                        .client()
-                        .map(|client| client.ping());
-                    ui.set_last_response(SharedString::from(match answer {
-                        Some(Ok(tm)) => {
-                            format!(
-                                "PING OK at {}",
-                                tm.header.timestamp.time_of_day()
-                            )
-                        }
-                        Some(Err(e)) => format!("PING failed: {e}"),
-                        None => crate::ci_link::NOT_CONNECTED.to_string(),
-                    }));
-                }
+        // ARM Restart and Initiate restart as they are sent, at the press or
+        // at Go on in the advisory asked before it: one place for what each
+        // sends.
+        let send_restart: SendRestart = {
+            let link = link.clone();
+            Rc::new(move |ui: &MainWindow, action| match action {
                 // Onto the restart target: this window's configuration
                 // unless the operator named another. What it comes to is
                 // said with the answer, and kept as the arm's, so that the
@@ -1324,11 +1494,10 @@ pub(crate) fn command_buttons(
                             return;
                         }
                     };
-                    let answer = link
-                        .lock()
-                        .unwrap()
-                        .client()
-                        .map(|client| client.restart_arm(key, target.digest));
+                    let answer =
+                        link.lock().unwrap().client().map(|client| {
+                            client.restart_arm(key, target.digest)
+                        });
                     let onto = target.said();
                     // Armed only by a success: a refused arm, or one whose
                     // answer never came, is one the restart cannot count on.
@@ -1415,6 +1584,83 @@ pub(crate) fn command_buttons(
                         ),
                         None => crate::ci_link::NOT_CONNECTED.to_string(),
                     }));
+                }
+                // Nothing else is handed here: the menu sends the rest
+                // itself.
+                _ => {}
+            })
+        };
+        // What the advisory's Go on is to send, and the two answers to it.
+        // The error pop-up has nothing waiting, and its OK is Cancel.
+        let pending: Pending = Rc::new(std::cell::RefCell::new(None));
+        {
+            let weak = ui.as_weak();
+            let pending = pending.clone();
+            let send_restart = send_restart.clone();
+            ui.on_notice_go_on(move || {
+                let Some(ui) = weak.upgrade() else {
+                    return;
+                };
+                ui.set_notice_up(false);
+                if let Some(action) = pending.borrow_mut().take() {
+                    send_restart(&ui, action);
+                }
+            });
+        }
+        {
+            let weak = ui.as_weak();
+            let pending = pending.clone();
+            ui.on_notice_cancel(move || {
+                *pending.borrow_mut() = None;
+                if let Some(ui) = weak.upgrade() {
+                    ui.set_notice_up(false);
+                }
+            });
+        }
+        ui.on_menu_action(move |action| {
+            let Some(ui) = weak.upgrade() else {
+                return;
+            };
+            match action {
+                // The two the menu can do something about. Each is the same
+                // command the button beside it sends, by the same function:
+                // one place decides what a press means.
+                MenuAction::Query => {
+                    query_every_node(&ui, &link, &agreed, &model)
+                }
+                MenuAction::Ping => {
+                    if refused_unmatched(
+                        &ui,
+                        &link,
+                        tcslibgs::CommandType::Ping,
+                    ) {
+                        return;
+                    }
+                    let answer = link
+                        .lock()
+                        .unwrap()
+                        .client()
+                        .map(|client| client.ping());
+                    ui.set_last_response(SharedString::from(match answer {
+                        Some(Ok(tm)) => {
+                            format!(
+                                "PING OK at {}",
+                                tm.header.timestamp.time_of_day()
+                            )
+                        }
+                        Some(Err(e)) => format!("PING failed: {e}"),
+                        None => crate::ci_link::NOT_CONNECTED.to_string(),
+                    }));
+                }
+                // The two that go unmatched, and are asked about first
+                // where no CONNECT has been answered: see
+                // `advise_before_restart`.
+                MenuAction::ArmRestart | MenuAction::Restart => {
+                    if !advise_before_restart(
+                        &ui, &link, &agreed, action, &pending,
+                    ) {
+                        send_restart(&ui, action);
+                    }
                 }
                 // The rest are not answered: the three DH items name a data
                 // handler where a graph has nodes -- which the panels'
@@ -2545,6 +2791,176 @@ pub(crate) mod tests {
             vec![("arm", other), ("restart", other)],
             "both onto the target, and nothing sent while it differed"
         );
+    }
+
+    /// Pressed while this window is not matched for commanding, a command
+    /// other than the three is refused unsent in an error pop-up naming the
+    /// beacon's checksum and this window's; ARM Restart pressed before a
+    /// CONNECT has been answered asks first, and sends nothing on Cancel and
+    /// the arm on Go on.
+    ///
+    /// The link is brought up without a Connect, which leaves it as a
+    /// CONNECT that went unanswered does: up, with nothing agreed. No beacon
+    /// is handed to the match, so the window is matched for nothing.
+    ///
+    /// Not a test of its own, for the reason
+    /// [`pressing_connect_and_enable_commands_the_vehicle`] is not: called
+    /// from `crate::tests::every_panels_data_is_inside_the_window`.
+    pub(crate) fn a_command_pressed_unmatched_is_said_in_a_pop_up() {
+        use i_slint_backend_testing::ElementQuery;
+        use std::net::UdpSocket;
+        use tcslibgs::{Command, CommandType, ConfigDigest, HostPort};
+
+        let ours = ConfigDigest([0x5Au8; 16]);
+        let theirs = ConfigDigest([0x11u8; 16]);
+
+        // A stand-in that answers what it is sent and lists it: nothing
+        // but the one arm is to reach it.
+        let vehicle = UdpSocket::bind("127.0.0.1:0").expect("a stub socket");
+        vehicle
+            .set_read_timeout(Some(std::time::Duration::from_secs(2)))
+            .expect("a timeout");
+        let at = vehicle.local_addr().expect("where it is").to_string();
+        let asked = std::thread::spawn(move || {
+            let mut buffer = [0u8; 256];
+            let mut seen = Vec::new();
+            while let Ok((size, from)) = vehicle.recv_from(&mut buffer) {
+                let command =
+                    Command::read(&buffer[..size]).expect("a command");
+                seen.push(command.cmd_type());
+                let answer = tcslibgs::answer_to(
+                    &command,
+                    tcslibgs::CommandStatus::Success,
+                );
+                vehicle
+                    .send_to(&answer.to_bytes(), from)
+                    .expect("an answer");
+            }
+            seen
+        });
+
+        let ui = MainWindow::new().expect("a window");
+        ui.window().set_size(slint::LogicalSize::new(900.0, 700.0));
+        ui.show().expect("shown");
+        let graph = example("simple-app");
+        let links = telemetry::of(&graph).expect("its links");
+        let model: Rc<VecModel<DHInfo>> =
+            Rc::new(VecModel::from(panels(&links, &settable_of(&graph))));
+        ui.set_dh_model(ModelRc::from(model.clone()));
+        let here = |port| HostPort {
+            address: "127.0.0.1".to_string(),
+            port,
+        };
+        let link = Arc::new(Mutex::new(CiLink::down_commanding(
+            "127.0.0.1:0",
+            Commanded {
+                from: here(0),
+                to: here(vehicle_port(&at)),
+            },
+            Matched::for_configuration(ours),
+        )));
+        let agreed: Agreed = Arc::new(Mutex::new(None));
+        let declined = declined_for(model.row_count());
+        let contact = Arc::new(Mutex::new(tcslib::beacon::Contact::Lost));
+        command_buttons(
+            &ui,
+            &link,
+            &agreed,
+            Some(ours),
+            &model,
+            &declined,
+            &contact,
+        );
+        link.lock()
+            .unwrap()
+            .connect(&at)
+            .expect("the link comes up");
+        ui.set_ci_status(SharedString::from(CONNECTED_STATUS));
+        ui.set_beacon_checksum(SharedString::from(theirs.to_string()));
+
+        // A button in the pop-up, pressed as the operator would.
+        let press = |label: &'static str| {
+            ElementQuery::from_root(&ui)
+                .match_inherits("NoticePanel")
+                .match_descendants()
+                .match_predicate(move |e| {
+                    e.accessible_label().as_deref() == Some(label)
+                })
+                .find_first()
+                .unwrap_or_else(|| panic!("the pop-up has {label}"))
+                .invoke_accessible_default_action();
+        };
+
+        // PING, from the button and from the menu, and a panel's Enable:
+        // each an error pop-up, with OK, naming both checksums.
+        for pressed in ["Ping", "menu Ping", "Enable"] {
+            match pressed {
+                "Ping" => ui.invoke_ping_clicked(),
+                "menu Ping" => ui.invoke_menu_action(MenuAction::Ping),
+                _ => ui.invoke_enable_dh(0),
+            }
+            assert!(ui.get_notice_up(), "{pressed}: no pop-up");
+            assert!(
+                !ui.get_notice_asks(),
+                "{pressed}: an error, not a question"
+            );
+            assert_eq!(ui.get_notice_heading().as_str(), UNMATCHED_HEADING);
+            let said = ui.get_notice_message().to_string();
+            assert!(said.contains("not sent"), "{pressed}: {said}");
+            assert!(said.contains(&theirs.to_string()), "{pressed}: {said}");
+            assert!(said.contains(&ours.to_string()), "{pressed}: {said}");
+            assert!(
+                ElementQuery::from_root(&ui)
+                    .match_inherits("NoticePanel")
+                    .find_first()
+                    .is_some(),
+                "{pressed}: the pop-up is in the window"
+            );
+            press("OK");
+            assert!(!ui.get_notice_up(), "{pressed}: OK closes it");
+        }
+
+        // ARM Restart, before any CONNECT has been answered: asked first.
+        ui.invoke_menu_action(MenuAction::ArmRestart);
+        assert!(ui.get_notice_up() && ui.get_notice_asks(), "asked first");
+        assert_eq!(ui.get_notice_heading().as_str(), UNANSWERED_HEADING);
+        let said = ui.get_notice_message().to_string();
+        assert!(said.contains("ARM Restart"), "{said}");
+        assert!(said.contains(&theirs.to_string()), "{said}");
+        press("Cancel");
+        assert!(!ui.get_notice_up(), "Cancel closes it");
+
+        // Again, and Go on: the arm goes, as it would have unasked.
+        ui.invoke_menu_action(MenuAction::ArmRestart);
+        assert!(ui.get_notice_up(), "asked again");
+        press("Go on");
+        assert!(!ui.get_notice_up(), "Go on closes it");
+        let said = ui.get_last_response().to_string();
+        assert!(said.contains("ARM Restart onto"), "{said}");
+        assert!(said.contains("Success"), "{said}");
+
+        link.lock().unwrap().disconnect();
+        let _ = ui.hide();
+        assert_eq!(
+            asked.join().expect("the stand-in"),
+            vec![CommandType::RestartArm],
+            "the arm Go on sent, and nothing else"
+        );
+    }
+
+    /// The port of an address a stand-in is at.
+    ///
+    /// # Arguments
+    ///
+    /// * `at` - The address, as `host:port`.
+    ///
+    /// # Returns
+    ///
+    /// Its port.
+    fn vehicle_port(at: &str) -> u16 {
+        at.parse::<std::net::SocketAddr>()
+            .expect("an address")
+            .port()
     }
 
     /// What a refused node command says is one sentence, spaced as one: a

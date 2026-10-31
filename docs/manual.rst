@@ -4146,9 +4146,25 @@ counted, and as a match begins whatever was already waiting is dropped and
 counted too. It is *matched for commanding* once, besides, its own
 ``Connect`` has been answered with its checksum; until then every command but
 ``Connect``, ``ARM Restart`` and ``Initiate restart`` is refused before it
-is sent, and ``Last Response`` says why::
+is sent. tcsmoc says why in an error pop-up in front of the panels, headed
+*Not sent: the match between the ground's and the vehicle's configurations
+is still in progress*, and in ``Last Response``::
 
-   PING failed: Ping not sent: the configurations are not yet matched. Check that the checksum in the vehicle's beacon is this station's configuration's, and Connect
+   Ping not sent: the configurations are not yet matched. Check that the checksum in the vehicle's beacon is this station's configuration's, and Connect
+
+The pop-up goes on to name the checksum the vehicle's last beacon carried
+and this station's own, so that the two can be compared: where they differ,
+the vehicle is running another configuration, and tcsmoc has to be run with
+that one to command it. ``OK`` closes it. With the link down, a press says
+to press ``Connect`` instead, as it always has.
+
+``ARM Restart`` and ``Initiate restart`` are never refused, being how a
+vehicle that will not match is restarted onto a configuration that will.
+Pressed with the link up before a ``CONNECT`` has been answered, though,
+they ask first, in an advisory pop-up headed *No CONNECT has been answered
+yet* that names the same two checksums: ``Go on`` sends the command as it
+would have gone, and ``Cancel`` sends nothing. Every pop-up's text can be
+selected and copied, and its ``Copy`` button copies all of it.
 
 A beacon with the flag set, one carrying another checksum, or the beacons
 going overdue ends both, and the next ``Connect`` after the beacons say the

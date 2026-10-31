@@ -214,10 +214,16 @@ impl BeaconReceive {
             }
 
             let shown = Shown::of(pass);
+            // Copied, and made words on the window's thread: the pop-ups
+            // name it beside this station's checksum.
+            let theirs = pass.digest;
             let ui_weak = ui_weak.clone();
             let _ = slint::invoke_from_event_loop(move || {
                 if let Some(ui) = ui_weak.upgrade() {
                     show_beacon(&ui, &shown);
+                    ui.set_beacon_checksum(SharedString::from(
+                        theirs.map(|d| d.to_string()).unwrap_or_default(),
+                    ));
                 }
             });
         });

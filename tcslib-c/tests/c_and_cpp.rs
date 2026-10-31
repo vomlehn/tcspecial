@@ -7,7 +7,10 @@
 //! g++, each linked with the `libtcs.a` this crate builds, each run against a
 //! stand-in vehicle that sends beacons as tcspecial serializes them, answers
 //! CONNECT, PING and QUERY_NODE, and sends one datum to the moc node. The two
-//! must print the same lines, and the right ones.
+//! must print the same lines, and the right ones: among them that a PING is
+//! refused unsent before the station is matched, that it is matched for
+//! listening by the vehicle's beacon and for commanding by its Connect, and
+//! what it has counted of what the vehicle sent.
 //!
 //! The ports are free ones, found as the test starts. Where there is no gcc
 //! or g++ this says so and passes: it tests the header, and a machine with no
@@ -395,8 +398,11 @@ vehicle:
     // configuration's, which differs between the two runs.
     let expected = [
         format!("configuration: md5 {digest}"),
+        "ping before a match: refused, unsent".to_string(),
         format!("beacon: Heard, tcspecial v{version} md5 {digest}"),
+        "matched: listening yes, commanding no".to_string(),
         "connect: agrees".to_string(),
+        "matched: listening yes, commanding yes".to_string(),
         "ping: answered".to_string(),
         "query ping (node 1): Success, running".to_string(),
         "set ping count: refused -- no command binding says the ground \
@@ -410,6 +416,11 @@ vehicle:
         "ping ping: answered, round trip timed, up and down summing to it \
         yes"
         .to_string(),
+        // Seven answers and two data, every one read: the vehicle beacons
+        // clear and with this configuration's checksum, so nothing it sends
+        // is dropped.
+        "packets: 9 received = 9 processed + 0 malformed + 0 mismatched"
+            .to_string(),
     ];
     let lines: Vec<&str> = printed.lines().collect();
     assert_eq!(lines, expected, "{}", program.display());

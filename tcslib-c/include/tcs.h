@@ -101,6 +101,58 @@ const char *tcs_configuration_digest(const tcs_configuration *configuration);
 int tcs_configuration_node_id(const tcs_configuration *configuration,
 			      const char *name, uint32_t *id);
 
+/* A station using a configuration is matched with the vehicle for listening
+ * while the last beacon its beacon watch has heard, since the configuration
+ * was opened, is recent (TCS_STAGE_HEARD), has its restart flag clear and
+ * carries the configuration's checksum; and for commanding while, besides, a
+ * tcs_client_connect of its own has been answered with that checksum since
+ * the match last ended. A beacon with the flag set or another checksum, or
+ * one gone overdue, ends both.
+ *
+ * Until it is matched for listening, a moc node made from the configuration
+ * reads nothing: every datum is dropped and counted, and at the match
+ * whatever was already queued is dropped and counted too. Until it is
+ * matched for commanding, a client made from it sends nothing but CONNECT,
+ * RESTART_ARM and RESTART; every other command fails, unsent, saying the
+ * configurations are not yet matched. The match is kept by the beacon watch
+ * made from the configuration, so a station that reads data or commands
+ * nodes passes its beacons too. The match and the counts are the
+ * configuration's, shared by every handle made from it, and may be read
+ * from any thread. */
+
+/* What a station has received from the vehicle, data and answers alike:
+ * every packet counted once, in one of the last three, which add up to the
+ * first. */
+typedef struct tcs_counts {
+	uint64_t received;   /* every packet */
+	uint64_t processed;  /* read and handed on */
+	uint64_t malformed;  /* not readable with the configuration's
+	                        definitions */
+	uint64_t mismatched; /* dropped because the two ends may not be using
+	                        the same configuration */
+} tcs_counts;
+
+/** Says whether the station using this configuration is matched with the
+ * vehicle.
+ *
+ * @param configuration  The configuration.
+ * @param listening      Where 1 is written when it is matched for
+ *                       listening, 0 when not.
+ * @param commanding     Where 1 is written when it is matched for
+ *                       commanding, 0 when not.
+ * @return               0, or -1 on an error. */
+int tcs_configuration_matched(const tcs_configuration *configuration,
+			      int *listening, int *commanding);
+
+/** Says what the station using this configuration has received from the
+ * vehicle.
+ *
+ * @param configuration  The configuration.
+ * @param counts         Where the counts are written.
+ * @return               0, or -1 on an error. */
+int tcs_configuration_counts(const tcs_configuration *configuration,
+			     tcs_counts *counts);
+
 /* ---- Beacons ------------------------------------------------------------ */
 
 /* How long it has been since the vehicle's last beacon arrived, counted in
@@ -131,16 +183,18 @@ typedef struct tcs_pass {
 	uint32_t at_nanos;  /* and nanoseconds; both 0 where none has */
 	int restarted;    /* whether the beacon this pass heard says tcspecial
 	                     has started again: its number went back */
-	int commanded_restart; /* whether the last beacon said a restart the
-	                          ground commanded is under way: set from the
-	                          RESTART until the vehicle takes a CONNECT */
+	int restart_flag; /* whether the last beacon's restart flag was set:
+	                     set at every start of the vehicle and from a
+	                     RESTART, until it takes a Connect carrying its
+	                     configuration's checksum */
 } tcs_pass;
 
 /* The ground's end of the beacon link: a socket where the configuration says
  * beacons arrive, taking them only from where it says they come from. */
 typedef struct tcs_beacons tcs_beacons;
 
-/** Listens where the configuration says beacons arrive.
+/** Listens where the configuration says beacons arrive. Each pass keeps the
+ * configuration's match: see tcs_configuration_matched().
  *
  * @param configuration  The configuration, which must have a tcspecial
  *                       section.
@@ -160,9 +214,9 @@ int tcs_beacons_pass(tcs_beacons *beacons, tcs_pass *pass);
 /** Says what the last beacon said.
  *
  * @param beacons  The beacon watch.
- * @return         "tcspecial v0.1.0 md5 ...", with ", COMMANDED RESTART"
- *                 after it while a commanded restart is under way; "<none>"
- *                 before any beacon; NULL on an error. */
+ * @return         "tcspecial v0.1.0 md5 ...", with ", RESTARTED, NOT YET
+ *                 MATCHED" after it while the restart flag is set;
+ *                 "<none>" before any beacon; NULL on an error. */
 const char *tcs_beacons_said(const tcs_beacons *beacons);
 
 /** Counts what the last pass had to say on a console, which is news:
@@ -212,7 +266,8 @@ typedef struct tcs_datum {
 	size_t length;
 } tcs_datum;
 
-/** Opens a moc node on the ground.
+/** Opens a moc node on the ground, which reads data only while the station
+ * is matched for listening: see tcs_configuration_matched().
  *
  * @param configuration  The configuration.
  * @param moc            The moc node's name.
@@ -254,7 +309,13 @@ typedef enum tcs_status {
 	 * sent by a client whose count has gone back. The client starts its
 	 * count again past the newest the vehicle has taken at its next
 	 * Connect. */
-	TCS_STATUS_STALE = 9
+	TCS_STATUS_STALE = 9,
+	/* Not acted on, because the vehicle has not been matched since it last
+	 * started, or has taken a RESTART: it acts on nothing but CONNECT,
+	 * RESTART_ARM and RESTART until a Connect carrying its configuration's
+	 * checksum. Connect with the configuration whose checksum its beacons
+	 * carry. */
+	TCS_STATUS_UNMATCHED = 10
 } tcs_status;
 
 /** Names a status.
@@ -267,7 +328,9 @@ const char *tcs_status_name(tcs_status status);
 /* The ground's end of the two command links the configuration states. */
 typedef struct tcs_client tcs_client;
 
-/** Opens the two command links the configuration states.
+/** Opens the two command links the configuration states. The client sends
+ * nothing but CONNECT, RESTART_ARM and RESTART until the station is matched
+ * for commanding: see tcs_configuration_matched().
  *
  * @param configuration  The configuration, which must have a tcspecial
  *                       section.
@@ -277,14 +340,18 @@ tcs_client *tcs_client_open(const tcs_configuration *configuration);
 
 /** Sends CONNECT: says what this end read, and hears what the vehicle read.
  *
- * The answer also says which generation of tcspecial is flying, and clears
- * the commanded-restart bit in the vehicle's beacons. Until a Connect has
- * been answered, and again once a beacon handed to tcs_client_beacon_heard
- * says tcspecial has started again or an answer comes from another
- * generation, every command but PING and CONNECT fails, unsent, because what
- * the vehicle flies may have changed. A command carries no generation, only
- * its sequence. A Connect goes during a wait begun by a RESTART, without
- * ending it.
+ * It carries this configuration's checksum. Where that is the vehicle's own,
+ * the vehicle clears the restart flag in its beacons and opens its downlink
+ * and its other commands; where it is not, the vehicle answers with its own
+ * checksum and changes nothing else. Answered with this configuration's
+ * checksum, it makes the station matched for commanding once it is matched
+ * for listening: see tcs_configuration_matched(). The answer also says which
+ * generation of tcspecial is flying. Until a Connect has been answered, and
+ * again once a beacon handed to tcs_client_beacon_heard says tcspecial has
+ * started again or an answer comes from another generation, every command
+ * but PING and CONNECT fails, unsent, because what the vehicle flies may have
+ * changed. A command carries no generation, only its sequence. A Connect
+ * goes during a wait begun by a RESTART, without ending it.
  *
  * @param client  The client.
  * @param agrees  Where 1 is written when the vehicle is flying this
@@ -293,7 +360,8 @@ tcs_client *tcs_client_open(const tcs_configuration *configuration);
  * @return        0, or -1 on an error. */
 int tcs_client_connect(tcs_client *client, int *agrees);
 
-/** Sends PING, to ask whether the vehicle's command link answers.
+/** Sends PING, to ask whether the vehicle's command link answers. Not sent
+ * until the station is matched for commanding.
  *
  * @param client  The client.
  * @return        0 when it answered, or -1 on an error. */
@@ -337,9 +405,9 @@ int tcs_client_restart_arm(tcs_client *client, uint64_t key,
 			   tcs_status *status);
 
 /** Sends RESTART, to restart the vehicle, which the last RESTART_ARM must
- * have armed with the same key: the beacons carry the commanded-restart bit
- * from then, the process restarts, and its beacons start again at #1, the
- * bit still set until a Connect.
+ * have armed with the same key: the beacons carry the restart flag from
+ * then, the process restarts, and its beacons start again at #1, the flag
+ * still set until a Connect carrying its configuration's checksum.
  *
  * Look at the beacons before sending it again for want of an answer: they
  * say whether it was taken, and a RESTART that reaches the start that came
@@ -364,14 +432,12 @@ int tcs_client_restart(tcs_client *client, uint64_t key,
  *
  * @param client   The client.
  * @param beacons  The beacon watch, just passed.
- * @return         1 when that ended the wait with the start the RESTART
- *                 commanded; 2 when it ended it with a start nobody
- *                 commanded -- the vehicle restarted for some other reason
- *                 before the RESTART was taken, and runs with the
- *                 definitions it had; 3 when it ended it with a start the
- *                 beacon cannot say of, because a Connect during the wait
- *                 reached that start and cleared its flag; 0 when it did
- *                 not end one; -1 on an error. */
+ * @return         1 when that ended the wait, because the beacon's number
+ *                 says tcspecial has started again; 0 when it did not end
+ *                 one; -1 on an error. Whether the start that came back is
+ *                 the one the RESTART asked for is not said: every start
+ *                 sets the restart flag, and the checksum in its beacons
+ *                 says which configuration it runs. */
 int tcs_client_beacon_heard(tcs_client *client, const tcs_beacons *beacons);
 
 /** Says whether the client is waiting for a beacon to say a RESTART is

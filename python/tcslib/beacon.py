@@ -386,8 +386,9 @@ class Heard:
     message: str
     #: The beacon's own number, if it was a beacon this can read.
     sequence: int = None
-    #: Whether it said a restart the ground commanded is under way.
-    commanded_restart: bool = False
+    #: Whether its restart flag was set: the vehicle has started, or taken a
+    #: RESTART, and has not been matched since.
+    restart_flag: bool = False
     #: What is wrong with the configuration it announces, if anything.
     differs: str = None
 
@@ -400,7 +401,7 @@ def _beacon_of(datagram):
 
     Returns:
         A dict of the beacon's ``sequence``, ``version`` and ``digest`` (as
-        text) and ``commanded_restart``, or ``None`` if the datagram is not a
+        text) and ``restart_flag``, or ``None`` if the datagram is not a
         beacon this can read.
     """
     try:
@@ -411,7 +412,7 @@ def _beacon_of(datagram):
         "sequence": beacon.sequence,
         "version": version_text(beacon.version),
         "digest": digest_text(beacon.digest),
-        "commanded_restart": beacon.commanded_restart,
+        "restart_flag": beacon.restart_flag,
     }
 
 
@@ -436,26 +437,25 @@ def hear(datagram, expected):
     return Heard(
         message=f"{why} -- {message}" if why else message,
         sequence=None if beacon is None else beacon["sequence"],
-        commanded_restart=(beacon is not None
-                           and beacon["commanded_restart"]),
+        restart_flag=(beacon is not None
+                           and beacon["restart_flag"]),
         differs=why,
     )
 
 
-def restarted(now, commanded):
+def restarted(now):
     """What to say of a restart: the same words as the Rust's.
 
+    Not which kind of restart it was: every start begins with the restart
+    flag set, so the flag says nothing of whether the ground commanded it.
+
     Args:
-        now:       The number the beacons start again at.
-        commanded: Whether a commanded restart is under way.
+        now: The number the beacons start again at.
 
     Returns:
         The sentence to say.
     """
-    how = ("as commanded" if commanded
-           else "without being commanded to, with the definitions it had")
-    return (f"the beacons start again at #{now}, so tcspecial has "
-            f"restarted {how}")
+    return f"the beacons start again at #{now}, so tcspecial has restarted"
 
 
 def differs(theirs, ours):
@@ -484,15 +484,15 @@ def message_of(datagram):
         datagram: The bytes that arrived on the beacon link.
 
     Returns:
-        The beacon's version and digest and whether it was a commanded
-        restart, as one line. A datagram this cannot read is shown
+        The beacon's version and digest and whether its restart flag was
+        set, as one line. A datagram this cannot read is shown
         as what arrived, cut short to forty characters.
     """
     beacon = _beacon_of(datagram)
     if beacon is not None:
         said = what_it_read(beacon["version"], beacon["digest"])
-        return (said + ", COMMANDED RESTART" if beacon["commanded_restart"]
-                else said)
+        return (said + ", RESTARTED, NOT YET MATCHED"
+                if beacon["restart_flag"] else said)
     text = datagram.decode("utf-8", errors="replace")
     head = text[:40]
     return (
@@ -706,7 +706,7 @@ class Beacons:
                     f"arrive: #{now} came after #{last}"
                 )
             elif kind is Counted.RESTARTED:
-                remarks.append(restarted(now, heard.commanded_restart))
+                remarks.append(restarted(now))
             # A repeat is the radio's, and says nothing new.
             self._count = now
 

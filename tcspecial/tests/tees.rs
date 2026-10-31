@@ -15,6 +15,8 @@ use std::time::{Duration, Instant};
 use tcslibgs::graph::telemetry;
 use tcslibgs::graph::Graph;
 
+mod common;
+
 /// Binds a socket on a loopback port nothing holds.
 ///
 /// # Returns
@@ -160,6 +162,9 @@ fn a_tee_sends_each_datum_both_ways() {
     // the test is the heater, bound where the configuration says it is.
     let heater = bound();
     let (sensor, uplink, base) = (free(), free(), free());
+    // The ground's command link: where tcs_cmd.send says it sends from,
+    // and where tcs_cmd.recv says tcspecial takes them.
+    let (commands, take_at) = (bound(), free());
     let mut text = text;
     for (was, now) in [
         ("\"8001\"", format!("\"{}\"", port(&heater))),
@@ -173,8 +178,8 @@ fn a_tee_sends_each_datum_both_ways() {
         ("127.0.0.1:8310", format!("127.0.0.1:{}", free())),
         ("127.0.0.1:8410", format!("127.0.0.1:{}", free())),
         ("0.0.0.0:8400", format!("127.0.0.1:{}", free())),
-        ("0.0.0.0:8200", format!("127.0.0.1:{}", free())),
-        ("127.0.0.1:8210", format!("127.0.0.1:{}", free())),
+        ("0.0.0.0:8200", format!("127.0.0.1:{take_at}")),
+        ("127.0.0.1:8210", format!("127.0.0.1:{}", port(&commands))),
         (
             "/tmp/telemetry",
             dir.path().join("telemetry").display().to_string(),
@@ -219,6 +224,12 @@ fn a_tee_sends_each_datum_both_ways() {
             .spawn()
             .expect("tcspecial starts"),
     );
+
+    // Nothing comes down until the ground has matched the start, with a
+    // CONNECT carrying the configuration's checksum.
+    let take: SocketAddr =
+        format!("127.0.0.1:{take_at}").parse().expect("an address");
+    common::connect(&commands, take, 1, common::checksum_of(&configuration));
 
     // A command: to the heater, as it was going, and back to the ground.
     let ground = bound();

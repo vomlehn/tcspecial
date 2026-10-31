@@ -41,7 +41,8 @@ use std::sync::Arc;
 
 use crate::endpoint::bind_oc_pair;
 use crate::node::vehicle::log::LogNode;
-use crate::runtime::fabric::{Fabric, Moved, Port, Read};
+use crate::runtime::fabric::{Arriving, Fabric, Moved, Port, Read, Taken};
+use crate::runtime::matched::Matched;
 use crate::runtime::node_state::{Abandon, NodeStates, Nudge};
 use crate::runtime::port::{
     AppPort, ComputePort, EndpointPort, LogPort, NullPort, PingPort, TeePort,
@@ -320,7 +321,9 @@ impl System {
     /// where one error at a time is one trip each.
     ///
     /// Every log is opened with `segsend`, which is what its filled segments
-    /// are handed to.
+    /// are handed to, and every link to the ground with `matched`, which
+    /// holds back what it would send until the ground has matched this
+    /// start: see [`Downlink`].
     ///
     /// # Arguments
     ///
@@ -328,6 +331,7 @@ impl System {
     /// * `now`     - When the vehicle starts, from which every group and
     ///               paced node is first due.
     /// * `segsend` - What each log hands its filled segments to.
+    /// * `matched` - Whether the ground has matched this start.
     ///
     /// # Returns
     ///
@@ -341,12 +345,18 @@ impl System {
         graph: &Graph,
         now: Instant,
         segsend: SegSend,
+        matched: Matched,
     ) -> Result<System, Vec<String>> {
         System::of_opening(
             graph,
             now,
             move |node, routes, abandon| open(node, routes, abandon, &segsend),
-            open_ground_link,
+            |link| {
+                open_ground_link(link).map(|port| {
+                    Box::new(Downlink::of(port, matched.clone()))
+                        as Box<dyn Port>
+                })
+            },
         )
     }
 
@@ -987,6 +997,97 @@ pub fn open_ground_link(link: &Telemetered) -> Result<Box<dyn Port>, String> {
     )))
 }
 
+/// A link to the ground that sends nothing until the ground has matched
+/// this start's configuration.
+///
+/// From a start, and from a RESTART being taken, until a CONNECT carrying the
+/// running configuration's checksum, tcspecial sends the ground nothing but
+/// beacons and answers: a datum read with another configuration's
+/// definitions is worse than none. What a node produces meanwhile still
+/// reaches every other node it is drawn to, the logs among them, so it is
+/// kept on board; only the link to the ground drops it. Dropped as delivered,
+/// not refused: a datum held back is the configuration working as it should,
+/// and refusing it would put a line in the log for every reading until the
+/// ground connected.
+///
+/// Asks one atomic for each datum, which is what the main loop can afford:
+/// no lock, and nothing allocated.
+pub struct Downlink {
+    /// The link itself, which sends what it is given.
+    inner: Box<dyn Port>,
+    /// Whether the ground has matched this start.
+    matched: Matched,
+}
+
+impl Downlink {
+    /// Holds a link to the ground back until the ground has matched.
+    ///
+    /// # Arguments
+    ///
+    /// * `inner`   - The link, as [`open_ground_link`] opened it.
+    /// * `matched` - Whether the ground has matched this start.
+    ///
+    /// # Returns
+    ///
+    /// The link, gated.
+    pub fn of(inner: Box<dyn Port>, matched: Matched) -> Downlink {
+        Downlink { inner, matched }
+    }
+}
+
+impl Port for Downlink {
+    fn take(&mut self, buffer: &mut [u8]) -> Result<Taken, String> {
+        self.inner.take(buffer)
+    }
+
+    fn take_unasked(&mut self, buffer: &mut [u8]) -> Result<Taken, String> {
+        self.inner.take_unasked(buffer)
+    }
+
+    fn strangers(&mut self) -> u64 {
+        self.inner.strangers()
+    }
+
+    fn ask(&mut self) -> Result<(), String> {
+        self.inner.ask()
+    }
+
+    fn give(
+        &mut self,
+        arriving: Arriving<'_>,
+        data: &[u8],
+    ) -> Result<(), String> {
+        if !self.matched.is_matched() {
+            return Ok(());
+        }
+        self.inner.give(arriving, data)
+    }
+
+    fn accepts(&self) -> bool {
+        self.inner.accepts()
+    }
+
+    fn holds(&self) -> bool {
+        self.inner.holds()
+    }
+
+    fn produces(&self) -> bool {
+        self.inner.produces()
+    }
+
+    fn set(&mut self, attribute: &str, value: &[u8]) -> Result<(), String> {
+        self.inner.set(attribute, value)
+    }
+
+    fn flush(&mut self) -> Result<(), String> {
+        self.inner.flush()
+    }
+
+    fn ready(&self) -> bool {
+        self.inner.ready()
+    }
+}
+
 /// What a node becomes: a port over whatever it is.
 ///
 /// The three kinds of node there are, which is the one place that mapping is
@@ -1205,6 +1306,31 @@ mod tests {
             self.got.lock().expect("the record").push(data.to_vec());
             Ok(())
         }
+    }
+
+    /// A link to the ground sends nothing from a start until the ground has
+    /// matched it, and nothing again from the moment a RESTART is taken.
+    #[test]
+    fn nothing_goes_to_the_ground_before_a_match() {
+        let got = kept();
+        let matched = Matched::at_a_start();
+        let mut link = Downlink::of(
+            Box::new(Ground { got: got.clone() }),
+            matched.clone(),
+        );
+
+        link.give(Arriving::ANYWHERE, b"before")
+            .expect("dropped quietly");
+        assert!(got.lock().expect("the record").is_empty());
+
+        matched.connected();
+        link.give(Arriving::ANYWHERE, b"matched").expect("sent");
+        assert_eq!(*got.lock().expect("the record"), vec![b"matched".to_vec()]);
+
+        matched.restart_taken();
+        link.give(Arriving::ANYWHERE, b"ending")
+            .expect("dropped quietly");
+        assert_eq!(got.lock().expect("the record").len(), 1);
     }
 
     /// A node that counts how often it is read and how often it is asked, and

@@ -108,6 +108,11 @@
           <!-- Older than a command this start has already taken, and
                not acted on. -->
           <Enumeration value="9" label="Stale"/>
+          <!-- Not acted on, because this start of tcspecial has not taken
+               a CONNECT whose configuration checksum is its own since it
+               started, or has taken a RESTART: only CONNECT, RESTART_ARM
+               and RESTART are taken until it does. -->
+          <Enumeration value="10" label="Unmatched"/>
         </EnumerationList>
       </EnumeratedParameterType>
     </ParameterTypeSet>

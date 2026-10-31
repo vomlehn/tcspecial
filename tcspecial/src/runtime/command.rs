@@ -66,6 +66,7 @@ use tcslibgs::{
 };
 
 use crate::beacon_send::BeaconSend;
+use crate::runtime::matched::Matched;
 use crate::runtime::node_state::{NodeStates, Wakeup};
 use crate::runtime::system::{Work, Workbench};
 use crate::telemetry_log::TelemetryLog;
@@ -167,6 +168,9 @@ impl Commands {
     /// * `beacon`  - The beacon sender, which a CONNECT slows and a RESTART
     ///               speeds up; `None` where no beacons are sent.
     /// * `log`     - Where every answer is recorded.
+    /// * `matched` - Whether the ground has matched this start, which a
+    ///               CONNECT carrying this configuration's checksum sets and
+    ///               a RESTART taken clears.
     /// * `restart` - What an armed RESTART calls once it has been answered.
     ///
     /// # Returns
@@ -177,6 +181,12 @@ impl Commands {
     ///
     /// `TcsError::Config` for a link that will not bind; an I/O error where
     /// a bound socket's address or the stop descriptor cannot be had.
+    //
+    // Eight, each a different thing the interpreter is handed by whatever
+    // started the vehicle and none of them belonging with another: a
+    // structure holding them would only be these arguments again, named a
+    // second time.
+    #[allow(clippy::too_many_arguments)]
     pub fn start(
         ci: &CIConfig,
         states: Arc<NodeStates>,
@@ -184,6 +194,7 @@ impl Commands {
         flying: Flying,
         beacon: Option<BeaconSend>,
         log: TelemetryLog,
+        matched: Matched,
         restart: fn(),
     ) -> TcsResult<Commands> {
         let spacecraft = Link {
@@ -221,6 +232,7 @@ impl Commands {
             flying,
             beacon,
             log,
+            matched,
             stopping: stopping.clone(),
             wakeup: wakeup.clone(),
             answer: AnswerPacker::new(),
@@ -275,6 +287,44 @@ impl Drop for Commands {
     }
 }
 
+/// Drops every command already queued on `link`, unread, without waiting.
+///
+/// Read into `buffer`, which the thread already holds, so that dropping
+/// allocates nothing. The count is logged once, for the record of what the
+/// match threw away.
+///
+/// # Arguments
+///
+/// * `link`   - The link to empty.
+/// * `buffer` - Room for a datagram.
+fn drop_queued(link: &Link, buffer: &mut [u8]) {
+    if let Err(e) = link.socket.set_nonblocking(true) {
+        error!("{}: cannot be emptied: {e}", spelling(link.which));
+        return;
+    }
+    let mut dropped = 0u32;
+    loop {
+        match link.socket.recv_from(buffer) {
+            Ok(_) => dropped = dropped.saturating_add(1),
+            Err(ref e) if e.kind() == std::io::ErrorKind::Interrupted => {}
+            // WouldBlock is the queue empty; anything else is a socket that
+            // has nothing more to give, and the next poll will say why.
+            Err(_) => break,
+        }
+    }
+    if let Err(e) = link.socket.set_nonblocking(false) {
+        error!("{}: cannot wait on it again: {e}", spelling(link.which));
+    }
+    if dropped > 0 {
+        // Allocates, where the log formats the line: once a start, at the
+        // match, and worth it for the record of what was thrown away.
+        warn!(
+            "{}: {dropped} command(s) queued before the match dropped unread",
+            spelling(link.which)
+        );
+    }
+}
+
 /// Binds one link, saying which it was if it will not bind.
 ///
 /// # Arguments
@@ -313,6 +363,10 @@ struct Serving {
     /// Where every answer is recorded, which is the log the beacons use: one
     /// log holds everything that went to the ground.
     log: TelemetryLog,
+    /// Whether the ground has matched this start. Until it has, every
+    /// command but the three [`tcslibgs::CommandType::taken_unmatched`]
+    /// names is answered `Unmatched` and not acted on.
+    matched: Matched,
     stopping: Arc<AtomicBool>,
     wakeup: Arc<Wakeup>,
     /// What an answer is packed into before it is sent: made with the
@@ -341,8 +395,8 @@ struct Serving {
     ///
     /// Not kept across a restart, because it need not be: the link
     /// delivers in order, so a command sent before a RESTART arrives before
-    /// it, and a ground station sends nothing but PING and CONNECT after a
-    /// RESTART until it hears the start that came back.
+    /// it, and a ground station sends nothing but CONNECT, RESTART_ARM and
+    /// RESTART after a RESTART until it hears the start that came back.
     newest: Option<u32>,
 }
 
@@ -399,8 +453,16 @@ impl Serving {
                 let ready = set[which]
                     .revents()
                     .is_some_and(|events| events.contains(PollFlags::POLLIN));
-                if ready {
-                    self.take_one(link, &mut buffer);
+                if ready && self.take_one(link, &mut buffer) {
+                    // A CONNECT has just matched this start. Everything
+                    // already queued on the node link was sent before the
+                    // ground knew it was matched -- it sends nothing but the
+                    // three commands until it is -- so none of it is read.
+                    // Then the poll again, rather than the rest of this
+                    // one's answers: the node link it said was readable may
+                    // be empty now.
+                    drop_queued(&links[1], &mut buffer);
+                    break;
                 }
             }
         }
@@ -416,17 +478,26 @@ impl Serving {
     ///
     /// * `link`   - The link the poll said is readable.
     /// * `buffer` - Room for the datagram, as long as the longest one.
-    fn take_one(&mut self, link: &Link, buffer: &mut [u8]) {
+    ///
+    /// # Returns
+    ///
+    /// Whether the command was a CONNECT that matched this start, which it
+    /// had not been before.
+    fn take_one(&mut self, link: &Link, buffer: &mut [u8]) -> bool {
         let (size, from) = match link.socket.recv_from(buffer) {
             Ok(got) => got,
             // Nothing there after all, which a poll can say: another reader
             // does not exist here, but a spurious readiness is cheaper to
             // tolerate than to rule out.
-            Err(ref e) if e.kind() == std::io::ErrorKind::WouldBlock => return,
-            Err(ref e) if e.kind() == std::io::ErrorKind::Interrupted => return,
+            Err(ref e) if e.kind() == std::io::ErrorKind::WouldBlock => {
+                return false
+            }
+            Err(ref e) if e.kind() == std::io::ErrorKind::Interrupted => {
+                return false
+            }
             Err(e) => {
                 error!("{}: cannot be read: {e}", spelling(link.which));
-                return;
+                return false;
             }
         };
 
@@ -440,7 +511,7 @@ impl Serving {
                 spelling(link.which),
                 link.from
             );
-            return;
+            return false;
         }
 
         // Read without allocating, a SET_NODE's attribute and value
@@ -456,11 +527,12 @@ impl Serving {
                     "{}: {size} bytes that are not a command: {why}",
                     spelling(link.which)
                 );
-                return;
+                return false;
             }
         };
 
         trace!("{}: {command:?}", spelling(link.which));
+        let was_matched = self.matched.is_matched();
         // Every answer says which start of tcspecial made it, stamped here,
         // where every answer goes out, so that none can be sent without it.
         let answer = self
@@ -481,13 +553,15 @@ impl Serving {
         // taken before the links close under it.
         if self.restarting {
             self.restarting = false;
-            // Initiated now: the beacons carry the commanded-restart bit from
-            // here, fast, starting with one at once, until the process ends.
+            // Initiated now: the beacons carry the restart flag, which the
+            // RESTART set as it was taken, fast from here, starting with one
+            // at once, until the process ends.
             if let Some(beacon) = self.beacon.as_ref() {
                 beacon.restart_initiated();
             }
             (self.restart)();
         }
+        !was_matched && self.matched.is_matched()
     }
 
     /// Acts on a command and says what this vehicle answers it with.
@@ -496,8 +570,9 @@ impl Serving {
     /// command added later is answered deliberately -- by someone who had to
     /// decide -- rather than by whichever side of a default it fell on.
     ///
-    /// A command on the wrong link, for another generation or older than one
-    /// already taken is refused before anything in it is acted on.
+    /// A command on the wrong link, one sent before the ground has matched
+    /// this start, or one older than one already taken is refused before
+    /// anything in it is acted on.
     ///
     /// # Arguments
     ///
@@ -524,6 +599,24 @@ impl Serving {
                 spelling(command.link())
             );
             return answer_to(command, CommandStatus::InvalidCommand);
+        }
+
+        // Before the ground has matched this start, or once a RESTART has
+        // been taken: the command may have been made with another
+        // configuration, whose node ids and attributes mean something else
+        // here. Answered, so that a station that does not watch the beacons
+        // learns why nothing happened rather than sending it again, and not
+        // acted on. Before the sequence is looked at, because nothing in it
+        // is taken.
+        if !command.cmd_type().taken_unmatched() && !self.matched.is_matched() {
+            warn!(
+                "{:?} {sequence} came before a CONNECT carrying this \
+                 configuration's checksum, {}: answered Unmatched, and \
+                 nothing in it acted on",
+                command.cmd_type(),
+                self.flying.digest
+            );
+            return answer_to(command, CommandStatus::Unmatched);
         }
 
         // Older than one already taken: overtaken on the link by a later
@@ -556,11 +649,24 @@ impl Serving {
             // does not match does not send them.
             // And the newest command taken, which is where a station whose
             // count has gone back starts it again.
-            // The MOC has connected: the beacons clear the commanded-restart
-            // bit and go back to their interval.
-            Command::Connect(_) => {
-                if let Some(beacon) = self.beacon.as_ref() {
-                    beacon.connected();
+            // Where the CONNECT carries the running configuration's
+            // checksum the ground has matched this start: the restart flag
+            // clears, the beacons go back to their interval and the downlink
+            // and the other commands open. One carrying another checksum is
+            // answered the same and changes nothing else, and after a
+            // RESTART is taken no CONNECT does: see `Matched::connected`.
+            Command::Connect(cmd) => {
+                if cmd.digest == self.flying.digest {
+                    self.matched.connected();
+                    if let Some(beacon) = self.beacon.as_ref() {
+                        beacon.connected();
+                    }
+                } else {
+                    warn!(
+                        "a CONNECT carried configuration {}, and this start \
+                         runs {}: answered, and nothing else changed",
+                        cmd.digest, self.flying.digest
+                    );
                 }
                 Telemetry::Connect(ConnectTelemetry::new(
                     sequence,
@@ -679,6 +785,10 @@ impl Serving {
                     }
                     self.armed = None;
                     self.restarting = true;
+                    // Unmatched from this moment: nothing the old
+                    // configuration makes goes down after the RESTART, and
+                    // no command but the three is acted on.
+                    self.matched.restart_taken();
                     answer_to(command, CommandStatus::Success)
                 }
                 Some((key, _)) if key != cmd.arm_key => {
@@ -1068,7 +1178,8 @@ mod tests {
     }
 
     /// Starts the command interpreter with links on loopback, and a ground
-    /// socket to command it from.
+    /// socket to command it from, on a start the ground has already
+    /// matched: what most of these tests are about comes after the match.
     ///
     /// # Arguments
     ///
@@ -1087,6 +1198,34 @@ mod tests {
         states: Arc<NodeStates>,
         bench: Workbench,
     ) -> (UdpSocket, Commands) {
+        let matched = Matched::at_a_start();
+        matched.connected();
+        started_matching(states, bench, matched)
+    }
+
+    /// [`started_with`], with whether the ground has matched the start
+    /// given rather than settled.
+    ///
+    /// # Arguments
+    ///
+    /// * `states`  - Every node's state.
+    /// * `bench`   - How the interpreter hands work to the pass.
+    /// * `matched` - Whether the ground has matched this start, which the
+    ///               test may go on reading.
+    ///
+    /// # Returns
+    ///
+    /// The ground's socket, with a five-second read timeout, and the
+    /// running interpreter.
+    ///
+    /// # Panics
+    ///
+    /// If either socket cannot be bound.
+    fn started_matching(
+        states: Arc<NodeStates>,
+        bench: Workbench,
+        matched: Matched,
+    ) -> (UdpSocket, Commands) {
         let ground = UdpSocket::bind("127.0.0.1:0").expect("a ground socket");
         ground
             .set_read_timeout(Some(Duration::from_secs(5)))
@@ -1098,10 +1237,127 @@ mod tests {
             flying(),
             None,
             TelemetryLog::disabled(),
+            matched,
             || {},
         )
         .expect("both links bind");
         (ground, commands)
+    }
+
+    /// From a start, every command but CONNECT, RESTART_ARM and RESTART --
+    /// PING among them -- is answered `Unmatched` and not acted on. A
+    /// CONNECT carrying another configuration's checksum is answered with
+    /// this one's and changes nothing; one carrying this one's matches the
+    /// start, and the node is started.
+    #[test]
+    fn nothing_but_the_three_is_acted_on_until_a_matching_connect() {
+        let graph = two_nodes();
+        let states = Arc::new(NodeStates::of(&graph).expect("states"));
+        let (bench, done) = a_pass_answering(|_| Ok(()));
+        let matched = Matched::at_a_start();
+        let (ground, commands) =
+            started_matching(states, bench, matched.clone());
+        let at = commands.spacecraft_address();
+        let node_at = commands.node_address();
+        let status =
+            |answer: Option<Telemetry>| answer.expect("an answer").status();
+        let start = |sequence| {
+            Command::StartNode(NodeCommand::start(sequence, NodeId::of(1)))
+        };
+        let connect = |sequence, digest| {
+            Command::Connect(tcslibgs::ConnectCommand::new(
+                sequence,
+                ConfigVersion::of_this_build(),
+                digest,
+            ))
+        };
+
+        assert_eq!(
+            status(ask(&ground, node_at, &start(1))),
+            CommandStatus::Unmatched
+        );
+        assert_eq!(
+            status(ask(
+                &ground,
+                at,
+                &Command::Ping(tcslibgs::PingCommand::new(2))
+            )),
+            CommandStatus::Unmatched
+        );
+        assert!(
+            done.lock().expect("the record").is_empty(),
+            "nothing was handed to the pass"
+        );
+
+        // Another configuration: answered, with this one's checksum, and
+        // nothing else changes.
+        match ask(&ground, at, &connect(3, ConfigDigest([0x11; 16]))) {
+            Some(Telemetry::Connect(tm)) => {
+                assert_eq!(tm.header.status, CommandStatus::Success);
+                assert_eq!(tm.digest, flying().digest, "the running one's");
+            }
+            other => panic!("expected a connect answer, got {other:?}"),
+        }
+        assert!(
+            !matched.is_matched(),
+            "a mismatched CONNECT matches nothing"
+        );
+        assert_eq!(
+            status(ask(&ground, node_at, &start(4))),
+            CommandStatus::Unmatched
+        );
+
+        // This configuration: matched, and the node is started.
+        assert_eq!(
+            status(ask(&ground, at, &connect(5, flying().digest))),
+            CommandStatus::Success
+        );
+        assert!(matched.is_matched(), "a matching CONNECT matches the start");
+        assert_eq!(
+            status(ask(&ground, node_at, &start(6))),
+            CommandStatus::Success
+        );
+        assert_eq!(done.lock().expect("the record").len(), 1);
+    }
+
+    /// Dropping what is queued on a link at a match reads every datagram
+    /// waiting there and leaves the link waiting for the next as before.
+    #[test]
+    fn what_is_queued_at_a_match_is_dropped_and_the_link_still_waits() {
+        let socket = UdpSocket::bind("127.0.0.1:0").expect("a link");
+        let at = socket.local_addr().expect("where it is");
+        let link = Link {
+            socket,
+            which: CommandLink::Payload,
+            from: HostPort {
+                address: "127.0.0.1".to_string(),
+                port: 0,
+            },
+        };
+        let ground = UdpSocket::bind("127.0.0.1:0").expect("a ground socket");
+        for queued in [&b"one"[..], b"two", b"three"] {
+            ground.send_to(queued, at).expect("sent");
+        }
+        // On loopback a datagram is queued at the receiver by the time its
+        // send returns, so all three are waiting now.
+
+        let mut buffer = [0u8; 64];
+        drop_queued(&link, &mut buffer);
+
+        // Nothing left of what was queued, and the link blocks again: a read
+        // with a short timeout times out rather than failing at once.
+        link.socket
+            .set_read_timeout(Some(Duration::from_millis(100)))
+            .expect("a timeout");
+        let left = link.socket.recv_from(&mut buffer);
+        assert!(
+            matches!(&left, Err(e) if e.kind() == std::io::ErrorKind::WouldBlock
+                || e.kind() == std::io::ErrorKind::TimedOut),
+            "{left:?}"
+        );
+        ground.send_to(b"after", at).expect("sent");
+        let (size, _) = link.socket.recv_from(&mut buffer).expect("the next");
+        assert_eq!(&buffer[..size], b"after");
     }
 
     /// A PING is answered, and a CONNECT says what this vehicle is flying.
@@ -1650,6 +1906,8 @@ mod tests {
             .set_read_timeout(Some(Duration::from_secs(5)))
             .expect("a timeout");
         let (bench, _) = a_pass_answering(|_| Ok(()));
+        // Unmatched, as a start is: the two RESTART commands go whether or
+        // not the ground has matched it.
         let commands = Commands::start(
             &links_for(&ground),
             states,
@@ -1657,6 +1915,7 @@ mod tests {
             flying(),
             None,
             TelemetryLog::disabled(),
+            Matched::at_a_start(),
             counted,
         )
         .expect("both links bind");
@@ -1728,6 +1987,7 @@ mod tests {
                 flying: flying(),
                 beacon: None,
                 log: TelemetryLog::disabled(),
+                matched: Matched::at_a_start(),
                 stopping: Arc::new(AtomicBool::new(false)),
                 wakeup: Arc::new(Wakeup::new().expect("a wakeup")),
                 answer: AnswerPacker::new(),

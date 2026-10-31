@@ -17,10 +17,12 @@
 use std::net::UdpSocket;
 use std::os::fd::AsRawFd;
 use std::path::Path;
-use std::time::Duration;
+use std::time::{Duration, Instant};
 
 use tcslibgs::graph::telemetry::{self, Telemetered, Via};
 use tcslibgs::graph::Graph;
+
+use crate::matched::Matched;
 
 /// What the ground's end of the `payload_telemetry` links is called.
 pub const PAYLOAD_TELEMETRY: &str = "payload_telemetry";
@@ -61,6 +63,9 @@ pub struct Moc {
     /// Which port the next receive looks at first, so that one busy source
     /// cannot keep the others waiting.
     next: usize,
+    /// Whether the station is matched with the vehicle, where it watches
+    /// the beacons: see [`Moc::gated_by`]. `None` reads everything.
+    gate: Option<Matched>,
 }
 
 impl Moc {
@@ -202,7 +207,32 @@ impl Moc {
             ports,
             fds,
             next: 0,
+            gate: None,
         })
+    }
+
+    /// Reads data only while the station is matched with the vehicle for
+    /// listening, and counts every datum in `matched`.
+    ///
+    /// While the station is not matched every datum that arrives is dropped
+    /// and counted, rather than read with a configuration that may not be
+    /// the one that made it; each time a match begins, everything already
+    /// queued on this node's sockets is dropped and counted first, since all
+    /// of it was made before the match. A station that watches the vehicle's
+    /// beacons gates every node it opens so; one that does not has nothing
+    /// to gate by, and reads everything.
+    ///
+    /// # Arguments
+    ///
+    /// * `matched` - Whether the station is matched, which its beacon watch
+    ///               keeps, and where what arrives is counted.
+    pub fn gated_by(&mut self, matched: Matched) {
+        // Allocates, once, as the node is gated: the match's list of
+        // sockets to empty.
+        for (_, socket) in &self.ports {
+            matched.queued_on(socket.as_raw_fd());
+        }
+        self.gate = Some(matched);
     }
 
     /// The `moc` node's name.
@@ -287,6 +317,63 @@ impl Moc {
         wait: Option<Duration>,
         out: &mut [u8],
     ) -> Result<Option<Arrival>, String> {
+        let deadline = wait.map(|wait| Instant::now() + wait);
+        loop {
+            let left = deadline.map(|deadline| {
+                deadline.saturating_duration_since(Instant::now())
+            });
+            let Some(arrival) = self.next_arrival(left, out)? else {
+                return Ok(None);
+            };
+            match self.gate.as_ref() {
+                // Not matched: dropped and counted, and the wait goes on for
+                // as long as it was asked to.
+                Some(matched) if !matched.for_listening() => {
+                    matched.mismatched(1);
+                    continue;
+                }
+                Some(matched) if arrival.length > out.len() => {
+                    matched.malformed();
+                }
+                Some(matched) => matched.processed(),
+                None => {}
+            }
+            if arrival.length > out.len() {
+                let (source, _) = &self.ports[arrival.source];
+                return Err(format!(
+                    "\"{}\": \"{source}\" sent {} bytes, which is more \
+                     than the {} there was room for: receive into a buffer of \
+                     DATUM_BYTES",
+                    self.name,
+                    arrival.length,
+                    out.len()
+                ));
+            }
+            return Ok(Some(arrival));
+        }
+    }
+
+    /// The next datagram to arrive at any of this node's sockets, waiting up
+    /// to `wait` for one, or for ever where it is `None`.
+    ///
+    /// # Arguments
+    ///
+    /// * `wait` - How long to wait, or `None` for ever.
+    /// * `out`  - Where the datagram is put, from its start.
+    ///
+    /// # Returns
+    ///
+    /// Which source sent it and how long it was, which is more than `out`
+    /// holds where it was cut short; `None` where the wait ran out.
+    ///
+    /// # Errors
+    ///
+    /// A message where waiting or reading fails.
+    fn next_arrival(
+        &mut self,
+        wait: Option<Duration>,
+        out: &mut [u8],
+    ) -> Result<Option<Arrival>, String> {
         for fd in &mut self.fds {
             fd.revents = 0;
         }
@@ -355,18 +442,22 @@ impl Moc {
                     std::io::Error::last_os_error()
                 ));
             };
-            if length > out.len() {
-                return Err(format!(
-                    "\"{}\": \"{source}\" sent {length} bytes, which is more \
-                     than the {} there was room for: receive into a buffer of \
-                     DATUM_BYTES",
-                    self.name,
-                    out.len()
-                ));
-            }
             return Ok(Some(Arrival { source: at, length }));
         }
         Ok(None)
+    }
+}
+
+impl Drop for Moc {
+    /// Takes this node's sockets off its match's list before they close, so
+    /// that the descriptors' numbers, which the system may give to anything
+    /// opened later, are never read from by the match.
+    fn drop(&mut self) {
+        if let Some(matched) = self.gate.as_ref() {
+            for (_, socket) in &self.ports {
+                matched.no_longer_queued_on(socket.as_raw_fd());
+            }
+        }
     }
 }
 
@@ -492,6 +583,58 @@ payloads:
             (received.source, received.data),
             ("a".to_string(), b"from a".to_vec())
         );
+    }
+
+    /// A gated node reads nothing while the station is not matched, and
+    /// drops and counts it; at a match it drops and counts what was queued
+    /// before reading on; and every datum is counted once.
+    #[test]
+    fn a_gated_node_reads_only_while_matched() {
+        use crate::beacon::Stage;
+        use tcslibgs::ConfigDigest;
+
+        let ours = ConfigDigest([0x5A; 16]);
+        let port = a_free_port();
+        let mut moc = Moc::open(&graph(port), "ground").expect("it opens");
+        let matched = crate::matched::Matched::for_configuration(ours);
+        moc.gated_by(matched.clone());
+        let vehicle =
+            UdpSocket::bind("127.0.0.1:0").expect("the vehicle's socket");
+        let send = |what: &[u8]| {
+            vehicle.send_to(what, ("127.0.0.1", port)).expect("sent");
+        };
+        let mut datum = vec![0u8; DATUM_BYTES];
+        let wait = Some(Duration::from_millis(200));
+
+        // Not matched: what arrives is dropped and counted.
+        send(b"before");
+        assert_eq!(moc.receive_into(wait, &mut datum), Ok(None));
+        assert_eq!(matched.counts().mismatched, 1);
+
+        // Queued while not matched, and dropped as the match begins, before
+        // anything is read; what comes after it is read.
+        send(b"queued");
+        send(b"queued too");
+        matched.beacon(false, Some(ours), Stage::Heard, false);
+        assert_eq!(matched.counts().mismatched, 3, "dropped at the match");
+        assert_eq!(moc.receive_into(wait, &mut datum), Ok(None));
+        send(b"matched");
+        let arrival = moc
+            .receive_into(Some(Duration::from_secs(5)), &mut datum)
+            .expect("it reads")
+            .expect("read while matched");
+        assert_eq!(&datum[..arrival.length], b"matched");
+
+        // The match ends with a flagged beacon: nothing is read again.
+        matched.beacon(true, Some(ours), Stage::Heard, false);
+        send(b"flagged");
+        assert_eq!(moc.receive_into(wait, &mut datum), Ok(None));
+
+        let counts = matched.counts();
+        assert_eq!(counts.processed, 1);
+        assert_eq!(counts.mismatched, 4);
+        assert_eq!(counts.received(), 5, "every datum counted once");
+        assert_eq!(counts.malformed, 0);
     }
 
     /// A wait that runs out says nothing arrived.

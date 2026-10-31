@@ -342,6 +342,7 @@ fn status_of(status: CommandStatus) -> StatusType {
         CommandStatus::AlreadyExists => StatusType::ALREADY_EXISTS,
         CommandStatus::Timeout => StatusType::TIMEOUT,
         CommandStatus::Stale => StatusType::STALE,
+        CommandStatus::Unmatched => StatusType::UNMATCHED,
     }
 }
 
@@ -369,6 +370,7 @@ fn status_from(status: StatusType) -> Result<CommandStatus, LinkError> {
         StatusType::ALREADY_EXISTS => CommandStatus::AlreadyExists,
         StatusType::TIMEOUT => CommandStatus::Timeout,
         StatusType::STALE => CommandStatus::Stale,
+        StatusType::UNMATCHED => CommandStatus::Unmatched,
         _ => return Err(LinkError::Value("a status no build has")),
     })
 }
@@ -759,6 +761,7 @@ mod tests {
                 12,
                 CommandStatus::Stale,
             )),
+            Telemetry::Ping(PingTelemetry::new(13, CommandStatus::Unmatched)),
             Telemetry::StartNode(NodeTelemetry::started(
                 6,
                 CommandStatus::Success,

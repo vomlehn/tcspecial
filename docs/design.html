@@ -3366,11 +3366,13 @@ again.</dd>
 <dt>Requirement</dt>
 <dd>A RESTART is taken only once the state file says the next start is a
 commanded one -- see <a class="reference internal" href="#the-generation-number-and-the-state-file">The generation number and the state file</a> -- so
-that the start it asks for begins with the commanded-restart flag set.
-Where that cannot
-be written the RESTART is answered <tt class="docutils literal">Failure</tt>, nothing restarts, and
-the arm stands: a vehicle that came back saying it had not been
-commanded would be telling the ground its RESTART had not taken.</dd>
+that the start it asks for says in its startup summary that it was
+commanded. Where that cannot be written the RESTART is answered
+<tt class="docutils literal">Failure</tt>, nothing restarts, and the arm stands: a vehicle that came
+back saying in its log that it had not been commanded would be telling
+whoever reads it that its RESTART had not taken. (The beacon's restart
+flag does not depend on it: every start sets the flag. See
+<a class="reference internal" href="#configurations-named-by-their-checksum">Configurations named by their checksum</a>.)</dd>
 <dt>Requirement</dt>
 <dd>A RESTART that is taken is answered before anything stops, so the ground
 hears that it was taken before the links close under it. The vehicle then
@@ -5608,11 +5610,11 @@ lower-case hex digits</td>
 sent, from one, in decimal digits with no sign or space, and
 no more than 32 bits hold</td>
 </tr>
-<tr><td>commanded</td>
-<td><tt class="docutils literal">restart</tt> while a restart the ground commanded is under
-way and the MOC has not connected since, and <tt class="docutils literal">normal</tt>
-otherwise: the <em>commanded-restart flag</em>,
-<tt class="docutils literal">commanded_restart</tt> in code</td>
+<tr><td>restart</td>
+<td><tt class="docutils literal">restart</tt> from every start of tcspecial, and from its
+taking a RESTART, until the start takes a CONNECT carrying
+its configuration's checksum, and <tt class="docutils literal">normal</tt> otherwise: the
+<em>restart flag</em>, <tt class="docutils literal">restart_flag</tt> in code</td>
 </tr>
 <tr><td>interface</td>
 <td>The digest of the interface this tcspecial speaks, as 32
@@ -5662,8 +5664,8 @@ digests, which is the difference a version would have told.</dd>
 <dt>Requirement</dt>
 <dd>The MOC shows what the last beacon said as one line, each part
 labelled: <tt class="docutils literal">tcspecial v0.1.0 md5</tt> and the digest's sixteen bytes in
-hex with nothing between them, then <tt class="docutils literal">, COMMANDED RESTART</tt> where the
-commanded-restart flag says <tt class="docutils literal">restart</tt>. That is the window's way of
+hex with nothing between them, then <tt class="docutils literal">, RESTARTED, NOT YET MATCHED</tt>
+where the restart flag says <tt class="docutils literal">restart</tt>. That is the window's way of
 writing it, not what is on the wire, which is the beacon's own text
 above. The answer to a <tt class="docutils literal">CONNECT</tt> is written the same way, up to the
 digest; see <a class="reference internal" href="#what-each-end-read">What Each End Read</a>.</dd>
@@ -5705,9 +5707,10 @@ heard is a start, the same number as the last is the radio delivering
 one twice and counts for nothing, the next number is the next beacon,
 and a higher one says how many were missed. The MOC says which it was:
 <em>n beacons did not arrive: #x came after #y</em>, or <em>the beacons start
-again at #n, so tcspecial has restarted as commanded</em>, or <em>... has
-restarted without being commanded to, with the definitions it had</em>, as
-the beacon's commanded-restart flag says.</dd>
+again at #n, so tcspecial has restarted</em>. Not whether the restart was
+commanded: every start sets the restart flag, so the flag cannot say,
+and the checksum the beacon carries says which configuration the start
+is running.</dd>
 </dl>
 </div>
 </div>
@@ -5723,14 +5726,14 @@ once; where another section says the same thing, the one stating it is the
 one it follows.</p>
 <div class="admonition note">
 <p class="first admonition-title">Note</p>
-<p class="last"><strong>What runs today.</strong> The beacon is text, carries the commanded-restart
-flag and the interface digest, and no generation, and is written and
-read without allocating.
+<p class="last"><strong>What runs today.</strong> The beacon is text, carries the restart flag and
+the interface digest, and no generation, and is written and read without
+allocating.
 <tt class="docutils literal">state_file</tt>, <tt class="docutils literal">beacon.default_interval</tt> and <tt class="docutils literal">beacon.reset_interval</tt>
 are read; every start counts its generation in the state file before its
 first beacon, and every answer carries it; the beacon goes fast from
-start, and from a restart's being initiated, and slows when a CONNECT is
-taken. <tt class="docutils literal"><span class="pre">tcslibgs::interface</span></tt> gives the interface digest in Rust and
+start, and from a restart's being initiated, and slows when a CONNECT
+carrying the running configuration's checksum is taken. <tt class="docutils literal"><span class="pre">tcslibgs::interface</span></tt> gives the interface digest in Rust and
 Python. <tt class="docutils literal">tcslib</tt>'s <tt class="docutils literal">TcsClient</tt>, and through it the C/C++ library,
 holds a station's commands from a RESTART until a beacon whose number
 went back says it is done, and the beacon watches in Rust and Python
@@ -6055,11 +6058,43 @@ sends some other way must not either.</dd>
 <h2><a class="toc-backref" href="#toc-entry-65">Configurations named by their checksum</a></h2>
 <div class="admonition note">
 <p class="first admonition-title">Note</p>
-<p class="last"><strong>Designed, not yet built</strong> (2026-10-30). This section is how tcspecial
-and the ground are to make sure nothing is sent with one configuration
-and read with another. Once it is built it replaces the requirements
-listed under <a class="reference internal" href="#what-this-replaces">What this replaces</a>, below; until then those describe
-what runs. What is still to be decided is under <a class="reference internal" href="#still-to-be-decided">Still to be decided</a>.</p>
+<p><strong>Partly built</strong> (2026-10-30). This section is how tcspecial and the
+ground are to make sure nothing is sent with one configuration and read
+with another. What is still to be decided is under <a class="reference internal" href="#still-to-be-decided">Still to be
+decided</a>.</p>
+<p><em>Built:</em> in <a class="reference internal" href="#starting-and-the-restart-flag">Starting, and the restart flag</a>, the restart flag set at
+every start and from a RESTART's being taken and cleared only by a
+matching CONNECT; nothing sent down but beacons and answers until a
+match; every command but the three answered <tt class="docutils literal">Unmatched</tt> (status 10)
+and not acted on until a match; and the commands queued on the node
+command link dropped at a match. In <a class="reference internal" href="#the-three-commands-that-always-go">The three commands that always
+go</a>, the three being taken at any time, named once in
+<tt class="docutils literal"><span class="pre">tcslibgs::CommandType::taken_unmatched</span></tt>, and the CONNECT requirement:
+its answer carries the running checksum, a matching one clears the flag,
+sends a beacon at once, slows the beacons and opens the downlink and the
+other commands, one with another checksum changes nothing else, one
+after a RESTART changes nothing, and the ground takes a CONNECT as
+matched only when its answer carries the station's checksum. In <a class="reference internal" href="#on-the-ground">On the
+ground</a>, every requirement but tcsmoc's pop-ups: the station's match
+(<tt class="docutils literal"><span class="pre">tcslib::matched</span></tt>), data dropped and counted while not matched and
+what is queued dropped and counted as a match begins, a match ended by a
+flagged beacon, another checksum or an overdue beacon, answers taken
+only by their sequence, the four counts (shown by tcsmoc and given by
+the C/C++ library), the differing checksum said, and <tt class="docutils literal">TcsClient</tt>
+refusing all but the three, unsent. <tt class="docutils literal">TcsClient</tt> queues no commands, so
+ending a match has nothing to throw away; tcsmoc reads one configuration
+for as long as it runs, so a node id is never taken from another.</p>
+<p class="last"><em>Not yet built:</em> <a class="reference internal" href="#keeping-configurations-on-board">Keeping configurations on board</a> entirely; in
+<a class="reference internal" href="#starting-and-the-restart-flag">Starting, and the restart flag</a>, removing the generation, the state
+file naming configurations by checksum and the confirmed one, the order
+a start loads them in, a damaged state file loading the command line's,
+and <tt class="docutils literal">load_trials</tt>; in <a class="reference internal" href="#the-three-commands-that-always-go">The three commands that always go</a>, a frozen
+layout for the three (see <a class="reference internal" href="#still-to-be-decided">Still to be decided</a>), the checksums in
+RESTART_ARM and RESTART and refusing one that names no configuration
+held, and the two functions a restart calls; tcsmoc's pop-ups; and
+removing what <a class="reference internal" href="#what-this-replaces">What this replaces</a> lists as still standing. Until those
+are built, a restart runs the same configuration file again, and the
+generation and its checks stay beside the match.</p>
 </div>
 <p>A configuration is known by its <em>checksum</em>: the MD5 <tt class="docutils literal">tcsverify</tt>
 computes of it, the configuration digest (<tt class="docutils literal"><span class="pre">tcslibgs::config_digest</span></tt>).
@@ -6354,22 +6389,32 @@ leaves as it is.</dd>
 </div>
 <div class="section" id="what-this-replaces">
 <h3><a class="toc-backref" href="#toc-entry-71">What this replaces</a></h3>
-<p>Once built, these requirements are replaced:</p>
+<p>Replaced already, and rewritten where they stand to say what runs:</p>
 <ul class="simple">
 <li><a class="reference internal" href="#the-beacon-across-a-restart">The beacon across a restart</a>: the commanded-restart flag, set only for
-a commanded restart and cleared by any CONNECT. The flag becomes the
-restart flag above.</li>
-<li><a class="reference internal" href="#kinds-of-restart">Kinds of restart</a>: a start being commanded or not, and only a
-commanded start changing the definitions. The checksum in the beacon
-says which configuration a start is running, whichever kind it is.</li>
-<li><a class="reference internal" href="#the-generation-number-and-the-state-file">The generation number and the state file</a>, and every requirement that
-an answer carries a generation or that the ground compares generations.
-There is no generation.</li>
-<li><a class="reference internal" href="#what-the-ground-may-send-meanwhile">What the ground may send meanwhile</a>: the wait for a beacon whose
-number went back, and the commands allowed during it. Being matched
-decides what the ground may send.</li>
+a commanded restart and cleared by any CONNECT. It is the restart flag
+above, set at every start.</li>
+<li><a class="reference internal" href="#kinds-of-restart">Kinds of restart</a>: a commanded start's beacons beginning with the flag
+set and a start nobody commanded's with it clear. Whether a start was
+commanded is now said only in its startup summary.</li>
+<li><a class="reference internal" href="#what-the-ground-may-send-meanwhile">What the ground may send meanwhile</a>: the wait's reading of the flag to
+say whether the start that came back was the one commanded, and the
+station's sending PING before it is matched. Being matched decides what
+the ground may send beside the three; the wait for a beacon whose number
+went back still refuses all but the three meanwhile.</li>
 <li><a class="reference internal" href="#downlinked-data-across-a-switch">Downlinked data across a switch</a>: reading each datum with the last
 beacon's definitions. The ground reads data only while matched.</li>
+</ul>
+<p>Replaced once the rest is built, and describing what runs until then:</p>
+<ul class="simple">
+<li><a class="reference internal" href="#kinds-of-restart">Kinds of restart</a>: only a commanded start changing the definitions.
+The checksum in the beacon says which configuration a start is running,
+whichever kind it is.</li>
+<li><a class="reference internal" href="#the-generation-number-and-the-state-file">The generation number and the state file</a>, and every requirement that
+an answer carries a generation or that the ground compares generations.
+There is to be no generation.</li>
+<li><a class="reference internal" href="#what-the-ground-may-send-meanwhile">What the ground may send meanwhile</a>: the wait for a beacon whose
+number went back, and the commands allowed during it.</li>
 <li>In <a class="reference internal" href="#holes-in-this-and-what-closes-them">Holes in this, and what closes them</a> under <a class="reference internal" href="#fault-resiliency">Fault Resiliency</a>: the
 entries on the generation, the state file, downlinked data and commands
 across a switch, a restart nobody commanded, a wait that never ends, a
@@ -6395,8 +6440,12 @@ the three get a layout of their own, is open.</dd>
 <h2><a class="toc-backref" href="#toc-entry-73">In-flight data across a restart</a></h2>
 <div class="admonition note">
 <p class="first admonition-title">Note</p>
-<p class="last"><strong>Designed, not yet built</strong>, with <a class="reference internal" href="#configurations-named-by-their-checksum">Configurations named by their
-checksum</a>, whose rules this section follows through a restart.</p>
+<p class="last"><strong>Partly built</strong>, with <a class="reference internal" href="#configurations-named-by-their-checksum">Configurations named by their checksum</a>, whose
+rules this section follows through a restart. Every drop in <a class="reference internal" href="#what-is-dropped-and-where">What is
+dropped, and where</a> is built. A restart onto another configuration, as
+the first figure draws it, waits for configurations kept on board: until
+then a restart reads the same configuration file again, and is the
+second figure's case unless that file was changed.</p>
 </div>
 <p>When either end restarts, or the ground changes the configuration it is
 using, there are packets on their way that one configuration made and that
@@ -6567,16 +6616,17 @@ misreading.</p>
 <div class="section" id="kinds-of-restart">
 <h2><a class="toc-backref" href="#toc-entry-78">Kinds of restart</a></h2>
 <p>A start of tcspecial is commanded or it is not, and which it is decides
-whether the definitions it runs with may change: see <a class="reference internal" href="#the-beacon-across-a-restart">The beacon across a
-restart</a> for what each says in its beacons.</p>
+whether the definitions it runs with may change. Its beacons do not say
+which: every start begins with the restart flag set -- see <a class="reference internal" href="#configurations-named-by-their-checksum">Configurations
+named by their checksum</a> -- and the startup summary says which it was.</p>
 <dl class="docutils">
 <dt>Requirement</dt>
 <dd>A start is <em>commanded</em> when the state file says so: the start before
 took an armed RESTART or SWITCH with the right key. A commanded start
-begins with the commanded-restart flag set in its beacons and may change
-the definitions it runs with. A start nobody commanded -- a crash, a
-power cycle, a supervisor's restart -- begins with the flag clear and
-runs with the definitions it had.</dd>
+may change the definitions it runs with. A start nobody commanded -- a
+crash, a power cycle, a supervisor's restart -- runs with the
+definitions it had. Either begins with the restart flag set, and the
+checksum in its beacons says which configuration it runs.</dd>
 <dt>Requirement</dt>
 <dd>The executable the vehicle is installed with is the <em>golden</em> build. It is
 always what starts: on every start it reads the state file and, where a
@@ -6638,8 +6688,10 @@ nothing one command was answered with is read as another's
 (<tt class="docutils literal"><span class="pre">TcsClient::answers_dropped</span></tt>).</dd>
 </dl>
 <p>What that means for each command: PING and the two queries change nothing.
-CONNECT changes only the beacons -- it clears the commanded-restart flag and
-slows them -- which a repeat leaves as the first did. START_NODE and
+CONNECT changes only the beacons, the downlink and which commands are taken --
+one carrying the running configuration's checksum clears the restart flag,
+slows the beacons and opens the rest -- which a repeat leaves as the first
+did. START_NODE and
 STOP_NODE answer <tt class="docutils literal">Success</tt> for a node already in the state asked for, and
 every attribute SET_NODE may set is a value, not a step. RESTART_ARM with the
 key of the arm already standing leaves that arm as it was -- see
@@ -6662,12 +6714,12 @@ and how many times each has started.</dd>
 <dt>Requirement</dt>
 <dd>An armed RESTART or SWITCH that is taken writes to the state file that
 the next start is commanded, before it is answered. The start that
-reads it begins with the commanded-restart flag set in its beacons, and
-writes the file again without it as it counts itself, so that a later
-start of its own
--- a crash -- is not taken for a commanded one. A state file that is
-damaged says nothing of the next start, which is then taken for one
-nobody commanded.</dd>
+reads it says so in its startup summary, and writes the file again
+without it as it counts itself, so that a later start of its own -- a
+crash -- is not taken for a commanded one. A state file that is damaged
+says nothing of the next start, which is then taken for one nobody
+commanded. Neither changes the beacons: every start begins with the
+restart flag set.</dd>
 <dt>Requirement</dt>
 <dd>Every start of tcspecial -- a commanded restart, a crash the supervisor
 restarted, a power cycle -- adds one to the generation number and writes
@@ -6699,19 +6751,20 @@ seen as a restart.</dd>
 <h2><a class="toc-backref" href="#toc-entry-81">The beacon across a restart</a></h2>
 <dl class="docutils">
 <dt>Requirement</dt>
-<dd>The beacon carries a <em>commanded-restart</em> flag, written <tt class="docutils literal">restart</tt> when
-it is set and <tt class="docutils literal">normal</tt> when it is clear, which says that a restart the
-ground commanded is under way and the MOC has not connected since.
-tcspecial sets it the moment it takes an armed RESTART or SWITCH with
-the right key, and the start that comes back begins with it set. It is
-cleared when that start takes a CONNECT from the MOC. A start nobody
-commanded -- a first start, a crash the supervisor restarted, a power
-cycle -- begins with it clear.</dd>
+<dd>The beacon carries the <em>restart flag</em>, written <tt class="docutils literal">restart</tt> when it is
+set and <tt class="docutils literal">normal</tt> when it is clear, which says that this start has not
+been matched by the ground: see <a class="reference internal" href="#configurations-named-by-their-checksum">Configurations named by their
+checksum</a>. Every start begins with it set -- a first start, a commanded
+restart, a crash the supervisor restarted, a power cycle -- and
+tcspecial sets it again the moment it takes an armed RESTART or SWITCH
+with the right key. It is cleared when the start takes a CONNECT
+carrying the running configuration's checksum, and by nothing else.</dd>
 <dt>Requirement</dt>
 <dd>The beacon carries no generation. Its number going back is what says a
-start, because the radio delivers in order, and the flag says whether it
-was the start the ground asked for. The generation is in every answer,
-where a station that commands learns it from the answer to CONNECT.</dd>
+start, because the radio delivers in order. The flag does not say
+whether it was the start the ground asked for: every start sets it. The
+generation is in every answer, where a station that commands learns it
+from the answer to CONNECT.</dd>
 <dt>Requirement</dt>
 <dd>Only a commanded start may change the definitions the vehicle runs with.
 A start nobody commanded runs with the definitions the start before it
@@ -6729,20 +6782,22 @@ which is not nought and not longer than
 <tt class="docutils literal">beacon.default_interval</tt>, and a file still writing <tt class="docutils literal">interval</tt> is
 told so by name.</dd>
 <dt>Requirement</dt>
-<dd>When a restart is initiated, the commanded-restart flag is set, a beacon
+<dd>When a restart is initiated, the restart flag is set, a beacon
 is sent at once, and from then on beacons are sent every
 <tt class="docutils literal">reset_interval</tt>. They come fast because the ground is waiting for
 the next start's first beacon, and the flag says at once that the
 RESTART was taken, whatever becomes of its answer.</dd>
 <dt>Requirement</dt>
 <dd>Every start of tcspecial beacons every <tt class="docutils literal">reset_interval</tt> until it takes
-a CONNECT, and its first beacon follows the generation number's being
-incremented and the state file's being written, so the first beacon of
-a commanded start already carries the flag.</dd>
+a CONNECT carrying its configuration's checksum, and its first beacon
+follows the generation number's being incremented and the state file's
+being written. Every start's first beacon carries the flag.</dd>
 <dt>Requirement</dt>
 <dd>A CONNECT taken -- valid, from where the configuration says the MOC
-sends from, and answered -- clears the commanded-restart flag, sends a
-beacon at once, and from then on beacons every <tt class="docutils literal">default_interval</tt>.
+sends from, answered, and carrying the running configuration's
+checksum -- clears the restart flag, sends a beacon at once, and from
+then on beacons every <tt class="docutils literal">default_interval</tt>. One carrying another
+checksum does neither.
 Once a restart has been initiated a
 CONNECT does neither: the flag stays set and the beacons stay at
 <tt class="docutils literal">reset_interval</tt> until the process ends. No other command slows the
@@ -6766,9 +6821,9 @@ connect.</p>
 it. The answer is a packet like any other on a link that loses them, and the
 vehicle may be gone before it is sent again, so the ground may never hear one;
 the beacons keep coming whatever happens to the answer. A beacon
-whose number has gone back says the old start has gone, and its
-commanded-restart flag says whether the start that replaced it is the one the
-RESTART asked for. Until
+whose number has gone back says the old start has gone; its restart flag is
+set, as every start's is, so it does not say whether the start that replaced
+it is the one the RESTART asked for. Until
 that beacon, the ground cannot know which definitions a packet it sends would
 be read with, so it sends none.</p>
 <dl class="docutils">
@@ -6777,7 +6832,9 @@ be read with, so it sends none.</p>
 but CONNECT, RESTART_ARM and RESTART until it has a beacon whose number
 is lower than the one before it: a beacon saying that tcspecial has
 started again, and is using the definitions it has started with. Then
-it sends nothing but PING and CONNECT until a CONNECT is answered.
+it sends nothing but those three until it is matched for commanding --
+see <a class="reference internal" href="#on-the-ground">On the ground</a> -- which a CONNECT answered with its checksum, and
+a beacon with the flag clear, make it.
 <tt class="docutils literal">tcslib</tt>'s <tt class="docutils literal">TcsClient</tt> holds to this itself, refusing any other
 command in between, unsent, and <tt class="docutils literal"><span class="pre">RestartWait::lets</span></tt> is where the three
 are named. CONNECT changes nothing the restart depends on, and is how an
@@ -6792,16 +6849,13 @@ Disconnected and forgets what the last CONNECT agreed, because the
 start that came back may be flying other definitions and knows nothing
 of the station.</dd>
 <dt>Requirement</dt>
-<dd>The wait says how it ended. Beacons that start again with the
-commanded-restart flag set are the start the SWITCH or RESTART asked
-for. Beacons that start again with the flag
-clear is a start nobody commanded -- the vehicle crashed or lost power
-before the command was taken -- running with the definitions it had: the
-command did not happen, and the station says so rather than going on as
-though it had. Where a CONNECT sent during the wait was answered by a
-generation other than the one the RESTART went to, that start has
-cleared its flag, and a clear flag says nothing: the station says it
-cannot tell, and finds out before sending the RESTART again.</dd>
+<dd>The wait says that it ended, and not how. Every start begins with the
+restart flag set, so the flag cannot tell the start the SWITCH or
+RESTART asked for from one nobody commanded -- the vehicle crashed or
+lost power before the command was taken. The checksum in the new
+start's beacons says which configuration it runs, and matching it is
+what lets the station command it again; the vehicle's own log says
+whether the start was commanded.</dd>
 <dt>Requirement</dt>
 <dd>The wait does not depend on the answer: one that never arrives leaves it
 standing until the beacon comes. An answer that does arrive and says
@@ -6819,9 +6873,10 @@ and the ground's client. The link delivers in order -- see <a class="reference i
 assumed</a> -- so a command sent before a RESTART arrives before it, and
 the client sends nothing after a RESTART but CONNECT, RESTART_ARM and
 RESTART until a beacon says a start came back, and then nothing but
-PING and CONNECT until a CONNECT is answered; nor anything but those
-after an answer of another generation, or a beacon whose number went
-back, until a CONNECT is answered. PING and CONNECT go whatever the
+those three until it is matched for commanding; nor anything but PING
+and CONNECT after an answer of another generation, or a beacon whose
+number went back, until a CONNECT is answered. Before a match a PING is
+refused besides, by <tt class="docutils literal"><span class="pre">tcslibgs::CommandType::taken_unmatched</span></tt>. PING and CONNECT go whatever the
 generation, so a ground station that has not yet
 heard a beacon can still find out what is flying; which commands those
 are is <tt class="docutils literal"><span class="pre">tcslibgs::CommandType::always_taken</span></tt>, and nowhere else.</dd>
@@ -6839,8 +6894,10 @@ command arrive after one sent later all the same, the later one is what
 the ground meant last. Older is by serial-number arithmetic on the
 four-byte sequence (RFC 1982), <tt class="docutils literal"><span class="pre">tcslibgs::sequence_is_before</span></tt>, so that a count that wraps
 still goes forward. A command of the same sequence as the newest taken
-is a repeat, not an older command, and is taken. PING and CONNECT are
-answered however old they are, by the same
+is a repeat, not an older command, and is taken. A command refused
+<tt class="docutils literal">Unmatched</tt> is refused before its sequence is looked at, and does not
+count as taken. PING and CONNECT are answered however old they are, by
+the same
 <tt class="docutils literal"><span class="pre">tcslibgs::CommandType::always_taken</span></tt>. The newest taken is not kept
 across a restart, and need not be: a command sent before a RESTART
 arrives before it, in order, and the ground sends none after it until
@@ -6930,8 +6987,9 @@ with each datum's.</dd>
 <dt>A restart nobody commanded changing the format</dt>
 <dd>A crash or a power cycle is a restart the ground did not ask for. It
 runs with the definitions it had, so nothing the ground sends is read
-differently, and its beacons' commanded-restart flag is clear, so the
-ground knows not to take up new ones. The fallback to the golden build
+differently. Its beacons carry the restart flag, as every start's do,
+and the checksum of the configuration it runs, which the ground matches
+before it reads anything of it. The fallback to the golden build
 is the exception, and the interface digest in its beacons says so.</dd>
 <dt>Commands in flight across the switch</dt>
 <dd>A command sent before the SWITCH arrives before it, because the link
@@ -6946,12 +7004,13 @@ overdue enough to say the vehicle may be starting again.</dd>
 <dd>If the SWITCH was refused, or never arrived, no beacon starts again.
 A refusal ends the wait; a SWITCH that never arrived shows as beacons
 that go on counting at their own interval, not every
-<tt class="docutils literal">reset_interval</tt>, and without the commanded-restart flag, and the
-operator may end the wait by hand.</dd>
+<tt class="docutils literal">reset_interval</tt>, and without the restart flag, and the operator may
+end the wait by hand.</dd>
 <dt>A stray packet slowing the beacons or clearing the flag</dt>
 <dd>Only a CONNECT, valid, from the address the configuration says the MOC
-sends from, and answered, slows the beacons or clears the
-commanded-restart flag; no other command does either.</dd>
+sends from, answered, and carrying the running configuration's
+checksum, slows the beacons or clears the restart flag; no other command
+does either.</dd>
 <dt>A load set that is incomplete, or not what the ground meant</dt>
 <dd>The manifest names every file with its size and MD5, the SWITCH names the
 interface digest, and the vehicle checks the set at LOAD_CHECK and again
@@ -6976,7 +7035,9 @@ CONNECT, RESTART_ARM and RESTART, and its wait does not end without a
 beacon whose number went back, so the restart is not taken for done:
 the wait goes on. A CONNECT then answered by another generation says a
 start came back, but does not end the wait either. The flag cannot end it,
-because the old start's last beacons carried it too. What ends it is
+because the old start's last beacons carried it too. The station is not
+matched meanwhile in any case: the new start's beacons carry the flag
+until a matching CONNECT. What ends it is
 <tt class="docutils literal"><span class="pre">TcsClient::end_restart_wait</span></tt>, by hand, which tcsmoc does not yet
 offer: until it does, an operator in that state starts tcsmoc again.
 Should a missed restart nobody commanded ever matter, the remedy is the
@@ -10953,11 +11014,12 @@ arrived.</p>
 <dl class="docutils">
 <dt>Requirement</dt>
 <dd>To the right of the indicator a field that cannot be edited reads
-<tt class="docutils literal">Restarted—connect</tt> while the last beacon's commanded-restart flag
-said <tt class="docutils literal">restart</tt>, and is empty while it said <tt class="docutils literal">normal</tt>. The flag is
-set from a commanded
-restart until the MOC connects, so the field says what the operator is
-to do next: press Connect, which clears it. The <tt class="docutils literal">beacon</tt> example's
+<tt class="docutils literal">Restarted—connect</tt> while the last beacon's restart flag said
+<tt class="docutils literal">restart</tt>, and is empty while it said <tt class="docutils literal">normal</tt>. The flag is set
+from every start of tcspecial, and from its taking a RESTART, until it
+takes a CONNECT carrying its configuration's checksum, so the field
+says what the operator is to do next: press Connect, with the
+configuration whose checksum the beacons carry, which clears it. The <tt class="docutils literal">beacon</tt> example's
 window, which commands nothing and so cannot connect, does not show it.</dd>
 <dt>Requirement</dt>
 <dd>When a wait on a restart ends, <tt class="docutils literal">Last Response</tt> says how: <tt class="docutils literal">tcspecial

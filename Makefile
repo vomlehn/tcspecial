@@ -406,6 +406,8 @@ SPELLINGS = \
 	examples/thermostat/thermostat:examples/thermostat/thermostat-sim.yaml \
 	examples/simple-app/simple-app:examples/simple-app/simple-app-sim.yaml \
 	examples/beacon/beacon:examples/beacon/beacon-sim.yaml \
+	examples/fprime/fprime:examples/fprime/fprime-sim.yaml \
+	examples/cfs/cfs:examples/cfs/cfs-sim.yaml \
 	example:example-sim.yaml
 
 # Every shipped configuration, both spellings: the examples, the thermostat

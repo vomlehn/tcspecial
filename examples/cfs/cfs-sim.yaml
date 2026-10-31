@@ -1,0 +1,25 @@
+# yaml-language-server: $schema=../../tcsgui/share/schema/tcspecial-sim.schema.json
+
+# How tcssim stands in for the payloads of cfs.ytcs.
+description: Simulator settings for the payloads of cfs.ytcs
+
+# Where tcssim answers whether it has made its stand-ins, which whatever
+# starts the run asks before it starts tcspecial. A port no other example
+# uses, so that two can be run at once.
+tcssim:
+  ready: "127.0.0.1:7908"
+
+simulated_payloads:
+  # Driven and never read: its stand-in sends nothing and counts what the
+  # vehicle sends it, so that its panel shows each command reaching it.
+  - name: heater
+    simulate: true
+    type: network
+    protocol: udp
+
+  # One reading a second, sent whole.
+  - name: thermometer
+    simulate: true
+    type: network
+    protocol: udp
+    packet_interval: 1 s

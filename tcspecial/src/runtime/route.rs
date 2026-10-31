@@ -663,9 +663,7 @@ mod tests {
         assert_eq!(link.via, Via::Gateway("gateway".to_string()));
         // The thermostat's mean is its fifth node, id 4, and its gateway node's
         // ground_base is 10.0.0.2:5100.
-        assert_eq!(
-            (link.ground.address.as_str(), link.ground.port),
-            ("10.0.0.2", 5104)
-        );
+        let ground = link.ground().expect("a link over UDP");
+        assert_eq!((ground.address.as_str(), ground.port), ("10.0.0.2", 5104));
     }
 }

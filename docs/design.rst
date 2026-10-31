@@ -722,15 +722,20 @@ winner decided by the order the files happened to be read in.
 Gateways: what the vehicle answers to
 -------------------------------------
 
-**Specified, and built as far as the F´ gateway node.** ``tcspecial.gateway``
-is read and required; ``radio`` and ``fprime`` are the kinds it accepts, and a
-configuration naming ``cfs`` is refused as specified but not yet built --
+**Specified, and built but for the far ends.** ``tcspecial.gateway`` is read
+and required, and ``radio``, ``cfs`` and ``fprime`` are all accepted --
 ``tcslibgs::gateway`` is the one place that says which kinds are built, which
-node type is which kind's, and what each calls its far end. The radio is the
-``gateway_radio`` node; the F´ gateway is the ``gateway_fprime`` node, opened,
-counted and driven as the radio's is, and ``examples/fprime`` flies it. Not yet
-built: the bridge's F´ model generated from the configuration, and the
-``TcsBridge`` component itself.
+node type is which kind's, which are on a bus, and what each calls its far
+end. The radio is the ``gateway_radio`` node; the F´ gateway is the
+``gateway_fprime`` node, opened, counted and driven as the radio's is, and
+``examples/fprime`` flies it. cFS is the ``gateway_cfs`` node, with every link
+of the vehicle carried over one SBN peer (``tcspecial::runtime::bus``, on
+``tcslibgs::sbn`` and ``tcslibgs::cfs``), and ``examples/cfs`` flies it
+against a test playing the cFS end. Not yet built: the bridge's F´ model
+generated from the configuration, the ``TcsBridge`` component itself, tcssim
+standing in for the cFS end and tcslib's SBN transport, so that tcsmoc cannot
+yet command a vehicle that answers to cFS (see `What crosses the bus`_), and
+the run against cFS's own Linux build.
 
 The gateway nodes are written in the ``gateway`` section, linked through
 ``gateway-in`` and ``gateway-out``, with ``tee-gateway``, ``null-gateway`` and
@@ -903,7 +908,8 @@ is stated once, in ``tcspecial``:
      tcs_cmd: { cmd_msgid: "0x4280", response_msgid: "0x4200" }
      payload_command: { cmd_base: "0x4290", response_base: "0x4210" }
      payload_telemetry: { tlm_base: "0x4220" }
-     beacon: { default_interval: "5 s", tlm_msgid: "0x4201" }
+     beacon: { default_interval: "5 s", reset_interval: "1 s",
+               tlm_msgid: "0x4201" }
 
    gateway:
      - name: fsw
@@ -913,7 +919,16 @@ is stated once, in ``tcspecial``:
        payload-in: true
 
 (The numbers are illustrative, and laid out for the message-ID mapping below;
-the allotment is the mission's.)
+the allotment is the mission's. ``beacon.reset_interval`` is required here as
+everywhere: it times beacons, not a socket. ``examples/cfs`` is this
+configuration whole.)
+
+``payload_command``'s bases count by every node's id, not only a payload's:
+the link is the one commands about a node arrive on, and a node command may
+be about a computation or a log as well. A node command published under one
+node's message ID that names another node is answered ``InvalidCommand`` and
+not acted on, as a command on the wrong UDP link is: one end is not reading
+the configuration the other is.
 
 What SBN is, on the wire
 ^^^^^^^^^^^^^^^^^^^^^^^^
@@ -921,10 +936,18 @@ What SBN is, on the wire
 Every SBN message over UDP is one datagram: a 13-byte header -- the length of
 what follows as four bytes, the message type as one, the sender's processor
 ID as four and its spacecraft ID as four, all most significant byte first --
-and then the message. The types are a subscription, an unsubscription, an
-application's message (a cFS packet, carried whole), and SBN's protocol
-version; the UDP module adds a heartbeat, an announcement and a disconnect of
-its own. A peer is connected by the first datagram that arrives from it, sends
+and then the message. The types are a subscription (1), an unsubscription
+(2), an application's message (3, a cFS packet, carried whole), and SBN's
+protocol version (4, one byte); the UDP module adds a heartbeat (``0xA0``), an
+announcement (``0xA1``) and a disconnect (``0xA2``) of its own, each carrying
+nothing. A subscription and an unsubscription are laid out alike: the
+48-byte ident, a count of two bytes, and for each message ID four bytes of it
+and a byte each of priority and reliability, which tcspecial sends as nought.
+(The type numbers and the subscription's entries are as built, from SBN
+v7.0.1 as read in October 2026; the copy of cFS beside this tree has no SBN,
+so they were not read again when the gateway was built, and the run against
+cFS's own build is what will confirm them.) ``tcslibgs::sbn`` is the one
+statement of all of it. A peer is connected by the first datagram that arrives from it, sends
 a heartbeat when it has sent nothing for five seconds, and is disconnected by
 ten seconds of silence. Each of those numbers is compiled into SBN and none
 can be configured from this side.
@@ -942,7 +965,8 @@ Two facts in that shape decide requirements here:
   own is refused. Those bytes are git's ``$Id$`` of ``sbn_types.h`` -- the
   hash of that one file as it was checked out -- so they differ between
   releases, and between a release and a mission's copy of it with that file
-  changed.
+  changed. Written out they are ``$Id:``, a space, the 40-digit hash, a space
+  and ``$``, and the C string's terminating nought: 48 bytes.
 
 Requirement
     ``sbn.release`` names an SBN release this build of tcspecial speaks, and
@@ -1018,6 +1042,14 @@ Requirement
     wrongly: the configuration says nothing about it, because there is
     nothing it could choose.
 
+In that header a a command's secondary header is followed by the four spare bytes cFE's
+``CFE_MSG_CommandHeader_t`` pads itself with (``default_cfe_msg_hdr_priext.h``),
+so that a command's data begins sixteen bytes in, where a cFS application
+reads it; a telemetry packet's begins sixteen bytes in too, after its six
+bytes of time. tcspecial writes the spare bytes as nought, the extended
+header's EDS version as cFE's default, 1, and its system ID as
+``sbn.spacecraft_id``, cut to sixteen bits as cFE cuts it.
+
 Requirement
     A cFS function code is seven bits, so every tcspecial command code is
     below 128. ``tcslibgs`` holds the codes to that where they are listed,
@@ -1029,6 +1061,17 @@ Requirement
     check theirs, and a command whose checksum is wrong is answered as one
     that could not be read; every command and response tcspecial sends
     carries a correct one.
+
+    As built, "answered as one that could not be read" is what the UDP links
+    do with a datagram that is not a command: not answered, not acted on, and
+    logged and counted as malformed. So is a command whose function code is
+    not its command's code, and a packet that is not one whole command --
+    another CCSDS version, no secondary header, a segment, a length its
+    primary header does not say. Only what the peer has subscribed to is
+    published, as SBN itself sends a peer only what it asked for, and nothing
+    is published until the peer has been heard and its protocol version
+    checked: tcspecial only answers, and publishes telemetry, so it never
+    sends a command, and so carries the checksum only where it checks one.
 
 Requirement
     At start tcspecial subscribes to its command message IDs --
@@ -1069,6 +1112,14 @@ Requirement
     build, with SBN, is the test that the wire format is SBN's and not only
     ours.
 
+    **Not yet built.** Until it is, ``tcspecial/tests/cfs.rs`` plays the cFS
+    end -- a UDP socket speaking SBN's wire format from ``tcslibgs::sbn`` --
+    against the vehicle flying ``examples/cfs``, and tcslib, tcsmoc and the
+    C/C++ library refuse a configuration that answers to cFS, saying it is
+    to be commanded from the cFS side. A ``gateway_cfs`` node, like the other
+    gateway nodes, has no stand-in of its own in tcssim: it is the far end
+    that is stood in for, not the node.
+
 Requirement
     A message ID is read and written by cFE's version 2 mapping, which a cFS
     built with ``MISSION_MSGID_V2`` uses, and by no other: the low seven bits
@@ -1103,6 +1154,11 @@ Requirement
     stamped wrong by the same amount, which nothing downstream can see.
     The leap-second count is fixed for as long as the configuration is, and
     a change is a new configuration; none has been added since 2017.
+
+    As built, a datum carries no time of its own through the vehicle, so a
+    reading is stamped as the pass that read it delivers it to its link to
+    the bus -- the same pass, before anything else is read -- and an answer
+    and a beacon as they are published.
 
 Requirement
     Commands are carried tunnelled, as stated above, for now. A cFS ground
@@ -1180,6 +1236,8 @@ What locates a node depends on its type:
 
    network, gateway_radio, gateway_fprime
                    address, port, and for network the protocol
+   gateway_cfs     nothing: it is reached through the tcspecial section's
+                   sbn peer, and states message IDs instead
    i2c             path (the bus) and address (the device on it)
    can             interface and can_id
    everything else path
@@ -5779,8 +5837,8 @@ The link without a header
 -------------------------
 
 .. note::
-   **Built** (2026-10-31), but for the framing of ``gateway_cfs``, whose
-   gateway is not built: see `Framing is a gateway's`_. It replaces the
+   **Built** (2026-10-31), with the framing of ``gateway_cfs`` since: see
+   `Framing is a gateway's`_. It replaces the
    CCSDS layout in `Every packet is XTCE`_, above, and settles what was left
    open in `Configurations named by their checksum`_: what of the link
    never changes. What it replaced is under `What the headerless link
@@ -5957,8 +6015,9 @@ playing the MOC, and what F´ itself frames is what the bridge passes on to
 the rest of its deployment, not what crosses the link to tcspecial. The
 framing of ``gateway_cfs`` -- the CCSDS primary header, cFS's extended
 header and its secondary header, around exactly what the UDP link carries
--- is specified in `What crosses the bus`_ and not built, because the
-``gateway_cfs`` node is not: a configuration naming ``cfs`` is refused.
+-- is specified in `What crosses the bus`_ and built in ``tcslibgs::cfs``,
+which the vehicle frames and strips with, refusing and counting as
+malformed whatever arrives on the bus not framed so.
 
 There is then nothing about framing for a configuration to get wrong, or
 for two configurations to disagree about: the node type a configuration

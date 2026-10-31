@@ -1580,9 +1580,13 @@ impl Document {
                 .map(|value| value.trim())
                 .filter(|value| !value.is_empty())
         };
+        // Which are required depends on what the vehicle answers to, which
+        // decides how its links are written.
+        let kind = answered("gateway")
+            .and_then(|said| tcslibgs::gateway::GatewayKind::of(said).ok());
         let filled = tcslibgs::graph::parameters::ATTRIBUTES
             .iter()
-            .filter(|(_, required)| *required)
+            .filter(|(_, needed)| needed.required(kind))
             .all(|(attribute, _)| answered(attribute).is_some());
         if filled {
             let said = self
@@ -3199,8 +3203,8 @@ mod tests {
 
         // Complete and wrong, in the words of the rules that know why.
         for (attribute, instead, expected) in [
-            // A kind that is specified and not built yet.
-            ("gateway", "cfs", "not yet built"),
+            // A word that is no kind of gateway.
+            ("gateway", "ground", "not a kind of gateway"),
             ("beacon.send", "10.0.0.1", "address:port"),
             ("beacon.recv", "127.0.0.1:0", "port 0"),
             // Slower across a restart than otherwise, which defeats it.

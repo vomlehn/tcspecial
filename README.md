@@ -64,7 +64,7 @@ without them:
      make deb                                # build/packages/*.deb
      make rpm                                # build/packages/*.rpm
      make install                            # with apt-get, dnf or zypper
-     make install SIMULATE=1                 # what that would do
+     make install DRY_RUN=1                  # what that would do
      make uninstall                          # remove the packages
      make install-build && sudo make install-files HOOKS=1
      make install-files PREFIX=$HOME/tcs     # no hooks outside the prefix

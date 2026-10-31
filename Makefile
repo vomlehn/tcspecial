@@ -55,7 +55,7 @@ HOOKS ?= 0
 # unless TCS_HELPERS names another, used where it is rather than installed.
 # Installing and packaging check it first: see the tcs-helpers target.
 TCS_HELPERS ?= $(abspath $(CURDIR)/../tcs-helpers)
-TCS_HELPERS_REQUIRED := 0.4.0
+TCS_HELPERS_REQUIRED := 0.5.0
 # tcs-xtce, whose Python package generates the link's codecs and holds the
 # runtime python/tcslibgs/_xtce links to: a checkout of
 # https://github.com/vomlehn/tcs-xtce beside this one, always, since a link
@@ -183,7 +183,7 @@ help:
 	@echo "  make distclean   - Remove everything that can be rebuilt"
 	@echo "  make install     - Build the packages and install them with" \
 		"apt-get, dnf or zypper"
-	@echo "                     (SIMULATE=1: show what it would do)"
+	@echo "                     (DRY_RUN=1: show what it would do)"
 	@echo "  make uninstall   - Remove the installed packages the same way"
 	@echo "  make install-build - The release build install-files copies"
 	@echo "  make install-files - Copy a build already made under PREFIX" \

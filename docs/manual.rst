@@ -2818,7 +2818,7 @@ them do so first:
 ``make install`` builds the packages, as whoever ran it, and installs those
 of the kind this system takes with its usual installer, under sudo: apt-get
 on Debian and Ubuntu, dnf on Fedora and Red Hat's, zypper on SUSE's, read
-from ``/etc/os-release``. ``SIMULATE=1`` has the installer show what it
+from ``/etc/os-release``. ``DRY_RUN=1`` has the installer show what it
 would do and change nothing. ``make uninstall`` removes the packages the
 same way, leaving the configuration and the state, which are the mission's.
 
@@ -2834,7 +2834,7 @@ was copied.
 
 .. code-block:: console
 
-   $ make install SIMULATE=1
+   $ make install DRY_RUN=1
    $ make install
    $ make install-build
    $ sudo make install-files HOOKS=1

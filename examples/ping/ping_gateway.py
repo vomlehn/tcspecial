@@ -13,6 +13,16 @@ in Rust:
 * and this program: read the configuration, start the two loops, put what
   they report in the window.
 
+It sends a CONNECT of its own, carrying the configuration's checksum, as
+soon as the vehicle is started: a vehicle sends nothing down -- the ping
+node's answers included -- until it has taken one, and a station that only
+pings cannot count on a commanding one's being there. It sends it again each
+second no answer comes, or the answer carries another configuration's
+checksum, until the vehicle answers with this one's, and says so; see
+``python/tcslib/listening.py``. It is sent from the configuration's
+``tcs_cmd.send``, so nothing else -- tcsmoc -- may be using that address
+meanwhile. ``--pings`` waits for the match before its first ping.
+
 It starts the vehicle as well: tcspecial, from the repository's build, on the
 same configuration, killed when this program exits -- however it exits, the
 kernel being told to see to it where this program is killed or crashes. So a
@@ -62,6 +72,7 @@ sys.path.insert(0, str(ROOT / "python"))
 sys.path.insert(0, str(HERE))
 
 from tcslib.beacon import Beacons, Schedule  # noqa: E402
+from tcslib.listening import Listening  # noqa: E402
 from tcslibgs import configuration  # noqa: E402
 from tcslibgs.configuration import find_built  # noqa: E402
 from ping_ground import NO_MESSAGE, Pinger, interval, precise_time  # noqa: E402
@@ -309,6 +320,14 @@ class Setup:
         self.digest, self.why_no_digest = configuration.digest(
             options.configuration, options.tcsverify
         )
+        # Where the CONNECT goes from and to, where the section says:
+        # ``None`` for a section that states no command link.
+        said = self.config.tcspecial
+        self.command = (
+            self.config.command_link()
+            if "tcs_cmd.send" in said and "tcs_cmd.recv" in said
+            else None
+        )
 
     def describe(self):
         """The facts, one per line, as the agreement test reads them.
@@ -336,6 +355,63 @@ def status(text):
     doing, as against what has gone wrong, which is said whatever."""
     if VERBOSE:
         print(text, file=sys.stderr, flush=True)
+
+
+def connecting(setup):
+    """Start sending CONNECT, on a thread of its own, until the vehicle
+    answers with this configuration's checksum.
+
+    What is wrong -- a vehicle running another configuration -- is said
+    whether or not ``-v`` was given; a CONNECT unanswered while the vehicle
+    starts, and the match, are status.
+
+    Args:
+        setup: What the program read out of the configuration.
+
+    Returns:
+        A ``threading.Event`` set once the vehicle has answered with this
+        configuration's checksum; or ``None`` where no CONNECT can be sent,
+        having said why: the configuration states no command link, or could
+        not be digested.
+
+    Raises:
+        OSError: ``tcs_cmd.send`` cannot be bound.
+    """
+    if setup.command is None:
+        status("the configuration states no command link: no CONNECT is sent")
+        return None
+    if setup.digest is None:
+        print("no CONNECT is sent, since the configuration has no digest",
+              file=sys.stderr)
+        return None
+    ours = bytes.fromhex(setup.digest)
+    listening = Listening(setup.command, ours)
+    matched = threading.Event()
+
+    def say(heard):
+        """Say what one CONNECT heard: see :func:`connecting`. A standard
+        error nobody reads any longer -- closed by whoever started this --
+        is no reason to stop connecting, so a failure to say it is let go.
+
+        Args:
+            heard: The :class:`tcslib.listening.Heard`.
+        """
+        try:
+            if heard.running is not None and not heard.matched:
+                print(heard.said(ours), file=sys.stderr, flush=True)
+            else:
+                status(heard.said(ours))
+        except OSError:
+            pass
+
+    def connect():
+        """Send CONNECT until matched, and say so."""
+        listening.until_matched(say)
+        listening.close()
+        matched.set()
+
+    threading.Thread(target=connect, daemon=True).start()
+    return matched
 
 
 def run_without_a_window(setup, beacons, pinger, count):
@@ -640,7 +716,16 @@ def main(argv):
             print(f"the vehicle cannot be started: {why}", file=sys.stderr)
             return 1
     try:
+        # The CONNECT, once the vehicle is started, since nothing comes down
+        # until the vehicle has taken one.
+        try:
+            matched = connecting(setup)
+        except OSError as why:
+            print(f"cannot send CONNECT: {why}", file=sys.stderr)
+            return 1
         if options.pings is not None:
+            if matched is not None:
+                matched.wait()
             return run_without_a_window(setup, beacons, pinger, options.pings)
         return run_the_window(setup, beacons, pinger)
     finally:

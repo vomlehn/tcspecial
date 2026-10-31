@@ -2085,6 +2085,18 @@ before it started listening, prints each with one space
 between them, and stops at the end of the line. ``gateway-1`` states no
 ``address`` or ``port``, because nothing goes back up to the vehicle.
 
+Before its first word, ``lorem_gateway`` sends a ``CONNECT`` of its own,
+carrying the configuration's checksum, and sends it again each second until
+the vehicle answers with that checksum: a vehicle sends nothing down until it
+has taken one, and a station that only listens cannot count on another
+station's having sent it. It sends from the configuration's ``tcs_cmd.send``,
+so tcsmoc cannot be run on the same configuration beside it. ``-v`` says when
+it is matched; a vehicle answering with another configuration's checksum is
+said whatever the flag. ``ping_gateway.py`` does the same as soon as it has
+started the vehicle, and ``--pings`` waits for the match before its first
+ping. Through ``tcslib::listening`` in Rust and ``tcslib.listening`` in
+Python, either of which a station of your own that only listens can use.
+
 Both programs are beside the configuration: the payload is a Python 3 script
 that uses only the standard library, and the ground station is a Rust crate.
 ``make -C examples run-simple-app`` checks that ``python3`` is installed -- 3.6

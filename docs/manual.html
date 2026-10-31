@@ -3562,22 +3562,26 @@ command line, and a restart may name any of them, by its checksum:</p>
   </span><span class="name tag">configurations_kept</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal string">&quot;2&quot;</span><span class="whitespace">
   </span><span class="name tag">load_trials</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal string">&quot;3&quot;</span>
 </pre>
-<p><tt class="docutils literal">configurations</tt> is the directory they are kept in, each under its
-checksum: <tt class="docutils literal"><span class="pre">&lt;checksum&gt;.ytcs</span></tt> or <tt class="docutils literal"><span class="pre">&lt;checksum&gt;.xtcs</span></tt>. Left out, the vehicle
-keeps none, and a restart may name only the configuration it runs. A
-configuration kept there is a single file: one that includes another is
-refused. Its checksum is computed again each time it is loaded, and one
-whose checksum is not its name -- cut short as it was written, or damaged
--- is not loaded.</p>
+<p><tt class="docutils literal">configurations</tt> is the directory they are kept in, each in a directory
+named by its checksum. In it, the top file is named by the checksum too --
+<tt class="docutils literal"><span class="pre">&lt;checksum&gt;/&lt;checksum&gt;.ytcs</span></tt> or <tt class="docutils literal"><span class="pre">&lt;checksum&gt;/&lt;checksum&gt;.xtcs</span></tt> -- and
+each file it includes sits beside it under the name its include list gives
+it. The checksum takes in those names, so it says the shape of the tree as
+well as what is in it. Left out, the vehicle keeps none, and a restart may
+name only the configuration it runs. An include name must be a file's
+name, not a path, must not begin with a dot, and must not be the checksum.
+A checksum is computed again each time its configuration is loaded, and
+one whose checksum is not its name -- cut short as it was written, or
+damaged -- is not loaded.</p>
 <p>To put one there, on the ground or at first provisioning, check and keep it
 with tcsverify:</p>
 <pre class="code text literal-block">
 $ tcsverify --keep=/var/lib/tcspecial/configurations vehicle.ytcs
 vehicle.ytcs: md5 0123456789abcdef0123456789abcdef, kept as
-/var/lib/tcspecial/configurations/0123456789abcdef0123456789abcdef.ytcs
+/var/lib/tcspecial/configurations/0123456789abcdef0123456789abcdef/0123456789abcdef0123456789abcdef.ytcs
 </pre>
 <p>It keeps nothing that has an error, writes nothing for a checksum already
-kept, and makes the file it writes read-only. Making the directory
+kept, and makes the files it writes read-only. Making the directory
 read-only, or immutable, once every configuration is in it is the
 provisioner's to do. Configurations cannot yet be uplinked.</p>
 <p>Every start loads the first of these that passes its checks, and says in
@@ -3631,6 +3635,13 @@ change to <tt class="docutils literal">tcslibgs/xtce/link.xtce</tt>, <tt class="
 every configuration shipped in the tree. The
 configuration's checksum covers <tt class="docutils literal">interface</tt>, so a vehicle and a ground
 station whose checksums match are reading the same interface as well.</p>
+<p>Every digest you will see on the link stands for <tt class="docutils literal">link.xtce</tt>: the
+beacon's last field is its digest, and the checksums in the beacon, in
+CONNECT and its answer, and in RESTART_ARM and RESTART are configuration
+checksums, which cover <tt class="docutils literal">interface</tt>. None covers
+<tt class="docutils literal">tcslibgs/xtce/fixed.xtce</tt>, where CONNECT, RESTART_ARM, RESTART and the
+beacon are laid out. It is the same in every build, so there is nothing to
+compare, and a test in <tt class="docutils literal">tcslibgs</tt> fails if it is ever changed.</p>
 </div>
 <div class="section" id="where-the-links-are">
 <h2><a class="toc-backref" href="#toc-entry-57">Where the links are</a></h2>
@@ -4154,7 +4165,8 @@ of one payload's attributes. The order of the payloads does count -- ids follow
 it -- so each payload is given a sequence number as the file is read, the
 digest takes them in that order, and a file may not state a number of its own.
 Both formats number them alike, which is what lets the YAML and the XML of
-one set digest the same.</p>
+one set digest the same. In a set written as several files, the names its
+include list gives them count too; the top file's own name does not.</p>
 <p>A difference means the two ends are not serving the same set. The usual cause
 is a tcspecial left running from an earlier one, which tcsmoc attaches to
 rather than replacing; stopping it and letting tcsmoc start a fresh one is the

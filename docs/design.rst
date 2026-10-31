@@ -10571,21 +10571,24 @@ Requirement
        iio          the device belongs to the kernel's iio_dummy, or the path
                     resolves to a pseudo-terminal
        serial, spi,
-       rpmsg,
-       device-file  the path resolves to a pseudo-terminal's slave, which is
+       rpmsg        the path resolves to a pseudo-terminal's slave, which is
                     what tcssim makes
+       device-file  the path is a regular file, which is what tcssim makes and
+                    no hardware is, or resolves to a pseudo-terminal's slave
        hdlc         never at its interface: nothing stands in for a
                     synchronous line
        hdlc, spi,
        rpmsg, iio   reached at a stand_in, under some or all: the stand_in
                     is a loopback address, so the far end is on this host
 
-    Tcssim does not yet make a pseudo-terminal for a device-file payload:
-    what it stands in for there is the device producing data, which
-    tcspecial reads from whatever is at the path. So a device-file payload is
-    a stand-in only where something else has made its path a
-    pseudo-terminal, and until tcssim makes one a run with a device-file
-    payload cannot be ``all``.
+    Tcssim stands in for a device-file payload with a regular file at its
+    path, which it lengthens with a packet of lorem ipsum every packet
+    interval, paced and faulted as its simulator file says, until the text
+    runs out; tcspecial reads what has been added each time it looks, so the
+    data comes for a while and then stops. Tcssim makes the file new and
+    removes it when the payload stops, replaces only a file holding the
+    start of its own text, and leaves anything else at the path alone,
+    saying so.
 
 Requirement
     What cannot be told apart is real. Under ``all`` it is refused, and the

@@ -1542,6 +1542,14 @@ path           the device the handler opens
 <p>Nothing else: a plain device has no terms to be set and no address to be
 reached at. A device cannot be triggered -- tcspecial opens it and reads it,
 and there is nothing to write a request to.</p>
+<p>The simulator stands in for a device file with a file of text. It makes a
+regular file at <tt class="docutils literal">path</tt> and adds a packet of lorem ipsum to it every packet
+interval, at the pace and with the faults its simulator file gives, until the
+text runs out, about 2900 bytes of it. tcspecial reads what has been added
+each time it looks, so the data comes for a while and then stops. The file
+is removed when the payload stops. Where something else is already at
+<tt class="docutils literal">path</tt> -- a real device, or a file the simulator did not write -- the
+simulator leaves it alone and says so, rather than standing in for it.</p>
 <p>Three other types are reached through a device file too and are not devices in
 this sense: a serial line, a bus and a SPI peripheral each have terms of their
 own, which is why each has a type of its own below.</p>
@@ -2835,7 +2843,8 @@ with what is at the payload's endpoint, by the same rules tcspecial judges a
 stand-in by (see <a class="reference internal" href="#stand-ins-or-hardware-simulate">Stand-ins or hardware: --simulate</a>), and will not start on
 a disagreement: <tt class="docutils literal">simulate: true</tt> where the configuration points at real
 hardware, or <tt class="docutils literal">simulate: false</tt> where it points at a stand-in. A stand-in
-tcssim makes itself, a pseudo-terminal or a socket, is not there yet, and
+tcssim makes itself, a pseudo-terminal, a file or a socket, is not there
+yet, and
 that is no disagreement; one the scripts in <tt class="docutils literal">bin/</tt> make has to be. A
 payload the file does not name whose endpoint is a stand-in all the same is
 refused too: tcssim controls and shows every simulated device, so each one
@@ -3946,14 +3955,15 @@ of its endpoint, before it opens anything, and says so as it starts:</p>
 named with what it reaches, what is there, and what would satisfy the mode.</p>
 <p>A payload is a stand-in when its endpoint is something <tt class="docutils literal">bin/</tt> or tcssim
 makes: an I2C bus whose adapter is the kernel's <tt class="docutils literal"><span class="pre">i2c-stub</span></tt>, a GPIO chip of
-<tt class="docutils literal"><span class="pre">gpio-sim</span></tt>, a virtual CAN interface, an IIO sensor of <tt class="docutils literal">iio_dummy</tt>, or a
-path that leads to a pseudo-terminal, which is what tcssim makes for a
-serial, SPI, rpmsg or IIO payload. A network payload is a stand-in when its
-address is a loopback address or a Unix-domain path. That is the weakest of
-the judgements: it says only that the far end is on this host, and a program
-on this host in front of real hardware passes it. A synchronous HDLC line is
-never a stand-in, and anything that cannot be told -- nothing at the path, a
-host name -- is taken for hardware.</p>
+<tt class="docutils literal"><span class="pre">gpio-sim</span></tt>, a virtual CAN interface, an IIO sensor of <tt class="docutils literal">iio_dummy</tt>, a path
+that leads to a pseudo-terminal, which is what tcssim makes for a serial, SPI,
+rpmsg or IIO payload, or, for a device-file payload, a regular file, which is
+what tcssim makes for one and which no hardware is. A network payload is a
+stand-in when its address is a loopback address or a Unix-domain path. That is
+the weakest of the judgements: it says only that the far end is on this host,
+and a program on this host in front of real hardware passes it. A synchronous
+HDLC line is never a stand-in, and anything that cannot be told -- nothing at
+the path, a host name -- is taken for hardware.</p>
 <p>Four types have nothing in the operating system that stands in for them
 faithfully: an HDLC line has no virtual interface at all, and a
 pseudo-terminal carries a SPI peripheral's, an rpmsg channel's or an IIO

@@ -5,8 +5,13 @@
 //! which `crate::graph::reach` reads with the rules of
 //! `crate::endpoint_config`; there is nothing of its own to check.
 
-/// Judges whether a device file is a stand-in: a pseudo-terminal, which is
-/// what tcssim makes for a device-file payload. See [`crate::simulate`].
+/// What would make a device-file payload a stand-in.
+const TO_STAND_IN: &str =
+    "start tcssim first, which makes a file of text at path";
+
+/// Judges whether a device file is a stand-in: a regular file, which is what
+/// tcssim makes for a device-file payload and which no hardware is, or a
+/// pseudo-terminal. See [`crate::simulate`].
 ///
 /// # Arguments
 ///
@@ -16,11 +21,14 @@
 ///
 /// The judgement, with what to change if it is not a stand-in.
 pub fn judged(path: &str) -> crate::simulate::Judged {
-    crate::simulate::pseudo_terminal(
-        path,
-        "path",
-        "start tcssim first, which makes a pseudo-terminal at path",
-    )
+    if std::fs::metadata(path).is_ok_and(|found| found.is_file()) {
+        return crate::simulate::Judged::stand_in(
+            format!("{path} is a regular file, which no hardware is"),
+            "path",
+            TO_STAND_IN,
+        );
+    }
+    crate::simulate::pseudo_terminal(path, "path", TO_STAND_IN)
 }
 
 #[cfg(test)]
@@ -28,10 +36,11 @@ mod tests {
     use super::*;
     use crate::simulate::Verdict;
 
-    /// A pseudo-terminal is a stand-in, through a link to it as tcssim makes
-    /// one, and a device that is not one is hardware.
+    /// A pseudo-terminal is a stand-in, through a link to it, and so is a
+    /// regular file, as tcssim makes one; a device that is neither is
+    /// hardware.
     #[test]
-    fn a_pseudo_terminal_is_a_stand_in_and_another_device_is_not() {
+    fn a_file_or_a_pseudo_terminal_is_a_stand_in_and_a_device_is_not() {
         let mut master = 0;
         let mut slave = 0;
         // SAFETY: openpty writes the two descriptors it opens into the two
@@ -61,6 +70,9 @@ mod tests {
         );
 
         assert_eq!(judged_of("/dev/null"), Verdict::Hardware);
+        let text = dir.path().join("text");
+        std::fs::write(&text, "Lorem ipsum").unwrap();
+        assert_eq!(judged_of(text.to_str().unwrap()), Verdict::StandIn);
         assert_eq!(
             judged_of(dir.path().to_str().unwrap()),
             Verdict::CannotTell

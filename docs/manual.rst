@@ -1107,6 +1107,15 @@ Nothing else: a plain device has no terms to be set and no address to be
 reached at. A device cannot be triggered -- tcspecial opens it and reads it,
 and there is nothing to write a request to.
 
+The simulator stands in for a device file with a file of text. It makes a
+regular file at ``path`` and adds a packet of lorem ipsum to it every packet
+interval, at the pace and with the faults its simulator file gives, until the
+text runs out, about 2900 bytes of it. tcspecial reads what has been added
+each time it looks, so the data comes for a while and then stops. The file
+is removed when the payload stops. Where something else is already at
+``path`` -- a real device, or a file the simulator did not write -- the
+simulator leaves it alone and says so, rather than standing in for it.
+
 Three other types are reached through a device file too and are not devices in
 this sense: a serial line, a bus and a SPI peripheral each have terms of their
 own, which is why each has a type of its own below.
@@ -2559,7 +2568,8 @@ with what is at the payload's endpoint, by the same rules tcspecial judges a
 stand-in by (see `Stand-ins or hardware: --simulate`_), and will not start on
 a disagreement: ``simulate: true`` where the configuration points at real
 hardware, or ``simulate: false`` where it points at a stand-in. A stand-in
-tcssim makes itself, a pseudo-terminal or a socket, is not there yet, and
+tcssim makes itself, a pseudo-terminal, a file or a socket, is not there
+yet, and
 that is no disagreement; one the scripts in ``bin/`` make has to be. A
 payload the file does not name whose endpoint is a stand-in all the same is
 refused too: tcssim controls and shows every simulated device, so each one
@@ -3840,14 +3850,15 @@ named with what it reaches, what is there, and what would satisfy the mode.
 
 A payload is a stand-in when its endpoint is something ``bin/`` or tcssim
 makes: an I2C bus whose adapter is the kernel's ``i2c-stub``, a GPIO chip of
-``gpio-sim``, a virtual CAN interface, an IIO sensor of ``iio_dummy``, or a
-path that leads to a pseudo-terminal, which is what tcssim makes for a
-serial, SPI, rpmsg or IIO payload. A network payload is a stand-in when its
-address is a loopback address or a Unix-domain path. That is the weakest of
-the judgements: it says only that the far end is on this host, and a program
-on this host in front of real hardware passes it. A synchronous HDLC line is
-never a stand-in, and anything that cannot be told -- nothing at the path, a
-host name -- is taken for hardware.
+``gpio-sim``, a virtual CAN interface, an IIO sensor of ``iio_dummy``, a path
+that leads to a pseudo-terminal, which is what tcssim makes for a serial, SPI,
+rpmsg or IIO payload, or, for a device-file payload, a regular file, which is
+what tcssim makes for one and which no hardware is. A network payload is a
+stand-in when its address is a loopback address or a Unix-domain path. That is
+the weakest of the judgements: it says only that the far end is on this host,
+and a program on this host in front of real hardware passes it. A synchronous
+HDLC line is never a stand-in, and anything that cannot be told -- nothing at
+the path, a host name -- is taken for hardware.
 
 Four types have nothing in the operating system that stands in for them
 faithfully: an HDLC line has no virtual interface at all, and a

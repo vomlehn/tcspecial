@@ -1766,6 +1766,11 @@ pub struct CIConfigJson {
     /// file given an answer it was never asked for is a vehicle that listens
     /// for commands where nobody sends them.
     pub gateway: crate::gateway::GatewayKind,
+    /// The interface the configuration was written for: the digest of the
+    /// `xtce/link.xml` its commands are laid out by, which must be this
+    /// build's. Required, with no default: see
+    /// [`crate::graph::parameters::interface_of`], which reads it.
+    pub interface: crate::InterfaceDigest,
     /// The spacecraft command link: both ends of it.
     pub tcs_cmd: TcsCmdJson,
     /// Where each payload's telemetry comes from and goes to.
@@ -1799,15 +1804,37 @@ pub struct CIConfigJson {
     /// `20 min`, `90 s`. Absent is [`crate::RESTART_ARM_VALID_DEFAULT`].
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub restart_arm_valid: Option<String>,
-    /// The file tcspecial keeps what must survive a restart in: the
-    /// generation number, which every start adds one to.
+    /// The file tcspecial keeps what must survive a restart in: whether the
+    /// next start is one the ground commanded.
     ///
     /// Required, with no default: where a vehicle keeps state across a power
     /// cycle is a fact about its storage, and a default would be a path that
-    /// exists on a desk and not on the vehicle. See "The generation number
-    /// and the state file" in `docs/design.rst`.
+    /// exists on a desk and not on the vehicle. See "The state file"
+    /// in `docs/design.rst`.
     pub state_file: String,
+    /// The directory the vehicle keeps configurations in, each under its
+    /// checksum, or `None` for a vehicle that keeps none: see
+    /// [`crate::store`].
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub configurations: Option<String>,
+    /// The fewest configurations provisioning may leave in that directory.
+    /// Absent is [`CONFIGURATIONS_KEPT_DEFAULT`].
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub configurations_kept: Option<u32>,
+    /// How many starts of the configuration the state file names may end
+    /// before a matching CONNECT before it is given up for the confirmed
+    /// one. Absent is [`LOAD_TRIALS_DEFAULT`].
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub load_trials: Option<u32>,
 }
+
+/// How many configurations provisioning keeps at least where the section
+/// does not say: two, the one running and one to go back to.
+pub const CONFIGURATIONS_KEPT_DEFAULT: u32 = 2;
+
+/// How many starts a configuration is given before it is given up where the
+/// section does not say: three, as the design has it.
+pub const LOAD_TRIALS_DEFAULT: u32 = 3;
 
 /// How long an arm lasts, from what `restart_arm_valid` says.
 ///
@@ -1882,8 +1909,18 @@ pub struct CIConfig {
     pub restart_arm_valid: Duration,
     /// What the vehicle answers to.
     pub gateway: crate::gateway::GatewayKind,
-    /// Where the generation number is kept: `state_file`.
+    /// The interface the configuration was written for, which is this
+    /// build's: `interface`.
+    pub interface: crate::InterfaceDigest,
+    /// Where what must survive a restart is kept: `state_file`.
     pub state_file: String,
+    /// Where configurations are kept: `configurations`, or `None`.
+    pub configurations: Option<String>,
+    /// The fewest configurations kept: `configurations_kept`.
+    pub configurations_kept: u32,
+    /// How many unconfirmed starts a configuration is given:
+    /// `load_trials`.
+    pub load_trials: u32,
 }
 
 impl CIConfigJson {
@@ -1953,8 +1990,8 @@ impl CIConfigJson {
         if self.state_file.trim().is_empty() {
             return Err(
                 "state_file is empty: give the path of the file tcspecial \
-                 keeps its generation number in, on storage that survives a \
-                 power cycle"
+                 keeps what must survive a restart in, on storage that \
+                 survives a power cycle"
                     .to_string(),
             );
         }
@@ -2000,7 +2037,13 @@ impl CIConfigJson {
                 None => crate::RESTART_ARM_VALID_DEFAULT,
             },
             gateway: self.gateway,
+            interface: self.interface,
             state_file: self.state_file.trim().to_string(),
+            configurations: self.configurations.clone(),
+            configurations_kept: self
+                .configurations_kept
+                .unwrap_or(CONFIGURATIONS_KEPT_DEFAULT),
+            load_trials: self.load_trials.unwrap_or(LOAD_TRIALS_DEFAULT),
         })
     }
 }
@@ -2105,11 +2148,91 @@ pub enum CommandStatus {
     /// the configurations at the two ends have not been matched, and only
     /// the commands [`crate::CommandType::taken_unmatched`] names are taken.
     Unmatched,
+    /// A status this build does not know, by its number on the link.
+    ///
+    /// The numbers above keep their meanings for ever and new ones may be
+    /// added, so a vehicle of a later build can answer with one a station
+    /// of this build has never heard of. It is a refusal all the same --
+    /// nothing but `Success` says a command was done -- and the station says
+    /// so with the number, rather than taking the answer for one it cannot
+    /// read and the command for lost.
+    Unknown(u8),
 }
 
 impl CommandStatus {
     pub fn is_success(&self) -> bool {
         matches!(self, CommandStatus::Success)
+    }
+
+    /// Gives the status's number on the link.
+    ///
+    /// The one table of them, read by the link's packing, by the C/C++
+    /// library and by whatever shows a status: `xtce/fixed.xml` and
+    /// `xtce/link.xml` give the same numbers, and a test in [`crate::link`]
+    /// holds the three to each other.
+    ///
+    /// # Returns
+    ///
+    /// The number: 0 Success, 1 Failure, 2 InvalidCommand, 3
+    /// InvalidParameter, 4 NotArmed, 5 NotFound, 6 AlreadyExists, 7 Timeout,
+    /// 9 Stale, 10 Unmatched, or an unknown status's own. 8 is not used: it
+    /// was WrongGeneration, when a command carried a generation.
+    pub fn number(self) -> u8 {
+        match self {
+            CommandStatus::Success => 0,
+            CommandStatus::Failure => 1,
+            CommandStatus::InvalidCommand => 2,
+            CommandStatus::InvalidParameter => 3,
+            CommandStatus::NotArmed => 4,
+            CommandStatus::NotFound => 5,
+            CommandStatus::AlreadyExists => 6,
+            CommandStatus::Timeout => 7,
+            CommandStatus::Stale => 9,
+            CommandStatus::Unmatched => 10,
+            CommandStatus::Unknown(number) => number,
+        }
+    }
+
+    /// Reads a status from its number on the link: [`CommandStatus::number`]
+    /// the other way.
+    ///
+    /// # Arguments
+    ///
+    /// * `number` - The status's number.
+    ///
+    /// # Returns
+    ///
+    /// The status, [`CommandStatus::Unknown`] for a number this build does
+    /// not know.
+    pub fn of_number(number: u8) -> CommandStatus {
+        match number {
+            0 => CommandStatus::Success,
+            1 => CommandStatus::Failure,
+            2 => CommandStatus::InvalidCommand,
+            3 => CommandStatus::InvalidParameter,
+            4 => CommandStatus::NotArmed,
+            5 => CommandStatus::NotFound,
+            6 => CommandStatus::AlreadyExists,
+            7 => CommandStatus::Timeout,
+            9 => CommandStatus::Stale,
+            10 => CommandStatus::Unmatched,
+            other => CommandStatus::Unknown(other),
+        }
+    }
+}
+
+/// Says a status as a station shows it: its name, or for one this build does
+/// not know, that it is a refusal and its number.
+impl std::fmt::Display for CommandStatus {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            CommandStatus::Unknown(number) => write!(
+                f,
+                "refused, for a reason this build cannot name (status \
+                 {number})"
+            ),
+            known => write!(f, "{known:?}"),
+        }
     }
 }
 

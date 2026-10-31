@@ -33,6 +33,8 @@ import xml.etree.ElementTree as ElementTree
 from dataclasses import dataclass, field
 from pathlib import Path
 
+from . import interface as _interface
+
 #: The sections whose entries are nodes, in which a node's device id is
 #: counted: a node's id is its position among every node the file writes, in
 #: the order it writes them, whatever section each is in.
@@ -96,6 +98,15 @@ class HostPort:
 @dataclass(frozen=True)
 class BeaconLink:
     """Where beacons come from and where they are received."""
+
+    send: HostPort
+    recv: HostPort
+
+
+@dataclass(frozen=True)
+class CommandLink:
+    """The spacecraft command link: where the ground sends from, ``send``,
+    and where the vehicle takes commands, ``recv``."""
 
     send: HostPort
     recv: HostPort
@@ -172,6 +183,21 @@ class Configuration:
         return BeaconLink(
             send=HostPort.of("beacon.send", self._said("beacon.send")),
             recv=HostPort.of("beacon.recv", self._said("beacon.recv")),
+        )
+
+    def command_link(self):
+        """The spacecraft command link: ``tcs_cmd.send`` and
+        ``tcs_cmd.recv``.
+
+        Returns:
+            The :class:`CommandLink`.
+
+        Raises:
+            ValueError: Either is missing or is not an address and a port.
+        """
+        return CommandLink(
+            send=HostPort.of("tcs_cmd.send", self._said("tcs_cmd.send")),
+            recv=HostPort.of("tcs_cmd.recv", self._said("tcs_cmd.recv")),
         )
 
     def beacon_interval(self):
@@ -414,13 +440,35 @@ def load(path):
     path = Path(path)
     suffix = path.suffix.lower()
     if suffix == ".xml":
-        return _load_xml(path)
+        return _interface_checked(_load_xml(path))
     if suffix in (".yaml", ".yml"):
-        return _load_yaml(path)
+        return _interface_checked(_load_yaml(path))
     raise ValueError(
         f"{path}: a configuration file is named .yaml, .yml or .xml, and this "
         "is none of those"
     )
+
+
+def _interface_checked(config):
+    """The configuration, once its ``tcspecial`` section's ``interface`` is
+    found to be this tree's: see :func:`tcslibgs.interface.of_configuration`.
+    A configuration with no section states no links, and names no interface.
+
+    Args:
+        config: The configuration read.
+
+    Returns:
+        The configuration.
+
+    Raises:
+        ValueError: Its interface is not stated, or is not this tree's.
+    """
+    if config.tcspecial:
+        try:
+            _interface.of_configuration(config.tcspecial.get("interface"))
+        except ValueError as why:
+            raise ValueError(f"{config.path}: {why}") from None
+    return config
 
 
 def _includes(path):

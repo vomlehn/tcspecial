@@ -23,6 +23,7 @@ fn with_errors(dir: &Path, count: usize) -> PathBuf {
 description: many
 tcspecial:
   gateway: radio
+  interface: \"ad9aac4dd5a6d88dd5e78824ba8a83ac\"
   state_file: /tmp/tcspecial-test.state
   beacon:
     default_interval: \"5 s\"
@@ -80,6 +81,93 @@ fn run(args: &[&str]) -> (Vec<String>, i32) {
         printed.lines().map(str::to_string).collect(),
         out.status.code().expect("an exit status"),
     )
+}
+
+/// `--interface-digest` prints the digest of the interface this build
+/// speaks, alone, as a configuration's `interface` writes it; with anything
+/// beside it the command line is none of the shapes.
+#[test]
+fn the_interface_digest_is_printed_alone() {
+    let (lines, status) = run(&["--interface-digest"]);
+    assert_eq!(status, 0);
+    assert_eq!(
+        lines,
+        vec![tcslibgs::InterfaceDigest::of_this_build().to_string()]
+    );
+    assert_eq!(lines[0].len(), 32);
+    assert!(
+        lines[0]
+            .bytes()
+            .all(|b| b.is_ascii_digit() || b.is_ascii_lowercase()),
+        "{lines:?}"
+    );
+
+    // And it is what the shipped configurations name.
+    let example = Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("../examples/ping/ping.yaml");
+    let text = std::fs::read_to_string(example).expect("the example");
+    assert!(
+        text.contains(&format!("interface: \"{}\"", lines[0])),
+        "the ping example names another interface"
+    );
+
+    let (_, status) = run(&["--interface-digest", "a.yaml"]);
+    assert_eq!(status, 2, "given alone");
+}
+
+/// `--keep=<directory>` keeps a configuration with nothing wrong with it
+/// under its checksum, read-only, and says where; again, it writes nothing
+/// and says it is kept already. One with errors is not kept, and the store
+/// is what tcspecial loads from.
+#[test]
+fn a_checked_configuration_is_kept_under_its_checksum() {
+    use std::os::unix::fs::PermissionsExt;
+
+    let dir = tempfile::tempdir().expect("a directory");
+    let store = dir.path().join("kept");
+    std::fs::create_dir(&store).expect("a store");
+    let keep = format!("--keep={}", store.display());
+    let example = Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("../examples/ping/ping.yaml");
+    let example = example.to_str().expect("a path");
+    let checksum =
+        tcslibgs::config_digest::digest_of_file(example).expect("it digests");
+    let kept = store.join(format!("{checksum}.yaml"));
+
+    let (lines, status) = run(&[&keep, example]);
+    assert_eq!(status, 0, "{lines:?}");
+    assert_eq!(
+        lines,
+        vec![format!(
+            "{example}: md5 {checksum}, kept as {}",
+            kept.display()
+        )]
+    );
+    let mode = std::fs::metadata(&kept).expect("kept").permissions().mode();
+    assert_eq!(mode & 0o777, 0o444, "read-only");
+    let (graph, _) = tcslibgs::store::Store::at(&store)
+        .load(checksum)
+        .expect("it loads by its checksum");
+    assert_eq!(graph.nodes.len(), 2);
+
+    let (lines, status) = run(&[&keep, example]);
+    assert_eq!(status, 0);
+    assert!(lines[0].contains("already kept as"), "{lines:?}");
+
+    let wrong = with_errors(dir.path(), 2);
+    let (_, status) = run(&[&keep, wrong.to_str().expect("a path")]);
+    assert_eq!(status, 1, "a configuration with errors");
+    assert_eq!(
+        tcslibgs::store::Store::at(&store)
+            .held()
+            .expect("it reads")
+            .len(),
+        1,
+        "is not kept"
+    );
+
+    let (_, status) = run(&["--keep=", example]);
+    assert_eq!(status, 2, "a directory is named");
 }
 
 #[test]
@@ -253,6 +341,7 @@ fn with_vehicle_node(dir: &Path, node: &str) -> PathBuf {
 description: one vehicle node
 tcspecial:
   gateway: radio
+  interface: \"ad9aac4dd5a6d88dd5e78824ba8a83ac\"
   state_file: /tmp/tcspecial-test.state
   beacon:
     default_interval: \"5 s\"

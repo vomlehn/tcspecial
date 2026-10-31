@@ -1,64 +1,47 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<!-- Every command the MOC sends tcspecial and every answer tcspecial sends
-     back, as they go on the link: the whole of each datagram.
+<!-- Every ordinary command the MOC sends tcspecial and every answer
+     tcspecial sends back, as they go on the link: the whole of each
+     datagram. CONNECT, RESTART_ARM and RESTART are not here: they are the
+     fixed commands, whose layouts never change, and are in xtce/fixed.xml.
 
-     Each is a CCSDS Space Packet, so that a ground system that reads them
-     from an XTCE mission database, Yamcs among them, reads them with no code
-     of its own:
+     A command is
 
-       primary header   6 bytes: version 0, packet type (1 for a command, 0
-                        for an answer), no secondary header, APID 0x100,
-                        sequence flags 3 (unsegmented), sequence count (the
-                        low 14 bits of the sequence below), packet length
-       opcode or kind   1 byte: which command, or which answer
+       opcode           1 byte: which command
        sequence         4 bytes: the command's number, which its answer
                         carries back; a command older than one this start
-                        of tcspecial has taken, PING and CONNECT aside, is
-                        answered Stale and not acted on
-       generation       4 bytes, an answer only: the generation of
-                        tcspecial that made it, so that the ground hears of
-                        a restart from any answer, a refusal among them. A
-                        command carries no generation: its sequence is all
-                        that numbers it
-       status           1 byte, an answer only: how the command went
-       timestamp        8 bytes, an answer only: microseconds since the UNIX
-                        epoch when the answer was made, all ones where the
-                        vehicle could not tell the time
-       ...              what that command or answer carries
+                        of tcspecial has taken, PING aside, is answered
+                        Stale and not acted on
+       ...              what that command carries
 
-     Every number is most significant byte first, as CCSDS and the beacon
-     have it. A packet carries no CRC of its own: the transport under it,
-     UDP's checksum on this link, refuses a damaged datagram before it is
-     read. One whose header or length does not match is refused, and nothing
-     in it is acted on.
+     and an answer is
+
+       opcode           1 byte: the opcode of the command it answers
+       sequence         4 bytes: that command's sequence
+       status           1 byte: how the command went
+       timestamp        8 bytes: microseconds since the UNIX epoch when the
+                        answer was made, all ones where the vehicle could
+                        not tell the time
+       ...              what that answer carries
+
+     There is no header, no packet type and no generation: which way a
+     packet goes is said by who sends it and who receives it, and which
+     layout it has by the configuration, whose `interface` names the digest
+     of this document. Every number is most significant byte first, as the
+     beacon has it. A packet carries no CRC of its own: the transport under
+     it, UDP's checksum on this link, refuses a damaged datagram before it
+     is read. A datagram whose length is not exactly what its opcode's
+     layout gives is refused, not answered and not acted on.
 
      The Rust in tcslibgs/src/link_packet.rs is generated from this file by
-     `make link-packet` in tcslibgs/: change this, and regenerate it. See
-     tcslibgs/src/link.rs, and "The Interface, the Fallback and Switching
-     Over" in docs/design.rst. -->
+     `make link-packet` in tcslibgs/: change this, and regenerate it, and
+     the interface digest with `make interface-digest`. See
+     tcslibgs/src/link.rs, and "The link without a header" in
+     docs/design.rst. -->
 <SpaceSystem xmlns="http://www.omg.org/spec/XTCE/20250214" name="TcsLink">
   <TelemetryMetaData>
     <ParameterTypeSet>
-      <IntegerParameterType name="U1Type" signed="false">
-        <IntegerDataEncoding sizeInBits="1" encoding="unsigned"/>
-      </IntegerParameterType>
-      <IntegerParameterType name="U2Type" signed="false">
-        <IntegerDataEncoding sizeInBits="2" encoding="unsigned"/>
-      </IntegerParameterType>
-      <IntegerParameterType name="U3Type" signed="false">
-        <IntegerDataEncoding sizeInBits="3" encoding="unsigned"/>
-      </IntegerParameterType>
-      <IntegerParameterType name="U11Type" signed="false">
-        <IntegerDataEncoding sizeInBits="11" encoding="unsigned"/>
-      </IntegerParameterType>
-      <IntegerParameterType name="U14Type" signed="false">
-        <IntegerDataEncoding sizeInBits="14" encoding="unsigned"/>
-      </IntegerParameterType>
       <IntegerParameterType name="U8Type" signed="false">
         <IntegerDataEncoding sizeInBits="8" encoding="unsigned"/>
-      </IntegerParameterType>
-      <IntegerParameterType name="U16Type" signed="false">
-        <IntegerDataEncoding sizeInBits="16" encoding="unsigned"/>
       </IntegerParameterType>
       <IntegerParameterType name="U32Type" signed="false">
         <IntegerDataEncoding sizeInBits="32" encoding="unsigned"/>
@@ -69,13 +52,6 @@
       <BooleanParameterType name="FlagType">
         <IntegerDataEncoding sizeInBits="8" encoding="unsigned"/>
       </BooleanParameterType>
-      <BinaryParameterType name="DigestType">
-        <BinaryDataEncoding>
-          <SizeInBits>
-            <FixedValue>128</FixedValue>
-          </SizeInBits>
-        </BinaryDataEncoding>
-      </BinaryParameterType>
       <BinaryParameterType name="SampleBytesType">
         <BinaryDataEncoding>
           <SizeInBits>
@@ -117,31 +93,10 @@
       </EnumeratedParameterType>
     </ParameterTypeSet>
     <ParameterSet>
-      <Parameter name="Version" parameterTypeRef="U3Type"/>
-      <Parameter name="PacketType" parameterTypeRef="U1Type"/>
-      <Parameter name="SecHdrFlag" parameterTypeRef="U1Type"/>
-      <Parameter name="APID" parameterTypeRef="U11Type"/>
-      <Parameter name="SeqFlags" parameterTypeRef="U2Type"/>
-      <Parameter name="SeqCount" parameterTypeRef="U14Type"/>
-      <Parameter name="PacketLength" parameterTypeRef="U16Type">
-        <!-- CCSDS: bytes in the packet data field, minus 1 -->
-        <AncillaryDataSet>
-          <AncillaryData name="tcs-xtce.length">-1</AncillaryData>
-        </AncillaryDataSet>
-      </Parameter>
-      <Parameter name="Kind" parameterTypeRef="U8Type"/>
+      <Parameter name="Opcode" parameterTypeRef="U8Type"/>
       <Parameter name="Sequence" parameterTypeRef="U32Type"/>
       <Parameter name="Status" parameterTypeRef="StatusType"/>
       <Parameter name="Timestamp" parameterTypeRef="U64Type"/>
-      <Parameter name="Major" parameterTypeRef="U8Type"/>
-      <Parameter name="Minor" parameterTypeRef="U8Type"/>
-      <Parameter name="Patch" parameterTypeRef="U8Type"/>
-      <Parameter name="Digest" parameterTypeRef="DigestType"/>
-      <Parameter name="Generation" parameterTypeRef="U32Type"/>
-      <!-- The newest command sequence this start has taken, or the
-           CONNECT's own where it has taken none: where a ground station
-           whose count has gone back starts again. -->
-      <Parameter name="NewestTaken" parameterTypeRef="U32Type"/>
       <Parameter name="Node" parameterTypeRef="U32Type"/>
       <Parameter name="Reason" parameterTypeRef="ReasonType"/>
       <Parameter name="Enabled" parameterTypeRef="FlagType"/>
@@ -178,70 +133,17 @@
       <!-- What every answer holds first. -->
       <SequenceContainer name="AnswerLayout" abstract="true">
         <EntryList>
-          <ParameterRefEntry parameterRef="Version"/>
-          <ParameterRefEntry parameterRef="PacketType"/>
-          <ParameterRefEntry parameterRef="SecHdrFlag"/>
-          <ParameterRefEntry parameterRef="APID"/>
-          <ParameterRefEntry parameterRef="SeqFlags"/>
-          <ParameterRefEntry parameterRef="SeqCount"/>
-          <ParameterRefEntry parameterRef="PacketLength"/>
-          <ParameterRefEntry parameterRef="Kind"/>
+          <ParameterRefEntry parameterRef="Opcode"/>
           <ParameterRefEntry parameterRef="Sequence"/>
-          <ParameterRefEntry parameterRef="Generation"/>
           <ParameterRefEntry parameterRef="Status"/>
           <ParameterRefEntry parameterRef="Timestamp"/>
         </EntryList>
       </SequenceContainer>
-      <!-- An answer from tcspecial: the header's constants fixed. -->
-      <SequenceContainer name="Answer" abstract="true">
+      <SequenceContainer name="PingAnswer">
         <EntryList/>
         <BaseContainer containerRef="AnswerLayout">
           <RestrictionCriteria>
-            <ComparisonList>
-              <Comparison parameterRef="Version" value="0"/>
-              <Comparison parameterRef="PacketType" value="0"/>
-              <Comparison parameterRef="SecHdrFlag" value="0"/>
-              <Comparison parameterRef="APID" value="256"/>
-              <Comparison parameterRef="SeqFlags" value="3"/>
-            </ComparisonList>
-          </RestrictionCriteria>
-        </BaseContainer>
-      </SequenceContainer>
-      <SequenceContainer name="PingAnswer">
-        <EntryList/>
-        <BaseContainer containerRef="Answer">
-          <RestrictionCriteria>
-            <Comparison parameterRef="Kind" value="129"/>
-          </RestrictionCriteria>
-        </BaseContainer>
-      </SequenceContainer>
-      <SequenceContainer name="RestartArmAnswer">
-        <EntryList/>
-        <BaseContainer containerRef="Answer">
-          <RestrictionCriteria>
-            <Comparison parameterRef="Kind" value="130"/>
-          </RestrictionCriteria>
-        </BaseContainer>
-      </SequenceContainer>
-      <SequenceContainer name="RestartAnswer">
-        <EntryList/>
-        <BaseContainer containerRef="Answer">
-          <RestrictionCriteria>
-            <Comparison parameterRef="Kind" value="131"/>
-          </RestrictionCriteria>
-        </BaseContainer>
-      </SequenceContainer>
-      <SequenceContainer name="ConnectAnswer">
-        <EntryList>
-          <ParameterRefEntry parameterRef="Major"/>
-          <ParameterRefEntry parameterRef="Minor"/>
-          <ParameterRefEntry parameterRef="Patch"/>
-          <ParameterRefEntry parameterRef="Digest"/>
-          <ParameterRefEntry parameterRef="NewestTaken"/>
-        </EntryList>
-        <BaseContainer containerRef="Answer">
-          <RestrictionCriteria>
-            <Comparison parameterRef="Kind" value="132"/>
+            <Comparison parameterRef="Opcode" value="1"/>
           </RestrictionCriteria>
         </BaseContainer>
       </SequenceContainer>
@@ -249,9 +151,9 @@
         <EntryList>
           <ParameterRefEntry parameterRef="Node"/>
         </EntryList>
-        <BaseContainer containerRef="Answer">
+        <BaseContainer containerRef="AnswerLayout">
           <RestrictionCriteria>
-            <Comparison parameterRef="Kind" value="48"/>
+            <Comparison parameterRef="Opcode" value="48"/>
           </RestrictionCriteria>
         </BaseContainer>
       </SequenceContainer>
@@ -259,9 +161,9 @@
         <EntryList>
           <ParameterRefEntry parameterRef="Node"/>
         </EntryList>
-        <BaseContainer containerRef="Answer">
+        <BaseContainer containerRef="AnswerLayout">
           <RestrictionCriteria>
-            <Comparison parameterRef="Kind" value="49"/>
+            <Comparison parameterRef="Opcode" value="49"/>
           </RestrictionCriteria>
         </BaseContainer>
       </SequenceContainer>
@@ -270,9 +172,9 @@
           <ParameterRefEntry parameterRef="Node"/>
           <ParameterRefEntry parameterRef="Reason"/>
         </EntryList>
-        <BaseContainer containerRef="Answer">
+        <BaseContainer containerRef="AnswerLayout">
           <RestrictionCriteria>
-            <Comparison parameterRef="Kind" value="50"/>
+            <Comparison parameterRef="Opcode" value="50"/>
           </RestrictionCriteria>
         </BaseContainer>
       </SequenceContainer>
@@ -293,9 +195,9 @@
           <ParameterRefEntry parameterRef="MovedKnown"/>
           <ParameterRefEntry parameterRef="LastMoved"/>
         </EntryList>
-        <BaseContainer containerRef="Answer">
+        <BaseContainer containerRef="AnswerLayout">
           <RestrictionCriteria>
-            <Comparison parameterRef="Kind" value="51"/>
+            <Comparison parameterRef="Opcode" value="51"/>
           </RestrictionCriteria>
         </BaseContainer>
       </SequenceContainer>
@@ -313,9 +215,9 @@
           <ParameterRefEntry parameterRef="GivenTotal"/>
           <ParameterRefEntry parameterRef="GivenBytesShown"/>
         </EntryList>
-        <BaseContainer containerRef="Answer">
+        <BaseContainer containerRef="AnswerLayout">
           <RestrictionCriteria>
-            <Comparison parameterRef="Kind" value="52"/>
+            <Comparison parameterRef="Opcode" value="52"/>
           </RestrictionCriteria>
         </BaseContainer>
       </SequenceContainer>
@@ -323,40 +225,12 @@
   </TelemetryMetaData>
   <CommandMetaData>
     <ArgumentTypeSet>
-      <IntegerArgumentType name="U1Arg" signed="false">
-        <IntegerDataEncoding sizeInBits="1" encoding="unsigned"/>
-      </IntegerArgumentType>
-      <IntegerArgumentType name="U2Arg" signed="false">
-        <IntegerDataEncoding sizeInBits="2" encoding="unsigned"/>
-      </IntegerArgumentType>
-      <IntegerArgumentType name="U3Arg" signed="false">
-        <IntegerDataEncoding sizeInBits="3" encoding="unsigned"/>
-      </IntegerArgumentType>
       <IntegerArgumentType name="U8Arg" signed="false">
         <IntegerDataEncoding sizeInBits="8" encoding="unsigned"/>
-      </IntegerArgumentType>
-      <IntegerArgumentType name="U11Arg" signed="false">
-        <IntegerDataEncoding sizeInBits="11" encoding="unsigned"/>
-      </IntegerArgumentType>
-      <IntegerArgumentType name="U14Arg" signed="false">
-        <IntegerDataEncoding sizeInBits="14" encoding="unsigned"/>
-      </IntegerArgumentType>
-      <IntegerArgumentType name="U16Arg" signed="false">
-        <IntegerDataEncoding sizeInBits="16" encoding="unsigned"/>
       </IntegerArgumentType>
       <IntegerArgumentType name="U32Arg" signed="false">
         <IntegerDataEncoding sizeInBits="32" encoding="unsigned"/>
       </IntegerArgumentType>
-      <IntegerArgumentType name="U64Arg" signed="false">
-        <IntegerDataEncoding sizeInBits="64" encoding="unsigned"/>
-      </IntegerArgumentType>
-      <BinaryArgumentType name="DigestArg">
-        <BinaryDataEncoding>
-          <SizeInBits>
-            <FixedValue>128</FixedValue>
-          </SizeInBits>
-        </BinaryDataEncoding>
-      </BinaryArgumentType>
       <!-- The attribute a SET_NODE sets: up to 64 bytes of UTF-8, after a
            byte saying how many. -->
       <StringArgumentType name="AttributeArg">
@@ -387,54 +261,16 @@
     </ArgumentTypeSet>
     <MetaCommandSet>
       <!-- What every command holds first. -->
-      <MetaCommand name="Command" abstract="true">
+      <MetaCommand name="TcsCommand" abstract="true">
         <ArgumentList>
-          <Argument name="Version" argumentTypeRef="U3Arg"/>
-          <Argument name="PacketType" argumentTypeRef="U1Arg"/>
-          <Argument name="SecHdrFlag" argumentTypeRef="U1Arg"/>
-          <Argument name="APID" argumentTypeRef="U11Arg"/>
-          <Argument name="SeqFlags" argumentTypeRef="U2Arg"/>
-          <Argument name="SeqCount" argumentTypeRef="U14Arg"/>
-          <Argument name="PacketLength" argumentTypeRef="U16Arg">
-            <!-- CCSDS: bytes in the packet data field, minus 1 -->
-            <AncillaryDataSet>
-              <AncillaryData name="tcs-xtce.length">-1</AncillaryData>
-            </AncillaryDataSet>
-          </Argument>
           <Argument name="Opcode" argumentTypeRef="U8Arg"/>
           <Argument name="Sequence" argumentTypeRef="U32Arg"/>
         </ArgumentList>
-        <CommandContainer name="CommandContainer">
+        <CommandContainer name="TcsCommandContainer">
           <EntryList>
-            <ArgumentRefEntry argumentRef="Version"/>
-            <ArgumentRefEntry argumentRef="PacketType"/>
-            <ArgumentRefEntry argumentRef="SecHdrFlag"/>
-            <ArgumentRefEntry argumentRef="APID"/>
-            <ArgumentRefEntry argumentRef="SeqFlags"/>
-            <ArgumentRefEntry argumentRef="SeqCount"/>
-            <ArgumentRefEntry argumentRef="PacketLength"/>
             <ArgumentRefEntry argumentRef="Opcode"/>
             <ArgumentRefEntry argumentRef="Sequence"/>
           </EntryList>
-        </CommandContainer>
-      </MetaCommand>
-      <!-- A command to tcspecial: the header's constants fixed, as
-           arguments assigned rather than fixed entries, so that a packet
-           without them, such as an answer, whose packet type is 0, is not
-           taken for a command. -->
-      <MetaCommand name="TcsCommand" abstract="true">
-        <BaseMetaCommand metaCommandRef="Command">
-          <ArgumentAssignmentList>
-            <ArgumentAssignment argumentName="Version" argumentValue="0"/>
-            <ArgumentAssignment argumentName="PacketType" argumentValue="1"/>
-            <ArgumentAssignment argumentName="SecHdrFlag" argumentValue="0"/>
-            <ArgumentAssignment argumentName="APID" argumentValue="256"/>
-            <ArgumentAssignment argumentName="SeqFlags" argumentValue="3"/>
-          </ArgumentAssignmentList>
-        </BaseMetaCommand>
-        <CommandContainer name="TcsCommandContainer">
-          <EntryList/>
-          <BaseContainer containerRef="CommandContainer"/>
         </CommandContainer>
       </MetaCommand>
       <MetaCommand name="Ping">
@@ -448,60 +284,10 @@
           <BaseContainer containerRef="TcsCommandContainer"/>
         </CommandContainer>
       </MetaCommand>
-      <MetaCommand name="RestartArm">
-        <BaseMetaCommand metaCommandRef="TcsCommand">
-          <ArgumentAssignmentList>
-            <ArgumentAssignment argumentName="Opcode" argumentValue="2"/>
-          </ArgumentAssignmentList>
-        </BaseMetaCommand>
-        <ArgumentList>
-          <Argument name="ArmKey" argumentTypeRef="U64Arg"/>
-        </ArgumentList>
-        <CommandContainer name="RestartArmContainer">
-          <EntryList>
-            <ArgumentRefEntry argumentRef="ArmKey"/>
-          </EntryList>
-          <BaseContainer containerRef="TcsCommandContainer"/>
-        </CommandContainer>
-      </MetaCommand>
-      <MetaCommand name="Restart">
-        <BaseMetaCommand metaCommandRef="TcsCommand">
-          <ArgumentAssignmentList>
-            <ArgumentAssignment argumentName="Opcode" argumentValue="3"/>
-          </ArgumentAssignmentList>
-        </BaseMetaCommand>
-        <ArgumentList>
-          <Argument name="ArmKey" argumentTypeRef="U64Arg"/>
-        </ArgumentList>
-        <CommandContainer name="RestartContainer">
-          <EntryList>
-            <ArgumentRefEntry argumentRef="ArmKey"/>
-          </EntryList>
-          <BaseContainer containerRef="TcsCommandContainer"/>
-        </CommandContainer>
-      </MetaCommand>
-      <MetaCommand name="Connect">
-        <BaseMetaCommand metaCommandRef="TcsCommand">
-          <ArgumentAssignmentList>
-            <ArgumentAssignment argumentName="Opcode" argumentValue="4"/>
-          </ArgumentAssignmentList>
-        </BaseMetaCommand>
-        <ArgumentList>
-          <Argument name="Major" argumentTypeRef="U8Arg"/>
-          <Argument name="Minor" argumentTypeRef="U8Arg"/>
-          <Argument name="Patch" argumentTypeRef="U8Arg"/>
-          <Argument name="Digest" argumentTypeRef="DigestArg"/>
-        </ArgumentList>
-        <CommandContainer name="ConnectContainer">
-          <EntryList>
-            <ArgumentRefEntry argumentRef="Major"/>
-            <ArgumentRefEntry argumentRef="Minor"/>
-            <ArgumentRefEntry argumentRef="Patch"/>
-            <ArgumentRefEntry argumentRef="Digest"/>
-          </EntryList>
-          <BaseContainer containerRef="TcsCommandContainer"/>
-        </CommandContainer>
-      </MetaCommand>
+      <!-- Opcodes 0x00 to 0x0F belong to the fixed commands, in
+           fixed.xml, and no command here takes another of them. PING keeps
+           0x01, which it had before there were fixed commands, and is an
+           ordinary command all the same. -->
       <!-- Opcode 32, and answer kind 160, are not used: they were CONFIG,
            which set the beacon interval while tcspecial ran. The interval
            is the configuration's alone, so that every station with the same

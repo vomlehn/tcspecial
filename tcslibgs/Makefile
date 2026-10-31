@@ -18,9 +18,13 @@ help:
 	@echo "  make link-packet     - Regenerate the commands' and answers'" \
 		"Rust codec"
 	@echo "                         from xtce/link.xml"
+	@echo "  make fixed-packet    - Regenerate the fixed commands' Rust and" \
+		"Python codecs"
+	@echo "                         from xtce/fixed.xml"
 	@echo "  make interface-digest - Regenerate the digest of the" \
 		"interface,"
-	@echo "                         src/interface_digest.rs, from xtce/"
+	@echo "                         src/interface_digest.rs, from" \
+		"xtce/link.xml"
 	@echo "  make clean           - Remove README.html"
 
 .PHONY: docs
@@ -39,7 +43,8 @@ README.html: README.md
 TCS_XTCE := cd ../vendor/tcs-xtce/python && python3 -m tcs_xtce
 XTCE_DIGEST := cd ../vendor/tcs-xtce/python && python3 -m tcs_xtce.digest_cli
 
-# Every command and answer on the link is stated once, in xtce/link.xml, and
+# Every ordinary command and answer on the link is stated once, in
+# xtce/link.xml, and
 # packed and unpacked by the Rust tcs-xtce generates from it, without dynamic
 # allocation, because tcspecial decodes each command in its main loop.
 #
@@ -61,12 +66,42 @@ $(LINK_RS): $(LINK_XML)
 		--source-name tcslibgs/$(LINK_XML)
 	rustfmt --edition 2021 $(LINK_RS)
 
-# The digest of the interface: the tcs-xtce digest of every XTCE document in
-# xtce/, which every beacon carries so that the ground can tell whether it
-# read the documents tcspecial was built from. Generated, and committed, for
-# the reason the codecs are; a test in src/interface.rs computes it again
-# from the documents and fails if this has not been rerun.
-INTERFACE_XML := $(wildcard xtce/*.xml)
+# The three fixed commands -- CONNECT, RESTART_ARM and RESTART -- and their
+# answers are stated in xtce/fixed.xml, which never changes, and packed and
+# unpacked by the Rust and the Python tcs-xtce generates from it. The Python
+# is for the ground stations written in Python; it imports the runtime from
+# the copy python/tcslibgs/_xtce links to, so that an installed package
+# needs nothing from the source tree.
+FIXED_XML := xtce/fixed.xml
+FIXED_RS := src/fixed_packet.rs
+FIXED_PY := ../python/tcslibgs/fixed_packet.py
+
+.PHONY: fixed-packet
+fixed-packet: $(FIXED_RS) $(FIXED_PY)
+
+$(FIXED_RS): $(FIXED_XML)
+	$(TCS_XTCE) ../../../tcslibgs/$(FIXED_XML) \
+		../../../tcslibgs/$(FIXED_RS) \
+		--lang rust --dynamic-allocations false \
+		--source-name tcslibgs/$(FIXED_XML)
+	rustfmt --edition 2021 $(FIXED_RS)
+
+$(FIXED_PY): $(FIXED_XML)
+	$(TCS_XTCE) ../../../tcslibgs/$(FIXED_XML) \
+		../../../python/tcslibgs/fixed_packet.py \
+		--lang python --source-name tcslibgs/$(FIXED_XML)
+	sed -i 's/^from tcs_xtce import packet as pk$$/from ._xtce import packet as pk/' \
+		$(FIXED_PY)
+
+# The digest of the interface: the tcs-xtce digest of xtce/link.xml, which
+# every beacon carries and every configuration names as its `interface`, so
+# that the ground can tell whether it read the document tcspecial was built
+# from. fixed.xml is not part of it: no change to the ordinary interface
+# can touch the fixed commands, and their own digest is pinned by a test in
+# src/link.rs. Generated, and committed, for the reason the codecs are; a
+# test in src/interface.rs computes it again from the document and fails if
+# this has not been rerun.
+INTERFACE_XML := xtce/link.xml
 INTERFACE_RS := src/interface_digest.rs
 
 .PHONY: interface-digest

@@ -6,8 +6,9 @@
 //! and error, and whatever a supervisor handed it -- a socket it listens on, a
 //! pipe it reports to. The process id stays the same, so whatever supervises
 //! tcspecial sees one process throughout, and the vehicle that comes back
-//! reads its configuration file again, which is how a changed configuration
-//! is flown.
+//! chooses its configuration again -- the one the RESTART named, which the
+//! state file now says -- which is how another configuration is flown: see
+//! [`crate::runtime::choose`].
 //!
 //! Which descriptors it was started with is asked as the process starts,
 //! before anything opens, because by the time a RESTART arrives they are

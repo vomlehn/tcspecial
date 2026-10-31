@@ -69,6 +69,13 @@ use crate::{
     PANEL_REFRESH_INTERVAL,
 };
 
+/// What the window says of ARM Restart and Initiate restart pressed where
+/// its configuration could not be digested: they name the configuration to
+/// restart onto by its checksum, and there is none to name.
+const NO_TARGET: &str = "not sent: this window's configuration could not be \
+                         digested, so there is no checksum to name the \
+                         configuration to restart onto";
+
 /// What a panel's status says of a node the spacecraft says is running.
 pub const ACTIVE_STATUS: &str = "Active";
 
@@ -466,8 +473,7 @@ fn command_links_of(
 /// * `link`    - The link the CONNECT goes on.
 /// * `agreed`  - Where the verdict is kept: whether the digests matched, or
 ///               `None` where the CONNECT did not get through.
-/// * `version` - The configuration version this window read.
-/// * `digest`  - The digest of the configuration this window read.
+/// * `digest`  - The checksum of the configuration this window read.
 ///
 /// # Panics
 ///
@@ -476,13 +482,12 @@ fn hear_what_the_vehicle_read(
     ui: &MainWindow,
     link: &Mutex<CiLink>,
     agreed: &Agreed,
-    version: tcslibgs::ConfigVersion,
     digest: tcslibgs::ConfigDigest,
 ) {
     let answer = {
         let mut guard = link.lock().unwrap();
         match guard.client() {
-            Some(client) => client.connect(version, digest),
+            Some(client) => client.connect(digest),
             None => {
                 ui.set_last_response(SharedString::from(
                     crate::ci_link::NOT_CONNECTED,
@@ -492,6 +497,10 @@ fn hear_what_the_vehicle_read(
         }
     };
 
+    // The CONNECT carries no build version, since the vehicle acts on the
+    // checksum alone; the answer carries the vehicle's, which is shown
+    // against this window's own.
+    let version = tcslibgs::ConfigVersion::of_this_build();
     match answer {
         Ok((theirs, their_digest)) => {
             eprintln!(
@@ -712,9 +721,7 @@ fn ask_nodes(
                 said.push(format!("{}: {}", info.name, info.status));
                 model.set_row_data(row, info);
             }
-            Ok((status, _, _)) => {
-                said.push(format!("{}: {status:?}", info.name))
-            }
+            Ok((status, _, _)) => said.push(format!("{}: {status}", info.name)),
             Err(e) => said.push(format!("{}: no answer ({e})", info.name)),
         }
     }
@@ -841,11 +848,11 @@ fn set_a_nodes_attribute(
     let said = match answer {
         Ok((status, answered, _)) if answered != node => format!(
             "SET_NODE {node} ({name}) was answered about {answered}: the two \
-             ends are not reading the same configuration ({status:?})"
+             ends are not reading the same configuration ({status})"
         ),
         Ok((status, _, _)) if status.is_success() => {
             format!(
-                "SET_NODE {node} ({name}).{} = {value}: {status:?}",
+                "SET_NODE {node} ({name}).{} = {value}: {status}",
                 attribute.trim()
             )
         }
@@ -853,7 +860,7 @@ fn set_a_nodes_attribute(
         // are both InvalidParameter, so the status says that it was refused
         // and the reason the vehicle sends says why: which word to change.
         Ok((status, _, reason)) if !reason.is_empty() => format!(
-            "SET_NODE {node} ({name}).{} = {value} was refused: {status:?} -- \
+            "SET_NODE {node} ({name}).{} = {value} was refused: {status} -- \
              {reason}",
             attribute.trim()
         ),
@@ -861,7 +868,7 @@ fn set_a_nodes_attribute(
         // because an operator with the window and no log should still know
         // where to look.
         Ok((status, _, _)) => format!(
-            "SET_NODE {node} ({name}).{} = {value} was refused: {status:?} -- \
+            "SET_NODE {node} ({name}).{} = {value} was refused: {status} -- \
              no binding names that attribute, or the node will not take that \
              value",
             attribute.trim()
@@ -947,7 +954,7 @@ fn command_a_node(
         // thing this could not otherwise notice.
         Ok((status, answered)) if answered != node => format!(
             "{verb} {node} ({name}) was answered about {answered}: the two \
-             ends are not reading the same configuration ({status:?})"
+             ends are not reading the same configuration ({status})"
         ),
         Ok((status, _)) if status.is_success() => {
             let mut info = info;
@@ -962,11 +969,11 @@ fn command_a_node(
                     *flag = !enable;
                 }
             }
-            format!("{verb} {node} ({name}): {status:?}")
+            format!("{verb} {node} ({name}): {status}")
         }
         Ok((status, _)) => format!(
             "{verb} {node} ({name}) was refused: \
-                                    {status:?}"
+                                    {status}"
         ),
         Err(e) => format!("{verb} {node} ({name}) failed: {e}"),
     };
@@ -1019,7 +1026,6 @@ pub(crate) fn command_buttons(
         let model = model.clone();
         let declined = declined.clone();
         let contact = contact.clone();
-        let ours = tcslibgs::config_digest::ConfigVersion::of_this_build();
         ui.on_link_clicked(move || {
             let ui = weak.unwrap();
 
@@ -1064,9 +1070,7 @@ pub(crate) fn command_buttons(
 
             match digest {
                 Some(digest) => {
-                    hear_what_the_vehicle_read(
-                        &ui, &link, &agreed, ours, digest,
-                    );
+                    hear_what_the_vehicle_read(&ui, &link, &agreed, digest);
                     connected_in_contact(
                         &ui,
                         &link,
@@ -1159,14 +1163,21 @@ pub(crate) fn command_buttons(
                         None => crate::ci_link::NOT_CONNECTED.to_string(),
                     }));
                 }
+                // Onto the configuration this window read, which is the
+                // one the vehicle is matched to run: a plain restart. A
+                // window with no checksum has nothing to name.
                 MenuAction::ArmRestart => {
+                    let Some(target) = digest else {
+                        ui.set_last_response(SharedString::from(NO_TARGET));
+                        return;
+                    };
                     let answer = link
                         .lock()
                         .unwrap()
                         .client()
-                        .map(|client| client.restart_arm(key));
+                        .map(|client| client.restart_arm(key, target));
                     ui.set_last_response(SharedString::from(match answer {
-                        Some(Ok(status)) => format!("ARM Restart: {status:?}"),
+                        Some(Ok(status)) => format!("ARM Restart: {status}"),
                         Some(Err(e)) => format!("ARM Restart failed: {e}"),
                         None => crate::ci_link::NOT_CONNECTED.to_string(),
                     }));
@@ -1175,23 +1186,27 @@ pub(crate) fn command_buttons(
                 // the beacons say when it is back, and until then the
                 // window's commands are refused unsent.
                 MenuAction::Restart => {
+                    let Some(target) = digest else {
+                        ui.set_last_response(SharedString::from(NO_TARGET));
+                        return;
+                    };
                     let answer = link
                         .lock()
                         .unwrap()
                         .client()
-                        .map(|client| client.restart(key));
+                        .map(|client| client.restart(key, target));
                     ui.set_last_response(SharedString::from(match answer {
                         Some(Ok(status)) if status.is_success() => {
                             "Initiate restart: Success -- waiting for a beacon \
-                             of the next generation"
+                             of the next start"
                                 .to_string()
                         }
                         Some(Ok(status)) => {
-                            format!("Initiate restart: {status:?}")
+                            format!("Initiate restart: {status}")
                         }
                         Some(Err(e)) => format!(
                             "Initiate restart: no answer ({e}) -- waiting for \
-                             a beacon of the next generation"
+                             a beacon of the next start"
                         ),
                         None => crate::ci_link::NOT_CONNECTED.to_string(),
                     }));

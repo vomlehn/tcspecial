@@ -75,8 +75,8 @@ impl GatewayReceiver {
     ///
     /// # Arguments
     ///
-    /// * `path` - The configuration file.
-    /// * `gateway`  - The gateway node's name.
+    /// * `path`    - The configuration file.
+    /// * `gateway` - The gateway node's name.
     ///
     /// # Returns
     ///
@@ -100,8 +100,8 @@ impl GatewayReceiver {
     ///
     /// # Arguments
     ///
-    /// * `graph` - The configuration's graph.
-    /// * `gateway`   - The gateway node's name.
+    /// * `graph`   - The configuration's graph.
+    /// * `gateway` - The gateway node's name.
     ///
     /// # Returns
     ///

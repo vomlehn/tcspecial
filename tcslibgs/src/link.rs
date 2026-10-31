@@ -1,24 +1,32 @@
 //! Commands and answers, as they go on the link.
 //!
-//! What the MOC sends tcspecial and what tcspecial sends back, each a CCSDS
-//! Space Packet. The layouts are stated once, in XTCE, in
-//! `tcslibgs/xtce/link.xml`, and packed and unpacked by the code tcs-xtce
-//! generates from it, `link_packet.rs`, which allocates nothing. This module
-//! is the one place that turns those packets into the [`Command`] and
-//! [`Telemetry`] the rest of the software works with, and back:
+//! What the MOC sends tcspecial and what tcspecial sends back, with no
+//! header: a command is its opcode, its sequence and what it carries, and an
+//! answer the opcode and sequence of the command it answers, a status, a
+//! time and what it carries. The layouts are stated once, in XTCE: the three
+//! fixed commands -- CONNECT, RESTART_ARM and RESTART -- in
+//! `tcslibgs/xtce/fixed.xml`, whose layouts never change, and every other
+//! command in `tcslibgs/xtce/link.xml`. Each is packed and unpacked by the
+//! code tcs-xtce generates from it, `fixed_packet.rs` and `link_packet.rs`,
+//! which allocates nothing. This module is the one place that turns those
+//! packets into the [`Command`] and [`Telemetry`] the rest of the software
+//! works with, and back:
 //!
-//! * [`Command::read`] and [`Telemetry::read`], which refuse a datagram that
-//!   is not exactly one packet of the layout;
+//! * [`Command::read`] and [`Telemetry::read`], which refuse a datagram whose
+//!   opcode no command has or whose length is not exactly its opcode's
+//!   layout's;
 //! * [`CommandPacker`] and [`AnswerPacker`], which pack into a buffer they
 //!   keep, so that a loop that sends allocates nothing.
 //!
-//! A packet carries no CRC of its own: the transport under it checks it,
-//! as UDP's checksum does on this link, and a damaged datagram is refused
-//! there before it reaches this.
+//! Which way a packet goes is said by who sends it and who receives it: the
+//! vehicle reads only commands and a ground station only answers, so nothing
+//! in a packet says which it is. A packet carries no CRC of its own: the
+//! transport under it checks it, as UDP's checksum does on this link, and a
+//! damaged datagram is refused there before it reaches this.
 //!
-//! It replaced JSON, which no ground system reads from a mission database,
-//! and which named every field in every packet. See "Every packet is XTCE"
-//! in `docs/design.rst`.
+//! It replaced CCSDS Space Packets, whose header said what the link already
+//! did, and before them JSON. See "The link without a header" in
+//! `docs/design.rst`.
 
 use std::fmt;
 
@@ -30,8 +38,8 @@ use crate::commands::{
     SetNodeCommand, Value,
 };
 use crate::config_digest::{ConfigDigest, ConfigVersion};
+use crate::fixed_packet as fixed;
 use crate::link_packet as packet;
-use crate::link_packet::StatusType;
 use crate::telemetry::{
     ConnectTelemetry, NodeTelemetry, PingTelemetry, QueryNodeSampleTelemetry,
     QueryNodeTelemetry, Reason, RestartArmTelemetry, RestartTelemetry,
@@ -42,41 +50,82 @@ use crate::types::{
     DH_SAMPLE_BYTES,
 };
 
+/// The larger of two lengths, for the constants below.
+///
+/// # Arguments
+///
+/// * `a` - One length.
+/// * `b` - The other.
+///
+/// # Returns
+///
+/// Whichever is larger.
+const fn larger(a: usize, b: usize) -> usize {
+    if a > b {
+        a
+    } else {
+        b
+    }
+}
+
 /// The longest command there is, in bytes: a SET_NODE with the longest
 /// attribute and value.
-pub const COMMAND_BYTES: usize = packet::CommandKind::MAX_BYTES;
+pub const COMMAND_BYTES: usize = larger(
+    packet::TcsCommandKind::MAX_BYTES,
+    fixed::FixedCommandKind::MAX_BYTES,
+);
 
 /// The longest answer there is, in bytes: a SET_NODE's with the longest
 /// reason.
-pub const ANSWER_BYTES: usize = packet::AnswerLayoutKind::MAX_BYTES;
+pub const ANSWER_BYTES: usize = larger(
+    packet::AnswerLayoutKind::MAX_BYTES,
+    fixed::FixedAnswerKind::MAX_BYTES,
+);
 
 /// Why a datagram is not a command or an answer.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum LinkError {
-    /// It holds one packet and then more bytes, which no sender of these
-    /// writes.
+    /// It holds nothing, so not even an opcode.
+    Empty,
+    /// Its first byte is an opcode no command has.
+    Opcode(u8),
+    /// It holds one packet of its opcode's layout and then more bytes, which
+    /// no sender of these writes.
     Trailing { length: usize, packet: usize },
-    /// It is not a packet of the layout.
+    /// It is not a packet of its opcode's layout: too short, or a field out
+    /// of the layout's range.
     Packet(PacketError),
     /// It is a packet of the layout and says something the software cannot
-    /// hold: a status no build has, an attribute that is not text.
+    /// hold: an attribute that is not text, a sample longer than one is
+    /// shown.
     Value(&'static str),
 }
 
 impl fmt::Display for LinkError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
+            LinkError::Empty => write!(
+                f,
+                "an empty datagram, which holds no opcode: something other \
+                 than tcspecial or its ground is sending here"
+            ),
+            LinkError::Opcode(opcode) => write!(
+                f,
+                "opcode {opcode:#04x}, which no command of this interface \
+                 has: something other than tcspecial or its ground, or one \
+                 built from another interface, is sending here"
+            ),
             LinkError::Trailing { length, packet } => write!(
                 f,
-                "{length} bytes, of which the packet is the first {packet}: \
-                 something other than tcspecial or its ground, or one of \
-                 another layout, is sending here"
+                "{length} bytes, where its opcode's layout is {packet}: \
+                 something other than tcspecial or its ground, or one built \
+                 from another interface, is sending here"
             ),
             LinkError::Packet(why) => write!(
                 f,
-                "not a packet of tcspecial's link ({why}): something other \
-                 than tcspecial or its ground, or one of another layout, is \
-                 sending here"
+                "not a packet of its opcode's layout ({why}): something \
+                 other than tcspecial or its ground, or one built from \
+                 another interface, is sending here"
             ),
             LinkError::Value(why) => write!(f, "a packet that says {why}"),
         }
@@ -84,6 +133,29 @@ impl fmt::Display for LinkError {
 }
 
 impl std::error::Error for LinkError {}
+
+/// Reads which command a datagram is, or answers, by its opcode. The three
+/// [`CommandType::taken_unmatched`] names are the fixed commands, which
+/// `xtce/fixed.xml` states; every other opcode is read by `xtce/link.xml`'s
+/// layouts.
+///
+/// # Arguments
+///
+/// * `datagram` - The datagram received.
+///
+/// # Returns
+///
+/// The kind of command the opcode names, whose
+/// [`CommandType::taken_unmatched`] says which document's layout it has.
+///
+/// # Errors
+///
+/// [`LinkError::Empty`] for an empty datagram, and [`LinkError::Opcode`]
+/// for an opcode no command has.
+fn opcode_of(datagram: &[u8]) -> Result<CommandType, LinkError> {
+    let opcode = *datagram.first().ok_or(LinkError::Empty)?;
+    CommandType::from_u8(opcode).ok_or(LinkError::Opcode(opcode))
+}
 
 /// Unpacks the one packet a datagram holds, as `P` unpacks it.
 ///
@@ -110,12 +182,6 @@ fn whole<P: Packet>(datagram: &[u8]) -> Result<P, LinkError> {
     Ok(read)
 }
 
-/// The CCSDS sequence count of a packet whose sequence is `sequence`: its
-/// low fourteen bits, which is all the header has room for.
-fn seq_count(sequence: u32) -> u16 {
-    (sequence & 0x3fff) as u16
-}
-
 /// Makes the header of a command read from the link.
 ///
 /// # Arguments
@@ -137,7 +203,7 @@ fn digest_of(bytes: &[u8]) -> ConfigDigest {
 }
 
 /// Sixteen bytes into a buffer of sixteen, which cannot fail.
-fn fixed<const N: usize>(bytes: &[u8]) -> FixedBytes<N> {
+fn fixed_bytes<const N: usize>(bytes: &[u8]) -> FixedBytes<N> {
     let mut out = FixedBytes::new();
     let _ = out.extend_from_slice(&bytes[..bytes.len().min(N)]);
     out
@@ -166,30 +232,34 @@ impl Command {
     ///
     /// # Errors
     ///
-    /// What [`whole`] refuses, and [`LinkError::Value`] for a SET_NODE
-    /// attribute or value too long for the command to hold.
+    /// What [`opcode_of`] and [`whole`] refuse -- an opcode no command has,
+    /// or a length that is not exactly its layout's -- and
+    /// [`LinkError::Value`] for a SET_NODE attribute or value too long for
+    /// the command to hold.
     pub fn read(datagram: &[u8]) -> Result<Command, LinkError> {
-        use packet::CommandKind as K;
+        if opcode_of(datagram)?.taken_unmatched() {
+            use fixed::FixedCommandKind as F;
+            return Ok(match whole::<F>(datagram)? {
+                F::RestartArm(p) => Command::RestartArm(RestartArmCommand {
+                    header: header(p.sequence, CommandType::RestartArm),
+                    arm_key: ArmKey(p.arm_key),
+                    target: digest_of(&p.target),
+                }),
+                F::Restart(p) => Command::Restart(RestartCommand {
+                    header: header(p.sequence, CommandType::Restart),
+                    arm_key: ArmKey(p.arm_key),
+                    target: digest_of(&p.target),
+                }),
+                F::Connect(p) => Command::Connect(ConnectCommand {
+                    header: header(p.sequence, CommandType::Connect),
+                    digest: digest_of(&p.checksum),
+                }),
+            });
+        }
+        use packet::TcsCommandKind as K;
         Ok(match whole::<K>(datagram)? {
             K::Ping(p) => Command::Ping(PingCommand {
                 header: header(p.sequence, CommandType::Ping),
-            }),
-            K::Connect(p) => Command::Connect(ConnectCommand {
-                header: header(p.sequence, CommandType::Connect),
-                version: ConfigVersion {
-                    major: p.major,
-                    minor: p.minor,
-                    patch: p.patch,
-                },
-                digest: digest_of(&p.digest),
-            }),
-            K::RestartArm(p) => Command::RestartArm(RestartArmCommand {
-                header: header(p.sequence, CommandType::RestartArm),
-                arm_key: ArmKey(p.arm_key),
-            }),
-            K::Restart(p) => Command::Restart(RestartCommand {
-                header: header(p.sequence, CommandType::Restart),
-                arm_key: ArmKey(p.arm_key),
             }),
             K::StartNode(p) => Command::StartNode(NodeCommand {
                 header: header(p.sequence, CommandType::StartNode),
@@ -226,174 +296,129 @@ impl Command {
     pub fn to_bytes(&self) -> Vec<u8> {
         CommandPacker::new().pack(self).to_vec()
     }
+}
 
-    /// Makes the generated packet that says this command.
+/// Packs commands into a buffer it keeps, for a loop that sends them.
+///
+/// Two codecs, one for each document, each with a buffer of its own, made
+/// when the packer is: packing allocates nothing after that.
+pub struct CommandPacker {
+    fixed: Codec,
+    ordinary: Codec,
+}
+
+impl CommandPacker {
+    /// Makes a packer, with a buffer for the longest command of each
+    /// document.
     ///
     /// # Returns
     ///
-    /// The packet, its CCSDS sequence count taken from the sequence number.
-    fn packet(&self) -> packet::CommandKind {
-        use packet::CommandKind as K;
-        let sequence = self.sequence();
-        let seq_count = seq_count(sequence);
-        match self {
-            Command::Ping(_) => K::Ping(packet::Ping {
-                seq_count,
-                sequence,
-            }),
-            Command::Connect(c) => K::Connect(packet::Connect {
-                seq_count,
-                sequence,
-                major: c.version.major,
-                minor: c.version.minor,
-                patch: c.version.patch,
-                digest: fixed(&c.digest.0),
-            }),
-            Command::RestartArm(c) => K::RestartArm(packet::RestartArm {
-                seq_count,
-                sequence,
-                arm_key: c.arm_key.0,
-            }),
-            Command::Restart(c) => K::Restart(packet::Restart {
-                seq_count,
-                sequence,
-                arm_key: c.arm_key.0,
-            }),
+    /// The packer.
+    pub fn new() -> Self {
+        Self {
+            fixed: Codec::for_packet::<fixed::FixedCommandKind>(),
+            ordinary: Codec::for_packet::<packet::TcsCommandKind>(),
+        }
+    }
+
+    /// Packs a command, in the packer's own buffer.
+    ///
+    /// # Arguments
+    ///
+    /// * `command` - The command.
+    ///
+    /// # Returns
+    ///
+    /// Its bytes on the link, good until the next pack.
+    pub fn pack(&mut self, command: &Command) -> &[u8] {
+        use fixed::FixedCommandKind as F;
+        use packet::TcsCommandKind as K;
+        let sequence = command.sequence();
+        let ordinary = match command {
+            Command::RestartArm(c) => {
+                return encoded(
+                    &mut self.fixed,
+                    &F::RestartArm(fixed::RestartArm {
+                        sequence,
+                        arm_key: c.arm_key.0,
+                        target: fixed_bytes(&c.target.0),
+                    }),
+                )
+            }
+            Command::Restart(c) => {
+                return encoded(
+                    &mut self.fixed,
+                    &F::Restart(fixed::Restart {
+                        sequence,
+                        arm_key: c.arm_key.0,
+                        target: fixed_bytes(&c.target.0),
+                    }),
+                )
+            }
+            Command::Connect(c) => {
+                return encoded(
+                    &mut self.fixed,
+                    &F::Connect(fixed::Connect {
+                        sequence,
+                        checksum: fixed_bytes(&c.digest.0),
+                    }),
+                )
+            }
+            Command::Ping(_) => K::Ping(packet::Ping { sequence }),
             Command::StartNode(c) => K::StartNode(packet::StartNode {
-                seq_count,
                 sequence,
                 node: c.node.0,
             }),
             Command::StopNode(c) => K::StopNode(packet::StopNode {
-                seq_count,
                 sequence,
                 node: c.node.0,
             }),
             Command::QueryNode(c) => K::QueryNode(packet::QueryNode {
-                seq_count,
                 sequence,
                 node: c.node.0,
             }),
             Command::QueryNodeSample(c) => {
                 K::QueryNodeSample(packet::QueryNodeSample {
-                    seq_count,
                     sequence,
                     node: c.node.0,
                 })
             }
             Command::SetNode(c) => K::SetNode(packet::SetNode {
-                seq_count,
                 sequence,
                 node: c.node.0,
                 attribute: text(c.attribute.as_str()),
-                value_: fixed(c.value.as_bytes()),
+                value_: fixed_bytes(c.value.as_bytes()),
             }),
-        }
+        };
+        encoded(&mut self.ordinary, &ordinary)
     }
 }
 
-/// Packs commands into a buffer it keeps, for a loop that sends them.
-pub struct CommandPacker {
-    codec: Codec,
-}
-
-impl CommandPacker {
-    pub fn new() -> Self {
-        Self {
-            codec: Codec::for_packet::<packet::CommandKind>(),
-        }
-    }
-
-    /// `command`, packed, in the packer's own buffer.
-    pub fn pack(&mut self, command: &Command) -> &[u8] {
-        // Every field is in range by the command's own types -- an attribute
-        // of at most 64 bytes, a value of at most 256 -- which are the
-        // layout's, so there is nothing a command can hold that does not
-        // pack.
-        self.codec
-            .encode(&command.packet())
-            .expect("every command fits the layout")
-    }
+/// Packs `packet` with `codec`, into the codec's own buffer.
+///
+/// Every field of a command or an answer is in range by its own types -- an
+/// attribute of at most 64 bytes, a value of at most 256, a reason of at
+/// most 160 -- which are the layouts', so there is nothing one can hold
+/// that does not pack.
+///
+/// # Arguments
+///
+/// * `codec`  - The codec of the document `packet` is stated in.
+/// * `packet` - The generated packet.
+///
+/// # Returns
+///
+/// The packed bytes.
+fn encoded<'a, P: Packet>(codec: &'a mut Codec, packet: &P) -> &'a [u8] {
+    codec
+        .encode(packet)
+        .expect("every command and answer fits its layout")
 }
 
 impl Default for CommandPacker {
     fn default() -> Self {
         Self::new()
     }
-}
-
-/// Gives a status as the link carries it.
-///
-/// # Arguments
-///
-/// * `status` - The status.
-///
-/// # Returns
-///
-/// Its value on the link.
-fn status_of(status: CommandStatus) -> StatusType {
-    match status {
-        CommandStatus::Success => StatusType::SUCCESS,
-        CommandStatus::Failure => StatusType::FAILURE,
-        CommandStatus::InvalidCommand => StatusType::INVALID_COMMAND,
-        CommandStatus::InvalidParameter => StatusType::INVALID_PARAMETER,
-        CommandStatus::NotArmed => StatusType::NOT_ARMED,
-        CommandStatus::NotFound => StatusType::NOT_FOUND,
-        CommandStatus::AlreadyExists => StatusType::ALREADY_EXISTS,
-        CommandStatus::Timeout => StatusType::TIMEOUT,
-        CommandStatus::Stale => StatusType::STALE,
-        CommandStatus::Unmatched => StatusType::UNMATCHED,
-    }
-}
-
-/// Reads a status from the link: the inverse of [`status_of`].
-///
-/// # Arguments
-///
-/// * `status` - The status as the link carries it.
-///
-/// # Returns
-///
-/// The status.
-///
-/// # Errors
-///
-/// [`LinkError::Value`] for a status no build has.
-fn status_from(status: StatusType) -> Result<CommandStatus, LinkError> {
-    Ok(match status {
-        StatusType::SUCCESS => CommandStatus::Success,
-        StatusType::FAILURE => CommandStatus::Failure,
-        StatusType::INVALID_COMMAND => CommandStatus::InvalidCommand,
-        StatusType::INVALID_PARAMETER => CommandStatus::InvalidParameter,
-        StatusType::NOT_ARMED => CommandStatus::NotArmed,
-        StatusType::NOT_FOUND => CommandStatus::NotFound,
-        StatusType::ALREADY_EXISTS => CommandStatus::AlreadyExists,
-        StatusType::TIMEOUT => CommandStatus::Timeout,
-        StatusType::STALE => CommandStatus::Stale,
-        StatusType::UNMATCHED => CommandStatus::Unmatched,
-        _ => return Err(LinkError::Value("a status no build has")),
-    })
-}
-
-/// Gives a time that may not have happened as the link carries it.
-///
-/// # Arguments
-///
-/// * `time` - The time, or `None` where it has not happened.
-///
-/// # Returns
-///
-/// Whether it has happened, and when in microseconds, nought where it has
-/// not.
-fn when_of(time: Option<Timestamp>) -> (bool, u64) {
-    match time {
-        Some(time) => (true, time.micros),
-        None => (false, 0),
-    }
-}
-
-fn when_from(known: bool, micros: u64) -> Option<Timestamp> {
-    known.then_some(Timestamp { micros })
 }
 
 /// Reads what a sample says, from the fields the link carries it in.
@@ -438,6 +463,34 @@ fn sample_from(
     })
 }
 
+/// Gives a time that may not have happened as the link carries it.
+///
+/// # Arguments
+///
+/// * `time` - The time, or `None` where it has not happened.
+///
+/// # Returns
+///
+/// Whether it has happened, and when in microseconds, nought where it has
+/// not.
+fn when_of(time: Option<Timestamp>) -> (bool, u64) {
+    match time {
+        Some(time) => (true, time.micros),
+        None => (false, 0),
+    }
+}
+
+fn when_from(known: bool, micros: u64) -> Option<Timestamp> {
+    known.then_some(Timestamp { micros })
+}
+
+/// Reads a status from its number on the link. A number this build does not
+/// know is read as [`CommandStatus::Unknown`], not refused: see there.
+fn status_from(raw: i64) -> CommandStatus {
+    // The field is eight bits wide, so the number always fits.
+    CommandStatus::of_number(raw as u8)
+}
+
 impl Telemetry {
     /// Reads the answer a datagram holds.
     ///
@@ -451,46 +504,51 @@ impl Telemetry {
     ///
     /// # Errors
     ///
-    /// What [`whole`] refuses, a status no build has, and a sample longer
+    /// What [`opcode_of`] and [`whole`] refuse -- an opcode no command has,
+    /// or a length that is not exactly its layout's -- and a sample longer
     /// than one is shown.
     pub fn read(datagram: &[u8]) -> Result<Telemetry, LinkError> {
-        use packet::AnswerLayoutKind as K;
         // The header every answer starts with, from the fields every packet
         // has under the same names.
         macro_rules! head {
             ($p:expr, $kind:expr) => {
                 TelemetryHeader {
                     sequence: $p.sequence,
-                    generation: $p.generation,
                     tm_type: $kind,
-                    status: status_from($p.status)?,
+                    status: status_from($p.status.0),
                     timestamp: Timestamp {
                         micros: $p.timestamp,
                     },
                 }
             };
         }
+        if opcode_of(datagram)?.taken_unmatched() {
+            use fixed::FixedAnswerKind as F;
+            return Ok(match whole::<F>(datagram)? {
+                F::RestartArmAnswer(p) => {
+                    Telemetry::RestartArm(RestartArmTelemetry {
+                        header: head!(p, TelemetryType::RestartArm),
+                    })
+                }
+                F::RestartAnswer(p) => Telemetry::Restart(RestartTelemetry {
+                    header: head!(p, TelemetryType::Restart),
+                }),
+                F::ConnectAnswer(p) => Telemetry::Connect(ConnectTelemetry {
+                    header: head!(p, TelemetryType::Connect),
+                    version: ConfigVersion {
+                        major: p.major,
+                        minor: p.minor,
+                        patch: p.patch,
+                    },
+                    digest: digest_of(&p.running),
+                    newest_taken: p.newest_taken,
+                }),
+            });
+        }
+        use packet::AnswerLayoutKind as K;
         Ok(match whole::<K>(datagram)? {
             K::PingAnswer(p) => Telemetry::Ping(PingTelemetry {
                 header: head!(p, TelemetryType::Ping),
-            }),
-            K::RestartArmAnswer(p) => {
-                Telemetry::RestartArm(RestartArmTelemetry {
-                    header: head!(p, TelemetryType::RestartArm),
-                })
-            }
-            K::RestartAnswer(p) => Telemetry::Restart(RestartTelemetry {
-                header: head!(p, TelemetryType::Restart),
-            }),
-            K::ConnectAnswer(p) => Telemetry::Connect(ConnectTelemetry {
-                header: head!(p, TelemetryType::Connect),
-                version: ConfigVersion {
-                    major: p.major,
-                    minor: p.minor,
-                    patch: p.patch,
-                },
-                digest: digest_of(&p.digest),
-                newest_taken: p.newest_taken,
             }),
             K::StartNodeAnswer(p) => Telemetry::StartNode(NodeTelemetry {
                 header: head!(p, TelemetryType::StartNode),
@@ -551,52 +609,97 @@ impl Telemetry {
     pub fn to_bytes(&self) -> Vec<u8> {
         AnswerPacker::new().pack(self).to_vec()
     }
+}
 
-    /// Makes the generated packet that says this answer.
+/// Packs answers into a buffer it keeps, for the command interpreter, which
+/// answers every command it takes from its main loop.
+///
+/// Two codecs, one for each document, as [`CommandPacker`] has.
+pub struct AnswerPacker {
+    fixed: Codec,
+    ordinary: Codec,
+}
+
+impl AnswerPacker {
+    /// Makes a packer, with a buffer for the longest answer of each
+    /// document.
     ///
     /// # Returns
     ///
-    /// The packet, its CCSDS sequence count taken from the sequence number.
-    fn packet(&self) -> packet::AnswerLayoutKind {
+    /// The packer.
+    pub fn new() -> Self {
+        Self {
+            fixed: Codec::for_packet::<fixed::FixedAnswerKind>(),
+            ordinary: Codec::for_packet::<packet::AnswerLayoutKind>(),
+        }
+    }
+
+    /// Packs an answer, in the packer's own buffer.
+    ///
+    /// # Arguments
+    ///
+    /// * `answer` - The answer.
+    ///
+    /// # Returns
+    ///
+    /// Its bytes on the link, good until the next pack.
+    pub fn pack(&mut self, answer: &Telemetry) -> &[u8] {
+        use fixed::FixedAnswerKind as F;
         use packet::AnswerLayoutKind as K;
+        // The four fields every answer starts with, in either document.
         macro_rules! fill {
-            ($ty:ident, $h:expr; $($field:ident: $value:expr),* $(,)?) => {
-                packet::$ty {
-                    seq_count: seq_count($h.sequence),
+            ($doc:ident, $ty:ident, $h:expr; $($field:ident: $value:expr),*
+             $(,)?) => {
+                $doc::$ty {
                     sequence: $h.sequence,
-                    generation: $h.generation,
-                    status: status_of($h.status),
+                    status: $doc::StatusType(i64::from($h.status.number())),
                     timestamp: $h.timestamp.micros,
                     $($field: $value,)*
                 }
             };
         }
-        match self {
-            Telemetry::Ping(t) => K::PingAnswer(fill!(PingAnswer, t.header;)),
+        let p = match answer {
             Telemetry::RestartArm(t) => {
-                K::RestartArmAnswer(fill!(RestartArmAnswer, t.header;))
+                let p = F::RestartArmAnswer(fill!(
+                    fixed,
+                    RestartArmAnswer,
+                    t.header;
+                ));
+                return encoded(&mut self.fixed, &p);
             }
             Telemetry::Restart(t) => {
-                K::RestartAnswer(fill!(RestartAnswer, t.header;))
+                let p =
+                    F::RestartAnswer(fill!(fixed, RestartAnswer, t.header;));
+                return encoded(&mut self.fixed, &p);
             }
-            Telemetry::Connect(t) => K::ConnectAnswer(fill!(
-                ConnectAnswer,
-                t.header;
-                    major: t.version.major,
-                    minor: t.version.minor,
-                    patch: t.version.patch,
-                    digest: fixed(&t.digest.0),
-                    newest_taken: t.newest_taken,
-            )),
+            Telemetry::Connect(t) => {
+                let p = F::ConnectAnswer(fill!(
+                    fixed,
+                    ConnectAnswer,
+                    t.header;
+                        running: fixed_bytes(&t.digest.0),
+                        major: t.version.major,
+                        minor: t.version.minor,
+                        patch: t.version.patch,
+                        newest_taken: t.newest_taken,
+                ));
+                return encoded(&mut self.fixed, &p);
+            }
+            Telemetry::Ping(t) => {
+                K::PingAnswer(fill!(packet, PingAnswer, t.header;))
+            }
             Telemetry::StartNode(t) => K::StartNodeAnswer(fill!(
+                packet,
                 StartNodeAnswer,
                 t.header; node: t.node.0
             )),
             Telemetry::StopNode(t) => K::StopNodeAnswer(fill!(
+                packet,
                 StopNodeAnswer,
                 t.header; node: t.node.0
             )),
             Telemetry::SetNode(t) => K::SetNodeAnswer(fill!(
+                packet,
                 SetNodeAnswer,
                 t.header;
                     node: t.node.0,
@@ -606,6 +709,7 @@ impl Telemetry {
                 let (moved_known, last_moved) = when_of(t.counts.last_moved);
                 let c = &t.counts;
                 K::QueryNodeAnswer(fill!(
+                    packet,
                     QueryNodeAnswer,
                     t.header;
                         node: t.node.0,
@@ -628,6 +732,7 @@ impl Telemetry {
                 let (taken_known, taken_time) = when_of(t.taken.time);
                 let (given_known, given_time) = when_of(t.given.time);
                 K::QueryNodeSampleAnswer(fill!(
+                    packet,
                     QueryNodeSampleAnswer,
                     t.header;
                         node: t.node.0,
@@ -635,38 +740,16 @@ impl Telemetry {
                         taken_time: taken_time,
                         taken_length: t.taken.len,
                         taken_total: t.taken.total,
-                        taken_bytes_shown: fixed(&t.taken.bytes),
+                        taken_bytes_shown: fixed_bytes(&t.taken.bytes),
                         given_known: given_known,
                         given_time: given_time,
                         given_length: t.given.len,
                         given_total: t.given.total,
-                        given_bytes_shown: fixed(&t.given.bytes),
+                        given_bytes_shown: fixed_bytes(&t.given.bytes),
                 ))
             }
-        }
-    }
-}
-
-/// Packs answers into a buffer it keeps, for the command interpreter, which
-/// answers every command it takes from its main loop.
-pub struct AnswerPacker {
-    codec: Codec,
-}
-
-impl AnswerPacker {
-    pub fn new() -> Self {
-        Self {
-            codec: Codec::for_packet::<packet::AnswerLayoutKind>(),
-        }
-    }
-
-    /// `answer`, packed, in the packer's own buffer.
-    pub fn pack(&mut self, answer: &Telemetry) -> &[u8] {
-        // Every field is in range by the answer's own types -- a reason of
-        // at most 160 bytes -- which are the layout's.
-        self.codec
-            .encode(&answer.packet())
-            .expect("every answer fits the layout")
+        };
+        encoded(&mut self.ordinary, &p)
     }
 }
 
@@ -680,6 +763,16 @@ impl Default for AnswerPacker {
 mod tests {
     use super::*;
 
+    /// The tcs-xtce digest of `xtce/fixed.xml`, which must never change.
+    ///
+    /// The fixed commands are what two ends that agree on nothing else still
+    /// agree on, so a change to their document is a change to every ground
+    /// station and every vehicle at once, including the ones already flying.
+    /// A test that fails here is not a constant to update: the change to
+    /// `fixed.xml` is to be undone, and a new fixed command made instead,
+    /// with an opcode of its own and a document of its own.
+    const FIXED_DIGEST: &str = "87aa3a5da4546803bba49afe56c66ba8";
+
     /// Makes one command of every kind, and a SET_NODE as long as one can be.
     ///
     /// # Returns
@@ -688,13 +781,17 @@ mod tests {
     fn every_command() -> Vec<Command> {
         vec![
             Command::Ping(PingCommand::new(1)),
-            Command::Connect(ConnectCommand::new(
-                2,
-                ConfigVersion::of_this_build(),
-                ConfigDigest([0x5a; 16]),
+            Command::Connect(ConnectCommand::new(2, ConfigDigest([0x5a; 16]))),
+            Command::RestartArm(RestartArmCommand::new(
+                3,
+                ArmKey(0x1234),
+                ConfigDigest([0x11; 16]),
             )),
-            Command::RestartArm(RestartArmCommand::new(3, ArmKey(0x1234))),
-            Command::Restart(RestartCommand::new(4, ArmKey(0x1234))),
+            Command::Restart(RestartCommand::new(
+                4,
+                ArmKey(0x1234),
+                ConfigDigest([0x22; 16]),
+            )),
             Command::StartNode(NodeCommand::start(6, NodeId(7))),
             Command::StopNode(NodeCommand::stop(7, NodeId(7))),
             Command::QueryNode(NodeCommand::query(8, NodeId(7))),
@@ -759,7 +856,7 @@ mod tests {
             )),
             Telemetry::RestartArm(RestartArmTelemetry::new(
                 12,
-                CommandStatus::Stale,
+                CommandStatus::NotFound,
             )),
             Telemetry::Ping(PingTelemetry::new(13, CommandStatus::Unmatched)),
             Telemetry::StartNode(NodeTelemetry::started(
@@ -789,7 +886,7 @@ mod tests {
             )),
             Telemetry::QueryNode(QueryNodeTelemetry::refused(
                 10,
-                CommandStatus::NotFound,
+                CommandStatus::Stale,
                 NodeId(7),
             )),
             Telemetry::QueryNodeSample(QueryNodeSampleTelemetry::new(
@@ -813,109 +910,251 @@ mod tests {
 
     #[test]
     fn every_answer_reads_back_as_itself() {
-        // Each of a generation of its own, so that a generation read from
-        // another answer's place in the packet would be seen.
-        for (generation, answer) in (7..).zip(every_answer()) {
-            let answer = answer.for_generation(generation);
+        for answer in every_answer() {
             let packed = answer.to_bytes();
             assert!(packed.len() <= ANSWER_BYTES);
             assert_eq!(Telemetry::read(&packed), Ok(answer.clone()));
         }
     }
 
-    /// A command is a CCSDS telecommand of APID 0x100, its length field the
-    /// CCSDS one, then the opcode and the sequence, most significant byte
-    /// first, then what it carries: no generation, which only an answer
-    /// carries.
+    /// The fixed commands' document is the one their layouts are pinned
+    /// by: see [`FIXED_DIGEST`].
     #[test]
-    fn a_command_is_a_ccsds_packet() {
-        let packed = Command::RestartArm(RestartArmCommand::new(
-            0x0102_4005,
-            ArmKey(0x1122_3344_5566_7788),
-        ))
-        .to_bytes();
-        // Version 0, type 1, no secondary header, APID 0x100; unsegmented,
-        // count 0x4005 & 0x3fff; 19 bytes in all, 13 after the header,
-        // less one. Then RESTART_ARM, the sequence and the key.
-        let want = vec![
-            0x11, 0x00, 0xc0, 0x05, 0x00, 0x0c, //
-            0x02, //
-            0x01, 0x02, 0x40, 0x05, //
-            0x11, 0x22, 0x33, 0x44, 0x55, 0x66, 0x77, 0x88,
-        ];
-        assert_eq!(packed, want);
+    fn the_fixed_commands_document_never_changes() {
+        let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+            .join("xtce/fixed.xml");
+        let digest = tcs_xtce::digest::digest_files_bytes(&[path])
+            .expect("fixed.xml digests");
+        let said: String = digest.iter().map(|b| format!("{b:02x}")).collect();
+        assert_eq!(
+            said, FIXED_DIGEST,
+            "tcslibgs/xtce/fixed.xml has changed, and it must never change: \
+             the layouts of CONNECT, RESTART_ARM and RESTART are what every \
+             ground station and every vehicle agree on whatever else they \
+             run. Undo the change, and make a new fixed command, with an \
+             opcode of its own from 0x00 to 0x0F, in a document of its own"
+        );
     }
 
-    /// An answer is a CCSDS telemetry packet of the same APID, its kind,
-    /// sequence, generation, status and time after the header.
+    /// Each fixed command and answer is exactly the bytes the design's
+    /// table gives, most significant byte first, with no header.
     #[test]
-    fn an_answer_is_a_ccsds_packet() {
+    fn the_fixed_commands_are_laid_out_as_the_table_says() {
+        let target = ConfigDigest(core::array::from_fn(|i| 0xa0 + i as u8));
+        let arm = Command::RestartArm(RestartArmCommand::new(
+            0x0102_0304,
+            ArmKey(0x1122_3344_5566_7788),
+            target,
+        ))
+        .to_bytes();
+        let mut want = vec![0x02, 0x01, 0x02, 0x03, 0x04];
+        want.extend([0x11, 0x22, 0x33, 0x44, 0x55, 0x66, 0x77, 0x88]);
+        want.extend(target.0);
+        assert_eq!(arm, want, "RESTART_ARM: opcode, sequence, key, target");
+        assert_eq!(arm.len(), 29);
+
+        let restart = Command::Restart(RestartCommand::new(
+            0x0102_0304,
+            ArmKey(0x1122_3344_5566_7788),
+            target,
+        ))
+        .to_bytes();
+        want[0] = 0x03;
+        assert_eq!(restart, want, "RESTART: as RESTART_ARM, opcode 0x03");
+
+        let connect =
+            Command::Connect(ConnectCommand::new(7, target)).to_bytes();
+        let mut want = vec![0x04, 0, 0, 0, 7];
+        want.extend(target.0);
+        assert_eq!(connect, want, "CONNECT: opcode, sequence, checksum");
+        assert_eq!(connect.len(), 21);
+
+        let mut answer = ConnectTelemetry::new(
+            7,
+            ConfigVersion {
+                major: 1,
+                minor: 2,
+                patch: 3,
+            },
+            target,
+            0x0a0b_0c0d,
+        );
+        answer.header.timestamp = Timestamp { micros: 0x0102 };
+        let packed = Telemetry::Connect(answer).to_bytes();
+        let mut want = vec![0x04, 0, 0, 0, 7, 0];
+        want.extend([0, 0, 0, 0, 0, 0, 0x01, 0x02]);
+        want.extend(target.0);
+        want.extend([1, 2, 3, 0x0a, 0x0b, 0x0c, 0x0d]);
+        assert_eq!(
+            packed, want,
+            "CONNECT's answer: opcode, sequence, status, time, running \
+             checksum, build version, newest sequence taken"
+        );
+        assert_eq!(packed.len(), 37);
+
+        for (answer, opcode) in [
+            (
+                Telemetry::RestartArm(RestartArmTelemetry::new(
+                    9,
+                    CommandStatus::NotFound,
+                )),
+                0x02,
+            ),
+            (
+                Telemetry::Restart(RestartTelemetry::new(
+                    9,
+                    CommandStatus::NotFound,
+                )),
+                0x03,
+            ),
+        ] {
+            let packed = answer.to_bytes();
+            assert_eq!(packed.len(), 14, "{answer:?}");
+            assert_eq!(&packed[..6], &[opcode, 0, 0, 0, 9, 5], "{answer:?}");
+        }
+    }
+
+    /// An ordinary command and answer have no header either: the opcode,
+    /// the sequence and what they carry, and for an answer the status and
+    /// the time between.
+    #[test]
+    fn an_ordinary_command_and_answer_have_no_header() {
+        let packed =
+            Command::StartNode(NodeCommand::start(0x0102_0304, NodeId(7)))
+                .to_bytes();
+        assert_eq!(packed, vec![0x30, 1, 2, 3, 4, 0, 0, 0, 7]);
+
         let mut ping = PingTelemetry::new(7, CommandStatus::NotArmed);
         ping.header.timestamp = Timestamp { micros: 0x0102 };
-        let packed =
-            Telemetry::Ping(ping).for_generation(0x0a0b_0c0d).to_bytes();
-        // Version 0, type 0, no secondary header, APID 0x100; unsegmented,
-        // count 7; 24 bytes in all. Then the answer to a PING, the
-        // sequence, the generation that made it, NotArmed and the time.
-        let want = vec![
-            0x01, 0x00, 0xc0, 0x07, 0x00, 0x11, //
-            0x81, //
-            0x00, 0x00, 0x00, 0x07, //
-            0x0a, 0x0b, 0x0c, 0x0d, //
-            0x04, //
-            0, 0, 0, 0, 0, 0, 0x01, 0x02,
-        ];
-        assert_eq!(packed, want);
-    }
-
-    /// A packet whose header is not this link's, whose length field does
-    /// not match its datagram, or that has more after it, is refused. One
-    /// damaged on the way is the transport's to refuse, by its checksum.
-    #[test]
-    fn a_packet_of_another_header_or_length_is_refused() {
-        let good =
-            Command::StartNode(NodeCommand::start(6, NodeId(7))).to_bytes();
-        assert!(Command::read(&good).is_ok());
-        // The version, the packet type, the secondary header flag, the
-        // APID, the sequence flags and the length field.
-        for (at, bits) in [
-            (0, 0x20),
-            (0, 0x10),
-            (0, 0x08),
-            (1, 0x01),
-            (0, 0x01),
-            (2, 0x40),
-            (5, 0x01),
-        ] {
-            let mut other = good.clone();
-            other[at] ^= bits;
-            assert!(Command::read(&other).is_err(), "byte {at} ^ {bits:#04x}");
-        }
-        let mut padded = good.clone();
-        padded.push(0);
-        assert!(
-            Command::read(&padded).is_err(),
-            "a byte after the packet is not part of a command"
+        let packed = Telemetry::Ping(ping).to_bytes();
+        assert_eq!(
+            packed,
+            vec![0x01, 0, 0, 0, 7, 0x04, 0, 0, 0, 0, 0, 0, 0x01, 0x02]
         );
-        assert!(Command::read(&good[..good.len() - 1]).is_err());
-        assert!(Command::read(b"").is_err());
     }
 
-    /// An answer sent to where commands are taken is not a command, though
-    /// a node answer's kind is a node command's opcode: the packet type
-    /// says which it is.
+    /// A datagram is taken only if its length is exactly what its opcode's
+    /// layout gives, and only with an opcode a command has: one too short,
+    /// one too long and one of an unknown opcode are all refused, commands
+    /// and answers alike.
     #[test]
-    fn an_answer_is_not_a_command() {
-        let answer = Telemetry::StartNode(NodeTelemetry::started(
-            6,
-            CommandStatus::Success,
-            NodeId(7),
-        ))
-        .to_bytes();
-        assert!(Command::read(&answer).is_err());
-        let command =
-            Command::StartNode(NodeCommand::start(6, NodeId(7))).to_bytes();
-        assert!(Telemetry::read(&command).is_err());
+    fn a_datagram_of_the_wrong_length_or_opcode_is_refused() {
+        for command in every_command() {
+            let good = command.to_bytes();
+            let mut long = good.clone();
+            long.push(0);
+            assert!(Command::read(&long).is_err(), "{command:?} and a byte");
+            assert!(
+                Command::read(&good[..good.len() - 1]).is_err(),
+                "{command:?} a byte short"
+            );
+        }
+        for answer in every_answer() {
+            let good = answer.to_bytes();
+            let mut long = good.clone();
+            long.push(0);
+            assert!(Telemetry::read(&long).is_err(), "{answer:?} and a byte");
+            assert!(
+                Telemetry::read(&good[..good.len() - 1]).is_err(),
+                "{answer:?} a byte short"
+            );
+        }
+        assert_eq!(Command::read(b""), Err(LinkError::Empty));
+        assert_eq!(Telemetry::read(b""), Err(LinkError::Empty));
+        for opcode in [0x00, 0x05, 0x0f, 0x20, 0x81, 0x84, 0xff] {
+            let datagram = [opcode, 0, 0, 0, 1];
+            assert_eq!(
+                Command::read(&datagram),
+                Err(LinkError::Opcode(opcode)),
+                "{opcode:#04x}"
+            );
+        }
+    }
+
+    /// A status this build does not know is read as one, with its number,
+    /// rather than refusing the answer: a vehicle of a later build may add
+    /// one. It is a refusal, and says its number.
+    #[test]
+    fn a_status_this_build_does_not_know_is_read_with_its_number() {
+        for answer in [
+            Telemetry::Ping(PingTelemetry::new(3, CommandStatus::Success)),
+            Telemetry::Connect(ConnectTelemetry::new(
+                3,
+                ConfigVersion::of_this_build(),
+                ConfigDigest([1; 16]),
+                3,
+            )),
+        ] {
+            let mut packed = answer.to_bytes();
+            packed[5] = 42;
+            let read = Telemetry::read(&packed).expect("it is still an answer");
+            assert_eq!(read.status(), CommandStatus::Unknown(42));
+            assert!(!read.status().is_success());
+            let said = read.status().to_string();
+            assert!(said.contains("refused"), "{said}");
+            assert!(said.contains("42"), "{said}");
+            // And it goes back on the link as the number it came as.
+            assert_eq!(read.to_bytes()[5], 42);
+        }
+    }
+
+    /// The status numbers are the XTCE's, in both documents.
+    #[test]
+    fn the_status_numbers_are_the_documents() {
+        for (status, link, fixed) in [
+            (
+                CommandStatus::Success,
+                packet::StatusType::SUCCESS,
+                Some(fixed::StatusType::SUCCESS),
+            ),
+            (
+                CommandStatus::Failure,
+                packet::StatusType::FAILURE,
+                Some(fixed::StatusType::FAILURE),
+            ),
+            (
+                CommandStatus::InvalidCommand,
+                packet::StatusType::INVALID_COMMAND,
+                Some(fixed::StatusType::INVALID_COMMAND),
+            ),
+            (
+                CommandStatus::InvalidParameter,
+                packet::StatusType::INVALID_PARAMETER,
+                Some(fixed::StatusType::INVALID_PARAMETER),
+            ),
+            (
+                CommandStatus::NotArmed,
+                packet::StatusType::NOT_ARMED,
+                Some(fixed::StatusType::NOT_ARMED),
+            ),
+            (
+                CommandStatus::NotFound,
+                packet::StatusType::NOT_FOUND,
+                Some(fixed::StatusType::NOT_FOUND),
+            ),
+            (
+                CommandStatus::AlreadyExists,
+                packet::StatusType::ALREADY_EXISTS,
+                None,
+            ),
+            (CommandStatus::Timeout, packet::StatusType::TIMEOUT, None),
+            (
+                CommandStatus::Stale,
+                packet::StatusType::STALE,
+                Some(fixed::StatusType::STALE),
+            ),
+            (
+                CommandStatus::Unmatched,
+                packet::StatusType::UNMATCHED,
+                Some(fixed::StatusType::UNMATCHED),
+            ),
+        ] {
+            assert_eq!(i64::from(status.number()), link.0, "{status:?}");
+            if let Some(fixed) = fixed {
+                assert_eq!(i64::from(status.number()), fixed.0, "{status:?}");
+            }
+            assert_eq!(CommandStatus::of_number(status.number()), status);
+        }
     }
 
     /// A reason cut to fit reads back as the text it was cut to, and with
@@ -936,14 +1175,14 @@ mod tests {
         assert!(read.reason.as_str().ends_with("..."));
     }
 
-    /// The opcode and the kind on the link are the ones `CommandType` and
-    /// `TelemetryType` name: the tables those keep are held to the XTCE
+    /// The opcode on the link is the one `CommandType` names, for a command
+    /// and for its answer alike: the tables those keep are held to the XTCE
     /// here, which is the one statement of what goes on the link.
     #[test]
     fn the_opcodes_are_the_tables_numbers() {
         for command in every_command() {
             assert_eq!(
-                command.to_bytes()[6],
+                command.to_bytes()[0],
                 command.cmd_type().to_u8(),
                 "{:?}",
                 command.cmd_type()
@@ -951,10 +1190,14 @@ mod tests {
         }
         for answer in every_answer() {
             assert_eq!(
-                answer.to_bytes()[6],
+                answer.to_bytes()[0],
                 answer.tm_type().to_u8(),
                 "{:?}",
                 answer.tm_type()
+            );
+            assert_eq!(
+                TelemetryType::from_u8(answer.tm_type().to_u8()),
+                Some(answer.tm_type())
             );
         }
     }

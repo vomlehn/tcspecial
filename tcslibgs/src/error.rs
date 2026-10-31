@@ -60,18 +60,6 @@ pub enum TcsError {
     #[error("{0}")]
     AwaitingRestart(String),
 
-    /// A command refused by the ground's own client, unsent: the client
-    /// has heard of no generation of tcspecial since it started, or has
-    /// heard of a new one since it last connected, and a command read with
-    /// definitions it was not written for would be worse than none. See
-    /// `tcslibgs::CommandType::always_taken`.
-    #[error(
-        "{0:?} not sent: this station does not know which generation of \
-         tcspecial is flying, and what it flies may have changed. CONNECT \
-         first, or pass on the next beacon"
-    )]
-    GenerationUnknown(crate::commands::CommandType),
-
     /// A command refused by the ground's own client, unsent: the station is
     /// not matched for commanding -- the last beacon it heard does not
     /// carry its configuration's checksum with the restart flag clear, is

@@ -1,22 +1,32 @@
 //! The state file: what tcspecial keeps across a restart.
 //!
-//! For now that is the generation number, which every start of tcspecial adds
-//! one to before it sends its first beacon, so that the ground can tell from a
-//! beacon alone that the vehicle has started again, and whether the next start
-//! is one the ground commanded, which the startup summary then says. (The
-//! beacon's restart flag no longer depends on it: every start begins with the
-//! flag set.) It is kept in the
-//! file the `tcspecial` section's `state_file` names, on storage that survives
-//! a power cycle, because a count kept in memory would start again at every
-//! crash and every power cycle -- which are the restarts the ground most needs
-//! to know about.
+//! Which configuration the next start loads, by its checksum -- the one the
+//! last taken RESTART named, or else the one the start before ran -- and how
+//! many of its starts have ended before a matching CONNECT; which
+//! configuration is *confirmed*, the last one a matching CONNECT was taken
+//! on; and whether the next start is one the ground commanded, which the
+//! startup summary then says. (The beacon's restart flag does not depend on
+//! any of it: every start begins with the flag set.) It is kept in the file
+//! the `tcspecial` section's `state_file` names, on storage that survives a
+//! power cycle, because what is kept in memory is gone at every crash and
+//! every power cycle -- which are the restarts this is most needed across.
+//! How a start uses it is in [`crate::runtime::choose`].
+//!
+//! There is no generation number. A start of tcspecial is told by its
+//! beacon's restart flag and its number going back, and which configuration
+//! it runs by its checksum; nothing in the state file counts starts but the
+//! trials of the configuration it names. A file written by a build that
+//! kept a generation still has a `generation` line, which is read and
+//! dropped, and the start says so in its log.
 //!
 //! The file is a few lines of text, so that somebody at a console can read
 //! it, and ends with a CRC of everything before it:
 //!
 //! ```text
 //! # tcspecial's state, which it writes on every start: do not edit.
-//! generation 7
+//! next 0123456789abcdef0123456789abcdef
+//! trials 1
+//! confirmed 0123456789abcdef0123456789abcdef
 //! next_start commanded
 //! crc16 0x1a2b
 //! ```
@@ -26,53 +36,56 @@
 //!
 //! It is written whole to a file beside it, flushed, and renamed over it, and
 //! the directory is flushed after: a power failure part way through leaves
-//! the old file or the new one, never half of each. See "The generation
-//! number and the state file" in `docs/design.rst`.
+//! the old file or the new one, never half of each. See "The state file" in
+//! `docs/design.rst`.
 
 use std::fs::{File, OpenOptions};
 use std::io::Write;
 use std::path::{Path, PathBuf};
 
 use tcslibgs::crc::crc16;
+use tcslibgs::ConfigDigest;
 
-/// What a start found in the state file and what it made of it.
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct Started {
-    /// This start's generation, already written to the file.
-    pub generation: u32,
-    /// Whether the ground commanded this start: the start before took an
-    /// armed RESTART and said so in the file before it went. See
-    /// [`commanded_restart`]. The startup summary says it, for somebody
-    /// reading a log after a restart; the beacon's restart flag does not
-    /// depend on it, since every start begins with the flag set.
+/// What a state file holds.
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub struct State {
+    /// The configuration the next start loads, by its checksum, or `None`
+    /// where the file names none.
+    pub next: Option<ConfigDigest>,
+    /// How many starts of `next` have ended -- a crash, a power loss, a
+    /// failed check -- before a matching CONNECT. Each start of it adds one
+    /// as it starts, and a matching CONNECT sets it back to nought, so a
+    /// start that ran until it was matched leaves nought behind.
+    pub trials: u32,
+    /// The last configuration a matching CONNECT was taken on, or `None`.
+    pub confirmed: Option<ConfigDigest>,
+    /// Whether the next start is one the ground commanded.
     pub commanded: bool,
-    /// What was wrong with the file that was there, where something was: the
-    /// generation then started again from one, and this says why, for the
-    /// log.
-    pub damaged: Option<String>,
 }
 
-/// Counts this start: reads the generation the state file at `path` holds,
-/// adds one, and writes it back before anything is sent.
+/// What a start found in the state file.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Found {
+    /// What it holds: nothing, where it is missing or damaged.
+    pub state: State,
+    /// What was wrong with the file that was there, where something was: the
+    /// start then took it to name nothing, and this says why, for the log.
+    pub damaged: Option<String>,
+    /// The generation a file written by an older build held, which this
+    /// start read and dropped, for the log: there is no generation now.
+    pub dropped_generation: Option<u32>,
+}
+
+/// Reads the state file at `path`.
 ///
-/// A file that does not exist is a first start, generation 1. One that
-/// exists and cannot be read, or fails its CRC, is reported in
-/// [`Started::damaged`] and the count starts again from 1: a vehicle that
-/// would not start because a counter was damaged would be lost to a counter,
-/// and the ground judges a restart by any change of generation, so a count
-/// that went back is still seen.
-///
-/// Where the new count cannot be written this is an error, and the vehicle
-/// does not start: one that beaconed a generation it had not kept would
-/// beacon the same one after its next start, and the ground would not see
-/// that start at all.
-///
-/// The file is written without the `next_start` line, whatever it held, so
-/// that a later start nobody commanded -- a crash of this one -- is not taken
-/// for a commanded one. A damaged file says nothing of the next start, and
-/// the start is then taken for one nobody commanded: a vehicle that claimed a
-/// commanded start it could not vouch for would be telling the ground its
-/// definitions had changed when they might not have.
+/// A file that does not exist names nothing: a first start, which nobody
+/// commanded. One that exists and cannot be read, or fails its CRC, is
+/// reported in [`Found::damaged`] and also names nothing: a vehicle that
+/// would not start because its state file was damaged would be lost to a
+/// file. A damaged file says nothing of the next start, which is then taken
+/// for one nobody commanded: a vehicle that claimed a commanded start it
+/// could not vouch for would be telling the ground its definitions had
+/// changed when they might not have.
 ///
 /// # Arguments
 ///
@@ -80,80 +93,125 @@ pub struct Started {
 ///
 /// # Returns
 ///
-/// This start's generation, whether the ground commanded it, and what was
-/// wrong with the file that was there.
-///
-/// # Errors
-///
-/// What is wrong, naming the file and the setting to change, where the new
-/// count cannot be written.
-pub fn start(path: &Path) -> Result<Started, String> {
-    let ((before, commanded), damaged) = match std::fs::read(path) {
+/// What it holds, what was wrong with it, and the generation an older
+/// build's file held.
+pub fn read(path: &Path) -> Found {
+    let (state, damaged) = match std::fs::read(path) {
         Ok(text) => match state_in(&text) {
-            Ok(state) => (state, None),
+            Ok(said) => (said, None),
             Err(why) => {
-                ((0, false), Some(format!("{}: {why}", path.display())))
+                (Said::default(), Some(format!("{}: {why}", path.display())))
             }
         },
         Err(e) if e.kind() == std::io::ErrorKind::NotFound => {
-            ((0, false), None)
+            (Said::default(), None)
         }
         Err(e) => (
-            (0, false),
+            Said::default(),
             Some(format!("{} cannot be read: {e}", path.display())),
         ),
     };
-    // Nought is never a generation, so that a beacon of generation 0 is one
-    // from a build that kept none, and never a count that wrapped.
-    let generation = match before.wrapping_add(1) {
-        0 => 1,
-        next => next,
-    };
-    write(path, generation, false)?;
-    Ok(Started {
-        generation,
-        commanded,
+    Found {
+        state: state.state,
         damaged,
-    })
+        dropped_generation: state.generation,
+    }
 }
 
 /// Says in the state file at `path` that the next start is one the ground
-/// commanded: an armed RESTART has been taken by `generation`, the start
-/// running now.
+/// commanded, and that it loads the configuration whose checksum is
+/// `target`: an armed RESTART naming it has been taken.
+///
+/// Its trials start again at nought, since nothing has yet tried it, and
+/// what the file says is confirmed is kept.
 ///
 /// Written before the RESTART is answered and before anything stops, so that
 /// a RESTART the file cannot say is refused and nothing restarts: a vehicle
-/// that came back saying in its log that it had not been commanded would
-/// tell whoever reads it the RESTART had not taken, when it had.
+/// that came back on the old configuration, saying in its log that it had
+/// not been commanded, would tell whoever reads it the RESTART had not
+/// taken, when it had.
 ///
-/// Allocates, in the command loop: the file's text is made, and the path is
-/// formatted into a refusal. Once, for a RESTART, after which the process
-/// ends, and there is no way to write a file without the bytes it holds.
-pub fn commanded_restart(path: &Path, generation: u32) -> Result<(), String> {
-    write(path, generation, true)
+/// Allocates, in the command loop: the file is read, its text made, and the
+/// path formatted into a refusal. Once, for a RESTART, after which the
+/// process ends, and there is no way to write a file without the bytes it
+/// holds.
+///
+/// # Arguments
+///
+/// * `path`   - The state file.
+/// * `target` - The checksum the RESTART named.
+///
+/// # Errors
+///
+/// Why the file could not be written, naming it and the attribute.
+pub fn commanded_restart(
+    path: &Path,
+    target: ConfigDigest,
+) -> Result<(), String> {
+    let mut state = read(path).state;
+    state.next = Some(target);
+    state.trials = 0;
+    state.commanded = true;
+    write(path, &state)
+}
+
+/// Says in the state file at `path` that the configuration running, whose
+/// checksum is `running`, is confirmed: a CONNECT carrying it has been
+/// taken. It is what the next start loads, and its trials go back to
+/// nought.
+///
+/// Allocates, in the command loop: the file is read and its text made.
+/// Once a start, at its match, and a confirmation that could not be kept
+/// would be one the next start did not know of.
+///
+/// # Arguments
+///
+/// * `path`    - The state file.
+/// * `running` - The running configuration's checksum.
+///
+/// # Errors
+///
+/// Why the file could not be written, naming it and the attribute.
+pub fn confirmed(path: &Path, running: ConfigDigest) -> Result<(), String> {
+    let mut state = read(path).state;
+    state.next = Some(running);
+    state.trials = 0;
+    state.confirmed = Some(running);
+    write(path, &state)
+}
+
+/// What a state file's text says, a generation an older build wrote
+/// included.
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+struct Said {
+    state: State,
+    /// The generation an older build's file held, which is dropped.
+    generation: Option<u32>,
 }
 
 /// Makes the state file's text.
 ///
 /// # Arguments
 ///
-/// * `generation` - The generation it holds.
-/// * `commanded`  - Whether it says the next start is commanded.
+/// * `state` - What it holds.
 ///
 /// # Returns
 ///
 /// The text, its CRC line last.
-fn text_of(generation: u32, commanded: bool) -> Vec<u8> {
-    let next = if commanded {
-        "next_start commanded\n"
-    } else {
-        ""
-    };
-    let mut text = format!(
-        "# tcspecial's state, which it writes on every start: do not edit.\n\
-         generation {generation}\n{next}"
-    )
-    .into_bytes();
+fn text_of(state: &State) -> Vec<u8> {
+    let mut text = String::from(
+        "# tcspecial's state, which it writes on every start: do not edit.\n",
+    );
+    if let Some(next) = state.next {
+        text.push_str(&format!("next {next}\ntrials {}\n", state.trials));
+    }
+    if let Some(confirmed) = state.confirmed {
+        text.push_str(&format!("confirmed {confirmed}\n"));
+    }
+    if state.commanded {
+        text.push_str("next_start commanded\n");
+    }
+    let mut text = text.into_bytes();
     let crc = crc16(&text);
     text.extend_from_slice(format!("crc16 {crc:#06x}\n").as_bytes());
     text
@@ -167,14 +225,14 @@ fn text_of(generation: u32, commanded: bool) -> Vec<u8> {
 ///
 /// # Returns
 ///
-/// The generation it holds and whether the next start is commanded.
+/// What it says, and the generation an older build's file held.
 ///
 /// # Errors
 ///
 /// Why it holds no state, said in words: no CRC line last, a CRC that is
-/// not one or does not match, text that is not UTF-8, a line that is not
-/// state, or no generation.
-fn state_in(text: &[u8]) -> Result<(u32, bool), String> {
+/// not one or does not match, text that is not UTF-8, or a line that is not
+/// state.
+fn state_in(text: &[u8]) -> Result<Said, String> {
     const CRC: &[u8] = b"crc16 ";
     // The CRC's line is the last, and covers every byte before it.
     let body_end = text
@@ -202,40 +260,54 @@ fn state_in(text: &[u8]) -> Result<(u32, bool), String> {
         ));
     }
     let body = std::str::from_utf8(body).map_err(|_| "it is not text")?;
-    let mut generation = None;
-    let mut commanded = false;
+    let checksum = |what: &str, said: &str| {
+        ConfigDigest::of_hex(said.trim()).ok_or_else(|| {
+            format!("its {what} is {said:?}, not a configuration's checksum")
+        })
+    };
+    let count = |what: &str, said: &str| {
+        said.trim()
+            .parse::<u32>()
+            .map_err(|_| format!("its {what} is {said:?}, not a count"))
+    };
+    let mut read = Said::default();
     for line in body.lines() {
         let line = line.trim();
         if line.is_empty() || line.starts_with('#') {
             continue;
         }
         match line.split_once(' ') {
-            Some(("generation", number)) => {
-                generation =
-                    Some(number.trim().parse::<u32>().map_err(|_| {
-                        format!("its generation is {number:?}, not a count")
-                    })?);
+            Some(("next", said)) => {
+                read.state.next = Some(checksum("next", said)?)
             }
-            Some(("next_start", "commanded")) => commanded = true,
+            Some(("trials", said)) => {
+                read.state.trials = count("trials", said)?
+            }
+            Some(("confirmed", said)) => {
+                read.state.confirmed = Some(checksum("confirmed", said)?)
+            }
+            Some(("next_start", "commanded")) => read.state.commanded = true,
+            // What a build that counted generations wrote, read so that its
+            // file is not taken for a damaged one and dropped: there is no
+            // generation now.
+            Some(("generation", said)) => {
+                read.generation = Some(count("generation", said)?)
+            }
             _ => return Err(format!("it says {line:?}, which is not state")),
         }
     }
-    let generation =
-        generation.ok_or_else(|| "it holds no generation".to_string())?;
-    Ok((generation, commanded))
+    Ok(read)
 }
 
-/// Writes `generation` to the state file at `path`, and whether the next
-/// start is commanded, whole or not at all.
+/// Writes the state file at `path`, whole or not at all.
 ///
 /// Written to a file beside it, flushed and renamed over it, and the
 /// directory flushed after.
 ///
 /// # Arguments
 ///
-/// * `path`       - The state file.
-/// * `generation` - The generation to write.
-/// * `commanded`  - Whether to say the next start is commanded.
+/// * `path`  - The state file.
+/// * `state` - What it is to hold.
 ///
 /// # Returns
 ///
@@ -245,7 +317,7 @@ fn state_in(text: &[u8]) -> Result<(u32, bool), String> {
 ///
 /// What could not be done, naming the file and the setting to change, where
 /// it cannot be written, renamed or flushed.
-fn write(path: &Path, generation: u32, commanded: bool) -> Result<(), String> {
+pub fn write(path: &Path, state: &State) -> Result<(), String> {
     let cannot = |what: &str, e: std::io::Error| {
         format!(
             "the state file {} cannot be {what} ({e}): state_file in the \
@@ -262,7 +334,7 @@ fn write(path: &Path, generation: u32, commanded: bool) -> Result<(), String> {
         .truncate(true)
         .open(&beside)
         .map_err(|e| cannot("written", e))?;
-    file.write_all(&text_of(generation, commanded))
+    file.write_all(&text_of(state))
         .and_then(|()| file.sync_all())
         .map_err(|e| cannot("written", e))?;
     drop(file);
@@ -290,44 +362,130 @@ fn beside(path: &Path) -> PathBuf {
 mod tests {
     use super::*;
 
+    const ONE: ConfigDigest = ConfigDigest([0x11; 16]);
+    const TWO: ConfigDigest = ConfigDigest([0x22; 16]);
+
+    /// A file that is not there names nothing, and is no damage.
     #[test]
-    fn a_first_start_is_generation_one_and_each_start_adds_one() {
+    fn a_missing_file_names_nothing() {
         let dir = tempfile::tempdir().expect("a directory");
-        let path = dir.path().join("tcspecial.state");
-        for expected in 1..=3 {
-            let started = start(&path).expect("it starts");
-            assert_eq!(started.generation, expected);
-            assert_eq!(started.damaged, None);
-        }
-        assert!(!beside(&path).exists(), "nothing is left beside it");
+        let found = read(&dir.path().join("tcspecial.state"));
+        assert_eq!(found.state, State::default());
+        assert_eq!(found.damaged, None);
+        assert_eq!(found.dropped_generation, None);
     }
 
+    /// What is written reads back, and is text a person can read, holding
+    /// no generation: nothing in it counts starts but the trials.
     #[test]
-    fn the_file_is_text_a_person_can_read() {
+    fn what_is_written_reads_back_and_is_text() {
         let dir = tempfile::tempdir().expect("a directory");
         let path = dir.path().join("tcspecial.state");
-        start(&path).expect("it starts");
+        let state = State {
+            next: Some(ONE),
+            trials: 2,
+            confirmed: Some(TWO),
+            commanded: true,
+        };
+        write(&path, &state).expect("written");
+        assert_eq!(read(&path).state, state);
         let text = std::fs::read_to_string(&path).expect("it is text");
-        assert!(text.contains("\ngeneration 1\n"), "{text}");
+        assert!(
+            text.contains(&format!("\nnext {ONE}\ntrials 2\n")),
+            "{text}"
+        );
+        assert!(text.contains(&format!("\nconfirmed {TWO}\n")), "{text}");
+        assert!(!text.contains("generation"), "{text}");
         assert!(
             text.lines().last().unwrap().starts_with("crc16 0x"),
             "{text}"
         );
+        assert!(!beside(&path).exists(), "nothing is left beside it");
+    }
+
+    /// A RESTART taken names its target for the next start, with no trials
+    /// yet, and says it is commanded, keeping what is confirmed; a matching
+    /// CONNECT confirms the running configuration and sets the trials back
+    /// to nought.
+    #[test]
+    fn a_restart_names_its_target_and_a_connect_confirms() {
+        let dir = tempfile::tempdir().expect("a directory");
+        let path = dir.path().join("tcspecial.state");
+        write(
+            &path,
+            &State {
+                next: Some(ONE),
+                trials: 1,
+                confirmed: Some(ONE),
+                commanded: false,
+            },
+        )
+        .expect("written");
+
+        commanded_restart(&path, TWO).expect("said");
+        assert_eq!(
+            read(&path).state,
+            State {
+                next: Some(TWO),
+                trials: 0,
+                confirmed: Some(ONE),
+                commanded: true,
+            }
+        );
+
+        write(
+            &path,
+            &State {
+                next: Some(TWO),
+                trials: 2,
+                confirmed: Some(ONE),
+                commanded: false,
+            },
+        )
+        .expect("written");
+        confirmed(&path, TWO).expect("confirmed");
+        assert_eq!(
+            read(&path).state,
+            State {
+                next: Some(TWO),
+                trials: 0,
+                confirmed: Some(TWO),
+                commanded: false,
+            }
+        );
+    }
+
+    /// A file an older build wrote, which counted generations, is read: its
+    /// generation is dropped and said, and what else it says is kept.
+    #[test]
+    fn an_older_builds_file_has_its_generation_dropped() {
+        let dir = tempfile::tempdir().expect("a directory");
+        let path = dir.path().join("tcspecial.state");
+        let mut old = b"# tcspecial's state, which it writes on every start: \
+do not edit.\ngeneration 7\nnext_start commanded\n"
+            .to_vec();
+        let crc = crc16(&old);
+        old.extend_from_slice(format!("crc16 {crc:#06x}\n").as_bytes());
+        std::fs::write(&path, &old).expect("written");
+
+        let found = read(&path);
+        assert_eq!(found.dropped_generation, Some(7));
+        assert_eq!(found.damaged, None, "not a damaged file");
+        assert!(found.state.commanded, "what else it says is read");
+        assert_eq!(found.state.next, None, "and it names no configuration");
     }
 
     /// A file damaged on its storage, edited by hand or cut short is said to
-    /// be, and the count starts again rather than the vehicle not starting.
+    /// be, and names nothing, rather than the vehicle not starting.
     #[test]
-    fn a_damaged_file_starts_the_count_again_and_says_why() {
+    fn a_damaged_file_names_nothing_and_says_why() {
         let dir = tempfile::tempdir().expect("a directory");
         let path = dir.path().join("tcspecial.state");
-        for _ in 0..4 {
-            start(&path).expect("it starts");
-        }
+        commanded_restart(&path, ONE).expect("written");
         let good = std::fs::read(&path).expect("it reads");
         let edited = String::from_utf8(good.clone())
             .unwrap()
-            .replace("generation 4", "generation 9");
+            .replace(&ONE.to_string(), &TWO.to_string());
         let cut = good[..good.len() - 10].to_vec();
         for (damage, said) in [
             (edited.into_bytes(), "CRC"),
@@ -335,51 +493,23 @@ mod tests {
             (b"nothing like it".to_vec(), "crc16"),
         ] {
             std::fs::write(&path, &damage).expect("it is damaged");
-            let started = start(&path).expect("it still starts");
-            assert_eq!(started.generation, 1);
-            let why = started.damaged.expect("and says why");
+            let found = read(&path);
+            assert_eq!(found.state, State::default(), "it names nothing");
+            let why = found.damaged.expect("and says why");
             assert!(why.contains(said), "{why}");
             assert!(why.contains("tcspecial.state"), "{why}");
         }
     }
 
-    /// The count never wraps to nought, which is no generation.
-    #[test]
-    fn the_count_wraps_past_nought() {
-        let dir = tempfile::tempdir().expect("a directory");
-        let path = dir.path().join("tcspecial.state");
-        std::fs::write(&path, text_of(u32::MAX, false)).expect("written");
-        assert_eq!(start(&path).expect("it starts").generation, 1);
-    }
-
-    /// A start is commanded when the start before said so, and only that
-    /// one: the next start nobody commanded is not, though nothing was
-    /// written in between.
-    #[test]
-    fn only_the_start_after_a_commanded_restart_is_commanded() {
-        let dir = tempfile::tempdir().expect("a directory");
-        let path = dir.path().join("tcspecial.state");
-        let first = start(&path).expect("it starts");
-        assert!(!first.commanded, "nobody commanded a first start");
-
-        commanded_restart(&path, first.generation).expect("it is said");
-        let text = std::fs::read_to_string(&path).expect("it is text");
-        assert!(text.contains("\nnext_start commanded\n"), "{text}");
-
-        let second = start(&path).expect("it starts");
-        assert_eq!(second.generation, first.generation + 1);
-        assert!(second.commanded, "the start the RESTART asked for");
-
-        let third = start(&path).expect("it starts");
-        assert!(!third.commanded, "a crash after it is not commanded");
-    }
-
-    /// A file that cannot be written stops the start, naming the attribute
-    /// to change.
+    /// A file that cannot be written is refused, naming the attribute to
+    /// change.
     #[test]
     fn a_state_file_that_cannot_be_written_is_refused() {
-        let why = start(Path::new("/nonexistent/directory/tcspecial.state"))
-            .expect_err("there is nowhere to write it");
+        let why = write(
+            Path::new("/nonexistent/directory/tcspecial.state"),
+            &State::default(),
+        )
+        .expect_err("there is nowhere to write it");
         assert!(why.contains("state_file"), "{why}");
         assert!(why.contains("/nonexistent/directory"), "{why}");
     }

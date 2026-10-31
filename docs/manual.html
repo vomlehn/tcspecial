@@ -433,36 +433,38 @@ ul.auto-toc {
 <li><a class="reference internal" href="#checking-a-set-without-running-it" id="toc-entry-52">Checking a set without running it</a></li>
 <li><a class="reference internal" href="#what-the-programs-take-without-the-makefile" id="toc-entry-53">What the programs take without the Makefile</a></li>
 <li><a class="reference internal" href="#what-the-vehicle-answers-to" id="toc-entry-54">What the vehicle answers to</a></li>
-<li><a class="reference internal" href="#where-the-links-are" id="toc-entry-55">Where the links are</a></li>
-<li><a class="reference internal" href="#where-the-logs-segments-go" id="toc-entry-56">Where the logs' segments go</a></li>
-<li><a class="reference internal" href="#stand-ins-or-hardware-simulate" id="toc-entry-57">Stand-ins or hardware: <tt class="docutils literal"><span class="pre">--simulate</span></tt></a><ul>
-<li><a class="reference internal" href="#waiting-for-the-simulator" id="toc-entry-58">Waiting for the simulator</a></li>
+<li><a class="reference internal" href="#configurations-kept-on-board" id="toc-entry-55">Configurations kept on board</a></li>
+<li><a class="reference internal" href="#which-interface-it-is-written-for" id="toc-entry-56">Which interface it is written for</a></li>
+<li><a class="reference internal" href="#where-the-links-are" id="toc-entry-57">Where the links are</a></li>
+<li><a class="reference internal" href="#where-the-logs-segments-go" id="toc-entry-58">Where the logs' segments go</a></li>
+<li><a class="reference internal" href="#stand-ins-or-hardware-simulate" id="toc-entry-59">Stand-ins or hardware: <tt class="docutils literal"><span class="pre">--simulate</span></tt></a><ul>
+<li><a class="reference internal" href="#waiting-for-the-simulator" id="toc-entry-60">Waiting for the simulator</a></li>
 </ul>
 </li>
-<li><a class="reference internal" href="#building-tcspecial-for-a-vehicle" id="toc-entry-59">Building tcspecial for a vehicle</a></li>
-<li><a class="reference internal" href="#watching-tcspecial-work" id="toc-entry-60">Watching tcspecial work</a></li>
+<li><a class="reference internal" href="#building-tcspecial-for-a-vehicle" id="toc-entry-61">Building tcspecial for a vehicle</a></li>
+<li><a class="reference internal" href="#watching-tcspecial-work" id="toc-entry-62">Watching tcspecial work</a></li>
 </ul>
 </li>
-<li><a class="reference internal" href="#testing" id="toc-entry-61">Testing</a><ul>
-<li><a class="reference internal" href="#tcsmoc" id="toc-entry-62">tcsmoc</a><ul>
-<li><a class="reference internal" href="#the-tcsmoc-window" id="toc-entry-63">The tcsmoc window</a></li>
-<li><a class="reference internal" href="#when-data-last-arrived" id="toc-entry-64">When data last arrived</a></li>
-<li><a class="reference internal" href="#a-triggered-payload-on-the-console" id="toc-entry-65">A triggered payload on the console</a></li>
-<li><a class="reference internal" href="#what-each-end-read" id="toc-entry-66">What each end read</a></li>
-<li><a class="reference internal" href="#matching-the-configurations" id="toc-entry-67">Matching the configurations</a></li>
-<li><a class="reference internal" href="#commands" id="toc-entry-68">Commands</a></li>
-<li><a class="reference internal" href="#beaconing" id="toc-entry-69">Beaconing</a></li>
+<li><a class="reference internal" href="#testing" id="toc-entry-63">Testing</a><ul>
+<li><a class="reference internal" href="#tcsmoc" id="toc-entry-64">tcsmoc</a><ul>
+<li><a class="reference internal" href="#the-tcsmoc-window" id="toc-entry-65">The tcsmoc window</a></li>
+<li><a class="reference internal" href="#when-data-last-arrived" id="toc-entry-66">When data last arrived</a></li>
+<li><a class="reference internal" href="#a-triggered-payload-on-the-console" id="toc-entry-67">A triggered payload on the console</a></li>
+<li><a class="reference internal" href="#what-each-end-read" id="toc-entry-68">What each end read</a></li>
+<li><a class="reference internal" href="#matching-the-configurations" id="toc-entry-69">Matching the configurations</a></li>
+<li><a class="reference internal" href="#commands" id="toc-entry-70">Commands</a></li>
+<li><a class="reference internal" href="#beaconing" id="toc-entry-71">Beaconing</a></li>
 </ul>
 </li>
-<li><a class="reference internal" href="#tcssim" id="toc-entry-70">tcssim</a><ul>
-<li><a class="reference internal" href="#the-tcssim-window" id="toc-entry-71">The tcssim window</a></li>
+<li><a class="reference internal" href="#tcssim" id="toc-entry-72">tcssim</a><ul>
+<li><a class="reference internal" href="#the-tcssim-window" id="toc-entry-73">The tcssim window</a></li>
 </ul>
 </li>
 </ul>
 </li>
-<li><a class="reference internal" href="#crates-used" id="toc-entry-72">Crates Used</a></li>
-<li><a class="reference internal" href="#license" id="toc-entry-73">License</a></li>
-<li><a class="reference internal" href="#see-also" id="toc-entry-74">See Also</a></li>
+<li><a class="reference internal" href="#crates-used" id="toc-entry-74">Crates Used</a></li>
+<li><a class="reference internal" href="#license" id="toc-entry-75">License</a></li>
+<li><a class="reference internal" href="#see-also" id="toc-entry-76">See Also</a></li>
 </ul>
 </div>
 <div class="section" id="introduction">
@@ -794,9 +796,8 @@ that sends more than that reuses numbers.</dd>
 <dt>Counters</dt>
 <dd>The beacon's sequence number is 32 bits and wraps, and the ground takes
 a sequence that goes backwards as a restart: at one beacon every 5
-seconds, that happens after about 680 years. The generation, which
-counts starts and is carried in every answer, is 32 bits and wraps,
-skipping 0.</dd>
+seconds, that happens after about 680 years. Nothing else counts
+starts: there is no generation number.</dd>
 <dt>Data sizes</dt>
 <dd>Aboard, one read delivers at most 4096 bytes, so <tt class="docutils literal">max_length</tt> is at
 most 4096.</dd>
@@ -818,9 +819,10 @@ configuration file is called. JSON was read as well, and was what a file with
 no extension or an unfamiliar one was assumed to be, which made a misspelled
 extension not an error but a file parsed as the wrong language. Nothing was
 written in it that was not also written in YAML.</p>
-<p>(The command link carries CCSDS packets stated in XTCE, in
-<tt class="docutils literal">tcslibgs/xtce/link.xml</tt>. That is not a configuration file and is
-unaffected.)</p>
+<p>(The command link carries packets stated in XTCE: the three fixed commands
+in <tt class="docutils literal">tcslibgs/xtce/fixed.xml</tt> and the rest in <tt class="docutils literal">tcslibgs/xtce/link.xml</tt>.
+Those are not configuration files and are unaffected; a configuration names
+the second, as its <tt class="docutils literal">interface</tt>: see <a class="reference internal" href="#which-interface-it-is-written-for">Which interface it is written for</a>.)</p>
 </div>
 <div class="section" id="which-files-there-are">
 <h1><a class="toc-backref" href="#toc-entry-7">Which Files There Are</a></h1>
@@ -2399,6 +2401,17 @@ the words from <tt class="docutils literal"><span class="pre">gateway-1</span></
 before it started listening, prints each with one space
 between them, and stops at the end of the line. <tt class="docutils literal"><span class="pre">gateway-1</span></tt> states no
 <tt class="docutils literal">address</tt> or <tt class="docutils literal">port</tt>, because nothing goes back up to the vehicle.</p>
+<p>Before its first word, <tt class="docutils literal">lorem_gateway</tt> sends a <tt class="docutils literal">CONNECT</tt> of its own,
+carrying the configuration's checksum, and sends it again each second until
+the vehicle answers with that checksum: a vehicle sends nothing down until it
+has taken one, and a station that only listens cannot count on another
+station's having sent it. It sends from the configuration's <tt class="docutils literal">tcs_cmd.send</tt>,
+so tcsmoc cannot be run on the same configuration beside it. <tt class="docutils literal"><span class="pre">-v</span></tt> says when
+it is matched; a vehicle answering with another configuration's checksum is
+said whatever the flag. <tt class="docutils literal">ping_gateway.py</tt> does the same as soon as it has
+started the vehicle, and <tt class="docutils literal"><span class="pre">--pings</span></tt> waits for the match before its first
+ping. Through <tt class="docutils literal"><span class="pre">tcslib::listening</span></tt> in Rust and <tt class="docutils literal">tcslib.listening</tt> in
+Python, either of which a station of your own that only listens can use.</p>
 <p>Both programs are beside the configuration: the payload is a Python 3 script
 that uses only the standard library, and the ground station is a Rust crate.
 <tt class="docutils literal">make <span class="pre">-C</span> examples <span class="pre">run-simple-app</span></tt> checks that <tt class="docutils literal">python3</tt> is installed -- 3.6
@@ -3502,9 +3515,82 @@ how every link below is written.</p>
 node there is of the kind <tt class="docutils literal">tcspecial.gateway</tt> names, and one of another kind is refused,
 naming both, because a vehicle answers to one: commands, beacons and data all go
 the one way.</p>
+<p>Nothing in the configuration says how what crosses a gateway is framed: the
+node type does. <tt class="docutils literal">gateway_radio</tt> and <tt class="docutils literal">gateway_fprime</tt> both carry
+tcspecial's packets as they are, one to a datagram, the F´ bridge speaking
+the radio's own protocol; <tt class="docutils literal">gateway_cfs</tt>, when it is built, wraps each in
+the CCSDS Space Packet the cFS software bus carries.</p>
+</div>
+<div class="section" id="configurations-kept-on-board">
+<h2><a class="toc-backref" href="#toc-entry-55">Configurations kept on board</a></h2>
+<p>A vehicle may keep configurations of its own, beside the one on its
+command line, and a restart may name any of them, by its checksum:</p>
+<pre class="code yaml literal-block">
+<span class="name tag">tcspecial</span><span class="punctuation">:</span><span class="whitespace">
+  </span><span class="name tag">configurations</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal string">&quot;/var/lib/tcspecial/configurations&quot;</span><span class="whitespace">
+  </span><span class="name tag">configurations_kept</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal string">&quot;2&quot;</span><span class="whitespace">
+  </span><span class="name tag">load_trials</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal string">&quot;3&quot;</span>
+</pre>
+<p><tt class="docutils literal">configurations</tt> is the directory they are kept in, each under its
+checksum: <tt class="docutils literal"><span class="pre">&lt;checksum&gt;.yaml</span></tt> or <tt class="docutils literal"><span class="pre">&lt;checksum&gt;.xml</span></tt>. Left out, the vehicle
+keeps none, and a restart may name only the configuration it runs. A
+configuration kept there is a single file: one that includes another is
+refused. Its checksum is computed again each time it is loaded, and one
+whose checksum is not its name -- cut short as it was written, or damaged
+-- is not loaded.</p>
+<p>To put one there, on the ground or at first provisioning, check and keep it
+with tcsverify:</p>
+<pre class="code text literal-block">
+$ tcsverify --keep=/var/lib/tcspecial/configurations vehicle.yaml
+vehicle.yaml: md5 0123456789abcdef0123456789abcdef, kept as
+/var/lib/tcspecial/configurations/0123456789abcdef0123456789abcdef.yaml
+</pre>
+<p>It keeps nothing that has an error, writes nothing for a checksum already
+kept, and makes the file it writes read-only. Making the directory
+read-only, or immutable, once every configuration is in it is the
+provisioner's to do. Configurations cannot yet be uplinked.</p>
+<p>Every start loads the first of these that passes its checks, and says in
+its startup summary and its log which it loaded and why: the configuration
+the state file names -- the one the last restart named, or the one the
+start before ran; else the <em>confirmed</em> one, the last one a matching
+<tt class="docutils literal">Connect</tt> was taken on; else the one on its command line. A state file
+that is missing or damaged names nothing, and the start loads the one on
+its command line. A configuration whose starts keep ending before a
+matching <tt class="docutils literal">Connect</tt> -- it crashes, or fails its checks -- is given up after
+<tt class="docutils literal">load_trials</tt> of them, three where it is not said, for the confirmed one.
+<tt class="docutils literal">state_file</tt>, <tt class="docutils literal">configurations</tt> and <tt class="docutils literal">load_trials</tt> are always the
+command line's configuration's, whichever configuration runs.
+<tt class="docutils literal">configurations_kept</tt>, two where it is not said, is the fewest the
+vehicle is to keep, which nothing removes below; nothing in flight removes
+configurations yet.</p>
+</div>
+<div class="section" id="which-interface-it-is-written-for">
+<h2><a class="toc-backref" href="#toc-entry-56">Which interface it is written for</a></h2>
+<p>The section's <tt class="docutils literal">interface</tt> says which commands the configuration is written
+for, and every configuration states it:</p>
+<pre class="code yaml literal-block">
+<span class="name tag">tcspecial</span><span class="punctuation">:</span><span class="whitespace">
+  </span><span class="name tag">interface</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal string">&quot;ad9aac4dd5a6d88dd5e78824ba8a83ac&quot;</span>
+</pre>
+<p>It is the digest of the <tt class="docutils literal">tcslibgs/xtce/link.xml</tt> a build was made from --
+the layouts of every command but CONNECT, RESTART_ARM and RESTART -- as 32
+lower-case hex digits. A build speaks only the interface it was made from, so
+tcsverify, tcspecial, tcsmoc and the libraries all refuse a configuration
+whose <tt class="docutils literal">interface</tt> is not their build's, saying both digests: a vehicle
+reading commands with other layouts than the ground's would be doing whatever
+each command happened to mean to it.</p>
+<p>To find the value, ask the build that is to fly it:</p>
+<pre class="code text literal-block">
+$ tcsverify --interface-digest
+ad9aac4dd5a6d88dd5e78824ba8a83ac
+</pre>
+<p>The same digest is the last field of every beacon that build's tcspecial
+sends, so a person with only a packet capture can read it there too. The
+configuration's checksum covers <tt class="docutils literal">interface</tt>, so a vehicle and a ground
+station whose checksums match are reading the same interface as well.</p>
 </div>
 <div class="section" id="where-the-links-are">
-<h2><a class="toc-backref" href="#toc-entry-55">Where the links are</a></h2>
+<h2><a class="toc-backref" href="#toc-entry-57">Where the links are</a></h2>
 <p>Five of the section's attributes are a host and a port written together, as
 <tt class="docutils literal">address:port</tt>, and most of them sit in a subsection with the rest of what
 they are about:</p>
@@ -3624,7 +3710,7 @@ address, stops it before it starts, saying which setting to change: a vehicle
 flying without beacons is one the ground cannot tell from a dead one.</p>
 </div>
 <div class="section" id="where-the-logs-segments-go">
-<h2><a class="toc-backref" href="#toc-entry-56">Where the logs' segments go</a></h2>
+<h2><a class="toc-backref" href="#toc-entry-58">Where the logs' segments go</a></h2>
 <p>A log -- the telemetry log under <tt class="docutils literal">log.directory</tt>, or a <tt class="docutils literal">log</tt> node -- is
 written in segment files, and each one that fills is handed to a program
 called <tt class="docutils literal">segsend</tt>, beside tcspecial's own executable, with the segment's file
@@ -3651,7 +3737,7 @@ overrides the quieter default as well.</p>
 </pre>
 </div>
 <div class="section" id="stand-ins-or-hardware-simulate">
-<h2><a class="toc-backref" href="#toc-entry-57">Stand-ins or hardware: <tt class="docutils literal"><span class="pre">--simulate</span></tt></a></h2>
+<h2><a class="toc-backref" href="#toc-entry-59">Stand-ins or hardware: <tt class="docutils literal"><span class="pre">--simulate</span></tt></a></h2>
 <p>Nothing in a configuration says whether a payload is the hardware or a
 stand-in for it, and <tt class="docutils literal"><span class="pre">/dev/i2c-7</span></tt> can be the kernel's I2C stub on one host
 and a real bus on the next. So each run says which kind of run it is, with
@@ -3708,7 +3794,7 @@ which is <tt class="docutils literal">all</tt> unless the command line says othe
 <span class="generic prompt">$ </span>make<span class="whitespace"> </span>runmocy<span class="whitespace"> </span><span class="name variable">SIMULATE</span><span class="operator">=</span>some
 </pre>
 <div class="section" id="waiting-for-the-simulator">
-<h3><a class="toc-backref" href="#toc-entry-58">Waiting for the simulator</a></h3>
+<h3><a class="toc-backref" href="#toc-entry-60">Waiting for the simulator</a></h3>
 <p>A stand-in has to exist before tcspecial looks for it, so in a run with
 stand-ins tcssim is started first, and tcspecial only once tcssim has said it
 has made them all. tcssim makes every stand-in as it starts; a panel's button
@@ -3740,7 +3826,7 @@ through <tt class="docutils literal"><span class="pre">tcslib::simulator::wait</
 </div>
 </div>
 <div class="section" id="building-tcspecial-for-a-vehicle">
-<h2><a class="toc-backref" href="#toc-entry-59">Building tcspecial for a vehicle</a></h2>
+<h2><a class="toc-backref" href="#toc-entry-61">Building tcspecial for a vehicle</a></h2>
 <p>A tcspecial contains the payload types it was built with, and no others.
 Each type is a Cargo feature named as a configuration writes the type --
 <tt class="docutils literal"><span class="pre">device-file</span></tt>, <tt class="docutils literal">serial</tt>, <tt class="docutils literal">i2c</tt>, <tt class="docutils literal">spi</tt>, <tt class="docutils literal">can</tt>, <tt class="docutils literal">iio</tt>, <tt class="docutils literal">rpmsg</tt>,
@@ -3776,7 +3862,7 @@ configuration</span>
 vehicle; see <a class="reference internal" href="#checking-a-set-without-running-it">Checking a set without running it</a>.</p>
 </div>
 <div class="section" id="watching-tcspecial-work">
-<h2><a class="toc-backref" href="#toc-entry-60">Watching tcspecial work</a></h2>
+<h2><a class="toc-backref" href="#toc-entry-62">Watching tcspecial work</a></h2>
 <p>A tcspecial built with the <tt class="docutils literal">visual</tt> feature can show what it is doing. Never
 build a tcspecial that flies this way: the feature is for a vehicle on a desk.</p>
 <pre class="code console literal-block">
@@ -3801,7 +3887,7 @@ build one that has it.</p>
 </div>
 </div>
 <div class="section" id="testing">
-<h1><a class="toc-backref" href="#toc-entry-61">Testing</a></h1>
+<h1><a class="toc-backref" href="#toc-entry-63">Testing</a></h1>
 <p>Testing is done with two programs, and a third that checks the files they
 read:</p>
 <ul class="simple">
@@ -3813,9 +3899,9 @@ and errors.</li>
 running any of it: see <a class="reference internal" href="#checking-a-set-without-running-it">Checking a set without running it</a>.</li>
 </ul>
 <div class="section" id="tcsmoc">
-<h2><a class="toc-backref" href="#toc-entry-62">tcsmoc</a></h2>
+<h2><a class="toc-backref" href="#toc-entry-64">tcsmoc</a></h2>
 <div class="section" id="the-tcsmoc-window">
-<h3><a class="toc-backref" href="#toc-entry-63">The tcsmoc window</a></h3>
+<h3><a class="toc-backref" href="#toc-entry-65">The tcsmoc window</a></h3>
 <p>Across the top, from the left:</p>
 <dl class="docutils">
 <dt>the <tt class="docutils literal">tcspecial link</tt> box</dt>
@@ -3949,7 +4035,7 @@ see traffic, and nothing is asked of the spacecraft to show it.</p>
 said about that handler: see <a class="reference internal" href="#seeing-what-was-read">Seeing what was read</a>.</p>
 </div>
 <div class="section" id="when-data-last-arrived">
-<h3><a class="toc-backref" href="#toc-entry-64">When data last arrived</a></h3>
+<h3><a class="toc-backref" href="#toc-entry-66">When data last arrived</a></h3>
 <p><tt class="docutils literal">Last recv</tt> on each panel is when that source's data last arrived, and the
 panel says nothing more about whether that was recent enough. Nothing in a
 configuration states how often a node's data should arrive -- a node produces
@@ -3963,7 +4049,7 @@ what has arrived without a command going out. What only the spacecraft can say
 is for.</p>
 </div>
 <div class="section" id="a-triggered-payload-on-the-console">
-<h3><a class="toc-backref" href="#toc-entry-65">A triggered payload on the console</a></h3>
+<h3><a class="toc-backref" href="#toc-entry-67">A triggered payload on the console</a></h3>
 <p>A payload that answers requests sends nothing until tcspecial asks it to, so
 when such a panel shows no data the question is what the MOC sent and what came
 back -- and a panel shows neither. For those payloads, and only those, tcsmoc
@@ -3995,7 +4081,7 @@ appears in no other counter, because a trigger is a write with no read behind
 it.</p>
 </div>
 <div class="section" id="what-each-end-read">
-<h3><a class="toc-backref" href="#toc-entry-66">What each end read</a></h3>
+<h3><a class="toc-backref" href="#toc-entry-68">What each end read</a></h3>
 <p>When a link comes up, tcsmoc sends its software version and an MD5 of the
 payload configuration it read, and tcspecial answers with its own. Each
 prints what it read on the terminal it was
@@ -4032,7 +4118,7 @@ rather than replacing; stopping it and letting tcsmoc start a fresh one is the
 fix.</p>
 </div>
 <div class="section" id="matching-the-configurations">
-<h3><a class="toc-backref" href="#toc-entry-67">Matching the configurations</a></h3>
+<h3><a class="toc-backref" href="#toc-entry-69">Matching the configurations</a></h3>
 <p>Neither end acts on what the other made with a different configuration. The
 digest is the configuration's <em>checksum</em>, and the two ends are matched once
 the vehicle has taken a <tt class="docutils literal">CONNECT</tt> carrying the checksum of the
@@ -4071,7 +4157,7 @@ vehicle is matched again makes the station matched for commanding once more.
 So after an outage, or a restart, press <tt class="docutils literal">Connect</tt> before commanding.</p>
 </div>
 <div class="section" id="commands">
-<h3><a class="toc-backref" href="#toc-entry-68">Commands</a></h3>
+<h3><a class="toc-backref" href="#toc-entry-70">Commands</a></h3>
 <p>From the <tt class="docutils literal">Command</tt> menu. Three of the seven items send a command:</p>
 <dl class="docutils">
 <dt>Ping</dt>
@@ -4080,7 +4166,10 @@ sent, then what came back -- <tt class="docutils literal">PING OK at 14:22:31</t
 spacecraft made the answer, which every response carries -- and if nothing
 came back within the client's timeout it says when it stopped waiting.</dd>
 <dt>ARM Restart</dt>
-<dd>Arms a restart, which a restart will not happen without. An arm lasts 20
+<dd>Arms a restart onto the configuration this tcsmoc read, whose checksum
+it carries: a plain restart, onto what the vehicle is running. A vehicle
+that does not hold the configuration an arm names refuses it
+<tt class="docutils literal">NotFound</tt> and arms nothing. An arm lasts 20
 minutes from when the vehicle takes it unless the <tt class="docutils literal">tcspecial</tt> section's
 <tt class="docutils literal">restart_arm_valid</tt> says otherwise, as a length of time --
 <tt class="docutils literal">restart_arm_valid: &quot;45 min&quot;</tt> -- and a restart after that is refused until
@@ -4090,12 +4179,15 @@ enough that an arm left behind does not stand ready for the next restart
 anybody sends.</dd>
 <dt>Initiate restart</dt>
 <dd><p class="first">Restarts the spacecraft software, which only a restart armed with the same
-key within the time an arm lasts does. The arm is used up by it; a restart
-with the wrong key is refused and leaves the arm standing. tcspecial
+key and the same configuration's checksum within the time an arm lasts
+does. The arm is used up by it; a restart with the wrong key or another
+checksum is refused and leaves the arm standing, and one naming a
+configuration the vehicle can no longer load is refused <tt class="docutils literal">NotFound</tt> and
+restarts nothing. tcspecial
 answers, stops as it does when it is told to -- the pass finished, the
 links closed, the log flushed -- and runs itself again in the same process,
-reading its configuration file again: a changed configuration is flown this
-way. It keeps the descriptors it was started with, such as a socket or pipe
+loading the configuration the restart named: see <a class="reference internal" href="#configurations-kept-on-board">Configurations kept on
+board</a>. Another configuration is flown this way. It keeps the descriptors it was started with, such as a socket or pipe
 a supervisor handed it, and closes everything it opened itself. On a system
 where it cannot do that -- one with neither <tt class="docutils literal">/proc/self/fd</tt> nor
 <tt class="docutils literal">/dev/fd</tt> to say what it was started with -- it says so on its error
@@ -4107,10 +4199,12 @@ which then say <tt class="docutils literal">restart</tt> where they said <tt cla
 field beside the indicator reads <tt class="docutils literal">Restarted—connect</tt>, and the message
 line ends <tt class="docutils literal">, RESTARTED, NOT YET MATCHED</tt> -- stops sending anything down
 but beacons and answers, and sends one beacon at once and the rest every
-<tt class="docutils literal">beacon.reset_interval</tt>. The tcspecial that comes back counts itself a
-new <em>generation</em>, one more than the last, which it keeps in the file the
-<tt class="docutils literal">tcspecial</tt> section's <tt class="docutils literal">state_file</tt> names; its beacons start again at
-#1 with the flag still set, as every start's do. Every start beacons
+<tt class="docutils literal">beacon.reset_interval</tt>. The tcspecial that comes back reads the file
+the <tt class="docutils literal">tcspecial</tt> section's <tt class="docutils literal">state_file</tt> names, which says whether the
+start was commanded; its beacons start again at #1 with the flag still
+set, as every start's do. Nothing counts starts: there is no generation
+number, and the beacons' number going back is what says a start. Every
+start beacons
 every <tt class="docutils literal">beacon.reset_interval</tt> until it takes a <tt class="docutils literal">Connect</tt> carrying its
 configuration's checksum. When it does it clears the flag, sends a beacon
 at once, and from then on beacons every <tt class="docutils literal">beacon.default_interval</tt>. A
@@ -4118,9 +4212,9 @@ at once, and from then on beacons every <tt class="docutils literal">beacon.defa
 tcspecial has gone neither clears the flag nor slows the beacons: the
 restart is still under way.</p>
 <p>A tcspecial that starts again for any other reason -- it crashed and its
-supervisor started it, or the vehicle lost power -- also counts a new
-generation and starts its beacons again at #1 with the flag set, and runs
-with the configuration it had. The beacons do not say which kind of start
+supervisor started it, or the vehicle lost power -- also starts its
+beacons again at #1 with the flag set, and runs with the configuration it
+had. The beacons do not say which kind of start
 it was: the checksum they carry says which configuration it is running,
 and the startup summary on tcspecial's error output says whether the
 start was commanded.</p>
@@ -4144,14 +4238,14 @@ is <tt class="docutils literal">Connect</tt>, which every start needs before any
 where the beacon also ends the wait, <tt class="docutils literal">tcspecial has started again after
 the restart initiated here: press Connect</tt>. It does not say whether the
 start that came back is the one the restart asked for.</p>
-<p>A command carries its sequence number and no generation. Every answer
-says the generation that made it, and the station learns which
-generation is flying from the answer to <tt class="docutils literal">Connect</tt>, since the beacons do
-not say. So an answer from a vehicle that has restarted since, or a
-beacon whose number has gone back, is noticed: from then on the station
-refuses every command but a ping and a Connect, unsent, until a
-<tt class="docutils literal">Connect</tt> is answered. (A ping is refused besides until the station is
-matched: see <a class="reference internal" href="#matching-the-configurations">Matching the configurations</a>.)</p>
+<p>A command carries its sequence number and nothing that counts starts,
+and so does its answer: there is no generation number. A start of the
+vehicle is noticed from its beacons, which carry the restart flag and so
+end the station's match: from then on the station refuses every command
+but <tt class="docutils literal">Connect</tt>, <tt class="docutils literal">Arm restart</tt> and <tt class="docutils literal">Initiate restart</tt>, unsent, until
+it is matched again, which a <tt class="docutils literal">Connect</tt> answered with its checksum, and
+a beacon with the flag clear, make it. See <a class="reference internal" href="#matching-the-configurations">Matching the
+configurations</a>.</p>
 <p>A command older than one the vehicle has already taken -- sent by a
 station whose count has gone back, or overtaken on the way should the
 link ever deliver out of order -- is answered <tt class="docutils literal">Stale</tt> and not acted on:
@@ -4161,11 +4255,9 @@ the answer to Connect tells it where to go on counting from.</p>
 <p class="last">Any command whose answer does not come can be sent again: a second one
 changes nothing the first did not. The exception is the restart itself:
 look at the beacons before sending it again for want of an answer, since
-they say whether it was taken, and a restart that reaches the tcspecial
-that came back restarts it again. The station sends one only while it
-knows which generation is flying, so a restart sent again after an answer
-from the new start, or after a beacon whose number went back, is refused
-until a <tt class="docutils literal">Connect</tt>.</p>
+they say whether it was taken. A restart sent again that reaches the
+tcspecial that came back is refused <tt class="docutils literal">NotArmed</tt> there, since that start
+holds no arm, and restarts nothing.</p>
 </dd>
 </dl>
 <p>The remaining four -- <tt class="docutils literal">Query</tt>, <tt class="docutils literal">Query DH</tt>, <tt class="docutils literal">Start DH</tt> and <tt class="docutils literal">Stop DH</tt> --
@@ -4174,7 +4266,7 @@ is done from its own panel, and the panels show what a query would ask for
 without anyone asking.</p>
 </div>
 <div class="section" id="beaconing">
-<h3><a class="toc-backref" href="#toc-entry-69">Beaconing</a></h3>
+<h3><a class="toc-backref" href="#toc-entry-71">Beaconing</a></h3>
 <p>TCSpecial sends a beacon every <tt class="docutils literal">beacon.reset_interval</tt> from when it starts,
 or from when a restart is initiated, until it takes a <tt class="docutils literal">Connect</tt> carrying
 its configuration's checksum, and every
@@ -4301,9 +4393,9 @@ arrived and leaves the status to the commands and to the beacon.</p>
 </div>
 </div>
 <div class="section" id="tcssim">
-<h2><a class="toc-backref" href="#toc-entry-70">tcssim</a></h2>
+<h2><a class="toc-backref" href="#toc-entry-72">tcssim</a></h2>
 <div class="section" id="the-tcssim-window">
-<h3><a class="toc-backref" href="#toc-entry-71">The tcssim window</a></h3>
+<h3><a class="toc-backref" href="#toc-entry-73">The tcssim window</a></h3>
 <p>One panel per simulated payload, in a grid, and a <tt class="docutils literal">Quit All</tt> button at the
 foot of the window. Nothing in the window names a payload or fixes how many
 there are: the two configuration files decide that, so a payload added to or
@@ -4366,7 +4458,7 @@ both are shown the same way.</p>
 </div>
 </div>
 <div class="section" id="crates-used">
-<h1><a class="toc-backref" href="#toc-entry-72">Crates Used</a></h1>
+<h1><a class="toc-backref" href="#toc-entry-74">Crates Used</a></h1>
 <p>These are the crates the workspace's <tt class="docutils literal">Cargo.toml</tt> files name directly --
 every one of the nineteen manifests, the root and each crate under it. The
 crates they depend on in turn are not listed: <tt class="docutils literal">cargo tree</tt> shows the whole
@@ -4541,7 +4633,7 @@ $ cargo metadata --format-version 1
 </pre>
 </div>
 <div class="section" id="license">
-<h1><a class="toc-backref" href="#toc-entry-73">License</a></h1>
+<h1><a class="toc-backref" href="#toc-entry-75">License</a></h1>
 <p>TCSpecial -- the flight software, the libraries, the ground programs and the
 examples -- is licensed under either of the Apache License, Version 2.0
 (<tt class="docutils literal"><span class="pre">LICENSE-APACHE</span></tt>, or <a class="reference external" href="http://www.apache.org/licenses/LICENSE-2.0">http://www.apache.org/licenses/LICENSE-2.0</a>) or the MIT
@@ -4554,7 +4646,7 @@ dual licensed as above, without any additional terms or conditions.</p>
 <a class="reference internal" href="#crates-used">Crates Used</a>.</p>
 </div>
 <div class="section" id="see-also">
-<h1><a class="toc-backref" href="#toc-entry-74">See Also</a></h1>
+<h1><a class="toc-backref" href="#toc-entry-76">See Also</a></h1>
 <dl class="docutils">
 <dt><a class="reference external" href="https://vomlehn.github.io/tcs-xtce/docs/manual.html">tcs-xtce manual</a></dt>
 <dd>tcs-xtce turns an XTCE description of telemetry and command packets

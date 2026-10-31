@@ -45,7 +45,13 @@ fn each_ping_is_answered_and_timed_and_the_beacon_is_heard() {
         .set_read_timeout(Some(Duration::from_secs(10)))
         .expect("a timeout");
     let beacon = bound();
-    let (answers, beacons) = (free(), free());
+    // And where it takes commands, from where the ground sends them: the
+    // ground station sends a CONNECT before its first ping.
+    let commands = bound();
+    commands
+        .set_read_timeout(Some(Duration::from_secs(20)))
+        .expect("a timeout");
+    let (answers, beacons, ground_commands) = (free(), free(), free());
 
     let dir = tempfile::tempdir().expect("a directory");
     let configuration = dir.path().join("ping.xml");
@@ -55,9 +61,12 @@ fn each_ping_is_answered_and_timed_and_the_beacon_is_heard() {
             "<configuration>
     <tcspecial>
         <gateway>radio</gateway>
+        <interface>ad9aac4dd5a6d88dd5e78824ba8a83ac</interface>
         <beacon><default_interval>5 s</default_interval>\
 <reset_interval>1 s</reset_interval><recv>127.0.0.1:{beacons}</recv>\
 <send>127.0.0.1:{}</send></beacon>
+        <tcs_cmd><recv>127.0.0.1:{}</recv>\
+<send>127.0.0.1:{ground_commands}</send></tcs_cmd>
     </tcspecial>
     <gateway>
         <name>gateway</name><type>gateway_radio</type>
@@ -73,6 +82,7 @@ fn each_ping_is_answered_and_timed_and_the_beacon_is_heard() {
 </configuration>
 ",
             port(&beacon),
+            port(&commands),
             port(&uplink),
             answers - 1,
         ),
@@ -99,9 +109,18 @@ fn each_ping_is_answered_and_timed_and_the_beacon_is_heard() {
     // Once it says it is listening, and not before: a beacon sent before the
     // ground has its socket is one nobody will ever read.
     let mut said = String::new();
-    BufReader::new(ground.stderr.take().expect("its complaints"))
-        .read_line(&mut said)
-        .expect("what it said");
+    let mut complaints =
+        BufReader::new(ground.stderr.take().expect("its complaints"));
+    complaints.read_line(&mut said).expect("what it said");
+    // The rest of what it says read too, as a terminal would, and kept: it
+    // says when the vehicle has matched it, which is asked below, and a
+    // ground station whose standard error had been closed under it would be
+    // a ground station run as nobody runs one.
+    let complained = std::thread::spawn(move || {
+        let mut rest = String::new();
+        let _ = complaints.read_to_string(&mut rest);
+        rest
+    });
     // A ground station that cannot digest its configuration says so first,
     // and the usual reason is that nothing has built tcsverify: this test's
     // own package does not, a program of another package being nothing cargo
@@ -133,6 +152,30 @@ fn each_ping_is_answered_and_timed_and_the_beacon_is_heard() {
         })
     };
 
+    // The vehicle's command link: the CONNECT answered with the
+    // configuration's checksum, which matches the vehicle and opens its
+    // downlink. Before it, nothing would come down.
+    {
+        let mut buffer = [0u8; 256];
+        let (size, from) = commands.recv_from(&mut buffer).expect("a CONNECT");
+        let Ok(tcslibgs::Command::Connect(cmd)) =
+            tcslibgs::Command::read(&buffer[..size])
+        else {
+            panic!("a CONNECT first");
+        };
+        assert_eq!(cmd.digest, digest, "carrying the station's checksum");
+        let answer =
+            tcslibgs::Telemetry::Connect(tcslibgs::ConnectTelemetry::new(
+                cmd.header.sequence,
+                ConfigVersion::of_this_build(),
+                digest,
+                cmd.header.sequence,
+            ));
+        commands
+            .send_to(&answer.to_bytes(), from)
+            .expect("the answer");
+    }
+
     // The vehicle: each ping answered with the vehicle's time, as the node
     // answers it, at ground_base plus the ping node's device id.
     for count in 1..=2u64 {
@@ -158,7 +201,9 @@ fn each_ping_is_answered_and_timed_and_the_beacon_is_heard() {
     stop.store(true, Ordering::Relaxed);
     beaconing.join().expect("the beacons stop");
 
-    assert!(status.success(), "{printed}");
+    let complained = complained.join().expect("what it said");
+    assert!(status.success(), "{printed}{complained}");
+    assert!(complained.contains("matched: "), "{complained}");
     // The beacon, read from the vehicle's own bytes.
     assert!(
         printed.contains(&format!(

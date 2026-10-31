@@ -442,151 +442,159 @@ ul.auto-toc {
 </li>
 <li><a class="reference internal" href="#the-interface-the-fallback-and-switching-over" id="toc-entry-56">The Interface, the Fallback and Switching Over</a><ul>
 <li><a class="reference internal" href="#every-packet-is-xtce" id="toc-entry-57">Every packet is XTCE</a></li>
-<li><a class="reference internal" href="#two-interfaces" id="toc-entry-58">Two interfaces</a></li>
-<li><a class="reference internal" href="#reading-writing-and-checking-an-interface" id="toc-entry-59">Reading, writing and checking an interface</a></li>
-<li><a class="reference internal" href="#the-load-set" id="toc-entry-60">The load set</a></li>
-<li><a class="reference internal" href="#uploading-and-keeping-what-was-uploaded" id="toc-entry-61">Uploading, and keeping what was uploaded</a></li>
-<li><a class="reference internal" href="#restarting-onto-a-load-set" id="toc-entry-62">Restarting onto a load set</a></li>
+<li><a class="reference internal" href="#the-link-without-a-header" id="toc-entry-58">The link without a header</a><ul>
+<li><a class="reference internal" href="#packets-without-a-header" id="toc-entry-59">Packets without a header</a></li>
+<li><a class="reference internal" href="#the-three-fixed-commands" id="toc-entry-60">The three fixed commands</a></li>
+<li><a class="reference internal" href="#the-configuration-names-its-interface" id="toc-entry-61">The configuration names its interface</a></li>
+<li><a class="reference internal" href="#framing-is-a-gateway-s" id="toc-entry-62">Framing is a gateway's</a></li>
+<li><a class="reference internal" href="#what-the-headerless-link-replaces" id="toc-entry-63">What the headerless link replaces</a></li>
 </ul>
 </li>
-<li><a class="reference internal" href="#fault-resiliency" id="toc-entry-63">Fault Resiliency</a><ul>
-<li><a class="reference internal" href="#what-is-assumed" id="toc-entry-64">What is assumed</a></li>
-<li><a class="reference internal" href="#configurations-named-by-their-checksum" id="toc-entry-65">Configurations named by their checksum</a><ul>
-<li><a class="reference internal" href="#keeping-configurations-on-board" id="toc-entry-66">Keeping configurations on board</a></li>
-<li><a class="reference internal" href="#starting-and-the-restart-flag" id="toc-entry-67">Starting, and the restart flag</a></li>
-<li><a class="reference internal" href="#the-three-commands-that-always-go" id="toc-entry-68">The three commands that always go</a></li>
-<li><a class="reference internal" href="#on-the-ground" id="toc-entry-69">On the ground</a></li>
-<li><a class="reference internal" href="#holes-in-the-checksum-scheme-and-what-closes-them" id="toc-entry-70">Holes in the checksum scheme, and what closes them</a></li>
-<li><a class="reference internal" href="#what-this-replaces" id="toc-entry-71">What this replaces</a></li>
-<li><a class="reference internal" href="#still-to-be-decided" id="toc-entry-72">Still to be decided</a></li>
+<li><a class="reference internal" href="#two-interfaces" id="toc-entry-64">Two interfaces</a></li>
+<li><a class="reference internal" href="#reading-writing-and-checking-an-interface" id="toc-entry-65">Reading, writing and checking an interface</a></li>
+<li><a class="reference internal" href="#the-load-set" id="toc-entry-66">The load set</a></li>
+<li><a class="reference internal" href="#uploading-and-keeping-what-was-uploaded" id="toc-entry-67">Uploading, and keeping what was uploaded</a></li>
+<li><a class="reference internal" href="#restarting-onto-a-load-set" id="toc-entry-68">Restarting onto a load set</a></li>
 </ul>
 </li>
-<li><a class="reference internal" href="#in-flight-data-across-a-restart" id="toc-entry-73">In-flight data across a restart</a><ul>
-<li><a class="reference internal" href="#a-commanded-restart" id="toc-entry-74">A commanded restart</a></li>
-<li><a class="reference internal" href="#a-restart-on-the-same-configuration" id="toc-entry-75">A restart on the same configuration</a></li>
-<li><a class="reference internal" href="#a-ground-station-that-restarts-or-changes-configuration" id="toc-entry-76">A ground station that restarts or changes configuration</a></li>
-<li><a class="reference internal" href="#what-is-dropped-and-where" id="toc-entry-77">What is dropped, and where</a></li>
+<li><a class="reference internal" href="#fault-resiliency" id="toc-entry-69">Fault Resiliency</a><ul>
+<li><a class="reference internal" href="#what-is-assumed" id="toc-entry-70">What is assumed</a></li>
+<li><a class="reference internal" href="#configurations-named-by-their-checksum" id="toc-entry-71">Configurations named by their checksum</a><ul>
+<li><a class="reference internal" href="#keeping-configurations-on-board" id="toc-entry-72">Keeping configurations on board</a></li>
+<li><a class="reference internal" href="#starting-and-the-restart-flag" id="toc-entry-73">Starting, and the restart flag</a></li>
+<li><a class="reference internal" href="#the-three-commands-that-always-go" id="toc-entry-74">The three commands that always go</a></li>
+<li><a class="reference internal" href="#on-the-ground" id="toc-entry-75">On the ground</a></li>
+<li><a class="reference internal" href="#holes-in-the-checksum-scheme-and-what-closes-them" id="toc-entry-76">Holes in the checksum scheme, and what closes them</a></li>
+<li><a class="reference internal" href="#what-this-replaces" id="toc-entry-77">What this replaces</a></li>
+<li><a class="reference internal" href="#still-to-be-decided" id="toc-entry-78">Still to be decided</a></li>
 </ul>
 </li>
-<li><a class="reference internal" href="#kinds-of-restart" id="toc-entry-78">Kinds of restart</a></li>
-<li><a class="reference internal" href="#lost-late-and-repeated-commands" id="toc-entry-79">Lost, late and repeated commands</a></li>
-<li><a class="reference internal" href="#the-generation-number-and-the-state-file" id="toc-entry-80">The generation number and the state file</a></li>
-<li><a class="reference internal" href="#the-beacon-across-a-restart" id="toc-entry-81">The beacon across a restart</a></li>
-<li><a class="reference internal" href="#what-the-ground-may-send-meanwhile" id="toc-entry-82">What the ground may send meanwhile</a></li>
-<li><a class="reference internal" href="#downlinked-data-across-a-switch" id="toc-entry-83">Downlinked data across a switch</a></li>
-<li><a class="reference internal" href="#holes-in-this-and-what-closes-them" id="toc-entry-84">Holes in this, and what closes them</a></li>
+<li><a class="reference internal" href="#in-flight-data-across-a-restart" id="toc-entry-79">In-flight data across a restart</a><ul>
+<li><a class="reference internal" href="#a-commanded-restart" id="toc-entry-80">A commanded restart</a></li>
+<li><a class="reference internal" href="#a-restart-on-the-same-configuration" id="toc-entry-81">A restart on the same configuration</a></li>
+<li><a class="reference internal" href="#a-ground-station-that-restarts-or-changes-configuration" id="toc-entry-82">A ground station that restarts or changes configuration</a></li>
+<li><a class="reference internal" href="#what-is-dropped-and-where" id="toc-entry-83">What is dropped, and where</a></li>
 </ul>
 </li>
-<li><a class="reference internal" href="#tcspecial" id="toc-entry-85">TCSpecial</a><ul>
-<li><a class="reference internal" href="#configuration-files" id="toc-entry-86">Configuration Files</a></li>
-<li><a class="reference internal" href="#tcspecial-1" id="toc-entry-87">tcspecial</a><ul>
-<li><a class="reference internal" href="#endpoints" id="toc-entry-88">EndPoints</a><ul>
-<li><a class="reference internal" href="#datagram-endpoints" id="toc-entry-89">Datagram Endpoints</a></li>
-<li><a class="reference internal" href="#stream-endpoints" id="toc-entry-90">Stream Endpoints</a></li>
-<li><a class="reference internal" href="#network-endpoints" id="toc-entry-91">Network Endpoints</a></li>
+<li><a class="reference internal" href="#kinds-of-restart" id="toc-entry-84">Kinds of restart</a></li>
+<li><a class="reference internal" href="#lost-late-and-repeated-commands" id="toc-entry-85">Lost, late and repeated commands</a></li>
+<li><a class="reference internal" href="#the-generation-number-and-the-state-file" id="toc-entry-86">The generation number and the state file</a></li>
+<li><a class="reference internal" href="#the-beacon-across-a-restart" id="toc-entry-87">The beacon across a restart</a></li>
+<li><a class="reference internal" href="#what-the-ground-may-send-meanwhile" id="toc-entry-88">What the ground may send meanwhile</a></li>
+<li><a class="reference internal" href="#downlinked-data-across-a-switch" id="toc-entry-89">Downlinked data across a switch</a></li>
+<li><a class="reference internal" href="#holes-in-this-and-what-closes-them" id="toc-entry-90">Holes in this, and what closes them</a></li>
 </ul>
 </li>
-</ul>
-</li>
-<li><a class="reference internal" href="#which-node-types-are-built" id="toc-entry-92">Which Node Types Are Built</a></li>
-<li><a class="reference internal" href="#lunar-lander-payload-interfaces" id="toc-entry-93">Lunar Lander Payload Interfaces</a><ul>
-<li><a class="reference internal" href="#lunar-lander-interfaces-tcspecial-speaks" id="toc-entry-94">Lunar lander interfaces tcspecial speaks</a></li>
-</ul>
-</li>
-<li><a class="reference internal" href="#the-visual-window" id="toc-entry-95">The Visual Window</a></li>
-<li><a class="reference internal" href="#tcslib" id="toc-entry-96">tcslib</a></li>
-<li><a class="reference internal" href="#tcslibgs" id="toc-entry-97">tcslibgs</a></li>
-<li><a class="reference internal" href="#what-each-end-read" id="toc-entry-98">What Each End Read</a></li>
-</ul>
-</li>
-<li><a class="reference internal" href="#payloads" id="toc-entry-99">Payloads</a><ul>
-<li><a class="reference internal" href="#how-a-payload-is-made-to-send" id="toc-entry-100">How a Payload Is Made to Send</a></li>
-<li><a class="reference internal" href="#link-terms" id="toc-entry-101">Link Terms</a><ul>
-<li><a class="reference internal" href="#what-is-experimental" id="toc-entry-102">What Is Experimental</a></li>
-<li><a class="reference internal" href="#gpio-payloads-discrete-lines" id="toc-entry-103">GPIO Payloads: Discrete Lines</a></li>
-<li><a class="reference internal" href="#two-ways-of-watching-and-a-set-of-lines-may-ask-for-either-or-both" id="toc-entry-104">Two ways of watching, and a set of lines may ask for either or both</a></li>
-<li><a class="reference internal" href="#rpmsg-payloads-another-core" id="toc-entry-105">rpmsg Payloads: Another Core</a></li>
-<li><a class="reference internal" href="#iio-payloads-a-sensor-s-buffer" id="toc-entry-106">IIO Payloads: a Sensor's Buffer</a></li>
-<li><a class="reference internal" href="#can-payloads-a-bus-of-peers" id="toc-entry-107">CAN Payloads: a Bus of Peers</a></li>
-<li><a class="reference internal" href="#serial-payloads-a-line" id="toc-entry-108">Serial Payloads: a Line</a></li>
-<li><a class="reference internal" href="#rs-485-a-two-wire-bus" id="toc-entry-109">RS-485: a Two-Wire Bus</a></li>
-<li><a class="reference internal" href="#hdlc-payloads-a-synchronous-line" id="toc-entry-110">HDLC Payloads: a Synchronous Line</a></li>
-<li><a class="reference internal" href="#i2c-payloads-a-bus" id="toc-entry-111">I2C Payloads: a Bus</a></li>
-<li><a class="reference internal" href="#spi-payloads-a-peripheral" id="toc-entry-112">SPI Payloads: a Peripheral</a></li>
-<li><a class="reference internal" href="#where-a-read-of-a-line-ends" id="toc-entry-113">Where a Read of a Line Ends</a></li>
-<li><a class="reference internal" href="#value-syntax" id="toc-entry-114">Value Syntax</a></li>
+<li><a class="reference internal" href="#tcspecial" id="toc-entry-91">TCSpecial</a><ul>
+<li><a class="reference internal" href="#configuration-files" id="toc-entry-92">Configuration Files</a></li>
+<li><a class="reference internal" href="#tcspecial-1" id="toc-entry-93">tcspecial</a><ul>
+<li><a class="reference internal" href="#endpoints" id="toc-entry-94">EndPoints</a><ul>
+<li><a class="reference internal" href="#datagram-endpoints" id="toc-entry-95">Datagram Endpoints</a></li>
+<li><a class="reference internal" href="#stream-endpoints" id="toc-entry-96">Stream Endpoints</a></li>
+<li><a class="reference internal" href="#network-endpoints" id="toc-entry-97">Network Endpoints</a></li>
 </ul>
 </li>
 </ul>
 </li>
-<li><a class="reference internal" href="#platforms-and-porting" id="toc-entry-115">Platforms and Porting</a><ul>
-<li><a class="reference internal" href="#what-the-flight-software-assumes" id="toc-entry-116">What the flight software assumes</a></li>
-<li><a class="reference internal" href="#linux-only" id="toc-entry-117">Linux-only</a></li>
-<li><a class="reference internal" href="#posix" id="toc-entry-118">POSIX</a></li>
-<li><a class="reference internal" href="#rust-s-standard-library" id="toc-entry-119">Rust's standard library</a></li>
-<li><a class="reference internal" href="#thoughts-on-real-time-operating-systems" id="toc-entry-120">Thoughts on real-time operating systems</a></li>
+<li><a class="reference internal" href="#which-node-types-are-built" id="toc-entry-98">Which Node Types Are Built</a></li>
+<li><a class="reference internal" href="#lunar-lander-payload-interfaces" id="toc-entry-99">Lunar Lander Payload Interfaces</a><ul>
+<li><a class="reference internal" href="#lunar-lander-interfaces-tcspecial-speaks" id="toc-entry-100">Lunar lander interfaces tcspecial speaks</a></li>
 </ul>
 </li>
-<li><a class="reference internal" href="#simulator-configuration-files" id="toc-entry-121">Simulator Configuration Files</a><ul>
-<li><a class="reference internal" href="#file-structure" id="toc-entry-122">File Structure</a></li>
-<li><a class="reference internal" href="#what-a-simulated-payload-stands-in-for" id="toc-entry-123">What a Simulated Payload Stands In For</a></li>
-<li><a class="reference internal" href="#thermal-masses" id="toc-entry-124">Thermal Masses</a></li>
-<li><a class="reference internal" href="#fault-injection" id="toc-entry-125">Fault Injection</a></li>
-<li><a class="reference internal" href="#matching" id="toc-entry-126">Matching</a></li>
-<li><a class="reference internal" href="#example" id="toc-entry-127">Example</a></li>
+<li><a class="reference internal" href="#the-visual-window" id="toc-entry-101">The Visual Window</a></li>
+<li><a class="reference internal" href="#tcslib" id="toc-entry-102">tcslib</a></li>
+<li><a class="reference internal" href="#tcslibgs" id="toc-entry-103">tcslibgs</a></li>
+<li><a class="reference internal" href="#what-each-end-read" id="toc-entry-104">What Each End Read</a></li>
 </ul>
 </li>
-<li><a class="reference internal" href="#testing" id="toc-entry-128">Testing</a><ul>
-<li><a class="reference internal" href="#simulation-modes" id="toc-entry-129">Simulation Modes</a><ul>
-<li><a class="reference internal" href="#how-a-stand-in-is-recognised" id="toc-entry-130">How a Stand-in Is Recognised</a></li>
-<li><a class="reference internal" href="#saying-which-payloads-are-simulated" id="toc-entry-131">Saying Which Payloads Are Simulated</a></li>
-<li><a class="reference internal" href="#what-each-program-does-with-the-mode" id="toc-entry-132">What Each Program Does With the Mode</a></li>
+<li><a class="reference internal" href="#payloads" id="toc-entry-105">Payloads</a><ul>
+<li><a class="reference internal" href="#how-a-payload-is-made-to-send" id="toc-entry-106">How a Payload Is Made to Send</a></li>
+<li><a class="reference internal" href="#link-terms" id="toc-entry-107">Link Terms</a><ul>
+<li><a class="reference internal" href="#what-is-experimental" id="toc-entry-108">What Is Experimental</a></li>
+<li><a class="reference internal" href="#gpio-payloads-discrete-lines" id="toc-entry-109">GPIO Payloads: Discrete Lines</a></li>
+<li><a class="reference internal" href="#two-ways-of-watching-and-a-set-of-lines-may-ask-for-either-or-both" id="toc-entry-110">Two ways of watching, and a set of lines may ask for either or both</a></li>
+<li><a class="reference internal" href="#rpmsg-payloads-another-core" id="toc-entry-111">rpmsg Payloads: Another Core</a></li>
+<li><a class="reference internal" href="#iio-payloads-a-sensor-s-buffer" id="toc-entry-112">IIO Payloads: a Sensor's Buffer</a></li>
+<li><a class="reference internal" href="#can-payloads-a-bus-of-peers" id="toc-entry-113">CAN Payloads: a Bus of Peers</a></li>
+<li><a class="reference internal" href="#serial-payloads-a-line" id="toc-entry-114">Serial Payloads: a Line</a></li>
+<li><a class="reference internal" href="#rs-485-a-two-wire-bus" id="toc-entry-115">RS-485: a Two-Wire Bus</a></li>
+<li><a class="reference internal" href="#hdlc-payloads-a-synchronous-line" id="toc-entry-116">HDLC Payloads: a Synchronous Line</a></li>
+<li><a class="reference internal" href="#i2c-payloads-a-bus" id="toc-entry-117">I2C Payloads: a Bus</a></li>
+<li><a class="reference internal" href="#spi-payloads-a-peripheral" id="toc-entry-118">SPI Payloads: a Peripheral</a></li>
+<li><a class="reference internal" href="#where-a-read-of-a-line-ends" id="toc-entry-119">Where a Read of a Line Ends</a></li>
+<li><a class="reference internal" href="#value-syntax" id="toc-entry-120">Value Syntax</a></li>
 </ul>
 </li>
-<li><a class="reference internal" href="#waiting-for-the-simulator" id="toc-entry-133">Waiting for the Simulator</a></li>
-<li><a class="reference internal" href="#tcssim" id="toc-entry-134">tcssim</a><ul>
-<li><a class="reference internal" href="#which-types-can-be-simulated" id="toc-entry-135">Which Types Can Be Simulated</a></li>
 </ul>
 </li>
-<li><a class="reference internal" href="#tcsmoc" id="toc-entry-136">tcsmoc</a><ul>
-<li><a class="reference internal" href="#where-the-addresses-are" id="toc-entry-137">Where the Addresses Are</a></li>
+<li><a class="reference internal" href="#platforms-and-porting" id="toc-entry-121">Platforms and Porting</a><ul>
+<li><a class="reference internal" href="#what-the-flight-software-assumes" id="toc-entry-122">What the flight software assumes</a></li>
+<li><a class="reference internal" href="#linux-only" id="toc-entry-123">Linux-only</a></li>
+<li><a class="reference internal" href="#posix" id="toc-entry-124">POSIX</a></li>
+<li><a class="reference internal" href="#rust-s-standard-library" id="toc-entry-125">Rust's standard library</a></li>
+<li><a class="reference internal" href="#thoughts-on-real-time-operating-systems" id="toc-entry-126">Thoughts on real-time operating systems</a></li>
 </ul>
 </li>
-<li><a class="reference internal" href="#tcsverify" id="toc-entry-138">tcsverify</a></li>
-<li><a class="reference internal" href="#gui-framework" id="toc-entry-139">GUI Framework</a></li>
+<li><a class="reference internal" href="#simulator-configuration-files" id="toc-entry-127">Simulator Configuration Files</a><ul>
+<li><a class="reference internal" href="#file-structure" id="toc-entry-128">File Structure</a></li>
+<li><a class="reference internal" href="#what-a-simulated-payload-stands-in-for" id="toc-entry-129">What a Simulated Payload Stands In For</a></li>
+<li><a class="reference internal" href="#thermal-masses" id="toc-entry-130">Thermal Masses</a></li>
+<li><a class="reference internal" href="#fault-injection" id="toc-entry-131">Fault Injection</a></li>
+<li><a class="reference internal" href="#matching" id="toc-entry-132">Matching</a></li>
+<li><a class="reference internal" href="#example" id="toc-entry-133">Example</a></li>
 </ul>
 </li>
-<li><a class="reference internal" href="#hints" id="toc-entry-140">Hints</a></li>
-<li><a class="reference internal" href="#possible-enhancements" id="toc-entry-141">Possible Enhancements</a></li>
-<li><a class="reference internal" href="#development-approach" id="toc-entry-142">Development Approach</a></li>
-<li><a class="reference internal" href="#requirements" id="toc-entry-143">Requirements</a><ul>
-<li><a class="reference internal" href="#about-the-names-and-the-notes" id="toc-entry-144">About the names and the notes</a></li>
-<li><a class="reference internal" href="#the-name-of-the-project-is-tcspecial" id="toc-entry-145">The name of the project is TCSpecial</a></li>
-<li><a class="reference internal" href="#tcspecial-shall-include-a-process-named-tcspecial-that-runs-on-the-spacecraft" id="toc-entry-146">TCSpecial shall include a process named tcspecial that runs on the spacecraft</a></li>
-<li><a class="reference internal" href="#tcspecial-shall-include-a-library-named-tcslib-that-links-with-misssion-control-software" id="toc-entry-147">TCSpecial shall include a library named tcslib that links with misssion control software</a></li>
-<li><a class="reference internal" href="#tcspecial-shall-include-a-library-named-tcslibgs-that-is-shared-between-tcspecial-and-tcslib" id="toc-entry-148">TCSpecial shall include a library named tcslibgs that is shared between tcspecial and tcslib</a></li>
-<li><a class="reference internal" href="#tcspecial-shall-include-applications-named-tcsmoc-and-tcssim-that-provide-guis-for-testing-tcspecial-tcslibgs-and-tcslib" id="toc-entry-149">TCSpecial shall include applications named tcsmoc and tcssim that provide GUIs for testing tcspecial, tcslibgs, and tcslib</a></li>
-<li><a class="reference internal" href="#tcspecial-must-have-a-trait-named-command-interpreter-ci-that-parses-commands-sent-by-tcslib" id="toc-entry-150">TCSpecial must have a trait named Command Interpreter (CI) that parses commands sent by tcslib</a></li>
-<li><a class="reference internal" href="#tcspecial-must-have-a-trait-named-data-handler-dh-that-is-called-by-ci-to-process-commands" id="toc-entry-151">TCSpecial must have a trait named data handler (DH) that is called by CI to process commands</a><ul>
-<li><a class="reference internal" href="#ci-must-be-implemented-by-ci-udp-that-communicates-with-tcslib-code-via-udp-ip" id="toc-entry-152">CI must be implemented by CI_UDP that communicates with tcslib code via UDP/IP</a></li>
-<li><a class="reference internal" href="#dh-udp-must-implement-dh-and-use-udp-to-send-telemetry-to-tcslib" id="toc-entry-153">DH_UDP must implement DH and use UDP to send telemetry to tcslib</a></li>
-<li><a class="reference internal" href="#ci-must-have-an-element-named-dh-of-type-btreemap" id="toc-entry-154">CI must have an element named dh of type BTreeMap</a><ul>
-<li><a class="reference internal" href="#ci-must-support-sending-telemetry-responses-to-all-ci-commands" id="toc-entry-155">CI must support sending telemetry responses to all CI commands</a></li>
-<li><a class="reference internal" href="#each-ci-telemetry-response-to-a-command-must-contain-a-timestamp-command-sequence-number-a-success-or-error-indication" id="toc-entry-156">Each CI telemetry response to a command must contain a timestamp, command sequence number, a success or error indication</a></li>
-<li><a class="reference internal" href="#ci-must-periodically-send-a-telemetry-beacon-message-with-a-timestamp-and-unique-sequence-number" id="toc-entry-157">CI must periodically send a Telemetry::Beacon message with a timestamp and unique sequence number</a></li>
-<li><a class="reference internal" href="#ci-must-parse-commands-from-the-ground-receved-via-udp-ip" id="toc-entry-158">CI must parse commands from the ground receved via UDP/IP</a></li>
-<li><a class="reference internal" href="#all-ci-commands-must-include-a-sequence-number-that-increments-for-each-command-sent" id="toc-entry-159">All CI commands must include a sequence number that increments for each command sent</a></li>
-<li><a class="reference internal" href="#ci-must-support-an-exit-command-that-terminates-the-tcspecial-process" id="toc-entry-160">CI must support an EXIT command that terminates the tcspecial process</a></li>
+<li><a class="reference internal" href="#testing" id="toc-entry-134">Testing</a><ul>
+<li><a class="reference internal" href="#simulation-modes" id="toc-entry-135">Simulation Modes</a><ul>
+<li><a class="reference internal" href="#how-a-stand-in-is-recognised" id="toc-entry-136">How a Stand-in Is Recognised</a></li>
+<li><a class="reference internal" href="#saying-which-payloads-are-simulated" id="toc-entry-137">Saying Which Payloads Are Simulated</a></li>
+<li><a class="reference internal" href="#what-each-program-does-with-the-mode" id="toc-entry-138">What Each Program Does With the Mode</a></li>
 </ul>
 </li>
-<li><a class="reference internal" href="#tcspecial-includes-zero-or-more-components-named-data-handler-dh" id="toc-entry-161">Tcspecial includes zero or more components named Data Handler (DH)</a></li>
+<li><a class="reference internal" href="#waiting-for-the-simulator" id="toc-entry-139">Waiting for the Simulator</a></li>
+<li><a class="reference internal" href="#tcssim" id="toc-entry-140">tcssim</a><ul>
+<li><a class="reference internal" href="#which-types-can-be-simulated" id="toc-entry-141">Which Types Can Be Simulated</a></li>
 </ul>
 </li>
-<li><a class="reference internal" href="#the-top-part-of-the-tcsmoc-window-is-for-sending-commands-to-tcspecial-s-ci-and-viewing-telemetry-from-tcspecial-s-ci" id="toc-entry-162">The top part of the tcsmoc window is for sending commands to tcspecial's CI and viewing telemetry from tcspecial's CI</a></li>
-<li><a class="reference internal" href="#the-middle-part-of-the-tcsmoc-window-is-for-viewing-telemetry-from-individual-dhs" id="toc-entry-163">The middle part of the tcsmoc window is for viewing telemetry from individual DHs</a></li>
+<li><a class="reference internal" href="#tcsmoc" id="toc-entry-142">tcsmoc</a><ul>
+<li><a class="reference internal" href="#where-the-addresses-are" id="toc-entry-143">Where the Addresses Are</a></li>
 </ul>
 </li>
-<li><a class="reference internal" href="#see-also" id="toc-entry-164">See Also</a></li>
+<li><a class="reference internal" href="#tcsverify" id="toc-entry-144">tcsverify</a></li>
+<li><a class="reference internal" href="#gui-framework" id="toc-entry-145">GUI Framework</a></li>
+</ul>
+</li>
+<li><a class="reference internal" href="#hints" id="toc-entry-146">Hints</a></li>
+<li><a class="reference internal" href="#possible-enhancements" id="toc-entry-147">Possible Enhancements</a></li>
+<li><a class="reference internal" href="#development-approach" id="toc-entry-148">Development Approach</a></li>
+<li><a class="reference internal" href="#requirements" id="toc-entry-149">Requirements</a><ul>
+<li><a class="reference internal" href="#about-the-names-and-the-notes" id="toc-entry-150">About the names and the notes</a></li>
+<li><a class="reference internal" href="#the-name-of-the-project-is-tcspecial" id="toc-entry-151">The name of the project is TCSpecial</a></li>
+<li><a class="reference internal" href="#tcspecial-shall-include-a-process-named-tcspecial-that-runs-on-the-spacecraft" id="toc-entry-152">TCSpecial shall include a process named tcspecial that runs on the spacecraft</a></li>
+<li><a class="reference internal" href="#tcspecial-shall-include-a-library-named-tcslib-that-links-with-misssion-control-software" id="toc-entry-153">TCSpecial shall include a library named tcslib that links with misssion control software</a></li>
+<li><a class="reference internal" href="#tcspecial-shall-include-a-library-named-tcslibgs-that-is-shared-between-tcspecial-and-tcslib" id="toc-entry-154">TCSpecial shall include a library named tcslibgs that is shared between tcspecial and tcslib</a></li>
+<li><a class="reference internal" href="#tcspecial-shall-include-applications-named-tcsmoc-and-tcssim-that-provide-guis-for-testing-tcspecial-tcslibgs-and-tcslib" id="toc-entry-155">TCSpecial shall include applications named tcsmoc and tcssim that provide GUIs for testing tcspecial, tcslibgs, and tcslib</a></li>
+<li><a class="reference internal" href="#tcspecial-must-have-a-trait-named-command-interpreter-ci-that-parses-commands-sent-by-tcslib" id="toc-entry-156">TCSpecial must have a trait named Command Interpreter (CI) that parses commands sent by tcslib</a></li>
+<li><a class="reference internal" href="#tcspecial-must-have-a-trait-named-data-handler-dh-that-is-called-by-ci-to-process-commands" id="toc-entry-157">TCSpecial must have a trait named data handler (DH) that is called by CI to process commands</a><ul>
+<li><a class="reference internal" href="#ci-must-be-implemented-by-ci-udp-that-communicates-with-tcslib-code-via-udp-ip" id="toc-entry-158">CI must be implemented by CI_UDP that communicates with tcslib code via UDP/IP</a></li>
+<li><a class="reference internal" href="#dh-udp-must-implement-dh-and-use-udp-to-send-telemetry-to-tcslib" id="toc-entry-159">DH_UDP must implement DH and use UDP to send telemetry to tcslib</a></li>
+<li><a class="reference internal" href="#ci-must-have-an-element-named-dh-of-type-btreemap" id="toc-entry-160">CI must have an element named dh of type BTreeMap</a><ul>
+<li><a class="reference internal" href="#ci-must-support-sending-telemetry-responses-to-all-ci-commands" id="toc-entry-161">CI must support sending telemetry responses to all CI commands</a></li>
+<li><a class="reference internal" href="#each-ci-telemetry-response-to-a-command-must-contain-a-timestamp-command-sequence-number-a-success-or-error-indication" id="toc-entry-162">Each CI telemetry response to a command must contain a timestamp, command sequence number, a success or error indication</a></li>
+<li><a class="reference internal" href="#ci-must-periodically-send-a-telemetry-beacon-message-with-a-timestamp-and-unique-sequence-number" id="toc-entry-163">CI must periodically send a Telemetry::Beacon message with a timestamp and unique sequence number</a></li>
+<li><a class="reference internal" href="#ci-must-parse-commands-from-the-ground-receved-via-udp-ip" id="toc-entry-164">CI must parse commands from the ground receved via UDP/IP</a></li>
+<li><a class="reference internal" href="#all-ci-commands-must-include-a-sequence-number-that-increments-for-each-command-sent" id="toc-entry-165">All CI commands must include a sequence number that increments for each command sent</a></li>
+<li><a class="reference internal" href="#ci-must-support-an-exit-command-that-terminates-the-tcspecial-process" id="toc-entry-166">CI must support an EXIT command that terminates the tcspecial process</a></li>
+</ul>
+</li>
+<li><a class="reference internal" href="#tcspecial-includes-zero-or-more-components-named-data-handler-dh" id="toc-entry-167">Tcspecial includes zero or more components named Data Handler (DH)</a></li>
+</ul>
+</li>
+<li><a class="reference internal" href="#the-top-part-of-the-tcsmoc-window-is-for-sending-commands-to-tcspecial-s-ci-and-viewing-telemetry-from-tcspecial-s-ci" id="toc-entry-168">The top part of the tcsmoc window is for sending commands to tcspecial's CI and viewing telemetry from tcspecial's CI</a></li>
+<li><a class="reference internal" href="#the-middle-part-of-the-tcsmoc-window-is-for-viewing-telemetry-from-individual-dhs" id="toc-entry-169">The middle part of the tcsmoc window is for viewing telemetry from individual DHs</a></li>
+</ul>
+</li>
+<li><a class="reference internal" href="#see-also" id="toc-entry-170">See Also</a></li>
 </ul>
 </div>
 <div class="section" id="introduction">
@@ -5824,8 +5832,199 @@ string or a binary field is a fixed-capacity buffer whose capacity the
 XTCE states, and decoding a command in the main loop touches no heap.</dd>
 </dl>
 </div>
+<div class="section" id="the-link-without-a-header">
+<h2><a class="toc-backref" href="#toc-entry-58">The link without a header</a></h2>
+<div class="admonition note">
+<p class="first admonition-title">Note</p>
+<p class="last"><strong>Designed, not yet built</strong> (2026-10-31). Once built it replaces the
+CCSDS layout in <a class="reference internal" href="#every-packet-is-xtce">Every packet is XTCE</a>, above, and settles what was left
+open in <a class="reference internal" href="#configurations-named-by-their-checksum">Configurations named by their checksum</a>: what of the link
+never changes. Until then <a class="reference internal" href="#every-packet-is-xtce">Every packet is XTCE</a> describes what runs.
+What it replaces is under <a class="reference internal" href="#what-the-headerless-link-replaces">What the headerless link replaces</a>.</p>
+</div>
+<p>A packet on tcspecial's command links carries what the protocol uses and
+nothing else. There is no CCSDS primary header, no packet type, no APID and
+no generation. What those did is done by what is already there:</p>
+<ul class="simple">
+<li><strong>Which way a packet goes</strong> is said by who sends it and who receives it.
+The vehicle reads commands from its command links and sends answers back;
+a ground station does the reverse. Neither reads the other's packets, so
+nothing in a packet needs to say which it is.</li>
+<li><strong>What layout a packet has</strong> is said by the configuration: the two ends
+have matched their configurations' checksums before anything but the
+three fixed commands goes, and the configuration names the interface
+(see <a class="reference internal" href="#the-configuration-names-its-interface">The configuration names its interface</a>).</li>
+<li><strong>Whether a datagram is tcspecial's at all</strong> is said by where it came
+from -- each end takes packets only from the address its configuration
+names -- and by its length, which must be exactly the length its opcode's
+layout gives.</li>
+<li><strong>Whether it arrived whole</strong> is said by the transport beneath it: UDP's
+checksum here, and a gateway's own framing where there is one (see
+<a class="reference internal" href="#what-is-assumed">What is assumed</a>).</li>
+</ul>
+<p>Where data leaves tcspecial, a gateway may wrap it in whatever framing the
+far side needs -- CCSDS Space Packets for a cFS software bus, a radio's
+transfer frames, or nothing for a program on the vehicle that takes plain
+datagrams. That framing belongs to the kind of gateway, and is never part
+of tcspecial's own packets: see <a class="reference internal" href="#framing-is-a-gateway-s">Framing is a gateway's</a>.</p>
+<div class="section" id="packets-without-a-header">
+<h3><a class="toc-backref" href="#toc-entry-59">Packets without a header</a></h3>
+<dl class="docutils">
+<dt>Requirement</dt>
+<dd>A command is its opcode, one byte; its sequence, four bytes; then what
+that command carries. An answer is the opcode of the command it
+answers, one byte; that command's sequence, four bytes; its status, one
+byte; the time it was made, eight bytes of microseconds since the UNIX
+epoch, all ones where the vehicle could not tell the time; then what
+the answer carries. Every number is most significant byte first.</dd>
+<dt>Requirement</dt>
+<dd>An answer carries its command's opcode, not a kind of its own. The
+values 129 to 132 that told an answer from a command when both shared a
+header are not used.</dd>
+<dt>Requirement</dt>
+<dd>A datagram is taken only from the address the configuration says its
+sender sends from, and only if its length is exactly what its opcode's
+layout gives. One that is not -- from elsewhere, of an unknown opcode,
+too short or too long -- is not answered, not acted on, and is logged
+and counted as malformed. A packet that is taken but refused is
+answered, as now.</dd>
+<dt>Requirement</dt>
+<dd>There is no generation number anywhere: not in an answer, not in the
+state file, and not in <tt class="docutils literal">tcslib</tt>. A start is told by the beacon's
+restart flag, and which configuration it runs by its checksum.</dd>
+</dl>
+</div>
+<div class="section" id="the-three-fixed-commands">
+<h3><a class="toc-backref" href="#toc-entry-60">The three fixed commands</a></h3>
+<p>CONNECT, RESTART_ARM and RESTART are taken at any time, whatever either end
+is running, so that two ends that agree on nothing else can still agree on
+these. Their opcodes and layouts, and those of their answers, are fixed for
+ever: no build and no configuration changes them.</p>
+<dl class="docutils">
+<dt>Requirement</dt>
+<dd>Opcodes 0x00 to 0x0F belong to the fixed commands for ever. Three are
+used; the rest are kept so that a fixed command could be added without
+taking an opcode another command has had. No other command uses them.</dd>
+<dt>Requirement</dt>
+<dd><p class="first">The fixed commands and their answers are laid out as below. They carry
+nothing else, and are never given another field: a change to one is a
+new fixed command with an opcode of its own.</p>
+<table border="1" class="last docutils">
+<colgroup>
+<col width="17%" />
+<col width="8%" />
+<col width="75%" />
+</colgroup>
+<thead valign="bottom">
+<tr><th class="head">Packet</th>
+<th class="head">Opcode</th>
+<th class="head">Layout (bytes)</th>
+</tr>
+</thead>
+<tbody valign="top">
+<tr><td>RESTART_ARM</td>
+<td>0x02</td>
+<td>opcode 1, sequence 4, arm key 8, target checksum 16</td>
+</tr>
+<tr><td>its answer</td>
+<td>0x02</td>
+<td>opcode 1, sequence 4, status 1, time 8</td>
+</tr>
+<tr><td>RESTART</td>
+<td>0x03</td>
+<td>opcode 1, sequence 4, arm key 8, target checksum 16</td>
+</tr>
+<tr><td>its answer</td>
+<td>0x03</td>
+<td>opcode 1, sequence 4, status 1, time 8</td>
+</tr>
+<tr><td>CONNECT</td>
+<td>0x04</td>
+<td>opcode 1, sequence 4, checksum 16 (the ground's)</td>
+</tr>
+<tr><td>its answer</td>
+<td>0x04</td>
+<td>opcode 1, sequence 4, status 1, time 8,
+running checksum 16, build version 3 (major, minor,
+patch), newest sequence taken 4</td>
+</tr>
+</tbody>
+</table>
+</dd>
+<dt>Requirement</dt>
+<dd>The status values the fixed answers use keep their meanings for ever:
+0 Success, 1 Failure, 2 InvalidCommand, 3 InvalidParameter, 4 NotArmed,
+5 NotFound, 9 Stale, 10 Unmatched. New values may be added; a station
+reads a value it does not know as a refusal for a reason it cannot name,
+and says so with the number.</dd>
+<dt>Requirement</dt>
+<dd>The beacon's layout is fixed for ever too: its text fields, in their
+order, as <a class="reference internal" href="#asynchronous-telemetry">Asynchronous Telemetry</a> gives them.</dd>
+</dl>
+<p>PING keeps opcode 0x01 for now, but is an ordinary command: it is refused
+before a match like any other, and moves out of the fixed range when the
+ordinary commands are renumbered, if they ever are.</p>
+</div>
+<div class="section" id="the-configuration-names-its-interface">
+<h3><a class="toc-backref" href="#toc-entry-61">The configuration names its interface</a></h3>
+<p>The layouts of the ordinary commands and answers -- everything but the
+fixed three -- are stated in XTCE, compiled into each build by tcs-xtce. A
+build can only speak the interface it was compiled from, so what a
+configuration can do is say which interface it is written for, and be
+refused by a build that speaks another.</p>
+<dl class="docutils">
+<dt>Requirement</dt>
+<dd>The <tt class="docutils literal">tcspecial</tt> section's <tt class="docutils literal">interface</tt> attribute, required, is the
+interface digest -- 32 hex digits, <tt class="docutils literal"><span class="pre">tcslibgs::interface</span></tt> -- of the XTCE
+the configuration was written against. tcsverify, tcspecial and every
+ground program refuse a configuration whose <tt class="docutils literal">interface</tt> is not their
+build's own, saying both digests. The configuration's checksum covers
+it, so matching checksums means matching interfaces as well.</dd>
+<dt>Requirement</dt>
+<dd>The fixed commands are not in that XTCE: they are in a document of their
+own, <tt class="docutils literal">fixed.xml</tt>, whose digest never changes, so that no change to the
+ordinary interface can touch them.</dd>
+</dl>
+</div>
+<div class="section" id="framing-is-a-gateway-s">
+<h3><a class="toc-backref" href="#toc-entry-62">Framing is a gateway's</a></h3>
+<dl class="docutils">
+<dt>Requirement</dt>
+<dd>How what a gateway carries is framed outside tcspecial is part of what
+that kind of gateway node is, and is not stated in the configuration:
+choosing the node type chooses the framing. <tt class="docutils literal">gateway_radio</tt> sends and
+takes tcspecial's packets as they are, one to a datagram;
+<tt class="docutils literal">gateway_cfs</tt> wraps each in the CCSDS Space Packet the cFS software
+bus carries; <tt class="docutils literal">gateway_fprime</tt> frames them as F´ does. A far side that
+needs another framing is a gateway node type of its own. A gateway
+strips its framing from what it takes, and refuses what is not framed
+as its type frames it, logging and counting it as malformed.</dd>
+</dl>
+<p>There is then nothing about framing for a configuration to get wrong, or
+for two configurations to disagree about: the node type a configuration
+names, which its checksum covers, says it all.</p>
+</div>
+<div class="section" id="what-the-headerless-link-replaces">
+<h3><a class="toc-backref" href="#toc-entry-63">What the headerless link replaces</a></h3>
+<p>Once built:</p>
+<ul class="simple">
+<li>In <a class="reference internal" href="#every-packet-is-xtce">Every packet is XTCE</a>: the CCSDS base container, the command and
+answer headers with their constants, and the packet type that told an
+answer from a command. Layouts are still stated in XTCE.</li>
+<li>In <a class="reference internal" href="#the-generation-number-and-the-state-file">The generation number and the state file</a>, and wherever an answer
+carries a generation: there is none.</li>
+<li>In <a class="reference internal" href="#configurations-named-by-their-checksum">Configurations named by their checksum</a>, under <a class="reference internal" href="#still-to-be-decided">Still to be
+decided</a>: the frozen layout of the three commands, settled here.</li>
+<li>In <a class="reference internal" href="#the-interface-the-fallback-and-switching-over">The Interface, the Fallback and Switching Over</a>: the fallback
+interface becomes <tt class="docutils literal">fixed.xml</tt>, holding only the three fixed commands.</li>
+<li>CONNECT no longer carries the ground station's build version: the
+vehicle acts on the checksum alone. The answer still carries the
+vehicle's build version, for the station to show.</li>
+</ul>
+</div>
+</div>
 <div class="section" id="two-interfaces">
-<h2><a class="toc-backref" href="#toc-entry-58">Two interfaces</a></h2>
+<h2><a class="toc-backref" href="#toc-entry-64">Two interfaces</a></h2>
 <p>The vehicle speaks two interfaces, each a set of XTCE documents with a
 digest of its own: the <em>full</em> interface, which is everything the ground can
 ask of the vehicle, and the <em>fallback</em> interface, which is just enough to put
@@ -5873,7 +6072,7 @@ are never refused for this, because they are how a mismatch is fixed.</dd>
 </dl>
 </div>
 <div class="section" id="reading-writing-and-checking-an-interface">
-<h2><a class="toc-backref" href="#toc-entry-59">Reading, writing and checking an interface</a></h2>
+<h2><a class="toc-backref" href="#toc-entry-65">Reading, writing and checking an interface</a></h2>
 <dl class="docutils">
 <dt>Requirement</dt>
 <dd><p class="first"><tt class="docutils literal"><span class="pre">tcslibgs::interface</span></tt> is the one place an interface is read, written
@@ -5899,7 +6098,7 @@ set as the vehicle will check it before switching to it.</dd>
 </dl>
 </div>
 <div class="section" id="the-load-set">
-<h2><a class="toc-backref" href="#toc-entry-60">The load set</a></h2>
+<h2><a class="toc-backref" href="#toc-entry-66">The load set</a></h2>
 <p>A full interface is compiled into the build that speaks it: tcs-xtce
 generates code from XTCE and does not interpret it. A new interface is
 therefore a new build, and a new build is only useful with the configuration
@@ -5941,7 +6140,7 @@ them, and the running load set is never written to.</dd>
 </dl>
 </div>
 <div class="section" id="uploading-and-keeping-what-was-uploaded">
-<h2><a class="toc-backref" href="#toc-entry-61">Uploading, and keeping what was uploaded</a></h2>
+<h2><a class="toc-backref" href="#toc-entry-67">Uploading, and keeping what was uploaded</a></h2>
 <dl class="docutils">
 <dt>Requirement</dt>
 <dd>A file is uploaded with FILE_OPEN, naming the load set, the path and the
@@ -5984,7 +6183,7 @@ answer <tt class="docutils literal">Success</tt>: what was asked for is so.</dd>
 </dl>
 </div>
 <div class="section" id="restarting-onto-a-load-set">
-<h2><a class="toc-backref" href="#toc-entry-62">Restarting onto a load set</a></h2>
+<h2><a class="toc-backref" href="#toc-entry-68">Restarting onto a load set</a></h2>
 <dl class="docutils">
 <dt>Requirement</dt>
 <dd>A switch is a full restart, never a change made in place: every node
@@ -6003,7 +6202,7 @@ what both rest on are in <a class="reference internal" href="#kinds-of-restart">
 </div>
 </div>
 <div class="section" id="fault-resiliency">
-<h1><a class="toc-backref" href="#toc-entry-63">Fault Resiliency</a></h1>
+<h1><a class="toc-backref" href="#toc-entry-69">Fault Resiliency</a></h1>
 <p>What tcspecial and the ground do about faults, in one place: what is
 assumed, how each kind of start is handled, how commands survive a link that
 loses and repeats them and what is done should one arrive out of order, what
@@ -6014,7 +6213,7 @@ they need to explain how something works, and point here for the rule.</p>
 answered with what is most reliable, and a design that would be easier to
 use or more flexible is not taken where it would be less sure.</p>
 <div class="section" id="what-is-assumed">
-<h2><a class="toc-backref" href="#toc-entry-64">What is assumed</a></h2>
+<h2><a class="toc-backref" href="#toc-entry-70">What is assumed</a></h2>
 <dl class="docutils">
 <dt>Requirement</dt>
 <dd><strong>The golden configuration always works.</strong> The build and configuration
@@ -6081,7 +6280,7 @@ sends some other way must not either.</dd>
 </dl>
 </div>
 <div class="section" id="configurations-named-by-their-checksum">
-<h2><a class="toc-backref" href="#toc-entry-65">Configurations named by their checksum</a></h2>
+<h2><a class="toc-backref" href="#toc-entry-71">Configurations named by their checksum</a></h2>
 <div class="admonition note">
 <p class="first admonition-title">Note</p>
 <p><strong>Partly built</strong> (2026-10-30). This section is how tcspecial and the
@@ -6141,7 +6340,7 @@ on sockets of their own, so a packet the radio delivered first can still be
 read after one it delivered later, on another socket. The requirements
 below that drop what is queued at a match are what make up for that.</p>
 <div class="section" id="keeping-configurations-on-board">
-<h3><a class="toc-backref" href="#toc-entry-66">Keeping configurations on board</a></h3>
+<h3><a class="toc-backref" href="#toc-entry-72">Keeping configurations on board</a></h3>
 <dl class="docutils">
 <dt>Requirement</dt>
 <dd>For now a configuration is a single file. One that includes another
@@ -6187,7 +6386,7 @@ by mistake.</dd>
 </dl>
 </div>
 <div class="section" id="starting-and-the-restart-flag">
-<h3><a class="toc-backref" href="#toc-entry-67">Starting, and the restart flag</a></h3>
+<h3><a class="toc-backref" href="#toc-entry-73">Starting, and the restart flag</a></h3>
 <dl class="docutils">
 <dt>Requirement</dt>
 <dd>There is no generation number. A start of tcspecial is told by its
@@ -6250,7 +6449,7 @@ so everything queued at that moment was sent before it.</dd>
 </dl>
 </div>
 <div class="section" id="the-three-commands-that-always-go">
-<h3><a class="toc-backref" href="#toc-entry-68">The three commands that always go</a></h3>
+<h3><a class="toc-backref" href="#toc-entry-74">The three commands that always go</a></h3>
 <dl class="docutils">
 <dt>Requirement</dt>
 <dd>CONNECT, RESTART_ARM and RESTART are taken at any time: before a
@@ -6291,7 +6490,7 @@ survives into the new one.</dd>
 </dl>
 </div>
 <div class="section" id="on-the-ground">
-<h3><a class="toc-backref" href="#toc-entry-69">On the ground</a></h3>
+<h3><a class="toc-backref" href="#toc-entry-75">On the ground</a></h3>
 <dl class="docutils">
 <dt>Requirement</dt>
 <dd>A ground station is <em>matched</em> while the last beacon it heard, since it
@@ -6351,7 +6550,7 @@ advisory pop-up instead, which lets the operator go on or cancel.</dd>
 </dl>
 </div>
 <div class="section" id="holes-in-the-checksum-scheme-and-what-closes-them">
-<h3><a class="toc-backref" href="#toc-entry-70">Holes in the checksum scheme, and what closes them</a></h3>
+<h3><a class="toc-backref" href="#toc-entry-76">Holes in the checksum scheme, and what closes them</a></h3>
 <p>What was looked for: any way a message could be read with a configuration
 that did not make it, any way the vehicle could be left running nothing the
 ground can match, and any way a kept configuration could be lost or
@@ -6414,7 +6613,7 @@ leaves as it is.</dd>
 </dl>
 </div>
 <div class="section" id="what-this-replaces">
-<h3><a class="toc-backref" href="#toc-entry-71">What this replaces</a></h3>
+<h3><a class="toc-backref" href="#toc-entry-77">What this replaces</a></h3>
 <p>Replaced already, and rewritten where they stand to say what runs:</p>
 <ul class="simple">
 <li><a class="reference internal" href="#the-beacon-across-a-restart">The beacon across a restart</a>: the commanded-restart flag, set only for
@@ -6453,17 +6652,18 @@ Interface, the Fallback and Switching Over</a>, are set aside: they are not
 part of this scheme, and are not to be built for now.</p>
 </div>
 <div class="section" id="still-to-be-decided">
-<h3><a class="toc-backref" href="#toc-entry-72">Still to be decided</a></h3>
+<h3><a class="toc-backref" href="#toc-entry-78">Still to be decided</a></h3>
 <dl class="docutils">
 <dt>The frozen layout of the three commands</dt>
-<dd>Freezing the three commands, their answers and the beacon freezes the
-packet header they share. Whether the header is frozen with them, or
-the three get a layout of their own, is open.</dd>
+<dd>Settled, though not yet built, in <a class="reference internal" href="#the-link-without-a-header">The link without a header</a>: there
+is no shared header, and the three are fixed commands whose opcodes and
+layouts never change, with the target checksum in RESTART_ARM and
+RESTART.</dd>
 </dl>
 </div>
 </div>
 <div class="section" id="in-flight-data-across-a-restart">
-<h2><a class="toc-backref" href="#toc-entry-73">In-flight data across a restart</a></h2>
+<h2><a class="toc-backref" href="#toc-entry-79">In-flight data across a restart</a></h2>
 <div class="admonition note">
 <p class="first admonition-title">Note</p>
 <p class="last"><strong>Partly built</strong>, with <a class="reference internal" href="#configurations-named-by-their-checksum">Configurations named by their checksum</a>, whose
@@ -6506,7 +6706,7 @@ whose layout never changes -- and is drawn in that configuration's own
 line style as well as its colour, so the figures read the same without
 colour. What becomes of each message is written beside the end it reaches.</p>
 <div class="section" id="a-commanded-restart">
-<h3><a class="toc-backref" href="#toc-entry-74">A commanded restart</a></h3>
+<h3><a class="toc-backref" href="#toc-entry-80">A commanded restart</a></h3>
 <div class="figure">
 <object data="restart-commanded.svg" style="width: 100%;" type="image/svg+xml">A sequence diagram of a commanded restart from configuration A
 to B. The vehicle runs A and the station is matched with it. The
@@ -6542,7 +6742,7 @@ station reads nothing until it has heard a beacon of B with the flag clear.
 Every datum it reads from then on was made with B.</p>
 </div>
 <div class="section" id="a-restart-on-the-same-configuration">
-<h3><a class="toc-backref" href="#toc-entry-75">A restart on the same configuration</a></h3>
+<h3><a class="toc-backref" href="#toc-entry-81">A restart on the same configuration</a></h3>
 <div class="figure">
 <object data="restart-crash.svg" style="width: 100%;" type="image/svg+xml">A sequence diagram of a crash. The vehicle runs A and the station
 is matched. A datum tagged A sent before the crash arrives before
@@ -6565,7 +6765,7 @@ on the strength of a state the crash has lost. Refusing it costs one more
 CONNECT and keeps the rule the same for every start.</p>
 </div>
 <div class="section" id="a-ground-station-that-restarts-or-changes-configuration">
-<h3><a class="toc-backref" href="#toc-entry-76">A ground station that restarts or changes configuration</a></h3>
+<h3><a class="toc-backref" href="#toc-entry-82">A ground station that restarts or changes configuration</a></h3>
 <div class="figure">
 <object data="restart-ground.svg" style="width: 100%;" type="image/svg+xml">A sequence diagram of a ground station that restarts using
 configuration C while the vehicle runs A, matched with another
@@ -6591,7 +6791,7 @@ CONNECT whose checksum does not match changes nothing on the vehicle, which
 goes on serving whichever station matched it.</p>
 </div>
 <div class="section" id="what-is-dropped-and-where">
-<h3><a class="toc-backref" href="#toc-entry-77">What is dropped, and where</a></h3>
+<h3><a class="toc-backref" href="#toc-entry-83">What is dropped, and where</a></h3>
 <table border="1" class="docutils">
 <colgroup>
 <col width="45%" />
@@ -6640,7 +6840,7 @@ misreading.</p>
 </div>
 </div>
 <div class="section" id="kinds-of-restart">
-<h2><a class="toc-backref" href="#toc-entry-78">Kinds of restart</a></h2>
+<h2><a class="toc-backref" href="#toc-entry-84">Kinds of restart</a></h2>
 <p>A start of tcspecial is commanded or it is not, and which it is decides
 whether the definitions it runs with may change. Its beacons do not say
 which: every start begins with the restart flag set -- see <a class="reference internal" href="#configurations-named-by-their-checksum">Configurations
@@ -6682,7 +6882,7 @@ a crash that keeps its definitions cannot keep them for ever.</dd>
 </dl>
 </div>
 <div class="section" id="lost-late-and-repeated-commands">
-<h2><a class="toc-backref" href="#toc-entry-79">Lost, late and repeated commands</a></h2>
+<h2><a class="toc-backref" href="#toc-entry-85">Lost, late and repeated commands</a></h2>
 <dl class="docutils">
 <dt>Requirement</dt>
 <dd>Every valid packet from the MOC that is a command is answered exactly
@@ -6729,7 +6929,7 @@ no arm; it changes nothing, and it is not how the ground learns what
 happened.</p>
 </div>
 <div class="section" id="the-generation-number-and-the-state-file">
-<h2><a class="toc-backref" href="#toc-entry-80">The generation number and the state file</a></h2>
+<h2><a class="toc-backref" href="#toc-entry-86">The generation number and the state file</a></h2>
 <dl class="docutils">
 <dt>Requirement</dt>
 <dd>The <tt class="docutils literal">tcspecial</tt> section's <tt class="docutils literal">state_file</tt>, required, is the path of the
@@ -6774,7 +6974,7 @@ seen as a restart.</dd>
 </dl>
 </div>
 <div class="section" id="the-beacon-across-a-restart">
-<h2><a class="toc-backref" href="#toc-entry-81">The beacon across a restart</a></h2>
+<h2><a class="toc-backref" href="#toc-entry-87">The beacon across a restart</a></h2>
 <dl class="docutils">
 <dt>Requirement</dt>
 <dd>The beacon carries the <em>restart flag</em>, written <tt class="docutils literal">restart</tt> when it is
@@ -6842,7 +7042,7 @@ operator's cue that the restart is done and that the next thing to do is
 connect.</p>
 </div>
 <div class="section" id="what-the-ground-may-send-meanwhile">
-<h2><a class="toc-backref" href="#toc-entry-82">What the ground may send meanwhile</a></h2>
+<h2><a class="toc-backref" href="#toc-entry-88">What the ground may send meanwhile</a></h2>
 <p>The beacon is the acknowledgement of a RESTART or a SWITCH, not the answer to
 it. The answer is a packet like any other on a link that loses them, and the
 vehicle may be gone before it is sent again, so the ground may never hear one;
@@ -6953,7 +7153,7 @@ nothing of it.</dd>
 </dl>
 </div>
 <div class="section" id="downlinked-data-across-a-switch">
-<h2><a class="toc-backref" href="#toc-entry-83">Downlinked data across a switch</a></h2>
+<h2><a class="toc-backref" href="#toc-entry-89">Downlinked data across a switch</a></h2>
 <p>What the vehicle downlinks from a node is the node's bytes and nothing else:
 no header, no generation, no time. Which node sent a datum is the port it
 arrives at, and how to read it is that node's configuration. A switch of
@@ -6971,7 +7171,7 @@ arrival already says.</dd>
 </dl>
 </div>
 <div class="section" id="holes-in-this-and-what-closes-them">
-<h2><a class="toc-backref" href="#toc-entry-84">Holes in this, and what closes them</a></h2>
+<h2><a class="toc-backref" href="#toc-entry-90">Holes in this, and what closes them</a></h2>
 <p>What was looked for: any way the ground and the vehicle could come to
 disagree about which definitions are in use, any way a vehicle could be left
 with no way in, and any way an upload could be lost or damaged. Each is
@@ -7085,9 +7285,9 @@ designed here.</dd>
 </div>
 </div>
 <div class="section" id="tcspecial">
-<h1><a class="toc-backref" href="#toc-entry-85">TCSpecial</a></h1>
+<h1><a class="toc-backref" href="#toc-entry-91">TCSpecial</a></h1>
 <div class="section" id="configuration-files">
-<h2><a class="toc-backref" href="#toc-entry-86">Configuration Files</a></h2>
+<h2><a class="toc-backref" href="#toc-entry-92">Configuration Files</a></h2>
 <dl class="docutils">
 <dt>Requirement</dt>
 <dd>Every configuration file may be written in YAML or XML: the command
@@ -7138,7 +7338,7 @@ carries the comments.</p>
 configuration and is no part of this.)</p>
 </div>
 <div class="section" id="tcspecial-1">
-<h2><a class="toc-backref" href="#toc-entry-87">tcspecial</a></h2>
+<h2><a class="toc-backref" href="#toc-entry-93">tcspecial</a></h2>
 <p>Tcspecial reads one configuration file, named on its command line. It
 describes the nodes, the links between them and the payloads among them --
 see <a class="reference internal" href="#payloads">Payloads</a> -- and it states what tcspecial itself is configured with in
@@ -7203,7 +7403,7 @@ as stream or datagram protocols, or serial or parallel interfaces,
 but also stackable DH protocols that can be
 employed to build custom protocol stacks.</p>
 <div class="section" id="endpoints">
-<h3><a class="toc-backref" href="#toc-entry-88">EndPoints</a></h3>
+<h3><a class="toc-backref" href="#toc-entry-94">EndPoints</a></h3>
 <p>Endpoints handle the low level I/O and each one is associated with a thread.</p>
 <p>The EndpointWaitable trait defines wait_for_event() as a function that waits for
 an event to occur on a Read or Write trait, similar to the Linux poll()
@@ -7269,14 +7469,14 @@ generally irregular timing and without any error checking.
 Datagrams differ in that all data in a datagram is either transferred in a complete
 block with no errors, or it is discarded.</p>
 <div class="section" id="datagram-endpoints">
-<h4><a class="toc-backref" href="#toc-entry-89">Datagram Endpoints</a></h4>
+<h4><a class="toc-backref" href="#toc-entry-95">Datagram Endpoints</a></h4>
 <p>A consequence of datagrams being transferred in a single block is that select()-like
 calls indicate that the entire datagram is present or none is. There is no need to
 read a piece at a time. It is possible to read the amount of data available and allocate
 a bigger buffer but tcspecial does not support this capability.</p>
 </div>
 <div class="section" id="stream-endpoints">
-<h4><a class="toc-backref" href="#toc-entry-90">Stream Endpoints</a></h4>
+<h4><a class="toc-backref" href="#toc-entry-96">Stream Endpoints</a></h4>
 <p>Streams do not have embedded markers to indicate data boundaries, so select()-like
 calls indicate only that one or more bytes are available. Transferring one byte
 at a time will incur a significant amount of overhead, so tcspecial can delay for
@@ -7293,7 +7493,7 @@ file descriptors are generally stream devices, network-related file
 descriptors may behave like streams or datagrams.</p>
 </div>
 <div class="section" id="network-endpoints">
-<h4><a class="toc-backref" href="#toc-entry-91">Network Endpoints</a></h4>
+<h4><a class="toc-backref" href="#toc-entry-97">Network Endpoints</a></h4>
 <p>The table below lists network protocols supported on Linux-based systems. The
 protocols below are generally available, see the man page for socket(2) and
 other, associated, documentation. The protocol family, socket type, and protocol
@@ -7651,7 +7851,7 @@ reach the handler that opens them.</p>
 </div>
 </div>
 <div class="section" id="which-node-types-are-built">
-<h2><a class="toc-backref" href="#toc-entry-92">Which Node Types Are Built</a></h2>
+<h2><a class="toc-backref" href="#toc-entry-98">Which Node Types Are Built</a></h2>
 <p>Every node type was built into every tcspecial, which assumed that every
 platform offers every interface: a GPIO character device, an IIO buffer, an
 rpmsg channel, SocketCAN. Not every platform does, and a vehicle that flies a
@@ -7763,7 +7963,7 @@ with every type never makes.</dd>
 </dl>
 </div>
 <div class="section" id="lunar-lander-payload-interfaces">
-<h2><a class="toc-backref" href="#toc-entry-93">Lunar Lander Payload Interfaces</a></h2>
+<h2><a class="toc-backref" href="#toc-entry-99">Lunar Lander Payload Interfaces</a></h2>
 <p>The payloads tcspecial is for are the kind the Moon's landers were meant to
 carry, have carried, or are meant to carry, so the interfaces those landers
 give a payload are the interfaces tcspecial has to speak. This table is every
@@ -7877,7 +8077,7 @@ its data needs. A new interface is a new node type, and its stand-in is a
 UDP <tt class="docutils literal">stand_in</tt> where the operating system has nothing to stand in for it:
 see <a class="reference internal" href="#saying-which-payloads-are-simulated">Saying Which Payloads Are Simulated</a>.</p>
 <div class="section" id="lunar-lander-interfaces-tcspecial-speaks">
-<h3><a class="toc-backref" href="#toc-entry-94">Lunar lander interfaces tcspecial speaks</a></h3>
+<h3><a class="toc-backref" href="#toc-entry-100">Lunar lander interfaces tcspecial speaks</a></h3>
 <p>These are the payload interfaces the Moon's landers offer that tcspecial
 supports, with the payload type that speaks each. Landers are named by series
 -- Apollo 11 to 17 are &quot;Apollo&quot;, Peregrine and Griffin are &quot;Astrobotic&quot; --
@@ -7936,7 +8136,7 @@ where each row comes from.</p>
 </div>
 </div>
 <div class="section" id="the-visual-window">
-<h2><a class="toc-backref" href="#toc-entry-95">The Visual Window</a></h2>
+<h2><a class="toc-backref" href="#toc-entry-101">The Visual Window</a></h2>
 <p>A configuration is a drawing in tcsgui and a running process in tcspecial, and
 nothing showed the one as the other: what a vehicle on a desk was doing could
 be read only from its logs and from the ground station's panels. The visual
@@ -8001,7 +8201,7 @@ destination in the file's order, which is the order tcsgui draws them in.</dd>
 </dl>
 </div>
 <div class="section" id="tcslib">
-<h2><a class="toc-backref" href="#toc-entry-96">tcslib</a></h2>
+<h2><a class="toc-backref" href="#toc-entry-102">tcslib</a></h2>
 <p>The TCSpecial library has a set of operations for global control and status
 and a set of per-payload interface operations.  It is used for building control applications using mission control
 software such as YAMCS or MCT.</p>
@@ -8024,12 +8224,12 @@ rather than in tcsmoc: a second copy of it would be a second thing to keep
 correct, and the one in tcsmoc was the only one that existed.</p>
 </div>
 <div class="section" id="tcslibgs">
-<h2><a class="toc-backref" href="#toc-entry-97">tcslibgs</a></h2>
+<h2><a class="toc-backref" href="#toc-entry-103">tcslibgs</a></h2>
 <p>The TCSpecial ground/space library contains definitions used by both
 tcslib and tcspecial.</p>
 </div>
 <div class="section" id="what-each-end-read">
-<h2><a class="toc-backref" href="#toc-entry-98">What Each End Read</a></h2>
+<h2><a class="toc-backref" href="#toc-entry-104">What Each End Read</a></h2>
 <dl class="docutils">
 <dt>Requirement</dt>
 <dd>A link begins with each end saying what it read. The ground sends a
@@ -8128,7 +8328,7 @@ something.</p>
 </div>
 </div>
 <div class="section" id="payloads">
-<h1><a class="toc-backref" href="#toc-entry-99">Payloads</a></h1>
+<h1><a class="toc-backref" href="#toc-entry-105">Payloads</a></h1>
 <p>The <tt class="docutils literal">payloads</tt> section of a configuration describes the payloads themselves:
 which there are, how tcspecial reaches each one, and what one read of it asks
 for. What it deliberately does not describe is how a <em>simulated</em> payload
@@ -8141,7 +8341,7 @@ Architecture</a>; what they mean is here.</p>
 <p>A payload is a node, and <a class="reference internal" href="#what-a-device-node-says">What a device node says</a> is the section a reader of
 a configuration wants beside this one.</p>
 <div class="section" id="how-a-payload-is-made-to-send">
-<h2><a class="toc-backref" href="#toc-entry-100">How a Payload Is Made to Send</a></h2>
+<h2><a class="toc-backref" href="#toc-entry-106">How a Payload Is Made to Send</a></h2>
 <p>Payloads are generally one of two types, and which type a payload is decides
 where the timing of it is written down.</p>
 <dl class="docutils">
@@ -8405,7 +8605,7 @@ once. The handler's end is where the misspelling actually is, so that is the
 error reported.</p>
 </div>
 <div class="section" id="link-terms">
-<h2><a class="toc-backref" href="#toc-entry-101">Link Terms</a></h2>
+<h2><a class="toc-backref" href="#toc-entry-107">Link Terms</a></h2>
 <p>Three types of payload are on a link of their own -- a serial line, a device
 on an I2C bus, a peripheral on a SPI bus -- and each has terms that say how
 that link is driven: a data rate, an address on a bus, the shape of a clock.
@@ -8463,7 +8663,7 @@ whether it sends of its own accord or on a trigger -- and one word cannot
 mean both.</dd>
 </dl>
 <div class="section" id="what-is-experimental">
-<h3><a class="toc-backref" href="#toc-entry-102">What Is Experimental</a></h3>
+<h3><a class="toc-backref" href="#toc-entry-108">What Is Experimental</a></h3>
 <p>Some of what follows is <strong>experimental and not yet supported</strong>: RS-485 on a
 serial line, and the <tt class="docutils literal">can</tt>, <tt class="docutils literal">iio</tt>, <tt class="docutils literal">rpmsg</tt>, <tt class="docutils literal">gpio</tt> and <tt class="docutils literal">hdlc</tt> types
 of payload. Each is written, parses, reaches a handler and has tests of its
@@ -8479,7 +8679,7 @@ where the five supported types -- <tt class="docutils literal">network</tt>, <tt
 and <tt class="docutils literal">spi</tt> -- will not.</p>
 </div>
 <div class="section" id="gpio-payloads-discrete-lines">
-<h3><a class="toc-backref" href="#toc-entry-103">GPIO Payloads: Discrete Lines</a></h3>
+<h3><a class="toc-backref" href="#toc-entry-109">GPIO Payloads: Discrete Lines</a></h3>
 <p><strong>Experimental, not yet supported.</strong></p>
 <p>Not every payload is a stream of data. A deployment switch, an arming line, a
 thermostat's output: each is one wire that is high or low, and what the ground
@@ -8498,7 +8698,7 @@ out of a schematic in whichever form the schematic used.</dd>
 </dl>
 </div>
 <div class="section" id="two-ways-of-watching-and-a-set-of-lines-may-ask-for-either-or-both">
-<h3><a class="toc-backref" href="#toc-entry-104">Two ways of watching, and a set of lines may ask for either or both</a></h3>
+<h3><a class="toc-backref" href="#toc-entry-110">Two ways of watching, and a set of lines may ask for either or both</a></h3>
 <p><tt class="docutils literal">edge</tt> says <em>when a line changed</em>; <tt class="docutils literal">state_interval</tt> says <em>what the lines
 are</em>, every so often. They answer different questions, so a payload may ask
 for one, the other, or both:</p>
@@ -8643,7 +8843,7 @@ edge on each of its lines every packet interval.</dd>
 </dl>
 </div>
 <div class="section" id="rpmsg-payloads-another-core">
-<h3><a class="toc-backref" href="#toc-entry-105">rpmsg Payloads: Another Core</a></h3>
+<h3><a class="toc-backref" href="#toc-entry-111">rpmsg Payloads: Another Core</a></h3>
 <p><strong>Experimental, not yet supported.</strong></p>
 <p>A flight computer is commonly one package with cores of more than one type in
 it, and the payload is then software on another core rather than anything on a
@@ -8692,7 +8892,7 @@ the stand-in differs from the thing.</dd>
 </dl>
 </div>
 <div class="section" id="iio-payloads-a-sensor-s-buffer">
-<h3><a class="toc-backref" href="#toc-entry-106">IIO Payloads: a Sensor's Buffer</a></h3>
+<h3><a class="toc-backref" href="#toc-entry-112">IIO Payloads: a Sensor's Buffer</a></h3>
 <p><strong>Experimental, not yet supported.</strong></p>
 <p>The kernel's Industrial I/O subsystem is what a sensor looks like on Linux. A
 program that wants a stream of samples enables the channels it cares about and
@@ -8738,7 +8938,7 @@ handler too, which touches none of those attributes.</dd>
 </dl>
 </div>
 <div class="section" id="can-payloads-a-bus-of-peers">
-<h3><a class="toc-backref" href="#toc-entry-107">CAN Payloads: a Bus of Peers</a></h3>
+<h3><a class="toc-backref" href="#toc-entry-113">CAN Payloads: a Bus of Peers</a></h3>
 <p><strong>Experimental, not yet supported.</strong></p>
 <p>A CAN controller is a network interface rather than a device file, so a CAN
 payload is located by an interface and by the identifier its frames carry.
@@ -8803,7 +9003,7 @@ I<sup>2</sup>C stand-in does for its kernel module.</dd>
 </dl>
 </div>
 <div class="section" id="serial-payloads-a-line">
-<h3><a class="toc-backref" href="#toc-entry-108">Serial Payloads: a Line</a></h3>
+<h3><a class="toc-backref" href="#toc-entry-114">Serial Payloads: a Line</a></h3>
 <p>A start-stop line: each byte delimited by its own start and stop bits, which is
 what <tt class="docutils literal">termios</tt> drives. A line whose bits are carried on a clock is not one of
 these -- Linux drives such a line as a network interface rather than as a
@@ -8839,7 +9039,7 @@ is what will not have it.</dd>
 </dl>
 </div>
 <div class="section" id="rs-485-a-two-wire-bus">
-<h3><a class="toc-backref" href="#toc-entry-109">RS-485: a Two-Wire Bus</a></h3>
+<h3><a class="toc-backref" href="#toc-entry-115">RS-485: a Two-Wire Bus</a></h3>
 <p><strong>Experimental, not yet supported.</strong></p>
 <p>A start-stop line may be half of an RS-485 bus rather than one end of a
 point-to-point link: one pair of wires, several transmitters, and each of them
@@ -8939,7 +9139,7 @@ so there is always a rule deciding where one read ends.</dd>
 </dl>
 </div>
 <div class="section" id="hdlc-payloads-a-synchronous-line">
-<h3><a class="toc-backref" href="#toc-entry-110">HDLC Payloads: a Synchronous Line</a></h3>
+<h3><a class="toc-backref" href="#toc-entry-116">HDLC Payloads: a Synchronous Line</a></h3>
 <p><strong>Experimental, not yet supported, and the one type with nothing to be run
 against.</strong></p>
 <p>A synchronous serial line: bits carried on a clock, framed as HDLC. Linux calls
@@ -9079,7 +9279,7 @@ payload, and listed with the rest above</td>
 </table>
 </div>
 <div class="section" id="i2c-payloads-a-bus">
-<h3><a class="toc-backref" href="#toc-entry-111">I2C Payloads: a Bus</a></h3>
+<h3><a class="toc-backref" href="#toc-entry-117">I2C Payloads: a Bus</a></h3>
 <p>A serial port is configured by describing how a byte is framed on the wire.
 I2C needs none of that, because the protocol fixes it: every byte is eight
 data bits, most significant bit first, followed by an acknowledge bit. What a
@@ -9158,7 +9358,7 @@ recorded and never applied, and is refused by name now.</dd>
 </dl>
 </div>
 <div class="section" id="spi-payloads-a-peripheral">
-<h3><a class="toc-backref" href="#toc-entry-112">SPI Payloads: a Peripheral</a></h3>
+<h3><a class="toc-backref" href="#toc-entry-118">SPI Payloads: a Peripheral</a></h3>
 <p>SPI is clocked and full duplex, so, as with I2C, there is no parity and there
 are no stop bits; a transfer is delimited by the chip select rather than by
 framing bits. What a payload carries is the shape of the clock and of a word.</p>
@@ -9222,7 +9422,7 @@ rate the payload gives.</dd>
 </dl>
 </div>
 <div class="section" id="where-a-read-of-a-line-ends">
-<h3><a class="toc-backref" href="#toc-entry-113">Where a Read of a Line Ends</a></h3>
+<h3><a class="toc-backref" href="#toc-entry-119">Where a Read of a Line Ends</a></h3>
 <p>A stream delivers bytes with no frame boundaries of its own, so a node on one
 needs to be told where one read ends. Four attributes say so, written flat
 beside the node's other terms. A stream is a line or a stream socket: a
@@ -9369,7 +9569,7 @@ guess. Writing <tt class="docutils literal">read_timeout: none</tt> says the fir
 neither attribute is reported as an error rather than being taken for it.</p>
 </div>
 <div class="section" id="value-syntax">
-<h3><a class="toc-backref" href="#toc-entry-114">Value Syntax</a></h3>
+<h3><a class="toc-backref" href="#toc-entry-120">Value Syntax</a></h3>
 <p>XML carries every attribute value as text, while YAML distinguishes
 numbers from strings. Both are accepted everywhere a value is expected, so the
 same value may be written <tt class="docutils literal">8</tt> or <tt class="docutils literal">&quot;8&quot;</tt> without changing its meaning.</p>
@@ -9439,7 +9639,7 @@ the answer's reason, and the vehicle's log.</dd>
 </div>
 </div>
 <div class="section" id="platforms-and-porting">
-<h1><a class="toc-backref" href="#toc-entry-115">Platforms and Porting</a></h1>
+<h1><a class="toc-backref" href="#toc-entry-121">Platforms and Porting</a></h1>
 <p>TCSpecial runs on Linux, and only on Linux. This section says which parts
 of it depend on Linux, which on POSIX, and which only on Rust's standard
 library, and sets down some thoughts on how each might be carried to a
@@ -9451,7 +9651,7 @@ documentation for the release and board in question. <a class="reference interna
 Built</a> gives the rule that already stops a build that asks for a Linux
 interface on another operating system.</p>
 <div class="section" id="what-the-flight-software-assumes">
-<h2><a class="toc-backref" href="#toc-entry-116">What the flight software assumes</a></h2>
+<h2><a class="toc-backref" href="#toc-entry-122">What the flight software assumes</a></h2>
 <p>The flight software is ordinary hosted Rust. It uses the standard library
 throughout -- <tt class="docutils literal"><span class="pre">std::thread</span></tt>, <tt class="docutils literal"><span class="pre">std::net</span></tt>, <tt class="docutils literal"><span class="pre">std::fs</span></tt>, <tt class="docutils literal"><span class="pre">std::process</span></tt>
 and <tt class="docutils literal"><span class="pre">std::os::unix</span></tt> -- and nothing is <tt class="docutils literal">no_std</tt>. Its model of waiting is
@@ -9466,7 +9666,7 @@ what needs only Rust's standard library, what needs POSIX, and what needs
 Linux itself.</p>
 </div>
 <div class="section" id="linux-only">
-<h2><a class="toc-backref" href="#toc-entry-117">Linux-only</a></h2>
+<h2><a class="toc-backref" href="#toc-entry-123">Linux-only</a></h2>
 <p>Each of these uses an interface only Linux has: a kernel ABI through a
 character device and <tt class="docutils literal">ioctl</tt>, a socket family, or a Linux file system.</p>
 <table border="1" class="docutils">
@@ -9538,7 +9738,7 @@ parity, and the baud rates above 921600</td>
 are not gated, and are smaller.</p>
 </div>
 <div class="section" id="posix">
-<h2><a class="toc-backref" href="#toc-entry-118">POSIX</a></h2>
+<h2><a class="toc-backref" href="#toc-entry-124">POSIX</a></h2>
 <p>These need a POSIX layer, which VxWorks (in real-time processes), QNX,
 RTEMS, LynxOS and INTEGRITY's POSIX subsystem have in some measure, and
 FreeRTOS and Zephyr have only in part.</p>
@@ -9562,7 +9762,7 @@ and <tt class="docutils literal">waitpid</tt>; and a restart re-executes the pro
 </ul>
 </div>
 <div class="section" id="rust-s-standard-library">
-<h2><a class="toc-backref" href="#toc-entry-119">Rust's standard library</a></h2>
+<h2><a class="toc-backref" href="#toc-entry-125">Rust's standard library</a></h2>
 <p>These need only an operating system that Rust's standard library has been
 ported to.</p>
 <ul class="simple">
@@ -9582,7 +9782,7 @@ not a porting concern: they run on the ground, on Linux or another desktop
 system.</p>
 </div>
 <div class="section" id="thoughts-on-real-time-operating-systems">
-<h2><a class="toc-backref" href="#toc-entry-120">Thoughts on real-time operating systems</a></h2>
+<h2><a class="toc-backref" href="#toc-entry-126">Thoughts on real-time operating systems</a></h2>
 <p>The first question for any of them is whether Rust's standard library is
 there, because that decides whether the work is a port or a rewrite.</p>
 <p>Where it is, most of TCSpecial would build as it is, and the work is in
@@ -9661,7 +9861,7 @@ Linux companion is likely the better answer.</p>
 </div>
 </div>
 <div class="section" id="simulator-configuration-files">
-<h1><a class="toc-backref" href="#toc-entry-121">Simulator Configuration Files</a></h1>
+<h1><a class="toc-backref" href="#toc-entry-127">Simulator Configuration Files</a></h1>
 <p>The tcspecial configuration describes payloads. Simulating one takes more than
 that description holds, and the extra is not payload configuration: how often a
 payload produces a packet, and how it divides a packet into segments, are
@@ -9678,7 +9878,7 @@ language read by two programs cannot live inside one of them.</dd>
 <p>The format is chosen from the extension exactly as every other configuration
 file's is, so a simulator configuration may be written in YAML or XML.</p>
 <div class="section" id="file-structure">
-<h2><a class="toc-backref" href="#toc-entry-122">File Structure</a></h2>
+<h2><a class="toc-backref" href="#toc-entry-128">File Structure</a></h2>
 <p>A simulator configuration file has a description of its own, a <tt class="docutils literal">tcssim</tt>
 section, which is required, and two sections that are optional.</p>
 <dl class="docutils">
@@ -9886,7 +10086,7 @@ working.</dd>
 </dl>
 </div>
 <div class="section" id="what-a-simulated-payload-stands-in-for">
-<h2><a class="toc-backref" href="#toc-entry-123">What a Simulated Payload Stands In For</a></h2>
+<h2><a class="toc-backref" href="#toc-entry-129">What a Simulated Payload Stands In For</a></h2>
 <p>The two files are joined by handler name and by nothing else, and a name is
 exactly what survives a payload set copied from another one. Two sets that
 differ only in how their payload is reached -- one a datagram socket, one a
@@ -9960,7 +10160,7 @@ bus from the third.</dd>
 </dl>
 </div>
 <div class="section" id="thermal-masses">
-<h2><a class="toc-backref" href="#toc-entry-124">Thermal Masses</a></h2>
+<h2><a class="toc-backref" href="#toc-entry-130">Thermal Masses</a></h2>
 <p>Every other simulated payload makes its bytes up. A buffer filled from a
 random number generator exercises a link and nothing at all of a control loop:
 three sensors sending noise never agree, so the vote over them produces
@@ -10059,7 +10259,7 @@ of the loop.</dd>
 </dl>
 </div>
 <div class="section" id="fault-injection">
-<h2><a class="toc-backref" href="#toc-entry-125">Fault Injection</a></h2>
+<h2><a class="toc-backref" href="#toc-entry-131">Fault Injection</a></h2>
 <p>A payload that always works exercises only the path where everything works.
 The settings above have a simulated payload misbehave in the ways a real one
 does, so that a handler's own counting, framing, timeouts and reconnection can
@@ -10117,7 +10317,7 @@ be guessed at from the results afterwards.</dd>
 </dl>
 </div>
 <div class="section" id="matching">
-<h2><a class="toc-backref" href="#toc-entry-126">Matching</a></h2>
+<h2><a class="toc-backref" href="#toc-entry-132">Matching</a></h2>
 <p>The two files are joined by name, not by position: the order of one file has no
 bearing on the other, and a data handler's id is not a row number.</p>
 <dl class="docutils">
@@ -10153,7 +10353,7 @@ looks like. As there, the error is reported from the payload's end.</dd>
 </dl>
 </div>
 <div class="section" id="example">
-<h2><a class="toc-backref" href="#toc-entry-127">Example</a></h2>
+<h2><a class="toc-backref" href="#toc-entry-133">Example</a></h2>
 <p>This is the shipped <tt class="docutils literal"><span class="pre">examples/thermostat/thermostat-sim.yaml</span></tt>, which
 simulates the three sensors of <tt class="docutils literal">thermostat.yaml</tt>. All three are read together
 and so share a group, which carries their rate and the thermal mass they
@@ -10189,7 +10389,7 @@ rather than being driven through.</p>
 </div>
 </div>
 <div class="section" id="testing">
-<h1><a class="toc-backref" href="#toc-entry-128">Testing</a></h1>
+<h1><a class="toc-backref" href="#toc-entry-134">Testing</a></h1>
 <p>There are two components of testing software. Tcssim is a GUI used to simulate
 payloads and tcsmoc is used to simulate the MOC. Both allow user interaction
 to change parameters and see what result the changes produce. A third program,
@@ -10228,7 +10428,7 @@ what is wrong with them.</p>
                            :    +-------------------------+     +-----------------+
 </pre>
 <div class="section" id="simulation-modes">
-<h2><a class="toc-backref" href="#toc-entry-129">Simulation Modes</a></h2>
+<h2><a class="toc-backref" href="#toc-entry-135">Simulation Modes</a></h2>
 <p>Implemented, except that the mode and the judgements are not yet written
 to the telemetry log: they are said in the startup summary only. The mode is
 read by <tt class="docutils literal"><span class="pre">tcslibgs::simulate::take_mode</span></tt>, a payload is judged by
@@ -10281,7 +10481,7 @@ is the link the run is commanded over, which is set up by whoever started
 the ground station, and not one of the payloads the configuration serves.</dd>
 </dl>
 <div class="section" id="how-a-stand-in-is-recognised">
-<h3><a class="toc-backref" href="#toc-entry-130">How a Stand-in Is Recognised</a></h3>
+<h3><a class="toc-backref" href="#toc-entry-136">How a Stand-in Is Recognised</a></h3>
 <dl class="docutils">
 <dt>Requirement</dt>
 <dd>Tcspecial decides for itself whether each payload is a stand-in, from the
@@ -10366,7 +10566,7 @@ should say what kind of run it was.</dd>
 </dl>
 </div>
 <div class="section" id="saying-which-payloads-are-simulated">
-<h3><a class="toc-backref" href="#toc-entry-131">Saying Which Payloads Are Simulated</a></h3>
+<h3><a class="toc-backref" href="#toc-entry-137">Saying Which Payloads Are Simulated</a></h3>
 <p>Implemented: <tt class="docutils literal">simulate</tt> is read by
 <tt class="docutils literal"><span class="pre">tcslibgs::sim_config::SimConfigFile::simulate_of</span></tt>, tcssim's comparison is
 <tt class="docutils literal"><span class="pre">tcslibgs::simulate::disagreement</span></tt>, and a stand-in reached over UDP is
@@ -10482,7 +10682,7 @@ the hardware.</dd>
 </dl>
 </div>
 <div class="section" id="what-each-program-does-with-the-mode">
-<h3><a class="toc-backref" href="#toc-entry-132">What Each Program Does With the Mode</a></h3>
+<h3><a class="toc-backref" href="#toc-entry-138">What Each Program Does With the Mode</a></h3>
 <p>Tcspecial checks what it finds; tcssim checks what it has been asked to do.
 The two catch different mistakes, and only the first protects the hardware.</p>
 <dl class="docutils">
@@ -10521,7 +10721,7 @@ served only testing.</dd>
 </div>
 </div>
 <div class="section" id="waiting-for-the-simulator">
-<h2><a class="toc-backref" href="#toc-entry-133">Waiting for the Simulator</a></h2>
+<h2><a class="toc-backref" href="#toc-entry-139">Waiting for the Simulator</a></h2>
 <p>Implemented: the messages are <tt class="docutils literal"><span class="pre">tcslibgs::ready</span></tt>, tcssim's end is
 <tt class="docutils literal">tcssim/src/ready.rs</tt>, a harness waits through <tt class="docutils literal"><span class="pre">tcslib::simulator</span></tt> or
 <tt class="docutils literal">python/tcslib/simulator.py</tt>, and tcsmoc and <tt class="docutils literal">tcssim <span class="pre">--wait</span></tt> are
@@ -10640,7 +10840,7 @@ a harness neither starts one nor asks.</dd>
 </dl>
 </div>
 <div class="section" id="tcssim">
-<h2><a class="toc-backref" href="#toc-entry-134">tcssim</a></h2>
+<h2><a class="toc-backref" href="#toc-entry-140">tcssim</a></h2>
 <p>Tcssim is a GUI simulating the payloads. It reads two files. The payload
 definition comes from the configuration, named by the <tt class="docutils literal">SIM_PAYLOAD_CONFIG_PATH</tt>
 environment variable when that is set, and says which payloads exist, how each
@@ -10671,7 +10871,7 @@ named, which left no way to write a configuration that is part hardware
 and part simulation.</dd>
 </dl>
 <div class="section" id="which-types-can-be-simulated">
-<h3><a class="toc-backref" href="#toc-entry-135">Which Types Can Be Simulated</a></h3>
+<h3><a class="toc-backref" href="#toc-entry-141">Which Types Can Be Simulated</a></h3>
 <p>A simulated payload has to be whatever is at the far end of its handler's
 payload endpoint, and the types of endpoint are not equally easy to be. The
 experimental types are covered where each of them is: a CAN bus of peers, a
@@ -11018,7 +11218,7 @@ the program opens at.</p>
 </div>
 </div>
 <div class="section" id="tcsmoc">
-<h2><a class="toc-backref" href="#toc-entry-136">tcsmoc</a></h2>
+<h2><a class="toc-backref" href="#toc-entry-142">tcsmoc</a></h2>
 <p>The tcsmoc is a GUI program used to control simulated payloads
 interacting with tcspecial using
 the tcslib library over a datagram connection to tcspecial.  For testing
@@ -11215,7 +11415,7 @@ Types Are Built</a>), and the <tt class="docutils literal"><span class="pre">--s
 <a class="reference internal" href="#simulation-modes">Simulation Modes</a>), say how a program runs and not what it reads.</dd>
 </dl>
 <div class="section" id="where-the-addresses-are">
-<h3><a class="toc-backref" href="#toc-entry-137">Where the Addresses Are</a></h3>
+<h3><a class="toc-backref" href="#toc-entry-143">Where the Addresses Are</a></h3>
 <dl class="docutils">
 <dt>Requirement</dt>
 <dd>No address appears on tcspecial's command line. The configuration file is
@@ -11762,7 +11962,7 @@ when tcsmoc is halted.</p>
 </div>
 </div>
 <div class="section" id="tcsverify">
-<h2><a class="toc-backref" href="#toc-entry-138">tcsverify</a></h2>
+<h2><a class="toc-backref" href="#toc-entry-144">tcsverify</a></h2>
 <p>Tcsverify reads a configuration -- the file itself, and the simulator file
 beside it when one is given -- and prints what is wrong with it. It opens no socket and no device node, so it can be run anywhere, by a
 person editing a file or by a recipe: it is given the files to read and says
@@ -11928,7 +12128,7 @@ found. It says that it did not do it, rather than leaving it unsaid.</dd>
 </dl>
 </div>
 <div class="section" id="gui-framework">
-<h2><a class="toc-backref" href="#toc-entry-139">GUI Framework</a></h2>
+<h2><a class="toc-backref" href="#toc-entry-145">GUI Framework</a></h2>
 <p>The testing GUIs will all use
 the Rust slint crate
 with black on white. All windows will have a go away box which will shut down
@@ -11936,7 +12136,7 @@ the entire application, i.e. tcspecial, tcsmod, and tcssim.</p>
 </div>
 </div>
 <div class="section" id="hints">
-<h1><a class="toc-backref" href="#toc-entry-140">Hints</a></h1>
+<h1><a class="toc-backref" href="#toc-entry-146">Hints</a></h1>
 <p>These are some things that Claude doesn't seem to figure out by itself.</p>
 <ul class="simple">
 <li>Do not pass an i32 to PollFd::new() as the first argument. Instead, pass the i32
@@ -11951,7 +12151,7 @@ JSON.</li>
 </ul>
 </div>
 <div class="section" id="possible-enhancements">
-<h1><a class="toc-backref" href="#toc-entry-141">Possible Enhancements</a></h1>
+<h1><a class="toc-backref" href="#toc-entry-147">Possible Enhancements</a></h1>
 <p>Build-time selection of CI and DH protocols to OC/spacecraft radio</p>
 <blockquote>
 Though most or all of on-board spacecraft protocols are based on datagrams, use
@@ -11969,7 +12169,7 @@ The EndpointWaitable trait, and each device interface, could be
 extended to other operating systems: see <a class="reference internal" href="#platforms-and-porting">Platforms and Porting</a>.</blockquote>
 </div>
 <div class="section" id="development-approach">
-<h1><a class="toc-backref" href="#toc-entry-142">Development Approach</a></h1>
+<h1><a class="toc-backref" href="#toc-entry-148">Development Approach</a></h1>
 <p>As of this writing, this design document is all there is of TCSpecial. The intent
 is to use AI to generate it from this code. Going from design to code, if
 AI is ready, should both save time and improve quality but these will only
@@ -11977,7 +12177,7 @@ be true to the extent that the design is accurate and complete. Right now
 I am using Claude Code as the AI code generator.</p>
 </div>
 <div class="section" id="requirements">
-<h1><a class="toc-backref" href="#toc-entry-143">Requirements</a></h1>
+<h1><a class="toc-backref" href="#toc-entry-149">Requirements</a></h1>
 <p>These are the requirements TCSpecial was written against, as they were
 written, with the implementation notes that say where the software does
 something else. They are here rather than in a file of their own so that a
@@ -11987,7 +12187,7 @@ kept somewhere else is a requirement nobody reads while making a decision.</p>
 operations center and for conduiting telemetry from the payloads back to it.
 What follows sets out the requirements for its operation.</p>
 <div class="section" id="about-the-names-and-the-notes">
-<h2><a class="toc-backref" href="#toc-entry-144">About the names and the notes</a></h2>
+<h2><a class="toc-backref" href="#toc-entry-150">About the names and the notes</a></h2>
 <p>The requirements below are as they were written, with two types of change.</p>
 <p>The names are the ones the software goes by. Three were settled differently
 after this was written: the spacecraft process is <strong>tcspecial</strong>, not
@@ -12015,19 +12215,19 @@ RS-485 on a serial line, and the <tt class="docutils literal">can</tt>, <tt clas
 <tt class="docutils literal">hdlc</tt> types.</p>
 </div>
 <div class="section" id="the-name-of-the-project-is-tcspecial">
-<h2><a class="toc-backref" href="#toc-entry-145">The name of the project is TCSpecial</a></h2>
+<h2><a class="toc-backref" href="#toc-entry-151">The name of the project is TCSpecial</a></h2>
 </div>
 <div class="section" id="tcspecial-shall-include-a-process-named-tcspecial-that-runs-on-the-spacecraft">
-<h2><a class="toc-backref" href="#toc-entry-146">TCSpecial shall include a process named tcspecial that runs on the spacecraft</a></h2>
+<h2><a class="toc-backref" href="#toc-entry-152">TCSpecial shall include a process named tcspecial that runs on the spacecraft</a></h2>
 </div>
 <div class="section" id="tcspecial-shall-include-a-library-named-tcslib-that-links-with-misssion-control-software">
-<h2><a class="toc-backref" href="#toc-entry-147">TCSpecial shall include a library named tcslib that links with misssion control software</a></h2>
+<h2><a class="toc-backref" href="#toc-entry-153">TCSpecial shall include a library named tcslib that links with misssion control software</a></h2>
 </div>
 <div class="section" id="tcspecial-shall-include-a-library-named-tcslibgs-that-is-shared-between-tcspecial-and-tcslib">
-<h2><a class="toc-backref" href="#toc-entry-148">TCSpecial shall include a library named tcslibgs that is shared between tcspecial and tcslib</a></h2>
+<h2><a class="toc-backref" href="#toc-entry-154">TCSpecial shall include a library named tcslibgs that is shared between tcspecial and tcslib</a></h2>
 </div>
 <div class="section" id="tcspecial-shall-include-applications-named-tcsmoc-and-tcssim-that-provide-guis-for-testing-tcspecial-tcslibgs-and-tcslib">
-<h2><a class="toc-backref" href="#toc-entry-149">TCSpecial shall include applications named tcsmoc and tcssim that provide GUIs for testing tcspecial, tcslibgs, and tcslib</a></h2>
+<h2><a class="toc-backref" href="#toc-entry-155">TCSpecial shall include applications named tcsmoc and tcssim that provide GUIs for testing tcspecial, tcslibgs, and tcslib</a></h2>
 <div class="admonition note">
 <p class="first admonition-title">Note</p>
 <p class="last">Implemented as two programs rather than one. Tcsmoc stands in for the
@@ -12036,7 +12236,7 @@ ends of every link and one window driving both says less about either.</p>
 </div>
 </div>
 <div class="section" id="tcspecial-must-have-a-trait-named-command-interpreter-ci-that-parses-commands-sent-by-tcslib">
-<h2><a class="toc-backref" href="#toc-entry-150">TCSpecial must have a trait named Command Interpreter (CI) that parses commands sent by tcslib</a></h2>
+<h2><a class="toc-backref" href="#toc-entry-156">TCSpecial must have a trait named Command Interpreter (CI) that parses commands sent by tcslib</a></h2>
 <div class="admonition note">
 <p class="first admonition-title">Note</p>
 <p class="last">Implemented differently. <tt class="docutils literal">CommandInterpreter</tt> is a struct, not a trait:
@@ -12047,7 +12247,7 @@ there really are many implementations, one per type of endpoint.</p>
 </div>
 </div>
 <div class="section" id="tcspecial-must-have-a-trait-named-data-handler-dh-that-is-called-by-ci-to-process-commands">
-<h2><a class="toc-backref" href="#toc-entry-151">TCSpecial must have a trait named data handler (DH) that is called by CI to process commands</a></h2>
+<h2><a class="toc-backref" href="#toc-entry-157">TCSpecial must have a trait named data handler (DH) that is called by CI to process commands</a></h2>
 <div class="admonition note">
 <p class="first admonition-title">Note</p>
 <p class="last">Implemented differently, for the reason above: <tt class="docutils literal">DataHandler</tt> is a struct.
@@ -12055,7 +12255,7 @@ What differs between handlers is the endpoints they open, which is where
 the traits are.</p>
 </div>
 <div class="section" id="ci-must-be-implemented-by-ci-udp-that-communicates-with-tcslib-code-via-udp-ip">
-<h3><a class="toc-backref" href="#toc-entry-152">CI must be implemented by CI_UDP that communicates with tcslib code via UDP/IP</a></h3>
+<h3><a class="toc-backref" href="#toc-entry-158">CI must be implemented by CI_UDP that communicates with tcslib code via UDP/IP</a></h3>
 <div class="admonition note">
 <p class="first admonition-title">Note</p>
 <p class="last">Implemented differently. There is no <tt class="docutils literal">CI_UDP</tt>: the command interpreter
@@ -12064,7 +12264,7 @@ and one for commands about a payload.</p>
 </div>
 </div>
 <div class="section" id="dh-udp-must-implement-dh-and-use-udp-to-send-telemetry-to-tcslib">
-<h3><a class="toc-backref" href="#toc-entry-153">DH_UDP must implement DH and use UDP to send telemetry to tcslib</a></h3>
+<h3><a class="toc-backref" href="#toc-entry-159">DH_UDP must implement DH and use UDP to send telemetry to tcslib</a></h3>
 <div class="admonition note">
 <p class="first admonition-title">Note</p>
 <p class="last">Implemented differently. There is no <tt class="docutils literal">DH_UDP</tt>. A node's endpoint is per
@@ -12098,7 +12298,7 @@ the <tt class="docutils literal">commands</tt> section says the ground may set.<
 </div>
 </div>
 <div class="section" id="ci-must-have-an-element-named-dh-of-type-btreemap">
-<h3><a class="toc-backref" href="#toc-entry-154">CI must have an element named dh of type BTreeMap</a></h3>
+<h3><a class="toc-backref" href="#toc-entry-160">CI must have an element named dh of type BTreeMap</a></h3>
 <div class="admonition note">
 <p class="first admonition-title">Note</p>
 <p class="last">Implemented as a <tt class="docutils literal">BTreeMap</tt>, of nodes rather than of handlers and under
@@ -12110,10 +12310,10 @@ whole map, so a node held open for a slow read does not hold up a command
 about another.</p>
 </div>
 <div class="section" id="ci-must-support-sending-telemetry-responses-to-all-ci-commands">
-<h4><a class="toc-backref" href="#toc-entry-155">CI must support sending telemetry responses to all CI commands</a></h4>
+<h4><a class="toc-backref" href="#toc-entry-161">CI must support sending telemetry responses to all CI commands</a></h4>
 </div>
 <div class="section" id="each-ci-telemetry-response-to-a-command-must-contain-a-timestamp-command-sequence-number-a-success-or-error-indication">
-<h4><a class="toc-backref" href="#toc-entry-156">Each CI telemetry response to a command must contain a timestamp, command sequence number, a success or error indication</a></h4>
+<h4><a class="toc-backref" href="#toc-entry-162">Each CI telemetry response to a command must contain a timestamp, command sequence number, a success or error indication</a></h4>
 <div class="admonition note">
 <p class="first admonition-title">Note</p>
 <p class="last">Implemented. <tt class="docutils literal">TelemetryHeader</tt> carries the sequence number, the
@@ -12126,7 +12326,7 @@ read.</p>
 </div>
 </div>
 <div class="section" id="ci-must-periodically-send-a-telemetry-beacon-message-with-a-timestamp-and-unique-sequence-number">
-<h4><a class="toc-backref" href="#toc-entry-157">CI must periodically send a Telemetry::Beacon message with a timestamp and unique sequence number</a></h4>
+<h4><a class="toc-backref" href="#toc-entry-163">CI must periodically send a Telemetry::Beacon message with a timestamp and unique sequence number</a></h4>
 <div class="admonition note">
 <p class="first admonition-title">Note</p>
 <p>Implemented, from one stated socket to another: a beacon went to a
@@ -12145,13 +12345,13 @@ says otherwise and is not met: one of the two is to change.</p>
 </div>
 </div>
 <div class="section" id="ci-must-parse-commands-from-the-ground-receved-via-udp-ip">
-<h4><a class="toc-backref" href="#toc-entry-158">CI must parse commands from the ground receved via UDP/IP</a></h4>
+<h4><a class="toc-backref" href="#toc-entry-164">CI must parse commands from the ground receved via UDP/IP</a></h4>
 </div>
 <div class="section" id="all-ci-commands-must-include-a-sequence-number-that-increments-for-each-command-sent">
-<h4><a class="toc-backref" href="#toc-entry-159">All CI commands must include a sequence number that increments for each command sent</a></h4>
+<h4><a class="toc-backref" href="#toc-entry-165">All CI commands must include a sequence number that increments for each command sent</a></h4>
 </div>
 <div class="section" id="ci-must-support-an-exit-command-that-terminates-the-tcspecial-process">
-<h4><a class="toc-backref" href="#toc-entry-160">CI must support an EXIT command that terminates the tcspecial process</a></h4>
+<h4><a class="toc-backref" href="#toc-entry-166">CI must support an EXIT command that terminates the tcspecial process</a></h4>
 <div class="admonition note">
 <p class="first admonition-title">Note</p>
 <p class="last">Not implemented. There is no EXIT command. RESTART comes nearest, and is
@@ -12170,7 +12370,7 @@ gave; a ground station asks about every node by asking about each.</p>
 </div>
 </div>
 <div class="section" id="tcspecial-includes-zero-or-more-components-named-data-handler-dh">
-<h3><a class="toc-backref" href="#toc-entry-161">Tcspecial includes zero or more components named Data Handler (DH)</a></h3>
+<h3><a class="toc-backref" href="#toc-entry-167">Tcspecial includes zero or more components named Data Handler (DH)</a></h3>
 <div class="admonition note">
 <p class="first admonition-title">Note</p>
 <p class="last">Implemented, as nodes: a configuration draws zero or more, and what a
@@ -12182,10 +12382,10 @@ let a decision be made aboard.</p>
 </div>
 </div>
 <div class="section" id="the-top-part-of-the-tcsmoc-window-is-for-sending-commands-to-tcspecial-s-ci-and-viewing-telemetry-from-tcspecial-s-ci">
-<h2><a class="toc-backref" href="#toc-entry-162">The top part of the tcsmoc window is for sending commands to tcspecial's CI and viewing telemetry from tcspecial's CI</a></h2>
+<h2><a class="toc-backref" href="#toc-entry-168">The top part of the tcsmoc window is for sending commands to tcspecial's CI and viewing telemetry from tcspecial's CI</a></h2>
 </div>
 <div class="section" id="the-middle-part-of-the-tcsmoc-window-is-for-viewing-telemetry-from-individual-dhs">
-<h2><a class="toc-backref" href="#toc-entry-163">The middle part of the tcsmoc window is for viewing telemetry from individual DHs</a></h2>
+<h2><a class="toc-backref" href="#toc-entry-169">The middle part of the tcsmoc window is for viewing telemetry from individual DHs</a></h2>
 <div class="admonition note">
 <p class="first admonition-title">Note</p>
 <p class="last">Implemented, one panel per node the configuration draws. What the panel
@@ -12198,7 +12398,7 @@ payload nobody sends to.</p>
 </div>
 </div>
 <div class="section" id="see-also">
-<h1><a class="toc-backref" href="#toc-entry-164">See Also</a></h1>
+<h1><a class="toc-backref" href="#toc-entry-170">See Also</a></h1>
 <dl class="docutils">
 <dt><a class="reference external" href="https://vomlehn.github.io/tcs-xtce/docs/manual.html">tcs-xtce manual</a></dt>
 <dd>tcs-xtce turns an XTCE description of telemetry and command packets

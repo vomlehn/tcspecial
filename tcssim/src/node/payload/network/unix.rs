@@ -588,7 +588,15 @@ mod tests {
             got.extend_from_slice(&buf[..n]);
         }
 
-        let stats = device.stats();
+        // The device counts a packet once the whole of it has been written,
+        // which can be a moment after its last byte has arrived here: the
+        // count is waited for, not read the instant the bytes are in.
+        let deadline = Instant::now() + Duration::from_secs(5);
+        let mut stats = device.stats();
+        while stats.bytes_sent < 12 && Instant::now() < deadline {
+            std::thread::sleep(Duration::from_millis(5));
+            stats = device.stats();
+        }
         device.stop();
 
         assert!(got.len() >= 12, "only {} bytes arrived", got.len());

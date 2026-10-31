@@ -19,9 +19,10 @@ RUST = .
 # tcspecial, tcslog, tcslog-tools and tcs-xtce alike -- so that a ground
 # station or a vehicle has one bin, one lib and one include to be told of:
 #
-#   make install                           # /opt/tcs
-#   make install PREFIX=$HOME/tcs          # somewhere a user may write
-#   make install DESTDIR=/tmp/package      # staged, for building a package
+#   make install                         # the packages, with apt-get, dnf
+#                                        # or zypper, into /opt/tcs
+#   make install-files PREFIX=$HOME/tcs  # a copy somewhere a user may write
+#   make install-files DESTDIR=/tmp/pkg  # staged, for building a package
 #
 # DESTDIR is prepended to everything and is not part of any path a program
 # looks in, which is what lets a package be built in a staging directory.
@@ -49,6 +50,17 @@ DESTDIR ?=
 SYSCONFDIR ?= /etc/opt/tcs
 LOCALSTATEDIR ?= /var/opt/tcs
 HOOKS ?= 0
+# tcs-helpers, the packaging scripts and make rules the TCS projects share:
+# a checkout of https://github.com/vomlehn/tcs-helpers, beside this one
+# unless TCS_HELPERS names another, used where it is rather than installed.
+# Installing and packaging check it first: see the tcs-helpers target.
+TCS_HELPERS ?= $(abspath $(CURDIR)/../tcs-helpers)
+TCS_HELPERS_REQUIRED := 0.4.0
+# tcs-xtce, whose Python package generates the link's codecs and holds the
+# runtime python/tcslibgs/_xtce links to: a checkout of
+# https://github.com/vomlehn/tcs-xtce beside this one, always, since a link
+# cannot follow a variable. See the tcs-xtce target in tcslibgs/Makefile.
+TCS_XTCE := $(abspath $(CURDIR)/../tcs-xtce)
 BINDIR = $(PREFIX)/bin
 SBINDIR = $(PREFIX)/sbin
 LIBEXECDIR = $(PREFIX)/libexec
@@ -169,16 +181,20 @@ help:
 	@echo "  make release     - Build with optimizations"
 	@echo "  make clean       - Remove build artifacts"
 	@echo "  make distclean   - Remove everything that can be rebuilt"
-	@echo "  make install     - Build and install all three packages" \
-		"under PREFIX (/opt/tcs)"
-	@echo "  make install-build - The release build make install installs"
-	@echo "  make install-files - Install a build already made"
+	@echo "  make install     - Build the packages and install them with" \
+		"apt-get, dnf or zypper"
+	@echo "                     (SIMULATE=1: show what it would do)"
+	@echo "  make uninstall   - Remove the installed packages the same way"
+	@echo "  make install-build - The release build install-files copies"
+	@echo "  make install-files - Copy a build already made under PREFIX" \
+		"(/opt/tcs)"
 	@echo "  make install-tcspecial, install-tcspecial-ground," \
 		"install-tcspecial-test"
-	@echo "                   - Install one package from a build" \
+	@echo "                   - Copy one package's files from a build" \
 		"already made"
 	@echo "  make install-data - Install tcsgui's descriptions and schemas"
-	@echo "  make uninstall   - Take away what make install put in place"
+	@echo "  make uninstall-files - Take away what install-files put in" \
+		"place"
 	@echo "  make links       - Link the installed programs into" \
 		"LINKDIR (/usr/local/bin)"
 	@echo "  make unlinks     - Take those links away"
@@ -192,8 +208,8 @@ help:
 		"scripts"
 	@echo "                     (with lintian, rpmlint and shellcheck)"
 	@echo ""
-	@echo "Installing:  make install-build &&" \
-		"sudo make install-files HOOKS=1"
+	@echo "Installing:  make install, which asks for sudo to install" \
+		"the packages"
 	@echo ""
 	@echo "Configuration: make runmocy" \
 		"TCSPECIAL_CONFIG_FILE=examples/minimal/minimal"
@@ -241,7 +257,7 @@ buildgui:
 
 # Run tests
 .PHONY: test
-test:
+test: tcs-xtce
 	( \
 		set -eu; \
 		echo "Running tests..."; \
@@ -252,11 +268,31 @@ test:
 
 # Every non-trivial function, in Rust, C, C++ and Python, has a header:
 # what it does, what each parameter means and what it returns, in its
-# language's own convention. The checker is tcs-xtce's, vendored with the
-# rest of it; it checks every file git tracks but vendor/ and target/.
+# language's own convention. The checker is tcs-xtce's, run from its
+# checkout; it checks every file git tracks but target/.
 .PHONY: doc-headers
-doc-headers:
-	python3 -I vendor/tcs-xtce/tests/doc_headers.py
+doc-headers: tcs-xtce
+	python3 -I $(TCS_XTCE)/tests/doc_headers.py
+
+# Stop, saying what to do, unless the tcs-xtce checkout beside this one is
+# there, at the version tcslibgs pins the tcs-xtce crate to, and ready to
+# run: the tests reach its Python runtime through python/tcslibgs/_xtce,
+# and installing the ground package copies it from there.
+.PHONY: tcs-xtce
+tcs-xtce:
+	@$(MAKE) --no-print-directory -C tcslibgs tcs-xtce
+
+# Stop, saying what to do, unless the tcs-helpers checkout is there and
+# at least TCS_HELPERS_REQUIRED.
+.PHONY: tcs-helpers
+tcs-helpers:
+	@if [ ! -x "$(TCS_HELPERS)/bin/tcs-helpers" ]; then \
+		echo "No tcs-helpers checkout at $(TCS_HELPERS): clone" \
+			"https://github.com/vomlehn/tcs-helpers beside this" \
+			"repository, or set TCS_HELPERS to where it is." >&2; \
+		exit 1; \
+	fi
+	@"$(TCS_HELPERS)/bin/tcs-helpers" --require $(TCS_HELPERS_REQUIRED)
 
 # Run the tcspecial application
 .PHONY: run
@@ -746,13 +782,14 @@ define strip_installed
 endef
 
 # Installs $(1)-links in sbin, with the package's own programs, $(2),
-# written into it: see packaging/hooks/links.sh.in. Written in rather than
-# found when it runs, because bin is shared by every TCS package and one
-# package's links must never touch another's.
+# written into it: see tcs-helpers' packaging/links.sh.in. Written in
+# rather than found when it runs, because bin is shared by every TCS
+# package and one package's links must never touch another's.
 define install_links
 	install -d -m 755 $(DESTDIR)$(SBINDIR)
 	$(SUBST) -e 's|@PACKAGE@|$(1)|g' -e 's|@PROGRAMS@|$(2)|g' \
-		packaging/hooks/links.sh.in > $(DESTDIR)$(SBINDIR)/$(1)-links
+		$(TCS_HELPERS)/packaging/links.sh.in \
+		> $(DESTDIR)$(SBINDIR)/$(1)-links
 	chmod 755 $(DESTDIR)$(SBINDIR)/$(1)-links
 endef
 
@@ -760,16 +797,6 @@ endef
 SUBST = sed -e 's|@PREFIX@|$(PREFIX)|g' -e 's|@SYSCONFDIR@|$(SYSCONFDIR)|g' \
 	    -e 's|@LOCALSTATEDIR@|$(LOCALSTATEDIR)|g' \
 	    -e 's|@LIBTCS_VERSION@|$(LIBTCS_VERSION)|g'
-
-# Build and install everything: all three packages, in one place.
-#
-# The build is cargo's release build of the crates that are installed, and
-# no more, run before the install rather than as part of it: `make
-# install-build` as the user and `sudo make install-files` installs into
-# /opt/tcs without building anything as root.
-.PHONY: install
-install: install-build
-	$(MAKE) --no-print-directory install-files
 
 # A release build of everything that is installed.
 #
@@ -780,7 +807,13 @@ install: install-build
 install-build:
 	cargo build --release $(addprefix -p ,$(INSTALL_CRATES))
 
-# Install all three packages from a build already made.
+# Copy all three packages' files into place from a build already made,
+# under PREFIX and DESTDIR: what `make install` once did, kept for
+# development and for `make stage`, which cuts the packages from it; `make
+# install` installs the packages. The build is cargo's release build of the
+# crates that are installed, and no more, made before the copy rather than
+# as part of it: `make install-build` as the user and `sudo make
+# install-files` installs without building anything as root.
 .PHONY: install-files
 install-files: $(addprefix install-,$(PACKAGES))
 
@@ -800,7 +833,7 @@ install-files: $(addprefix install-,$(PACKAGES))
 # with "#!" is a script to run, so it would be installed executable and the
 # rest are not; none of today's does.
 .PHONY: install-tcspecial
-install-tcspecial:
+install-tcspecial: tcs-helpers
 	@echo "Installing $(PROJECT_NAME) under $(DESTDIR)$(PREFIX)..."
 	install -d -m 755 $(DESTDIR)$(BINDIR) $(DESTDIR)$(LIBEXECDIR)
 	install -m 755 $(addprefix $(RELEASE_DIR)/,$(FLIGHT_BIN)) \
@@ -851,7 +884,7 @@ install-tcspecial:
 # compiling it, so that the path names no Python version and any python3 can
 # read it; the .pth hook is what puts that directory on python3's path.
 .PHONY: install-tcspecial-ground
-install-tcspecial-ground: install-data
+install-tcspecial-ground: install-data tcs-helpers tcs-xtce
 	@echo "Installing tcspecial-ground under $(DESTDIR)$(PREFIX)..."
 	install -d -m 755 $(DESTDIR)$(BINDIR) $(DESTDIR)$(INCLUDEDIR) \
 		$(DESTDIR)$(LIBDIR)/pkgconfig $(DESTDIR)$(PYTHONDIR)
@@ -904,7 +937,7 @@ install-tcspecial-ground: install-data
 # tcsmoc starts the tcspecial and the tcssim beside it, so these go in the
 # same bin as tcspecial does: see child_command in tcsmoc/src/main.rs.
 .PHONY: install-tcspecial-test
-install-tcspecial-test:
+install-tcspecial-test: tcs-helpers
 	@echo "Installing tcspecial-test under $(DESTDIR)$(PREFIX)..."
 	install -d -m 755 $(DESTDIR)$(BINDIR) \
 		$(DESTDIR)$(DOCDIR)/tcspecial-test
@@ -947,18 +980,19 @@ install-data:
 		-exec install -m 644 {} $(TCSGUI_DATA)/{} \;
 	@echo "✓ $(GUI_NAME) data installed"
 
-# Take away what `make install` put in place, with the same PREFIX, DESTDIR
-# and HOOKS it was given. The links `make links` made in LINKDIR go first,
-# while the scripts that know which they are are still there, so that none
-# is left pointing at a program that is gone.
+# Take away what `make install-files` put in place, with the same PREFIX,
+# DESTDIR and HOOKS it was given; `make uninstall` removes the packages.
+# The links `make links` made in LINKDIR go first, while the scripts that
+# know which they are are still there, so that none is left pointing at a
+# program that is gone.
 #
 # Not the configuration in /etc/opt/tcs/tcspecial or the state and telemetry
 # in /var/opt/tcs/tcspecial, which are the mission's rather than this
 # program's: their directories go only if they are empty. Directories under
 # the prefix go when nothing else is in them, which leaves those another TCS
 # package installed into.
-.PHONY: uninstall
-uninstall:
+.PHONY: uninstall-files
+uninstall-files:
 	-for package in $(PACKAGES); do \
 		script=$(DESTDIR)$(SBINDIR)/$$package-links; \
 		[ -x $$script ] && $$script --remove --dir $(LINKDIR); \
@@ -996,137 +1030,45 @@ uninstall:
 		[ -d $$dir ] && rmdir --ignore-fail-on-non-empty $$dir; \
 	done; true
 
-# Link every package's programs into LINKDIR, or take the links away, for an
-# install made with `make install`; the packages' own users run
-# /opt/tcs/sbin/<package>-links themselves. Each package's script touches
-# only its own programs, and a name already taken by something else is left
-# alone and said. Usually as root, for /usr/local/bin:
-#   sudo make links
-#   sudo make unlinks LINKDIR=/opt/bin
+# Where `make links` links the installed programs, and from where
+# uninstall-files removes them: see tcs-helpers' packaging.mk.
 LINKDIR ?= /usr/local/bin
-.PHONY: links
-links:
-	status=0; \
-	for package in $(PACKAGES); do \
-		$(DESTDIR)$(SBINDIR)/$$package-links --dir $(LINKDIR) || \
-			status=1; \
-	done; \
-	exit $$status
 
-.PHONY: unlinks
-unlinks:
-	status=0; \
-	for package in $(PACKAGES); do \
-		$(DESTDIR)$(SBINDIR)/$$package-links --remove \
-			--dir $(LINKDIR) || status=1; \
-	done; \
-	exit $$status
-
-# Where the packages are built: build/, which git ignores.
-#
-# The stage is one directory per package, each installed into by itself
-# with the paths the packages are for and the hooks on, so that a package is
-# exactly what its install target installs. What pip and install -D made
-# carries the builder's umask, so the stage is made writable by its owner
-# alone: a package installs nothing that anyone but root may write.
-STAGE := $(CURDIR)/build/stage
-PACKAGE_DIR := $(CURDIR)/build/packages
-
-# Install each package into the stage, from a fresh release build.
-.PHONY: stage
+# The packaging targets -- install, uninstall, stage, deb, rpm, packages,
+# lint-packages, links and unlinks -- are tcs-helpers' packaging.mk's,
+# shared by the TCS projects; see it for what each does. Each of PACKAGES
+# is staged by its own install-<package>, from one release build, with the
+# configuration and state directories under /etc/opt/tcs and
+# /var/opt/tcs, and built from packaging/deb/<package> and
+# packaging/rpm/<package>.spec, which read the parts they share from
+# packaging/rpm. Without a tcs-helpers checkout new enough to have
+# packaging.mk, the targets stop as the tcs-helpers target says.
+STAGE_TARGET = install-$$package
+STAGE_VARS   = SYSCONFDIR=/etc/opt/tcs LOCALSTATEDIR=/var/opt/tcs
+RPM_DEFINES  = --define "_sourcedir $(CURDIR)/packaging/rpm"
+ifneq ($(wildcard $(TCS_HELPERS)/packaging/packaging.mk),)
+include $(TCS_HELPERS)/packaging/packaging.mk
 stage: install-build
-	rm -rf $(STAGE)
-	for package in $(PACKAGES); do \
-		$(MAKE) --no-print-directory install-$$package \
-			DESTDIR=$(STAGE)/$$package PREFIX=/opt/tcs \
-			SYSCONFDIR=/etc/opt/tcs LOCALSTATEDIR=/var/opt/tcs \
-			HOOKS=1 || exit 1; \
-	done
-	chmod -R go-w $(STAGE)
-	@echo "✓ Staged in $(STAGE)"
-
-# The release's time, which dates the changelog entry each package carries:
-# that of the commit being built, so that building the same commit again
-# makes the same entry, or now outside a git clone. The name is the one
-# reproducible builds give it, so that a builder's own SOURCE_DATE_EPOCH is
-# taken. Worked out once, so that the .debs and the RPMs are dated alike.
-ifndef SOURCE_DATE_EPOCH
-SOURCE_DATE_EPOCH := $(shell git log -1 --format=%ct 2>/dev/null || date +%s)
-endif
-
-# The Debian packages, one per staged package: see packaging/deb.
-#
-# DEB_REVISION is the Debian revision, for a package rebuilt from the same
-# source.
-DEB_REVISION ?= 1
-DEB_VERSION := $(VERSION)-$(DEB_REVISION)
+else
+.PHONY: install
+install: tcs-helpers
+.PHONY: uninstall
+uninstall: tcs-helpers
+.PHONY: stage
+stage: tcs-helpers
 .PHONY: deb
-deb: stage
-	for package in $(PACKAGES); do \
-		packaging/deb/build-deb.sh $$package $(STAGE)/$$package \
-			$(CURDIR)/build/deb $(PACKAGE_DIR) \
-			$(DEB_VERSION) $$(dpkg --print-architecture) \
-			$(SOURCE_DATE_EPOCH) || exit 1; \
-	done
-	@echo "✓ .debs in $(PACKAGE_DIR)"
-
-# The RPMs, one per staged package: see packaging/rpm.
-#
-# rpmbuild is asked first, before anything is built, so that a machine
-# without it says so in one line and goes on: `make packages` there still
-# builds the .debs. rpmbuild is given a package database of its own under
-# build/, because it opens one even for a package that requires nothing to
-# build, and a Debian machine has no system one it may read.
-RPM_TOP := $(CURDIR)/build/rpm
+deb: tcs-helpers
 .PHONY: rpm
-rpm:
-	@if ! command -v rpmbuild >/dev/null 2>&1; then \
-		echo "rpmbuild is not installed, so no RPMs were built:" \
-			"install it (sudo apt install rpm, or sudo dnf" \
-			"install rpm-build) and run make rpm again"; \
-		exit 0; \
-	fi; \
-	set -e; \
-	$(MAKE) --no-print-directory stage; \
-	rm -rf $(RPM_TOP); \
-	mkdir -p $(PACKAGE_DIR); \
-	for package in $(PACKAGES); do \
-		rpmbuild -bb --quiet \
-			--define "_topdir $(RPM_TOP)" \
-			--define "_dbpath $(RPM_TOP)/rpmdb" \
-			--define "_sourcedir $(CURDIR)/packaging/rpm" \
-			--define "tcs_version $(VERSION)" \
-			--define "tcs_date $$(date -u \
-				-d @$(SOURCE_DATE_EPOCH) '+%a %b %d %Y')" \
-			--define "tcs_stage $(STAGE)/$$package" \
-			packaging/rpm/$$package.spec; \
-	done; \
-	cp $(RPM_TOP)/RPMS/*/*.rpm $(PACKAGE_DIR); \
-	echo "✓ RPMs in $(PACKAGE_DIR)"
-
-# Both kinds of package.
+rpm: tcs-helpers
 .PHONY: packages
-packages: deb rpm
-
-# Check the packages `make packages` built, and the shell scripts they run
-# or install, with lintian, rpmlint and shellcheck, any of which is skipped
-# in a line if it is not installed: see packaging/lint-packages.sh. rpmlint
-# is given packaging/rpm/rpmlint.toml, which says why each finding it
-# accepts is intended; each .deb carries its own lintian overrides. The
-# links scripts and the profile.d hooks are checked as the stage has them,
-# with their placeholders filled in.
+packages: tcs-helpers
 .PHONY: lint-packages
-lint-packages:
-	packaging/lint-packages.sh packaging/rpm/rpmlint.toml \
-		$(wildcard $(foreach package,$(PACKAGES), \
-			$(PACKAGE_DIR)/$(package)_$(DEB_VERSION)_*.deb \
-			$(PACKAGE_DIR)/$(package)-$(VERSION)-*.rpm)) \
-		-- $(wildcard $(STAGE)/*/opt/tcs/sbin/*-links \
-			$(STAGE)/*/etc/profile.d/*.sh) \
-		$(wildcard $(foreach script,preinst postinst prerm postrm, \
-			packaging/deb/*/DEBIAN/$(script))) \
-		packaging/deb/build-deb.sh packaging/deb/debian-files.sh \
-		packaging/lint-packages.sh
+lint-packages: tcs-helpers
+.PHONY: links
+links: tcs-helpers
+.PHONY: unlinks
+unlinks: tcs-helpers
+endif
 
 # Check code quality
 #

@@ -54,12 +54,20 @@ Everything installs under `/opt/tcs`, as three packages:
   telemetry log segment. A vehicle that keeps a log puts its own segsend in
   `/opt/tcs/bin` instead.
 
-To build them, or to install without them:
+Building them needs checkouts of
+[tcs-helpers](https://github.com/vomlehn/tcs-helpers) and
+[tcs-xtce](https://github.com/vomlehn/tcs-xtce) beside this one, the second
+with its `python/tcs_xtce/generated.py` made; `make tcs-helpers` and `make
+tcs-xtce` say what is missing. To build them, install them, or install
+without them:
 
      make deb                                # build/packages/*.deb
      make rpm                                # build/packages/*.rpm
+     make install                            # with apt-get, dnf or zypper
+     make install SIMULATE=1                 # what that would do
+     make uninstall                          # remove the packages
      make install-build && sudo make install-files HOOKS=1
-     make install PREFIX=$HOME/tcs           # no hooks outside the prefix
+     make install-files PREFIX=$HOME/tcs     # no hooks outside the prefix
      pip install ./python                    # the Python alone
      cargo install --path tcsverify --root /opt/tcs
      cc station.c $(pkg-config --cflags --libs tcs)
@@ -81,7 +89,7 @@ and to undo it, take the links away:
 
      sudo /opt/tcs/sbin/tcspecial-links          # likewise -ground, -test
      sudo /opt/tcs/sbin/tcspecial-links --remove
-     sudo make links                             # for a make install
+     sudo make links                         # after make install-files
      sudo make unlinks
 
 Each script links only its own package's programs, leaves alone a name

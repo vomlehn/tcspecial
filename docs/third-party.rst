@@ -51,7 +51,9 @@ The Projects
     Flight software. It compiles an XTCE description of telemetry and
     commands into code that packs and unpacks them, byte for byte the same in
     Rust, C/C++ and Python, with bit packing. tcspecial's beacon is already
-    packed with it; see ``vendor/tcs-xtce``. https://github.com/vomlehn/tcs-xtce
+    packed with it, and its Python package, from a checkout of it beside
+    this tree, generates the link's codecs.
+    https://github.com/vomlehn/tcs-xtce
 
 The Frameworks
 --------------

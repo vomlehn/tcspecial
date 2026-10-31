@@ -4900,7 +4900,7 @@ editor is part of before any other, found from the program rather than
 named, so that <tt class="docutils literal">/opt/tcs/bin/tcsgui</tt> reads <tt class="docutils literal">/opt/tcs/share/tcsgui</tt> and
 an install under another prefix reads its own; the working directory last,
 so that running the editor out of a checkout finds the checkout's own.
-<tt class="docutils literal">make <span class="pre">install-data</span></tt>, which <tt class="docutils literal">make install</tt> runs, puts them under
+<tt class="docutils literal">make <span class="pre">install-data</span></tt>, which <tt class="docutils literal">make <span class="pre">install-files</span></tt> runs, puts them under
 <tt class="docutils literal"><span class="pre">$(PREFIX)/share/tcsgui</span></tt>, <tt class="docutils literal">/opt/tcs/share/tcsgui</tt> by default:
 architecture-independent data belonging to one package, which is where the
 filesystem hierarchy standard puts it. <tt class="docutils literal">/usr/local/share/tcsgui</tt> and

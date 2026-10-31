@@ -1,5 +1,5 @@
 # pkg-config's account of libtcs, tcslib for C and C++, written by
-# `make install` with the prefix it installs under.
+# `make install-files` with the prefix it installs under.
 prefix=@PREFIX@
 exec_prefix=${prefix}
 libdir=${exec_prefix}/lib

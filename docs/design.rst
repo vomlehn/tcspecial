@@ -4774,7 +4774,7 @@ editor is part of before any other, found from the program rather than
 named, so that ``/opt/tcs/bin/tcsgui`` reads ``/opt/tcs/share/tcsgui`` and
 an install under another prefix reads its own; the working directory last,
 so that running the editor out of a checkout finds the checkout's own.
-``make install-data``, which ``make install`` runs, puts them under
+``make install-data``, which ``make install-files`` runs, puts them under
 ``$(PREFIX)/share/tcsgui``, ``/opt/tcs/share/tcsgui`` by default:
 architecture-independent data belonging to one package, which is where the
 filesystem hierarchy standard puts it. ``/usr/local/share/tcsgui`` and

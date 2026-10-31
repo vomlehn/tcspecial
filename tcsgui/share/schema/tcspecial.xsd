@@ -413,6 +413,17 @@
       <!-- The file tcspecial keeps what must survive a restart in, on
            storage that survives a power cycle. -->
       <xs:element name="state_file" type="xs:string" minOccurs="0"/>
+      <!-- The directory the vehicle keeps configurations in, each under its
+           checksum. Absent is a vehicle that keeps none. -->
+      <xs:element name="configurations" type="xs:string" minOccurs="0"/>
+      <!-- The fewest configurations kept there: 1 or more, 2 where it is
+           not stated. -->
+      <xs:element name="configurations_kept" type="xs:string"
+                  minOccurs="0"/>
+      <!-- How many starts of the configuration the state file names may end
+           before a matching CONNECT before it is given up: 1 or more, 3
+           where it is not stated. -->
+      <xs:element name="load_trials" type="xs:string" minOccurs="0"/>
       <!-- Where tcsgui writes the Rust it generates from this configuration.
            The one attribute of this section about building the software rather
            than about running it: nothing aboard reads it. -->

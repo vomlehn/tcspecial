@@ -54,6 +54,8 @@ pub mod ready;
 pub mod sim_config;
 /// The simulation mode, `--simulate`, as tcspecial, tcssim and tcsmoc take it.
 pub mod simulate;
+/// Configurations kept on board, named by their checksum.
+pub mod store;
 pub mod telemetry;
 pub mod trigger;
 pub mod types;

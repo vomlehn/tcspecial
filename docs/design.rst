@@ -620,6 +620,19 @@ anybody sends. A mission whose link is slower, or whose operators want the
 window narrower, says so. Nought is refused, being an arm that lapses as it
 is taken and a vehicle that can never be restarted.
 
+``configurations``, ``configurations_kept`` and ``load_trials`` may be left
+out too. ``configurations`` is the directory the vehicle keeps
+configurations in, each under its checksum, and absent is a vehicle that
+keeps none, which is a configuration somebody may mean as a vehicle with no
+log is. ``configurations_kept`` is the fewest that provisioning may leave
+there, two where it says nothing: the one running and one to go back to.
+``load_trials`` is how many starts of a configuration may end before a
+matching CONNECT before it is given up, three where it says nothing, as
+`Starting, and the restart flag`_ has it. Nought is refused for either
+count, naming it. All three, and ``state_file``, are read from the
+configuration on tcspecial's command line, whichever configuration runs:
+see `Configurations named by their checksum`_.
+
 Five of them are a host and a port written together, as ``address:port``: two
 things only ever used together are one fact about a configuration, and writing
 them apart invites a file that states one and not the other. Each is split at
@@ -2547,10 +2560,11 @@ both ends read; what follows is what a vehicle made of nodes does with each.
     command names a node`_.
 
 ``RESTART_ARM`` and ``RESTART``
-    The process is what restarts: a vehicle that comes back
-    reads the configuration file again, so a RESTART is how a changed
-    configuration is flown. The arm key is the interlock, and an unarmed
-    RESTART is refused. See `Restarting`_.
+    The process is what restarts: a vehicle that comes back loads the
+    configuration the RESTART named by its checksum, so a RESTART is how
+    another configuration is flown. The arm key is the interlock, and an
+    unarmed RESTART is refused. See `Restarting`_ and `Configurations named
+    by their checksum`_.
 
 ``START_NODE`` and ``STOP_NODE``
     Enable and disable a node. The unit is a node of the graph, so a
@@ -6235,19 +6249,36 @@ Configurations named by their checksum
    Built with `The link without a header`_: in `Starting, and the restart
    flag`_, there being no generation; in `The three commands that always
    go`_, the frozen layout of the three, and the checksums in RESTART_ARM
-   and RESTART, a target the vehicle does not hold refused ``NotFound`` at
-   the arm and checked again at the restart.
+   and RESTART.
 
-   *Not yet built:* `Keeping configurations on board`_ entirely; in
-   `Starting, and the restart flag`_, the state file naming configurations
-   by checksum and the confirmed one, the order a start loads them in, a
-   damaged state file loading the command line's, and ``load_trials``; in
-   `The three commands that always go`_, a held configuration other than
-   the running one, and the two functions a restart calls; tcsmoc's
-   pop-ups; and removing what `What this replaces`_ lists as still
-   standing. Until those are built, the one configuration a RESTART may
-   name is the running one, and a restart runs the same configuration file
-   again.
+   Built since (2026-10-31): in `Keeping configurations on board`_, the
+   single-file rule, kept and loaded; configurations kept under their
+   checksum in the directory ``configurations`` names; keeping one already
+   held writing nothing; the checksum computed again at every load and a
+   mismatch refused; and ``configurations_kept`` read and enforced by the
+   store's removal (``tcslibgs::store``), which nothing in flight calls
+   yet. In `Starting, and the restart flag`_, every requirement: the state
+   file naming the next start's configuration and the confirmed one, a
+   matching CONNECT confirming, the order a start loads them in and saying
+   which and why, a damaged or missing state file loading the command
+   line's, and ``load_trials``, read from the command line's
+   configuration. In `The three commands that always go`_, every
+   requirement: a target the vehicle does not hold refused ``NotFound`` at
+   the arm, the target loaded and checked again just before the restart, a
+   RESTART naming the running configuration a plain restart, and the two
+   functions a restart calls (``choose::Boot::load`` and ``start::clean_up``
+   in tcspecial). A configuration is put into the store, for testing and for
+   first provisioning, by ``tcsverify --keep=<directory>``, which checks it
+   first.
+
+   *Not yet built:* uplinking a configuration by CFDP to a staging area,
+   checking it there and keeping it, and the provisioning crate on
+   ``cfdp-rs`` that does it and removes configurations in flight; the
+   read-only directory and the immutable attribute of first provisioning,
+   which are the provisioner's to set -- ``tcsverify --keep`` makes the file
+   it writes 0444 and leaves the directory as it is, so that it can keep
+   more; tcsmoc's pop-ups; and removing what `What this replaces`_ lists as
+   still standing.
 
 A configuration is known by its *checksum*: the MD5 ``tcsverify``
 computes of it, the configuration digest (``tcslibgs::config_digest``).
@@ -6277,6 +6308,20 @@ Requirement
     For now a configuration is a single file. One that includes another
     file is refused when it is uplinked and when it is loaded, saying so.
     A configuration spread across several files is to be handled later.
+
+As built, a configuration is kept as ``<checksum>.yaml`` or
+``<checksum>.xml`` -- its checksum in 32 lower-case hex digits, and the
+extension that says how it is read, the one it was given -- in the
+directory the ``tcspecial`` section's ``configurations`` names. A section
+that names none is a vehicle that keeps no configurations: it runs the one
+on its command line, and a RESTART may name only that and the one running.
+The rules are ``tcslibgs::store``'s, which tcspecial loads through and
+``tcsverify --keep=<directory>`` keeps through, so the two cannot disagree
+about what a kept configuration is. ``tcsverify --keep`` checks the
+configuration as tcsverify checks any, keeps it only if nothing is wrong
+with it, and is for testing and for first provisioning; uplinking is not
+built. tcspecial refuses a configuration that includes another as it loads
+it, the one on its command line among them.
 
 Requirement
     The vehicle keeps each configuration it holds under its checksum, in
@@ -6335,6 +6380,12 @@ Requirement
     start before ran -- and the *confirmed* configuration: the last one a
     matching CONNECT was taken on. A matching CONNECT writes the running
     configuration to it as confirmed.
+
+The state file is the command line's configuration's, whichever
+configuration runs, and so are ``configurations`` and ``load_trials``: a
+start reads them before it knows which configuration it will run. A
+configuration that names another state file is run with the command line's,
+and the start says so in its log.
 
 Requirement
     Every start loads the first of these that passes its check: the
@@ -6434,6 +6485,14 @@ Requirement
     writes the state file, and runs the process again, whose start calls
     the second, so that nothing the old configuration left in memory
     survives into the new one.
+
+As built, the clean-up is ``start::clean_up`` and the load
+``choose::Boot::load``, which the RESTART also calls just before it is
+taken, to check its target as it would be loaded. The state file is written
+as the RESTART is taken, before its answer, rather than after the clean-up,
+so that a RESTART the state file cannot say is refused ``Failure`` and
+nothing restarts, as `Restarting`_ requires. The beacon thread is not
+joined: the ``exec`` ends it, and it holds nothing the next start reads.
 
 On the ground
 ~~~~~~~~~~~~~
@@ -6594,12 +6653,14 @@ Replaced already, and rewritten where they stand to say what runs:
 - `The state file`_, once `The generation number and the state file`, and
   every requirement that an answer carries a generation or that the ground
   compares generations: there is no generation.
+- `Kinds of restart`_: only a commanded start changing the definitions.
+  The checksum in the beacon says which configuration a start is running,
+  whichever kind it is, and a start nobody commanded may load the
+  confirmed or the command line's configuration when the one the state
+  file names will not load or is given up.
 
 Replaced once the rest is built, and describing what runs until then:
 
-- `Kinds of restart`_: only a commanded start changing the definitions.
-  The checksum in the beacon says which configuration a start is running,
-  whichever kind it is.
 - `What the ground may send meanwhile`_: the wait for a beacon whose
   number went back, and the commands allowed during it.
 - In `Holes in this, and what closes them`_ under `Fault Resiliency`_: the
@@ -6625,12 +6686,12 @@ In-flight data across a restart
 -------------------------------
 
 .. note::
-   **Partly built**, with `Configurations named by their checksum`_, whose
-   rules this section follows through a restart. Every drop in `What is
-   dropped, and where`_ is built. A restart onto another configuration, as
-   the first figure draws it, waits for configurations kept on board: until
-   then a restart reads the same configuration file again, and is the
-   second figure's case unless that file was changed.
+   **Built**, with `Configurations named by their checksum`_, whose rules
+   this section follows through a restart. Every drop in `What is dropped,
+   and where`_ is built, and a restart onto another configuration kept on
+   board, as the first figure draws it, is built: a RESTART names it by its
+   checksum, and the start that comes back loads it. A restart naming the
+   running configuration is the second figure's case.
 
 When either end restarts, or the ground changes the configuration it is
 using, there are packets on their way that one configuration made and that
@@ -12026,6 +12087,16 @@ Requirement
     this desk -- can be asked of a file without running anything. It is of the
     graph a file parses into and not of the file's bytes, so the two spellings
     of one configuration answer alike.
+
+Requirement
+    ``--keep=<directory>``, with one configuration and its simulator file if
+    it has one, checks it as tcsverify checks any and, where nothing is
+    wrong with it, keeps it in ``<directory>`` under its checksum, as the
+    vehicle keeps a configuration a RESTART may name: see `Keeping
+    configurations on board`_. It prints where it is kept, or that it was
+    kept already, which writes nothing. One that includes another file is
+    refused. It is how a configuration is put on board for testing and at
+    first provisioning, until configurations are uplinked.
 
 Requirement
     ``--interface-digest``, given alone, prints the digest of the interface

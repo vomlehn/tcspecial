@@ -3346,6 +3346,56 @@ tcspecial's packets as they are, one to a datagram, the F´ bridge speaking
 the radio's own protocol; ``gateway_cfs``, when it is built, wraps each in
 the CCSDS Space Packet the cFS software bus carries.
 
+Configurations kept on board
+----------------------------
+
+A vehicle may keep configurations of its own, beside the one on its
+command line, and a restart may name any of them, by its checksum:
+
+.. code-block:: yaml
+
+   tcspecial:
+     configurations: "/var/lib/tcspecial/configurations"
+     configurations_kept: "2"
+     load_trials: "3"
+
+``configurations`` is the directory they are kept in, each under its
+checksum: ``<checksum>.yaml`` or ``<checksum>.xml``. Left out, the vehicle
+keeps none, and a restart may name only the configuration it runs. A
+configuration kept there is a single file: one that includes another is
+refused. Its checksum is computed again each time it is loaded, and one
+whose checksum is not its name -- cut short as it was written, or damaged
+-- is not loaded.
+
+To put one there, on the ground or at first provisioning, check and keep it
+with tcsverify:
+
+.. code-block:: text
+
+   $ tcsverify --keep=/var/lib/tcspecial/configurations vehicle.yaml
+   vehicle.yaml: md5 0123456789abcdef0123456789abcdef, kept as
+   /var/lib/tcspecial/configurations/0123456789abcdef0123456789abcdef.yaml
+
+It keeps nothing that has an error, writes nothing for a checksum already
+kept, and makes the file it writes read-only. Making the directory
+read-only, or immutable, once every configuration is in it is the
+provisioner's to do. Configurations cannot yet be uplinked.
+
+Every start loads the first of these that passes its checks, and says in
+its startup summary and its log which it loaded and why: the configuration
+the state file names -- the one the last restart named, or the one the
+start before ran; else the *confirmed* one, the last one a matching
+``Connect`` was taken on; else the one on its command line. A state file
+that is missing or damaged names nothing, and the start loads the one on
+its command line. A configuration whose starts keep ending before a
+matching ``Connect`` -- it crashes, or fails its checks -- is given up after
+``load_trials`` of them, three where it is not said, for the confirmed one.
+``state_file``, ``configurations`` and ``load_trials`` are always the
+command line's configuration's, whichever configuration runs.
+``configurations_kept``, two where it is not said, is the fewest the
+vehicle is to keep, which nothing removes below; nothing in flight removes
+configurations yet.
+
 Which interface it is written for
 ---------------------------------
 
@@ -4070,8 +4120,8 @@ Initiate restart
   restarts nothing. tcspecial
   answers, stops as it does when it is told to -- the pass finished, the
   links closed, the log flushed -- and runs itself again in the same process,
-  reading its configuration file again: a changed configuration is flown this
-  way. It keeps the descriptors it was started with, such as a socket or pipe
+  loading the configuration the restart named: see `Configurations kept on
+  board`_. Another configuration is flown this way. It keeps the descriptors it was started with, such as a socket or pipe
   a supervisor handed it, and closes everything it opened itself. On a system
   where it cannot do that -- one with neither ``/proc/self/fd`` nor
   ``/dev/fd`` to say what it was started with -- it says so on its error

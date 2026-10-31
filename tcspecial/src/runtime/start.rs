@@ -18,11 +18,12 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use std::time::Instant;
 
 use log::{debug, error, info, warn};
-use tcslibgs::config_digest::{digest_of_graph, ConfigDigest, ConfigVersion};
+use tcslibgs::config_digest::{ConfigDigest, ConfigVersion};
 use tcslibgs::graph::Graph;
 use tcslibgs::simulate::{judge, refusals, Host, Judged, Mode};
 
 use crate::beacon_send::BeaconSend;
+use crate::runtime::choose;
 use crate::runtime::command::{Commands, Flying};
 use crate::runtime::fabric::Moved;
 use crate::runtime::held::Held;
@@ -80,8 +81,12 @@ pub fn summary(line: impl std::fmt::Display) {
     }
 }
 
-/// Reads, checks and runs the configuration in `path` under the simulation
-/// mode `mode`, until asked to stop.
+/// Chooses, checks and runs a configuration under the simulation mode
+/// `mode`, until asked to stop.
+///
+/// Which configuration is [`choose::choose`]'s: the one the state file names,
+/// the confirmed one, or the one in `path`, on tcspecial's command line. It
+/// says in the log and the summary which it ran and why.
 ///
 /// Every reason it could not start, rather than the first: a file with three
 /// problems in it is one trip to a desk, where one problem at a time is three.
@@ -91,50 +96,55 @@ pub fn summary(line: impl std::fmt::Display) {
 ///
 /// # Arguments
 ///
-/// * `path` - The configuration file.
+/// * `path` - The configuration on tcspecial's command line.
 /// * `mode` - The run's simulation mode, `--simulate`.
 ///
 /// # Returns
 ///
-/// Nothing, once the vehicle has stopped and its telemetry log is flushed.
+/// Nothing, once the vehicle has stopped and [`clean_up`] has let go of
+/// everything it held.
 ///
 /// # Errors
 ///
 /// Every reason the configuration could not start, each a line beginning
-/// with `path`: a file that does not load, the checks' problems, types this
-/// build lacks, payloads the mode refuses, and anything that could not be
-/// opened, bound or started.
+/// with the file it is about: a file that does not load, the checks'
+/// problems, types this build lacks, payloads the mode refuses, and anything
+/// that could not be opened, bound or started.
 pub fn run_graph(path: &str, mode: Mode) -> Result<(), Vec<String>> {
     // Set once: a RESTART runs this again in the same process, with the mode
     // it was started with, and the first is the one that holds.
     let _ = MODE.set(mode);
-    let graph =
-        Graph::load(path).map_err(|why| vec![format!("{path}: {why}")])?;
 
-    // The same checks the ground tool runs, against the same code. A
-    // configuration that arrived here unchecked is exactly the configuration
-    // that should not open a bus. With them, whether this build contains every
-    // type the configuration has, which is tcsverify's `--types` with the
-    // types this was built with.
-    let mut problems = graph.check();
-    problems.extend(tcslibgs::graph::built::not_built(
-        &graph.nodes,
-        crate::node::payload::BUILT,
-    ));
-    if !problems.is_empty() {
-        return Err(problems
-            .iter()
-            .map(|problem| format!("{path}: {}", problem.describe()))
-            .collect());
+    // Which configuration, before anything else: the state file and the
+    // configurations kept are read, every configuration tried is checked
+    // with the checks the ground tool runs, against the same code, and the
+    // state file is written with the choice before the first beacon goes.
+    let chosen = choose::choose(std::path::Path::new(path))?;
+    for note in &chosen.notes {
+        warn!("{note}");
     }
+    let digest = chosen.loaded.digest;
+    let shown = chosen.loaded.path.display().to_string();
+    let path = shown.as_str();
+    info!("running configuration {digest}, {path}: {}", chosen.why);
+    let graph = &chosen.loaded.graph;
 
     // What is about to run, before anything is opened: on stderr as the
     // command addresses are, because it is what somebody watching a vehicle
     // start compares against the file they think is flying.
-    summary(format!("{path}: {}", shape_of(&graph)));
-    for (name, what) in described(&graph) {
+    summary(format!("{path}: {}", shape_of(graph)));
+    for (name, what) in described(graph) {
         summary(format!("  {name}: {what}"));
     }
+    // Which configuration and why, and which kind of start this is, because
+    // they are the first thing somebody reading a log after an unexpected
+    // restart asks.
+    summary(format!("configuration {digest}: {}", chosen.why));
+    summary(if chosen.commanded {
+        "a commanded restart"
+    } else {
+        "not commanded"
+    });
 
     // Whether each payload is a stand-in, judged from what is at the end of
     // its endpoint and before anything is opened, and the run refused here if
@@ -142,7 +152,7 @@ pub fn run_graph(path: &str, mode: Mode) -> Result<(), Vec<String>> {
     // after opening would already have done what --simulate=all exists to
     // prevent. Said in the summary whatever the answer, because what kind of
     // run this is is what somebody watching it start needs to know first.
-    let refused = judged_against(&graph, mode);
+    let refused = judged_against(graph, mode);
     if !refused.is_empty() {
         return Err(refused
             .iter()
@@ -154,8 +164,6 @@ pub fn run_graph(path: &str, mode: Mode) -> Result<(), Vec<String>> {
     // digest. The ground compares the digest in every beacon with its own,
     // which is how it knows the vehicle is running the configuration it is
     // reading -- the same ports, the same device ids, the same nodes.
-    let digest = digest_of_graph(&graph)
-        .map_err(|why| vec![format!("{path}: {why}")])?;
     summary(format!(
         "tcspecial v{} md5 {digest}",
         ConfigVersion::of_this_build()
@@ -164,7 +172,7 @@ pub fn run_graph(path: &str, mode: Mode) -> Result<(), Vec<String>> {
     // What every log hands its filled segments to, found before any log is
     // opened: opening one hands over what an earlier run left in it.
     let segsend =
-        segsend_for(&graph).map_err(|why| vec![format!("{path}: {why}")])?;
+        segsend_for(graph).map_err(|why| vec![format!("{path}: {why}")])?;
 
     // Whether the ground has matched this start, which every start begins
     // without: the beacons carry the restart flag, the links to the ground
@@ -173,8 +181,8 @@ pub fn run_graph(path: &str, mode: Mode) -> Result<(), Vec<String>> {
     // asks it.
     let matched = Matched::at_a_start();
 
-    let mut system =
-        System::of(&graph, Instant::now(), segsend.clone(), matched.clone())?;
+    let system =
+        System::of(graph, Instant::now(), segsend.clone(), matched.clone())?;
     // What was opened, which the line above already says the shape of: for
     // somebody looking at how the running system is put together.
     debug!("{path}: {system:?}");
@@ -183,14 +191,13 @@ pub fn run_graph(path: &str, mode: Mode) -> Result<(), Vec<String>> {
     // says: opened before anything that records into it, so that a log
     // directory that is not there stops the start rather than losing the
     // first beacons to it.
-    let telemetry_log = telemetry_log(&graph, &segsend)
+    let telemetry_log = telemetry_log(graph, &segsend)
         .map_err(|why| vec![format!("{path}: {why}")])?;
 
     // Beacons, once everything has opened: a vehicle that will not start has
     // nothing to announce. Held until the vehicle stops.
-    let beacon =
-        beacons(&graph, digest, telemetry_log.clone(), matched.clone())
-            .map_err(|why| vec![format!("{path}: {why}")])?;
+    let beacon = beacons(graph, digest, telemetry_log.clone(), matched.clone())
+        .map_err(|why| vec![format!("{path}: {why}")])?;
 
     // And the ground's commands, on a thread of their own. After the beacons
     // because a CONNECT or a RESTART retimes them, and after the ports
@@ -200,41 +207,87 @@ pub fn run_graph(path: &str, mode: Mode) -> Result<(), Vec<String>> {
     let flying = Flying {
         version: ConfigVersion::of_this_build(),
         digest,
-        held: Held::running_only(digest),
+        held: Held::of(digest, chosen.boot.clone()),
     };
-    let mut commands = command_links(
-        &graph,
+    let commands = command_links(
+        graph,
         system.states(),
         system.workbench(),
         flying,
         beacon.clone(),
         telemetry_log.clone(),
         matched,
+        chosen.boot.state_file.as_deref(),
     )
     .map_err(|why| vec![format!("{path}: {why}")])?;
 
     listen_for_stop();
 
+    let mut running = Running {
+        system,
+        commands,
+        beacon,
+        telemetry_log,
+    };
     // The loop's own wakeup, taken before the loop borrows the system: a pass
     // waiting for the next group to come due is woken by work the command
     // interpreter has queued, so a command is acted on between stages rather
     // than when the group is read.
-    let nudge = system.nudge();
-    system.run(&asked_to_stop, report, move |waiting| nudge.wait(waiting));
+    let nudge = running.system.nudge();
+    running
+        .system
+        .run(&asked_to_stop, report, move |waiting| nudge.wait(waiting));
 
-    // The links closed before the log is flushed, so that nothing records an
-    // answer into a log whose last page has already been written.
-    if let Some(commands) = commands.as_mut() {
-        commands.stop();
-    }
-
-    // What was recorded and not yet written, before the process goes: the
-    // log is the account of what the vehicle sent, and an account missing
-    // its last page is one nobody can rely on.
-    telemetry_log.flush();
-
+    clean_up(running);
     info!("{path}: stopped");
     Ok(())
+}
+
+/// What a running configuration holds, which [`clean_up`] lets go of.
+struct Running {
+    /// The nodes, their ports and the loop's threads.
+    system: System,
+    /// The two command links and their thread, where the configuration
+    /// takes commands.
+    commands: Option<Commands>,
+    /// The beacon sender, where beacons are sent.
+    beacon: Option<BeaconSend>,
+    /// What the vehicle sent to the ground, kept.
+    telemetry_log: TelemetryLog,
+}
+
+/// Cleans up the running configuration: tcspecial's function that lets go
+/// of everything a configuration held, so that nothing it left in memory
+/// survives into the next.
+///
+/// The command links first -- their thread joined, their sockets closed,
+/// and what was queued on them dropped with the sockets -- so that nothing
+/// records an answer into a log whose last page has already been written;
+/// then the nodes, every port closed and every node's thread joined as the
+/// system is dropped; then the log flushed, because the log is the account
+/// of what the vehicle sent, and an account missing its last page is one
+/// nobody can rely on. The beacon thread is left to the process: a restart
+/// `exec`s, which ends it, and it holds nothing the next start reads.
+///
+/// A restart calls this, as a stop does, before it runs the process again:
+/// see [`crate::runtime::restart`].
+///
+/// # Arguments
+///
+/// * `running` - What the configuration holds.
+fn clean_up(running: Running) {
+    let Running {
+        system,
+        commands,
+        beacon,
+        telemetry_log,
+    } = running;
+    if let Some(mut commands) = commands {
+        commands.stop();
+    }
+    drop(beacon);
+    drop(system);
+    telemetry_log.flush();
 }
 
 /// Judges each payload of `graph`, says in the summary what each was found
@@ -402,8 +455,8 @@ fn segsend_for(graph: &Graph) -> Result<SegSend, String> {
 ///
 /// From `beacon.send` to `beacon.recv`, carrying this build's version, the
 /// configuration's digest and the restart flag, which every start begins
-/// with. The state file is read and written here, before the first beacon
-/// goes. Every
+/// with. The state file has been read and written by then, as the
+/// configuration was chosen. Every
 /// `beacon.reset_interval` until the MOC connects, as every start is, and
 /// every `beacon.default_interval` after that: see
 /// [`BeaconSend::connected`].
@@ -430,9 +483,8 @@ fn segsend_for(graph: &Graph) -> Result<SegSend, String> {
 ///
 /// # Errors
 ///
-/// The section's parameters not making a configuration, the state file not
-/// being written, or the beacon socket not binding or its destination not
-/// resolving, as a message.
+/// The section's parameters not making a configuration, or the beacon socket
+/// not binding or its destination not resolving, as a message.
 fn beacons(
     graph: &Graph,
     digest: ConfigDigest,
@@ -446,34 +498,6 @@ fn beacons(
         &tcslibgs::graph::parameters::flatten(section),
     )?
     .to_ci_config()?;
-    let started = crate::state::start(std::path::Path::new(&ci.state_file))?;
-    if let Some(why) = &started.damaged {
-        log::warn!(
-            "the state file was not one tcspecial can read ({why}), so it \
-             says nothing of this start, which is taken for one nobody \
-             commanded"
-        );
-    }
-    if let Some(generation) = started.dropped_generation {
-        log::warn!(
-            "the state file {} was written by a build that counted \
-             generations, and said generation {generation}: there is no \
-             generation now, so it was dropped, and the file written again \
-             without it",
-            ci.state_file
-        );
-    }
-    // Which kind of start this is goes in the summary, because it is the
-    // first thing somebody reading a log after an unexpected restart asks.
-    summary(format!(
-        "{}: {}",
-        if started.commanded {
-            "a commanded restart"
-        } else {
-            "not commanded"
-        },
-        ci.state_file
-    ));
     let sending = BeaconSend::new(
         crate::beacon_send::BeaconTiming {
             default_interval: ci.beacon_interval,
@@ -521,6 +545,8 @@ fn beacons(
 /// * `telemetry_log` - Where answers to the ground are recorded.
 /// * `matched`       - Whether the ground has matched this start, which a
 ///                     matching CONNECT sets and a RESTART clears.
+/// * `state_file`    - The state file the command line's configuration
+///                     names, which a matching CONNECT and a RESTART write.
 ///
 /// # Returns
 ///
@@ -531,6 +557,11 @@ fn beacons(
 ///
 /// The section's parameters not making a configuration, or a link not
 /// binding or its thread not starting, as a message.
+//
+// Eight, each a different thing the links are handed by the start, as
+// `Commands::start` has: a structure holding them would only be these
+// arguments again.
+#[allow(clippy::too_many_arguments)]
 fn command_links(
     graph: &Graph,
     states: std::sync::Arc<crate::runtime::node_state::NodeStates>,
@@ -539,14 +570,30 @@ fn command_links(
     beacon: Option<BeaconSend>,
     telemetry_log: TelemetryLog,
     matched: Matched,
+    state_file: Option<&std::path::Path>,
 ) -> Result<Option<Commands>, String> {
     let Some(section) = graph.tcspecial.as_ref() else {
         return Ok(None);
     };
-    let ci = tcslibgs::graph::parameters::ci_config_of(
+    let mut ci = tcslibgs::graph::parameters::ci_config_of(
         &tcslibgs::graph::parameters::flatten(section),
     )?
     .to_ci_config()?;
+    // The state file is the command line's configuration's, whichever
+    // configuration runs: it is what the next start reads before it knows
+    // which configuration that will be, so a configuration that named
+    // another would be naming a file no start reads.
+    if let Some(state_file) = state_file {
+        let state_file = state_file.display().to_string();
+        if ci.state_file != state_file {
+            warn!(
+                "this configuration's state_file is {}, and the state file \
+                 is the one the configuration on the command line names, {}",
+                ci.state_file, state_file
+            );
+            ci.state_file = state_file;
+        }
+    }
 
     let commands = Commands::start(
         &ci,

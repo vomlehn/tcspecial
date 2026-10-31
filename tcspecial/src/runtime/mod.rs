@@ -22,6 +22,11 @@
 //!   their own so that a command never waits for the pass.
 //! * [`restart`] is what an armed RESTART does: tcspecial runs itself again,
 //!   keeping only the descriptors it was started with.
+//! * [`choose`] is which configuration a start runs -- the one the state
+//!   file names, the confirmed one, or the one on the command line -- and
+//!   the function that loads a configuration by its checksum, which a
+//!   RESTART asks too; [`held`] is which configurations a RESTART may
+//!   name.
 //! * [`matched`] is whether the ground has matched this start's
 //!   configuration, which the beacons, the commands and every link to the
 //!   ground ask.
@@ -31,6 +36,7 @@
 //! against a configuration with no vehicle present, where a fault in either
 //! would otherwise look like a fault in a device.
 
+pub mod choose;
 pub mod command;
 pub mod fabric;
 pub mod frame;

@@ -771,7 +771,12 @@ mod tests {
     /// A test that fails here is not a constant to update: the change to
     /// `fixed.xml` is to be undone, and a new fixed command made instead,
     /// with an opcode of its own and a document of its own.
-    const FIXED_DIGEST: &str = "87aa3a5da4546803bba49afe56c66ba8";
+    ///
+    /// It changed once, deliberately, when the beacon's layout was moved
+    /// into `fixed.xml` beside the three fixed commands, before the first
+    /// release that carries the document: it was `87aa3a5d...`. From that
+    /// release on it never changes.
+    const FIXED_DIGEST: &str = "47fa3ffdcbdb9038b5434469114b113f";
 
     /// Makes one command of every kind, and a SET_NODE as long as one can be.
     ///
@@ -929,9 +934,9 @@ mod tests {
         assert_eq!(
             said, FIXED_DIGEST,
             "tcslibgs/xtce/fixed.xml has changed, and it must never change: \
-             the layouts of CONNECT, RESTART_ARM and RESTART are what every \
-             ground station and every vehicle agree on whatever else they \
-             run. Undo the change, and make a new fixed command, with an \
+             the layouts of CONNECT, RESTART_ARM, RESTART and the beacon are \
+             what every ground station and every vehicle agree on whatever \
+             else they run. Undo the change, and make a new fixed command, with an \
              opcode of its own from 0x00 to 0x0F, in a document of its own"
         );
     }

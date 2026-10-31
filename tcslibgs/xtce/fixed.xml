@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<!-- The three fixed commands, and their answers, as they go on the link: the
-     whole of each datagram.
+<!-- The three fixed commands, their answers and the beacon, as they go on
+     the link: the whole of each datagram.
 
      CONNECT, RESTART_ARM and RESTART are taken at any time, whatever either
      end is running, so that a ground station and a vehicle that agree about
@@ -34,6 +34,19 @@
      is not exactly what its opcode's layout gives is refused, not answered
      and not acted on.
 
+     The beacon is text, and only text, so that a person can read it as it
+     is, in a capture or a log, with no decoder:
+
+       tcspecial:1.2.3:d41d8cd98f00b204e9800998ecf8427e:42:normal:0123...cdef
+
+     six fields of UTF-8: the name, the version, the configuration's digest,
+     the beacon's number, the restart flag and the interface's digest, each
+     but the last ended by a colon, and the last 32 characters that end the
+     datagram. Numbers are decimal digits and digests lower-case hex: what
+     the text must say, and turning it into numbers and digests and back,
+     is tcslibgs/src/beacon.rs's and python/tcslibgs/beacon.py's. At most
+     106 bytes. Its layout is fixed for ever, as the commands' are.
+
      The status values keep their meanings for ever: 0 Success, 1 Failure,
      2 InvalidCommand, 3 InvalidParameter, 4 NotArmed, 5 NotFound, 9 Stale,
      10 Unmatched. A value this document does not list is carried as the
@@ -62,6 +75,53 @@
           </SizeInBits>
         </BinaryDataEncoding>
       </BinaryParameterType>
+      <!-- The beacon's fields: each but the last ended by a colon, and no
+           longer than the field can be, the colon counted. -->
+      <StringParameterType name="BeaconNameType">
+        <StringDataEncoding encoding="UTF-8">
+          <Variable maxSizeInBits="80">
+            <TerminationChar>3A</TerminationChar>
+          </Variable>
+        </StringDataEncoding>
+      </StringParameterType>
+      <StringParameterType name="BeaconVersionType">
+        <StringDataEncoding encoding="UTF-8">
+          <Variable maxSizeInBits="96">
+            <TerminationChar>3A</TerminationChar>
+          </Variable>
+        </StringDataEncoding>
+      </StringParameterType>
+      <StringParameterType name="BeaconDigestType">
+        <StringDataEncoding encoding="UTF-8">
+          <Variable maxSizeInBits="264">
+            <TerminationChar>3A</TerminationChar>
+          </Variable>
+        </StringDataEncoding>
+      </StringParameterType>
+      <StringParameterType name="BeaconNumberType">
+        <StringDataEncoding encoding="UTF-8">
+          <Variable maxSizeInBits="88">
+            <TerminationChar>3A</TerminationChar>
+          </Variable>
+        </StringDataEncoding>
+      </StringParameterType>
+      <StringParameterType name="BeaconFlagType">
+        <StringDataEncoding encoding="UTF-8">
+          <Variable maxSizeInBits="64">
+            <TerminationChar>3A</TerminationChar>
+          </Variable>
+        </StringDataEncoding>
+      </StringParameterType>
+      <!-- The last: 32 characters, which end the datagram. -->
+      <StringParameterType name="BeaconInterfaceType">
+        <StringDataEncoding encoding="UTF-8">
+          <SizeInBits>
+            <Fixed>
+              <FixedValue>256</FixedValue>
+            </Fixed>
+          </SizeInBits>
+        </StringDataEncoding>
+      </StringParameterType>
       <EnumeratedParameterType name="StatusType">
         <IntegerDataEncoding sizeInBits="8" encoding="unsigned"/>
         <EnumerationList>
@@ -91,6 +151,13 @@
            CONNECT's own where it has taken none: where a ground station
            whose count has gone back starts again. -->
       <Parameter name="NewestTaken" parameterTypeRef="U32Type"/>
+      <Parameter name="BeaconName" parameterTypeRef="BeaconNameType"/>
+      <Parameter name="BeaconVersion" parameterTypeRef="BeaconVersionType"/>
+      <Parameter name="BeaconDigest" parameterTypeRef="BeaconDigestType"/>
+      <Parameter name="BeaconNumber" parameterTypeRef="BeaconNumberType"/>
+      <Parameter name="BeaconFlag" parameterTypeRef="BeaconFlagType"/>
+      <Parameter name="BeaconInterface"
+                 parameterTypeRef="BeaconInterfaceType"/>
     </ParameterSet>
     <ContainerSet>
       <!-- What every fixed answer holds first. -->
@@ -131,6 +198,18 @@
             <Comparison parameterRef="Opcode" value="4"/>
           </RestrictionCriteria>
         </BaseContainer>
+      </SequenceContainer>
+      <!-- The beacon, which answers nothing: the vehicle sends it every
+           beacon interval, whatever else it is doing. -->
+      <SequenceContainer name="Beacon">
+        <EntryList>
+          <ParameterRefEntry parameterRef="BeaconName"/>
+          <ParameterRefEntry parameterRef="BeaconVersion"/>
+          <ParameterRefEntry parameterRef="BeaconDigest"/>
+          <ParameterRefEntry parameterRef="BeaconNumber"/>
+          <ParameterRefEntry parameterRef="BeaconFlag"/>
+          <ParameterRefEntry parameterRef="BeaconInterface"/>
+        </EntryList>
       </SequenceContainer>
     </ContainerSet>
   </TelemetryMetaData>

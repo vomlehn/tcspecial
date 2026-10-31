@@ -2158,7 +2158,10 @@ digest, also as 32 hex digits:
    tcspecial:0.1.0:36999e46a4bf436854442d8f97a2248d:42:normal:0123...cdef
 
 It is text so that it can be read as it is, in a packet capture, a log or
-with any UDP listener, with nothing to decode it. That is what goes on the
+with any UDP listener, with nothing to decode it. Its layout is stated in
+XTCE, in ``tcslibgs/xtce/fixed.xml`` beside the three commands that always
+go, as six text fields -- each but the last ended by its colon -- and
+nothing else, so a ground system that reads XTCE can read it too. That is what goes on the
 wire; what the window shows on its ``Last msg:`` line is written for the
 window, as ``tcspecial v0.1.0 md5`` and the digest. tcspecial writes each
 beacon, and ``tcslib::beacon`` reads it, with ``tcslibgs::Beacon``, which

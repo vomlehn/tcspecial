@@ -5531,10 +5531,18 @@ Asynchronous Telemetry
 Beacon
 
 The beacon answers no command and has a form of its own: a line of text, six
-fields with a colon between each, and no newline at the end. It is written
-and read by hand, in ``tcslibgs::beacon``, which tcspecial and ``tcslib`` use,
-and again in Python in ``python/tcslibgs/beacon.py``; the two are held to
-each other by the same examples in their tests. For example:
+fields with a colon between each, and no newline at the end. Its layout is
+stated in XTCE in ``tcslibgs/xtce/fixed.xml``, beside the three fixed
+commands: six string fields of UTF-8, each but the last ended by the
+termination character ``:`` (``0x3A``) and no longer than its field can be,
+and the last 32 characters that end the datagram. It is packed and
+unpacked by the code tcs-xtce generates from that document, in Rust without
+allocating and in Python; what each field must say -- the name, decimal
+digits, lower-case hex -- and turning the text into numbers and digests and
+back is ``tcslibgs::beacon``'s, which tcspecial and ``tcslib`` use, and
+``python/tcslibgs/beacon.py``'s; the two are held to each other by the same
+examples in their tests, and to what the hand-written packer that came
+before wrote, byte for byte. For example:
 
 .. code-block:: text
 
@@ -5570,8 +5578,8 @@ Requirement
     beacon is meant to be read by a person as it is -- in a packet capture,
     in a log, or with a plain UDP listener -- with nothing to decode it, and
     a binary field would end that. It is the one packet a person on the
-    ground may look at before any tool is set up, which is why it is the one
-    packet that has no XTCE.
+    ground may look at before any tool is set up, which is why its XTCE is
+    of text fields and nothing else.
 
 Requirement
     A beacon is read strictly, by ``tcslibgs::Beacon::read`` in Rust and
@@ -5716,10 +5724,11 @@ Requirement
     Every command and every answer on the links between the MOC and
     tcspecial has a layout stated in XTCE and is packed and unpacked by the
     code tcs-xtce generates from that statement. Nothing on a link is JSON,
-    and nothing that packs or unpacks a command or an answer is written by
-    hand. The beacon is the exception: it is text, written and read by hand,
-    because it is to be read by a person as it is -- see `Asynchronous
-    Telemetry`_ -- and so it is in neither interface's documents.
+    and nothing that packs or unpacks a command, an answer or the beacon is
+    written by hand. The beacon's layout is in ``fixed.xml`` beside the
+    three fixed commands, as text fields, because it is to be read by a
+    person as it is -- see `Asynchronous Telemetry`_ -- and it is not in
+    the interface: no change to ``link.xml`` can touch it.
 
 Replaced
     Commands and answers are built on a base container that holds the CCSDS
@@ -5878,7 +5887,12 @@ Requirement
 
 Requirement
     The beacon's layout is fixed for ever too: its text fields, in their
-    order, as `Asynchronous Telemetry`_ gives them.
+    order, as `Asynchronous Telemetry`_ gives them. It is stated in
+    ``fixed.xml`` beside the three, so that the one document every end
+    agrees on holds everything that never changes. The document's digest
+    is pinned by a test, and changed once, deliberately, when the beacon
+    was moved into it, before the first release to carry it; from that
+    release on it never changes.
 
 PING keeps opcode 0x01 for now, but is an ordinary command: it is refused
 before a match like any other, and moves out of the fixed range when the

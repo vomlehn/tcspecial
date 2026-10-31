@@ -3058,7 +3058,7 @@ them do so first:</p>
 <p><tt class="docutils literal">make install</tt> builds the packages, as whoever ran it, and installs those
 of the kind this system takes with its usual installer, under sudo: apt-get
 on Debian and Ubuntu, dnf on Fedora and Red Hat's, zypper on SUSE's, read
-from <tt class="docutils literal"><span class="pre">/etc/os-release</span></tt>. <tt class="docutils literal">SIMULATE=1</tt> has the installer show what it
+from <tt class="docutils literal"><span class="pre">/etc/os-release</span></tt>. <tt class="docutils literal">DRY_RUN=1</tt> has the installer show what it
 would do and change nothing. <tt class="docutils literal">make uninstall</tt> removes the packages the
 same way, leaving the configuration and the state, which are the mission's.</p>
 <p><tt class="docutils literal">make <span class="pre">install-files</span></tt> copies the files into place instead, under
@@ -3071,7 +3071,7 @@ a developer's copy leaves alone unless asked. <tt class="docutils literal">make 
 package. <tt class="docutils literal">make <span class="pre">uninstall-files</span></tt>, with the same variables, takes away what
 was copied.</p>
 <pre class="code console literal-block">
-<span class="generic prompt">$ </span>make<span class="whitespace"> </span>install<span class="whitespace"> </span><span class="name variable">SIMULATE</span><span class="operator">=</span><span class="literal number">1</span><span class="whitespace">
+<span class="generic prompt">$ </span>make<span class="whitespace"> </span>install<span class="whitespace"> </span><span class="name variable">DRY_RUN</span><span class="operator">=</span><span class="literal number">1</span><span class="whitespace">
 </span><span class="generic prompt">$ </span>make<span class="whitespace"> </span>install<span class="whitespace">
 </span><span class="generic prompt">$ </span>make<span class="whitespace"> </span>install-build<span class="whitespace">
 </span><span class="generic prompt">$ </span>sudo<span class="whitespace"> </span>make<span class="whitespace"> </span>install-files<span class="whitespace"> </span><span class="name variable">HOOKS</span><span class="operator">=</span><span class="literal number">1</span><span class="whitespace">

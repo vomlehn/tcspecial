@@ -992,6 +992,16 @@ mod tests {
         }
     }
 
+    /// Every command code is below 128, because over a cFS software bus a
+    /// command's function code is its code, and a cFS function code is
+    /// seven bits: see "What crosses the bus" in `docs/design.rst`.
+    #[test]
+    fn every_command_code_fits_a_cfs_function_code() {
+        for kind in (0u8..=255).filter_map(CommandType::from_u8) {
+            assert!(kind.to_u8() < 128, "{kind:?} is {:#x}", kind.to_u8());
+        }
+    }
+
     #[test]
     fn test_command_type_conversion() {
         let cmd_type = CommandType::Ping;

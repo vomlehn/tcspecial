@@ -1809,10 +1809,32 @@ pub struct CIConfigJson {
     ///
     /// Required, with no default: where a vehicle keeps state across a power
     /// cycle is a fact about its storage, and a default would be a path that
-    /// exists on a desk and not on the vehicle. See "The generation number
-    /// and the state file" in `docs/design.rst`.
+    /// exists on a desk and not on the vehicle. See "The state file"
+    /// in `docs/design.rst`.
     pub state_file: String,
+    /// The directory the vehicle keeps configurations in, each under its
+    /// checksum, or `None` for a vehicle that keeps none: see
+    /// [`crate::store`].
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub configurations: Option<String>,
+    /// The fewest configurations provisioning may leave in that directory.
+    /// Absent is [`CONFIGURATIONS_KEPT_DEFAULT`].
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub configurations_kept: Option<u32>,
+    /// How many starts of the configuration the state file names may end
+    /// before a matching CONNECT before it is given up for the confirmed
+    /// one. Absent is [`LOAD_TRIALS_DEFAULT`].
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub load_trials: Option<u32>,
 }
+
+/// How many configurations provisioning keeps at least where the section
+/// does not say: two, the one running and one to go back to.
+pub const CONFIGURATIONS_KEPT_DEFAULT: u32 = 2;
+
+/// How many starts a configuration is given before it is given up where the
+/// section does not say: three, as the design has it.
+pub const LOAD_TRIALS_DEFAULT: u32 = 3;
 
 /// How long an arm lasts, from what `restart_arm_valid` says.
 ///
@@ -1892,6 +1914,13 @@ pub struct CIConfig {
     pub interface: crate::InterfaceDigest,
     /// Where what must survive a restart is kept: `state_file`.
     pub state_file: String,
+    /// Where configurations are kept: `configurations`, or `None`.
+    pub configurations: Option<String>,
+    /// The fewest configurations kept: `configurations_kept`.
+    pub configurations_kept: u32,
+    /// How many unconfirmed starts a configuration is given:
+    /// `load_trials`.
+    pub load_trials: u32,
 }
 
 impl CIConfigJson {
@@ -2010,6 +2039,11 @@ impl CIConfigJson {
             gateway: self.gateway,
             interface: self.interface,
             state_file: self.state_file.trim().to_string(),
+            configurations: self.configurations.clone(),
+            configurations_kept: self
+                .configurations_kept
+                .unwrap_or(CONFIGURATIONS_KEPT_DEFAULT),
+            load_trials: self.load_trials.unwrap_or(LOAD_TRIALS_DEFAULT),
         })
     }
 }

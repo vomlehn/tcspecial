@@ -115,6 +115,61 @@ fn the_interface_digest_is_printed_alone() {
     assert_eq!(status, 2, "given alone");
 }
 
+/// `--keep=<directory>` keeps a configuration with nothing wrong with it
+/// under its checksum, read-only, and says where; again, it writes nothing
+/// and says it is kept already. One with errors is not kept, and the store
+/// is what tcspecial loads from.
+#[test]
+fn a_checked_configuration_is_kept_under_its_checksum() {
+    use std::os::unix::fs::PermissionsExt;
+
+    let dir = tempfile::tempdir().expect("a directory");
+    let store = dir.path().join("kept");
+    std::fs::create_dir(&store).expect("a store");
+    let keep = format!("--keep={}", store.display());
+    let example = Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("../examples/ping/ping.yaml");
+    let example = example.to_str().expect("a path");
+    let checksum =
+        tcslibgs::config_digest::digest_of_file(example).expect("it digests");
+    let kept = store.join(format!("{checksum}.yaml"));
+
+    let (lines, status) = run(&[&keep, example]);
+    assert_eq!(status, 0, "{lines:?}");
+    assert_eq!(
+        lines,
+        vec![format!(
+            "{example}: md5 {checksum}, kept as {}",
+            kept.display()
+        )]
+    );
+    let mode = std::fs::metadata(&kept).expect("kept").permissions().mode();
+    assert_eq!(mode & 0o777, 0o444, "read-only");
+    let (graph, _) = tcslibgs::store::Store::at(&store)
+        .load(checksum)
+        .expect("it loads by its checksum");
+    assert_eq!(graph.nodes.len(), 2);
+
+    let (lines, status) = run(&[&keep, example]);
+    assert_eq!(status, 0);
+    assert!(lines[0].contains("already kept as"), "{lines:?}");
+
+    let wrong = with_errors(dir.path(), 2);
+    let (_, status) = run(&[&keep, wrong.to_str().expect("a path")]);
+    assert_eq!(status, 1, "a configuration with errors");
+    assert_eq!(
+        tcslibgs::store::Store::at(&store)
+            .held()
+            .expect("it reads")
+            .len(),
+        1,
+        "is not kept"
+    );
+
+    let (_, status) = run(&["--keep=", example]);
+    assert_eq!(status, 2, "a directory is named");
+}
+
 #[test]
 fn the_options_are_taken_as_options() {
     let dir = tempfile::tempdir().expect("a directory");

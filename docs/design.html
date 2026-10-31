@@ -1148,6 +1148,18 @@ left behind by a session that ended does not stand ready for the next RESTART
 anybody sends. A mission whose link is slower, or whose operators want the
 window narrower, says so. Nought is refused, being an arm that lapses as it
 is taken and a vehicle that can never be restarted.</p>
+<p><tt class="docutils literal">configurations</tt>, <tt class="docutils literal">configurations_kept</tt> and <tt class="docutils literal">load_trials</tt> may be left
+out too. <tt class="docutils literal">configurations</tt> is the directory the vehicle keeps
+configurations in, each under its checksum, and absent is a vehicle that
+keeps none, which is a configuration somebody may mean as a vehicle with no
+log is. <tt class="docutils literal">configurations_kept</tt> is the fewest that provisioning may leave
+there, two where it says nothing: the one running and one to go back to.
+<tt class="docutils literal">load_trials</tt> is how many starts of a configuration may end before a
+matching CONNECT before it is given up, three where it says nothing, as
+<a class="reference internal" href="#starting-and-the-restart-flag">Starting, and the restart flag</a> has it. Nought is refused for either
+count, naming it. All three, and <tt class="docutils literal">state_file</tt>, are read from the
+configuration on tcspecial's command line, whichever configuration runs:
+see <a class="reference internal" href="#configurations-named-by-their-checksum">Configurations named by their checksum</a>.</p>
 <p>Five of them are a host and a port written together, as <tt class="docutils literal">address:port</tt>: two
 things only ever used together are one fact about a configuration, and writing
 them apart invites a file that states one and not the other. Each is split at
@@ -2934,10 +2946,11 @@ being flown. Asked as the link comes up, and
 what licenses every command that carries a node id: see <a class="reference internal" href="#how-a-command-names-a-node">How a
 command names a node</a>.</dd>
 <dt><tt class="docutils literal">RESTART_ARM</tt> and <tt class="docutils literal">RESTART</tt></dt>
-<dd>The process is what restarts: a vehicle that comes back
-reads the configuration file again, so a RESTART is how a changed
-configuration is flown. The arm key is the interlock, and an unarmed
-RESTART is refused. See <a class="reference internal" href="#restarting">Restarting</a>.</dd>
+<dd>The process is what restarts: a vehicle that comes back loads the
+configuration the RESTART named by its checksum, so a RESTART is how
+another configuration is flown. The arm key is the interlock, and an
+unarmed RESTART is refused. See <a class="reference internal" href="#restarting">Restarting</a> and <a class="reference internal" href="#configurations-named-by-their-checksum">Configurations named
+by their checksum</a>.</dd>
 <dt><tt class="docutils literal">START_NODE</tt> and <tt class="docutils literal">STOP_NODE</tt></dt>
 <dd>Enable and disable a node. The unit is a node of the graph, so a
 computation, a log and a payload are each something the ground can stop.</dd>
@@ -6378,18 +6391,34 @@ for as long as it runs, so a node id is never taken from another.</p>
 <p>Built with <a class="reference internal" href="#the-link-without-a-header">The link without a header</a>: in <a class="reference internal" href="#starting-and-the-restart-flag">Starting, and the restart
 flag</a>, there being no generation; in <a class="reference internal" href="#the-three-commands-that-always-go">The three commands that always
 go</a>, the frozen layout of the three, and the checksums in RESTART_ARM
-and RESTART, a target the vehicle does not hold refused <tt class="docutils literal">NotFound</tt> at
-the arm and checked again at the restart.</p>
-<p class="last"><em>Not yet built:</em> <a class="reference internal" href="#keeping-configurations-on-board">Keeping configurations on board</a> entirely; in
-<a class="reference internal" href="#starting-and-the-restart-flag">Starting, and the restart flag</a>, the state file naming configurations
-by checksum and the confirmed one, the order a start loads them in, a
-damaged state file loading the command line's, and <tt class="docutils literal">load_trials</tt>; in
-<a class="reference internal" href="#the-three-commands-that-always-go">The three commands that always go</a>, a held configuration other than
-the running one, and the two functions a restart calls; tcsmoc's
-pop-ups; and removing what <a class="reference internal" href="#what-this-replaces">What this replaces</a> lists as still
-standing. Until those are built, the one configuration a RESTART may
-name is the running one, and a restart runs the same configuration file
-again.</p>
+and RESTART.</p>
+<p>Built since (2026-10-31): in <a class="reference internal" href="#keeping-configurations-on-board">Keeping configurations on board</a>, the
+single-file rule, kept and loaded; configurations kept under their
+checksum in the directory <tt class="docutils literal">configurations</tt> names; keeping one already
+held writing nothing; the checksum computed again at every load and a
+mismatch refused; and <tt class="docutils literal">configurations_kept</tt> read and enforced by the
+store's removal (<tt class="docutils literal"><span class="pre">tcslibgs::store</span></tt>), which nothing in flight calls
+yet. In <a class="reference internal" href="#starting-and-the-restart-flag">Starting, and the restart flag</a>, every requirement: the state
+file naming the next start's configuration and the confirmed one, a
+matching CONNECT confirming, the order a start loads them in and saying
+which and why, a damaged or missing state file loading the command
+line's, and <tt class="docutils literal">load_trials</tt>, read from the command line's
+configuration. In <a class="reference internal" href="#the-three-commands-that-always-go">The three commands that always go</a>, every
+requirement: a target the vehicle does not hold refused <tt class="docutils literal">NotFound</tt> at
+the arm, the target loaded and checked again just before the restart, a
+RESTART naming the running configuration a plain restart, and the two
+functions a restart calls (<tt class="docutils literal"><span class="pre">choose::Boot::load</span></tt> and <tt class="docutils literal"><span class="pre">start::clean_up</span></tt>
+in tcspecial). A configuration is put into the store, for testing and for
+first provisioning, by <tt class="docutils literal">tcsverify <span class="pre">--keep=&lt;directory&gt;</span></tt>, which checks it
+first.</p>
+<p class="last"><em>Not yet built:</em> uplinking a configuration by CFDP to a staging area,
+checking it there and keeping it, and the provisioning crate on
+<tt class="docutils literal"><span class="pre">cfdp-rs</span></tt> that does it and removes configurations in flight; the
+read-only directory and the immutable attribute of first provisioning,
+which are the provisioner's to set -- <tt class="docutils literal">tcsverify <span class="pre">--keep</span></tt> makes the file
+it writes 0444 and leaves the directory as it is, so that it can keep
+more; tcsmoc's pop-ups; and removing what <a class="reference internal" href="#what-this-replaces">What this replaces</a> lists as
+still standing.</p>
 </div>
 <p>A configuration is known by its <em>checksum</em>: the MD5 <tt class="docutils literal">tcsverify</tt>
 computes of it, the configuration digest (<tt class="docutils literal"><span class="pre">tcslibgs::config_digest</span></tt>).
@@ -6416,6 +6445,21 @@ below that drop what is queued at a match are what make up for that.</p>
 <dd>For now a configuration is a single file. One that includes another
 file is refused when it is uplinked and when it is loaded, saying so.
 A configuration spread across several files is to be handled later.</dd>
+</dl>
+<p>As built, a configuration is kept as <tt class="docutils literal"><span class="pre">&lt;checksum&gt;.yaml</span></tt> or
+<tt class="docutils literal"><span class="pre">&lt;checksum&gt;.xml</span></tt> -- its checksum in 32 lower-case hex digits, and the
+extension that says how it is read, the one it was given -- in the
+directory the <tt class="docutils literal">tcspecial</tt> section's <tt class="docutils literal">configurations</tt> names. A section
+that names none is a vehicle that keeps no configurations: it runs the one
+on its command line, and a RESTART may name only that and the one running.
+The rules are <tt class="docutils literal"><span class="pre">tcslibgs::store</span></tt>'s, which tcspecial loads through and
+<tt class="docutils literal">tcsverify <span class="pre">--keep=&lt;directory&gt;</span></tt> keeps through, so the two cannot disagree
+about what a kept configuration is. <tt class="docutils literal">tcsverify <span class="pre">--keep</span></tt> checks the
+configuration as tcsverify checks any, keeps it only if nothing is wrong
+with it, and is for testing and for first provisioning; uplinking is not
+built. tcspecial refuses a configuration that includes another as it loads
+it, the one on its command line among them.</p>
+<dl class="docutils">
 <dt>Requirement</dt>
 <dd>The vehicle keeps each configuration it holds under its checksum, in
 hex, in the directory the <tt class="docutils literal">tcspecial</tt> section's <tt class="docutils literal">configurations</tt>
@@ -6468,6 +6512,13 @@ loads -- the one the last taken RESTART named, or else the one the
 start before ran -- and the <em>confirmed</em> configuration: the last one a
 matching CONNECT was taken on. A matching CONNECT writes the running
 configuration to it as confirmed.</dd>
+</dl>
+<p>The state file is the command line's configuration's, whichever
+configuration runs, and so are <tt class="docutils literal">configurations</tt> and <tt class="docutils literal">load_trials</tt>: a
+start reads them before it knows which configuration it will run. A
+configuration that names another state file is run with the command line's,
+and the start says so in its log.</p>
+<dl class="docutils">
 <dt>Requirement</dt>
 <dd>Every start loads the first of these that passes its check: the
 configuration the state file names for it; else the confirmed one;
@@ -6558,6 +6609,13 @@ writes the state file, and runs the process again, whose start calls
 the second, so that nothing the old configuration left in memory
 survives into the new one.</dd>
 </dl>
+<p>As built, the clean-up is <tt class="docutils literal"><span class="pre">start::clean_up</span></tt> and the load
+<tt class="docutils literal"><span class="pre">choose::Boot::load</span></tt>, which the RESTART also calls just before it is
+taken, to check its target as it would be loaded. The state file is written
+as the RESTART is taken, before its answer, rather than after the clean-up,
+so that a RESTART the state file cannot say is refused <tt class="docutils literal">Failure</tt> and
+nothing restarts, as <a class="reference internal" href="#restarting">Restarting</a> requires. The beacon thread is not
+joined: the <tt class="docutils literal">exec</tt> ends it, and it holds nothing the next start reads.</p>
 </div>
 <div class="section" id="on-the-ground">
 <h3><a class="toc-backref" href="#toc-entry-75">On the ground</a></h3>
@@ -6702,12 +6760,14 @@ beacon's definitions. The ground reads data only while matched.</li>
 <li><a class="reference internal" href="#the-state-file">The state file</a>, once <cite>The generation number and the state file</cite>, and
 every requirement that an answer carries a generation or that the ground
 compares generations: there is no generation.</li>
+<li><a class="reference internal" href="#kinds-of-restart">Kinds of restart</a>: only a commanded start changing the definitions.
+The checksum in the beacon says which configuration a start is running,
+whichever kind it is, and a start nobody commanded may load the
+confirmed or the command line's configuration when the one the state
+file names will not load or is given up.</li>
 </ul>
 <p>Replaced once the rest is built, and describing what runs until then:</p>
 <ul class="simple">
-<li><a class="reference internal" href="#kinds-of-restart">Kinds of restart</a>: only a commanded start changing the definitions.
-The checksum in the beacon says which configuration a start is running,
-whichever kind it is.</li>
 <li><a class="reference internal" href="#what-the-ground-may-send-meanwhile">What the ground may send meanwhile</a>: the wait for a beacon whose
 number went back, and the commands allowed during it.</li>
 <li>In <a class="reference internal" href="#holes-in-this-and-what-closes-them">Holes in this, and what closes them</a> under <a class="reference internal" href="#fault-resiliency">Fault Resiliency</a>: the
@@ -6735,12 +6795,12 @@ change, with the target checksum in RESTART_ARM and RESTART.</dd>
 <h2><a class="toc-backref" href="#toc-entry-79">In-flight data across a restart</a></h2>
 <div class="admonition note">
 <p class="first admonition-title">Note</p>
-<p class="last"><strong>Partly built</strong>, with <a class="reference internal" href="#configurations-named-by-their-checksum">Configurations named by their checksum</a>, whose
-rules this section follows through a restart. Every drop in <a class="reference internal" href="#what-is-dropped-and-where">What is
-dropped, and where</a> is built. A restart onto another configuration, as
-the first figure draws it, waits for configurations kept on board: until
-then a restart reads the same configuration file again, and is the
-second figure's case unless that file was changed.</p>
+<p class="last"><strong>Built</strong>, with <a class="reference internal" href="#configurations-named-by-their-checksum">Configurations named by their checksum</a>, whose rules
+this section follows through a restart. Every drop in <a class="reference internal" href="#what-is-dropped-and-where">What is dropped,
+and where</a> is built, and a restart onto another configuration kept on
+board, as the first figure draws it, is built: a RESTART names it by its
+checksum, and the start that comes back loads it. A restart naming the
+running configuration is the second figure's case.</p>
 </div>
 <p>When either end restarts, or the ground changes the configuration it is
 using, there are packets on their way that one configuration made and that
@@ -12085,6 +12145,15 @@ the digest exists to answer -- is the vehicle flying the configuration on
 this desk -- can be asked of a file without running anything. It is of the
 graph a file parses into and not of the file's bytes, so the two spellings
 of one configuration answer alike.</dd>
+<dt>Requirement</dt>
+<dd><tt class="docutils literal"><span class="pre">--keep=&lt;directory&gt;</span></tt>, with one configuration and its simulator file if
+it has one, checks it as tcsverify checks any and, where nothing is
+wrong with it, keeps it in <tt class="docutils literal">&lt;directory&gt;</tt> under its checksum, as the
+vehicle keeps a configuration a RESTART may name: see <a class="reference internal" href="#keeping-configurations-on-board">Keeping
+configurations on board</a>. It prints where it is kept, or that it was
+kept already, which writes nothing. One that includes another file is
+refused. It is how a configuration is put on board for testing and at
+first provisioning, until configurations are uplinked.</dd>
 <dt>Requirement</dt>
 <dd><tt class="docutils literal"><span class="pre">--interface-digest</span></tt>, given alone, prints the digest of the interface
 this build speaks and nothing else: the 32 lower-case hex digits a

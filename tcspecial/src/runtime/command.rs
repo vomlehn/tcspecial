@@ -682,7 +682,14 @@ impl Serving {
             // RESTART is taken no CONNECT does: see `Matched::connected`.
             Command::Connect(cmd) => {
                 if cmd.digest == self.flying.digest {
-                    self.matched.connected();
+                    // Newly matched: the running configuration is the
+                    // confirmed one, and its trials go back to nought, so
+                    // that the next start loads it and never gives it up
+                    // for having been started. Once a start, at its match:
+                    // a CONNECT repeated changes nothing aboard.
+                    if self.matched.connected() {
+                        self.say_confirmed();
+                    }
                     if let Some(beacon) = self.beacon.as_ref() {
                         beacon.connected();
                     }
@@ -835,7 +842,8 @@ impl Serving {
                     // anything else, so that it says so in its beacons; a
                     // vehicle that cannot say it does not restart, and the
                     // arm stands for a RESTART that can.
-                    if let Err(why) = self.say_next_start_commanded() {
+                    if let Err(why) = self.say_next_start_commanded(cmd.target)
+                    {
                         error!("a RESTART was refused: {why}");
                         return answer_to(command, CommandStatus::Failure);
                     }
@@ -870,10 +878,15 @@ impl Serving {
     }
 
     /// Says in the state file that the next start is one the ground
-    /// commanded. See [`crate::state::commanded_restart`], which says why it
-    /// allocates, here in the loop.
+    /// commanded, onto the configuration `target` names. See
+    /// [`crate::state::commanded_restart`], which says why it allocates,
+    /// here in the loop.
     ///
     /// Nothing is written where the configuration gave no state file.
+    ///
+    /// # Arguments
+    ///
+    /// * `target` - The checksum the RESTART named.
     ///
     /// # Returns
     ///
@@ -882,11 +895,38 @@ impl Serving {
     /// # Errors
     ///
     /// Why the state file could not be written, as a message.
-    fn say_next_start_commanded(&self) -> Result<(), String> {
+    fn say_next_start_commanded(
+        &self,
+        target: ConfigDigest,
+    ) -> Result<(), String> {
         if self.state_file.as_os_str().is_empty() {
             return Ok(());
         }
-        crate::state::commanded_restart(&self.state_file)
+        crate::state::commanded_restart(&self.state_file, target)
+    }
+
+    /// Says in the state file that the running configuration is confirmed:
+    /// see [`crate::state::confirmed`], which says why it allocates, here in
+    /// the loop. A state file that cannot be written is logged and the
+    /// CONNECT answered all the same: the match is the ground's, and a
+    /// vehicle refusing it would be one nobody could command; what is lost
+    /// is that the next start may load another configuration, which the
+    /// beacon's checksum then says.
+    ///
+    /// Nothing is written where the configuration gave no state file.
+    fn say_confirmed(&self) {
+        if self.state_file.as_os_str().is_empty() {
+            return;
+        }
+        if let Err(why) =
+            crate::state::confirmed(&self.state_file, self.flying.digest)
+        {
+            error!(
+                "configuration {} is matched and could not be kept as the \
+                 confirmed one: {why}",
+                self.flying.digest
+            );
+        }
     }
 
     /// Logs that the ground named a node this configuration has not got.
@@ -1102,6 +1142,9 @@ mod tests {
             restart_arm_valid: tcslibgs::RESTART_ARM_VALID_DEFAULT,
             gateway: tcslibgs::gateway::GatewayKind::Radio,
             interface: tcslibgs::InterfaceDigest::of_this_build(),
+            configurations: None,
+            configurations_kept: tcslibgs::CONFIGURATIONS_KEPT_DEFAULT,
+            load_trials: tcslibgs::LOAD_TRIALS_DEFAULT,
             // Nothing reads it: the state file is counted where beacons
             // start, which this does not.
             state_file: String::new(),

@@ -216,6 +216,9 @@ pub const ATTRIBUTES: &[(&str, bool)] = &[
     ("log.directory", false),
     ("log.segment_size", false),
     ("restart_arm_valid", false),
+    ("configurations", false),
+    ("configurations_kept", false),
+    ("load_trials", false),
 ];
 
 /// Gives what a new configuration is given for an attribute, where anything.
@@ -427,6 +430,26 @@ pub fn ci_config_of(
             _ => None,
         },
         state_file: text("state_file")?,
+        // Absent is a vehicle that keeps no configurations of its own: it
+        // runs the one on its command line, and a RESTART may name only
+        // that and the one running. A vehicle with no writable storage is
+        // a configuration somebody may mean, as a missing log.directory is.
+        configurations: said
+            .get("configurations")
+            .map(|value| value.as_str().trim().to_string())
+            .filter(|value| !value.is_empty()),
+        configurations_kept: match said.get("configurations_kept") {
+            Some(value) if !value.as_str().trim().is_empty() => {
+                Some(at_least_one("configurations_kept", &number)?)
+            }
+            _ => None,
+        },
+        load_trials: match said.get("load_trials") {
+            Some(value) if !value.as_str().trim().is_empty() => {
+                Some(at_least_one("load_trials", &number)?)
+            }
+            _ => None,
+        },
         log: LogJson {
             // Absent is "run without a telemetry log", which is a
             // configuration somebody may mean: a vehicle with no writable
@@ -443,6 +466,34 @@ pub fn ci_config_of(
             },
         },
     })
+}
+
+/// Reads a count the section states that may not be nought.
+///
+/// # Arguments
+///
+/// * `name`   - The attribute's flat name.
+/// * `number` - How the section reads a whole number of it.
+///
+/// # Returns
+///
+/// The count.
+///
+/// # Errors
+///
+/// What `number` refuses, and nought, naming the attribute and why.
+fn at_least_one(
+    name: &str,
+    number: &dyn Fn(&str) -> Result<u32, String>,
+) -> Result<u32, String> {
+    match number(name)? {
+        0 => Err(format!(
+            "{name} is 0: it counts configurations, and nought of them would \
+             be a vehicle that keeps none or never tries one, so make it 1 or \
+             more, or leave it out for its default"
+        )),
+        count => Ok(count),
+    }
 }
 
 /// Reads the section's `interface`, and refuses one that is not this build's.
@@ -719,6 +770,48 @@ mod tests {
         assert!(why.contains(other), "{why}");
         assert!(why.contains(&ours.to_string()), "{why}");
         assert!(why.contains("interface:"), "{why}");
+    }
+
+    /// Where configurations are kept, how many must be, and how many tries a
+    /// configuration is given are all optional; the two counts have their
+    /// defaults where they are left out, and nought is refused, naming the
+    /// attribute.
+    #[test]
+    fn the_configurations_attributes_have_their_defaults_and_refuse_nought() {
+        let settled = |extra: &[(&'static str, &'static str)]| {
+            let mut all = whole();
+            all.extend_from_slice(extra);
+            ci_config_of(&said(&all)).and_then(|config| config.to_ci_config())
+        };
+        let left_out = settled(&[]).expect("left out");
+        assert_eq!(left_out.configurations, None, "a vehicle that keeps none");
+        assert_eq!(
+            left_out.configurations_kept,
+            crate::CONFIGURATIONS_KEPT_DEFAULT
+        );
+        assert_eq!(left_out.load_trials, crate::LOAD_TRIALS_DEFAULT);
+        assert_eq!(crate::LOAD_TRIALS_DEFAULT, 3, "as the design says");
+
+        let stated = settled(&[
+            ("configurations", "/var/lib/tcspecial/configurations"),
+            ("configurations_kept", "4"),
+            ("load_trials", "5"),
+        ])
+        .expect("stated");
+        assert_eq!(
+            stated.configurations.as_deref(),
+            Some("/var/lib/tcspecial/configurations")
+        );
+        assert_eq!(stated.configurations_kept, 4);
+        assert_eq!(stated.load_trials, 5);
+
+        for name in ["configurations_kept", "load_trials"] {
+            let why = settled(&[(name, "0")]).expect_err(name);
+            assert!(why.contains(name), "{why}");
+            assert!(why.contains("1 or more"), "{why}");
+            let why = settled(&[(name, "many")]).expect_err(name);
+            assert!(why.contains(name), "{why}");
+        }
     }
 
     /// A file still writing `beacon.interval`, from before there were two,

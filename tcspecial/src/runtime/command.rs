@@ -2113,6 +2113,96 @@ mod tests {
         assert_eq!(ASKED.load(Ordering::SeqCst), 1);
     }
 
+    /// A RESTART is taken only onto the target its arm named, even where
+    /// the vehicle holds the other configuration it names: the arm, not
+    /// what is held, decides. With a vehicle that held only one, a RESTART
+    /// onto another would be refused for not being held, and a missing
+    /// comparison of targets would go unseen.
+    ///
+    /// Through the links, as [`a_restart_is_taken_only_with_the_arms_key`]
+    /// is, onto two configurations kept in a store of the test's.
+    #[test]
+    fn a_restart_is_taken_only_onto_the_arms_target() {
+        static ASKED: std::sync::atomic::AtomicU32 =
+            std::sync::atomic::AtomicU32::new(0);
+        fn counted() {
+            ASKED.fetch_add(1, Ordering::SeqCst);
+        }
+
+        let desk = crate::runtime::choose::tests::Desk::new(3);
+        let armed_onto = desk.keep(1);
+        let other = desk.keep(2);
+        let (boot, _) =
+            crate::runtime::choose::Boot::of_command_line(&desk.command_line)
+                .expect("the desk's configuration loads");
+        let running = flying().digest;
+        let holding_both = Flying {
+            held: Held::of(running, boot),
+            ..flying()
+        };
+        assert!(holding_both.held.check(armed_onto).is_ok());
+        assert!(holding_both.held.check(other).is_ok());
+
+        let graph = two_nodes();
+        let states = Arc::new(NodeStates::of(&graph).expect("states"));
+        let ground = UdpSocket::bind("127.0.0.1:0").expect("a ground socket");
+        ground
+            .set_read_timeout(Some(Duration::from_secs(5)))
+            .expect("a timeout");
+        let (bench, _) = a_pass_answering(|_| Ok(()));
+        let commands = Commands::start(
+            &links_for(&ground),
+            states,
+            bench,
+            holding_both,
+            None,
+            TelemetryLog::disabled(),
+            Matched::at_a_start(),
+            counted,
+        )
+        .expect("both links bind");
+        let at = commands.spacecraft_address();
+        let restart = |sequence, target| match ask(
+            &ground,
+            at,
+            &Command::Restart(tcslibgs::RestartCommand::new(
+                sequence,
+                ArmKey(42),
+                target,
+            )),
+        ) {
+            Some(Telemetry::Restart(tm)) => tm.header.status,
+            other => panic!("expected a restart answer, got {other:?}"),
+        };
+        let arm = match ask(
+            &ground,
+            at,
+            &Command::RestartArm(tcslibgs::RestartArmCommand::new(
+                1,
+                ArmKey(42),
+                armed_onto,
+            )),
+        ) {
+            Some(Telemetry::RestartArm(tm)) => tm.header.status,
+            other => panic!("expected an arm answer, got {other:?}"),
+        };
+        assert_eq!(arm, CommandStatus::Success);
+
+        // Onto another the vehicle holds, with the arm's key: refused, and
+        // the arm stands.
+        assert_eq!(restart(2, other), CommandStatus::NotArmed);
+        assert_eq!(restart(3, running), CommandStatus::NotArmed);
+        assert_eq!(
+            ASKED.load(Ordering::SeqCst),
+            0,
+            "a RESTART onto another target restarts nothing"
+        );
+
+        // Onto the arm's own: taken.
+        assert_eq!(restart(4, armed_onto), CommandStatus::Success);
+        assert_eq!(ASKED.load(Ordering::SeqCst), 1);
+    }
+
     /// An arm lasts as long as the configuration's `restart_arm_valid` and
     /// no longer: within it a RESTART is taken, after it refused.
     ///

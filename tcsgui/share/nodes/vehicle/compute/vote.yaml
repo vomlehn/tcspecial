@@ -8,8 +8,8 @@ sets:
   function: vote
 payload-sink: true
 payload-source: true
-moc-sink: true
-moc-source: true
+gateway-sink: true
+gateway-source: true
 attributes:
   - name: inputs
     required: true

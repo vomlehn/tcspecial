@@ -1,5 +1,5 @@
 //! That a ground station's loop, once running, allocates nothing: a beacon
-//! pass, a datum from a `moc` node, a ping and its answer, and a command
+//! pass, a datum from a gateway node, a ping and its answer, and a command
 //! sent. A beacon is text, read in place by `tcslibgs::Beacon::read`, so a
 //! beacon pass allocates nothing to unpack it.
 //!
@@ -17,7 +17,7 @@ use tcslibgs::{
 
 use crate::beacon::{Arrived, Beacons, Link, Schedule};
 use crate::connection::{Connection, UdpConnection};
-use crate::moc::{Moc, DATUM_BYTES};
+use crate::gateway::{GatewayReceiver, DATUM_BYTES};
 use crate::ping::Pinger;
 
 /// The process's allocator, counting what one thread asks of it while that
@@ -168,8 +168,8 @@ fn a_datum_received_into_a_buffer_allocates_nothing() {
     std::fs::write(
         &path,
         format!(
-            "moc:
-  - {{ name: ground, type: moc, ground_base: \"127.0.0.1:{}\" }}
+            "gateway:
+  - {{ name: ground, type: gateway_radio, ground_base: \"127.0.0.1:{}\" }}
 payloads:
   - {{ name: a, type: network, protocol: udp, address: \"127.0.0.1\", \
     port: \"7001\", payload-out: ground }}
@@ -179,26 +179,26 @@ payloads:
     )
     .expect("written");
     let graph = Graph::load(&path).expect("it reads");
-    let Ok(mut moc) = Moc::open(&graph, "ground") else {
+    let Ok(mut gateway) = GatewayReceiver::open(&graph, "ground") else {
         return;
     };
     let vehicle = UdpSocket::bind("127.0.0.1:0").expect("the vehicle's socket");
     let mut buffer = vec![0u8; DATUM_BYTES];
     let to = std::net::SocketAddr::from(([127, 0, 0, 1], port));
 
-    let mut round = |moc: &mut Moc| {
+    let mut round = |gateway: &mut GatewayReceiver| {
         vehicle.send_to(b"293.15", to).expect("sent");
-        let arrival = moc
+        let arrival = gateway
             .receive_into(Some(Duration::from_secs(5)), &mut buffer)
             .expect("it reads")
             .expect("it arrives");
-        assert_eq!(moc.source(arrival.source), Some("a"));
+        assert_eq!(gateway.source(arrival.source), Some("a"));
         assert_eq!(&buffer[..arrival.length], b"293.15");
     };
-    round(&mut moc);
+    round(&mut gateway);
     let made = allocations_in(|| {
         for _ in 0..20 {
-            round(&mut moc);
+            round(&mut gateway);
         }
     });
     assert_eq!(made, 0, "twenty data allocated {made} times");
@@ -213,8 +213,8 @@ fn a_datum_longer_than_the_buffer_is_refused() {
     std::fs::write(
         &path,
         format!(
-            "moc:
-  - {{ name: ground, type: moc, ground_base: \"127.0.0.1:{}\" }}
+            "gateway:
+  - {{ name: ground, type: gateway_radio, ground_base: \"127.0.0.1:{}\" }}
 payloads:
   - {{ name: a, type: network, protocol: udp, address: \"127.0.0.1\", \
     port: \"7001\", payload-out: ground }}
@@ -224,7 +224,7 @@ payloads:
     )
     .expect("written");
     let graph = Graph::load(&path).expect("it reads");
-    let Ok(mut moc) = Moc::open(&graph, "ground") else {
+    let Ok(mut gateway) = GatewayReceiver::open(&graph, "ground") else {
         return;
     };
     let vehicle = UdpSocket::bind("127.0.0.1:0").expect("the vehicle's socket");
@@ -232,7 +232,7 @@ payloads:
         .send_to(b"293.15", ("127.0.0.1", port))
         .expect("sent");
     let mut small = [0u8; 3];
-    let why = moc
+    let why = gateway
         .receive_into(Some(Duration::from_secs(5)), &mut small)
         .expect_err("six bytes do not fit in three");
     assert!(why.contains("sent 6 bytes"), "{why}");

@@ -1,9 +1,9 @@
 [package]
-name = "app_moc_veh"
+name = "app_gateway_veh"
 version = "0.1.0"
 edition = "2021"
 license.workspace = true
-description = "A test app for the tcspecial node type app_moc_veh"
+description = "A test app for the tcspecial node type app_gateway_veh"
 
 [dependencies]
 tcsapp = { path = "../tcsapp" }

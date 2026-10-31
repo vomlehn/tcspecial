@@ -3,7 +3,7 @@
 //! Only how a network payload's stand-in is told apart is here. What a
 //! network node may say is shared with the ground link, and is
 //! `crate::graph::reach`'s: see `crate::node`, which says why there is no
-//! `moc` directory.
+//! `gateway` directory.
 
 use std::net::IpAddr;
 

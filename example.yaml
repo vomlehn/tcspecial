@@ -20,9 +20,9 @@ tcspecial:
     recv: "0.0.0.0:4000"
     send: "127.0.0.1:4100"
 
-moc:
-  - name: moc-1
-    type: moc
+gateway:
+  - name: gateway-1
+    type: gateway_radio
     address: "127.0.0.1"
     ground_base: "127.0.0.1:5100"
     port: "5000"
@@ -36,9 +36,9 @@ payloads:
     spi_mode: "0"
     stand_in: "127.0.0.1:7951"
     payload-out:
-      - target: moc-1
+      - target: gateway-1
 
 tcsgui:
   nodes:
-    - { name: moc-1, x: 469, y: 34 }
+    - { name: gateway-1, x: 469, y: 34 }
     - { name: spi-1, x: 15, y: 34 }

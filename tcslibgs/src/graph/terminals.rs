@@ -3,7 +3,7 @@
 //! A link joins one node's data source to another's data sink. Each end has a
 //! name, and the name says two things about the data and nothing about what is
 //! at the other end: whose it is, and whether it arrives here or leaves.
-//! `payload-` is a payload's own data, on its way to the ground; `moc-` is
+//! `payload-` is a payload's own data, on its way to the ground; `gateway-` is
 //! what the ground sends, on its way to a payload. `-in` is where it arrives
 //! and `-out` is where it leaves -- so every `-out` is a data source and every
 //! `-in` a data sink, which is the whole of the rule a reader has to remember.
@@ -17,15 +17,15 @@
 //! | stream      | leaves at     | arrives at   |
 //! |-------------|---------------|--------------|
 //! | groundward  | `payload-out` | `payload-in` |
-//! | vehicleward | `moc-out`     | `moc-in`     |
+//! | vehicleward | `gateway-out`     | `gateway-in`     |
 //!
 //! Groundward is a payload's readings on their way to the ground, which is why
 //! those two are the `payload-` pair; vehicleward is what the ground sends
-//! back -- a command, a trigger, a setpoint -- which is the `moc-` pair.
+//! back -- a command, a trigger, a setpoint -- which is the `gateway-` pair.
 //!
 //! # Which types this knows
 //!
-//! The types whose terminals are fixed: a payload kind, a `moc`, the two
+//! The types whose terminals are fixed: a payload kind, a `gateway`, the two
 //! `null-` and two `tee-` vehicle nodes, the `ping` vehicle node, and the
 //! five app node types. A computation's sinks are the inputs it declares and a
 //! log's are whatever is written to it, so their terminals are their own rules'
@@ -64,8 +64,8 @@ const KNOWN: &[(&str, bool, Stream)] = &[
     // name, whether it is a sink, which stream.
     ("payload-out", false, Stream::Groundward),
     ("payload-in", true, Stream::Groundward),
-    ("moc-out", false, Stream::Vehicleward),
-    ("moc-in", true, Stream::Vehicleward),
+    ("gateway-out", false, Stream::Vehicleward),
+    ("gateway-in", true, Stream::Vehicleward),
 ];
 
 /// Finds which stream a terminal carries, and whether it is a sink.
@@ -89,8 +89,8 @@ pub fn stream_of(terminal: &str) -> Option<(bool, Stream)> {
 /// Finds the terminal at the other end of this one's stream.
 ///
 /// The pairing, as four sentences: a `payload-out` may only be linked to a
-/// `payload-in`, a `payload-in` only to a `payload-out`, a `moc-out` only to
-/// a `moc-in`, and a `moc-in` only to a `moc-out`. Which is one
+/// `payload-in`, a `payload-in` only to a `payload-out`, a `gateway-out` only
+/// to a `gateway-in`, and a `gateway-in` only to a `gateway-out`. Which is one
 /// sentence twice over -- a stream leaves at one terminal and arrives at the
 /// other -- and that is why it is derived from `KNOWN` rather than written
 /// out again: the two halves of the table cannot drift apart.
@@ -143,7 +143,7 @@ pub struct Terminals {
     /// payload's telemetry arrives at its own socket, `source_base` plus the
     /// payload's id (see [`crate::types::HostPort::at`]), and the id is what
     /// says which panel a datagram belongs on. So every payload aboard
-    /// reporting to one `moc` node is the ordinary shape of a configuration,
+    /// reporting to one gateway node is the ordinary shape of a configuration,
     /// and it is what the shipped examples are.
     ///
     /// A vehicle node is not the ground and does not merge: two streams into
@@ -156,7 +156,7 @@ impl Terminals {
     /// Finds the one terminal of this kind, where there is exactly one.
     ///
     /// What a link end that names no terminal means. A node with one sink and
-    /// one source needs no names in the file -- `{ from: temp_1, to: moc }`
+    /// one source needs no names in the file -- `{ from: temp_1, to: gateway }`
     /// is unambiguous -- and one with two of either has to be told which.
     ///
     /// # Arguments
@@ -189,15 +189,15 @@ pub fn terminals_of(node_type: &str) -> Option<Terminals> {
     const PAYLOAD: Terminals = Terminals {
         // A payload receives what asks it for a reading -- a trigger, a
         // command, a byte written to a line -- and sends what it read.
-        sinks: &["moc-in"],
+        sinks: &["gateway-in"],
         sources: &["payload-out"],
         merges: false,
     };
-    const MOC: Terminals = Terminals {
+    const GATEWAY: Terminals = Terminals {
         // And the ground is the other end of both: it receives the readings
         // and sends what asks for them.
         sinks: &["payload-in"],
-        sources: &["moc-out"],
+        sources: &["gateway-out"],
         // Every payload's telemetry arrives here, told apart by the payload
         // id its socket carries: see the field.
         merges: true,
@@ -207,9 +207,9 @@ pub fn terminals_of(node_type: &str) -> Option<Terminals> {
     // at one is never two streams interleaved: a node that took both and
     // passed both on would hand a command to the ground and a reading to a
     // payload, and nothing downstream could tell which it had been given.
-    const NULL_MOC: Terminals = Terminals {
+    const NULL_GATEWAY: Terminals = Terminals {
         // What the ground sends, taken and dropped.
-        sinks: &["moc-in"],
+        sinks: &["gateway-in"],
         sources: &[],
         merges: false,
     };
@@ -219,49 +219,49 @@ pub fn terminals_of(node_type: &str) -> Option<Terminals> {
         sources: &[],
         merges: false,
     };
-    const TEE_MOC: Terminals = Terminals {
+    const TEE_GATEWAY: Terminals = Terminals {
         // What the ground sends, passed on as it was going and copied the
         // other way: a link cannot carry one stream into the other, so this
         // is the node that does. See `crate::graph::check`'s CrossedStreams.
-        sinks: &["moc-in"],
-        sources: &["moc-out", "payload-out"],
+        sinks: &["gateway-in"],
+        sources: &["gateway-out", "payload-out"],
         merges: false,
     };
     const TEE_PAYLOAD: Terminals = Terminals {
         // And the mirror of it: a payload's readings, passed on groundward
         // and copied vehicleward.
         sinks: &["payload-in"],
-        sources: &["payload-out", "moc-out"],
+        sources: &["payload-out", "gateway-out"],
         merges: false,
     };
 
     // An app node is a program run with one or both of two file interfaces,
     // and its terminals are which of them it has: see `crate::node::app`. The
     // pairing is the point -- on the interface where it reads payload data it
-    // writes MOC data -- so the terminals of the first kind are the ground
+    // writes gateway data -- so the terminals of the first kind are the ground
     // link's, and of the second a payload's.
     const APP_PAYLOAD: Terminals = Terminals {
-        // Payload data read, MOC data written: it takes what travels
+        // Payload data read, gateway data written: it takes what travels
         // groundward and answers with what travels vehicleward.
         sinks: &["payload-in"],
-        sources: &["moc-out"],
+        sources: &["gateway-out"],
         // One source into it, for the reason a vehicle node has one: a packet
         // carries no word for which node it came from, so two sources would be
         // two streams the program could not tell apart. The ground merges
         // because a payload id is in the socket it arrives on.
         merges: false,
     };
-    const APP_MOC: Terminals = Terminals {
-        // And the mirror of it: MOC data read, payload data written.
-        sinks: &["moc-in"],
+    const APP_GATEWAY: Terminals = Terminals {
+        // And the mirror of it: gateway data read, payload data written.
+        sinks: &["gateway-in"],
         sources: &["payload-out"],
         merges: false,
     };
     const APP_ALL: Terminals = Terminals {
         // Both interfaces, so all four terminals: the one type with them all,
         // each stream passing through it on its own interface.
-        sinks: &["payload-in", "moc-in"],
-        sources: &["payload-out", "moc-out"],
+        sinks: &["payload-in", "gateway-in"],
+        sources: &["payload-out", "gateway-out"],
         merges: false,
     };
     const APP_PL: Terminals = Terminals {
@@ -277,17 +277,17 @@ pub fn terminals_of(node_type: &str) -> Option<Terminals> {
     match node_type {
         "i2c" | "spi" | "serial" | "hdlc" | "can" | "iio" | "rpmsg"
         | "network" | "device-file" | "gpio" => Some(PAYLOAD),
-        gateway if crate::gateway::is_gateway(gateway) => Some(MOC),
-        "null-moc" => Some(NULL_MOC),
+        gateway if crate::gateway::is_gateway(gateway) => Some(GATEWAY),
+        "null-gateway" => Some(NULL_GATEWAY),
         "null-payload" => Some(NULL_PAYLOAD),
-        "tee-moc" => Some(TEE_MOC),
+        "tee-gateway" => Some(TEE_GATEWAY),
         "tee-payload" => Some(TEE_PAYLOAD),
         "app_payload_veh" => Some(APP_PAYLOAD),
         // A node that answers the ground's pings takes what the ground sends
-        // and sends its answer groundward, which is an `app_moc_veh`'s shape:
-        // the same table, because it is the same fact. See
+        // and sends its answer groundward, which is an `app_gateway_veh`'s
+        // shape: the same table, because it is the same fact. See
         // `crate::node::vehicle::ping`.
-        "app_moc_veh" | "ping" => Some(APP_MOC),
+        "app_gateway_veh" | "ping" => Some(APP_GATEWAY),
         "app_all_veh" => Some(APP_ALL),
         "app_pl" => Some(APP_PL),
         // A payload that is a program and is asked, which is a payload: the
@@ -421,8 +421,11 @@ mod tests {
     fn each_terminal_is_one_end_of_one_stream() {
         assert_eq!(stream_of("payload-out"), Some((false, Stream::Groundward)));
         assert_eq!(stream_of("payload-in"), Some((true, Stream::Groundward)));
-        assert_eq!(stream_of("moc-out"), Some((false, Stream::Vehicleward)));
-        assert_eq!(stream_of("moc-in"), Some((true, Stream::Vehicleward)));
+        assert_eq!(
+            stream_of("gateway-out"),
+            Some((false, Stream::Vehicleward))
+        );
+        assert_eq!(stream_of("gateway-in"), Some((true, Stream::Vehicleward)));
         // A computation's own input is not one of them.
         assert_eq!(stream_of("in0"), None);
 
@@ -443,15 +446,15 @@ mod tests {
     /// Each terminal may be linked to exactly one other, and which.
     ///
     /// The four sentences the editor is held to: a `payload-out` to a
-    /// `payload-in`, a `payload-in` to a `payload-out`, a `moc-out` to a
-    /// `moc-in`, a `moc-in` to a `moc-out`. Anything else is a link
+    /// `payload-in`, a `payload-in` to a `payload-out`, a `gateway-out` to a
+    /// `gateway-in`, a `gateway-in` to a `gateway-out`. Anything else is a link
     /// that would carry one stream into the other.
     #[test]
     fn a_terminal_may_be_linked_to_one_other_terminal() {
         assert_eq!(answers("payload-out"), Some("payload-in"));
         assert_eq!(answers("payload-in"), Some("payload-out"));
-        assert_eq!(answers("moc-out"), Some("moc-in"));
-        assert_eq!(answers("moc-in"), Some("moc-out"));
+        assert_eq!(answers("gateway-out"), Some("gateway-in"));
+        assert_eq!(answers("gateway-in"), Some("gateway-out"));
         assert_eq!(answers("in0"), None);
 
         // And the pairing is from the source end to the sink end: a link
@@ -459,11 +462,11 @@ mod tests {
         // other way about is a link drawn backwards.
         assert!(pairs_with("payload-out", "payload-in"));
         assert!(!pairs_with("payload-in", "payload-out"));
-        assert!(pairs_with("moc-out", "moc-in"));
-        assert!(!pairs_with("moc-in", "moc-out"));
+        assert!(pairs_with("gateway-out", "gateway-in"));
+        assert!(!pairs_with("gateway-in", "gateway-out"));
 
         // Nothing else pairs with anything: the two streams never meet.
-        let every = ["payload-out", "payload-in", "moc-out", "moc-in"];
+        let every = ["payload-out", "payload-in", "gateway-out", "gateway-in"];
         for leaves in every {
             for arrives in every {
                 assert_eq!(
@@ -480,36 +483,38 @@ mod tests {
     #[test]
     fn a_payload_and_the_ground_face_each_other() {
         let payload = terminals_of("i2c").expect("a payload kind");
-        let moc = terminals_of("moc").expect("the ground link");
+        let gateway = terminals_of("gateway_radio").expect("the ground link");
 
         // What the payload sends arrives at the ground, and what the ground
         // sends arrives at the payload: the same two streams, named from each
         // end.
         assert_eq!(payload.sources, &["payload-out"]);
-        assert_eq!(moc.sinks, &["payload-in"]);
-        assert_eq!(moc.sources, &["moc-out"]);
-        assert_eq!(payload.sinks, &["moc-in"]);
+        assert_eq!(gateway.sinks, &["payload-in"]);
+        assert_eq!(gateway.sources, &["gateway-out"]);
+        assert_eq!(payload.sinks, &["gateway-in"]);
     }
 
     /// A null node takes one stream and sends nothing on; a tee takes one
     /// stream and sends it on both.
     #[test]
     fn a_null_node_ends_one_stream_and_a_tee_sends_it_both_ways() {
-        let null_moc = terminals_of("null-moc").expect("the null-moc node");
-        assert_eq!(null_moc.sinks, &["moc-in"]);
-        assert!(null_moc.sources.is_empty());
+        let null_gateway =
+            terminals_of("null-gateway").expect("the null-gateway node");
+        assert_eq!(null_gateway.sinks, &["gateway-in"]);
+        assert!(null_gateway.sources.is_empty());
         let null_payload =
             terminals_of("null-payload").expect("the null-payload node");
         assert_eq!(null_payload.sinks, &["payload-in"]);
         assert!(null_payload.sources.is_empty());
 
-        let tee_moc = terminals_of("tee-moc").expect("the tee-moc node");
-        assert_eq!(tee_moc.sinks, &["moc-in"]);
+        let tee_gateway =
+            terminals_of("tee-gateway").expect("the tee-gateway node");
+        assert_eq!(tee_gateway.sinks, &["gateway-in"]);
         let tee_payload =
             terminals_of("tee-payload").expect("the tee-payload node");
         assert_eq!(tee_payload.sinks, &["payload-in"]);
-        for tee in [tee_moc, tee_payload] {
-            for name in ["payload-out", "moc-out"] {
+        for tee in [tee_gateway, tee_payload] {
+            for name in ["payload-out", "gateway-out"] {
                 assert!(tee.sources.contains(&name), "{name} is not a source");
             }
             assert!(!tee.merges);
@@ -518,14 +523,14 @@ mod tests {
     }
 
     /// A ping node hears the ground and answers it: what the ground sends
-    /// arrives, and the answer leaves groundward, to arrive at a `moc` node.
+    /// arrives, and the answer leaves groundward, to arrive at a gateway node.
     #[test]
     fn a_ping_node_hears_the_ground_and_answers_it() {
         let ping = terminals_of("ping").expect("the ping node");
-        assert_eq!(ping.sinks, &["moc-in"]);
+        assert_eq!(ping.sinks, &["gateway-in"]);
         assert_eq!(ping.sources, &["payload-out"]);
         assert!(!ping.merges);
-        assert!(pairs_with("moc-out", ping.sinks[0]));
+        assert!(pairs_with("gateway-out", ping.sinks[0]));
         assert!(pairs_with(ping.sources[0], "payload-in"));
     }
 
@@ -537,20 +542,20 @@ mod tests {
     #[test]
     fn an_app_has_the_terminals_its_interfaces_are() {
         // The vehicle's own three. On the interface where it reads payload
-        // data it writes MOC data, so the first wears the ground link's shape
-        // and the second a payload's.
+        // data it writes gateway data, so the first wears the ground link's
+        // shape and the second a payload's.
         let payload_veh =
             terminals_of("app_payload_veh").expect("a kind of app");
         assert_eq!(payload_veh.sinks, &["payload-in"]);
-        assert_eq!(payload_veh.sources, &["moc-out"]);
+        assert_eq!(payload_veh.sources, &["gateway-out"]);
         assert_eq!(
-            terminals_of("app_moc_veh"),
+            terminals_of("app_gateway_veh"),
             terminals_of("i2c"),
             "a node that is asked and answers wears a payload's shape"
         );
         let all_veh = terminals_of("app_all_veh").expect("a kind of app");
-        assert_eq!(all_veh.sinks, &["payload-in", "moc-in"]);
-        assert_eq!(all_veh.sources, &["payload-out", "moc-out"]);
+        assert_eq!(all_veh.sinks, &["payload-in", "gateway-in"]);
+        assert_eq!(all_veh.sources, &["payload-out", "gateway-out"]);
 
         // And the two that are payloads. The asked one is a payload, down to
         // the table it reads from; the one that is never asked is a payload
@@ -576,7 +581,7 @@ mod tests {
 
         // Named, and the name is one of the four: still refused, and by the
         // rule that was there already.
-        let said = terminal_at("app_pl", Some("moc-in"), true)
+        let said = terminal_at("app_pl", Some("gateway-in"), true)
             .expect_err("nothing may arrive");
         assert!(said.contains("none at all"), "{said}");
 
@@ -595,7 +600,7 @@ mod tests {
     /// what says whose it is. A vehicle node has one link and no such label.
     #[test]
     fn only_the_ground_takes_several_sources_at_one_sink() {
-        assert!(merges("moc"));
+        assert!(merges("gateway_radio"));
         assert!(!merges("i2c"));
         assert!(!merges("null"));
         // And a type with rules of its own is held to one, which is what a
@@ -629,16 +634,17 @@ mod tests {
             "a payload sends on its only source"
         );
         assert_eq!(
-            terminal_at("moc", None, true),
+            terminal_at("gateway_radio", None, true),
             Ok(Some("payload-in".to_string())),
             "the ground receives on its only sink"
         );
 
         // And a node with two of them has to be told which: a tee sends on
         // both streams, so an unnamed link from it could be either.
-        let said = terminal_at("tee-moc", None, false).expect_err("ambiguous");
+        let said =
+            terminal_at("tee-gateway", None, false).expect_err("ambiguous");
         assert!(
-            said.contains("payload-out") && said.contains("moc-out"),
+            said.contains("payload-out") && said.contains("gateway-out"),
             "{said}"
         );
     }
@@ -657,16 +663,16 @@ mod tests {
             "{said}"
         );
 
-        let said =
-            terminal_at("moc", Some("moc-out"), true).expect_err("wrong end");
-        assert!(
-            said.contains("moc-out") && said.contains("leaves"),
-            "{said}"
-        );
-        let said = terminal_at("tee-moc", Some("moc-in"), false)
+        let said = terminal_at("gateway_radio", Some("gateway-out"), true)
             .expect_err("wrong end");
         assert!(
-            said.contains("moc-in") && said.contains("arrives"),
+            said.contains("gateway-out") && said.contains("leaves"),
+            "{said}"
+        );
+        let said = terminal_at("tee-gateway", Some("gateway-in"), false)
+            .expect_err("wrong end");
+        assert!(
+            said.contains("gateway-in") && said.contains("arrives"),
             "{said}"
         );
     }

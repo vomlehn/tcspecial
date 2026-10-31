@@ -87,12 +87,12 @@
         <!-- Which of the four terminals a node of this type has. The names
              say whose data it is and whether it arrives or leaves: a payload
              sink is where the payload's own data arrives, on its way to the
-             ground, and a moc source is where what the ground sends leaves,
+             ground, and a gateway source is where what the ground sends leaves,
              on its way to a payload. -->
         <xs:element name="payload-sink" type="terminal"/>
         <xs:element name="payload-source" type="terminal"/>
-        <xs:element name="moc-sink" type="terminal"/>
-        <xs:element name="moc-source" type="terminal"/>
+        <xs:element name="gateway-sink" type="terminal"/>
+        <xs:element name="gateway-source" type="terminal"/>
       </xs:choice>
     </xs:complexType>
   </xs:element>

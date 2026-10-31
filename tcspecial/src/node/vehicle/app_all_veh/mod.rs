@@ -8,8 +8,8 @@
 //! way each of them carries data.
 //!
 //! Both interfaces, so all four directions: payload data written to it at
-//! descriptor 0 and read back from it at descriptor 1, and MOC data written at
-//! descriptor 1 and read back at descriptor 0. Which makes this the one kind
+//! descriptor 0 and read back from it at descriptor 1, and gateway data written
+//! at descriptor 1 and read back at descriptor 0. Which makes this the one kind
 //! that can carry both streams through, each kept apart from the other, with
 //! something done to what passes.
 //!
@@ -19,8 +19,8 @@
 //! asks it -- both of its interfaces, turn and turn about, so that a busy
 //! stream does not starve the other. Each datum it produces says which stream
 //! it is on, and the fabric follows only the links that carry that stream:
-//! without it, a reading would go out of this node's `moc-out` as well and the
-//! ground's commands would carry telemetry.
+//! without it, a reading would go out of this node's `gateway-out` as well and
+//! the ground's commands would carry telemetry.
 
 use std::process::ExitStatus;
 
@@ -97,17 +97,17 @@ impl AppAllVeh {
         self.running.read_payload_now_into(out)
     }
 
-    /// And whatever MOC data, likewise.
-    pub fn take_moc_data_now(&mut self) -> Result<Arrived, String> {
-        self.running.read_moc_now()
+    /// And whatever gateway data, likewise.
+    pub fn take_gateway_data_now(&mut self) -> Result<Arrived, String> {
+        self.running.read_gateway_now()
     }
 
     /// The same, into the fabric's buffer, allocating nothing.
-    pub fn take_moc_data_now_into(
+    pub fn take_gateway_data_now_into(
         &mut self,
         out: &mut [u8],
     ) -> Result<ReadInto, String> {
-        self.running.read_moc_now_into(out)
+        self.running.read_gateway_now_into(out)
     }
 
     /// And take one back from it, which is what it made of what it was given.
@@ -115,14 +115,14 @@ impl AppAllVeh {
         self.running.read_payload()
     }
 
-    /// Hand it a packet of MOC data, on its way vehicleward.
-    pub fn give_moc_data(&mut self, data: &[u8]) -> Result<(), String> {
-        self.running.write_moc(data)
+    /// Hand it a packet of gateway data, on its way vehicleward.
+    pub fn give_gateway_data(&mut self, data: &[u8]) -> Result<(), String> {
+        self.running.write_gateway(data)
     }
 
     /// And take one back.
-    pub fn take_moc_data(&mut self) -> Result<Option<Vec<u8>>, String> {
-        self.running.read_moc()
+    pub fn take_gateway_data(&mut self) -> Result<Option<Vec<u8>>, String> {
+        self.running.read_gateway()
     }
 
     /// What it said went wrong, or `None` once it has said all it will.
@@ -199,7 +199,7 @@ mod tests {
             kind: Kind::AllVeh,
             executable: executable.display().to_string(),
             payload_arg: Some("--readings".to_string()),
-            moc_arg: Some("--commands".to_string()),
+            gateway_arg: Some("--commands".to_string()),
             restart: Restart::Never,
         }
     }

@@ -215,18 +215,20 @@ node
     the attributes are unchanged: a bus and an address, a chip and a set of
     lines, a path.
 
-    *MOC links* -- ``moc`` -- a network link carrying telemetry to the ground
-    and commands back. This is what the OC endpoint was.
+    *gateway links* -- ``gateway_radio`` and ``gateway_fprime`` -- a network
+    link carrying telemetry to the ground and commands back. This is what the OC
+    endpoint was.
 
     *compute elements* -- ``compute`` -- software that transforms what arrives.
 
     *sinks* -- ``log`` -- somewhere data is kept rather than passed on. See
     `The logging node`_.
 
-    *generic vehicle nodes* -- ``null-moc``, ``null-payload``, ``tee-moc``,
-    ``tee-payload`` -- nodes that do nothing to what passes. Each takes one
-    stream: a null node drops it, and a tee sends each datum on both ways, on
-    its own stream and again on the other. See `Null nodes and tees`_.
+    *generic vehicle nodes* -- ``null-gateway``, ``null-payload``,
+    ``tee-gateway``, ``tee-payload`` -- nodes that do nothing to what passes.
+    Each takes one stream: a null node drops it, and a tee sends each datum on
+    both ways, on its own stream and again on the other. See `Null nodes and
+    tees`_.
 
     *link checks* -- ``ping`` -- a node that answers each ping the ground sends
     it with the vehicle's time. See `The ping node`_.
@@ -253,7 +255,7 @@ link
     Within one stream, that is. A link carries one stream and may not carry it
     into the other, so a copy that has to cross -- what the ground sent, back
     to the ground as payload data; a reading, to something that takes the
-    ground's data -- is what the ``tee-moc`` and ``tee-payload`` nodes are
+    ground's data -- is what the ``tee-gateway`` and ``tee-payload`` nodes are
     for. The crossing is a node, drawn and named, rather than a link that
     could be drawn backwards by mistake: see `Terminals: where a link is
     attached`_.
@@ -272,7 +274,7 @@ link
          type: compute
          function: "to_kelvin"
          payload-out:
-           - target: moc
+           - target: gateway
            - target: mean_temp
              input: in0
            - target: housekeeping
@@ -282,15 +284,15 @@ link
     per line is what makes several of them safe: the alternative was two lists
     read against each other, and a list one name short is a configuration that
     reads as valid and delivers a reading to somebody else's input. A word an
-    entry does not know is refused rather than ignored, because ``targte: moc``
-    quietly ignored is a line that goes nowhere.
+    entry does not know is refused rather than ignored, because ``targte:
+    gateway`` quietly ignored is a line that goes nowhere.
 
-    The short spelling is still read -- ``payload-out: moc``, or ``payload-out: [moc,
-    mean_temp.in0]``, the node and its input separated by a dot. Every
-    configuration written before entries existed says what it said, and a link
-    to one place is still a line somebody can write in a line. All of them read
-    into the same thing, because every rule about a link is about where it goes
-    and not about how the file said so.
+    The short spelling is still read -- ``payload-out: gateway``, or
+    ``payload-out: [gateway, mean_temp.in0]``, the node and its input separated
+    by a dot. Every configuration written before entries existed says what it
+    said, and a link to one place is still a line somebody can write in a line.
+    All of them read into the same thing, because every rule about a link is
+    about where it goes and not about how the file said so.
 
     So there is no links section. A node and the links out of it are read,
     written and deleted together, which is where a reader of the file wants
@@ -309,7 +311,7 @@ link
          function: "mean"
          inputs: "in0,in1,in2"
          payload-out:
-           - target: moc
+           - target: gateway
            - target: thermostat
          payload-in: true
 
@@ -365,7 +367,7 @@ The three sections
 A configuration's nodes are written in three sections, and they are the three
 working panes of the editor:
 
-``moc``
+``gateway``
     the ground links: the other end of the link, which is not the vehicle at
     all.
 
@@ -404,7 +406,7 @@ Terminals: where a link is attached
 A link joins one node's **data source** to another's **data sink**. Each end
 has a name, and the name says two things about the data and nothing about what
 is at the other end: whose it is, and whether it arrives here or leaves.
-``payload-`` is a payload's own data, on its way to the ground; ``moc-`` is
+``payload-`` is a payload's own data, on its way to the ground; ``gateway-`` is
 what the ground sends, on its way to a payload. ``-in`` is where it arrives and
 ``-out`` is where it leaves -- so **every ``-out`` is a data source and every
 ``-in`` a data sink**, which is the whole of the rule a reader has to remember.
@@ -423,53 +425,53 @@ There are four:
      - ``payload-in``
      - a payload's readings, on their way to the ground
    * - vehicleward
-     - ``moc-out``
-     - ``moc-in``
+     - ``gateway-out``
+     - ``gateway-in``
      - what the ground sends back: a command, a trigger, a setpoint
 
 So one stream is named twice -- ``payload-out`` where it leaves a node and
 ``payload-in`` where it arrives at the next -- and the two words are a sentence
 about the same bytes read from either end. The names say nothing about the type
 at the far end: with no vehicle node in the way, a payload's ``payload-out``
-connects to a MOC link's ``payload-in``, and with one it connects to that
+connects to a gateway link's ``payload-in``, and with one it connects to that
 node's ``payload-in`` instead and the node's own ``payload-out`` carries it the
 rest of the way.
 
 A link end is written ``node.terminal``, and may be written as ``node`` alone
 wherever the type has one terminal of the kind the end needs: ``{ from:
-temp_fore, to: moc }`` is unambiguous, because a payload has one data source
-and a MOC link has one data sink. A type with two of either has to be told
+temp_fore, to: gateway }`` is unambiguous, because a payload has one data source
+and a gateway link has one data sink. A type with two of either has to be told
 which, which is why the links out of a tee name their terminals.
 
 Which types have which:
 
 payloads
-    ``moc-in`` and ``payload-out``. A payload receives what asks it for a reading
-    -- a trigger, a command, a byte written to a line -- and sends what it
-    read.
+    ``gateway-in`` and ``payload-out``. A payload receives what asks it for a
+    reading -- a trigger, a command, a byte written to a line -- and sends what
+    it read.
 
-MOC links
-    ``payload-in`` and ``moc-out``. The ground is the other end of both.
+gateway links
+    ``payload-in`` and ``gateway-out``. The ground is the other end of both.
 
-``null-moc``
-    ``moc-in`` alone: what the ground sends arrives, and nothing leaves.
+``null-gateway``
+    ``gateway-in`` alone: what the ground sends arrives, and nothing leaves.
 
 ``null-payload``
     ``payload-in`` alone: a payload's data arrives, and nothing leaves.
 
-``tee-moc``
-    ``moc-in``, and both sources, ``moc-out`` and ``payload-out``: what the
-    ground sends arrives, and leaves both ways.
+``tee-gateway``
+    ``gateway-in``, and both sources, ``gateway-out`` and ``payload-out``: what
+    the ground sends arrives, and leaves both ways.
 
 ``tee-payload``
-    ``payload-in``, and both sources, ``payload-out`` and ``moc-out``.
+    ``payload-in``, and both sources, ``payload-out`` and ``gateway-out``.
 
 ``app_all_veh``
     all four, a program with both interfaces: see `App nodes`_.
 
 ``ping``
-    ``moc-in`` and ``payload-out``, a payload's pair: what the ground sends
-    arrives, and the answer leaves groundward, to arrive at a MOC link.
+    ``gateway-in`` and ``payload-out``, a payload's pair: what the ground sends
+    arrives, and the answer leaves groundward, to arrive at a gateway link.
 
 A computation's and a log's terminals are their own rules' business: a
 computation's data sinks are the inputs it declares, and a log's are whatever
@@ -486,16 +488,16 @@ Requirement
     ordinary case -- the arrangement drawn as a "T".
 
 Requirement
-    A MOC link's data sink takes as many sources as the configuration gives
+    A gateway link's data sink takes as many sources as the configuration gives
     it. The exception to the rule above, and not one made to let the examples
     through: the ground is the one place that *can* tell interleaved streams
     apart, because each payload's telemetry arrives at its own socket --
     ``payload_telemetry.source_base`` plus the payload's id -- and the id is
     what says whose a datagram is. Every payload aboard reporting to one
-    ``moc`` node is the ordinary shape of a configuration.
+    gateway node is the ordinary shape of a configuration.
 
 Requirement
-    A payload or a MOC link with no link on it at all is refused. Either a
+    A payload or a gateway link with no link on it at all is refused. Either a
     sink or a source will do: a payload that is only read has a source and no
     sink, one that is only driven -- a heater, a valve, a latch -- has a sink
     and no source, and both are configurations somebody means. Neither is a
@@ -504,10 +506,10 @@ Requirement
 Requirement
     Each terminal may be linked to one other terminal, and the pairing is four
     sentences: a ``payload-out`` only to a ``payload-in``, a ``payload-in`` only
-    to a ``payload-out``, a ``moc-out`` only to a ``moc-in``, a ``moc-in``
-    only to a ``moc-out``. Which is one sentence twice over -- a stream
-    leaves at one terminal and arrives at the other -- so the pairing is
-    derived from the table above rather than written out again.
+    to a ``payload-out``, a ``gateway-out`` only to a ``gateway-in``, a
+    ``gateway-in`` only to a ``gateway-out``. Which is one sentence twice over
+    -- a stream leaves at one terminal and arrives at the other -- so the
+    pairing is derived from the table above rather than written out again.
 
     The editor is held to it as a *gesture*: a line dragged from a terminal
     goes to the terminal that pairs with it and to no other, and a node with
@@ -533,9 +535,9 @@ Requirement
 Requirement
     A terminal is written into a file only where it says which. A node with one
     data source and one data sink needs neither name -- ``{ from: temp_fore,
-    to: moc }`` is unambiguous, and the schema reads an unnamed end as the only
-    terminal of the kind that end needs -- so the editor writes a terminal only
-    where the type has two of the kind, a tee's sources and an
+    to: gateway }`` is unambiguous, and the schema reads an unnamed end as the
+    only terminal of the kind that end needs -- so the editor writes a terminal
+    only where the type has two of the kind, a tee's sources and an
     ``app_all_veh``'s four. A tool that wrote a name into every
     link of every file it saved would churn every configuration it opened for
     no gain.
@@ -706,19 +708,30 @@ is read and required; ``radio`` and ``fprime`` are the kinds it accepts, and a
 configuration naming ``cfs`` is refused as specified but not yet built --
 ``tcslibgs::gateway`` is the one place that says which kinds are built, which
 node type is which kind's, and what each calls its far end. The radio is the
-``moc`` node, under its old name; the F´ gateway is the ``gateway_fprime``
-node, opened, counted and driven as the radio's is, and ``examples/fprime``
-flies it. Not yet built: the bridge's F´ model generated from the
-configuration, and the ``TcsBridge`` component itself.
+``gateway_radio`` node; the F´ gateway is the ``gateway_fprime`` node, opened,
+counted and driven as the radio's is, and ``examples/fprime`` flies it. Not yet
+built: the bridge's F´ model generated from the configuration, and the
+``TcsBridge`` component itself.
 
-The gateway nodes are written in the ``moc`` section, linked through
-``moc-in`` and ``moc-out``, with ``tee-moc``, ``null-moc`` and ``app_moc_veh``
-beside them. The rename to ``gateway`` changes configuration keys, so it is
-held back to land with the ``payload`` rename, when the configuration schema
-is complete; until then a file says ``moc`` wherever this section says
-``gateway``, and the radio's node type is ``moc`` where this section says
-``gateway_radio``. The rest of this section is written in the names it will
-have, because it is the statement the code is to be built to.
+The gateway nodes are written in the ``gateway`` section, linked through
+``gateway-in`` and ``gateway-out``, with ``tee-gateway``, ``null-gateway`` and
+``app_gateway_veh`` beside them. Each of those was named for the MOC while the
+ground was the only thing a vehicle answered to: the section and the radio's
+node type were ``moc``, the links ``moc-in`` and ``moc-out``, the others
+``tee-moc``, ``null-moc`` and ``app_moc_veh``, and an app's argument for the
+stream ``app-moc-arg``. The rename was held back to land with the ``payload``
+rename and no longer is; the ``payload`` rename still is, so ``payloads:``,
+``payload-in`` and ``payload-out`` keep their names.
+
+Requirement
+    A file that still writes one of the old words -- the ``moc`` section, a
+    node type ``moc``, ``tee-moc``, ``null-moc`` or ``app_moc_veh``, a key
+    ``moc-in``, ``moc-out`` or ``app-moc-arg`` -- is refused as it is read,
+    in either spelling, naming the file and the line and saying the word to
+    write instead. Refused rather than read as the new word, because a reader
+    that took both would leave every file free to say either for good, which
+    is the one word for two things the rename was for. The list is
+    ``tcslibgs::graph::renamed``'s, and it is the one statement of it.
 
 tcspecial was written to answer to the ground. What it does well -- reach a
 payload over any of the interfaces in `Payloads`_ from a configuration
@@ -740,7 +753,7 @@ node, and there are three kinds of gateway:
      - what the node states
    * - ``gateway_radio``
      - the ground, through the vehicle's radio
-     - UDP, as the ``moc`` node is today
+     - UDP
      - ``address``, ``port``, ``ground_base``
    * - ``gateway_cfs``
      - a cFS flight computer's software bus
@@ -752,8 +765,8 @@ node, and there are three kinds of gateway:
      - UDP, in the radio's own protocol, the bridge playing the MOC
      - ``address``, ``port``, ``bridge_base``, ``fprime_id_base``
 
-All three are in the ``gateway`` section, and all three have the terminals a
-MOC link has today: ``payload-in``, which takes as many sources as the
+All three are in the ``gateway`` section, and all three have the terminals
+the radio's has: ``payload-in``, which takes as many sources as the
 configuration gives it, and ``gateway-out``.
 
 One kind per configuration
@@ -826,9 +839,10 @@ ports and message IDs alike.
 The radio: ``gateway_radio``
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-The ``moc`` node, renamed, and nothing else changed. Every requirement on a
-``moc`` node in `What a device node says`_ and `Where the Addresses Are`_ is
-a requirement on it, and its link is UDP, which it will remain.
+What was the ``moc`` node, renamed, and nothing else changed. Every
+requirement on a gateway node in `What a device node says`_ and `Where the
+Addresses Are`_ is a requirement on it, and its link is UDP, which it will
+remain.
 
 cFS: ``gateway_cfs``
 ~~~~~~~~~~~~~~~~~~~~
@@ -1145,7 +1159,8 @@ What locates a node depends on its type:
 
 .. code-block:: text
 
-   network, moc    address, port, and for network the protocol
+   network, gateway_radio, gateway_fprime
+                   address, port, and for network the protocol
    i2c             path (the bus) and address (the device on it)
    can             interface and can_id
    everything else path
@@ -1211,13 +1226,13 @@ Requirement
     where to find.
 
 Requirement
-    A ``moc`` node needs no protocol and a ``network`` node does. A ground link
+    A gateway node needs no protocol and a ``network`` node does. A ground link
     is a datagram link, as the one tcspecial has always had is; a device
     reached over a socket could be any of the four, and guessing which is how a
     stream payload comes to be addressed as datagrams.
 
 Requirement
-    A ``moc`` node is the ground's end of the vehicle's data, and states where
+    A gateway node is the ground's end of the vehicle's data, and states where
     the ground is as ``ground_base``, ``address:port``. What each node drawn
     into it produces is sent by tcspecial as UDP datagrams to that address, at
     that port plus the source node's device id -- its position among all the
@@ -1244,28 +1259,28 @@ Requirement
     stopping the tcspecial and tcssim it started -- if not.
 
 Requirement
-    Ground software gets a ``moc`` node's data with a function call --
-    ``tcslib::moc::Moc::open`` names the node in the configuration, and
-    ``Moc::receive`` returns each datum with the name of the node that
-    produced it -- rather than opening sockets of its own. One function
-    between the configuration and the data is one place that counts ports,
-    and it counts them as the vehicle does.
+    Ground software gets a gateway node's data with a function call --
+    ``tcslib::gateway::GatewayReceiver::open`` names the node in the
+    configuration, and ``GatewayReceiver::receive`` returns each datum with the
+    name of the node that produced it -- rather than opening sockets of its own.
+    One function between the configuration and the data is one place that counts
+    ports, and it counts them as the vehicle does.
 
 Requirement
     A ground station's loop allocates nothing once it runs: a beacon pass,
-    a datum taken with ``Moc::receive_into`` into a buffer of
-    ``moc::DATUM_BYTES`` made beforehand, a ping and the folding in of its
+    a datum taken with ``GatewayReceiver::receive_into`` into a buffer of
+    ``gateway::DATUM_BYTES`` made beforehand, a ping and the folding in of its
     answer, and a command sent each reuse room made when they were opened.
     A datum longer than the buffer is refused, saying how long it was,
     rather than cut short. What still allocates does so only where
     something happens -- a remark on the beacon pass where something
     changed, the answer to a command, a datum that is not an answer to a
-    ping -- and says so where it does; ``Moc::receive``, which hands each
-    datum back to be kept, allocates it, and the ground programs here --
-    tcsmoc and ``lorem_moc`` -- use ``receive_into``.
+    ping -- and says so where it does; ``GatewayReceiver::receive``, which hands
+    each datum back to be kept, allocates it, and the ground programs here --
+    tcsmoc and ``lorem_gateway`` -- use ``receive_into``.
 
 Requirement
-    A ``moc`` node that the ground sends through -- a command binding comes
+    A gateway node that the ground sends through -- a command binding comes
     from it, or a line leaves it -- states the ``address`` and ``port``
     tcspecial binds to receive what the ground sends. One that only receives
     the vehicle's data states neither. ``ground_base`` is refused on every
@@ -1531,9 +1546,9 @@ Requirement
          format: variable_ts_rc }
 
    links:
-     - { from: k_fore, to: [moc, mean_temp.in0, housekeeping] }
-     - { from: k_aft, to: [moc, mean_temp.in1, housekeeping] }
-     - { from: k_bay, to: [moc, mean_temp.in2, housekeeping] }
+     - { from: k_fore, to: [gateway, mean_temp.in0, housekeeping] }
+     - { from: k_aft, to: [gateway, mean_temp.in1, housekeeping] }
+     - { from: k_bay, to: [gateway, mean_temp.in2, housekeeping] }
      - { from: thermostat, to: [heaters, housekeeping] }
 
 That is the thermostat's three converted readings and what the comparison
@@ -1551,31 +1566,32 @@ the ground left by every link it had, so a configuration that used both of its
 streams sent commands to the ground and readings to the payloads, which nothing
 in the file showed.
 
-``null-moc`` and ``null-payload``
-    take one stream -- what the ground sends at a ``null-moc``'s ``moc-in``, a
-    payload's data at a ``null-payload``'s ``payload-in`` -- and drop it. For a
-    stream that has to go somewhere and has nowhere to go yet. They have no
-    data source.
+``null-gateway`` and ``null-payload``
+    take one stream -- what the ground sends at a ``null-gateway``'s
+    ``gateway-in``, a payload's data at a ``null-payload``'s ``payload-in`` --
+    and drop it. For a stream that has to go somewhere and has nowhere to go
+    yet. They have no data source.
 
-``tee-moc`` and ``tee-payload``
-    take one stream and send each datum on both ways. A ``tee-moc`` sends what
-    arrives at its ``moc-in`` on by its ``moc-out``, as it was going, and again
-    by its ``payload-out``; a ``tee-payload`` sends what arrives at its
-    ``payload-in`` on by its ``payload-out`` and again by its ``moc-out``.
+``tee-gateway`` and ``tee-payload``
+    take one stream and send each datum on both ways. A ``tee-gateway`` sends
+    what arrives at its ``gateway-in`` on by its ``gateway-out``, as it was
+    going, and again by its ``payload-out``; a ``tee-payload`` sends what
+    arrives at its ``payload-in`` on by its ``payload-out`` and again by its
+    ``gateway-out``.
 
 .. code-block:: yaml
 
-   moc:
-     - { name: ground, type: moc, address: 127.0.0.1, port: "5000",
-         ground_base: "127.0.0.1:5100", moc-out: echo }
+   gateway:
+     - { name: ground, type: gateway_radio, address: 127.0.0.1, port: "5000",
+         ground_base: "127.0.0.1:5100", gateway-out: echo }
    payloads:
      - { name: heater, type: gpio, direction: output, lines: "4",
          path: /dev/gpiochip0 }
    vehicle:
      # What the ground sends the heater, and back to the ground to be seen.
      - name: echo
-       type: tee-moc
-       moc-out: [heater]
+       type: tee-gateway
+       gateway-out: [heater]
        payload-out: [ground]
 
 Requirement
@@ -1609,14 +1625,14 @@ far apart the two clocks are -- which a ping is the one exchange able to show.
 
 .. code-block:: yaml
 
-   moc:
-     - { name: ground, type: moc, address: 127.0.0.1, port: "5000",
-         ground_base: "127.0.0.1:5100", moc-out: pinger }
+   gateway:
+     - { name: ground, type: gateway_radio, address: 127.0.0.1, port: "5000",
+         ground_base: "127.0.0.1:5100", gateway-out: pinger }
    vehicle:
      - { name: pinger, type: ping, payload-out: ground }
 
-The ground sends its pings to the MOC link's ``address`` and ``port``, and the
-answers arrive at its ``ground_base`` plus the ping node's device id, as any
+The ground sends its pings to the gateway link's ``address`` and ``port``, and
+the answers arrive at its ``ground_base`` plus the ping node's device id, as any
 node's telemetry does.
 
 Requirement
@@ -1876,13 +1892,13 @@ with and on which side of the graph the node stands. Three are the vehicle's
 own, parts of the telemetry and control system itself:
 
 ``app_payload_veh``
-    Reads payload data, writes MOC data. A sink for what travels groundward and
-    a source of what travels vehicleward, which is the shape the ground link
+    Reads payload data, writes gateway data. A sink for what travels groundward
+    and a source of what travels vehicleward, which is the shape the ground link
     has: it takes readings and answers with commands.
 
-``app_moc_veh``
-    The mirror of it. Reads MOC data, writes payload data, which is the shape a
-    payload has: it is asked for something and answers with it.
+``app_gateway_veh``
+    The mirror of it. Reads gateway data, writes payload data, which is the
+    shape a payload has: it is asked for something and answers with it.
 
 ``app_all_veh``
     Both, and so all four terminals. The one kind that can carry a stream
@@ -1894,8 +1910,9 @@ And two are payloads: what the vehicle carries this flight, where what it
 carries is a program the mission wrote rather than a device on a bus. A payload
 sends readings and is sent what asks for them, so neither of these is run with
 the payload interface -- payload data is what they *write*, and the interface
-payload data is written on is the MOC one. Both are written in the ``payloads``
-section, drawn on the payload pane, and read the way a sensor is read.
+payload data is written on is the gateway one. Both are written in the
+``payloads`` section, drawn on the payload pane, and read the way a sensor is
+read.
 
 ``app_pl``
     Writes payload data and reads nothing. A payload that is never asked: it
@@ -1906,13 +1923,13 @@ section, drawn on the payload pane, and read the way a sensor is read.
     into it.
 
 ``app_all_pl``
-    Reads MOC data, writes payload data, which is a payload's own shape: asked
-    for a reading, and answering with one. It states no ``trigger`` as a device
-    on a bus does, and for the reason a trigger exists: the bytes that ask a
-    sensor are written before a read because a sensor has no other way of being
-    told, where a program is told by being given the packet.
+    Reads gateway data, writes payload data, which is a payload's own shape:
+    asked for a reading, and answering with one. It states no ``trigger`` as a
+    device on a bus does, and for the reason a trigger exists: the bytes that
+    ask a sensor are written before a read because a sensor has no other way of
+    being told, where a program is told by being given the packet.
 
-The payload pair hold the same interface an ``app_moc_veh`` holds and do the
+The payload pair hold the same interface an ``app_gateway_veh`` holds and do the
 same two things with it. What tells the node types apart is which side of the
 graph each stands on -- which section of the file, which pane of the editor,
 which family of ``tcspecial::node`` opens it -- and not anything the program
@@ -1977,8 +1994,8 @@ node it is comes first, for every kind: one program may be several nodes of one
 configuration, and three processes that cannot say which of them each is are
 three processes whose complaints an operator cannot act on. Then one argument
 per stream the kind handles -- ``app-payload-arg`` for the kinds that handle
-payload data, ``app-moc-arg`` for the kinds that handle MOC data, payload
-before MOC where a kind has both:
+payload data, ``app-gateway-arg`` for the kinds that handle gateway data,
+payload before gateway where a kind has both:
 
 .. code-block:: yaml
 
@@ -1987,7 +2004,7 @@ before MOC where a kind has both:
        type: app_all_veh
        executable: $HOME/libexec/tcs/through
        app-payload-arg: --readings
-       app-moc-arg: --commands
+       app-gateway-arg: --commands
 
    payloads:
      - name: bay_2
@@ -2001,8 +2018,8 @@ take them, and refused of the kinds that do not. Required because the order is
 the whole of what makes the list readable from the program end: a list whose
 length depends on which attributes somebody wrote is a list a program has to
 count before it can read, and it would count wrongly on the day a node's type
-changed. Refused because an ``app-moc-arg`` on a kind that handles no MOC data
-is an argument written for a program that will not be given it.
+changed. Refused because an ``app-gateway-arg`` on a kind that handles no
+gateway data is an argument written for a program that will not be given it.
 
 The data never comes that way. What a node was given arrives on an interface,
 and a command line carrying readings would be a node whose work was in neither
@@ -2016,12 +2033,13 @@ read; it sits beside the two node families rather than in one of them, because
 the rule is one rule and the kind says which family a given app belongs to.
 ``tcspecial::node::vehicle::app_payload_veh`` and its four neighbours are the
 flight side, two of them under ``tcspecial::node::payload`` because two of the
-kinds are payloads. And ``app_payload_veh``, ``app_moc_veh``, ``app_all_veh``,
-``app_pl`` and ``app_all_pl`` are five programs of their own, built as crates
-and not installed: they are what the arrangement is tested with -- three of
-them answer what arrives, one carries each stream through to the other
-interface, one reports without being asked, and a test that a packet comes back
-out of the interface it was *not* going to is how the streams are held apart.
+kinds are payloads. And ``app_payload_veh``, ``app_gateway_veh``,
+``app_all_veh``, ``app_pl`` and ``app_all_pl`` are five programs of their own,
+built as crates and not installed: they are what the arrangement is tested with
+-- three of them answer what arrives, one carries each stream through to the
+other interface, one reports without being asked, and a test that a packet comes
+back out of the interface it was *not* going to is how the streams are held
+apart.
 
 Which stream a datum is on
 ~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -2038,11 +2056,11 @@ every link out of them is followed, which is what the fabric always did.
 
 A node with more than one terminal at either end has to be told and has to say.
 An ``app_all_veh`` is the one that does: it reads payload data on the one
-interface and MOC data on the other, so each datum it produces belongs to one
-of the two, and delivering a reading to the links leaving its ``moc-out`` would
-send telemetry out as a command. So the stream travels with the bytes --
-``Taken`` carries it out of a node, ``Arriving`` carries it in -- and
-``Fabric`` follows only the links that carry it.
+interface and gateway data on the other, so each datum it produces belongs to
+one of the two, and delivering a reading to the links leaving its
+``gateway-out`` would send telemetry out as a command. So the stream travels
+with the bytes -- ``Taken`` carries it out of a node, ``Arriving`` carries it in
+-- and ``Fabric`` follows only the links that carry it.
 
 Which stream a link carries is settled once, where the routing table is built:
 from the terminal either end names, and failing that from the only terminal the
@@ -2088,7 +2106,8 @@ the second is threads, descriptors and bytes.
          command interpreter on its own thread, the conductor running one pass,
          a thread for each node, given its part of every stage, and the beacons. Each node has a state and a wakeup descriptor, so a
          command that disables a node reaches it while it is waiting. On the
-         ground, data arrives as UDP and is taken with tcslib::moc::Moc::receive.
+         ground, data arrives as UDP and is taken with
+         tcslib::gateway::GatewayReceiver::receive.
    :width: 100%
 
    What a configuration becomes, and what runs at once.
@@ -2102,7 +2121,7 @@ with one node missing would be a vehicle flying a configuration nobody wrote.
 What survives the check is turned into four tables, described under `Running a
 graph`_: ``route`` says where each node's output goes and which link fills each
 of its named inputs, ``schedule`` says when each group is next read,
-``telemetry`` gives each source its own link to the ground -- a ``moc`` node's
+``telemetry`` gives each source its own link to the ground -- a gateway node's
 ``ground_base`` counted on by that source's device id -- and ``parameters``
 reads the ``tcspecial`` section for the beacons, the log and the two command
 ports. None of the four opens anything, which is what lets each be tested
@@ -2721,7 +2740,7 @@ How a command names a node
 By its node id: the number the node has from the order the configuration
 declares it, counted across every node whatever its kind. It is not a number
 invented for commands -- it is the one a node's link to the ground is already
-counted by, a ``moc`` node's ``ground_base`` plus that node's id -- so the id
+counted by, a gateway node's ``ground_base`` plus that node's id -- so the id
 in a command and the port its telemetry arrives on are the same number, worked
 out in one place.
 
@@ -3137,7 +3156,7 @@ Requirement
     delivery. The two are different things: a sensor has a reading when its
     group is due and a delivery does not change that, while a computation has
     one *because* something arrived. Reading every destination instead would
-    cost a device read per delivery, and would take a command off a MOC link
+    cost a device read per delivery, and would take a command off a gateway link
     and pass it on as though it were a result.
 
 Requirement
@@ -3224,8 +3243,8 @@ Requirement
 Requirement
     A node is polled only if it is in no group, its output goes somewhere, and
     it produces by the clock rather than by arrival. Each of those rules out a
-    read whose result would be discarded. The one that matters is a MOC link:
-    what arrives on one is a command, which sets an attribute rather than
+    read whose result would be discarded. The one that matters is a gateway
+    link: what arrives on one is a command, which sets an attribute rather than
     travelling a link, so polling it would be taking commands off the socket
     and throwing them away. A ground link that does feed the graph says so with
     a link out of it, and is polled like anything else.
@@ -3263,7 +3282,7 @@ Requirement
     -- would be the hardest lines to find in it.
 
 Requirement
-    A command binding counts as a connection at both of its ends. A MOC link
+    A command binding counts as a connection at both of its ends. A gateway link
     exists to carry commands as much as telemetry, and a computation whose
     setpoint is the only thing the ground sets is reached by its binding and by
     nothing else -- so a configuration judged by its links alone would call
@@ -3277,7 +3296,7 @@ Requirement
     because the fault is in the file and not in the attempt.
 
 Requirement
-    A MOC link that a command binding arrives on is read as well as written,
+    A gateway link that a command binding arrives on is read as well as written,
     though no link leaves it. A command sets an attribute rather than
     travelling a link, so the ``commands`` section is the only statement that
     anything arrives from the ground -- and a ground link judged by its links
@@ -3316,8 +3335,8 @@ Requirement
     does not name it. Delivering it would make a file that says something it
     does not mean work by accident. A *terminal* is not one of those -- see
     `Terminals: where a link is attached`_ -- and never reaches a port: a
-    device's ``moc-in`` is its one way in, spelled, and is resolved where the
-    routing table is built.
+    device's ``gateway-in`` is its one way in, spelled, and is resolved where
+    the routing table is built.
 
 Requirement
     A device that must be asked before it answers is asked after it is read,
@@ -3390,11 +3409,11 @@ button does on demand, whether or not anything was edited:
 
 A comment above a link is kept, and a link is now an attribute -- so this is
 the one attribute whose comment survives a save: the run of comment lines above
-a ``payload-out:`` or ``moc-out:`` is read as a note about the links that
+a ``payload-out:`` or ``gateway-out:`` is read as a note about the links that
 attribute makes. Where the attribute names several destinations the note is
 about all of them, one line carrying one comment.
 
-A comment above a ``payload-in:`` or ``moc-in:`` is not kept, those being
+A comment above a ``payload-in:`` or ``gateway-in:`` is not kept, those being
 a record of links rather than links: the note belongs above the link, at the
 end it is written at, and a comment the editor kept in a derived line would be
 a comment it moved. It is the fourth kind in the list above.
@@ -3411,9 +3430,10 @@ it is for. Left to right: the *payload working pane*, labelled ``Payloads``,
 which holds everything the vehicle carries: a device on a bus, a line it
 drives, a link to something aboard; the *vehicle working pane*, labelled
 ``Vehicle``, which holds the vehicle's own graph -- the computations, the log,
-a page of its own; and the *moc working pane*, labelled ``MOC``, which holds
-the ground link. It is the order the examples' diagrams in the manual are drawn
-in, so a diagram there and the same configuration in the editor read alike.
+a page of its own; and the *gateway working pane*, labelled ``Gateway``, which
+holds the ground link. It is the order the examples' diagrams in the manual are
+drawn in, so a diagram there and the same configuration in the editor read
+alike.
 
 The labels are light grey and italic, which is this window's way of saying "not
 part of the drawing": one in the colour and the face of a node would read as
@@ -3424,7 +3444,7 @@ with a row nothing can be put in.
 
 There is a selection pane for each, one above another in the same order the
 working panes are in -- payloads at the top, then the vehicle's, then the
-MOC's -- and which one a shape was pressed in is what decides where it lands.
+gateway's -- and which one a shape was pressed in is what decides where it lands.
 A node stays in its pane: a drag that would carry a payload rightwards across a
 divider stops at it.
 
@@ -3435,7 +3455,7 @@ settings file as percentages. A line moves the boundary between its own two
 neighbours and leaves the third alone, which is what a person dragging it
 expects: the list above grows by what the list below gives up. The upper line
 is between the payload list and the vehicle's, the lower one between the
-vehicle's and the MOC's. The arithmetic
+vehicle's and the gateway's. The arithmetic
 is ``tcsgui::list_shares_after``, in Rust where it can be tested, and the
 markup reports a drag as how far it went and how tall the column is -- what a
 share is depends on what it is a share of.
@@ -3480,16 +3500,16 @@ node already on the wrong side holds nothing, so one such node cannot freeze
 the control.
 
 Where the dividers sit is kept in ``$HOME/.tcsgui/preferences.xml``, as the
-percentages of the working pane the moc and vehicle working panes take, the
+percentages of the working pane the gateway and vehicle working panes take, the
 payload pane taking what is left. Each is kept by the pane it is about rather
-than by its place on the screen, so a file written when the moc pane was the
+than by its place on the screen, so a file written when the gateway pane was the
 leftmost still means the same widths now that it is the rightmost. The file is
 read when the editor starts and is what places the dividers; it is written
 whenever a line is moved. The directory is made automatically, and a
 preferences file that is missing, unreadable or hand-edited into nonsense
 leaves the defaults in place and says so on the error output: an editor that
 refused to start because it could not remember a pane width would be an editor
-traded for a preference. A file written before there was a moc working pane
+traded for a preference. A file written before there was a gateway working pane
 states only the vehicle's share, and the new pane's share is taken out of that
 one rather than out of the payload column somebody had arranged. The file was
 called ``config.xml`` in one build and is still read under that name when the
@@ -3506,7 +3526,7 @@ section at the end of the file rather than on the node it is about:
    tcsgui:
      nodes:
        - { name: payload, x: 40, y: 160 }
-       - { name: moc, x: 784, y: 40 }
+       - { name: gateway, x: 784, y: 40 }
 
 Last, and in a section of its own, because it is a different kind of thing.
 The sections above say what the vehicle carries and what it is told; this says
@@ -3584,11 +3604,12 @@ edge is where a node may be as well. The canvas draws a faint line every five
 millimetres, which are the lines the terminals are on.
 
 Each working pane is painted, and every node type has its own colour inside its
-pane's family. The MOC pane is a pale blue, the vehicle pane a pale green and
-the payload pane a pale blush: all three light and neutral -- no chroma above
-14 -- so that a pane reads as tinted paper rather than as a coloured panel. The
-nodes drawn on one are darker members of its own hue family: a payload is a
-plum or a maroon, a vehicle node a green or an olive, the ground link an azure.
+pane's family. The gateway pane is a pale blue, the vehicle pane a pale green
+and the payload pane a pale blush: all three light and neutral -- no chroma
+above 14 -- so that a pane reads as tinted paper rather than as a coloured
+panel. The nodes drawn on one are darker members of its own hue family: a
+payload is a plum or a maroon, a vehicle node a green or an olive, the ground
+link an azure.
 
 So a node's colour says two things at once. The hue says which family it is in,
 which makes a node drawn in the wrong pane visible as one; the step within the
@@ -3671,8 +3692,8 @@ each corner it has one in, with an arrow in it pointing the way the data on it
 travels across the canvas. Two rows, which are the two streams. Along the top,
 left to right, the payload's own data on its way to the ground: it arrives at
 ``payload-in`` and leaves at ``payload-out``. Along the bottom, right to left,
-what the ground sends on its way to a payload: it arrives at ``moc-in`` and
-leaves at ``moc-out``. Each box's upper left corner is on one of the lines
+what the ground sends on its way to a payload: it arrives at ``gateway-in`` and
+leaves at ``gateway-out``. Each box's upper left corner is on one of the lines
 five millimetres apart, so the terminals of nodes line up with each other and
 with those lines, and a line between two level terminals runs along one: worked
 out from where the node is, a millimetre not being a whole number of pixels,
@@ -3698,8 +3719,8 @@ and two columns inside the width. A name never collides with them however they g
 padded away from whichever side carries terminals.
 
 Only the terminals the type actually has. A payload carries its two on its
-right, a MOC link its two on its left, an ``app_all_veh`` all four, a tee its
-three, a null node its one, a log the one
+right, a gateway link its two on its left, an ``app_all_veh`` all four, a tee
+its three, a null node its one, a log the one
 it receives on, and a page of its own none -- what a page has is what the nodes
 inside it have, and nothing outside it knows that. A drawing that showed four
 on every node would say nothing about what may be linked to what, which is the
@@ -3732,13 +3753,13 @@ change.
 
 Which rules apply to a node depends on which pane it is in, because that is
 what the data flow is: a payload is where the payload's own data begins and a
-MOC link is where it ends, and the other stream runs the other way. A payload's
-``payload-out`` with nothing on it is a concern -- those readings reach nobody
--- where a computation's is not, a computation being free to send its result
-the other way or to be read by nothing yet. What is asked of a vehicle node is
-that a stream passing through it comes out somewhere, which is the shape of the
-whole graph. A log is the exception by having no data source at all: it is
-where a stream stops on purpose.
+gateway link is where it ends, and the other stream runs the other way. A
+payload's ``payload-out`` with nothing on it is a concern -- those readings
+reach nobody -- where a computation's is not, a computation being free to send
+its result the other way or to be read by nothing yet. What is asked of a
+vehicle node is that a stream passing through it comes out somewhere, which is
+the shape of the whole graph. A log is the exception by having no data source at
+all: it is where a stream stops on purpose.
 
 Setting one aside is an edit, so undo takes it back, and it is written in the
 file's own ``tcsgui`` section beside where the nodes were drawn: two people
@@ -3825,7 +3846,7 @@ corner to say something the stream already said.
 
 Which does not widen what may be joined to what. A node with no terminal of
 that stream takes nothing: the ground receives readings and is sent nothing, so
-a line carrying what the ground sends has nowhere to land on a ``moc`` node,
+a line carrying what the ground sends has nowhere to land on a gateway node,
 and a log has nothing to leave it by. The rule is still
 ``tcslibgs::graph::terminals``; only the aiming has changed.
 
@@ -3859,8 +3880,8 @@ is what makes a press on it ambiguous.
 Where it lands settles that. A node that could be *this* end -- one with the
 same terminal -- takes the end, which is the re-routing gesture. A node that
 could only be the *other* end gets a new line instead, and the line that was
-picked up stays where it was. So the moc node already feeding one payload,
-pressed on its ``moc-out`` and let go of over a second payload, feeds the
+picked up stays where it was. So the gateway node already feeding one payload,
+pressed on its ``gateway-out`` and let go of over a second payload, feeds the
 second one as well: a payload cannot be a data source, so there is nothing else
 the gesture could have meant.
 
@@ -4152,7 +4173,7 @@ body, and a test says so.
 Each link line is a **darker shade of the pane its data comes from**. The
 payload's own readings start in the payload pane and generally end at the
 ground, so that line is a teal taken from the teal pane they leave; what the
-ground sends starts in the moc pane and ends at a payload, so that line is a
+ground sends starts in the gateway pane and ends at a payload, so that line is a
 darker blue. A reader can then see where a line's data started without
 following it back, and the hue is held within twenty degrees of its own pane's
 by a test.
@@ -4217,7 +4238,7 @@ and it cannot be acted on until there is a second node. The rules come back as
 soon as there is a graph to apply them to.
 
 A configuration that does not exist yet opens with the ground station already
-in it, at the upper right, in the moc working pane. Every graph has
+in it, at the upper right, in the gateway working pane. Every graph has
 one -- a vehicle whose telemetry reaches nobody is a vehicle nobody is
 operating -- so placing it is work the editor can do rather than work it can
 wait for. It is placed through the history like any other edit, so it can be
@@ -4350,7 +4371,7 @@ function, because a name the editor chose should look the same whichever of its
 hands chose it.
 
 Nothing the editor places itself covers a pane's own name. The three names are
-written across the top of the sheet -- "MOC", "Vehicle", "Payloads", one per
+written across the top of the sheet -- "Gateway", "Vehicle", "Payloads", one per
 pane at the same height -- and they are what a pane has to say when it is empty
 or when somebody has lost their bearings. A node somebody *drags* over one is
 their own business, the sheet being their drawing; a node the editor put there
@@ -4518,9 +4539,10 @@ Two trees with one structure, family by family. A description at
 ``vehicle/compute/vote.yaml`` has its Rust at
 ``tcspecial/src/node/vehicle/compute/vote.rs``; one at ``payload/i2c.yaml``
 has ``node/payload/i2c/``, a directory with as many files under it as it takes.
-``moc.yaml`` sits at the root of the tree because the ground station has no
-Rust of its own: it is the other end of the link rather than part of the
-vehicle, and the code that serves one is the network payload's.
+``gateway_radio.yaml`` and ``gateway_fprime.yaml`` sit at the root of the
+tree because a gateway node has no Rust of its own: it is the vehicle's end of
+the link to what it answers to rather than part of the vehicle, and the code
+that serves one is the network payload's.
 
 The correspondence is checked both ways by
 ``tcsgui::nodes::tests::every_description_has_its_rust``: a description with no
@@ -4564,8 +4586,8 @@ twice is two statements of what its terminals are. What it says:
      function: mean
    payload-sink: true         # which of the four terminals a node of this
    payload-source: true       # type has: the payload's own data in and out,
-   moc-sink: true             # and what the ground sends in and out
-   moc-source: true
+   gateway-sink: true         # and what the ground sends in and out
+   gateway-source: true
    attributes:                # what a node of this kind says for itself
      - name: inputs
        required: true
@@ -4747,7 +4769,7 @@ where the complaint can name the file, the line and the attribute::
 
    vehicle.yaml:11: "temp_fore" is an i2c node, so it needs the device it is
    reached through: say path
-   vehicle.yaml:13: "moc" is a network node, so it needs the host it is at:
+   vehicle.yaml:13: "gateway" is a network node, so it needs the host it is at:
    say address
 
 That check is new, and the editor's laziness rests on it: before it, a node
@@ -5067,28 +5089,31 @@ addresses are its own. What is here is checked as it stands, with a
    payload_groups:
      - { name: cabin_temps, interval: "100 ms" }
 
-   moc:
-     - { name: moc, type: moc, address: "10.0.0.1", port: "5000",
+   gateway:
+     - { name: gateway, type: gateway_radio, address: "10.0.0.1", port: "5000",
          ground_base: "10.0.0.2:5100", payload-in: true }
 
    vehicle:
      - { name: k_1, type: compute, function: to_kelvin, format: i16_be,
          scale: "0.0625", offset: "273.15", payload-in: true,
-         payload-out: [{ target: moc }, { target: cabin_temp, input: in0 }] }
+         payload-out: [{ target: gateway }, { target: cabin_temp, input: in0 }]
+         }
      - { name: k_2, type: compute, function: to_kelvin, format: i16_be,
          scale: "0.0625", offset: "273.15", payload-in: true,
-         payload-out: [{ target: moc }, { target: cabin_temp, input: in1 }] }
+         payload-out: [{ target: gateway }, { target: cabin_temp, input: in1 }]
+         }
      - { name: k_3, type: compute, function: to_kelvin, format: u24_be,
          scale: "0.0078", offset: "255.37", payload-in: true,
-         payload-out: [{ target: moc }, { target: cabin_temp, input: in2 }] }
+         payload-out: [{ target: gateway }, { target: cabin_temp, input: in2 }]
+         }
 
      - { name: cabin_temp, type: compute, function: vote, algorithm: median,
          inputs: "in0,in1,in2", payload-in: true,
-         payload-out: [{ target: moc }, { target: thermostat }] }
+         payload-out: [{ target: gateway }, { target: thermostat }] }
      - { name: thermostat, type: compute, function: hysteresis,
          setpoint: "293.15", half_band: "2.0", payload-in: true,
-         payload-out: [{ target: moc }],
-         moc-out: [{ target: heaters_1 }, { target: heaters_2 }] }
+         payload-out: [{ target: gateway }],
+         gateway-out: [{ target: heaters_1 }, { target: heaters_2 }] }
 
    payloads:
      - { name: temp_1, type: i2c, group: cabin_temps, path: "/dev/i2c-1",
@@ -5100,19 +5125,19 @@ addresses are its own. What is here is checked as it stands, with a
          payload-out: [{ target: k_3 }] }
 
      - { name: heaters_1, type: gpio, direction: output, path: "/dev/gpiochip0",
-         lines: "3,4,5", moc-in: true }
+         lines: "3,4,5", gateway-in: true }
      - { name: heaters_2, type: gpio, direction: output, path: "/dev/gpiochip0",
-         lines: "6,7,8", moc-in: true }
+         lines: "6,7,8", gateway-in: true }
 
    commands:
-     - { from: moc, sets: thermostat.setpoint }
+     - { from: gateway, sets: thermostat.setpoint }
 
 A line is written once, on the node it leaves, under the terminal it leaves
 by: ``payload-out`` on each sensor names the conversion it feeds, and the
 conversions name the vote's input they bind. The thermostat's decision leaves
 by two terminals, which is the file saying two different things with it -- its
-``payload-out`` sends it to the ground as telemetry, and its ``moc-out`` drives
-the two heaters.
+``payload-out`` sends it to the ground as telemetry, and its ``gateway-out``
+drives the two heaters.
 
 Several things in that file are refusals waiting to happen, which is the point.
 Drop ``cabin_temp.in2`` from ``k_3``'s links and the configuration is refused
@@ -5206,7 +5231,7 @@ Features
   configuration and connects into the graph
 
   * App nodes: three on the vehicle's side (``app_payload_veh``,
-    ``app_moc_veh``, ``app_all_veh``) and two that are payloads (``app_pl``,
+    ``app_gateway_veh``, ``app_all_veh``) and two that are payloads (``app_pl``,
     ``app_all_pl``), each naming its ``executable``
 
   * The interface is file descriptors carrying length-prefixed packets, so a
@@ -5251,7 +5276,7 @@ systems as follows:
    |  +---------+          |  :   |  | Beacon              |  |   |             |
    |       ^               |  :   |  +---------------------+  |   |             |
    |       |               |  :   |  | The graph           |  |   | +---------+ |
-   |       v               |  :   |  |  moc nodes          |  |   | |Payload 0| |
+   |       v               |  :   |  |  gateway nodes      |  |   | |Payload 0| |
    |  +-----------------+  |  :   |  |  vehicle nodes:     |  |   | +---------+ |
    |  | tcslib          |<------->|  |   compute, log,     |  |   | +---------+ |
    |  | tcslib-c        |  |  :   |  |   tee, null, ping,  |  |   | |Payload 1| |
@@ -5273,8 +5298,8 @@ Over IP the link is several sockets, each saying by the port it is on what it
 carries -- see `Where the Addresses Are`_. Commands about the spacecraft go to
 the command interpreter on one port and commands about a payload on another;
 the command interpreter answers each. The beacon is sent on a link of its own.
-What the ground sends into the graph arrives at a ``moc`` node, and what leaves
-the graph for the ground goes from each source to the ``moc`` node's
+What the ground sends into the graph arrives at a gateway node, and what leaves
+the graph for the ground goes from each source to the gateway node's
 ``ground_base``, at a port of its own. On a space link the same division is by
 virtual channel.
 
@@ -8227,7 +8252,7 @@ Requirement
     started; two on one device file, one serial line or one SPI peripheral is
     worse, each taking part of the one stream and reporting it as though it
     were the whole. Every node that is opened is compared with every other --
-    the payloads and the MOC node, a port being a port whatever claims it --
+    the payloads and the gateway node, a port being a port whatever claims it --
     and the node whose claim came second is the one named, since the first
     claim is the one that stands and a reader given both names has to change
     one of them. The claim is per kind, because what a kind shares by design
@@ -11974,10 +11999,10 @@ for the payloads, rather than one ``tcstest``. A third test program,
 Four words changed as well, and these requirements use the old ones throughout.
 What a requirement calls a **payload** is a **device** where it is hardware,
 and a **node** where the statement is about anything the configuration can name
--- a device, a MOC link, or a compute element. Where it says *device* and means
-an entry in the filesystem, that is a **device file**. Where it says **OC** it
-means the **MOC**, the mission operations center. The requirements stand as
-written; ``manual.rst`` gives the vocabulary in force.
+-- a device, a gateway link, or a compute element. Where it says *device* and
+means an entry in the filesystem, that is a **device file**. Where it says
+**OC** it means the **MOC**, the mission operations center. The requirements
+stand as written; ``manual.rst`` gives the vocabulary in force.
 
 A ``Not implemented`` or ``Implemented differently`` note says where the
 software does not do what a requirement says. The requirement stands as
@@ -12049,7 +12074,7 @@ DH_UDP must implement DH and use UDP to send telemetry to tcslib
    and ``GpioEndpoint``. Telemetry no longer leaves from the payload's own
    node: every payload had an OC endpoint of its own, and a node's data now
    reaches the ground along the links the configuration draws, through the
-   ``moc`` node, which is the one UDP socket to the ground whatever types the
+   gateway node, which is the one UDP socket to the ground whatever types the
    nodes behind it are. What that is for is that the graph decides where a
    datum goes -- to the ground, to a log, to a computation, or to all three --
    and a payload wired to send its own telemetry could only decide the one.

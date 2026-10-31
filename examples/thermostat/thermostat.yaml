@@ -28,9 +28,9 @@ payload_groups:
   - name: "cabin_temps"
     interval: "100 ms"
 
-moc:
-  - name: moc
-    type: moc
+gateway:
+  - name: gateway
+    type: gateway_radio
     address: "127.0.0.1"
     ground_base: "127.0.0.1:5100"
     port: "5000"
@@ -44,7 +44,7 @@ vehicle:
     offset: "273.15"
     scale: "0.0625"
     payload-out:
-      - target: moc
+      - target: gateway
       - target: cabin_temp
         input: in0
       - target: housekeeping
@@ -56,7 +56,7 @@ vehicle:
     offset: "273.15"
     scale: "0.0625"
     payload-out:
-      - target: moc
+      - target: gateway
       - target: cabin_temp
         input: in1
       - target: housekeeping
@@ -68,7 +68,7 @@ vehicle:
     offset: "255.37"
     scale: "0.0078"
     payload-out:
-      - target: moc
+      - target: gateway
       - target: cabin_temp
         input: in2
       - target: housekeeping
@@ -85,7 +85,7 @@ vehicle:
     function: "vote"
     inputs: "in0,in1,in2"
     payload-out:
-      - target: moc
+      - target: gateway
       - target: thermostat
     payload-in: true
   # setpoint is set from the ground; half_band is how far either side
@@ -98,12 +98,12 @@ vehicle:
     setpoint: "293.15"
     payload-out:
       - target: housekeeping
-      - target: moc
+      - target: gateway
     # asserted below the setpoint, unasserted above it. Two heaters,
     # because one failing must not leave the mass with no way to be
     # warmed: either alone holds the band, and both together hold it
     # twice as fast.
-    moc-out:
+    gateway-out:
       - target: heaters_1
       - target: heaters_2
     payload-in: true
@@ -155,17 +155,17 @@ payloads:
     direction: "output"
     lines: "3,4,5"
     path: "/dev/gpiochip0"
-    moc-in: true
+    gateway-in: true
   - name: heaters_2
     type: gpio
     direction: "output"
     lines: "6,7,8"
     path: "/dev/gpiochip0"
-    moc-in: true
+    gateway-in: true
 
 commands:
   # the cabin temperature the heaters are held at, in kelvin
-  - { from: moc, sets: thermostat.setpoint }
+  - { from: gateway, sets: thermostat.setpoint }
 
 tcsgui:
   nodes:
@@ -177,7 +177,7 @@ tcsgui:
     - { name: k_3, x: 242, y: 280 }
     - { name: cabin_temp, x: 469, y: 166 }
     - { name: thermostat, x: 601, y: 242 }
-    - { name: moc, x: 790, y: 34 }
+    - { name: gateway, x: 790, y: 34 }
     - { name: heaters_1, x: 34, y: 393 }
     - { name: heaters_2, x: 34, y: 470 }
     - { name: housekeeping, x: 469, y: 374 }

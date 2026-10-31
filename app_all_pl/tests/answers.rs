@@ -13,7 +13,7 @@ fn app() -> PathBuf {
 }
 
 /// The arguments an `app_all_pl` is run with: its name, then the payload
-/// argument, then the MOC one, this kind handling both streams.
+/// argument, then the gateway one, this kind handling both streams.
 ///
 /// # Returns
 ///
@@ -29,16 +29,18 @@ fn arguments() -> Vec<String> {
 /// What asks for a reading comes back as a reading.
 #[test]
 fn what_asks_for_a_reading_is_answered_with_one() {
-    let mut running =
-        parent::start(&app(), &arguments(), Supports::MOC).expect("it starts");
+    let mut running = parent::start(&app(), &arguments(), Supports::GATEWAY)
+        .expect("it starts");
 
-    running.write_moc(b"READ").expect("it takes a packet");
+    running.write_gateway(b"READ").expect("it takes a packet");
     assert_eq!(
         running.read_payload().expect("an answer"),
         Some(b"READ".to_vec())
     );
 
-    running.write_moc(b"").expect("an empty packet is a packet");
+    running
+        .write_gateway(b"")
+        .expect("an empty packet is a packet");
     assert_eq!(running.read_payload().expect("an answer"), Some(Vec::new()));
 
     running.no_more().expect("the interfaces end");
@@ -48,8 +50,8 @@ fn what_asks_for_a_reading_is_answered_with_one() {
 /// The payload interface is not this kind of app's.
 #[test]
 fn the_interface_it_has_not_got_cannot_be_reached() {
-    let mut running =
-        parent::start(&app(), &arguments(), Supports::MOC).expect("it starts");
+    let mut running = parent::start(&app(), &arguments(), Supports::GATEWAY)
+        .expect("it starts");
 
     let said = running
         .write_payload(b"293.15")
@@ -86,7 +88,7 @@ fn run_as_a_kind_it_is_not_it_refuses_and_says_why() {
 #[test]
 fn run_with_the_wrong_arguments_it_refuses_and_says_why() {
     let mut running =
-        parent::start(&app(), &["bay".to_string()], Supports::MOC)
+        parent::start(&app(), &["bay".to_string()], Supports::GATEWAY)
             .expect("it starts");
 
     let said = running

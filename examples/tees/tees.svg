@@ -1,6 +1,6 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="900" height="500" viewBox="0 0 900 500" role="img" aria-labelledby="title desc">
   <title id="title">The tees example</title>
-  <desc id="desc">The ground sends a command up to the moc node ground, which tcspecial binds at 127.0.0.1:8600. It leaves ground by its moc-out link for echo, a tee-moc, which sends it on by its moc-out to the heater, as it was going, and again by its payload-out back to ground, and so down at 127.0.0.1:8704: ground_base, 8700, plus echo's device id, 4. The sensor's readings arrive at readings, a tee-payload, which sends each on by its payload-out to ground, arriving at 127.0.0.1:8705, and again by its moc-out to dropped, a null-moc, which drops it. The spare payload's data goes to unheard, a null-payload, which drops it.</desc>
+  <desc id="desc">The ground sends a command up to the gateway node ground, which tcspecial binds at 127.0.0.1:8600. It leaves ground by its gateway-out link for echo, a tee-gateway, which sends it on by its gateway-out to the heater, as it was going, and again by its payload-out back to ground, and so down at 127.0.0.1:8704: ground_base, 8700, plus echo's device id, 4. The sensor's readings arrive at readings, a tee-payload, which sends each on by its payload-out to ground, arriving at 127.0.0.1:8705, and again by its gateway-out to dropped, a null-gateway, which drops it. The spare payload's data goes to unheard, a null-payload, which drops it.</desc>
   <defs>
     <style>
       text { font-family: "DejaVu Sans", Helvetica, Arial, sans-serif; fill: #111827; }
@@ -53,7 +53,7 @@
   <!-- The vehicle's own nodes -->
   <rect class="vehicle" x="260" y="80" width="160" height="70" rx="10"/>
   <text class="name" x="274" y="105">echo</text>
-  <text class="kind" x="274" y="124">tee-moc, id 4</text>
+  <text class="kind" x="274" y="124">tee-gateway, id 4</text>
   <text class="detail" x="274" y="141">sends both ways</text>
 
   <rect class="vehicle" x="260" y="190" width="160" height="70" rx="10"/>
@@ -63,7 +63,7 @@
 
   <rect class="vehicle" x="470" y="190" width="160" height="70" rx="10"/>
   <text class="name" x="484" y="215">dropped</text>
-  <text class="kind" x="484" y="234">null-moc</text>
+  <text class="kind" x="484" y="234">null-gateway</text>
   <text class="detail" x="484" y="251">drops what arrives</text>
 
   <rect class="vehicle" x="260" y="300" width="160" height="70" rx="10"/>
@@ -71,10 +71,10 @@
   <text class="kind" x="274" y="344">null-payload</text>
   <text class="detail" x="274" y="361">drops what arrives</text>
 
-  <!-- The moc node, the ground's end of the link both ways -->
+  <!-- The gateway node, the ground's end of the link both ways -->
   <rect class="socket" x="470" y="72" width="160" height="96" rx="10"/>
   <text class="name" x="484" y="97">ground</text>
-  <text class="kind" x="484" y="116">moc node, id 0</text>
+  <text class="kind" x="484" y="116">gateway node, id 0</text>
   <text class="detail" x="484" y="135">binds :8600</text>
   <text class="detail" x="484" y="152">ground_base :8700</text>
 
@@ -85,15 +85,15 @@
   <text class="kind" x="704" y="134">sees it come back,</text>
   <text class="kind" x="704" y="152">and the readings</text>
 
-  <!-- Up: a command, to the moc node and on to the tee, and from the tee to
+  <!-- Up: a command, to the gateway node and on to the tee, and from the tee to
        the heater -->
   <path class="up" d="M686,90 L634,90" marker-end="url(#arrow-amber)"/>
   <path class="up" d="M470,98 L424,98" marker-end="url(#arrow-amber)"/>
-  <text class="label" x="426" y="90">moc-out</text>
+  <text class="label" x="426" y="90">gateway-out</text>
   <path class="up" d="M260,105 L194,105" marker-end="url(#arrow-amber)"/>
-  <text class="label" x="198" y="97">moc-out</text>
+  <text class="label" x="198" y="97">gateway-out</text>
 
-  <!-- Down: the command's copy, from the tee back to the moc node and down -->
+  <!-- Down: the command's copy, from the tee back to the gateway node and down -->
   <path class="down" d="M420,132 L466,132" marker-end="url(#arrow-blue)"/>
   <text class="label" x="368" y="166">payload-out</text>
   <path class="down" d="M630,130 L686,130" marker-end="url(#arrow-blue)"/>
@@ -105,7 +105,7 @@
   <path class="down" d="M630,155 L660,155 L660,150 L686,150" marker-end="url(#arrow-blue)"/>
   <text class="detail" x="640" y="176">:8705</text>
   <path class="up" d="M420,240 L466,240" marker-end="url(#arrow-amber)"/>
-  <text class="label" x="424" y="276">moc-out</text>
+  <text class="label" x="424" y="276">gateway-out</text>
 
   <!-- The spare's data, to the node that drops it -->
   <path class="down" d="M190,335 L256,335" marker-end="url(#arrow-blue)"/>

@@ -29,12 +29,12 @@ fn started() -> parent::Running {
 fn printing_and_reading_stdin_leave_the_interfaces_alone() {
     let mut running = started();
     assert_eq!(
-        running.read_moc().expect("its report"),
+        running.read_gateway().expect("its report"),
         Some(b"stdin gave Some(0)".to_vec())
     );
     running.write_payload(b"293.15").expect("it takes a packet");
     assert_eq!(
-        running.read_moc().expect("an answer"),
+        running.read_gateway().expect("an answer"),
         Some(b"293.15".to_vec())
     );
     running.no_more().expect("the interfaces end");
@@ -47,7 +47,7 @@ fn printing_and_reading_stdin_leave_the_interfaces_alone() {
 #[test]
 fn a_panic_is_said_as_a_complaint() {
     let mut running = started();
-    running.read_moc().expect("its report");
+    running.read_gateway().expect("its report");
     running.write_payload(b"panic").expect("it takes a packet");
     let said = running
         .read_complaint()

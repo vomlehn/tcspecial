@@ -3,28 +3,28 @@
 //!
 //! One type per kind of app, each holding a handle for every interface that
 //! kind supports and no handle at all for the ones it does not. So an
-//! `app_payload_veh` that reaches for the MOC interface does not compile,
+//! `app_payload_veh` that reaches for the gateway interface does not compile,
 //! which is the first and best place to refuse it: the descriptor not being
 //! open is the second, and it only answers once the program is running.
 //!
 //! Five kinds: three that are nodes of the vehicle's own and two that are
-//! payloads. The payload-side pair are run with the MOC interface, that being
-//! the interface payload data is written on, and a payload's readings are what
-//! it writes -- so [`AppPl`] and [`AppAllPl`] hold descriptor 1 where a
+//! payloads. The payload-side pair are run with the gateway interface, that
+//! being the interface payload data is written on, and a payload's readings are
+//! what it writes -- so [`AppPl`] and [`AppAllPl`] hold descriptor 1 where a
 //! reader might have expected descriptor 0. Which of them a program is
 //! depends on whether anything asks it: an `app_pl` is asked nothing and
 //! holds a handle it can only write with.
 //!
 //! Each handle's methods are named for what they carry and not for the
-//! direction -- `read_payload` and `write_moc` rather than `read` and `write`
-//! -- because both happen on the one interface and a reader of an app should
-//! not have to remember which way round descriptor 0 is.
+//! direction -- `read_payload` and `write_gateway` rather than `read` and
+//! `write` -- because both happen on the one interface and a reader of an app
+//! should not have to remember which way round descriptor 0 is.
 //!
 //! # What the command line told it
 //!
 //! A short, fixed list, the same for every node of a kind: the name of the
 //! node this program is, and then the argument the configuration states for
-//! each stream the kind handles -- payload before MOC. Each kind's
+//! each stream the kind handles -- payload before gateway. Each kind's
 //! `inherited` takes its own, so the type says how many there are and a
 //! program run with the wrong number is refused with a sentence rather than
 //! reading somebody else's argument as its own.
@@ -68,7 +68,7 @@ use std::sync::OnceLock;
 
 use crate::{is_handed_over, is_open, packet, Interface};
 
-/// Payload data in, MOC data out: the interface at descriptor 0.
+/// Payload data in, gateway data out: the interface at descriptor 0.
 #[derive(Debug)]
 pub struct PayloadInterface(UnixStream);
 
@@ -79,8 +79,8 @@ impl PayloadInterface {
         packet::read(&mut self.0)
     }
 
-    /// Write a packet of MOC data.
-    pub fn write_moc(&mut self, data: &[u8]) -> io::Result<()> {
+    /// Write a packet of gateway data.
+    pub fn write_gateway(&mut self, data: &[u8]) -> io::Result<()> {
         packet::write(&mut self.0, data)
     }
 
@@ -94,14 +94,14 @@ impl PayloadInterface {
     }
 }
 
-/// MOC data in, payload data out: the interface at descriptor 1.
+/// Gateway data in, payload data out: the interface at descriptor 1.
 #[derive(Debug)]
-pub struct MocInterface(UnixStream);
+pub struct GatewayInterface(UnixStream);
 
-impl MocInterface {
-    /// Read the next packet of MOC data, or `None` once the interface has
+impl GatewayInterface {
+    /// Read the next packet of gateway data, or `None` once the interface has
     /// ended.
-    pub fn read_moc(&mut self) -> io::Result<Option<Vec<u8>>> {
+    pub fn read_gateway(&mut self) -> io::Result<Option<Vec<u8>>> {
         packet::read(&mut self.0)
     }
 
@@ -112,24 +112,24 @@ impl MocInterface {
 
     /// Another handle on the same interface. See
     /// [`PayloadInterface::try_clone`].
-    pub fn try_clone(&self) -> io::Result<MocInterface> {
-        Ok(MocInterface(self.0.try_clone()?))
+    pub fn try_clone(&self) -> io::Result<GatewayInterface> {
+        Ok(GatewayInterface(self.0.try_clone()?))
     }
 }
 
 /// Payload data out, and nothing in: the interface at descriptor 1, held one
 /// way about.
 ///
-/// What an `app_pl` has. The interface is the MOC one, that being the
+/// What an `app_pl` has. The interface is the gateway one, that being the
 /// interface payload data is written on, but a payload that is never asked has
 /// nothing to read there: nothing is linked into such a node, so nothing is
 /// ever written to it, and a program waiting on the read would wait for ever.
 ///
-/// Which is why it is a type of its own rather than a [`MocInterface`] used by
-/// halves. The rule this module exists for is that an app cannot reach for
+/// Which is why it is a type of its own rather than a [`GatewayInterface`] used
+/// by halves. The rule this module exists for is that an app cannot reach for
 /// what it has not got, and "has not got" is as true of a direction as it is
-/// of an interface: `read_moc` is not on this, so an `app_pl` that waits to be
-/// asked does not compile.
+/// of an interface: `read_gateway` is not on this, so an `app_pl` that waits to
+/// be asked does not compile.
 #[derive(Debug)]
 pub struct PayloadOut(UnixStream);
 
@@ -168,7 +168,7 @@ impl Errors {
     }
 }
 
-/// An app that reads payload data and writes MOC data.
+/// An app that reads payload data and writes gateway data.
 ///
 /// The node type `app_payload_veh`. Descriptor 1 is not open: there is nothing
 /// here to reach it with, and nothing else may reach it either.
@@ -213,21 +213,21 @@ impl AppPayloadVeh {
     }
 }
 
-/// An app that reads MOC data and writes payload data.
+/// An app that reads gateway data and writes payload data.
 ///
-/// The node type `app_moc_veh`. Descriptor 0 is not open.
+/// The node type `app_gateway_veh`. Descriptor 0 is not open.
 #[derive(Debug)]
-pub struct AppMocVeh {
+pub struct AppGatewayVeh {
     /// What the node this program is runs under in the configuration.
     pub name: String,
-    /// What the configuration says about the MOC stream, this kind handling
-    /// MOC data.
-    pub moc_arg: String,
-    pub moc: MocInterface,
+    /// What the configuration says about the gateway stream, this kind handling
+    /// gateway data.
+    pub gateway_arg: String,
+    pub gateway: GatewayInterface,
     pub errors: Errors,
 }
 
-impl AppMocVeh {
+impl AppGatewayVeh {
     /// Takes the interfaces and the arguments this program was run with.
     ///
     /// Called once, at the start of the program: the descriptors are owned
@@ -240,18 +240,18 @@ impl AppMocVeh {
     /// # Errors
     ///
     /// A sentence saying what is wrong unless the program was run with
-    /// the MOC interface and the errors handed over, and the node's name
-    /// and its app-moc-arg, and nothing else.
-    pub fn inherited() -> Result<AppMocVeh, String> {
-        taking(&[Interface::Moc, Interface::Errors])?;
-        let [name, moc_arg] = told(["the node's name", "app-moc-arg"])?;
-        let moc = MocInterface(stream(Interface::Moc)?);
+    /// the gateway interface and the errors handed over, and the node's name
+    /// and its app-gateway-arg, and nothing else.
+    pub fn inherited() -> Result<AppGatewayVeh, String> {
+        taking(&[Interface::Gateway, Interface::Errors])?;
+        let [name, gateway_arg] = told(["the node's name", "app-gateway-arg"])?;
+        let gateway = GatewayInterface(stream(Interface::Gateway)?);
         let errors = Errors(file(Interface::Errors)?);
         quiet(&name, &errors)?;
-        Ok(AppMocVeh {
+        Ok(AppGatewayVeh {
             name,
-            moc_arg,
-            moc,
+            gateway_arg,
+            gateway,
             errors,
         })
     }
@@ -268,11 +268,11 @@ pub struct AppAllVeh {
     pub name: String,
     /// What the configuration says about the payload stream.
     pub payload_arg: String,
-    /// And about the MOC stream. It comes second on the command line, this
+    /// And about the gateway stream. It comes second on the command line, this
     /// kind handling both.
-    pub moc_arg: String,
+    pub gateway_arg: String,
     pub payload: PayloadInterface,
-    pub moc: MocInterface,
+    pub gateway: GatewayInterface,
     pub errors: Errors,
 }
 
@@ -290,21 +290,21 @@ impl AppAllVeh {
     ///
     /// A sentence saying what is wrong unless the program was run with
     /// both data interfaces and the errors handed over, and the node's
-    /// name, its app-payload-arg and its app-moc-arg, and nothing else.
+    /// name, its app-payload-arg and its app-gateway-arg, and nothing else.
     pub fn inherited() -> Result<AppAllVeh, String> {
-        taking(&[Interface::Payload, Interface::Moc, Interface::Errors])?;
-        let [name, payload_arg, moc_arg] =
-            told(["the node's name", "app-payload-arg", "app-moc-arg"])?;
+        taking(&[Interface::Payload, Interface::Gateway, Interface::Errors])?;
+        let [name, payload_arg, gateway_arg] =
+            told(["the node's name", "app-payload-arg", "app-gateway-arg"])?;
         let payload = PayloadInterface(stream(Interface::Payload)?);
-        let moc = MocInterface(stream(Interface::Moc)?);
+        let gateway = GatewayInterface(stream(Interface::Gateway)?);
         let errors = Errors(file(Interface::Errors)?);
         quiet(&name, &errors)?;
         Ok(AppAllVeh {
             name,
             payload_arg,
-            moc_arg,
+            gateway_arg,
             payload,
-            moc,
+            gateway,
             errors,
         })
     }
@@ -313,10 +313,10 @@ impl AppAllVeh {
 /// An app that is a payload nothing asks: it writes payload data and reads
 /// nothing.
 ///
-/// The node type `app_pl`. Descriptor 0 is not open, as for an `app_moc_veh`,
-/// and descriptor 1 is held as a [`PayloadOut`]: a payload that reports of its
-/// own accord has no question to wait for, and the type says so by having
-/// nothing to read with.
+/// The node type `app_pl`. Descriptor 0 is not open, as for an
+/// `app_gateway_veh`, and descriptor 1 is held as a [`PayloadOut`]: a payload
+/// that reports of its own accord has no question to wait for, and the type
+/// says so by having nothing to read with.
 ///
 /// When it writes is its own business, which is the whole of what this kind is
 /// for: a payload that samples on a clock of its own, or reports when
@@ -348,9 +348,9 @@ impl AppPl {
     /// descriptor 1 and the errors handed over, and the node's name and
     /// its app-payload-arg, and nothing else.
     pub fn inherited() -> Result<AppPl, String> {
-        taking(&[Interface::Moc, Interface::Errors])?;
+        taking(&[Interface::Gateway, Interface::Errors])?;
         let [name, payload_arg] = told(["the node's name", "app-payload-arg"])?;
-        let payload = PayloadOut(stream(Interface::Moc)?);
+        let payload = PayloadOut(stream(Interface::Gateway)?);
         let errors = Errors(file(Interface::Errors)?);
         quiet(&name, &errors)?;
         Ok(AppPl {
@@ -362,11 +362,11 @@ impl AppPl {
     }
 }
 
-/// An app that is a payload and is asked: MOC data in, payload data out.
+/// An app that is a payload and is asked: gateway data in, payload data out.
 ///
-/// The node type `app_all_pl`, and the same interface an `app_moc_veh` is run
-/// with -- what tells the two apart is which side of the graph the node stands
-/// on, not what its program holds. A payload is asked for a reading and
+/// The node type `app_all_pl`, and the same interface an `app_gateway_veh` is
+/// run with -- what tells the two apart is which side of the graph the node
+/// stands on, not what its program holds. A payload is asked for a reading and
 /// answers with one, so this is the kind that stands in for a payload as every
 /// other payload behaves: see `tcslibgs::node::app`.
 #[derive(Debug)]
@@ -376,10 +376,10 @@ pub struct AppAllPl {
     /// What the configuration says about the payload stream: the readings this
     /// payload answers with.
     pub payload_arg: String,
-    /// And about the MOC stream: what asks it for them. Second on the command
-    /// line, this kind handling both.
-    pub moc_arg: String,
-    pub moc: MocInterface,
+    /// And about the gateway stream: what asks it for them. Second on the
+    /// command line, this kind handling both.
+    pub gateway_arg: String,
+    pub gateway: GatewayInterface,
     pub errors: Errors,
 }
 
@@ -397,19 +397,19 @@ impl AppAllPl {
     ///
     /// A sentence saying what is wrong unless the program was run with
     /// descriptor 1 and the errors handed over, and the node's name, its
-    /// app-payload-arg and its app-moc-arg, and nothing else.
+    /// app-payload-arg and its app-gateway-arg, and nothing else.
     pub fn inherited() -> Result<AppAllPl, String> {
-        taking(&[Interface::Moc, Interface::Errors])?;
-        let [name, payload_arg, moc_arg] =
-            told(["the node's name", "app-payload-arg", "app-moc-arg"])?;
-        let moc = MocInterface(stream(Interface::Moc)?);
+        taking(&[Interface::Gateway, Interface::Errors])?;
+        let [name, payload_arg, gateway_arg] =
+            told(["the node's name", "app-payload-arg", "app-gateway-arg"])?;
+        let gateway = GatewayInterface(stream(Interface::Gateway)?);
         let errors = Errors(file(Interface::Errors)?);
         quiet(&name, &errors)?;
         Ok(AppAllPl {
             name,
             payload_arg,
-            moc_arg,
-            moc,
+            gateway_arg,
+            gateway,
             errors,
         })
     }
@@ -541,7 +541,7 @@ static TAKEN: AtomicBool = AtomicBool::new(false);
 /// interface was not handed over, an unsupported one was, or the error
 /// interface is not open.
 fn taking(supported: &[Interface]) -> Result<(), String> {
-    for interface in [Interface::Payload, Interface::Moc] {
+    for interface in [Interface::Payload, Interface::Gateway] {
         let wanted = supported.contains(&interface);
         match (wanted, is_handed_over(interface.fd())) {
             (true, false) => {

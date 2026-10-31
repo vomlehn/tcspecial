@@ -935,7 +935,14 @@ mod tests {
         for counted_type in ["i2c", "network", "device-file", "hdlc", "gpio"] {
             assert!(counted(&node(counted_type)), "{counted_type}");
         }
-        for not in ["moc", "compute", "log", "app_pl", "tee-moc", "ping"] {
+        for not in [
+            "gateway_radio",
+            "compute",
+            "log",
+            "app_pl",
+            "tee-gateway",
+            "ping",
+        ] {
             assert!(!counted(&node(not)), "{not}");
         }
     }

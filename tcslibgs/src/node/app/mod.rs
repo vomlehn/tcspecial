@@ -10,12 +10,12 @@
 //! program is run with and on which side of the graph the node stands. Three
 //! are the vehicle's own, parts of the telemetry and control system itself:
 //!
-//! * `app_payload_veh` reads payload data and writes MOC data, so it is a sink
-//!   for what travels groundward and a source of what travels vehicleward. The
-//!   same shape the ground link has, which is the thing an app of this kind
-//!   stands in for: something that consumes readings and answers with
-//!   commands.
-//! * `app_moc_veh` is the mirror of it: MOC data in, payload data out.
+//! * `app_payload_veh` reads payload data and writes gateway data, so it is a
+//!   sink for what travels groundward and a source of what travels
+//!   vehicleward. The same shape the ground link has, which is the thing an
+//!   app of this kind stands in for: something that consumes readings and
+//!   answers with commands.
+//! * `app_gateway_veh` is the mirror of it: gateway data in, payload data out.
 //! * `app_all_veh` has both, which makes it the one kind that can carry a
 //!   stream *through* -- payload data in at the one interface and out at the
 //!   other -- and so the one type of any kind that carries both streams
@@ -29,9 +29,9 @@
 //! * `app_pl` writes payload data and reads nothing. A payload that is never
 //!   asked -- it reports of its own accord -- so its one terminal is a
 //!   `payload-out` and nothing may be linked into it.
-//! * `app_all_pl` reads MOC data and writes payload data, which is the shape
-//!   every other payload has: it is asked for a reading, by a trigger or a
-//!   command, and answers with one.
+//! * `app_all_pl` reads gateway data and writes payload data, which is the
+//!   shape every other payload has: it is asked for a reading, by a trigger or
+//!   a command, and answers with one.
 //!
 //! One module for the five because what a file may say about one is what it
 //! may say about any: a program to run, and what to do when it stops. The kind
@@ -67,11 +67,11 @@ use crate::endpoint_config::Scalar;
 /// -- and a configuration names the pair of them with a single word.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Kind {
-    /// Payload data is read and MOC data written, by a node of the vehicle's
-    /// own: the node type `app_payload_veh`.
+    /// Payload data is read and gateway data written, by a node of the
+    /// vehicle's own: the node type `app_payload_veh`.
     PayloadVeh,
-    /// MOC data is read and payload data written: `app_moc_veh`.
-    MocVeh,
+    /// Gateway data is read and payload data written: `app_gateway_veh`.
+    GatewayVeh,
     /// Both: `app_all_veh`.
     AllVeh,
     /// Payload data is written and nothing is read, by a payload: `app_pl`.
@@ -79,7 +79,8 @@ pub enum Kind {
     /// A payload that is never asked. It reports of its own accord, so the
     /// interface it is run with is one it only writes.
     Pl,
-    /// MOC data is read and payload data written, by a payload: `app_all_pl`.
+    /// Gateway data is read and payload data written, by a payload:
+    /// `app_all_pl`.
     ///
     /// Which is the shape every other payload has: asked for a reading, and
     /// answering with one.
@@ -95,7 +96,7 @@ impl Kind {
     pub fn node_type(self) -> &'static str {
         match self {
             Kind::PayloadVeh => "app_payload_veh",
-            Kind::MocVeh => "app_moc_veh",
+            Kind::GatewayVeh => "app_gateway_veh",
             Kind::AllVeh => "app_all_veh",
             Kind::Pl => "app_pl",
             Kind::AllPl => "app_all_pl",
@@ -118,7 +119,7 @@ impl Kind {
     pub fn of(node_type: &str) -> Option<Kind> {
         match node_type {
             "app_payload_veh" => Some(Kind::PayloadVeh),
-            "app_moc_veh" => Some(Kind::MocVeh),
+            "app_gateway_veh" => Some(Kind::GatewayVeh),
             "app_all_veh" => Some(Kind::AllVeh),
             "app_pl" => Some(Kind::Pl),
             "app_all_pl" => Some(Kind::AllPl),
@@ -129,7 +130,7 @@ impl Kind {
     /// Every kind there is, for a sentence listing them and for the tests.
     pub const ALL: [Kind; 5] = [
         Kind::PayloadVeh,
-        Kind::MocVeh,
+        Kind::GatewayVeh,
         Kind::AllVeh,
         Kind::Pl,
         Kind::AllPl,
@@ -149,12 +150,12 @@ impl Kind {
     pub fn is_payload(self) -> bool {
         match self {
             Kind::Pl | Kind::AllPl => true,
-            Kind::PayloadVeh | Kind::MocVeh | Kind::AllVeh => false,
+            Kind::PayloadVeh | Kind::GatewayVeh | Kind::AllVeh => false,
         }
     }
 
     /// Whether the payload interface is opened for a program of this kind:
-    /// payload data read and MOC data written, at descriptor 0.
+    /// payload data read and gateway data written, at descriptor 0.
     ///
     /// No payload-side kind has it. A payload's readings are what it writes,
     /// and the interface that writes payload data is the other one.
@@ -162,22 +163,30 @@ impl Kind {
         matches!(self, Kind::PayloadVeh | Kind::AllVeh)
     }
 
-    /// And whether the MOC interface is: MOC data read and payload data
+    /// And whether the gateway interface is: gateway data read and payload data
     /// written, at descriptor 1.
     ///
     /// True of a `Pl` as well, which writes payload data there and never
     /// reads: an interface it holds one way about is still the interface it is
     /// run with, and tcspecial opens the descriptor either way.
-    pub fn has_moc_interface(self) -> bool {
-        matches!(self, Kind::MocVeh | Kind::AllVeh | Kind::Pl | Kind::AllPl)
+    ///
+    /// # Returns
+    ///
+    /// `true` for `app_gateway_veh`, `app_all_veh`, `app_pl` and
+    /// `app_all_pl`.
+    pub fn has_gateway_interface(self) -> bool {
+        matches!(
+            self,
+            Kind::GatewayVeh | Kind::AllVeh | Kind::Pl | Kind::AllPl
+        )
     }
 
     /// Whether this kind handles payload data, and so takes the argument for
     /// it.
     ///
     /// The question the node type's own name answers: a type that names
-    /// payload handles payload data, one that names MOC handles MOC data, and
-    /// an `all` handles both. Not the same question as
+    /// payload handles payload data, one that names gateway handles gateway
+    /// data, and an `all` handles both. Not the same question as
     /// [`Kind::has_payload_interface`], which is about descriptors: a `Pl`
     /// handles payload data -- writing it is handling it -- on the interface
     /// at descriptor 1.
@@ -187,7 +196,7 @@ impl Kind {
     ///
     /// # Returns
     ///
-    /// `true` for every kind but `app_moc_veh`.
+    /// `true` for every kind but `app_gateway_veh`.
     pub fn handles_payload_data(self) -> bool {
         matches!(
             self,
@@ -195,9 +204,9 @@ impl Kind {
         )
     }
 
-    /// And whether it handles MOC data, and so takes `app-moc-arg`.
-    pub fn handles_moc_data(self) -> bool {
-        matches!(self, Kind::MocVeh | Kind::AllVeh | Kind::AllPl)
+    /// And whether it handles gateway data, and so takes `app-gateway-arg`.
+    pub fn handles_gateway_data(self) -> bool {
+        matches!(self, Kind::GatewayVeh | Kind::AllVeh | Kind::AllPl)
     }
 
     /// What a node of this kind may be told, and whether it must be.
@@ -222,15 +231,15 @@ impl Kind {
                 ("app-payload-arg", true),
                 ("restart", false),
             ],
-            Kind::MocVeh => &[
+            Kind::GatewayVeh => &[
                 ("executable", true),
-                ("app-moc-arg", true),
+                ("app-gateway-arg", true),
                 ("restart", false),
             ],
             Kind::AllVeh | Kind::AllPl => &[
                 ("executable", true),
                 ("app-payload-arg", true),
-                ("app-moc-arg", true),
+                ("app-gateway-arg", true),
                 ("restart", false),
             ],
         }
@@ -270,9 +279,9 @@ pub struct AppParams {
     /// `Some` exactly when [`Kind::handles_payload_data`], the attribute being
     /// required of those kinds and refused of the others.
     pub payload_arg: Option<String>,
-    /// And what it is told about the MOC stream, where its kind handles MOC
-    /// data.
-    pub moc_arg: Option<String>,
+    /// And what it is told about the gateway stream, where its kind handles
+    /// gateway data.
+    pub gateway_arg: Option<String>,
     /// What to do when it stops.
     pub restart: Restart,
 }
@@ -308,12 +317,12 @@ impl AppParams {
     /// which of them each is -- not in a complaint, not in a log of its own,
     /// not in a file it writes.
     ///
-    /// Then the argument for each stream the kind handles, payload before MOC.
-    /// Fixed by the kind rather than by what the file happened to state, which
-    /// is why both are required where the kind takes them: an argument list
-    /// whose meaning depends on which attributes somebody wrote is a list a
-    /// program has to count before it can read, and it would count wrongly on
-    /// the day it mattered.
+    /// Then the argument for each stream the kind handles, payload before
+    /// gateway. Fixed by the kind rather than by what the file happened to
+    /// state, which is why both are required where the kind takes them: an
+    /// argument list whose meaning depends on which attributes somebody wrote
+    /// is a list a program has to count before it can read, and it would count
+    /// wrongly on the day it mattered.
     ///
     /// # Returns
     ///
@@ -321,7 +330,7 @@ impl AppParams {
     pub fn arguments(&self) -> Vec<String> {
         let mut said = vec![self.name.clone()];
         said.extend(self.payload_arg.clone());
-        said.extend(self.moc_arg.clone());
+        said.extend(self.gateway_arg.clone());
         said
     }
 }
@@ -416,9 +425,9 @@ pub fn attributes_of(
 /// one that nothing reads is refused rather than ignored, because an app node
 /// whose `exectuable` was misspelled would be a node with no program at all --
 /// refused for the absence and never for the typo, and a reader comparing the
-/// two words is the only way anybody would find it. An `app-moc-arg` on a kind
-/// that handles no MOC data is the same mistake with a different word: an
-/// argument written for a program that will not be given it.
+/// two words is the only way anybody would find it. An `app-gateway-arg` on a
+/// kind that handles no gateway data is the same mistake with a different word:
+/// an argument written for a program that will not be given it.
 ///
 /// # Arguments
 ///
@@ -523,7 +532,7 @@ pub fn params_of(
             }
         };
     let payload_arg = argument("app-payload-arg", kind.handles_payload_data())?;
-    let moc_arg = argument("app-moc-arg", kind.handles_moc_data())?;
+    let gateway_arg = argument("app-gateway-arg", kind.handles_gateway_data())?;
 
     // The same two spellings a computation's restart has, read in the one
     // place they are read: see `Restart::of`.
@@ -535,7 +544,7 @@ pub fn params_of(
         kind,
         executable,
         payload_arg,
-        moc_arg,
+        gateway_arg,
         restart,
     })
 }
@@ -569,10 +578,10 @@ mod tests {
         for other in [
             "compute",
             "log",
-            "null-moc",
+            "null-gateway",
             "tee-payload",
             "i2c",
-            "moc",
+            "gateway_radio",
             "app",
             "app_",
             "app_pl_",
@@ -580,28 +589,29 @@ mod tests {
             assert_eq!(Kind::of(other), None, "{other}");
         }
 
-        // Which interfaces each is run with: the payload one, the MOC one, or
-        // both, and every kind has at least one.
+        // Which interfaces each is run with: the payload one, the gateway one,
+        // or both, and every kind has at least one.
         assert!(
             Kind::PayloadVeh.has_payload_interface()
-                && !Kind::PayloadVeh.has_moc_interface()
+                && !Kind::PayloadVeh.has_gateway_interface()
         );
         assert!(
-            Kind::MocVeh.has_moc_interface()
-                && !Kind::MocVeh.has_payload_interface()
+            Kind::GatewayVeh.has_gateway_interface()
+                && !Kind::GatewayVeh.has_payload_interface()
         );
         assert!(
             Kind::AllVeh.has_payload_interface()
-                && Kind::AllVeh.has_moc_interface()
+                && Kind::AllVeh.has_gateway_interface()
         );
         // A payload writes its readings, and the interface payload data is
-        // written on is the MOC one: neither payload kind is run with the
+        // written on is the gateway one: neither payload kind is run with the
         // other, whatever else it does with the one it has.
         assert!(
-            Kind::Pl.has_moc_interface() && !Kind::Pl.has_payload_interface()
+            Kind::Pl.has_gateway_interface()
+                && !Kind::Pl.has_payload_interface()
         );
         assert!(
-            Kind::AllPl.has_moc_interface()
+            Kind::AllPl.has_gateway_interface()
                 && !Kind::AllPl.has_payload_interface()
         );
 
@@ -624,25 +634,25 @@ mod tests {
 
         // Which streams each handles, which is the question its own name
         // answers and is not the question about descriptors above: a `Pl`
-        // handles payload data and holds the MOC interface to write it on.
+        // handles payload data and holds the gateway interface to write it on.
         assert!(
             Kind::PayloadVeh.handles_payload_data()
-                && !Kind::PayloadVeh.handles_moc_data()
+                && !Kind::PayloadVeh.handles_gateway_data()
         );
         assert!(
-            Kind::MocVeh.handles_moc_data()
-                && !Kind::MocVeh.handles_payload_data()
+            Kind::GatewayVeh.handles_gateway_data()
+                && !Kind::GatewayVeh.handles_payload_data()
         );
         assert!(
             Kind::AllVeh.handles_payload_data()
-                && Kind::AllVeh.handles_moc_data()
+                && Kind::AllVeh.handles_gateway_data()
         );
         assert!(
-            Kind::Pl.handles_payload_data() && !Kind::Pl.handles_moc_data()
+            Kind::Pl.handles_payload_data() && !Kind::Pl.handles_gateway_data()
         );
         assert!(
             Kind::AllPl.handles_payload_data()
-                && Kind::AllPl.handles_moc_data()
+                && Kind::AllPl.handles_gateway_data()
         );
 
         // And so which arguments each takes. Every kind says a program and
@@ -673,8 +683,9 @@ mod tests {
                 kind.node_type()
             );
             assert_eq!(
-                says("app-moc-arg"),
-                kind.handles_moc_data().then_some(&("app-moc-arg", true)),
+                says("app-gateway-arg"),
+                kind.handles_gateway_data()
+                    .then_some(&("app-gateway-arg", true)),
                 "{}",
                 kind.node_type()
             );
@@ -686,7 +697,7 @@ mod tests {
     /// The program is run with the node's name, then an argument per stream.
     ///
     /// The order is the whole of what makes the list readable from the program
-    /// end: the name first, always, and payload before MOC where a kind has
+    /// end: the name first, always, and payload before gateway where a kind has
     /// both. A program counting its arguments to find out which it was given
     /// would count wrongly on the day somebody changed the node's type.
     #[test]
@@ -696,7 +707,7 @@ mod tests {
                 .map(|params| params.arguments())
         };
 
-        // Both streams: the name, then payload, then MOC.
+        // Both streams: the name, then payload, then gateway.
         assert_eq!(
             of(
                 "through",
@@ -704,7 +715,7 @@ mod tests {
                 &[
                     ("executable", "/bin/true"),
                     ("app-payload-arg", "--readings"),
-                    ("app-moc-arg", "--commands"),
+                    ("app-gateway-arg", "--commands"),
                 ]
             )
             .expect("a node that states both"),
@@ -727,8 +738,11 @@ mod tests {
         assert_eq!(
             of(
                 "back",
-                "app_moc_veh",
-                &[("executable", "/bin/true"), ("app-moc-arg", "--commands")]
+                "app_gateway_veh",
+                &[
+                    ("executable", "/bin/true"),
+                    ("app-gateway-arg", "--commands")
+                ]
             )
             .expect("a node that states its one"),
             vec!["back", "--commands"]
@@ -752,7 +766,7 @@ mod tests {
                 &[
                     ("executable", "/bin/true"),
                     ("app-payload-arg", "--bay-2"),
-                    ("app-moc-arg", "--bay-2-commands"),
+                    ("app-gateway-arg", "--bay-2-commands"),
                 ]
             )
             .expect("a payload that states both"),
@@ -791,11 +805,11 @@ mod tests {
 
         let why = params_of(
             "back",
-            "app_moc_veh",
+            "app_gateway_veh",
             &said(&[("executable", "/bin/true")]),
         )
-        .expect_err("a kind that handles MOC data and said nothing");
-        assert!(why.contains("app-moc-arg is not set"), "{why}");
+        .expect_err("a kind that handles gateway data and said nothing");
+        assert!(why.contains("app-gateway-arg is not set"), "{why}");
 
         // And both of them, where the kind handles both: the first missing one
         // is the complaint, payload being the first argument.
@@ -804,7 +818,7 @@ mod tests {
             "app_all_veh",
             &said(&[
                 ("executable", "/bin/true"),
-                ("app-moc-arg", "--commands"),
+                ("app-gateway-arg", "--commands"),
             ]),
         )
         .expect_err("a kind that handles both and stated one");
@@ -929,9 +943,9 @@ mod tests {
 
     /// And one the kind is not run with is refused by name.
     ///
-    /// An `app-moc-arg` on a kind that handles no MOC data is an argument
-    /// written for a program that will not be given it -- most likely a node
-    /// whose type was changed and whose attributes were left behind.
+    /// An `app-gateway-arg` on a kind that handles no gateway data is an
+    /// argument written for a program that will not be given it -- most likely
+    /// a node whose type was changed and whose attributes were left behind.
     #[test]
     fn an_argument_the_kind_is_not_run_with_is_refused() {
         let why = params_of(
@@ -940,11 +954,11 @@ mod tests {
             &said(&[
                 ("executable", "/bin/true"),
                 ("app-payload-arg", "--readings"),
-                ("app-moc-arg", "--commands"),
+                ("app-gateway-arg", "--commands"),
             ]),
         )
         .expect_err("an argument this kind is not run with");
-        assert!(why.contains("app-moc-arg"), "{why}");
+        assert!(why.contains("app-gateway-arg"), "{why}");
         assert!(why.contains("app_payload_veh"), "{why}");
         assert!(
             why.contains("executable, app-payload-arg, restart"),
@@ -955,28 +969,28 @@ mod tests {
         // handles no payload data.
         let why = params_of(
             "back",
-            "app_moc_veh",
+            "app_gateway_veh",
             &said(&[
                 ("executable", "/bin/true"),
-                ("app-moc-arg", "--commands"),
+                ("app-gateway-arg", "--commands"),
                 ("app-payload-arg", "--readings"),
             ]),
         )
         .expect_err("an argument this kind is not run with");
         assert!(why.contains("app-payload-arg"), "{why}");
 
-        // And on a payload that is never asked, which handles no MOC data.
+        // And on a payload that is never asked, which handles no gateway data.
         let why = params_of(
             "bay",
             "app_pl",
             &said(&[
                 ("executable", "/bin/true"),
                 ("app-payload-arg", "--bay-2"),
-                ("app-moc-arg", "--commands"),
+                ("app-gateway-arg", "--commands"),
             ]),
         )
         .expect_err("an argument this kind is not run with");
-        assert!(why.contains("app-moc-arg"), "{why}");
+        assert!(why.contains("app-gateway-arg"), "{why}");
     }
 
     /// A program is what an app node is, so it says one.
@@ -1005,8 +1019,8 @@ mod tests {
         // And a program named as nothing at all is no program.
         let why = params_of(
             "fore",
-            "app_moc_veh",
-            &said(&[("executable", "  "), ("app-moc-arg", "--commands")]),
+            "app_gateway_veh",
+            &said(&[("executable", "  "), ("app-gateway-arg", "--commands")]),
         )
         .expect_err("a program that is blank");
         assert!(why.contains("executable is not set"), "{why}");
@@ -1027,7 +1041,7 @@ mod tests {
         assert_eq!(params.executable, "/usr/libexec/tcs/bay");
         assert_eq!(params.name, "bay");
         assert_eq!(params.payload_arg.as_deref(), Some("--bay-2"));
-        assert_eq!(params.moc_arg, None);
+        assert_eq!(params.gateway_arg, None);
     }
 
     /// Restarting is declared, in the two spellings a computation uses.
@@ -1040,7 +1054,7 @@ mod tests {
                 &said(&[
                     ("executable", "/bin/true"),
                     ("app-payload-arg", "--readings"),
-                    ("app-moc-arg", "--commands"),
+                    ("app-gateway-arg", "--commands"),
                     ("restart", restart),
                 ]),
             )
@@ -1126,7 +1140,8 @@ mod tests {
         assert!(why.contains("not an app node type"), "{why}");
         assert!(
             why.contains(
-                "app_payload_veh, app_moc_veh, app_all_veh, app_pl, app_all_pl"
+                "app_payload_veh, app_gateway_veh, app_all_veh, app_pl, \
+                 app_all_pl"
             ),
             "{why}"
         );

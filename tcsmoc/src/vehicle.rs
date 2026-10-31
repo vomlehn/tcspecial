@@ -1,11 +1,11 @@
 //! The MOC's view of the vehicle: running a configuration.
 //!
 //! A vehicle is a graph of nodes, and what the window shows is that graph:
-//! each node drawn into a `moc` node sends to the `moc` node's `ground_base`
-//! plus its device id, and each payload nothing touches sends
+//! each node drawn into a gateway node sends to the gateway node's
+//! `ground_base` plus its device id, and each payload nothing touches sends
 //! over `payload_telemetry` -- see `tcslibgs::graph::telemetry`. So there is
-//! one panel per source, filled through `tcslib::moc`, the same function call
-//! any ground software uses.
+//! one panel per source, filled through `tcslib::gateway`, the same function
+//! call any ground software uses.
 //!
 //! # What the buttons send
 //!
@@ -44,9 +44,9 @@ use std::thread;
 
 use slint::{ComponentHandle, Model, ModelRc, SharedString, VecModel};
 
+use tcslib::gateway::GatewayReceiver;
+use tcslib::gateway::DATUM_BYTES;
 use tcslib::matched::Matched;
-use tcslib::moc::Moc;
-use tcslib::moc::DATUM_BYTES;
 use tcslib::ping::{Pinger, Uplink};
 use tcslib::simulator;
 use tcslibgs::graph::telemetry::{self, Telemetered, Via};
@@ -166,7 +166,7 @@ fn may_command_nodes(agreed: &Agreed) -> bool {
 
 /// Which attributes of each node the configuration lets the ground set.
 ///
-/// From the `commands` section, in the order it is written: `{ from: moc,
+/// From the `commands` section, in the order it is written: `{ from: gateway,
 /// sets: thermostat.setpoint }` puts `setpoint` under `thermostat`. A node no
 /// binding names is absent, which is most of them.
 ///
@@ -188,7 +188,7 @@ pub fn settable_of(graph: &Graph) -> BTreeMap<String, Vec<String>> {
         let target = binding.target();
         if let Some(attribute) = target.input {
             let theirs = settable.entry(target.node).or_default();
-            // Once each: two bindings of one attribute, from two moc nodes,
+            // Once each: two bindings of one attribute, from two gateway nodes,
             // are one thing the ground may set.
             if !theirs.contains(&attribute) {
                 theirs.push(attribute);
@@ -222,7 +222,7 @@ pub fn panels(
         .into_iter()
         .map(|link| {
             let via = match &link.via {
-                Via::Moc(moc) => format!("to {moc}"),
+                Via::Gateway(gateway) => format!("to {gateway}"),
                 Via::PayloadTelemetry => "over payload_telemetry".to_string(),
             };
             DHInfo {
@@ -1455,10 +1455,10 @@ fn window_arm_key() -> tcslibgs::ArmKey {
 
 /// The ping node's answers, on their way to the pinger and its window.
 ///
-/// A ping node is a source like any other, so its answers arrive at its `moc`
-/// node with the rest and are shown in its panel. They are also the answers
-/// to the pings sent from the ping window, so the receiver hands each one to
-/// the pinger as well, which matches it to its ping and times it.
+/// A ping node is a source like any other, so its answers arrive at its
+/// `gateway` node with the rest and are shown in its panel. They are also the
+/// answers to the pings sent from the ping window, so the receiver hands each
+/// one to the pinger as well, which matches it to its ping and times it.
 ///
 /// The receiver does no more than that and say so: the window is shown what
 /// the pinger keeps from the window's own thread, on its own timer -- see
@@ -1547,27 +1547,27 @@ fn show_ping(window: &PingWindow, shown: &PingShown) {
     window.set_down(shown.down.clone().into());
 }
 
-/// Keeps what arrives at one `moc` node, in the panel of the source it came
+/// Keeps what arrives at one gateway node, in the panel of the source it came
 /// from -- and hands the ping node's answers to the pinger, where this is the
-/// `moc` node they come down through. Runs for as long as the MOC does.
+/// gateway node they come down through. Runs for as long as the MOC does.
 ///
 /// # Arguments
 ///
-/// * `moc`          - The `moc` node's receiver.
+/// * `gateway`      - The gateway node's receiver.
 /// * `rows`         - Each source's panel row, by the source's name.
 /// * `sends_values` - The sources that send values, shown as readings rather
 ///                    than as bytes.
 /// * `arrivals`     - Where the last arrival for each panel is left, by row.
 /// * `pings`        - The pinger to hand the ping node's answers to, where
-///                    they come down through this `moc` node.
+///                    they come down through this gateway node.
 fn serve(
-    mut moc: Moc,
+    mut gateway: GatewayReceiver,
     rows: Arc<BTreeMap<String, usize>>,
     sends_values: Arc<BTreeSet<String>>,
     arrivals: Arrivals,
     pings: Option<PingFeed>,
 ) {
-    // What each source is to this receiver, by its place in the moc node's
+    // What each source is to this receiver, by its place in the gateway node's
     // sources, worked out before the loop: a datum says which source sent it
     // by that place, so the loop looks nothing up by name.
     struct Source {
@@ -1579,7 +1579,7 @@ fn serve(
         /// How many have arrived from it since the MOC started.
         packets: u64,
     }
-    let mut sources: Vec<Source> = moc
+    let mut sources: Vec<Source> = gateway
         .sources()
         .iter()
         .map(|&source| Source {
@@ -1591,7 +1591,7 @@ fn serve(
         .collect();
     let mut datum = vec![0u8; DATUM_BYTES];
     loop {
-        let arrival = match moc.receive_into(None, &mut datum) {
+        let arrival = match gateway.receive_into(None, &mut datum) {
             Ok(Some(arrival)) => arrival,
             Ok(None) => continue,
             Err(e) => {
@@ -1630,7 +1630,7 @@ fn serve(
 
 /// Sets the ping window up, where the configuration has a ping node the
 /// ground can reach both ways: the Ping node button that opens it, and its
-/// Send ping, which pings the node through its `moc` node's uplink.
+/// Send ping, which pings the node through its gateway node's uplink.
 ///
 /// # Arguments
 ///
@@ -1640,12 +1640,12 @@ fn serve(
 ///
 /// # Returns
 ///
-/// The `moc` node the answers come down through, and what its receiver
+/// The gateway node the answers come down through, and what its receiver
 /// hands them on to; `None` where there is nothing to ping.
 ///
 /// # Errors
 ///
-/// Where there is a ping node and no way to send to it: its `moc` node's
+/// Where there is a ping node and no way to send to it: its gateway node's
 /// uplink cannot be opened.
 fn ping_node(
     ui: &MainWindow,
@@ -1655,12 +1655,12 @@ fn ping_node(
     let Some(route) = tcslib::ping::route_of(graph) else {
         return Ok(None);
     };
-    let uplink = Uplink::open(graph, &route.moc)
+    let uplink = Uplink::open(graph, &route.gateway)
         .map_err(|e| format!("{} cannot be pinged: {e}", route.node))?;
     eprintln!(
         "pinging {} through {} at {}",
         route.node,
-        route.moc,
+        route.gateway,
         uplink.to()
     );
     let pinger = Arc::new(Mutex::new(Pinger::new()));
@@ -1695,7 +1695,7 @@ fn ping_node(
         });
     }
     Ok(Some((
-        route.moc,
+        route.gateway,
         PingFeed {
             node: route.node,
             pinger,
@@ -1988,8 +1988,8 @@ pub fn run(
         }
     };
 
-    // The ground's end of every link, through tcslib::moc: one receiver per
-    // moc node and one for the payloads that report over payload_telemetry,
+    // The ground's end of every link, through tcslib::gateway: one receiver per
+    // gateway node and one for the payloads that report over payload_telemetry,
     // each on a thread of its own. A port that cannot be bound is said with
     // the rest of what was found, and costs its panels their data.
     // The ping node, where there is one the ground can reach both ways: a
@@ -2009,44 +2009,48 @@ pub fn run(
     let _answers = pings.as_ref().map(|(_, feed)| show_answers(feed.clone()));
 
     let arrivals: Arrivals = Arc::new(Mutex::new(vec![None; count]));
-    let mocs: Vec<&str> = graph
+    let gateways: Vec<&str> = graph
         .nodes
         .iter()
         .filter(|n| tcslibgs::gateway::is_gateway(&n.node_type))
         .map(|n| n.name.as_str())
         .filter(|name| {
-            links.iter().any(|l| l.via == Via::Moc(name.to_string()))
+            links
+                .iter()
+                .any(|l| l.via == Via::Gateway(name.to_string()))
         })
         .collect();
     let mut receivers = Vec::new();
-    for name in mocs {
-        match Moc::open(&graph, name) {
-            Ok(moc) => receivers.push(moc),
+    for name in gateways {
+        match GatewayReceiver::open(&graph, name) {
+            Ok(gateway) => receivers.push(gateway),
             Err(e) => startup.warning(e),
         }
     }
-    match Moc::open_payload_telemetry(&graph) {
-        Ok(Some(moc)) => receivers.push(moc),
+    match GatewayReceiver::open_payload_telemetry(&graph) {
+        Ok(Some(gateway)) => receivers.push(gateway),
         Ok(None) => {}
         Err(e) => startup.warning(e),
     }
-    for mut moc in receivers {
+    for mut gateway in receivers {
         // Read only while this window is matched with the vehicle, and
         // counted in the window's counts whether read or dropped.
-        moc.gated_by(matched.clone());
+        gateway.gated_by(matched.clone());
         eprintln!(
             "receiving at {} from {}",
-            moc.name(),
-            moc.sources().join(", ")
+            gateway.name(),
+            gateway.sources().join(", ")
         );
         let rows = rows.clone();
         let sends_values = sends_values.clone();
         let arrivals = arrivals.clone();
         let feed = pings
             .as_ref()
-            .filter(|(through, _)| through == moc.name())
+            .filter(|(through, _)| through == gateway.name())
             .map(|(_, feed)| feed.clone());
-        thread::spawn(move || serve(moc, rows, sends_values, arrivals, feed));
+        thread::spawn(move || {
+            serve(gateway, rows, sends_values, arrivals, feed)
+        });
     }
 
     // The panels, kept current -- and the one thing that keeps running on the
@@ -2159,8 +2163,8 @@ pub(crate) mod tests {
         std::fs::write(
             &path,
             format!(
-                "moc:
-  - {{ name: ground, type: moc, ground_base: \"127.0.0.1:{}\" }}
+                "gateway:
+  - {{ name: ground, type: gateway_radio, ground_base: \"127.0.0.1:{}\" }}
 vehicle:
   - {{ name: pinger, type: ping, payload-out: ground }}
 ",
@@ -2169,7 +2173,7 @@ vehicle:
         )
         .expect("written");
         let graph = Graph::load(&path).expect("it reads");
-        let Ok(moc) = Moc::open(&graph, "ground") else {
+        let Ok(gateway) = GatewayReceiver::open(&graph, "ground") else {
             // The port was taken between being chosen and being bound.
             return;
         };
@@ -2192,7 +2196,13 @@ vehicle:
         let rows = Arc::new(BTreeMap::from([("pinger".to_string(), 0)]));
         let arrivals: Arrivals = Arc::new(Mutex::new(vec![None]));
         thread::spawn(move || {
-            serve(moc, rows, Arc::new(BTreeSet::new()), arrivals, Some(feed))
+            serve(
+                gateway,
+                rows,
+                Arc::new(BTreeSet::new()),
+                arrivals,
+                Some(feed),
+            )
         });
 
         let answer = ping::reply(sent.as_bytes(), at).expect("answered");
@@ -2219,7 +2229,7 @@ vehicle:
         );
     }
 
-    /// What arrives at a moc node is put in the panel of the source that
+    /// What arrives at a gateway node is put in the panel of the source that
     /// sent it, counted, and marked as values where that source sends them;
     /// a source with no panel is passed over.
     #[test]
@@ -2233,8 +2243,8 @@ vehicle:
         std::fs::write(
             &path,
             format!(
-                "moc:
-  - {{ name: ground, type: moc, ground_base: \"127.0.0.1:{}\" }}
+                "gateway:
+  - {{ name: ground, type: gateway_radio, ground_base: \"127.0.0.1:{}\" }}
 payloads:
   - {{ name: a, type: network, protocol: udp, address: \"127.0.0.1\", \
     port: \"7001\", payload-out: ground }}
@@ -2246,7 +2256,7 @@ payloads:
         )
         .expect("written");
         let graph = Graph::load(&path).expect("it reads");
-        let Ok(moc) = Moc::open(&graph, "ground") else {
+        let Ok(gateway) = GatewayReceiver::open(&graph, "ground") else {
             // The port was taken between being chosen and being bound.
             return;
         };
@@ -2258,7 +2268,7 @@ payloads:
         {
             let arrivals = arrivals.clone();
             thread::spawn(move || {
-                serve(moc, rows, sends_values, arrivals, None)
+                serve(gateway, rows, sends_values, arrivals, None)
             });
         }
 
@@ -2350,7 +2360,11 @@ payloads:
                 ("thermostat".to_string(), 5),
             ]
         );
-        assert!(panels[3].config.contains("to moc"), "{}", panels[3].config);
+        assert!(
+            panels[3].config.contains("to gateway"),
+            "{}",
+            panels[3].config
+        );
         assert!(panels[3].config.contains("5104"), "{}", panels[3].config);
     }
 
@@ -2520,12 +2534,13 @@ payloads:
             "a link already down has nothing to take down"
         );
     }
-    /// Send ping, pressed, pings the ping node through its moc node, and the
-    /// node's answer, taken as the receiver takes it, is timed in the window.
+    /// Send ping, pressed, pings the ping node through its gateway node, and
+    /// the node's answer, taken as the receiver takes it, is timed in the
+    /// window.
     ///
     /// Run from `main.rs`'s window test, which owns the testing backend. The
-    /// vehicle is a socket this test holds where the moc node binds, so what
-    /// is checked is the press and the answer and not tcspecial.
+    /// vehicle is a socket this test holds where the gateway node binds, so
+    /// what is checked is the press and the answer and not tcspecial.
     pub(crate) fn pressing_send_ping_pings_the_node_and_times_its_answer() {
         use std::net::UdpSocket;
         use tcslibgs::node::vehicle::ping;
@@ -2540,11 +2555,12 @@ payloads:
         std::fs::write(
             &path,
             format!(
-                "moc:\n  - name: moc\n    type: moc\n    address: \
-                 \"127.0.0.1\"\n    port: \"{port}\"\n    ground_base: \
-                 \"127.0.0.1:9100\"\n    payload-in: true\n    moc-out:\n      \
-                 - target: ping\nvehicle:\n  - name: ping\n    type: ping\n    \
-                 moc-in: true\n    payload-out:\n      - target: moc\n"
+                "gateway:\n  - name: gateway\n    type: gateway_radio\n    \
+                 address: \"127.0.0.1\"\n    port: \"{port}\"\n    \
+                 ground_base: \"127.0.0.1:9100\"\n    payload-in: true\n    \
+                 gateway-out:\n      - target: ping\nvehicle:\n  \
+                 - name: ping\n    type: ping\n    gateway-in: true\n    \
+                 payload-out:\n      - target: gateway\n"
             ),
         )
         .expect("written");
@@ -2555,7 +2571,7 @@ payloads:
         let (through, feed) = ping_node(&ui, &ping_window, &graph)
             .expect("it can be pinged")
             .expect("there is a ping node");
-        assert_eq!(through, "moc");
+        assert_eq!(through, "gateway");
         assert!(ui.get_can_ping_node(), "the Ping node button is there");
         ui.invoke_ping_node_clicked();
 

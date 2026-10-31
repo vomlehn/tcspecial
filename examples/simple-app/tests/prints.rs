@@ -1,18 +1,18 @@
 //! The ground end puts the line back together and stops at the end of it.
 //!
 //! This test is the vehicle: it sends the words the payload would have sent to
-//! the port a `moc` node's data arrives at -- its `ground_base` plus the
+//! the port a gateway node's data arrives at -- its `ground_base` plus the
 //! sending node's device id -- which is what tcspecial does. The ground
-//! station gets them from the `moc` node with `tcslib::moc`, so it is given a
-//! configuration of its own, whose `moc` node is somewhere free. What this
-//! reads is what the ground station printed.
+//! station gets them from the gateway node with `tcslib::gateway`, so it is
+//! given a configuration of its own, whose gateway node is somewhere free. What
+//! this reads is what the ground station printed.
 
 use std::io::{BufRead, BufReader, Read};
 use std::net::UdpSocket;
 use std::path::PathBuf;
 use std::process::{Child, Command, Stdio};
 
-/// A configuration whose `moc` node takes `lorem`'s words on a port nothing
+/// A configuration whose gateway node takes `lorem`'s words on a port nothing
 /// holds, and that port: `lorem` is the second node read, device id 1, so it
 /// is the base plus one.
 ///
@@ -35,11 +35,11 @@ fn configuration() -> (tempfile::TempDir, PathBuf, u16) {
     std::fs::write(
         &path,
         format!(
-            "moc:
-  - {{ name: moc, type: moc, ground_base: \"127.0.0.1:{}\" }}
+            "gateway:
+  - {{ name: gateway, type: gateway_radio, ground_base: \"127.0.0.1:{}\" }}
 payloads:
   - {{ name: lorem, type: network, protocol: udp, address: \"127.0.0.1\", \
-port: \"7001\", payload-out: moc }}
+port: \"7001\", payload-out: gateway }}
 ",
             port - 1
         ),
@@ -48,7 +48,7 @@ port: \"7001\", payload-out: moc }}
     (dir, path, port)
 }
 
-/// The ground station, getting its data from that configuration's `moc` node,
+/// The ground station, getting its data from that configuration's gateway node,
 /// once it says it is.
 ///
 /// Waiting for it to say so is what makes the test sound: a word sent before
@@ -66,9 +66,9 @@ port: \"7001\", payload-out: moc }}
 ///
 /// It cannot be started, or what it first says is not that it is listening.
 fn ground(configuration: &PathBuf) -> Child {
-    let mut ground = Command::new(env!("CARGO_BIN_EXE_lorem_moc"))
+    let mut ground = Command::new(env!("CARGO_BIN_EXE_lorem_gateway"))
         .arg(configuration)
-        .arg("moc")
+        .arg("gateway")
         // To be told when it is listening, which it says only when verbose.
         .arg("--verbose")
         .stdout(Stdio::piped())
@@ -79,7 +79,7 @@ fn ground(configuration: &PathBuf) -> Child {
     BufReader::new(ground.stderr.take().expect("its complaints"))
         .read_line(&mut said)
         .expect("what it said");
-    assert!(said.contains("listening on moc for lorem"), "{said}");
+    assert!(said.contains("listening on gateway for lorem"), "{said}");
     ground
 }
 
@@ -163,11 +163,11 @@ fn a_datum_that_is_only_the_terminator_ends_it() {
     assert!(ground.wait().expect("it stops").success());
 }
 
-/// A `moc` node it cannot open is refused, saying why.
+/// A gateway node it cannot open is refused, saying why.
 #[test]
-fn a_moc_node_it_cannot_open_is_refused() {
+fn a_gateway_node_it_cannot_open_is_refused() {
     let (_dir, path, _port) = configuration();
-    let output = Command::new(env!("CARGO_BIN_EXE_lorem_moc"))
+    let output = Command::new(env!("CARGO_BIN_EXE_lorem_gateway"))
         .arg(&path)
         .arg("lorem")
         .output()

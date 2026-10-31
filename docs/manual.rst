@@ -99,8 +99,8 @@ These words are used precisely throughout, and some of them replaced older ones
 that were used loosely.
 
 node
-    Anything the configuration can name and a link can join: a device, a MOC
-    link, or a compute element. The generic term.
+    Anything the configuration can name and a link can join: a device, a
+    gateway, or a compute element. The generic term.
 
 device
     A node that is real hardware, reached over one of the interfaces. These
@@ -114,8 +114,18 @@ device file
     to be exact.
 
 MOC
-    The mission operations center, on the ground. A MOC node is a network link
-    carrying telemetry down and commands up. Earlier text calls this the OC.
+    The mission operations center, on the ground. Earlier text calls this the
+    OC.
+
+gateway
+    The node the vehicle reaches what it answers to through -- the ground,
+    over the radio, as a ``gateway_radio`` node, or an F´ flight computer, as
+    a ``gateway_fprime`` -- written in the ``gateway`` section: a network link
+    carrying telemetry down and commands up. It was called ``moc`` while the
+    ground was the only thing at the other end, and a configuration that still
+    says ``moc``, ``moc-in``, ``moc-out``, ``tee-moc``, ``null-moc``,
+    ``app_moc_veh`` or ``app-moc-arg`` is refused, naming the line and the
+    word to write instead.
 
 compute element
     A node that transforms what it is given. It may keep state between
@@ -167,21 +177,22 @@ terminal
     and a **data sink** is where data arrives. A terminal has a name, and the
     name says whose data it is and whether it arrives or leaves, not what is
     at the other end of it: ``payload-`` is the payload's own data on its way
-    to the ground, ``moc-`` is what the ground sends on its way to a payload,
-    and ``-in`` arrives where ``-out`` leaves. So every ``-out`` is a data
-    source and every ``-in`` a data sink. There are four of them, two per
+    to the ground, ``gateway-`` is what the ground sends on its way to a
+    payload, and ``-in`` arrives where ``-out`` leaves. So every ``-out`` is a
+    data source and every ``-in`` a data sink. There are four of them, two per
     stream:
 
     ``payload-out`` is where a payload's readings leave and ``payload-in`` is
-    where they arrive; ``moc-out`` is where what the ground sends leaves and
-    ``moc-in`` is where it arrives. A payload has ``moc-in`` and
-    ``payload-out``; a MOC link has ``payload-in`` and ``moc-out``; a
-    ``null-moc`` has ``moc-in`` alone and a ``null-payload`` ``payload-in``
-    alone; a ``tee-moc`` has ``moc-in``, ``moc-out`` and ``payload-out``, and a
-    ``tee-payload`` ``payload-in``, ``payload-out`` and ``moc-out``; an
-    ``app_all_veh`` has all four; and a ``ping`` node has a payload's pair,
-    ``moc-in`` and ``payload-out``. With no vehicle node in the way, a payload's ``payload-out``
-    connects to a MOC link's ``payload-in``.
+    where they arrive; ``gateway-out`` is where what the ground sends leaves and
+    ``gateway-in`` is where it arrives. A payload has ``gateway-in`` and
+    ``payload-out``; a gateway link has ``payload-in`` and ``gateway-out``; a
+    ``null-gateway`` has ``gateway-in`` alone and a ``null-payload``
+    ``payload-in`` alone; a ``tee-gateway`` has ``gateway-in``, ``gateway-out``
+    and ``payload-out``, and a ``tee-payload`` ``payload-in``, ``payload-out``
+    and ``gateway-out``; an ``app_all_veh`` has all four; and a ``ping`` node
+    has a payload's pair, ``gateway-in`` and ``payload-out``. With no vehicle
+    node in the way, a payload's ``payload-out`` connects to a gateway link's
+    ``payload-in``.
 
     A link is written as an attribute of the node it leaves, named after the
     data source it leaves by, with one entry per line:
@@ -191,7 +202,7 @@ terminal
        - name: k_fore
          type: compute
          payload-out:
-           - target: moc
+           - target: gateway
            - target: mean_temp
              input: in0
 
@@ -202,10 +213,11 @@ terminal
     with two data sources -- a tee, an ``app_all_veh`` -- is written under the
     one it leaves by, which says which. The short spelling is read
     as well, the destination written as ``node`` or ``node.terminal``, alone or
-    in a list: ``payload-out: k_fore``, or ``payload-out: [moc, mean_temp.in0]``.
+    in a list: ``payload-out: k_fore``, or ``payload-out: [gateway,
+    mean_temp.in0]``.
 
     A data sink takes one data source; a data source may reach several sinks;
-    and a MOC link's sink takes as many as the configuration gives it, every
+    and a gateway link's sink takes as many as the configuration gives it, every
     payload's telemetry arriving at the ground on its own socket.
 
     The node at the arriving end says so under the data sink the line arrives
@@ -218,59 +230,60 @@ terminal
     the links is refused where the file is read. tcsgui writes them.
 
     Each terminal may be linked to one other: a ``payload-out`` to a
-    ``payload-in``, a ``payload-in`` to a ``payload-out``, a ``moc-out`` to a
-    ``moc-in``, a ``moc-in`` to a ``moc-out``. Anything else would carry
-    one stream into the other. In tcsgui the terminals are drawn as small boxes
-    in a node's corners, each with an arrow saying which way its data goes: the
-    payload's own data along the top pointing right, towards the ground, and
-    what the ground sends along the bottom pointing left, towards the
-    payloads -- the canvas having the payloads on the left, the vehicle in the
-    middle and the MOC on the right. A link is made by dragging from one of
-    them onto the node the line is to reach: anywhere on that node will do,
+    ``payload-in``, a ``payload-in`` to a ``payload-out``, a ``gateway-out`` to
+    a ``gateway-in``, a ``gateway-in`` to a ``gateway-out``. Anything else would
+    carry one stream into the other. In tcsgui the terminals are drawn as small
+    boxes in a node's corners, each with an arrow saying which way its data
+    goes: the payload's own data along the top pointing right, towards the
+    ground, and what the ground sends along the bottom pointing left, towards
+    the payloads -- the canvas having the payloads on the left, the vehicle in
+    the middle and the gateway on the right. A link is made by dragging from one
+    of them onto the node the line is to reach: anywhere on that node will do,
     and the line is drawn to whichever of its terminals the stream arrives at.
-    A node with no terminal of that stream takes nothing, and a MOC link has
+    A node with no terminal of that stream takes nothing, and a gateway link has
     none on its right at all: the payload data it receives arrives at the
     ``payload-in`` in its upper left, and what it sends leaves by the
-    ``moc-out`` in its lower left.
+    ``gateway-out`` in its lower left.
 
-``null-moc`` and ``null-payload`` nodes
-    Vehicle nodes that take one stream and drop it: a ``null-moc`` takes what
-    the ground sends at its ``moc-in``, and a ``null-payload`` takes a
+``null-gateway`` and ``null-payload`` nodes
+    Vehicle nodes that take one stream and drop it: a ``null-gateway`` takes
+    what the ground sends at its ``gateway-in``, and a ``null-payload`` takes a
     payload's data at its ``payload-in``. Neither has a data source, so nothing
     can be linked out of one. For a stream that has to go somewhere and has
     nowhere to go yet. They take no attributes.
 
-``tee-moc`` and ``tee-payload`` nodes
+``tee-gateway`` and ``tee-payload`` nodes
     Vehicle nodes that take one stream and send each datum on both ways. A
-    ``tee-moc`` takes what the ground sends at its ``moc-in`` and sends it on by
-    its ``moc-out``, as it was going, and again by its ``payload-out``, as
-    payload data. A ``tee-payload`` takes a payload's data at its
-    ``payload-in`` and sends it on by its ``payload-out`` and again by its
-    ``moc-out``, as MOC data. A link cannot carry one stream into the other, so
-    a tee is how what the ground sends reaches a ``payload-in`` -- the ground's
-    own, to see what it sent, or a log's -- and how a payload's reading reaches
-    a ``moc-in``. Each data source may reach as many sinks as any other, so
-    every link out of a tee gets a copy. A link out of one names the source it
-    leaves by, there being two:
+    ``tee-gateway`` takes what the ground sends at its ``gateway-in`` and sends
+    it on by its ``gateway-out``, as it was going, and again by its
+    ``payload-out``, as payload data. A ``tee-payload`` takes a payload's data
+    at its ``payload-in`` and sends it on by its ``payload-out`` and again by
+    its ``gateway-out``, as gateway data. A link cannot carry one stream into
+    the other, so a tee is how what the ground sends reaches a ``payload-in`` --
+    the ground's own, to see what it sent, or a log's -- and how a payload's
+    reading reaches a ``gateway-in``. Each data source may reach as many sinks
+    as any other, so every link out of a tee gets a copy. A link out of one
+    names the source it leaves by, there being two:
 
     .. code-block:: yaml
 
        - name: echo
-         type: tee-moc
-         moc-out: [heater]
-         payload-out: [moc]
+         type: tee-gateway
+         gateway-out: [heater]
+         payload-out: [gateway]
 
     They take no attributes.
 
 ``ping`` node
-    A vehicle node that answers the ground. Link a MOC link's ``moc-out`` to
-    it and its ``payload-out`` back to the MOC link. Each ping the ground sends,
-    ``ping #<count> <time>``, comes back with a space and the vehicle's time on
-    the end. Each time is seconds since the UNIX epoch with nine digits after
-    the point, such as ``1760900000.000000001``, and the count starts at one.
-    A message that is not a ping is refused and logged aboard, not answered.
-    A ping node takes no attributes, and it cannot be stopped or started from
-    the ground: both commands are answered ``InvalidCommand``.
+    A vehicle node that answers the ground. Link a gateway link's
+    ``gateway-out`` to it and its ``payload-out`` back to the gateway link. Each
+    ping the ground sends, ``ping #<count> <time>``, comes back with a space and
+    the vehicle's time on the end. Each time is seconds since the UNIX epoch
+    with nine digits after the point, such as ``1760900000.000000001``, and the
+    count starts at one. A message that is not a ping is refused and logged
+    aboard, not answered. A ping node takes no attributes, and it cannot be
+    stopped or started from the ground: both commands are answered
+    ``InvalidCommand``.
 
 command binding
     A statement that a named command from the MOC sets a named attribute of a
@@ -280,10 +293,10 @@ command binding
    **What runs today.** The architecture above is what TCSpecial is being
    built into, and this manual describes it as the thing to configure against.
    What is in flight-ready shape at the time of writing is narrower: a node may
-   be a device or a MOC link, and the links the software builds are the pair
-   that joins one device to one MOC link in each direction. Compute elements,
-   links with several destinations, groups with a shared interval, discrete
-   lines driven as outputs are specified in ``design.rst`` and are being
+   be a device or a gateway link, and the links the software builds are the
+   pair that joins one device to one gateway link in each direction. Compute
+   elements, links with several destinations, groups with a shared interval,
+   discrete lines driven as outputs are specified in ``design.rst`` and are being
    implemented in that order. Command bindings run: the ground sets a bound
    attribute of a node with a ``SET_NODE``. Where this manual
    describes something not yet running it says so in a note like this one, and
@@ -334,7 +347,7 @@ Platform
 
 Number of nodes
    A node's id is its position among all the configuration's nodes -- the
-   moc, vehicle and payload sections, the top file first and then the files
+   gateway, vehicle and payload sections, the top file first and then the files
    it includes -- counting from nought, and it is 32 bits. A node's
    telemetry port is a base plus its id, so a base of *B* leaves room for
    ids up to 65535 - *B*, counting every node, not only payloads. A
@@ -400,7 +413,7 @@ the configuration
     Everything tcspecial is configured with. Its ``tcspecial`` section is the
     command interpreter's own settings -- the ports it takes commands on,
     where beacons go and how often, and where the telemetry log goes -- and
-    its ``moc``, ``vehicle`` and ``payloads`` sections say which nodes there
+    its ``gateway``, ``vehicle`` and ``payloads`` sections say which nodes there
     are, what each of them does and how the lines between them run. Named on
     the command line of every program that reads it, which is tcspecial,
     tcsmoc, tcssim and tcsverify.
@@ -692,7 +705,7 @@ to put the halves back together.
 
 *A program.* An ``app_pl`` is a program that writes its readings when it
 chooses and is never asked; an ``app_all_pl`` answers whatever arrives on its
-MOC interface, so the data that arrives is the question. Neither states a
+gateway interface, so the data that arrives is the question. Neither states a
 trigger.
 
 **When tcspecial reads.** The main loop works in passes.
@@ -835,7 +848,7 @@ transaction on every pass. Give such a payload a group or a rate.
      - No
      - One packet
    * - ``app_all_pl``
-     - When MOC data arrives
+     - When gateway data arrives
      - By the data that arrives
      - One packet
 
@@ -1708,7 +1721,7 @@ otherwise produces a payload that looks configured and is not:
   started; two on one device file, serial line or SPI peripheral is worse,
   each taking part of the one stream and reporting it as though it were the
   whole. Every node that is opened is compared with every other -- the
-  payloads and the ``moc`` node -- since a port is a port whatever claims it,
+  payloads and the gateway node -- since a port is a port whatever claims it,
   and ``localhost``, ``127.0.0.1`` and ``::1`` count as one host. A Unix
   socket collides by its path, its port meaning nothing, and so does a device
   file opened twice. The exceptions are the things that are shared by design:
@@ -1771,14 +1784,14 @@ which is what a panel in the MOC shows.
        direction: "output"
        lines: "3,4,5"
        path: "/dev/gpiochip0"
-       moc-in: true
+       gateway-in: true
 
      - name: heaters_2
        type: gpio
        direction: "output"
        lines: "6,7,8"
        path: "/dev/gpiochip0"
-       moc-in: true
+       gateway-in: true
 
 The same configuration in the other spelling is
 ``examples/thermostat/thermostat.xml``, which a test holds to saying the same
@@ -1866,21 +1879,22 @@ sections are, and in the XML spelling however they interleave -- the top file
 first and then the files it includes. The ids say which port each node's data
 reaches the ground on.
 
-A ``moc`` node is the ground's end of the vehicle's data. tcspecial sends what
-each node drawn into a ``moc`` node produces as UDP datagrams to the address in
-the ``moc`` node's ``ground_base``, at its port plus the source node's device
+A gateway node is the ground's end of the vehicle's data. tcspecial sends what
+each node drawn into a gateway node produces as UDP datagrams to the address in
+the gateway node's ``ground_base``, at its port plus the source node's device
 id, so each source arrives on a port of its own. Ground software does not open
-those ports itself: it gets the data from the ``moc`` node with a function
-call, ``tcslib::moc::Moc::receive``, which works the ports out from the same
-configuration and says which node each datum came from. A loop that does not
-keep each datum takes it with ``Moc::receive_into``, into a buffer of
-``tcslib::moc::DATUM_BYTES`` it made before it started, and allocates nothing.
-What it does with the data then -- process it, display it, log it -- is its own business. A ``moc``
-node that the ground sends commands or other data through also states the
-``address`` and ``port`` tcspecial binds to receive them.
+those ports itself: it gets the data from the gateway node with a function
+call, ``tcslib::gateway::GatewayReceiver::receive``, which works the ports out
+from the same configuration and says which node each datum came from. A loop
+that does not keep each datum takes it with ``GatewayReceiver::receive_into``,
+into a buffer of ``tcslib::gateway::DATUM_BYTES`` it made before it started, and
+allocates nothing. What it does with the data then -- process it, display it,
+log it -- is its own business. A gateway node that the ground sends commands or
+other data through also states the ``address`` and ``port`` tcspecial binds to
+receive them.
 
 tcsmoc runs a configuration as a ground station for that data: one
-panel per source, filled through ``tcslib::moc``, with tcspecial started on
+panel per source, filled through ``tcslib::gateway``, with tcspecial started on
 the same file and tcssim where the simulator file simulates anything. Both
 it and tcspecial digest the configuration files they read, and tcspecial
 sends its digest in every beacon. If tcspecial's digest is not the one tcsmoc
@@ -1932,7 +1946,7 @@ say and nowhere else.
 In the diagrams, blue lines carry data toward the ground and orange lines
 carry it toward the vehicle; a dotted orange line is a command binding; a
 dashed blue line is a payload's ``payload_telemetry`` link; and a heavy grey
-arrow is the function call that gets data from a ``moc`` node. The dashed box
+arrow is the function call that gets data from a gateway node. The dashed box
 in the middle of each diagram is what runs inside tcspecial, and the one on
 the right is the ground.
 
@@ -1988,7 +2002,7 @@ whole trio out.
 
 Each reading is converted to kelvin by its own ``to_kelvin`` node, ``k_1``,
 ``k_2`` or ``k_3``, and each converted reading goes three ways: to the ground
-through the ``moc`` node -- at its ``ground_base``, ``127.0.0.1:5100``, plus
+through the gateway node -- at its ``ground_base``, ``127.0.0.1:5100``, plus
 each source's device id, so ``k_1``, ``k_2`` and ``k_3``, ids 1 to 3, arrive on
 ports 5101 to 5103 -- into ``cabin_temp`` as the input ``in0``, ``in1`` or
 ``in2``, and into the log ``housekeeping``.
@@ -2024,7 +2038,7 @@ sensors' readings reach the ground through their conversions, and the heaters
 are driven and never read. Tcssim watches the heaters' lines on the
 ``gpio-sim`` chip and counts each time the vehicle switches them.
 
-The command binding on the ``moc`` node says the ground may set the
+The command binding on the gateway node says the ground may set the
 thermostat's setpoint, and the running vehicle applies it: a ``SET_NODE``
 naming that node and that attribute is taken on the node command link, the
 value reaches the thermostat between stages of a pass, and the next pass
@@ -2048,8 +2062,8 @@ The simple-app example
 ----------------------
 .. figure:: ../examples/simple-app/simple-app.svg
    :alt: The simple-app example: a payload that is a program, lorem, sending
-         a line of text one word per packet through the moc node moc-1 to the
-         ground station program lorem_moc.
+         a line of text one word per packet through the gateway node gateway-1
+         to the ground station program lorem_gateway.
    :width: 100%
 
    ``examples/simple-app``: a payload that is a program, and a ground station
@@ -2062,12 +2076,13 @@ configuration with the argument
 the first line of the lorem ipsum text one word per packet, then a packet
 holding the line terminator.
 
-tcspecial sends the words to the ``moc`` node on the ground, ``moc-1``, at its
-``ground_base``, ``127.0.0.1:5100``, plus ``lorem``'s device id, 1: port 5101.
-The ground is ``lorem_moc``, the example's second program. It gets the words
-from ``moc-1`` with ``tcslib::moc::Moc::receive_into``, into a buffer it made
+tcspecial sends the words to the gateway node on the ground, ``gateway-1``, at
+its ``ground_base``, ``127.0.0.1:5100``, plus ``lorem``'s device id, 1: port
+5101. The ground is ``lorem_gateway``, the example's second program. It gets
+the words from ``gateway-1`` with
+``tcslib::gateway::GatewayReceiver::receive_into``, into a buffer it made
 before it started listening, prints each with one space
-between them, and stops at the end of the line. ``moc-1`` states no
+between them, and stops at the end of the line. ``gateway-1`` states no
 ``address`` or ``port``, because nothing goes back up to the vehicle.
 
 Both programs are beside the configuration: the payload is a Python 3 script
@@ -2165,10 +2180,10 @@ watcher opens a window, so it wants a display.
 The ping example
 ----------------
 .. figure:: ../examples/ping/ping.svg
-   :alt: The ping example: the ground station ping_moc.py sends a ping up to
-         the moc node, which hands it to the ping node by its moc-out link;
-         the ping node answers with the vehicle's time on the end, and the
-         answer comes back down through the moc node to the ground, beside
+   :alt: The ping example: the ground station ping_gateway.py sends a ping up to
+         the gateway node, which hands it to the ping node by its gateway-out
+         link; the ping node answers with the vehicle's time on the end, and the
+         answer comes back down through the gateway node to the ground, beside
          the beacon panel.
    :width: 100%
 
@@ -2176,15 +2191,15 @@ The ping example
 
 The one exchange that shows how long the link takes each way, and how far the
 two ends' clocks are apart. The ground station sends ``ping #<count> <time>``
-up to the ``moc`` node, which binds ``address:port`` aboard and hands it by its
-``moc-out`` link to the ``ping`` node. The ``ping`` node answers with the ping,
-a space, and the vehicle's time, and sends that by its ``payload-out`` link
-back to the ``moc`` node and so down to the ground, at ``ground_base`` plus its
-device id. Each time is seconds since the UNIX epoch to the nanosecond:
+up to the gateway node, which binds ``address:port`` aboard and hands it by its
+``gateway-out`` link to the ``ping`` node. The ``ping`` node answers with the
+ping, a space, and the vehicle's time, and sends that by its ``payload-out``
+link back to the gateway node and so down to the ground, at ``ground_base`` plus
+its device id. Each time is seconds since the UNIX epoch to the nanosecond:
 ``1760900000.000000001``. What a ping and its answer say is
 ``tcslibgs::node::vehicle::ping``.
 
-The ground station is a Python 3 program, ``ping_moc.py``, that uses nothing
+The ground station is a Python 3 program, ``ping_gateway.py``, that uses nothing
 outside the standard library to read the XML spelling of its configuration --
 its window is tkinter -- and PyYAML to read the YAML one. A beacon is text and
 needs nothing to read; the interface digest it is compared with is worked
@@ -2242,23 +2257,23 @@ ground station is killed or crashes, the kernel kills tcspecial. So a vehicle
 is running exactly while its ground station is. ``--no-vehicle`` starts none,
 for a tcspecial run in another terminal.
 
-Every example program -- ``beacon``, ``ping_moc.py`` and ``lorem_moc`` -- takes
-``--yaml`` or ``--xml``, but not both, saying which of its example's two
-configuration files to read: they say the same thing. With neither, ``beacon``
-and ``lorem_moc`` read the YAML and ``ping_moc.py`` the XML. A file named on
-the command line beside one of the two has to be the spelling it asks for, and
-the vehicle the program starts reads the same file.
+Every example program -- ``beacon``, ``ping_gateway.py`` and ``lorem_gateway``
+-- takes ``--yaml`` or ``--xml``, but not both, saying which of its example's
+two configuration files to read: they say the same thing. With neither,
+``beacon`` and ``lorem_gateway`` read the YAML and ``ping_gateway.py`` the XML.
+A file named on the command line beside one of the two has to be the spelling it
+asks for, and the vehicle the program starts reads the same file.
 
 ``make -C examples run-ping`` checks for Python 3 and tkinter, builds the
 vehicle and tcsverify, and runs the ground station, which starts the vehicle
 and stops it when the window is closed. With no display, ``python3
-examples/ping/ping_moc.py --pings 3`` starts the vehicle, sends three pings,
+examples/ping/ping_gateway.py --pings 3`` starts the vehicle, sends three pings,
 prints each answer and its times, and stops both. Every port the example uses is in
 the seven thousands, which no other example uses.
 
 tcsmoc pings it too. ``make runmocy TCSPECIAL_CONFIG_FILE=examples/ping/ping``
 runs the MOC on the example, and a configuration with a ``ping`` node the
-ground can reach both ways -- a ``moc`` node binding an address and port with a
+ground can reach both ways -- a gateway node binding an address and port with a
 link to it, and its link back down -- gives the MOC a ``Ping node`` button
 beside ``Command``. It opens the same panel, in a window of its own: the
 button, the ping sent and the answer, and the three times. Both ground stations
@@ -2268,11 +2283,11 @@ Python.
 The tees example
 ----------------
 .. figure:: ../examples/tees/tees.svg
-   :alt: The tees example: a command from the ground goes up to the moc node
-         ground and on to echo, a tee-moc, which sends it to the heater and
+   :alt: The tees example: a command from the ground goes up to the gateway node
+         ground and on to echo, a tee-gateway, which sends it to the heater and
          back down to the ground; the sensor's readings go to readings, a
          tee-payload, which sends them down to the ground and on to dropped,
-         a null-moc; the spare payload's data goes to unheard, a
+         a null-gateway; the spare payload's data goes to unheard, a
          null-payload.
    :width: 100%
 
@@ -2280,14 +2295,14 @@ The tees example
    aboard, and data dropped.
 
 The four nodes that do nothing to what passes, each taking one stream. What
-the ground sends goes up to the ``moc`` node ``ground``, which binds
-``127.0.0.1:8600`` aboard, and leaves it for ``echo``, a ``tee-moc``. The tee
-sends each command on by its ``moc-out`` to the ``heater``, as it was going,
-and again by its ``payload-out`` back to ``ground`` -- so the ground sees what
-the vehicle was told, arriving at ``ground_base`` plus ``echo``'s device id,
-``127.0.0.1:8704``. The ``sensor``'s readings go to ``readings``, a
+the ground sends goes up to the gateway node ``ground``, which binds
+``127.0.0.1:8600`` aboard, and leaves it for ``echo``, a ``tee-gateway``. The
+tee sends each command on by its ``gateway-out`` to the ``heater``, as it was
+going, and again by its ``payload-out`` back to ``ground`` -- so the ground sees
+what the vehicle was told, arriving at ``ground_base`` plus ``echo``'s device
+id, ``127.0.0.1:8704``. The ``sensor``'s readings go to ``readings``, a
 ``tee-payload``, which sends each down to the ground at ``127.0.0.1:8705`` and
-again by its ``moc-out`` to ``dropped``, a ``null-moc``, standing where
+again by its ``gateway-out`` to ``dropped``, a ``null-gateway``, standing where
 something aboard that took readings as commands would be. The ``spare``
 payload's data goes to ``unheard``, a ``null-payload``: nobody wants it yet.
 
@@ -2319,15 +2334,15 @@ deployment, ``TcsBridge``, built on tcslib-c: as far as tcspecial can tell it is
 a ground station, so every link is the radio's, UDP in the radio's protocol,
 and everything in the ``tcspecial`` section is written as it is for a radio.
 
-What differs is the gateway node. Where a ``moc`` node says where the ground
+What differs is the gateway node. Where a gateway node says where the ground
 station is as ``ground_base``, a ``gateway_fprime`` node says where the bridge
 is as ``bridge_base``, counted on the same way: the ``thermometer``, device id
 2, reports to ``127.0.0.1:9702``. It also states ``fprime_id_base``, the first
 of the F´ IDs the bridge gives what arrives, counted on by the same device id
 -- the thermometer's readings are F´ channel ``0x3002`` -- which the bridge's
 model is made from and nothing aboard reads. A command the bridge sends up to
-``fsw``, which binds ``127.0.0.1:9600``, leaves it by its ``moc-out`` for the
-``heater``.
+``fsw``, which binds ``127.0.0.1:9600``, leaves it by its ``gateway-out`` for
+the ``heater``.
 
 ``make -C examples run-fprime`` runs tcsmoc on the example, which starts
 tcspecial and tcssim; tcsmoc plays the bridge's part, the two speaking the one
@@ -3319,11 +3334,11 @@ A configuration that says nothing is refused too, rather than given ``radio``:
 what a vehicle answers to is a fact about the mission, and the kind decides
 how every link below is written.
 
-The gateway nodes are still written in the ``moc`` section: a radio's with
-``type: moc``, an F´ bridge's with ``type: gateway_fprime``. Every node there is
-of the kind ``gateway`` names, and one of another kind is refused, naming both,
-because a vehicle answers to one: commands, beacons and data all go the one
-way.
+The gateway nodes are written in the ``gateway`` section: a radio's with
+``type: gateway_radio``, an F´ bridge's with ``type: gateway_fprime``. Every
+node there is of the kind ``tcspecial.gateway`` names, and one of another kind is refused,
+naming both, because a vehicle answers to one: commands, beacons and data all go
+the one way.
 
 Where the links are
 -------------------

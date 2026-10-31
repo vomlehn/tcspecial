@@ -23,14 +23,15 @@
 //!
 //! | Interface | Descriptor | The program reads | The program writes |
 //! |---|---|---|---|
-//! | [`Interface::Payload`] | 0 | payload data | MOC data |
-//! | [`Interface::Moc`] | 1 | MOC data | payload data |
+//! | [`Interface::Payload`] | 0 | payload data | gateway data |
+//! | [`Interface::Gateway`] | 1 | gateway data | payload data |
 //! | [`Interface::Errors`] | 2 | -- | what went wrong |
 //!
 //! Each of the first two is read *and* written, which is why each is one
-//! interface and not two: an app that is handed payload data answers with MOC
-//! data on the same interface, and the pairing is the point. A descriptor like
-//! that is one end of a socket pair rather than a pipe -- see [`parent`].
+//! interface and not two: an app that is handed payload data answers with
+//! gateway data on the same interface, and the pairing is the point. A
+//! descriptor like that is one end of a socket pair rather than a pipe -- see
+//! [`parent`].
 //!
 //! A Rust app does not keep them there. They are its stdin, stdout and stderr
 //! too, so [`app`] moves each to a descriptor of its own once it holds them,
@@ -39,8 +40,8 @@
 //! [`app`].
 //!
 //! Payload data is what travels groundward, from what the vehicle carries
-//! towards the ground; MOC data is what travels vehicleward, from the ground
-//! towards what it carries. The names are the graph's own: see
+//! towards the ground; gateway data is what travels vehicleward, from the
+//! ground towards what it carries. The names are the graph's own: see
 //! `tcslibgs::graph::terminals`.
 //!
 //! # What an app supports, and what it does not
@@ -48,20 +49,20 @@
 //! Five kinds of app, and the kind is the node type a configuration names.
 //! Three of them are nodes of the vehicle's own:
 //!
-//! * [`app::AppPayloadVeh`] reads payload data and writes MOC data. Descriptor
-//!   1 is not open at all.
-//! * [`app::AppMocVeh`] reads MOC data and writes payload data. Descriptor 0
-//!   is not open at all.
+//! * [`app::AppPayloadVeh`] reads payload data and writes gateway data.
+//!   Descriptor 1 is not open at all.
+//! * [`app::AppGatewayVeh`] reads gateway data and writes payload data.
+//!   Descriptor 0 is not open at all.
 //! * [`app::AppAllVeh`] does both.
 //!
 //! And two are payloads, which send readings and are sent what asks for them.
 //! Payload data is what a payload *writes*, and the interface payload data is
-//! written on is the MOC one -- so both of these are run with descriptor 1 and
-//! neither has descriptor 0 open:
+//! written on is the gateway one -- so both of these are run with descriptor 1
+//! and neither has descriptor 0 open:
 //!
 //! * [`app::AppPl`] writes payload data and reads nothing: a payload that is
 //!   never asked, and reports of its own accord. Its handle has no read on it.
-//! * [`app::AppAllPl`] reads MOC data and writes payload data, which is the
+//! * [`app::AppAllPl`] reads gateway data and writes payload data, which is the
 //!   shape every other payload has: asked for a reading, and answering with
 //!   one.
 //!
@@ -92,9 +93,10 @@
 //!
 //! A short, fixed list of arguments: the name of the node the program is, and
 //! then the argument the configuration states for each stream the kind handles
-//! -- `app-payload-arg` before `app-moc-arg`. So an `app_all_veh` named
-//! `through` is run as `program through <payload> <moc>`, an `app_moc_veh` as
-//! `program back <moc>`, and an `app_pl` as `program bay <payload>`.
+//! -- `app-payload-arg` before `app-gateway-arg`. So an `app_all_veh` named
+//! `through` is run as `program through <payload> <gateway>`, an
+//! `app_gateway_veh` as `program back <gateway>`, and an `app_pl` as
+//! `program bay <payload>`.
 //!
 //! The order is fixed by the kind and not by what a file happened to state,
 //! which is why both attributes are required of the kinds that take them:
@@ -126,10 +128,10 @@ use std::os::fd::RawFd;
 /// descriptors is the errors.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Interface {
-    /// Payload data in, MOC data out.
+    /// Payload data in, gateway data out.
     Payload,
-    /// MOC data in, payload data out.
-    Moc,
+    /// Gateway data in, payload data out.
+    Gateway,
     /// What went wrong, out.
     Errors,
 }
@@ -139,11 +141,11 @@ impl Interface {
     ///
     /// # Returns
     ///
-    /// 0 for the payload interface, 1 for the MOC one, 2 for the errors.
+    /// 0 for the payload interface, 1 for the gateway one, 2 for the errors.
     pub fn fd(self) -> RawFd {
         match self {
             Interface::Payload => 0,
-            Interface::Moc => 1,
+            Interface::Gateway => 1,
             Interface::Errors => 2,
         }
     }
@@ -156,7 +158,7 @@ impl Interface {
     pub fn name(self) -> &'static str {
         match self {
             Interface::Payload => "the payload interface",
-            Interface::Moc => "the MOC interface",
+            Interface::Gateway => "the gateway interface",
             Interface::Errors => "the error interface",
         }
     }
@@ -165,11 +167,15 @@ impl Interface {
     ///
     /// # Returns
     ///
-    /// A clause such as "payload data is read and MOC data written".
+    /// A clause such as "payload data is read and gateway data written".
     pub fn carries(self) -> &'static str {
         match self {
-            Interface::Payload => "payload data is read and MOC data written",
-            Interface::Moc => "MOC data is read and payload data written",
+            Interface::Payload => {
+                "payload data is read and gateway data written"
+            }
+            Interface::Gateway => {
+                "gateway data is read and payload data written"
+            }
             Interface::Errors => "error messages are written",
         }
     }

@@ -33,9 +33,9 @@ tcspecial:
     recv: "0.0.0.0:9200"
     send: "127.0.0.1:9210"
 
-moc:
+gateway:
   # The F´ bridge's end of the link, both ways. What the bridge sends goes up
-  # to address:port, which this node binds aboard, and leaves it by moc-out
+  # to address:port, which this node binds aboard, and leaves it by gateway-out
   # for the heater. What comes down arrives at bridge_base plus the device id
   # of the node that sent it, and the bridge gives it the F´ ID
   # fprime_id_base plus that same id: the thermometer, device id 2, arrives
@@ -47,7 +47,7 @@ moc:
     bridge_base: "127.0.0.1:9700"
     fprime_id_base: "0x3000"
     payload-in: true
-    moc-out:
+    gateway-out:
       - target: heater
 
 payloads:
@@ -58,7 +58,7 @@ payloads:
     protocol: "udp"
     address: "127.0.0.1"
     port: "9001"
-    moc-in: true
+    gateway-in: true
   # A thermometer whose readings go to the flight computer.
   - name: thermometer
     type: network

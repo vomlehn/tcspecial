@@ -9,11 +9,11 @@
 //!
 //! Three pieces:
 //!
-//! * [`route_of`] finds a `ping` node the ground can reach, and the `moc`
+//! * [`route_of`] finds a `ping` node the ground can reach, and the `gateway`
 //!   node a ping goes up through and its answer comes down through.
-//! * [`Uplink`] sends to a `moc` node: the address and port it binds aboard,
-//!   which is what leaves it by its `moc-out` links. The answer comes down as
-//!   any node's data does, through [`crate::moc::Moc`].
+//! * [`Uplink`] sends to a gateway node: the address and port it binds aboard,
+//!   which is what leaves it by its `gateway-out` links. The answer comes down
+//!   as any node's data does, through [`crate::gateway::GatewayReceiver`].
 //! * [`Pinger`] keeps what there is to show: the last ping sent and when, the
 //!   last answer and when, and the three times between them.
 //!
@@ -46,23 +46,23 @@ use tcslibgs::graph::{Destination, Graph};
 use tcslibgs::node::vehicle::ping;
 use tcslibgs::EndpointConfig;
 
-/// A `ping` node the ground can reach, and the `moc` node between them.
+/// A `ping` node the ground can reach, and the gateway node between them.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Route {
     /// The `ping` node.
     pub node: String,
-    /// The `moc` node a ping goes up through, by its `moc-out` link to the
-    /// `ping` node, and the answer comes down through, by the `ping` node's
+    /// The gateway node a ping goes up through, by its `gateway-out` link to
+    /// the `ping` node, and the answer comes down through, by the `ping` node's
     /// link to it.
-    pub moc: String,
+    pub gateway: String,
 }
 
 /// Finds the first `ping` node in the configuration the ground can reach
 /// both ways, in the order the file writes them.
 ///
-/// Both ways: a `moc` node that binds an address and port aboard -- somewhere
+/// Both ways: a gateway node that binds an address and port aboard -- somewhere
 /// for a ping to go up to -- with a link to the `ping` node, and a link from
-/// the `ping` node back down to that same `moc` node.
+/// the `ping` node back down to that same gateway node.
 ///
 /// # Arguments
 ///
@@ -70,7 +70,7 @@ pub struct Route {
 ///
 /// # Returns
 ///
-/// The `ping` node and its `moc` node, or `None` where there is no such
+/// The `ping` node and its gateway node, or `None` where there is no such
 /// node, which is a configuration with nothing to ping; a ping node
 /// reachable one way only is one a ping would vanish into.
 pub fn route_of(graph: &Graph) -> Option<Route> {
@@ -83,13 +83,13 @@ pub fn route_of(graph: &Graph) -> Option<Route> {
             down.iter()
                 .filter(|link| link.source == node.name)
                 .find_map(|link| match &link.via {
-                    Via::Moc(moc)
-                        if feeds(graph, moc, &node.name)
-                            && binds(graph, moc) =>
+                    Via::Gateway(gateway)
+                        if feeds(graph, gateway, &node.name)
+                            && binds(graph, gateway) =>
                     {
                         Some(Route {
                             node: node.name.clone(),
-                            moc: moc.clone(),
+                            gateway: gateway.clone(),
                         })
                     }
                     _ => None,
@@ -119,12 +119,14 @@ fn feeds(graph: &Graph, from: &str, to: &str) -> bool {
     })
 }
 
-/// Whether a `moc` node binds an address and port aboard.
-fn binds(graph: &Graph, moc: &str) -> bool {
-    graph.node(moc).is_some_and(tcslibgs::graph::reach::binds)
+/// Whether a gateway node binds an address and port aboard.
+fn binds(graph: &Graph, gateway: &str) -> bool {
+    graph
+        .node(gateway)
+        .is_some_and(tcslibgs::graph::reach::binds)
 }
 
-/// The ground's end of a `moc` node's way up.
+/// The ground's end of a gateway node's way up.
 #[derive(Debug)]
 pub struct Uplink {
     socket: UdpSocket,
@@ -132,13 +134,13 @@ pub struct Uplink {
 }
 
 impl Uplink {
-    /// Opens the way up to a `moc` node: where it binds aboard, which the
+    /// Opens the way up to a gateway node: where it binds aboard, which the
     /// configuration says.
     ///
     /// # Arguments
     ///
-    /// * `graph` - The configuration's graph.
-    /// * `moc`   - The name of the `moc` node.
+    /// * `graph`   - The configuration's graph.
+    /// * `gateway` - The name of the gateway node.
     ///
     /// # Returns
     ///
@@ -150,38 +152,41 @@ impl Uplink {
     /// gateway node, or binds nothing -- it only sends, to its
     /// `ground_base`, and has nowhere for the ground to send to -- and for
     /// an address that does not resolve or a socket that cannot be made.
-    pub fn open(graph: &Graph, moc: &str) -> Result<Uplink, String> {
+    pub fn open(graph: &Graph, gateway: &str) -> Result<Uplink, String> {
         let node = graph
-            .node(moc)
-            .ok_or_else(|| format!("there is no node called \"{moc}\""))?;
+            .node(gateway)
+            .ok_or_else(|| format!("there is no node called \"{gateway}\""))?;
         if !tcslibgs::gateway::is_gateway(&node.node_type) {
             return Err(format!(
-                "\"{moc}\" is a {} node, not a gateway node",
+                "\"{gateway}\" is a {} node, not a gateway node",
                 node.node_type
             ));
         }
         if !tcslibgs::graph::reach::binds(node) {
             return Err(format!(
-                "\"{moc}\" states no address and port, so it binds nothing \
+                "\"{gateway}\" states no address and port, so it binds nothing \
                  aboard and the ground has nowhere to send to it"
             ));
         }
         let EndpointConfig::Network(at) = reach_of(node)?.endpoint else {
-            return Err(format!("\"{moc}\" is not reached over a socket"));
+            return Err(format!("\"{gateway}\" is not reached over a socket"));
         };
         let to = (at.address.as_str(), at.port)
             .to_socket_addrs()
             .map_err(|e| {
-                format!("\"{moc}\" at {}:{}: {e}", at.address, at.port)
+                format!("\"{gateway}\" at {}:{}: {e}", at.address, at.port)
             })?
             .next()
             .ok_or_else(|| {
-                format!("\"{moc}\" at {}:{} is no address", at.address, at.port)
+                format!(
+                    "\"{gateway}\" at {}:{} is no address",
+                    at.address, at.port
+                )
             })?;
         let socket =
             UdpSocket::bind(if to.is_ipv4() { "0.0.0.0:0" } else { "[::]:0" })
                 .map_err(|e| {
-                    format!("a socket to send to \"{moc}\" from: {e}")
+                    format!("a socket to send to \"{gateway}\" from: {e}")
                 })?;
         Ok(Uplink { socket, to })
     }
@@ -555,10 +560,10 @@ mod tests {
         assert_eq!(NO_MESSAGE, "<none>");
     }
 
-    /// The shipped example's ping node is found, through its moc node, and a
-    /// ping goes up to where that node binds.
+    /// The shipped example's ping node is found, through its gateway node, and
+    /// a ping goes up to where that node binds.
     #[test]
-    fn the_example_is_routed_and_its_moc_node_is_sent_to() {
+    fn the_example_is_routed_and_its_gateway_node_is_sent_to() {
         let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("..");
         let graph = Graph::load(root.join("examples/ping/ping.yaml"))
             .expect("it reads");
@@ -566,21 +571,21 @@ mod tests {
             route_of(&graph),
             Some(Route {
                 node: "ping".to_string(),
-                moc: "moc".to_string()
+                gateway: "gateway".to_string()
             })
         );
-        let uplink = Uplink::open(&graph, "moc").expect("it binds aboard");
+        let uplink = Uplink::open(&graph, "gateway").expect("it binds aboard");
         assert_eq!(uplink.to().to_string(), "127.0.0.1:7600");
 
-        // And a configuration whose moc node binds nothing has no way up.
+        // And a configuration whose gateway node binds nothing has no way up.
         let beacon = Graph::load(root.join("examples/beacon/beacon.yaml"))
             .expect("it reads");
         assert_eq!(route_of(&beacon), None);
     }
 
-    /// What is sent up arrives where the moc node binds.
+    /// What is sent up arrives where the gateway node binds.
     #[test]
-    fn an_uplink_sends_to_where_the_moc_node_binds() {
+    fn an_uplink_sends_to_where_the_gateway_node_binds() {
         let vehicle = UdpSocket::bind("127.0.0.1:0").expect("a port");
         vehicle
             .set_read_timeout(Some(Duration::from_secs(2)))
@@ -591,14 +596,15 @@ mod tests {
         std::fs::write(
             &path,
             format!(
-                "moc:\n  - {{ name: moc, type: moc, address: \"127.0.0.1\", \
-                 port: \"{port}\", ground_base: \"127.0.0.1:9000\" }}\n"
+                "gateway:\n  - {{ name: gateway, type: gateway_radio, \
+                 address: \"127.0.0.1\", port: \"{port}\", \
+                 ground_base: \"127.0.0.1:9000\" }}\n"
             ),
         )
         .expect("written");
         let graph = Graph::load(&path).expect("it reads");
 
-        Uplink::open(&graph, "moc")
+        Uplink::open(&graph, "gateway")
             .expect("it binds aboard")
             .send(b"ping #1 1760900000.000000000")
             .expect("sent");

@@ -31,18 +31,18 @@ tcspecial:
     recv: "0.0.0.0:7200"
     send: "127.0.0.1:7210"
 
-moc:
+gateway:
   # The ground's end of the link, both ways. A ping goes up to address:port,
-  # which this node binds aboard, and leaves it by moc-out for the ping node.
-  # The answer comes back to the ground at ground_base plus the ping node's
-  # device id: ping is the second node written, device id 1, so 7701.
-  - name: moc
-    type: moc
+  # which this node binds aboard, and leaves it by gateway-out for the ping
+  # node. The answer comes back to the ground at ground_base plus the ping
+  # node's device id: ping is the second node written, device id 1, so 7701.
+  - name: gateway
+    type: gateway_radio
     address: "127.0.0.1"
     port: "7600"
     ground_base: "127.0.0.1:7700"
     payload-in: true
-    moc-out:
+    gateway-out:
       - target: ping
 
 vehicle:
@@ -50,11 +50,11 @@ vehicle:
   # tcslibgs::node::vehicle::ping for what a ping and its answer say.
   - name: ping
     type: ping
-    moc-in: true
+    gateway-in: true
     payload-out:
-      - target: moc
+      - target: gateway
 
 tcsgui:
   nodes:
-    - { name: moc, x: 469, y: 34 }
+    - { name: gateway, x: 469, y: 34 }
     - { name: ping, x: 34, y: 34 }

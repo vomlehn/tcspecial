@@ -297,7 +297,7 @@ fn draw(
 ) -> Shown {
     let settings = tcsdiagram::settings::read().settings;
     let dividers =
-        pane::dividers_for(settings.moc_percent, settings.vehicle_percent);
+        pane::dividers_for(settings.gateway_percent, settings.vehicle_percent);
 
     let top = graph.files.first();
     let here = |name: &str| graph.homes.get(name) == top || top.is_none();
@@ -377,7 +377,7 @@ fn draw(
     window.set_vehicle_divider(dividers.vehicle as f32);
     window.set_payload_ground(colour(&ground_of(style::Ground::Payloads)));
     window.set_vehicle_ground(colour(&ground_of(style::Ground::Vehicle)));
-    window.set_moc_ground(colour(&ground_of(style::Ground::Moc)));
+    window.set_gateway_ground(colour(&ground_of(style::Ground::Gateway)));
 
     Shown { links, rows }
 }
@@ -430,8 +430,8 @@ fn node_view(look: NodeLook) -> ui::NodeView {
         selected: false,
         summary: look.summary.into(),
         openable: look.openable,
-        moc_in: terminal(look.moc_in),
-        moc_out: terminal(look.moc_out),
+        gateway_in: terminal(look.gateway_in),
+        gateway_out: terminal(look.gateway_out),
         payload_in: terminal(look.payload_in),
         payload_out: terminal(look.payload_out),
         terminal_column: look.terminal_column,

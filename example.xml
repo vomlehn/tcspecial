@@ -25,14 +25,14 @@
             <send>127.0.0.1:4100</send>
         </tcs_cmd>
     </tcspecial>
-    <moc>
-        <name>moc-1</name>
-        <type>moc</type>
+    <gateway>
+        <name>gateway-1</name>
+        <type>gateway_radio</type>
         <address>127.0.0.1</address>
         <ground_base>127.0.0.1:5100</ground_base>
         <port>5000</port>
         <payload-in>true</payload-in>
-    </moc>
+    </gateway>
     <payloads>
         <name>spi-1</name>
         <type>spi</type>
@@ -40,10 +40,10 @@
         <path>/dev/spidev0.0</path>
         <spi_mode>0</spi_mode>
         <stand_in>127.0.0.1:7951</stand_in>
-        <payload-out><target>moc-1</target></payload-out>
+        <payload-out><target>gateway-1</target></payload-out>
     </payloads>
     <tcsgui>
-        <nodes><name>moc-1</name><x>469</x><y>34</y></nodes>
+        <nodes><name>gateway-1</name><x>469</x><y>34</y></nodes>
         <nodes><name>spi-1</name><x>15</x><y>34</y></nodes>
     </tcsgui>
 </configuration>

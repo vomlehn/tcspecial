@@ -125,11 +125,11 @@ Key TCSpecial features are:
   * Extensible in any language. A node can be a program of its own -- in
     Python, C, a shell script, Rust, or anything else the vehicle can execute --
     that tcspecial starts from the configuration and connects into the graph:
-    on the vehicle's side (`app_payload_veh`, `app_moc_veh`, `app_all_veh`) or
-    as a payload that is a program (`app_pl`, `app_all_pl`). The program talks
-    to tcspecial over file descriptors carrying length-prefixed packets, so it
-    links against nothing of tcspecial's; the `tcsapp` crate speaks that for
-    Rust, and `examples/simple-app` has a payload written in Python 3 with
+    on the vehicle's side (`app_payload_veh`, `app_gateway_veh`, `app_all_veh`)
+    or as a payload that is a program (`app_pl`, `app_all_pl`). The program
+    talks to tcspecial over file descriptors carrying length-prefixed packets,
+    so it links against nothing of tcspecial's; the `tcsapp` crate speaks that
+    for Rust, and `examples/simple-app` has a payload written in Python 3 with
     nothing outside its standard library. A `process` computation likewise
     hands what arrives to any program, a line at a time, and takes back what
     it writes. A capability added this way needs no change to the flight

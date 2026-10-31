@@ -1,6 +1,6 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="1020" height="470" viewBox="0 0 1020 470" role="img" aria-labelledby="title desc">
   <title id="title">The simple-app example</title>
-  <desc id="desc">One payload that is a program, lorem, an app_pl node that tcspecial starts as the Python 3 program examples/simple-app/lorem_pl.py with the argument 1. tcspecial sends each word it produces as a UDP datagram to the moc node on the ground, moc-1, at its ground_base, 127.0.0.1:5100, plus lorem's device id, 1: port 5101. The ground program lorem_moc gets the words from moc-1 with a function call, tcslib's Moc::receive, and prints the line.</desc>
+  <desc id="desc">One payload that is a program, lorem, an app_pl node that tcspecial starts as the Python 3 program examples/simple-app/lorem_pl.py with the argument 1. tcspecial sends each word it produces as a UDP datagram to the gateway node on the ground, gateway-1, at its ground_base, 127.0.0.1:5100, plus lorem's device id, 1: port 5101. The ground program lorem_gateway gets the words from gateway-1 with a function call, tcslib's GatewayReceiver::receive, and prints the line.</desc>
   <defs>
     <style>
       text { font-family: "DejaVu Sans", Helvetica, Arial, sans-serif; fill: #111827; }
@@ -12,7 +12,7 @@
       .label { font-size: 12px; fill: #1f2937; }
       .note { font-size: 12px; fill: #4b5563; }
       .payload { fill: #eaf2fb; stroke: #2f6db5; stroke-width: 1.6; }
-      .moc { fill: #e9f6ee; stroke: #2e7d4f; stroke-width: 1.6; }
+      .gateway { fill: #e9f6ee; stroke: #2e7d4f; stroke-width: 1.6; }
       .socket { fill: #ffffff; stroke: #2f6db5; stroke-width: 1.4; stroke-dasharray: 5 3; }
       .ground { fill: #f3f4f6; stroke: #4b5563; stroke-width: 1.6; }
       .boundary { fill: #fbfbfd; stroke: #94a3b8; stroke-width: 1.4; stroke-dasharray: 7 5; }
@@ -47,48 +47,48 @@
   <text class="kind" x="61" y="157">app_pl, Python 3, id 1</text>
   <text class="detail" x="61" y="176">lorem_pl.py, line 1</text>
 
-  <!-- lorem's link to the moc node, which tcspecial opens -->
+  <!-- lorem's link to the gateway node, which tcspecial opens -->
   <rect class="socket" x="310" y="110" width="240" height="80" rx="10"/>
-  <text class="name" x="326" y="136">lorem to moc-1</text>
+  <text class="name" x="326" y="136">lorem to gateway-1</text>
   <text class="kind" x="326" y="157">sends each datum as UDP</text>
   <text class="detail" x="326" y="176">to 127.0.0.1:5101</text>
 
-  <text class="note" x="298" y="226">5101 is moc-1's ground_base port,</text>
+  <text class="note" x="298" y="226">5101 is gateway-1's ground_base port,</text>
   <text class="note" x="298" y="242">5100, plus lorem's device id, 1.</text>
 
-  <!-- The moc node, on the ground -->
-  <rect class="moc" x="670" y="110" width="280" height="80" rx="10"/>
-  <text class="name" x="686" y="136">moc-1</text>
+  <!-- The gateway node, on the ground -->
+  <rect class="gateway" x="670" y="110" width="280" height="80" rx="10"/>
+  <text class="name" x="686" y="136">gateway-1</text>
   <text class="kind" x="686" y="157">receives what tcspecial sends</text>
   <text class="detail" x="686" y="176">ground_base 127.0.0.1:5100</text>
 
   <!-- The ground program -->
   <rect class="ground" x="670" y="262" width="280" height="80" rx="10"/>
-  <text class="name" x="686" y="288">lorem_moc</text>
+  <text class="name" x="686" y="288">lorem_gateway</text>
   <text class="kind" x="686" y="309">ground program, Rust</text>
   <text class="detail" x="686" y="328">prints the line</text>
 
-  <!-- lorem's words, through tcspecial, to the moc node -->
+  <!-- lorem's words, through tcspecial, to the gateway node -->
   <path class="groundward" d="M245,150 L306,150" marker-end="url(#arrow-blue)"/>
   <path class="groundward" d="M550,150 L666,150" marker-end="url(#arrow-blue)"/>
   <text class="label" x="596" y="140">UDP</text>
 
   <!-- The ground program gets them with a function call -->
   <path class="call" d="M810,190 L810,258" marker-end="url(#arrow-call)"/>
-  <text class="code" x="822" y="229">Moc::receive()</text>
+  <text class="code" x="822" y="229">GatewayReceiver::receive()</text>
 
   <!-- Legend -->
   <line x1="45" y1="392" x2="980" y2="392" stroke="#e5e7eb" stroke-width="1"/>
   <path class="groundward" d="M45,422 L95,422" marker-end="url(#arrow-blue)"/>
   <text class="label" x="105" y="426">data toward the ground</text>
   <path class="call" d="M300,422 L350,422" marker-end="url(#arrow-call)"/>
-  <text class="label" x="360" y="426">function call, from tcslib::moc</text>
+  <text class="label" x="360" y="426">function call, from tcslib::gateway</text>
   <rect class="payload" x="45" y="444" width="22" height="16" rx="4"/>
   <text class="label" x="75" y="457">payload</text>
   <rect class="socket" x="160" y="444" width="22" height="16" rx="4"/>
   <text class="label" x="190" y="457">opened by tcspecial</text>
-  <rect class="moc" x="340" y="444" width="22" height="16" rx="4"/>
-  <text class="label" x="370" y="457">moc node</text>
+  <rect class="gateway" x="340" y="444" width="22" height="16" rx="4"/>
+  <text class="label" x="370" y="457">gateway node</text>
   <rect class="ground" x="465" y="444" width="22" height="16" rx="4"/>
   <text class="label" x="495" y="457">ground program</text>
 </svg>

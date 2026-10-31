@@ -447,7 +447,7 @@ impl NodeCommand {
 ///
 /// Which node, which of its attributes, and what to set it to. The
 /// configuration's `commands` section says which attribute of which node the
-/// ground may set -- `{ from: moc, sets: thermostat.setpoint }` -- and a
+/// ground may set -- `{ from: gateway, sets: thermostat.setpoint }` -- and a
 /// command naming an attribute no binding mentions is refused. That is what
 /// makes what the ground may change in flight something written down and
 /// checkable rather than whatever a computation happens to accept: a bus

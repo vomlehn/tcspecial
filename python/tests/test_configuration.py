@@ -65,10 +65,10 @@ class ConfigurationTest(unittest.TestCase):
         link = config.beacon_link()
         self.assertEqual(link.send, HostPort("0.0.0.0", 7500))
         self.assertEqual(link.recv, HostPort("127.0.0.1", 7510))
-        self.assertEqual(config.uplink("moc"), HostPort("127.0.0.1", 7600))
+        self.assertEqual(config.uplink("gateway"), HostPort("127.0.0.1", 7600))
         # ping is the second node written, device id 1.
         self.assertEqual(config.device_id("ping"), 1)
-        self.assertEqual(config.downlink("moc", "ping"),
+        self.assertEqual(config.downlink("gateway", "ping"),
                          HostPort("127.0.0.1", 7701))
 
     def test_the_beacon_interval_is_read_as_the_rust_reads_one(self):
@@ -90,8 +90,8 @@ class ConfigurationTest(unittest.TestCase):
         # them, not within a section.
         directory, path = written(
             "<payloads><name>a</name><type>i2c</type></payloads>"
-            "<moc><name>m</name><type>moc</type>"
-            "<ground_base>127.0.0.1:9000</ground_base></moc>"
+            "<gateway><name>m</name><type>gateway_radio</type>"
+            "<ground_base>127.0.0.1:9000</ground_base></gateway>"
             "<vehicle><name>p</name><type>ping</type>"
             "<payload-out><target>m</target></payload-out></vehicle>"
             "<payloads><name>b</name><type>i2c</type></payloads>"

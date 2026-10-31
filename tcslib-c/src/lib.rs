@@ -1,7 +1,7 @@
 //! tcslib for C and C++.
 //!
 //! What a ground station is built on -- the vehicle's beacons, its data from
-//! a `moc` node, and commands to it -- behind one header, `include/tcs.h`,
+//! a gateway node, and commands to it -- behind one header, `include/tcs.h`,
 //! which says the whole of the interface and is includable from C and C++
 //! alike. Nothing here is a second implementation of anything: each function
 //! is the C spelling of a call into `tcslib`, so a C or C++ station reads the
@@ -43,8 +43,8 @@ use std::path::PathBuf;
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
 use tcslib::beacon::{Beacons, Contact, Schedule, Stage, STANDARD_INTERVAL};
+use tcslib::gateway::{GatewayReceiver, DATUM_BYTES};
 use tcslib::matched::Matched;
-use tcslib::moc::{Moc, DATUM_BYTES};
 use tcslib::ping::{route_of, Pinger, Uplink, NO_MESSAGE};
 use tcslib::{command_links_of, CommandStatus, TcsClient};
 use tcslibgs::config_digest::{digest_of_graph, ConfigDigest, ConfigVersion};
@@ -334,7 +334,7 @@ pub struct tcs_configuration {
     digest_text: Text<33>,
     /// Whether the station using this configuration is matched with the
     /// vehicle, and what it has received: kept by every beacon watch made
-    /// from this configuration, and read by every client and moc node made
+    /// from this configuration, and read by every client and gateway node made
     /// from it, which each hold a clone. The station is the configuration's
     /// holder, so this is where its match is.
     matched: Matched,
@@ -848,9 +848,9 @@ pub unsafe extern "C" fn tcs_beacons_close(beacons: *mut tcs_beacons) {
 
 // ---- The vehicle's data -----------------------------------------------------
 
-/// A `moc` node, open, and the last datum it received.
-pub struct tcs_moc {
-    moc: Moc,
+/// A gateway node, open, and the last datum it received.
+pub struct tcs_gateway {
+    gateway: GatewayReceiver,
     /// Each source's name as C reads it, in the order tcslib numbers them,
     /// made once when the node is opened: a datum's source is one of these,
     /// so a receive points at one rather than copying a name.
@@ -868,47 +868,48 @@ pub struct tcs_datum {
     length: usize,
 }
 
-/// Opens the `moc` node called `moc`.
+/// Opens the gateway node called `gateway`.
 ///
 /// # Arguments
 ///
 /// * `configuration` - The configuration.
-/// * `moc`           - The moc node's name.
+/// * `gateway`       - The gateway node's name.
 ///
 /// # Returns
 ///
-/// The moc node, or NULL where it cannot be opened.
+/// The gateway node, or NULL where it cannot be opened.
 ///
 /// # Safety
 ///
-/// `configuration` as [`tcs_configuration_digest`]; `moc` NULL or a
+/// `configuration` as [`tcs_configuration_digest`]; `gateway` NULL or a
 /// NUL-terminated string.
 #[no_mangle]
-pub unsafe extern "C" fn tcs_moc_open(
+pub unsafe extern "C" fn tcs_gateway_open(
     configuration: *const tcs_configuration,
-    moc: *const c_char,
-) -> *mut tcs_moc {
+    gateway: *const c_char,
+) -> *mut tcs_gateway {
     guard(std::ptr::null_mut(), || {
         let configuration = handle_of(configuration, "the configuration")?;
-        let name = text_of(moc, "the moc node's name")?;
-        let mut moc = Moc::open(&configuration.graph, name).map_err(|e| {
-            fail(format_args!("{}: {e}", configuration.path.display()))
-        })?;
+        let name = text_of(gateway, "the gateway node's name")?;
+        let mut gateway = GatewayReceiver::open(&configuration.graph, name)
+            .map_err(|e| {
+                fail(format_args!("{}: {e}", configuration.path.display()))
+            })?;
         // Read only while the station is matched with the vehicle, which
         // its beacon watch keeps, and counted with what else it receives.
-        moc.gated_by(configuration.matched.clone());
+        gateway.gated_by(configuration.matched.clone());
         // Allocates, once, at startup: the handle, which outlives this call;
         // the names of the node's sources, which are known now and read by
         // every receive after; and the buffer every datum is received in.
-        let names = moc
+        let names = gateway
             .sources()
             .iter()
             .map(|source| {
                 CString::new(source.replace('\0', " ")).unwrap_or_default()
             })
             .collect();
-        Ok(Box::into_raw(Box::new(tcs_moc {
-            moc,
+        Ok(Box::into_raw(Box::new(tcs_gateway {
+            gateway,
             names,
             data: vec![0; DATUM_BYTES],
         })))
@@ -919,7 +920,7 @@ pub unsafe extern "C" fn tcs_moc_open(
 ///
 /// # Arguments
 ///
-/// * `moc`     - The moc node.
+/// * `gateway` - The gateway node.
 /// * `wait_ms` - How long to wait, in milliseconds, or for ever where it is
 ///               negative.
 /// * `datum`   - Where the datum is written; its source and bytes are the
@@ -931,26 +932,28 @@ pub unsafe extern "C" fn tcs_moc_open(
 ///
 /// # Safety
 ///
-/// `moc` NULL or made by `tcs_moc_open` and not yet closed, used from one
-/// thread at a time; `datum` NULL or writable.
+/// `gateway` NULL or made by `tcs_gateway_open` and not yet closed, used from
+/// one thread at a time; `datum` NULL or writable.
 #[no_mangle]
-pub unsafe extern "C" fn tcs_moc_receive(
-    moc: *mut tcs_moc,
+pub unsafe extern "C" fn tcs_gateway_receive(
+    gateway: *mut tcs_gateway,
     wait_ms: i64,
     datum: *mut tcs_datum,
 ) -> c_int {
     guard(-1, || {
-        let node = handle_of_mut(moc, "the moc node")?;
+        let node = handle_of_mut(gateway, "the gateway node")?;
         let out = out_of(datum, "the datum")?;
         let wait = u64::try_from(wait_ms).ok().map(Duration::from_millis);
-        let Some(arrival) =
-            node.moc.receive_into(wait, &mut node.data).map_err(fail)?
+        let Some(arrival) = node
+            .gateway
+            .receive_into(wait, &mut node.data)
+            .map_err(fail)?
         else {
             return Ok(0);
         };
         let Some(source) = node.names.get(arrival.source) else {
             return Err(fail(format_args!(
-                "a datum came from source {}, which this moc node does not \
+                "a datum came from source {}, which this gateway node does not \
                  draw",
                 arrival.source
             )));
@@ -964,15 +967,15 @@ pub unsafe extern "C" fn tcs_moc_receive(
     })
 }
 
-/// Close a `moc` node.
+/// Close a gateway node.
 ///
 /// # Safety
 ///
-/// `moc` NULL or made by `tcs_moc_open` and not yet closed.
+/// `gateway` NULL or made by `tcs_gateway_open` and not yet closed.
 #[no_mangle]
-pub unsafe extern "C" fn tcs_moc_close(moc: *mut tcs_moc) {
-    if !moc.is_null() {
-        drop(Box::from_raw(moc));
+pub unsafe extern "C" fn tcs_gateway_close(gateway: *mut tcs_gateway) {
+    if !gateway.is_null() {
+        drop(Box::from_raw(gateway));
     }
 }
 
@@ -1596,7 +1599,7 @@ pub struct tcs_pinger {
     uplink: Uplink,
     pinger: Pinger,
     node: CString,
-    moc: CString,
+    gateway: CString,
     sent: Text<TEXT_BYTES>,
     received: Text<TEXT_BYTES>,
 }
@@ -1629,7 +1632,7 @@ fn now() -> Result<Duration, Failed> {
 ///
 /// # Returns
 ///
-/// The pinger, or NULL where there is no such ping node or its moc node's
+/// The pinger, or NULL where there is no such ping node or its gateway node's
 /// uplink cannot be opened.
 ///
 /// # Safety
@@ -1645,10 +1648,10 @@ pub unsafe extern "C" fn tcs_pinger_open(
         let route = route_of(&configuration.graph).ok_or_else(|| {
             fail(format_args!(
                 "{place} has no ping node the ground can reach both ways, \
-                 through a moc node that binds an address aboard"
+                 through a gateway node that binds an address aboard"
             ))
         })?;
-        let uplink = Uplink::open(&configuration.graph, &route.moc)
+        let uplink = Uplink::open(&configuration.graph, &route.gateway)
             .map_err(|e| fail(format_args!("{place}: {e}")))?;
         let mut sent = Text::EMPTY;
         sent.set(NO_MESSAGE);
@@ -1660,7 +1663,7 @@ pub unsafe extern "C" fn tcs_pinger_open(
             uplink,
             pinger: Pinger::new(),
             node: CString::new(route.node).unwrap_or_default(),
-            moc: CString::new(route.moc).unwrap_or_default(),
+            gateway: CString::new(route.gateway).unwrap_or_default(),
             sent,
             received,
         })))
@@ -1681,17 +1684,17 @@ pub unsafe extern "C" fn tcs_pinger_node(
     })
 }
 
-/// The moc node's name.
+/// The gateway node's name.
 ///
 /// # Safety
 ///
 /// As [`tcs_pinger_node`].
 #[no_mangle]
-pub unsafe extern "C" fn tcs_pinger_moc(
+pub unsafe extern "C" fn tcs_pinger_gateway(
     pinger: *const tcs_pinger,
 ) -> *const c_char {
     guard(std::ptr::null(), || {
-        Ok(handle_of(pinger, "the pinger")?.moc.as_ptr())
+        Ok(handle_of(pinger, "the pinger")?.gateway.as_ptr())
     })
 }
 
@@ -1911,7 +1914,7 @@ mod tests {
         unsafe {
             tcs_configuration_close(std::ptr::null_mut());
             tcs_beacons_close(std::ptr::null_mut());
-            tcs_moc_close(std::ptr::null_mut());
+            tcs_gateway_close(std::ptr::null_mut());
             tcs_client_close(std::ptr::null_mut());
             tcs_pinger_close(std::ptr::null_mut());
         }

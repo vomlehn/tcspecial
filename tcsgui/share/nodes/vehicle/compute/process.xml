@@ -11,8 +11,8 @@
     </sets>
     <payload-sink>true</payload-sink>
     <payload-source>true</payload-source>
-    <moc-sink>true</moc-sink>
-    <moc-source>true</moc-source>
+    <gateway-sink>true</gateway-sink>
+    <gateway-source>true</gateway-source>
     <attributes>
         <name>executable</name>
         <required>true</required>

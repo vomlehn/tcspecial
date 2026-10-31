@@ -1,19 +1,19 @@
 //! The example's ground end: it prints the line the vehicle sends.
 //!
 //! What stands in for ground software while this example runs. tcspecial
-//! sends `lorem`'s words as UDP datagrams to the configuration's `moc` node,
+//! sends `lorem`'s words as UDP datagrams to the configuration's gateway node,
 //! and this program gets them from that node with one function call --
-//! `tcslib::moc::Moc::receive` -- rather than opening a socket of its own: the
-//! library works out from the configuration which port each source's data
-//! arrives at, exactly as the vehicle does, and says which node each datum
-//! came from.
+//! `tcslib::gateway::GatewayReceiver::receive` -- rather than opening a socket
+//! of its own: the library works out from the configuration which port each
+//! source's data arrives at, exactly as the vehicle does, and says which node
+//! each datum came from.
 //!
 //! One datum is one word, which is how `lorem_pl.py` sent it. A datum holding
 //! nothing but `simple_app::TERMINATOR` is the end of the line: it is written
 //! out as well, and then this stops -- the line is whole, and a ground station
 //! waiting for more would be waiting for a payload that has said everything.
 //!
-//! Arguments, all optional: the configuration, the `moc` node to get the data
+//! Arguments, all optional: the configuration, the gateway node to get the data
 //! from, `--yaml` or `--xml` but not both -- which of the example's two files
 //! to read, YAML where neither is given -- and `-v` or `--verbose`. Run from
 //! the repository's root none need be given. Quiet unless `-v` or `--verbose`
@@ -26,7 +26,7 @@ use std::io::Write;
 use std::process::ExitCode;
 
 use simple_app::TERMINATOR;
-use tcslib::moc::{Moc, DATUM_BYTES};
+use tcslib::gateway::{GatewayReceiver, DATUM_BYTES};
 
 /// The example's configuration, without its extension: `.yaml` or `.xml`,
 /// the two saying the same thing.
@@ -36,14 +36,14 @@ const CONFIGURATION: &str = "examples/simple-app/simple-app";
 const SPELLING: tcslib::ConfigFormat = tcslib::ConfigFormat::Yaml;
 
 /// The node in it that `lorem`'s words go to, which the configuration calls
-/// `moc-1`.
-const MOC: &str = "moc-1";
+/// `gateway-1`.
+const GATEWAY: &str = "gateway-1";
 
 /// What the command line asked for.
 #[derive(Debug, PartialEq, Eq)]
 struct Arguments {
     configuration: String,
-    moc_name: String,
+    gateway_name: String,
     verbose: bool,
 }
 
@@ -58,7 +58,7 @@ impl Arguments {
     /// # Returns
     ///
     /// The configuration, chosen by `--yaml` or `--xml` where none is named;
-    /// the `moc` node, [`MOC`] where none is named; and whether to talk.
+    /// the gateway node, [`GATEWAY`] where none is named; and whether to talk.
     ///
     /// # Errors
     ///
@@ -83,9 +83,9 @@ impl Arguments {
                 }
                 _ if names.len() == 2 => {
                     return Err(format!(
-                        "{arg}: a configuration and a moc node may be named, \
+                    "{arg}: a configuration and a gateway node may be named, \
                          and nothing more"
-                    ))
+                ))
                 }
                 _ => names.push(arg),
             }
@@ -97,7 +97,7 @@ impl Arguments {
                 CONFIGURATION,
                 SPELLING,
             )?,
-            moc_name: names.next().unwrap_or_else(|| MOC.to_string()),
+            gateway_name: names.next().unwrap_or_else(|| GATEWAY.to_string()),
             verbose,
         })
     }
@@ -114,32 +114,33 @@ impl Arguments {
 fn main() -> ExitCode {
     let Arguments {
         configuration,
-        moc_name,
+        gateway_name,
         verbose,
     } = match Arguments::of(std::env::args().skip(1)) {
         Ok(arguments) => arguments,
         Err(why) => {
-            eprintln!("lorem_moc: {why}");
+            eprintln!("lorem_gateway: {why}");
             eprintln!(
-                "usage: lorem_moc [--yaml | --xml] [-v | --verbose] \
-                 [configuration [moc node]]"
+                "usage: lorem_gateway [--yaml | --xml] [-v | --verbose] \
+                 [configuration [gateway node]]"
             );
             return ExitCode::from(2);
         }
     };
 
-    let mut moc = match Moc::open_file(&configuration, &moc_name) {
-        Ok(moc) => moc,
-        Err(e) => {
-            eprintln!("lorem_moc: {e}");
-            return ExitCode::FAILURE;
-        }
-    };
+    let mut gateway =
+        match GatewayReceiver::open_file(&configuration, &gateway_name) {
+            Ok(gateway) => gateway,
+            Err(e) => {
+                eprintln!("lorem_gateway: {e}");
+                return ExitCode::FAILURE;
+            }
+        };
     if verbose {
         eprintln!(
-            "lorem_moc: listening on {} for {}",
-            moc.name(),
-            moc.sources().join(", ")
+            "lorem_gateway: listening on {} for {}",
+            gateway.name(),
+            gateway.sources().join(", ")
         );
     }
 
@@ -147,11 +148,11 @@ fn main() -> ExitCode {
     // Every word is received here, made once: room for any datagram.
     let mut datum = vec![0u8; DATUM_BYTES];
     loop {
-        let arrival = match moc.receive_into(None, &mut datum) {
+        let arrival = match gateway.receive_into(None, &mut datum) {
             Ok(Some(arrival)) => arrival,
             Ok(None) => continue,
             Err(e) => {
-                eprintln!("lorem_moc: {e}");
+                eprintln!("lorem_gateway: {e}");
                 return ExitCode::FAILURE;
             }
         };
@@ -193,7 +194,7 @@ mod tests {
         let quiet = of(&[]).expect("nothing is fine");
         assert!(!quiet.verbose);
         assert_eq!(quiet.configuration, "examples/simple-app/simple-app.yaml");
-        assert_eq!(quiet.moc_name, MOC);
+        assert_eq!(quiet.gateway_name, GATEWAY);
 
         for args in [
             &["-v"][..],
@@ -205,7 +206,7 @@ mod tests {
         }
         let both = of(&["-v", "a.yaml", "m"]).expect("they read");
         assert_eq!(
-            (both.configuration.as_str(), both.moc_name.as_str()),
+            (both.configuration.as_str(), both.gateway_name.as_str()),
             ("a.yaml", "m")
         );
 

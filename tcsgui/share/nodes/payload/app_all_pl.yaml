@@ -3,8 +3,8 @@
 # A payload: what the vehicle carries this flight, and this one is a program
 # the mission wrote rather than a device on a bus. Its readings leave by
 # payload-out on their way to the ground, and what asks for them -- a trigger,
-# a command -- arrives at moc-in, which is the shape every payload has. It is
-# run with one file interface, on which it reads what asks and writes the
+# a command -- arrives at gateway-in, which is the shape every payload has. It
+# is run with one file interface, on which it reads what asks and writes the
 # answer, so the bytes that ask are the datum itself and there is no trigger to
 # state. The interfaces and the packets they carry are tcsapp; its Rust is
 # tcspecial/src/node/payload/app_all_pl/.
@@ -15,8 +15,8 @@ about: >
   answers with one.
 payload-sink: false
 payload-source: true
-moc-sink: true
-moc-source: false
+gateway-sink: true
+gateway-source: false
 attributes:
   - name: executable
     required: true
@@ -34,11 +34,11 @@ attributes:
       What the program is told about the payload stream, as the argument after
       the node's name. Required: the arguments are a fixed list, so a node that
       said nothing would shift what the rest of the list means.
-  - name: app-moc-arg
+  - name: app-gateway-arg
     required: true
     about: >
-      What the program is told about the MOC stream, as the argument after the
-      payload one where this kind has both. Required, for the reason the
+      What the program is told about the gateway stream, as the argument after
+      the payload one where this kind has both. Required, for the reason the
       payload argument is.
   - name: restart
     required: false

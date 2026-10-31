@@ -99,7 +99,7 @@ slint::include_modules!();
 /// * `dividers` - Where both dividers are now, in working-pane units.
 /// * `which`    - The divider being dragged: `Pane::Payloads` for the one
 ///                between the payload and vehicle panes, anything else for
-///                the one between the vehicle and moc panes.
+///                the one between the vehicle and gateway panes.
 ///
 /// # Returns
 ///
@@ -117,10 +117,10 @@ fn divider_range(
         Pane::Payloads => {
             (Pane::Payloads, Pane::Vehicle, step, dividers.vehicle - step)
         }
-        // And the vehicle divider, between the vehicle's and the moc pane.
+        // And the vehicle divider, between the vehicle's and the gateway pane.
         _ => (
             Pane::Vehicle,
-            Pane::Moc,
+            Pane::Gateway,
             dividers.payloads + step,
             WORKING_WIDTH - step,
         ),
@@ -144,14 +144,14 @@ fn divider_range(
 
 /// Where the ground station goes in a configuration that is new.
 ///
-/// The upper right of the moc working pane, clear of the pane's own label: the
-/// moc pane being the rightmost, the node is held off its right edge. Where a
-/// node may be, at 209 millimetres across and 9 down -- see
+/// The upper right of the gateway working pane, clear of the pane's own label:
+/// the gateway pane being the rightmost, the node is held off its right edge.
+/// Where a node may be, at 209 millimetres across and 9 down -- see
 /// `pane::NODE_STEP_MM` and the test below, which holds it there.
-const MOC_PLACE: (i32, i32) = (790, 34);
+const GATEWAY_PLACE: (i32, i32) = (790, 34);
 // Clear of the strip the panes' names are written in, as everything the
 // editor places is: see `pane::NAMES`, which the test below holds this to.
-const _: () = assert!(MOC_PLACE.1 >= pane::NAMES.0 + pane::NAMES.1);
+const _: () = assert!(GATEWAY_PLACE.1 >= pane::NAMES.0 + pane::NAMES.1);
 
 /// Every window currently showing part of the document.
 ///
@@ -175,8 +175,9 @@ struct Views {
     /// diagram. See `settings.rs`.
     divider: Rc<std::cell::Cell<Dividers>>,
     /// And how the selection column is divided, as two lists' percentages of
-    /// it: the moc list's and the vehicle list's, the payload list taking what
-    /// is left. By list rather than by position, as the settings keep them.
+    /// it: the gateway list's and the vehicle list's, the payload list taking
+    /// what is left. By list rather than by position, as the settings keep
+    /// them.
     ///
     /// Percentages rather than pixels, because the column is as tall as the
     /// window and a share is what somebody chose -- the same distinction
@@ -547,7 +548,7 @@ macro_rules! furnish {
     ($window:expr, $described:expr) => {{
         let window = $window;
         let described = $described;
-        window.set_moc_palette(palette_of(Pane::Moc, described));
+        window.set_gateway_palette(palette_of(Pane::Gateway, described));
         window.set_vehicle_palette(palette_of(Pane::Vehicle, described));
         window.set_payload_palette(palette_of(Pane::Payloads, described));
         window.set_working_width(WORKING_WIDTH as f32);
@@ -557,7 +558,7 @@ macro_rules! furnish {
         // What each pane is painted. Here with the palette rather than in the
         // markup, because which ground belongs to which pane is a rule with
         // tests on it: see style::ground_of.
-        window.set_moc_ground(colour(&ground_of(style::Ground::Moc)));
+        window.set_gateway_ground(colour(&ground_of(style::Ground::Gateway)));
         window.set_vehicle_ground(colour(&ground_of(style::Ground::Vehicle)));
         window.set_payload_ground(colour(&ground_of(style::Ground::Payloads)));
     }};
@@ -688,13 +689,13 @@ fn main() -> Result<(), slint::PlatformError> {
     // brought into its own as the file is read.
     let settings = settings::load();
     let divider = Rc::new(std::cell::Cell::new(dividers_for(
-        settings.moc_percent,
+        settings.gateway_percent,
         settings.vehicle_percent,
     )));
     // And how the selection column was divided, which is the same preference
     // the other way: see `Views::lists`.
     let lists = Rc::new(std::cell::Cell::new((
-        settings.list_moc_percent,
+        settings.list_gateway_percent,
         settings.list_vehicle_percent,
     )));
 
@@ -1459,7 +1460,7 @@ fn wire_sub(
 /// * `home`     - The group drawn: `None` for the top of the configuration.
 /// * `chosen`   - The name of the node drawn as chosen, if any.
 /// * `dividers` - Where the working pane's dividers are.
-/// * `lists`    - The moc and vehicle selection lists' shares of their
+/// * `lists`    - The gateway and vehicle selection lists' shares of their
 ///                column, in per cent.
 /// * `held`     - The link whose end is being dragged, which is drawn
 ///                nowhere.
@@ -1474,7 +1475,7 @@ fn put(
 ) {
     ui.set_payload_divider(dividers.payloads as f32);
     ui.set_vehicle_divider(dividers.vehicle as f32);
-    ui.set_moc_list_percent(lists.0);
+    ui.set_gateway_list_percent(lists.0);
     ui.set_vehicle_list_percent(lists.1);
     ui.set_has_simulator(editor.document().simulator.is_some());
     let (nodes, links) = views_of(editor, home, held);
@@ -1504,7 +1505,7 @@ fn put(
 /// * `home`     - The name of the group the window shows.
 /// * `chosen`   - The name of the node drawn as chosen, if any.
 /// * `dividers` - Where the working pane's dividers are.
-/// * `lists`    - The moc and vehicle selection lists' shares of their
+/// * `lists`    - The gateway and vehicle selection lists' shares of their
 ///                column, in per cent.
 /// * `held`     - The link whose end is being dragged, which is drawn
 ///                nowhere.
@@ -1519,7 +1520,7 @@ fn put_sub(
 ) {
     window.set_payload_divider(dividers.payloads as f32);
     window.set_vehicle_divider(dividers.vehicle as f32);
-    window.set_moc_list_percent(lists.0);
+    window.set_gateway_list_percent(lists.0);
     window.set_vehicle_list_percent(lists.1);
     window.set_has_simulator(editor.document().simulator.is_some());
     let home = Some(home.to_string());
@@ -1746,8 +1747,8 @@ fn wire_node(
 ///
 /// `which` is the pane on the divider's left -- `Pane::Payloads` for the line
 /// between the payload pane and the vehicle's, `Pane::Vehicle` for the one
-/// between the vehicle's and the moc pane. Both gestures are the same work, and
-/// writing it twice is two places for the clamping to be got wrong in.
+/// between the vehicle's and the gateway pane. Both gestures are the same work,
+/// and writing it twice is two places for the clamping to be got wrong in.
 ///
 /// The new place is snapped to the grid and kept inside [`divider_range`],
 /// saved as a preference, and every window redrawn; a divider that did not
@@ -1802,12 +1803,13 @@ fn drag_divider(
         });
     }
 
-    let (moc_percent, vehicle_percent) = percents_for(dividers.get());
-    let (list_moc_percent, list_vehicle_percent) = views.borrow().lists.get();
+    let (gateway_percent, vehicle_percent) = percents_for(dividers.get());
+    let (list_gateway_percent, list_vehicle_percent) =
+        views.borrow().lists.get();
     settings::save(settings::Settings {
-        moc_percent,
+        gateway_percent,
         vehicle_percent,
-        list_moc_percent,
+        list_gateway_percent,
         list_vehicle_percent,
     });
     views.borrow().refresh(&editor.borrow());
@@ -1857,12 +1859,12 @@ fn drag_list_divider(
     }
     lists.set(now);
 
-    let (moc_percent, vehicle_percent) =
+    let (gateway_percent, vehicle_percent) =
         percents_for(views.borrow().divider.get());
     settings::save(settings::Settings {
-        moc_percent,
+        gateway_percent,
         vehicle_percent,
-        list_moc_percent: now.0,
+        list_gateway_percent: now.0,
         list_vehicle_percent: now.1,
     });
     views.borrow().refresh(&editor.borrow());
@@ -1870,10 +1872,10 @@ fn drag_list_divider(
 
 /// Works out what the two shares become when a line is dragged this far.
 ///
-/// `was` is the moc list's share and the vehicle list's, the payload list
+/// `was` is the gateway list's share and the vehicle list's, the payload list
 /// taking what is left; `which` is the list above the line that moved -- the
 /// payload list for the upper line, the vehicle list for the lower one, the
-/// lists running payloads, vehicle, moc down the column; `dy` is how far it
+/// lists running payloads, vehicle, gateway down the column; `dy` is how far it
 /// went and `tall` how tall the column is, both in pixels.
 ///
 /// A share of the column, worked out here rather than in the markup: a
@@ -1884,48 +1886,49 @@ fn drag_list_divider(
 ///
 /// # Arguments
 ///
-/// * `(moc, vehicle)` - The moc list's and the vehicle list's shares of the
-///                      column now, in per cent.
-/// * `which`          - The list above the line that moved:
-///                      `Pane::Payloads` for the upper line, anything else
-///                      for the lower.
-/// * `dy`             - How far the line went, in pixels, downward
-///                      positive.
-/// * `tall`           - How tall the column is, in pixels; under one pixel
-///                      changes nothing.
+/// * `(gateway, vehicle)` - The gateway list's and the vehicle list's
+///                          shares of the column now, in per cent.
+/// * `which`              - The list above the line that moved:
+///                          `Pane::Payloads` for the upper line, anything else
+///                          for the lower.
+/// * `dy`                 - How far the line went, in pixels, downward
+///                          positive.
+/// * `tall`               - How tall the column is, in pixels; under one pixel
+///                          changes nothing.
 ///
 /// # Returns
 ///
-/// The moc list's and the vehicle list's new shares, in per cent.
+/// The gateway list's and the vehicle list's new shares, in per cent.
 fn list_shares_after(
-    (moc, vehicle): (i32, i32),
+    (gateway, vehicle): (i32, i32),
     which: Pane,
     dy: f32,
     tall: f32,
 ) -> (i32, i32) {
     if tall < 1.0 {
-        return (moc, vehicle);
+        return (gateway, vehicle);
     }
     let step = (dy / tall * 100.0).round() as i32;
     if step == 0 {
-        return (moc, vehicle);
+        return (gateway, vehicle);
     }
     // Each line moves only the boundary between its own two neighbours, so
     // the step is held to what both of them can give: the third list is not
     // touched however far the line goes.
-    let payload = 100 - moc - vehicle;
+    let payload = 100 - gateway - vehicle;
     let least = settings::LEAST;
     let asked = match which {
         // The upper line takes from the vehicle list and gives to the payload
         // one, which is whatever is left.
         Pane::Payloads => {
             let step = step.clamp(least - payload, vehicle - least);
-            (moc, vehicle - step)
+            (gateway, vehicle - step)
         }
-        // The lower line takes from the moc list and gives to the vehicle's.
+        // The lower line takes from the gateway list and gives to the
+        // vehicle's.
         _ => {
-            let step = step.clamp(least - vehicle, moc - least);
-            (moc - step, vehicle + step)
+            let step = step.clamp(least - vehicle, gateway - least);
+            (gateway - step, vehicle + step)
         }
     };
     settings::shares(asked.0, asked.1)
@@ -4766,9 +4769,9 @@ fn attached(document: &Document, at: &Drawing, sink: bool) -> Vec<Link> {
 /// mind;
 ///
 /// let go of over a terminal that does not pair with the one it started at. A
-/// `payload-out` may only be linked to a `payload-in` and a `moc-out` only to
-/// a `moc-in`: that is one stream, named at each of its ends, and anything
-/// else would carry one stream into the other. The rule is
+/// `payload-out` may only be linked to a `payload-in` and a `gateway-out` only
+/// to a `gateway-in`: that is one stream, named at each of its ends, and
+/// anything else would carry one stream into the other. The rule is
 /// `tcslibgs::graph::terminals::pairs_with`, which is also what the checking
 /// refuses a written-out configuration for;
 ///
@@ -5099,21 +5102,21 @@ fn seed(editor: &mut Editor) {
     }
 
     // Two edits, as placing one by hand is: a node exists, and then it is
-    // somewhere. And named as one placed by hand is -- `moc-1`, from
+    // somewhere. And named as one placed by hand is -- `gateway-1`, from
     // `fresh_name` -- because a name the editor chose should look the same
     // whichever of its hands chose it. First in the group, so that the
     // group is described by it: see `Edit::describe`.
-    let name = fresh_name(editor.document(), "moc", &None);
+    let name = fresh_name(editor.document(), "gateway", &None);
     let placed = [
         Edit::AddNode {
             name: name.clone(),
-            node_type: "moc".to_string(),
+            node_type: "gateway_radio".to_string(),
             home: None,
         },
         Edit::MoveNode {
             node: name,
             was: (0, 0),
-            now: MOC_PLACE,
+            now: GATEWAY_PLACE,
         },
     ];
     edits.splice(0..0, placed);
@@ -5517,8 +5520,8 @@ fn node_view(look: tcsdiagram::view::NodeLook, selected: bool) -> NodeView {
         selected,
         summary: look.summary.into(),
         openable: look.openable,
-        moc_in: terminal(look.moc_in),
-        moc_out: terminal(look.moc_out),
+        gateway_in: terminal(look.gateway_in),
+        gateway_out: terminal(look.gateway_out),
         payload_in: terminal(look.payload_in),
         payload_out: terminal(look.payload_out),
         terminal_column: look.terminal_column,
@@ -5583,7 +5586,7 @@ fn link_view(look: tcsdiagram::view::LinkLook) -> LinkView {
 #[cfg(test)]
 fn family_hue(pane: Pane) -> f64 {
     match pane {
-        Pane::Moc => 265.0,
+        Pane::Gateway => 265.0,
         Pane::Vehicle => 118.0,
         Pane::Payloads => 200.0,
     }
@@ -5626,7 +5629,7 @@ mod tests {
     use slint::Model;
     use style::ERROR_TINT;
     use tcsdiagram::look::{
-        came_later, ramp_order, tint_of, MARK, MOC_LINE, MOC_RUNGS,
+        came_later, ramp_order, tint_of, GATEWAY_LINE, GATEWAY_RUNGS, MARK,
         PAYLOAD_LINE, PAYLOAD_RUNGS, VEHICLE_RUNGS,
     };
 
@@ -5636,12 +5639,19 @@ mod tests {
     /// lines between them, so it is worked in the division the editor opens
     /// with.
     fn dividers() -> Dividers {
-        dividers_for(settings::DEFAULT_MOC, settings::DEFAULT_VEHICLE)
+        dividers_for(settings::DEFAULT_GATEWAY, settings::DEFAULT_VEHICLE)
     }
 
     /// And how the selection column is divided, until somebody drags a line.
+    ///
+    /// # Returns
+    ///
+    /// The gateway list's share and the vehicle list's, in per cent.
     fn lists() -> (i32, i32) {
-        (settings::DEFAULT_LIST_MOC, settings::DEFAULT_LIST_VEHICLE)
+        (
+            settings::DEFAULT_LIST_GATEWAY,
+            settings::DEFAULT_LIST_VEHICLE,
+        )
     }
 
     /// A screenful at the top of the sheet, which is what a window shows when
@@ -5697,8 +5707,8 @@ mod tests {
             (c.red(), c.green(), c.blue())
         };
 
-        let panes = [Pane::Moc, Pane::Vehicle, Pane::Payloads];
-        let lines = [PAYLOAD_LINE, MOC_LINE];
+        let panes = [Pane::Gateway, Pane::Vehicle, Pane::Payloads];
+        let lines = [PAYLOAD_LINE, GATEWAY_LINE];
         let mark = painted(MARK);
 
         // Every pane is lighter than every line. Every line crosses every
@@ -5719,7 +5729,7 @@ mod tests {
 
         // And each line is a shade of the pane its data comes from. A
         // payload's readings start in the payload pane and generally end at
-        // the ground; what the ground sends starts in the moc pane and ends
+        // the ground; what the ground sends starts in the gateway pane and ends
         // at a payload. So the line's colour says which end of the canvas its
         // data started at, without a reader following it back.
         //
@@ -5729,7 +5739,7 @@ mod tests {
         // 9 a step of one in a channel moves it several degrees.
         for (what, line, pane) in [
             ("payload", PAYLOAD_LINE, Pane::Payloads),
-            ("moc", MOC_LINE, Pane::Moc),
+            ("gateway", GATEWAY_LINE, Pane::Gateway),
         ] {
             let ground = painted(&ground_of(style::ground_of(pane)));
             let apart = hue_apart(hue(painted(line)), hue(ground));
@@ -5803,9 +5813,9 @@ mod tests {
         // carries without tracing it to its corner.
         use sight::{difference, seen, Sight};
         let payload = painted(PAYLOAD_LINE);
-        let moc = painted(MOC_LINE);
+        let gateway = painted(GATEWAY_LINE);
         for sight in Sight::ALL {
-            let apart = difference(seen(payload, sight), seen(moc, sight));
+            let apart = difference(seen(payload, sight), seen(gateway, sight));
             assert!(
                 apart >= 14.0,
                 "the two lines are {apart:.1} apart under {sight:?}, which is \
@@ -5867,11 +5877,11 @@ mod tests {
         }
 
         for (pane, share) in [
-            (Pane::Moc, settings::DEFAULT_LIST_MOC),
+            (Pane::Gateway, settings::DEFAULT_LIST_GATEWAY),
             (Pane::Vehicle, settings::DEFAULT_LIST_VEHICLE),
             (
                 Pane::Payloads,
-                100 - settings::DEFAULT_LIST_MOC
+                100 - settings::DEFAULT_LIST_GATEWAY
                     - settings::DEFAULT_LIST_VEHICLE,
             ),
         ] {
@@ -6050,11 +6060,14 @@ mod tests {
             (Pane::Vehicle, -4000.0),
             (Pane::Vehicle, 4000.0),
         ] {
-            let (moc, vehicle) = list_shares_after(lists(), which, dy, 800.0);
-            let payload = 100 - moc - vehicle;
-            for (name, share) in
-                [("moc", moc), ("vehicle", vehicle), ("payload", payload)]
-            {
+            let (gateway, vehicle) =
+                list_shares_after(lists(), which, dy, 800.0);
+            let payload = 100 - gateway - vehicle;
+            for (name, share) in [
+                ("gateway", gateway),
+                ("vehicle", vehicle),
+                ("payload", payload),
+            ] {
                 assert!(
                     share >= settings::LEAST,
                     "dragging the {which:?} line by {dy} would leave the \
@@ -6067,19 +6080,19 @@ mod tests {
         // alone: the list above grows by what the list below gives up. The
         // upper line gives the payload list, which has no share of its own,
         // what it takes from the vehicle list.
-        let (was_moc, was_vehicle) = lists();
-        let (moc, vehicle) =
+        let (was_gateway, was_vehicle) = lists();
+        let (gateway, vehicle) =
             list_shares_after(lists(), Pane::Payloads, 80.0, 800.0);
-        assert_eq!((moc, vehicle), (was_moc, was_vehicle - 10));
+        assert_eq!((gateway, vehicle), (was_gateway, was_vehicle - 10));
 
-        // And the lower line takes from the moc list and gives to the
+        // And the lower line takes from the gateway list and gives to the
         // vehicle's, leaving the payload list alone.
-        let (moc, vehicle) =
+        let (gateway, vehicle) =
             list_shares_after(lists(), Pane::Vehicle, 80.0, 800.0);
-        assert_eq!((moc, vehicle), (was_moc - 10, was_vehicle + 10));
+        assert_eq!((gateway, vehicle), (was_gateway - 10, was_vehicle + 10));
         assert_eq!(
-            100 - moc - vehicle,
-            100 - was_moc - was_vehicle,
+            100 - gateway - vehicle,
+            100 - was_gateway - was_vehicle,
             "the third list is left alone"
         );
 
@@ -6238,8 +6251,8 @@ mod tests {
         std::fs::write(
             &path,
             "payload_groups:\n  - name: idle\n    interval: 3 s\n\
-             payloads:\n  - name: a\n    type: i2c\n    payload-out: moc\n\
-             moc:\n  - name: moc\n    type: moc\n",
+             payloads:\n  - name: a\n    type: i2c\n    payload-out: gateway\n\
+             gateway:\n  - name: gateway\n    type: gateway_radio\n",
         )
         .expect("a configuration with an empty group and an unfinished node");
 
@@ -6299,7 +6312,7 @@ mod tests {
     fn the_names_offered_have_to_settle_the_duplicate() {
         let mut document = Document::new();
         for (name, node_type) in
-            [("i2c", "i2c"), ("i2c", "i2c"), ("moc", "moc")]
+            [("i2c", "i2c"), ("i2c", "i2c"), ("gateway", "gateway_radio")]
         {
             document.apply(&Edit::AddNode {
                 name: name.to_string(),
@@ -6336,9 +6349,12 @@ mod tests {
 
         // And a third node's name is a duplicate again: a button that made
         // the same question come back would be no answer at all.
-        let said = names_settle(&document, &asked(&[(0, "i2c"), (1, "moc")]))
-            .expect_err("renaming one of them to the ground station's name");
-        assert!(said.contains("moc"), "{said}");
+        let said =
+            names_settle(&document, &asked(&[(0, "i2c"), (1, "gateway")]))
+                .expect_err(
+                    "renaming one of them to the ground station's name",
+                );
+        assert!(said.contains("gateway"), "{said}");
 
         // What is said is about what is wrong, because it is said instead of
         // the button being pressable.
@@ -6357,7 +6373,7 @@ mod tests {
     /// whichever heading its first letter landed in.
     #[test]
     fn every_panel_is_in_alphabetical_order_under_each_heading() {
-        for pane in [Pane::Moc, Pane::Vehicle, Pane::Payloads] {
+        for pane in [Pane::Gateway, Pane::Vehicle, Pane::Payloads] {
             let rows = rows_from(pane, descriptions());
             let mut heading = String::new();
             let mut under: Vec<String> = Vec::new();
@@ -6396,7 +6412,7 @@ mod tests {
     #[test]
     fn the_selection_panes_offer_every_node_type_once() {
         let mut offered: Vec<String> = Vec::new();
-        for pane in [Pane::Moc, Pane::Vehicle, Pane::Payloads] {
+        for pane in [Pane::Gateway, Pane::Vehicle, Pane::Payloads] {
             let rows = rows_of(pane);
 
             // Grouped, and every shape sits under a heading rather than above
@@ -6478,7 +6494,7 @@ mod tests {
 
         // Every description is offered, in whichever pane its type belongs to.
         let everywhere: Vec<String> =
-            [Pane::Moc, Pane::Vehicle, Pane::Payloads]
+            [Pane::Gateway, Pane::Vehicle, Pane::Payloads]
                 .into_iter()
                 .flat_map(|pane| {
                     rows_from(pane, &described)
@@ -6530,7 +6546,7 @@ mod tests {
             .map(|row| row.node.name.to_string())
             .collect();
         assert!(bare.contains(&"compute".to_string()), "{bare:?}");
-        assert!(bare.contains(&"null-moc".to_string()), "{bare:?}");
+        assert!(bare.contains(&"null-gateway".to_string()), "{bare:?}");
         assert!(bare.contains(&"tee-payload".to_string()), "{bare:?}");
         assert!(!bare.contains(&"mean".to_string()), "{bare:?}");
     }
@@ -6594,7 +6610,7 @@ mod tests {
     #[test]
     fn the_palette_holds_no_red() {
         let error = colour(ERROR_TINT);
-        for pane in [Pane::Moc, Pane::Vehicle, Pane::Payloads] {
+        for pane in [Pane::Gateway, Pane::Vehicle, Pane::Payloads] {
             for row in rows_of(pane) {
                 if row.is_heading {
                     continue;
@@ -6672,31 +6688,31 @@ mod tests {
 
         // A payload: what the ground sends arrives, and its readings leave.
         let sensor = view("i2c");
-        assert!(sensor.moc_in.shown && sensor.payload_out.shown);
-        assert!(!sensor.moc_out.shown && !sensor.payload_in.shown);
+        assert!(sensor.gateway_in.shown && sensor.payload_out.shown);
+        assert!(!sensor.gateway_out.shown && !sensor.payload_in.shown);
         // Both on its right, and the arrows point the way the data travels:
         // its own readings leave along the top going right, and what asks for
         // them arrives along the bottom going left.
-        assert!(sensor.moc_in.x > sensor.width / 2.0);
+        assert!(sensor.gateway_in.x > sensor.width / 2.0);
         assert!(sensor.payload_out.x > sensor.width / 2.0);
-        assert!(sensor.payload_out.y < sensor.moc_in.y);
-        assert!(!sensor.moc_in.rightward && sensor.payload_out.rightward);
+        assert!(sensor.payload_out.y < sensor.gateway_in.y);
+        assert!(!sensor.gateway_in.rightward && sensor.payload_out.rightward);
 
         // The ground: the other end of both, and both on its left.
-        let moc = view("moc");
-        assert!(moc.moc_out.shown && moc.payload_in.shown);
-        assert!(!moc.moc_in.shown && !moc.payload_out.shown);
-        assert!(moc.moc_out.x < moc.width / 2.0);
-        assert!(moc.payload_in.x < moc.width / 2.0);
-        assert!(moc.payload_in.y < moc.moc_out.y);
+        let gateway = view("gateway_radio");
+        assert!(gateway.gateway_out.shown && gateway.payload_in.shown);
+        assert!(!gateway.gateway_in.shown && !gateway.payload_out.shown);
+        assert!(gateway.gateway_out.x < gateway.width / 2.0);
+        assert!(gateway.payload_in.x < gateway.width / 2.0);
+        assert!(gateway.payload_in.y < gateway.gateway_out.y);
 
         // A page has all four: what is inside it may have any of them, and
         // nothing out here knows which -- so a line can be drawn to a page
         // either way on either stream.
         let page = view("subdiagram");
         for terminal in [
-            &page.moc_in,
-            &page.moc_out,
+            &page.gateway_in,
+            &page.gateway_out,
             &page.payload_in,
             &page.payload_out,
         ] {
@@ -6708,15 +6724,15 @@ mod tests {
         // type nothing here can describe -- and there is nothing to be gained
         // by letting a line be drawn to one.
         let unknown = view("contraption");
-        assert!(!unknown.moc_in.shown && !unknown.payload_out.shown);
+        assert!(!unknown.gateway_in.shown && !unknown.payload_out.shown);
 
         // Every terminal is drawn inside its node, which is what makes the box
         // a person presses and the box a link arrives at the same box.
         for (node, terminal) in [
-            (&sensor, &sensor.moc_in),
+            (&sensor, &sensor.gateway_in),
             (&sensor, &sensor.payload_out),
-            (&moc, &moc.moc_out),
-            (&moc, &moc.payload_in),
+            (&gateway, &gateway.gateway_out),
+            (&gateway, &gateway.payload_in),
         ] {
             assert!(terminal.x >= 0.0 && terminal.y >= 0.0);
             assert!(terminal.x + style::TERMINAL.0 as f32 <= node.width);
@@ -6755,7 +6771,9 @@ mod tests {
         };
         let fault = painted(ERROR_TINT);
 
-        for (what, line) in [("payload", PAYLOAD_LINE), ("moc", MOC_LINE)] {
+        for (what, line) in
+            [("payload", PAYLOAD_LINE), ("gateway", GATEWAY_LINE)]
+        {
             for sight in Sight::ALL {
                 let apart =
                     difference(seen(painted(line), sight), seen(fault, sight));
@@ -6799,7 +6817,7 @@ mod tests {
         let mark = painted(MARK);
 
         for (pane, rungs, from) in [
-            (Pane::Moc, MOC_RUNGS, MOC_LINE),
+            (Pane::Gateway, GATEWAY_RUNGS, GATEWAY_LINE),
             (Pane::Payloads, PAYLOAD_RUNGS, PAYLOAD_LINE),
             // The vehicle panel has no line of its own, so it starts below
             // the darker of the two that cross it.
@@ -6917,10 +6935,10 @@ mod tests {
             // sharing a tint are still two shapes nobody can confuse. The
             // ramp is walked in order either way, which the loop above is
             // what checks.
-            // And the MOC panel, since the F´ gateway joined the ground
+            // And the gateway panel, since the F´ gateway joined the ground
             // station: two types and one rung, the two being told apart by
             // their edge and their label rather than by colour.
-            if !matches!(pane, Pane::Vehicle | Pane::Payloads | Pane::Moc) {
+            if !matches!(pane, Pane::Vehicle | Pane::Payloads | Pane::Gateway) {
                 assert!(
                     order.len() <= rungs.len(),
                     "the {} panel has {} nodes and {} rungs, so it wraps -- \
@@ -6977,7 +6995,7 @@ mod tests {
         // no ramp.
         type Rgb = (u8, u8, u8);
         let mut scheme: Vec<(String, Option<Pane>, Rgb)> = Vec::new();
-        for pane in [Pane::Moc, Pane::Vehicle, Pane::Payloads] {
+        for pane in [Pane::Gateway, Pane::Vehicle, Pane::Payloads] {
             scheme.push((
                 format!("the {} pane", pane.label()),
                 None,
@@ -6989,7 +7007,11 @@ mod tests {
             None,
             painted(PAYLOAD_LINE),
         ));
-        scheme.push(("the moc line".to_string(), None, painted(MOC_LINE)));
+        scheme.push((
+            "the gateway line".to_string(),
+            None,
+            painted(GATEWAY_LINE),
+        ));
         for t in NodeType::ALL {
             scheme.push((
                 t.spelling().to_string(),
@@ -7092,8 +7114,8 @@ mod tests {
         // families overlap and a node's colour would stop saying which pane
         // it belongs in -- which is the whole of what the rule above is for.
         for (one, two) in [
-            (Pane::Moc, Pane::Vehicle),
-            (Pane::Moc, Pane::Payloads),
+            (Pane::Gateway, Pane::Vehicle),
+            (Pane::Gateway, Pane::Payloads),
             (Pane::Vehicle, Pane::Payloads),
         ] {
             let apart = hue_apart(family_hue(one), family_hue(two));
@@ -7110,7 +7132,7 @@ mod tests {
         // they are looking at.
         use sight::{difference, seen, Sight};
         let grounds: Vec<(Pane, (u8, u8, u8))> =
-            [Pane::Moc, Pane::Vehicle, Pane::Payloads]
+            [Pane::Gateway, Pane::Vehicle, Pane::Payloads]
                 .into_iter()
                 .map(|pane| (pane, painted(&ground_of(style::ground_of(pane)))))
                 .collect();
@@ -7355,10 +7377,10 @@ mod tests {
         }
         // The ground station a new configuration starts with is on it too.
         assert!(
-            pane::is_on_node_grid(MOC_PLACE.0)
-                && pane::is_on_node_grid(MOC_PLACE.1)
+            pane::is_on_node_grid(GATEWAY_PLACE.0)
+                && pane::is_on_node_grid(GATEWAY_PLACE.1)
         );
-        assert!(MOC_PLACE.0 + style::WIDTH as i32 <= WORKING_WIDTH);
+        assert!(GATEWAY_PLACE.0 + style::WIDTH as i32 <= WORKING_WIDTH);
     }
 
     /// Drawing links into a node that names its inputs fills them in order.
@@ -7415,8 +7437,8 @@ mod tests {
             home: None,
         });
         editor.edit(Edit::AddNode {
-            name: "moc".into(),
-            node_type: "moc".into(),
+            name: "gateway".into(),
+            node_type: "gateway_radio".into(),
             home: None,
         });
         editor.edit(Edit::AddNode {
@@ -7428,7 +7450,7 @@ mod tests {
         let (top, _) = views_of(&editor, &None, None);
         let names: Vec<String> =
             top.iter().map(|n| n.name.to_string()).collect();
-        assert_eq!(names, vec!["cabin".to_string(), "moc".to_string()]);
+        assert_eq!(names, vec!["cabin".to_string(), "gateway".to_string()]);
 
         let (inside, _) = views_of(&editor, &Some("cabin".into()), None);
         let names: Vec<String> =
@@ -7460,8 +7482,8 @@ mod tests {
             home: None,
         });
         editor.edit(Edit::AddNode {
-            name: "moc".into(),
-            node_type: "moc".into(),
+            name: "gateway".into(),
+            node_type: "gateway_radio".into(),
             home: None,
         });
         editor.edit(Edit::AddNode {
@@ -7470,13 +7492,13 @@ mod tests {
             home: Some("cabin".into()),
         });
         editor.edit(Edit::AddLink {
-            link: Link::new("cabin/temp_1", "moc", None),
+            link: Link::new("cabin/temp_1", "gateway", None),
         });
 
         // Seen from inside the subdiagram: one link, named for where it goes.
         let (_, inside) = views_of(&editor, &Some("cabin".into()), None);
         assert_eq!(inside.len(), 1);
-        assert_eq!(inside[0].label, "moc");
+        assert_eq!(inside[0].label, "gateway");
 
         // And seen from the top diagram, where its source is off the page.
         let (_, top) = views_of(&editor, &None, None);
@@ -7653,7 +7675,7 @@ mod tests {
         for (name, node_type, at) in [
             ("sensor", "i2c", (560, 120)),
             ("through", "app_all_veh", (300, 120)),
-            ("ground", "moc", (16, 120)),
+            ("ground", "gateway_radio", (16, 120)),
         ] {
             document.apply(&Edit::AddNode {
                 name: name.into(),
@@ -7724,13 +7746,13 @@ mod tests {
         // sink: the schema reads an unnamed end as that one.
         assert_eq!(link.input, None);
 
-        // And back the other way, which is the other stream: a moc-out let
-        // go of over a moc-in.
+        // And back the other way, which is the other stream: a gateway-out let
+        // go of over a gateway-in.
         let back = joined(
             &document,
             &None,
-            &drawn("ground", "moc-out"),
-            over("sensor", "moc-in"),
+            &drawn("ground", "gateway-out"),
+            over("sensor", "gateway-in"),
         )
         .expect("what the ground sends reaches the payload");
         assert_eq!(
@@ -7761,7 +7783,7 @@ mod tests {
                 &document,
                 &None,
                 &drawn("sensor", "payload-out"),
-                over("ground", "moc-out"),
+                over("ground", "gateway-out"),
             ),
             Some(link.clone()),
             "a release anywhere on the node makes the link the stream allows"
@@ -7785,11 +7807,11 @@ mod tests {
             joined(
                 &document,
                 &None,
-                &drawn("through", "moc-out"),
+                &drawn("through", "gateway-out"),
                 middle("ground"),
             ),
             None,
-            "a moc node has no moc-in to arrive at"
+            "a gateway node has no gateway-in to arrive at"
         );
 
         // Let go of over nothing.
@@ -7810,7 +7832,7 @@ mod tests {
                 &document,
                 &None,
                 &drawn("through", "payload-out"),
-                over("through", "moc-in"),
+                over("through", "gateway-in"),
             ),
             None
         );
@@ -7930,7 +7952,7 @@ mod tests {
 
         let mut document = Document::new();
         for (name, node_type, at) in [
-            ("ground", "moc", (16, 120)),
+            ("ground", "gateway_radio", (16, 120)),
             ("through", "app_all_veh", (300, 120)),
             ("sensor", "i2c", (600, 120)),
             ("other", "i2c", (600, 400)),
@@ -8033,7 +8055,7 @@ mod tests {
         // of one of its data sources, and the middle of it all put the end on
         // its payload-in, that being where a groundward stream arrives.
         for landing in [
-            over("through", "moc-in"),
+            over("through", "gateway-in"),
             over("through", "payload-out"),
             middle("through"),
         ] {
@@ -8060,7 +8082,7 @@ mod tests {
                 &None,
                 &held,
                 &pressed,
-                over("sensor", "moc-in")
+                over("sensor", "gateway-in")
             ),
             None
         );
@@ -8137,8 +8159,8 @@ mod tests {
 
     /// A second line out of a data source is drawn from that source.
     ///
-    /// The gesture somebody tried first and found dead: a moc node already
-    /// feeding one payload, pressed on its `moc-out` and let go of over a
+    /// The gesture somebody tried first and found dead: a gateway node already
+    /// feeding one payload, pressed on its `gateway-out` and let go of over a
     /// second payload. That terminal has one line on it, so the press means
     /// "pick this line up" -- and a payload cannot be a data source, so there
     /// was nowhere for the end to land and nothing happened at all. What they
@@ -8154,7 +8176,7 @@ mod tests {
 
         let mut document = Document::new();
         for (name, node_type, at) in [
-            ("ground", "moc", (0, 0)),
+            ("ground", "gateway_radio", (0, 0)),
             ("i2c", "i2c", (dividers().vehicle + 8, 0)),
             ("spi", "spi", (dividers().vehicle + 8, 152)),
         ] {
@@ -8171,14 +8193,14 @@ mod tests {
         }
         // The line that is already there, which is what made the gesture
         // ambiguous: the ground feeds one payload.
-        let held = Link::joining("ground", Some("moc-out"), "i2c", None);
+        let held = Link::joining("ground", Some("gateway-out"), "i2c", None);
         document.apply(&Edit::AddLink { link: held.clone() });
 
-        // Pressed on the ground's moc-out, which hands over the line it
+        // Pressed on the ground's gateway-out, which hands over the line it
         // has, and let go of in the middle of the other payload.
         let pressed = Drawing {
             node: "ground".to_string(),
-            terminal: "moc-out".to_string(),
+            terminal: "gateway-out".to_string(),
             holding: Some(held.clone()),
         };
         let (width, height) = size_of("spi");
@@ -8191,7 +8213,7 @@ mod tests {
         assert_eq!(
             dropped(&document, &None, &held, &pressed, over),
             Some(Edit::AddLink {
-                link: Link::joining("ground", Some("moc-out"), "spi", None)
+                link: Link::joining("ground", Some("gateway-out"), "spi", None)
             }),
             "the second line was not drawn"
         );
@@ -8215,7 +8237,7 @@ mod tests {
 
         let mut document = Document::new();
         for (name, node_type) in [
-            ("ground", "moc"),
+            ("ground", "gateway_radio"),
             ("sensor", "i2c"),
             ("other", "i2c"),
             ("housekeeping", "log"),
@@ -8280,11 +8302,11 @@ mod tests {
     /// A link to a terminal is recorded as the terminal that was pressed.
     ///
     /// The fault this is here for: a line dragged from the ground link's
-    /// `moc-out` to the upper left corner of a computation -- its `moc-in`
-    /// -- was recorded as a link naming no terminal at all, and then drawn
-    /// arriving at the computation's lower right. Twice wrong: what somebody
-    /// had just said was thrown away, and the drawing then guessed the other
-    /// stream.
+    /// `gateway-out` to the upper left corner of a computation -- its
+    /// `gateway-in` -- was recorded as a link naming no terminal at all, and
+    /// then drawn arriving at the computation's lower right. Twice wrong: what
+    /// somebody had just said was thrown away, and the drawing then guessed the
+    /// other stream.
     ///
     /// Thrown away because the question had been put to the schema's table,
     /// which calls a computation's sinks its own business, rather than to the
@@ -8296,7 +8318,7 @@ mod tests {
 
         let mut document = Document::new();
         for (name, node_type, at) in [
-            ("ground", "moc", (16, 120)),
+            ("ground", "gateway_radio", (16, 120)),
             ("to_kelvin", "compute", (300, 120)),
         ] {
             document.apply(&Edit::AddNode {
@@ -8325,27 +8347,28 @@ mod tests {
             &None,
             &Drawing {
                 node: "ground".to_string(),
-                terminal: "moc-out".to_string(),
+                terminal: "gateway-out".to_string(),
                 holding: None,
             },
-            over("to_kelvin", "compute", (300, 120), "moc-in"),
+            over("to_kelvin", "compute", (300, 120), "gateway-in"),
         )
         .expect("the ground reaches a computation");
 
         assert_eq!(link.from, "ground");
-        assert_eq!(link.origin.as_deref(), Some("moc-out"));
+        assert_eq!(link.origin.as_deref(), Some("gateway-out"));
         assert_eq!(link.to, "to_kelvin");
         // The terminal that was pressed, which is the whole of what the
         // gesture said: a computation has two data sinks, so the file has to
         // say which.
-        assert_eq!(link.input.as_deref(), Some("moc-in"));
+        assert_eq!(link.input.as_deref(), Some("gateway-in"));
 
         // And the line is drawn to that corner: the upper left, where what
         // the ground sends arrives.
         document.apply(&Edit::AddLink { link });
         let ends = ends_of(&document, &document.links[0], &None);
-        let ((x, y), _) = style::attachment("compute", (300, 120), "moc-in")
-            .expect("a terminal");
+        let ((x, y), _) =
+            style::attachment("compute", (300, 120), "gateway-in")
+                .expect("a terminal");
         assert_eq!(
             ends.to,
             (x, y),
@@ -8375,8 +8398,8 @@ mod tests {
 
     /// A link the file does not name a sink for is drawn at the pairing one.
     ///
-    /// A link leaving `moc-out` carries what the ground sends, so it
-    /// arrives at a `moc-in`: the same stream, named at its other end. The
+    /// A link leaving `gateway-out` carries what the ground sends, so it
+    /// arrives at a `gateway-in`: the same stream, named at its other end. The
     /// drawing used to fall back to the groundward sink whatever the link
     /// carried, which drew a command from the ground arriving at the corner
     /// the readings leave by.
@@ -8386,7 +8409,7 @@ mod tests {
 
         let mut document = Document::new();
         for (name, node_type, at) in [
-            ("ground", "moc", (16, 120)),
+            ("ground", "gateway_radio", (16, 120)),
             ("through", "app_all_veh", (300, 120)),
         ] {
             document.apply(&Edit::AddNode {
@@ -8402,12 +8425,12 @@ mod tests {
         }
         // Written by hand, naming the source and not the sink.
         document.apply(&Edit::AddLink {
-            link: Link::joining("ground", Some("moc-out"), "through", None),
+            link: Link::joining("ground", Some("gateway-out"), "through", None),
         });
 
         let ends = ends_of(&document, &document.links[0], &None);
         let ((x, y), _) =
-            style::attachment("app_all_veh", (300, 120), "moc-in")
+            style::attachment("app_all_veh", (300, 120), "gateway-in")
                 .expect("the sink");
         assert_eq!(
             ends.to,
@@ -8426,7 +8449,7 @@ mod tests {
     fn every_pane_has_room_for_a_node() {
         let width = style::WIDTH as i32;
         let dividers = dividers();
-        for pane in [Pane::Moc, Pane::Vehicle, Pane::Payloads] {
+        for pane in [Pane::Gateway, Pane::Vehicle, Pane::Payloads] {
             let (left, right) = edges_of(pane, dividers);
             assert!(
                 right - left >= width + 16,
@@ -8479,13 +8502,16 @@ mod tests {
         assert!(payload_right + width <= payloads);
 
         // The ground link: left to the vehicle divider, right to the far edge.
-        assert_eq!(confine("moc", d, (0, 100)), (pane::node_ceil(vehicle), y));
         assert_eq!(
-            confine("moc", d, (vehicle - 1, 100)),
+            confine("gateway_radio", d, (0, 100)),
             (pane::node_ceil(vehicle), y)
         );
         assert_eq!(
-            confine("moc", d, (WORKING_WIDTH, 100)),
+            confine("gateway_radio", d, (vehicle - 1, 100)),
+            (pane::node_ceil(vehicle), y)
+        );
+        assert_eq!(
+            confine("gateway_radio", d, (WORKING_WIDTH, 100)),
             (pane::node_floor(WORKING_WIDTH - width), y)
         );
 
@@ -8505,7 +8531,7 @@ mod tests {
 
         // A node is never dragged off the top, whichever pane it is in: a
         // negative y is a node nobody can reach to drag back.
-        for node_type in ["i2c", "compute", "moc"] {
+        for node_type in ["i2c", "compute", "gateway_radio"] {
             assert_eq!(
                 confine(node_type, d, (vehicle, -80)).1,
                 pane::node_ceil(0),
@@ -8524,7 +8550,7 @@ mod tests {
     /// Every type is placed in the pane its list is in.
     ///
     /// The rule that was asked for: a payload can only be created in the
-    /// payload working pane, the ground link only in the moc working pane,
+    /// payload working pane, the ground link only in the gateway working pane,
     /// and the rest of the graph only in the vehicle's. Checked for every
     /// type rather than for one of each, because the thing that would break
     /// it is a new type whose family says one thing and whose placement says
@@ -8605,7 +8631,7 @@ mod tests {
     ///
     /// Both lines and all three panes, which is three rules in one place: the
     /// payload line keeps the payload pane and the vehicle's open, and the
-    /// vehicle line keeps the vehicle's and the moc pane open. A pane with
+    /// vehicle line keeps the vehicle's and the gateway pane open. A pane with
     /// nothing visible in it is a pane whose nodes cannot be reached, and the
     /// drag that does it is one press away.
     #[test]
@@ -8646,7 +8672,7 @@ mod tests {
                         ..dividers
                     }
                 };
-                for pane in [Pane::Payloads, Pane::Vehicle, Pane::Moc] {
+                for pane in [Pane::Payloads, Pane::Vehicle, Pane::Gateway] {
                     let (left, right) = edges_of(pane, settled);
                     assert!(
                         right - left >= least,
@@ -8842,7 +8868,7 @@ mod tests {
 
     /// Nothing the editor places itself covers a pane's own name.
     ///
-    /// Each pane has a band at its top with its name in it -- "MOC",
+    /// Each pane has a band at its top with its name in it -- "Gateway",
     /// "Vehicle", "Payloads" -- painted in that pane's own tint, and the band
     /// is what a pane has to say when it is empty or when somebody has lost
     /// their bearings. A node somebody *drags* there is their own business;
@@ -8864,7 +8890,7 @@ mod tests {
             markup.split_whitespace().collect::<Vec<&str>>().join(" ");
 
         // The three names, each at the same height inside its own band.
-        for name in ["\"MOC\"", "\"Vehicle\"", "\"Payloads\""] {
+        for name in ["\"Gateway\"", "\"Vehicle\"", "\"Payloads\""] {
             let at = markup
                 .split(&format!("text: {name};"))
                 .next()
@@ -8886,7 +8912,10 @@ mod tests {
                 "vehicle-ground",
                 "root.vehicle-divider - root.payload-divider;",
             ),
-            ("moc-ground", "root.working-width - root.vehicle-divider;"),
+            (
+                "gateway-ground",
+                "root.working-width - root.vehicle-divider;",
+            ),
         ] {
             let band = format!(
                 "y: 0; width: {width} height: root.heading-tall; \
@@ -8904,7 +8933,7 @@ mod tests {
         assert!(
             tightened.contains(
                 "property <length> heading-tall: \
-                 max(moc-heading.preferred-height, \
+                 max(gateway-heading.preferred-height, \
                  max(vehicle-heading.preferred-height, \
                  payload-heading.preferred-height)) + 2 * Space.tight;"
             ),
@@ -8960,9 +8989,12 @@ mod tests {
         let where_ = tempfile::tempdir().expect("a directory");
         let mut editor =
             Editor::open(&where_.path().join("vehicle.yaml"), dividers());
-        for (name, kind) in
-            [("a", "i2c"), ("b", "i2c"), ("c", "compute"), ("d", "moc")]
-        {
+        for (name, kind) in [
+            ("a", "i2c"),
+            ("b", "i2c"),
+            ("c", "compute"),
+            ("d", "gateway_radio"),
+        ] {
             editor.edit(Edit::AddNode {
                 name: name.to_string(),
                 node_type: kind.to_string(),
@@ -9057,44 +9089,44 @@ mod tests {
     /// settle on, round tripped.
     #[test]
     fn the_dividers_survive_being_written_down() {
-        for moc in settings::LEAST..=settings::MOST {
+        for gateway in settings::LEAST..=settings::MOST {
             for vehicle in [settings::LEAST, 25, settings::DEFAULT_VEHICLE] {
-                let (moc, vehicle) = settings::shares(moc, vehicle);
-                let dividers = dividers_for(moc, vehicle);
+                let (gateway, vehicle) = settings::shares(gateway, vehicle);
+                let dividers = dividers_for(gateway, vehicle);
                 assert!(
                     pane::is_on_grid(dividers.payloads),
                     "{vehicle}% is off the grid"
                 );
                 assert!(
                     pane::is_on_grid(dividers.vehicle),
-                    "{moc}% is off the grid"
+                    "{gateway}% is off the grid"
                 );
                 // And a percentage means what it says: that much of the
                 // working pane, within the grid step it is snapped to, counted
-                // from the right where the moc pane is.
+                // from the right where the gateway pane is.
                 assert!(
-                    (dividers.vehicle - WORKING_WIDTH * (100 - moc) / 100)
+                    (dividers.vehicle - WORKING_WIDTH * (100 - gateway) / 100)
                         .abs()
                         <= 2,
-                    "a moc pane of {moc}% left the divider at {} of \
+                    "a gateway pane of {gateway}% left the divider at {} of \
                      {WORKING_WIDTH}",
                     dividers.vehicle
                 );
                 assert!(
                     (dividers.payloads
-                        - WORKING_WIDTH * (100 - moc - vehicle) / 100)
+                        - WORKING_WIDTH * (100 - gateway - vehicle) / 100)
                         .abs()
                         <= 2,
                     "a vehicle pane of {vehicle}% left the divider at {} of \
                      {WORKING_WIDTH}",
                     dividers.payloads
                 );
-                let (moc_again, vehicle_again) = percents_for(dividers);
+                let (gateway_again, vehicle_again) = percents_for(dividers);
                 assert_eq!(
-                    dividers_for(moc_again, vehicle_again),
+                    dividers_for(gateway_again, vehicle_again),
                     dividers,
-                    "{moc}% and {vehicle}% come back as {moc_again}% and \
-                     {vehicle_again}%"
+                    "{gateway}% and {vehicle}% come back as \
+                     {gateway_again}% and {vehicle_again}%"
                 );
             }
         }
@@ -9134,7 +9166,7 @@ mod tests {
         assert_eq!(
             high,
             WORKING_WIDTH - step,
-            "the moc pane keeps a twentieth"
+            "the gateway pane keeps a twentieth"
         );
         assert!(low > 0 && high < WORKING_WIDTH);
     }
@@ -9150,7 +9182,7 @@ mod tests {
         let width = style::WIDTH as i32;
         let d = dividers();
 
-        // A computation in the vehicle pane and the ground link in the moc
+        // A computation in the vehicle pane and the ground link in the gateway
         // pane, both where they belong.
         document.apply(&Edit::AddNode {
             name: "to_kelvin".into(),
@@ -9164,7 +9196,7 @@ mod tests {
         });
         document.apply(&Edit::AddNode {
             name: "ground".into(),
-            node_type: "moc".into(),
+            node_type: "gateway_radio".into(),
             home: None,
         });
         document.apply(&Edit::MoveNode {
@@ -9188,7 +9220,7 @@ mod tests {
         // the thing somebody would be using the divider to make room for.
         document.apply(&Edit::AddNode {
             name: "stray".into(),
-            node_type: "moc".into(),
+            node_type: "gateway_radio".into(),
             home: None,
         });
         document.apply(&Edit::MoveNode {
@@ -9281,13 +9313,16 @@ mod tests {
             );
         }
 
-        let moc = editor.document().node("moc-1").expect("a ground station");
-        assert_eq!(moc.node_type, "moc");
-        assert_eq!(moc.at, MOC_PLACE);
-        // The upper left of the moc working pane, which is where the ground
+        let gateway = editor
+            .document()
+            .node("gateway-1")
+            .expect("a ground station");
+        assert_eq!(gateway.node_type, "gateway_radio");
+        assert_eq!(gateway.at, GATEWAY_PLACE);
+        // The upper left of the gateway working pane, which is where the ground
         // link belongs.
-        let (left, right) = pane::pane_for("moc", dividers());
-        assert!(moc.at.0 >= left && moc.at.0 <= right);
+        let (left, right) = pane::pane_for("gateway_radio", dividers());
+        assert!(gateway.at.0 >= left && gateway.at.0 <= right);
 
         // Undoable, like any other edit: somebody drawing a page of a bigger
         // configuration does not want a second ground station on it.
@@ -9295,7 +9330,7 @@ mod tests {
         editor.undo();
         editor.undo();
         assert!(
-            editor.document().node("moc-1").is_none(),
+            editor.document().node("gateway-1").is_none(),
             "the ground station cannot be taken back"
         );
 
@@ -9321,7 +9356,7 @@ mod tests {
             home: None,
         });
         seed(&mut editor);
-        assert!(editor.document().node("moc-1").is_none());
+        assert!(editor.document().node("gateway-1").is_none());
 
         // One somebody has emptied, which has a history behind it.
         let mut editor =
@@ -9335,7 +9370,7 @@ mod tests {
         assert!(editor.document().nodes.is_empty());
         seed(&mut editor);
         assert!(
-            editor.document().node("moc-1").is_none(),
+            editor.document().node("gateway-1").is_none(),
             "a configuration somebody emptied was refilled"
         );
 
@@ -9349,7 +9384,7 @@ mod tests {
             "a damaged file should be reported"
         );
         seed(&mut editor);
-        assert!(editor.document().node("moc-1").is_none());
+        assert!(editor.document().node("gateway-1").is_none());
         assert_eq!(
             std::fs::read_to_string(&damaged).unwrap(),
             "nodes: [[[\n",
@@ -9638,7 +9673,7 @@ mod tests {
             drawing: Rc::new(RefCell::new(None)),
             divider: Rc::new(std::cell::Cell::new(dividers())),
             lists: Rc::new(std::cell::Cell::new((
-                settings::DEFAULT_LIST_MOC,
+                settings::DEFAULT_LIST_GATEWAY,
                 settings::DEFAULT_LIST_VEHICLE,
             ))),
             group: None,
@@ -9866,7 +9901,9 @@ mod tests {
             &where_.path().join("vehicle.yaml"),
             dividers(),
         )));
-        for (name, node_type) in [("ground", "moc"), ("sensor", "i2c")] {
+        for (name, node_type) in
+            [("ground", "gateway_radio"), ("sensor", "i2c")]
+        {
             editor.borrow_mut().edit(Edit::AddNode {
                 name: name.to_string(),
                 node_type: node_type.to_string(),
@@ -9891,7 +9928,7 @@ mod tests {
             drawing: Rc::new(RefCell::new(None)),
             divider: Rc::new(std::cell::Cell::new(dividers())),
             lists: Rc::new(std::cell::Cell::new((
-                settings::DEFAULT_LIST_MOC,
+                settings::DEFAULT_LIST_GATEWAY,
                 settings::DEFAULT_LIST_VEHICLE,
             ))),
             group: None,
@@ -10005,7 +10042,7 @@ mod tests {
         )));
         for (name, node_type, at) in [
             ("sensor", "i2c", (dividers().vehicle + 24, 120)),
-            ("ground", "moc", (16, 120)),
+            ("ground", "gateway_radio", (16, 120)),
         ] {
             editor.borrow_mut().edit(Edit::AddNode {
                 name: name.to_string(),
@@ -10028,7 +10065,7 @@ mod tests {
             drawing: Rc::new(RefCell::new(None)),
             divider: Rc::new(std::cell::Cell::new(dividers())),
             lists: Rc::new(std::cell::Cell::new((
-                settings::DEFAULT_LIST_MOC,
+                settings::DEFAULT_LIST_GATEWAY,
                 settings::DEFAULT_LIST_VEHICLE,
             ))),
             group: None,
@@ -10136,7 +10173,7 @@ mod tests {
             dividers(),
         )));
         for (name, node_type, at) in [
-            ("ground", "moc", (16, 1600)),
+            ("ground", "gateway_radio", (16, 1600)),
             ("sensor", "i2c", (dividers().vehicle + 24, 1200)),
             ("other", "i2c", (dividers().vehicle + 24, 1800)),
         ] {
@@ -10161,7 +10198,7 @@ mod tests {
             drawing: Rc::new(RefCell::new(None)),
             divider: Rc::new(std::cell::Cell::new(dividers())),
             lists: Rc::new(std::cell::Cell::new((
-                settings::DEFAULT_LIST_MOC,
+                settings::DEFAULT_LIST_GATEWAY,
                 settings::DEFAULT_LIST_VEHICLE,
             ))),
             group: None,
@@ -10242,7 +10279,7 @@ mod tests {
             drawing: Rc::new(RefCell::new(None)),
             divider: Rc::new(std::cell::Cell::new(dividers())),
             lists: Rc::new(std::cell::Cell::new((
-                settings::DEFAULT_LIST_MOC,
+                settings::DEFAULT_LIST_GATEWAY,
                 settings::DEFAULT_LIST_VEHICLE,
             ))),
             group: None,
@@ -10380,7 +10417,7 @@ mod tests {
             drawing: Rc::new(RefCell::new(None)),
             divider: Rc::new(std::cell::Cell::new(dividers())),
             lists: Rc::new(std::cell::Cell::new((
-                settings::DEFAULT_LIST_MOC,
+                settings::DEFAULT_LIST_GATEWAY,
                 settings::DEFAULT_LIST_VEHICLE,
             ))),
             group: None,
@@ -10487,7 +10524,7 @@ mod tests {
             dividers(),
         )));
         for (name, node_type, at) in [
-            ("ground", "moc", (16, 120)),
+            ("ground", "gateway_radio", (16, 120)),
             ("sensor", "i2c", (dividers().vehicle + 24, 120)),
         ] {
             editor.borrow_mut().edit(Edit::AddNode {
@@ -10519,7 +10556,7 @@ mod tests {
             drawing: Rc::new(RefCell::new(None)),
             divider: Rc::new(std::cell::Cell::new(dividers())),
             lists: Rc::new(std::cell::Cell::new((
-                settings::DEFAULT_LIST_MOC,
+                settings::DEFAULT_LIST_GATEWAY,
                 settings::DEFAULT_LIST_VEHICLE,
             ))),
             group: None,
@@ -10638,7 +10675,7 @@ mod tests {
             drawing: Rc::new(RefCell::new(None)),
             divider: Rc::new(std::cell::Cell::new(dividers())),
             lists: Rc::new(std::cell::Cell::new((
-                settings::DEFAULT_LIST_MOC,
+                settings::DEFAULT_LIST_GATEWAY,
                 settings::DEFAULT_LIST_VEHICLE,
             ))),
             group: None,
@@ -10738,7 +10775,7 @@ mod tests {
         // And so for every entry the palette offers, in every pane: whatever
         // a type's entry answers, it is one Undo away from not being there
         // and one Redo from being back where it was put.
-        for pane in [Pane::Payloads, Pane::Vehicle, Pane::Moc] {
+        for pane in [Pane::Payloads, Pane::Vehicle, Pane::Gateway] {
             for row in rows_of(pane) {
                 let before: Vec<String> = editor
                     .borrow()
@@ -10811,7 +10848,7 @@ mod tests {
         for (name, node_type, at) in [
             ("sensor", "i2c", (dividers().vehicle + 24, 120)),
             ("other", "i2c", (dividers().vehicle + 24, 320)),
-            ("ground", "moc", (16, 120)),
+            ("ground", "gateway_radio", (16, 120)),
         ] {
             editor.borrow_mut().edit(Edit::AddNode {
                 name: name.to_string(),
@@ -10834,7 +10871,7 @@ mod tests {
             drawing: Rc::new(RefCell::new(None)),
             divider: Rc::new(std::cell::Cell::new(dividers())),
             lists: Rc::new(std::cell::Cell::new((
-                settings::DEFAULT_LIST_MOC,
+                settings::DEFAULT_LIST_GATEWAY,
                 settings::DEFAULT_LIST_VEHICLE,
             ))),
             group: None,
@@ -10980,12 +11017,12 @@ mod tests {
 
         // And a node with no terminal of that stream takes nothing: a payload
         // receives what asks it for a reading, so what arrives at its
-        // moc-in leaves a moc-out -- and a payload has none to offer.
-        gesture(middle("other", "moc-in"), centre("sensor"));
+        // gateway-in leaves a gateway-out -- and a payload has none to offer.
+        gesture(middle("other", "gateway-in"), centre("sensor"));
         assert_eq!(
             editor.borrow().document().links.len(),
             2,
-            "a payload has no moc-out for a line to leave by"
+            "a payload has no gateway-out for a line to leave by"
         );
     }
 
@@ -11145,7 +11182,7 @@ mod tests {
             drawing: Rc::new(RefCell::new(None)),
             divider: Rc::new(std::cell::Cell::new(dividers())),
             lists: Rc::new(std::cell::Cell::new((
-                settings::DEFAULT_LIST_MOC,
+                settings::DEFAULT_LIST_GATEWAY,
                 settings::DEFAULT_LIST_VEHICLE,
             ))),
             group: None,
@@ -11288,7 +11325,7 @@ mod tests {
             drawing: Rc::new(RefCell::new(None)),
             divider: Rc::new(std::cell::Cell::new(dividers())),
             lists: Rc::new(std::cell::Cell::new((
-                settings::DEFAULT_LIST_MOC,
+                settings::DEFAULT_LIST_GATEWAY,
                 settings::DEFAULT_LIST_VEHICLE,
             ))),
             group: None,
@@ -11384,7 +11421,7 @@ mod tests {
             drawing: Rc::new(RefCell::new(None)),
             divider: Rc::new(std::cell::Cell::new(dividers())),
             lists: Rc::new(std::cell::Cell::new((
-                settings::DEFAULT_LIST_MOC,
+                settings::DEFAULT_LIST_GATEWAY,
                 settings::DEFAULT_LIST_VEHICLE,
             ))),
             group: None,
@@ -11544,7 +11581,7 @@ mod tests {
             drawing: Rc::new(RefCell::new(None)),
             divider: Rc::new(std::cell::Cell::new(dividers())),
             lists: Rc::new(std::cell::Cell::new((
-                settings::DEFAULT_LIST_MOC,
+                settings::DEFAULT_LIST_GATEWAY,
                 settings::DEFAULT_LIST_VEHICLE,
             ))),
             group: None,
@@ -11618,7 +11655,7 @@ mod tests {
             drawing: Rc::new(RefCell::new(None)),
             divider: Rc::new(std::cell::Cell::new(dividers())),
             lists: Rc::new(std::cell::Cell::new((
-                settings::DEFAULT_LIST_MOC,
+                settings::DEFAULT_LIST_GATEWAY,
                 settings::DEFAULT_LIST_VEHICLE,
             ))),
             group: None,
@@ -11770,7 +11807,7 @@ mod tests {
             drawing: Rc::new(RefCell::new(None)),
             divider: Rc::new(std::cell::Cell::new(dividers())),
             lists: Rc::new(std::cell::Cell::new((
-                settings::DEFAULT_LIST_MOC,
+                settings::DEFAULT_LIST_GATEWAY,
                 settings::DEFAULT_LIST_VEHICLE,
             ))),
             group: None,
@@ -12043,7 +12080,7 @@ mod tests {
             drawing: Rc::new(RefCell::new(None)),
             divider: Rc::new(std::cell::Cell::new(dividers())),
             lists: Rc::new(std::cell::Cell::new((
-                settings::DEFAULT_LIST_MOC,
+                settings::DEFAULT_LIST_GATEWAY,
                 settings::DEFAULT_LIST_VEHICLE,
             ))),
             group: None,
@@ -12127,7 +12164,7 @@ mod tests {
             drawing: Rc::new(RefCell::new(None)),
             divider: Rc::new(std::cell::Cell::new(dividers())),
             lists: Rc::new(std::cell::Cell::new((
-                settings::DEFAULT_LIST_MOC,
+                settings::DEFAULT_LIST_GATEWAY,
                 settings::DEFAULT_LIST_VEHICLE,
             ))),
             group: None,
@@ -12255,7 +12292,7 @@ mod tests {
             drawing: Rc::new(RefCell::new(None)),
             divider: Rc::new(std::cell::Cell::new(dividers())),
             lists: Rc::new(std::cell::Cell::new((
-                settings::DEFAULT_LIST_MOC,
+                settings::DEFAULT_LIST_GATEWAY,
                 settings::DEFAULT_LIST_VEHICLE,
             ))),
             group: None,
@@ -12464,12 +12501,12 @@ mod tests {
                 position: to,
                 button: PointerEventButton::Left,
             });
-        let said = payload_moved
-            .get()
-            .expect("dragging the moc divider should report how far it went");
+        let said = payload_moved.get().expect(
+            "dragging the gateway divider should report how far it went",
+        );
         assert!(
             (said - by).abs() < 1.0,
-            "the moc divider dragged by {by} reported {said}"
+            "the gateway divider dragged by {by} reported {said}"
         );
     }
 

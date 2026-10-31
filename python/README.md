@@ -13,7 +13,7 @@ written after, and each module after the Rust it says again:
 | `tcslibgs/ping.py` | `tcslibgs/src/node/vehicle/ping/mod.rs` | What a ping and its answer say. |
 | `tcslibgs/ready.py` | `tcslibgs/src/ready.rs` | What a harness and tcssim say on tcssim's readiness socket. |
 | `tcslib/simulator.py` | `tcslib/src/simulator.rs` | Waiting for tcssim to have made its stand-ins before tcspecial is started. |
-| `tcslibgs/configuration.py` | `tcslibgs::graph::parameters`, `graph::order`, `graph::telemetry`, `types::came_from` | What a ground station reads out of a configuration: where the beacons are, where a `moc` node is bound, and which port a source's data arrives at. |
+| `tcslibgs/configuration.py` | `tcslibgs::graph::parameters`, `graph::order`, `graph::telemetry`, `types::came_from` | What a ground station reads out of a configuration: where the beacons are, where a gateway node is bound, and which port a source's data arrives at. |
 
 And beside the ping example, because it is the example's own part of the
 ground station: `examples/ping/ping_ground.py`, written after

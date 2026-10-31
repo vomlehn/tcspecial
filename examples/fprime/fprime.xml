@@ -42,11 +42,11 @@
     </tcspecial>
     <!-- The F´ bridge's end of the link, both ways. What the bridge sends
          goes up to address:port, which this node binds aboard, and leaves it
-         by moc-out for the heater. What comes down arrives at bridge_base plus
-         the device id of the node that sent it, and the bridge gives it the
-         F´ ID fprime_id_base plus that same id: the thermometer, device id 2,
-         arrives at 127.0.0.1:9702 as 0x3002. -->
-    <moc>
+         by gateway-out for the heater. What comes down arrives at bridge_base
+         plus the device id of the node that sent it, and the bridge gives it
+         the F´ ID fprime_id_base plus that same id: the thermometer, device id
+         2, arrives at 127.0.0.1:9702 as 0x3002. -->
+    <gateway>
         <name>fsw</name>
         <type>gateway_fprime</type>
         <address>127.0.0.1</address>
@@ -54,8 +54,8 @@
         <bridge_base>127.0.0.1:9700</bridge_base>
         <fprime_id_base>0x3000</fprime_id_base>
         <payload-in>true</payload-in>
-        <moc-out><target>heater</target></moc-out>
-    </moc>
+        <gateway-out><target>heater</target></gateway-out>
+    </gateway>
     <!-- A heater, driven by what the flight computer sends: the far end of a
          UDP socket. -->
     <payloads>
@@ -64,7 +64,7 @@
         <protocol>udp</protocol>
         <address>127.0.0.1</address>
         <port>9001</port>
-        <moc-in>true</moc-in>
+        <gateway-in>true</gateway-in>
     </payloads>
     <!-- A thermometer whose readings go to the flight computer. -->
     <payloads>

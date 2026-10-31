@@ -39,29 +39,29 @@
         </tcs_cmd>
     </tcspecial>
     <!-- The ground's end of the link, both ways. A ping goes up to
-         address:port, which this node binds aboard, and leaves it by moc-out
-         for the ping node. The answer comes back to the ground at
+         address:port, which this node binds aboard, and leaves it by
+         gateway-out for the ping node. The answer comes back to the ground at
          ground_base plus the ping node's device id: ping is the second node
          written, device id 1, so 7701. -->
-    <moc>
-        <name>moc</name>
-        <type>moc</type>
+    <gateway>
+        <name>gateway</name>
+        <type>gateway_radio</type>
         <address>127.0.0.1</address>
         <port>7600</port>
         <ground_base>127.0.0.1:7700</ground_base>
         <payload-in>true</payload-in>
-        <moc-out><target>ping</target></moc-out>
-    </moc>
+        <gateway-out><target>ping</target></gateway-out>
+    </gateway>
     <!-- Answers each ping with the vehicle's time on the end: see
          tcslibgs::node::vehicle::ping for what a ping and its answer say. -->
     <vehicle>
         <name>ping</name>
         <type>ping</type>
-        <moc-in>true</moc-in>
-        <payload-out><target>moc</target></payload-out>
+        <gateway-in>true</gateway-in>
+        <payload-out><target>gateway</target></payload-out>
     </vehicle>
     <tcsgui>
-        <nodes><name>moc</name><x>469</x><y>34</y></nodes>
+        <nodes><name>gateway</name><x>469</x><y>34</y></nodes>
         <nodes><name>ping</name><x>34</x><y>34</y></nodes>
     </tcsgui>
 </configuration>

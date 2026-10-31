@@ -1282,10 +1282,10 @@ payload_groups:
     interval: \"3 s\"
 payloads:
   - { name: sensor, type: i2c, group: temps, path: \"/dev/i2c-1\", \
-address: \"0x48\", payload-out: moc }
-moc:
-  - { name: moc, type: moc, address: \"10.0.0.1\", port: \"5000\", \
-ground_base: \"10.0.0.2:5100\" }
+address: \"0x48\", payload-out: gateway }
+gateway:
+  - { name: gateway, type: gateway_radio, address: \"10.0.0.1\", \
+port: \"5000\", ground_base: \"10.0.0.2:5100\" }
 ";
 
     /// A simulator file that names a payload the simulator will not stand in
@@ -1299,17 +1299,17 @@ ground_base: \"10.0.0.2:5100\" }
         // The sound graph with a heater the ground drives through a tee.
         let configuration = format!(
             "{SOUND_GRAPH}vehicle:
-  - {{ name: echo, type: tee-moc, moc-out: heater }}
+  - {{ name: echo, type: tee-gateway, gateway-out: heater }}
 "
         )
         .replace(
-            "payload-out: moc }\n",
-            "payload-out: moc }\n  - { name: heater, type: network, \
+            "payload-out: gateway }\n",
+            "payload-out: gateway }\n  - { name: heater, type: network, \
              protocol: udp, address: \"127.0.0.1\", port: \"8001\" }\n",
         )
         .replace(
             "ground_base: \"10.0.0.2:5100\" }",
-            "ground_base: \"10.0.0.2:5100\", moc-out: echo }",
+            "ground_base: \"10.0.0.2:5100\", gateway-out: echo }",
         );
         let sim = "\
 simulated_payloads:
@@ -1422,6 +1422,31 @@ vehicle:
         }
     }
 
+    /// A file still written in a word that was renamed is reported at the
+    /// line the word is on, with the word to write instead, rather than at
+    /// the top of the file in the parser's words.
+    #[test]
+    fn an_old_word_is_reported_at_its_line_with_the_new_one() {
+        let dir = tempfile::tempdir().expect("a directory");
+        let top = dir.path().join("vehicle.yaml");
+        std::fs::write(
+            &top,
+            "description: an old file\n\
+             moc:\n  \
+             - { name: down, type: gateway_radio }\n",
+        )
+        .unwrap();
+
+        let report = verify(&top, None, Limits::EVERYTHING);
+        let old = report
+            .findings
+            .iter()
+            .find(|f| f.message.contains("rename it"))
+            .expect("the old section should be reported");
+        assert_eq!(old.line, 2, "{old}");
+        assert!(old.message.contains("is called gateway now"), "{old}");
+    }
+
     /// A problem about a node is reported in the file the node is in.
     ///
     /// A configuration made of several files has its nodes spread across them,
@@ -1433,8 +1458,8 @@ vehicle:
         let top = dir.path().join("vehicle.yaml");
         std::fs::write(
             &top,
-            "include:\n  - cabin\nmoc:\n  \
-             - { name: moc, type: moc, moc-out: moc }\n",
+            "include:\n  - cabin\ngateway:\n  \
+             - { name: gateway, type: gateway_radio, gateway-out: gateway }\n",
         )
         .unwrap();
         // The included file holds a node nothing links to.
@@ -1988,7 +2013,7 @@ simulated_payloads:
         }
         graph_written(
             ".yaml",
-            &SOUND_GRAPH.replace("moc:\n", &format!("{extra}moc:\n")),
+            &SOUND_GRAPH.replace("gateway:\n", &format!("{extra}gateway:\n")),
         )
     }
 

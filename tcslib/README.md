@@ -13,11 +13,11 @@ for each:
   node, arm and restart the vehicle, change how often it beacons. A mission
   control system such as YAMCS or MCT drives a `TcsClient` instead of speaking
   the command and telemetry protocol itself.
-- **Receiving its data.** `moc::Moc` is the ground's end of a `moc` node in a
-  configuration. Name the node, open it, and each call to `receive` returns
-  one datum along with the name of the node that produced it. The ports the
-  data arrive on are worked out from the configuration, the same way
-  tcspecial works them out, so the two ends cannot disagree about them.
+- **Receiving its data.** `gateway::GatewayReceiver` is the ground's end of a
+  gateway node in a configuration. Name the node, open it, and each call to
+  `receive` returns one datum along with the name of the node that produced it.
+  The ports the data arrive on are worked out from the configuration, the same
+  way tcspecial works them out, so the two ends cannot disagree about them.
 - **Knowing it is there.** `beacon` listens for the beacon tcspecial sends on
   its own, every `beacon.default_interval`, whether or not anyone has
   connected. It says which build is running, which configuration it is serving and the
@@ -47,8 +47,8 @@ uses too. tcslib re-exports all of it, so a ground program needs only tcslib.
 - `tcsmoc`, the test ground station.
 - `tcssim`, whose `--wait` waits through `simulator`.
 - `tcsui`, the window pieces shared by the ground programs.
-- `examples/simple-app`, whose ground station `lorem_moc` gets its data with
-  one call to `Moc::receive_into`, into a buffer it made beforehand.
+- `examples/simple-app`, whose ground station `lorem_gateway` gets its data with
+  one call to `GatewayReceiver::receive_into`, into a buffer it made beforehand.
 - `examples/beacon`, whose window watches the beacon through `beacon`.
 
 ## Building and testing

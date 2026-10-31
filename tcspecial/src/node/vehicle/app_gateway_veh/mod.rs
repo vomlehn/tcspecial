@@ -1,4 +1,4 @@
-//! The node that is a program reading MOC data and writing payload data.
+//! The node that is a program reading gateway data and writing payload data.
 //!
 //! An app node is a program of the vehicle's own, run by tcspecial, that takes
 //! part in the graph. What a file may say about one, and what is wrong with
@@ -7,9 +7,9 @@
 //! is here is this kind of node: which of those interfaces it has, and which
 //! way each of them carries data.
 //!
-//! One interface, at descriptor 1 of the program: it reads MOC data there and
-//! writes payload data there. So this end writes MOC data and reads payload
-//! data. Descriptor 0 is not opened for it at all.
+//! One interface, at descriptor 1 of the program: it reads gateway data there
+//! and writes payload data there. So this end writes gateway data and reads
+//! payload data. Descriptor 0 is not opened for it at all.
 //!
 //! Which makes a node of this kind the shape a payload has: it is asked for
 //! something and answers with it.
@@ -28,11 +28,11 @@ use tcslibgs::node::app::{AppParams, Kind};
 
 /// The program this node is, running, and this end of its interfaces.
 #[derive(Debug)]
-pub struct AppMocVeh {
+pub struct AppGatewayVeh {
     running: Running,
 }
 
-impl AppMocVeh {
+impl AppGatewayVeh {
     /// Starts the program this node names.
     ///
     /// Started when the configuration is loaded rather than at the first
@@ -48,7 +48,8 @@ impl AppMocVeh {
     /// # Arguments
     ///
     /// * `params` - The node's attributes: its kind, which must be
-    ///              `Kind::MocVeh`, its program and that program's arguments.
+    ///              `Kind::GatewayVeh`, its program and that program's
+    ///              arguments.
     ///
     /// # Returns
     ///
@@ -58,27 +59,27 @@ impl AppMocVeh {
     ///
     /// A message saying why, if `params` is of another kind, or the
     /// program cannot be found or started.
-    pub fn of(params: &AppParams) -> Result<AppMocVeh, String> {
-        if params.kind != Kind::MocVeh {
+    pub fn of(params: &AppParams) -> Result<AppGatewayVeh, String> {
+        if params.kind != Kind::GatewayVeh {
             return Err(format!(
                 "a {} node cannot be opened as {}: the two are run with \
                  different interfaces",
                 params.kind.node_type(),
-                Kind::MocVeh.node_type()
+                Kind::GatewayVeh.node_type()
             ));
         }
-        Ok(AppMocVeh {
+        Ok(AppGatewayVeh {
             running: parent::start(
                 &params.executable_path()?,
                 &params.arguments(),
-                Supports::MOC,
+                Supports::GATEWAY,
             )?,
         })
     }
 
-    /// Hand it a packet of MOC data, which it reads as MOC data.
-    pub fn give_moc_data(&mut self, data: &[u8]) -> Result<(), String> {
-        self.running.write_moc(data)
+    /// Hand it a packet of gateway data, which it reads as gateway data.
+    pub fn give_gateway_data(&mut self, data: &[u8]) -> Result<(), String> {
+        self.running.write_gateway(data)
     }
 
     /// Whatever payload data it has written, without waiting.
@@ -134,9 +135,9 @@ mod tests {
 
     /// Writes a program standing in for an app of this kind.
     ///
-    /// `cat`, reading and writing the one interface this kind is given: MOC
-    /// data arrives at descriptor 1 and what it reads goes back to the same
-    /// descriptor, which is payload data there.
+    /// `cat`, reading and writing the one interface this kind is given:
+    /// gateway data arrives at descriptor 1 and what it reads goes back to the
+    /// same descriptor, which is payload data there.
     ///
     /// # Arguments
     ///
@@ -171,10 +172,10 @@ mod tests {
     fn says(executable: &std::path::Path) -> AppParams {
         AppParams {
             name: "back".to_string(),
-            kind: Kind::MocVeh,
+            kind: Kind::GatewayVeh,
             executable: executable.display().to_string(),
             payload_arg: None,
-            moc_arg: Some("--commands".to_string()),
+            gateway_arg: Some("--commands".to_string()),
             restart: Restart::Never,
         }
     }
@@ -188,16 +189,19 @@ mod tests {
     fn packets_reach_the_program_and_come_back() {
         let where_ = tempfile::tempdir().expect("a directory");
         let program = stands_in(where_.path());
-        let mut node = crate::when_not_busy(|| AppMocVeh::of(&says(&program)))
-            .expect("it starts");
+        let mut node =
+            crate::when_not_busy(|| AppGatewayVeh::of(&says(&program)))
+                .expect("it starts");
 
-        node.give_moc_data(b"SET 300").expect("it takes a packet");
+        node.give_gateway_data(b"SET 300")
+            .expect("it takes a packet");
         assert_eq!(
             node.take_payload_data().expect("an answer"),
             Some(b"SET 300".to_vec())
         );
 
-        node.give_moc_data(b"").expect("it takes an empty packet");
+        node.give_gateway_data(b"")
+            .expect("it takes an empty packet");
         assert_eq!(
             node.take_payload_data().expect("an answer"),
             Some(Vec::new())
@@ -218,8 +222,9 @@ mod tests {
     #[test]
     fn a_program_that_cannot_be_started_is_said_so() {
         let where_ = tempfile::tempdir().expect("a directory");
-        let said = AppMocVeh::of(&says(&where_.path().join("nothing-here")))
-            .expect_err("a program that is not there");
+        let said =
+            AppGatewayVeh::of(&says(&where_.path().join("nothing-here")))
+                .expect_err("a program that is not there");
         assert!(said.contains("nothing-here"), "{said}");
         assert!(said.contains("could not be started"), "{said}");
     }
@@ -235,8 +240,9 @@ mod tests {
         let mut params = says(&stands_in(where_.path()));
         params.kind = Kind::PayloadVeh;
 
-        let said = AppMocVeh::of(&params).expect_err("a node of another kind");
+        let said =
+            AppGatewayVeh::of(&params).expect_err("a node of another kind");
         assert!(said.contains(Kind::PayloadVeh.node_type()), "{said}");
-        assert!(said.contains(Kind::MocVeh.node_type()), "{said}");
+        assert!(said.contains(Kind::GatewayVeh.node_type()), "{said}");
     }
 }

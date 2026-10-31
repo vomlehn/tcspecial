@@ -1,18 +1,19 @@
-//! Getting the vehicle's data from a `moc` node, on the ground.
+//! Getting the vehicle's data from a gateway node, on the ground.
 //!
-//! A `moc` node is the ground's end of the vehicle's data. tcspecial sends
+//! A gateway node is the ground's end of the vehicle's data. tcspecial sends
 //! what each node drawn into it produces as UDP datagrams to the node's
 //! `ground_base` address, at its port plus the source node's device id -- see
 //! `tcslibgs::graph::telemetry`, which is where both ends work that out. So a
-//! `moc` node is a set of ports, one per source, and the port a datagram
+//! gateway node is a set of ports, one per source, and the port a datagram
 //! arrives at says which node sent it.
 //!
-//! Ground software does not open those ports itself. It names the `moc` node
-//! in the configuration, [`Moc::open`]s it, and calls [`Moc::receive`] for
-//! each datum, which comes back with the name of the node that produced it:
-//! what to do with it next -- process it, display it, log it -- is the
-//! caller's. One function between the configuration and the data means one
-//! place that counts ports, and it is the same counting the vehicle does.
+//! Ground software does not open those ports itself. It names the gateway node
+//! in the configuration, [`GatewayReceiver::open`]s it, and calls
+//! [`GatewayReceiver::receive`] for each datum, which comes back with the name
+//! of the node that produced it: what to do with it next -- process it, display
+//! it, log it -- is the caller's. One function between the configuration and
+//! the data means one place that counts ports, and it is the same counting the
+//! vehicle does.
 
 use std::net::UdpSocket;
 use std::os::fd::AsRawFd;
@@ -28,31 +29,31 @@ use crate::matched::Matched;
 pub const PAYLOAD_TELEMETRY: &str = "payload_telemetry";
 
 /// The largest datum one receive returns: room for a whole datagram, and
-/// the size of a buffer that [`Moc::receive_into`] can always fill.
+/// the size of a buffer that [`GatewayReceiver::receive_into`] can always fill.
 pub const DATUM_BYTES: usize = 65_536;
 
 /// One datum from the vehicle, and the node that produced it.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Received {
-    /// The node drawn into the `moc` node that produced this.
+    /// The node drawn into the gateway node that produced this.
     pub source: String,
     /// What it produced, exactly as it was sent.
     pub data: Vec<u8>,
 }
 
-/// Where [`Moc::receive_into`] put a datum.
+/// Where [`GatewayReceiver::receive_into`] put a datum.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct Arrival {
-    /// Which source sent it, as its place in [`Moc::sources`]: see
-    /// [`Moc::source`].
+    /// Which source sent it, as its place in [`GatewayReceiver::sources`]: see
+    /// [`GatewayReceiver::source`].
     pub source: usize,
     /// How many bytes of the buffer it filled.
     pub length: usize,
 }
 
-/// A `moc` node, open on the ground: a port for each node drawn into it.
+/// A gateway node, open on the ground: a port for each node drawn into it.
 #[derive(Debug)]
-pub struct Moc {
+pub struct GatewayReceiver {
     name: String,
     /// Each source and the socket its data arrives at, in the order the
     /// configuration draws them.
@@ -64,18 +65,18 @@ pub struct Moc {
     /// cannot keep the others waiting.
     next: usize,
     /// Whether the station is matched with the vehicle, where it watches
-    /// the beacons: see [`Moc::gated_by`]. `None` reads everything.
+    /// the beacons: see [`GatewayReceiver::gated_by`]. `None` reads everything.
     gate: Option<Matched>,
 }
 
-impl Moc {
-    /// Opens a `moc` node of the configuration in a file, as [`Moc::open`]
-    /// does.
+impl GatewayReceiver {
+    /// Opens a gateway node of the configuration in a file, as
+    /// [`GatewayReceiver::open`] does.
     ///
     /// # Arguments
     ///
     /// * `path` - The configuration file.
-    /// * `moc`  - The `moc` node's name.
+    /// * `gateway`  - The gateway node's name.
     ///
     /// # Returns
     ///
@@ -84,20 +85,23 @@ impl Moc {
     /// # Errors
     ///
     /// A message naming the file where it cannot be loaded, and whatever
-    /// [`Moc::open`] refuses.
-    pub fn open_file(path: impl AsRef<Path>, moc: &str) -> Result<Moc, String> {
+    /// [`GatewayReceiver::open`] refuses.
+    pub fn open_file(
+        path: impl AsRef<Path>,
+        gateway: &str,
+    ) -> Result<GatewayReceiver, String> {
         let path = path.as_ref();
         let graph = Graph::load(path)
             .map_err(|e| format!("{}: {e}", path.display()))?;
-        Moc::open(&graph, moc)
+        GatewayReceiver::open(&graph, gateway)
     }
 
-    /// Opens a `moc` node: binds the port each source's data arrives at.
+    /// Opens a gateway node: binds the port each source's data arrives at.
     ///
     /// # Arguments
     ///
     /// * `graph` - The configuration's graph.
-    /// * `moc`   - The `moc` node's name.
+    /// * `gateway`   - The gateway node's name.
     ///
     /// # Returns
     ///
@@ -105,33 +109,38 @@ impl Moc {
     ///
     /// # Errors
     ///
-    /// Refused for a name that is not a `moc` node, for one nothing is drawn
+    /// Refused for a name that is not a gateway node, for one nothing is drawn
     /// into -- it would receive nothing, and a caller waiting on it would wait
     /// for ever -- and for a port that cannot be bound, which says which.
-    pub fn open(graph: &Graph, moc: &str) -> Result<Moc, String> {
-        match graph.node(moc) {
+    pub fn open(
+        graph: &Graph,
+        gateway: &str,
+    ) -> Result<GatewayReceiver, String> {
+        match graph.node(gateway) {
             Some(node) if tcslibgs::gateway::is_gateway(&node.node_type) => {}
             Some(node) => {
                 return Err(format!(
-                    "\"{moc}\" is a {} node, not a gateway node",
+                    "\"{gateway}\" is a {} node, not a gateway node",
                     node.node_type
                 ))
             }
-            None => return Err(format!("there is no node called \"{moc}\"")),
+            None => {
+                return Err(format!("there is no node called \"{gateway}\""))
+            }
         }
 
         let links = telemetry::of(graph).map_err(|refused| refused.why)?;
         let ours: Vec<Telemetered> = links
             .into_iter()
-            .filter(|l| l.via == Via::Moc(moc.to_string()))
+            .filter(|l| l.via == Via::Gateway(gateway.to_string()))
             .collect();
         if ours.is_empty() {
             return Err(format!(
-                "\"{moc}\" has nothing drawn into it, so nothing would ever \
-                 arrive at it"
+                "\"{gateway}\" has nothing drawn into it, so nothing would \
+                 ever arrive at it"
             ));
         }
-        Moc::binding(moc, ours)
+        GatewayReceiver::binding(gateway, ours)
     }
 
     /// Open the ground's end of every payload that reports over the
@@ -156,7 +165,7 @@ impl Moc {
     /// port cannot be bound.
     pub fn open_payload_telemetry(
         graph: &Graph,
-    ) -> Result<Option<Moc>, String> {
+    ) -> Result<Option<GatewayReceiver>, String> {
         let links = telemetry::of(graph).map_err(|refused| refused.why)?;
         let ours: Vec<Telemetered> = links
             .into_iter()
@@ -165,7 +174,7 @@ impl Moc {
         if ours.is_empty() {
             return Ok(None);
         }
-        Moc::binding(PAYLOAD_TELEMETRY, ours).map(Some)
+        GatewayReceiver::binding(PAYLOAD_TELEMETRY, ours).map(Some)
     }
 
     /// Binds each link's ground end, as one node.
@@ -182,7 +191,10 @@ impl Moc {
     /// # Errors
     ///
     /// A message saying which source's port cannot be bound.
-    fn binding(name: &str, links: Vec<Telemetered>) -> Result<Moc, String> {
+    fn binding(
+        name: &str,
+        links: Vec<Telemetered>,
+    ) -> Result<GatewayReceiver, String> {
         let mut ports = Vec::new();
         for link in links {
             let at = format!("{}:{}", link.ground.address, link.ground.port);
@@ -202,7 +214,7 @@ impl Moc {
                 revents: 0,
             })
             .collect();
-        Ok(Moc {
+        Ok(GatewayReceiver {
             name: name.to_string(),
             ports,
             fds,
@@ -235,7 +247,7 @@ impl Moc {
         self.gate = Some(matched);
     }
 
-    /// The `moc` node's name.
+    /// The gateway node's name.
     pub fn name(&self) -> &str {
         &self.name
     }
@@ -252,8 +264,8 @@ impl Moc {
             .collect()
     }
 
-    /// The source at this place in [`Moc::sources`], which is what an
-    /// [`Arrival`] names.
+    /// The source at this place in [`GatewayReceiver::sources`], which is what
+    /// an [`Arrival`] names.
     pub fn source(&self, index: usize) -> Option<&str> {
         self.ports.get(index).map(|(source, _)| source.as_str())
     }
@@ -264,8 +276,8 @@ impl Moc {
     /// back is the wait running out with nothing arrived.
     ///
     /// Allocates the datum and its source's name, each time: for a caller
-    /// that keeps what it receives. A loop that does not, [`Moc::receive_into`]
-    /// a buffer it made before it started.
+    /// that keeps what it receives. A loop that does not,
+    /// [`GatewayReceiver::receive_into`] a buffer it made before it started.
     ///
     /// # Arguments
     ///
@@ -278,7 +290,7 @@ impl Moc {
     ///
     /// # Errors
     ///
-    /// What [`Moc::receive_into`] refuses.
+    /// What [`GatewayReceiver::receive_into`] refuses.
     pub fn receive(
         &mut self,
         wait: Option<Duration>,
@@ -294,8 +306,8 @@ impl Moc {
         }))
     }
 
-    /// [`Moc::receive`], into `out`, allocating nothing: where the datum was
-    /// put, and which source sent it.
+    /// [`GatewayReceiver::receive`], into `out`, allocating nothing: where the
+    /// datum was put, and which source sent it.
     ///
     /// # Arguments
     ///
@@ -448,7 +460,7 @@ impl Moc {
     }
 }
 
-impl Drop for Moc {
+impl Drop for GatewayReceiver {
     /// Takes this node's sockets off its match's list before they close, so
     /// that the descriptors' numbers, which the system may give to anything
     /// opened later, are never read from by the match.
@@ -479,7 +491,7 @@ mod tests {
             .port()
     }
 
-    /// Makes a configuration of two sources drawn into one moc node.
+    /// Makes a configuration of two sources drawn into one gateway node.
     ///
     /// # Arguments
     ///
@@ -495,8 +507,8 @@ mod tests {
         std::fs::write(
             &path,
             format!(
-                "moc:
-  - {{ name: ground, type: moc, ground_base: \"127.0.0.1:{}\" }}
+                "gateway:
+  - {{ name: ground, type: gateway_radio, ground_base: \"127.0.0.1:{}\" }}
 payloads:
   - {{ name: a, type: network, protocol: udp, address: \"127.0.0.1\", \
     port: \"7001\", payload-out: ground }}
@@ -515,8 +527,9 @@ payloads:
     #[test]
     fn each_datum_says_which_node_sent_it() {
         let port = a_free_port();
-        let mut moc = Moc::open(&graph(port), "ground").expect("it opens");
-        assert_eq!(moc.sources(), vec!["a", "b"]);
+        let mut gateway =
+            GatewayReceiver::open(&graph(port), "ground").expect("it opens");
+        assert_eq!(gateway.sources(), vec!["a", "b"]);
 
         let vehicle =
             UdpSocket::bind("127.0.0.1:0").expect("the vehicle's socket");
@@ -529,7 +542,7 @@ payloads:
 
         let mut got = Vec::new();
         for _ in 0..2 {
-            let received = moc
+            let received = gateway
                 .receive(Some(Duration::from_secs(5)))
                 .expect("it reads")
                 .expect("something arrived");
@@ -556,7 +569,7 @@ payloads:
         std::fs::write(
             &path,
             format!(
-                "moc:
+                "gateway:
   - {{ name: fsw, type: gateway_fprime, bridge_base: \"127.0.0.1:{}\", \
     fprime_id_base: \"0x3000\" }}
 payloads:
@@ -568,14 +581,15 @@ payloads:
         )
         .expect("written");
         let graph = Graph::load(&path).expect("it reads");
-        let mut moc = Moc::open(&graph, "fsw").expect("it opens");
-        assert_eq!(moc.sources(), vec!["a"]);
+        let mut gateway =
+            GatewayReceiver::open(&graph, "fsw").expect("it opens");
+        assert_eq!(gateway.sources(), vec!["a"]);
 
         UdpSocket::bind("127.0.0.1:0")
             .expect("the vehicle's socket")
             .send_to(b"from a", ("127.0.0.1", port))
             .expect("sent");
-        let received = moc
+        let received = gateway
             .receive(Some(Duration::from_secs(5)))
             .expect("it reads")
             .expect("something arrived");
@@ -595,9 +609,10 @@ payloads:
 
         let ours = ConfigDigest([0x5A; 16]);
         let port = a_free_port();
-        let mut moc = Moc::open(&graph(port), "ground").expect("it opens");
+        let mut gateway =
+            GatewayReceiver::open(&graph(port), "ground").expect("it opens");
         let matched = crate::matched::Matched::for_configuration(ours);
-        moc.gated_by(matched.clone());
+        gateway.gated_by(matched.clone());
         let vehicle =
             UdpSocket::bind("127.0.0.1:0").expect("the vehicle's socket");
         let send = |what: &[u8]| {
@@ -608,7 +623,7 @@ payloads:
 
         // Not matched: what arrives is dropped and counted.
         send(b"before");
-        assert_eq!(moc.receive_into(wait, &mut datum), Ok(None));
+        assert_eq!(gateway.receive_into(wait, &mut datum), Ok(None));
         assert_eq!(matched.counts().mismatched, 1);
 
         // Queued while not matched, and dropped as the match begins, before
@@ -617,9 +632,9 @@ payloads:
         send(b"queued too");
         matched.beacon(false, Some(ours), Stage::Heard, false);
         assert_eq!(matched.counts().mismatched, 3, "dropped at the match");
-        assert_eq!(moc.receive_into(wait, &mut datum), Ok(None));
+        assert_eq!(gateway.receive_into(wait, &mut datum), Ok(None));
         send(b"matched");
-        let arrival = moc
+        let arrival = gateway
             .receive_into(Some(Duration::from_secs(5)), &mut datum)
             .expect("it reads")
             .expect("read while matched");
@@ -628,7 +643,7 @@ payloads:
         // The match ends with a flagged beacon: nothing is read again.
         matched.beacon(true, Some(ours), Stage::Heard, false);
         send(b"flagged");
-        assert_eq!(moc.receive_into(wait, &mut datum), Ok(None));
+        assert_eq!(gateway.receive_into(wait, &mut datum), Ok(None));
 
         let counts = matched.counts();
         assert_eq!(counts.processed, 1);
@@ -640,9 +655,10 @@ payloads:
     /// A wait that runs out says nothing arrived.
     #[test]
     fn a_wait_that_runs_out_is_nothing() {
-        let mut moc =
-            Moc::open(&graph(a_free_port()), "ground").expect("it opens");
-        assert_eq!(moc.receive(Some(Duration::from_millis(50))), Ok(None));
+        let mut gateway =
+            GatewayReceiver::open(&graph(a_free_port()), "ground")
+                .expect("it opens");
+        assert_eq!(gateway.receive(Some(Duration::from_millis(50))), Ok(None));
     }
 
     /// The payloads nothing touches are received too, named for the section.
@@ -661,7 +677,7 @@ payloads:
         );
         *section = tcslibgs::graph::parameters::nest(&flat);
 
-        let mut ground = Moc::open_payload_telemetry(&graph)
+        let mut ground = GatewayReceiver::open_payload_telemetry(&graph)
             .expect("it opens")
             .expect("the sensor reports that way");
         assert_eq!(ground.name(), PAYLOAD_TELEMETRY);
@@ -680,13 +696,14 @@ payloads:
         assert_eq!(received.data, b"reading".to_vec());
     }
 
-    /// Only a moc node can be opened, and only one something is drawn into.
+    /// Only a gateway node can be opened, and only one something is drawn into.
     #[test]
     fn what_cannot_be_opened_says_why() {
         let graph = graph(a_free_port());
-        let said = Moc::open(&graph, "a").expect_err("a payload");
+        let said = GatewayReceiver::open(&graph, "a").expect_err("a payload");
         assert!(said.contains("not a gateway node"), "{said}");
-        let said = Moc::open(&graph, "nowhere").expect_err("no such node");
+        let said =
+            GatewayReceiver::open(&graph, "nowhere").expect_err("no such node");
         assert!(said.contains("no node called"), "{said}");
     }
 }

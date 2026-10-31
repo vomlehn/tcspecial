@@ -1,6 +1,6 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="900" height="450" viewBox="0 0 900 450" role="img" aria-labelledby="title desc">
   <title id="title">The ping example</title>
-  <desc id="desc">The ground station ping_moc.py sends each ping, "ping #count time", up to the moc node, which tcspecial binds at 127.0.0.1:7600. It leaves the moc node by its moc-out link for the ping node, which answers it with the vehicle's time on the end and sends the answer by its payload-out link back to the moc node, and so down to the ground at 127.0.0.1:7701: the moc node's ground_base, 7700, plus the ping node's device id, 1. The ground station shows the ping sent, the answer received, and the round trip and its two halves. Beside it is the beacon panel, fed by the beacon tcspecial sends from 0.0.0.0:7500 to 127.0.0.1:7510.</desc>
+  <desc id="desc">The ground station ping_gateway.py sends each ping, "ping #count time", up to the gateway node, which tcspecial binds at 127.0.0.1:7600. It leaves the gateway node by its gateway-out link for the ping node, which answers it with the vehicle's time on the end and sends the answer by its payload-out link back to the gateway node, and so down to the ground at 127.0.0.1:7701: the gateway node's ground_base, 7700, plus the ping node's device id, 1. The ground station shows the ping sent, the answer received, and the round trip and its two halves. Beside it is the beacon panel, fed by the beacon tcspecial sends from 0.0.0.0:7500 to 127.0.0.1:7510.</desc>
   <defs>
     <style>
       text { font-family: "DejaVu Sans", Helvetica, Arial, sans-serif; fill: #111827; }
@@ -44,10 +44,10 @@
   <text class="kind" x="71" y="198">vehicle node, device id 1</text>
   <text class="detail" x="71" y="217">answers with its time</text>
 
-  <!-- The moc node, the ground's end of the link both ways -->
+  <!-- The gateway node, the ground's end of the link both ways -->
   <rect class="socket" x="340" y="120" width="220" height="150" rx="10"/>
-  <text class="name" x="356" y="147">moc</text>
-  <text class="kind" x="356" y="168">moc node, device id 0</text>
+  <text class="name" x="356" y="147">gateway</text>
+  <text class="kind" x="356" y="168">gateway node, device id 0</text>
   <text class="detail" x="356" y="190">binds 127.0.0.1:7600</text>
   <text class="detail" x="356" y="208">ground_base</text>
   <text class="detail" x="356" y="224">  127.0.0.1:7700</text>
@@ -58,7 +58,7 @@
 
   <!-- The ground station -->
   <rect class="ground" x="640" y="74" width="235" height="246" rx="10"/>
-  <text class="name" x="656" y="101">ping_moc.py</text>
+  <text class="name" x="656" y="101">ping_gateway.py</text>
   <text class="kind" x="656" y="122">ground station, Python 3</text>
   <!-- Its beacon panel, drawn as it looks -->
   <rect class="socket" x="656" y="134" width="203" height="40" rx="6"/>
@@ -74,13 +74,13 @@
   <text class="detail" x="668" y="268">round trip</text>
   <text class="detail" x="668" y="286">up, down</text>
 
-  <!-- Up: the ping, to the moc node and on to the ping node -->
+  <!-- Up: the ping, to the gateway node and on to the ping node -->
   <path class="up" d="M636,228 L564,228" marker-end="url(#arrow-amber)"/>
   <text class="label" x="574" y="219">ping</text>
   <path class="up" d="M340,175 L259,175" marker-end="url(#arrow-amber)"/>
-  <text class="label" x="266" y="166">moc-out</text>
+  <text class="label" x="266" y="166">gateway-out</text>
 
-  <!-- Down: the answer, back to the moc node and on to the ground -->
+  <!-- Down: the answer, back to the gateway node and on to the ground -->
   <path class="down" d="M255,215 L336,215" marker-end="url(#arrow-blue)"/>
   <text class="label" x="262" y="232">payload-out</text>
   <path class="down" d="M560,255 L636,255" marker-end="url(#arrow-blue)"/>

@@ -21,8 +21,8 @@ argue from this order and say so.
   telemetry protocol, and how every configuration file is read and checked.
   A rule about what a configuration may say belongs here, and nowhere else.
 - `tcslib` -- what a ground station is built on: `TcsClient` for commands,
-  `moc::Moc` for the vehicle's data, `beacon` for its beacons, `simulator`
-  for waiting until tcssim has made its stand-ins.
+  `gateway::GatewayReceiver` for the vehicle's data, `beacon` for its
+  beacons, `simulator` for waiting until tcssim has made its stand-ins.
 - `tcslib-c` -- tcslib for C and C++: beacons, data and commands behind one
   hand-written header, `include/tcs.h`, which `tests/c_and_cpp.rs` holds to
   the library by compiling a ground station against it with gcc and g++.
@@ -49,12 +49,20 @@ attributes and checks in `tcslibgs::node`, the flight-side node in
 ## Vocabulary
 
 - **node**: anything in the graph -- a device reached over an interface, a
-  link to the MOC, a computation, a log, an app.
-- **MOC**: the mission operations center, on the ground.
+  gateway, a computation, a log, an app.
+- **gateway**: the side of the graph that commands tcspecial and takes its
+  telemetry, and the node it is reached through: `gateway_radio` for the
+  ground, `gateway_fprime` for an F´ computer, `gateway_cfs` to come. Its
+  section is `gateway:`, its links `gateway-in` and `gateway-out`, and
+  `tee-gateway`, `null-gateway` and `app_gateway_veh` stand beside it. All
+  of these were `moc` once; a file still saying so is refused, told the
+  new word (`tcslibgs::graph::renamed`).
+- **MOC**: the mission operations center, on the ground. Still the word for
+  the ground itself -- tcsmoc, "the MOC sends" -- but never for a node.
 - **device file**: a filesystem entry, `device_file` in code and `type:`.
 - App node types are named stream-then-side: `app_payload_veh`,
-  `app_moc_veh` and `app_all_veh` on the vehicle; `app_pl` and `app_all_pl`
-  on the payload side.
+  `app_gateway_veh` and `app_all_veh` on the vehicle; `app_pl` and
+  `app_all_pl` on the payload side.
 - Older code still says `payload`, `PayloadConfig`, `payloads:`. That rename
   is held back on purpose until the configuration schema is complete, because
   those names mirror configuration keys. Do not start it piecemeal.

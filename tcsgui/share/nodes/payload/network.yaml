@@ -3,7 +3,7 @@
 #
 # A payload: what the vehicle carries this flight. Its readings leave by
 # payload-out on their way to the ground, and what asks for them -- a
-# trigger, a command -- arrives at moc-in. Its Rust is
+# trigger, a command -- arrives at gateway-in. Its Rust is
 # tcspecial/src/node/payload/network/.
 node: network
 type: network
@@ -12,8 +12,8 @@ about: >
   raw IP.
 payload-sink: false
 payload-source: true
-moc-sink: true
-moc-source: false
+gateway-sink: true
+gateway-source: false
 attributes:
   - name: protocol
     required: true

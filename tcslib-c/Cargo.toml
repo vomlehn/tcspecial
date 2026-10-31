@@ -5,7 +5,7 @@ edition = "2021"
 license.workspace = true
 description = """\
 tcslib for C and C++: a ground station's beacons, the vehicle's data from a \
-moc node, and commands to the vehicle, behind one header"""
+gateway node, and commands to the vehicle, behind one header"""
 
 [lib]
 # libtcs.a and libtcs.so, which a C or C++ program links with

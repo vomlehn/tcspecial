@@ -71,10 +71,10 @@ pub struct Reach {
     /// again whenever the ground starts it after stopping it -- and a write
     /// that fails is a node that did not open.
     pub init: Option<Vec<u8>>,
-    /// Where a ground link's data goes: the `moc` node's `ground_base`.
+    /// Where a ground link's data goes: the gateway node's `ground_base`.
     ///
-    /// For a `moc` node, and only for one. What each node linked into the
-    /// `moc` node produces is sent to this host, at this port plus that
+    /// For a gateway node, and only for one. What each node linked into the
+    /// gateway node produces is sent to this host, at this port plus that
     /// node's device id -- see `crate::graph::telemetry` -- so the ground
     /// tells the nodes apart by the port their data arrives at, and the
     /// vehicle sends from the first reading without being spoken to.
@@ -254,9 +254,9 @@ pub fn reach_of(node: &Node) -> Result<Reach, String> {
     let mut framing = None;
     let endpoint = match kind {
         // A socket: a host and a port, and which protocol is spoken to it.
-        // The MOC link is one of these, and a `moc` node needs no protocol --
-        // a ground link is a datagram link, as the one tcspecial has always
-        // had is.
+        // The gateway link is one of these, and a gateway node needs no
+        // protocol -- a ground link is a datagram link, as the one tcspecial
+        // has always had is.
         DHType::Network => {
             let protocol = match node.attributes.get("protocol") {
                 // A raw socket is a protocol only with its number beside it.
@@ -932,7 +932,7 @@ fn fits_one_read(
     Ok(())
 }
 
-/// What a `moc` node that binds nothing is given as its address: see
+/// What a gateway node that binds nothing is given as its address: see
 /// [`binds`].
 const UNBOUND: &str = "0.0.0.0";
 
@@ -1048,9 +1048,9 @@ fn locators(kind: DHType) -> &'static [&'static str] {
 /// The type names differ from those in two places and both are deliberate.
 /// `device-file` is what a configuration calls a file opened in the
 /// filesystem, the word `device` having meant that and a piece of hardware on
-/// a bus at once. And `moc` is a network link named for what is at the far end
-/// of it rather than for how it is reached, because that is the thing a reader
-/// of the configuration cares about.
+/// a bus at once. And `gateway` is a network link named for what is at the far
+/// end of it rather than for how it is reached, because that is the thing a
+/// reader of the configuration cares about.
 ///
 /// # Arguments
 ///
@@ -1100,9 +1100,9 @@ fn kind_of(node: &Node) -> Result<DHType, String> {
         other => Err(format!(
             "\"{}\": there is no node type called \"{other}\". The interfaces \
              are i2c, spi, serial, hdlc, can, iio, rpmsg, gpio, device-file \
-             and network; a ground link is moc; and compute, log, null-moc, \
-             null-payload, tee-moc, tee-payload, ping and the app nodes are \
-             the rest",
+             and network; a ground link is gateway_radio; and compute, log, \
+             null-gateway, null-payload, tee-gateway, tee-payload, ping and \
+             the app nodes are the rest",
             node.name
         )),
     }
@@ -1495,19 +1495,23 @@ mod tests {
     /// A ground link says where the ground is, as one address and port.
     #[test]
     fn a_ground_link_says_where_the_ground_is() {
-        let moc = node("moc", "moc", &[("ground_base", "127.0.0.1:5100")]);
-        let reach = reach_of(&moc).expect("it reads");
+        let gateway = node(
+            "gateway",
+            "gateway_radio",
+            &[("ground_base", "127.0.0.1:5100")],
+        );
+        let reach = reach_of(&gateway).expect("it reads");
         let ground = reach.ground.expect("a ground");
         assert_eq!((ground.address.as_str(), ground.port), ("127.0.0.1", 5100));
         // And with no address of its own, it binds nothing.
-        assert!(!binds(&moc));
+        assert!(!binds(&gateway));
 
-        let mut without = moc.clone();
+        let mut without = gateway.clone();
         without.attributes.remove("ground_base");
         let said = reach_of(&without).expect_err("a ground link says where");
         assert!(said.contains("ground_base"), "{said}");
 
-        let mut portless = moc.clone();
+        let mut portless = gateway.clone();
         portless
             .attributes
             .insert("ground_base".to_string(), Scalar::of("127.0.0.1"));
@@ -1519,8 +1523,8 @@ mod tests {
     #[test]
     fn a_ground_link_binds_both_halves_or_neither() {
         let both = node(
-            "moc",
-            "moc",
+            "gateway",
+            "gateway_radio",
             &[
                 ("address", "127.0.0.1"),
                 ("port", "5000"),
@@ -1616,7 +1620,7 @@ mod tests {
 
         // And the ground link, which needs no protocol: a ground link is a
         // datagram link.
-        match &reach("moc").endpoint {
+        match &reach("gateway").endpoint {
             EndpointConfig::Network(net) => {
                 assert_eq!(net.protocol, NetworkProtocol::Udp);
                 assert_eq!(net.address, "10.0.0.1");
@@ -1708,8 +1712,8 @@ mod tests {
 
         // And the other way round: a socket has no device file.
         let said = reach_of(&node(
-            "moc",
-            "moc",
+            "gateway",
+            "gateway_radio",
             &[
                 ("address", "10.0.0.1"),
                 ("port", "5000"),
@@ -1779,8 +1783,13 @@ mod tests {
         for (name, node_type, attributes, wanted) in [
             ("temp_1", "i2c", vec![("path", "/dev/i2c-1")], "address"),
             ("temp_1", "i2c", vec![("address", "0x48")], "path"),
-            ("link", "moc", vec![("port", "5000")], "address"),
-            ("link", "moc", vec![("address", "10.0.0.1")], "port"),
+            ("link", "gateway_radio", vec![("port", "5000")], "address"),
+            (
+                "link",
+                "gateway_radio",
+                vec![("address", "10.0.0.1")],
+                "port",
+            ),
             ("file", "device-file", vec![], "path"),
             ("bus", "can", vec![("can_id", "0x201")], "interface"),
             ("bus", "can", vec![("interface", "vcan0")], "can_id"),
@@ -1899,7 +1908,7 @@ mod tests {
 
         let said = reach_of(&node(
             "link",
-            "moc",
+            "gateway_radio",
             &[("address", "10.0.0.1"), ("port", "5000"), ("init", "[01]")],
         ))
         .expect_err("a ground link has no state to start in");
@@ -2061,7 +2070,7 @@ mod tests {
     fn a_port_is_a_port() {
         let said = reach_of(&node(
             "link",
-            "moc",
+            "gateway_radio",
             &[("address", "10.0.0.1"), ("port", "70000")],
         ))
         .expect_err("a number that is not a port");
@@ -2069,14 +2078,14 @@ mod tests {
 
         let said = reach_of(&node(
             "link",
-            "moc",
+            "gateway_radio",
             &[("address", "10.0.0.1"), ("port", "0")],
         ))
         .expect_err("port nought");
         assert!(said.contains("whichever one is free"), "{said}");
     }
 
-    /// A network node says which protocol is spoken to it; a MOC link need
+    /// A network node says which protocol is spoken to it; a gateway link need
     /// not.
     #[test]
     fn a_network_node_says_its_protocol() {

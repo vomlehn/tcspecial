@@ -2,8 +2,8 @@
 //!
 //! Two suites: the libraries' in `python/tests`, which say each Rust test of
 //! `tcslib::beacon`, `tcsui` and the ping format again, with the same figures;
-//! and this example's, beside `ping_moc.py`. Run under `cargo test` so that a
-//! change to the Rust that the Python has not followed fails where the Rust
+//! and this example's, beside `ping_gateway.py`. Run under `cargo test` so that
+//! a change to the Rust that the Python has not followed fails where the Rust
 //! change is being tested.
 
 use std::path::Path;

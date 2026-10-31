@@ -17,9 +17,9 @@
 //!
 //! # Two kinds of link
 //!
-//! * A link drawn into a `moc` node. What the source node produces is sent to
-//!   the `moc` node's `ground_base` host, at its port plus the source's id. The
-//!   vehicle's end is whatever port the system gives it: what the ground
+//! * A link drawn into a gateway node. What the source node produces is sent to
+//!   the gateway node's `ground_base` host, at its port plus the source's id.
+//!   The vehicle's end is whatever port the system gives it: what the ground
 //!   listens on is what is written down.
 //!
 //! * A payload that nothing in the drawing touches -- no link to it or from
@@ -45,8 +45,8 @@ use crate::types::{host_port_of, NetworkConfig, NetworkProtocol};
 /// Which kind of link to the ground this is.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Via {
-    /// Drawn into this `moc` node, and sent to its `ground_base`.
-    Moc(String),
+    /// Drawn into this gateway node, and sent to its `ground_base`.
+    Gateway(String),
     /// A payload nothing touches, over the section's `payload_telemetry`.
     PayloadTelemetry,
 }
@@ -63,7 +63,7 @@ pub struct Telemetered {
     /// Which kind of link it is.
     pub via: Via,
     /// tcspecial's end, which it binds and sends from. Port nought for a link
-    /// into a `moc` node, whose vehicle end is whatever the system gives.
+    /// into a gateway node, whose vehicle end is whatever the system gives.
     pub vehicle: NetworkConfig,
     /// The ground's end, which the ground binds and tcspecial sends to.
     pub ground: NetworkConfig,
@@ -95,9 +95,9 @@ pub fn ids(graph: &Graph) -> BTreeMap<String, usize> {
         .collect()
 }
 
-/// What a source's link into a `moc` node is called.
-pub fn moc_link_name(source: &str, moc: &str) -> String {
-    format!("{source} to {moc}")
+/// What a source's link into a gateway node is called.
+pub fn gateway_link_name(source: &str, gateway: &str) -> String {
+    format!("{source} to {gateway}")
 }
 
 /// What an untouched payload's link over `payload_telemetry` is called.
@@ -107,7 +107,7 @@ pub fn payload_link_name(payload: &str) -> String {
 
 /// Finds every link to the ground this configuration has.
 ///
-/// A `moc` node with no `ground_base`, or one that does not read, contributes
+/// A gateway node with no `ground_base`, or one that does not read, contributes
 /// nothing here: [`crate::graph::reach::reach_of`] says what is wrong with it,
 /// and says it once.
 ///
@@ -129,13 +129,13 @@ pub fn of(graph: &Graph) -> Result<Vec<Telemetered>, Refused> {
     let ids = ids(graph);
     let mut links = Vec::new();
 
-    // Links drawn into a moc node, in the order they are drawn.
+    // Links drawn into a gateway node, in the order they are drawn.
     let mut seen: BTreeSet<(String, String)> = BTreeSet::new();
     for link in &graph.links {
         let source = link.origin().node;
         for destination in link.to.each() {
             let to = Destination::parse(destination).node;
-            let Some(moc) = graph
+            let Some(gateway) = graph
                 .node(&to)
                 .filter(|n| crate::gateway::is_gateway(&n.node_type))
             else {
@@ -145,10 +145,10 @@ pub fn of(graph: &Graph) -> Result<Vec<Telemetered>, Refused> {
             // ground_base, an F´ gateway's bridge_base. One rule counts on
             // from either.
             let attribute =
-                crate::gateway::GatewayKind::of_node_type(&moc.node_type)
+                crate::gateway::GatewayKind::of_node_type(&gateway.node_type)
                     .expect("a gateway node")
                     .base_attribute();
-            let Some(base) = moc
+            let Some(base) = gateway
                 .attributes
                 .get(attribute)
                 .and_then(|b| host_port_of(attribute, b.as_str()).ok())
@@ -166,10 +166,10 @@ pub fn of(graph: &Graph) -> Result<Vec<Telemetered>, Refused> {
                 why: format!("\"{to}\": {attribute} {why}"),
             })?;
             links.push(Telemetered {
-                name: moc_link_name(&source, &to),
+                name: gateway_link_name(&source, &to),
                 source: source.clone(),
                 id,
-                via: Via::Moc(to.clone()),
+                via: Via::Gateway(to.clone()),
                 vehicle: NetworkConfig {
                     protocol: NetworkProtocol::Udp,
                     address: "0.0.0.0".to_string(),
@@ -290,7 +290,7 @@ mod tests {
     #[test]
     fn every_node_has_a_device_id() {
         let ids = ids(&example("thermostat"));
-        assert_eq!(ids["moc"], 0);
+        assert_eq!(ids["gateway"], 0);
         assert_eq!(ids["k_1"], 1);
         assert_eq!(ids["cabin_temp"], 4);
         assert_eq!(ids["temp_1"], 7);
@@ -298,10 +298,10 @@ mod tests {
         assert_eq!(ids["heaters_2"], 11);
     }
 
-    /// What is drawn into a moc node goes to its ground_base plus the source's
-    /// id, one port per source.
+    /// What is drawn into a gateway node goes to its ground_base plus the
+    /// source's id, one port per source.
     #[test]
-    fn a_link_into_a_moc_node_goes_to_its_ground_base_plus_the_id() {
+    fn a_link_into_a_gateway_node_goes_to_its_ground_base_plus_the_id() {
         let links = of(&example("thermostat")).expect("it reads");
         assert_eq!(
             summary(&links),
@@ -316,7 +316,9 @@ mod tests {
                 ("thermostat", 5, "127.0.0.1", 5105),
             ]
         );
-        assert!(links.iter().all(|l| l.via == Via::Moc("moc".to_string())));
+        assert!(links
+            .iter()
+            .all(|l| l.via == Via::Gateway("gateway".to_string())));
 
         let links = of(&example("simple-app")).expect("it reads");
         assert_eq!(summary(&links), vec![("lorem", 1, "127.0.0.1", 5101)]);
@@ -345,15 +347,15 @@ mod tests {
     #[test]
     fn two_sources_on_one_port_are_refused() {
         let mut graph = example("thermostat");
-        // temp_2, id 8, unlinked: 6100 + 8 = 6108; a moc base of 6104 puts
+        // temp_2, id 8, unlinked: 6100 + 8 = 6108; a gateway base of 6104 puts
         // k_1's 6105 ... cabin_temp's 6108 on the same port.
         graph.links.retain(|link| link.origin().node != "temp_2");
-        let moc = graph
+        let gateway = graph
             .nodes
             .iter_mut()
-            .find(|n| n.name == "moc")
-            .expect("moc");
-        moc.attributes.insert(
+            .find(|n| n.name == "gateway")
+            .expect("gateway");
+        gateway.attributes.insert(
             "ground_base".to_string(),
             crate::Scalar::of("127.0.0.1:6104"),
         );
@@ -367,23 +369,23 @@ mod tests {
     #[test]
     fn a_base_with_no_room_is_refused() {
         let mut graph = example("thermostat");
-        let moc = graph
+        let gateway = graph
             .nodes
             .iter_mut()
-            .find(|n| n.name == "moc")
-            .expect("moc");
-        moc.attributes.insert(
+            .find(|n| n.name == "gateway")
+            .expect("gateway");
+        gateway.attributes.insert(
             "ground_base".to_string(),
             crate::Scalar::of("127.0.0.1:65535"),
         );
         let refused = of(&graph).expect_err("port 65536 is not a port");
-        assert_eq!(refused.node.as_deref(), Some("moc"));
+        assert_eq!(refused.node.as_deref(), Some("gateway"));
         assert!(refused.why.contains("65535"), "{}", refused.why);
     }
 
-    /// No section: the moc links stand, and no payload reports on its own.
+    /// No section: the gateway links stand, and no payload reports on its own.
     #[test]
-    fn with_no_section_only_the_moc_links_remain() {
+    fn with_no_section_only_the_gateway_links_remain() {
         let mut graph = example("minimal");
         graph.tcspecial = None;
         assert_eq!(of(&graph), Ok(Vec::new()));

@@ -6,7 +6,7 @@
 //! attribute of which node.
 //!
 //! Three sections of nodes, and they are the three working panes of the
-//! editor: `moc` holds the ground links, `vehicle` holds what the vehicle
+//! editor: `gateway` holds the ground links, `vehicle` holds what the vehicle
 //! itself runs, and `payloads` holds what it carries. A node's type says which
 //! section it belongs in -- see [`Section`] -- and a node written in the wrong
 //! one is refused where the file is read, because a file and a drawing that
@@ -17,7 +17,7 @@
 //! link from this node's `payload-out` terminal to `k_1`, and an entry naming
 //! an `input` as well feeds a named input of the node it reaches. The short
 //! spelling is read too -- `payload-out: k_1`,
-//! `payload-out: [moc, cabin_temp.in0]` -- and means the same thing; see
+//! `payload-out: [gateway, cabin_temp.in0]` -- and means the same thing; see
 //! [`Destinations`].
 //!
 //! So there is no links section, and a node and the links out of it are read,
@@ -53,6 +53,7 @@ pub mod mirror;
 pub mod order;
 pub mod parameters;
 pub mod reach;
+pub mod renamed;
 pub mod simulated;
 pub mod telemetry;
 pub mod terminals;
@@ -140,9 +141,9 @@ pub struct GraphFile {
     /// Sets of payloads read on one interval.
     #[serde(default)]
     pub payload_groups: Vec<Group>,
-    /// The ground links: what the editor's moc working pane holds.
+    /// The ground links: what the editor's gateway working pane holds.
     #[serde(default)]
-    pub moc: Vec<NodeFile>,
+    pub gateway: Vec<NodeFile>,
     /// What the vehicle itself runs: computations, logs, pass-throughs, pages.
     #[serde(default)]
     pub vehicle: Vec<NodeFile>,
@@ -240,7 +241,7 @@ pub struct Placed {
 /// be read as "here is the vehicle, and here is what it is carrying".
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Section {
-    Moc,
+    Gateway,
     Vehicle,
     Payloads,
 }
@@ -250,10 +251,10 @@ impl Section {
     ///
     /// # Returns
     ///
-    /// `moc`, `vehicle` or `payloads`.
+    /// `gateway`, `vehicle` or `payloads`.
     pub fn name(self) -> &'static str {
         match self {
-            Section::Moc => "moc",
+            Section::Gateway => "gateway",
             Section::Vehicle => "vehicle",
             Section::Payloads => "payloads",
         }
@@ -263,9 +264,9 @@ impl Section {
 /// Says which section a node of this type belongs in.
 ///
 /// The one statement of the rule, read by the file reader and by the editor's
-/// panes: a payload is something the vehicle carries, `moc` is the ground link,
-/// and everything else -- a computation, a log, a pass-through, a page of its
-/// own -- is the vehicle's own. A type this build does not know is the
+/// panes: a payload is something the vehicle carries, `gateway` is the ground
+/// link, and everything else -- a computation, a log, a pass-through, a page of
+/// its own -- is the vehicle's own. A type this build does not know is the
 /// vehicle's: it is refused by name elsewhere, and the vehicle pane is the one
 /// a reader looks at first.
 ///
@@ -280,7 +281,7 @@ pub fn section_of(node_type: &str) -> Section {
     if Node::is_payload_type(node_type) {
         Section::Payloads
     } else if crate::gateway::is_gateway(node_type) {
-        Section::Moc
+        Section::Gateway
     } else {
         Section::Vehicle
     }
@@ -294,9 +295,9 @@ pub fn section_of(node_type: &str) -> Section {
 const VEHICLE_TYPES: &[&str] = &[
     "compute",
     "log",
-    "null-moc",
+    "null-gateway",
     "null-payload",
-    "tee-moc",
+    "tee-gateway",
     "tee-payload",
     "ping",
 ];
@@ -316,7 +317,7 @@ const VEHICLE_TYPES: &[&str] = &[
 ///
 /// # Returns
 ///
-/// The types, as a file spells them; for `moc`, only the gateway kinds this
+/// The types, as a file spells them; for `gateway`, only the gateway kinds this
 /// build has.
 pub fn types_in(section: Section) -> Vec<&'static str> {
     use crate::node::app::Kind;
@@ -327,7 +328,7 @@ pub fn types_in(section: Section) -> Vec<&'static str> {
             .map(|kind| kind.node_type())
     };
     match section {
-        Section::Moc => crate::gateway::GatewayKind::ALL
+        Section::Gateway => crate::gateway::GatewayKind::ALL
             .into_iter()
             .filter(|kind| kind.is_built())
             .filter_map(|kind| kind.node_type())
@@ -345,7 +346,7 @@ pub fn types_in(section: Section) -> Vec<&'static str> {
 
 /// Whether there is a node type of this name.
 pub fn is_node_type(node_type: &str) -> bool {
-    [Section::Moc, Section::Vehicle, Section::Payloads]
+    [Section::Gateway, Section::Vehicle, Section::Payloads]
         .into_iter()
         .any(|section| types_in(section).contains(&node_type))
 }
@@ -433,8 +434,8 @@ pub struct NodeFile {
     /// Where this node's groundward data goes: the sinks its `payload-out`
     /// reaches.
     pub payload_out: Vec<String>,
-    /// And its vehicleward data: the sinks its `moc-out` reaches.
-    pub moc_out: Vec<String>,
+    /// And its vehicleward data: the sinks its `gateway-out` reaches.
+    pub gateway_out: Vec<String>,
     /// Whether a line arrives at this node's `payload-in` sink, as the entry
     /// says so.
     ///
@@ -445,8 +446,8 @@ pub struct NodeFile {
     /// and `Some(false)` one saying none does, and either is refused where the
     /// links say otherwise.
     pub payload_in: Option<bool>,
-    /// And whether one arrives at its `moc-in` sink.
-    pub moc_in: Option<bool>,
+    /// And whether one arrives at its `gateway-in` sink.
+    pub gateway_in: Option<bool>,
 }
 
 impl NodeFile {
@@ -463,7 +464,7 @@ impl NodeFile {
         let mut links = Vec::new();
         for (terminal, destinations) in [
             ("payload-out", &self.payload_out),
-            ("moc-out", &self.moc_out),
+            ("gateway-out", &self.gateway_out),
         ] {
             if destinations.is_empty() {
                 continue;
@@ -482,8 +483,16 @@ impl NodeFile {
     /// The mirror of [`NodeFile::links`], and deliberately not links: this is
     /// a record of links written elsewhere, and a record read as a link would
     /// be the same connection in the graph twice.
+    ///
+    /// # Returns
+    ///
+    /// Each sink's terminal and what the entry said of it, `None` for
+    /// nothing.
     pub fn arriving(&self) -> Vec<(&'static str, Option<bool>)> {
-        vec![("payload-in", self.payload_in), ("moc-in", self.moc_in)]
+        vec![
+            ("payload-in", self.payload_in),
+            ("gateway-in", self.gateway_in),
+        ]
     }
 }
 
@@ -521,9 +530,9 @@ impl<'de> Deserialize<'de> for NodeFile {
 
                 let mut attributes: BTreeMap<String, Scalar> = BTreeMap::new();
                 let mut payload_out: Vec<String> = Vec::new();
-                let mut moc_out: Vec<String> = Vec::new();
+                let mut gateway_out: Vec<String> = Vec::new();
                 let mut payload_in: Option<bool> = None;
-                let mut moc_in: Option<bool> = None;
+                let mut gateway_in: Option<bool> = None;
                 let mut lists: BTreeMap<String, Vec<String>> = BTreeMap::new();
 
                 while let Some(key) = map.next_key::<String>()? {
@@ -571,7 +580,7 @@ impl<'de> Deserialize<'de> for NodeFile {
                                 .into_iter()
                                 .map(str::to_string),
                         ),
-                        "moc-out" => moc_out.extend(
+                        "gateway-out" => gateway_out.extend(
                             map.next_value::<Destinations>()?
                                 .each()
                                 .into_iter()
@@ -584,7 +593,9 @@ impl<'de> Deserialize<'de> for NodeFile {
                         "payload-in" => {
                             payload_in = Some(said_so("payload-in", &mut map)?)
                         }
-                        "moc-in" => moc_in = Some(said_so("moc-in", &mut map)?),
+                        "gateway-in" => {
+                            gateway_in = Some(said_so("gateway-in", &mut map)?)
+                        }
                         // A list of alternatives, each a run of bytes: a YAML
                         // list, or a repeated XML element, whose repeats add
                         // to it as payload-out's do. See `Listed`.
@@ -646,9 +657,9 @@ impl<'de> Deserialize<'de> for NodeFile {
                         attributes,
                     },
                     payload_out,
-                    moc_out,
+                    gateway_out,
                     payload_in,
-                    moc_in,
+                    gateway_in,
                 })
             }
         }
@@ -675,7 +686,7 @@ impl Group {
     }
 }
 
-/// One node: a device, a MOC link, a compute element or a sink.
+/// One node: a device, a gateway link, a compute element or a sink.
 #[derive(Debug, Clone, Deserialize, PartialEq)]
 pub struct Node {
     pub name: String,
@@ -772,7 +783,7 @@ impl Link {
 ///
 /// ```yaml
 /// payload-out:
-///   - target: moc
+///   - target: gateway
 ///   - target: cabin_temp
 ///     input: in0
 /// ```
@@ -783,13 +794,13 @@ impl Link {
 /// input. In XML the same thing is a repeated `<payload-out>` with `<target>`
 /// in it.
 ///
-/// The short spellings are still read: `payload-out: moc` and
-/// `payload-out: [moc, cabin_temp.in0]`, the node and its input separated by a
-/// dot. Every configuration written before entries existed says what it said,
-/// and a link to one place is a line somebody can still write in a line. All of
-/// them read into the same thing -- a destination as `node` or `node.input` --
-/// because every rule about a link is about where it goes and not about how the
-/// file said so.
+/// The short spellings are still read: `payload-out: gateway` and
+/// `payload-out: [gateway, cabin_temp.in0]`, the node and its input separated
+/// by a dot. Every configuration written before entries existed says what it
+/// said, and a link to one place is a line somebody can still write in a line.
+/// All of them read into the same thing -- a destination as `node` or
+/// `node.input` -- because every rule about a link is about where it goes and
+/// not about how the file said so.
 ///
 /// Read by hand rather than as an untagged enum, for the reason [`Scalar`]
 /// exists: a value written as an XML child element does not arrive as a
@@ -848,8 +859,8 @@ impl<'de> Deserialize<'de> for Destinations {
                 Ok(Destinations(all))
             }
 
-            /// One entry -- `{ target: moc }` -- or one XML element with text
-            /// in it: `<payload-out>moc</payload-out>`.
+            /// One entry -- `{ target: gateway }` -- or one XML element with
+            /// text in it: `<payload-out>gateway</payload-out>`.
             fn visit_map<A: MapAccess<'de>>(
                 self,
                 map: A,
@@ -1033,9 +1044,9 @@ fn said_so<'de, A: serde::de::MapAccess<'de>>(
 /// Two shapes arrive here. An entry -- `{ target: cabin_temp, input: in0 }` --
 /// which is what the editor writes and what a person writing a link by hand
 /// now has to write for a link to a named input. And an XML element with text
-/// in it, `<payload-out>moc</payload-out>`, which quick-xml hands over as a map
-/// of one entry whose value is the text: the short spelling, in the language
-/// where it does not arrive as a string.
+/// in it, `<payload-out>gateway</payload-out>`, which quick-xml hands over as a
+/// map of one entry whose value is the text: the short spelling, in the
+/// language where it does not arrive as a string.
 ///
 /// Told apart by `target`, which the entry form always has. A mapping with
 /// neither `target` nor exactly one entry is refused rather than guessed at,
@@ -1076,7 +1087,7 @@ fn written_as<'de, A: serde::de::MapAccess<'de>>(
             }
             // What XML calls the text of an element, which is how the short
             // spelling arrives in that language:
-            // `<payload-out>moc</payload-out>`.
+            // `<payload-out>gateway</payload-out>`.
             "$text" => {
                 text = Some(map.next_value::<Scalar>()?.as_str().to_string())
             }
@@ -1118,9 +1129,10 @@ fn written_as<'de, A: serde::de::MapAccess<'de>>(
 
 /// Which node and which input a destination names.
 ///
-/// `cabin_temp.in0` is the `in0` input of `cabin_temp`; `moc` is a node that
-/// takes one input and does not name it. The separator is a dot because a node
-/// name cannot contain one and an input name cannot either, which is checked.
+/// `cabin_temp.in0` is the `in0` input of `cabin_temp`; `gateway` is a node
+/// that takes one input and does not name it. The separator is a dot because a
+/// node name cannot contain one and an input name cannot either, which is
+/// checked.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Destination {
     pub node: String,
@@ -1166,7 +1178,7 @@ impl Destination {
 #[derive(Debug, Clone, Deserialize, PartialEq, Eq)]
 #[serde(deny_unknown_fields)]
 pub struct CommandBinding {
-    /// The MOC node the command arrives on.
+    /// The gateway node the command arrives on.
     pub from: String,
     /// What it sets, as `node.attribute`.
     pub sets: String,
@@ -1337,7 +1349,7 @@ impl Graph {
     ) -> TcsResult<()> {
         let first = self.nodes.len();
         for (section, nodes) in [
-            (Section::Moc, &file.moc),
+            (Section::Gateway, &file.gateway),
             (Section::Vehicle, &file.vehicle),
             (Section::Payloads, &file.payloads),
         ] {
@@ -1434,6 +1446,12 @@ fn read_one(path: &Path) -> TcsResult<GraphFile> {
         return Err(TcsError::Config(format!("{}: {gone}", path.display())));
     }
 
+    // A word that was renamed, refused by its line and told the word it is
+    // now, before serde can call it a field nobody has heard of.
+    if let Some(why) = renamed::refused(&text, format) {
+        return Err(TcsError::Config(format!("{}: {why}", path.display())));
+    }
+
     let file: GraphFile = format
         .parse(&text)
         .map_err(|e| TcsError::Config(format!("{}: {e}", path.display())))?;
@@ -1446,8 +1464,8 @@ fn read_one(path: &Path) -> TcsResult<GraphFile> {
         (
             "nodes",
             file.nodes.is_some(),
-            "a node is written under moc, vehicle or payloads, according to \
-             what it is",
+            "a node is written under gateway, vehicle or payloads, according \
+             to what it is",
         ),
         (
             "links",
@@ -1771,14 +1789,15 @@ mod tests {
     /// spelling is a word where it was written.
     #[test]
     fn spelled_offers_the_other_spelling_only_where_it_is_real() {
-        let known = |name: &str| ["max_length", "app-moc-arg"].contains(&name);
+        let known =
+            |name: &str| ["max_length", "app-gateway-arg"].contains(&name);
         assert_eq!(
             spelled("max-length", known).as_deref(),
             Some("it is spelled max_length")
         );
         assert_eq!(
-            spelled("app_moc_arg", known).as_deref(),
-            Some("it is spelled app-moc-arg")
+            spelled("app_gateway_arg", known).as_deref(),
+            Some("it is spelled app-gateway-arg")
         );
         assert_eq!(spelled("max-lenght", known), None, "a misspelling");
         assert_eq!(spelled("max_length", known), None, "itself is no hint");
@@ -1790,7 +1809,7 @@ mod tests {
     #[test]
     fn each_type_is_in_the_section_it_belongs_in() {
         let mut seen = std::collections::BTreeSet::new();
-        for section in [Section::Moc, Section::Vehicle, Section::Payloads] {
+        for section in [Section::Gateway, Section::Vehicle, Section::Payloads] {
             for node_type in types_in(section) {
                 assert!(seen.insert(node_type), "{node_type} is listed twice");
                 assert_eq!(section_of(node_type), section, "{node_type}");
@@ -1997,8 +2016,8 @@ mod tests {
     /// A destination names a node, and an input where it says one.
     #[test]
     fn a_destination_may_name_an_input() {
-        let plain = Destination::parse("moc");
-        assert_eq!(plain.node, "moc");
+        let plain = Destination::parse("gateway");
+        assert_eq!(plain.node, "gateway");
         assert_eq!(plain.input, None);
 
         let named = Destination::parse("cabin_temp.in0");
@@ -2129,8 +2148,8 @@ tcspecial:
     send: \"0.0.0.0:5550\"
     recv: \"\
              127.0.0.1:5650\"
-moc:
-  - { name: moc, type: moc, address: \"\
+gateway:
+  - { name: gateway, type: gateway_radio, address: \"\
              10.0.0.1\", port: \"5000\", ground_base: \"10.0.0.2:5100\" }
 ",
         )
@@ -2143,7 +2162,7 @@ moc:
             where_.path().join("cabin.yaml"),
             "payloads:\n  \
              - { name: cabin_sensor, type: i2c, path: \"/dev/i2c-1\", \
-             address: \"0x48\", payload-out: moc }\n",
+             address: \"0x48\", payload-out: gateway }\n",
         )
         .unwrap();
 
@@ -2158,7 +2177,7 @@ moc:
         // Which file each node came from, so the digest can cover the set and
         // a complaint can say where to look.
         assert!(graph.homes["cabin_sensor"].ends_with("cabin.yaml"));
-        assert!(graph.homes["moc"].ends_with("vehicle.yaml"));
+        assert!(graph.homes["gateway"].ends_with("vehicle.yaml"));
 
         // And a link across the boundary is sound, which is what including a
         // file is for.
@@ -2262,26 +2281,26 @@ moc:
             "name: k_1
 type: compute
 payload-out:
-  - target: moc
+  - target: gateway
   - target: cabin_temp
     input: in0
 ",
         )
         .expect("entries");
-        assert_eq!(said.payload_out, vec!["moc", "cabin_temp.in0"]);
+        assert_eq!(said.payload_out, vec!["gateway", "cabin_temp.in0"]);
 
         // One entry on its own needs no list, as one destination needs no
         // list.
         let one: NodeFile = serde_norway::from_str(
-            "name: a\ntype: compute\npayload-out: { target: moc }\n",
+            "name: a\ntype: compute\npayload-out: { target: gateway }\n",
         )
         .expect("one entry");
-        assert_eq!(one.payload_out, vec!["moc"]);
+        assert_eq!(one.payload_out, vec!["gateway"]);
     }
 
     /// A misspelled word in an entry is refused, not ignored.
     ///
-    /// `targte: moc` read as an entry naming nothing is a link that quietly
+    /// `targte: gateway` read as an entry naming nothing is a link that quietly
     /// goes nowhere, which is the kind of fault a configuration file exists to
     /// make impossible.
     #[test]
@@ -2289,7 +2308,7 @@ payload-out:
         let said = format!(
             "{}",
             serde_norway::from_str::<NodeFile>(
-                "name: a\ntype: compute\npayload-out:\n  - targte: moc\n"
+                "name: a\ntype: compute\npayload-out:\n  - targte: gateway\n"
             )
             .expect_err("a misspelling is refused")
         );

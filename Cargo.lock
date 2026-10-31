@@ -226,7 +226,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "app_moc_veh"
+name = "app_gateway_veh"
 version = "0.1.0"
 dependencies = [
  "tcsapp",

@@ -36,17 +36,17 @@
     </tcspecial>
     <!-- The ground's end of the link, both ways. What the ground sends goes
          up to address:port, which this node binds aboard, and leaves it by
-         moc-out for the tee. What comes down arrives at ground_base plus the
-         device id of the node that sent it. -->
-    <moc>
+         gateway-out for the tee. What comes down arrives at ground_base plus
+         the device id of the node that sent it. -->
+    <gateway>
         <name>ground</name>
-        <type>moc</type>
+        <type>gateway_radio</type>
         <address>127.0.0.1</address>
         <port>8600</port>
         <ground_base>127.0.0.1:8700</ground_base>
         <payload-in>true</payload-in>
-        <moc-out><target>echo</target></moc-out>
-    </moc>
+        <gateway-out><target>echo</target></gateway-out>
+    </gateway>
     <!-- A heater, driven by what the ground sends: the far end of a UDP
          socket. -->
     <payloads>
@@ -55,7 +55,7 @@
         <protocol>udp</protocol>
         <address>127.0.0.1</address>
         <port>8001</port>
-        <moc-in>true</moc-in>
+        <gateway-in>true</gateway-in>
     </payloads>
     <!-- A sensor whose readings go to the ground and are copied aboard. -->
     <payloads>
@@ -81,9 +81,9 @@
          names its own. -->
     <vehicle>
         <name>echo</name>
-        <type>tee-moc</type>
-        <moc-in>true</moc-in>
-        <moc-out><target>heater</target></moc-out>
+        <type>tee-gateway</type>
+        <gateway-in>true</gateway-in>
+        <gateway-out><target>heater</target></gateway-out>
         <payload-out><target>ground</target></payload-out>
     </vehicle>
     <!-- Each reading goes on to the ground, as it was going, and again
@@ -94,13 +94,13 @@
         <type>tee-payload</type>
         <payload-in>true</payload-in>
         <payload-out><target>ground</target></payload-out>
-        <moc-out><target>dropped</target></moc-out>
+        <gateway-out><target>dropped</target></gateway-out>
     </vehicle>
     <!-- Takes what arrives from the ground's side and drops it. -->
     <vehicle>
         <name>dropped</name>
-        <type>null-moc</type>
-        <moc-in>true</moc-in>
+        <type>null-gateway</type>
+        <gateway-in>true</gateway-in>
     </vehicle>
     <!-- Takes the spare payload's data and drops it. -->
     <vehicle>

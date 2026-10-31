@@ -218,8 +218,10 @@ fn no_text_is_set_smaller_than_the_one_size() {
         }
     }
 
-    for python in ["python/tcsui/beacon_panel.py", "examples/ping/ping_moc.py"]
-    {
+    for python in [
+        "python/tcsui/beacon_panel.py",
+        "examples/ping/ping_gateway.py",
+    ] {
         let text =
             std::fs::read_to_string(root().join(python)).expect("it reads");
         for (at, line) in text.lines().enumerate() {

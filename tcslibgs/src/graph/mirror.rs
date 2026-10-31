@@ -203,14 +203,14 @@ mod tests {
     /// Loads a configuration of one payload and the ground, with whatever the
     /// two entries are given to say about their own data sinks.
     ///
-    /// The groundward link is the payload's `payload-out: moc` and the
-    /// vehicleward one is the ground's `moc-out: payload`, so the flags that
-    /// agree with them are `payload-in: true` on the ground and `moc-in: true`
-    /// on the payload.
+    /// The groundward link is the payload's `payload-out: gateway` and the
+    /// vehicleward one is the ground's `gateway-out: payload`, so the flags
+    /// that agree with them are `payload-in: true` on the ground and
+    /// `gateway-in: true` on the payload.
     ///
     /// # Arguments
     ///
-    /// * `moc_says`     - Lines added to the ground's entry.
+    /// * `gateway_says` - Lines added to the ground's entry.
     /// * `payload_says` - Lines added to the payload's entry.
     ///
     /// # Returns
@@ -224,7 +224,7 @@ mod tests {
     /// # Panics
     ///
     /// If the file cannot be written.
-    fn pair(moc_says: &str, payload_says: &str) -> TcsResult<Graph> {
+    fn pair(gateway_says: &str, payload_says: &str) -> TcsResult<Graph> {
         let where_ = tempfile::tempdir().expect("a directory");
         let path = where_.path().join("vehicle.yaml");
         std::fs::write(
@@ -247,14 +247,14 @@ mod tests {
     reset_interval: 5 s
     send: \"0.0.0.0:5550\"
     recv: \"127.0.0.1:5650\"
-moc:
-  - name: moc
-    type: moc
+gateway:
+  - name: gateway
+    type: gateway_radio
     address: \"10.0.0.1\"
     port: \"5000\"
-    moc-out:
+    gateway-out:
       - target: payload
-{moc_says}
+{gateway_says}
 payloads:
   - name: payload
     type: i2c
@@ -262,7 +262,7 @@ payloads:
     address: \"0x48\"
     read_size: \"2\"
     payload-out:
-      - target: moc
+      - target: gateway
 {payload_says}
 "
             ),
@@ -275,7 +275,7 @@ payloads:
     /// that reads.
     #[test]
     fn a_flag_that_agrees_with_the_links_is_read() {
-        let graph = pair("    payload-in: true", "    moc-in: true")
+        let graph = pair("    payload-in: true", "    gateway-in: true")
             .expect("both ends saying the same thing");
         assert_eq!(graph.links.len(), 2, "the flags are not links");
     }
@@ -298,7 +298,7 @@ payloads:
             "{}",
             pair(
                 "    payload-in: true",
-                "    moc-in: true\n    payload-in: true"
+                "    gateway-in: true\n    payload-in: true"
             )
             .expect_err("a payload has no payload-in")
         );
@@ -313,11 +313,11 @@ payloads:
             "{}",
             pair(
                 "    payload-in: true",
-                "    moc-in: true\nvehicle:\n  - name: through\n    type: \
-                 null-moc\n    \
-                 moc-in: true",
+                "    gateway-in: true\nvehicle:\n  - name: through\n    type: \
+                 null-gateway\n    \
+                 gateway-in: true",
             )
-            .expect_err("nothing sends the null-moc node anything")
+            .expect_err("nothing sends the null-gateway node anything")
         );
         assert!(said.contains("none does"), "{said}");
         assert!(said.contains("\"through\""), "{said}");
@@ -331,7 +331,7 @@ payloads:
     fn a_sink_that_denies_a_line_it_is_sent_is_refused() {
         let said = format!(
             "{}",
-            pair("    payload-in: false", "    moc-in: true")
+            pair("    payload-in: false", "    gateway-in: true")
                 .expect_err("the payload sends its readings there")
         );
         assert!(said.contains("\"payload\" sends one there"), "{said}");
@@ -340,9 +340,9 @@ payloads:
     /// `false` where nothing arrives is true, and reads.
     #[test]
     fn a_sink_that_denies_a_line_nobody_sends_is_read() {
-        pair("    payload-in: true", "    moc-in: false")
+        pair("    payload-in: true", "    gateway-in: false")
             .expect_err("the ground sends the payload what it asks with");
-        pair("    payload-in: true", "    moc-in: true")
+        pair("    payload-in: true", "    gateway-in: true")
             .expect("and says so when it says so");
     }
 
@@ -356,7 +356,7 @@ payloads:
     fn a_sink_given_a_name_instead_of_a_flag_is_refused() {
         let said = format!(
             "{}",
-            pair("    payload-in: payload", "    moc-in: true")
+            pair("    payload-in: payload", "    gateway-in: true")
                 .expect_err("a name is not a flag")
         );
         assert!(said.contains("is not true or false"), "{said}");

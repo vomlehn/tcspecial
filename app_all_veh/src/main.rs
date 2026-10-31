@@ -2,12 +2,12 @@
 //!
 //! The node type `app_all_veh`. Having both, it is the one kind that can carry
 //! a stream *through*: payload data read on the first interface is written as
-//! payload data on the second, and MOC data read on the second is written as
-//! MOC data on the first. Which makes it a pass-through for both streams,
-//! written as a program -- and that is what makes it the one to test with,
-//! because a packet put in at either end comes out at the other and nothing
-//! else does. An app that crossed the two streams would pass an echo test and
-//! fail this one.
+//! payload data on the second, and gateway data read on the second is written
+//! as gateway data on the first. Which makes it a pass-through for both
+//! streams, written as a program -- and that is what makes it the one to test
+//! with, because a packet put in at either end comes out at the other and
+//! nothing else does. An app that crossed the two streams would pass an echo
+//! test and fail this one.
 //!
 //! One thread per stream, because both interfaces are read and a program
 //! waiting on the one is not waiting on the other. Each thread reads one
@@ -23,7 +23,7 @@ use std::thread;
 
 use tcsapp::app::{complain, AppAllVeh, Errors};
 
-/// Carries payload data from the first interface to the second and MOC data
+/// Carries payload data from the first interface to the second and gateway data
 /// from the second to the first, one thread per stream, until both end.
 ///
 /// # Returns
@@ -42,9 +42,9 @@ fn main() -> ExitCode {
     let AppAllVeh {
         name,
         payload_arg: _,
-        moc_arg: _,
+        gateway_arg: _,
         mut payload,
-        mut moc,
+        mut gateway,
         mut errors,
     } = app;
 
@@ -52,10 +52,10 @@ fn main() -> ExitCode {
     // for the complaints of each: a clone that cannot be made is a program
     // that cannot do half its work, which is said now rather than on the first
     // packet that needs it.
-    let (mut writes_moc, mut writes_payload, mut other_errors) =
-        match (payload.try_clone(), moc.try_clone(), errors.try_clone()) {
-            (Ok(writes_moc), Ok(writes_payload), Ok(other_errors)) => {
-                (writes_moc, writes_payload, other_errors)
+    let (mut writes_gateway, mut writes_payload, mut other_errors) =
+        match (payload.try_clone(), gateway.try_clone(), errors.try_clone()) {
+            (Ok(writes_gateway), Ok(writes_payload), Ok(other_errors)) => {
+                (writes_gateway, writes_payload, other_errors)
             }
             _ => {
                 let _ = errors.say(&format!(
@@ -79,9 +79,9 @@ fn main() -> ExitCode {
     // And vehicleward: what the ground sent, on its way in.
     let vehicleward = thread::spawn(move || {
         carry(
-            "MOC data",
-            || moc.read_moc(),
-            |data| writes_moc.write_moc(data),
+            "gateway data",
+            || gateway.read_gateway(),
+            |data| writes_gateway.write_gateway(data),
             &mut other_errors,
         )
     });

@@ -66,12 +66,13 @@ pub fn save(settings: Settings) {
     let Some(path) = path() else {
         return;
     };
-    let (moc, vehicle) = shares(settings.moc_percent, settings.vehicle_percent);
-    let (list_moc, list_vehicle) =
-        shares(settings.list_moc_percent, settings.list_vehicle_percent);
+    let (gateway, vehicle) =
+        shares(settings.gateway_percent, settings.vehicle_percent);
+    let (list_gateway, list_vehicle) =
+        shares(settings.list_gateway_percent, settings.list_vehicle_percent);
     if let Err(why) = crate::save::write_atomically(
         &path,
-        written(moc, vehicle, list_moc, list_vehicle).as_bytes(),
+        written(gateway, vehicle, list_gateway, list_vehicle).as_bytes(),
     ) {
         eprintln!("tcsgui: {} cannot be written: {why}", path.display());
     }
@@ -109,12 +110,12 @@ mod tests {
 
         // And a round trip through the file itself.
         save(Settings {
-            moc_percent: 20,
+            gateway_percent: 20,
             vehicle_percent: 40,
-            list_moc_percent: 15,
+            list_gateway_percent: 15,
             list_vehicle_percent: 45,
         });
-        assert_eq!(load().moc_percent, 20);
+        assert_eq!(load().gateway_percent, 20);
         assert_eq!(load().vehicle_percent, 40);
 
         // A file nobody can make sense of leaves the defaults standing.
@@ -135,14 +136,14 @@ mod tests {
             ),
         )
         .expect("a file");
-        assert_eq!(load().vehicle_percent, 30 - DEFAULT_MOC);
+        assert_eq!(load().vehicle_percent, 30 - DEFAULT_GATEWAY);
         assert!(
             path.exists(),
             "the value should be carried into the new name"
         );
         assert_eq!(
             load().vehicle_percent,
-            30 - DEFAULT_MOC,
+            30 - DEFAULT_GATEWAY,
             "and read from it afterwards"
         );
         assert!(
@@ -153,7 +154,7 @@ mod tests {
         // The current name wins where both are there, it being the one that
         // is written.
         save(Settings {
-            moc_percent: DEFAULT_MOC,
+            gateway_percent: DEFAULT_GATEWAY,
             vehicle_percent: 60,
             ..Settings::default()
         });

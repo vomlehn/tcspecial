@@ -15,8 +15,8 @@ about: >
   nothing.
 payload-sink: false
 payload-source: true
-moc-sink: false
-moc-source: false
+gateway-sink: false
+gateway-source: false
 attributes:
   - name: executable
     required: true

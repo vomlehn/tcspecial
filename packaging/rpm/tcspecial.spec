@@ -35,7 +35,7 @@ fi
 /opt/tcs/bin/tcsverify
 /opt/tcs/libexec/app_pl
 /opt/tcs/libexec/app_all_pl
-/opt/tcs/libexec/app_moc_veh
+/opt/tcs/libexec/app_gateway_veh
 /opt/tcs/libexec/app_payload_veh
 /opt/tcs/libexec/app_all_veh
 %doc /opt/tcs/share/doc/tcspecial

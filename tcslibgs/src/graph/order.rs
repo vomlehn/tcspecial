@@ -16,7 +16,7 @@ use crate::error::{TcsError, TcsResult};
 use crate::format::ConfigFormat;
 
 /// The sections a node is written under.
-const SECTIONS: &[&str] = &["moc", "vehicle", "payloads"];
+const SECTIONS: &[&str] = &["gateway", "vehicle", "payloads"];
 
 /// Lists the names of the nodes a file declares, in the order it declares
 /// them.
@@ -163,7 +163,7 @@ mod tests {
         (dir, path)
     }
 
-    /// YAML: the sections in the order they are written, not moc first.
+    /// YAML: the sections in the order they are written, not gateway first.
     #[test]
     fn yaml_sections_are_in_the_order_written() {
         let (_dir, path) = written(
@@ -171,8 +171,8 @@ mod tests {
             "payloads:
   - { name: p1, type: i2c }
   - { name: p2, type: i2c }
-moc:
-  - { name: m, type: moc }
+gateway:
+  - { name: m, type: gateway_radio }
 vehicle:
   - { name: v, type: \"null\" }
 ",
@@ -188,7 +188,7 @@ vehicle:
             "<?xml version=\"1.0\"?>
 <configuration>
     <payloads><name>p1</name><type>i2c</type></payloads>
-    <moc><name>m</name><type>moc</type></moc>
+    <gateway><name>m</name><type>gateway_radio</type></gateway>
     <payloads><name>p2</name><type>i2c</type></payloads>
     <tcsgui><nodes><name>p1</name><x>0</x><y>0</y></nodes></tcsgui>
 </configuration>

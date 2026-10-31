@@ -56,8 +56,8 @@ pub struct NodeLook {
     pub faulty: bool,
     pub summary: String,
     pub openable: bool,
-    pub moc_in: TerminalLook,
-    pub moc_out: TerminalLook,
+    pub gateway_in: TerminalLook,
+    pub gateway_out: TerminalLook,
     pub payload_in: TerminalLook,
     pub payload_out: TerminalLook,
     pub terminal_column: f32,
@@ -175,8 +175,8 @@ pub fn node_look(
         // this build does not know has none: the shape already says it cannot
         // be placed, and four arrows on it would be four claims about a type
         // nothing here can describe.
-        moc_in: terminal_look("moc-in", terminals, outline, size, at),
-        moc_out: terminal_look("moc-out", terminals, outline, size, at),
+        gateway_in: terminal_look("gateway-in", terminals, outline, size, at),
+        gateway_out: terminal_look("gateway-out", terminals, outline, size, at),
         payload_in: terminal_look("payload-in", terminals, outline, size, at),
         payload_out: terminal_look("payload-out", terminals, outline, size, at),
         // The column the name is padded away from, plus whatever the outline
@@ -344,8 +344,8 @@ pub fn ends(nodes: &[OnSheet], line: &LineOnSheet) -> route::Ends {
         style::attachment(node.node_type, node.at, terminal)
     };
     // Which data sink the line arrives at, where the link does not say. The
-    // one that pairs with the source it left: a link leaving `moc-out`
-    // arrives at a `moc-in`, that being the same stream named at its other
+    // one that pairs with the source it left: a link leaving `gateway-out`
+    // arrives at a `gateway-in`, that being the same stream named at its other
     // end -- see tcslibgs::graph::terminals::answers. Without this the drawing
     // fell back to the groundward sink whatever the link carried, so a command
     // from the ground was drawn arriving at the corner the readings leave by.

@@ -161,7 +161,7 @@ class WindowTest(unittest.TestCase):
         import tkinter as tk
         from tkinter import ttk
 
-        import ping_moc
+        import ping_gateway
 
         vehicle = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
         vehicle.bind(("127.0.0.1", 0))
@@ -230,7 +230,7 @@ class WindowTest(unittest.TestCase):
 
         tk.Tk.mainloop = mainloop
         try:
-            ping_moc.run_the_window(None, NoBeacons(), pinger)
+            ping_gateway.run_the_window(None, NoBeacons(), pinger)
         finally:
             tk.Tk.mainloop = original
             pinger.close()

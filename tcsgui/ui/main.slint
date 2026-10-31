@@ -352,7 +352,7 @@ component Surface inherits Rectangle {
     // configuration rather than about a window, and they are checked by tests
     // there. Stating the divider in this file as well would be stating it
     // twice.
-    in property <[PaletteEntry]> moc-palette: [];
+    in property <[PaletteEntry]> gateway-palette: [];
     in property <[PaletteEntry]> vehicle-palette: [];
     in property <[PaletteEntry]> payload-palette: [];
     in property <length> payload-divider: 0px;
@@ -370,7 +370,7 @@ component Surface inherits Rectangle {
     // two. From Rust -- see tcsdiagram::style::Ground -- for the reason the
     // tints come from there: what a colour means is a rule with tests on it,
     // and this file paints.
-    in property <color> moc-ground: white;
+    in property <color> gateway-ground: white;
     in property <color> vehicle-ground: white;
     in property <color> payload-ground: white;
 
@@ -422,10 +422,10 @@ component Surface inherits Rectangle {
     // this much. Two callbacks and not one with a name in it: which divider
     // moved is known where the gesture happened, and a string crossing the
     // boundary would be a name to keep in step in two files.
-    // How the selection column is divided, as the moc and vehicle lists'
+    // How the selection column is divided, as the gateway and vehicle lists'
     // shares of it, the payload list taking what is left. From Rust, where the
     // settings file keeps them: see tcsgui::Views::lists.
-    in property <int> moc-list-percent: 20;
+    in property <int> gateway-list-percent: 20;
     in property <int> vehicle-list-percent: 35;
     // And the two lines between the lists, dragged: how far it went and how
     // tall the whole column is. See tcsgui::drag_list_divider.
@@ -569,16 +569,18 @@ component Surface inherits Rectangle {
             // what somebody chose and what the settings file keeps.
             //
             // Top to bottom in the order the working panes are left to right --
-            // payloads, vehicle, moc -- so the two readings of the same rule
-            // agree. The payload list takes what is left, being the longest:
-            // ten of the fifteen types are payloads.
+            // payloads, vehicle, gateway -- so the two readings of the same
+            // rule agree. The payload list takes what is left, being the
+            // longest: ten of the fifteen types are payloads.
             lists := Rectangle {
                 width: 180px;
                 // What the shares are of. Named so the dividers can report it:
                 // see ListDivider.
                 property <length> whole: self.height;
-                property <length> payload-tall: whole - moc-tall - vehicle-tall;
-                property <length> moc-tall: whole * root.moc-list-percent / 100;
+                property <length> payload-tall:
+                    whole - gateway-tall - vehicle-tall;
+                property <length> gateway-tall:
+                    whole * root.gateway-list-percent / 100;
                 property <length> vehicle-tall:
                     whole * root.vehicle-list-percent / 100;
 
@@ -628,10 +630,10 @@ component Surface inherits Rectangle {
                     x: 0;
                     y: lists.payload-tall + lists.vehicle-tall;
                     width: 100%;
-                    height: lists.moc-tall;
-                    heading: "MOC node types";
-                    ground: root.moc-ground;
-                    palette: root.moc-palette;
+                    height: lists.gateway-tall;
+                    heading: "Gateway node types";
+                    ground: root.gateway-ground;
+                    palette: root.gateway-palette;
                     place-node(name, t, sets) => {
                         root.place-node(name, t, sets);
                     }
@@ -677,7 +679,7 @@ component Surface inherits Rectangle {
                         vehicle-divider: root.vehicle-divider;
                         payload-ground: root.payload-ground;
                         vehicle-ground: root.vehicle-ground;
-                        moc-ground: root.moc-ground;
+                        gateway-ground: root.gateway-ground;
                     }
 
 
@@ -1096,7 +1098,7 @@ export component MainWindow inherits Window {
     // configuration rather than about a window, and they are checked by tests
     // there. Stating the divider in this file as well would be stating it
     // twice.
-    in property <[PaletteEntry]> moc-palette: [];
+    in property <[PaletteEntry]> gateway-palette: [];
     in property <[PaletteEntry]> vehicle-palette: [];
     in property <[PaletteEntry]> payload-palette: [];
     in property <length> payload-divider: 0px;
@@ -1110,7 +1112,7 @@ export component MainWindow inherits Window {
     // because a person scrolling moves it and placing a node sets it.
     in-out property <length> canvas-offset: 0px;
     out property <length> canvas-view-height: surface.canvas-view-height;
-    in property <color> moc-ground: white;
+    in property <color> gateway-ground: white;
     in property <color> vehicle-ground: white;
     in property <color> payload-ground: white;
     in property <int> undo-depth: 0;
@@ -1136,10 +1138,10 @@ export component MainWindow inherits Window {
     // this much. Two callbacks and not one with a name in it: which divider
     // moved is known where the gesture happened, and a string crossing the
     // boundary would be a name to keep in step in two files.
-    // How the selection column is divided, as the moc and vehicle lists'
+    // How the selection column is divided, as the gateway and vehicle lists'
     // shares of it, the payload list taking what is left. From Rust, where the
     // settings file keeps them: see tcsgui::Views::lists.
-    in property <int> moc-list-percent: 20;
+    in property <int> gateway-list-percent: 20;
     in property <int> vehicle-list-percent: 35;
     // And the two lines between the lists, dragged: how far it went and how
     // tall the whole column is. See tcsgui::drag_list_divider.
@@ -1248,12 +1250,12 @@ export component MainWindow inherits Window {
         nodes: root.nodes;
         links: root.links;
         drawing-route: root.drawing-route;
-        moc-palette: root.moc-palette;
+        gateway-palette: root.gateway-palette;
         vehicle-palette: root.vehicle-palette;
         payload-palette: root.payload-palette;
         payload-divider: root.payload-divider;
         vehicle-divider: root.vehicle-divider;
-        moc-list-percent: root.moc-list-percent;
+        gateway-list-percent: root.gateway-list-percent;
         vehicle-list-percent: root.vehicle-list-percent;
         payload-list-divider-moved(dy, tall) => {
             root.payload-list-divider-moved(dy, tall);
@@ -1263,7 +1265,7 @@ export component MainWindow inherits Window {
         }
         working-width: root.working-width;
         working-height: root.working-height;
-        moc-ground: root.moc-ground;
+        gateway-ground: root.gateway-ground;
         vehicle-ground: root.vehicle-ground;
         payload-ground: root.payload-ground;
         save-clicked => { root.save-clicked(); }
@@ -1389,7 +1391,7 @@ export component SubWindow inherits Window {
     // configuration rather than about a window, and they are checked by tests
     // there. Stating the divider in this file as well would be stating it
     // twice.
-    in property <[PaletteEntry]> moc-palette: [];
+    in property <[PaletteEntry]> gateway-palette: [];
     in property <[PaletteEntry]> vehicle-palette: [];
     in property <[PaletteEntry]> payload-palette: [];
     in property <length> payload-divider: 0px;
@@ -1403,7 +1405,7 @@ export component SubWindow inherits Window {
     // because a person scrolling moves it and placing a node sets it.
     in-out property <length> canvas-offset: 0px;
     out property <length> canvas-view-height: surface.canvas-view-height;
-    in property <color> moc-ground: white;
+    in property <color> gateway-ground: white;
     in property <color> vehicle-ground: white;
     in property <color> payload-ground: white;
     in property <int> undo-depth: 0;
@@ -1432,7 +1434,7 @@ export component SubWindow inherits Window {
     // How the selection column is divided, and its two lines: a subdiagram is
     // a page of the same configuration, so its lists are arranged the same
     // way and dragging one of its lines arranges every window's.
-    in property <int> moc-list-percent: 20;
+    in property <int> gateway-list-percent: 20;
     in property <int> vehicle-list-percent: 35;
     callback payload-list-divider-moved(length, length);
     callback vehicle-list-divider-moved(length, length);
@@ -1532,12 +1534,12 @@ export component SubWindow inherits Window {
         nodes: root.nodes;
         links: root.links;
         drawing-route: root.drawing-route;
-        moc-palette: root.moc-palette;
+        gateway-palette: root.gateway-palette;
         vehicle-palette: root.vehicle-palette;
         payload-palette: root.payload-palette;
         payload-divider: root.payload-divider;
         vehicle-divider: root.vehicle-divider;
-        moc-list-percent: root.moc-list-percent;
+        gateway-list-percent: root.gateway-list-percent;
         vehicle-list-percent: root.vehicle-list-percent;
         payload-list-divider-moved(dy, tall) => {
             root.payload-list-divider-moved(dy, tall);
@@ -1547,7 +1549,7 @@ export component SubWindow inherits Window {
         }
         working-width: root.working-width;
         working-height: root.working-height;
-        moc-ground: root.moc-ground;
+        gateway-ground: root.gateway-ground;
         vehicle-ground: root.vehicle-ground;
         payload-ground: root.payload-ground;
         save-clicked => { root.save-clicked(); }

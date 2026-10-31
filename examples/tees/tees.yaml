@@ -28,18 +28,18 @@ tcspecial:
     recv: "0.0.0.0:8200"
     send: "127.0.0.1:8210"
 
-moc:
+gateway:
   # The ground's end of the link, both ways. What the ground sends goes up to
-  # address:port, which this node binds aboard, and leaves it by moc-out for
+  # address:port, which this node binds aboard, and leaves it by gateway-out for
   # the tee. What comes down arrives at ground_base plus the device id of the
   # node that sent it.
   - name: ground
-    type: moc
+    type: gateway_radio
     address: "127.0.0.1"
     port: "8600"
     ground_base: "127.0.0.1:8700"
     payload-in: true
-    moc-out:
+    gateway-out:
       - target: echo
 
 payloads:
@@ -49,7 +49,7 @@ payloads:
     protocol: "udp"
     address: "127.0.0.1"
     port: "8001"
-    moc-in: true
+    gateway-in: true
   # A sensor whose readings go to the ground and are copied aboard.
   - name: sensor
     type: network
@@ -72,9 +72,9 @@ vehicle:
   # back down to the ground as payload data, so that the ground sees what the
   # vehicle was told. A tee has two data sources, so each link names its own.
   - name: echo
-    type: tee-moc
-    moc-in: true
-    moc-out:
+    type: tee-gateway
+    gateway-in: true
+    gateway-out:
       - target: heater
     payload-out:
       - target: ground
@@ -86,12 +86,12 @@ vehicle:
     payload-in: true
     payload-out:
       - target: ground
-    moc-out:
+    gateway-out:
       - target: dropped
   # Takes what arrives from the ground's side and drops it.
   - name: dropped
-    type: null-moc
-    moc-in: true
+    type: null-gateway
+    gateway-in: true
   # Takes the spare payload's data and drops it.
   - name: unheard
     type: null-payload

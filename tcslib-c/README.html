@@ -172,8 +172,8 @@
 <h1 id="tcslib-c">tcslib-c</h1>
 <p><strong>tcslib-c is tcslib for C and C++.</strong> It is the library
 a ground station written in C or C++ is built on: the vehicle’s beacons,
-the vehicle’s data from a <code>moc</code> node, and commands to the
-vehicle, behind one header, <code>include/tcs.h</code>.</p>
+the vehicle’s data from a gateway node, and commands to the vehicle,
+behind one header, <code>include/tcs.h</code>.</p>
 <p>It is not a second implementation of anything. Each function is a
 call into <a href="../tcslib/README.md">tcslib</a>, so a C or C++ ground
 station reads the configuration, counts ports and ages beacons exactly
@@ -201,18 +201,18 @@ remarks, which are news, and warnings, which are to be said whether or
 not anybody asked.</li>
 <li><strong>Matching.</strong> Each pass keeps the configuration’s
 <em>match</em> with the vehicle, which every beacon watch, client and
-moc node made from that configuration shares. The station is matched for
-listening while the last beacon is recent, has the restart flag clear
-and carries the configuration’s checksum, and for commanding once,
+gateway node made from that configuration shares. The station is matched
+for listening while the last beacon is recent, has the restart flag
+clear and carries the configuration’s checksum, and for commanding once,
 besides, its own connect has been answered with that checksum.
 <code>tcs_configuration_matched</code> says which;
 <code>tcs_configuration_counts</code> says how many packets have come
 from the vehicle, data and answers, and how many of them were processed,
 malformed or dropped for a configuration mismatch, which add up.</li>
-<li><strong>The vehicle’s data.</strong> <code>tcs_moc_open</code> opens
-a <code>moc</code> node, and each <code>tcs_moc_receive</code> returns
-one datum and the name of the node that produced it. A moc node reads
-data only while the station is matched for listening: what arrives
+<li><strong>The vehicle’s data.</strong> <code>tcs_gateway_open</code>
+opens a gateway node, and each <code>tcs_gateway_receive</code> returns
+one datum and the name of the node that produced it. A gateway node
+reads data only while the station is matched for listening: what arrives
 before is dropped and counted, as is whatever is waiting when the match
 begins. So a station that reads data passes its beacons too.</li>
 <li><strong>Commands.</strong> <code>tcs_client_open</code> opens the
@@ -234,9 +234,9 @@ wait for the vehicle to come back, during which nothing but connect, arm
 and restart goes.</li>
 <li><strong>Pinging a ping node.</strong> <code>tcs_pinger_open</code>
 finds the first <code>ping</code> node the ground can reach both ways
-and its <code>moc</code> node. <code>tcs_pinger_ping</code> sends a ping
-up; its answer comes down as the ping node’s data, which a station takes
-with <code>tcs_moc_receive</code> and hands to
+and its gateway node. <code>tcs_pinger_ping</code> sends a ping up; its
+answer comes down as the ping node’s data, which a station takes with
+<code>tcs_gateway_receive</code> and hands to
 <code>tcs_pinger_answered</code>; and <code>tcs_pinger_exchange</code>
 gives the round trip and the two halves of it.</li>
 </ul>
@@ -284,11 +284,10 @@ wanted, rather than run against a library it does not match.</p>
 <code>examples/ground.cpp</code> the same one in C++: each reads the
 configuration, waits for the first beacon, connects and pings, asks
 about a node and sets one of its attributes, pings the vehicle’s ping
-node and times the answer, and prints the vehicle’s data from a
-<code>moc</code> node. They take <code>--yaml</code> or
-<code>--xml</code>, as every example program does, and
-<code>--restart</code> to arm a restart and restart the vehicle, which
-they do only when asked.</p>
+node and times the answer, and prints the vehicle’s data from a gateway
+node. They take <code>--yaml</code> or <code>--xml</code>, as every
+example program does, and <code>--restart</code> to arm a restart and
+restart the vehicle, which they do only when asked.</p>
 <h2 id="how-the-header-is-kept-honest">How the header is kept
 honest</h2>
 <p>It is written by hand, for people, so the proof that it says what the
@@ -347,8 +346,8 @@ happens, and is:
 <li><em>Once, at startup.</em> Each <code>_open</code> allocates its
 handle, which has to outlive the call and whose size C does not see.
 <code>tcs_configuration_open</code> reads and checks a whole
-configuration, as tcslib does; <code>tcs_moc_open</code> makes the names
-of the node’s sources, which every receive then points at, and the
+configuration, as tcslib does; <code>tcs_gateway_open</code> makes the
+names of the node’s sources, which every receive then points at, and the
 buffer every datum is received in; and
 <code>tcs_configuration_node_id</code> asks tcslib for every node’s
 id.</li>

@@ -16,13 +16,13 @@
 //! # The three families
 //!
 //! Each tree is divided the way a configuration file is divided, and the way
-//! the editor's working panes are: `moc` is the ground link, `vehicle` is what
-//! the vehicle itself runs, and `payload` is what it carries. See
+//! the editor's working panes are: `gateway` is the ground link, `vehicle` is
+//! what the vehicle itself runs, and `payload` is what it carries. See
 //! `crate::graph::section_of`, which is the one statement of which family a
 //! type belongs to -- the file reader, the editor's panes and these
 //! directories all read it rather than deciding for themselves.
 //!
-//! There is no `moc` directory here, and that is not an omission. A ground
+//! There is no `gateway` directory here, and that is not an omission. A ground
 //! link is a network endpoint: what its attributes are is the network type's
 //! own rule -- see `crate::graph::reach` -- and the code that opens one is
 //! `tcspecial::node::payload::network`. A directory holding nothing but a

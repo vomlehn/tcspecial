@@ -59,16 +59,16 @@ fn each_ping_is_answered_and_timed_and_the_beacon_is_heard() {
 <reset_interval>1 s</reset_interval><recv>127.0.0.1:{beacons}</recv>\
 <send>127.0.0.1:{}</send></beacon>
     </tcspecial>
-    <moc>
-        <name>moc</name><type>moc</type>
+    <gateway>
+        <name>gateway</name><type>gateway_radio</type>
         <address>127.0.0.1</address><port>{}</port>
         <ground_base>127.0.0.1:{}</ground_base>
         <payload-in>true</payload-in>
-        <moc-out><target>ping</target></moc-out>
-    </moc>
+        <gateway-out><target>ping</target></gateway-out>
+    </gateway>
     <vehicle>
-        <name>ping</name><type>ping</type><moc-in>true</moc-in>
-        <payload-out><target>moc</target></payload-out>
+        <name>ping</name><type>ping</type><gateway-in>true</gateway-in>
+        <payload-out><target>gateway</target></payload-out>
     </vehicle>
 </configuration>
 ",
@@ -85,7 +85,7 @@ fn each_ping_is_answered_and_timed_and_the_beacon_is_heard() {
     let digest = digest_of_file(&configuration).expect("it digests");
 
     let mut ground = Command::new("python3")
-        .arg(concat!(env!("CARGO_MANIFEST_DIR"), "/ping_moc.py"))
+        .arg(concat!(env!("CARGO_MANIFEST_DIR"), "/ping_gateway.py"))
         .arg(&configuration)
         // This test is the vehicle, so the ground station starts none.
         // Verbose, because it is the line saying it is listening that this

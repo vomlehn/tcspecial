@@ -21,8 +21,8 @@ use crate::style::{self, NodeType};
 ///
 /// The middle of the three tiers the palette is built as, and a shade of the
 /// pane its data comes from: the payload stream leaves the payload pane and
-/// is drawn in a darker teal, the ground's stream leaves the moc pane and is
-/// drawn in a darker blue. A drawing then reads as one picture -- a pale
+/// is drawn in a darker teal, the ground's stream leaves the gateway pane and
+/// is drawn in a darker blue. A drawing then reads as one picture -- a pale
 /// sheet, lines on the sheet, solid blocks on the lines -- a line can never be
 /// mistaken for a node's own edge, and the colour of a line says which end of
 /// the canvas its data started at.
@@ -40,7 +40,7 @@ use crate::style::{self, NodeType};
 /// # Arguments
 ///
 /// * `leaves_by` - The terminal the line leaves its source by:
-///                 `payload-out`, `moc-out`, or anything else or nothing
+///                 `payload-out`, `gateway-out`, or anything else or nothing
 ///                 for a stream that cannot be told.
 ///
 /// # Returns
@@ -49,7 +49,7 @@ use crate::style::{self, NodeType};
 pub fn line_ink(leaves_by: Option<&str>) -> String {
     match leaves_by {
         Some("payload-out") => PAYLOAD_LINE,
-        Some("moc-out") => MOC_LINE,
+        Some("gateway-out") => GATEWAY_LINE,
         _ => LINE_GREY,
     }
     .to_string()
@@ -95,27 +95,27 @@ pub const LINE_GREY: &str = "#6b7280";
 /// `tests::the_palette_runs_from_the_pane_through_the_line_to_the_bodies`.
 pub const PAYLOAD_LINE: &str = "#289aa2";
 
-/// And what the ground sends: a darker shade of the moc pane, at 58.2.
+/// And what the ground sends: a darker shade of the gateway pane, at 58.2.
 ///
 /// Thirty-two points darker, for the same reasons, and still a blue -- the
 /// ground's own hue, which is the one thing about the lines that did not have
 /// to change.
-pub const MOC_LINE: &str = "#0292e4";
+pub const GATEWAY_LINE: &str = "#0292e4";
 
 /// What a node of this type is painted.
 ///
 /// A rung of its own panel's ramp. Each panel starts twelve CIE units below
-/// the line that carries its data -- the moc panel below the moc line, the
-/// payload panel below the payload line, and the vehicle panel below both,
+/// the line that carries its data -- the gateway panel below the gateway line,
+/// the payload panel below the payload line, and the vehicle panel below both,
 /// having no line of its own -- and steps three and a half units darker for
 /// each node, taking the panel's nodes in alphabetical order. A reader can
 /// then find a node in a panel by how dark it is, and the panel reads as one
 /// family rather than as a set of unrelated colours.
 ///
-/// Twelve for the first step and not the eight the tiers ask, because the moc
-/// family's line and its bodies are the same hue: at the same hue a step in
-/// lightness *is* the difference, and twelve is the floor two colours of this
-/// scheme are held apart by.
+/// Twelve for the first step and not the eight the tiers ask, because the
+/// gateway family's line and its bodies are the same hue: at the same hue a
+/// step in lightness *is* the difference, and twelve is the floor two colours
+/// of this scheme are held apart by.
 ///
 /// The ramp stops at thirteen of lightness, which is where the three families
 /// stop being told apart: below it a dark blue, a dark green and a dark teal
@@ -149,7 +149,7 @@ pub const MOC_LINE: &str = "#0292e4";
 pub fn tint_of(node_type: &str) -> String {
     let pane = pane_of(node_type);
     let rungs = match pane {
-        Pane::Moc => MOC_RUNGS,
+        Pane::Gateway => GATEWAY_RUNGS,
         Pane::Vehicle => VEHICLE_RUNGS,
         Pane::Payloads => PAYLOAD_RUNGS,
     };
@@ -165,10 +165,10 @@ pub fn tint_of(node_type: &str) -> String {
 }
 
 /// The ground link's panel: one node, so one rung.
-pub const MOC_RUNGS: &[&str] = &["#0073b5"];
+pub const GATEWAY_RUNGS: &[&str] = &["#0073b5"];
 
 /// The vehicle's own graph, in the order the panel lists it: compute, log,
-/// null-moc (which took the null node's), ping, subdiagram.
+/// null-gateway (which took the null node's), ping, subdiagram.
 pub const VEHICLE_RUNGS: &[&str] =
     &["#547800", "#4b7000", "#446600", "#3d5d00"];
 
@@ -209,7 +209,7 @@ pub fn ramp_order(pane: Pane) -> Vec<&'static str> {
 }
 
 /// When a type came, for `ramp_order`: the types the rungs were chosen for,
-/// then the five apps, then the types that came after them. `null-moc` took
+/// then the five apps, then the types that came after them. `null-gateway` took
 /// the place and the colour of the `null` node it replaced, and the other
 /// three that replaced it come last, so that no colour already in use moved.
 ///
@@ -224,11 +224,13 @@ pub fn ramp_order(pane: Pane) -> Vec<&'static str> {
 pub fn came_later(node_type: NodeType) -> u8 {
     match node_type {
         NodeType::AppPayloadVeh
-        | NodeType::AppMocVeh
+        | NodeType::AppGatewayVeh
         | NodeType::AppAllVeh
         | NodeType::AppPl
         | NodeType::AppAllPl => 1,
-        NodeType::NullPayload | NodeType::TeeMoc | NodeType::TeePayload => 2,
+        NodeType::NullPayload | NodeType::TeeGateway | NodeType::TeePayload => {
+            2
+        }
         _ => 0,
     }
 }
@@ -244,7 +246,7 @@ pub fn came_later(node_type: NodeType) -> u8 {
 /// The pane's colour, `#rrggbb`.
 pub fn ground_of(ground: style::Ground) -> String {
     match ground {
-        style::Ground::Moc => "#dee2fc",
+        style::Ground::Gateway => "#dee2fc",
         style::Ground::Vehicle => "#e8e4ca",
         style::Ground::Payloads => "#bad2d0",
     }

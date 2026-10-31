@@ -220,20 +220,20 @@ uses, so that tcsmoc starts tcspecial only once they are there. The
 program started without <code>--simulate</code> gets the flight setting,
 <code>none</code>, and refuses every stand-in. See “Stand-ins or
 hardware” in the manual.</p>
-<p>The examples’ programs – <code>beacon</code>, <code>lorem_moc</code>
-and <code>ping_moc.py</code> – are quiet unless given <code>-v</code> or
-<code>--verbose</code>: they print what they are for and any error, and
-with the flag they also say what they are doing, such as where they are
-listening. A tcspecial one of them starts is started
-<code>--quiet</code>, so that its startup summary does not fill the
-console, unless the program was given <code>-v</code> itself; whatever
-stops tcspecial starting is said either way.</p>
+<p>The examples’ programs – <code>beacon</code>,
+<code>lorem_gateway</code> and <code>ping_gateway.py</code> – are quiet
+unless given <code>-v</code> or <code>--verbose</code>: they print what
+they are for and any error, and with the flag they also say what they
+are doing, such as where they are listening. A tcspecial one of them
+starts is started <code>--quiet</code>, so that its startup summary does
+not fill the console, unless the program was given <code>-v</code>
+itself; whatever stops tcspecial starting is said either way.</p>
 <p>They also take <code>--yaml</code> or <code>--xml</code>, but not
 both, saying which of the example’s two configuration files to read.
-With neither, <code>beacon</code> and <code>lorem_moc</code> read the
-YAML and <code>ping_moc.py</code> the XML. A file named on the command
-line beside one of the two has to be the spelling it asks for, and a
-vehicle the program starts reads the same file.</p>
+With neither, <code>beacon</code> and <code>lorem_gateway</code> read
+the YAML and <code>ping_gateway.py</code> the XML. A file named on the
+command line beside one of the two has to be the spelling it asks for,
+and a vehicle the program starts reads the same file.</p>
 <p>Two sets of tests find the examples on their own, so adding one means
 adding its directory here, and a row to the table of its section below;
 there’s no list in the tests to update:</p>
@@ -292,11 +292,11 @@ the Rust.</td>
 <tr>
 <td><code>tees</code></td>
 <td>The four nodes that do nothing to what passes: a
-<code>tee-moc</code> sends each command on to a heater and back to the
-ground, a <code>tee-payload</code> sends each reading to the ground and
-on aboard, and a <code>null-moc</code> and a <code>null-payload</code>
-drop what they are sent. <code>tcspecial/tests/tees.rs</code> flies
-it.</td>
+<code>tee-gateway</code> sends each command on to a heater and back to
+the ground, a <code>tee-payload</code> sends each reading to the ground
+and on aboard, and a <code>null-gateway</code> and a
+<code>null-payload</code> drop what they are sent.
+<code>tcspecial/tests/tees.rs</code> flies it.</td>
 </tr>
 <tr>
 <td><code>fprime</code></td>
@@ -407,17 +407,16 @@ cargo run --bin beacon -- --xml      # beacon.xml</code></pre>
 payload.</li>
 </ul>
 <h3 id="ping">ping</h3>
-<p>The ground sends a ping up to the <code>moc</code> node, which hands
-it to the <code>ping</code> node; the <code>ping</code> node answers
-with the vehicle’s time on the end, and the answer comes back down. What
-a ping and its answer say is
-<code>tcslibgs::node::vehicle::ping</code>:</p>
+<p>The ground sends a ping up to the gateway node, which hands it to the
+<code>ping</code> node; the <code>ping</code> node answers with the
+vehicle’s time on the end, and the answer comes back down. What a ping
+and its answer say is <code>tcslibgs::node::vehicle::ping</code>:</p>
 <pre><code>ping #&lt;count&gt; &lt;seconds&gt;.&lt;nanoseconds&gt;                    up
 ping #&lt;count&gt; &lt;seconds&gt;.&lt;nanoseconds&gt; &lt;seconds&gt;.&lt;nanoseconds&gt;   down</code></pre>
-<p>The ground station, <code>ping_moc.py</code>, is Python 3 and uses
-nothing outside the standard library to read its configuration’s XML,
-the default; with <code>--yaml</code> it reads the YAML instead, which
-needs PyYAML (<code>python3-yaml</code> on Debian and Ubuntu). Its
+<p>The ground station, <code>ping_gateway.py</code>, is Python 3 and
+uses nothing outside the standard library to read its configuration’s
+XML, the default; with <code>--yaml</code> it reads the YAML instead,
+which needs PyYAML (<code>python3-yaml</code> on Debian and Ubuntu). Its
 window shows the beacon panel, the last ping sent and when, the last
 answer and when, and three times: the round trip, MOC to tcspecial, and
 tcspecial to MOC. The last two are each read across two clocks, so each
@@ -435,18 +434,18 @@ worked out with tcs-xtce’s Python runtime, from
 here is the ping’s own part, with no window. The Rust crate beside them
 is the tests that hold the Python to the Rust; <code>cargo test</code>
 runs them.</p>
-<pre><code>make run-ping                               # the vehicle and the window
-python3 examples/ping/ping_moc.py --pings 3 # no window: three pings, printed
-python3 examples/ping/ping_moc.py --yaml    # ping.yaml rather than ping.xml</code></pre>
-<p><code>ping_moc.py</code> starts the vehicle itself: tcspecial from
-the build, on the same configuration. It kills it when it exits, however
-it exits – if it is killed or crashes, the kernel is told to kill
-tcspecial – so a vehicle is running exactly while its ground station is.
-Build tcspecial first (<code>make run-ping</code> does). To run the
-vehicle yourself, in another terminal, say
+<pre><code>make run-ping                                   # the vehicle and the window
+python3 examples/ping/ping_gateway.py --pings 3 # no window: three pings
+python3 examples/ping/ping_gateway.py --yaml    # ping.yaml, not ping.xml</code></pre>
+<p><code>ping_gateway.py</code> starts the vehicle itself: tcspecial
+from the build, on the same configuration. It kills it when it exits,
+however it exits – if it is killed or crashes, the kernel is told to
+kill tcspecial – so a vehicle is running exactly while its ground
+station is. Build tcspecial first (<code>make run-ping</code> does). To
+run the vehicle yourself, in another terminal, say
 <code>--no-vehicle</code>:</p>
-<pre><code>cargo run --bin tcspecial -- examples/ping/ping.xml          # in one terminal
-python3 examples/ping/ping_moc.py --no-vehicle               # in another</code></pre>
+<pre><code>cargo run --bin tcspecial -- examples/ping/ping.xml   # in one terminal
+python3 examples/ping/ping_gateway.py --no-vehicle    # in another</code></pre>
 <p>Its ports are all in the seven thousands, which no other example
 uses.</p>
 <p>tcsmoc pings it too:
@@ -456,8 +455,8 @@ same panel, kept by <code>tcslib::ping</code>, which
 <code>ping_ground.py</code> is written after.</p>
 <p>Languages:</p>
 <ul>
-<li>MOC: Python 3 – <code>ping_moc.py</code>, on <code>python/</code>;
-or Rust, in tcsmoc.</li>
+<li>MOC: Python 3 – <code>ping_gateway.py</code>, on
+<code>python/</code>; or Rust, in tcsmoc.</li>
 <li>Vehicle: Rust – tcspecial, whose <code>ping</code> node
 answers.</li>
 <li>Payload: none. The <code>ping</code> node is the vehicle’s own, and
@@ -546,12 +545,13 @@ node named <code>lorem</code>, and runs it with the node’s name and
 <code>app-payload-arg</code> – which for this payload is the line of the
 text to send, counting from one. It sends one word per packet and then a
 packet holding the line terminator.</li>
-<li><code>lorem_moc</code> is the ground station, a Rust program in the
-crate beside the configuration. It gets <code>lorem</code>’s words from
-the configuration’s moc node, <code>moc-1</code>, with one function
-call, <code>tcslib::moc::Moc::receive_into</code>, which works out from
-the configuration which port they arrive at and puts each word in a
-buffer made before the loop, so that the loop allocates nothing; it
+<li><code>lorem_gateway</code> is the ground station, a Rust program in
+the crate beside the configuration. It gets <code>lorem</code>’s words
+from the configuration’s gateway node, <code>gateway-1</code>, with one
+function call,
+<code>tcslib::gateway::GatewayReceiver::receive_into</code>, which works
+out from the configuration which port they arrive at and puts each word
+in a buffer made before the loop, so that the loop allocates nothing; it
 writes out each word with one space between them, and stops when the
 terminator arrives.</li>
 </ul>
@@ -560,14 +560,15 @@ terminator arrives.</li>
 starts the vehicle in the background and the ground in the foreground,
 prints the line, and then stops the vehicle. To watch the two
 separately, run them in two terminals instead, in either order:</p>
-<pre><code>cargo build                     # lorem_moc and tcspecial
-cargo run --bin lorem_moc       # in one terminal: the ground (--xml for XML)
+<pre><code>cargo build                   # lorem_gateway and tcspecial
+cargo run --bin lorem_gateway # in one terminal: the ground (--xml for XML)
 cargo run --bin tcspecial -- examples/simple-app/simple-app.yaml   # in another</code></pre>
 <p>Run the vehicle from the repository’s root, where the configuration’s
 <code>executable</code> path starts. Either order works because the
 payload waits a couple of seconds before its first word: the vehicle
 sends each word to the ground station’s address as soon as it has it,
-and a word sent before <code>lorem_moc</code> is listening is lost.</p>
+and a word sent before <code>lorem_gateway</code> is listening is
+lost.</p>
 <p>The text itself is <code>simple_app</code>’s library: the first
 paragraph of the lorem ipsum text as one array per line, each holding
 that line’s words. Nothing holds a line terminator; the end of a word
@@ -575,8 +576,8 @@ array is the end of the line, and what stands for it on the wire is the
 one constant both programs read.</p>
 <p>Languages:</p>
 <ul>
-<li>MOC: Rust – <code>lorem_moc</code>, on
-<code>tcslib::moc</code>.</li>
+<li>MOC: Rust – <code>lorem_gateway</code>, on
+<code>tcslib::gateway</code>.</li>
 <li>Vehicle: Rust – tcspecial, which runs the payload as its
 <code>app_pl</code> node.</li>
 <li>Payload: Python 3 – <code>lorem_pl.py</code>.</li>

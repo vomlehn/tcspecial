@@ -1117,7 +1117,7 @@ mod tests {
             name: SharedString::from(name),
             dev_id: i32::try_from(row).unwrap_or(i32::MAX),
             config: SharedString::from(format!(
-                "to moc, at 127.0.0.1:{}",
+                "to gateway, at 127.0.0.1:{}",
                 5100 + row
             )),
             packet_size: 0,

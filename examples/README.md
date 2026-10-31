@@ -31,7 +31,7 @@ give every program `--simulate=all`, the run being one with stand-ins only: a
 program started without `--simulate` gets the flight setting, `none`, and
 refuses every stand-in. See "Stand-ins or hardware" in the manual.
 
-The examples' programs -- `beacon`, `lorem_moc` and `ping_moc.py` --
+The examples' programs -- `beacon`, `lorem_gateway` and `ping_gateway.py` --
 are quiet unless given `-v` or `--verbose`: they print what they are for and
 any error, and with the flag they also say what they are doing, such as where
 they are listening. A tcspecial one of them starts is started `--quiet`, so
@@ -40,7 +40,7 @@ given `-v` itself; whatever stops tcspecial starting is said either way.
 
 They also take `--yaml` or `--xml`, but not both, saying which of the
 example's two configuration files to read. With neither, `beacon` and
-`lorem_moc` read the YAML and `ping_moc.py` the XML. A file named on the
+`lorem_gateway` read the YAML and `ping_gateway.py` the XML. A file named on the
 command line beside one of the two has to be the spelling it asks for, and a
 vehicle the program starts reads the same file.
 
@@ -71,7 +71,7 @@ the vehicle saying it is alive, the vehicle answering a ping. Start with
 | `minimal` | The smallest working configuration: one UDP payload whose telemetry goes straight to the ground (MOC). |
 | `beacon` | The one thing a ground station knows without asking: a window showing the spacecraft's beacon, built from the two halves any ground station would use -- `tcslib::beacon` to listen and `tcsui`'s panel to show it. |
 | `ping` | The ground pings a `ping` vehicle node and times the answer: the round trip, and the two halves of it. The ground station is Python 3, with the beacon panel and the halves it is built from written again in Python under `python/`, and tests that hold them to the Rust. |
-| `tees` | The four nodes that do nothing to what passes: a `tee-moc` sends each command on to a heater and back to the ground, a `tee-payload` sends each reading to the ground and on aboard, and a `null-moc` and a `null-payload` drop what they are sent. `tcspecial/tests/tees.rs` flies it. |
+| `tees` | The four nodes that do nothing to what passes: a `tee-gateway` sends each command on to a heater and back to the ground, a `tee-payload` sends each reading to the ground and on aboard, and a `null-gateway` and a `null-payload` drop what they are sent. `tcspecial/tests/tees.rs` flies it. |
 | `fprime` | A vehicle that answers to an F´ flight computer rather than to the ground: a `gateway_fprime` node sends each reading to the deployment's bridge component at its `bridge_base`, and takes the bridge's commands on to a heater. `tcspecial/tests/fprime.rs` flies it. |
 
 ### minimal
@@ -183,7 +183,7 @@ Languages:
 
 ### ping
 
-The ground sends a ping up to the `moc` node, which hands it to the `ping`
+The ground sends a ping up to the gateway node, which hands it to the `ping`
 node; the `ping` node answers with the vehicle's time on the end, and the
 answer comes back down. What a ping and its answer say is
 `tcslibgs::node::vehicle::ping`:
@@ -193,7 +193,7 @@ ping #<count> <seconds>.<nanoseconds>                    up
 ping #<count> <seconds>.<nanoseconds> <seconds>.<nanoseconds>   down
 ```
 
-The ground station, `ping_moc.py`, is Python 3 and uses nothing outside the
+The ground station, `ping_gateway.py`, is Python 3 and uses nothing outside the
 standard library to read its configuration's XML, the default; with `--yaml`
 it reads the YAML instead, which needs PyYAML (`python3-yaml` on Debian and
 Ubuntu). Its window shows the beacon panel, the last ping sent and
@@ -213,20 +213,21 @@ part, with no window. The Rust crate beside them is the tests that hold the
 Python to the Rust; `cargo test` runs them.
 
 ```
-make run-ping                               # the vehicle and the window
-python3 examples/ping/ping_moc.py --pings 3 # no window: three pings, printed
-python3 examples/ping/ping_moc.py --yaml    # ping.yaml rather than ping.xml
+make run-ping                                   # the vehicle and the window
+python3 examples/ping/ping_gateway.py --pings 3 # no window: three pings
+python3 examples/ping/ping_gateway.py --yaml    # ping.yaml, not ping.xml
 ```
 
-`ping_moc.py` starts the vehicle itself: tcspecial from the build, on the same
-configuration. It kills it when it exits, however it exits -- if it is killed
-or crashes, the kernel is told to kill tcspecial -- so a vehicle is running
-exactly while its ground station is. Build tcspecial first (`make run-ping`
-does). To run the vehicle yourself, in another terminal, say `--no-vehicle`:
+`ping_gateway.py` starts the vehicle itself: tcspecial from the build, on the
+same configuration. It kills it when it exits, however it exits -- if it is
+killed or crashes, the kernel is told to kill tcspecial -- so a vehicle is
+running exactly while its ground station is. Build tcspecial first (`make
+run-ping` does). To run the vehicle yourself, in another terminal, say
+`--no-vehicle`:
 
 ```
-cargo run --bin tcspecial -- examples/ping/ping.xml          # in one terminal
-python3 examples/ping/ping_moc.py --no-vehicle               # in another
+cargo run --bin tcspecial -- examples/ping/ping.xml   # in one terminal
+python3 examples/ping/ping_gateway.py --no-vehicle    # in another
 ```
 
 Its ports are all in the seven thousands, which no other example uses.
@@ -237,7 +238,7 @@ then the `Ping node` button beside `Command`. It is the same panel, kept by
 
 Languages:
 
-- MOC: Python 3 -- `ping_moc.py`, on `python/`; or Rust, in tcsmoc.
+- MOC: Python 3 -- `ping_gateway.py`, on `python/`; or Rust, in tcsmoc.
 - Vehicle: Rust -- tcspecial, whose `ping` node answers.
 - Payload: none. The `ping` node is the vehicle's own, and nothing is
   simulated.
@@ -304,10 +305,11 @@ see what an app node is. Two programs, both in `examples/simple-app`:
   node's name and `app-payload-arg` -- which for this payload is the line of
   the text to send, counting from one. It sends one word per packet and then a
   packet holding the line terminator.
-- `lorem_moc` is the ground station, a Rust program in the crate beside the
-  configuration. It gets `lorem`'s words from the configuration's moc node,
-  `moc-1`, with one function call, `tcslib::moc::Moc::receive_into`, which
-  works out from the configuration which port they arrive at and puts each
+- `lorem_gateway` is the ground station, a Rust program in the crate beside the
+  configuration. It gets `lorem`'s words from the configuration's gateway node,
+  `gateway-1`, with one function call,
+  `tcslib::gateway::GatewayReceiver::receive_into`, which works out from the
+  configuration which port they arrive at and puts each
   word in a buffer made before the loop, so that the loop allocates nothing; it writes out each word
   with one space between them, and stops when the terminator arrives.
 
@@ -321,16 +323,16 @@ line, and then stops the vehicle. To watch the two separately, run them in two
 terminals instead, in either order:
 
 ```
-cargo build                     # lorem_moc and tcspecial
-cargo run --bin lorem_moc       # in one terminal: the ground (--xml for XML)
+cargo build                   # lorem_gateway and tcspecial
+cargo run --bin lorem_gateway # in one terminal: the ground (--xml for XML)
 cargo run --bin tcspecial -- examples/simple-app/simple-app.yaml   # in another
 ```
 
 Run the vehicle from the repository's root, where the configuration's
 `executable` path starts. Either order works because the payload waits a couple
 of seconds before its first word: the vehicle sends each word to the ground
-station's address as soon as it has it, and a word sent before `lorem_moc` is
-listening is lost.
+station's address as soon as it has it, and a word sent before
+`lorem_gateway` is listening is lost.
 
 The text itself is `simple_app`'s library: the first paragraph of the lorem
 ipsum text as one array per line, each holding that line's words. Nothing
@@ -339,6 +341,6 @@ what stands for it on the wire is the one constant both programs read.
 
 Languages:
 
-- MOC: Rust -- `lorem_moc`, on `tcslib::moc`.
+- MOC: Rust -- `lorem_gateway`, on `tcslib::gateway`.
 - Vehicle: Rust -- tcspecial, which runs the payload as its `app_pl` node.
 - Payload: Python 3 -- `lorem_pl.py`.

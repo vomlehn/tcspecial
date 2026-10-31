@@ -18,7 +18,7 @@ speaks without the Rust library that describes it:
 
 What it reports is one word per packet, from the line its node names, and
 then a packet holding nothing but the line terminator. The words are separate
-data all the way to the ground, where ``lorem_moc`` writes them out with one
+data all the way to the ground, where ``lorem_gateway`` writes them out with one
 space between them.
 
 Which line is ``app-payload-arg``, counting from one. The example's
@@ -26,7 +26,7 @@ configuration says ``1``, so it sends the first line.
 
 The first word waits a little. The vehicle sends each word to the ground
 station's address the moment it arrives, and a datagram sent to a port nobody
-has bound yet is lost without a word. The pause gives ``lorem_moc`` time to
+has bound yet is lost without a word. The pause gives ``lorem_gateway`` time to
 start listening, so the two can be started together in either order.
 
 It does not finish when it has nothing left to say. A program that exited
@@ -72,7 +72,7 @@ TERMINATOR = b"\n"
 
 # The descriptors an app is run with.
 PAYLOAD_INTERFACE = 0
-MOC_INTERFACE = 1
+GATEWAY_INTERFACE = 1
 ERROR_INTERFACE = 2
 
 # How long between one word and the next: slow enough that the line arrives
@@ -142,7 +142,7 @@ def is_handed_over(fd):
 
 def main(argv):
     """Send the line of the paragraph the node asks for, a word to a packet,
-    on the MOC interface, then wait to be stopped.
+    on the gateway interface, then wait to be stopped.
 
     Args:
         argv: The command line: the program, the node's name and
@@ -152,12 +152,12 @@ def main(argv):
         The exit status: nought once nobody is reading any more, one for a
         failure, which has been said on the error interface.
     """
-    # Run the way an app_pl is run: the MOC interface handed over, the payload
-    # interface not. Said at once rather than discovered as a write that goes
-    # wherever the descriptor happens to go.
-    if not is_handed_over(MOC_INTERFACE):
+    # Run the way an app_pl is run: the gateway interface handed over, the
+    # payload interface not. Said at once rather than discovered as a write that
+    # goes wherever the descriptor happens to go.
+    if not is_handed_over(GATEWAY_INTERFACE):
         complain(
-            "lorem_pl: the MOC interface was not handed over, and this app "
+            "lorem_pl: the gateway interface was not handed over, and this app "
             "writes payload data on it: it is run by tcspecial, which opens "
             "descriptor 1 for it as one end of a socket pair"
         )
@@ -203,7 +203,7 @@ def main(argv):
         [w.encode("utf-8") for w in PARAGRAPH[number - 1]] + [TERMINATOR]
     ):
         try:
-            write_all(MOC_INTERFACE, packet(word))
+            write_all(GATEWAY_INTERFACE, packet(word))
         except BrokenPipeError:
             # Nobody is reading any more: the vehicle has finished with this
             # payload, which is an end and not a fault.

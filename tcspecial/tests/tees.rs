@@ -190,7 +190,7 @@ fn a_tee_sends_each_datum_both_ways() {
     let configuration = dir.path().join("tees.yaml");
     std::fs::write(&configuration, &text).expect("written");
 
-    // Where the ground hears each tee, as the vehicle works it out: the moc
+    // Where the ground hears each tee, as the vehicle works it out: the gateway
     // node's ground_base plus the tee's device id.
     let graph = Graph::load(&configuration).expect("it reads");
     let links =

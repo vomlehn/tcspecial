@@ -2,7 +2,7 @@
 #
 # A vehicle node: part of the telemetry and control system itself rather than
 # something bolted to the vehicle. It is run with one file interface, on which
-# it reads payload data and writes MOC data -- so it takes what travels
+# it reads payload data and writes gateway data -- so it takes what travels
 # groundward and answers with what travels vehicleward, which is the shape the
 # ground link has and the thing an app of this kind stands in for. The
 # interfaces and the packets they carry are tcsapp; its Rust is
@@ -10,11 +10,11 @@
 node: app_payload_veh
 type: app_payload_veh
 about: >
-  A program of its own: it reads payload data and writes MOC data.
+  A program of its own: it reads payload data and writes gateway data.
 payload-sink: true
 payload-source: false
-moc-sink: false
-moc-source: true
+gateway-sink: false
+gateway-source: true
 attributes:
   - name: executable
     required: true

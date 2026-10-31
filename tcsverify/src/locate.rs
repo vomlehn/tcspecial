@@ -84,7 +84,7 @@ impl Where {
             }
             About::SimPayload(name) => (&["simulated_payloads"], name),
             About::SimGroup(name) => (&["simulated_payload_groups"], name),
-            About::Node(name) => (&["moc", "vehicle", "payloads"], name),
+            About::Node(name) => (&["gateway", "vehicle", "payloads"], name),
             About::NodeGroup(name) => (&["payload_groups"], name),
         };
 
@@ -495,9 +495,9 @@ simulated_payloads:
             <interval>1 s</interval>
         </beacon>
     </tcspecial>
-    <moc>
-        <name>moc-1</name>
-    </moc>
+    <gateway>
+        <name>gateway-1</name>
+    </gateway>
     <payloads
         type=\"i2c\">
         <name>sensor</name>
@@ -506,7 +506,7 @@ simulated_payloads:
 ";
         let found = Where::of(text, ConfigFormat::Xml);
         assert_eq!(found.line_of(&About::Section("tcspecial")), 6);
-        assert_eq!(found.line_of(&About::Node("moc-1".to_string())), 14);
+        assert_eq!(found.line_of(&About::Node("gateway-1".to_string())), 14);
         assert_eq!(found.line_of(&About::Node("sensor".to_string())), 18);
     }
 

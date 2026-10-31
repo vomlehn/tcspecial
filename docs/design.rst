@@ -5676,7 +5676,7 @@ The Interface, the Fallback and Switching Over
 
 This section is the whole of what was asked for when the link was moved from
 JSON to XTCE: what every packet is, the two interfaces the vehicle speaks,
-how a new interface and everything it needs is uploaded and protected, how
+how a new interface and everything it needs is laid out on the vehicle,
 and how the vehicle restarts onto it. What the beacon says across a restart,
 what the ground may send meanwhile, and everything else about surviving a
 fault are in `Fault Resiliency`_, which follows. Each requirement is stated
@@ -5705,7 +5705,7 @@ one it follows.
    configuration names its interface, and every program refuses one that
    is not its build's. Not yet built: the fallback interface and its link
    (``fixed.xtce`` takes its place, holding only the three fixed commands),
-   load sets, uploads, SWITCH, the golden build, and ``tcsverify
+   load sets, SWITCH, the golden build, and ``tcsverify
    --interface`` on a set of documents.
 
 Every packet is XTCE
@@ -6001,8 +6001,9 @@ Two interfaces
 
 The vehicle speaks two interfaces, each a set of XTCE documents with a
 digest of its own: the *full* interface, which is everything the ground can
-ask of the vehicle, and the *fallback* interface, which is just enough to put
-a new full interface on the vehicle and switch to it.
+ask of the vehicle, and the *fallback* interface, which is just enough to
+reach the vehicle and switch it to a new full interface, whatever state the
+full interface is in.
 
 Requirement
     The *interface digest* of an interface is the tcs-xtce digest of its set
@@ -6018,10 +6019,10 @@ Requirement
 
 Requirement
     The fallback interface is its own XTCE document,
-    ``tcslibgs/xtce/fallback.xtcs``: its own ``SpaceSystem``, sharing no type,
+    ``tcslibgs/xtce/fallback.xtce``: its own ``SpaceSystem``, sharing no type,
     parameter or container with the full interface, so that no change to the
     full interface can change it. It is compiled into every build, and no
-    upload replaces it.
+    load set replaces it.
 
 Requirement
     The fallback interface is taken on a link of its own -- ``fallback.recv``
@@ -6032,11 +6033,10 @@ Requirement
 
 Requirement
     The fallback interface is PING; CONNECT, whose answer carries the build,
-    the configuration digest and the interface digest;
-    the upload commands below; and SWITCH_ARM and SWITCH. It has nothing that
-    starts, stops or sets a node, changes the beacon interval or changes what
-    any payload does: what it can do to the vehicle is put files in the
-    staging area and switch to them.
+    the configuration digest and the interface digest; and SWITCH_ARM and
+    SWITCH. It has nothing that starts, stops or sets a node, changes the
+    beacon interval or changes what any payload does: what it can do to the
+    vehicle is switch it to a load set already there.
 
 Requirement
     The full interface is read and write: every command the vehicle takes,
@@ -6060,8 +6060,8 @@ Requirement
     * *read*: the documents of an interface and the manifest they hold, and
       their interface digest;
     * *write*: a load set into a directory -- the documents, the build and
-      every file the manifest names -- and the upload commands that carry it
-      to the vehicle, a piece at a time;
+      every file the manifest names -- for whatever carries it to the
+      vehicle;
     * *check*: that a directory holds exactly the load set its manifest
       describes, every file of the size and digest it states, and that the
       configuration in it passes ``tcsverify``'s ``verify`` against the
@@ -6112,39 +6112,31 @@ Requirement
     misread.
 
 Requirement
-    The vehicle keeps each load set in a directory of its own, named by its
+    Each load set on the vehicle is in a directory of its own, named by its
     interface digest in hex, under the directory the ``loads`` attribute of
-    the ``tcspecial`` section names. Uploads go to a staging directory beside
-    them, and the running load set is never written to.
+    the ``tcspecial`` section names. tcspecial reads load sets there and
+    never writes to one.
 
-Uploading, and keeping what was uploaded
-----------------------------------------
-
-Requirement
-    A file is uploaded with FILE_OPEN, naming the load set, the path and the
-    size and MD5 the whole file will have; FILE_WRITE, carrying an offset and
-    up to one packet of bytes; and FILE_CLOSE, which is answered ``Success``
-    only when the bytes written are the size and the MD5 FILE_OPEN stated.
-    Each is safe to send again: a FILE_WRITE repeated writes the same bytes
-    to the same place, a FILE_OPEN of a file already complete and correct
-    answers ``Success`` and changes nothing, and so does a FILE_CLOSE of one
-    already accepted.
+Keeping load sets on the vehicle
+--------------------------------
 
 Requirement
-    LOAD_CHECK checks a staged load set as ``tcsverify`` does and, when it
-    passes, moves it from staging to its own directory under ``loads``, in one
-    rename. A LOAD_CHECK of a load set already in its own directory, and
-    passing its check there, answers ``Success``: it is a repeat of one whose
-    answer was lost.
+    Which load sets the vehicle holds is managed from the ground. Getting a
+    load set's files onto the vehicle, checking them as they arrive,
+    protecting them and removing them are done outside tcspecial: tcspecial
+    transfers no files, and has no command that writes, unlocks or removes
+    a load set. What tcspecial does with one is check it and switch to it,
+    as `Restarting onto a load set`_ says.
 
 Requirement
-    Every file uploaded is made read-only as FILE_CLOSE accepts it -- mode
-    ``0444``, or ``0555`` for an ``executable`` or ``app_program`` -- and a load
-    set's directory is made read-only (``0555``) as LOAD_CHECK accepts it, so
-    that nothing in it can be removed, renamed or written. Where the file
-    system allows it, each is also made immutable (``FS_IMMUTABLE_FL``, what
-    ``chattr +i`` sets), which a process running as root cannot get round
-    by accident; where it does not, the log says so once, at start.
+    Whatever puts a load set on the vehicle makes each of its files
+    read-only -- mode ``0444``, or ``0555`` for an ``executable`` or
+    ``app_program`` -- and its directory read-only (``0555``), so that
+    nothing in it can be removed, renamed or written, and where the file
+    system allows it makes each immutable as well (``FS_IMMUTABLE_FL``, what
+    ``chattr +i`` sets), which a process running as root cannot get round by
+    accident. It never removes the running load set or the one the vehicle
+    would fall back to.
 
 Whether a file can be deleted is decided by the directory it is in, not by
 the file: a file of mode ``0444`` in a directory that can be written is
@@ -6152,14 +6144,6 @@ removed by ``rm -f`` without a question. That is why the directory is made
 read-only as well as the files, and why the immutable attribute is used
 where there is one: an operator logged in as root has every permission,
 and the immutable attribute is the one thing that asks first.
-
-Requirement
-    LOAD_UNLOCK makes a load set's directory and files writable again, so
-    that it can be replaced or removed, and LOAD_REMOVE removes one. Both
-    refuse the running load set and the one the vehicle would fall back to,
-    answering ``InvalidParameter`` and saying which it is. A LOAD_UNLOCK of
-    one already writable, and a LOAD_REMOVE of one that is not there,
-    answer ``Success``: what was asked for is so.
 
 Restarting onto a load set
 --------------------------
@@ -6172,9 +6156,11 @@ Requirement
 
 Requirement
     SWITCH_ARM and SWITCH are armed as RESTART_ARM and RESTART are, and
-    SWITCH carries the interface digest of the load set to switch to. A
-    SWITCH is refused, ``NotFound``, unless that load set has passed
-    LOAD_CHECK, and is checked again -- every size and every MD5 -- just
+    each carries the interface digest of the load set to switch to. Each
+    is refused, ``NotFound``, unless that load set is in its directory under
+    ``loads`` and passes the check `Reading, writing and checking an
+    interface`_ describes -- every size and every MD5, and its configuration
+    verified against its interface -- and the SWITCH checks it again just
     before the restart, because storage can change between the two.
 
 Which build starts, what is done with a load set that will not start, and
@@ -6200,9 +6186,9 @@ What is assumed
 Requirement
     **The golden configuration always works.** The build and configuration
     the vehicle is installed with -- the golden build, see `Kinds of
-    restart`_ -- always start, and always work well enough to receive a new
-    operating configuration and switch to it. Everything below rests on
-    this: it is the one way in that no upload, switch or fault can take
+    restart`_ -- always start, and always work well enough to be switched
+    to a new operating configuration. Everything below rests on this: it
+    is the one way in that no new load set, switch or fault can take
     away, so it is proved before launch rather than trusted in flight, and
     nothing in flight replaces it.
 
@@ -6995,12 +6981,10 @@ did. START_NODE and
 STOP_NODE answer ``Success`` for a node already in the state asked for, and
 every attribute SET_NODE may set is a value, not a step. RESTART_ARM with the
 key of the arm already standing leaves that arm as it was -- see
-`Restarting`_ -- and the upload commands answer a repeat ``Success`` once
-what was asked for is done: see `Uploading, and keeping what was uploaded`_.
-A repeated RESTART is refused ``NotArmed``, because the first used the arm up
-or because the start that took it has gone and the one that came back holds
-no arm; it changes nothing, and it is not how the ground learns what
-happened.
+`Restarting`_. A repeated RESTART is refused ``NotArmed``, because the
+first used the arm up or because the start that took it has gone and the
+one that came back holds no arm; it changes nothing, and it is not how the
+ground learns what happened.
 
 The state file
 --------------
@@ -7263,7 +7247,7 @@ Holes in this, and what closes them
 
 What was looked for: any way the ground and the vehicle could come to
 disagree about which definitions are in use, any way a vehicle could be left
-with no way in, and any way an upload could be lost or damaged. Each is
+with no way in, and any way a load set could be lost or damaged. Each is
 paired with the requirement above that closes it.
 
 UDP may carry no checksum
@@ -7276,8 +7260,9 @@ UDP may carry no checksum
 
 A read-only file can still be deleted
     Deleting is permitted by the directory, not the file, and root is
-    permitted everything. The load set's directory is made read-only too, and
-    the immutable attribute is set where the file system has one.
+    permitted everything. What puts a load set on the vehicle makes its
+    directory read-only too, and sets the immutable attribute where the file
+    system has one: see `Keeping load sets on the vehicle`_.
 
 A new build that cannot start
     An executable that crashes at start cannot roll itself back. The golden
@@ -7337,17 +7322,18 @@ A stray packet slowing the beacons or clearing the flag
 
 A load set that is incomplete, or not what the ground meant
     The manifest names every file with its size and MD5, the SWITCH names the
-    interface digest, and the vehicle checks the set at LOAD_CHECK and again
-    at the SWITCH. A build refuses documents of another digest.
+    interface digest, and the vehicle checks the set at SWITCH_ARM and
+    again at the SWITCH. A build refuses documents of another digest.
 
 A configuration the new build would refuse
-    LOAD_CHECK runs ``verify`` on the load set's configuration with the load
-    set's interface, so a configuration refused when it is loaded is refused
-    before the vehicle switches to it, not after.
+    The check at SWITCH_ARM and SWITCH runs ``verify`` on the load set's
+    configuration with the load set's interface, so a configuration
+    refused when it is loaded is refused before the vehicle switches to it,
+    not after.
 
 The full interface breaking the way in
     The fallback interface has its own document and its own link, and no
-    upload replaces it.
+    load set replaces it.
 
 A restart whose first beacons are all lost
     A restart is judged from the beacons by their number going back alone,
@@ -7380,7 +7366,8 @@ A confirmed load set that later fails at every start
 
 Still open
     The command link carries no authentication. Anyone who can reach it can
-    arm and restart the vehicle, upload a load set and switch to it; an arm
+    arm and restart the vehicle, or switch it to any load set it holds; an
+    arm
     key on an open link is a guard against mistakes, not against anybody.
     CCSDS SDLS, or authentication at the radio, is the remedy, and it is not
     designed here.

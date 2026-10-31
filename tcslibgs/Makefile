@@ -3,8 +3,7 @@
 # Cargo builds the crate itself, from the repository's root: see README.md.
 # This builds the page, and regenerates the code that packs and unpacks the
 # commands and answers from the XTCE that describes them. The beacon is text,
-# and its layout is in xtce/fixed.xtce beside the three fixed commands, as
-# text fields: see src/beacon.rs.
+# and its layout is in xtce/beacon.xtce, as text fields: see src/beacon.rs.
 
 .PHONY: all
 all:	docs
@@ -22,6 +21,9 @@ help:
 	@echo "  make fixed-packet    - Regenerate the fixed commands' Rust and" \
 		"Python codecs"
 	@echo "                         from xtce/fixed.xtce"
+	@echo "  make beacon-packet   - Regenerate the beacon's Rust and Python" \
+		"codecs"
+	@echo "                         from xtce/beacon.xtce"
 	@echo "  make interface-digest - Regenerate the digest of the" \
 		"interface,"
 	@echo "                         src/interface_digest.rs, from" \
@@ -101,8 +103,9 @@ $(LINK_RS): $(LINK_XML) | tcs-xtce
 		--source-name tcslibgs/$(LINK_XML)
 	rustfmt --edition 2021 $(LINK_RS)
 
-# The three fixed commands -- CONNECT, RESTART_ARM and RESTART -- and their
-# answers are stated in xtce/fixed.xtce, which never changes, and packed and
+# The fixed commands -- CONNECT, RESTART_ARM, RESTART, SWITCH_ARM and
+# SWITCH -- and their answers are stated in xtce/fixed.xtce, which never
+# changes, and packed and
 # unpacked by the Rust and the Python tcs-xtce generates from it. The Python
 # is for the ground stations written in Python; it imports the runtime
 # through python/tcslibgs/_xtce, whose links into the tcs-xtce checkout
@@ -127,12 +130,33 @@ $(FIXED_PY): $(FIXED_XML) | tcs-xtce
 	sed -i 's/^from tcs_xtce import packet as pk$$/from ._xtce import packet as pk/' \
 		$(FIXED_PY)
 
+# The beacon is stated in xtce/beacon.xtce, which never changes either, and
+# packed and unpacked by the code generated from it in the same way.
+BEACON_XML := xtce/beacon.xtce
+BEACON_RS := src/beacon_packet.rs
+BEACON_PY := ../python/tcslibgs/beacon_packet.py
+
+.PHONY: beacon-packet
+beacon-packet: $(BEACON_RS) $(BEACON_PY)
+
+$(BEACON_RS): $(BEACON_XML) | tcs-xtce
+	$(XTCE_COMPILE) $(CURDIR)/$(BEACON_XML) $(CURDIR)/$(BEACON_RS) \
+		--lang rust --dynamic-allocations false \
+		--source-name tcslibgs/$(BEACON_XML)
+	rustfmt --edition 2021 $(BEACON_RS)
+
+$(BEACON_PY): $(BEACON_XML) | tcs-xtce
+	$(XTCE_COMPILE) $(CURDIR)/$(BEACON_XML) $(abspath $(BEACON_PY)) \
+		--lang python --source-name tcslibgs/$(BEACON_XML)
+	sed -i 's/^from tcs_xtce import packet as pk$$/from ._xtce import packet as pk/' \
+		$(BEACON_PY)
+
 # The digest of the interface: the tcs-xtce digest of xtce/link.xtce, which
 # every beacon carries and every configuration names as its `interface`, so
 # that the ground can tell whether it read the document tcspecial was built
-# from. fixed.xtce is not part of it: no change to the ordinary interface
-# can touch the fixed commands, and their own digest is pinned by a test in
-# src/link.rs. Generated, and committed, for the reason the codecs are; a
+# from. fixed.xtce and beacon.xtce are not part of it: no change to the
+# ordinary interface can touch the fixed commands or the beacon, and their
+# own digests are pinned by a test in src/link.rs. Generated, and committed, for the reason the codecs are; a
 # test in src/interface.rs computes it again from the document and fails if
 # this has not been rerun.
 INTERFACE_XML := xtce/link.xtce

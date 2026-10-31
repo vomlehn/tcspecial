@@ -1,6 +1,6 @@
-"""The three fixed commands, as they go on the link, in Python.
+"""The fixed commands, as they go on the link, in Python.
 
-CONNECT, RESTART_ARM and RESTART are taken at any time, whatever either end
+CONNECT, RESTART_ARM, RESTART, SWITCH_ARM and SWITCH are taken at any time, whatever either end
 is running, and their layouts never change: they are stated in
 ``tcslibgs/xtce/fixed.xtce``, apart from every other command, and packed and
 unpacked here by the code tcs-xtce generates from it,

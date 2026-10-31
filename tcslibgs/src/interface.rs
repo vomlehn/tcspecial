@@ -8,9 +8,10 @@
 //!
 //! The vehicle says which interface it speaks in every beacon, from
 //! [`InterfaceDigest::of_this_build`]: the digest of `tcslibgs/xtce/link.xtce`
-//! this build was generated from, which states every command but the three
-//! fixed ones. The fixed commands are in `tcslibgs/xtce/fixed.xtce`, which is
-//! not part of the interface: no change to the interface can touch them. A
+//! this build was generated from, which states every command but the fixed
+//! ones. The fixed commands are in `tcslibgs/xtce/fixed.xtce`, and the beacon
+//! in `tcslibgs/xtce/beacon.xtce`, which are not part of the interface: no
+//! change to the interface can touch them. A
 //! configuration names the interface it was written for as the `tcspecial`
 //! section's `interface`, and every program refuses one that is not its
 //! build's own; `tcsverify --interface-digest` prints it. A ground station
@@ -157,7 +158,8 @@ mod tests {
 
     /// Lists the documents this build's interface is stated in:
     /// `tcslibgs/xtce/link.xtce`, as `make interface-digest` takes it. Not
-    /// `fixed.xtce`, which no change to the interface may touch.
+    /// `fixed.xtce` or `beacon.xtce`, which no change to the interface may
+    /// touch.
     ///
     /// # Returns
     ///

@@ -21,8 +21,8 @@ use tcslibgs::{
     ArmKey, Command, CommandStatus, ConfigDigest, ConfigVersion,
     ConnectTelemetry, DHSample, NodeCounts, NodeId, NodeTelemetry,
     PingTelemetry, QueryNodeSampleTelemetry, QueryNodeTelemetry, Reason,
-    RestartArmTelemetry, RestartTelemetry, SetNodeTelemetry, TcsError,
-    Telemetry,
+    RestartArmTelemetry, RestartTelemetry, SetNodeTelemetry,
+    SwitchArmTelemetry, SwitchTelemetry, TcsError, Telemetry,
 };
 
 fn stub_sample(first: u8) -> DHSample {
@@ -89,6 +89,13 @@ fn stub_spacecraft(count: usize) -> (String, thread::JoinHandle<()>) {
                 Command::Restart(_) => Telemetry::Restart(
                     RestartTelemetry::new(seq, CommandStatus::Success),
                 ),
+                Command::SwitchArm(_) => Telemetry::SwitchArm(
+                    SwitchArmTelemetry::new(seq, CommandStatus::Success),
+                ),
+                Command::Switch(_) => Telemetry::Switch(SwitchTelemetry::new(
+                    seq,
+                    CommandStatus::Success,
+                )),
                 // A node's commands, each answered for the node it named.
                 // Every command has an answer here because the stub reads
                 // whatever arrives, and a command it could not answer would

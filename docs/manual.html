@@ -825,9 +825,10 @@ file is not a tcspecial configuration and keeps its language's extension,
 unfamiliar one was assumed to be, which made a misspelled extension not an
 error but a file parsed as the wrong language. Nothing was written in it
 that was not also written in YAML.</p>
-<p>(The command link carries packets stated in XTCE: the three fixed commands
-in <tt class="docutils literal">tcslibgs/xtce/fixed.xtce</tt> and the rest in <tt class="docutils literal">tcslibgs/xtce/link.xtce</tt>.
-Those are not configuration files and are unaffected; a configuration names
+<p>(The links carry packets stated in XTCE: the fixed commands in
+<tt class="docutils literal">tcslibgs/xtce/fixed.xtce</tt>, the beacon in <tt class="docutils literal">tcslibgs/xtce/beacon.xtce</tt>
+and the rest in <tt class="docutils literal">tcslibgs/xtce/link.xtce</tt>. Those are not configuration
+files and are unaffected; a configuration names
 the second, as its <tt class="docutils literal">interface</tt>: see <a class="reference internal" href="#which-interface-it-is-written-for">Which interface it is written for</a>.)</p>
 </div>
 <div class="section" id="which-files-there-are">
@@ -2474,17 +2475,16 @@ tcspecial:0.1.0:36999e46a4bf436854442d8f97a2248d:42:normal:0123...cdef
 </pre>
 <p>It is text so that it can be read as it is, in a packet capture, a log or
 with any UDP listener, with nothing to decode it. Its layout is stated in
-XTCE, in <tt class="docutils literal">tcslibgs/xtce/fixed.xtce</tt> beside the three commands that always
-go, as six text fields -- each but the last ended by its colon -- and
-nothing else, so a ground system that reads XTCE can read it too. That is what goes on the
-wire; what the window shows on its <tt class="docutils literal">Last msg:</tt> line is written for the
-window, as <tt class="docutils literal">tcspecial v0.1.0 md5</tt> and the digest. tcspecial writes each
-beacon, and <tt class="docutils literal"><span class="pre">tcslib::beacon</span></tt> reads it, with <tt class="docutils literal"><span class="pre">tcslibgs::Beacon</span></tt>, which
-the Python in <tt class="docutils literal">python/tcslibgs/beacon.py</tt> says again, held to it by the
-same examples in their tests. The example's test writes the beacon it sends
-the same way. A beacon is read strictly: anything with a field out of its
-form, a seventh field, a trailing colon or newline, or more than 106 bytes,
-is not a beacon.</p>
+XTCE, in <tt class="docutils literal">tcslibgs/xtce/beacon.xtce</tt>, as six text fields -- each but the
+last ended by its colon -- and nothing else, so a ground system that reads
+XTCE can read it too. That is what goes on the wire; what the window shows on
+its <tt class="docutils literal">Last msg:</tt> line is written for the window, as <tt class="docutils literal">tcspecial v0.1.0 md5</tt>
+and the digest. tcspecial writes each beacon, and <tt class="docutils literal"><span class="pre">tcslib::beacon</span></tt> reads it,
+with <tt class="docutils literal"><span class="pre">tcslibgs::Beacon</span></tt>, which the Python in <tt class="docutils literal">python/tcslibgs/beacon.py</tt>
+says again, held to it by the same examples in their tests. The example's test
+writes the beacon it sends the same way. A beacon is read strictly: anything
+with a field out of its form, a seventh field, a trailing colon or newline, or
+more than 106 bytes, is not a beacon.</p>
 <p>tcsmoc shows that same panel from that same library, in a row beside its
 command link. That is the point of their being apart: what a beacon means is
 one thing wherever it is shown, and an operator who has read one window has
@@ -3638,12 +3638,14 @@ every configuration shipped in the tree. The
 configuration's checksum covers <tt class="docutils literal">interface</tt>, so a vehicle and a ground
 station whose checksums match are reading the same interface as well.</p>
 <p>Every digest you will see on the link stands for <tt class="docutils literal">link.xtce</tt>: the
-beacon's last field is its digest, and the checksums in the beacon, in
-CONNECT and its answer, and in RESTART_ARM and RESTART are configuration
-checksums, which cover <tt class="docutils literal">interface</tt>. None covers
-<tt class="docutils literal">tcslibgs/xtce/fixed.xtce</tt>, where CONNECT, RESTART_ARM, RESTART and the
-beacon are laid out. It is the same in every build, so there is nothing to
-compare, and a test in <tt class="docutils literal">tcslibgs</tt> fails if it is ever changed.</p>
+beacon's last field is its digest, the checksums in the beacon, in CONNECT
+and its answer, and in RESTART_ARM and RESTART are configuration
+checksums, which cover <tt class="docutils literal">interface</tt>, and the target of SWITCH_ARM and
+SWITCH is the digest of a load set's <tt class="docutils literal">link.xtce</tt>. None covers
+<tt class="docutils literal">tcslibgs/xtce/fixed.xtce</tt>, where the fixed commands are laid out, or
+<tt class="docutils literal">tcslibgs/xtce/beacon.xtce</tt>, where the beacon is. Each is the same in
+every build, so there is nothing to compare, and a test in <tt class="docutils literal">tcslibgs</tt>
+fails if either is ever changed.</p>
 </div>
 <div class="section" id="where-the-links-are">
 <h2><a class="toc-backref" href="#toc-entry-57">Where the links are</a></h2>

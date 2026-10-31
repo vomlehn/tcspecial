@@ -13,6 +13,9 @@
 
 /// The beacon, as it goes on the link.
 pub mod beacon;
+/// The beacon's packing code, which tcs-xtce generated from
+/// `xtce/beacon.xtce`: used through [`beacon`].
+mod beacon_packet;
 pub mod commands;
 pub mod config;
 pub mod config_digest;

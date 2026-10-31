@@ -31,11 +31,11 @@ SECOND = 1_000_000_000
 AT = 1_000_000 * SECOND
 
 
-def a_beacon(sequence=2, digest=None, version=(0, 1, 0), commanded=False,
+def a_beacon(sequence=2, digest=None, version=(0, 1, 0), flagged=False,
              interface_digest=None):
     """A beacon, as tcspecial sends one.
 
-    The name, the version, the digest, the number, the commanded-restart flag
+    The name, the version, the digest, the number, the restart flag
     and the interface's digest, as text, a colon between each.
 
     Args:
@@ -43,7 +43,7 @@ def a_beacon(sequence=2, digest=None, version=(0, 1, 0), commanded=False,
         digest:           The configuration's digest, sixteen byte values;
                           ``None`` for a fixed one.
         version:          The version, major, minor and patch.
-        commanded:        Whether the start was commanded.
+        flagged:          Whether the restart flag is set.
         interface_digest: The interface's digest, sixteen bytes; ``None`` for
                           this tree's.
 
@@ -54,7 +54,7 @@ def a_beacon(sequence=2, digest=None, version=(0, 1, 0), commanded=False,
                         121, 87, 153, 67, 108, 53, 167, 176]
     interface_digest = interface_digest or interface.of_this_tree()
     major, minor, patch = version
-    flag = "restart" if commanded else "normal"
+    flag = "restart" if flagged else "normal"
     return (f"tcspecial:{major}.{minor}.{patch}:{bytes(digest).hex()}:"
             f"{sequence}:{flag}:{bytes(interface_digest).hex()}"
             ).encode("ascii")
@@ -205,7 +205,7 @@ class LayoutTest(unittest.TestCase):
         self.assertEqual(packed, a_beacon(sequence=0x01020304,
                                           digest=list(digest),
                                           version=(1, 2, 3),
-                                          commanded=True))
+                                          flagged=True))
         self.assertEqual(
             packed,
             b"tcspecial:1.2.3:d41d8cd98f00b204e9800998ecf8427e:16909060:"
@@ -253,12 +253,12 @@ class HearingTest(unittest.TestCase):
         datagram = a_beacon(sequence=3, digest=[0xAB] * 16, version=(1, 2, 3))
         want = f"tcspecial v1.2.3 md5 {'ab' * 16}"
         self.assertEqual(beacon.message_of(datagram), want)
-        commanded = a_beacon(sequence=3, digest=[0xAB] * 16,
-                             version=(1, 2, 3), commanded=True)
+        flagged = a_beacon(sequence=3, digest=[0xAB] * 16,
+                           version=(1, 2, 3), flagged=True)
         self.assertEqual(
-            beacon.message_of(commanded),
-            f"tcspecial v1.2.3 md5 {'ab' * 16}, COMMANDED RESTART")
-        heard = beacon.hear(commanded, None)
+            beacon.message_of(flagged),
+            f"tcspecial v1.2.3 md5 {'ab' * 16}, RESTARTED, NOT YET MATCHED")
+        heard = beacon.hear(flagged, None)
         self.assertTrue(heard.restart_flag)
         self.assertFalse(beacon.hear(datagram, None).restart_flag)
         self.assertEqual(beacon.hear(datagram, None).sequence, 3)
@@ -357,15 +357,14 @@ class LoopTest(unittest.TestCase):
         repeat = self.beacons.heard(a_beacon(sequence=4), sender)
         self.assertEqual(repeat.remarks, [], "the radio's repeat")
         started = self.beacons.heard(
-            a_beacon(sequence=1, commanded=True), sender)
+            a_beacon(sequence=1, flagged=True), sender)
         self.assertIn("the beacons start again at #1, so tcspecial has "
-                      "restarted as commanded", started.remarks)
-        self.beacons.heard(a_beacon(sequence=2), sender)
+                      "restarted", started.remarks)
+        self.beacons.heard(a_beacon(sequence=3), sender)
         # A start whose #1 was lost: the number still went back.
-        crashed = self.beacons.heard(a_beacon(sequence=1), sender)
-        self.assertIn("the beacons start again at #1, so tcspecial has "
-                      "restarted without being commanded to, with the "
-                      "definitions it had", crashed.remarks)
+        crashed = self.beacons.heard(a_beacon(sequence=2), sender)
+        self.assertIn("the beacons start again at #2, so tcspecial has "
+                      "restarted", crashed.remarks)
 
     def test_a_datagram_from_the_wrong_place_is_not_a_beacon(self):
         wrong = self.beacons.heard(a_beacon(), ("127.0.0.1", 9999))

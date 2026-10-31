@@ -14,6 +14,8 @@ use std::net::UdpSocket;
 use std::thread;
 use std::time::Duration;
 
+use tcslib::beacon::Stage;
+use tcslib::matched::Matched;
 use tcslib::{TcsClient, UdpConnection};
 use tcslibgs::{
     ArmKey, Command, CommandStatus, ConfigDigest, ConfigVersion,
@@ -171,15 +173,36 @@ fn client_to(addr: &str) -> TcsClient {
     let spacecraft =
         UdpConnection::new("127.0.0.1:0", addr).expect("connection");
     let nodes = UdpConnection::new("127.0.0.1:0", addr).expect("the node link");
-    let mut client =
-        TcsClient::of_a_graph(Box::new(spacecraft), Box::new(nodes));
+    let mut client = TcsClient::of_a_graph(
+        Box::new(spacecraft),
+        Box::new(nodes),
+        listening(),
+    );
     client.set_timeout(Duration::from_secs(10));
     // A station that has connected, so that it knows which generation is
-    // flying and its node commands are sent rather than refused unsent.
+    // flying and is matched for commanding, and its node commands are sent
+    // rather than refused unsent.
     client
         .connect(ConfigVersion::of_this_build(), ConfigDigest([0x5A; 16]))
         .expect("connected");
     client
+}
+
+/// The checksum of the configuration these stations use, which the stand-in
+/// answers a CONNECT with.
+const DIGEST: ConfigDigest = ConfigDigest([0x5A; 16]);
+
+/// A station matched for listening: it has heard a clear beacon carrying
+/// its checksum, as it would from a vehicle another station has matched. A
+/// CONNECT answered with the checksum then matches it for commanding.
+///
+/// # Returns
+///
+/// The station's state.
+fn listening() -> Matched {
+    let matched = Matched::for_configuration(DIGEST);
+    matched.beacon(false, Some(DIGEST), Stage::Heard, false);
+    matched
 }
 
 /// Makes the counts a stand-in vehicle says a node has moved.
@@ -292,7 +315,8 @@ fn a_client_with_no_node_link_refuses_a_node_command() {
     // there is nothing for a far end to do.
     let spacecraft =
         UdpConnection::new("127.0.0.1:0", "127.0.0.1:1").expect("connection");
-    let mut client = TcsClient::spacecraft_only(Box::new(spacecraft));
+    let mut client =
+        TcsClient::spacecraft_only(Box::new(spacecraft), listening());
     let said =
         format!("{}", client.start_node(NodeId::of(0)).expect_err("refused"));
     assert!(
@@ -350,14 +374,16 @@ fn every_operation_reaches_the_spacecraft_and_comes_back() {
         CommandStatus::Success
     );
     assert!(client.restart_wait().is_some());
-    // Not by the old start's beacons, though they carry the bit.
-    assert_eq!(client.beacon_heard(false, true), None);
+    // Not by the old start's beacons, though they carry the flag.
+    assert!(!client.beacon_heard(false));
     assert!(client.restart_wait().is_some());
-    // By the next start, which says it was the one commanded.
-    let ended = client.beacon_heard(true, true).expect("it ends the wait");
-    assert_eq!(ended.commanded, Some(true));
+    // By the next start.
+    assert!(client.beacon_heard(true), "it ends the wait");
     assert!(client.restart_wait().is_none());
-    // And then a CONNECT, before anything but a PING.
+    // And then a CONNECT, before anything but the three. (Here the
+    // station's match is not fed the beacons, so what refuses the command
+    // is the generation; at a real station the new start's flagged beacons
+    // refuse it first, as not matched.)
     assert!(matches!(
         start(&mut client),
         Err(TcsError::GenerationUnknown(_))
@@ -378,9 +404,15 @@ fn a_spacecraft_that_does_not_answer_times_out() {
 
     let connection = UdpConnection::new("127.0.0.1:0", &addr).unwrap();
     let nodes = UdpConnection::new("127.0.0.1:0", &addr).unwrap();
-    let mut client =
-        TcsClient::of_a_graph(Box::new(connection), Box::new(nodes));
+    let mut client = TcsClient::of_a_graph(
+        Box::new(connection),
+        Box::new(nodes),
+        listening(),
+    );
     client.set_timeout(Duration::from_millis(250));
+    // Matched for commanding, so that a PING goes and is not refused unsent.
+    let mark = client.matched().before_connect();
+    client.matched().connect_answered(DIGEST, mark);
 
     assert!(client.ping().is_err(), "a silent link should be an error");
 }

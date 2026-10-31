@@ -1930,10 +1930,10 @@ mod tests {
         );
         assert!(
             !shown.iter().any(|line| line == tcsui::RESTARTED_CONNECT),
-            "no restart said of a beacon without the bit: {shown:?}"
+            "no restart said of a beacon without the flag: {shown:?}"
         );
 
-        // A beacon carrying the commanded-restart bit says, beside the
+        // A beacon carrying the restart flag says, beside the
         // indicator, to connect; the next without it clears that.
         let restarted = tcsui::Shown {
             restart: tcsui::restart_of(true),

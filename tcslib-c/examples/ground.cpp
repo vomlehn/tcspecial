@@ -32,6 +32,20 @@ const std::string STEM = "examples/ping/ping";
 // The key a restart is armed with, which the restart must carry.
 const std::uint64_t ARM_KEY = 0x1234;
 
+// Says whether the station is matched with the vehicle, for listening and
+// for commanding; false where it cannot be asked.
+bool say_matched(const tcs_configuration *configuration)
+{
+	int listening = 0, commanding = 0;
+	if (tcs_configuration_matched(configuration, &listening,
+				      &commanding) != 0) {
+		return false;
+	}
+	std::printf("matched: listening %s, commanding %s\n",
+		    listening ? "yes" : "no", commanding ? "yes" : "no");
+	return true;
+}
+
 // Each handle, closed by its own _close when it goes.
 template <typename T, void (*Close)(T *)> struct Closer {
 	void operator()(T *handle) const { Close(handle); }
@@ -124,6 +138,14 @@ int main(int argc, char **argv)
 		return fail("open");
 	}
 
+	// Nothing but CONNECT, RESTART_ARM and RESTART goes before a match,
+	// and this station has heard no beacon yet.
+	const bool refused = tcs_client_ping(client.get()) != 0 &&
+		std::string(tcs_last_error()).find("not yet matched") !=
+		std::string::npos;
+	std::printf("ping before a match: %s\n",
+		    refused ? "refused, unsent" : "sent");
+
 	// The first beacon: what the vehicle is flying, before anything has
 	// been asked of it.
 	tcs_pass pass{};
@@ -142,12 +164,18 @@ int main(int argc, char **argv)
 		    "" : " (not in contact)",
 		    tcs_beacons_said(beacons.get()));
 
+	if (!say_matched(configuration.get())) {
+		return fail("matched");
+	}
 	int agrees = 0;
 	if (tcs_client_connect(client.get(), &agrees) != 0) {
 		return fail("connect");
 	}
 	std::printf("connect: %s\n",
 		    agrees ? "agrees" : "a different configuration");
+	if (!say_matched(configuration.get())) {
+		return fail("matched");
+	}
 	if (tcs_client_ping(client.get()) != 0) {
 		return fail("ping");
 	}
@@ -268,5 +296,18 @@ int main(int argc, char **argv)
 	if (!data_seen || !exchange.answered) {
 		std::printf("data: not everything arrived\n");
 	}
+
+	// Every packet from the vehicle, data and answers, in exactly one of
+	// the three counts.
+	tcs_counts counts{};
+	if (tcs_configuration_counts(configuration.get(), &counts) != 0) {
+		return fail("counts");
+	}
+	std::printf("packets: %llu received = %llu processed + %llu "
+		    "malformed + %llu mismatched\n",
+		    static_cast<unsigned long long>(counts.received),
+		    static_cast<unsigned long long>(counts.processed),
+		    static_cast<unsigned long long>(counts.malformed),
+		    static_cast<unsigned long long>(counts.mismatched));
 	return 0;
 }

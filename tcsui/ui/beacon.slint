@@ -48,8 +48,8 @@ export component BeaconPanel inherits TitledBox {
     // tcsmoc's is.
     in property <string> messages: "";
     // What the field to the right of the indicator says of a restart --
-    // tcsui::RESTARTED_CONNECT while the last beacon carried the
-    // commanded-restart bit, empty while it did not -- and whether the
+    // tcsui::RESTARTED_CONNECT while the last beacon carried the restart
+    // flag, empty while it did not -- and whether the
     // window shows the field at all. Read-only: it is the beacon's to say.
     in property <string> restart: "";
     in property <bool> shows-restart: false;

@@ -149,29 +149,30 @@ pub struct Shown {
     /// colour, so the two cannot disagree.
     pub stage: String,
     /// What the field beside the indicator says of a restart:
-    /// [`RESTARTED_CONNECT`] where the last beacon carried the
-    /// commanded-restart bit, and nothing where it did not.
+    /// [`RESTARTED_CONNECT`] where the last beacon carried the restart flag,
+    /// and nothing where it did not.
     pub restart: &'static str,
 }
 
 /// What the field beside the indicator says while the beacons carry the
-/// commanded-restart bit: tcspecial has restarted, or is restarting, as
-/// commanded, and the ground is to CONNECT before anything else, which is
-/// what clears the bit.
+/// restart flag: tcspecial has started -- any start, the first included --
+/// or taken a RESTART, and has not been matched since. The ground is to
+/// CONNECT with the configuration whose checksum the beacons carry, which is
+/// what clears the flag; until then nothing but beacons and answers comes
+/// down.
 pub const RESTARTED_CONNECT: &str = "Restarted\u{2014}connect";
 
-/// What that field says of a beacon whose commanded-restart bit is
-/// `commanded`.
+/// What that field says of a beacon whose restart flag is `flag`.
 ///
 /// # Arguments
 ///
-/// * `commanded` - The beacon's commanded-restart bit.
+/// * `flag` - The beacon's restart flag.
 ///
 /// # Returns
 ///
 /// [`RESTARTED_CONNECT`] where it is set, and nothing where it is not.
-pub fn restart_of(commanded: bool) -> &'static str {
-    if commanded {
+pub fn restart_of(flag: bool) -> &'static str {
+    if flag {
         RESTARTED_CONNECT
     } else {
         ""
@@ -449,7 +450,7 @@ mod tests {
     }
 
     /// The field beside the indicator says to connect while the beacons
-    /// carry the commanded-restart bit, and nothing while they do not.
+    /// carry the restart flag, and nothing while they do not.
     #[test]
     fn the_restart_field_says_to_connect_while_the_bit_is_set() {
         assert_eq!(restart_of(true), "Restarted\u{2014}connect");

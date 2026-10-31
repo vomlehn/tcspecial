@@ -25,6 +25,11 @@ if [ "$1" = 0 ]; then
 fi
 
 %files
+%dir /opt/tcs
+%dir /opt/tcs/bin
+%dir /opt/tcs/sbin
+%dir /opt/tcs/share
+%dir /opt/tcs/share/doc
 /opt/tcs/bin/tcsmoc
 /opt/tcs/bin/tcssim
 /opt/tcs/bin/segsend

@@ -46,6 +46,15 @@ if [ "$1" = 0 ]; then
 fi
 
 %files
+%dir /opt/tcs
+%dir /opt/tcs/bin
+%dir /opt/tcs/sbin
+%dir /opt/tcs/include
+%dir /opt/tcs/lib
+%dir /opt/tcs/lib/pkgconfig
+%dir /opt/tcs/lib/python3
+%dir /opt/tcs/share
+%dir /opt/tcs/share/doc
 /opt/tcs/bin/tcsgui
 /opt/tcs/include/tcs.h
 /opt/tcs/lib/libtcs.so*

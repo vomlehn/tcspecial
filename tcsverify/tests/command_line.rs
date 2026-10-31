@@ -23,6 +23,7 @@ fn with_errors(dir: &Path, count: usize) -> PathBuf {
 description: many
 tcspecial:
   gateway: radio
+  interface: \"ad9aac4dd5a6d88dd5e78824ba8a83ac\"
   state_file: /tmp/tcspecial-test.state
   beacon:
     default_interval: \"5 s\"
@@ -80,6 +81,38 @@ fn run(args: &[&str]) -> (Vec<String>, i32) {
         printed.lines().map(str::to_string).collect(),
         out.status.code().expect("an exit status"),
     )
+}
+
+/// `--interface-digest` prints the digest of the interface this build
+/// speaks, alone, as a configuration's `interface` writes it; with anything
+/// beside it the command line is none of the shapes.
+#[test]
+fn the_interface_digest_is_printed_alone() {
+    let (lines, status) = run(&["--interface-digest"]);
+    assert_eq!(status, 0);
+    assert_eq!(
+        lines,
+        vec![tcslibgs::InterfaceDigest::of_this_build().to_string()]
+    );
+    assert_eq!(lines[0].len(), 32);
+    assert!(
+        lines[0]
+            .bytes()
+            .all(|b| b.is_ascii_digit() || b.is_ascii_lowercase()),
+        "{lines:?}"
+    );
+
+    // And it is what the shipped configurations name.
+    let example = Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("../examples/ping/ping.yaml");
+    let text = std::fs::read_to_string(example).expect("the example");
+    assert!(
+        text.contains(&format!("interface: \"{}\"", lines[0])),
+        "the ping example names another interface"
+    );
+
+    let (_, status) = run(&["--interface-digest", "a.yaml"]);
+    assert_eq!(status, 2, "given alone");
 }
 
 #[test]
@@ -253,6 +286,7 @@ fn with_vehicle_node(dir: &Path, node: &str) -> PathBuf {
 description: one vehicle node
 tcspecial:
   gateway: radio
+  interface: \"ad9aac4dd5a6d88dd5e78824ba8a83ac\"
   state_file: /tmp/tcspecial-test.state
   beacon:
     default_interval: \"5 s\"

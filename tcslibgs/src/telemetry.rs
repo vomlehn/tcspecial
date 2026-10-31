@@ -3,7 +3,7 @@
 //! Telemetry is sent from space to ground.
 //!
 //! These are the answers to commands, which go on the link as the packets
-//! `xtce/link.xml` states: see [`crate::link`]. The beacon, which answers
+//! `xtce/fixed.xml` and `xtce/link.xml` state: see [`crate::link`]. The beacon, which answers
 //! nothing and has a layout of its own, is in [`crate::beacon`].
 
 use crate::config_digest::{ConfigDigest, ConfigVersion};
@@ -14,16 +14,6 @@ use crate::types::{CommandStatus, DHSample, NodeCounts, NodeId, Timestamp};
 pub struct TelemetryHeader {
     /// Sequence number matching the command that generated this response
     pub sequence: u32,
-    /// The generation of tcspecial that made this answer: how many times it
-    /// has started, from its state file, as the beacon says it.
-    ///
-    /// In every answer, refusals among them, so that a ground station hears
-    /// of a restart from whatever answer reaches it first, and can tell
-    /// which start of tcspecial took the command it is answering. Stamped as
-    /// the answer goes -- see [`Telemetry::for_generation`] -- by the one
-    /// place that sends answers, which is what knows it; nought until then,
-    /// which no start is.
-    pub generation: u32,
     /// Telemetry type identifier
     pub tm_type: TelemetryType,
     /// Command status
@@ -57,7 +47,7 @@ impl TelemetryHeader {
     ///
     /// # Returns
     ///
-    /// The header, stamped with the time now and with generation nought.
+    /// The header, stamped with the time now.
     pub fn new(
         sequence: u32,
         tm_type: TelemetryType,
@@ -65,7 +55,6 @@ impl TelemetryHeader {
     ) -> Self {
         Self {
             sequence,
-            generation: 0,
             tm_type,
             status,
             timestamp: Timestamp::now(),
@@ -93,51 +82,61 @@ pub enum TelemetryType {
 }
 
 impl TelemetryType {
-    /// Gives the kind an answer of this type carries. What goes on the link
-    /// is stated in `xtce/link.xml`, and a test in [`crate::link`] holds this
-    /// to it, so the two cannot come to differ.
+    /// Gives the command this is the answer to.
     ///
     /// # Returns
     ///
-    /// The kind's byte on the link.
-    pub fn to_u8(&self) -> u8 {
+    /// The command's kind.
+    pub fn answers(&self) -> crate::commands::CommandType {
+        use crate::commands::CommandType;
         match self {
-            TelemetryType::Ping => 0x81,
-            TelemetryType::Connect => 0x84,
-            TelemetryType::RestartArm => 0x82,
-            TelemetryType::Restart => 0x83,
-            // 0xA0 is not used: it was CONFIG's answer.
-            TelemetryType::StartNode => 0x30,
-            TelemetryType::StopNode => 0x31,
-            TelemetryType::SetNode => 0x32,
-            TelemetryType::QueryNode => 0x33,
-            TelemetryType::QueryNodeSample => 0x34,
+            TelemetryType::Ping => CommandType::Ping,
+            TelemetryType::Connect => CommandType::Connect,
+            TelemetryType::RestartArm => CommandType::RestartArm,
+            TelemetryType::Restart => CommandType::Restart,
+            TelemetryType::StartNode => CommandType::StartNode,
+            TelemetryType::StopNode => CommandType::StopNode,
+            TelemetryType::SetNode => CommandType::SetNode,
+            TelemetryType::QueryNode => CommandType::QueryNode,
+            TelemetryType::QueryNodeSample => CommandType::QueryNodeSample,
         }
     }
 
-    /// Reads the type an answer's kind byte names: [`TelemetryType::to_u8`]
+    /// Gives the opcode an answer of this type carries, which is the opcode
+    /// of the command it answers: an answer has no kind of its own. The
+    /// values 129 to 132 that once told an answer from a command, when the
+    /// two shared a header, are not used.
+    ///
+    /// # Returns
+    ///
+    /// The opcode on the link.
+    pub fn to_u8(&self) -> u8 {
+        self.answers().to_u8()
+    }
+
+    /// Reads the type an answer's opcode names: [`TelemetryType::to_u8`]
     /// the other way.
     ///
     /// # Arguments
     ///
-    /// * `value` - The kind's byte on the link.
+    /// * `value` - The opcode on the link.
     ///
     /// # Returns
     ///
-    /// The type, or `None` for a byte that names none.
+    /// The type, or `None` for an opcode no command has.
     pub fn from_u8(value: u8) -> Option<Self> {
-        match value {
-            0x81 => Some(TelemetryType::Ping),
-            0x84 => Some(TelemetryType::Connect),
-            0x82 => Some(TelemetryType::RestartArm),
-            0x83 => Some(TelemetryType::Restart),
-            0x30 => Some(TelemetryType::StartNode),
-            0x31 => Some(TelemetryType::StopNode),
-            0x32 => Some(TelemetryType::SetNode),
-            0x33 => Some(TelemetryType::QueryNode),
-            0x34 => Some(TelemetryType::QueryNodeSample),
-            _ => None,
-        }
+        use crate::commands::CommandType;
+        Some(match CommandType::from_u8(value)? {
+            CommandType::Ping => TelemetryType::Ping,
+            CommandType::Connect => TelemetryType::Connect,
+            CommandType::RestartArm => TelemetryType::RestartArm,
+            CommandType::Restart => TelemetryType::Restart,
+            CommandType::StartNode => TelemetryType::StartNode,
+            CommandType::StopNode => TelemetryType::StopNode,
+            CommandType::SetNode => TelemetryType::SetNode,
+            CommandType::QueryNode => TelemetryType::QueryNode,
+            CommandType::QueryNodeSample => TelemetryType::QueryNodeSample,
+        })
     }
 }
 
@@ -211,13 +210,16 @@ impl RestartTelemetry {
     }
 }
 
-/// START_DH telemetry response
+/// The answer to a CONNECT: the running configuration's checksum, the
+/// vehicle's build, and the newest command sequence taken.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct ConnectTelemetry {
     pub header: TelemetryHeader,
+    /// The version of the vehicle's build, for the station to show: the
+    /// vehicle acts on the checksum alone.
     pub version: ConfigVersion,
-    /// The digest of the configuration this end read, which says which set
-    /// it is serving: see `crate::config_digest`.
+    /// The checksum of the configuration the vehicle is running, which says
+    /// which set it is serving: see `crate::config_digest`.
     pub digest: ConfigDigest,
     /// The newest command sequence this start of tcspecial has taken, or
     /// the CONNECT's own where it has taken none. A ground station whose
@@ -736,18 +738,6 @@ impl Telemetry {
         self.header().sequence
     }
 
-    /// The generation that made this answer: see
-    /// [`TelemetryHeader::generation`].
-    pub fn generation(&self) -> u32 {
-        self.header().generation
-    }
-
-    /// This answer, made by `generation`.
-    pub fn for_generation(mut self, generation: u32) -> Self {
-        self.header_mut().generation = generation;
-        self
-    }
-
     /// Gives this answer as the answer to the command numbered `sequence`.
     ///
     /// For a stand-in vehicle, which answers whatever it is asked: the
@@ -856,8 +846,9 @@ mod tests {
     #[test]
     fn test_telemetry_type_conversion() {
         let tm_type = TelemetryType::Ping;
-        assert_eq!(tm_type.to_u8(), 0x81);
-        assert_eq!(TelemetryType::from_u8(0x81), Some(TelemetryType::Ping));
+        assert_eq!(tm_type.to_u8(), 0x01, "the opcode of the PING it answers");
+        assert_eq!(TelemetryType::from_u8(0x01), Some(TelemetryType::Ping));
+        assert_eq!(TelemetryType::from_u8(0x81), None, "no kind of its own");
     }
 
     #[test]

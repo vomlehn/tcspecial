@@ -4,7 +4,7 @@ use std::net::{SocketAddr, UdpSocket};
 use std::path::Path;
 use std::time::{Duration, Instant};
 
-use tcslibgs::config_digest::{digest_of_graph, ConfigDigest, ConfigVersion};
+use tcslibgs::config_digest::{digest_of_graph, ConfigDigest};
 use tcslibgs::graph::Graph;
 use tcslibgs::{Command, ConnectCommand, Telemetry};
 
@@ -53,12 +53,8 @@ pub fn connect(
     sequence: u32,
     digest: ConfigDigest,
 ) -> Telemetry {
-    let command = Command::Connect(ConnectCommand::new(
-        sequence,
-        ConfigVersion::of_this_build(),
-        digest,
-    ))
-    .to_bytes();
+    let command =
+        Command::Connect(ConnectCommand::new(sequence, digest)).to_bytes();
     let deadline = Instant::now() + Duration::from_secs(20);
     let mut buffer = [0u8; 65535];
     while Instant::now() < deadline {

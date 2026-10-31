@@ -428,6 +428,15 @@ mod tests {
     }
 
     /// The line a piece of text is on, from 1.
+    ///
+    /// # Arguments
+    ///
+    /// * `text`  - The whole text.
+    /// * `piece` - What to find in it, which must be there.
+    ///
+    /// # Returns
+    ///
+    /// The line it starts on.
     fn line_of(text: &str, piece: &str) -> usize {
         text[..text.find(piece).expect("it is there")]
             .matches('\n')

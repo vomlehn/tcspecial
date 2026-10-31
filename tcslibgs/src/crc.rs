@@ -2,7 +2,7 @@
 //!
 //! Packets on the link carry none: the transport under them checks them.
 //! What is kept on storage has nothing under it that does -- the state file
-//! tcspecial keeps its generation number in is one -- so it carries the
+//! tcspecial keeps what must survive a restart in is one -- so it carries the
 //! CCSDS CRC-16, computed through this by tcs-xtce's routine, so that there
 //! is one CRC in the system and one implementation of it.
 

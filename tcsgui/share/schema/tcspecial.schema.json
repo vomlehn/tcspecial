@@ -49,6 +49,11 @@
             "fprime"
           ]
         },
+        "interface": {
+          "description": "The interface the configuration was written for: the digest of the tcslibgs/xtce/link.xml its commands are laid out by, as 32 lower-case hex digits, which `tcsverify --interface-digest` prints. Required, and refused unless it is the build's own.",
+          "type": "string",
+          "pattern": "^[0-9a-f]{32}$"
+        },
         "tcs_cmd": {
           "type": "object",
           "properties": {
@@ -149,7 +154,7 @@
           "additionalProperties": false
         },
         "state_file": {
-          "description": "The file tcspecial counts its starts in, the generation number every beacon carries. On storage that survives a power cycle.",
+          "description": "The file tcspecial keeps what must survive a restart in: whether the next start is commanded. On storage that survives a power cycle.",
           "type": "string"
         },
         "restart_arm_valid": {

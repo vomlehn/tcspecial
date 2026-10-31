@@ -562,6 +562,7 @@ section every configuration holds, and it is required of every one of them.
 
    tcspecial:
      gateway: radio
+     interface: "ad9aac4dd5a6d88dd5e78824ba8a83ac"
      tcs_cmd:
        recv: 0.0.0.0:4000
        send: 127.0.0.1:4100
@@ -581,22 +582,27 @@ section every configuration holds, and it is required of every one of them.
        segment_size: 65536
      restart_arm_valid: "20 min"
 
-Five of its seven entries are subsections, because each of them is one thing
+Five of its eight entries are subsections, because each of them is one thing
 with more than one attribute to it: the spacecraft command link has two ends,
 the commands about nodes have two, a payload's telemetry has two, the beacon
-has two and a timing, and the log has a place and a size. The other two,
-``gateway`` and ``restart_arm_valid``, are one fact each and are written as
-one. ``gateway`` is what the vehicle answers to -- see `Gateways: what the
-vehicle answers to`_. A prefix repeated
+has two and a timing, and the log has a place and a size. The other three,
+``gateway``, ``interface`` and ``restart_arm_valid``, are one fact each and
+are written as one. ``gateway`` is what the vehicle answers to -- see
+`Gateways: what the vehicle answers to`_. ``interface`` is the interface the
+configuration was written for, which every program refuses unless it is the
+one its build speaks -- see `The configuration names its interface`_.
+``state_file`` is beside them, and so are the attributes `Configurations
+named by their checksum`_ adds. A prefix repeated
 on two or three flat names -- ``beacon.send``, ``beacon.recv``, ``beacon.default_interval`` -- is a subsection
 somebody declined to write, and the names under one are short for the same
 reason: ``beacon.send`` says what ``beacon.send`` said, where the reader is
 already looking at the beacon.
 
-Ten of the thirteen attributes must be stated, and are required rather than
+Twelve of the attributes above must be stated, and are required rather than
 defaulted for one reason: a configuration that has not been asked the question
-has not answered it. What the vehicle answers to, where commands are taken and
-where beacons go are mission facts, and a file that was silently given an answer to either is a vehicle
+has not answered it. What the vehicle answers to, which interface its commands
+are laid out by, where commands are taken and where beacons go are mission
+facts, and a file that was silently given an answer to either is a vehicle
 nobody can reach whose configuration looks complete. The two in ``log`` are the
 exception, and so is ``log`` itself: no ``log.directory`` means the telemetry
 log is not kept, which is a configuration somebody may mean -- a vehicle with
@@ -3070,7 +3076,7 @@ Requirement
 
 Requirement
     A RESTART is taken only once the state file says the next start is a
-    commanded one -- see `The generation number and the state file`_ -- so
+    commanded one -- see `The state file`_ -- so
     that the start it asks for says in its startup summary that it was
     commanded. Where that cannot be written the RESTART is answered
     ``Failure``, nothing restarts, and the arm stands: a vehicle that came
@@ -5320,19 +5326,20 @@ Both command and telemetry messages are subject to loss between the sender
 and the receiver. Thus, commands must be idempotent, generating the same
 resulting state and the same telemetry response
 
-The formats of command and telemetry messages are as given in the document:
-
-   `CCSDS 732.1-B-3 Unified Space Data Link Protocol <https://ccsds.org/Pubs/732x1b3e1.pdf>`_ (Blue Book, June 2024)
+The formats of command and telemetry messages are as given in `The link
+without a header`_: an opcode, a sequence and what each carries, with no
+header of any other protocol. A gateway that needs one, as the CCSDS Space
+Packets of a cFS software bus, frames them: see `Framing is a gateway's`_.
 
 Commands and Response Telemetry
 -------------------------------
 Commands cause generation of one or more telemetry responses. Every response
 contains a success failure and may contain additional parameter values
 
-Every response carries a header before whatever else it says: the sequence
-number of the command it answers, the generation of tcspecial that made it,
-which type of response it is, the status, and the time the spacecraft made
-it. The tables below list what each type adds to that.
+Every response carries the same four fields before whatever else it says:
+the opcode of the command it answers, that command's sequence, the status,
+and the time the spacecraft made it. The tables below list what each type
+adds to that.
 
 What is done with a command or an answer the link loses, and why every
 command is safe to send again, is in `Lost, late and repeated commands`_.
@@ -5420,7 +5427,7 @@ Verify that TLSpecial is able to process commands.
 +----------------+----------+-----------+--------------------------------------+
 | PING_TM        | Parameters                                                  |
 |                +------------+-----------+------------------------------------+
-|                | None, beyond the header every response carries              |
+|                | None, beyond the four fields every response starts with     |
 +----------------+-------------------------------------------------------------+
 
 RESTART_ARM
@@ -5435,6 +5442,10 @@ Enable a restart of TCSpecial for as long as the ``tcspecial`` section's
 |                +------------+-----------+------------------------------------+
 |                | arm_key    | ArmKey    | Value that must match the RESTART  |
 |                |            |           | command key                        |
+|                +------------+-----------+------------------------------------+
+|                | target     | Checksum  | The configuration to restart onto: |
+|                |            |           | one the vehicle does not hold is   |
+|                |            |           | refused ``NotFound``               |
 +----------------+------------+-----------+------------------------------------+
 | RESTART_ARM_TM | Parameters                                                  |
 |                +------------+-----------+------------------------------------+
@@ -5446,9 +5457,12 @@ Enable a restart of TCSpecial for as long as the ``tcspecial`` section's
 RESTART
 ~~~~~~~
 Restart TCSpecial if the time is within ``restart_arm_valid`` -- twenty
-minutes where it is not stated -- of the last RESTART_ARM command and arm_key matches the value of arm_key from
-the last RESTART_ARM command. Otherwise it is answered ``NotArmed``. See
-`Restarting`_ for what a restart does.
+minutes where it is not stated -- of the last RESTART_ARM command and arm_key
+and target match the values from the last RESTART_ARM command. Otherwise it
+is answered ``NotArmed``. A target the vehicle no longer holds, or that would
+not load, is answered ``NotFound``, and nothing restarts. See `Restarting`_
+for what a restart does. The layouts of the three on the link are in `The
+three fixed commands`_.
 
 +----------------+-------------------------------------------------------------+
 | Name           | Parameters                                                  |
@@ -5457,6 +5471,9 @@ the last RESTART_ARM command. Otherwise it is answered ``NotArmed``. See
 |                +------------+-----------+------------------------------------+
 |                | arm_key    | ArmKey    | Value that must match the          |
 |                |            |           | RESTART_ARM command key            |
+|                +------------+-----------+------------------------------------+
+|                | target     | Checksum  | Value that must match the          |
+|                |            |           | RESTART_ARM command's target       |
 +----------------+------------+-----------+------------------------------------+
 | RESTART_TM     | Parameters                                                  |
 |                +------------+-----------+------------------------------------+
@@ -5520,7 +5537,7 @@ Requirement
     in a log, or with a plain UDP listener -- with nothing to decode it, and
     a binary field would end that. It is the one packet a person on the
     ground may look at before any tool is set up, which is why it is the one
-    packet that is not CCSDS and has no XTCE.
+    packet that has no XTCE.
 
 Requirement
     A beacon is read strictly, by ``tcslibgs::Beacon::read`` in Rust and
@@ -5574,8 +5591,8 @@ Requirement
     serving.
 
 Requirement
-    Every telemetry response carries the time the spacecraft made it, in its
-    header. Not the time the command was received, and not the time of
+    Every telemetry response carries the time the spacecraft made it, among
+    the four fields every answer starts with. Not the time the command was received, and not the time of
     whatever the answer is about: a ``QUERY_NODE_SAMPLE`` carries the times
     its samples moved, and this is the time it was asked. The two are worth
     telling apart -- a sample from an hour ago in an answer made a second ago
@@ -5583,9 +5600,10 @@ Requirement
     nothing to read that against.
 
 Two of them used to carry a time of their own, PING and the beacon, and the
-other eight carried none; the header carries it for all of the answers now,
-and a header is built one way so that a type of telemetry added later cannot
-be the ninth. The beacon is not an answer and has no header: see Beacon.
+other eight carried none; every answer carries it now, in the same place,
+and the fields every answer starts with are built one way so that a type of
+telemetry added later cannot be the ninth. The beacon is not an answer and
+has none of them: see Beacon.
 
 Requirement
     Every beacon carries its own number, counted by the sender from one. A
@@ -5628,24 +5646,37 @@ one it follows.
    the interface digest, and no generation, and is written and read without
    allocating.
    ``state_file``, ``beacon.default_interval`` and ``beacon.reset_interval``
-   are read; every start counts its generation in the state file before its
-   first beacon, and every answer carries it; the beacon goes fast from
-   start, and from a restart's being initiated, and slows when a CONNECT
-   carrying the running configuration's checksum is taken. ``tcslibgs::interface`` gives the interface digest in Rust and
-   Python. ``tcslib``'s ``TcsClient``, and through it the C/C++ library,
-   holds a station's commands from a RESTART until a beacon whose number
-   went back says it is done, and the beacon watches in Rust and Python
-   judge a restart by the beacon's number alone. Commands and answers are
-   CCSDS packets stated in
-   ``tcslibgs/xtce/link.xml``, packed and unpacked by
-   ``tcslibgs::link`` without allocating; nothing on the link is JSON. Not
-   yet built: a count of the packets
-   refused (they are logged), the fallback interface and its link, load
-   sets, uploads, SWITCH, the golden build, the refusal of full-interface
-   commands on an interface mismatch, and ``tcsverify --interface``.
+   are read; there is no generation, in the state file or anywhere else;
+   the beacon goes fast from start, and from a restart's being initiated,
+   and slows when a CONNECT carrying the running configuration's checksum
+   is taken. ``tcslibgs::interface`` gives the interface digest in Rust and
+   Python, and ``tcsverify --interface-digest`` prints it. ``tcslib``'s
+   ``TcsClient``, and through it the C/C++ library, holds a station's
+   commands from a RESTART until a beacon whose number went back says it is
+   done, and the beacon watches in Rust and Python judge a restart by the
+   beacon's number alone. Commands and answers have no header, as `The link
+   without a header`_ says: the three fixed commands are stated in
+   ``tcslibgs/xtce/fixed.xml`` and every other in
+   ``tcslibgs/xtce/link.xml``, packed and unpacked by ``tcslibgs::link``
+   without allocating; nothing on the link is JSON. The vehicle counts the
+   datagrams its command links do not take, and logs each. Every
+   configuration names its interface, and every program refuses one that
+   is not its build's. Not yet built: the fallback interface and its link
+   (``fixed.xml`` takes its place, holding only the three fixed commands),
+   load sets, uploads, SWITCH, the golden build, and ``tcsverify
+   --interface`` on a set of documents.
 
 Every packet is XTCE
 --------------------
+
+.. note::
+   **Built, and then replaced in part** by `The link without a header`_,
+   which is built: the CCSDS base container and the command and answer
+   headers below are gone, and what each packet holds is the opcode, the
+   sequence and what it carries. Every layout is still stated in XTCE, and
+   the requirements here that are not about the header still hold. Those
+   that are about it are kept below, marked, as the record of what was
+   replaced.
 
 Requirement
     Every command and every answer on the links between the MOC and
@@ -5656,14 +5687,14 @@ Requirement
     because it is to be read by a person as it is -- see `Asynchronous
     Telemetry`_ -- and so it is in neither interface's documents.
 
-Requirement
+Replaced
     Commands and answers are built on a base container that holds the CCSDS
     primary header, so that a ground system that reads CCSDS Space Packets
     from an XTCE mission database -- Yamcs is one -- reads them with no code
     of its own. The beacon starts with its name and version, which are what
     let a person reading a capture see what it is.
 
-Requirement
+Replaced
     A command is the six-byte CCSDS primary header -- version 0, packet type
     1, no secondary header, APID ``0x100``, unsegmented, the low fourteen
     bits of the command's sequence as the sequence count, and the CCSDS
@@ -5682,7 +5713,9 @@ Requirement
     ``tcslibgs::link`` is the one place a command or an answer is turned
     into a packet and back, and every program goes through it: tcspecial,
     ``tcslib`` and through it the C/C++ library and tcsmoc, and every test's
-    stand-in.
+    stand-in. A ground station in Python sends CONNECT through
+    ``tcslibgs.fixed``, which packs it with the code tcs-xtce generates from
+    ``fixed.xml``.
 
 No packet carries a check of its own: the transport beneath it checks it,
 which is one of the things `What is assumed`_ assumes.
@@ -5703,11 +5736,18 @@ The link without a header
 -------------------------
 
 .. note::
-   **Designed, not yet built** (2026-10-31). Once built it replaces the
+   **Built** (2026-10-31), but for the framing of ``gateway_cfs``, whose
+   gateway is not built: see `Framing is a gateway's`_. It replaces the
    CCSDS layout in `Every packet is XTCE`_, above, and settles what was left
    open in `Configurations named by their checksum`_: what of the link
-   never changes. Until then `Every packet is XTCE`_ describes what runs.
-   What it replaces is under `What the headerless link replaces`_.
+   never changes. What it replaced is under `What the headerless link
+   replaces`_. The fixed commands are ``tcslibgs/xtce/fixed.xml``, and a
+   test in ``tcslibgs::link`` pins its digest, failing, saying it must never
+   change, if it does. The vehicle counts and logs every datagram its
+   command links do not take (``Commands::malformed``); the ground counts
+   them as malformed, as it did. A station shows a status it does not know
+   as a refusal with its number, in Rust as ``CommandStatus::Unknown`` and
+   in C/C++ by the number ``tcs_status_name`` cannot name.
 
 A packet on tcspecial's command links carries what the protocol uses and
 nothing else. There is no CCSDS primary header, no packet type, no APID and
@@ -5821,11 +5861,21 @@ refused by a build that speaks another.
 
 Requirement
     The ``tcspecial`` section's ``interface`` attribute, required, is the
-    interface digest -- 32 hex digits, ``tcslibgs::interface`` -- of the XTCE
-    the configuration was written against. tcsverify, tcspecial and every
-    ground program refuse a configuration whose ``interface`` is not their
-    build's own, saying both digests. The configuration's checksum covers
-    it, so matching checksums means matching interfaces as well.
+    interface digest -- 32 lower-case hex digits, ``tcslibgs::interface`` --
+    of the XTCE the configuration was written against. tcsverify, tcspecial
+    and every ground program refuse a configuration whose ``interface`` is
+    not their build's own, saying both digests. The configuration's checksum
+    covers it, so matching checksums means matching interfaces as well.
+
+The rule is stated once, in ``tcslibgs::graph::parameters::interface_of``,
+which every Rust program and the C/C++ library read the section through, and
+again in Python, in ``tcslibgs.interface.of_configuration``, which
+``tcslibgs.configuration.load`` calls. The value a configuration is to give
+is what ``tcsverify --interface-digest`` prints: the digest of the
+``link.xml`` that build was made from, which is also the last field of every
+beacon it sends. A change to ``link.xml`` is a new interface, after which
+``make interface-digest`` in ``tcslibgs/`` is run and every configuration
+given the new digest; a build refuses the old ones until it is.
 
 Requirement
     The fixed commands are not in that XTCE: they are in a document of their
@@ -5846,6 +5896,16 @@ Requirement
     strips its framing from what it takes, and refuses what is not framed
     as its type frames it, logging and counting it as malformed.
 
+As built, ``gateway_radio`` sends tcspecial's packets as they are. So does
+``gateway_fprime``: as `F´: gateway_fprime`_ has it, the F´ end is a bridge
+component built on ``tcslib-c`` that speaks the radio's own UDP protocol,
+playing the MOC, and what F´ itself frames is what the bridge passes on to
+the rest of its deployment, not what crosses the link to tcspecial. The
+framing of ``gateway_cfs`` -- the CCSDS primary header, cFS's extended
+header and its secondary header, around exactly what the UDP link carries
+-- is specified in `What crosses the bus`_ and not built, because the
+``gateway_cfs`` node is not: a configuration naming ``cfs`` is refused.
+
 There is then nothing about framing for a configuration to get wrong, or
 for two configurations to disagree about: the node type a configuration
 names, which its checksum covers, says it all.
@@ -5853,13 +5913,14 @@ names, which its checksum covers, says it all.
 What the headerless link replaces
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-Once built:
+Each of these is gone, and its section rewritten or marked where it
+stands:
 
 - In `Every packet is XTCE`_: the CCSDS base container, the command and
   answer headers with their constants, and the packet type that told an
   answer from a command. Layouts are still stated in XTCE.
-- In `The generation number and the state file`_, and wherever an answer
-  carries a generation: there is none.
+- In `The state file`_, once `The generation number and the state file`,
+  and wherever an answer carried a generation: there is none.
 - In `Configurations named by their checksum`_, under `Still to be
   decided`_: the frozen layout of the three commands, settled here.
 - In `The Interface, the Fallback and Switching Over`_: the fallback
@@ -5904,7 +5965,7 @@ Requirement
 
 Requirement
     The fallback interface is PING; CONNECT, whose answer carries the build,
-    the configuration digest, the interface digest and the generation number;
+    the configuration digest and the interface digest;
     the upload commands below; and SWITCH_ARM and SWITCH. It has nothing that
     starts, stops or sets a node, changes the beacon interval or changes what
     any payload does: what it can do to the vehicle is put files in the
@@ -6171,17 +6232,22 @@ Configurations named by their checksum
    ending a match has nothing to throw away; tcsmoc reads one configuration
    for as long as it runs, so a node id is never taken from another.
 
+   Built with `The link without a header`_: in `Starting, and the restart
+   flag`_, there being no generation; in `The three commands that always
+   go`_, the frozen layout of the three, and the checksums in RESTART_ARM
+   and RESTART, a target the vehicle does not hold refused ``NotFound`` at
+   the arm and checked again at the restart.
+
    *Not yet built:* `Keeping configurations on board`_ entirely; in
-   `Starting, and the restart flag`_, removing the generation, the state
-   file naming configurations by checksum and the confirmed one, the order
-   a start loads them in, a damaged state file loading the command line's,
-   and ``load_trials``; in `The three commands that always go`_, a frozen
-   layout for the three (see `Still to be decided`_), the checksums in
-   RESTART_ARM and RESTART and refusing one that names no configuration
-   held, and the two functions a restart calls; tcsmoc's pop-ups; and
-   removing what `What this replaces`_ lists as still standing. Until those
-   are built, a restart runs the same configuration file again, and the
-   generation and its checks stay beside the match.
+   `Starting, and the restart flag`_, the state file naming configurations
+   by checksum and the confirmed one, the order a start loads them in, a
+   damaged state file loading the command line's, and ``load_trials``; in
+   `The three commands that always go`_, a held configuration other than
+   the running one, and the two functions a restart calls; tcsmoc's
+   pop-ups; and removing what `What this replaces`_ lists as still
+   standing. Until those are built, the one configuration a RESTART may
+   name is the running one, and a restart runs the same configuration file
+   again.
 
 A configuration is known by its *checksum*: the MD5 ``tcsverify``
 computes of it, the configuration digest (``tcslibgs::config_digest``).
@@ -6525,15 +6591,15 @@ Replaced already, and rewritten where they stand to say what runs:
   went back still refuses all but the three meanwhile.
 - `Downlinked data across a switch`_: reading each datum with the last
   beacon's definitions. The ground reads data only while matched.
+- `The state file`_, once `The generation number and the state file`, and
+  every requirement that an answer carries a generation or that the ground
+  compares generations: there is no generation.
 
 Replaced once the rest is built, and describing what runs until then:
 
 - `Kinds of restart`_: only a commanded start changing the definitions.
   The checksum in the beacon says which configuration a start is running,
   whichever kind it is.
-- `The generation number and the state file`_, and every requirement that
-  an answer carries a generation or that the ground compares generations.
-  There is to be no generation.
 - `What the ground may send meanwhile`_: the wait for a beacon whose
   number went back, and the commands allowed during it.
 - In `Holes in this, and what closes them`_ under `Fault Resiliency`_: the
@@ -6551,10 +6617,9 @@ Still to be decided
 ~~~~~~~~~~~~~~~~~~~
 
 The frozen layout of the three commands
-    Settled, though not yet built, in `The link without a header`_: there
-    is no shared header, and the three are fixed commands whose opcodes and
-    layouts never change, with the target checksum in RESTART_ARM and
-    RESTART.
+    Settled, and built, in `The link without a header`_: there is no shared
+    header, and the three are fixed commands whose opcodes and layouts never
+    change, with the target checksum in RESTART_ARM and RESTART.
 
 In-flight data across a restart
 -------------------------------
@@ -6798,11 +6863,11 @@ Requirement
     it asks for a state, not an action, and a repeat answers with the state
     reached rather than with a failure. RESTART and SWITCH are the two
     exceptions, and are not sent again on a timeout alone: the beacon, not
-    an answer, says whether one was taken, and one that reaches the start
-    that came back starts it again. An operator who has looked at the
-    beacons may send a RESTART again during the wait; the ground's client
-    sends it only while it knows the generation, so not to a start it has
-    heard from since. See `What the ground may send meanwhile`_.
+    an answer, says whether one was taken. An operator who has looked at
+    the beacons may send a RESTART again during the wait; one that reaches
+    the start that came back is refused ``NotArmed`` there, since that start
+    holds no arm, and restarts nothing. See `What the ground may send
+    meanwhile`_.
 
 Requirement
     The ground takes an answer only as the answer to the command whose
@@ -6828,34 +6893,44 @@ or because the start that took it has gone and the one that came back holds
 no arm; it changes nothing, and it is not how the ground learns what
 happened.
 
-The generation number and the state file
-----------------------------------------
+The state file
+--------------
+
+This section was `The generation number and the state file` while every
+start counted a generation in it. There is no generation now: see `The link
+without a header`_.
 
 Requirement
     The ``tcspecial`` section's ``state_file``, required, is the path of the
-    file in which tcspecial keeps what must survive a restart: the
-    generation number, whether the next start is one the ground commanded,
-    and, once there are load sets, which one is chosen, which is confirmed
-    and how many times each has started.
+    file in which tcspecial keeps what must survive a restart: whether the
+    next start is one the ground commanded, and which configurations it
+    names, as `Starting, and the restart flag`_ says.
 
 Requirement
     An armed RESTART or SWITCH that is taken writes to the state file that
     the next start is commanded, before it is answered. The start that
     reads it says so in its startup summary, and writes the file again
-    without it as it counts itself, so that a later start of its own -- a
-    crash -- is not taken for a commanded one. A state file that is damaged
-    says nothing of the next start, which is then taken for one nobody
-    commanded. Neither changes the beacons: every start begins with the
-    restart flag set.
+    without it, so that a later start of its own -- a crash -- is not taken
+    for a commanded one. A state file that is damaged says nothing of the
+    next start, which is then taken for one nobody commanded. Neither
+    changes the beacons: every start begins with the restart flag set.
 
 Requirement
-    Every start of tcspecial -- a commanded restart, a crash the supervisor
-    restarted, a power cycle -- adds one to the generation number and writes
-    it to the state file before the first beacon goes, and every answer it
-    makes carries it. A start that cannot write it says why on its error
-    output and does not start: a vehicle that answered with a generation it
-    had not kept would answer with it again after the next start, and two
-    starts would read to the ground as one.
+    There is no generation number. Nothing in the state file counts starts:
+    a start is told by its beacons' restart flag and by their number going
+    back, and which configuration it runs by the checksum they carry. A
+    state file written by a build that kept a generation holds a
+    ``generation`` line, which is read and dropped, the start saying so in
+    its log, and the file written again without it: a vehicle given a new
+    build starts as it did, rather than taking its state file for a damaged
+    one.
+
+Requirement
+    Every start reads and writes the state file before its first beacon
+    goes. A start that cannot write it says why on its error output and
+    does not start: a vehicle that could not write it could not say a
+    RESTART was commanded either, and a later start of its own would read
+    whatever the old file said.
 
 Requirement
     The state file is written whole, to a file beside it that is then
@@ -6863,18 +6938,17 @@ Requirement
     before the rename is relied on, and it carries a CRC of its own. A
     power failure part way through therefore leaves the old file or the new
     one, never half of each. A state file that does not exist is a first
-    start, generation 1. One that exists and fails its CRC or cannot be read
-    is reported in the log, and the generation then starts again from 1: a
-    vehicle that would not start because a counter was damaged would be lost
-    to a counter.
+    start. One that exists and fails its CRC or cannot be read is reported
+    in the log, and names nothing: a vehicle that would not start because
+    its state file was damaged would be lost to a file.
 
 Requirement
     The ground judges from the beacons that tcspecial has restarted when a
     beacon's number is lower than the last one's: see `Asynchronous
-    Telemetry`_. From the answers, it judges so when an answer's generation
-    differs from the one the last CONNECT was answered with, not only when
-    it is greater, so that a generation that started again from 1 is still
-    seen as a restart.
+    Telemetry`_. No answer says it, since none carries a generation: a
+    start's beacons carry the restart flag, which ends a station's match,
+    and every command but the three is answered ``Unmatched`` until the
+    station has matched the start that came back.
 
 The beacon across a restart
 ---------------------------
@@ -6890,11 +6964,10 @@ Requirement
     carrying the running configuration's checksum, and by nothing else.
 
 Requirement
-    The beacon carries no generation. Its number going back is what says a
-    start, because the radio delivers in order. The flag does not say
-    whether it was the start the ground asked for: every start sets it. The
-    generation is in every answer, where a station that commands learns it
-    from the answer to CONNECT.
+    Nothing carries a generation: there is none. The beacon's number going
+    back is what says a start, because the radio delivers in order. The
+    flag does not say whether it was the start the ground asked for: every
+    start sets it.
 
 Requirement
     Only a commanded start may change the definitions the vehicle runs with.
@@ -6924,8 +6997,8 @@ Requirement
 Requirement
     Every start of tcspecial beacons every ``reset_interval`` until it takes
     a CONNECT carrying its configuration's checksum, and its first beacon
-    follows the generation number's being incremented and the state file's
-    being written. Every start's first beacon carries the flag.
+    follows the state file's being read and written. Every start's first
+    beacon carries the flag.
 
 Requirement
     A CONNECT taken -- valid, from where the configuration says the MOC
@@ -6941,8 +7014,8 @@ Requirement
 The beacon goes fast across a restart because that is when the ground most
 needs to know how the vehicle is: that the restart was taken, and that it has
 come back, with which interface. It slows on a CONNECT, and on nothing else,
-because a CONNECT is the ground learning what is flying -- which generation,
-which configuration and which interface -- after which it can ask, and the
+because a CONNECT is the ground learning what is flying -- which
+configuration and which interface -- after which it can ask, and the
 link is the ground's again. A PING or a stray command says only that
 something on the ground is sending; until the ground has connected it may not
 yet know that a restart happened, and the fast beacons and the flag are what
@@ -6975,9 +7048,9 @@ Requirement
     command in between, unsent, and ``RestartWait::lets`` is where the three
     are named. CONNECT changes nothing the restart depends on, and is how an
     operator asks what is flying; RESTART_ARM and RESTART are how a RESTART
-    that may never have arrived is sent again. A RESTART still goes only
-    while the generation is known, so one that would reach the start that
-    came back, after an answer from it, is refused until a CONNECT.
+    that may never have arrived is sent again. One that reaches the start
+    that came back is refused there ``NotArmed``, since that start holds no
+    arm.
 
 Requirement
     A beacon whose number has gone back, waited for or not, ends the
@@ -7005,27 +7078,24 @@ Requirement
     records; nothing else ends it, a CONNECT answered during it included.
 
 Requirement
-    A command carries its sequence and no generation: a generation is a
-    start of tcspecial, which the answers say, not something a command is
-    numbered by. What keeps a command from being
+    A command carries its sequence and no generation, and an answer
+    carries none either: there is none. What keeps a command from being
     read with definitions it was not written for is the order of the link
     and the ground's client. The link delivers in order -- see `What is
     assumed`_ -- so a command sent before a RESTART arrives before it, and
     the client sends nothing after a RESTART but CONNECT, RESTART_ARM and
     RESTART until a beacon says a start came back, and then nothing but
-    those three until it is matched for commanding; nor anything but PING
-    and CONNECT after an answer of another generation, or a beacon whose
-    number went back, until a CONNECT is answered. Before a match a PING is
-    refused besides, by ``tcslibgs::CommandType::taken_unmatched``. PING and CONNECT go whatever the
-    generation, so a ground station that has not yet
-    heard a beacon can still find out what is flying; which commands those
-    are is ``tcslibgs::CommandType::always_taken``, and nowhere else.
+    those three until it is matched for commanding. A start's beacons carry
+    the restart flag, which ends a match, so the same holds after a start
+    nobody commanded. Before a match a PING is refused besides, by
+    ``tcslibgs::CommandType::taken_unmatched``.
 
 Requirement
-    Every answer carries the generation of tcspecial that made it, refusals
-    among them, so that a ground station that does not watch the beacons --
-    a program that only commands -- hears of a restart from whichever
-    answer reaches it first.
+    A ground station that does not watch the beacons -- a program that only
+    commands -- hears of a restart from whichever answer reaches it first:
+    every command but the three is answered ``Unmatched`` by a start that
+    has not been matched, so that it learns why nothing happened and
+    connects again, rather than taking the command for lost.
 
 Requirement
     A command older than one this start of tcspecial has already taken, on
@@ -7039,7 +7109,6 @@ Requirement
     is a repeat, not an older command, and is taken. A command refused
     ``Unmatched`` is refused before its sequence is looked at, and does not
     count as taken. PING and CONNECT are answered however old they are, by
-    the same
     ``tcslibgs::CommandType::always_taken``. The newest taken is not kept
     across a restart, and need not be: a command sent before a RESTART
     arrives before it, in order, and the ground sends none after it until
@@ -7053,21 +7122,14 @@ Requirement
     starts its count again.
 
 Requirement
-    ``tcslib``'s ``TcsClient``, and through it the C/C++ library, knows
-    which generation is flying from the last CONNECT's answer alone, since
-    the beacons do not say. Until one has been answered, it refuses every
-    command but PING and CONNECT, unsent, saying to CONNECT first
-    (``TcsError::GenerationUnknown``). An answer made by another generation
-    than the one it knows, or a beacon handed to it whose number went back,
-    makes it forget the generation, so that it refuses again until it is
-    told: the vehicle has
-    started since, and what it is flying should be asked again before
-    anything else is sent. It does not take the generation from the answer
-    and carry on, which would be carrying on as though nothing had
-    happened. After a CONNECT its count goes on from past the newest
-    command the vehicle says it has taken, forward only. An answer that
-    carries a generation of nought, which no start is, is read as saying
-    nothing of it.
+    ``tcslib``'s ``TcsClient``, and through it the C/C++ library, sends
+    nothing but CONNECT, RESTART_ARM and RESTART, refusing every other
+    command unsent, while the station is not matched for commanding (see
+    `On the ground`_): which the beacons' restart flag and checksum, and a
+    CONNECT of its own answered with its checksum, decide. It knows no
+    generation, and needs none: a start the station has not matched is a
+    start it does not command. After a CONNECT its count goes on from past
+    the newest command the vehicle says it has taken, forward only.
 
 Downlinked data across a switch
 -------------------------------
@@ -7118,11 +7180,10 @@ A restart that never comes back
     again; without one the vehicle is gone, which is why one is required.
 
 A damaged or half-written state file
-    Written whole and renamed into place, with a CRC; a damaged one starts
-    the generation again from 1. The ground judges a restart from the beacons
-    by their number going back, which a damaged state file does not touch,
-    and from the answers by any change of generation, so a reset count is
-    still seen.
+    Written whole and renamed into place, with a CRC; a damaged one names
+    nothing, and the start loads the configuration on its command line. The
+    ground judges a restart from the beacons by their number going back and
+    by their restart flag, which a damaged state file does not touch.
 
 Downlinked data from before a switch
     A datum carries nothing that says which configuration wrote it. It is
@@ -7186,20 +7247,20 @@ A restart whose first beacons are all lost
     beacons, and a new one whose #1 to #3 were all lost, has its #4 read as
     the next beacon of the old. The new start begins at ``reset_interval``,
     so the window is short. A station that is not waiting on a restart
-    hears of one nobody commanded from the generation in the next answer
-    it gets. A station waiting on a commanded restart sends nothing but
+    hears of one nobody commanded from the restart flag in the new start's
+    beacons, which ends its match, and from the ``Unmatched`` answer to its
+    next command. A station waiting on a commanded restart sends nothing but
     CONNECT, RESTART_ARM and RESTART, and its wait does not end without a
     beacon whose number went back, so the restart is not taken for done:
-    the wait goes on. A CONNECT then answered by another generation says a
-    start came back, but does not end the wait either. The flag cannot end it,
+    the wait goes on. The flag cannot end it,
     because the old start's last beacons carried it too. The station is not
     matched meanwhile in any case: the new start's beacons carry the flag
     until a matching CONNECT. What ends it is
     ``TcsClient::end_restart_wait``, by hand, which tcsmoc does not yet
     offer: until it does, an operator in that state starts tcsmoc again.
-    Should a missed restart nobody commanded ever matter, the remedy is the
-    generation in the beacon again, as a field of its own, at the cost of
-    up to ten more digits in every beacon.
+    Should a missed restart nobody commanded ever matter, the remedy is a
+    count of starts in the beacon, as a field of its own, at the cost of up
+    to ten more digits in every beacon.
 
 A confirmed load set that later fails at every start
     A crash keeps the definitions it had, so a load set that fails at every
@@ -9659,7 +9720,7 @@ Processes
     running code linked into the image, app nodes would not be built,
     segment handoff would call a function rather than a program, and a
     restart would be a reset of the processor -- by a watchdog, or the
-    operating system's own restart -- with the generation kept in the
+    operating system's own restart -- with what must survive it kept in the
     state file as it is now. Re-execution also needs the program's path
     and its open descriptors, which Linux finds in ``/proc``; elsewhere
     they would be passed in or kept.
@@ -11500,7 +11561,7 @@ Requirement
     Every configuration states where beacons come from, where they are
     received, and how often: ``beacon.send``, ``beacon.recv``,
     ``beacon.default_interval`` and ``beacon.reset_interval``, in its
-    ``tcspecial`` section, and where it keeps its generation number,
+    ``tcspecial`` section, and where it keeps what must survive a restart,
     ``state_file``. None has a default and none may be left out.
 
 Requirement
@@ -11965,6 +12026,14 @@ Requirement
     this desk -- can be asked of a file without running anything. It is of the
     graph a file parses into and not of the file's bytes, so the two spellings
     of one configuration answer alike.
+
+Requirement
+    ``--interface-digest``, given alone, prints the digest of the interface
+    this build speaks and nothing else: the 32 lower-case hex digits a
+    configuration's ``tcspecial`` section gives as its ``interface``, and
+    the last field of every beacon this build's tcspecial sends. It is how
+    a person writing a configuration finds the value: see `The
+    configuration names its interface`_.
 
 Requirement
     ``--types=<types>`` checks a configuration as a tcspecial built with only

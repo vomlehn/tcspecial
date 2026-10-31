@@ -50,13 +50,19 @@ linkage throughout, and nothing in it that C++ will not compile.
   for commanding, every command but connect, arm and restart fails, unsent,
   saying the configurations are not yet matched; the vehicle itself answers
   any other command that reaches it before a match `TCS_STATUS_UNMATCHED`,
-  and does not act on it. The client
-  learns which generation of tcspecial is flying from the answer to connect,
-  so until one is answered, and again after a beacon whose number went back
-  or an answer from another generation, it refuses every command but ping
-  and connect, unsent. `tcs_client_beacon_heard` tells it of each pass's
-  beacon; after a restart is sent it is what ends the wait for the vehicle
-  to come back, during which nothing but connect, arm and restart goes.
+  and does not act on it. A start of the vehicle ends the match, since its
+  beacons carry the restart flag, so after one the client again sends
+  nothing but connect, arm and restart until a connect is answered with this
+  configuration's checksum: no answer carries a generation, and none is
+  needed. `tcs_client_restart_arm` and `tcs_client_restart` name the
+  configuration to restart onto by its checksum, NULL meaning this one's; a
+  vehicle that does not hold it answers `TCS_STATUS_NOT_FOUND`.
+  `tcs_client_beacon_heard` tells the client of each pass's beacon; after a
+  restart is sent it is what ends the wait for the vehicle to come back,
+  during which nothing but connect, arm and restart goes. A status this
+  library does not know -- a vehicle of a later build may add one -- is
+  written as the number it came as: it is a refusal, and
+  `tcs_status_name` gives "" for it, so a station says it by its number.
 - **Pinging a ping node.** `tcs_pinger_open` finds the first `ping` node the
   ground can reach both ways and its gateway node. `tcs_pinger_ping` sends a
   ping up; its answer comes down as the ping node's data, which a station
@@ -91,7 +97,7 @@ c++ my_station.cpp $(pkg-config --cflags --libs tcs)
 ### The ABI version
 
 `<ABI>` is the library's ABI version, the one whole number in `abi-version`,
-now 1. It is the shared library's soname, `libtcs.so.<ABI>`, which a station
+now 2. It is the shared library's soname, `libtcs.so.<ABI>`, which a station
 linked with the library asks for at run time; `build.rs` sets the soname
 from the file, and the Makefile installs the library under the same name,
 so the number is stated once. It is not the crate's version, and changes
@@ -108,6 +114,10 @@ Adding a function, or anything else an old station cannot notice, leaves it
 alone. A new ABI version is a new soname, so a station built against the
 old one is refused by the loader, saying which library it wanted, rather
 than run against a library it does not match.
+
+It went from 1 to 2 when the link lost its header: `tcs_client_restart_arm`
+and `tcs_client_restart` gained the target checksum, and the generation the
+client used to track went.
 
 `examples/ground.c` is a ground station in C, and `examples/ground.cpp` the
 same one in C++: each reads the configuration, waits for the first beacon,

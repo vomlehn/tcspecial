@@ -200,6 +200,7 @@ fn against_a_vehicle(program: &Path) -> String {
         format!(
             "tcspecial:
   gateway: radio
+  interface: \"ad9aac4dd5a6d88dd5e78824ba8a83ac\"
   beacon:
     default_interval: \"5 s\"
     recv: \"127.0.0.1:{beacons}\"
@@ -301,11 +302,14 @@ vehicle:
                             ))
                         }
                         // Refused as the vehicle refuses one, with its
-                        // reason: which the ground station prints.
+                        // reason: which the ground station prints. With a
+                        // status no build yet has, as a vehicle of a later
+                        // build might answer, which the station says is a
+                        // refusal, by its number.
                         tcslibgs::Command::SetNode(cmd) => Telemetry::SetNode(
                             SetNodeTelemetry::new(
                                 seq,
-                                CommandStatus::InvalidParameter,
+                                CommandStatus::Unknown(42),
                                 cmd.node,
                             )
                             .because(Reason::of(
@@ -331,15 +335,22 @@ vehicle:
                                 ),
                             )
                         }
-                        tcslibgs::Command::RestartArm(_) => {
+                        // Onto the configuration the station read, which is
+                        // what a NULL target says.
+                        tcslibgs::Command::RestartArm(cmd) => {
+                            assert_eq!(cmd.target, digest, "a plain restart");
                             Telemetry::RestartArm(RestartArmTelemetry::new(
                                 seq,
                                 CommandStatus::Success,
                             ))
                         }
-                        tcslibgs::Command::Restart(_) => Telemetry::Restart(
-                            RestartTelemetry::new(seq, CommandStatus::Success),
-                        ),
+                        tcslibgs::Command::Restart(cmd) => {
+                            assert_eq!(cmd.target, digest, "the arm's");
+                            Telemetry::Restart(RestartTelemetry::new(
+                                seq,
+                                CommandStatus::Success,
+                            ))
+                        }
                         other => panic!(
                             "the ground station sent {:?}",
                             other.cmd_type()
@@ -405,8 +416,8 @@ vehicle:
         "matched: listening yes, commanding yes".to_string(),
         "ping: answered".to_string(),
         "query ping (node 1): Success, running".to_string(),
-        "set ping count: refused -- no command binding says the ground \
-        may set \"ping.count\""
+        "set ping count: refused (status 42) -- no command binding says \
+        the ground may set \"ping.count\""
             .to_string(),
         "sample ping: took \"ping\" of 6 bytes, gave nothing".to_string(),
         "restart: armed done, restarted done".to_string(),

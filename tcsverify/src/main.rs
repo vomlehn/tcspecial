@@ -76,11 +76,12 @@ configuration.
                      file if it has one: once it is checked and nothing is
                      wrong with it, keep it in <directory>, the directory a
                      tcspecial section's configurations attribute names,
-                     under its checksum -- <checksum>.ytcs or .xtcs, mode
-                     0444 -- as the vehicle keeps a configuration it may
-                     restart onto. One that includes another file is
-                     refused; one whose checksum is kept already is not
-                     written again. Prints where it is kept. For first
+                     under its checksum -- <checksum>/<checksum>.ytcs or
+                     .xtcs, with each file it includes beside it under its
+                     include name, mode 0444 -- as the vehicle keeps a
+                     configuration it may restart onto. One whose
+                     checksum is kept already is not written again.
+                     Prints where it is kept. For first
                      provisioning and for testing: making the directory
                      read-only afterwards is the provisioner's
   --interface-digest print the digest of the interface this build speaks,

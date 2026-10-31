@@ -31,7 +31,7 @@ use std::path::{Path, PathBuf};
 
 use tcslibgs::config_digest::{digest_of_graph, ConfigDigest};
 use tcslibgs::graph::Graph;
-use tcslibgs::store::{single_file, Store};
+use tcslibgs::store::Store;
 
 use crate::state::{self, State};
 
@@ -87,8 +87,7 @@ pub struct Chosen {
 /// this build contains every type the configuration has, which is
 /// tcsverify's `--types` with the types this was built with. A
 /// configuration that arrived here unchecked is exactly the configuration
-/// that should not open a bus. And for now a configuration is a single
-/// file: see [`single_file`].
+/// that should not open a bus.
 ///
 /// # Arguments
 ///
@@ -99,7 +98,7 @@ pub struct Chosen {
 ///
 /// Every problem, each a line beginning with `path`; none where it may run.
 pub fn problems_of(path: &Path, graph: &Graph) -> Vec<String> {
-    let mut problems: Vec<String> = graph
+    graph
         .check()
         .iter()
         .chain(
@@ -110,11 +109,7 @@ pub fn problems_of(path: &Path, graph: &Graph) -> Vec<String> {
             .iter(),
         )
         .map(|problem| format!("{}: {}", path.display(), problem.describe()))
-        .collect();
-    if let Err(why) = single_file(path, graph) {
-        problems.push(why);
-    }
-    problems
+        .collect()
 }
 
 impl Boot {
@@ -553,7 +548,7 @@ vehicle:
         assert_eq!(chosen.loaded.digest, other);
         assert_eq!(
             chosen.loaded.path,
-            desk.dir.path().join(format!("kept/{other}.ytcs"))
+            desk.dir.path().join(format!("kept/{other}/{other}.ytcs"))
         );
         assert!(chosen.commanded);
         assert!(chosen.why.contains("RESTART"), "{}", chosen.why);
@@ -683,7 +678,7 @@ vehicle:
         assert!(!boot.holds(missing));
         assert!(boot.load(missing).is_err());
 
-        let kept = desk.dir.path().join(format!("kept/{other}.ytcs"));
+        let kept = desk.dir.path().join(format!("kept/{other}/{other}.ytcs"));
         let mut perms = std::fs::metadata(&kept).unwrap().permissions();
         #[allow(clippy::permissions_set_readonly_false)]
         perms.set_readonly(false);

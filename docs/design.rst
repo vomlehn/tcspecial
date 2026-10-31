@@ -6345,23 +6345,31 @@ Keeping configurations on board
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 Requirement
-    For now a configuration is a single file. One that includes another
-    file is refused when it is uplinked and when it is loaded, saying so.
-    A configuration spread across several files is to be handled later.
+    A configuration is kept as a tree: a directory named by its checksum,
+    holding its top file, named by the checksum too, and each file the top
+    file includes, under the name its include list gives it. The checksum
+    takes in those names, so that it says the shape of the tree as well as
+    what is in it, and two configurations that each include a ``cabin``
+    of their own are kept apart. An include name that is a path, begins
+    with a dot or is the checksum is refused when the configuration is
+    kept and when it is loaded, saying so.
 
-As built, a configuration is kept as ``<checksum>.ytcs`` or
-``<checksum>.xtcs`` -- its checksum in 32 lower-case hex digits, and the
-extension that says how it is read, the one it was given -- in the
-directory the ``tcspecial`` section's ``configurations`` names. A section
-that names none is a vehicle that keeps no configurations: it runs the one
-on its command line, and a RESTART may name only that and the one running.
+As built, a configuration is kept as ``<checksum>/<checksum>.ytcs`` or
+``<checksum>/<checksum>.xtcs`` -- its checksum in 32 lower-case hex digits,
+and the extension that says how it is read, the one it was given -- with
+each file it includes beside it, in the directory the ``tcspecial``
+section's ``configurations`` names. It is written to a hidden directory
+beside its name and renamed into place, and removed by being renamed out
+of the way first, so that a power failure leaves the whole of it or none.
+A section that names none is a vehicle that keeps no configurations: it
+runs the one on its command line, and a RESTART may name only that and the
+one running.
 The rules are ``tcslibgs::store``'s, which tcspecial loads through and
 ``tcsverify --keep=<directory>`` keeps through, so the two cannot disagree
 about what a kept configuration is. ``tcsverify --keep`` checks the
 configuration as tcsverify checks any, keeps it only if nothing is wrong
 with it, and is for testing and for first provisioning; uplinking is not
-built. tcspecial refuses a configuration that includes another as it loads
-it, the one on its command line among them.
+built.
 
 Requirement
     The vehicle keeps each configuration it holds under its checksum, in
@@ -12144,9 +12152,9 @@ Requirement
     wrong with it, keeps it in ``<directory>`` under its checksum, as the
     vehicle keeps a configuration a RESTART may name: see `Keeping
     configurations on board`_. It prints where it is kept, or that it was
-    kept already, which writes nothing. One that includes another file is
-    refused. It is how a configuration is put on board for testing and at
-    first provisioning, until configurations are uplinked.
+    kept already, which writes nothing. One of several files is kept with
+    each file it includes. It is how a configuration is put on board for
+    testing and at first provisioning, until configurations are uplinked.
 
 Requirement
     ``--set-interface <configuration>...``, given configurations and

@@ -512,8 +512,7 @@ fn a_restart_runs_the_configuration_it_names() {
         ask(&commands, take_at, &arm(3, theirs)),
         CommandStatus::Success
     );
-    let kept_at = store.find(theirs).expect("it is kept");
-    std::fs::remove_file(&kept_at).expect("removed");
+    store.remove(theirs, &[], 0).expect("removed");
     assert_eq!(
         ask(&commands, take_at, &restart(4, theirs)),
         CommandStatus::NotFound,

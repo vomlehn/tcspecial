@@ -132,7 +132,9 @@ fn a_checked_configuration_is_kept_under_its_checksum() {
     let example = example.to_str().expect("a path");
     let checksum =
         tcslibgs::config_digest::digest_of_file(example).expect("it digests");
-    let kept = store.join(format!("{checksum}.ytcs"));
+    let kept = store
+        .join(checksum.to_string())
+        .join(format!("{checksum}.ytcs"));
 
     let (lines, status) = run(&[&keep, example]);
     assert_eq!(status, 0, "{lines:?}");

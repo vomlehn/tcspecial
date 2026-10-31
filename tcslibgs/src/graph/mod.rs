@@ -1317,6 +1317,32 @@ impl Graph {
         Ok(graph)
     }
 
+    /// Says the names the top file's include list gave its other files.
+    ///
+    /// Each as the include list wrote it: the included file's path beside
+    /// the top file, without the extension [`Graph::load`] gave it.
+    ///
+    /// # Returns
+    ///
+    /// The names, in the order the include list gave them; none for a
+    /// configuration of one file, or one not read from files.
+    pub fn included(&self) -> Vec<String> {
+        let Some(top) = self.files.first() else {
+            return Vec::new();
+        };
+        let dir = top.parent().unwrap_or(Path::new(""));
+        self.files[1..]
+            .iter()
+            .map(|file| {
+                file.strip_prefix(dir)
+                    .unwrap_or(file)
+                    .with_extension("")
+                    .to_string_lossy()
+                    .into_owned()
+            })
+            .collect()
+    }
+
     /// Takes in one file: its nodes, the links they carry, and the rest.
     ///
     /// The three sections are one list of nodes once they are read, because

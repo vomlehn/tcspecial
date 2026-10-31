@@ -3406,13 +3406,17 @@ command line, and a restart may name any of them, by its checksum:
      configurations_kept: "2"
      load_trials: "3"
 
-``configurations`` is the directory they are kept in, each under its
-checksum: ``<checksum>.ytcs`` or ``<checksum>.xtcs``. Left out, the vehicle
-keeps none, and a restart may name only the configuration it runs. A
-configuration kept there is a single file: one that includes another is
-refused. Its checksum is computed again each time it is loaded, and one
-whose checksum is not its name -- cut short as it was written, or damaged
--- is not loaded.
+``configurations`` is the directory they are kept in, each in a directory
+named by its checksum. In it, the top file is named by the checksum too --
+``<checksum>/<checksum>.ytcs`` or ``<checksum>/<checksum>.xtcs`` -- and
+each file it includes sits beside it under the name its include list gives
+it. The checksum takes in those names, so it says the shape of the tree as
+well as what is in it. Left out, the vehicle keeps none, and a restart may
+name only the configuration it runs. An include name must be a file's
+name, not a path, must not begin with a dot, and must not be the checksum.
+A checksum is computed again each time its configuration is loaded, and
+one whose checksum is not its name -- cut short as it was written, or
+damaged -- is not loaded.
 
 To put one there, on the ground or at first provisioning, check and keep it
 with tcsverify:
@@ -3421,10 +3425,10 @@ with tcsverify:
 
    $ tcsverify --keep=/var/lib/tcspecial/configurations vehicle.ytcs
    vehicle.ytcs: md5 0123456789abcdef0123456789abcdef, kept as
-   /var/lib/tcspecial/configurations/0123456789abcdef0123456789abcdef.ytcs
+   /var/lib/tcspecial/configurations/0123456789abcdef0123456789abcdef/0123456789abcdef0123456789abcdef.ytcs
 
 It keeps nothing that has an error, writes nothing for a checksum already
-kept, and makes the file it writes read-only. Making the directory
+kept, and makes the files it writes read-only. Making the directory
 read-only, or immutable, once every configuration is in it is the
 provisioner's to do. Configurations cannot yet be uplinked.
 
@@ -4102,7 +4106,8 @@ of one payload's attributes. The order of the payloads does count -- ids follow
 it -- so each payload is given a sequence number as the file is read, the
 digest takes them in that order, and a file may not state a number of its own.
 Both formats number them alike, which is what lets the YAML and the XML of
-one set digest the same.
+one set digest the same. In a set written as several files, the names its
+include list gives them count too; the top file's own name does not.
 
 A difference means the two ends are not serving the same set. The usual cause
 is a tcspecial left running from an earlier one, which tcsmoc attaches to

@@ -170,6 +170,55 @@ fn a_checked_configuration_is_kept_under_its_checksum() {
     assert_eq!(status, 2, "a directory is named");
 }
 
+/// `--set-interface` writes this build's interface into a stale
+/// configuration, changing that and nothing else, says what it changed, and
+/// changes nothing in one that is current.
+#[test]
+fn set_interface_rewrites_only_the_interface() {
+    let dir = tempfile::tempdir().expect("a directory");
+    let ours = tcslibgs::InterfaceDigest::of_this_build().to_string();
+    let stale = "0123456789abcdef0123456789abcdef";
+    let mut paths = Vec::new();
+    for name in ["ping.yaml", "ping.xml"] {
+        let shipped = Path::new(env!("CARGO_MANIFEST_DIR"))
+            .join("../examples/ping")
+            .join(name);
+        let good = std::fs::read_to_string(&shipped).expect("the example");
+        let path = dir.path().join(name);
+        std::fs::write(&path, good.replace(&ours, stale)).expect("written");
+        paths.push((path, good));
+    }
+    let args: Vec<String> = paths
+        .iter()
+        .map(|(path, _)| path.display().to_string())
+        .collect();
+    let mut command = vec!["--set-interface"];
+    command.extend(args.iter().map(String::as_str));
+
+    let (lines, status) = run(&command);
+    assert_eq!(status, 0, "{lines:?}");
+    for ((path, good), line) in paths.iter().zip(&lines) {
+        assert_eq!(
+            &std::fs::read_to_string(path).expect("it reads"),
+            good,
+            "every other byte as it was"
+        );
+        assert!(
+            line.contains(&format!("set to {ours}, from {stale}")),
+            "{line}"
+        );
+    }
+    let (lines, status) = run(&command);
+    assert_eq!(status, 0);
+    assert!(
+        lines.iter().all(|line| line.contains("already")),
+        "{lines:?}"
+    );
+
+    let (_, status) = run(&["--set-interface"]);
+    assert_eq!(status, 2, "a configuration is named");
+}
+
 #[test]
 fn the_options_are_taken_as_options() {
     let dir = tempfile::tempdir().expect("a directory");

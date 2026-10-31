@@ -42,6 +42,7 @@ use tcslibgs::graph::check::Severity;
 use tcslibgs::{ConfigFormat, SimConfigFile, TcsError};
 
 pub mod locate;
+pub mod set_interface;
 pub mod startup;
 
 use locate::{Where, THE_FILE_ITSELF};

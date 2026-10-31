@@ -731,11 +731,14 @@ end. The radio is the ``gateway_radio`` node; the F´ gateway is the
 ``examples/fprime`` flies it. cFS is the ``gateway_cfs`` node, with every link
 of the vehicle carried over one SBN peer (``tcspecial::runtime::bus``, on
 ``tcslibgs::sbn`` and ``tcslibgs::cfs``), and ``examples/cfs`` flies it
-against a test playing the cFS end. Not yet built: the bridge's F´ model
-generated from the configuration, the ``TcsBridge`` component itself, tcssim
-standing in for the cFS end and tcslib's SBN transport, so that tcsmoc cannot
-yet command a vehicle that answers to cFS (see `What crosses the bus`_), and
-the run against cFS's own Linux build.
+against a test playing the cFS end. The bridge at the F´ end is built too:
+its F´ model is written from the configuration by ``tcsverify
+--fprime-model``, and the ``TcsBridge`` component in ``fprime/`` is tested in
+an F´ deployment against tcspecial and tcssim -- see `F´: gateway_fprime`_,
+which says what it does not yet do. Not yet built: tcssim standing in for the
+cFS end and tcslib's SBN transport, so that tcsmoc cannot yet command a
+vehicle that answers to cFS (see `What crosses the bus`_), and the run against
+cFS's own Linux build.
 
 The gateway nodes are written in the ``gateway`` section, linked through
 ``gateway-in`` and ``gateway-out``, with ``tee-gateway``, ``null-gateway`` and
@@ -1224,6 +1227,99 @@ Requirement
     The bridge allocates nothing once the deployment is running, as a ground
     station's loop built on tcslib does not: a datum is taken into a buffer
     made when the component was, and a channel is written from it.
+
+**Built.** What follows is how, and the choices the requirements left open,
+each made for reliability first.
+
+The model is ``tcslibgs::graph::fprime``'s, and nothing else says any of it.
+It counts from ``tcslibgs::graph::telemetry::of``, the function that gives
+each source its port, so a channel's ID and its port are the one device id
+counted on from two bases. Each source drawn into the node is the channel at
+``fprime_id_base`` plus its device id, named after it; the bridge's own
+channels -- the beacon's stage and restart flag, the two halves of the match,
+the four counts of what has arrived, and how many data were longer than a
+channel holds -- follow every device id the configuration has, so that
+drawing a new link never moves one. The component instance's base ID is
+``fprime_id_base``, so an ID within the component is the device id itself;
+the deployment gives it as ``base id Tcs.TcsBridge.ID_BASE``, a constant of
+the model, and the bridge refuses to run under any other.
+
+``tcsverify --fprime-model=<directory> <configuration>`` writes the model,
+once the configuration has been checked and nothing found wrong with it, as
+``TcsBridgeModel.fppi`` -- the constants and every channel, which
+``TcsBridge.fpp`` includes -- and ``TcsBridgeModel.cpp``, which says which
+channel a source's datum is written to and which device id a node's name is.
+In tcsverify because a model is then made only from a configuration the
+vehicle would load, with every rule about the file in the one place they are
+checked; a step in the component's build would be a second reader of the
+file. A model is of one bridge, so a configuration with two
+``gateway_fprime`` nodes has none written, and is told to give each bridge a
+configuration of its own.
+
+Requirement
+    What a model would get wrong is refused as the configuration is read,
+    by ``Graph::check`` and so by tcsverify, tcspecial and every program
+    that checks through them, naming the node: a source drawn into a
+    ``gateway_fprime`` node whose name is not an F´ name -- letters, digits
+    and underscores, not starting with a digit -- or is the name of one of
+    the bridge's own channels; an ID that would pass 32 bits, F´'s
+    ``FwChanIdType``; and two ``gateway_fprime`` nodes whose IDs, from
+    ``fprime_id_base`` to the last of the bridge's own, overlap, which would
+    be two channels under one ID in one deployment. Refused rather than
+    renamed: a name made F´'s by the model would be two names for one node,
+    and one that might be another node's.
+
+Requirement
+    The bridge holds the configuration it opens to its model, by digest, and
+    refuses to run on any other, saying so in an event: a bridge flying a
+    configuration its channels were not written from would put one node's
+    data under another's name.
+
+The commands are one for each tcspecial command the bridge sends: ``PING``,
+and ``START_NODE``, ``STOP_NODE`` and ``QUERY_NODE``, each naming a node by
+its name, which the model turns into the device id. CONNECT is not a command:
+the bridge sends one for each beacon heard while it is not matched for
+commanding, because nothing comes down until one is answered and a flight
+computer has nobody at it to press a button. A node command naming a node
+the configuration lacks is refused unsent. What tcspecial answers is the
+command's response and an event. The restart commands are not offered yet:
+after a RESTART a client waits for a beacon to say the vehicle is back, handed
+it with ``tcs_client_beacon_heard``, and the beacon watch and the client are
+each used from a thread of their own here, so that wait needs a design of its
+own rather than a line.
+
+A datum is a channel of type ``Tcs.Datum``: its length, and its first 64
+bytes. A longer one goes as its first 64 bytes with its whole length, is
+counted, and is said in an event, so that nothing is cut short quietly. What
+a beacon says is longer than a channel's text may be in F´, so it is an
+event, each time it changes.
+
+Two threads: the component's own takes each command and each tick of a rate
+group -- on a tick it takes what data has arrived, sends CONNECT if one is
+due and writes the channels -- and a second waits on the beacon watch,
+whose pass waits for a beacon, for ever before the first, and leaves what it
+heard under a lock for the next tick. Each handle and buffer is made when the
+component is configured, as the topology is set up, and nothing is allocated
+after; the beacon watch's thread is not joined as the deployment stops,
+since a pass nothing has answered cannot be interrupted, and ends with the
+process. Both threads are given the stack a Rust thread has, 2 MiB:
+tcslib-c's calls need more than F´'s usual 64 KiB.
+
+The test is ``make fprime-test``: tcssim, waited for, standing in for the
+fprime example's payloads with every one sending from the start
+(``--sending``, there being nobody at its window); tcspecial flying the
+example; F´'s ground system; and ``BridgeTest``, a deployment of F´'s command
+and data handling and CCSDS communications with the bridge on a rate group,
+started by the tests once F´'s test API is listening. The tests, in
+``fprime/BridgeTest/test``, see the bridge only as F´ does: the bridge
+connects and is matched, and the beacon says the configuration's checksum;
+beacons are heard; a simulated reading arrives as the thermometer's channel;
+a PING is answered; a node is stopped and started again; a node the
+configuration lacks is refused unsent; and the deployment stops cleanly.
+
+Not yet built: data up from the bridge to the gateway node, which the fprime
+example's heater is driven by and tcs.h has no call for; the restart
+commands; and channels of a type other than a datum's bytes.
 
 What a device node says
 -----------------------

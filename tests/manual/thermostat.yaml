@@ -8,6 +8,7 @@ tcspecial:
     reset_interval: "1 s"
     send: "0.0.0.0:5550"
   gateway: "radio"
+  interface: "ad9aac4dd5a6d88dd5e78824ba8a83ac"
   log:
     directory: "/var/log/tcspecial"
     segment_size: "65536"

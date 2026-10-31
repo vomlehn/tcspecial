@@ -54,11 +54,31 @@ static int fail(const char *what)
 	return 1;
 }
 
-/* What a status means here, by the header's own constants, so that a header
- * whose numbers had drifted from the library's would say so. */
-static const char *outcome(tcs_status status)
+/* The most an outcome takes to say, its NUL included. */
+#define OUTCOME_BYTES 40
+
+/** Says what a status means here, by the header's own constants, so that a
+ * header whose numbers had drifted from the library's would say so: done,
+ * or refused and the status's name, or its number for one this library does
+ * not know -- a vehicle of a later build may answer with one, and it is a
+ * refusal all the same.
+ *
+ * @param status  The status the vehicle answered with.
+ * @param said    Where the words are written: room for OUTCOME_BYTES.
+ * @return        said. */
+static const char *outcome(tcs_status status, char *said)
 {
-	return status == TCS_STATUS_SUCCESS ? "done" : "refused";
+	const char *name = tcs_status_name(status);
+
+	if (status == TCS_STATUS_SUCCESS) {
+		snprintf(said, OUTCOME_BYTES, "done");
+	} else if (*name) {
+		snprintf(said, OUTCOME_BYTES, "refused (%s)", name);
+	} else {
+		snprintf(said, OUTCOME_BYTES, "refused (status %d)",
+			 (int)status);
+	}
+	return said;
 }
 
 /** Runs the ground station's steps in order, printing a line for each.
@@ -197,7 +217,9 @@ int main(int argc, char **argv)
 		/* Why, where it was refused: the status alone is the same for
 		 * every refusal, and the reason is what says which word to
 		 * change. */
-		printf("set %s count: %s%s%s\n", node_name, outcome(status),
+		char said[OUTCOME_BYTES];
+		printf("set %s count: %s%s%s\n", node_name,
+		       outcome(status, said),
 		       *tcs_client_reason(client) ? " -- " : "",
 		       tcs_client_reason(client));
 
@@ -215,13 +237,18 @@ int main(int argc, char **argv)
 	if (restart) {
 		tcs_status armed = TCS_STATUS_FAILURE,
 			   restarted = TCS_STATUS_FAILURE;
-		if (tcs_client_restart_arm(client, ARM_KEY, &armed) != 0
-		    || tcs_client_restart(client, ARM_KEY,
+		/* Onto this configuration, NULL saying so: a plain restart.
+		 * Another configuration the vehicle holds is named by its
+		 * checksum, as tcsverify prints it. */
+		if (tcs_client_restart_arm(client, ARM_KEY, NULL, &armed) != 0
+		    || tcs_client_restart(client, ARM_KEY, NULL,
 					  &restarted) != 0) {
 			return fail("restart");
 		}
-		printf("restart: armed %s, restarted %s\n", outcome(armed),
-		       outcome(restarted));
+		char said_armed[OUTCOME_BYTES], said_restarted[OUTCOME_BYTES];
+		printf("restart: armed %s, restarted %s\n",
+		       outcome(armed, said_armed),
+		       outcome(restarted, said_restarted));
 		/* Nothing more goes to the vehicle until a beacon whose number
 		 * starts again says it is back: the beacon is the restart's
 		 * acknowledgement. */

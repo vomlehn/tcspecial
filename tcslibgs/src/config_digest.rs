@@ -107,6 +107,24 @@ impl std::fmt::Display for ConfigVersion {
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
 pub struct ConfigDigest(pub [u8; 16]);
 
+impl ConfigDigest {
+    /// Reads a checksum as tcsverify prints it and a beacon carries it: 32
+    /// lower-case hex digits.
+    ///
+    /// # Arguments
+    ///
+    /// * `said` - The digits.
+    ///
+    /// # Returns
+    ///
+    /// The checksum, or `None` for anything that is not 32 lower-case hex
+    /// digits.
+    pub fn of_hex(said: &str) -> Option<ConfigDigest> {
+        crate::interface::InterfaceDigest::of_hex(said)
+            .map(|digest| ConfigDigest(digest.0))
+    }
+}
+
 impl std::fmt::Display for ConfigDigest {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         for byte in self.0 {
@@ -444,6 +462,22 @@ mod tests {
         node.attributes
             .insert("setpoint".to_string(), crate::Scalar::of("300.0"));
         assert_ne!(digest_of_graph(&retuned).expect("it digests"), digest);
+
+        // The interface the configuration names is part of it, so two
+        // configurations whose checksums match name the same interface.
+        let mut other_interface = graph.clone();
+        if let Some(section) = other_interface.tcspecial.as_mut() {
+            section.insert(
+                "interface".to_string(),
+                crate::graph::parameters::Parameter::Value(crate::Scalar::of(
+                    "0123456789abcdef0123456789abcdef",
+                )),
+            );
+        }
+        assert_ne!(
+            digest_of_graph(&other_interface).expect("it digests"),
+            digest
+        );
 
         // Two nodes swapped are two device ids swapped, and two ports.
         let mut reordered = graph.clone();

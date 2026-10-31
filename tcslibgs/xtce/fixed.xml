@@ -1,0 +1,229 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- The three fixed commands, and their answers, as they go on the link: the
+     whole of each datagram.
+
+     CONNECT, RESTART_ARM and RESTART are taken at any time, whatever either
+     end is running, so that a ground station and a vehicle that agree about
+     nothing else can still agree about these. Their opcodes and layouts are
+     fixed for ever: no build and no configuration changes them, and nothing
+     in this document is ever changed. A change to one of them is a new fixed
+     command, with an opcode of its own from 0x00 to 0x0F, in a document of
+     its own. A test in tcslibgs/src/link.rs pins the digest of this
+     document, and fails, saying so, if it is changed.
+
+     A command is
+
+       opcode           1 byte: which command
+       sequence         4 bytes: the command's number, which its answer
+                        carries back
+       ...              what that command carries
+
+     and an answer is
+
+       opcode           1 byte: the opcode of the command it answers
+       sequence         4 bytes: that command's sequence
+       status           1 byte: how the command went
+       time             8 bytes: microseconds since the UNIX epoch when the
+                        answer was made, all ones where the vehicle could
+                        not tell the time
+       ...              what the answer carries
+
+     There is no header: which way a packet goes is said by who sends it and
+     who receives it, and whether it arrived whole by the transport beneath
+     it. Every number is most significant byte first. A datagram whose length
+     is not exactly what its opcode's layout gives is refused, not answered
+     and not acted on.
+
+     The status values keep their meanings for ever: 0 Success, 1 Failure,
+     2 InvalidCommand, 3 InvalidParameter, 4 NotArmed, 5 NotFound, 9 Stale,
+     10 Unmatched. A value this document does not list is carried as the
+     number it is, and a station reads it as a refusal it cannot name.
+
+     The Rust in tcslibgs/src/fixed_packet.rs and the Python in
+     python/tcslibgs/fixed_packet.py are generated from this file by
+     `make fixed-packet` in tcslibgs/. See "The three fixed commands" in
+     docs/design.rst. -->
+<SpaceSystem xmlns="http://www.omg.org/spec/XTCE/20250214" name="TcsFixed">
+  <TelemetryMetaData>
+    <ParameterTypeSet>
+      <IntegerParameterType name="U8Type" signed="false">
+        <IntegerDataEncoding sizeInBits="8" encoding="unsigned"/>
+      </IntegerParameterType>
+      <IntegerParameterType name="U32Type" signed="false">
+        <IntegerDataEncoding sizeInBits="32" encoding="unsigned"/>
+      </IntegerParameterType>
+      <IntegerParameterType name="U64Type" signed="false">
+        <IntegerDataEncoding sizeInBits="64" encoding="unsigned"/>
+      </IntegerParameterType>
+      <BinaryParameterType name="ChecksumType">
+        <BinaryDataEncoding>
+          <SizeInBits>
+            <FixedValue>128</FixedValue>
+          </SizeInBits>
+        </BinaryDataEncoding>
+      </BinaryParameterType>
+      <EnumeratedParameterType name="StatusType">
+        <IntegerDataEncoding sizeInBits="8" encoding="unsigned"/>
+        <EnumerationList>
+          <Enumeration value="0" label="Success"/>
+          <Enumeration value="1" label="Failure"/>
+          <Enumeration value="2" label="InvalidCommand"/>
+          <Enumeration value="3" label="InvalidParameter"/>
+          <Enumeration value="4" label="NotArmed"/>
+          <Enumeration value="5" label="NotFound"/>
+          <Enumeration value="9" label="Stale"/>
+          <Enumeration value="10" label="Unmatched"/>
+        </EnumerationList>
+      </EnumeratedParameterType>
+    </ParameterTypeSet>
+    <ParameterSet>
+      <Parameter name="Opcode" parameterTypeRef="U8Type"/>
+      <Parameter name="Sequence" parameterTypeRef="U32Type"/>
+      <Parameter name="Status" parameterTypeRef="StatusType"/>
+      <Parameter name="Timestamp" parameterTypeRef="U64Type"/>
+      <!-- The checksum of the configuration the vehicle is running. -->
+      <Parameter name="Running" parameterTypeRef="ChecksumType"/>
+      <!-- The version of the vehicle's build: major, minor, patch. -->
+      <Parameter name="Major" parameterTypeRef="U8Type"/>
+      <Parameter name="Minor" parameterTypeRef="U8Type"/>
+      <Parameter name="Patch" parameterTypeRef="U8Type"/>
+      <!-- The newest command sequence this start has taken, or the
+           CONNECT's own where it has taken none: where a ground station
+           whose count has gone back starts again. -->
+      <Parameter name="NewestTaken" parameterTypeRef="U32Type"/>
+    </ParameterSet>
+    <ContainerSet>
+      <!-- What every fixed answer holds first. -->
+      <SequenceContainer name="FixedAnswer" abstract="true">
+        <EntryList>
+          <ParameterRefEntry parameterRef="Opcode"/>
+          <ParameterRefEntry parameterRef="Sequence"/>
+          <ParameterRefEntry parameterRef="Status"/>
+          <ParameterRefEntry parameterRef="Timestamp"/>
+        </EntryList>
+      </SequenceContainer>
+      <SequenceContainer name="RestartArmAnswer">
+        <EntryList/>
+        <BaseContainer containerRef="FixedAnswer">
+          <RestrictionCriteria>
+            <Comparison parameterRef="Opcode" value="2"/>
+          </RestrictionCriteria>
+        </BaseContainer>
+      </SequenceContainer>
+      <SequenceContainer name="RestartAnswer">
+        <EntryList/>
+        <BaseContainer containerRef="FixedAnswer">
+          <RestrictionCriteria>
+            <Comparison parameterRef="Opcode" value="3"/>
+          </RestrictionCriteria>
+        </BaseContainer>
+      </SequenceContainer>
+      <SequenceContainer name="ConnectAnswer">
+        <EntryList>
+          <ParameterRefEntry parameterRef="Running"/>
+          <ParameterRefEntry parameterRef="Major"/>
+          <ParameterRefEntry parameterRef="Minor"/>
+          <ParameterRefEntry parameterRef="Patch"/>
+          <ParameterRefEntry parameterRef="NewestTaken"/>
+        </EntryList>
+        <BaseContainer containerRef="FixedAnswer">
+          <RestrictionCriteria>
+            <Comparison parameterRef="Opcode" value="4"/>
+          </RestrictionCriteria>
+        </BaseContainer>
+      </SequenceContainer>
+    </ContainerSet>
+  </TelemetryMetaData>
+  <CommandMetaData>
+    <ArgumentTypeSet>
+      <IntegerArgumentType name="U8Arg" signed="false">
+        <IntegerDataEncoding sizeInBits="8" encoding="unsigned"/>
+      </IntegerArgumentType>
+      <IntegerArgumentType name="U32Arg" signed="false">
+        <IntegerDataEncoding sizeInBits="32" encoding="unsigned"/>
+      </IntegerArgumentType>
+      <IntegerArgumentType name="U64Arg" signed="false">
+        <IntegerDataEncoding sizeInBits="64" encoding="unsigned"/>
+      </IntegerArgumentType>
+      <BinaryArgumentType name="ChecksumArg">
+        <BinaryDataEncoding>
+          <SizeInBits>
+            <FixedValue>128</FixedValue>
+          </SizeInBits>
+        </BinaryDataEncoding>
+      </BinaryArgumentType>
+    </ArgumentTypeSet>
+    <MetaCommandSet>
+      <!-- What every fixed command holds first. -->
+      <MetaCommand name="FixedCommand" abstract="true">
+        <ArgumentList>
+          <Argument name="Opcode" argumentTypeRef="U8Arg"/>
+          <Argument name="Sequence" argumentTypeRef="U32Arg"/>
+        </ArgumentList>
+        <CommandContainer name="FixedCommandContainer">
+          <EntryList>
+            <ArgumentRefEntry argumentRef="Opcode"/>
+            <ArgumentRefEntry argumentRef="Sequence"/>
+          </EntryList>
+        </CommandContainer>
+      </MetaCommand>
+      <!-- Arms a restart onto the configuration whose checksum is Target,
+           with this key, which the RESTART must carry too. -->
+      <MetaCommand name="RestartArm">
+        <BaseMetaCommand metaCommandRef="FixedCommand">
+          <ArgumentAssignmentList>
+            <ArgumentAssignment argumentName="Opcode" argumentValue="2"/>
+          </ArgumentAssignmentList>
+        </BaseMetaCommand>
+        <ArgumentList>
+          <Argument name="ArmKey" argumentTypeRef="U64Arg"/>
+          <Argument name="Target" argumentTypeRef="ChecksumArg"/>
+        </ArgumentList>
+        <CommandContainer name="RestartArmContainer">
+          <EntryList>
+            <ArgumentRefEntry argumentRef="ArmKey"/>
+            <ArgumentRefEntry argumentRef="Target"/>
+          </EntryList>
+          <BaseContainer containerRef="FixedCommandContainer"/>
+        </CommandContainer>
+      </MetaCommand>
+      <!-- Restarts onto the configuration whose checksum is Target, which
+           must be the arm's, as the key must. -->
+      <MetaCommand name="Restart">
+        <BaseMetaCommand metaCommandRef="FixedCommand">
+          <ArgumentAssignmentList>
+            <ArgumentAssignment argumentName="Opcode" argumentValue="3"/>
+          </ArgumentAssignmentList>
+        </BaseMetaCommand>
+        <ArgumentList>
+          <Argument name="ArmKey" argumentTypeRef="U64Arg"/>
+          <Argument name="Target" argumentTypeRef="ChecksumArg"/>
+        </ArgumentList>
+        <CommandContainer name="RestartContainer">
+          <EntryList>
+            <ArgumentRefEntry argumentRef="ArmKey"/>
+            <ArgumentRefEntry argumentRef="Target"/>
+          </EntryList>
+          <BaseContainer containerRef="FixedCommandContainer"/>
+        </CommandContainer>
+      </MetaCommand>
+      <!-- Says which configuration the ground is using, by its checksum. -->
+      <MetaCommand name="Connect">
+        <BaseMetaCommand metaCommandRef="FixedCommand">
+          <ArgumentAssignmentList>
+            <ArgumentAssignment argumentName="Opcode" argumentValue="4"/>
+          </ArgumentAssignmentList>
+        </BaseMetaCommand>
+        <ArgumentList>
+          <Argument name="Checksum" argumentTypeRef="ChecksumArg"/>
+        </ArgumentList>
+        <CommandContainer name="ConnectContainer">
+          <EntryList>
+            <ArgumentRefEntry argumentRef="Checksum"/>
+          </EntryList>
+          <BaseContainer containerRef="FixedCommandContainer"/>
+        </CommandContainer>
+      </MetaCommand>
+    </MetaCommandSet>
+  </CommandMetaData>
+</SpaceSystem>

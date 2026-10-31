@@ -72,11 +72,25 @@ int fail(const std::string &what)
 	return 1;
 }
 
-// What a status means here, by the header's own constants, so that a header
-// whose numbers had drifted from the library's would say so.
-const char *outcome(tcs_status status)
+/** Says what a status means here, by the header's own constants, so that a
+ * header whose numbers had drifted from the library's would say so: done,
+ * or refused and the status's name, or its number for one this library does
+ * not know -- a vehicle of a later build may answer with one, and it is a
+ * refusal all the same.
+ *
+ * @param status  The status the vehicle answered with.
+ * @return        The words. */
+std::string outcome(tcs_status status)
 {
-	return status == TCS_STATUS_SUCCESS ? "done" : "refused";
+	const std::string name = tcs_status_name(status);
+	if (status == TCS_STATUS_SUCCESS) {
+		return "done";
+	}
+	if (!name.empty()) {
+		return "refused (" + name + ")";
+	}
+	return "refused (status " + std::to_string(static_cast<int>(status)) +
+	       ")";
 }
 
 } // namespace
@@ -214,7 +228,8 @@ int main(int argc, char **argv)
 		// change.
 		const char *reason = tcs_client_reason(client.get());
 		std::printf("set %s count: %s%s%s\n", node_name.c_str(),
-			    outcome(status), *reason ? " -- " : "", reason);
+			    outcome(status).c_str(), *reason ? " -- " : "",
+			    reason);
 
 		tcs_sample taken{}, given{};
 		if (tcs_client_query_node_sample(client.get(), node, &status,
@@ -233,14 +248,17 @@ int main(int argc, char **argv)
 	if (restart) {
 		tcs_status armed = TCS_STATUS_FAILURE,
 			   restarted = TCS_STATUS_FAILURE;
-		if (tcs_client_restart_arm(client.get(), ARM_KEY,
+		// Onto this configuration, nullptr saying so: a plain
+		// restart. Another configuration the vehicle holds is named by
+		// its checksum, as tcsverify prints it.
+		if (tcs_client_restart_arm(client.get(), ARM_KEY, nullptr,
 					   &armed) != 0 ||
-		    tcs_client_restart(client.get(), ARM_KEY,
+		    tcs_client_restart(client.get(), ARM_KEY, nullptr,
 				       &restarted) != 0) {
 			return fail("restart");
 		}
 		std::printf("restart: armed %s, restarted %s\n",
-			    outcome(armed), outcome(restarted));
+			    outcome(armed).c_str(), outcome(restarted).c_str());
 		// Nothing more goes to the vehicle until a beacon whose number
 		// starts again says it is back: the beacon is the restart's
 		// acknowledgement.

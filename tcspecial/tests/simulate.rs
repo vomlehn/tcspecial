@@ -33,6 +33,7 @@ fn configuration(dir: &std::path::Path) -> std::path::PathBuf {
         format!(
             "tcspecial:
   gateway: radio
+  interface: \"ad9aac4dd5a6d88dd5e78824ba8a83ac\"
   beacon: {{ default_interval: \"5 s\", reset_interval: \"1 s\", \
   recv: \"127.0.0.1:1\", send: \"127.0.0.1:2\" }}
   log: {{ directory: \"{}\", segment_size: \"65536\" }}
@@ -129,6 +130,7 @@ fn a_stand_in_is_where_a_simulated_channel_is_reached() {
         format!(
             "tcspecial:
   gateway: radio
+  interface: \"ad9aac4dd5a6d88dd5e78824ba8a83ac\"
   beacon: {{ default_interval: \"5 s\", reset_interval: \"1 s\", \
   recv: \"127.0.0.1:1\", send: \"127.0.0.1:2\" }}
   payload_command: {{ dest_base: \"127.0.0.1:3\", \

@@ -201,6 +201,7 @@ pub fn nest(flat: &BTreeMap<String, Scalar>) -> BTreeMap<String, Parameter> {
 /// before what it may.
 pub const ATTRIBUTES: &[(&str, bool)] = &[
     ("gateway", true),
+    ("interface", true),
     ("tcs_cmd.recv", true),
     ("tcs_cmd.send", true),
     ("payload_command.source_base", true),
@@ -215,6 +216,9 @@ pub const ATTRIBUTES: &[(&str, bool)] = &[
     ("log.directory", false),
     ("log.segment_size", false),
     ("restart_arm_valid", false),
+    ("configurations", false),
+    ("configurations_kept", false),
+    ("load_trials", false),
 ];
 
 /// Gives what a new configuration is given for an attribute, where anything.
@@ -368,6 +372,10 @@ pub fn ci_config_of(
         // that answers to a gateway this build cannot is refused here, by
         // name, before anything is said about its sockets.
         gateway: crate::gateway::GatewayKind::of(&text("gateway")?)?,
+        // Second, because a configuration written for another interface is
+        // one whose commands this build would read with other layouts, and
+        // nothing else it says is worth reading until that is settled.
+        interface: interface_of(&text("interface")?)?,
         tcs_cmd: TcsCmdJson {
             recv: text("tcs_cmd.recv")?,
             send: text("tcs_cmd.send")?,
@@ -422,6 +430,26 @@ pub fn ci_config_of(
             _ => None,
         },
         state_file: text("state_file")?,
+        // Absent is a vehicle that keeps no configurations of its own: it
+        // runs the one on its command line, and a RESTART may name only
+        // that and the one running. A vehicle with no writable storage is
+        // a configuration somebody may mean, as a missing log.directory is.
+        configurations: said
+            .get("configurations")
+            .map(|value| value.as_str().trim().to_string())
+            .filter(|value| !value.is_empty()),
+        configurations_kept: match said.get("configurations_kept") {
+            Some(value) if !value.as_str().trim().is_empty() => {
+                Some(at_least_one("configurations_kept", &number)?)
+            }
+            _ => None,
+        },
+        load_trials: match said.get("load_trials") {
+            Some(value) if !value.as_str().trim().is_empty() => {
+                Some(at_least_one("load_trials", &number)?)
+            }
+            _ => None,
+        },
         log: LogJson {
             // Absent is "run without a telemetry log", which is a
             // configuration somebody may mean: a vehicle with no writable
@@ -438,6 +466,76 @@ pub fn ci_config_of(
             },
         },
     })
+}
+
+/// Reads a count the section states that may not be nought.
+///
+/// # Arguments
+///
+/// * `name`   - The attribute's flat name.
+/// * `number` - How the section reads a whole number of it.
+///
+/// # Returns
+///
+/// The count.
+///
+/// # Errors
+///
+/// What `number` refuses, and nought, naming the attribute and why.
+fn at_least_one(
+    name: &str,
+    number: &dyn Fn(&str) -> Result<u32, String>,
+) -> Result<u32, String> {
+    match number(name)? {
+        0 => Err(format!(
+            "{name} is 0: it counts configurations, and nought of them would \
+             be a vehicle that keeps none or never tries one, so make it 1 or \
+             more, or leave it out for its default"
+        )),
+        count => Ok(count),
+    }
+}
+
+/// Reads the section's `interface`, and refuses one that is not this build's.
+///
+/// The one place the rule is stated. tcspecial, tcsverify, tcsmoc, tcslib
+/// and the C/C++ library all read the section through [`ci_config_of`], so
+/// all of them refuse a configuration written for another interface, saying
+/// both digests: a build can speak only the interface it was compiled from,
+/// and a configuration whose ordinary commands it read with other layouts
+/// would be one whose every command meant something else.
+///
+/// # Arguments
+///
+/// * `said` - The attribute, as the file wrote it.
+///
+/// # Returns
+///
+/// The interface it names, which is this build's.
+///
+/// # Errors
+///
+/// A message naming the attribute for one that is not 32 lower-case hex
+/// digits, and for one that is another interface's, saying what to write.
+pub fn interface_of(said: &str) -> Result<crate::InterfaceDigest, String> {
+    let ours = crate::InterfaceDigest::of_this_build();
+    let named = crate::InterfaceDigest::of_hex(said).ok_or_else(|| {
+        format!(
+            "interface is \"{said}\", which is not an interface digest: \
+             write the 32 lower-case hex digits `tcsverify \
+             --interface-digest` prints, which for this build are {ours}"
+        )
+    })?;
+    if named != ours {
+        return Err(format!(
+            "interface is {named}, and this build speaks interface {ours}, \
+             the digest of the tcslibgs/xtce/link.xml it was built from: \
+             fly this configuration with a build of interface {named}, or, \
+             once its commands have been checked against this build's, write \
+             interface: \"{ours}\""
+        ));
+    }
+    Ok(named)
 }
 
 /// Finds where a configuration says its beacons are: both ends of the link,
@@ -555,6 +653,7 @@ mod tests {
     fn whole() -> Vec<(&'static str, &'static str)> {
         vec![
             ("gateway", "radio"),
+            ("interface", "ad9aac4dd5a6d88dd5e78824ba8a83ac"),
             ("tcs_cmd.recv", "0.0.0.0:4000"),
             ("tcs_cmd.send", "127.0.0.1:4100"),
             ("payload_command.source_base", "127.0.0.1:4300"),
@@ -630,6 +729,88 @@ mod tests {
         ] {
             let why = settled(&[change]).expect_err(change.1);
             assert!(why.contains(said), "{change:?}: {why}");
+        }
+    }
+
+    /// `interface` is required, is 32 lower-case hex digits, and must be
+    /// this build's: one that is not is refused naming both digests and the
+    /// attribute to change.
+    #[test]
+    fn the_interface_is_required_and_must_be_this_builds() {
+        let with = |interface: Option<&'static str>| {
+            let mut all: Vec<_> = whole()
+                .into_iter()
+                .filter(|(name, _)| *name != "interface")
+                .collect();
+            if let Some(said) = interface {
+                all.push(("interface", said));
+            }
+            ci_config_of(&said(&all))
+        };
+        let ours = crate::InterfaceDigest::of_this_build();
+        assert_eq!(
+            with(Some("ad9aac4dd5a6d88dd5e78824ba8a83ac"))
+                .expect("this build's")
+                .interface,
+            ours,
+            "the examples' interface is this build's: when link.xml changes, \
+             every configuration is given the new digest"
+        );
+
+        let why = with(None).expect_err("it is required");
+        assert!(why.contains("interface is not stated"), "{why}");
+
+        let why = with(Some("AD9AAC4DD5A6D88DD5E78824BA8A83AC"))
+            .expect_err("upper case is not how a digest is written");
+        assert!(why.contains("not an interface digest"), "{why}");
+        assert!(why.contains("--interface-digest"), "{why}");
+
+        let other = "0123456789abcdef0123456789abcdef";
+        let why = with(Some(other)).expect_err("another interface");
+        assert!(why.contains(other), "{why}");
+        assert!(why.contains(&ours.to_string()), "{why}");
+        assert!(why.contains("interface:"), "{why}");
+    }
+
+    /// Where configurations are kept, how many must be, and how many tries a
+    /// configuration is given are all optional; the two counts have their
+    /// defaults where they are left out, and nought is refused, naming the
+    /// attribute.
+    #[test]
+    fn the_configurations_attributes_have_their_defaults_and_refuse_nought() {
+        let settled = |extra: &[(&'static str, &'static str)]| {
+            let mut all = whole();
+            all.extend_from_slice(extra);
+            ci_config_of(&said(&all)).and_then(|config| config.to_ci_config())
+        };
+        let left_out = settled(&[]).expect("left out");
+        assert_eq!(left_out.configurations, None, "a vehicle that keeps none");
+        assert_eq!(
+            left_out.configurations_kept,
+            crate::CONFIGURATIONS_KEPT_DEFAULT
+        );
+        assert_eq!(left_out.load_trials, crate::LOAD_TRIALS_DEFAULT);
+        assert_eq!(crate::LOAD_TRIALS_DEFAULT, 3, "as the design says");
+
+        let stated = settled(&[
+            ("configurations", "/var/lib/tcspecial/configurations"),
+            ("configurations_kept", "4"),
+            ("load_trials", "5"),
+        ])
+        .expect("stated");
+        assert_eq!(
+            stated.configurations.as_deref(),
+            Some("/var/lib/tcspecial/configurations")
+        );
+        assert_eq!(stated.configurations_kept, 4);
+        assert_eq!(stated.load_trials, 5);
+
+        for name in ["configurations_kept", "load_trials"] {
+            let why = settled(&[(name, "0")]).expect_err(name);
+            assert!(why.contains(name), "{why}");
+            assert!(why.contains("1 or more"), "{why}");
+            let why = settled(&[(name, "many")]).expect_err(name);
+            assert!(why.contains(name), "{why}");
         }
     }
 

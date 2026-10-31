@@ -10,12 +10,14 @@
 //! tcssim before tcspecial waits for it to be ready through [`simulator`].
 //! Whether a station and the vehicle are using the same configuration, which
 //! its commands and its data wait for, and what it has received, are
-//! [`matched`]'s.
+//! [`matched`]'s. A station that only listens sends its own CONNECT
+//! through [`listening`], since the vehicle sends nothing down until one.
 
 pub mod beacon;
 pub mod client;
 pub mod connection;
 pub mod gateway;
+pub mod listening;
 pub mod matched;
 pub mod ping;
 pub mod simulator;

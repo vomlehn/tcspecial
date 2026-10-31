@@ -49,6 +49,11 @@
             "fprime"
           ]
         },
+        "interface": {
+          "description": "The interface the configuration was written for: the digest of the tcslibgs/xtce/link.xml its commands are laid out by, as 32 lower-case hex digits, which `tcsverify --interface-digest` prints. Required, and refused unless it is the build's own.",
+          "type": "string",
+          "pattern": "^[0-9a-f]{32}$"
+        },
         "tcs_cmd": {
           "type": "object",
           "properties": {
@@ -149,8 +154,26 @@
           "additionalProperties": false
         },
         "state_file": {
-          "description": "The file tcspecial counts its starts in, the generation number every beacon carries. On storage that survives a power cycle.",
+          "description": "The file tcspecial keeps what must survive a restart in: which configuration the next start loads, which is confirmed, and whether the next start is commanded. On storage that survives a power cycle.",
           "type": "string"
+        },
+        "configurations": {
+          "description": "The directory the vehicle keeps configurations in, each under its checksum, as <checksum>.yaml or <checksum>.xml. Absent is a vehicle that keeps none, which a RESTART may restart only onto the configuration it runs.",
+          "type": "string"
+        },
+        "configurations_kept": {
+          "description": "The fewest configurations provisioning may leave in that directory: a whole number, 1 or more, 2 where it is not stated.",
+          "type": [
+            "string",
+            "integer"
+          ]
+        },
+        "load_trials": {
+          "description": "How many starts of the configuration the state file names may end before a matching CONNECT before it is given up for the confirmed one: a whole number, 1 or more, 3 where it is not stated. Read from the configuration on tcspecial's command line.",
+          "type": [
+            "string",
+            "integer"
+          ]
         },
         "restart_arm_valid": {
           "description": "How long a RESTART_ARM licenses a RESTART for, as a length of time: 20 min, 90 s. Twenty minutes where it is not stated; nought is refused.",

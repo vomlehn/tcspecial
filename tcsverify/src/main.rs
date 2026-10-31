@@ -6,6 +6,8 @@
 //! tcsverify tests/manual/tcspecial2.xml tests/manual/tcspecial2.yaml \
 //!     tests/manual/tcspecial2sim.yaml
 //! tcsverify --digest tests/manual/tcspecial2.yaml
+//! tcsverify --interface-digest
+//! tcsverify --keep=/var/lib/tcspecial/configurations vehicle.yaml
 //! ```
 //!
 //! Prints one line per problem -- file, line, and what is wrong -- and exits
@@ -30,6 +32,7 @@ usage: tcsverify [options] <tcspecial configuration file> \
 [payload simulator file]
        tcsverify [options] <configuration> <configuration> \
 <payload simulator file>
+       tcsverify --interface-digest
        tcsverify -h | --help
 
 Checks the files and prints the problems it finds, each as
@@ -67,6 +70,24 @@ configuration.
                      what `tcspecial --types` prints -- reporting each
                      node of another type as that tcspecial would refuse
                      it. Without it, every type is taken to be built
+  --keep=<directory> with one configuration, and its payload simulator
+                     file if it has one: once it is checked and nothing is
+                     wrong with it, keep it in <directory>, the directory a
+                     tcspecial section's configurations attribute names,
+                     under its checksum -- <checksum>.yaml or .xml, mode
+                     0444 -- as the vehicle keeps a configuration it may
+                     restart onto. One that includes another file is
+                     refused; one whose checksum is kept already is not
+                     written again. Prints where it is kept. For first
+                     provisioning and for testing: making the directory
+                     read-only afterwards is the provisioner's
+  --interface-digest print the digest of the interface this build speaks,
+                     the 32 lower-case hex digits a configuration's
+                     tcspecial section gives as its interface, and exit.
+                     It is the digest of the tcslibgs/xtce/link.xml the
+                     build was made from, which every beacon carries, and
+                     a configuration naming another is refused by this
+                     build's tcsverify, tcspecial and ground programs
   -h, --help         print this message and exit
 
 Exit status: 0 no error was printed -- a run that stopped before it found
@@ -96,6 +117,17 @@ const TYPES_FLAG: &str = "--types=";
 /// configuration and nothing to choose about it.
 const DIGEST_FLAG: &str = "--digest";
 
+/// Keeps the configuration, once checked, in the directory given: see
+/// `tcslibgs::store`.
+const KEEP_FLAG: &str = "--keep=";
+
+/// Asks for the interface digest of this build, alone on the command line.
+///
+/// A shape of its own, with nothing beside it: it is a fact about this
+/// build, not about any file, and a file named with it would be a file the
+/// run did not check.
+const INTERFACE_DIGEST_FLAG: &str = "--interface-digest";
+
 /// Reads the command line, checks the files it names and prints what it
 /// found, and each configuration's digest where `--digest` asks for it.
 ///
@@ -108,8 +140,22 @@ fn main() -> ExitCode {
     let mut files: Vec<PathBuf> = Vec::new();
     let mut limits = tcsverify::Limits::EVERYTHING;
     let mut digest = false;
+    let mut keep: Option<PathBuf> = None;
     let mut built: Vec<&str> = tcslibgs::graph::built::OPTIONAL_TYPES.to_vec();
-    for arg in std::env::args_os().skip(1) {
+    let args: Vec<_> = std::env::args_os().skip(1).collect();
+    if args.iter().any(|arg| arg == INTERFACE_DIGEST_FLAG) {
+        if args.len() != 1 {
+            eprintln!(
+                "tcsverify: {INTERFACE_DIGEST_FLAG} is given alone: it says \
+                 which interface this build speaks, and checks no file\n\n\
+                 {USAGE}"
+            );
+            return ExitCode::from(2);
+        }
+        println!("{}", tcslibgs::InterfaceDigest::of_this_build());
+        return ExitCode::SUCCESS;
+    }
+    for arg in args {
         let said = arg.to_string_lossy();
         // Asked for, so on stdout and a success: the message is the answer.
         if said == "-h" || said == "--help" {
@@ -118,6 +164,17 @@ fn main() -> ExitCode {
         }
         if said == DIGEST_FLAG {
             digest = true;
+            continue;
+        }
+        if let Some(value) = said.strip_prefix(KEEP_FLAG) {
+            if value.is_empty() {
+                eprintln!(
+                    "tcsverify: {KEEP_FLAG} names the directory to keep the \
+                     configuration in, and names none\n\n{USAGE}"
+                );
+                return ExitCode::from(2);
+            }
+            keep = Some(PathBuf::from(value));
             continue;
         }
         let asked = if let Some(value) = said.strip_prefix(ERROR_LIMIT_FLAG) {
@@ -136,6 +193,16 @@ fn main() -> ExitCode {
             eprintln!("tcsverify: {why}\n\n{USAGE}");
             return ExitCode::from(2);
         }
+    }
+
+    // One configuration is kept, not a pair of spellings: the two would be
+    // one checksum and one file kept.
+    if keep.is_some() && !matches!(files.len(), 1 | 2) {
+        eprintln!(
+            "tcsverify: {KEEP_FLAG} keeps one configuration, given with its \
+             payload simulator file or alone\n\n{USAGE}"
+        );
+        return ExitCode::from(2);
     }
 
     let report = match files.as_slice() {
@@ -226,6 +293,41 @@ fn main() -> ExitCode {
 
     if digest_failed {
         return ExitCode::from(1);
+    }
+
+    // Kept only once nothing is wrong with it: a configuration the vehicle
+    // may restart onto is one the ground has checked, and the vehicle
+    // checks it again as it loads it.
+    if let Some(dir) = keep {
+        if report.found_errors() {
+            eprintln!(
+                "tcsverify: {} has errors, so it is not kept in {}",
+                payload.display(),
+                dir.display()
+            );
+            return ExitCode::from(1);
+        }
+        match tcslibgs::store::Store::at(&dir).keep(payload) {
+            Ok((checksum, kept)) => {
+                let how = match kept {
+                    tcslibgs::store::Kept::Written(_) => "kept as",
+                    tcslibgs::store::Kept::Already(_) => "already kept as",
+                };
+                if let Err(e) = writeln!(
+                    out,
+                    "{}: md5 {checksum}, {how} {}",
+                    payload.display(),
+                    kept.path().display()
+                ) {
+                    eprintln!("tcsverify: cannot write where it is kept: {e}");
+                    return ExitCode::from(2);
+                }
+            }
+            Err(why) => {
+                eprintln!("tcsverify: not kept: {why}");
+                return ExitCode::from(1);
+            }
+        }
     }
 
     ExitCode::from(u8::try_from(report.status()).unwrap_or(1))

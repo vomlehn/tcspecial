@@ -2127,6 +2127,7 @@ mod tests {
   - cabin
 tcspecial:
   gateway: radio
+  interface: \"ad9aac4dd5a6d88dd5e78824ba8a83ac\"
   tcs_cmd:
     \
              recv: 0.0.0.0:4000

@@ -8,6 +8,16 @@
 //! source's data arrives at, exactly as the vehicle does, and says which node
 //! each datum came from.
 //!
+//! It sends a CONNECT of its own, with its configuration's checksum, before
+//! it waits for a word: a vehicle sends nothing down until it has taken one,
+//! and a station that only listens cannot count on a commanding station's
+//! being there. It sends it again each time no answer comes in time, or the
+//! answer carries another configuration's checksum, until the vehicle
+//! answers with this one's -- through `tcslib::listening`, from the
+//! configuration's `tcs_cmd.send`, so nothing else may be using that address
+//! meanwhile. A configuration with no `tcspecial` section states no command
+//! link, and nothing is sent.
+//!
 //! One datum is one word, which is how `lorem_pl.py` sent it. A datum holding
 //! nothing but `simple_app::TERMINATOR` is the end of the line: it is written
 //! out as well, and then this stops -- the line is whole, and a ground station
@@ -20,13 +30,19 @@
 //! is given: the line is what this prints, on standard output, and errors are
 //! said on standard error whatever the flag. Verbose, it also says on standard
 //! error when the node is open, so that whoever started this knows the
-//! vehicle can be started.
+//! vehicle can be started, and when the vehicle has matched it.
 
 use std::io::Write;
 use std::process::ExitCode;
 
+use std::time::Duration;
+
 use simple_app::TERMINATOR;
 use tcslib::gateway::{GatewayReceiver, DATUM_BYTES};
+use tcslib::listening::{Heard, Listening};
+
+/// How long each CONNECT waits for its answer before it is sent again.
+const CONNECT_WAIT: Duration = Duration::from_secs(1);
 
 /// The example's configuration, without its extension: `.yaml` or `.xml`,
 /// the two saying the same thing.
@@ -142,6 +158,41 @@ fn main() -> ExitCode {
             gateway.name(),
             gateway.sources().join(", ")
         );
+    }
+
+    // The CONNECT, once the node is open, so that nothing the vehicle sends
+    // as it matches arrives before there is a socket to take it.
+    let graph = match tcslib::graph::Graph::load(&configuration) {
+        Ok(graph) => graph,
+        Err(e) => {
+            eprintln!("lorem_gateway: {configuration}: {e}");
+            return ExitCode::FAILURE;
+        }
+    };
+    match Listening::open(&graph) {
+        Ok(Some(mut listening)) => {
+            let ours = listening.ours();
+            // What is wrong is said whether or not -v was given: a vehicle
+            // running another configuration is one this station will wait
+            // on for ever. The rest -- the match, and a CONNECT unanswered
+            // while the vehicle starts -- is status.
+            listening.until_matched(CONNECT_WAIT, &mut |heard| match heard {
+                Heard::Other(_) => {
+                    eprintln!("lorem_gateway: {}", heard.said(ours))
+                }
+                heard if verbose => {
+                    eprintln!("lorem_gateway: {}", heard.said(ours))
+                }
+                _ => {}
+            });
+        }
+        // No tcspecial section, so no command link: nothing to send, and
+        // nothing to say of it.
+        Ok(None) => {}
+        Err(e) => {
+            eprintln!("lorem_gateway: {e}");
+            return ExitCode::FAILURE;
+        }
     }
 
     let mut said_anything = false;

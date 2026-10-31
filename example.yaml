@@ -9,6 +9,7 @@ tcspecial:
     reset_interval: "1 s"
     send: "0.0.0.0:5550"
   gateway: "radio"
+  interface: "ad9aac4dd5a6d88dd5e78824ba8a83ac"
   payload_command:
     dest_base: "0.0.0.0:4200"
     source_base: "127.0.0.1:4300"

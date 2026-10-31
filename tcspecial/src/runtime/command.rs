@@ -48,7 +48,7 @@
 use std::fmt::Write as _;
 use std::net::{SocketAddr, UdpSocket};
 use std::os::unix::io::AsRawFd;
-use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::sync::Arc;
 use std::thread::JoinHandle;
 use std::time::{Duration, Instant};
@@ -66,6 +66,7 @@ use tcslibgs::{
 };
 
 use crate::beacon_send::BeaconSend;
+use crate::runtime::held::Held;
 use crate::runtime::matched::Matched;
 use crate::runtime::node_state::{NodeStates, Wakeup};
 use crate::runtime::system::{Work, Workbench};
@@ -112,21 +113,20 @@ struct Link {
     from: HostPort,
 }
 
-/// What this vehicle answers a CONNECT with.
+/// What this vehicle answers a CONNECT with, and what it may restart onto.
 ///
 /// Settled when the process starts, not read when a command arrives: the
 /// digest is of the file this process read, and a file edited since would
 /// otherwise have the answers claiming a configuration nothing is serving.
 /// The beacons carry the same two facts, from the same place.
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone)]
 pub struct Flying {
     /// The version of this build.
     pub version: ConfigVersion,
     /// The digest of the configuration file this process read.
     pub digest: ConfigDigest,
-    /// This start's generation, from the state file, which every answer
-    /// carries so that the ground hears of a restart from any of them.
-    pub generation: u32,
+    /// The configurations a RESTART_ARM and a RESTART may name.
+    pub held: Held,
 }
 
 /// The command interpreter: two links, one thread.
@@ -147,6 +147,9 @@ pub struct Commands {
     /// link is never.
     stopping: Arc<AtomicBool>,
     wakeup: Arc<Wakeup>,
+    /// How many datagrams the links have not taken: see
+    /// [`Commands::malformed`].
+    malformed: Arc<AtomicU64>,
 }
 
 impl Commands {
@@ -163,8 +166,8 @@ impl Commands {
     ///               lasts and the state file.
     /// * `states`  - Every node's state, which commands read and change.
     /// * `bench`   - How work a command causes is handed to the pass.
-    /// * `flying`  - What this vehicle answers a CONNECT with, and the
-    ///               generation commands must be sent for.
+    /// * `flying`  - What this vehicle answers a CONNECT with, and what a
+    ///               RESTART may name.
     /// * `beacon`  - The beacon sender, which a CONNECT slows and a RESTART
     ///               speeds up; `None` where no beacons are sent.
     /// * `log`     - Where every answer is recorded.
@@ -225,6 +228,7 @@ impl Commands {
 
         let stopping = Arc::new(AtomicBool::new(false));
         let wakeup = Arc::new(Wakeup::new()?);
+        let malformed = Arc::new(AtomicU64::new(0));
 
         let serving = Serving {
             states,
@@ -235,6 +239,7 @@ impl Commands {
             matched,
             stopping: stopping.clone(),
             wakeup: wakeup.clone(),
+            malformed: malformed.clone(),
             answer: AnswerPacker::new(),
             armed: None,
             arm_valid: ci.restart_arm_valid,
@@ -251,7 +256,21 @@ impl Commands {
             thread: Some(thread),
             stopping,
             wakeup,
+            malformed,
         })
+    }
+
+    /// Says how many datagrams the two links have not taken, since they
+    /// were bound: from an address the configuration does not say the
+    /// ground sends from, of an opcode no command has, or of a length that
+    /// is not exactly its opcode's layout's. None of them was answered or
+    /// acted on, and each was logged.
+    ///
+    /// # Returns
+    ///
+    /// The count.
+    pub fn malformed(&self) -> u64 {
+        self.malformed.load(Ordering::Relaxed)
     }
 
     /// Where spacecraft commands are taken, as the socket was bound.
@@ -369,12 +388,15 @@ struct Serving {
     matched: Matched,
     stopping: Arc<AtomicBool>,
     wakeup: Arc<Wakeup>,
+    /// How many datagrams have not been taken, which [`Commands::malformed`]
+    /// reads.
+    malformed: Arc<AtomicU64>,
     /// What an answer is packed into before it is sent: made with the
     /// thread and reused, so that answering allocates nothing of its own.
     answer: AnswerPacker,
-    /// The key of the last RESTART_ARM and when it was taken, until a RESTART
-    /// uses it.
-    armed: Option<(ArmKey, Instant)>,
+    /// The key and the target of the last RESTART_ARM and when it was
+    /// taken, until a RESTART uses it.
+    armed: Option<(ArmKey, ConfigDigest, Instant)>,
     /// How long an arm licenses a RESTART for: the configuration's
     /// `restart_arm_valid`.
     arm_valid: Duration,
@@ -471,7 +493,9 @@ impl Serving {
     /// Takes one datagram from this link and answers it.
     ///
     /// A datagram from anywhere but the link's one address, or one that is
-    /// not a command, is logged and not answered. An armed RESTART is
+    /// not a command -- of an opcode no command has, or of a length that is
+    /// not exactly its opcode's layout's -- is not answered and not acted
+    /// on, and is logged and counted as malformed. An armed RESTART is
     /// carried out once its answer has gone.
     ///
     /// # Arguments
@@ -505,9 +529,11 @@ impl Serving {
         // nothing is sent back to anywhere else: an answer would tell whoever
         // sent it that something is listening here.
         if !came_from(&link.from, &from) {
+            let count = self.malformed.fetch_add(1, Ordering::Relaxed) + 1;
             warn!(
                 "a {} came from {from} and not from {}, which is where the \
-                 configuration says the ground sends it from -- ignored",
+                 configuration says the ground sends it from -- not \
+                 answered, not acted on, and counted as malformed ({count})",
                 spelling(link.which),
                 link.from
             );
@@ -523,8 +549,11 @@ impl Serving {
             // Not a command. Nothing to answer and nobody to answer it to: the
             // sender is whatever sent this.
             Err(why) => {
+                let count = self.malformed.fetch_add(1, Ordering::Relaxed) + 1;
                 error!(
-                    "{}: {size} bytes that are not a command: {why}",
+                    "{}: {size} bytes from {from} that are not a command \
+                     ({why}) -- not answered, not acted on, and counted as \
+                     malformed ({count})",
                     spelling(link.which)
                 );
                 return false;
@@ -533,11 +562,7 @@ impl Serving {
 
         trace!("{}: {command:?}", spelling(link.which));
         let was_matched = self.matched.is_matched();
-        // Every answer says which start of tcspecial made it, stamped here,
-        // where every answer goes out, so that none can be sent without it.
-        let answer = self
-            .answer(link.which, &command)
-            .for_generation(self.flying.generation);
+        let answer = self.answer(link.which, &command);
 
         // Into the thread's own packer, which keeps its buffer.
         let data = self.answer.pack(&answer);
@@ -581,7 +606,7 @@ impl Serving {
     ///
     /// # Returns
     ///
-    /// The answer, not yet stamped with the generation.
+    /// The answer.
     fn answer(&mut self, arrived: CommandLink, command: &Command) -> Telemetry {
         let sequence = command.sequence();
 
@@ -657,7 +682,14 @@ impl Serving {
             // RESTART is taken no CONNECT does: see `Matched::connected`.
             Command::Connect(cmd) => {
                 if cmd.digest == self.flying.digest {
-                    self.matched.connected();
+                    // Newly matched: the running configuration is the
+                    // confirmed one, and its trials go back to nought, so
+                    // that the next start loads it and never gives it up
+                    // for having been started. Once a start, at its match:
+                    // a CONNECT repeated changes nothing aboard.
+                    if self.matched.connected() {
+                        self.say_confirmed();
+                    }
                     if let Some(beacon) = self.beacon.as_ref() {
                         beacon.connected();
                     }
@@ -744,42 +776,74 @@ impl Serving {
                 }
             },
 
-            // Armed for the next restart_arm_valid, with this key. A second
-            // arm with another key replaces the first, so the arm that counts
-            // is the one the operator gave last. One with the same key, while
-            // that arm stands, is a repeat -- the ground sends a command again
-            // when its answer is lost -- and leaves the arm as it was: a
-            // repeat changes nothing aboard, and one that started the arm's
-            // time again would hold the vehicle open to a RESTART for longer
-            // than anybody asked.
+            // Armed for the next restart_arm_valid, with this key, onto this
+            // target, which the vehicle must hold: one it does not is
+            // refused NotFound and arms nothing, so that an arm cannot stand
+            // ready to restart onto nothing. A second arm with another key
+            // or target replaces the first, so the arm that counts is the
+            // one the operator gave last. One with the same key and target,
+            // while that arm stands, is a repeat -- the ground sends a
+            // command again when its answer is lost -- and leaves the arm as
+            // it was: a repeat changes nothing aboard, and one that started
+            // the arm's time again would hold the vehicle open to a RESTART
+            // for longer than anybody asked.
             Command::RestartArm(cmd) => {
+                if !self.flying.held.holds(cmd.target) {
+                    warn!(
+                        "a RESTART_ARM named configuration {}, which this \
+                         vehicle does not hold: refused NotFound, and \
+                         nothing armed",
+                        cmd.target
+                    );
+                    return answer_to(command, CommandStatus::NotFound);
+                }
                 let standing = matches!(
                     self.armed,
-                    Some((key, taken))
+                    Some((key, target, taken))
                         if key == cmd.arm_key
+                            && target == cmd.target
                             && taken.elapsed() < self.arm_valid
                 );
                 if !standing {
-                    self.armed = Some((cmd.arm_key, Instant::now()));
+                    self.armed =
+                        Some((cmd.arm_key, cmd.target, Instant::now()));
                 }
                 answer_to(command, CommandStatus::Success)
             }
 
-            // Only with the key of an arm taken within restart_arm_valid, and
-            // the arm is used up: one lost or repeated datagram must not be
-            // able to restart the flight software. A key that does not match
-            // leaves the arm as it was, so an operator who mistyped it can
-            // send the RESTART again without arming again.
+            // Only with the key and the target of an arm taken within
+            // restart_arm_valid, and the arm is used up: one lost or
+            // repeated datagram must not be able to restart the flight
+            // software. A key or a target that does not match leaves the arm
+            // as it was, so an operator who mistyped it can send the RESTART
+            // again without arming again. The target is checked again as it
+            // would be loaded, because storage can change between the arm
+            // and the restart, and one that would not load is refused
+            // NotFound and restarts nothing.
             Command::Restart(cmd) => match self.armed {
-                Some((key, taken))
+                Some((key, target, taken))
                     if key == cmd.arm_key
+                        && target == cmd.target
                         && taken.elapsed() < self.arm_valid =>
                 {
+                    // Allocates, in the command loop: the configuration is
+                    // read as a start would read it. Once, for a RESTART,
+                    // after which the process ends.
+                    if let Err(why) = self.flying.held.check(cmd.target) {
+                        error!(
+                            "a RESTART named configuration {}, which cannot \
+                             be loaded: {why} -- refused NotFound, and \
+                             nothing restarts",
+                            cmd.target
+                        );
+                        return answer_to(command, CommandStatus::NotFound);
+                    }
                     // The next start is said to be commanded before
                     // anything else, so that it says so in its beacons; a
                     // vehicle that cannot say it does not restart, and the
                     // arm stands for a RESTART that can.
-                    if let Err(why) = self.say_next_start_commanded() {
+                    if let Err(why) = self.say_next_start_commanded(cmd.target)
+                    {
                         error!("a RESTART was refused: {why}");
                         return answer_to(command, CommandStatus::Failure);
                     }
@@ -791,10 +855,12 @@ impl Serving {
                     self.matched.restart_taken();
                     answer_to(command, CommandStatus::Success)
                 }
-                Some((key, _)) if key != cmd.arm_key => {
+                Some((key, target, _))
+                    if key != cmd.arm_key || target != cmd.target =>
+                {
                     warn!(
-                        "a RESTART came with a key that is not the arm's: \
-                           refused"
+                        "a RESTART came with a key or a target that is not \
+                         the arm's: refused"
                     );
                     answer_to(command, CommandStatus::NotArmed)
                 }
@@ -812,10 +878,15 @@ impl Serving {
     }
 
     /// Says in the state file that the next start is one the ground
-    /// commanded. See [`crate::state::commanded_restart`], which says why it
-    /// allocates, here in the loop.
+    /// commanded, onto the configuration `target` names. See
+    /// [`crate::state::commanded_restart`], which says why it allocates,
+    /// here in the loop.
     ///
     /// Nothing is written where the configuration gave no state file.
+    ///
+    /// # Arguments
+    ///
+    /// * `target` - The checksum the RESTART named.
     ///
     /// # Returns
     ///
@@ -824,14 +895,38 @@ impl Serving {
     /// # Errors
     ///
     /// Why the state file could not be written, as a message.
-    fn say_next_start_commanded(&self) -> Result<(), String> {
+    fn say_next_start_commanded(
+        &self,
+        target: ConfigDigest,
+    ) -> Result<(), String> {
         if self.state_file.as_os_str().is_empty() {
             return Ok(());
         }
-        crate::state::commanded_restart(
-            &self.state_file,
-            self.flying.generation,
-        )
+        crate::state::commanded_restart(&self.state_file, target)
+    }
+
+    /// Says in the state file that the running configuration is confirmed:
+    /// see [`crate::state::confirmed`], which says why it allocates, here in
+    /// the loop. A state file that cannot be written is logged and the
+    /// CONNECT answered all the same: the match is the ground's, and a
+    /// vehicle refusing it would be one nobody could command; what is lost
+    /// is that the next start may load another configuration, which the
+    /// beacon's checksum then says.
+    ///
+    /// Nothing is written where the configuration gave no state file.
+    fn say_confirmed(&self) {
+        if self.state_file.as_os_str().is_empty() {
+            return;
+        }
+        if let Err(why) =
+            crate::state::confirmed(&self.state_file, self.flying.digest)
+        {
+            error!(
+                "configuration {} is matched and could not be kept as the \
+                 confirmed one: {why}",
+                self.flying.digest
+            );
+        }
     }
 
     /// Logs that the ground named a node this configuration has not got.
@@ -1046,6 +1141,10 @@ mod tests {
             log_segment_bytes: 65_536,
             restart_arm_valid: tcslibgs::RESTART_ARM_VALID_DEFAULT,
             gateway: tcslibgs::gateway::GatewayKind::Radio,
+            interface: tcslibgs::InterfaceDigest::of_this_build(),
+            configurations: None,
+            configurations_kept: tcslibgs::CONFIGURATIONS_KEPT_DEFAULT,
+            load_trials: tcslibgs::LOAD_TRIALS_DEFAULT,
             // Nothing reads it: the state file is counted where beacons
             // start, which this does not.
             state_file: String::new(),
@@ -1080,19 +1179,18 @@ mod tests {
         Graph::load(&path).expect("it reads")
     }
 
-    /// The generation the vehicle in these tests is flying.
-    const GENERATION: u32 = 3;
-
     /// Says what the vehicle in these tests is flying.
     ///
     /// # Returns
     ///
-    /// This build's version, a made-up digest and [`GENERATION`].
+    /// This build's version and a made-up digest, which is the one
+    /// configuration it holds.
     fn flying() -> Flying {
+        let digest = ConfigDigest([0x5Au8; 16]);
         Flying {
             version: ConfigVersion::of_this_build(),
-            digest: ConfigDigest([0x5Au8; 16]),
-            generation: GENERATION,
+            digest,
+            held: Held::running_only(digest),
         }
     }
 
@@ -1265,11 +1363,7 @@ mod tests {
             Command::StartNode(NodeCommand::start(sequence, NodeId::of(1)))
         };
         let connect = |sequence, digest| {
-            Command::Connect(tcslibgs::ConnectCommand::new(
-                sequence,
-                ConfigVersion::of_this_build(),
-                digest,
-            ))
+            Command::Connect(tcslibgs::ConnectCommand::new(sequence, digest))
         };
 
         assert_eq!(
@@ -1385,7 +1479,6 @@ mod tests {
 
         let connect = Command::Connect(tcslibgs::ConnectCommand::new(
             8,
-            ConfigVersion::of_this_build(),
             ConfigDigest([0x5Au8; 16]),
         ));
         match ask(&ground, at, &connect) {
@@ -1401,7 +1494,6 @@ mod tests {
                     ConfigVersion::of_this_build(),
                     "this build"
                 );
-                assert_eq!(tm.header.generation, GENERATION, "this start");
             }
             other => panic!("expected a connect answer, got {other:?}"),
         }
@@ -1422,15 +1514,8 @@ mod tests {
         let node_at = commands.node_address();
         let at = commands.spacecraft_address();
         let handed_over = || done.lock().expect("the record").clone();
-        let status = |answer: Option<Telemetry>| {
-            let answer = answer.expect("an answer");
-            assert_eq!(
-                answer.generation(),
-                GENERATION,
-                "every answer says which start made it"
-            );
-            answer.status()
-        };
+        let status =
+            |answer: Option<Telemetry>| answer.expect("an answer").status();
 
         let stop = Command::StopNode(NodeCommand::stop(10, inside));
         assert_eq!(
@@ -1461,7 +1546,6 @@ mod tests {
         assert_eq!(status(ask(&ground, at, &ping)), CommandStatus::Success);
         let connect = Command::Connect(tcslibgs::ConnectCommand::new(
             2,
-            ConfigVersion::of_this_build(),
             ConfigDigest([0x5Au8; 16]),
         ));
         match ask(&ground, at, &connect) {
@@ -1884,6 +1968,53 @@ mod tests {
             states.is_enabled("inside"),
             "and the command is not acted on"
         );
+        assert_eq!(commands.malformed(), 1, "and it is counted as malformed");
+    }
+
+    /// A datagram from the ground whose opcode no command has, or whose
+    /// length is not exactly its opcode's layout's, is not answered and not
+    /// acted on, and is counted as malformed; the next good command is
+    /// answered as ever.
+    #[test]
+    fn a_datagram_of_the_wrong_length_or_opcode_is_not_taken() {
+        let graph = two_nodes();
+        let states = Arc::new(NodeStates::of(&graph).expect("states"));
+        let (ground, commands) = started(states.clone());
+        ground
+            .set_read_timeout(Some(Duration::from_millis(300)))
+            .expect("a timeout");
+        let node_at = commands.node_address();
+
+        let stop =
+            Command::StopNode(NodeCommand::stop(9, NodeId::of(0))).to_bytes();
+        let mut long = stop.clone();
+        long.push(0);
+        let mut unknown = stop.clone();
+        unknown[0] = 0x2f;
+        let mut buffer = [0u8; 64];
+        for (count, wrong) in
+            [long, stop[..stop.len() - 1].to_vec(), unknown, vec![]]
+                .into_iter()
+                .enumerate()
+        {
+            ground.send_to(&wrong, node_at).expect("it is sent");
+            assert!(
+                ground.recv_from(&mut buffer).is_err(),
+                "{wrong:02x?} is not answered"
+            );
+            assert_eq!(commands.malformed(), count as u64 + 1, "{wrong:02x?}");
+        }
+        assert!(states.is_enabled("inside"), "and none is acted on");
+
+        ground
+            .set_read_timeout(Some(Duration::from_secs(5)))
+            .expect("a timeout");
+        let stop = Command::StopNode(NodeCommand::stop(10, NodeId::of(0)));
+        assert_eq!(
+            ask(&ground, node_at, &stop).expect("answered").status(),
+            CommandStatus::Success
+        );
+        assert_eq!(commands.malformed(), 4, "a good command is not counted");
     }
 
     /// A RESTART is taken with the key of the last RESTART_ARM, and only
@@ -1921,45 +2052,56 @@ mod tests {
         )
         .expect("both links bind");
         let at = commands.spacecraft_address();
-        let restart = |sequence, key| match ask(
+        let running = flying().digest;
+        let elsewhere = ConfigDigest([0x77; 16]);
+        let restart = |sequence, key, target| match ask(
             &ground,
             at,
             &Command::Restart(tcslibgs::RestartCommand::new(
                 sequence,
                 ArmKey(key),
+                target,
             )),
         ) {
             Some(Telemetry::Restart(tm)) => tm.header.status,
             other => panic!("expected a restart answer, got {other:?}"),
         };
-
-        // Not armed.
-        assert_eq!(restart(1, 42), CommandStatus::NotArmed);
-
-        match ask(
+        let arm = |sequence, key, target| match ask(
             &ground,
             at,
             &Command::RestartArm(tcslibgs::RestartArmCommand::new(
-                2,
-                ArmKey(42),
+                sequence,
+                ArmKey(key),
+                target,
             )),
         ) {
-            Some(Telemetry::RestartArm(tm)) => {
-                assert_eq!(tm.header.status, CommandStatus::Success)
-            }
+            Some(Telemetry::RestartArm(tm)) => tm.header.status,
             other => panic!("expected an arm answer, got {other:?}"),
-        }
+        };
 
-        // Armed, and the wrong key: refused, and the arm stands.
-        assert_eq!(restart(3, 41), CommandStatus::NotArmed);
+        // Not armed.
+        assert_eq!(restart(1, 42, running), CommandStatus::NotArmed);
+
+        // An arm onto a configuration this vehicle does not hold is refused
+        // NotFound, and arms nothing.
+        assert_eq!(arm(2, 42, elsewhere), CommandStatus::NotFound);
+        assert_eq!(restart(3, 42, elsewhere), CommandStatus::NotArmed);
+
+        assert_eq!(arm(4, 42, running), CommandStatus::Success);
+
+        // Armed, and the wrong key or another target: refused, and the arm
+        // stands.
+        assert_eq!(restart(5, 41, running), CommandStatus::NotArmed);
+        assert_eq!(restart(6, 42, elsewhere), CommandStatus::NotArmed);
         assert_eq!(
             ASKED.load(Ordering::SeqCst),
             0,
             "a refused RESTART restarts nothing"
         );
 
-        // The right key: taken, once.
-        assert_eq!(restart(4, 42), CommandStatus::Success);
+        // The right key and the arm's target, the running configuration:
+        // taken, once, which is a plain restart.
+        assert_eq!(restart(7, 42, running), CommandStatus::Success);
         assert_eq!(
             ASKED.load(Ordering::SeqCst),
             1,
@@ -1967,7 +2109,7 @@ mod tests {
         );
 
         // And the arm is used up.
-        assert_eq!(restart(5, 42), CommandStatus::NotArmed);
+        assert_eq!(restart(8, 42, running), CommandStatus::NotArmed);
         assert_eq!(ASKED.load(Ordering::SeqCst), 1);
     }
 
@@ -1991,6 +2133,7 @@ mod tests {
                 matched: Matched::at_a_start(),
                 stopping: Arc::new(AtomicBool::new(false)),
                 wakeup: Arc::new(Wakeup::new().expect("a wakeup")),
+                malformed: Arc::new(AtomicU64::new(0)),
                 answer: AnswerPacker::new(),
                 armed: None,
                 arm_valid: valid,
@@ -2000,17 +2143,19 @@ mod tests {
                 state_file: std::path::PathBuf::new(),
             }
         };
+        let running = flying().digest;
         let restart = |serving: &mut Serving, ago: Duration| {
             let taken = Instant::now()
                 .checked_sub(ago)
                 .expect("a machine up longer than a few seconds");
-            serving.armed = Some((ArmKey(7), taken));
+            serving.armed = Some((ArmKey(7), running, taken));
             serving
                 .answer(
                     CommandLink::Spacecraft,
                     &Command::Restart(tcslibgs::RestartCommand::new(
                         1,
                         ArmKey(7),
+                        running,
                     )),
                 )
                 .status()
@@ -2064,6 +2209,7 @@ mod tests {
                     &Command::RestartArm(tcslibgs::RestartArmCommand::new(
                         sequence,
                         ArmKey(key),
+                        running,
                     )),
                 )
                 .status()
@@ -2072,16 +2218,16 @@ mod tests {
         let taken = Instant::now()
             .checked_sub(Duration::from_secs(50))
             .expect("a machine up longer than a minute");
-        repeated.armed = Some((ArmKey(7), taken));
+        repeated.armed = Some((ArmKey(7), running, taken));
         assert_eq!(arm(&mut repeated, 2, 7), CommandStatus::Success);
         assert_eq!(
             repeated.armed,
-            Some((ArmKey(7), taken)),
+            Some((ArmKey(7), running, taken)),
             "a repeat changes nothing aboard"
         );
         assert_eq!(arm(&mut repeated, 3, 8), CommandStatus::Success);
         match repeated.armed {
-            Some((ArmKey(8), now)) => {
+            Some((ArmKey(8), _, now)) => {
                 assert!(now.elapsed() < Duration::from_secs(10))
             }
             other => panic!("expected the new arm, got {other:?}"),

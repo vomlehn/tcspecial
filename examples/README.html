@@ -437,6 +437,15 @@ runs them.</p>
 <pre><code>make run-ping                                   # the vehicle and the window
 python3 examples/ping/ping_gateway.py --pings 3 # no window: three pings
 python3 examples/ping/ping_gateway.py --yaml    # ping.yaml, not ping.xml</code></pre>
+<p>It sends a CONNECT of its own as soon as the vehicle is started,
+carrying the configuration’s checksum, with
+<code>python/tcslib/listening.py</code>, and again each second until the
+vehicle answers with that checksum: a vehicle sends nothing down, the
+ping node’s answers included, until it has taken one.
+<code>--pings</code> waits for it before the first ping; <code>-v</code>
+says when it is matched. It is sent from the configuration’s
+<code>tcs_cmd.send</code>, so tcsmoc cannot be run on the same
+configuration beside it.</p>
 <p><code>ping_gateway.py</code> starts the vehicle itself: tcspecial
 from the build, on the same configuration. It kills it when it exits,
 however it exits – if it is killed or crashes, the kernel is told to
@@ -553,7 +562,14 @@ function call,
 out from the configuration which port they arrive at and puts each word
 in a buffer made before the loop, so that the loop allocates nothing; it
 writes out each word with one space between them, and stops when the
-terminator arrives.</li>
+terminator arrives. Before its first word it sends a CONNECT of its own,
+carrying the configuration’s checksum, with
+<code>tcslib::listening</code>, and sends it again each second until the
+vehicle answers with that checksum: a vehicle sends nothing down until
+it has taken one, and nothing else in this example sends one. It sends
+it from the configuration’s <code>tcs_cmd.send</code>, so tcsmoc cannot
+be run on the same configuration beside it; <code>-v</code> says when it
+is matched.</li>
 </ul>
 <pre><code>make run-simple-app</code></pre>
 <p>That checks for Python 3, builds the vehicle and the ground station,

@@ -195,7 +195,7 @@ impl Shown {
             received: received_at(pass.at),
             message: pass.said.clone(),
             stage: pass.showing.stage.label().to_string(),
-            restart: restart_of(pass.commanded_restart),
+            restart: restart_of(pass.restart_flag),
         }
     }
 

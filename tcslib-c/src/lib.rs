@@ -494,7 +494,7 @@ pub struct tcs_pass {
     at_seconds: i64,
     at_nanos: u32,
     restarted: c_int,
-    commanded_restart: c_int,
+    restart_flag: c_int,
 }
 
 /// Names a stage as a person reads it.
@@ -627,10 +627,10 @@ pub unsafe extern "C" fn tcs_beacons_pass(
             at_seconds: i64::try_from(at.as_secs()).unwrap_or(i64::MAX),
             at_nanos: at.subsec_nanos(),
             restarted: c_int::from(found.restarted),
-            commanded_restart: c_int::from(found.commanded_restart),
+            restart_flag: c_int::from(found.restart_flag),
         };
         watch.last = (found.arrived == tcslib::beacon::Arrived::Beacon)
-            .then_some((found.restarted, found.commanded_restart));
+            .then_some((found.restarted, found.restart_flag));
         watch.said.set(&found.said);
         watch.remarks.set(&found.remarks);
         watch.warnings.set(&found.warnings);
@@ -887,7 +887,7 @@ pub unsafe extern "C" fn tcs_moc_close(moc: *mut tcs_moc) {
 ///
 /// # Returns
 ///
-/// Its number, 0 to 9.
+/// Its number, 0 to 10.
 fn status_number(status: CommandStatus) -> c_int {
     match status {
         CommandStatus::Success => 0,
@@ -899,6 +899,7 @@ fn status_number(status: CommandStatus) -> c_int {
         CommandStatus::AlreadyExists => 6,
         CommandStatus::Timeout => 7,
         CommandStatus::Stale => 9,
+        CommandStatus::Unmatched => 10,
     }
 }
 
@@ -924,6 +925,7 @@ pub extern "C" fn tcs_status_name(status: c_int) -> *const c_char {
         6 => c"AlreadyExists",
         7 => c"Timeout",
         9 => c"Stale",
+        10 => c"Unmatched",
         _ => c"",
     };
     name.as_ptr()

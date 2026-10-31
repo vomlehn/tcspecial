@@ -146,7 +146,7 @@ impl BeaconReceive {
             if let (Arrived::Beacon, Some(heard)) =
                 (&pass.arrived, heard.as_ref())
             {
-                heard(pass.restarted, pass.commanded_restart);
+                heard(pass.restarted, pass.restart_flag);
             }
 
             // Said on the console: a configuration that differs, beacons that

@@ -18,6 +18,7 @@ use std::time::{Duration, SystemTime};
 use log::{error, info, trace};
 use tcslibgs::{Beacon, BeaconPacker, ConfigDigest, ConfigVersion, TcsResult};
 
+use crate::runtime::matched::Matched;
 use crate::telemetry_log::TelemetryLog;
 
 /// How often beacons go: normally, and across a restart.
@@ -47,15 +48,13 @@ pub struct BeaconSend {
     /// no CONNECT has come from the MOC since this process started. Shared,
     /// so that the command interpreter's copy clears it for all of them.
     awaiting_connect: Arc<AtomicBool>,
-    /// Whether a restart has been initiated, from which the beacons go
-    /// every `reset_interval`, the commanded-restart bit set, until the
-    /// process ends. See [`BeaconSend::restart_initiated`].
-    ending: Arc<AtomicBool>,
-    /// The commanded-restart bit every beacon carries: set from a RESTART
-    /// being taken, through the start it asked for -- which begins with it
-    /// set, from [`crate::state::Started::commanded`] -- until that start
-    /// takes a CONNECT. Asked without a lock, as each beacon is packed.
-    commanded: Arc<AtomicBool>,
+    /// Whether the ground has matched this start, which the restart flag
+    /// every beacon carries is the opposite of: set at every start and from
+    /// a RESTART being taken, clear once a matching CONNECT has been taken.
+    /// Asked without a lock, as each beacon is packed. A RESTART having been
+    /// taken also keeps the beacons fast until the process ends: see
+    /// [`BeaconSend::restart_initiated`].
+    matched: Matched,
     /// Where beacons go: `beacon_recv`, which is what tcsmoc makes its
     /// receiving socket out of.
     dest_addr: tcslibgs::HostPort,
@@ -117,8 +116,8 @@ impl BeaconSend {
     /// * `version`   - What this build is, carried in every beacon.
     /// * `digest`    - The digest of the configuration read, carried in every
     ///                 beacon.
-    /// * `started`   - This start, as the state file counted it, which says
-    ///                 whether the ground commanded it.
+    /// * `matched`   - Whether the ground has matched this start, which the
+    ///                 restart flag in every beacon says the opposite of.
     ///
     /// # Returns
     ///
@@ -136,9 +135,8 @@ impl BeaconSend {
         log: TelemetryLog,
         version: ConfigVersion,
         digest: ConfigDigest,
-        started: &crate::state::Started,
+        matched: Matched,
     ) -> TcsResult<Option<BeaconSend>> {
-        let commanded = started.commanded;
         if timing.default_interval == Duration::from_secs(0) {
             return Ok(None);
         }
@@ -186,8 +184,7 @@ impl BeaconSend {
             interval: Arc::new(Mutex::new(interval)),
             timing,
             awaiting_connect: Arc::new(AtomicBool::new(true)),
-            ending: Arc::new(AtomicBool::new(false)),
-            commanded: Arc::new(AtomicBool::new(commanded)),
+            matched,
             dest_addr,
             from_addr,
             log,
@@ -279,7 +276,7 @@ impl BeaconSend {
         let sequence =
             self.sent.fetch_add(1, Ordering::Relaxed).wrapping_add(1);
         let beacon = Beacon::new(sequence, self.version, self.digest)
-            .commanded_restart(self.commanded.load(Ordering::SeqCst));
+            .restart_flag(!self.matched.is_matched());
         let data = packer.pack(&beacon);
         trace!("send_beacon: sending to {dest}");
         // Recorded before it is sent, as a command response is, so that a
@@ -289,18 +286,18 @@ impl BeaconSend {
         Ok(())
     }
 
-    /// A CONNECT has been taken from the MOC: the commanded-restart bit is
-    /// cleared, and the beacons go back to their normal interval, starting
-    /// with one at once so that the ground sees the bit clear.
+    /// A CONNECT matching the running configuration has been taken from the
+    /// MOC, and [`Matched::connected`] has cleared the restart flag: the
+    /// beacons go back to their normal interval, starting with one at once
+    /// so that the ground sees the flag clear.
     ///
     /// Not once a restart has been initiated: from then until the process
     /// ends, the beacons are the ground's news of the restart, and they stay
-    /// fast, with the bit set.
+    /// fast, with the flag set.
     pub fn connected(&self) {
-        if self.ending.load(Ordering::SeqCst) {
+        if self.matched.is_ending() {
             return;
         }
-        self.commanded.store(false, Ordering::SeqCst);
         let normal = self.timing.default_interval;
         if self.awaiting_connect.swap(false, Ordering::SeqCst) {
             // The one allocation this makes in the command loop, where the
@@ -311,13 +308,11 @@ impl BeaconSend {
         self.retime(normal);
     }
 
-    /// A restart has been initiated: the commanded-restart bit is set, one
-    /// beacon goes at once, and the rest every `reset_interval` until the
-    /// process ends. They come fast, because the ground is waiting for the
-    /// first one of the start that comes back.
+    /// A restart has been initiated, and [`Matched::restart_taken`] has set
+    /// the restart flag: one beacon goes at once, and the rest every
+    /// `reset_interval` until the process ends. They come fast, because the
+    /// ground is waiting for the first one of the start that comes back.
     pub fn restart_initiated(&self) {
-        self.ending.store(true, Ordering::SeqCst);
-        self.commanded.store(true, Ordering::SeqCst);
         self.retime(self.timing.reset_interval);
     }
 
@@ -391,23 +386,6 @@ impl Failing {
 mod tests {
     use super::*;
 
-    /// Makes a start of tcspecial as the state file counted it.
-    ///
-    /// # Arguments
-    ///
-    /// * `generation` - Its generation.
-    /// * `commanded`  - Whether the ground commanded it.
-    ///
-    /// # Returns
-    ///
-    /// The start, with nothing damaged.
-    fn a_start(generation: u32, commanded: bool) -> crate::state::Started {
-        crate::state::Started {
-            generation,
-            commanded,
-            damaged: None,
-        }
-    }
     use tcslibgs::CIConfig;
 
     /// Makes a timing that beacons every fifty milliseconds, across a
@@ -504,7 +482,7 @@ mod tests {
             log,
             ConfigVersion::of_this_build(),
             ConfigDigest([0u8; 16]),
-            &a_start(1, false),
+            Matched::at_a_start(),
         )
         .expect("a sender")
         .expect("an interval that sends");
@@ -536,24 +514,24 @@ mod tests {
     }
 
     /// Makes a ground socket, and a sender beaconing to it from a port of
-    /// its own with `timing`, from a start commanded or not.
+    /// its own with `timing`, from a start.
     ///
     /// # Arguments
     ///
-    /// * `timing`    - How often the sender beacons.
-    /// * `commanded` - Whether its start was commanded.
+    /// * `timing` - How often the sender beacons.
     ///
     /// # Returns
     ///
-    /// The ground socket and the sender.
+    /// The ground socket, the sender, and whether the start is matched,
+    /// which the test changes as a CONNECT or a RESTART would.
     ///
     /// # Panics
     ///
     /// If either socket cannot be made.
     fn sending(
         timing: BeaconTiming,
-        commanded: bool,
-    ) -> (std::net::UdpSocket, BeaconSend) {
+    ) -> (std::net::UdpSocket, BeaconSend, Matched) {
+        let matched = Matched::at_a_start();
         let ground =
             std::net::UdpSocket::bind("127.0.0.1:0").expect("a ground socket");
         let at = ground.local_addr().expect("where it is");
@@ -570,11 +548,11 @@ mod tests {
             TelemetryLog::disabled(),
             ConfigVersion::of_this_build(),
             ConfigDigest([0u8; 16]),
-            &a_start(7, commanded),
+            matched.clone(),
         )
         .expect("a sender")
         .expect("an interval that sends");
-        (ground, sender)
+        (ground, sender, matched)
     }
 
     /// Reads the next beacon to arrive.
@@ -608,25 +586,23 @@ mod tests {
     }
 
     /// Every start beacons fast until the MOC connects, and then at the
-    /// default interval. A restart
-    /// initiated sets the commanded-restart bit and sends one at once, fast
-    /// again, and a CONNECT does not slow them or clear the bit after that.
+    /// default interval. A restart initiated sets the restart flag and sends
+    /// one at once, fast again, and a CONNECT does not slow them or clear
+    /// the flag after that.
     #[test]
     fn beacons_go_fast_across_a_restart_and_slow_when_the_moc_connects() {
         let fast = Duration::from_millis(20);
-        let (ground, sender) = sending(
-            BeaconTiming {
-                default_interval: Duration::from_secs(60),
-                reset_interval: fast,
-            },
-            false,
-        );
+        let (ground, sender, matched) = sending(BeaconTiming {
+            default_interval: Duration::from_secs(60),
+            reset_interval: fast,
+        });
         let wait = Duration::from_secs(5);
         for _ in 0..3 {
             let beacon =
                 next(&ground, wait).expect("fast beacons as it starts");
-            assert!(!beacon.commanded_restart, "nobody commanded this start");
+            assert!(beacon.restart_flag, "every start begins with the flag");
         }
+        matched.connected();
         sender.connected();
         // One goes at once, and one may already have been on its way; after
         // that, none for two minutes, and a quarter of a second is a dozen
@@ -639,38 +615,38 @@ mod tests {
             "the beacons slowed when the MOC connected"
         );
 
+        matched.restart_taken();
         sender.restart_initiated();
         let beacon = next(&ground, wait).expect("one at once");
-        assert!(beacon.commanded_restart, "set as the restart is taken");
+        assert!(beacon.restart_flag, "set as the restart is taken");
+        matched.connected();
         sender.connected();
         for _ in 0..3 {
             let beacon = next(&ground, wait).expect("fast until it ends");
-            assert!(beacon.commanded_restart, "until the process ends");
+            assert!(beacon.restart_flag, "until the process ends");
         }
     }
 
-    /// A commanded start beacons with the bit set until the MOC connects,
-    /// and with it clear after.
+    /// A first start beacons with the restart flag set, and keeps it set
+    /// until the start is matched, and clear after.
     #[test]
-    fn a_commanded_start_says_so_until_the_moc_connects() {
-        let (ground, sender) = sending(
-            BeaconTiming {
-                default_interval: Duration::from_millis(20),
-                reset_interval: Duration::from_millis(20),
-            },
-            true,
-        );
+    fn a_first_start_carries_the_flag_until_it_is_matched() {
+        let (ground, sender, matched) = sending(BeaconTiming {
+            default_interval: Duration::from_millis(20),
+            reset_interval: Duration::from_millis(20),
+        });
         let wait = Duration::from_secs(5);
         for _ in 0..2 {
             let beacon = next(&ground, wait).expect("a beacon");
-            assert!(beacon.commanded_restart);
+            assert!(beacon.restart_flag, "a first start is flagged");
         }
+        matched.connected();
         sender.connected();
         // The one already on its way may still carry it; the one after
         // does not.
         let _ = next(&ground, wait);
         let beacon = next(&ground, wait).expect("a beacon");
-        assert!(!beacon.commanded_restart, "cleared by the CONNECT");
+        assert!(!beacon.restart_flag, "cleared by the match");
     }
 
     /// A `beacon.send` something else holds is refused when the sender is
@@ -694,7 +670,7 @@ mod tests {
             TelemetryLog::disabled(),
             ConfigVersion::of_this_build(),
             ConfigDigest([0u8; 16]),
-            &a_start(1, false),
+            Matched::at_a_start(),
         );
         let said = match refused {
             Err(e) => e.to_string(),
@@ -720,7 +696,7 @@ mod tests {
             TelemetryLog::disabled(),
             ConfigVersion::of_this_build(),
             ConfigDigest([0u8; 16]),
-            &a_start(1, false),
+            Matched::at_a_start(),
         );
         let said = match refused {
             Err(e) => e.to_string(),

@@ -584,7 +584,7 @@ pub struct Heard {
     /// The beacon's own number, if it was a beacon this build can read.
     pub sequence: Option<u32>,
     /// Whether it said a restart the ground commanded is under way.
-    pub commanded_restart: bool,
+    pub restart_flag: bool,
     /// What is wrong with the configuration it announces, if anything: see
     /// [`differs`].
     pub differs: Option<String>,
@@ -608,9 +608,7 @@ pub fn hear(datagram: &[u8], expected: Option<ConfigDigest>) -> Heard {
     Heard {
         message,
         sequence: reading.sequence,
-        commanded_restart: reading
-            .beacon
-            .is_some_and(|beacon| beacon.commanded_restart),
+        restart_flag: reading.beacon.is_some_and(|beacon| beacon.restart_flag),
         differs: reading
             .digests
             .and_then(|(theirs, ours)| differs(theirs, ours)),
@@ -737,7 +735,7 @@ fn write_message(
     match read {
         Ok(beacon) => {
             write_what_it_read(beacon.version, beacon.digest, out);
-            if beacon.commanded_restart {
+            if beacon.restart_flag {
                 out.push_str(", COMMANDED RESTART");
             }
         }
@@ -840,7 +838,7 @@ pub struct Pass {
     pub restarted: bool,
     /// Whether the last beacon said a restart the ground commanded is under
     /// way. Kept as `at` is.
-    pub commanded_restart: bool,
+    pub restart_flag: bool,
     /// Whether the spacecraft is being heard from, which is the same reading
     /// as the stage in the form a program acts on.
     pub contact: Contact,
@@ -934,7 +932,7 @@ impl Beacons {
             at: None,
             said,
             restarted: false,
-            commanded_restart: false,
+            restart_flag: false,
             contact: Contact::Lost,
             remarks: Vec::with_capacity(REMARKS_AT_ONCE),
             warnings: Vec::with_capacity(REMARKS_AT_ONCE),
@@ -1043,8 +1041,9 @@ impl Beacons {
                             if missed == 1 { "" } else { "s" },
                             last.unwrap_or(0)
                         )),
-                        Counted::Restarted => remarks
-                            .push(restarted(now, beacon.commanded_restart)),
+                        Counted::Restarted => {
+                            remarks.push(restarted(now, beacon.restart_flag))
+                        }
                         // The radio's doing, not the spacecraft's: what is
                         // known is what the first of the two said, and it
                         // is not said again.
@@ -1055,7 +1054,7 @@ impl Beacons {
                     }
                     self.count = Some(now);
                     self.last.restarted = kind == Counted::Restarted;
-                    self.last.commanded_restart = beacon.commanded_restart;
+                    self.last.restart_flag = beacon.restart_flag;
                 }
 
                 Arrived::Beacon
@@ -1511,15 +1510,15 @@ mod tests {
 
         // A beacon sent while a commanded restart is under way says so.
         let commanded = Beacon::new(4, version, digest)
-            .commanded_restart(true)
+            .restart_flag(true)
             .to_bytes();
         assert_eq!(
             message_of(&commanded),
             format!("{read}, COMMANDED RESTART")
         );
         let heard = hear(&commanded, None);
-        assert!(heard.commanded_restart);
-        assert!(!hear(&datagram, None).commanded_restart);
+        assert!(heard.restart_flag);
+        assert!(!hear(&datagram, None).restart_flag);
 
         // The beacon's own number comes back beside the message, which is
         // what tells a beacon that was missed from one that was never sent.

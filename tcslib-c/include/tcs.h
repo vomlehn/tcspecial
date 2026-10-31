@@ -131,7 +131,7 @@ typedef struct tcs_pass {
 	uint32_t at_nanos;  /* and nanoseconds; both 0 where none has */
 	int restarted;    /* whether the beacon this pass heard says tcspecial
 	                     has started again: its number went back */
-	int commanded_restart; /* whether the last beacon said a restart the
+	int restart_flag; /* whether the last beacon said a restart the
 	                          ground commanded is under way: set from the
 	                          RESTART until the vehicle takes a CONNECT */
 } tcs_pass;
@@ -254,7 +254,13 @@ typedef enum tcs_status {
 	 * sent by a client whose count has gone back. The client starts its
 	 * count again past the newest the vehicle has taken at its next
 	 * Connect. */
-	TCS_STATUS_STALE = 9
+	TCS_STATUS_STALE = 9,
+	/* Not acted on, because the vehicle has not been matched since it last
+	 * started, or has taken a RESTART: it acts on nothing but CONNECT,
+	 * RESTART_ARM and RESTART until a Connect carrying its configuration's
+	 * checksum. Connect with the configuration whose checksum its beacons
+	 * carry. */
+	TCS_STATUS_UNMATCHED = 10
 } tcs_status;
 
 /** Names a status.

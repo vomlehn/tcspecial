@@ -155,6 +155,43 @@ impl CommandType {
         }
     }
 
+    /// Tells whether a command of this kind is taken before the
+    /// configurations at the two ends have been matched: from a start of
+    /// tcspecial, and from its taking a RESTART, until it takes a CONNECT
+    /// whose configuration checksum is the one it is running.
+    ///
+    /// CONNECT, RESTART_ARM and RESTART, and nothing else. CONNECT is how
+    /// the two ends match; RESTART_ARM and RESTART are how the ground
+    /// rescues a vehicle that will not match, and none of the three carries
+    /// anything a configuration gives a meaning to. Every other command
+    /// names a node, an attribute or a value that means what one
+    /// configuration says, so the vehicle answers it `Unmatched` and does
+    /// not act on it, and a ground station's client does not send it. PING
+    /// is not among them: it says nothing a matched station needs before it
+    /// matches, and the beacon says the vehicle is alive.
+    ///
+    /// The vehicle's command interpreter and the ground's client both ask
+    /// this, so the two cannot come to disagree about which commands go.
+    ///
+    /// # Returns
+    ///
+    /// `true` for CONNECT, RESTART_ARM and RESTART, `false` for every other
+    /// kind.
+    pub fn taken_unmatched(&self) -> bool {
+        match self {
+            CommandType::Connect
+            | CommandType::RestartArm
+            | CommandType::Restart => true,
+
+            CommandType::Ping
+            | CommandType::StartNode
+            | CommandType::StopNode
+            | CommandType::SetNode
+            | CommandType::QueryNode
+            | CommandType::QueryNodeSample => false,
+        }
+    }
+
     /// Gives the opcode a command of this kind carries. What goes on the link
     /// is stated in `xtce/link.xml`, and a test in [`crate::link`] holds this
     /// to it, so the two cannot come to differ.
@@ -879,6 +916,25 @@ mod tests {
             .collect();
         known.sort_unstable();
         assert_eq!(all, known, "a command was left out of both lists");
+    }
+
+    /// Before the configurations are matched only CONNECT, RESTART_ARM and
+    /// RESTART are taken: PING and every command about a node wait for the
+    /// match.
+    #[test]
+    fn only_the_three_commands_go_before_a_match() {
+        let taken: Vec<CommandType> = (0u8..=255)
+            .filter_map(CommandType::from_u8)
+            .filter(|kind| kind.taken_unmatched())
+            .collect();
+        assert_eq!(
+            taken,
+            vec![
+                CommandType::RestartArm,
+                CommandType::Restart,
+                CommandType::Connect
+            ]
+        );
     }
 
     /// A CONNECT is the spacecraft's link's, and no payload's.

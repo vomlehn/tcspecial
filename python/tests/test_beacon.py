@@ -201,7 +201,7 @@ class LayoutTest(unittest.TestCase):
         digest = bytes([0xD4, 0x1D, 0x8C, 0xD9, 0x8F, 0x00, 0xB2, 0x04,
                         0xE9, 0x80, 0x09, 0x98, 0xEC, 0xF8, 0x42, 0x7E])
         packed = Beacon(sequence=0x01020304, version=(1, 2, 3),
-                        digest=digest, commanded_restart=True).to_bytes()
+                        digest=digest, restart_flag=True).to_bytes()
         self.assertEqual(packed, a_beacon(sequence=0x01020304,
                                           digest=list(digest),
                                           version=(1, 2, 3),
@@ -211,7 +211,7 @@ class LayoutTest(unittest.TestCase):
             b"tcspecial:1.2.3:d41d8cd98f00b204e9800998ecf8427e:16909060:"
             b"restart:" + interface.of_this_tree().hex().encode())
         longest = Beacon(sequence=2 ** 32 - 1, version=(255, 255, 255),
-                         digest=digest, commanded_restart=True).to_bytes()
+                         digest=digest, restart_flag=True).to_bytes()
         self.assertEqual(len(longest), BEACON_BYTES)
         self.assertEqual(BEACON_BYTES, 106)
 
@@ -227,7 +227,7 @@ class LayoutTest(unittest.TestCase):
 
     def test_a_beacon_reads_back_as_itself(self):
         sent = Beacon(sequence=7, version=(1, 2, 3), digest=bytes(range(16)),
-                      commanded_restart=True)
+                      restart_flag=True)
         self.assertEqual(Beacon.read(sent.to_bytes()), sent)
         with self.assertRaises(BeaconError):
             Beacon.read(sent.to_bytes() + b"\0")
@@ -259,8 +259,8 @@ class HearingTest(unittest.TestCase):
             beacon.message_of(commanded),
             f"tcspecial v1.2.3 md5 {'ab' * 16}, COMMANDED RESTART")
         heard = beacon.hear(commanded, None)
-        self.assertTrue(heard.commanded_restart)
-        self.assertFalse(beacon.hear(datagram, None).commanded_restart)
+        self.assertTrue(heard.restart_flag)
+        self.assertFalse(beacon.hear(datagram, None).restart_flag)
         self.assertEqual(beacon.hear(datagram, None).sequence, 3)
         self.assertIsNone(beacon.hear(b"hello", None).sequence)
 

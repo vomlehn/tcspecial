@@ -2405,7 +2405,7 @@ message ID or a base where a radio's configuration has a socket:
      gateway: "cfs"
      sbn:
        release: "v7.0.1"
-       ident: "0653995939d714ac94906f867b4397e9953ca66a"
+       ident: "3b339a5e0f686cef822a5d6ea95004222ab7af33"
        spacecraft_id: "0x42"
        processor_id: "2"
        local: "0.0.0.0:8634"
@@ -2426,7 +2426,11 @@ message ID or a base where a radio's configuration has a socket:
   of every message. ``sbn.ident`` is the 40-digit hash SBN prints in its
   start-up event on the cFS side: tcspecial puts it in every subscription,
   and SBN refuses a subscription that carries another, so a wrong one is a
-  link that connects and carries nothing.
+  link that connects and carries nothing. For SBN v7.0.1 checked out by git
+  it is ``3b339a5e0f686cef822a5d6ea95004222ab7af33``, which the example
+  gives. git fills the hash in as it checks SBN out; an SBN built from an
+  archive or a copy instead has no hash in it, and cannot be matched: build
+  the cFS side from a git checkout of SBN.
 - ``sbn.local`` is where tcspecial binds and ``sbn.peer`` where the cFS side's
   SBN listens; ``spacecraft_id``, ``processor_id`` and ``peer_processor_id``
   are the numbers SBN tells peers apart by, and tcspecial's processor ID may

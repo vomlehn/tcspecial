@@ -2687,7 +2687,7 @@ message ID or a base where a radio's configuration has a socket:</p>
   </span><span class="name tag">gateway</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal string">&quot;cfs&quot;</span><span class="whitespace">
   </span><span class="name tag">sbn</span><span class="punctuation">:</span><span class="whitespace">
     </span><span class="name tag">release</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal string">&quot;v7.0.1&quot;</span><span class="whitespace">
-    </span><span class="name tag">ident</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal string">&quot;0653995939d714ac94906f867b4397e9953ca66a&quot;</span><span class="whitespace">
+    </span><span class="name tag">ident</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal string">&quot;3b339a5e0f686cef822a5d6ea95004222ab7af33&quot;</span><span class="whitespace">
     </span><span class="name tag">spacecraft_id</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal string">&quot;0x42&quot;</span><span class="whitespace">
     </span><span class="name tag">processor_id</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal string">&quot;2&quot;</span><span class="whitespace">
     </span><span class="name tag">local</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal string">&quot;0.0.0.0:8634&quot;</span><span class="whitespace">
@@ -2709,7 +2709,11 @@ one this build speaks -- v7.0.1 -- because the release decides the layout
 of every message. <tt class="docutils literal">sbn.ident</tt> is the 40-digit hash SBN prints in its
 start-up event on the cFS side: tcspecial puts it in every subscription,
 and SBN refuses a subscription that carries another, so a wrong one is a
-link that connects and carries nothing.</li>
+link that connects and carries nothing. For SBN v7.0.1 checked out by git
+it is <tt class="docutils literal">3b339a5e0f686cef822a5d6ea95004222ab7af33</tt>, which the example
+gives. git fills the hash in as it checks SBN out; an SBN built from an
+archive or a copy instead has no hash in it, and cannot be matched: build
+the cFS side from a git checkout of SBN.</li>
 <li><tt class="docutils literal">sbn.local</tt> is where tcspecial binds and <tt class="docutils literal">sbn.peer</tt> where the cFS side's
 SBN listens; <tt class="docutils literal">spacecraft_id</tt>, <tt class="docutils literal">processor_id</tt> and <tt class="docutils literal">peer_processor_id</tt>
 are the numbers SBN tells peers apart by, and tcspecial's processor ID may

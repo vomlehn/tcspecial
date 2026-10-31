@@ -1420,7 +1420,7 @@ is stated once, in <tt class="docutils literal">tcspecial</tt>:</p>
   </span><span class="name tag">gateway</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">cfs</span><span class="whitespace">
   </span><span class="name tag">sbn</span><span class="punctuation">:</span><span class="whitespace">
     </span><span class="name tag">release</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal string">&quot;v7.0.1&quot;</span><span class="whitespace">
-    </span><span class="name tag">ident</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal string">&quot;0653995939d714ac94906f867b4397e9953ca66a&quot;</span><span class="whitespace">
+    </span><span class="name tag">ident</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal string">&quot;3b339a5e0f686cef822a5d6ea95004222ab7af33&quot;</span><span class="whitespace">
     </span><span class="name tag">spacecraft_id</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal string">&quot;0x42&quot;</span><span class="whitespace">
     </span><span class="name tag">processor_id</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal string">&quot;2&quot;</span><span class="whitespace">
     </span><span class="name tag">local</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal string">&quot;0.0.0.0:2234&quot;</span><span class="whitespace">
@@ -1463,10 +1463,10 @@ announcement (<tt class="docutils literal">0xA1</tt>) and a disconnect (<tt clas
 nothing. A subscription and an unsubscription are laid out alike: the
 48-byte ident, a count of two bytes, and for each message ID four bytes of it
 and a byte each of priority and reliability, which tcspecial sends as nought.
-(The type numbers and the subscription's entries are as built, from SBN
-v7.0.1 as read in October 2026; the copy of cFS beside this tree has no SBN,
-so they were not read again when the gateway was built, and the run against
-cFS's own build is what will confirm them.) <tt class="docutils literal"><span class="pre">tcslibgs::sbn</span></tt> is the one
+(Each of those numbers, and the layout, was read again from SBN v7.0.1's
+own source, <tt class="docutils literal">sbn_types.h</tt>, <tt class="docutils literal">sbn_interfaces.h</tt>, <tt class="docutils literal">sbn_subs.c</tt> and the UDP
+module's <tt class="docutils literal">sbn_udp_if.h</tt> and <tt class="docutils literal">sbn_udp_if.c</tt>, on 31 October 2026, after the
+gateway was built, and each is what was built.) <tt class="docutils literal"><span class="pre">tcslibgs::sbn</span></tt> is the one
 statement of all of it. A peer is connected by the first datagram that arrives from it, sends
 a heartbeat when it has sent nothing for five seconds, and is disconnected by
 ten seconds of silence. Each of those numbers is compiled into SBN and none
@@ -1485,7 +1485,13 @@ own is refused. Those bytes are git's <tt class="docutils literal">$Id$</tt> of 
 hash of that one file as it was checked out -- so they differ between
 releases, and between a release and a mission's copy of it with that file
 changed. Written out they are <tt class="docutils literal">$Id:</tt>, a space, the 40-digit hash, a space
-and <tt class="docutils literal">$</tt>, and the C string's terminating nought: 48 bytes.</li>
+and <tt class="docutils literal">$</tt>, and the C string's terminating nought: 48 bytes.
+For v7.0.1 checked out by git the hash is
+<tt class="docutils literal">3b339a5e0f686cef822a5d6ea95004222ab7af33</tt>. The file holds only
+<tt class="docutils literal">$Id$</tt>, which git fills in as it checks the file out (SBN's
+<tt class="docutils literal">.gitattributes</tt> asks it to), so an SBN taken any other way -- a release
+archive, a copy -- is built with <tt class="docutils literal">$Id$</tt> as it stands, which no
+<tt class="docutils literal">sbn.ident</tt> can match: such a far end is rebuilt from a git checkout.</li>
 </ul>
 <dl class="docutils">
 <dt>Requirement</dt>

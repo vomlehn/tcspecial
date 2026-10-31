@@ -897,7 +897,7 @@ is stated once, in ``tcspecial``:
      gateway: cfs
      sbn:
        release: "v7.0.1"
-       ident: "0653995939d714ac94906f867b4397e9953ca66a"
+       ident: "3b339a5e0f686cef822a5d6ea95004222ab7af33"
        spacecraft_id: "0x42"
        processor_id: "2"
        local: "0.0.0.0:2234"
@@ -943,10 +943,10 @@ announcement (``0xA1``) and a disconnect (``0xA2``) of its own, each carrying
 nothing. A subscription and an unsubscription are laid out alike: the
 48-byte ident, a count of two bytes, and for each message ID four bytes of it
 and a byte each of priority and reliability, which tcspecial sends as nought.
-(The type numbers and the subscription's entries are as built, from SBN
-v7.0.1 as read in October 2026; the copy of cFS beside this tree has no SBN,
-so they were not read again when the gateway was built, and the run against
-cFS's own build is what will confirm them.) ``tcslibgs::sbn`` is the one
+(Each of those numbers, and the layout, was read again from SBN v7.0.1's
+own source, ``sbn_types.h``, ``sbn_interfaces.h``, ``sbn_subs.c`` and the UDP
+module's ``sbn_udp_if.h`` and ``sbn_udp_if.c``, on 31 October 2026, after the
+gateway was built, and each is what was built.) ``tcslibgs::sbn`` is the one
 statement of all of it. A peer is connected by the first datagram that arrives from it, sends
 a heartbeat when it has sent nothing for five seconds, and is disconnected by
 ten seconds of silence. Each of those numbers is compiled into SBN and none
@@ -967,6 +967,12 @@ Two facts in that shape decide requirements here:
   releases, and between a release and a mission's copy of it with that file
   changed. Written out they are ``$Id:``, a space, the 40-digit hash, a space
   and ``$``, and the C string's terminating nought: 48 bytes.
+  For v7.0.1 checked out by git the hash is
+  ``3b339a5e0f686cef822a5d6ea95004222ab7af33``. The file holds only
+  ``$Id$``, which git fills in as it checks the file out (SBN's
+  ``.gitattributes`` asks it to), so an SBN taken any other way -- a release
+  archive, a copy -- is built with ``$Id$`` as it stands, which no
+  ``sbn.ident`` can match: such a far end is rebuilt from a git checkout.
 
 Requirement
     ``sbn.release`` names an SBN release this build of tcspecial speaks, and

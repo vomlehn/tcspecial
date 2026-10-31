@@ -228,7 +228,7 @@ fn example() -> (tempfile::TempDir, std::path::PathBuf, Peer, UdpSocket, u16) {
     }
     let configuration = dir.path().join("cfs.ytcs");
     std::fs::write(&configuration, &text).expect("written");
-    let ident = sbn::ident_of("0653995939d714ac94906f867b4397e9953ca66a")
+    let ident = sbn::ident_of("3b339a5e0f686cef822a5d6ea95004222ab7af33")
         .expect("the example's ident");
     let peer = Peer {
         socket,

@@ -47,5 +47,6 @@ pub mod port;
 pub mod restart;
 pub mod route;
 pub mod schedule;
+pub mod signals;
 pub mod start;
 pub mod system;

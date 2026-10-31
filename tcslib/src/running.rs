@@ -106,6 +106,34 @@ fn a_free_port() -> u16 {
         .port()
 }
 
+/// Packing a beacon allocates nothing once the packer is made, as the
+/// vehicle's beacon thread packs one every interval: the generated code
+/// formats each field into the room its packet holds, and encodes into the
+/// buffer the packer made. And reading one allocates nothing either.
+#[test]
+fn packing_and_reading_a_beacon_allocate_nothing() {
+    let mut packer = tcslibgs::BeaconPacker::new();
+    let digest = ConfigDigest([7; 16]);
+    let beacon = Beacon::new(1, ConfigVersion::of_this_build(), digest);
+    let mut read = None;
+    let made = allocations_in(|| {
+        for sequence in 1..=50u32 {
+            let packed =
+                packer.pack(&Beacon { sequence, ..beacon }.restart_flag(true));
+            read = Some(Beacon::read(packed));
+        }
+    });
+    assert_eq!(made, 0, "packing and reading allocated {made} times");
+    assert_eq!(
+        read,
+        Some(Ok(Beacon {
+            sequence: 50,
+            ..beacon
+        }
+        .restart_flag(true)))
+    );
+}
+
 /// Once the first has been heard, a beacon pass allocates nothing: not to
 /// unpack the beacon, which `tcslibgs::Beacon::read` reads in place, not for
 /// what the beacon said, and not for the pass it hands back.

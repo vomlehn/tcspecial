@@ -5663,10 +5663,18 @@ another interval flies a configuration that says so.</p>
 <h2><a class="toc-backref" href="#toc-entry-55">Asynchronous Telemetry</a></h2>
 <p>Beacon</p>
 <p>The beacon answers no command and has a form of its own: a line of text, six
-fields with a colon between each, and no newline at the end. It is written
-and read by hand, in <tt class="docutils literal"><span class="pre">tcslibgs::beacon</span></tt>, which tcspecial and <tt class="docutils literal">tcslib</tt> use,
-and again in Python in <tt class="docutils literal">python/tcslibgs/beacon.py</tt>; the two are held to
-each other by the same examples in their tests. For example:</p>
+fields with a colon between each, and no newline at the end. Its layout is
+stated in XTCE in <tt class="docutils literal">tcslibgs/xtce/fixed.xml</tt>, beside the three fixed
+commands: six string fields of UTF-8, each but the last ended by the
+termination character <tt class="docutils literal">:</tt> (<tt class="docutils literal">0x3A</tt>) and no longer than its field can be,
+and the last 32 characters that end the datagram. It is packed and
+unpacked by the code tcs-xtce generates from that document, in Rust without
+allocating and in Python; what each field must say -- the name, decimal
+digits, lower-case hex -- and turning the text into numbers and digests and
+back is <tt class="docutils literal"><span class="pre">tcslibgs::beacon</span></tt>'s, which tcspecial and <tt class="docutils literal">tcslib</tt> use, and
+<tt class="docutils literal">python/tcslibgs/beacon.py</tt>'s; the two are held to each other by the same
+examples in their tests, and to what the hand-written packer that came
+before wrote, byte for byte. For example:</p>
 <pre class="code text literal-block">
 tcspecial:1.2.3:d41d8cd98f00b204e9800998ecf8427e:42:normal:0123...cdef
 </pre>
@@ -5716,8 +5724,8 @@ lower-case hex digits</td>
 beacon is meant to be read by a person as it is -- in a packet capture,
 in a log, or with a plain UDP listener -- with nothing to decode it, and
 a binary field would end that. It is the one packet a person on the
-ground may look at before any tool is set up, which is why it is the one
-packet that has no XTCE.</dd>
+ground may look at before any tool is set up, which is why its XTCE is
+of text fields and nothing else.</dd>
 <dt>Requirement</dt>
 <dd>A beacon is read strictly, by <tt class="docutils literal"><span class="pre">tcslibgs::Beacon::read</span></tt> in Rust and
 <tt class="docutils literal">tcslibgs.beacon.Beacon.read</tt> in Python, and by nothing else: exactly
@@ -5856,10 +5864,11 @@ replaced.</p>
 <dd>Every command and every answer on the links between the MOC and
 tcspecial has a layout stated in XTCE and is packed and unpacked by the
 code tcs-xtce generates from that statement. Nothing on a link is JSON,
-and nothing that packs or unpacks a command or an answer is written by
-hand. The beacon is the exception: it is text, written and read by hand,
-because it is to be read by a person as it is -- see <a class="reference internal" href="#asynchronous-telemetry">Asynchronous
-Telemetry</a> -- and so it is in neither interface's documents.</dd>
+and nothing that packs or unpacks a command, an answer or the beacon is
+written by hand. The beacon's layout is in <tt class="docutils literal">fixed.xml</tt> beside the
+three fixed commands, as text fields, because it is to be read by a
+person as it is -- see <a class="reference internal" href="#asynchronous-telemetry">Asynchronous Telemetry</a> -- and it is not in
+the interface: no change to <tt class="docutils literal">link.xml</tt> can touch it.</dd>
 <dt>Replaced</dt>
 <dd>Commands and answers are built on a base container that holds the CCSDS
 primary header, so that a ground system that reads CCSDS Space Packets
@@ -6037,7 +6046,12 @@ reads a value it does not know as a refusal for a reason it cannot name,
 and says so with the number.</dd>
 <dt>Requirement</dt>
 <dd>The beacon's layout is fixed for ever too: its text fields, in their
-order, as <a class="reference internal" href="#asynchronous-telemetry">Asynchronous Telemetry</a> gives them.</dd>
+order, as <a class="reference internal" href="#asynchronous-telemetry">Asynchronous Telemetry</a> gives them. It is stated in
+<tt class="docutils literal">fixed.xml</tt> beside the three, so that the one document every end
+agrees on holds everything that never changes. The document's digest
+is pinned by a test, and changed once, deliberately, when the beacon
+was moved into it, before the first release to carry it; from that
+release on it never changes.</dd>
 </dl>
 <p>PING keeps opcode 0x01 for now, but is an ordinary command: it is refused
 before a match like any other, and moves out of the fixed range when the

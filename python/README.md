@@ -9,7 +9,7 @@ written after, and each module after the Rust it says again:
 | `tcslib/beacon.py` | `tcslib/src/beacon.rs` | Listening for beacons: the socket loop, how stale the last one is, the beacons that did not arrive, and whether the configuration it announces is the one this station read. No window. |
 | `tcsui/beacon_panel.py` | `tcsui/src/lib.rs`, `tcsui/ui/beacon.slint` | The beacon panel -- the indicator, when the last beacon arrived, and what it said -- in tkinter, with the same colours, labels and placeholders. |
 | `tcsui/theme.py` | `tcsui/ui/titled.slint`, the Slint windows' style | The ttk theme every Tk window is drawn in, and the kinds of text a panel holds: a heading, a value, the figure it is read for, a note. |
-| `tcslibgs/beacon.py` | `tcslibgs/src/beacon.rs` | The beacon as it goes on the link: six fields of text between colons, written and read by hand, and held to the Rust by the same examples in both tests. |
+| `tcslibgs/beacon.py` | `tcslibgs/src/beacon.rs` | The beacon as it goes on the link: six fields of text between colons, packed and unpacked by `tcslibgs/fixed_packet.py`, which tcs-xtce generates from `tcslibgs/xtce/fixed.xml`, what each field says checked here, and held to the Rust by the same examples in both tests. |
 | `tcslibgs/ping.py` | `tcslibgs/src/node/vehicle/ping/mod.rs` | What a ping and its answer say. |
 | `tcslibgs/ready.py` | `tcslibgs/src/ready.rs` | What a harness and tcssim say on tcssim's readiness socket. |
 | `tcslib/simulator.py` | `tcslib/src/simulator.rs` | Waiting for tcssim to have made its stand-ins before tcspecial is started. |

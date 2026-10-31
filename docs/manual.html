@@ -1550,9 +1550,11 @@ regular file at <tt class="docutils literal">path</tt> and adds a packet of lore
 interval, at the pace and with the faults its simulator file gives, until the
 text runs out, about 2900 bytes of it. tcspecial reads what has been added
 each time it looks, so the data comes for a while and then stops. The file
-is removed when the payload stops. Where something else is already at
-<tt class="docutils literal">path</tt> -- a real device, or a file the simulator did not write -- the
-simulator leaves it alone and says so, rather than standing in for it.</p>
+is removed when the simulator stops, whether by its <tt class="docutils literal">Quit All</tt> button or by
+a signal (see <a class="reference internal" href="#the-tcssim-window">The tcssim window</a>); a file left by one killed outright holds
+a prefix of the text, and the next start replaces it. Where something else is
+already at <tt class="docutils literal">path</tt> -- a real device, or a file the simulator did not write --
+the simulator leaves it alone and says so, rather than standing in for it.</p>
 <p>Three other types are reached through a device file too and are not devices in
 this sense: a serial line, a bus and a SPI peripheral each have terms of their
 own, which is why each has a type of its own below.</p>
@@ -4689,6 +4691,11 @@ arrived and leaves the status to the commands and to the beacon.</p>
 foot of the window. Nothing in the window names a payload or fixes how many
 there are: the two configuration files decide that, so a payload added to or
 removed from them adds or removes a panel.</p>
+<p>SIGHUP, SIGINT and SIGTERM do what <tt class="docutils literal">Quit All</tt> does: every payload stops and
+its stand-in is cleared, and then tcssim exits with the status a shell gives
+a program the signal ended, 128 more than the signal's number -- 130 for
+SIGINT. A second signal, for a stop that is taking too long, ends tcssim at
+once with status 1 and clears nothing.</p>
 <p>Each panel shows, from the top:</p>
 <dl class="docutils">
 <dt>the name, the number and the status</dt>

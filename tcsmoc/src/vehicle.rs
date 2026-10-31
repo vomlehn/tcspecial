@@ -2098,11 +2098,19 @@ fn serve(
 /// ground can reach both ways: the Ping node button that opens it, and its
 /// Send ping, which pings the node through its gateway node's uplink.
 ///
+/// A ping is not a command, and does not go through the client, but the
+/// ground sends the vehicle nothing but CONNECT, RESTART_ARM and RESTART
+/// before a match, and the answer would be dropped as data from a vehicle
+/// not matched: Send ping pressed while the station is not matched for
+/// commanding sends nothing, and says why in the ping window and in the
+/// same pop-up as a command refused unmatched.
+///
 /// # Arguments
 ///
 /// * `ui`          - The main window, whose Ping node button opens it.
 /// * `ping_window` - The ping window.
 /// * `graph`       - The configuration.
+/// * `matched`     - Whether this station is matched with the vehicle.
 ///
 /// # Returns
 ///
@@ -2117,6 +2125,7 @@ fn ping_node(
     ui: &MainWindow,
     ping_window: &PingWindow,
     graph: &Graph,
+    matched: &Matched,
 ) -> Result<Option<(String, PingFeed)>, String> {
     let Some(route) = tcslib::ping::route_of(graph) else {
         return Ok(None);
@@ -2143,10 +2152,27 @@ fn ping_node(
     {
         let pinger = pinger.clone();
         let window = ping_window.as_weak();
+        let main = ui.as_weak();
+        let matched = matched.clone();
+        let node = route.node.clone();
         ping_window.on_send_clicked(move || {
             let Some(window) = window.upgrade() else {
                 return;
             };
+            if !matched.for_commanding() {
+                let mut said = format!(
+                    "{node} was not pinged: the configurations are not yet \
+                     matched, and before a match the ground sends the \
+                     vehicle nothing but CONNECT, RESTART_ARM and RESTART."
+                );
+                if let Some(main) = main.upgrade() {
+                    said.push_str(&checksums_said(&main, matched.ours()));
+                    show_notice(&main, UNMATCHED_HEADING, &said, false);
+                }
+                eprintln!("{UNMATCHED_HEADING}: {said}");
+                window.set_sent(SharedString::from(said));
+                return;
+            }
             let sent = tcslibgs::node::vehicle::ping::now().and_then(|at| {
                 let mut pinger =
                     pinger.lock().map_err(|_| "the pinger".to_string())?;
@@ -2462,7 +2488,7 @@ pub fn run(
     // window of its own, opened by Ping node, that pings it and times the
     // answer. See `tcslib::ping`.
     let ping_window = PingWindow::new().unwrap();
-    let pings = match ping_node(&ui, &ping_window, &graph) {
+    let pings = match ping_node(&ui, &ping_window, &graph, &matched) {
         Ok(pings) => pings,
         Err(e) => {
             startup.warning(e);
@@ -3394,7 +3420,9 @@ payloads:
 
         let ui = MainWindow::new().expect("a window");
         let ping_window = PingWindow::new().expect("the ping window");
-        let (through, feed) = ping_node(&ui, &ping_window, &graph)
+        let ours = tcslibgs::ConfigDigest([0x5A; 16]);
+        let matched = Matched::for_configuration(ours);
+        let (through, feed) = ping_node(&ui, &ping_window, &graph, &matched)
             .expect("it can be pinged")
             .expect("there is a ping node");
         assert_eq!(through, "gateway");
@@ -3402,18 +3430,50 @@ payloads:
         ui.invoke_ping_node_clicked();
 
         // The press -- Enter, which the window takes from the moment it
-        // opens, as it does a click on Send ping: a ping goes up, numbered
-        // from one, and is shown.
-        for event in [
-            slint::platform::WindowEvent::KeyPressed {
-                text: slint::platform::Key::Return.into(),
-            },
-            slint::platform::WindowEvent::KeyReleased {
-                text: slint::platform::Key::Return.into(),
-            },
-        ] {
-            ping_window.window().dispatch_event(event);
-        }
+        // opens, as it does a click on Send ping.
+        let press = || {
+            for event in [
+                slint::platform::WindowEvent::KeyPressed {
+                    text: slint::platform::Key::Return.into(),
+                },
+                slint::platform::WindowEvent::KeyReleased {
+                    text: slint::platform::Key::Return.into(),
+                },
+            ] {
+                ping_window.window().dispatch_event(event);
+            }
+        };
+
+        // Before a match: nothing goes up, and the press says why, in the
+        // ping window and in the pop-up a command refused unmatched is.
+        press();
+        assert!(ui.get_notice_up(), "the pop-up is up");
+        assert_eq!(ui.get_notice_heading().as_str(), UNMATCHED_HEADING);
+        assert!(
+            ping_window.get_sent().contains("was not pinged"),
+            "{}",
+            ping_window.get_sent()
+        );
+        vehicle
+            .set_read_timeout(Some(std::time::Duration::from_millis(200)))
+            .expect("a timeout");
+        let mut nothing = [0u8; 64];
+        assert!(
+            vehicle.recv_from(&mut nothing).is_err(),
+            "a ping went up before a match"
+        );
+        vehicle
+            .set_read_timeout(Some(std::time::Duration::from_secs(2)))
+            .expect("a timeout");
+        ui.set_notice_up(false);
+
+        // Matched, as a clear beacon of this configuration and a CONNECT
+        // answered with it make it: a ping goes up, numbered from one, and is
+        // shown.
+        matched.beacon(false, Some(ours), tcslib::beacon::Stage::Heard, false);
+        matched.connect_answered(ours, matched.before_connect());
+        assert!(matched.for_commanding());
+        press();
         let mut buffer = [0u8; ping::REPLY_BYTES];
         let (got, _) =
             vehicle.recv_from(&mut buffer).expect("the ping arrived");
@@ -3464,7 +3524,7 @@ payloads:
         // And a configuration with nothing to ping has no button.
         let other = MainWindow::new().expect("a window");
         let other_ping = PingWindow::new().expect("a ping window");
-        assert!(ping_node(&other, &other_ping, &example("beacon"))
+        assert!(ping_node(&other, &other_ping, &example("beacon"), &matched)
             .expect("nothing wrong")
             .is_none());
         assert!(!other.get_can_ping_node());

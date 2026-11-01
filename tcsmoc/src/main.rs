@@ -24,6 +24,7 @@ mod beacon_receive;
 mod ci_link;
 mod config;
 mod oc_link;
+mod thermal;
 mod vehicle;
 
 /// What the window's status line says about the link to the command

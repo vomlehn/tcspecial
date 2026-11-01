@@ -4626,6 +4626,34 @@ what has arrived without a command going out. What only the spacecraft can say
 -- a node's own counters, and whether it is running -- is what ``Query all``
 is for.
 
+The temperatures window
+^^^^^^^^^^^^^^^^^^^^^^^
+Where a sensor's temperature reaches the ground -- a ``to_kelvin`` node, the
+conversion of one sensor's counts, drawn into a gateway node -- tcsmoc opens a
+second window beside its own, ``tcsmoc: temperatures``, and its
+``Temperatures`` button opens it again once closed. It plots each sensor's
+temperature over the last ten seconds, sixty kelvin tall, centred on the
+thermostat's setpoint where the configuration has a ``hysteresis`` node and
+on the first reading where it has none. It fills from the left, and once ten
+seconds have been drawn it scrolls, the newest at the right edge. A sensor
+silent for more than two and a half seconds has its line broken there rather
+than drawn across the silence.
+
+Under the plot, as wide as it so that a change lines up with the temperatures
+above it, is a strip for each heater switch -- a ``hysteresis`` node drawn
+into a gateway node, named with what it drives -- coloured by what it last
+decided, and while it is on the plot behind the lines is shaded the same
+colour. A thermostat tells the ground only when its decision changes, so a
+switch is drawn from each change to the next, and before the first is heard
+it is not drawn at all, its state said as ``not heard`` rather than guessed as
+off.
+
+The colours are Okabe and Ito's, which readers with each common kind of colour
+blindness tell apart: blue, bluish green, reddish purple and sky blue for the
+sensors, and vermillion, which nothing else uses, for a heater on. None is
+alone: the legend names each sensor beside its colour with its latest
+reading, and each switch's state is in words beside its strip.
+
 A triggered payload on the console
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 A payload that answers requests sends nothing until tcspecial asks it to, so

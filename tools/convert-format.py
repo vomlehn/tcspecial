@@ -72,6 +72,10 @@ LINKS = ("gateway-out", "payload-out")
 #: A node's sinks, which say whether a line arrives there.
 SINKS = ("gateway-in", "payload-in")
 
+#: The attributes a node writes as a list, whose entries are a set:
+#: ``tcslibgs::graph::LISTED``.
+LISTED = ("terminators",)
+
 #: The indentation of each level of the new shape in YAML: the section's
 #: entries, a type's nodes, and a node's keys.
 YAML_TYPE = 2
@@ -426,13 +430,12 @@ def yaml_entries(body, report, section):
         section: The section's old name, for the report.
 
     Returns:
-        The comment lines at the top of the section that are about it, the
-        nodes, and the comment lines left at its end.
+        The nodes, and the comment lines left at the section's end.
     """
     dashes = [indentation(line) for line in body
               if line.lstrip().startswith("- ")]
     if not dashes:
-        return [], [], [line for line in body if is_comment(line)]
+        return [], [line for line in body if is_comment(line)]
     margin = min(dashes)
     # Each entry: its comment lines above, and its own lines.
     entries = []
@@ -577,7 +580,12 @@ def yaml_key_lines(node, key, comments, chunk, value, report):
                 out.append(f"{pad}    input: {entry}")
         return out
     out.append(pad + chunk[0])
-    out.extend(pad + line if line.strip() else "" for line in chunk[1:])
+    rest = chunk[1:]
+    # A listed attribute's entries, one to a line, in the order of their
+    # text, as the editor writes them: they are a set.
+    if key in LISTED and all(line.lstrip().startswith("- ") for line in rest):
+        rest = sorted(rest, key=lambda line: line.lstrip())
+    out.extend(pad + line if line.strip() else "" for line in rest)
     return out
 
 
@@ -1029,10 +1037,15 @@ def xml_node_lines(node, word, report):
         out.append(f"{' ' * XML_NODE}<{word} name={quoteattr(node.name)}/>")
         return out
     out.append(f"{' ' * XML_NODE}<{word} name={quoteattr(node.name)}>")
-    # Each attribute in name order, a listed one's repeats in the order
-    # written; then the links, each destination in order; then the sinks.
+    # Each attribute in name order; then the links, each destination in
+    # order; then the sinks.
     links = {}
-    for key, comments, child in sorted(keyed, key=lambda c: kind(c[0])):
+    # A listed attribute's repeats in the order of their text, as the editor
+    # writes them: they are a set.
+    for key, comments, child in sorted(keyed,
+                                       key=lambda c: kind(c[0])
+                                       + ((text_of(c[2]),) if c[0] in LISTED
+                                          else ())):
         if key in LINKS:
             entry = links.setdefault(key, ([], []))
             entry[0].extend(comments)

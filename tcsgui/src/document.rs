@@ -532,6 +532,76 @@ impl Document {
         self.nodes.iter().filter(|n| &n.home == home).collect()
     }
 
+    /// One home's nodes of a section, grouped by type, as a file writes
+    /// them: the types by name, and each type's nodes by name.
+    ///
+    /// # Arguments
+    ///
+    /// * `home`    - The subdiagram, or `None` for the top diagram.
+    /// * `section` - The section.
+    ///
+    /// # Returns
+    ///
+    /// Each type with its nodes; none for a section with no nodes.
+    fn grouped(
+        &self,
+        home: &Home,
+        section: Section,
+    ) -> Vec<(&str, Vec<&Node>)> {
+        let mut grouped: BTreeMap<&str, Vec<&Node>> = BTreeMap::new();
+        for node in self.nodes_in(home) {
+            if section_of(&node.node_type) == section {
+                grouped.entry(&node.node_type).or_default().push(node);
+            }
+        }
+        grouped
+            .into_iter()
+            .map(|(node_type, mut nodes)| {
+                nodes.sort_by(|a, b| a.name.cmp(&b.name));
+                (node_type, nodes)
+            })
+            .collect()
+    }
+
+    /// One home's nodes, by name: the order the editor's section writes
+    /// their places in.
+    ///
+    /// # Arguments
+    ///
+    /// * `home` - The subdiagram, or `None` for the top diagram.
+    ///
+    /// # Returns
+    ///
+    /// The nodes.
+    fn placed_in(&self, home: &Home) -> Vec<&Node> {
+        let mut placed = self.nodes_in(home);
+        placed.sort_by(|a, b| a.name.cmp(&b.name));
+        placed
+    }
+
+    /// What was set aside about one home's nodes, and only those: a
+    /// decision about a node in a subdiagram belongs in that subdiagram's
+    /// file, where the node is.
+    ///
+    /// # Arguments
+    ///
+    /// * `home` - The subdiagram, or `None` for the top diagram.
+    ///
+    /// # Returns
+    ///
+    /// Each node, as the document holds it, and the concern, in order.
+    fn aside_in(&self, home: &Home) -> Vec<&(String, String)> {
+        let placed = self.nodes_in(home);
+        self.aside
+            .iter()
+            .filter(|(node, _)| {
+                placed.iter().any(|drawn| {
+                    Qualified::of(&drawn.name, home).absolute() == *node
+                })
+            })
+            .collect()
+    }
+
     /// The parameters of the section that are actually stated, by the
     /// subsection each belongs to.
     ///
@@ -607,20 +677,24 @@ impl Document {
     /// How many nodes were moved, which is what a caller would log.
     pub fn settle(&mut self, dividers: crate::pane::Dividers) -> usize {
         // The rule is tcsdiagram's, which tcspecial's visual window draws by
-        // as well: see pane::settle.
-        let mut placing: Vec<crate::pane::Placing> = self
-            .nodes
+        // as well: see pane::settle. Walked in the order of the names, which
+        // is the one order a configuration has, so that a file saved and
+        // read again is laid out as it was whatever order the session added
+        // its nodes in.
+        let mut order: Vec<usize> = (0..self.nodes.len()).collect();
+        order.sort_by(|a, b| self.nodes[*a].name.cmp(&self.nodes[*b].name));
+        let mut placing: Vec<crate::pane::Placing> = order
             .iter()
-            .map(|node| crate::pane::Placing {
-                node_type: &node.node_type,
-                at: node.at,
+            .map(|at| crate::pane::Placing {
+                node_type: &self.nodes[*at].node_type,
+                at: self.nodes[*at].at,
             })
             .collect();
         let moved = crate::pane::settle(&mut placing, dividers);
         let settled: Vec<(i32, i32)> =
             placing.iter().map(|placing| placing.at).collect();
-        for (node, at) in self.nodes.iter_mut().zip(settled) {
-            node.at = at;
+        for (at, place) in order.into_iter().zip(settled) {
+            self.nodes[at].at = place;
         }
         moved
     }
@@ -960,7 +1034,7 @@ impl Document {
     /// Where every node would go if the diagram were laid out afresh.
     ///
     /// What **Edit -> Arrange the nodes** is: each node at the top of its own
-    /// pane, in the order the document holds them, nothing covering anything,
+    /// pane, in the order of their names, nothing covering anything,
     /// and all of it where the top of the sheet is -- which is where the view
     /// starts. It is what a person reaches for when a configuration read out
     /// of a file is spread over more sheet than the window shows, or when a
@@ -993,7 +1067,11 @@ impl Document {
         let mut taken: Vec<(i32, i32, u32, u32)> = Vec::new();
         let mut moved = Vec::new();
 
-        for node in &self.nodes {
+        // By name, the one order a configuration has, so that the same nodes
+        // are arranged alike however the session came to hold them.
+        let mut nodes: Vec<&Node> = self.nodes.iter().collect();
+        nodes.sort_by(|a, b| a.name.cmp(&b.name));
+        for node in nodes {
             let at = crate::pane::place_in(
                 &taken,
                 &node.node_type,
@@ -1902,86 +1980,107 @@ impl Document {
         // The three sections, as the YAML writer does them: one file shape in
         // two spellings. Several destinations are several elements of one
         // name, which is how XML says a list.
-        for section in [Section::Gateway, Section::Vehicle, Section::Payloads] {
-            for node in self
-                .nodes_in(home)
-                .into_iter()
-                .filter(|node| section_of(&node.node_type) == section)
-            {
-                if let Some(comment) = &node.comment {
-                    for line in comment_lines(comment, 4) {
-                        out.push_str(&format!(
-                            "    <!-- {} -->\n",
-                            escape(&comment_safe(&line))
-                        ));
-                    }
-                }
-                let tag = section.name();
-                out.push_str(&format!("    <{tag}>\n"));
+        for section in Section::ALL {
+            let grouped = self.grouped(home, section);
+            if grouped.is_empty() {
+                continue;
+            }
+            let word = section.node_word();
+            out.push_str(&format!("    <{}>\n", section.name()));
+            for (node_type, nodes) in grouped {
                 out.push_str(&format!(
-                    "        <name>{}</name>\n",
-                    escape(&node.name)
+                    "        <type name=\"{}\">\n",
+                    escape(node_type)
                 ));
-                out.push_str(&format!(
-                    "        <type>{}</type>\n",
-                    escape(&node.node_type)
-                ));
-                for (attribute, value) in &node.attributes {
-                    // Left out where it is empty, as the YAML writer does it.
-                    if value.trim().is_empty() {
-                        continue;
-                    }
-                    // A list is the element once for each entry, which is
-                    // how XML writes one: see tcslibgs::graph::LISTED.
-                    if tcslibgs::graph::LISTED.contains(&attribute.as_str()) {
-                        for one in tcslibgs::graph::entries(value) {
+                for node in nodes {
+                    if let Some(comment) = &node.comment {
+                        for line in comment_lines(comment, 12) {
                             out.push_str(&format!(
-                                "        <{attribute}>{}</{attribute}>\n",
-                                escape(one)
-                            ));
-                        }
-                        continue;
-                    }
-                    out.push_str(&format!(
-                        "        <{attribute}>{}</{attribute}>\n",
-                        escape(value)
-                    ));
-                }
-                for (terminal, destinations, comment) in
-                    self.leaving(node, home)
-                {
-                    if let Some(comment) = &comment {
-                        for line in comment_lines(comment, 8) {
-                            out.push_str(&format!(
-                                "        <!-- {} -->\n",
+                                "            <!-- {} -->\n",
                                 escape(&comment_safe(&line))
                             ));
                         }
                     }
-                    for Bound { target, input } in destinations {
-                        // One element per line, the entry's words inside it:
-                        // the same shape the tcsgui section's nodes are
-                        // written in, and short enough to read as one line.
-                        let said = match input {
-                            Some(input) => format!(
-                                "<target>{}</target><input>{}</input>",
-                                escape(&target),
-                                escape(&input)
-                            ),
-                            None => {
-                                format!("<target>{}</target>", escape(&target))
+                    // What is inside the node, written after its opening
+                    // tag; a node with nothing to say is one empty element.
+                    let mut inside = String::new();
+                    for (attribute, value) in &node.attributes {
+                        // Left out where it is empty, as the YAML writer does
+                        // it.
+                        if value.trim().is_empty() {
+                            continue;
+                        }
+                        // A list is the element once for each entry, which
+                        // is how XML writes one: see tcslibgs::graph::LISTED.
+                        if tcslibgs::graph::LISTED.contains(&attribute.as_str())
+                        {
+                            for one in listed(value) {
+                                inside.push_str(&format!(
+                                    "                <{attribute}>{}\
+                                     </{attribute}>\n",
+                                    escape(one)
+                                ));
                             }
-                        };
-                        out.push_str(&format!(
-                            "        <{terminal}>{said}</{terminal}>\n"
+                            continue;
+                        }
+                        inside.push_str(&format!(
+                            "                <{attribute}>{}</{attribute}>\n",
+                            escape(value)
                         ));
                     }
+                    for (terminal, destinations, comment) in
+                        self.leaving(node, home)
+                    {
+                        if let Some(comment) = &comment {
+                            for line in comment_lines(comment, 16) {
+                                inside.push_str(&format!(
+                                    "                <!-- {} -->\n",
+                                    escape(&comment_safe(&line))
+                                ));
+                            }
+                        }
+                        for Bound { target, input } in destinations {
+                            // One element per line, the entry's words inside
+                            // it, short enough to read as one line.
+                            let said = match input {
+                                Some(input) => format!(
+                                    "<target>{}</target><input>{}</input>",
+                                    escape(&target),
+                                    escape(&input)
+                                ),
+                                None => format!(
+                                    "<target>{}</target>",
+                                    escape(&target)
+                                ),
+                            };
+                            inside.push_str(&format!(
+                                "                <{terminal}>{said}\
+                                 </{terminal}>\n"
+                            ));
+                        }
+                    }
+                    for sink in self.arriving(node, home) {
+                        inside.push_str(&format!(
+                            "                <{sink}>true</{sink}>\n"
+                        ));
+                    }
+                    if inside.is_empty() {
+                        out.push_str(&format!(
+                            "            <{word} name=\"{}\"/>\n",
+                            escape(&node.name)
+                        ));
+                    } else {
+                        out.push_str(&format!(
+                            "            <{word} name=\"{}\">\n",
+                            escape(&node.name)
+                        ));
+                        out.push_str(&inside);
+                        out.push_str(&format!("            </{word}>\n"));
+                    }
                 }
-                for sink in self.arriving(node, home) {
-                    out.push_str(&format!("        <{sink}>true</{sink}>\n"));
-                }
-                out.push_str(&format!("    </{tag}>\n"));
+                out.push_str("        </type>\n");
             }
+            out.push_str(&format!("    </{}>\n", section.name()));
         }
 
         // The command bindings, which only the top file declares: what the
@@ -2010,32 +2109,39 @@ impl Document {
             }
         }
 
-        // And last, what the editor arranged: see the YAML writer.
-        let placed = self.nodes_in(home);
-        if !placed.is_empty() {
+        // And last, what the editor arranged: see the YAML writer. Each
+        // entry names its node as the sections name theirs, by a name
+        // attribute, and in the order of the names.
+        let placed = self.placed_in(home);
+        let here = self.aside_in(home);
+        if !placed.is_empty() || !here.is_empty() {
             out.push_str("    <tcsgui>\n");
-            for node in placed {
+        }
+        if !placed.is_empty() {
+            out.push_str("        <nodes>\n");
+            for node in &placed {
                 out.push_str(&format!(
-                    "        <nodes><name>{}</name><x>{}</x>\
-                     <y>{}</y></nodes>\n",
+                    "            <node name=\"{}\" x=\"{}\" y=\"{}\"/>\n",
                     escape(&node.name),
                     node.at.0,
                     node.at.1
                 ));
             }
-            // And what was set aside about the nodes in this file.
-            for (node, concern) in self.aside.iter().filter(|(node, _)| {
-                self.nodes_in(home).iter().any(|drawn| {
-                    Qualified::of(&drawn.name, home).absolute() == *node
-                })
-            }) {
+            out.push_str("        </nodes>\n");
+        }
+        // And what was set aside about the nodes in this file.
+        if !here.is_empty() {
+            out.push_str("        <set-aside>\n");
+            for (node, concern) in &here {
                 out.push_str(&format!(
-                    "        <set-aside><node>{}</node>\
-                     <concern>{}</concern></set-aside>\n",
+                    "            <node name=\"{}\" concern=\"{}\"/>\n",
                     escape(&Qualified::parse(node).written_from(home)),
                     escape(concern)
                 ));
             }
+            out.push_str("        </set-aside>\n");
+        }
+        if !placed.is_empty() || !here.is_empty() {
             out.push_str("    </tcsgui>\n");
         }
 
@@ -2046,9 +2152,9 @@ impl Document {
     /// The document as a configuration file.
     ///
     /// Written in the shape `design.rst` specifies: three sections of nodes,
-    /// each entry carrying its `type`, its attributes and the links that leave
-    /// it. The canvas positions are written as well, in a `tcsgui` section at
-    /// the end, under a key the flight software
+    /// each grouped by type, each node carrying its name, its attributes and
+    /// the links that leave it. The canvas positions are written as well, in
+    /// a `tcsgui` section at the end, under a key the flight software
     /// ignores, so that reopening the file finds the diagram as it was left.
     #[cfg(test)]
     pub fn to_yaml(&self) -> String {
@@ -2157,90 +2263,107 @@ impl Document {
         // type's own answer -- see tcslibgs::graph::section_of -- so the file
         // and the drawing cannot come to disagree about what a node is.
         //
+        // Within a section the nodes are grouped by type, each group an entry
+        // `type <type>:` holding its nodes, and everything is in the one
+        // order a configuration has: the types by name, the nodes of a type
+        // by name, a node's attributes by name, then its links and their
+        // destinations, then its sinks. Nothing in a configuration is in an
+        // order that means anything, so the editor writes the order that
+        // makes two files saying one thing the same text.
+        //
         // A section with nothing in it is left out rather than written empty:
         // a configuration with no payloads yet is a configuration somebody is
         // partway through, and `payloads:` with nothing under it reads back as
         // nothing anyway.
-        for section in [Section::Gateway, Section::Vehicle, Section::Payloads] {
-            let theirs: Vec<&Node> = self
-                .nodes_in(home)
-                .into_iter()
-                .filter(|node| section_of(&node.node_type) == section)
-                .collect();
-            if theirs.is_empty() {
+        for section in Section::ALL {
+            let grouped = self.grouped(home, section);
+            if grouped.is_empty() {
                 continue;
             }
+            let word = section.node_word();
             out.push_str(&format!("\n{}:\n", section.name()));
-            for node in theirs {
-                // Above the entry it belongs to, as a comment and not as a
-                // field: this is what a person hand-editing the file expects
-                // to find, and it is what they would have written themselves.
-                // Broken where the XML writer breaks it, so the two spellings
-                // carry the same comment: see `comment_lines`.
-                if let Some(comment) = &node.comment {
-                    for line in comment_lines(comment, 4) {
-                        out.push_str(&format!("  # {line}\n"));
-                    }
-                }
-                out.push_str(&format!(
-                    "  - name: {}\n    type: {}\n",
-                    plain(&node.name),
-                    plain(&node.node_type)
-                ));
-                for (attribute, value) in &node.attributes {
-                    // Nothing written for an attribute nobody has answered.
-                    // Absent and empty mean the same thing to the checking,
-                    // and a file without the line is the one a person would
-                    // have written -- which is the rule the tcspecial section
-                    // follows too. It matters on the way back as much as on
-                    // the way out: a hand-written `address:` with nothing
-                    // after it would otherwise be saved as `address: ""`.
-                    if value.trim().is_empty() {
-                        continue;
-                    }
-                    // Quoted, which is not fussiness. A YAML reader turns 0x48
-                    // into the integer 72 and 2.0 into 2 before anything sees
-                    // the text, where an XML reader hands over what was
-                    // written -- so the same configuration in the two formats
-                    // would read differently, and the digest of one would not
-                    // match the other. Quoting keeps the spelling the person
-                    // wrote.
-                    // A list is a sequence: see tcslibgs::graph::LISTED.
-                    if tcslibgs::graph::LISTED.contains(&attribute.as_str()) {
-                        out.push_str(&format!("    {attribute}:\n"));
-                        for one in tcslibgs::graph::entries(value) {
-                            out.push_str(&format!("      - {}\n", quoted(one)));
+            for (node_type, nodes) in grouped {
+                out.push_str(&format!("  - type {node_type}:\n"));
+                for node in nodes {
+                    // Above the entry it belongs to, as a comment and not as a
+                    // field: this is what a person hand-editing the file
+                    // expects to find, and it is what they would have written
+                    // themselves. Broken where the XML writer breaks it, so
+                    // the two spellings carry the same comment: see
+                    // `comment_lines`.
+                    if let Some(comment) = &node.comment {
+                        for line in comment_lines(comment, 12) {
+                            out.push_str(&format!("      # {line}\n"));
                         }
-                        continue;
                     }
                     out.push_str(&format!(
-                        "    {attribute}: {}\n",
-                        quoted(value)
+                        "      - {word}: {}\n",
+                        plain(&node.name)
                     ));
-                }
-                // And the links out of it, each under the data source it
-                // leaves by. One destination is written as itself and several
-                // as a list, which is what a reader of either would write.
-                for (terminal, destinations, comment) in
-                    self.leaving(node, home)
-                {
-                    if let Some(comment) = &comment {
-                        for line in comment_lines(comment, 8) {
-                            out.push_str(&format!("    # {line}\n"));
+                    for (attribute, value) in &node.attributes {
+                        // Nothing written for an attribute nobody has
+                        // answered. Absent and empty mean the same thing to
+                        // the checking, and a file without the line is the one
+                        // a person would have written -- which is the rule the
+                        // tcspecial section follows too. It matters on the way
+                        // back as much as on the way out: a hand-written
+                        // `address:` with nothing after it would otherwise be
+                        // saved as `address: ""`.
+                        if value.trim().is_empty() {
+                            continue;
+                        }
+                        // Quoted, which is not fussiness. A YAML reader turns
+                        // 0x48 into the integer 72 and 2.0 into 2 before
+                        // anything sees the text, where an XML reader hands
+                        // over what was written -- so the same configuration
+                        // in the two formats would read differently, and the
+                        // digest of one would not match the other. Quoting
+                        // keeps the spelling the person wrote.
+                        // A list is a sequence: see tcslibgs::graph::LISTED.
+                        if tcslibgs::graph::LISTED.contains(&attribute.as_str())
+                        {
+                            out.push_str(&format!("        {attribute}:\n"));
+                            for one in listed(value) {
+                                out.push_str(&format!(
+                                    "          - {}\n",
+                                    quoted(one)
+                                ));
+                            }
+                            continue;
+                        }
+                        out.push_str(&format!(
+                            "        {attribute}: {}\n",
+                            quoted(value)
+                        ));
+                    }
+                    // And the links out of it, each under the data source it
+                    // leaves by, one entry for each destination.
+                    for (terminal, destinations, comment) in
+                        self.leaving(node, home)
+                    {
+                        if let Some(comment) = &comment {
+                            for line in comment_lines(comment, 16) {
+                                out.push_str(&format!("        # {line}\n"));
+                            }
+                        }
+                        out.push_str(&format!("        {terminal}:\n"));
+                        for Bound { target, input } in destinations {
+                            out.push_str(&format!(
+                                "          - target: {target}\n"
+                            ));
+                            if let Some(input) = input {
+                                out.push_str(&format!(
+                                    "            input: {input}\n"
+                                ));
+                            }
                         }
                     }
-                    out.push_str(&format!("    {terminal}:\n"));
-                    for Bound { target, input } in destinations {
-                        out.push_str(&format!("      - target: {target}\n"));
-                        if let Some(input) = input {
-                            out.push_str(&format!("        input: {input}\n"));
-                        }
+                    // And which of its data sinks something arrives at, which
+                    // is the same lines seen from the other end. See
+                    // `arriving`.
+                    for sink in self.arriving(node, home) {
+                        out.push_str(&format!("        {sink}: true\n"));
                     }
-                }
-                // And which of its data sinks something arrives at, which is
-                // the same lines seen from the other end. See `arriving`.
-                for sink in self.arriving(node, home) {
-                    out.push_str(&format!("    {sink}: true\n"));
                 }
             }
         }
@@ -2268,19 +2391,11 @@ impl Document {
         // is told; this says where somebody put the boxes on a screen, which
         // the flight software ignores -- so a reader meets the vehicle first
         // and can stop reading when the vehicle stops.
-        let placed = self.nodes_in(home);
-        // What was set aside, and only for the nodes this file holds: a
-        // decision about a node in a subdiagram belongs in that subdiagram's
-        // file, where the node is.
-        let here: Vec<&(String, String)> = self
-            .aside
-            .iter()
-            .filter(|(node, _)| {
-                placed.iter().any(|drawn| {
-                    Qualified::of(&drawn.name, home).absolute() == *node
-                })
-            })
-            .collect();
+        //
+        // Each entry names its node as the sections name theirs, by its first
+        // key, and in the order of the names.
+        let placed = self.placed_in(home);
+        let here = self.aside_in(home);
         if !placed.is_empty() || !here.is_empty() {
             out.push_str("\ntcsgui:\n");
         }
@@ -2288,7 +2403,7 @@ impl Document {
             out.push_str("  nodes:\n");
             for node in placed {
                 out.push_str(&format!(
-                    "    - {{ name: {}, x: {}, y: {} }}\n",
+                    "    - {{ node: {}, x: {}, y: {} }}\n",
                     plain(&node.name),
                     node.at.0,
                     node.at.1
@@ -2341,8 +2456,9 @@ impl Document {
     /// terminal. Which terminal is the editor's own table where the link does
     /// not say: a payload has one data source and the line was drawn from it.
     ///
-    /// In the order the file writes them, which is the order the terminals are
-    /// named in: one file for one document, however the links were drawn.
+    /// In the one order a file writes them in: the terminals by name, and
+    /// each one's destinations by the node they reach and then the input, so
+    /// that one document is one file however the links were drawn.
     ///
     /// Written where the node is, which is what makes every link written
     /// exactly once however far it reaches: a link from a node on one page to
@@ -2376,7 +2492,9 @@ impl Document {
     ) -> Vec<(&'static str, Vec<Bound>, Option<String>)> {
         let mut leaving: Vec<(&'static str, Vec<Bound>, Option<String>)> =
             Vec::new();
-        for terminal in ["payload-out", "gateway-out"] {
+        // In the one order: the terminals by name, and each one's
+        // destinations by the node they reach and then the input.
+        for terminal in ["gateway-out", "payload-out"] {
             let mut destinations: Vec<Bound> = Vec::new();
             // One line carries one comment, so the attribute's comment is the
             // first thing written about any of the links under it. Nothing in
@@ -2405,6 +2523,9 @@ impl Document {
                 }
             }
             if !destinations.is_empty() {
+                destinations.sort_by(|a, b| {
+                    (&a.target, &a.input).cmp(&(&b.target, &b.input))
+                });
                 leaving.push((terminal, destinations, comment));
             }
         }
@@ -2443,7 +2564,7 @@ impl Document {
     fn arriving(&self, node: &Node, home: &Home) -> Vec<&'static str> {
         let mut arriving: Vec<&'static str> = Vec::new();
         let ours = Qualified::of(&node.name, home).absolute();
-        for sink in ["payload-in", "gateway-in"] {
+        for sink in ["gateway-in", "payload-in"] {
             let any = self.links.iter().filter(|l| l.to == ours).any(|link| {
                 // Which sink of this node the line arrives at, which needs the
                 // terminal it left by: the two are one stream read from either
@@ -2478,6 +2599,23 @@ impl Document {
         }
         arriving
     }
+}
+
+/// The entries of a listed attribute, as a file writes them: in the order of
+/// their text, a list of this kind being a set whose order means nothing. See
+/// tcslibgs::graph::LISTED.
+///
+/// # Arguments
+///
+/// * `value` - The attribute, its entries joined as the document holds them.
+///
+/// # Returns
+///
+/// The entries, sorted.
+fn listed(value: &str) -> Vec<&str> {
+    let mut entries = tcslibgs::graph::entries(value);
+    entries.sort_unstable();
+    entries
 }
 
 /// A value as YAML, spelled as it was written.
@@ -2698,11 +2836,13 @@ pub fn thermostat_example() -> Document {
                 now: Some(value.to_string()),
             });
         };
+    // A note held as the lines it is written in above a node, which is what
+    // reading the file back gives.
     let note = |document: &mut Document, node: &str, comment: &str| {
         document.apply(&Edit::SetNodeComment {
             node: node.to_string(),
             was: None,
-            now: Some(comment.to_string()),
+            now: Some(comment_lines(comment, 12).join("\n")),
         });
     };
 
@@ -2749,8 +2889,8 @@ pub fn thermostat_example() -> Document {
         &mut document,
         "temp_1",
         "One of three sensors of the same place, a trio, so that \
-         the\ntemperature survives one of them going wrong. Two bytes, \
-         signed,\nbig endian.",
+         the temperature survives one of them going wrong. Two bytes, \
+         signed, big endian.",
     );
 
     place(&mut document, "temp_2", "i2c", (34, 166));
@@ -2774,8 +2914,8 @@ pub fn thermostat_example() -> Document {
         &mut document,
         "temp_3",
         "The third. A different part on a different bus: three \
-         bytes,\nunsigned, its own scale and so its own conversion, so that no \
-         one\nbus and no one part number can take the whole trio out.",
+         bytes, unsigned, its own scale and so its own conversion, so that no \
+         one bus and no one part number can take the whole trio out.",
     );
 
     for (name, at, format, scale, offset) in [
@@ -2798,11 +2938,11 @@ pub fn thermostat_example() -> Document {
         &mut document,
         "zone_temp",
         "One temperature out of the three, by the algorithm named: \
-         median\ntakes the middle reading, closest_mean the mean of the two \
-         that\nagree best. Either leaves a sensor that has gone wrong out of \
-         the\nanswer, which a mean over all three would not, and it produces \
-         a\nvalue on every arrival, so one sensor that stops reporting \
-         is\noutvoted rather than stopping the vehicle from deciding anything.",
+         median takes the middle reading, closest_mean the mean of the two \
+         that agree best. Either leaves a sensor that has gone wrong out of \
+         the answer, which a mean over all three would not, and it produces \
+         a value on every arrival, so one sensor that stops reporting \
+         is outvoted rather than stopping the vehicle from deciding anything.",
     );
 
     place(&mut document, "thermostat", "compute", (601, 242));
@@ -2812,8 +2952,8 @@ pub fn thermostat_example() -> Document {
     note(
         &mut document,
         "thermostat",
-        "setpoint is set from the ground; half_band is how far either side\nof \
-         it the heaters are switched at, the setpoint being in the middle\nof \
+        "setpoint is set from the ground; half_band is how far either side of \
+         it the heaters are switched at, the setpoint being in the middle of \
          the band.",
     );
 
@@ -2837,9 +2977,9 @@ pub fn thermostat_example() -> Document {
         &mut document,
         "heaters_1",
         "Two heaters, each three circuits driven together, both near \
-         the\nsensors on the same thermal mass. Separate nodes rather than \
-         six\nlines on one, so that one can be stopped from the ground while \
-         the\nother goes on holding the temperature.",
+         the sensors on the same thermal mass. Separate nodes rather than \
+         six lines on one, so that one can be stopped from the ground while \
+         the other goes on holding the temperature.",
     );
 
     place(&mut document, "housekeeping", "log", (469, 374));
@@ -2921,11 +3061,14 @@ pub fn thermostat_example() -> Document {
             ),
             was: None,
             now: Some(
-                "asserted below the setpoint, unasserted above it. Two \
-                 heaters,\nbecause one failing must not leave the mass with no \
-                 way to be\nwarmed: either alone holds the band, and both \
-                 together hold it\ntwice as fast."
-                    .to_string(),
+                comment_lines(
+                    "asserted below the setpoint, unasserted above it. Two \
+                     heaters, because one failing must not leave the mass \
+                     with no way to be warmed: either alone holds the band, \
+                     and both together hold it twice as fast.",
+                    16,
+                )
+                .join("\n"),
             ),
         });
     }
@@ -4467,8 +4610,8 @@ mod tests {
         let yaml = document.to_yaml();
         assert!(
             yaml.contains(
-                "    terminators:\n      - \
-                           \"\\\"\\\\r\\\\n\\\"\"\n      - \"[03]\"\n"
+                "        terminators:\n          - \
+                           \"\\\"\\\\r\\\\n\\\"\"\n          - \"[03]\"\n"
             ),
             "{yaml}"
         );
@@ -4515,11 +4658,13 @@ mod tests {
 
         let yaml = document.to_yaml();
         assert!(
-            yaml.contains("    payload-out:\n      - target: gateway\n"),
+            yaml.contains(
+                "        payload-out:\n          - target: gateway\n"
+            ),
             "{yaml}"
         );
         assert!(
-            yaml.contains("    payload-in: true\n"),
+            yaml.contains("        payload-in: true\n"),
             "the arriving end does not say so: {yaml}"
         );
 
@@ -4863,8 +5008,10 @@ mod tests {
         let xml = document.to_xml();
         assert!(
             xml.contains(concat!(
-                "<set-aside><node>sensor</node>",
-                "<concern>payload-out-goes-nowhere</concern></set-aside>"
+                "<set-aside>\n",
+                "            <node name=\"sensor\" ",
+                "concern=\"payload-out-goes-nowhere\"/>\n",
+                "        </set-aside>"
             )),
             "{xml}"
         );
@@ -5049,13 +5196,14 @@ mod tests {
         let xml = document.to_xml();
 
         for node in &document.nodes {
+            let word = section_of(&node.node_type).node_word();
             assert!(
-                yaml.contains(&format!("name: {}", node.name)),
+                yaml.contains(&format!("- {word}: {}\n", node.name)),
                 "{}",
                 node.name
             );
             assert!(
-                xml.contains(&format!("<name>{}</name>", node.name)),
+                xml.contains(&format!("<{word} name=\"{}\">", node.name)),
                 "{} is missing from the XML",
                 node.name
             );
@@ -5074,7 +5222,10 @@ mod tests {
                 );
             }
             if let Some(comment) = &node.comment {
-                let first = comment.lines().next().unwrap();
+                // Its first line as it is written, broken to fit where the
+                // node's comment goes.
+                let lines = comment_lines(comment, 12);
+                let first = lines.first().expect("a comment has a line");
                 assert!(
                     yaml.contains(first),
                     "a comment is missing from the YAML"
@@ -5096,7 +5247,10 @@ mod tests {
         for link in &document.links {
             let (yaml_said, xml_said) = match &link.input {
                 Some(input) => (
-                    format!("- target: {}\n        input: {input}\n", link.to),
+                    format!(
+                        "- target: {}\n            input: {input}\n",
+                        link.to
+                    ),
                     format!(
                         "<target>{}</target><input>{input}</input>",
                         link.to
@@ -5373,7 +5527,7 @@ mod tests {
             .find(|(path, _)| path.ends_with("zone.ytcs"))
             .expect("the subdiagram's file");
         assert!(
-            inner.contains("payload-out:\n      - target: gateway\n"),
+            inner.contains("payload-out:\n          - target: gateway\n"),
             "{inner}"
         );
 
@@ -5448,7 +5602,19 @@ mod tests {
 
         let yaml = document.to_yaml();
         assert!(!yaml.contains("version:"), "{yaml}");
-        assert!(yaml.contains("type: i2c"), "{yaml}");
+        // Grouped by type, and each node named by the word for its section.
+        assert!(
+            yaml.contains(
+                "\npayloads:\n  - type i2c:\n      - payload: temp_1\n"
+            ),
+            "{yaml}"
+        );
+        assert!(
+            yaml.contains(
+                "\nvehicle:\n  - type compute:\n      - compute: zone_temp\n"
+            ),
+            "{yaml}"
+        );
         // Quoted: a YAML reader would otherwise turn 0x48 into 72. See
         // `quoted`.
         assert!(yaml.contains("address: \"0x48\""), "{yaml}");
@@ -5459,8 +5625,8 @@ mod tests {
         assert!(yaml.contains("\nvehicle:\n"), "{yaml}");
         assert!(
             yaml.contains(
-                "    payload-out:\n      - target: \
-                           zone_temp\n        input: in0\n"
+                "        payload-out:\n          - target: \
+                           zone_temp\n            input: in0\n"
             ),
             "a link into a named input is written as one entry: {yaml}"
         );

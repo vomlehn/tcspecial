@@ -737,6 +737,11 @@ pub struct Placing<'a> {
 /// One rule for the editor, which settles what it opens, and for tcspecial's
 /// visual window, which draws what the editor would.
 ///
+/// The nodes are walked in the order given, and each settled clear of those
+/// before it; both callers give them in the order of their names, the one
+/// order a configuration has, so that a drawing saved and read again is laid
+/// out the same.
+///
 /// # Arguments
 ///
 /// * `nodes`    - The nodes' types and positions; each position is moved

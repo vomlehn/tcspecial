@@ -269,6 +269,10 @@ arrives:
 | a ping | up | the gateway node's `apid_base`, 0x200 |
 | its answer | down | `apid_base` plus the ping node's device id, 0x201 |
 
+A payload nothing in the drawing touches would report as telemetry of
+`payload_telemetry.apid_base`, 0x300, plus its device id. This vehicle has
+none, so Yamcs is given no container for one.
+
 `ping_yamcs.py` writes a Yamcs configuration from the tcspecial one -- the
 ports and the APIDs, stated once -- with a mission database of tcspecial's
 own XTCE and `yamcs/tcs-ccsds.xtce.in`, which puts the header around it. It

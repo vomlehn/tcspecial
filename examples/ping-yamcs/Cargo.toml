@@ -12,6 +12,7 @@ hold the Python to the Rust it is written after"""
 # Python to -- the ports, the APIDs and the checksum the configuration gives.
 [dev-dependencies]
 tcslibgs = { path = "../../tcslibgs" }
+tempfile = "3.27.0"
 
 [lints]
 workspace = true

@@ -4470,20 +4470,31 @@ counting its own sequence per APID. Each link states its APID:</p>
 <span class="name tag">tcspecial</span><span class="punctuation">:</span><span class="whitespace">
   </span><span class="name tag">gateway</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal string">&quot;yamcs&quot;</span><span class="whitespace">
   </span><span class="name tag">beacon</span><span class="punctuation">:</span><span class="whitespace">
-    </span><span class="name tag">apid</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal string">&quot;0x100&quot;</span><span class="whitespace">     </span><span class="comment single"># the beacon</span><span class="whitespace">
+    </span><span class="name tag">apid</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal string">&quot;0x100&quot;</span><span class="whitespace">       </span><span class="comment single"># the beacon</span><span class="whitespace">
+  </span><span class="name tag">payload_telemetry</span><span class="punctuation">:</span><span class="whitespace">
+    </span><span class="name tag">apid_base</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal string">&quot;0x300&quot;</span><span class="whitespace">  </span><span class="comment single"># each untouched payload's telemetry, plus its id</span><span class="whitespace">
   </span><span class="name tag">tcs_cmd</span><span class="punctuation">:</span><span class="whitespace">
-    </span><span class="name tag">apid</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal string">&quot;0x101&quot;</span><span class="whitespace">     </span><span class="comment single"># commands, and their answers</span><span class="whitespace">
+    </span><span class="name tag">apid</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal string">&quot;0x101&quot;</span><span class="whitespace">       </span><span class="comment single"># commands, and their answers</span><span class="whitespace">
 </span><span class="name tag">gateways</span><span class="punctuation">:</span><span class="whitespace">
   </span><span class="punctuation indicator">-</span><span class="whitespace"> </span><span class="name tag">type gateway_yamcs</span><span class="punctuation">:</span><span class="whitespace">
       </span><span class="punctuation indicator">-</span><span class="whitespace"> </span><span class="name tag">gateway</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">gateway</span><span class="whitespace">
         </span><span class="name tag">apid_base</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal string">&quot;0x200&quot;</span>
 </pre>
 <p>A gateway node's uplink takes telecommands of its <tt class="docutils literal">apid_base</tt>, and each
-source sends through it as telemetry of <tt class="docutils literal">apid_base</tt> plus its device id.
-<tt class="docutils literal">beacon.apid</tt> and <tt class="docutils literal">tcs_cmd.apid</tt> are required in a yamcs configuration and
+source sends through it as telemetry of <tt class="docutils literal">apid_base</tt> plus its device id. A
+payload nothing in the drawing touches, which reports over
+<tt class="docutils literal">payload_telemetry</tt>, is framed too: its telemetry goes as telemetry of
+<tt class="docutils literal">payload_telemetry.apid_base</tt> plus its device id, to <tt class="docutils literal">dest_base</tt> plus the
+same id. An APID is counted as a port is, so a ground station finds a
+payload's APID where it finds its port. <tt class="docutils literal">beacon.apid</tt>, <tt class="docutils literal">tcs_cmd.apid</tt> and
+<tt class="docutils literal">payload_telemetry.apid_base</tt> are required in a yamcs configuration and
 refused in any other, as <tt class="docutils literal">apid_base</tt> is on any node but a <tt class="docutils literal">gateway_yamcs</tt>.
-Each APID is 0 to <tt class="docutils literal">0x7FF</tt>, and no two links may share one: the beacon, the
-commands, each gateway node's uplink and each of its sources.</p>
+Each APID, counted ones included, is 0 to <tt class="docutils literal">0x7FF</tt>, and no two links may
+share one: the beacon, the commands, each gateway node's uplink and each of
+its sources, and each untouched payload. The one exception is a gateway
+node's uplink and the downlink of the node of device id 0 through it, one
+telecommands and the other telemetry. A configuration that breaks either rule
+is refused where it is read, naming the two links and what to change.</p>
 <p>A command link's sender may be written with port <tt class="docutils literal">0</tt> -- <tt class="docutils literal">tcs_cmd.send:
 &quot;127.0.0.1:0&quot;</tt> -- to take commands from any port of that host, each answer
 still going back to the port its command came from. Yamcs needs it, sending

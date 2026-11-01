@@ -483,6 +483,9 @@
             <!-- On a cFS software bus: where an untouched payload's message
                  ID is counted from, by its id. -->
             <xs:element name="tlm_base" type="xs:string" minOccurs="0"/>
+            <!-- Where the gateway is yamcs: where an untouched payload's
+                 APID is counted from, by its id. -->
+            <xs:element name="apid_base" type="xs:string" minOccurs="0"/>
           </xs:all>
         </xs:complexType>
       </xs:element>

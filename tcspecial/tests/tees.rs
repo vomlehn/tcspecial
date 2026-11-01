@@ -9,7 +9,7 @@
 
 use std::net::{SocketAddr, UdpSocket};
 use std::path::Path;
-use std::process::{Child, Command, Stdio};
+use std::process::{Command, Stdio};
 use std::time::{Duration, Instant};
 
 use tcslibgs::graph::telemetry;
@@ -17,68 +17,7 @@ use tcslibgs::graph::Graph;
 
 mod common;
 
-/// Binds a socket on a loopback port nothing holds.
-///
-/// # Returns
-///
-/// The socket, with a read timeout of 100 ms.
-///
-/// # Panics
-///
-/// If no port can be bound or the timeout cannot be set.
-fn bound() -> UdpSocket {
-    let socket = UdpSocket::bind("127.0.0.1:0").expect("a port of its own");
-    socket
-        .set_read_timeout(Some(Duration::from_millis(100)))
-        .expect("a timeout");
-    socket
-}
-
-fn port(socket: &UdpSocket) -> u16 {
-    socket.local_addr().expect("its address").port()
-}
-
-/// A port nothing holds, for tcspecial to bind.
-fn free() -> u16 {
-    port(&bound())
-}
-
-/// tcspecial, stopped however the test ends: a vehicle left running would
-/// hold its ports for the next test to trip over.
-struct Flying(Child);
-
-impl Drop for Flying {
-    fn drop(&mut self) {
-        let _ = self.0.kill();
-        let _ = self.0.wait();
-    }
-}
-
-/// Writes `was` as `now` in `text`, where it appears exactly once: a
-/// socket the example stops naming is a test that no longer moves it, and
-/// would bind the example's own port.
-///
-/// # Arguments
-///
-/// * `text` - The example's configuration.
-/// * `was`  - What it says now, which must appear exactly once.
-/// * `now`  - What to say instead.
-///
-/// # Returns
-///
-/// `text` with the one `was` replaced by `now`.
-///
-/// # Panics
-///
-/// If `text` does not say `was` exactly once.
-fn moved(text: &str, was: &str, now: &str) -> String {
-    assert_eq!(
-        text.matches(was).count(),
-        1,
-        "the example should say {was} once"
-    );
-    text.replace(was, now)
-}
+use common::{bound, free, moved, port};
 
 /// Sends `datum` to `to` until something arrives at `at`, which is how
 /// long tcspecial takes to start.
@@ -212,7 +151,7 @@ fn a_tee_sends_each_datum_both_ways() {
     let echoed = ground_of("echo");
     let read = ground_of("readings");
 
-    let _flying = Flying(
+    let _flying = common::Flying::quiet(
         Command::new(env!("CARGO_BIN_EXE_tcspecial"))
             .arg(&configuration)
             .arg("--quiet")

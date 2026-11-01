@@ -6737,16 +6737,18 @@ joined: the <tt class="docutils literal">exec</tt> ends it, and it holds nothing
 began using its configuration, has its restart flag clear and carries
 that configuration's checksum, and while that beacon is recent: its
 beacon watch says the vehicle is heard from
-(<tt class="docutils literal"><span class="pre">tcslib::beacon::Stage::Heard</span></tt>). A beacon gone overdue ends the
+(<tt class="docutils literal"><span class="pre">tcslib::beacon::Stage::Heard</span></tt>). A beacon gone overdue -- four times
+<tt class="docutils literal">beacon.default_interval</tt> since it arrived, which is four beacons
+missed in a row, <tt class="docutils literal"><span class="pre">tcslib::beacon::AGING_AFTER_MISSED</span></tt> -- ends the
 match as a flagged one does, and the next beacon that qualifies begins
 it again, with the drop of queued data that a match begins with. A
-station that has missed beacons cannot then go on reading as though
-the vehicle had not changed in the meantime. A clear flag says that the vehicle has taken a
-matching CONNECT for the configuration in that beacon, from this
-station or another, so a station that only listens is matched as
-surely as one that commands. A station that commands is matched for
-commanding only once, besides, a CONNECT of its own has been answered
-with its checksum.</dd>
+station that has missed beacons cannot then go on reading as though the
+vehicle had not changed in the meantime. A clear flag says that the
+vehicle has taken a matching CONNECT for the configuration in that
+beacon, from this station or another, so a station that only listens is
+matched as surely as one that commands. A station that commands is
+matched for commanding only once, besides, a CONNECT of its own has been
+answered with its checksum.</dd>
 <dt>Requirement</dt>
 <dd>A station that is not matched reads no downlinked data and takes no
 answer but those to CONNECT, RESTART_ARM and RESTART. What it drops it
@@ -6823,7 +6825,8 @@ the order of the radio and the drops at a match: see <a class="reference interna
 across a restart</a>.</dd>
 <dt>A listening station that misses every beacon of a change</dt>
 <dd>It is matched only while its beacon is recent, so missing the beacons
-of a change ends its match within twice the beacon interval, before
+of a change ends its match within four times <tt class="docutils literal">default_interval</tt>,
+the time its beacon takes to go overdue (see <a class="reference internal" href="#on-the-ground">On the ground</a>), before
 the new configuration's data can be read with the old. The interval it
 ages beacons against is its configuration's, which is the vehicle's
 too: nothing changes it while tcspecial runs.</dd>
@@ -7459,8 +7462,9 @@ taken by the new start brings.</td>
 </tr>
 <tr><td>Every beacon lost for a while</td>
 <td>Nothing.</td>
-<td>The beacon goes overdue, which ends the match as a flagged one
-does: see <a class="reference internal" href="#on-the-ground">On the ground</a>.</td>
+<td>The beacon goes overdue after four times <tt class="docutils literal">default_interval</tt>,
+which ends the match as a flagged one does: see <a class="reference internal" href="#on-the-ground">On the
+ground</a>.</td>
 </tr>
 </tbody>
 </table>

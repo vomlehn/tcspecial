@@ -4644,7 +4644,10 @@ One beacon may be missed with the indicator still steady, because one lost
 datagram is a network and not a spacecraft. For a five-second interval the
 indicator is steady for ten seconds, blinks green for ten more, is yellow for
 twenty and red after that. The interval is the one the configuration states,
-which is the vehicle's too: nothing changes it while tcspecial runs.
+which is the vehicle's too: nothing changes it while tcspecial runs. The
+station stops being matched when the indicator turns yellow, four intervals
+after the last beacon, and reads none of the vehicle's data until a beacon
+comes again.
 
 Beside the indicator is the time the last beacon arrived, shown the way every
 other time in the window is. It is the time the beacon reached the MOC rather

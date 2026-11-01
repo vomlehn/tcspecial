@@ -113,10 +113,12 @@ pub enum Stage {
     ///
     /// Recently enough allows for a beacon that did not arrive, one lost
     /// datagram being a network rather than a spacecraft. The standard
-    /// schedule holds this stage for twice the beacon interval, steady at
-    /// first and then blinking -- an indicator that has begun to blink says
-    /// the beacons are aging, which is worth noticing before it is worth
-    /// doubting.
+    /// schedule holds this stage until [`AGING_AFTER_MISSED`] beacons have
+    /// been missed, four intervals, steady for the first two and blinking
+    /// for the rest -- an indicator that has begun to blink says the
+    /// beacons are aging, which is worth noticing before it is worth
+    /// doubting. A station's match ends when it does: see
+    /// [`crate::matched`].
     Heard,
     /// Late enough that contact is not claimed, and not so late that it is
     /// [`Stage::Waiting`].

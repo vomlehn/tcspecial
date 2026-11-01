@@ -197,7 +197,10 @@ help:
 		"kernel's vcan, gpio-sim and iio_dummy"
 	@echo "                     (make them first with sudo" \
 		"bin/mk-kernel-stand-ins)"
-	@echo "  make check       - cargo check, clippy, and a format check"
+	@echo "  make check       - cargo check, clippy, a format check and" \
+		"an HTML check"
+	@echo "  make html-check  - Fail where a committed HTML page is" \
+		"behind its source"
 	@echo "  make format      - Reformat the source"
 	@echo "  make release     - Build with optimizations"
 	@echo "  make clean       - Remove build artifacts"
@@ -1147,6 +1150,7 @@ check:
 	cd $(RUST) && cargo test -q -p $(PROJECT_NAME) --features visual \
 		--test visual
 	cd $(RUST) && cargo fmt -- --check
+	$(MAKE) --no-print-directory html-check
 
 # The F´ bridge, which F´'s own tools build rather than cargo: see
 # fprime/Makefile, which says where it looks for F´ and how to say
@@ -1225,3 +1229,29 @@ release: test
 docs:
 	make -C $(DOCS_DIR)
 
+# Every directory whose HTML pages are made from its markdown or
+# reStructuredText and committed beside it, which make in each builds.
+HTML_DIRS = $(DOCS_DIR) examples tcslib tcslib-c tcslibgs
+
+# Fail where a committed page has fallen behind its source, naming it. Every
+# page is made again whatever make thinks of it, since a checkout's times
+# say nothing of which was written last, and compared with what was there.
+# Made in place, so that a page this finds behind is already brought up to
+# date, and needs only committing. What is compared is every page and every
+# figure a page is drawn from that git knows of.
+.PHONY: html-check
+html-check:
+	@sums=$$(mktemp) && \
+	md5sum $$(git ls-files '*.html' '$(DOCS_DIR)/*.svg') > $$sums && \
+	for dir in $(HTML_DIRS); do \
+		$(MAKE) -s -B -C $$dir > /dev/null || { rm -f $$sums; exit 1; }; \
+	done; \
+	behind=$$(md5sum --quiet -c $$sums 2> /dev/null | \
+		sed 's/: FAILED$$//'); \
+	rm -f $$sums; \
+	if [ -n "$$behind" ]; then \
+		echo "These pages were behind their sources, and are made" \
+			"again now: commit them" >&2; \
+		echo "$$behind" | sed 's/^/  /' >&2; \
+		exit 1; \
+	fi

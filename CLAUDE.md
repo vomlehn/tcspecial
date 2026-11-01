@@ -88,6 +88,7 @@ cargo build --workspace
 cargo test --workspace          # before claiming anything works
 cargo clippy --workspace --all-targets
 cargo run -q --bin tcsverify -- <configuration> [simulator file]
+make html-check                 # every committed page made again, and current
 ```
 
 `make help` lists the Makefile's targets. `make` in `docs/`, `examples/`,

@@ -472,13 +472,16 @@ def run_without_a_window(setup, beacons, pinger, count):
     return 0 if answered_all else 1
 
 
-def run_the_window(setup, beacons, pinger):
+def run_the_window(setup, beacons, pinger, title="tcspecial ping"):
     """The window, and the two loops that feed it.
 
     Args:
         setup:   What the program read out of the configuration.
-        beacons: The beacon socket, which a loop of its own listens to.
+        beacons: The beacon socket, which a loop of its own listens to: a
+                 :class:`tcslib.beacon.Beacons`, or anything with its
+                 ``next_pass``.
         pinger:  The ping link, whose answers a loop of its own receives.
+        title:   The window's title.
 
     Returns:
         The exit status, nought, once the window is closed.
@@ -518,7 +521,7 @@ def run_the_window(setup, beacons, pinger):
     window = tk.Tk()
     fonts.use_in(window)
     theme.use_in(window)
-    window.title("tcspecial ping")
+    window.title(title)
     window.resizable(False, False)
 
     # Two boxes, the beacon's and the ping's, with one size of space between

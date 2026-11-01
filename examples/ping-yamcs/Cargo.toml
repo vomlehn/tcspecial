@@ -1,0 +1,17 @@
+[package]
+name = "ping-yamcs-example"
+version = "0.1.0"
+edition = "2021"
+license.workspace = true
+description = """\
+The tests of the ping-yamcs example, whose ground station is Python 3: they \
+hold the Python to the Rust it is written after"""
+
+# Nothing is built for the example itself: its ground station is ping_yamcs.py
+# beside this. What is here is the tests, which need the Rust to hold the
+# Python to -- the ports, the APIDs and the checksum the configuration gives.
+[dev-dependencies]
+tcslibgs = { path = "../../tcslibgs" }
+
+[lints]
+workspace = true

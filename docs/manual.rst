@@ -2557,15 +2557,16 @@ Python.
 The ping-yamcs example
 ----------------------
 .. figure:: ../examples/ping-yamcs/ping-yamcs.svg
-   :alt: The ping-yamcs example: Yamcs, driven by ping_yamcs.py, sends a ping
+   :alt: The ping-yamcs example: ping_yamcs.py, through Yamcs, sends a ping
          as a CCSDS telecommand up to the gateway_yamcs node, which takes the
          header off and hands it to the ping node; the answer goes back down
          through the gateway node, which puts a header on it, to Yamcs, beside
-         the beacon, also with a header.
+         the beacon, also with a header, and ping_yamcs.py's window shows
+         both.
    :width: 100%
 
-   ``examples/ping-yamcs``: the ping example with Yamcs as the ground
-   station, over CCSDS packets.
+   ``examples/ping-yamcs``: the ping example with Yamcs between the ground
+   station and the vehicle, over CCSDS packets.
 
 The ping example with Yamcs (https://yamcs.org) at the ground end. The
 vehicle is the same -- a ``ping`` node that answers each ping with its time
@@ -2582,8 +2583,8 @@ somewhere (``bin/yamcsd`` under it):
 
 .. code-block:: sh
 
-   python3 examples/ping-yamcs/ping_yamcs.py --yamcs ~/yamcs-5.14.0 --pings 3
    make -C examples run-ping-yamcs YAMCS_HOME=~/yamcs-5.14.0
+   python3 examples/ping-yamcs/ping_yamcs.py --yamcs ~/yamcs-5.14.0 --pings 3
 
 It writes a Yamcs configuration from the tcspecial one into a run directory,
 ``/tmp/ping-yamcs`` unless ``--run-dir`` says, so that the ports and APIDs
@@ -2592,17 +2593,26 @@ are stated once. The mission database is tcspecial's own XTCE,
 ``examples/ping-yamcs/yamcs/tcs-ccsds.xtce.in``: the CCSDS header, what
 follows it on each APID, and CONNECT and the ping behind a header. It starts
 Yamcs on that, and tcspecial on the configuration, each stopped when it
-exits; has Yamcs send CONNECT until the vehicle answers with the
-configuration's checksum; and then sends pings through Yamcs and reads the
-answers back, over Yamcs's REST API, printing each exchange:
+exits, however it exits -- the kernel is told to kill both if it is killed;
+has Yamcs send CONNECT until the vehicle answers with the configuration's
+checksum; and then sends pings through Yamcs and reads the answers back,
+over Yamcs's REST API.
+
+Its window is the ping example's, the beacon panel and the ping panel, with
+``Send ping`` sending each ping through Yamcs. The beacon panel is given the
+beacon's own bytes, which ``tcs-ccsds.xtce`` keeps whole as the
+``BeaconBody`` parameter, so that it checks the configuration's checksum and
+the beacon's number, and ages the indicator, as the ping example's does from
+its socket. With ``--pings`` there is no window, and it prints the first
+beacon and each exchange:
 
 .. code-block:: text
 
    connected: the vehicle is running this configuration
-   beacon: name tcspecial, version 0.1.0, number 2, flag normal
-   sent: ping #1 1793520566.926236889
-   received: ping #1 1793520566.926236889 1793520566.947812205
-   times: round trip 21.763111 ms, up 21.575316 ms, down 0.187795 ms
+   beacon: tcspecial v0.1.0 md5 27bf79b237069fc4c5d13325e1ac0bb6
+   sent: ping #1 1793562467.079578927
+   received: ping #1 1793562467.079578927 1793562467.091478556
+   times: round trip 11.421073 ms, up 11.899629 ms, down -0.478556 ms
 
 Yamcs's web interface, at ``http://localhost:16090``, shows every packet and
 parameter meanwhile. An answer's arrival time is when Yamcs acquired it,

@@ -1,6 +1,6 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="900" height="450" viewBox="0 0 900 450" role="img" aria-labelledby="title desc">
   <title id="title">The ping-yamcs example</title>
-  <desc id="desc">Yamcs, driven by ping_yamcs.py, sends each ping, "ping #count time", as a CCSDS telecommand of APID 0x200 up to the gateway node, a gateway_yamcs node, which tcspecial binds at 127.0.0.1:16600 and which takes the header off. It leaves the gateway node by its gateway-out link for the ping node, which answers it with the vehicle's time on the end and sends the answer by its payload-out link back to the gateway node, which puts a header on it, APID 0x201, and sends it down to Yamcs at 127.0.0.1:16701: the gateway node's ground_base, 16700, plus the ping node's device id, 1. ping_yamcs.py reads it back from Yamcs and shows the round trip and its two halves. The beacon goes from 0.0.0.0:16500 to Yamcs at 127.0.0.1:16510 as telemetry of APID 0x100.</desc>
+  <desc id="desc">Yamcs, driven by ping_yamcs.py, sends each ping, "ping #count time", as a CCSDS telecommand of APID 0x200 up to the gateway node, a gateway_yamcs node, which tcspecial binds at 127.0.0.1:16600 and which takes the header off. It leaves the gateway node by its gateway-out link for the ping node, which answers it with the vehicle's time on the end and sends the answer by its payload-out link back to the gateway node, which puts a header on it, APID 0x201, and sends it down to Yamcs at 127.0.0.1:16701: the gateway node's ground_base, 16700, plus the ping node's device id, 1. ping_yamcs.py reads it back from Yamcs and shows, in its window, the beacon, the round trip and its two halves. The beacon goes from 0.0.0.0:16500 to Yamcs at 127.0.0.1:16510 as telemetry of APID 0x100.</desc>
   <defs>
     <style>
       text { font-family: "DejaVu Sans", Helvetica, Arial, sans-serif; fill: #111827; }
@@ -58,8 +58,8 @@
 
   <!-- The ground station -->
   <rect class="ground" x="640" y="74" width="235" height="246" rx="10"/>
-  <text class="name" x="656" y="101">Yamcs</text>
-  <text class="kind" x="656" y="122">ping_yamcs.py drives it</text>
+  <text class="name" x="656" y="101">ping_yamcs.py</text>
+  <text class="kind" x="656" y="122">ground station, through Yamcs</text>
   <!-- Its beacon panel, drawn as it looks -->
   <rect class="socket" x="656" y="134" width="203" height="40" rx="6"/>
   <text class="label" x="668" y="159">Beacon:</text>

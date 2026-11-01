@@ -6480,12 +6480,21 @@ is tcspecial's own XTCE with a wrapper that puts the header around it, which
 ``python/tcslibgs/yamcs.py`` generates from the configuration, as it does
 Yamcs's links: a fixed part, ``python/tcslibgs/yamcs.xtce``, that says the
 header and the beacon's and the answers' layouts, with a container or a
-command added for every APID the configuration counts, each named after its
-node, its data a binary parameter since no XTCE lays a node's data out. So
-nothing per APID is stated twice, and a node added is decoded once the
-mission database is regenerated; the ping-yamcs example's tests hold the
-generated APIDs to the Rust's and work the containers as Yamcs would on
-packets the vehicle frames.
+command added for every APID the configuration counts. A node whose type
+has an interface document (`A node type's interface document`_) is given
+what it states: its container holds the document's container's fields, and
+a gateway node whose data goes only to nodes with that document takes the
+document's command, each named as the document names it and copied into
+the mission database, because a command cannot be put behind another's
+header from outside. Only what the copy says the same is copied, and a
+document that says more is refused. Any other node's container is named
+after it and holds its data as a binary parameter, and any other gateway
+node's command is named after it and carries its data whole. So nothing per
+APID is stated twice, and a node added is decoded once the mission database
+is regenerated; the ping-yamcs example's tests hold the generated APIDs to
+the Rust's and work the containers and commands as Yamcs would on packets
+the vehicle frames, the ping's field by field. The mission database is
+written as its fixed part is, no line wider than 80 columns.
 
 A command link's sender written with port nought takes commands from any
 port of its host. Yamcs sends from a port the system chooses and takes the
@@ -6585,6 +6594,43 @@ Requirement
 Still open
     There needs to be a way to name the items that are to be loaded on the
     vehicle and where each of them goes. It is not designed here.
+
+A node type's interface document
+--------------------------------
+
+The interface is tcspecial's: what the ground may ask of the vehicle. What
+a node takes from the ground through a gateway node and gives back is the
+node's, and some node types have a fixed form for it, which their code
+writes and reads. Such a type may have an *interface document*, which
+states that form in XTCE for the ground stations that read XTCE.
+
+Requirement
+    A node type's interface document is named by the type, in
+    ``tcslibgs/interface.py``'s ``NODE_DOCUMENTS``, and by nothing in a
+    configuration: a node of the type has it because of what its type's
+    code writes and reads, and a configuration that could name another
+    would state a form the vehicle does not speak. The ``ping`` type's is
+    ``tcslibgs/xtce/ping.xtce``, field by field: the prefix ``ping #``, the
+    count ended by a space, the seconds ended by a point and nine digits of
+    nanoseconds, and for the answer the same, a space, and the vehicle's
+    time.
+
+Requirement
+    A node type's interface document states only what its type's code
+    writes and reads, and a test holds the two together: packed by the code
+    tcs-xtce generates from the document, a message is the type's code's,
+    byte for byte, and unpacked, it is the same fields. For the ping node
+    that is ``tcslibgs::node::vehicle::ping``'s tests, and
+    ``python/tests/test_ping.py``'s of ``python/tcslibgs/ping.py``. The type's
+    code is still what the vehicle answers by; the generated code is
+    compiled into tests and ground stations only.
+
+Requirement
+    No interface document is part of the interface, and none goes on the
+    vehicle: like every XTCE document, each is the ground's. A ground
+    station that reads XTCE is given what the document states --
+    `Gateways: what the vehicle answers to`_ says how Yamcs's mission
+    database takes it -- and one that does not uses the type's code.
 
 Fault Resiliency
 ================

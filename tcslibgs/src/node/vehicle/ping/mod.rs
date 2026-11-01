@@ -27,6 +27,19 @@
 //! these and writes the answers, and a format stated twice is two formats on
 //! the day one of them changes. `tcspecial::node::vehicle::ping` is the node.
 //!
+//! # The interface document
+//!
+//! The same layout is stated in XTCE in `xtce/ping.xtce`, the ping node's
+//! interface document, field by field: the prefix, the count ended by a
+//! space, the seconds ended by a point, nine digits of nanoseconds, and for
+//! the answer the space and the vehicle's time after them. It is for the
+//! ground stations that read XTCE -- `python/tcslibgs/yamcs.py` gives Yamcs
+//! a command and a container from it -- and, like every XTCE document, it
+//! stays on the ground. This module is still what writes and reads a ping:
+//! a test here packs and unpacks pings and answers with the code tcs-xtce
+//! generates from the document and holds the bytes to this module's, so the
+//! two cannot drift apart.
+//!
 //! # A fixed size
 //!
 //! Every number has a largest value -- a count and a whole number of seconds
@@ -530,6 +543,113 @@ mod tests {
         let why = read_message(long.as_bytes()).expect_err("too long");
         assert!(why.contains("longer than any ping"), "{why}");
         assert!(why.len() < 200, "{why}");
+    }
+
+    /// The pings and answers [`xtce_holds_to_the_rust`] packs, unpacks and
+    /// compares: the smallest, ordinary ones, and the largest.
+    ///
+    /// # Returns
+    ///
+    /// Each ping's count, when it was sent and when it was answered.
+    fn examples() -> [(u64, Duration, Duration); 4] {
+        let largest = Duration::new(u64::MAX, 999_999_999);
+        [
+            (1, Duration::ZERO, Duration::ZERO),
+            (1, SENT, ANSWERED),
+            (42, Duration::new(1_793_562_467, 79_578_927), ANSWERED),
+            (u64::MAX, largest, largest),
+        ]
+    }
+
+    /// `xtce/ping.xtce`, the ping node's interface document, says what this
+    /// module writes and reads: a ping packed by the code tcs-xtce
+    /// generates from it, `crate::ping_packet`, from its fields is the
+    /// ping [`message`] writes, byte for byte, and so is an answer and
+    /// [`reply`]'s; and what [`message`] and [`reply`] write unpacks into
+    /// the same fields. So a ground station that reads the document --
+    /// Yamcs, through `python/tcslibgs/yamcs.py` -- sends the pings this
+    /// reads and reads the answers this writes.
+    #[test]
+    fn xtce_holds_to_the_rust() {
+        use crate::ping_packet::{Ping as PingFields, PingReply};
+        use tcs_xtce::packet::{FixedString, Packet};
+
+        /// A field, as the generated code holds it.
+        fn text<const N: usize>(said: &str) -> FixedString<N> {
+            FixedString::try_from(said).expect("it fits its field")
+        }
+
+        for (count, sent, answered) in examples() {
+            let ping = message(count, sent).expect("a ping");
+            let fields = PingFields {
+                count: text(&count.to_string()),
+                sent_seconds: text(&sent.as_secs().to_string()),
+                sent_nanoseconds: text(&format!("{:09}", sent.subsec_nanos())),
+            };
+            assert_eq!(
+                fields.to_bytes().expect("it packs"),
+                ping.as_bytes(),
+                "{ping}"
+            );
+            assert_eq!(
+                PingFields::decode(ping.as_bytes()).expect("it unpacks"),
+                fields,
+                "{ping}"
+            );
+
+            let answer = reply(ping.as_bytes(), answered).expect("an answer");
+            let fields = PingReply {
+                reply_count: fields.count,
+                reply_sent_seconds: fields.sent_seconds,
+                reply_sent_nanoseconds: fields.sent_nanoseconds,
+                reply_answered_seconds: text(&answered.as_secs().to_string()),
+                reply_answered_nanoseconds: text(&format!(
+                    "{:09}",
+                    answered.subsec_nanos()
+                )),
+            };
+            assert_eq!(
+                fields.to_bytes().expect("it packs"),
+                answer.as_bytes(),
+                "{answer:?}"
+            );
+            assert_eq!(
+                PingReply::decode(answer.as_bytes()).expect("it unpacks"),
+                fields,
+                "{answer:?}"
+            );
+        }
+    }
+
+    /// The document's largest ping and answer are this module's: the
+    /// generated code's buffers hold exactly what [`MESSAGE_BYTES`] and
+    /// [`REPLY_BYTES`] promise.
+    #[test]
+    fn xtce_has_the_rusts_largest_sizes() {
+        use crate::ping_packet::{Ping as PingFields, PingReply};
+        use tcs_xtce::packet::Packet;
+
+        assert_eq!(PingFields::MAX_BYTES, MESSAGE_BYTES);
+        assert_eq!(PingReply::MAX_BYTES, REPLY_BYTES);
+    }
+
+    /// An answer whose prefix or space is not the document's is refused by
+    /// the generated code, as [`read_reply`] refuses it.
+    #[test]
+    fn xtce_refuses_what_the_rust_refuses_of_an_answer() {
+        use crate::ping_packet::PingReply;
+        use tcs_xtce::packet::Packet;
+
+        for answer in [
+            "pong #1 1760900000.000000001 1760900000.250000000",
+            "ping #1 1760900000.000000001_1760900000.250000000",
+        ] {
+            assert!(read_reply(answer.as_bytes()).is_err(), "{answer:?}");
+            assert!(
+                PingReply::decode(answer.as_bytes()).is_err(),
+                "{answer:?}"
+            );
+        }
     }
 
     /// An answer that is not one is refused too, as the ground reads it.

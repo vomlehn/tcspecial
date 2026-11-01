@@ -19,10 +19,36 @@ import socket
 import time
 
 from tcslibgs import fixed
-from tcslibgs.configuration import came_from
+from tcslibgs.configuration import CommandLink, HostPort, came_from
 
 #: How long each CONNECT waits for its answer before it is sent again.
 WAIT = 1.0
+
+
+def command_link_of(config):
+    """The spacecraft command link a configuration's station sends CONNECT
+    on, wherever it is: ``tcs_cmd.send`` to ``tcs_cmd.recv``, or, for a
+    configuration that answers over a software bus, from a port the system
+    chooses to this process's peer of the bus, which publishes each command
+    -- as ``tcslib::command_links_of`` gives them.
+
+    Args:
+        config: The :class:`tcslibgs.configuration.Configuration`.
+
+    Returns:
+        The :class:`tcslibgs.configuration.CommandLink`.
+
+    Raises:
+        ValueError: The configuration does not say where the link is.
+        OSError:    The bus's peer cannot be started.
+    """
+    if not config.answers_over_bus():
+        return config.command_link()
+    from tcslib import bus
+
+    ground = bus.ground_of(config)
+    return CommandLink(send=HostPort("127.0.0.1", 0),
+                       recv=HostPort(*ground.spacecraft()))
 
 
 class Heard:

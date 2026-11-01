@@ -5,6 +5,10 @@ where the beacons are (``graph::parameters::beacon_of``), where a ``gateway``
 node is bound aboard, which port a source's data reaches the ground at
 (``graph::order`` and ``graph::telemetry``), whether a datagram came from where
 the configuration says (``types::came_from``), and the configuration's digest.
+For a configuration that answers to cFS, whose links are message IDs on a
+software bus rather than sockets, it reads the bus instead: its SBN peer and
+every message ID, counted as ``graph::telemetry::msgids`` counts them -- see
+:meth:`Configuration.bus`.
 
 It reads either spelling, chosen by the file's extension as the Rust's
 ``format::ConfigFormat`` chooses it. The XML with the standard library alone;
@@ -34,6 +38,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 
 from . import interface as _interface
+from . import sbn as _sbn
 
 #: The sections whose entries are nodes, in which a node's device id is
 #: counted: a node's id is its position among every node the file writes, in
@@ -47,7 +52,108 @@ NODE_SECTIONS = ("gateway", "vehicle", "payloads")
 GATEWAY_BASES = {
     "gateway_radio": "ground_base",
     "gateway_fprime": "bridge_base",
+    "gateway_cfs": "tlm_base",
 }
+
+#: The gateway node types whose far end is a software bus, and whose base is
+#: a message ID rather than an address: ``GatewayKind::on_bus``.
+ON_BUS = ("gateway_cfs",)
+
+
+def whole(attribute, said, most=0xFFFFFFFF):
+    """A whole number as a configuration writes one: ``tcslibgs::whole``'s
+    grammar, decimal or ``0x`` hexadecimal, underscores among the digits
+    meaning nothing.
+
+    Args:
+        attribute: The attribute it was stated as, for the error message.
+        said:      What the configuration says.
+        most:      The largest value the field holds.
+
+    Returns:
+        Its value.
+
+    Raises:
+        ValueError: It is not a whole number, or is larger than ``most``.
+    """
+    text = said.strip()
+    digits, radix = text, 10
+    if text[:2] in ("0x", "0X"):
+        digits, radix = text[2:], 16
+    bare = digits.replace("_", "")
+    allowed = "0123456789abcdefABCDEF"[: 22 if radix == 16 else 10]
+    if not bare or any(c not in allowed for c in bare):
+        raise ValueError(f'{attribute} is "{said}", which is not a whole '
+                         "number")
+    value = int(bare, radix)
+    if value > most:
+        raise ValueError(f"{attribute} is {value}, and the most it holds is "
+                         f"{most}")
+    return value
+
+
+@dataclass(frozen=True)
+class Sbn:
+    """The ``sbn`` section: the peer every link of the vehicle is carried
+    over. ``tcslibgs::Sbn``."""
+
+    release: _sbn.Release
+    #: ``SBN_IDENT``, the 48 bytes every subscription opens with.
+    ident: bytes
+    spacecraft_id: int
+    #: The vehicle's processor ID.
+    processor_id: int
+    #: Where the vehicle binds, and where the far end is.
+    local: "HostPort"
+    peer: "HostPort"
+    peer_processor_id: int
+    max_message: int
+
+    def ground_processor_id(self):
+        """The processor ID a ground station joins a stand-in for the far
+        end as: see :func:`tcslibgs.sbn.ground_processor_id`."""
+        return _sbn.ground_processor_id(self.processor_id,
+                                        self.peer_processor_id)
+
+
+@dataclass(frozen=True)
+class Bus:
+    """A vehicle's links over a cFS software bus: its SBN peer, and the
+    message IDs the ``tcspecial`` section states. ``tcslibgs::Bus``."""
+
+    sbn: Sbn
+    first: int
+    last: int
+    cmd_msgid: int
+    response_msgid: int
+    cmd_base: int
+    response_base: int
+    tlm_base: int
+    beacon_msgid: int
+
+
+def counted(attribute, base, device_id):
+    """A message ID counted on from a base by a node's device id:
+    ``graph::telemetry::counted``.
+
+    Args:
+        attribute: The base's attribute, for the error message.
+        base:      The base.
+        device_id: The node's device id.
+
+    Returns:
+        The message ID.
+
+    Raises:
+        ValueError: The sum is more than a message ID's sixteen bits.
+    """
+    msgid = base + device_id
+    if msgid > 0xFFFF:
+        raise ValueError(
+            f"{attribute} {base:#06x} plus {device_id} is more than a message "
+            "ID's sixteen bits"
+        )
+    return msgid
 
 
 @dataclass(frozen=True)
@@ -118,6 +224,9 @@ class Node:
 
     name: str
     node_type: str
+    #: The section it is written in: ``payloads``, ``gateway`` or
+    #: ``vehicle``.
+    section: str = ""
     #: Its attributes, by name: every child but its name, its type and its
     #: links.
     attributes: dict = field(default_factory=dict)
@@ -171,6 +280,198 @@ class Configuration:
                 return at
         raise ValueError(f'{self.path}: there is no node called "{name}"')
 
+    def answers_over_bus(self):
+        """Whether the vehicle answers over a software bus, as one that
+        answers to cFS does: ``tcspecial.gateway`` is ``cfs``."""
+        return self.tcspecial.get("gateway", "").strip() == "cfs"
+
+    def bus(self):
+        """The software bus a vehicle that answers to cFS is on.
+
+        Returns:
+            The :class:`Bus`, or ``None`` for a configuration whose links are
+            sockets.
+
+        Raises:
+            ValueError: An attribute of it is missing or does not read.
+        """
+        if not self.answers_over_bus():
+            return None
+
+        def number(attribute, most=0xFFFFFFFF):
+            return whole(attribute, self._said(attribute), most)
+
+        def msgid(attribute):
+            return number(attribute, 0xFFFF)
+
+        sbn = Sbn(
+            release=_sbn.release_of(self._said("sbn.release")),
+            ident=_sbn.ident_of(self._said("sbn.ident")),
+            spacecraft_id=number("sbn.spacecraft_id"),
+            processor_id=number("sbn.processor_id"),
+            local=HostPort.of("sbn.local", self._said("sbn.local")),
+            peer=HostPort.of("sbn.peer", self._said("sbn.peer")),
+            peer_processor_id=number("sbn.peer_processor_id"),
+            max_message=number("sbn.max_message"),
+        )
+        return Bus(
+            sbn=sbn,
+            first=msgid("msgid_range.first"),
+            last=msgid("msgid_range.last"),
+            cmd_msgid=msgid("tcs_cmd.cmd_msgid"),
+            response_msgid=msgid("tcs_cmd.response_msgid"),
+            cmd_base=msgid("payload_command.cmd_base"),
+            response_base=msgid("payload_command.response_base"),
+            tlm_base=msgid("payload_telemetry.tlm_base"),
+            beacon_msgid=msgid("beacon.tlm_msgid"),
+        )
+
+    def node_command_msgid(self, name):
+        """The message ID commands about a node are published under:
+        ``payload_command.cmd_base`` plus its device id.
+
+        Args:
+            name: The node's name.
+
+        Returns:
+            The message ID.
+
+        Raises:
+            ValueError: The configuration does not answer over a bus, there
+                        is no such node, or the sum does not fit.
+        """
+        bus = self._bus()
+        return counted("payload_command.cmd_base", bus.cmd_base,
+                       self.device_id(name))
+
+    def node_answer_msgid(self, name):
+        """The message ID the answers about a node are published under:
+        ``payload_command.response_base`` plus its device id.
+
+        Args:
+            name: The node's name.
+
+        Returns:
+            The message ID.
+
+        Raises:
+            ValueError: As :meth:`node_command_msgid`.
+        """
+        bus = self._bus()
+        return counted("payload_command.response_base", bus.response_base,
+                       self.device_id(name))
+
+    def downlink_msgid(self, gateway, source):
+        """The message ID what ``source`` sends to the ``gateway_cfs`` node
+        called ``gateway`` is published under: its ``tlm_base`` plus the
+        source's device id.
+
+        Args:
+            gateway: The gateway node's name.
+            source:  The name of the node whose data is received.
+
+        Returns:
+            The message ID.
+
+        Raises:
+            ValueError: Either node is missing, ``gateway`` is not a gateway
+                        on a bus, ``source`` has no ``payload-out`` link to
+                        it, or the base does not read or the sum not fit.
+        """
+        node = self._gateway(gateway)
+        if node.node_type not in ON_BUS:
+            raise ValueError(
+                f'{self.path}: "{gateway}" is a {node.node_type} node, whose '
+                "data arrives at a socket: see downlink"
+            )
+        self._sends_to(gateway, source)
+        base = whole(f'"{gateway}" tlm_base',
+                     node.attributes.get("tlm_base", ""), 0xFFFF)
+        return counted(f'"{gateway}" tlm_base', base, self.device_id(source))
+
+    def telemetry_msgids(self):
+        """Every message ID the vehicle publishes on the bus, which a ground
+        station subscribes to: the spacecraft's answers, the beacon, each
+        node's answers, what each source drawn into a ``gateway_cfs`` node
+        sends, and the telemetry of each payload nothing touches, over
+        ``payload_telemetry.tlm_base`` -- the telemetry half of
+        ``graph::telemetry::msgids``.
+
+        Returns:
+            The message IDs, sorted, each once.
+
+        Raises:
+            ValueError: The configuration does not answer over a bus, or a
+                        message ID does not read or fit.
+        """
+        bus = self._bus()
+        msgids = {bus.response_msgid, bus.beacon_msgid}
+        for name in (node.name for node in self.nodes):
+            msgids.add(self.node_answer_msgid(name))
+        touched = set()
+        for node in self.nodes:
+            for targets in node.links.values():
+                if targets:
+                    touched.add(node.name)
+                    touched.update(targets)
+            for target in node.links.get("payload-out", []):
+                kind = self._kind(target)
+                if kind in ON_BUS:
+                    msgids.add(self.downlink_msgid(target, node.name))
+        for at, node in enumerate(self.nodes):
+            if node.section == "payloads" and node.name not in touched:
+                msgids.add(counted("payload_telemetry.tlm_base",
+                                   bus.tlm_base, at))
+        return sorted(msgids)
+
+    def _kind(self, name):
+        """The node type of the node called ``name``.
+
+        Args:
+            name: The node's name.
+
+        Returns:
+            Its node type, or ``None`` where there is no such node.
+        """
+        for node in self.nodes:
+            if node.name == name:
+                return node.node_type
+        return None
+
+    def _bus(self):
+        """The bus, refusing a configuration that answers over sockets.
+
+        Returns:
+            The :class:`Bus`.
+
+        Raises:
+            ValueError: The configuration does not answer over a bus.
+        """
+        bus = self.bus()
+        if bus is None:
+            raise ValueError(
+                f"{self.path}: this configuration answers over sockets, not a "
+                "software bus: it states no message IDs"
+            )
+        return bus
+
+    def _not_on_a_bus(self, what):
+        """Refuses a question about sockets of a configuration on a bus.
+
+        Args:
+            what: What was asked for, as a clause.
+
+        Raises:
+            ValueError: The configuration answers over a bus, saying where
+                        to look instead.
+        """
+        if self.answers_over_bus():
+            raise ValueError(
+                f"{self.path}: this configuration answers to cFS, so {what} "
+                "is a message ID on its software bus and not a socket: read "
+                "it from bus(), through tcslib.bus"
+            )
+
     def beacon_link(self):
         """Where tcspecial's beacons go from and to.
 
@@ -178,8 +479,10 @@ class Configuration:
             The :class:`BeaconLink` of ``beacon.send`` and ``beacon.recv``.
 
         Raises:
-            ValueError: Either is missing or is not an address and a port.
+            ValueError: Either is missing or is not an address and a port,
+                        or the configuration answers over a bus.
         """
+        self._not_on_a_bus("its beacon")
         return BeaconLink(
             send=HostPort.of("beacon.send", self._said("beacon.send")),
             recv=HostPort.of("beacon.recv", self._said("beacon.recv")),
@@ -193,8 +496,10 @@ class Configuration:
             The :class:`CommandLink`.
 
         Raises:
-            ValueError: Either is missing or is not an address and a port.
+            ValueError: Either is missing or is not an address and a port,
+                        or the configuration answers over a bus.
         """
+        self._not_on_a_bus("its command link")
         return CommandLink(
             send=HostPort.of("tcs_cmd.send", self._said("tcs_cmd.send")),
             recv=HostPort.of("tcs_cmd.recv", self._said("tcs_cmd.recv")),
@@ -258,11 +563,12 @@ class Configuration:
         """
         node = self._gateway(gateway)
         attribute = GATEWAY_BASES[node.node_type]
-        if gateway not in self.node(source).links.get("payload-out", []):
+        if node.node_type in ON_BUS:
             raise ValueError(
-                f'{self.path}: "{source}" sends nothing to "{gateway}": it has '
-                "no payload-out link to it"
+                f'{self.path}: "{gateway}" is a {node.node_type} node, whose '
+                "data is published on a software bus: see downlink_msgid"
             )
+        self._sends_to(gateway, source)
         base = HostPort.of(
             f'"{gateway}" {attribute}', node.attributes.get(attribute, "")
         )
@@ -273,6 +579,23 @@ class Configuration:
                 f"device id is port {port}, and a port is at most 65535"
             )
         return HostPort(base.address, port)
+
+    def _sends_to(self, gateway, source):
+        """Refuses a source that sends nothing to ``gateway``.
+
+        Args:
+            gateway: The gateway node's name.
+            source:  The source's name.
+
+        Raises:
+            ValueError: ``source`` is missing, or has no ``payload-out`` link
+                        to ``gateway``.
+        """
+        if gateway not in self.node(source).links.get("payload-out", []):
+            raise ValueError(
+                f'{self.path}: "{source}" sends nothing to "{gateway}": it has '
+                "no payload-out link to it"
+            )
 
     def _gateway(self, name):
         """The gateway node called ``name``.
@@ -534,6 +857,7 @@ def _load_xml(path):
         node = Node(
             name=(element.findtext("name") or "").strip(),
             node_type=(element.findtext("type") or "").strip(),
+            section=element.tag,
         )
         for child in element:
             if child.tag in ("name", "type"):
@@ -606,7 +930,8 @@ def _load_yaml(path):
             continue
         for entry in entries or []:
             node = Node(name=_scalar(entry.get("name", "")),
-                        node_type=_scalar(entry.get("type", "")))
+                        node_type=_scalar(entry.get("type", "")),
+                        section=section)
             for key, value in entry.items():
                 if key in ("name", "type"):
                     continue

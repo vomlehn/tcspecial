@@ -594,7 +594,7 @@ OC.</dd>
 over the radio, as a <tt class="docutils literal">gateway_radio</tt> node, a Yamcs ground station, as a
 <tt class="docutils literal">gateway_yamcs</tt>, an F´ flight computer, as a <tt class="docutils literal">gateway_fprime</tt>, or a cFS
 flight computer's software bus, as a <tt class="docutils literal">gateway_cfs</tt> -- written in the
-<tt class="docutils literal">gateway</tt> section: a link carrying
+<tt class="docutils literal">gateways</tt> section: a link carrying
 telemetry down and commands up. It was called <tt class="docutils literal">moc</tt> while the
 ground was the only thing at the other end, and a configuration that still
 says <tt class="docutils literal">moc</tt>, <tt class="docutils literal"><span class="pre">moc-in</span></tt>, <tt class="docutils literal"><span class="pre">moc-out</span></tt>, <tt class="docutils literal"><span class="pre">tee-moc</span></tt>, <tt class="docutils literal"><span class="pre">null-moc</span></tt>,
@@ -666,12 +666,12 @@ node in the way, a payload's <tt class="docutils literal"><span class="pre">payl
 <p>A link is written as an attribute of the node it leaves, named after the
 data source it leaves by, with one entry per line:</p>
 <pre class="code yaml literal-block">
-<span class="punctuation indicator">-</span><span class="whitespace"> </span><span class="name tag">name</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">k_fore</span><span class="whitespace">
-  </span><span class="name tag">type</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">compute</span><span class="whitespace">
-  </span><span class="name tag">payload-out</span><span class="punctuation">:</span><span class="whitespace">
-    </span><span class="punctuation indicator">-</span><span class="whitespace"> </span><span class="name tag">target</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">gateway</span><span class="whitespace">
-    </span><span class="punctuation indicator">-</span><span class="whitespace"> </span><span class="name tag">target</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">mean_temp</span><span class="whitespace">
-      </span><span class="name tag">input</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">in0</span>
+<span class="punctuation indicator">-</span><span class="whitespace"> </span><span class="name tag">type compute</span><span class="punctuation">:</span><span class="whitespace">
+    </span><span class="punctuation indicator">-</span><span class="whitespace"> </span><span class="name tag">compute</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">k_fore</span><span class="whitespace">
+      </span><span class="name tag">payload-out</span><span class="punctuation">:</span><span class="whitespace">
+        </span><span class="punctuation indicator">-</span><span class="whitespace"> </span><span class="name tag">target</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">gateway</span><span class="whitespace">
+        </span><span class="punctuation indicator">-</span><span class="whitespace"> </span><span class="name tag">target</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">mean_temp</span><span class="whitespace">
+          </span><span class="name tag">input</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">in0</span>
 </pre>
 <p>An entry's <tt class="docutils literal">target</tt> is the node the line goes to; its <tt class="docutils literal">input</tt> is which
 of that node's inputs it feeds, or which of its data sinks it arrives at,
@@ -728,10 +728,10 @@ reading reaches a <tt class="docutils literal"><span class="pre">gateway-in</spa
 as any other, so every link out of a tee gets a copy. A link out of one
 names the source it leaves by, there being two:</p>
 <pre class="code yaml literal-block">
-<span class="punctuation indicator">-</span><span class="whitespace"> </span><span class="name tag">name</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">echo</span><span class="whitespace">
-  </span><span class="name tag">type</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">tee-gateway</span><span class="whitespace">
-  </span><span class="name tag">gateway-out</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="punctuation indicator">[</span><span class="name variable">heater</span><span class="punctuation indicator">]</span><span class="whitespace">
-  </span><span class="name tag">payload-out</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="punctuation indicator">[</span><span class="name variable">gateway</span><span class="punctuation indicator">]</span>
+<span class="punctuation indicator">-</span><span class="whitespace"> </span><span class="name tag">type tee-gateway</span><span class="punctuation">:</span><span class="whitespace">
+    </span><span class="punctuation indicator">-</span><span class="whitespace"> </span><span class="name tag">compute</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">echo</span><span class="whitespace">
+      </span><span class="name tag">gateway-out</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="punctuation indicator">[</span><span class="name variable">heater</span><span class="punctuation indicator">]</span><span class="whitespace">
+      </span><span class="name tag">payload-out</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="punctuation indicator">[</span><span class="name variable">gateway</span><span class="punctuation indicator">]</span>
 </pre>
 <p class="last">They take no attributes.</p>
 </dd>
@@ -804,13 +804,13 @@ own kernel interfaces, and much of the rest needs POSIX processes,
 in the design, says which parts are Linux-only and how they might be
 carried to a real-time operating system.</dd>
 <dt>Number of nodes</dt>
-<dd>A node's id is its position among all the configuration's nodes -- the
-gateway, vehicle and payload sections, the top file first and then the files
-it includes -- counting from nought, and it is 32 bits. A node's
-telemetry port is a base plus its id, so a base of <em>B</em> leaves room for
-ids up to 65535 - <em>B</em>, counting every node, not only payloads. A
-configuration whose ports would pass 65535, or that puts two sources on
-the same address and port, is refused when the file is read.</dd>
+<dd>A node's id is its position among the names of all the configuration's nodes
+-- the gateways, vehicle and payloads sections, in the top file and in the
+files it includes, sorted by name -- counting from nought, and it is 32 bits.
+A node's telemetry port is a base plus its id, so a base of <em>B</em> leaves room
+for ids up to 65535 - <em>B</em>, counting every node, not only payloads. A
+configuration whose ports would pass 65535, or that puts two sources on the
+same address and port, is refused when the file is read.</dd>
 <dt>Times</dt>
 <dd>Times are 64-bit counts of microseconds since the UNIX epoch, which run
 to the year 586524; all ones means the clock failed. The beacon interval,
@@ -869,12 +869,12 @@ are suggestions, nothing more.</p>
 <dl class="docutils">
 <dt>the configuration</dt>
 <dd>Everything tcspecial is configured with. Its <tt class="docutils literal">tcspecial</tt> section is the
-command interpreter's own settings -- the ports it takes commands on,
-where beacons go and how often, and where the telemetry log goes -- and
-its <tt class="docutils literal">gateway</tt>, <tt class="docutils literal">vehicle</tt> and <tt class="docutils literal">payloads</tt> sections say which nodes there
-are, what each of them does and how the lines between them run. Named on
-the command line of every program that reads it, which is tcspecial,
-tcsmoc, tcssim and tcsverify.</dd>
+command interpreter's own settings -- the ports it takes commands on, where
+beacons go and how often, and where the telemetry log goes -- and its
+<tt class="docutils literal">gateways</tt>, <tt class="docutils literal">vehicle</tt> and <tt class="docutils literal">payloads</tt> sections say which nodes there
+are, what each of them does and how the lines between them run. Named on the
+command line of every program that reads it, which is tcspecial, tcsmoc,
+tcssim and tcsverify.</dd>
 <dt>the simulator configuration file</dt>
 <dd>How a simulated payload behaves: how often it produces a packet, how it
 divides one into segments, and what in the physics model it is joined
@@ -907,10 +907,12 @@ payload_groups                  optional
   interval     how often the group is read, as a length of time
 
 payloads
-  name         the handler's name, which commands address it by and the
+  type &lt;type&gt;  one for each type of payload there is, holding its
+               payloads
+    payload    the handler's name, which commands address it by and the
                panels show
-  group        the group it is read with, if any
-  ...          any of the attributes below
+    group      the group it is read with, if any
+    ...        any of the attributes below
 </pre>
 <p>The shipped examples each carry a <tt class="docutils literal">tcspecial</tt> section, first in the file, so
 one file says what the set is and where its command interpreter belongs.
@@ -920,9 +922,10 @@ file <tt class="docutils literal">TCSPECIAL_CONFIG_PATH</tt> names. It is all ch
 loaded -- a section that could never place a command interpreter is refused
 where it is read.</p>
 <p>What follows is the attributes every payload has, whatever it is, and then one
-section per type of payload for the attributes only that type has. A payload
-states its type in <tt class="docutils literal">type</tt> and is then held to that type's attributes and no
-others: a device file stating a <tt class="docutils literal">port</tt>, or a network payload stating a
+section per type of payload for the attributes only that type has. A payload's
+type is the <tt class="docutils literal">type</tt> it is written under -- <tt class="docutils literal">- type i2c:</tt> in YAML, <tt class="docutils literal">&lt;type
+<span class="pre">name=&quot;i2c&quot;&gt;</span></tt> in XML -- and the payload is then held to that type's attributes
+and no others: a device file stating a <tt class="docutils literal">port</tt>, or a network payload stating a
 <tt class="docutils literal">path</tt>, is refused.</p>
 <div class="section" id="supported-and-experimental-interfaces">
 <h2><a class="toc-backref" href="#toc-entry-9">Supported and experimental interfaces</a></h2>
@@ -962,12 +965,15 @@ not.</p>
 <div class="section" id="attributes-every-payload-has">
 <h2><a class="toc-backref" href="#toc-entry-10">Attributes Every Payload Has</a></h2>
 <pre class="code text literal-block">
-name           the handler's name, which commands address it by and the
-               panels show
+payload        the handler's name, which commands address it by and the
+               panels show: payload: temp_1 in YAML, &lt;payload
+               name=&quot;temp_1&quot;&gt; in XML
 group          the group it is read with, if any. Optional: a payload in
                no group states its own rate, or is read on every pass --
                see `How a Payload's Data Is Read`_
-type           network | device-file | serial | i2c | spi | can | gpio,
+type           not an attribute but the type it is written under, as
+               - type network: or &lt;type name=&quot;network&quot;&gt;, one of
+               network | device-file | serial | i2c | spi | can | gpio,
                or one of the experimental iio | rpmsg | hdlc
 </pre>
 <div class="section" id="how-a-payload-is-driven">
@@ -987,12 +993,12 @@ group, or the payload's own <tt class="docutils literal">trigger_interval</tt>, 
 so there is nothing to send it. A simulated one that sends is driven at the
 rate its simulator configuration gives it, which is how fast a stand-in
 produces data rather than how fast the payload would.</p>
-<p><tt class="docutils literal">name</tt> belongs to a handler and never to a group: it is what tells one
-handler of a group from another, and what every command about a handler names
-it by. There is no number beside it -- a handler used to state a <tt class="docutils literal">dh_id</tt> as
-well, which was a second identity for one payload to keep consistent by hand.
-An OC address and an OC port are given together or not at all, and a handler
-needs them before it can be started.</p>
+<p>A payload's name -- <tt class="docutils literal">payload: temp_1</tt> -- belongs to a handler and never to a
+group: it is what tells one handler of a group from another, and what every
+command about a handler names it by. There is no number beside it -- a handler
+used to state a <tt class="docutils literal">dh_id</tt> as well, which was a second identity for one payload
+to keep consistent by hand. An OC address and an OC port are given together or
+not at all, and a handler needs them before it can be started.</p>
 </div>
 </div>
 <div class="section" id="the-two-types-of-payload">
@@ -1080,22 +1086,22 @@ came up on is warming the zone until then. <tt class="docutils literal">init</tt
 instead, written as the node is opened -- as the vehicle starts, and again
 whenever the ground starts the node after stopping it:</p>
 <pre class="code yaml literal-block">
-<span class="punctuation indicator">-</span><span class="whitespace"> </span><span class="name tag">name</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">heaters_1</span><span class="whitespace">
-  </span><span class="name tag">type</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">gpio</span><span class="whitespace">
-  </span><span class="name tag">path</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">/dev/gpiochip0</span><span class="whitespace">
-  </span><span class="name tag">lines</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal string">&quot;4&quot;</span><span class="whitespace">
-  </span><span class="name tag">direction</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">output</span><span class="whitespace">
-  </span><span class="name tag">init</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal string">'&quot;0&quot;'</span>
+<span class="punctuation indicator">-</span><span class="whitespace"> </span><span class="name tag">type gpio</span><span class="punctuation">:</span><span class="whitespace">
+    </span><span class="punctuation indicator">-</span><span class="whitespace"> </span><span class="name tag">payload</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">heaters_1</span><span class="whitespace">
+      </span><span class="name tag">path</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">/dev/gpiochip0</span><span class="whitespace">
+      </span><span class="name tag">lines</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal string">&quot;4&quot;</span><span class="whitespace">
+      </span><span class="name tag">direction</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">output</span><span class="whitespace">
+      </span><span class="name tag">init</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal string">'&quot;0&quot;'</span>
 </pre>
 <p>It is not only for what is driven. A sensor whose register has to be set
 before it reads sensibly states that register's write here, and is then read
 as any other:</p>
 <pre class="code yaml literal-block">
-<span class="punctuation indicator">-</span><span class="whitespace"> </span><span class="name tag">name</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">temp_1</span><span class="whitespace">
-  </span><span class="name tag">type</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">i2c</span><span class="whitespace">
-  </span><span class="name tag">path</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">/dev/i2c-1</span><span class="whitespace">
-  </span><span class="name tag">address</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal string">&quot;0x48&quot;</span><span class="whitespace">
-  </span><span class="name tag">init</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal string">'&quot;\x01\x60&quot;'</span>
+<span class="punctuation indicator">-</span><span class="whitespace"> </span><span class="name tag">type i2c</span><span class="punctuation">:</span><span class="whitespace">
+    </span><span class="punctuation indicator">-</span><span class="whitespace"> </span><span class="name tag">payload</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">temp_1</span><span class="whitespace">
+      </span><span class="name tag">path</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">/dev/i2c-1</span><span class="whitespace">
+      </span><span class="name tag">address</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal string">&quot;0x48&quot;</span><span class="whitespace">
+      </span><span class="name tag">init</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal string">'&quot;\x01\x60&quot;'</span>
 </pre>
 <p>A write that fails is a node that did not open: the vehicle does not start,
 or a <tt class="docutils literal">START_NODE</tt> is answered with the failure, saying which node and that
@@ -1448,27 +1454,26 @@ attribute, in the node description tree, as its <tt class="docutils literal">kin
     </span><span class="name tag">interval</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal string">&quot;500</span><span class="name variable"> </span><span class="literal string">ms&quot;</span><span class="whitespace">
 
 </span><span class="name tag">payloads</span><span class="punctuation">:</span><span class="whitespace">
-  </span><span class="comment single"># Sends on its own: nothing here about timing. A TCP payload is a</span><span class="whitespace">
-  </span><span class="comment single"># stream, so it says where a packet ends: twelve bytes at a time.</span><span class="whitespace">
-  </span><span class="punctuation indicator">-</span><span class="whitespace"> </span><span class="name tag">name</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">auto-send</span><span class="whitespace">
-    </span><span class="name tag">type</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">network</span><span class="whitespace">
-    </span><span class="name tag">protocol</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">tcp</span><span class="whitespace">
-    </span><span class="name tag">address</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">127.0.0.1</span><span class="whitespace">
-    </span><span class="name tag">port</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">5000</span><span class="whitespace">
-    </span><span class="name tag">max_length</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">12</span><span class="whitespace">
-    </span><span class="name tag">read_timeout</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">none</span><span class="whitespace">
+  </span><span class="punctuation indicator">-</span><span class="whitespace"> </span><span class="name tag">type network</span><span class="punctuation">:</span><span class="whitespace">
+      </span><span class="comment single"># Sends on its own: nothing here about timing. A TCP payload is a</span><span class="whitespace">
+      </span><span class="comment single"># stream, so it says where a packet ends: twelve bytes at a time.</span><span class="whitespace">
+      </span><span class="punctuation indicator">-</span><span class="whitespace"> </span><span class="name tag">payload</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">auto-send</span><span class="whitespace">
+        </span><span class="name tag">protocol</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">tcp</span><span class="whitespace">
+        </span><span class="name tag">address</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">127.0.0.1</span><span class="whitespace">
+        </span><span class="name tag">port</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">5000</span><span class="whitespace">
+        </span><span class="name tag">max_length</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">12</span><span class="whitespace">
+        </span><span class="name tag">read_timeout</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">none</span><span class="whitespace">
 
-  </span><span class="comment single"># Answers a request: the trigger is the question, and the group it is in</span><span class="whitespace">
-  </span><span class="comment single"># is how often the question is asked.</span><span class="whitespace">
-  </span><span class="punctuation indicator">-</span><span class="whitespace"> </span><span class="name tag">name</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">triggered-send</span><span class="whitespace">
-    </span><span class="name tag">type</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">network</span><span class="whitespace">
-    </span><span class="name tag">protocol</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">tcp</span><span class="whitespace">
-    </span><span class="name tag">address</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">127.0.0.1</span><span class="whitespace">
-    </span><span class="name tag">port</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">5001</span><span class="whitespace">
-    </span><span class="name tag">max_length</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">12</span><span class="whitespace">
-    </span><span class="name tag">read_timeout</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">none</span><span class="whitespace">
-    </span><span class="name tag">group</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">every_half_second</span><span class="whitespace">
-    </span><span class="name tag">trigger</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal string">'&quot;READ\r&quot;'</span><span class="whitespace">      </span><span class="comment single"># text, so a C string</span>
+      </span><span class="comment single"># Answers a request: the trigger is the question, and the group it</span><span class="whitespace">
+      </span><span class="comment single"># is in is how often the question is asked.</span><span class="whitespace">
+      </span><span class="punctuation indicator">-</span><span class="whitespace"> </span><span class="name tag">payload</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">triggered-send</span><span class="whitespace">
+        </span><span class="name tag">protocol</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">tcp</span><span class="whitespace">
+        </span><span class="name tag">address</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">127.0.0.1</span><span class="whitespace">
+        </span><span class="name tag">port</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">5001</span><span class="whitespace">
+        </span><span class="name tag">max_length</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">12</span><span class="whitespace">
+        </span><span class="name tag">read_timeout</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">none</span><span class="whitespace">
+        </span><span class="name tag">group</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">every_half_second</span><span class="whitespace">
+        </span><span class="name tag">trigger</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal string">'&quot;READ\r&quot;'</span><span class="whitespace">      </span><span class="comment single"># text, so a C string</span>
 </pre>
 <p>A file that gives one payload two clocks is refused rather than run: a
 payload in a group that states a <tt class="docutils literal">trigger_interval</tt> as well, or a payload
@@ -1496,12 +1501,12 @@ first sender the handler hears is taken for it, whoever that is. Its node
 says where it sends from with <tt class="docutils literal">sends_from</tt>, and is then read from there
 alone, strangers counted as above:</p>
 <pre class="code yaml literal-block">
-<span class="punctuation indicator">-</span><span class="whitespace"> </span><span class="name tag">name</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">sounder_feed</span><span class="whitespace">
-  </span><span class="name tag">type</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">network</span><span class="whitespace">
-  </span><span class="name tag">protocol</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">udp</span><span class="whitespace">
-  </span><span class="name tag">address</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">0.0.0.0</span><span class="whitespace">
-  </span><span class="name tag">port</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">7000</span><span class="whitespace">
-  </span><span class="name tag">sends_from</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">10.0.0.7:7001</span>
+<span class="punctuation indicator">-</span><span class="whitespace"> </span><span class="name tag">type network</span><span class="punctuation">:</span><span class="whitespace">
+    </span><span class="punctuation indicator">-</span><span class="whitespace"> </span><span class="name tag">payload</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">sounder_feed</span><span class="whitespace">
+      </span><span class="name tag">protocol</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">udp</span><span class="whitespace">
+      </span><span class="name tag">address</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">0.0.0.0</span><span class="whitespace">
+      </span><span class="name tag">port</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">7000</span><span class="whitespace">
+      </span><span class="name tag">sends_from</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">10.0.0.7:7001</span>
 </pre>
 <p><tt class="docutils literal">sends_from</tt> is a host and a port over <tt class="docutils literal">udp</tt> -- an IP address, not a name
 -- and a path over <tt class="docutils literal">unix_dgram</tt>, and never the node's own address, which is
@@ -1515,7 +1520,7 @@ simulator's stand-in sends from there, and a simulator file that names a
 </div>
 <div class="section" id="a-network-payload">
 <h2><a class="toc-backref" href="#toc-entry-16">A Network Payload</a></h2>
-<p>Keyword <tt class="docutils literal">type: network</tt>. A socket, which the transport decides the shape of.</p>
+<p>Keyword <tt class="docutils literal">type network</tt>. A socket, which the transport decides the shape of.</p>
 <pre class="code text literal-block">
 protocol       tcp | udp | unix_stream | unix_dgram | raw
 address        where this payload is reached: a host, as 127.0.0.1 -- or,
@@ -1545,14 +1550,14 @@ ends: <tt class="docutils literal">max_length</tt>, and <tt class="docutils lite
 arrives is held until the packet is done, and is then sent on as one, so a
 record split across two segments is not sent as two halves:</p>
 <pre class="code yaml literal-block">
-<span class="punctuation indicator">-</span><span class="whitespace"> </span><span class="name tag">name</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">logger</span><span class="whitespace">
-  </span><span class="name tag">type</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">network</span><span class="whitespace">
-  </span><span class="name tag">protocol</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">tcp</span><span class="whitespace">
-  </span><span class="name tag">address</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">10.0.0.9</span><span class="whitespace">
-  </span><span class="name tag">port</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">7000</span><span class="whitespace">
-  </span><span class="name tag">max_length</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">512</span><span class="whitespace">
-  </span><span class="name tag">terminators</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal string">'&quot;\r\n&quot;'</span><span class="whitespace">
-  </span><span class="name tag">read_timeout</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">1 s</span>
+<span class="punctuation indicator">-</span><span class="whitespace"> </span><span class="name tag">type network</span><span class="punctuation">:</span><span class="whitespace">
+    </span><span class="punctuation indicator">-</span><span class="whitespace"> </span><span class="name tag">payload</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">logger</span><span class="whitespace">
+      </span><span class="name tag">protocol</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">tcp</span><span class="whitespace">
+      </span><span class="name tag">address</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">10.0.0.9</span><span class="whitespace">
+      </span><span class="name tag">port</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">7000</span><span class="whitespace">
+      </span><span class="name tag">max_length</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">512</span><span class="whitespace">
+      </span><span class="name tag">terminators</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal string">'&quot;\r\n&quot;'</span><span class="whitespace">
+      </span><span class="name tag">read_timeout</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">1 s</span>
 </pre>
 <p>A datagram is a packet already, so a <tt class="docutils literal">udp</tt>, <tt class="docutils literal">unix_dgram</tt> or <tt class="docutils literal">raw</tt> node
 that gives these attributes is refused.</p>
@@ -1568,16 +1573,16 @@ it opens, saying so. tcssim does not stand in for a raw payload -- on one host
 every raw socket of a protocol hears every datagram of it, its own included --
 and refuses a simulator file that asks it to.</p>
 <pre class="code yaml literal-block">
-<span class="punctuation indicator">-</span><span class="whitespace"> </span><span class="name tag">name</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">sounder</span><span class="whitespace">
-  </span><span class="name tag">type</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">network</span><span class="whitespace">
-  </span><span class="name tag">protocol</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">raw</span><span class="whitespace">
-  </span><span class="name tag">ip_protocol</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">253</span><span class="whitespace">
-  </span><span class="name tag">address</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">10.0.0.7</span>
+<span class="punctuation indicator">-</span><span class="whitespace"> </span><span class="name tag">type network</span><span class="punctuation">:</span><span class="whitespace">
+    </span><span class="punctuation indicator">-</span><span class="whitespace"> </span><span class="name tag">payload</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">sounder</span><span class="whitespace">
+      </span><span class="name tag">protocol</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">raw</span><span class="whitespace">
+      </span><span class="name tag">ip_protocol</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">253</span><span class="whitespace">
+      </span><span class="name tag">address</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">10.0.0.7</span>
 </pre>
 </div>
 <div class="section" id="a-device-file-payload">
 <h2><a class="toc-backref" href="#toc-entry-17">A Device File Payload</a></h2>
-<p>Keyword <tt class="docutils literal">type: <span class="pre">device-file</span></tt>. A file in the filesystem, opened and read as
+<p>Keyword <tt class="docutils literal">type <span class="pre">device-file</span></tt>. A file in the filesystem, opened and read as
 the data comes.</p>
 <pre class="code text literal-block">
 path           the device the handler opens
@@ -1601,7 +1606,7 @@ own, which is why each has a type of its own below.</p>
 </div>
 <div class="section" id="a-can-payload">
 <h2><a class="toc-backref" href="#toc-entry-18">A CAN Payload</a></h2>
-<p>Keyword <tt class="docutils literal">type: can</tt>. <strong>Supported</strong>, as flown against the kernel's virtual
+<p>Keyword <tt class="docutils literal">type can</tt>. <strong>Supported</strong>, as flown against the kernel's virtual
 bus: see <a class="reference internal" href="#supported-and-experimental-interfaces">Supported and experimental interfaces</a>. A payload on a CAN bus,
 which is not a device file at all: a CAN controller is a network interface,
 and a payload on it is addressed by the identifier its frames carry.</p>
@@ -1667,7 +1672,7 @@ makes the bus; see <a class="reference internal" href="#making-the-kernel-s-stan
 </div>
 <div class="section" id="a-gpio-payload">
 <h2><a class="toc-backref" href="#toc-entry-19">A GPIO Payload</a></h2>
-<p>Keyword <tt class="docutils literal">type: gpio</tt>. <strong>Supported</strong>, as flown against the kernel's simulated
+<p>Keyword <tt class="docutils literal">type gpio</tt>. <strong>Supported</strong>, as flown against the kernel's simulated
 chip: see <a class="reference internal" href="#supported-and-experimental-interfaces">Supported and experimental interfaces</a>. A set of discrete lines --
 a deployment switch, an arming line, a payload's own &quot;alive&quot; line -- watched
 for changes, or a set of circuits driven: a heater, a valve, a latch.</p>
@@ -1771,7 +1776,7 @@ pulls, to the user who ran it; see <a class="reference internal" href="#making-t
 </div>
 <div class="section" id="an-hdlc-payload">
 <h2><a class="toc-backref" href="#toc-entry-20">An HDLC Payload</a></h2>
-<p>Keyword <tt class="docutils literal">type: hdlc</tt>. <strong>Experimental, not yet supported.</strong> A synchronous
+<p>Keyword <tt class="docutils literal">type hdlc</tt>. <strong>Experimental, not yet supported.</strong> A synchronous
 serial line -- bits carried on a clock, framed as HDLC -- which Linux drives as
 a network interface rather than as a device file.</p>
 <pre class="code text literal-block">
@@ -1825,7 +1830,7 @@ hardware: --simulate</a>.</p>
 </div>
 <div class="section" id="an-rpmsg-payload">
 <h2><a class="toc-backref" href="#toc-entry-21">An rpmsg Payload</a></h2>
-<p>Keyword <tt class="docutils literal">type: rpmsg</tt>. <strong>Experimental, not yet supported.</strong> Software on
+<p>Keyword <tt class="docutils literal">type rpmsg</tt>. <strong>Experimental, not yet supported.</strong> Software on
 another core of the same package -- a real-time core beside the Linux one --
 reached over an rpmsg channel, which Linux presents as a character device
 carrying whole messages both ways.</p>
@@ -1854,7 +1859,7 @@ payload writes faster than the handler reads.</p>
 </div>
 <div class="section" id="an-iio-payload">
 <h2><a class="toc-backref" href="#toc-entry-22">An IIO Payload</a></h2>
-<p>Keyword <tt class="docutils literal">type: iio</tt>. <strong>Experimental, not yet supported</strong>, until its test has
+<p>Keyword <tt class="docutils literal">type iio</tt>. <strong>Experimental, not yet supported</strong>, until its test has
 run against a kernel whose dummy sensor has a buffer: see <a class="reference internal" href="#supported-and-experimental-interfaces">Supported and
 experimental interfaces</a>. A sensor's buffered samples, read from a character
 device: what a thermistor, an accelerometer or an ADC looks like on Linux.</p>
@@ -1896,7 +1901,7 @@ what promotes the type, once it has passed.</p>
 </div>
 <div class="section" id="a-serial-payload">
 <h2><a class="toc-backref" href="#toc-entry-23">A Serial Payload</a></h2>
-<p>Keyword <tt class="docutils literal">type: serial</tt>. A line, with terms that say how it is driven. A
+<p>Keyword <tt class="docutils literal">type serial</tt>. A line, with terms that say how it is driven. A
 payload states them beside everything else it states, or takes them from its
 <tt class="docutils literal">payload_groups</tt> group the way it takes the rest.</p>
 <pre class="code text literal-block">
@@ -2018,15 +2023,15 @@ have all arrived; it is delivered whole, prefix and all, as a read ended by a
 terminator keeps its terminator. So with <tt class="docutils literal">length_prefix: u8</tt> the bytes
 <tt class="docutils literal">03 41 42 43</tt> are one read of four bytes.</p>
 <pre class="code yaml literal-block">
-<span class="punctuation indicator">-</span><span class="whitespace"> </span><span class="name tag">name</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">imu</span><span class="whitespace">
-  </span><span class="name tag">type</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">serial</span><span class="whitespace">
-  </span><span class="name tag">path</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">/dev/ttyS2</span><span class="whitespace">
-  </span><span class="name tag">datarate</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">115200</span><span class="whitespace">
-  </span><span class="name tag">byte_length</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">8</span><span class="whitespace">
-  </span><span class="name tag">stop_bits</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">1</span><span class="whitespace">
-  </span><span class="name tag">max_length</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">260</span><span class="whitespace">
-  </span><span class="name tag">length_prefix</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">u16be</span><span class="whitespace">
-  </span><span class="name tag">read_timeout</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">50 ms</span>
+<span class="punctuation indicator">-</span><span class="whitespace"> </span><span class="name tag">type serial</span><span class="punctuation">:</span><span class="whitespace">
+    </span><span class="punctuation indicator">-</span><span class="whitespace"> </span><span class="name tag">payload</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">imu</span><span class="whitespace">
+      </span><span class="name tag">path</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">/dev/ttyS2</span><span class="whitespace">
+      </span><span class="name tag">datarate</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">115200</span><span class="whitespace">
+      </span><span class="name tag">byte_length</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">8</span><span class="whitespace">
+      </span><span class="name tag">stop_bits</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">1</span><span class="whitespace">
+      </span><span class="name tag">max_length</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">260</span><span class="whitespace">
+      </span><span class="name tag">length_prefix</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">u16be</span><span class="whitespace">
+      </span><span class="name tag">read_timeout</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">50 ms</span>
 </pre>
 <p>A prefixed line says <tt class="docutils literal">read_timeout</tt> too, if only as <tt class="docutils literal">none</tt>. A byte lost on
 the line puts every later prefix in the wrong place, and nothing in the bytes
@@ -2055,7 +2060,7 @@ node on one that gives the attributes is refused.</p>
 </div>
 <div class="section" id="an-i2c-payload">
 <h2><a class="toc-backref" href="#toc-entry-24">An I<sup>2</sup>C Payload</a></h2>
-<p>Keyword <tt class="docutils literal">type: i2c</tt>. A device on a bus, which is why it gives two things to
+<p>Keyword <tt class="docutils literal">type i2c</tt>. A device on a bus, which is why it gives two things to
 be found by: the bus and the address on it. Two payloads commonly sit on the
 same bus and differ only in which device the master addresses.</p>
 <pre class="code text literal-block">
@@ -2097,7 +2102,7 @@ afterwards: <tt class="docutils literal">./bin/mki2c 0x50</tt> reloads it with a
 </div>
 <div class="section" id="a-spi-payload">
 <h2><a class="toc-backref" href="#toc-entry-25">A SPI Payload</a></h2>
-<p>Keyword <tt class="docutils literal">type: spi</tt>. A peripheral on a clocked, full-duplex link.</p>
+<p>Keyword <tt class="docutils literal">type spi</tt>. A peripheral on a clocked, full-duplex link.</p>
 <pre class="code text literal-block">
 path           the device node, which names the bus and the chip select
                together
@@ -2245,47 +2250,45 @@ which is what a panel in the MOC shows.</p>
     </span><span class="name tag">interval</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal string">&quot;100</span><span class="name variable"> </span><span class="literal string">ms&quot;</span><span class="whitespace">
 
 </span><span class="name tag">payloads</span><span class="punctuation">:</span><span class="whitespace">
-  </span><span class="punctuation indicator">-</span><span class="whitespace"> </span><span class="name tag">name</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">temp_1</span><span class="whitespace">
-    </span><span class="name tag">type</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">i2c</span><span class="whitespace">
-    </span><span class="name tag">address</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal string">&quot;0x48&quot;</span><span class="whitespace">
-    </span><span class="name tag">group</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal string">&quot;zone_temps&quot;</span><span class="whitespace">
-    </span><span class="name tag">path</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal string">&quot;/dev/i2c-1&quot;</span><span class="whitespace">
-    </span><span class="name tag">read_size</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal string">&quot;2&quot;</span><span class="whitespace">
-    </span><span class="name tag">payload-out</span><span class="punctuation">:</span><span class="whitespace">
-      </span><span class="punctuation indicator">-</span><span class="whitespace"> </span><span class="name tag">target</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">k_1</span><span class="whitespace">
+  </span><span class="punctuation indicator">-</span><span class="whitespace"> </span><span class="name tag">type gpio</span><span class="punctuation">:</span><span class="whitespace">
+      </span><span class="punctuation indicator">-</span><span class="whitespace"> </span><span class="name tag">payload</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">heaters_1</span><span class="whitespace">
+        </span><span class="name tag">direction</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal string">&quot;output&quot;</span><span class="whitespace">
+        </span><span class="name tag">lines</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal string">&quot;3,4,5&quot;</span><span class="whitespace">
+        </span><span class="name tag">path</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal string">&quot;/dev/gpiochip0&quot;</span><span class="whitespace">
+        </span><span class="name tag">gateway-in</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">true</span><span class="whitespace">
 
-  </span><span class="punctuation indicator">-</span><span class="whitespace"> </span><span class="name tag">name</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">temp_2</span><span class="whitespace">
-    </span><span class="name tag">type</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">i2c</span><span class="whitespace">
-    </span><span class="name tag">address</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal string">&quot;0x49&quot;</span><span class="whitespace">
-    </span><span class="name tag">group</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal string">&quot;zone_temps&quot;</span><span class="whitespace">
-    </span><span class="name tag">path</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal string">&quot;/dev/i2c-1&quot;</span><span class="whitespace">
-    </span><span class="name tag">read_size</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal string">&quot;2&quot;</span><span class="whitespace">
-    </span><span class="name tag">payload-out</span><span class="punctuation">:</span><span class="whitespace">
-      </span><span class="punctuation indicator">-</span><span class="whitespace"> </span><span class="name tag">target</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">k_2</span><span class="whitespace">
+      </span><span class="punctuation indicator">-</span><span class="whitespace"> </span><span class="name tag">payload</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">heaters_2</span><span class="whitespace">
+        </span><span class="name tag">direction</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal string">&quot;output&quot;</span><span class="whitespace">
+        </span><span class="name tag">lines</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal string">&quot;6,7,8&quot;</span><span class="whitespace">
+        </span><span class="name tag">path</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal string">&quot;/dev/gpiochip0&quot;</span><span class="whitespace">
+        </span><span class="name tag">gateway-in</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">true</span><span class="whitespace">
 
-  </span><span class="punctuation indicator">-</span><span class="whitespace"> </span><span class="name tag">name</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">temp_3</span><span class="whitespace">
-    </span><span class="name tag">type</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">spi</span><span class="whitespace">
-    </span><span class="name tag">group</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal string">&quot;zone_temps&quot;</span><span class="whitespace">
-    </span><span class="name tag">max_speed</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal string">&quot;1000000&quot;</span><span class="whitespace">
-    </span><span class="name tag">path</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal string">&quot;/dev/spidev0.0&quot;</span><span class="whitespace">
-    </span><span class="name tag">read_size</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal string">&quot;3&quot;</span><span class="whitespace">
-    </span><span class="name tag">spi_mode</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal string">&quot;0&quot;</span><span class="whitespace">
-    </span><span class="name tag">payload-out</span><span class="punctuation">:</span><span class="whitespace">
-      </span><span class="punctuation indicator">-</span><span class="whitespace"> </span><span class="name tag">target</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">k_3</span><span class="whitespace">
+  </span><span class="punctuation indicator">-</span><span class="whitespace"> </span><span class="name tag">type i2c</span><span class="punctuation">:</span><span class="whitespace">
+      </span><span class="punctuation indicator">-</span><span class="whitespace"> </span><span class="name tag">payload</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">temp_1</span><span class="whitespace">
+        </span><span class="name tag">address</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal string">&quot;0x48&quot;</span><span class="whitespace">
+        </span><span class="name tag">group</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal string">&quot;zone_temps&quot;</span><span class="whitespace">
+        </span><span class="name tag">path</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal string">&quot;/dev/i2c-1&quot;</span><span class="whitespace">
+        </span><span class="name tag">read_size</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal string">&quot;2&quot;</span><span class="whitespace">
+        </span><span class="name tag">payload-out</span><span class="punctuation">:</span><span class="whitespace">
+          </span><span class="punctuation indicator">-</span><span class="whitespace"> </span><span class="name tag">target</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">k_1</span><span class="whitespace">
 
-  </span><span class="punctuation indicator">-</span><span class="whitespace"> </span><span class="name tag">name</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">heaters_1</span><span class="whitespace">
-    </span><span class="name tag">type</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">gpio</span><span class="whitespace">
-    </span><span class="name tag">direction</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal string">&quot;output&quot;</span><span class="whitespace">
-    </span><span class="name tag">lines</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal string">&quot;3,4,5&quot;</span><span class="whitespace">
-    </span><span class="name tag">path</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal string">&quot;/dev/gpiochip0&quot;</span><span class="whitespace">
-    </span><span class="name tag">gateway-in</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">true</span><span class="whitespace">
+      </span><span class="punctuation indicator">-</span><span class="whitespace"> </span><span class="name tag">payload</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">temp_2</span><span class="whitespace">
+        </span><span class="name tag">address</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal string">&quot;0x49&quot;</span><span class="whitespace">
+        </span><span class="name tag">group</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal string">&quot;zone_temps&quot;</span><span class="whitespace">
+        </span><span class="name tag">path</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal string">&quot;/dev/i2c-1&quot;</span><span class="whitespace">
+        </span><span class="name tag">read_size</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal string">&quot;2&quot;</span><span class="whitespace">
+        </span><span class="name tag">payload-out</span><span class="punctuation">:</span><span class="whitespace">
+          </span><span class="punctuation indicator">-</span><span class="whitespace"> </span><span class="name tag">target</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">k_2</span><span class="whitespace">
 
-  </span><span class="punctuation indicator">-</span><span class="whitespace"> </span><span class="name tag">name</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">heaters_2</span><span class="whitespace">
-    </span><span class="name tag">type</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">gpio</span><span class="whitespace">
-    </span><span class="name tag">direction</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal string">&quot;output&quot;</span><span class="whitespace">
-    </span><span class="name tag">lines</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal string">&quot;6,7,8&quot;</span><span class="whitespace">
-    </span><span class="name tag">path</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal string">&quot;/dev/gpiochip0&quot;</span><span class="whitespace">
-    </span><span class="name tag">gateway-in</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">true</span>
+  </span><span class="punctuation indicator">-</span><span class="whitespace"> </span><span class="name tag">type spi</span><span class="punctuation">:</span><span class="whitespace">
+      </span><span class="punctuation indicator">-</span><span class="whitespace"> </span><span class="name tag">payload</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">temp_3</span><span class="whitespace">
+        </span><span class="name tag">group</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal string">&quot;zone_temps&quot;</span><span class="whitespace">
+        </span><span class="name tag">max_speed</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal string">&quot;1000000&quot;</span><span class="whitespace">
+        </span><span class="name tag">path</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal string">&quot;/dev/spidev0.0&quot;</span><span class="whitespace">
+        </span><span class="name tag">read_size</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal string">&quot;3&quot;</span><span class="whitespace">
+        </span><span class="name tag">spi_mode</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal string">&quot;0&quot;</span><span class="whitespace">
+        </span><span class="name tag">payload-out</span><span class="punctuation">:</span><span class="whitespace">
+          </span><span class="punctuation indicator">-</span><span class="whitespace"> </span><span class="name tag">target</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">k_3</span>
 </pre>
 <p>The same configuration in the other spelling is
 <tt class="docutils literal">tests/manual/thermostat.xtcs</tt>, which a test holds to saying the same
@@ -2361,11 +2364,11 @@ test holds to describing the same configuration -- and the simulator
 configuration beside it, <tt class="docutils literal"><span class="pre">&lt;name&gt;-sim.yaml</span></tt>. Every example is checked by
 <tt class="docutils literal">tcsverify</tt> on every test run and must pass with no errors and no warnings,
 so an example is always a configuration that can be copied.</p>
-<p>Every node has a <em>device id</em>: its position among the configuration's nodes,
-counting from nought, in the order the file writes them -- whatever the
-sections are, and in the XML spelling however they interleave -- the top file
-first and then the files it includes. The ids say which port each node's data
-reaches the ground on.</p>
+<p>Every node has a <em>device id</em>: its position among the names of all the
+configuration's nodes, sorted, counting from nought -- whatever section or
+type each is written under, and across the top file and the files it
+includes. Where a node is written in a file makes no difference to it. The
+ids say which port each node's data reaches the ground on.</p>
 <p>A gateway node is the ground's end of the vehicle's data. tcspecial sends what
 each node drawn into a gateway node produces as UDP datagrams to the address in
 the gateway node's <tt class="docutils literal">ground_base</tt>, at its port plus the source node's device
@@ -2413,11 +2416,11 @@ stopped, and when it last moved anything. They are what the node has moved
 since the vehicle started, not since it was last enabled, so a payload
 stopped and started again has moved what it moved before.</p>
 <p>A command names a node by the device id its panel shows, which is the node's
-position in the configuration. That is why nothing is sent until <tt class="docutils literal">CONNECT</tt>
-has agreed: the same id means a different node in a different configuration,
-and a command sent under that misunderstanding would stop something nobody
-chose. Until then, and for a vehicle whose answer disagreed, the controls say
-so rather than sending.</p>
+position among the names of the configuration's nodes. That is why nothing is
+sent until <tt class="docutils literal">CONNECT</tt> has agreed: the same id means a different node in a
+different configuration, and a command sent under that misunderstanding would
+stop something nobody chose. Until then, and for a vehicle whose answer
+disagreed, the controls say so rather than sending.</p>
 <p>A payload that nothing in the configuration touches -- no line to it or from
 it, and no command binding naming it -- reports over the <tt class="docutils literal">tcspecial</tt>
 section's <tt class="docutils literal">payload_telemetry</tt> instead, from <tt class="docutils literal">source_base</tt> plus its device
@@ -2479,8 +2482,8 @@ theirs, so that no one part number can take the whole trio out.</p>
 <p>Each reading is converted to kelvin by its own <tt class="docutils literal">to_kelvin</tt> node, <tt class="docutils literal">k_1</tt>,
 <tt class="docutils literal">k_2</tt> or <tt class="docutils literal">k_3</tt>, and each converted reading goes three ways: to the ground
 through the gateway node -- at its <tt class="docutils literal">ground_base</tt>, <tt class="docutils literal">127.0.0.1:5100</tt>, plus
-each source's device id, so <tt class="docutils literal">k_1</tt>, <tt class="docutils literal">k_2</tt> and <tt class="docutils literal">k_3</tt>, ids 1 to 3, arrive on
-ports 5101 to 5103 -- into <tt class="docutils literal">zone_temp</tt> as the input <tt class="docutils literal">in0</tt>, <tt class="docutils literal">in1</tt> or
+each source's device id, so <tt class="docutils literal">k_1</tt>, <tt class="docutils literal">k_2</tt> and <tt class="docutils literal">k_3</tt>, ids 4 to 6, arrive on
+ports 5104 to 5106 -- into <tt class="docutils literal">zone_temp</tt> as the input <tt class="docutils literal">in0</tt>, <tt class="docutils literal">in1</tt> or
 <tt class="docutils literal">in2</tt>, and into the log <tt class="docutils literal">housekeeping</tt>.</p>
 <p><tt class="docutils literal">zone_temp</tt> is a <tt class="docutils literal">vote</tt>: one temperature out of the three by the algorithm
 it names, <tt class="docutils literal">median</tt>, which takes the middle reading. A mean would be the wrong
@@ -2495,11 +2498,11 @@ nothing and reports it on each arrival rather than acting on one sensor's
 word. Fed 296.0, 296.1 and 270.0 -- two sensors warm and one stuck
 cold -- it says 296 and the heaters stay off, where a mean would have said
 287.4 and switched them on because one sensor had failed.</p>
-<p>The voted temperature goes to the ground, on port 5104, and to <tt class="docutils literal">thermostat</tt>:
+<p>The voted temperature goes to the ground, on port 5111, and to <tt class="docutils literal">thermostat</tt>:
 a hysteresis holding the zone at its <tt class="docutils literal">setpoint</tt>, 293.15 K, with a
 <tt class="docutils literal">half_band</tt> of 2.0, so the heaters switch two degrees either side of it and
 the setpoint is in the middle of its own band. Its decision is logged, sent to
-the ground on port 5105, and drives two heaters, <tt class="docutils literal">heaters_1</tt> and
+the ground on port 5110, and drives two heaters, <tt class="docutils literal">heaters_1</tt> and
 <tt class="docutils literal">heaters_2</tt>. Two of them, because one failing must not leave the zone with
 no way to be warmed: either alone holds the band, and both together hold it
 twice as fast. They are separate nodes so that the ground can stop one and
@@ -2565,8 +2568,9 @@ what would charge it is shunted.</p>
 <tt class="docutils literal">science</tt>, sheds the science instrument; above half it is unasserted and
 the instrument comes back. The band is wide so that an eclipse sheds the load
 once rather than at every reading near the edge. Every value and decision goes
-to the ground, on ports 5101 to 5104, and to the log <tt class="docutils literal">housekeeping</tt>, and the
-ground may set the setpoint through the command binding.</p>
+to the ground, on ports 5100 to 5102 and 5107, and to the log
+<tt class="docutils literal">housekeeping</tt>, and the ground may set the setpoint through the command
+binding.</p>
 <p>The physics model, <tt class="docutils literal"><span class="pre">battery-physics.yaml</span></tt>, is the power system as its parts:
 a <tt class="docutils literal">sun</tt>, a <tt class="docutils literal">solar_array</tt> of seven amperes, two <tt class="docutils literal">load</tt> elements of two
 amperes each -- <tt class="docutils literal">avionics</tt>, never shed, and <tt class="docutils literal">science</tt> -- a <tt class="docutils literal">bus</tt> and a
@@ -2917,8 +2921,8 @@ the ground sends goes up to the gateway node <tt class="docutils literal">ground
 tee sends each command on by its <tt class="docutils literal"><span class="pre">gateway-out</span></tt> to the <tt class="docutils literal">heater</tt>, as it was
 going, and again by its <tt class="docutils literal"><span class="pre">payload-out</span></tt> back to <tt class="docutils literal">ground</tt> -- so the ground sees
 what the vehicle was told, arriving at <tt class="docutils literal">ground_base</tt> plus <tt class="docutils literal">echo</tt>'s device
-id, <tt class="docutils literal">127.0.0.1:8704</tt>. The <tt class="docutils literal">sensor</tt>'s readings go to <tt class="docutils literal">readings</tt>, a
-<tt class="docutils literal"><span class="pre">tee-payload</span></tt>, which sends each down to the ground at <tt class="docutils literal">127.0.0.1:8705</tt> and
+id, <tt class="docutils literal">127.0.0.1:8701</tt>. The <tt class="docutils literal">sensor</tt>'s readings go to <tt class="docutils literal">readings</tt>, a
+<tt class="docutils literal"><span class="pre">tee-payload</span></tt>, which sends each down to the ground at <tt class="docutils literal">127.0.0.1:8704</tt> and
 again by its <tt class="docutils literal"><span class="pre">gateway-out</span></tt> to <tt class="docutils literal">dropped</tt>, a <tt class="docutils literal"><span class="pre">null-gateway</span></tt>, standing where
 something aboard that took readings as commands would be. The <tt class="docutils literal">spare</tt>
 payload's data goes to <tt class="docutils literal">unheard</tt>, a <tt class="docutils literal"><span class="pre">null-payload</span></tt>: nobody wants it yet.</p>
@@ -2952,23 +2956,21 @@ and everything in the <tt class="docutils literal">tcspecial</tt> section is wri
 <p>What differs is the gateway node. Where a gateway node says where the ground
 station is as <tt class="docutils literal">ground_base</tt>, a <tt class="docutils literal">gateway_fprime</tt> node says where the bridge
 is as <tt class="docutils literal">bridge_base</tt>, counted on the same way: the <tt class="docutils literal">thermometer</tt>, device id
-2, reports to <tt class="docutils literal">127.0.0.1:9702</tt>. It also states <tt class="docutils literal">fprime_id_base</tt>, the first
+3, reports to <tt class="docutils literal">127.0.0.1:9703</tt>. It also states <tt class="docutils literal">fprime_id_base</tt>, the first
 of the F´ IDs the bridge gives what arrives, counted on by the same device id
--- the thermometer's readings are F´ channel <tt class="docutils literal">0x3002</tt> -- which the bridge's
+-- the thermometer's readings are F´ channel <tt class="docutils literal">0x3003</tt> -- which the bridge's
 model is made from and nothing aboard reads. A command the bridge sends up to
 <tt class="docutils literal">fsw</tt>, which binds <tt class="docutils literal">127.0.0.1:9600</tt>, leaves it by its <tt class="docutils literal"><span class="pre">gateway-out</span></tt> for
 the <tt class="docutils literal">heater</tt>.</p>
 <p>The thermometer's readings go to <tt class="docutils literal">zone_temp</tt> too, a <tt class="docutils literal">to_kelvin</tt> compute
 node that makes each a temperature, and that goes to <tt class="docutils literal">fsw</tt> as well: device
-id 3, <tt class="docutils literal">127.0.0.1:9703</tt>, channel <tt class="docutils literal">0x3003</tt>. The <tt class="docutils literal">vehicle</tt> section is
-written after the payloads so that the thermometer keeps device id 2, a
-node's device id being its place in the file. In the simulator file the
+id 4, <tt class="docutils literal">127.0.0.1:9704</tt>, channel <tt class="docutils literal">0x3004</tt>. In the simulator file the
 thermometer reports a zone of the physics model, in the encoding <tt class="docutils literal">zone_temp</tt>
 reads back, and the heater's stand-in switches a heater warming it, so that what the
 flight computer sends the heater shows in the temperature it reads.</p>
 <p><tt class="docutils literal">zone_temp</tt>'s temperatures go on to <tt class="docutils literal">heater_wanted</tt>, a <tt class="docutils literal">hysteresis</tt>
 compute node -- on below 283.65 K, off above 284.65 K -- whose decisions go
-to <tt class="docutils literal">fsw</tt>: device id 4, <tt class="docutils literal">127.0.0.1:9704</tt>, channel <tt class="docutils literal">0x3004</tt>. It is
+to <tt class="docutils literal">fsw</tt>: device id 2, <tt class="docutils literal">127.0.0.1:9702</tt>, channel <tt class="docutils literal">0x3002</tt>. It is
 advice and drives nothing, the heater being the flight computer's to drive,
 and it shows the bridge a node that sends decisions.</p>
 <p><tt class="docutils literal">make <span class="pre">-C</span> examples <span class="pre">run-fprime</span></tt> runs tcsmoc on the example, which starts
@@ -3000,15 +3002,15 @@ fprime example unless told otherwise, with</p>
 </pre>
 <p>which checks the configuration first and writes nothing from one with errors.
 Each node drawn into the <tt class="docutils literal">gateway_fprime</tt> node is a channel named after it,
-at <tt class="docutils literal">fprime_id_base</tt> plus its device id -- <tt class="docutils literal">thermometer</tt>, <tt class="docutils literal">0x3002</tt> --
+at <tt class="docutils literal">fprime_id_base</tt> plus its device id -- <tt class="docutils literal">thermometer</tt>, <tt class="docutils literal">0x3003</tt> --
 of the type the configuration says its data are. A node that sends values, a
 compute node whose function is <tt class="docutils literal">to_kelvin</tt>, <tt class="docutils literal">to_value</tt>, <tt class="docutils literal">vote</tt> or
 <tt class="docutils literal">process</tt>, has an <tt class="docutils literal">F64</tt> channel in that node's unit, formatted with it --
-<tt class="docutils literal">zone_temp</tt>, <tt class="docutils literal">0x3003</tt>, in kelvin --
+<tt class="docutils literal">zone_temp</tt>, <tt class="docutils literal">0x3004</tt>, in kelvin --
 and a datum from it that is not a value goes to no channel, is counted in
 <tt class="docutils literal">DataNotValues</tt> and is said in a <tt class="docutils literal">NotAValue</tt> event. A node that sends
 decisions, a compute node whose function is <tt class="docutils literal">hysteresis</tt>, has a <tt class="docutils literal">bool</tt>
-channel, true for on -- <tt class="docutils literal">heater_wanted</tt>, <tt class="docutils literal">0x3004</tt> -- and a datum from it
+channel, true for on -- <tt class="docutils literal">heater_wanted</tt>, <tt class="docutils literal">0x3002</tt> -- and a datum from it
 that is not <tt class="docutils literal">1</tt> or <tt class="docutils literal">0</tt> goes to no channel, is counted in
 <tt class="docutils literal">DataNotDecisions</tt> and is said in a <tt class="docutils literal">NotADecision</tt> event. A thermostat
 sends the ground only a change of decision, so its channel shows what was
@@ -3232,7 +3234,7 @@ on the bus, filtered to its identifier, so <tt class="docutils literal">motor_st
 frames and nothing else, and <tt class="docutils literal">motor_command</tt> hears nothing it has not sent.
 Each status frame's data goes by <tt class="docutils literal">motor_status</tt>'s <tt class="docutils literal"><span class="pre">payload-out</span></tt> to the
 gateway node <tt class="docutils literal">ground</tt> and down to the MOC at <tt class="docutils literal">ground_base</tt> plus its
-device id, <tt class="docutils literal">127.0.0.1:3701</tt>. What the ground sends up to <tt class="docutils literal">ground</tt>, which
+device id, <tt class="docutils literal">127.0.0.1:3702</tt>. What the ground sends up to <tt class="docutils literal">ground</tt>, which
 binds <tt class="docutils literal">127.0.0.1:3600</tt>, leaves it by its <tt class="docutils literal"><span class="pre">gateway-out</span></tt> for
 <tt class="docutils literal">motor_command</tt> and goes out as one frame, so a command is at most eight
 bytes.</p>
@@ -3257,7 +3259,7 @@ which drives line 1 to it.</object>
 other driven, and a payload's lines all go one way. <tt class="docutils literal">switch</tt> watches line 0
 for both edges: each becomes a sixteen-byte record -- when, which line, and
 what it became -- that goes by its <tt class="docutils literal"><span class="pre">payload-out</span></tt> to <tt class="docutils literal">ground</tt> and down to
-the MOC at <tt class="docutils literal">127.0.0.1:3721</tt>. <tt class="docutils literal">lamp</tt> drives line 1: what the ground sends
+the MOC at <tt class="docutils literal">127.0.0.1:3722</tt>. <tt class="docutils literal">lamp</tt> drives line 1: what the ground sends
 up to <tt class="docutils literal">127.0.0.1:3620</tt> leaves <tt class="docutils literal">ground</tt> by its <tt class="docutils literal"><span class="pre">gateway-out</span></tt> for it, the
 text <tt class="docutils literal">1</tt> lighting the lamp and <tt class="docutils literal">0</tt> putting it out.</p>
 <p>The chip is one of the kernel's <tt class="docutils literal"><span class="pre">gpio-sim</span></tt>, which <tt class="docutils literal">sudo
@@ -4217,10 +4219,13 @@ so two spellings this finds no difference between are two that tcspecial and
 tcsmoc agree on. A difference is reported at the line of the second file it is
 on, saying what each file says:</p>
 <pre class="code console literal-block">
-<span class="generic output">examples/thermostat/thermostat.ytcs:87: error: nodes / thermostat / attributes / setpoint: examples/thermostat/thermostat.xtcs says &quot;290&quot; and examples/thermostat/thermostat.ytcs says &quot;293.15&quot;</span>
+<span class="generic output">examples/thermostat/thermostat.ytcs:81: error: nodes / thermostat / attributes / setpoint: examples/thermostat/thermostat.xtcs says &quot;290&quot; and examples/thermostat/thermostat.ytcs says &quot;293.15&quot;</span>
 </pre>
-<p>The order nodes are written in is compared too, a node's place in the file
-being its device id. A file that cannot be read is not compared, and says so.</p>
+<p>The order anything is written in is not compared: nothing in a configuration
+is in an order that means anything, and a node's device id comes from its
+name, not from where the file writes it. A list is compared as the set it is,
+so one entry missing is one difference. A file that cannot be read is not
+compared, and says so.</p>
 <p>A good set prints nothing. A bad one prints a line per problem, each naming
 the file, the line and what is wrong there:</p>
 <pre class="code console literal-block">
@@ -4259,7 +4264,7 @@ $ cargo run --bin tcsverify -- --warnings=off --error-limit=1 example.ytcs
 and before the problems:</p>
 <pre class="literal-block">
 $ cargo run --bin tcsverify -- --digest examples/thermostat/thermostat.ytcs
-examples/thermostat/thermostat.ytcs: md5 292a329b534cb88156e1a52870469c4a
+examples/thermostat/thermostat.ytcs: md5 8136194fda73c86685a82efbd5b955a5
 </pre>
 <p>That is the digest tcspecial prints as it starts and puts in every beacon, and
 the MOC compares with its own: two ends whose digests agree have read one
@@ -4441,10 +4446,10 @@ saying what that kind states instead.
 A configuration that says nothing is refused too, rather than given <tt class="docutils literal">radio</tt>:
 what a vehicle answers to is a fact about the mission, and the kind decides
 how every link below is written.</p>
-<p>The gateway nodes are written in the <tt class="docutils literal">gateway</tt> section: a radio's with
-<tt class="docutils literal">type: gateway_radio</tt>, a Yamcs station's with <tt class="docutils literal">type: gateway_yamcs</tt>, an F´
-bridge's with <tt class="docutils literal">type: gateway_fprime</tt>, a cFS
-software bus's with <tt class="docutils literal">type: gateway_cfs</tt>. Every
+<p>The gateway nodes are written in the <tt class="docutils literal">gateways</tt> section: a radio's under
+<tt class="docutils literal">- type gateway_radio:</tt>, a Yamcs station's under <tt class="docutils literal">- type gateway_yamcs:</tt>,
+an F´ bridge's under <tt class="docutils literal">- type gateway_fprime:</tt>, a cFS software bus's under
+<tt class="docutils literal">- type gateway_cfs:</tt>, each one <tt class="docutils literal">- gateway:</tt> and its name. Every
 node there is of the kind <tt class="docutils literal">tcspecial.gateway</tt> names, and one of another kind is refused,
 naming both, because a vehicle answers to one: commands, beacons and data all go
 the one way.</p>
@@ -4468,10 +4473,10 @@ counting its own sequence per APID. Each link states its APID:</p>
     </span><span class="name tag">apid</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal string">&quot;0x100&quot;</span><span class="whitespace">     </span><span class="comment single"># the beacon</span><span class="whitespace">
   </span><span class="name tag">tcs_cmd</span><span class="punctuation">:</span><span class="whitespace">
     </span><span class="name tag">apid</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal string">&quot;0x101&quot;</span><span class="whitespace">     </span><span class="comment single"># commands, and their answers</span><span class="whitespace">
-</span><span class="name tag">gateway</span><span class="punctuation">:</span><span class="whitespace">
-  </span><span class="punctuation indicator">-</span><span class="whitespace"> </span><span class="name tag">name</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">gateway</span><span class="whitespace">
-    </span><span class="name tag">type</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">gateway_yamcs</span><span class="whitespace">
-    </span><span class="name tag">apid_base</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal string">&quot;0x200&quot;</span>
+</span><span class="name tag">gateways</span><span class="punctuation">:</span><span class="whitespace">
+  </span><span class="punctuation indicator">-</span><span class="whitespace"> </span><span class="name tag">type gateway_yamcs</span><span class="punctuation">:</span><span class="whitespace">
+      </span><span class="punctuation indicator">-</span><span class="whitespace"> </span><span class="name tag">gateway</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">gateway</span><span class="whitespace">
+        </span><span class="name tag">apid_base</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal string">&quot;0x200&quot;</span>
 </pre>
 <p>A gateway node's uplink takes telecommands of its <tt class="docutils literal">apid_base</tt>, and each
 source sends through it as telemetry of <tt class="docutils literal">apid_base</tt> plus its device id.
@@ -4625,7 +4630,8 @@ command about a quick one.</p>
 bases because the link has two ends. Every payload has a UDP interface for
 exchanging data with the ground; tcspecial binds its end at
 <tt class="docutils literal">payload_telemetry.source_base</tt> plus <strong>the payload's own id</strong> -- the position
-the payload has in the configuration, counting from nought -- and the MOC binds
+its name has among the names of the configuration's nodes, counting from
+nought -- and the MOC binds
 its end at <tt class="docutils literal">payload_telemetry.dest_base</tt> plus the same id. So a set of four
 payloads based at 6000 and 6100 has tcspecial at 6000 to 6003 and the ground at
 6100 to 6103.</p>
@@ -4771,12 +4777,12 @@ opening the device, and tcssim answers there; under <tt class="docutils literal"
 opened, so the configuration that flies is the one that was tested:</p>
 <pre class="code yaml literal-block">
 <span class="name tag">payloads</span><span class="punctuation">:</span><span class="whitespace">
-  </span><span class="punctuation indicator">-</span><span class="whitespace"> </span><span class="name tag">name</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">link</span><span class="whitespace">
-    </span><span class="name tag">type</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">hdlc</span><span class="whitespace">
-    </span><span class="name tag">interface</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">hdlc0</span><span class="whitespace">
-    </span><span class="name tag">standard</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">v35</span><span class="whitespace">
-    </span><span class="name tag">clock_type</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">external</span><span class="whitespace">
-    </span><span class="name tag">stand_in</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal string">&quot;127.0.0.1:7950&quot;</span>
+  </span><span class="punctuation indicator">-</span><span class="whitespace"> </span><span class="name tag">type hdlc</span><span class="punctuation">:</span><span class="whitespace">
+      </span><span class="punctuation indicator">-</span><span class="whitespace"> </span><span class="name tag">payload</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">link</span><span class="whitespace">
+        </span><span class="name tag">interface</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">hdlc0</span><span class="whitespace">
+        </span><span class="name tag">standard</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">v35</span><span class="whitespace">
+        </span><span class="name tag">clock_type</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">external</span><span class="whitespace">
+        </span><span class="name tag">stand_in</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal string">&quot;127.0.0.1:7950&quot;</span>
 </pre>
 <p>The Makefiles' run targets give every program <tt class="docutils literal"><span class="pre">--simulate=$(SIMULATE)</span></tt>,
 which is <tt class="docutils literal">all</tt> unless the command line says otherwise:</p>
@@ -5023,9 +5029,9 @@ another row is started under it, and a <tt class="docutils literal">Quit</tt> bu
 window, which stops the tcspecial and tcssim the MOC started.</p>
 <p>Each panel shows its handler's name and number, its status, how it is
 reached, and its packet size; then two readings and one count. The number is
-the payload's place in the payload configuration, counted from nought in the
-order the file describes them -- <tt class="docutils literal"><span class="pre">auto-send</span> (dev id 0)</tt> -- and nothing in
-the file states it. Both windows count the same way, so a payload is the same
+the payload's device id, its place among the names of the configuration's
+nodes, counted from nought -- <tt class="docutils literal"><span class="pre">auto-send</span> (dev id 0)</tt> -- and nothing in the
+file states it. Both windows count the same way, so a payload is the same
 number in each. The status is <tt class="docutils literal">Active</tt>,
 <tt class="docutils literal">Stopped</tt>, <tt class="docutils literal">Stale</tt> or <tt class="docutils literal">Unknown</tt>, and where each comes from is under
 <a class="reference internal" href="#beaconing">Beaconing</a>: the spacecraft's answer to the last <tt class="docutils literal">Enable</tt> or <tt class="docutils literal">Disable</tt>,
@@ -5154,12 +5160,12 @@ tcspecial agrees: v0.1.0 md5 36999e46a4bf436854442d8f97a2248d
 same payload
 set if the digests match: the digest is of what a file says rather than of its
 bytes, so the YAML and the XML of one set digest alike, and so do two files
-differing only in comments, spacing, the order of their sections or the order
-of one payload's attributes. The order of the payloads does count -- ids follow
-it -- so each payload is given a sequence number as the file is read, the
-digest takes them in that order, and a file may not state a number of its own.
-Both formats number them alike, which is what lets the YAML and the XML of
-one set digest the same. In a set written as several files, the names its
+differing only in comments, spacing or order -- of their sections, types,
+nodes, attributes, links, groups or bindings. Nothing in a configuration is in
+an order that means anything: the digest takes everything in one canonical
+order, by name, and device ids are counted in that same order, so a node's id
+is its position among the names of all the nodes. In a set written as several
+files, the names its
 include list gives them count too; the top file's own name does not.</p>
 <p>A difference means the two ends are not serving the same set. The usual cause
 is a tcspecial left running from an earlier one, which tcsmoc attaches to

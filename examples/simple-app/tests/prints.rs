@@ -13,8 +13,8 @@ use std::path::PathBuf;
 use std::process::{Child, Command, Stdio};
 
 /// A configuration whose gateway node takes `lorem`'s words on a port nothing
-/// holds, and that port: `lorem` is the second node read, device id 1, so it
-/// is the base plus one.
+/// holds, and that port: `lorem` sorts after `gateway-1`, the only other
+/// node, so it is device id 1 and its port is the base plus one.
 ///
 /// # Returns
 ///

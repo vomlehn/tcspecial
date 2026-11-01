@@ -18,6 +18,12 @@ for each:
   `receive` returns one datum along with the name of the node that produced it.
   The ports the data arrive on are worked out from the configuration, the same
   way tcspecial works them out, so the two ends cannot disagree about them.
+- **Sending it data.** `ping::Uplink` sends a datum up to a gateway node, to
+  the address and port it binds aboard, from which it leaves by the node's
+  `gateway-out` links: a ping to a ping node, or a command to a heater. Gated
+  by the station's match, with `gated_by`, it sends only while the station is
+  matched for commanding, as `TcsClient` does every command but CONNECT,
+  RESTART_ARM and RESTART.
 - **Knowing it is there.** `beacon` listens for the beacon tcspecial sends on
   its own, every `beacon.default_interval`, whether or not anyone has
   connected. It says which build is running, which configuration it is serving and the

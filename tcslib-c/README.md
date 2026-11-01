@@ -48,6 +48,18 @@ peer (see "A vehicle on a cFS software bus" in
   it. A gateway node reads data only while the station is matched for listening:
   what arrives before is dropped and counted, as is whatever is waiting when
   the match begins. So a station that reads data passes its beacons too.
+  `tcs_configuration_sends_values` says whether a node's data are *values*
+  -- four bytes of micro-kelvin, which a conversion, a vote or a program's
+  answer makes -- as the configuration says, a datum's width being no
+  guide, and `tcs_value_kelvin` reads one as a temperature.
+- **Data up.** `tcs_uplink_open` opens the way up to a gateway node that
+  binds an address and port aboard, and each `tcs_uplink_send` sends one
+  datum there, which leaves the node by its `gateway-out` links for the
+  nodes they reach: a heater driven, a line set. It is tcslib's
+  `ping::Uplink`, the way the ping goes up. What goes up drives a payload
+  as a command does, so it goes only while the station is matched for
+  commanding, and fails unsent before, saying the configurations are not
+  yet matched.
 - **Commands.** `tcs_client_open` opens the two command links the
   configuration states. `tcs_client_connect` says whether the vehicle is
   flying this configuration; then ping; start, stop or query a node by its
@@ -130,9 +142,10 @@ client used to track went.
 same one in C++: each reads the configuration, waits for the first beacon,
 connects and pings, asks about a node and sets one of its attributes,
 pings the vehicle's ping node and times the answer, and
-prints the vehicle's data from a gateway node. They take `--yaml` or `--xml`,
-as every example program does, and `--restart` to arm a restart and restart
-the vehicle, which they do only when asked.
+prints the vehicle's data from a gateway node, a value as a temperature. They
+take `--yaml` or `--xml`, as every example program does, `--restart` to arm a
+restart and restart the vehicle, and `--send=<text>` to send the text up to
+the gateway node, each of which they do only when asked.
 
 ## How the header is kept honest
 

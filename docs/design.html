@@ -6842,6 +6842,15 @@ configuration.</dd>
 every command but CONNECT, RESTART_ARM and RESTART, unsent, while the
 station is not matched for commanding.</dd>
 <dt>Requirement</dt>
+<dd>A datum a station sends up to a gateway node, which leaves it by its
+<tt class="docutils literal"><span class="pre">gateway-out</span></tt> links to drive a payload, is held to the same match: a
+station that keeps one sends nothing up, and says so, while it is not
+matched for commanding. <tt class="docutils literal"><span class="pre">tcslib::ping::Uplink</span></tt> is the one way up,
+gated by <tt class="docutils literal"><span class="pre">Uplink::gated_by</span></tt>, and the C/C++ library's <tt class="docutils literal">tcs_uplink</tt>
+is it, gated so. The ping is the exception, sent ungated by tcsmoc and
+<tt class="docutils literal">tcs_pinger</tt>: a ping node answers it whatever the configuration, and
+it drives nothing.</dd>
+<dt>Requirement</dt>
 <dd>tcsmoc says the same in a pop-up error for every other command pressed
 meanwhile: that the match between the ground's and the vehicle's
 configurations is still in progress, and to check the beacon's checksum

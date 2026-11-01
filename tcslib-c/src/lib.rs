@@ -52,6 +52,7 @@ use tcslib::{command_links_of, CommandStatus, TcsClient};
 use tcslibgs::config_digest::{digest_of_graph, ConfigDigest};
 use tcslibgs::graph::parameters::beacon_interval_of;
 use tcslibgs::graph::{telemetry, Graph};
+use tcslibgs::node::vehicle::compute::{from_value, node_sends_a_value};
 use tcslibgs::{ArmKey, DHSample, NodeId, DH_SAMPLE_BYTES};
 
 /// The size of the buffer `tcs_last_error` returns, its NUL included:
@@ -1058,6 +1059,204 @@ pub unsafe extern "C" fn tcs_gateway_close(gateway: *mut tcs_gateway) {
     }
 }
 
+/// Says whether what a node sends is a value: four bytes of a signed count
+/// of micro-kelvin, which [`tcs_value_kelvin`] reads. The configuration's
+/// answer, `tcslibgs::node::vehicle::compute::node_sends_a_value`, and never
+/// a guess from a datum's width, every four bytes reading as a value.
+///
+/// # Arguments
+///
+/// * `configuration` - The configuration.
+/// * `node`          - The node's name.
+/// * `values`        - Where 1 is written when it sends values, 0 when not.
+///
+/// # Returns
+///
+/// 0, or -1 where there is no such node or an argument is NULL.
+///
+/// # Safety
+///
+/// `configuration` as [`tcs_configuration_digest`]; `node` NULL or a
+/// NUL-terminated string; `values` NULL or writable.
+#[no_mangle]
+pub unsafe extern "C" fn tcs_configuration_sends_values(
+    configuration: *const tcs_configuration,
+    node: *const c_char,
+    values: *mut c_int,
+) -> c_int {
+    guard(-1, || {
+        let configuration = handle_of(configuration, "the configuration")?;
+        let name = text_of(node, "the node's name")?;
+        let out = out_of(values, "values")?;
+        let node = configuration.graph.node(name).ok_or_else(|| {
+            fail(format_args!(
+                "{}: there is no node called \"{name}\"",
+                configuration.path.display()
+            ))
+        })?;
+        *out =
+            c_int::from(node_sends_a_value(&node.node_type, &node.attributes));
+        Ok(0)
+    })
+}
+
+/// Reads a value -- four bytes of a signed count of micro-kelvin, most
+/// significant first -- as a temperature in kelvin, by
+/// `tcslibgs::node::vehicle::compute::from_value`, the one statement of
+/// what a value is.
+///
+/// # Arguments
+///
+/// * `data`   - The datum's bytes.
+/// * `length` - How many bytes `data` holds.
+/// * `kelvin` - Where the temperature is written.
+///
+/// # Returns
+///
+/// 0, or -1 where the datum is not four bytes long or an argument is NULL.
+///
+/// # Safety
+///
+/// `data` NULL with `length` 0, or `length` readable bytes; `kelvin` NULL or
+/// writable.
+#[no_mangle]
+pub unsafe extern "C" fn tcs_value_kelvin(
+    data: *const u8,
+    length: usize,
+    kelvin: *mut f64,
+) -> c_int {
+    guard(-1, || {
+        let out = out_of(kelvin, "kelvin")?;
+        let data = bytes_of(data, length)?;
+        // Allocates, in tcslibgs, only where what arrived is not a value, to
+        // say why. Copied here into a fixed buffer.
+        *out = from_value(data, "the datum").map_err(fail)?;
+        Ok(0)
+    })
+}
+
+/// Reads bytes from C.
+///
+/// # Arguments
+///
+/// * `data`   - The bytes.
+/// * `length` - How many there are.
+///
+/// # Returns
+///
+/// The bytes, borrowed from C.
+///
+/// # Errors
+///
+/// `Failed`, its reason left for [`tcs_last_error`], where `data` is NULL
+/// and `length` is not 0.
+///
+/// # Safety
+///
+/// `data` NULL with `length` 0, or `length` readable bytes.
+unsafe fn bytes_of<'a>(
+    data: *const u8,
+    length: usize,
+) -> Result<&'a [u8], Failed> {
+    if length == 0 {
+        Ok(&[])
+    } else if data.is_null() {
+        Err(fail("the data is NULL"))
+    } else {
+        Ok(std::slice::from_raw_parts(data, length))
+    }
+}
+
+// ---- Data up to the vehicle -------------------------------------------------
+
+/// The way up to a gateway node: where it binds aboard.
+pub struct tcs_uplink {
+    uplink: Uplink,
+}
+
+/// Opens the way up to the gateway node called `gateway`, gated by the
+/// station's match for commanding.
+///
+/// # Arguments
+///
+/// * `configuration` - The configuration.
+/// * `gateway`       - The gateway node's name.
+///
+/// # Returns
+///
+/// The uplink, or NULL where there is no such gateway node, it binds no
+/// address and port aboard, or no socket can be made to send from.
+///
+/// # Safety
+///
+/// `configuration` as [`tcs_configuration_digest`]; `gateway` NULL or a
+/// NUL-terminated string.
+#[no_mangle]
+pub unsafe extern "C" fn tcs_uplink_open(
+    configuration: *const tcs_configuration,
+    gateway: *const c_char,
+) -> *mut tcs_uplink {
+    guard(std::ptr::null_mut(), || {
+        let configuration = handle_of(configuration, "the configuration")?;
+        let name = text_of(gateway, "the gateway node's name")?;
+        let mut uplink =
+            Uplink::open(&configuration.graph, name).map_err(|e| {
+                fail(format_args!("{}: {e}", configuration.path.display()))
+            })?;
+        // Sent only while the station is matched for commanding, as its
+        // client's commands are: what goes up drives a payload.
+        uplink.gated_by(configuration.matched.clone());
+        // Allocates, once, at startup: the handle, which outlives this call.
+        Ok(Box::into_raw(Box::new(tcs_uplink { uplink })))
+    })
+}
+
+/// Sends one datum up to the gateway node, in one datagram.
+///
+/// # Arguments
+///
+/// * `uplink` - The uplink.
+/// * `data`   - The datum's bytes.
+/// * `length` - How many bytes `data` holds.
+///
+/// # Returns
+///
+/// 0 once it has gone, or -1 where it was not sent: the station is not
+/// matched for commanding, the socket would not send it, or an argument is
+/// NULL.
+///
+/// # Safety
+///
+/// `uplink` NULL or made by `tcs_uplink_open` and not yet closed, used from
+/// one thread at a time; `data` as [`bytes_of`].
+#[no_mangle]
+pub unsafe extern "C" fn tcs_uplink_send(
+    uplink: *mut tcs_uplink,
+    data: *const u8,
+    length: usize,
+) -> c_int {
+    guard(-1, || {
+        let up = handle_of_mut(uplink, "the uplink")?;
+        let data = bytes_of(data, length)?;
+        // Allocates, in tcslib, only where it is not sent, to say why.
+        // Copied here into a fixed buffer.
+        up.uplink.send(data).map_err(fail)?;
+        Ok(0)
+    })
+}
+
+/// Close an uplink.
+///
+/// # Safety
+///
+/// `uplink` NULL or made by `tcs_uplink_open` and not yet closed.
+#[no_mangle]
+pub unsafe extern "C" fn tcs_uplink_close(uplink: *mut tcs_uplink) {
+    if !uplink.is_null() {
+        drop(Box::from_raw(uplink));
+    }
+}
+
 // ---- Commands ---------------------------------------------------------------
 
 /// Numbers a status as the header's `tcs_status` does: as the link does,
@@ -1882,6 +2081,78 @@ pub unsafe extern "C" fn tcs_pinger_close(pinger: *mut tcs_pinger) {
 
 #[cfg(test)]
 mod tests {
+    /// A value from C reads as the vehicle writes one, and a datum of
+    /// another width is refused, saying what a value is.
+    #[test]
+    fn a_value_reads_as_the_vehicle_writes_it() {
+        use super::*;
+
+        let written = tcslibgs::node::vehicle::compute::value_bytes(293.15)
+            .expect("a value");
+        let mut kelvin = 0.0;
+        // SAFETY: four readable bytes, and a writable double.
+        let read = unsafe {
+            tcs_value_kelvin(written.as_ptr(), written.len(), &mut kelvin)
+        };
+        assert_eq!(read, 0);
+        assert!((kelvin - 293.15).abs() < 1e-6, "{kelvin}");
+
+        // SAFETY: one readable byte, and a writable double.
+        let read = unsafe { tcs_value_kelvin(b"1".as_ptr(), 1, &mut kelvin) };
+        assert_eq!(read, -1);
+        // SAFETY: this thread's error buffer, which `Text` keeps terminated
+        // and which lives as long as the thread.
+        let why = unsafe { CStr::from_ptr(tcs_last_error()) };
+        assert!(why.to_string_lossy().contains("micro-kelvin"), "{why:?}");
+    }
+
+    /// Which nodes send values is the configuration's: in the thermostat
+    /// example, a conversion and the vote do, the hysteresis and a sensor
+    /// do not, and a node it lacks is refused.
+    #[test]
+    fn a_node_sends_values_as_the_configuration_says() {
+        use super::*;
+
+        let path = CString::new(concat!(
+            env!("CARGO_MANIFEST_DIR"),
+            "/../examples/thermostat/thermostat.ytcs"
+        ))
+        .expect("a path");
+        // SAFETY: a NUL-terminated path that outlives the call.
+        let configuration = unsafe { tcs_configuration_open(path.as_ptr()) };
+        assert!(!configuration.is_null(), "the example opens");
+        for (node, sends) in [
+            (c"k_1", 1),
+            (c"cabin_temp", 1),
+            (c"thermostat", 0),
+            (c"temp_1", 0),
+        ] {
+            let mut values = -1;
+            // SAFETY: a live configuration, a NUL-terminated name and a
+            // writable int.
+            let said = unsafe {
+                tcs_configuration_sends_values(
+                    configuration,
+                    node.as_ptr(),
+                    &mut values,
+                )
+            };
+            assert_eq!((said, values), (0, sends), "{node:?}");
+        }
+        let mut values = -1;
+        // SAFETY: as above.
+        let said = unsafe {
+            tcs_configuration_sends_values(
+                configuration,
+                c"nobody".as_ptr(),
+                &mut values,
+            )
+        };
+        assert_eq!(said, -1);
+        // SAFETY: made by tcs_configuration_open and not yet closed.
+        unsafe { tcs_configuration_close(configuration) };
+    }
+
     /// A restart's target from C: NULL is this configuration's checksum, 32
     /// lower-case hex digits are that checksum, and anything else is refused
     /// with a reason saying what to give.
@@ -1980,6 +2251,7 @@ mod tests {
             tcs_client_close(std::ptr::null_mut());
             tcs_pinger_close(std::ptr::null_mut());
             tcs_beacons_waker_close(std::ptr::null_mut());
+            tcs_uplink_close(std::ptr::null_mut());
         }
 
         // Nor is there a waker of no watch, or a wakeup from no waker.

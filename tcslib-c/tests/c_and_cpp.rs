@@ -6,11 +6,12 @@
 //! and works: `examples/ground.c` with gcc and `examples/ground.cpp` with
 //! g++, each linked with the `libtcs.a` this crate builds, each run against a
 //! stand-in vehicle that sends beacons as tcspecial serializes them, answers
-//! CONNECT, PING and QUERY_NODE, and sends one datum to the gateway node. The
-//! two must print the same lines, and the right ones: among them that a PING is
-//! refused unsent before the station is matched, that it is matched for
-//! listening by the vehicle's beacon and for commanding by its Connect, and
-//! what it has counted of what the vehicle sent.
+//! CONNECT, PING and QUERY_NODE, takes a datum sent up to the gateway node, and
+//! sends one datum down from it. The two must print the same lines, and the
+//! right ones: among them that a PING and a datum sent up are refused unsent
+//! before the station is matched, that it is matched for listening by the
+//! vehicle's beacon and for commanding by its Connect, and what it has counted
+//! of what the vehicle sent.
 //!
 //! The ports are free ones, found as the test starts. Where there is no gcc
 //! or g++ this says so and passes: it tests the header, and a machine with no
@@ -258,6 +259,7 @@ vehicle:
             let mut buffer = [0u8; 65535];
             let mut sequence = 0;
             let mut answered = Vec::new();
+            let mut sent_up = Vec::new();
             while !stop.load(Ordering::Relaxed) {
                 sequence += 1;
                 let datagram =
@@ -265,16 +267,23 @@ vehicle:
                 let _ = beacon.send_to(&datagram, ("127.0.0.1", beacons));
 
                 // A ping, answered as the ping node answers it, down to where
-                // the ground takes the ping node's data.
+                // the ground takes the ping node's data; and anything else
+                // sent up, kept to say what arrived.
                 if let Ok((size, _)) = uplink.recv_from(&mut buffer) {
-                    let answer = ping::reply(
+                    match ping::reply(
                         &buffer[..size],
                         ping::now().expect("a clock"),
-                    )
-                    .expect("it is a ping");
-                    sender
-                        .send_to(answer.as_bytes(), ("127.0.0.1", ground_data))
-                        .expect("the answer");
+                    ) {
+                        Ok(answer) => {
+                            sender
+                                .send_to(
+                                    answer.as_bytes(),
+                                    ("127.0.0.1", ground_data),
+                                )
+                                .expect("the answer");
+                        }
+                        Err(_) => sent_up.push(buffer[..size].to_vec()),
+                    }
                 }
 
                 for link in [&interpreter, &nodes] {
@@ -371,17 +380,18 @@ vehicle:
                     }
                 }
             }
-            answered
+            (answered, sent_up)
         })
     };
 
     let ran = Command::new(program)
         .arg("--restart")
+        .arg("--send=1")
         .arg(&configuration)
         .output()
         .expect("the ground station runs");
     stop.store(true, Ordering::Relaxed);
-    let answered = vehicle.join().expect("the vehicle stops");
+    let (answered, sent_up) = vehicle.join().expect("the vehicle stops");
 
     let printed = String::from_utf8_lossy(&ran.stdout).into_owned();
     assert!(
@@ -404,21 +414,31 @@ vehicle:
         "{}: what the vehicle was asked",
         program.display()
     );
+    // Once, after the match: the datum sent before it was refused unsent.
+    assert_eq!(
+        sent_up,
+        [b"1".to_vec()],
+        "{}: what was sent up",
+        program.display()
+    );
 
     // What it printed, with the digest taken out: it is the temporary
     // configuration's, which differs between the two runs.
     let expected = [
         format!("configuration: md5 {digest}"),
         "ping before a match: refused, unsent".to_string(),
+        "send before a match: refused, unsent".to_string(),
         format!("beacon: Heard, tcspecial v{version} md5 {digest}"),
         "matched: listening yes, commanding no".to_string(),
         "connect: agrees".to_string(),
         "matched: listening yes, commanding yes".to_string(),
         "ping: answered".to_string(),
+        "sent up to gateway: \"1\"".to_string(),
         "query ping (node 1): Success, running".to_string(),
         "set ping count: refused (status 42) -- no command binding says \
         the ground may set \"ping.count\""
             .to_string(),
+        "ping sends values: no".to_string(),
         "sample ping: took \"ping\" of 6 bytes, gave nothing".to_string(),
         "restart: armed done, restarted done".to_string(),
         "ping ping through gateway: sent".to_string(),

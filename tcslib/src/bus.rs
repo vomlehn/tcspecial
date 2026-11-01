@@ -670,8 +670,10 @@ impl Keeper {
 
     /// Refuses the far end: tells it so, and disconnects.
     fn refuse(&mut self) {
-        self.say(kind::DISCONNECT, 0);
+        // Disconnected before the far end is told, so that nothing it does
+        // on hearing so finds this side still saying it is verified.
         self.disconnect();
+        self.say(kind::DISCONNECT, 0);
     }
 
     /// Disconnects on this side, and announces again.
@@ -1141,8 +1143,10 @@ impl Hub {
 
     /// Refuses a peer: tells it so, and forgets it.
     fn refuse(&mut self, who: Who) {
-        self.say(who, kind::DISCONNECT, 0);
+        // Forgotten before it is told, as the station's peer refuses; its
+        // address is kept for the telling.
         self.kept(who).forget();
+        self.say(who, kind::DISCONNECT, 0);
     }
 
     /// Sends what is in `out` after its header to a peer, a message of

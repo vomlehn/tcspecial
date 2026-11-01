@@ -1151,11 +1151,11 @@ fprime-build:
 
 # Build the bridge and run its test: tcssim standing in for the fprime
 # example's payloads, tcspecial flying it, and F´'s ground system commanding
-# the bridge in an F´ deployment and reading its channels. tcssim's window
-# opens for the length of the test.
+# the bridge in an F´ deployment and reading its channels, holding the ports'
+# lock while it runs. tcssim's window opens for the length of the test.
 .PHONY: fprime-test
 fprime-test:
-	$(MAKE) -C fprime test
+	$(MAKE) -C fprime test TCS_PORTS_LOCK=$(PORTS_LOCK)
 
 # Where stand-ins-test keeps what a run leaves, emptied at the start of each.
 STAND_INS_RUN = $(CURDIR)/tests/stand-ins/run

@@ -4391,20 +4391,31 @@ counting its own sequence per APID. Each link states its APID:
    tcspecial:
      gateway: "yamcs"
      beacon:
-       apid: "0x100"     # the beacon
+       apid: "0x100"       # the beacon
+     payload_telemetry:
+       apid_base: "0x300"  # each untouched payload's telemetry, plus its id
      tcs_cmd:
-       apid: "0x101"     # commands, and their answers
+       apid: "0x101"       # commands, and their answers
    gateways:
      - type gateway_yamcs:
          - gateway: gateway
            apid_base: "0x200"
 
 A gateway node's uplink takes telecommands of its ``apid_base``, and each
-source sends through it as telemetry of ``apid_base`` plus its device id.
-``beacon.apid`` and ``tcs_cmd.apid`` are required in a yamcs configuration and
+source sends through it as telemetry of ``apid_base`` plus its device id. A
+payload nothing in the drawing touches, which reports over
+``payload_telemetry``, is framed too: its telemetry goes as telemetry of
+``payload_telemetry.apid_base`` plus its device id, to ``dest_base`` plus the
+same id. An APID is counted as a port is, so a ground station finds a
+payload's APID where it finds its port. ``beacon.apid``, ``tcs_cmd.apid`` and
+``payload_telemetry.apid_base`` are required in a yamcs configuration and
 refused in any other, as ``apid_base`` is on any node but a ``gateway_yamcs``.
-Each APID is 0 to ``0x7FF``, and no two links may share one: the beacon, the
-commands, each gateway node's uplink and each of its sources.
+Each APID, counted ones included, is 0 to ``0x7FF``, and no two links may
+share one: the beacon, the commands, each gateway node's uplink and each of
+its sources, and each untouched payload. The one exception is a gateway
+node's uplink and the downlink of the node of device id 0 through it, one
+telecommands and the other telemetry. A configuration that breaks either rule
+is refused where it is read, naming the two links and what to change.
 
 A command link's sender may be written with port ``0`` -- ``tcs_cmd.send:
 "127.0.0.1:0"`` -- to take commands from any port of that host, each answer

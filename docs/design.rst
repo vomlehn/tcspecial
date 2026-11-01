@@ -6432,15 +6432,22 @@ header on every packet, and no secondary header, so that a ground station
 that speaks CCSDS packets -- Yamcs -- tells them apart by APID. The kind
 frames every link in its section, as cFS's does: the beacon on
 ``beacon.apid``, the commands and their answers on ``tcs_cmd.apid``, each
-gateway node's uplink on its ``apid_base``, and each source through it on
-``apid_base`` plus its device id. The ground's packets are telecommands and
+gateway node's uplink on its ``apid_base``, each source through it on
+``apid_base`` plus its device id, and the telemetry of each payload nothing
+touches on ``payload_telemetry.apid_base`` plus its device id. An APID is
+counted as a port is, from a base by the device id, so the ground finds a
+payload's APID where it finds its port, and a node added moves both
+alike. The ground's packets are telecommands and
 the vehicle's telemetry, unsegmented, each sender counting its own sequence
 per APID; a packet with another type, another APID, a secondary header, a
 segment or a length field that is not its own is refused and counted, and
 the sequence count is not checked, a lost packet being no reason to refuse
 the next. The header is ``tcslibgs::ccsds``. The APIDs are stated rather
 than fixed, because which a mission's ground expects is the mission's, and
-they are checked distinct where the file is read. Yamcs's mission database
+they are checked where the file is read: each counted APID at most
+``0x7FF``, and no two links on one, a gateway node's uplink and its device
+id 0's downlink excepted, told apart by the packet type
+(``tcslibgs::graph::telemetry::apids``). Yamcs's mission database
 is tcspecial's own XTCE with a wrapper that puts the header around it, which
 the ping-yamcs example writes.
 

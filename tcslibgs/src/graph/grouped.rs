@@ -87,7 +87,7 @@ enum Language {
 ///
 /// # Errors
 ///
-/// Anything [`SectionVisitor`] refuses.
+/// Whatever the shape of a section does not allow: see the module.
 pub fn gateways<'de, D: Deserializer<'de>>(
     d: D,
 ) -> Result<Vec<Typed>, D::Error> {
@@ -106,7 +106,7 @@ pub fn gateways<'de, D: Deserializer<'de>>(
 ///
 /// # Errors
 ///
-/// Anything [`SectionVisitor`] refuses.
+/// Whatever the shape of a section does not allow: see the module.
 pub fn vehicle<'de, D: Deserializer<'de>>(
     d: D,
 ) -> Result<Vec<Typed>, D::Error> {
@@ -125,7 +125,7 @@ pub fn vehicle<'de, D: Deserializer<'de>>(
 ///
 /// # Errors
 ///
-/// Anything [`SectionVisitor`] refuses.
+/// Whatever the shape of a section does not allow: see the module.
 pub fn payloads<'de, D: Deserializer<'de>>(
     d: D,
 ) -> Result<Vec<Typed>, D::Error> {

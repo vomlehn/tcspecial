@@ -70,7 +70,7 @@ fn a_vehicle_answering_to_yamcs_frames_every_packet() {
     let dir = tempfile::tempdir().expect("a directory");
     let beacons = bound();
     let commands = bound();
-    // The ping node is the second node written, device id 1, so what it
+    // The ping node's name sorts second of the two, device id 1, so what it
     // sends goes to ground_base plus one: the ground socket's port.
     let downlink = bound();
     let take_at = free();

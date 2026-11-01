@@ -219,7 +219,7 @@ impl Routes {
             .collect();
 
         // The lines of the drawing, counted as tcsgui reads them: one per
-        // destination, in the file's order.
+        // destination, in the order the configuration holds them.
         let mut line = 0;
         for link in &graph.links {
             // The node it leaves, whatever terminal it leaves by. The routing

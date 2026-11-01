@@ -84,7 +84,7 @@ impl Where {
             }
             About::SimPayload(name) => (&["simulated_payloads"], name),
             About::SimGroup(name) => (&["simulated_payload_groups"], name),
-            About::Node(name) => (&["gateway", "vehicle", "payloads"], name),
+            About::Node(name) => (&["gateways", "vehicle", "payloads"], name),
             About::NodeGroup(name) => (&["payload_groups"], name),
             About::PhysicsElement(name) => (&["physics"], name),
         };
@@ -129,35 +129,59 @@ impl Where {
     }
 }
 
-/// Finds the `name` of a flow mapping, given what is inside its braces.
+/// The key an entry of a section is named by in YAML.
+///
+/// A node is named by the word for its section -- `- payload: temp_1` --
+/// and everything else by `name`.
+///
+/// # Arguments
+///
+/// * `section` - The section, as the file names it.
+///
+/// # Returns
+///
+/// The key, with its colon.
+fn name_key(section: &str) -> String {
+    let word = tcslibgs::graph::Section::ALL
+        .into_iter()
+        .find(|s| s.name() == section)
+        .map_or("name", |s| s.node_word());
+    format!("{word}:")
+}
+
+/// Finds the name of a flow mapping, given what is inside its braces.
 ///
 /// A scan and not a parse, as everything here is: the file has already
 /// parsed, so the question is only where a name was written. Commas separate
-/// the entries and the first `name:` wins, which is the one a reader sees.
+/// the entries and the first naming key wins, which is the one a reader
+/// sees.
 ///
 /// # Arguments
 ///
 /// * `inside` - What follows the opening brace, the closing one included or
 ///              not.
+/// * `key`    - The key that names an entry here, with its colon.
 ///
 /// # Returns
 ///
-/// The name, unquoted, or `None` if there is no `name:`.
-fn flow_name(inside: &str) -> Option<&str> {
+/// The name, unquoted, or `None` if there is no such key.
+fn flow_name<'a>(inside: &'a str, key: &str) -> Option<&'a str> {
     inside
         .trim_end_matches('}')
         .split(',')
         .map(str::trim)
-        .find_map(|piece| piece.strip_prefix("name:"))
+        .find_map(|piece| piece.strip_prefix(key))
         .map(unquoted)
 }
 
 /// Finds what a YAML file says where.
 ///
-/// A section is a key at the left margin; an entry is a `name:` under one.
-/// That is the whole of the shape these files have -- every section is a list
-/// of named things, or the `tcspecial` mapping -- so nothing here has to know
-/// what any of them mean.
+/// A section is a key at the left margin; an entry is a `name:` under one,
+/// or in a section of nodes the word for its nodes, `payload:` under
+/// `payloads`. That is the whole of the shape these files have -- every
+/// section is a list of named things, grouped by type where they are nodes,
+/// or the `tcspecial` mapping -- so nothing here has to know what any of them
+/// mean.
 ///
 /// # Arguments
 ///
@@ -190,19 +214,20 @@ fn yaml(text: &str) -> Where {
 
         // An entry's name, whether it is the first key of a list item or a
         // later one.
+        let naming = name_key(&section);
         let key = trimmed.strip_prefix("- ").unwrap_or(trimmed);
-        if let Some(value) = key.strip_prefix("name:") {
+        if let Some(value) = key.strip_prefix(naming.as_str()) {
             found.note(&section, unquoted(value), number);
             continue;
         }
 
         // Or a name inside a flow mapping, which is how a file is commonly
-        // written: `- { name: temp_1, type: i2c }` on one line. Without this
-        // such an entry is never found and a problem about it is
-        // reported from its section's line, which sends a reader to the top of
-        // a list rather than to the thing.
+        // written: `- { payload: temp_1, address: "0x48" }` on one line.
+        // Without this such an entry is never found and a problem about it
+        // is reported from its section's line, which sends a reader to the
+        // top of a list rather than to the thing.
         if let Some(inside) = key.strip_prefix('{') {
-            if let Some(name) = flow_name(inside) {
+            if let Some(name) = flow_name(inside, &naming) {
                 found.note(&section, name, number);
             }
         }
@@ -213,10 +238,11 @@ fn yaml(text: &str) -> Where {
 
 /// Finds what an XML file says where.
 ///
-/// The sections are the elements under the root and the entries are their
-/// `name` children, which is the convention a payload configuration in XML
-/// follows. A `name` attribute is read as well: it is how the format that is
-/// gone wrote one, and a file written that way is better pointed at than not.
+/// The sections are the elements under the root and the entries are named
+/// in them: a node by the `name` attribute of its element, under the
+/// `<type>` it is written in, and a group, a simulated payload and the rest
+/// by a `name` child. The `name` of a `<type>` is a type and not an entry,
+/// and is passed over.
 ///
 /// # Arguments
 ///
@@ -278,7 +304,9 @@ fn xml(text: &str) -> Where {
             found.note_section(&section, opened_on);
         }
 
-        if let Some(value) = attribute(body, "name") {
+        if let Some(value) =
+            attribute(body, "name").filter(|_| element != "type")
+        {
             found.note(&section, value, opened_on);
         }
 
@@ -370,23 +398,23 @@ payload_groups:
     type: device-file
 
 payloads:
-  - name: DH0
-    group: shared
-    packet_size: 1
+  - type device-file:
+      - payload: DH0
+        group: shared
+        packet_size: 1
 
-  - name: \"DH1\"
-    type: device-file
-    path: /dev/zero
-    packet_size: 1
+      - payload: \"DH1\"
+        path: /dev/zero
+        packet_size: 1
 ";
 
     #[test]
     fn a_yaml_file_says_where_each_payload_is() {
         let found = Where::of(YAML, ConfigFormat::Yaml);
 
-        assert_eq!(found.line_of(&About::Node("DH0".to_string())), 13);
+        assert_eq!(found.line_of(&About::Node("DH0".to_string())), 14);
         // Quoted or not: the name is the name.
-        assert_eq!(found.line_of(&About::Node("DH1".to_string())), 17);
+        assert_eq!(found.line_of(&About::Node("DH1".to_string())), 18);
         assert_eq!(found.line_of(&About::NodeGroup("shared".to_string())), 9);
         assert_eq!(found.line_of(&About::Section("tcspecial")), 4);
     }
@@ -395,11 +423,11 @@ payloads:
     /// the same line.
     #[test]
     fn a_name_is_looked_for_in_the_section_it_belongs_to() {
-        let text =
-            "payload_groups:\n  - name: alike\npayloads:\n  - name: alike\n";
+        let text = "payload_groups:\n  - name: alike\npayloads:\n  \
+                    - type i2c:\n      - payload: alike\n";
         let found = Where::of(text, ConfigFormat::Yaml);
         assert_eq!(found.line_of(&About::NodeGroup("alike".to_string())), 2);
-        assert_eq!(found.line_of(&About::Node("alike".to_string())), 4);
+        assert_eq!(found.line_of(&About::Node("alike".to_string())), 5);
     }
 
     /// A name the file does not have falls back to the section, and a section
@@ -450,25 +478,33 @@ simulated_payloads:
     <type>device</type>
   </payload_groups>
   <payloads>
-    <name>DH0</name>
-    <group>shared</group>
-  </payloads>
-  <payloads>
-    <name>DH1</name>
+    <type name=\"device-file\">
+      <payload name=\"DH0\">
+        <group>shared</group>
+      </payload>
+      <payload name=\"DH1\"/>
+    </type>
   </payloads>
 </payload-configuration>
 ";
         let found = Where::of(text, ConfigFormat::Xml);
         assert_eq!(found.line_of(&About::NodeGroup("shared".to_string())), 4);
-        assert_eq!(found.line_of(&About::Node("DH0".to_string())), 8);
+        assert_eq!(found.line_of(&About::Node("DH0".to_string())), 9);
         assert_eq!(found.line_of(&About::Node("DH1".to_string())), 12);
+        // A type's name is not a node's.
+        assert_eq!(
+            found.line_of(&About::Node("device-file".to_string())),
+            7,
+            "the payloads section, where a node of that name would be"
+        );
     }
 
-    /// A name written as an attribute is found too, on one line or several.
+    /// A name written as an attribute is found in either quotes, on one
+    /// line or several.
     #[test]
     fn an_xml_name_may_be_an_attribute() {
-        let text = "<doc>\n  <payloads name=\"DH0\"/>\n  \
-                    <payloads type='device' name='DH1'/>\n</doc>\n";
+        let text = "<doc>\n  <payloads><payload name=\"DH0\"/>\n  \
+                    <payload\n name='DH1'/></payloads>\n</doc>\n";
         let found = Where::of(text, ConfigFormat::Xml);
         assert_eq!(found.line_of(&About::Node("DH0".to_string())), 2);
         assert_eq!(found.line_of(&About::Node("DH1".to_string())), 3);
@@ -496,19 +532,24 @@ simulated_payloads:
             <interval>1 s</interval>
         </beacon>
     </tcspecial>
-    <gateway>
-        <name>gateway-1</name>
-    </gateway>
-    <payloads
-        type=\"i2c\">
-        <name>sensor</name>
+    <gateways>
+        <type name=\"gateway_radio\">
+            <gateway name=\"gateway-1\"/>
+        </type>
+    </gateways>
+    <payloads>
+        <type name=\"i2c\">
+            <payload
+                name=\"sensor\">
+            </payload>
+        </type>
     </payloads>
 </configuration>
 ";
         let found = Where::of(text, ConfigFormat::Xml);
         assert_eq!(found.line_of(&About::Section("tcspecial")), 6);
-        assert_eq!(found.line_of(&About::Node("gateway-1".to_string())), 14);
-        assert_eq!(found.line_of(&About::Node("sensor".to_string())), 18);
+        assert_eq!(found.line_of(&About::Node("gateway-1".to_string())), 15);
+        assert_eq!(found.line_of(&About::Node("sensor".to_string())), 20);
     }
 
     /// The scan does not mistake the root for a section, nor a closing tag
@@ -519,8 +560,8 @@ simulated_payloads:
     /// nowhere.
     #[test]
     fn the_root_is_not_a_section() {
-        let text =
-            "<payload-configuration><payloads><name>DH0</name></payloads>\
+        let text = "<payload-configuration><payloads><type name=\"i2c\">\
+                    <payload name=\"DH0\"/></type></payloads>\
                     </payload-configuration>\n";
         let found = Where::of(text, ConfigFormat::Xml);
         assert_eq!(found.line_of(&About::Node("DH0".to_string())), 1);

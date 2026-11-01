@@ -43,13 +43,13 @@ tcspecial:
     recv: \"0.0.0.0:4000\"
     send: \"127.0.0.1:4100\"
 payloads:
+  - type device-file:
 "
     .to_string();
     for id in 0..count {
         text.push_str(&format!(
-            "  - name: DH{id}\n    type: device-file\n    \
-             path: /dev/null{id}\n    \
-             payload-out:\n      - target: nowhere{id}\n"
+            "      - payload: DH{id}\n        path: /dev/null{id}\n        \
+             payload-out:\n          - target: nowhere{id}\n"
         ));
     }
     let path = dir.join("set.ytcs");
@@ -198,7 +198,7 @@ fn the_fprime_example_has_its_bridge_model_written() {
         "{fppi}"
     );
     assert!(
-        fppi.contains("telemetry $thermometer: Datum id 2"),
+        fppi.contains("telemetry $thermometer: Datum id 3"),
         "{fppi}"
     );
     assert!(model.join("TcsBridgeModel.cpp").is_file());
@@ -429,13 +429,15 @@ fn a_bad_option_is_a_command_line_of_none_of_the_shapes() {
 ///
 /// # Arguments
 ///
-/// * `dir`  - The directory it is written in, as `one.ytcs`.
-/// * `node` - The node's attributes after its name, as indented YAML lines.
+/// * `dir`       - The directory it is written in, as `one.ytcs`.
+/// * `node_type` - The node's type.
+/// * `node`      - The node's attributes after its name, as indented YAML
+///                 lines.
 ///
 /// # Returns
 ///
 /// The file's path.
-fn with_vehicle_node(dir: &Path, node: &str) -> PathBuf {
+fn with_vehicle_node(dir: &Path, node_type: &str, node: &str) -> PathBuf {
     let text = format!(
         "\
 description: one vehicle node
@@ -460,19 +462,20 @@ tcspecial:
   tcs_cmd:
     recv: \"0.0.0.0:4000\"
     send: \"127.0.0.1:4100\"
-gateway:
-  - name: ground
-    type: gateway_radio
-    address: \"127.0.0.1\"
-    port: \"5000\"
-    ground_base: \"127.0.0.1:5100\"
-    gateway-out:
-      - target: pinger
+gateways:
+  - type gateway_radio:
+      - gateway: ground
+        address: \"127.0.0.1\"
+        port: \"5000\"
+        ground_base: \"127.0.0.1:5100\"
+        gateway-out:
+          - target: pinger
 vehicle:
-  - name: pinger
+  - type {node_type}:
+      - compute: pinger
 {node}
-    payload-out:
-      - target: ground
+        payload-out:
+          - target: ground
 "
     );
     let path = dir.join("one.ytcs");
@@ -486,7 +489,7 @@ vehicle:
 fn warnings_alone_are_a_run_that_passes() {
     let dir = tempfile::tempdir().expect("a directory");
     let file =
-        with_vehicle_node(dir.path(), "    type: ping\n    interval: \"1 s\"");
+        with_vehicle_node(dir.path(), "ping", "        interval: \"1 s\"");
 
     let (lines, status) = run(&[file.to_str().expect("a path")]);
     assert_eq!(lines.len(), 1, "{lines:?}");
@@ -498,13 +501,12 @@ fn warnings_alone_are_a_run_that_passes() {
 #[test]
 fn a_type_that_does_not_exist_fails_the_run() {
     let dir = tempfile::tempdir().expect("a directory");
-    let file = with_vehicle_node(dir.path(), "    type: bogus");
+    let file = with_vehicle_node(dir.path(), "bogus", "");
 
     let (lines, status) = run(&[file.to_str().expect("a path")]);
     assert!(
-        lines.iter().any(
-            |line| line.contains(": error: ") && line.contains("\"bogus\"")
-        ),
+        lines.iter().any(|line| line.contains(": error: ")
+            && line.contains("bogus is not a type of node")),
         "{lines:?}"
     );
     assert_eq!(status, 1);

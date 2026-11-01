@@ -143,14 +143,18 @@ compute element
     time, a comparison against a setpoint, a filter that remembers.
 
 value
-    A number on a link: four bytes of a signed count of micro-kelvin, most
-    significant byte first. A temperature is a value in kelvins from the
-    conversion that made it to the computation, the log and the ground, so
-    that comparing two readings is a comparison and not a conversion. The unit
-    is finer than any sensor here resolves, so the number is exact rather than
-    rounded in practice, and the range it reaches is 2147.483647 K either way
-    -- a temperature outside that is refused where the value is made, naming
-    the number. Where a value becomes text -- the lines a program reads and
+    A number on a link, in a unit: four bytes of a signed count of the
+    unit's steps, most significant byte first -- micro-kelvin for a
+    temperature, micro-volts for a voltage, millimetres for a length. A
+    reading is a value in one unit from the conversion that made it to the
+    computation, the log and the ground, so that comparing two readings is a
+    comparison and not a conversion. The unit is not on the link: the
+    configuration says it, a conversion stating it and a vote taking its
+    inputs'. A step is finer than any part here resolves, so the number is
+    exact rather than rounded in practice, and each unit reaches what its
+    step allows -- 2147.483647 K either way for a temperature, 2147 km for an
+    altitude -- with a number outside that refused where the value is made,
+    naming the number. Where a value becomes text -- the lines a program reads and
     writes, or the value typed into a command -- it is converted at that
     boundary and nowhere else.
 
@@ -1832,14 +1836,22 @@ otherwise produces a payload that looks configured and is not:
   guess would run something nobody asked for, and the refusal says which
   rate the payload has: ``"both" states poll_interval and a trigger: a node
   that is asked is read when it has been asked, so say trigger_interval``.
-* **A temperature a value could not carry**. A ``setpoint`` or a
-  ``half_band`` on a thermostat, or an ``offset`` on a conversion, is a
-  temperature in kelvin, and a value carries 2147.483647 K either way. A
+* **A number a value could not carry**. An ``offset`` on a conversion is a
+  number in the conversion's unit, and a ``setpoint`` or a ``half_band`` on a
+  thermostat one in the unit of what the thermostat reads; a value carries
+  what its unit's step allows, 2147.483647 K either way for a temperature. A
   setpoint of 3000 K is a thermostat whose readings can never reach it, so the
   heaters would be driven on and held there for the whole flight; an offset
   outside the range is every reading of that part outside it. A ``scale`` is
-  not held to this -- it is kelvin per count, not a temperature, and what it
-  may be depends on counts no file states.
+  not held to this -- it is units per count, not a value, and what it may be
+  depends on counts no file states.
+* **A value in the wrong unit, or no value at all**. Every node feeding a
+  ``vote``, a ``hysteresis`` or a ``process`` must send values, and in one
+  unit: ``to_kelvin`` sends kelvin, ``to_value`` the ``unit`` it names (``K``,
+  ``V``, ``A``, ``W``, ``m``, ``m/s``, ``N`` or ``ratio``), a ``process`` the
+  ``unit`` it must state, and a vote its inputs'. A vote between a temperature
+  and a voltage is refused naming both, and a thermostat reading a sensor's
+  own bytes is told to put a conversion between them.
 * **Two nodes wanting the same thing**. Two at one address cannot both be
   started; two on one device file, serial line or SPI peripheral is worse,
   each taking part of the one stream and reporting it as though it were the
@@ -2554,8 +2566,9 @@ which checks the configuration first and writes nothing from one with errors.
 Each node drawn into the ``gateway_fprime`` node is a channel named after it,
 at ``fprime_id_base`` plus its device id -- ``thermometer``, ``0x3002`` --
 of the type the configuration says its data are. A node that sends values, a
-compute node whose function is ``to_kelvin``, ``vote`` or ``process``, has an
-``F64`` channel, its temperature in kelvin -- ``zone_temp``, ``0x3003`` --
+compute node whose function is ``to_kelvin``, ``to_value``, ``vote`` or
+``process``, has an ``F64`` channel in that node's unit, formatted with it --
+``zone_temp``, ``0x3003``, in kelvin --
 and a datum from it that is not a value goes to no channel, is counted in
 ``DataNotValues`` and is said in a ``NotAValue`` event. A node that sends
 decisions, a compute node whose function is ``hysteresis``, has a ``bool``

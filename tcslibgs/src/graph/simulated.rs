@@ -54,7 +54,7 @@ pub const DEFAULT_PACKET_BYTES: usize = 16;
 ///
 /// # Returns
 ///
-/// The `to_kelvin` parameters of the one conversion its readings go to.
+/// The parameters of the one conversion to kelvin its readings go to.
 ///
 /// # Errors
 ///
@@ -63,13 +63,11 @@ pub const DEFAULT_PACKET_BYTES: usize = 16;
 pub fn reading_of(
     graph: &Graph,
     payload: &str,
-) -> Result<crate::node::vehicle::compute::ToKelvinParams, String> {
+) -> Result<crate::node::vehicle::compute::ToValueParams, String> {
     use crate::node::vehicle::compute::{params_of, Computation};
 
-    let mut found: Vec<(
-        String,
-        crate::node::vehicle::compute::ToKelvinParams,
-    )> = Vec::new();
+    let mut found: Vec<(String, crate::node::vehicle::compute::ToValueParams)> =
+        Vec::new();
     for link in graph.links.iter().filter(|l| l.origin().node == payload) {
         for destination in link.to.each() {
             let to = Destination::parse(destination).node;
@@ -79,9 +77,16 @@ pub fn reading_of(
             if node.node_type != "compute" {
                 continue;
             }
-            if let Ok(Computation::ToKelvin(params)) =
-                params_of(&node.name, &node.attributes)
+            // A conversion to kelvin, by either name: a thermal mass is a
+            // temperature, and a conversion to anything else would read the
+            // mass's temperature back as volts.
+            if let Ok(
+                Computation::ToKelvin(params) | Computation::ToValue(params),
+            ) = params_of(&node.name, &node.attributes)
             {
+                if params.unit != crate::unit::Unit::Kelvin {
+                    continue;
+                }
                 if !found.iter().any(|(name, _)| name == &to) {
                     found.push((to, params));
                 }

@@ -54,6 +54,7 @@
 use std::time::{Duration, Instant};
 
 use tcslibgs::node::vehicle::compute::{Algorithm, VoteParams};
+use tcslibgs::unit::Unit;
 
 use super::{from_value, Function, Out};
 
@@ -76,6 +77,8 @@ pub struct Vote {
     /// How old a reading may be and still be counted, or `None` for no
     /// limit.
     age: Option<Duration>,
+    /// What the readings are numbers of, which the vote's value is in too.
+    unit: Unit,
     /// Whether a majority has been current at some arrival: before then, too
     /// few is a vote starting, and after, it is a vote that has lost its
     /// majority.
@@ -100,17 +103,19 @@ impl Vote {
     ///
     /// * `params` - The inputs' names, the algorithm to vote by, and how old
     ///              a reading may be.
+    /// * `unit`   - What the readings are numbers of.
     ///
     /// # Returns
     ///
     /// The vote, with no input reported yet.
-    pub fn of(params: VoteParams) -> Vote {
+    pub fn of(params: VoteParams, unit: Unit) -> Vote {
         let inputs = params.inputs.len();
         Vote {
             latest: vec![None; inputs],
             expected: params.inputs,
             algorithm: params.algorithm,
             age: params.age,
+            unit,
             voted: false,
             sorted: Vec::with_capacity(inputs),
         }
@@ -168,7 +173,7 @@ impl Vote {
         // The newest reading from that input, replacing whatever it said
         // before: this votes over the latest from each, so a sensor
         // reporting twice simply has its later reading used.
-        let reading = from_value(data, input)?;
+        let reading = from_value(data, self.unit, input)?;
         self.latest[at] = Some((now, reading));
 
         // The readings that still count, sorted for a verdict.
@@ -205,7 +210,8 @@ impl Vote {
         // The verdict is one of the readings, or the mean of two of them,
         // so it is inside the range every reading came in by -- but it is
         // made into a value the one way everything else is.
-        Ok(Some(Out::value(self.verdict())?))
+        let unit = self.unit;
+        Ok(Some(Out::value(self.verdict(), unit)?))
     }
 
     /// Works out the value the current readings come to.
@@ -322,7 +328,8 @@ mod tests {
     /// The refusal is `as_value`'s range, which these temperatures are all
     /// well inside; a test that meant to try the range says so.
     fn kelvin(number: f64) -> Vec<u8> {
-        as_value(number).expect("a temperature a value carries")
+        as_value(number, tcslibgs::unit::Unit::Kelvin)
+            .expect("a temperature a value carries")
     }
 
     /// Makes a vote over three inputs, `in0` to `in2`.
@@ -350,20 +357,36 @@ mod tests {
     ///
     /// The vote.
     fn aged(algorithm: Algorithm, age: Option<Duration>) -> Vote {
-        Vote::of(VoteParams {
-            inputs: vec![
-                "in0".to_string(),
-                "in1".to_string(),
-                "in2".to_string(),
-            ],
-            algorithm,
-            age,
-        })
+        Vote::of(
+            VoteParams {
+                inputs: vec![
+                    "in0".to_string(),
+                    "in1".to_string(),
+                    "in2".to_string(),
+                ],
+                algorithm,
+                age,
+            },
+            tcslibgs::unit::Unit::Kelvin,
+        )
     }
 
     /// What a vote says, as a number.
+    ///
+    /// # Arguments
+    ///
+    /// * `out` - What the vote produced.
+    ///
+    /// # Returns
+    ///
+    /// The number, in kelvin.
     fn said(out: Option<Out>) -> f64 {
-        from_value(&out.expect("a value"), "a vote").expect("a value")
+        from_value(
+            &out.expect("a value"),
+            tcslibgs::unit::Unit::Kelvin,
+            "a vote",
+        )
+        .expect("a value")
     }
 
     /// Nothing is produced until a majority has reported, and from then

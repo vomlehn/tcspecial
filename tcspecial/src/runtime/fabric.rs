@@ -1945,9 +1945,20 @@ mod tests {
     /// [`crate::node::vehicle::compute::as_value`]. A decision is still text,
     /// so the decisions these tests look for are written as `b"1"` and
     /// `b"0"`.
+    ///
+    /// # Arguments
+    ///
+    /// * `number` - The temperature, in kelvin.
+    ///
+    /// # Returns
+    ///
+    /// The value's four bytes.
     fn kelvin(number: f64) -> Vec<u8> {
-        crate::node::vehicle::compute::as_value(number)
-            .expect("a temperature a value carries")
+        crate::node::vehicle::compute::as_value(
+            number,
+            tcslibgs::unit::Unit::Kelvin,
+        )
+        .expect("a temperature a value carries")
     }
 
     /// The example's links, and only its links.
@@ -2156,8 +2167,13 @@ vehicle:
         for name in ["k_1", "k_2", "k_3", "zone_temp", "thermostat"] {
             let node = graph.node(name).expect("a node of the example");
             let inputs = routes.inputs_of(name);
-            let port = ComputePort::make(node, &inputs, &Abandon::nothing())
-                .unwrap_or_else(|why| panic!("{name}: {why}"));
+            let port = ComputePort::make(
+                node,
+                &inputs,
+                routes.input_unit_of(name),
+                &Abandon::nothing(),
+            )
+            .unwrap_or_else(|why| panic!("{name}: {why}"));
             fabric.hold(name, Box::new(port));
         }
 
@@ -2200,8 +2216,12 @@ vehicle:
             .iter()
             .filter(|datum| datum.len() == 4)
             .map(|datum| {
-                crate::node::vehicle::compute::from_value(datum, "the ground")
-                    .expect("a value")
+                crate::node::vehicle::compute::from_value(
+                    datum,
+                    tcslibgs::unit::Unit::Kelvin,
+                    "the ground",
+                )
+                .expect("a value")
             })
             .collect();
         assert_eq!(temperatures.len(), 5, "{temperatures:?}");
@@ -2275,8 +2295,13 @@ vehicle:
             fabric.hold(
                 name,
                 Box::new(
-                    ComputePort::make(node, &inputs, &Abandon::nothing())
-                        .expect("the computation"),
+                    ComputePort::make(
+                        node,
+                        &inputs,
+                        routes.input_unit_of(name),
+                        &Abandon::nothing(),
+                    )
+                    .expect("the computation"),
                 ),
             );
         }
@@ -2324,6 +2349,7 @@ vehicle:
                 ComputePort::make(
                     node,
                     &routes.inputs_of("k_1"),
+                    routes.input_unit_of("k_1"),
                     &Abandon::nothing(),
                 )
                 .expect("it builds"),
@@ -2367,8 +2393,13 @@ vehicle:
         fabric.hold(
             "thermostat",
             Box::new(
-                ComputePort::make(thermostat, &[], &Abandon::nothing())
-                    .expect("it builds"),
+                ComputePort::make(
+                    thermostat,
+                    &[],
+                    routes.input_unit_of("thermostat"),
+                    &Abandon::nothing(),
+                )
+                .expect("it builds"),
             ),
         );
         let (heaters, heater_port) = recorder();
@@ -2433,8 +2464,13 @@ vehicle:
         fabric.hold(
             "thermostat",
             Box::new(
-                ComputePort::make(thermostat, &[], &Abandon::nothing())
-                    .expect("it builds"),
+                ComputePort::make(
+                    thermostat,
+                    &[],
+                    routes.input_unit_of("thermostat"),
+                    &Abandon::nothing(),
+                )
+                .expect("it builds"),
             ),
         );
         let (heaters, heater_port) = device();
@@ -2520,13 +2556,18 @@ vehicle:
         let graph = drawn();
         let routes = Routes::of(&graph);
 
-        let mut fabric = Fabric::new(routes, 64);
+        let mut fabric = Fabric::new(routes.clone(), 64);
         let thermostat = graph.node("thermostat").expect("the thermostat");
         fabric.hold(
             "thermostat",
             Box::new(
-                ComputePort::make(thermostat, &[], &Abandon::nothing())
-                    .expect("it builds"),
+                ComputePort::make(
+                    thermostat,
+                    &[],
+                    routes.input_unit_of("thermostat"),
+                    &Abandon::nothing(),
+                )
+                .expect("it builds"),
             ),
         );
 
@@ -2552,8 +2593,13 @@ vehicle:
         fabric_bound.hold(
             "thermostat",
             Box::new(
-                ComputePort::make(thermostat, &[], &Abandon::nothing())
-                    .expect("it builds"),
+                ComputePort::make(
+                    thermostat,
+                    &[],
+                    routes.input_unit_of("thermostat"),
+                    &Abandon::nothing(),
+                )
+                .expect("it builds"),
             ),
         );
         let said = fabric_bound

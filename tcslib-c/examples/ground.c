@@ -342,17 +342,17 @@ int main(int argc, char **argv)
 			       exchange.up + exchange.down ==
 			       exchange.round_trip ? "yes" : "no");
 		} else {
-			int values = 0, decisions = 0, on = 0;
-			double kelvin = 0.0;
+			int decisions = 0, on = 0;
+			const char *unit = NULL;
+			double value = 0.0;
 			data_seen = 1;
-			if (tcs_configuration_sends_values(configuration,
-							   datum.source,
-							   &values) == 0 &&
-			    values && tcs_value_kelvin(datum.data,
-						       datum.length,
-						       &kelvin) == 0) {
-				printf("data from %s: %.6f K\n", datum.source,
-				       kelvin);
+			if (tcs_configuration_value_unit(configuration,
+							 datum.source,
+							 &unit) == 0 &&
+			    unit && tcs_value_in(unit, datum.data,
+						 datum.length, &value) == 0) {
+				printf("data from %s: %.6f %s\n", datum.source,
+				       value, unit);
 			} else if (tcs_configuration_sends_decisions(
 					   configuration, datum.source,
 					   &decisions) == 0 &&

@@ -54,6 +54,7 @@ use nix::poll::{poll, PollFd, PollFlags};
 
 use crate::runtime::node_state::Abandon;
 use tcslibgs::node::vehicle::compute::{ProcessParams, Restart};
+use tcslibgs::unit::Unit;
 
 use super::{Function, Out};
 
@@ -103,6 +104,10 @@ pub struct Process {
     answer: Vec<u8>,
     /// The program's name in quotes, as a complaint about its answer names it.
     quoted: String,
+    /// What the values handed to the program are numbers of.
+    reads: Unit,
+    /// What its answers are numbers of, as the node states.
+    answers: Unit,
 }
 
 /// Room for a line to the program and its answer: a value as decimal text,
@@ -121,15 +126,19 @@ impl Process {
     ///
     /// # Arguments
     ///
-    /// * `params` - The program, how long it has to answer, and whether it
-    ///              is started again when it stops.
+    /// * `params` - The program, how long it has to answer, whether it is
+    ///              started again when it stops, and what its answers are
+    ///              numbers of.
+    /// * `reads`  - What the values handed to it are numbers of.
     ///
     /// # Returns
     ///
     /// The node, its program not started and with nothing to abandon a
     /// wait for.
-    pub fn of(params: ProcessParams) -> Process {
+    pub fn of(params: ProcessParams, reads: Unit) -> Process {
         Process {
+            reads,
+            answers: params.unit,
             quoted: format!("\"{}\"", params.executable),
             executable: params.executable,
             timeout: params.timeout,
@@ -497,7 +506,7 @@ impl Function for Process {
         //
         // Written into the node's own line, which `as_text` would have made a
         // string of: the same decimal, by the same `Display`.
-        let datum = super::from_value(data, "what arrived")?;
+        let datum = super::from_value(data, self.reads, "what arrived")?;
         self.line.clear();
         {
             use std::fmt::Write as _;
@@ -518,8 +527,9 @@ impl Function for Process {
                         self.executable
                     )
                 })?;
-                let number = super::from_text(said, &self.quoted)?;
-                Ok(Some(Out::value(number)?))
+                let number =
+                    super::from_text(said, self.answers, &self.quoted)?;
+                Ok(Some(Out::value(number, self.answers)?))
             }
             Ok(false) => Ok(None),
             Err(why) => {
@@ -584,7 +594,8 @@ mod tests {
     /// The refusal is `as_value`'s range, which these temperatures are all
     /// well inside; a test that meant to try the range says so.
     fn kelvin(number: f64) -> Vec<u8> {
-        as_value(number).expect("a temperature a value carries")
+        as_value(number, tcslibgs::unit::Unit::Kelvin)
+            .expect("a temperature a value carries")
     }
 
     /// Makes a node for a program of these parameters, not started.
@@ -608,11 +619,15 @@ mod tests {
         timeout: Duration,
         restart: Restart,
     ) -> Process {
-        Process::of(ProcessParams {
-            executable: executable.to_string(),
-            timeout,
-            restart,
-        })
+        Process::of(
+            ProcessParams {
+                executable: executable.to_string(),
+                timeout,
+                restart,
+                unit: tcslibgs::unit::Unit::Kelvin,
+            },
+            tcslibgs::unit::Unit::Kelvin,
+        )
     }
 
     /// A program told nothing is a program left stopped.
@@ -781,11 +796,25 @@ mod tests {
 
     /// What a program answered, as a number.
     ///
-    /// The value goes in as eight bytes, reaches the program as a decimal,
-    /// and its answer comes back as eight bytes again: see `give`.
+    /// The value goes in as four bytes, reaches the program as a decimal,
+    /// and its answer comes back as four bytes again: see `give`.
+    ///
+    /// # Arguments
+    ///
+    /// * `p`      - The program's node.
+    /// * `number` - What it is handed, in kelvin.
+    ///
+    /// # Returns
+    ///
+    /// Its answer, in kelvin.
     fn answered(p: &mut Process, number: f64) -> f64 {
         let out = p.give(None, &kelvin(number)).expect("an answer");
-        from_value(&out.expect("a value"), "the program").expect("a value")
+        from_value(
+            &out.expect("a value"),
+            tcslibgs::unit::Unit::Kelvin,
+            "the program",
+        )
+        .expect("a value")
     }
 
     /// A named input reaches the program as its name and its value.
@@ -807,7 +836,8 @@ mod tests {
             .expect("an answer")
             .expect("a value");
         assert_eq!(
-            from_value(&out, "the program").expect("a value"),
+            from_value(&out, tcslibgs::unit::Unit::Kelvin, "the program")
+                .expect("a value"),
             1.0,
             "the program should see which input this is, and its value"
         );

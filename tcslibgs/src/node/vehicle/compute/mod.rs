@@ -25,51 +25,28 @@ use std::time::Duration;
 
 use serde::{Deserialize, Serialize};
 
+use crate::unit::Unit;
 use crate::Scalar;
 
 /// How wide a value is on a link: a 32-bit integer.
 pub const VALUE_BYTES: usize = 4;
 
-/// How many of them are in a kelvin.
-///
-/// A micro-kelvin is finer than anything a spacecraft's thermometry resolves
-/// -- the parts the examples use report in sixteenths and hundredths of a
-/// kelvin -- so the unit is below the noise of every sensor that will be read
-/// through it, which is what a unit has to be if rounding to it is to be
-/// nothing at all.
-pub const MICRO_KELVIN: f64 = 1_000_000.0;
-
-/// Gives the coldest and the hottest a value can say, in kelvin.
-///
-/// Said out loud so that a message can name it and a tool can ask: these are
-/// the ends of [`micro_kelvin`], which is the one place the range is decided.
-///
-/// # Returns
-///
-/// The coldest, then the hottest.
-pub fn kelvin_range() -> (f64, f64) {
-    (
-        f64::from(i32::MIN) / MICRO_KELVIN,
-        f64::from(i32::MAX) / MICRO_KELVIN,
-    )
-}
-
-/// Turns a temperature into the count of micro-kelvin a value carries.
+/// Turns a number in a unit into the count of that unit's steps a value
+/// carries.
 ///
 /// The one place the range of a value is decided, and everything that turns a
-/// number into a temperature comes here: a reading on its way onto a link, a
-/// number read from text -- which is a program's answer or an operator's
-/// command -- and a temperature written in a configuration.
+/// number into a value comes here: a reading on its way onto a link, a number
+/// read from text -- which is a program's answer or an operator's command --
+/// and a number written in a configuration. How fine a step is, and so how
+/// far a value reaches, is the unit's: see [`crate::unit`]. A temperature is
+/// counted in micro-kelvin and reaches a little past 2147 K either way.
 ///
-/// A signed count of micro-kelvin reaches a little past 2147 K either way,
-/// which is above anything these nodes are pointed at and below a great deal
-/// that exists -- a thruster's throat is hotter. A temperature outside it is
-/// refused and named rather than wrapped or pinned to the end of the range:
-/// wrapping turns 2200 K into a zone that is 42 K below zero, pinning turns
-/// a runaway into a reading that looks like a hot but surviving part, and
-/// either is a thermostat acting confidently on a number nobody produced. A
-/// node that must carry more than this wants a unit of its own, and that is a
-/// change to make deliberately.
+/// A number outside the range is refused and named rather than wrapped or
+/// pinned to the end of it: wrapping turns 2200 K into a zone that is 42 K
+/// below zero, pinning turns a runaway into a reading that looks like a hot
+/// but surviving part, and either is a decision taken confidently on a number
+/// nobody produced. A quantity that must carry more wants a unit with a
+/// coarser step, and that is a change to make deliberately.
 ///
 /// A NaN or an infinity is refused here too, and it is the comparison that
 /// makes it matter: a vote sorts its readings, and NaN compares as neither
@@ -78,55 +55,58 @@ pub fn kelvin_range() -> (f64, f64) {
 ///
 /// # Arguments
 ///
-/// * `number` - The temperature in kelvin.
+/// * `number` - The number, in `unit`.
+/// * `unit`   - What it is a number of.
 ///
 /// # Returns
 ///
-/// The count of micro-kelvin, rounded to the nearest.
+/// The count of the unit's steps, rounded to the nearest.
 ///
 /// # Errors
 ///
-/// A message naming the number for a NaN or an infinity, or a temperature
-/// outside [`kelvin_range`].
-pub fn micro_kelvin(number: f64) -> Result<i32, String> {
+/// A message naming the number for a NaN or an infinity, or for a number
+/// outside the unit's range.
+pub fn value_count(number: f64, unit: Unit) -> Result<i32, String> {
     if !number.is_finite() {
         return Err(format!(
             "{number} is not a number anything can be decided on"
         ));
     }
 
-    // Rounded to the nearest micro-kelvin rather than truncated: the
-    // conversions land a hair either side of the figure the part reported --
-    // 289.15 K arrives from a count as 289.14999999999998 -- and truncating
-    // would take a micro-kelvin off half of them.
-    let micro = (number * MICRO_KELVIN).round();
-    let (coldest, hottest) = kelvin_range();
-    if micro < f64::from(i32::MIN) || micro > f64::from(i32::MAX) {
+    // Rounded to the nearest step rather than truncated: the conversions
+    // land a hair either side of the figure the part reported -- 289.15 K
+    // arrives from a count as 289.14999999999998 -- and truncating would
+    // take a step off half of them.
+    let count = (number * unit.per_unit()).round();
+    if count < f64::from(i32::MIN) || count > f64::from(i32::MAX) {
+        let (least, most) = unit.range();
         return Err(format!(
-            "{number} K is outside what a value carries, which is \
-             {coldest:.6} K to {hottest:.6} K in micro-kelvin"
+            "{number} {unit} is outside what a value carries, which is \
+             {least} {unit} to {most} {unit} in {}",
+            unit.step()
         ));
     }
-    Ok(micro as i32)
+    Ok(count as i32)
 }
 
-/// A value as it travels: four bytes of a signed count of micro-kelvin,
+/// A value as it travels: four bytes of a signed count of its unit's steps,
 /// most significant first.
 ///
-/// A temperature is carried as a whole number of micro-kelvin rather than as
-/// the double the arithmetic produced. The unit is finer than any sensor here
-/// resolves, so nothing a part reported is lost by it, and what is gained is
-/// that the number on the link is exact: a conversion, a vote and a thermostat
-/// all see the same integer, where three doubles of the same temperature can
-/// differ in their last bit and a comparison between them turns on dust. It
-/// halves what a reading costs in a log and on a link as well.
+/// A number is carried as a whole number of steps rather than as the double
+/// the arithmetic produced. A step is finer than any part here resolves, so
+/// nothing a part reported is lost by it, and what is gained is that the
+/// number on the link is exact: a conversion, a vote and a thermostat all see
+/// the same integer, where three doubles of the same temperature can differ
+/// in their last bit and a comparison between them turns on dust. It halves
+/// what a reading costs in a log and on a link as well. The unit is not on
+/// the link: the configuration says what each node produces.
 ///
 /// Signed, although a temperature in kelvin is not, for two reasons. The
 /// arithmetic that produces one is signed -- a conversion is `counts * scale +
 /// offset` and a wrong scale produces a negative, which must arrive as a
 /// negative to be seen for what it is rather than as a temperature near
-/// 4295 K. And a difference of two temperatures is a temperature's width,
-/// which a band is, and that is signed by nature.
+/// 4295 K. And a difference of two values is a value's width, which a band
+/// is, and that is signed by nature.
 ///
 /// Most significant first because everything this software puts on the
 /// network is, unless the protocol it goes in says otherwise: a timestamp's
@@ -136,12 +116,25 @@ pub fn micro_kelvin(number: f64) -> Result<i32, String> {
 /// file states it.
 ///
 /// What it costs is the range, which is where this is refused rather than
-/// wrapped: see [`micro_kelvin`]. And a value in a telemetry log is four bytes
+/// wrapped: see [`value_count`]. And a value in a telemetry log is four bytes
 /// rather than a readable number, as is the datum a panel shows for a source.
 /// A decision is still text, `1` or `0`, because what it drives is a set of
 /// discrete lines and that is the value they take.
-pub fn as_value(number: f64) -> Result<Vec<u8>, String> {
-    Ok(value_bytes(number)?.to_vec())
+///
+/// # Arguments
+///
+/// * `number` - The number, in `unit`.
+/// * `unit`   - What it is a number of.
+///
+/// # Returns
+///
+/// The value's bytes.
+///
+/// # Errors
+///
+/// What [`value_count`] refuses.
+pub fn as_value(number: f64, unit: Unit) -> Result<Vec<u8>, String> {
+    Ok(value_bytes(number, unit)?.to_vec())
 }
 
 /// Makes a value as [`as_value`] does, as the four bytes themselves,
@@ -150,7 +143,8 @@ pub fn as_value(number: f64) -> Result<Vec<u8>, String> {
 ///
 /// # Arguments
 ///
-/// * `number` - The temperature in kelvin.
+/// * `number` - The number, in `unit`.
+/// * `unit`   - What it is a number of.
 ///
 /// # Returns
 ///
@@ -158,46 +152,51 @@ pub fn as_value(number: f64) -> Result<Vec<u8>, String> {
 ///
 /// # Errors
 ///
-/// What [`micro_kelvin`] refuses.
-pub fn value_bytes(number: f64) -> Result<[u8; VALUE_BYTES], String> {
-    Ok(micro_kelvin(number)?.to_be_bytes())
+/// What [`value_count`] refuses.
+pub fn value_bytes(
+    number: f64,
+    unit: Unit,
+) -> Result<[u8; VALUE_BYTES], String> {
+    Ok(value_count(number, unit)?.to_be_bytes())
 }
 
-/// Reads a value that arrived as a number of kelvin.
+/// Reads a value that arrived as a number in a unit.
 ///
-/// Exactly four bytes, and every four bytes are a value: a count of
-/// micro-kelvin is a number whatever the bits say, so the width is the whole
-/// of what there is to check here. What cannot be represented is refused
-/// where a value is made instead, by [`micro_kelvin`], which is where the
-/// complaint can name the number that would not fit.
+/// Exactly four bytes, and every four bytes are a value: a count of steps is
+/// a number whatever the bits say, so the width is the whole of what there is
+/// to check here. What cannot be represented is refused where a value is made
+/// instead, by [`value_count`], which is where the complaint can name the
+/// number that would not fit. The unit is the configuration's, which says
+/// what the node that sent it produces; the bytes do not say.
 ///
 /// A width that is not four is a link carrying something that is not a value
 /// -- a sensor's raw bytes delivered where a conversion's output was meant, or
 /// a node whose output is a decision -- and taking four of them would be a
-/// temperature made of whatever was there.
+/// number made of whatever was there.
 ///
 /// # Arguments
 ///
 /// * `data` - The value's bytes as they arrived.
+/// * `unit` - What it is a number of.
 /// * `what` - What the value is, for the message.
 ///
 /// # Returns
 ///
-/// The temperature in kelvin.
+/// The number, in `unit`.
 ///
 /// # Errors
 ///
 /// A message when `data` is not [`VALUE_BYTES`] long.
-pub fn from_value(data: &[u8], what: &str) -> Result<f64, String> {
+pub fn from_value(data: &[u8], unit: Unit, what: &str) -> Result<f64, String> {
     let bytes: [u8; VALUE_BYTES] = data.try_into().map_err(|_| {
         format!(
-            "{what}: a value is {VALUE_BYTES} bytes of micro-kelvin, and {} \
-             arrived",
+            "{what}: a value is {VALUE_BYTES} bytes of {}, and {} arrived",
+            unit.step(),
             data.len()
         )
     })?;
 
-    Ok(f64::from(i32::from_be_bytes(bytes)) / MICRO_KELVIN)
+    Ok(f64::from(i32::from_be_bytes(bytes)) / unit.per_unit())
 }
 
 /// What a computation produces, as the ground reads it back.
@@ -233,7 +232,7 @@ pub enum Produces {
 /// a computation.
 pub fn produces(function: &str) -> Option<Produces> {
     match function {
-        "to_kelvin" | "vote" | "process" => Some(Produces::Value),
+        "to_kelvin" | "to_value" | "vote" | "process" => Some(Produces::Value),
         "hysteresis" => Some(Produces::Decision),
         // Not a computation at all. Said as nothing rather than refused: this
         // answers how to show a datum, and a node nobody can name does not
@@ -372,40 +371,42 @@ pub fn from_decision(data: &[u8], what: &str) -> Result<bool, String> {
 ///
 /// The one place a value is text, because the far end is a program reading
 /// lines -- see `tcspecial::node::vehicle::compute::process` -- and a line is
-/// text. Written out of the kelvin the value carried, which is a whole number
-/// of micro-kelvin, so a program is handed at most six decimal places and what
-/// it reads back is what arrived.
+/// text. Written out of the number the value carried, which is a whole number
+/// of its unit's steps, so a program is handed no more places than there are
+/// and what it reads back is what arrived.
 pub fn as_text(number: f64) -> String {
     format!("{number}")
 }
 
-/// Reads a number a program wrote as a number of kelvin.
+/// Reads a number a program or an operator wrote, in a unit.
 ///
-/// Held to the same range as a reading, by [`micro_kelvin`], because what is
-/// read here becomes one: a program's answer goes straight onto a link, and
-/// an operator's setpoint or band is compared against readings that cannot
-/// leave that range. A number outside it is told so when it is sent rather
-/// than carried as far as the arithmetic and lost there.
+/// Held to the same range as a value in that unit, by [`value_count`],
+/// because what is read here becomes one: a program's answer goes straight
+/// onto a link, and an operator's setpoint or band is compared against
+/// readings that cannot leave that range. A number outside it is told so
+/// when it is sent rather than carried as far as the arithmetic and lost
+/// there.
 ///
 /// # Arguments
 ///
 /// * `text` - The number as written.
+/// * `unit` - What it is a number of.
 /// * `what` - What the number is, for the messages.
 ///
 /// # Returns
 ///
-/// The temperature in kelvin.
+/// The number, in `unit`.
 ///
 /// # Errors
 ///
-/// A message for text that is not a number, and for what
-/// [`micro_kelvin`] refuses.
-pub fn from_text(text: &str, what: &str) -> Result<f64, String> {
+/// A message for text that is not a number, and for what [`value_count`]
+/// refuses.
+pub fn from_text(text: &str, unit: Unit, what: &str) -> Result<f64, String> {
     let said = text.trim();
     let number: f64 = said
         .parse()
         .map_err(|_| format!("{what}: \"{said}\" is not a number"))?;
-    micro_kelvin(number).map_err(|why| format!("{what}: {why}"))?;
+    value_count(number, unit).map_err(|why| format!("{what}: {why}"))?;
     Ok(number)
 }
 
@@ -517,12 +518,21 @@ impl Format {
 /// attribute was first written and where every caller of it has looked since.
 pub use super::Restart;
 
-/// Raw counts to kelvin: read the bytes, scale, add an offset.
+/// Raw counts to a value: read the bytes, scale, add an offset, in a unit.
+///
+/// What every conversion is, `to_kelvin` and `to_value` alike: a part's
+/// counts made a number in a unit. `to_kelvin` is the one whose unit is the
+/// kelvin, kept by that name because a configuration that says it says what
+/// its part measures.
 #[derive(Debug, Clone, Copy, PartialEq)]
-pub struct ToKelvinParams {
+pub struct ToValueParams {
     pub format: Format,
+    /// How much of `unit` one count is.
     pub scale: f64,
+    /// What a count of nought is, in `unit`.
     pub offset: f64,
+    /// What the value made is a number of.
+    pub unit: Unit,
 }
 
 /// The mean over a named set of inputs.
@@ -628,12 +638,16 @@ pub struct ProcessParams {
     pub executable: String,
     pub timeout: Duration,
     pub restart: Restart,
+    /// What the program's answers are numbers of, which nothing else can
+    /// say: it is a program, and what it computes is its own business.
+    pub unit: Unit,
 }
 
 /// What a compute node computes, settled.
 #[derive(Debug, Clone, PartialEq)]
 pub enum Computation {
-    ToKelvin(ToKelvinParams),
+    ToKelvin(ToValueParams),
+    ToValue(ToValueParams),
     Vote(VoteParams),
     Hysteresis(HysteresisParams),
     Process(ProcessParams),
@@ -648,6 +662,7 @@ impl Computation {
     pub fn function(&self) -> &'static str {
         match self {
             Computation::ToKelvin(_) => "to_kelvin",
+            Computation::ToValue(_) => "to_value",
             Computation::Vote(_) => "vote",
             Computation::Hysteresis(_) => "hysteresis",
             Computation::Process(_) => "process",
@@ -657,7 +672,7 @@ impl Computation {
 
 /// Every function there is, for an error to list.
 pub fn functions() -> &'static str {
-    "to_kelvin, vote, hysteresis, or process"
+    "to_kelvin, to_value, vote, hysteresis, or process"
 }
 
 /// Lists what a computation is told, by name.
@@ -682,9 +697,12 @@ pub fn functions() -> &'static str {
 pub fn attributes_of(function: &str) -> Option<&'static [&'static str]> {
     match function {
         "to_kelvin" => Some(&["function", "format", "scale", "offset"]),
+        "to_value" => Some(&["function", "format", "scale", "offset", "unit"]),
         "vote" => Some(&["function", "inputs", "algorithm", "age"]),
         "hysteresis" => Some(&["function", "setpoint", "half_band"]),
-        "process" => Some(&["function", "executable", "timeout", "restart"]),
+        "process" => {
+            Some(&["function", "executable", "timeout", "restart", "unit"])
+        }
         _ => None,
     }
 }
@@ -759,7 +777,23 @@ pub fn params_of(
     }
 
     match function.as_str() {
-        "to_kelvin" => {
+        "to_kelvin" | "to_value" => {
+            // A to_kelvin's unit is in its name; a to_value states its own.
+            let unit = if function == "to_kelvin" {
+                Unit::Kelvin
+            } else {
+                let said = attributes.get("unit").ok_or_else(|| {
+                    named(
+                        "unit is not set: a to_value says what its value is \
+                         a number of -- K, V, A, m -- there being no way to \
+                         tell from a part's counts"
+                            .to_string(),
+                    )
+                })?;
+                Unit::of(said.as_str())
+                    .map_err(|why| named(format!("unit: {why}")))?
+            };
+
             let format = attributes
                 .get("format")
                 .ok_or_else(|| {
@@ -775,20 +809,27 @@ pub fn params_of(
             if scale == 0.0 {
                 // Every reading would become the offset, which is a sensor
                 // whose value never changes -- and that looks like a working
-                // sensor reporting a steady temperature.
+                // sensor reporting a steady reading.
                 return Err(named(
                     "scale: nought would make every reading the same"
                         .to_string(),
                 ));
             }
 
-            Ok(Computation::ToKelvin(ToKelvinParams {
+            // A value: it is what a count of nought converts to, so an
+            // offset outside the range is every reading outside it.
+            let offset = in_unit(attributes, "offset", unit).map_err(named)?;
+            let params = ToValueParams {
                 format,
                 scale,
-                // A temperature: it is what a count of nought converts to, so
-                // an offset outside the range is every reading outside it.
-                offset: temperature(attributes, "offset").map_err(named)?,
-            }))
+                offset,
+                unit,
+            };
+            Ok(if function == "to_kelvin" {
+                Computation::ToKelvin(params)
+            } else {
+                Computation::ToValue(params)
+            })
         }
         "vote" => {
             let inputs = attributes.get("inputs").ok_or_else(|| {
@@ -856,10 +897,12 @@ pub fn params_of(
             }))
         }
         "hysteresis" => {
-            // Both are temperatures -- a goal and the width of a band around
-            // it -- so both are held to what a value carries.
-            let half_band =
-                temperature(attributes, "half_band").map_err(named)?;
+            // Both are numbers in the unit of what the thermostat reads -- a
+            // goal and the width of a band around it -- which this node
+            // alone cannot say: whether each is in that unit's range is the
+            // graph's to check, knowing what feeds it. See
+            // `crate::graph::units`.
+            let half_band = number(attributes, "half_band").map_err(named)?;
             if half_band <= 0.0 {
                 return Err(named(
                     "half_band is how far from the setpoint the decision \
@@ -870,7 +913,7 @@ pub fn params_of(
             }
 
             Ok(Computation::Hysteresis(HysteresisParams {
-                setpoint: temperature(attributes, "setpoint").map_err(named)?,
+                setpoint: number(attributes, "setpoint").map_err(named)?,
                 half_band,
             }))
         }
@@ -911,10 +954,22 @@ pub fn params_of(
                 Restart::of(attributes.get("restart").map(Scalar::as_str))
                     .map_err(named)?;
 
+            let unit = attributes.get("unit").ok_or_else(|| {
+                named(
+                    "unit is not set: a process says what its program's \
+                     answers are numbers of -- K, V, A, m -- which nothing \
+                     but the program knows"
+                        .to_string(),
+                )
+            })?;
+            let unit = Unit::of(unit.as_str())
+                .map_err(|why| named(format!("unit: {why}")))?;
+
             Ok(Computation::Process(ProcessParams {
                 executable,
                 timeout,
                 restart,
+                unit,
             }))
         }
         // Covered by the match above, which refuses a function this does not
@@ -956,24 +1011,33 @@ fn number(
         .map_err(|_| format!("{name}: \"{}\" is not a number", text.as_str()))
 }
 
-/// A temperature a file states, held to what a value carries.
+/// A number a file states in a unit, held to what a value in that unit
+/// carries.
 ///
 /// The same range a reading is held to, and for the same reason it is a rule
-/// here rather than aboard: a setpoint of 3000 K is a thermostat whose
-/// readings can never reach it, so the heaters would be driven on and held
-/// there for the whole flight. A file is checked on a desk, where that is one
-/// line to change.
+/// here rather than aboard: an offset of 3000 K is a conversion whose every
+/// reading is out of range, and is one line to change on a desk.
 ///
-/// Only the attributes that are temperatures. A `scale` goes through
-/// [`number`] and not through this: it is a number of kelvin per count, not a
-/// temperature, and what it may be depends on the part's counts, which no
-/// file states.
-fn temperature(
+/// # Arguments
+///
+/// * `attributes` - The node's attributes.
+/// * `name`       - The attribute.
+/// * `unit`       - What it is a number of.
+///
+/// # Returns
+///
+/// The number.
+///
+/// # Errors
+///
+/// A message when it is not set, not a number, or outside the unit's range.
+fn in_unit(
     attributes: &BTreeMap<String, Scalar>,
     name: &str,
+    unit: Unit,
 ) -> Result<f64, String> {
     let said = number(attributes, name)?;
-    micro_kelvin(said).map_err(|why| format!("{name}: {why}"))?;
+    value_count(said, unit).map_err(|why| format!("{name}: {why}"))?;
     Ok(said)
 }
 
@@ -985,8 +1049,10 @@ mod tests {
     #[test]
     fn a_value_reads_back_as_itself() {
         for number in [0.0, 1.0, 273.15, 293.15, -40.0, 0.0625, 1000.0] {
-            let sent = as_value(number).expect("a temperature a value carries");
-            let back = from_value(&sent, "a value").expect("it reads back");
+            let sent = as_value(number, Unit::Kelvin)
+                .expect("a temperature a value carries");
+            let back = from_value(&sent, Unit::Kelvin, "a value")
+                .expect("it reads back");
             assert!(
                 (back - number).abs() < 0.0001,
                 "{number} came back as {back}"
@@ -1004,14 +1070,17 @@ mod tests {
     #[test]
     fn a_value_is_a_count_of_micro_kelvin() {
         assert_eq!(
-            as_value(293.15).expect("a temperature"),
+            as_value(293.15, Unit::Kelvin).expect("a temperature"),
             [0x11, 0x79, 0x1d, 0x30]
         );
-        assert_eq!(as_value(0.0).expect("nought").len(), VALUE_BYTES);
+        assert_eq!(
+            as_value(0.0, Unit::Kelvin).expect("nought").len(),
+            VALUE_BYTES
+        );
         // Below zero, which is what the sign is for: a conversion with the
         // wrong offset produces one, and it must arrive as what it is.
         assert_eq!(
-            as_value(-40.0).expect("below zero"),
+            as_value(-40.0, Unit::Kelvin).expect("below zero"),
             [0xfd, 0x9d, 0xa6, 0x00]
         );
 
@@ -1020,7 +1089,8 @@ mod tests {
         for number in [0.0, 273.15, 293.15, -40.0, 0.0625, 1000.0, 0.000_001] {
             assert_eq!(
                 from_value(
-                    &as_value(number).expect("a temperature"),
+                    &as_value(number, Unit::Kelvin).expect("a temperature"),
+                    Unit::Kelvin,
                     "a value"
                 )
                 .expect("it reads back"),
@@ -1030,9 +1100,12 @@ mod tests {
 
         // And what is finer than the unit is rounded to it, rather than
         // truncated: a third of a kelvin is 333_333 micro-kelvin and a hair.
-        let third =
-            from_value(&as_value(1.0 / 3.0).expect("a third"), "a third")
-                .expect("it reads back");
+        let third = from_value(
+            &as_value(1.0 / 3.0, Unit::Kelvin).expect("a third"),
+            Unit::Kelvin,
+            "a third",
+        )
+        .expect("it reads back");
         assert_eq!(third, 0.333_333);
     }
 
@@ -1045,8 +1118,8 @@ mod tests {
     #[test]
     fn a_temperature_outside_the_range_is_refused() {
         for wrong in [2200.0, -2200.0, 1.0e9, f64::NAN, f64::INFINITY] {
-            let said =
-                as_value(wrong).expect_err("outside what a value carries");
+            let said = as_value(wrong, Unit::Kelvin)
+                .expect_err("outside what a value carries");
             assert!(
                 said.contains("2147.483647") || said.contains("number"),
                 "the complaint should say what the range is: {said}"
@@ -1055,12 +1128,17 @@ mod tests {
 
         // The ends themselves are carried, and are what they say.
         assert_eq!(
-            from_value(&as_value(2147.483647).expect("the top"), "the top"),
+            from_value(
+                &as_value(2147.483647, Unit::Kelvin).expect("the top"),
+                Unit::Kelvin,
+                "the top"
+            ),
             Ok(2147.483647)
         );
         assert_eq!(
             from_value(
-                &as_value(-2147.483648).expect("the bottom"),
+                &as_value(-2147.483648, Unit::Kelvin).expect("the bottom"),
+                Unit::Kelvin,
                 "the bottom"
             ),
             Ok(-2147.483648)
@@ -1072,17 +1150,17 @@ mod tests {
     fn a_datum_that_is_not_a_value_is_reported() {
         // A width that is not four: a sensor's own bytes delivered where a
         // conversion's output was meant, or a decision, which is text.
-        let said =
-            from_value(b"293.15", "the fore sensor").expect_err("not a value");
+        let said = from_value(b"293.15", Unit::Kelvin, "the fore sensor")
+            .expect_err("not a value");
         assert!(said.contains("fore sensor"), "{said}");
         assert!(said.contains('6'), "the width is worth saying: {said}");
-        assert!(from_value(b"1", "a decision").is_err());
+        assert!(from_value(b"1", Unit::Kelvin, "a decision").is_err());
 
         // Four bytes are a value whatever they hold, there being no bit
         // pattern of a 32-bit integer that is not a number of micro-kelvin.
         // What a sensor cannot produce is refused where a value is made.
         assert_eq!(
-            from_value(&[0x7F, 0xFF, 0xFF, 0xFF], "the top"),
+            from_value(&[0x7F, 0xFF, 0xFF, 0xFF], Unit::Kelvin, "the top"),
             Ok(2147.483647)
         );
     }
@@ -1176,21 +1254,21 @@ mod tests {
 
         for number in [0.0, 293.15, 0.333_333, -40.0, 1.0e-9] {
             assert_eq!(
-                from_text(&as_text(number), "a program")
+                from_text(&as_text(number), Unit::Kelvin, "a program")
                     .expect("it reads back"),
                 number
             );
         }
 
-        assert!(from_text("nearly", "a program").is_err());
+        assert!(from_text("nearly", Unit::Kelvin, "a program").is_err());
         assert!(
-            from_text("NaN", "a program").is_err(),
+            from_text("NaN", Unit::Kelvin, "a program").is_err(),
             "a program may not answer with a number nothing can be decided on"
         );
         // And the range a reading is held to, because what a program answers
         // with becomes a reading: see `from_text`.
-        let said =
-            from_text("3000", "a program").expect_err("outside the range");
+        let said = from_text("3000", Unit::Kelvin, "a program")
+            .expect_err("outside the range");
         assert!(
             said.contains("a program") && said.contains("2147.483647"),
             "the refusal should name the program and the range: {said}"
@@ -1223,41 +1301,36 @@ mod tests {
             .expect_err("a computation that is wrong")
     }
 
-    /// A temperature a value could not carry is refused in the file.
+    /// An offset a value in the conversion's unit could not carry is
+    /// refused in the file.
     ///
     /// The same range a reading is held to, checked where the file is read:
-    /// a setpoint of 3000 K is a thermostat whose readings can never reach
-    /// it, so the heaters would be driven on and held there for the whole
-    /// flight -- and on a desk that is one line to change. An offset is the
-    /// temperature a count of nought converts to, so an offset outside the
-    /// range is every reading outside it.
+    /// an offset is what a count of nought converts to, so an offset outside
+    /// the range is every reading outside it -- and on a desk that is one
+    /// line to change. A thermostat's setpoint and band are held to the
+    /// range of what it reads, which only the graph knows: see
+    /// `crate::graph::units`.
     #[test]
     fn a_temperature_no_value_could_carry_is_refused() {
-        let (coldest, hottest) = kelvin_range();
+        let (coldest, hottest) = Unit::Kelvin.range();
 
         for (pairs, attribute) in [
-            (
-                vec![
-                    ("function", "hysteresis"),
-                    ("setpoint", "3000"),
-                    ("half_band", "2.0"),
-                ],
-                "setpoint",
-            ),
-            (
-                vec![
-                    ("function", "hysteresis"),
-                    ("setpoint", "293.15"),
-                    ("half_band", "4000"),
-                ],
-                "half_band",
-            ),
             (
                 vec![
                     ("function", "to_kelvin"),
                     ("format", "i16_be"),
                     ("scale", "0.0625"),
                     ("offset", "-2500"),
+                ],
+                "offset",
+            ),
+            (
+                vec![
+                    ("function", "to_value"),
+                    ("format", "i16_be"),
+                    ("scale", "0.0625"),
+                    ("offset", "-2500"),
+                    ("unit", "K"),
                 ],
                 "offset",
             ),
@@ -1289,6 +1362,56 @@ mod tests {
         ]);
     }
 
+    /// A to_value states its unit and makes values in it; one that states
+    /// none, or one that is not a unit, is refused, saying what to write.
+    /// A to_kelvin is one in kelvin, and a process states its unit too.
+    #[test]
+    fn a_conversion_states_its_unit() {
+        let conversion = |unit: Option<&str>| {
+            let mut pairs = vec![
+                ("function", "to_value"),
+                ("format", "u16_be"),
+                ("scale", "0.001"),
+                ("offset", "0"),
+            ];
+            if let Some(unit) = unit {
+                pairs.push(("unit", unit));
+            }
+            params_of("bus", &attributes(&pairs))
+        };
+        match conversion(Some("V")) {
+            Ok(Computation::ToValue(params)) => {
+                assert_eq!(params.unit, Unit::Volt)
+            }
+            other => panic!("{other:?}"),
+        }
+        let why = conversion(None).expect_err("no unit");
+        assert!(why.contains("unit is not set"), "{why}");
+        let why = conversion(Some("furlong")).expect_err("not a unit");
+        assert!(why.contains("furlong") && why.contains("m/s"), "{why}");
+        assert_eq!(produces("to_value"), Some(Produces::Value));
+
+        let why = refused(&[
+            ("function", "process"),
+            ("executable", "/bin/cat"),
+            ("timeout", "1 s"),
+        ]);
+        assert!(why.contains("unit is not set"), "{why}");
+    }
+
+    /// A value is counted in its unit's steps, so the same four bytes are a
+    /// different number in each, and each reads back as itself.
+    #[test]
+    fn a_value_is_counted_in_its_units_steps() {
+        let volts = as_value(28.5, Unit::Volt).expect("a voltage");
+        assert_eq!(from_value(&volts, Unit::Volt, "v"), Ok(28.5));
+        let metres = as_value(15_000.25, Unit::Metre).expect("an altitude");
+        assert_eq!(from_value(&metres, Unit::Metre, "m"), Ok(15_000.25));
+        // 15 km is past what micro-units reach, which is what a coarser
+        // step for metres is for.
+        assert!(as_value(15_000.0, Unit::Volt).is_err());
+    }
+
     /// Each computation is built from what its node says.
     #[test]
     fn each_computation_is_what_its_node_says() {
@@ -1299,10 +1422,11 @@ mod tests {
                 ("scale", "0.0625"),
                 ("offset", "273.15"),
             ]),
-            Computation::ToKelvin(ToKelvinParams {
+            Computation::ToKelvin(ToValueParams {
                 format: Format::I16Be,
                 scale: 0.0625,
                 offset: 273.15,
+                unit: Unit::Kelvin,
             })
         );
 
@@ -1340,11 +1464,13 @@ mod tests {
                 ("function", "process"),
                 ("executable", "/opt/flight/attitude"),
                 ("timeout", "500 ms"),
+                ("unit", "ratio"),
             ]),
             Computation::Process(ProcessParams {
                 executable: "/opt/flight/attitude".to_string(),
                 timeout: Duration::from_millis(500),
                 restart: Restart::Never,
+                unit: Unit::Ratio,
             })
         );
 
@@ -1584,6 +1710,7 @@ mod tests {
                 ("function", "process"),
                 ("executable", "/bin/cat"),
                 ("timeout", "1 s"),
+                ("unit", "K"),
             ])
             .restart,
             Restart::Never
@@ -1593,6 +1720,7 @@ mod tests {
                 ("function", "process"),
                 ("executable", "/bin/cat"),
                 ("timeout", "1 s"),
+                ("unit", "K"),
                 ("restart", "false"),
             ])
             .restart,
@@ -1603,6 +1731,7 @@ mod tests {
                 ("function", "process"),
                 ("executable", "/bin/cat"),
                 ("timeout", "1 s"),
+                ("unit", "K"),
                 ("restart", "true"),
             ])
             .restart,

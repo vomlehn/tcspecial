@@ -1148,7 +1148,8 @@ pub fn open(
     match node.node_type.as_str() {
         "compute" => {
             let inputs = routes.inputs_of(&node.name);
-            Ok(Box::new(ComputePort::make(node, &inputs, abandon)?))
+            let unit = routes.input_unit_of(&node.name);
+            Ok(Box::new(ComputePort::make(node, &inputs, unit, abandon)?))
         }
         "log" => Ok(Box::new(LogPort::of(LogNode::of(node, segsend)?))),
         // A node that drops the one stream it takes, and one that sends it on
@@ -2693,6 +2694,7 @@ vehicle:
             .map(|datum| {
                 match crate::node::vehicle::compute::from_value(
                     datum,
+                    tcslibgs::unit::Unit::Kelvin,
                     "the ground",
                 ) {
                     Ok(number) => format!("{number}"),

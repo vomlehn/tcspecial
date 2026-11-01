@@ -370,17 +370,17 @@ int main(int argc, char **argv)
 				    exchange.up + exchange.down ==
 				    exchange.round_trip ? "yes" : "no");
 		} else {
-			int values = 0, decisions = 0, on = 0;
-			double kelvin = 0.0;
+			int decisions = 0, on = 0;
+			const char *unit = nullptr;
+			double value = 0.0;
 			data_seen = true;
-			if (tcs_configuration_sends_values(configuration.get(),
-							   datum.source,
-							   &values) == 0 &&
-			    values && tcs_value_kelvin(datum.data,
-						       datum.length,
-						       &kelvin) == 0) {
-				std::printf("data from %s: %.6f K\n",
-					    datum.source, kelvin);
+			if (tcs_configuration_value_unit(configuration.get(),
+							 datum.source,
+							 &unit) == 0 &&
+			    unit && tcs_value_in(unit, datum.data,
+						 datum.length, &value) == 0) {
+				std::printf("data from %s: %.6f %s\n",
+					    datum.source, value, unit);
 			} else if (tcs_configuration_sends_decisions(
 					   configuration.get(), datum.source,
 					   &decisions) == 0 &&

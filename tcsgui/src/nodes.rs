@@ -821,6 +821,7 @@ mod tests {
                 "hysteresis",
                 "process",
                 "to_kelvin",
+                "to_value",
                 "vote",
                 "log",
                 "null-gateway",
@@ -867,7 +868,7 @@ mod tests {
         );
         let asked: Vec<&str> =
             process.attributes.iter().map(|a| a.name.as_str()).collect();
-        assert_eq!(asked, vec!["executable", "timeout", "restart"]);
+        assert_eq!(asked, vec!["executable", "timeout", "restart", "unit"]);
         assert!(process.attributes.iter().all(|a| a.required));
 
         // And a node with nothing to be told says nothing.
@@ -1158,7 +1159,7 @@ mod tests {
             .iter()
             .filter(|one| one.node_type == "compute")
             .collect();
-        assert_eq!(computations.len(), 4, "every computation is described");
+        assert_eq!(computations.len(), 5, "every computation is described");
 
         for one in computations {
             let function = one.sets.get("function").unwrap_or_else(|| {

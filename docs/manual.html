@@ -601,14 +601,18 @@ word to write instead.</dd>
 arrivals, which is what makes a control loop possible: an average over
 time, a comparison against a setpoint, a filter that remembers.</dd>
 <dt>value</dt>
-<dd>A number on a link: four bytes of a signed count of micro-kelvin, most
-significant byte first. A temperature is a value in kelvins from the
-conversion that made it to the computation, the log and the ground, so
-that comparing two readings is a comparison and not a conversion. The unit
-is finer than any sensor here resolves, so the number is exact rather than
-rounded in practice, and the range it reaches is 2147.483647 K either way
--- a temperature outside that is refused where the value is made, naming
-the number. Where a value becomes text -- the lines a program reads and
+<dd>A number on a link, in a unit: four bytes of a signed count of the
+unit's steps, most significant byte first -- micro-kelvin for a
+temperature, micro-volts for a voltage, millimetres for a length. A
+reading is a value in one unit from the conversion that made it to the
+computation, the log and the ground, so that comparing two readings is a
+comparison and not a conversion. The unit is not on the link: the
+configuration says it, a conversion stating it and a vote taking its
+inputs'. A step is finer than any part here resolves, so the number is
+exact rather than rounded in practice, and each unit reaches what its
+step allows -- 2147.483647 K either way for a temperature, 2147 km for an
+altitude -- with a number outside that refused where the value is made,
+naming the number. Where a value becomes text -- the lines a program reads and
 writes, or the value typed into a command -- it is converted at that
 boundary and nowhere else.</dd>
 <dt>decision</dt>
@@ -2185,14 +2189,22 @@ states a <tt class="docutils literal">poll_interval</tt> as well has said two wa
 guess would run something nobody asked for, and the refusal says which
 rate the payload has: <tt class="docutils literal">&quot;both&quot; states poll_interval and a trigger: a node
 that is asked is read when it has been asked, so say trigger_interval</tt>.</li>
-<li><strong>A temperature a value could not carry</strong>. A <tt class="docutils literal">setpoint</tt> or a
-<tt class="docutils literal">half_band</tt> on a thermostat, or an <tt class="docutils literal">offset</tt> on a conversion, is a
-temperature in kelvin, and a value carries 2147.483647 K either way. A
+<li><strong>A number a value could not carry</strong>. An <tt class="docutils literal">offset</tt> on a conversion is a
+number in the conversion's unit, and a <tt class="docutils literal">setpoint</tt> or a <tt class="docutils literal">half_band</tt> on a
+thermostat one in the unit of what the thermostat reads; a value carries
+what its unit's step allows, 2147.483647 K either way for a temperature. A
 setpoint of 3000 K is a thermostat whose readings can never reach it, so the
 heaters would be driven on and held there for the whole flight; an offset
 outside the range is every reading of that part outside it. A <tt class="docutils literal">scale</tt> is
-not held to this -- it is kelvin per count, not a temperature, and what it
-may be depends on counts no file states.</li>
+not held to this -- it is units per count, not a value, and what it may be
+depends on counts no file states.</li>
+<li><strong>A value in the wrong unit, or no value at all</strong>. Every node feeding a
+<tt class="docutils literal">vote</tt>, a <tt class="docutils literal">hysteresis</tt> or a <tt class="docutils literal">process</tt> must send values, and in one
+unit: <tt class="docutils literal">to_kelvin</tt> sends kelvin, <tt class="docutils literal">to_value</tt> the <tt class="docutils literal">unit</tt> it names (<tt class="docutils literal">K</tt>,
+<tt class="docutils literal">V</tt>, <tt class="docutils literal">A</tt>, <tt class="docutils literal">W</tt>, <tt class="docutils literal">m</tt>, <tt class="docutils literal">m/s</tt>, <tt class="docutils literal">N</tt> or <tt class="docutils literal">ratio</tt>), a <tt class="docutils literal">process</tt> the
+<tt class="docutils literal">unit</tt> it must state, and a vote its inputs'. A vote between a temperature
+and a voltage is refused naming both, and a thermostat reading a sensor's
+own bytes is told to put a conversion between them.</li>
 <li><strong>Two nodes wanting the same thing</strong>. Two at one address cannot both be
 started; two on one device file, serial line or SPI peripheral is worse,
 each taking part of the one stream and reporting it as though it were the
@@ -2831,8 +2843,9 @@ fprime example unless told otherwise, with</p>
 Each node drawn into the <tt class="docutils literal">gateway_fprime</tt> node is a channel named after it,
 at <tt class="docutils literal">fprime_id_base</tt> plus its device id -- <tt class="docutils literal">thermometer</tt>, <tt class="docutils literal">0x3002</tt> --
 of the type the configuration says its data are. A node that sends values, a
-compute node whose function is <tt class="docutils literal">to_kelvin</tt>, <tt class="docutils literal">vote</tt> or <tt class="docutils literal">process</tt>, has an
-<tt class="docutils literal">F64</tt> channel, its temperature in kelvin -- <tt class="docutils literal">zone_temp</tt>, <tt class="docutils literal">0x3003</tt> --
+compute node whose function is <tt class="docutils literal">to_kelvin</tt>, <tt class="docutils literal">to_value</tt>, <tt class="docutils literal">vote</tt> or
+<tt class="docutils literal">process</tt>, has an <tt class="docutils literal">F64</tt> channel in that node's unit, formatted with it --
+<tt class="docutils literal">zone_temp</tt>, <tt class="docutils literal">0x3003</tt>, in kelvin --
 and a datum from it that is not a value goes to no channel, is counted in
 <tt class="docutils literal">DataNotValues</tt> and is said in a <tt class="docutils literal">NotAValue</tt> event. A node that sends
 decisions, a compute node whose function is <tt class="docutils literal">hysteresis</tt>, has a <tt class="docutils literal">bool</tt>

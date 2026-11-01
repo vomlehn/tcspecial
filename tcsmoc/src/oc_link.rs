@@ -26,6 +26,7 @@
 
 use std::sync::{Arc, Mutex};
 
+use tcslibgs::unit::Unit;
 use tcslibgs::{DHSample, Timestamp};
 
 /// What one payload last sent to the ground, as the ground received it.
@@ -46,8 +47,9 @@ pub struct Arrival {
     /// had read from the ground, which is the other direction and reads
     /// nought for a payload nobody sends to.
     pub packets: u64,
-    /// Whether the node this came from sends values, so that a reading is
-    /// shown as the temperature it is and not as four bytes of hexadecimal.
+    /// What unit the node this came from sends values in, so that a reading
+    /// is shown as the number it is, with its unit, and not as four bytes of
+    /// hexadecimal; `None` for a node that does not send values.
     ///
     /// Kept per arrival because it is a property of the node it came from,
     /// and this is where the node is known: the receiving loop has the name
@@ -56,15 +58,15 @@ pub struct Arrival {
     ///
     /// From the configuration and never from the data. Every four bytes are a
     /// value, so a decision of four characters would be shown as a
-    /// temperature by anything that guessed from the width -- see
-    /// `tcslibgs::node::vehicle::compute::node_sends_a_value`.
-    pub sends_values: bool,
+    /// number by anything that guessed from the width -- see
+    /// `tcslibgs::graph::units::unit_of`.
+    pub unit: Option<Unit>,
 }
 
 impl Arrival {
     /// The two strings a panel shows: when, and what.
     pub fn panel_lines(&self) -> (String, String) {
-        let (_, data) = self.data.panel_lines_of(self.sends_values);
+        let (_, data) = self.data.panel_lines_of(self.unit);
         (self.at.time_of_day(), data)
     }
 }
@@ -90,7 +92,7 @@ mod tests {
         );
         let mut data = DHSample::new();
         data.record(
-            &tcslibgs::node::vehicle::compute::as_value(293.15)
+            &tcslibgs::node::vehicle::compute::as_value(293.15, Unit::Kelvin)
                 .expect("a temperature"),
         );
 
@@ -98,7 +100,7 @@ mod tests {
             at,
             data,
             packets: 1,
-            sends_values: true,
+            unit: Some(Unit::Kelvin),
         };
         assert_eq!(
             arrival.panel_lines(),
@@ -110,7 +112,7 @@ mod tests {
             at,
             data,
             packets: 1,
-            sends_values: false,
+            unit: None,
         };
         assert_eq!(
             arrival.panel_lines(),
@@ -134,7 +136,7 @@ mod tests {
             at,
             data,
             packets: 7,
-            sends_values: false,
+            unit: None,
         };
 
         // The time is the ground's clock, as every time in the window is, and

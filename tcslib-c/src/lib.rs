@@ -51,10 +51,12 @@ use tcslib::ping::{route_of, Pinger, Uplink, NO_MESSAGE};
 use tcslib::{command_links_of, CommandStatus, TcsClient};
 use tcslibgs::config_digest::{digest_of_graph, ConfigDigest};
 use tcslibgs::graph::parameters::beacon_interval_of;
+use tcslibgs::graph::units;
 use tcslibgs::graph::{telemetry, Graph};
 use tcslibgs::node::vehicle::compute::{
     from_decision, from_value, node_sends_a_decision, node_sends_a_value,
 };
+use tcslibgs::unit::Unit;
 use tcslibgs::{ArmKey, DHSample, NodeId, DH_SAMPLE_BYTES};
 
 /// The size of the buffer `tcs_last_error` returns, its NUL included:
@@ -1132,7 +1134,106 @@ pub unsafe extern "C" fn tcs_value_kelvin(
         let data = bytes_of(data, length)?;
         // Allocates, in tcslibgs, only where what arrived is not a value, to
         // say why. Copied here into a fixed buffer.
-        *out = from_value(data, "the datum").map_err(fail)?;
+        *out = from_value(data, Unit::Kelvin, "the datum").map_err(fail)?;
+        Ok(0)
+    })
+}
+
+/// A unit's symbol as C takes it: terminated, and for ever.
+///
+/// # Arguments
+///
+/// * `unit` - The unit.
+///
+/// # Returns
+///
+/// Its symbol, as `tcslibgs::unit::Unit::symbol` spells it.
+fn c_symbol(unit: Unit) -> &'static CStr {
+    match unit {
+        Unit::Kelvin => c"K",
+        Unit::Volt => c"V",
+        Unit::Ampere => c"A",
+        Unit::Watt => c"W",
+        Unit::Metre => c"m",
+        Unit::MetrePerSecond => c"m/s",
+        Unit::Newton => c"N",
+        Unit::Ratio => c"ratio",
+    }
+}
+
+/// Says what unit a node's values are in, as the configuration says:
+/// `tcslibgs::graph::units::unit_of`, and never the datum's width.
+///
+/// # Arguments
+///
+/// * `configuration` - The configuration.
+/// * `node`          - The node's name.
+/// * `symbol`        - Where the unit's symbol is written -- `K`, `V`,
+///                     `m/s` -- good for as long as the program runs, or
+///                     NULL where the node does not send values.
+///
+/// # Returns
+///
+/// 0, or -1 where there is no such node or an argument is NULL.
+///
+/// # Safety
+///
+/// As [`tcs_configuration_sends_values`]; `symbol` NULL or writable.
+#[no_mangle]
+pub unsafe extern "C" fn tcs_configuration_value_unit(
+    configuration: *const tcs_configuration,
+    node: *const c_char,
+    symbol: *mut *const c_char,
+) -> c_int {
+    guard(-1, || {
+        let configuration = handle_of(configuration, "the configuration")?;
+        let name = text_of(node, "the node's name")?;
+        let out = out_of(symbol, "symbol")?;
+        if configuration.graph.node(name).is_none() {
+            return Err(fail(format_args!(
+                "{}: there is no node called \"{name}\"",
+                configuration.path.display()
+            )));
+        }
+        *out = units::unit_of(&configuration.graph, name)
+            .map_or(std::ptr::null(), |unit| c_symbol(unit).as_ptr());
+        Ok(0)
+    })
+}
+
+/// Reads a value -- four bytes of a signed count of its unit's steps, most
+/// significant first -- as a number in that unit, by
+/// `tcslibgs::node::vehicle::compute::from_value`, the one statement of
+/// what a value is.
+///
+/// # Arguments
+///
+/// * `symbol` - The unit, as [`tcs_configuration_value_unit`] gives it.
+/// * `data`   - The datum's bytes.
+/// * `length` - How many bytes `data` holds.
+/// * `value`  - Where the number is written.
+///
+/// # Returns
+///
+/// 0, or -1 where the unit is not one, the datum is not four bytes long,
+/// or an argument is NULL.
+///
+/// # Safety
+///
+/// `symbol` NULL or a NUL-terminated string; `data` NULL with `length` 0,
+/// or `length` readable bytes; `value` NULL or writable.
+#[no_mangle]
+pub unsafe extern "C" fn tcs_value_in(
+    symbol: *const c_char,
+    data: *const u8,
+    length: usize,
+    value: *mut f64,
+) -> c_int {
+    guard(-1, || {
+        let unit = Unit::of(text_of(symbol, "the unit")?).map_err(fail)?;
+        let out = out_of(value, "value")?;
+        let data = bytes_of(data, length)?;
+        *out = from_value(data, unit, "the datum").map_err(fail)?;
         Ok(0)
     })
 }
@@ -2165,8 +2266,9 @@ mod tests {
     fn a_value_reads_as_the_vehicle_writes_it() {
         use super::*;
 
-        let written = tcslibgs::node::vehicle::compute::value_bytes(293.15)
-            .expect("a value");
+        let written =
+            tcslibgs::node::vehicle::compute::value_bytes(293.15, Unit::Kelvin)
+                .expect("a value");
         let mut kelvin = 0.0;
         // SAFETY: four readable bytes, and a writable double.
         let read = unsafe {
@@ -2199,8 +2301,9 @@ mod tests {
             assert_eq!((read, on), (0, said), "{written:?}");
         }
 
-        let value = tcslibgs::node::vehicle::compute::value_bytes(293.15)
-            .expect("a value");
+        let value =
+            tcslibgs::node::vehicle::compute::value_bytes(293.15, Unit::Kelvin)
+                .expect("a value");
         // SAFETY: four readable bytes, and a writable int.
         let read =
             unsafe { tcs_decision_on(value.as_ptr(), value.len(), &mut on) };
@@ -2209,6 +2312,68 @@ mod tests {
         // and which lives as long as the thread.
         let why = unsafe { CStr::from_ptr(tcs_last_error()) };
         assert!(why.to_string_lossy().contains("neither 1 nor 0"), "{why:?}");
+    }
+
+    /// What unit a node's values are in is the configuration's, and a value
+    /// reads back in it; a node that sends none has none, and a unit that
+    /// is not one is refused.
+    #[test]
+    fn a_value_reads_in_the_unit_the_configuration_says() {
+        use super::*;
+
+        let path = CString::new(concat!(
+            env!("CARGO_MANIFEST_DIR"),
+            "/../examples/thermostat/thermostat.ytcs"
+        ))
+        .expect("a path");
+        // SAFETY: a NUL-terminated path that outlives the call.
+        let configuration = unsafe { tcs_configuration_open(path.as_ptr()) };
+        assert!(!configuration.is_null(), "the example opens");
+        for (node, wanted) in [
+            (c"zone_temp", Some("K")),
+            (c"thermostat", None),
+            (c"temp_1", None),
+        ] {
+            let mut symbol: *const c_char = c"unset".as_ptr();
+            // SAFETY: a live configuration, a NUL-terminated name and a
+            // writable pointer.
+            let said = unsafe {
+                tcs_configuration_value_unit(
+                    configuration,
+                    node.as_ptr(),
+                    &mut symbol,
+                )
+            };
+            assert_eq!(said, 0, "{node:?}");
+            let got = (!symbol.is_null()).then(|| {
+                // SAFETY: a symbol from c_symbol, terminated and static.
+                unsafe { CStr::from_ptr(symbol) }.to_str().expect("text")
+            });
+            assert_eq!(got, wanted, "{node:?}");
+        }
+        // SAFETY: made by tcs_configuration_open and not yet closed.
+        unsafe { tcs_configuration_close(configuration) };
+
+        let volts =
+            tcslibgs::node::vehicle::compute::value_bytes(28.5, Unit::Volt)
+                .expect("a voltage");
+        let mut read = 0.0;
+        // SAFETY: a terminated unit, four readable bytes, a writable double.
+        let said = unsafe {
+            tcs_value_in(c"V".as_ptr(), volts.as_ptr(), volts.len(), &mut read)
+        };
+        assert_eq!(said, 0);
+        assert!((read - 28.5).abs() < 1e-9, "{read}");
+        // SAFETY: as above.
+        let said = unsafe {
+            tcs_value_in(
+                c"furlongs".as_ptr(),
+                volts.as_ptr(),
+                volts.len(),
+                &mut read,
+            )
+        };
+        assert_eq!(said, -1, "not a unit");
     }
 
     /// Which nodes send values is the configuration's: in the thermostat

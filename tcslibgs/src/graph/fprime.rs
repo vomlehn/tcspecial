@@ -32,9 +32,11 @@
 use std::fmt::Write as _;
 
 use super::telemetry::{self, Via};
+use super::units;
 use super::Graph;
 use crate::gateway::GatewayKind;
 use crate::node::vehicle::compute::{node_produces, Produces};
+use crate::unit::Unit;
 
 /// One of the bridge's own channels: not a source's, and the same in every
 /// model.
@@ -122,21 +124,22 @@ pub const OWN_CHANNELS: &[Own] = &[
 ///
 /// It says one thing of a datum's type, and only of some nodes: a compute
 /// node says, by its function, what it sends. A value -- four bytes of a
-/// signed count of micro-kelvin, see
-/// [`crate::node::vehicle::compute::from_value`] -- is a temperature; a
-/// decision -- the text `1` or `0`, see
-/// [`crate::node::vehicle::compute::from_decision`] -- is on or off. Of every
-/// other node it says nothing. A sensor's `format` is written on the
-/// conversion that reads it, not on the sensor, and says how that one reader
-/// takes the bytes. So a value's channel is a temperature, a decision's is a
-/// `bool`, and every other channel is the bytes as they came.
+/// signed count of its unit's steps, see
+/// [`crate::node::vehicle::compute::from_value`] -- is a number in the unit
+/// the graph gives it, see [`crate::graph::units`]; a decision -- the text
+/// `1` or `0`, see [`crate::node::vehicle::compute::from_decision`] -- is on
+/// or off. Of every other node it says nothing. A sensor's `format` is
+/// written on the conversion that reads it, not on the sensor, and says how
+/// that one reader takes the bytes. So a value's channel is a number with
+/// its unit, a decision's is a `bool`, and every other channel is the bytes
+/// as they came.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Form {
     /// The bytes, as a `Datum`: the length and the first of them.
     Datum,
-    /// A value, as an `F64` of kelvin, which tcslib-c's `tcs_value_kelvin`
+    /// A value, as an `F64` in its unit, which tcslib-c's `tcs_value_in`
     /// reads.
-    Kelvin,
+    Value(Unit),
     /// A decision, as a `bool`, true for on, which tcslib-c's
     /// `tcs_decision_on` reads.
     Decision,
@@ -152,17 +155,19 @@ impl Form {
     ///
     /// # Returns
     ///
-    /// [`Form::Kelvin`] for a node that sends values and [`Form::Decision`]
-    /// for one that sends decisions, as [`node_produces`] says, and
-    /// [`Form::Datum`] for every other.
+    /// [`Form::Value`] for a node that sends values in a unit, and
+    /// [`Form::Decision`] for one that sends decisions, as
+    /// [`node_produces`] and [`units::unit_of`] say; [`Form::Datum`] for
+    /// every other, including a node of values whose unit cannot be settled,
+    /// which `Graph::check` refuses.
     pub fn of(graph: &Graph, source: &str) -> Form {
         let produces = graph
             .node(source)
             .and_then(|node| node_produces(&node.node_type, &node.attributes));
-        match produces {
-            Some(Produces::Value) => Form::Kelvin,
-            Some(Produces::Decision) => Form::Decision,
-            None => Form::Datum,
+        match (produces, units::unit_of(graph, source)) {
+            (Some(Produces::Value), Some(unit)) => Form::Value(unit),
+            (Some(Produces::Decision), _) => Form::Decision,
+            _ => Form::Datum,
         }
     }
 
@@ -174,7 +179,7 @@ impl Form {
     pub fn fpp_type(self) -> &'static str {
         match self {
             Form::Datum => "Datum",
-            Form::Kelvin => "F64",
+            Form::Value(_) => "F64",
             Form::Decision => "bool",
         }
     }
@@ -185,11 +190,27 @@ impl Form {
     ///
     /// The words, which follow "What <node> produces, device id <n>:" in
     /// the annotation the FPP gives the channel.
-    fn about(self) -> &'static str {
+    fn about(self) -> String {
         match self {
-            Form::Datum => "its bytes",
-            Form::Kelvin => "a value, as a temperature in kelvin",
-            Form::Decision => "a decision, true for on",
+            Form::Datum => "its bytes".to_string(),
+            Form::Value(unit) => format!("a value, in {}", unit.name()),
+            Form::Decision => "a decision, true for on".to_string(),
+        }
+    }
+
+    /// Gives the channel's format, as FPP writes it after the channel, so
+    /// that F´'s ground system shows a value with its unit.
+    ///
+    /// # Returns
+    ///
+    /// ` format "{} K"` for a value with a unit symbol, and nothing for a
+    /// ratio, which has none, or for any other channel.
+    fn fpp_format(self) -> String {
+        match self {
+            Form::Value(unit) if unit != Unit::Ratio => {
+                format!(" format \"{{}} {}\"", unit.symbol())
+            }
+            _ => String::new(),
         }
     }
 }
@@ -561,13 +582,14 @@ impl Model {
                 &mut out,
                 format!(
                     "@ What {} produces, device id {}: {}\ntelemetry {}: {} \
-                     id {}",
+                     id {}{}",
                     channel.name,
                     channel.local,
                     form.about(),
                     fpp_name(&channel.name),
                     form.fpp_type(),
-                    channel.local
+                    channel.local,
+                    form.fpp_format()
                 ),
             );
         }
@@ -594,7 +616,7 @@ impl Model {
     /// that differ from one configuration to another, which say which
     /// channel a source's datum is written to, as what, and which device id
     /// a node's name is. A datum is made into a channel's type by the
-    /// component's own `asDatum`, `asKelvin` and `asDecision`, which are the
+    /// component's own `asDatum`, `asValue` and `asDecision`, which are the
     /// same in every model; the model says only which.
     ///
     /// # Arguments
@@ -626,11 +648,12 @@ impl Model {
                     "\t\tthis->tlmWrite_{}(this->asDatum(datum));",
                     channel.name
                 ),
-                Form::Kelvin => writeln!(
+                Form::Value(unit) => writeln!(
                     out,
-                    "\t\tF64 kelvin = 0.0;\n\t\t\
-                     if (this->asKelvin(datum, kelvin)) {{\n\t\t\t\
-                     this->tlmWrite_{}(kelvin);\n\t\t}}",
+                    "\t\tF64 value = 0.0;\n\t\t\
+                     if (this->asValue(datum, {}, value)) {{\n\t\t\t\
+                     this->tlmWrite_{}(value);\n\t\t}}",
+                    cpp_string(unit.symbol()),
                     channel.name
                 ),
                 Form::Decision => writeln!(
@@ -789,7 +812,7 @@ mod tests {
                         local: 3,
                         id: 0x3003,
                     },
-                    form: Form::Kelvin,
+                    form: Form::Value(Unit::Kelvin),
                 },
                 Source {
                     channel: Channel {
@@ -844,7 +867,7 @@ mod tests {
             "constant ID_BASE = 0x3000",
             "constant NODE_NAME_BYTES = 13",
             "telemetry $thermometer: Datum id 2",
-            "telemetry $zone_temp: F64 id 3",
+            "telemetry $zone_temp: F64 id 3 format \"{} K\"",
             "telemetry $heater_wanted: bool id 4",
             "telemetry $BeaconStage: Stage id 5",
             "telemetry $DataCutShort: U32 id 13",
@@ -866,8 +889,8 @@ mod tests {
         );
         assert!(
             cpp.contains(
-                "if (this->asKelvin(datum, kelvin)) {\n\t\t\t\
-                 this->tlmWrite_zone_temp(kelvin);"
+                "if (this->asValue(datum, \"K\", value)) {\n\t\t\t\
+                 this->tlmWrite_zone_temp(value);"
             ),
             "{cpp}"
         );
@@ -977,12 +1000,15 @@ mod tests {
         let thermostat =
             Graph::load(root.join("examples/thermostat/thermostat.ytcs"))
                 .expect("the example reads");
-        assert_eq!(Form::of(&thermostat, "k_1"), Form::Kelvin);
-        assert_eq!(Form::of(&thermostat, "zone_temp"), Form::Kelvin);
+        assert_eq!(Form::of(&thermostat, "k_1"), Form::Value(Unit::Kelvin));
+        assert_eq!(
+            Form::of(&thermostat, "zone_temp"),
+            Form::Value(Unit::Kelvin)
+        );
         assert_eq!(Form::of(&thermostat, "thermostat"), Form::Decision);
         assert_eq!(Form::of(&thermostat, "temp_1"), Form::Datum);
         assert_eq!(Form::of(&thermostat, "nobody"), Form::Datum);
-        assert_eq!(Form::Kelvin.fpp_type(), "F64");
+        assert_eq!(Form::Value(Unit::Volt).fpp_type(), "F64");
         assert_eq!(Form::Datum.fpp_type(), "Datum");
         assert_eq!(Form::Decision.fpp_type(), "bool");
     }

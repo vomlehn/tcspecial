@@ -36,7 +36,7 @@
 //! What stays the same is everything else the window does: the panels, the
 //! grid they sit in, tcspecial and tcssim started on the same file, and Quit.
 
-use std::collections::{BTreeMap, BTreeSet};
+use std::collections::BTreeMap;
 use std::rc::Rc;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex};
@@ -54,6 +54,7 @@ use tcslibgs::graph::Graph;
 use tcslibgs::ready::SetUpFor;
 use tcslibgs::sim_config::SimConfigFile;
 use tcslibgs::simulate::Mode;
+use tcslibgs::unit::Unit;
 use tcslibgs::{DHSample, Timestamp};
 use tcsui::PingShown;
 use tcsverify::startup::Startup;
@@ -2029,8 +2030,8 @@ fn show_ping(window: &PingWindow, shown: &PingShown) {
 ///
 /// * `gateway`      - The gateway node's receiver.
 /// * `rows`         - Each source's panel row, by the source's name.
-/// * `sends_values` - The sources that send values, shown as readings rather
-///                    than as bytes.
+/// * `units`        - The sources that send values, and in what unit, shown
+///                    as readings rather than as bytes.
 /// * `arrivals`     - Where the last arrival for each panel is left, by row.
 /// * `pings`        - The pinger to hand the ping node's answers to, where
 ///                    they come down through this gateway node.
@@ -2040,7 +2041,7 @@ fn show_ping(window: &PingWindow, shown: &PingShown) {
 fn serve(
     mut gateway: GatewayReceiver,
     rows: Arc<BTreeMap<String, usize>>,
-    sends_values: Arc<BTreeSet<String>>,
+    units: Arc<BTreeMap<String, Unit>>,
     arrivals: Arrivals,
     pings: Option<PingFeed>,
     plot: Option<Arc<Mutex<Plot>>>,
@@ -2051,7 +2052,7 @@ fn serve(
     struct Source {
         /// The panel it is shown in, if it has one.
         row: Option<usize>,
-        sends_values: bool,
+        unit: Option<Unit>,
         /// Whether it is the ping node whose answers the pinger times.
         pings: bool,
         /// What it is to the temperatures window's plot, if anything.
@@ -2064,7 +2065,7 @@ fn serve(
         .iter()
         .map(|&source| Source {
             row: rows.get(source).copied(),
-            sends_values: sends_values.contains(source),
+            unit: units.get(source).copied(),
             pings: pings.as_ref().is_some_and(|feed| feed.node == source),
             plotted: plot
                 .as_ref()
@@ -2107,7 +2108,7 @@ fn serve(
                     at: Timestamp::now(),
                     data: sample,
                     packets: source.packets,
-                    sends_values: source.sends_values,
+                    unit: source.unit,
                 });
             }
         }
@@ -2271,21 +2272,19 @@ pub fn run(
             .map(|(row, info)| (info.name.to_string(), row))
             .collect(),
     );
-    // Which sources send values, asked of the configuration once: a panel
-    // then shows a reading as a temperature and everything else as bytes.
-    // See `tcslibgs::node::vehicle::compute::node_sends_a_value` for why this
-    // is the configuration's answer rather than a guess from the data.
-    let sends_values: Arc<BTreeSet<String>> = Arc::new(
+    // Which sources send values, and in what unit, asked of the
+    // configuration once: a panel then shows a reading as the number it is,
+    // with its unit, and everything else as bytes. See
+    // `tcslibgs::graph::units::unit_of` for why this is the configuration's
+    // answer rather than a guess from the data.
+    let units: Arc<BTreeMap<String, Unit>> = Arc::new(
         graph
             .nodes
             .iter()
-            .filter(|node| {
-                tcslibgs::node::vehicle::compute::node_sends_a_value(
-                    &node.node_type,
-                    &node.attributes,
-                )
+            .filter_map(|node| {
+                tcslibgs::graph::units::unit_of(&graph, &node.name)
+                    .map(|unit| (node.name.clone(), unit))
             })
-            .map(|node| node.name.clone())
             .collect(),
     );
 
@@ -2569,7 +2568,7 @@ pub fn run(
             gateway.sources().join(", ")
         );
         let rows = rows.clone();
-        let sends_values = sends_values.clone();
+        let units = units.clone();
         let arrivals = arrivals.clone();
         let plot = plot.clone();
         let feed = pings
@@ -2577,7 +2576,7 @@ pub fn run(
             .filter(|(through, _)| through == gateway.name())
             .map(|(_, feed)| feed.clone());
         thread::spawn(move || {
-            serve(gateway, rows, sends_values, arrivals, feed, plot)
+            serve(gateway, rows, units, arrivals, feed, plot)
         });
     }
 
@@ -3087,7 +3086,7 @@ vehicle:
             serve(
                 gateway,
                 rows,
-                Arc::new(BTreeSet::new()),
+                Arc::new(BTreeMap::new()),
                 arrivals,
                 Some(feed),
                 None,
@@ -3152,12 +3151,12 @@ payloads:
 
         // b has the second panel and sends values; a has no panel.
         let rows = Arc::new(BTreeMap::from([("b".to_string(), 1)]));
-        let sends_values = Arc::new(BTreeSet::from(["b".to_string()]));
+        let units = Arc::new(BTreeMap::from([("b".to_string(), Unit::Kelvin)]));
         let arrivals: Arrivals = Arc::new(Mutex::new(vec![None, None]));
         {
             let arrivals = arrivals.clone();
             thread::spawn(move || {
-                serve(gateway, rows, sends_values, arrivals, None, None)
+                serve(gateway, rows, units, arrivals, None, None)
             });
         }
 
@@ -3182,7 +3181,7 @@ payloads:
                         &arrival.data.bytes[..arrival.data.len as usize],
                         b"293.15"
                     );
-                    assert!(arrival.sends_values);
+                    assert_eq!(arrival.unit, Some(Unit::Kelvin));
                     assert!(
                         slots[0].is_none(),
                         "a has no panel, and filled one"

@@ -29,7 +29,9 @@ use std::collections::BTreeMap;
 
 use tcslibgs::graph::telemetry::{self, Telemetered, Via};
 use tcslibgs::graph::terminals::{self, Stream};
+use tcslibgs::graph::units;
 use tcslibgs::graph::{Destination, Graph, Link};
+use tcslibgs::unit::Unit;
 
 /// What a command from the ground sets.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -152,6 +154,12 @@ pub struct Routes {
     /// whose setpoint comes from the ground has a `commands` entry and no
     /// link out of the ground at all.
     commands: BTreeMap<String, Vec<Commanded>>,
+    /// What unit the values arriving at each computation are in, by node
+    /// name, for the computations that read values: a vote, a thermostat,
+    /// a program. The unit is never on a link, so this is how a node knows
+    /// what the four bytes it is handed count -- `tcslibgs::graph::units`,
+    /// asked once as the configuration is loaded.
+    input_units: BTreeMap<String, Unit>,
     /// Every link to the ground, each delivered to under its own name.
     ///
     /// The names are not names a configuration can use, so they cannot
@@ -279,6 +287,12 @@ impl Routes {
             }
         }
 
+        for node in graph.nodes.iter().filter(|n| n.node_type == "compute") {
+            if let Some(unit) = units::input_unit(graph, &node.name) {
+                routes.input_units.insert(node.name.clone(), unit);
+            }
+        }
+
         routes
     }
 
@@ -340,6 +354,20 @@ impl Routes {
             .filter(|(to, _)| to == node)
             .map(|(_, input)| input.as_str())
             .collect()
+    }
+
+    /// What unit the values arriving at a computation are in.
+    ///
+    /// # Arguments
+    ///
+    /// * `node` - The computation's name.
+    ///
+    /// # Returns
+    ///
+    /// The unit, or `None` where nothing sends it values in one unit, which
+    /// `Graph::check` refuses for a computation that reads them.
+    pub fn input_unit_of(&self, node: &str) -> Option<Unit> {
+        self.input_units.get(node).copied()
     }
 
     /// Each payload's link to the ground, for the payloads that send one.

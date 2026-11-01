@@ -1,0 +1,30 @@
+# A sensor's raw bytes, scaled and offset into a value in a unit.
+node: to_value
+type: compute
+about: >
+  Reads a part's bytes as a number and scales it into a value in the unit it
+  names: volts, amperes, metres. A temperature is a to_kelvin.
+sets:
+  function: to_value
+payload-sink: true
+payload-source: true
+gateway-sink: true
+gateway-source: true
+attributes:
+  - name: format
+    required: true
+    about: >
+      "How the bytes are laid out: i16_be, u16_le and the rest."
+  - name: scale
+    required: true
+    about: >
+      What one count is worth, in the unit. Nought would make every reading
+      the same.
+  - name: offset
+    required: true
+    about: What is added after scaling, in the unit.
+  - name: unit
+    required: true
+    about: >
+      What the value is a number of: K, V, A, W, m, m/s, N, or ratio for a
+      fraction of a whole.

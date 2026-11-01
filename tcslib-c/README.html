@@ -222,13 +222,16 @@ reads data only while the station is matched for listening: what arrives
 before is dropped and counted, as is whatever is waiting when the match
 begins. So a station that reads data passes its beacons too.
 <code>tcs_configuration_sends_values</code> says whether a node’s data
-are <em>values</em> – four bytes of micro-kelvin, which a conversion, a
-vote or a program’s answer makes – as the configuration says, a datum’s
-width being no guide, and <code>tcs_value_kelvin</code> reads one as a
-temperature. <code>tcs_configuration_sends_decisions</code> says whether
-they are <em>decisions</em> – the text <code>1</code> or <code>0</code>,
-which a thermostat makes – and <code>tcs_decision_on</code> reads one as
-on or off.</li>
+are <em>values</em> – four bytes of a count of a unit’s steps, which a
+conversion, a vote or a program’s answer makes – as the configuration
+says, a datum’s width being no guide.
+<code>tcs_configuration_value_unit</code> says what unit a node’s values
+are in, <code>tcs_value_in</code> reads one as a number in it, and
+<code>tcs_value_kelvin</code> reads a temperature.
+<code>tcs_configuration_sends_decisions</code> says whether they are
+<em>decisions</em> – the text <code>1</code> or <code>0</code>, which a
+thermostat makes – and <code>tcs_decision_on</code> reads one as on or
+off.</li>
 <li><strong>Data up.</strong> <code>tcs_uplink_open</code> opens the way
 up to a gateway node that binds an address and port aboard, and each
 <code>tcs_uplink_send</code> sends one datum there, which leaves the

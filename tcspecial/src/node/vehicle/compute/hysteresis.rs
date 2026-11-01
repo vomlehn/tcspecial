@@ -38,6 +38,7 @@
 use tcslibgs::node::vehicle::compute::{
     HysteresisParams, DECISION_OFF, DECISION_ON,
 };
+use tcslibgs::unit::Unit;
 
 use super::{from_text, from_value, Function, Out};
 
@@ -83,6 +84,8 @@ pub struct Hysteresis {
     /// the first reading, and one that starts at Off would be silent because
     /// the decision had not changed.
     last: Option<Decision>,
+    /// What the readings, the setpoint and the band are numbers of.
+    unit: Unit,
 }
 
 impl Hysteresis {
@@ -95,16 +98,18 @@ impl Hysteresis {
     ///
     /// # Arguments
     ///
-    /// * `params` - The setpoint and half the band's width, both in kelvin.
+    /// * `params` - The setpoint and half the band's width, both in `unit`.
+    /// * `unit`   - What the readings are numbers of.
     ///
     /// # Returns
     ///
     /// The thermostat, with no decision made yet.
-    pub fn of(params: HysteresisParams) -> Hysteresis {
+    pub fn of(params: HysteresisParams, unit: Unit) -> Hysteresis {
         Hysteresis {
             setpoint: params.setpoint,
             half_band: params.half_band,
             last: None,
+            unit,
         }
     }
 
@@ -150,7 +155,7 @@ impl Function for Hysteresis {
         _input: Option<&str>,
         data: &[u8],
     ) -> Result<Option<Out>, String> {
-        let temperature = from_value(data, "the temperature")?;
+        let temperature = from_value(data, self.unit, "the reading")?;
 
         let Some(wanted) = self.decide(temperature) else {
             return Ok(None);
@@ -194,7 +199,7 @@ impl Function for Hysteresis {
         let said = std::str::from_utf8(value).map_err(|_| {
             format!("{attribute}: what the ground sent is not text")
         })?;
-        let wanted = from_text(said, attribute)?;
+        let wanted = from_text(said, self.unit, attribute)?;
 
         match attribute {
             "setpoint" => self.set_setpoint(wanted),
@@ -246,7 +251,8 @@ mod tests {
     /// The refusal is `as_value`'s range, which these temperatures are all
     /// well inside; a test that meant to try the range says so.
     fn kelvin(number: f64) -> Vec<u8> {
-        as_value(number).expect("a temperature a value carries")
+        as_value(number, tcslibgs::unit::Unit::Kelvin)
+            .expect("a temperature a value carries")
     }
 
     /// Makes the thermostat the tests use.
@@ -255,10 +261,13 @@ mod tests {
     ///
     /// A thermostat set to 293.15 K, two kelvin either side.
     fn thermostat() -> Hysteresis {
-        Hysteresis::of(HysteresisParams {
-            setpoint: 293.15,
-            half_band: 2.0,
-        })
+        Hysteresis::of(
+            HysteresisParams {
+                setpoint: 293.15,
+                half_band: 2.0,
+            },
+            tcslibgs::unit::Unit::Kelvin,
+        )
     }
 
     /// Cold turns the heaters on; hot turns them off.
@@ -416,7 +425,7 @@ mod tests {
     fn a_reading_that_is_not_a_temperature_is_refused() {
         let mut h = thermostat();
         let said = h.give(None, b"cold enough").expect_err("not a value");
-        assert!(said.contains("temperature"), "{said}");
+        assert!(said.contains("a value is 4 bytes"), "{said}");
     }
 
     /// What the heaters are held at between decisions.
@@ -427,10 +436,13 @@ mod tests {
     /// asserting `Off` before it had looked would be a decision nobody made.
     #[test]
     fn it_holds_the_heaters_at_the_last_decision() {
-        let mut h = Hysteresis::of(HysteresisParams {
-            setpoint: 293.15,
-            half_band: 2.0,
-        });
+        let mut h = Hysteresis::of(
+            HysteresisParams {
+                setpoint: 293.15,
+                half_band: 2.0,
+            },
+            tcslibgs::unit::Unit::Kelvin,
+        );
 
         assert_eq!(
             h.held(),

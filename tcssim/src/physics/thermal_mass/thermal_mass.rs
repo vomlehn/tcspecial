@@ -93,7 +93,7 @@ use std::time::Instant;
 use rand::rngs::StdRng;
 use rand::{Rng, SeedableRng};
 use rand_distr::StandardNormal;
-use tcslibgs::node::vehicle::compute::{Format, ToKelvinParams};
+use tcslibgs::node::vehicle::compute::{Format, ToValueParams};
 use tcslibgs::sim_config::{ResolvedMass, Wander};
 
 use super::sensor::Sensor;
@@ -433,7 +433,7 @@ pub enum Thermal {
         /// Taken from the conversion the readings go to, so the vehicle reads
         /// back the temperature the mass is at: see
         /// `tcslibgs::graph::simulated::reading_of`.
-        reading: ToKelvinParams,
+        reading: ToValueParams,
         /// What the sensor gets wrong, and what it has got wrong so far.
         sensor: Arc<Sensor>,
     },
@@ -515,7 +515,7 @@ pub fn driven(thermal: &Option<Thermal>, which: &str, data: &[u8]) {
 /// # Returns
 ///
 /// The sensor's bytes, two or three of them as the format says.
-pub fn encode(reading: &ToKelvinParams, kelvin: f64) -> Vec<u8> {
+pub fn encode(reading: &ToValueParams, kelvin: f64) -> Vec<u8> {
     let counts = ((kelvin - reading.offset) / reading.scale).round();
     match reading.format {
         Format::I16Be => {
@@ -782,17 +782,19 @@ mod tests {
         let parts = [
             // temp_1 and temp_2: two bytes, a sixteenth of a kelvin a count,
             // above freezing.
-            ToKelvinParams {
+            ToValueParams {
                 format: Format::I16Be,
                 scale: 0.0625,
                 offset: 273.15,
+                unit: tcslibgs::unit::Unit::Kelvin,
             },
             // temp_3: three bytes, eight thousandths of a kelvin, its own
             // offset.
-            ToKelvinParams {
+            ToValueParams {
                 format: Format::U24Be,
                 scale: 0.0078,
                 offset: 255.37,
+                unit: tcslibgs::unit::Unit::Kelvin,
             },
         ];
 
@@ -823,10 +825,11 @@ mod tests {
 
         // And a temperature the format cannot hold is clamped, not wrapped: a
         // wrapped count is a sensor reporting the other end of its range.
-        let part = ToKelvinParams {
+        let part = ToValueParams {
             format: Format::U16Be,
             scale: 1.0,
             offset: 0.0,
+            unit: tcslibgs::unit::Unit::Kelvin,
         };
         assert_eq!(encode(&part, -50.0), vec![0x00, 0x00]);
         assert_eq!(encode(&part, 1e9), vec![0xFF, 0xFF]);
@@ -934,7 +937,7 @@ mod tests {
     ///
     /// The temperature in kelvin, or `None` if there are too few bytes for
     /// the format or the format is not one the example's sensors use.
-    fn kelvin_of(reading: &ToKelvinParams, bytes: &[u8]) -> Option<f64> {
+    fn kelvin_of(reading: &ToValueParams, bytes: &[u8]) -> Option<f64> {
         let counts = match reading.format {
             Format::I16Be if bytes.len() >= 2 => {
                 i16::from_be_bytes([bytes[0], bytes[1]]) as f64
@@ -1015,15 +1018,17 @@ mod tests {
 
         // The two encodings of the example, so that what is voted over is
         // readings of one temperature in different formats.
-        let two_byte = ToKelvinParams {
+        let two_byte = ToValueParams {
             format: Format::I16Be,
             scale: 0.0625,
             offset: 273.15,
+            unit: tcslibgs::unit::Unit::Kelvin,
         };
-        let three_byte = ToKelvinParams {
+        let three_byte = ToValueParams {
             format: Format::U24Be,
             scale: 0.0078,
             offset: 255.37,
+            unit: tcslibgs::unit::Unit::Kelvin,
         };
 
         // The vehicle's end of each sensor link, which is the end that waits:

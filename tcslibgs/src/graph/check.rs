@@ -1412,6 +1412,13 @@ impl Graph {
             }
         }
 
+        // What units the values reaching each computation are in: one unit,
+        // and values at all, and a thermostat's band in that unit's range.
+        // See `units`, which says what unit every node sends.
+        for (node, why) in super::units::problems(self) {
+            problems.push(Problem::BadCompute { node, why });
+        }
+
         // A `null-` node, a `tee-` node and a `ping` node say nothing about
         // themselves.
         //
@@ -3770,9 +3777,24 @@ mod tests {
                     .attributes
                     .insert(attribute.to_string(), Scalar::of(*value));
             }
+            // Through a conversion, so that what arrives is a value: a
+            // thermostat reading a sensor's own bytes is refused for that
+            // alone, by `units`.
+            let mut kelvin = node("k", "compute");
+            kelvin.attributes.clear();
+            for (attribute, value) in [
+                ("function", "to_kelvin"),
+                ("format", "i16_be"),
+                ("scale", "0.0625"),
+                ("offset", "273.15"),
+            ] {
+                kelvin
+                    .attributes
+                    .insert(attribute.to_string(), Scalar::of(value));
+            }
             let g = graph(
-                vec![node("sensor", "i2c"), thermostat],
-                vec![link("sensor", &["thermostat"])],
+                vec![node("sensor", "i2c"), kelvin, thermostat],
+                vec![link("sensor", &["k"]), link("k", &["thermostat"])],
             );
             g.check()
         };

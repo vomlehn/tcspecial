@@ -1266,6 +1266,7 @@ impl NodeType {
                 ("format", false),
                 ("scale", false),
                 ("offset", false),
+                ("unit", false),
                 // vote
                 ("inputs", false),
                 ("algorithm", false),

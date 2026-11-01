@@ -1,7 +1,7 @@
 //! The IIO endpoint: a sensor's buffer, read and never written.
 //!
-//! **Experimental, and not yet supported.** Run against a pseudo-terminal
-//! standing in for a buffer, and against no sensor.
+//! **Supported.** Run against the kernel's dummy sensor, by
+//! `tests/kernel-stand-ins.rs`, and against no real one.
 //!
 //! What a buffered IIO device offers user space is a character device that
 //! hands over packed samples: open it, poll it, read it, and what comes back

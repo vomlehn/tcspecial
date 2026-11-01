@@ -1,8 +1,9 @@
 //! A simulated device that moves discrete lines.
 //!
-//! **Experimental, and not yet supported.** Written against the kernel's
-//! `gpio-sim` and run against no hardware; the scan below is what the tests
-//! here cover, as the I2C stand-in's is.
+//! A supported type, flown against the kernel's `gpio-sim` by
+//! `tcspecial/tests/kernel-stand-ins.rs`, which moves the lines itself rather
+//! than through this; the scan below is what the tests here cover, as the
+//! I2C stand-in's is.
 //!
 //! A discrete line is the one type of device the simulator cannot simply be
 //! the far end of. A serial line has a pty; a socket has another socket; a

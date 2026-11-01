@@ -1,7 +1,8 @@
 //! A simulated device that stands in for a sensor's sample buffer.
 //!
-//! **Experimental, and not yet supported.** Run against a pseudo-terminal
-//! standing in for the buffer, and against no sensor.
+//! A supported type, flown against the kernel's `iio_dummy` by
+//! `tcspecial/tests/kernel-stand-ins.rs`; this stands in for the buffer with
+//! a pseudo-terminal where there is no dummy.
 //!
 //! What a handler does with an IIO device is open `/dev/iio:deviceN` and
 //! read packed samples out of it. The simulator can be the other end of

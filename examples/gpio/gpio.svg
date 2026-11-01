@@ -1,0 +1,100 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="900" height="430" viewBox="0 0 900 430" role="img" aria-labelledby="title desc">
+  <title id="title">The gpio example</title>
+  <desc id="desc">Two lines of a chip of the kernel's gpio-sim, each a payload of its own. Each edge on line 0 is read by switch, device id 1, as a sixteen-byte record of when, which line and what it became, and goes by its payload-out link to ground, a gateway_radio node, and down to the MOC at 127.0.0.1:3721: ground_base, 3720, plus the id. A 1 or 0 the MOC sends up to 127.0.0.1:3620, which ground binds, leaves it by its gateway-out link for lamp, device id 2, which drives line 1 to it.</desc>
+  <defs>
+    <style>
+      text { font-family: "DejaVu Sans", Helvetica, Arial, sans-serif; fill: #111827; }
+      .name { font-family: "DejaVu Sans Mono", Menlo, Consolas, monospace; font-size: 15px; font-weight: bold; }
+      .kind { font-size: 12.5px; fill: #374151; }
+      .detail { font-family: "DejaVu Sans Mono", Menlo, Consolas, monospace; font-size: 11.5px; fill: #4b5563; }
+      .heading { font-size: 13px; font-weight: bold; fill: #475569; letter-spacing: 0.06em; }
+      .label { font-size: 12px; fill: #1f2937; }
+      .note { font-size: 12px; fill: #4b5563; }
+      .socket { fill: #ffffff; stroke: #2f6db5; stroke-width: 1.4; stroke-dasharray: 5 3; }
+      .kernel { fill: #fdf6ec; stroke: #b45309; stroke-width: 1.6; }
+      .ground { fill: #f3f4f6; stroke: #4b5563; stroke-width: 1.6; }
+      .boundary { fill: #fbfbfd; stroke: #94a3b8; stroke-width: 1.4; stroke-dasharray: 7 5; }
+      .up { fill: none; stroke: #b45309; stroke-width: 2; stroke-dasharray: 8 4; }
+      .down { fill: none; stroke: #2563eb; stroke-width: 2; }
+    </style>
+    <marker id="arrow-amber" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#b45309"/>
+    </marker>
+    <marker id="arrow-blue" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#2563eb"/>
+    </marker>
+  </defs>
+
+  <rect width="900" height="430" fill="#ffffff"/>
+
+  <!-- Column headings -->
+  <text class="heading" x="20" y="44">KERNEL STAND-IN</text>
+  <text class="heading" x="245" y="44">TCSPECIAL (VEHICLE)</text>
+  <text class="heading" x="705" y="44">GROUND</text>
+
+  <rect class="boundary" x="230" y="58" width="430" height="232" rx="14"/>
+
+  <!-- The kernel's simulated chip, whose lines the test pulls and reads -->
+
+  <rect class="kernel" x="20" y="80" width="180" height="210" rx="10"/>
+  <text class="name" x="36" y="107">gpio-sim</text>
+  <text class="kind" x="36" y="128">the kernel's simulated</text>
+  <text class="kind" x="36" y="148">GPIO chip</text>
+  <text class="note" x="36" y="168"></text>
+  <text class="detail" x="36" y="188">line 0: pull</text>
+  <text class="detail" x="36" y="208">line 1: value</text>
+
+  <!-- The two payloads, one line each -->
+
+  <rect class="socket" x="245" y="80" width="190" height="80" rx="10"/>
+  <text class="name" x="261" y="107">switch</text>
+  <text class="kind" x="261" y="128">gpio payload, id 1</text>
+  <text class="detail" x="261" y="148">line 0, input</text>
+
+  <rect class="socket" x="245" y="210" width="190" height="80" rx="10"/>
+  <text class="name" x="261" y="237">lamp</text>
+  <text class="kind" x="261" y="258">gpio payload, id 2</text>
+  <text class="detail" x="261" y="278">line 1, output</text>
+
+  <rect class="socket" x="470" y="110" width="170" height="150" rx="10"/>
+  <text class="name" x="486" y="137">ground</text>
+  <text class="kind" x="486" y="158">gateway_radio, id 0</text>
+  <text class="detail" x="486" y="178">binds 127.0.0.1:3620</text>
+  <text class="detail" x="486" y="198">ground_base</text>
+  <text class="detail" x="486" y="218">  127.0.0.1:3720</text>
+
+  <rect class="ground" x="705" y="110" width="180" height="150" rx="10"/>
+  <text class="name" x="721" y="137">MOC</text>
+  <text class="kind" x="721" y="158">ground station</text>
+  <text class="detail" x="721" y="178">edges on :3721</text>
+  <text class="note" x="721" y="198"></text>
+  <text class="note" x="721" y="218">1 or 0 up</text>
+  <text class="detail" x="721" y="238">  to :3620</text>
+
+  <!-- Down: an edge, as a record, to the ground -->
+  <path class="down" d="M200,120 L241,120" marker-end="url(#arrow-blue)"/>
+  <path class="down" d="M435,120 L466,140" marker-end="url(#arrow-blue)"/>
+  <text class="label" x="400" y="100">payload-out</text>
+  <path class="down" d="M640,150 L701,150" marker-end="url(#arrow-blue)"/>
+  <text class="label" x="646" y="142">record</text>
+
+  <!-- Up: 1 or 0, from the ground to the lamp's line -->
+  <path class="up" d="M701,230 L644,230" marker-end="url(#arrow-amber)"/>
+  <text class="label" x="646" y="222">1 or 0</text>
+  <path class="up" d="M470,240 L439,250" marker-end="url(#arrow-amber)"/>
+  <text class="label" x="440" y="275">gateway-out</text>
+  <path class="up" d="M245,250 L204,250" marker-end="url(#arrow-amber)"/>
+
+  <!-- Legend -->
+  <line x1="45" y1="320" x2="860" y2="320" stroke="#e5e7eb" stroke-width="1"/>
+  <path class="down" d="M45,352 L95,352" marker-end="url(#arrow-blue)"/>
+  <text class="label" x="105" y="356">data, solid: device to ground</text>
+  <path class="up" d="M400,352 L450,352" marker-end="url(#arrow-amber)"/>
+  <text class="label" x="460" y="356">command, dashed: ground to device</text>
+  <rect class="kernel" x="45" y="376" width="22" height="16" rx="4"/>
+  <text class="label" x="75" y="389">made by the kernel</text>
+  <rect class="socket" x="260" y="376" width="22" height="16" rx="4"/>
+  <text class="label" x="290" y="389">opened by tcspecial</text>
+  <rect class="ground" x="470" y="376" width="22" height="16" rx="4"/>
+  <text class="label" x="500" y="389">the ground</text>
+</svg>

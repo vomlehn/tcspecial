@@ -1,0 +1,77 @@
+# yaml-language-server: $schema=../../tcsgui/share/schema/tcspecial.schema.json
+
+description: "Discrete lines of a GPIO chip: a switch's edges to the ground,
+  and the ground's 1 or 0 driving a lamp"
+
+tcspecial:
+  # Every port is in the thirty-two hundreds to thirty-seven hundreds, ending
+  # in 20 or 30, which no other example uses, so this one can be left running
+  # while another is looked at.
+  beacon:
+    default_interval: "5 s"
+    recv: "127.0.0.1:3530"
+    reset_interval: "1 s"
+    send: "0.0.0.0:3520"
+  gateway: "radio"
+  interface: "ad9aac4dd5a6d88dd5e78824ba8a83ac"
+  log:
+    directory: "/tmp/telemetry"
+    segment_size: "65536"
+  payload_command:
+    dest_base: "0.0.0.0:3320"
+    source_base: "127.0.0.1:3330"
+  payload_telemetry:
+    dest_base: "127.0.0.1:3430"
+    source_base: "0.0.0.0:3420"
+  # tcspecial counts its starts in this file, which must be on storage
+  # that survives a power cycle on a vehicle.
+  state_file: "/tmp/tcspecial-gpio.state"
+  tcs_cmd:
+    recv: "0.0.0.0:3220"
+    send: "127.0.0.1:3230"
+
+gateway:
+  # The ground's end of the link, both ways. What the ground sends goes up to
+  # address:port, which this node binds aboard, and leaves it by gateway-out
+  # for the lamp. What comes down arrives at ground_base plus the device id
+  # of the node that sent it: the switch, device id 1, at 127.0.0.1:3721.
+  - name: ground
+    type: gateway_radio
+    address: "127.0.0.1"
+    port: "3620"
+    ground_base: "127.0.0.1:3720"
+    payload-in: true
+    gateway-out:
+      - target: lamp
+
+payloads:
+  # Two lines of one chip, each a payload of its own because one is read and
+  # the other driven, and a payload's lines go one way. The chip here is
+  # /dev/gpiochip1, which is what the kernel's gpio-sim chip is numbered on a
+  # host with one chip of its own; bin/mk-kernel-stand-ins makes that chip and
+  # prints the number it was given, which is the path to write here.
+  #
+  # A switch on line 0. Each time it changes, the kernel's edge becomes a
+  # sixteen-byte record -- when, which line, and what it became -- and the
+  # record goes to the ground.
+  - name: switch
+    type: gpio
+    path: "/dev/gpiochip1"
+    lines: "0"
+    edge: "both"
+    payload-out:
+      - target: ground
+  # A lamp on line 1, driven by what the ground sends: the text 1 to light
+  # it, 0 to put it out, and anything else refused.
+  - name: lamp
+    type: gpio
+    path: "/dev/gpiochip1"
+    lines: "1"
+    direction: "output"
+    gateway-in: true
+
+tcsgui:
+  nodes:
+    - { name: ground, x: 469, y: 34 }
+    - { name: switch, x: 34, y: 34 }
+    - { name: lamp, x: 34, y: 134 }

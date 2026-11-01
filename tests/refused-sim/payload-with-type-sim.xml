@@ -1,0 +1,9 @@
+<simulator>
+    <simulated_payloads>
+        <type name="network">
+            <payload name="sensor">
+                <type>network</type>
+            </payload>
+        </type>
+    </simulated_payloads>
+</simulator>

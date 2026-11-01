@@ -1,0 +1,7 @@
+simulated_payloads:
+  - type network:
+      - payload: a
+        simulate: true
+  - type network:
+      - payload: b
+        simulate: true

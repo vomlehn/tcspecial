@@ -1,0 +1,5 @@
+simulated_payloads:
+  - type network:
+      - payload: sensor
+        type: network
+        simulate: true

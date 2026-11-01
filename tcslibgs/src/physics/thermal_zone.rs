@@ -15,7 +15,7 @@
 
 use std::time::Duration;
 
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 
 use super::setting::{positive, quantity, size_of, time_of, wander_of, Wander};
 use super::terminal::{Kind, Terminal};
@@ -28,8 +28,9 @@ pub const TERMINALS: &[Terminal] = &[
     Terminal::output("temperature", Kind::Value(Unit::Kelvin)),
 ];
 
-/// Everything it states, by the name a file writes, `name` and `type`
-/// apart: the one list, from which an editor builds its form.
+/// Everything it states, by the name a file writes, the
+/// `component` naming it apart: the one list, from which an editor builds
+/// its form.
 pub const SETTINGS: &[&str] = &[
     "environment",
     "time_constant",
@@ -41,10 +42,11 @@ pub const SETTINGS: &[&str] = &[
 ];
 
 /// A thermal zone, as a physics model states it.
-#[derive(Debug, Clone, Deserialize, PartialEq, Eq)]
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
 #[serde(deny_unknown_fields)]
 pub struct ThermalZone {
     /// What it is called, which is how a connection or a stand-in names it.
+    #[serde(rename = "component")]
     pub name: String,
     /// The temperature it tends towards with nothing warming it, in kelvin:
     /// `"283.15 K"`.

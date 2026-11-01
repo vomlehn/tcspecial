@@ -22,39 +22,36 @@ tcssim:
 physics: descent-physics.yaml
 
 simulated_payloads:
-  # Ten readings a second, each with two centimetres of noise, which is
-  # what guidance differences into a rate of descent.
-  - name: radar
-    simulate: true
-    type: network
-    protocol: udp
-    packet_interval: 100 ms
-    connects: lander.altitude
-    noise: "0.02 m"
+  - type network:
+      # Five a second, for the ground: guidance does not take it, a process
+      # taking values in one unit and this one's being metres a second.
+      - payload: doppler
+        connects: lander.velocity
+        noise: "0.01 m/s"
+        packet_interval: 200 ms
+        protocol: udp
+        simulate: true
 
-  # Five a second, for the ground: guidance does not take it, a process
-  # taking values in one unit and this one's being metres a second.
-  - name: doppler
-    simulate: true
-    type: network
-    protocol: udp
-    packet_interval: 200 ms
-    connects: lander.velocity
-    noise: "0.01 m/s"
+      # Driven and never read: the engine's throttle, as guidance sends it.
+      - payload: engine
+        connects: engine.throttle
+        protocol: udp
+        simulate: true
 
-  # A switch on a landing leg: 1 on the ground, 0 off it. Said again every
-  # second, and at once when it changes, which is the moment of touchdown:
-  # the stand-in waits on the model for it rather than for its next turn.
-  - name: touchdown
-    simulate: true
-    type: network
-    protocol: udp
-    packet_interval: 1 s
-    connects: lander.contact
+      # Ten readings a second, each with two centimetres of noise, which is
+      # what guidance differences into a rate of descent.
+      - payload: radar
+        connects: lander.altitude
+        noise: "0.02 m"
+        packet_interval: 100 ms
+        protocol: udp
+        simulate: true
 
-  # Driven and never read: the engine's throttle, as guidance sends it.
-  - name: engine
-    simulate: true
-    type: network
-    protocol: udp
-    connects: engine.throttle
+      # A switch on a landing leg: 1 on the ground, 0 off it. Said again every
+      # second, and at once when it changes, which is the moment of touchdown:
+      # the stand-in waits on the model for it rather than for its next turn.
+      - payload: touchdown
+        connects: lander.contact
+        packet_interval: 1 s
+        protocol: udp
+        simulate: true

@@ -14,13 +14,12 @@ tcssim:
 # makes no bus. vcan0 has to be up before it starts, which
 # bin/mk-kernel-stand-ins sees to.
 simulated_payloads:
-  # A status frame a second.
-  - name: motor_status
-    simulate: true
-    type: can
-    packet_interval: 1 s
-  # Driven and never read: its stand-in sends nothing and counts what the
-  # vehicle sends it, so that its panel shows each command reaching it.
-  - name: motor_command
-    simulate: true
-    type: can
+  - type can:
+      # Driven and never read: its stand-in sends nothing and counts what the
+      # vehicle sends it, so that its panel shows each command reaching it.
+      - payload: motor_command
+        simulate: true
+      # A status frame a second.
+      - payload: motor_status
+        packet_interval: 1 s
+        simulate: true

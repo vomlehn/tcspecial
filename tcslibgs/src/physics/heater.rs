@@ -10,7 +10,7 @@
 //! power goes as the square of its voltage and its current as the voltage,
 //! so both follow. The arithmetic is tcssim's `physics::heater`.
 
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 
 use super::setting::{positive, wander_of, Wander};
 use super::terminal::{Kind, Terminal};
@@ -24,15 +24,17 @@ pub const TERMINALS: &[Terminal] = &[
     Terminal::output("current", Kind::Value(Unit::Ampere)),
 ];
 
-/// Everything it states, by the name a file writes, `name` and `type`
-/// apart: the one list, from which an editor builds its form.
+/// Everything it states, by the name a file writes, the
+/// `component` naming it apart: the one list, from which an editor builds
+/// its form.
 pub const SETTINGS: &[&str] = &["power", "voltage", "ripple", "ripple_time"];
 
 /// A heater, as a physics model states it.
-#[derive(Debug, Clone, Deserialize, PartialEq, Eq)]
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
 #[serde(deny_unknown_fields)]
 pub struct Heater {
     /// What it is called, which is how a connection or a stand-in names it.
+    #[serde(rename = "component")]
     pub name: String,
     /// What it gives out while on at its nominal voltage, in watts:
     /// `"60 W"`.

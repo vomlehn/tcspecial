@@ -29,7 +29,7 @@
 //! for being outside what this models. The arithmetic is tcssim's
 //! `physics::battery`.
 
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 
 use super::setting::{positive, quantity};
 use super::terminal::{Kind, Terminal};
@@ -43,16 +43,18 @@ pub const TERMINALS: &[Terminal] = &[
     Terminal::output("charge", Kind::Value(Unit::Ratio)),
 ];
 
-/// Everything it states, by the name a file writes, `name` and `type`
-/// apart: the one list, from which an editor builds its form.
+/// Everything it states, by the name a file writes, the
+/// `component` naming it apart: the one list, from which an editor builds
+/// its form.
 pub const SETTINGS: &[&str] =
     &["capacity", "empty", "full", "resistance", "charge"];
 
 /// A battery, as a physics model states it.
-#[derive(Debug, Clone, Deserialize, PartialEq, Eq)]
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
 #[serde(deny_unknown_fields)]
 pub struct Battery {
     /// What it is called, which is how a connection or a stand-in names it.
+    #[serde(rename = "component")]
     pub name: String,
     /// How much charge it holds full, in ampere-hours: `"10 Ah"`.
     pub capacity: String,

@@ -232,7 +232,7 @@ fn yaml_line(text: &str, said: &Renamed) -> usize {
 ///
 /// What is before a `#` that begins a comment: one at the start of the line
 /// or after a space, and outside quotes.
-pub(super) fn uncommented(line: &str) -> &str {
+pub(crate) fn uncommented(line: &str) -> &str {
     let mut quote = None;
     let mut before = ' ';
     for (at, c) in line.char_indices() {
@@ -258,7 +258,7 @@ pub(super) fn uncommented(line: &str) -> &str {
 ///
 /// Each key and the value after it, which is empty for a key whose value is
 /// on the lines below.
-pub(super) fn keys_and_values(
+pub(crate) fn keys_and_values(
     line: &str,
 ) -> impl Iterator<Item = (&str, &str)> {
     line.split(['{', ',', '}'])

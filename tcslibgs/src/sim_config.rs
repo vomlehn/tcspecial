@@ -38,13 +38,14 @@
 
 use std::collections::{BTreeMap, BTreeSet};
 use std::fmt;
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use std::time::Duration;
 
+use crate::physics::{PhysicsFile, ThermalMass};
 use crate::verify::About;
 use crate::{
     load_data_file, one_host, DHConfig, DHType, EndpointConfig,
-    NetworkProtocol, TcsResult,
+    NetworkProtocol, TcsError, TcsResult,
 };
 use serde::de::IgnoredAny;
 use serde::{Deserialize, Serialize};
@@ -460,9 +461,11 @@ impl SimConfigError {
             | SimConfigError::BadAttachment { payload, .. } => {
                 About::SimPayload(payload.clone())
             }
-            // A mass is not a payload and not a group: it is named in a
-            // section of its own, which is where a reader should be sent.
-            SimConfigError::BadThermalMass { .. } => About::File,
+            // A mass is not a payload and not a group: it is an element of
+            // the physics model, which is where a reader should be sent.
+            SimConfigError::BadThermalMass { mass, .. } => {
+                About::PhysicsElement(mass.clone())
+            }
         }
     }
 }
@@ -978,7 +981,7 @@ pub struct SimSettings {
     /// The thermal mass whose temperature this payload reports.
     ///
     /// What makes a simulated sensor send a temperature rather than noise:
-    /// the mass is a thing with a state -- see the `thermal_mass` section --
+    /// the mass is a thing with a state -- see [`crate::physics`] --
     /// and a sensor attached to one reports what it is, in the encoding the
     /// payload configuration says that sensor's readings are in.
     ///
@@ -1330,7 +1333,7 @@ fn wander_of(
 /// # Errors
 ///
 /// `d`'s error, or one naming the text if it does not parse as a `T`.
-fn blank_is_unstated<'de, D, T>(d: D) -> Result<Option<T>, D::Error>
+pub(crate) fn blank_is_unstated<'de, D, T>(d: D) -> Result<Option<T>, D::Error>
 where
     D: serde::Deserializer<'de>,
     T: std::str::FromStr,
@@ -1390,23 +1393,6 @@ pub const SETTINGS: &[&str] = &[
     "lag",
     "ripple",
     "ripple_time",
-];
-
-/// Everything a thermal mass states, by the name a file writes, `name` apart.
-///
-/// The second list, for the second kind of entry this file holds. It is here
-/// for the reason [`SETTINGS`] is: the editor keeps a mass a file carried and
-/// writes it back, and a field missing from this list is a field it would
-/// write away.
-pub const MASS_SETTINGS: &[&str] = &[
-    "environment",
-    "time_constant",
-    "inputs",
-    "outputs",
-    "swing",
-    "period",
-    "wander",
-    "wander_time",
 ];
 
 impl SimSettings {
@@ -1523,14 +1509,28 @@ pub struct SimConfigFile {
     pub tcssim: Option<SimTcssim>,
     #[serde(default)]
     pub simulated_payload_groups: Vec<SimGroup>,
-    /// The thermal masses the payloads are attached to.
+    /// The physics model the payloads are attached to, as this file names
+    /// it: a path, relative to the directory this file is in.
+    ///
+    /// A file of its own, because a vehicle's physics outlives any one
+    /// configuration of its payloads: see [`crate::physics`]. Unstated is a
+    /// set whose stand-ins are attached to nothing.
+    #[serde(default, deserialize_with = "blank_is_unstated")]
+    pub physics: Option<String>,
+    /// A `thermal_mass` section, which a simulator file held before the
+    /// physics model had a file of its own. Read only to be refused, saying
+    /// where it goes now: see [`MOVED_THERMAL_MASS`].
+    #[serde(default, rename = "thermal_mass")]
+    pub moved_thermal_mass: Option<IgnoredAny>,
+    /// The thermal masses of the physics model the file names, which the
+    /// payloads are attached to: read from that model by
+    /// [`SimConfigFile::read_physics`], and never from this file.
     ///
     /// A mass is not a payload. It is a thing the payloads are joined by: the
     /// sensors report its temperature and the heaters warm it, so what the
-    /// vehicle reads is a consequence of what it drove. Declared once, named
-    /// by each payload attached to it, the way a payload group is.
-    #[serde(default)]
-    pub thermal_mass: Vec<SimThermalMass>,
+    /// vehicle reads is a consequence of what it drove.
+    #[serde(skip)]
+    pub thermal_mass: Vec<ThermalMass>,
     #[serde(default)]
     pub simulated_payloads: Vec<SimPayload>,
 }
@@ -1556,63 +1556,6 @@ pub struct SimTcssim {
     /// which it reports as it starts.
     #[serde(default, deserialize_with = "blank_is_unstated")]
     pub seed: Option<u64>,
-}
-
-/// A thermal mass, as a simulator file states it.
-#[derive(Debug, Clone, Deserialize, PartialEq, Eq)]
-#[serde(deny_unknown_fields)]
-pub struct SimThermalMass {
-    /// What it is called, which is the name a payload names to attach to it.
-    pub name: String,
-    /// The temperature it tends towards with nothing warming it, in kelvin.
-    ///
-    /// Fixed, and not a figure that follows the vehicle's setpoint: a mass
-    /// whose surroundings tracked the setpoint could never be driven away
-    /// from it, and commanding the setpoint from the ground would then show
-    /// nothing at all.
-    pub environment: String,
-    /// How quickly it loses the difference, as a length of time.
-    ///
-    /// The time constant of Newton's cooling: with nothing warming it, the
-    /// gap between the mass and its surroundings falls to a third of itself
-    /// in this long. A mass ten kelvin above its surroundings with a fifty
-    /// second constant is cooling at a fifth of a kelvin a second.
-    ///
-    /// Stated as a time rather than as that rate because the rate depends on
-    /// how far from its surroundings the mass happens to be, and the constant
-    /// does not: one figure describes the mass at every temperature.
-    pub time_constant: String,
-    /// The names of the places a heater can be connected to it, separated
-    /// by commas: `in1,in2`. None need be connected, and none is an empty
-    /// list.
-    #[serde(default, deserialize_with = "blank_is_unstated")]
-    pub inputs: Option<String>,
-    /// The names of the places a sensor can read its temperature from,
-    /// separated by commas: `out1,out2,out3`. None need be connected, and
-    /// none is an empty list. A name may be followed by `=` and how far,
-    /// in kelvin, that place sits from the mass's temperature -- `out2=+0.3`
-    /// -- since a body warmed in one place is not one temperature
-    /// throughout.
-    #[serde(default, deserialize_with = "blank_is_unstated")]
-    pub outputs: Option<String>,
-    /// How far its environment swings either side of `environment`, in
-    /// kelvin, as a sine wave: a day and a night, or an orbit's sun and
-    /// shadow. Unstated is none.
-    #[serde(default, deserialize_with = "blank_is_unstated")]
-    pub swing: Option<String>,
-    /// How long one swing takes, as a length of time. Required with `swing`
-    /// and refused without it.
-    #[serde(default, deserialize_with = "blank_is_unstated")]
-    pub period: Option<String>,
-    /// How far its environment wanders at random: the standard deviation,
-    /// in kelvin, of a departure drawn back towards nought with
-    /// `wander_time` as its time constant. Unstated is none.
-    #[serde(default, deserialize_with = "blank_is_unstated")]
-    pub wander: Option<String>,
-    /// How slowly its environment wanders, as a length of time. Required
-    /// with `wander` and refused without it.
-    #[serde(default, deserialize_with = "blank_is_unstated")]
-    pub wander_time: Option<String>,
 }
 
 /// What a payload is to its thermal mass.
@@ -1740,10 +1683,83 @@ impl Faults {
     }
 }
 
+/// What a simulator file with a `thermal_mass` section is told: where the
+/// masses are written now.
+pub const MOVED_THERMAL_MASS: &str = "a simulator file no longer declares \
+    thermal masses: they are the vehicle's physics, and are written in a \
+    physics model of their own. Move this section to a file beside this one \
+    -- <name>-physics.yaml -- as a list under physics:, each mass given \
+    type: thermal_mass, and name that file here with physics: \
+    <name>-physics.yaml";
+
 impl SimConfigFile {
-    /// Read a simulator configuration file.
+    /// Read a simulator configuration file, and the physics model it names.
+    ///
+    /// # Arguments
+    ///
+    /// * `path` - The simulator file.
+    ///
+    /// # Returns
+    ///
+    /// The file, with the thermal masses of its model.
+    ///
+    /// # Errors
+    ///
+    /// `TcsError::Config` where the file cannot be read or parsed, or where
+    /// [`SimConfigFile::read_physics`] refuses its model.
     pub fn load<P: AsRef<Path>>(path: P) -> TcsResult<Self> {
-        load_data_file(path)
+        let path = path.as_ref();
+        let mut file: SimConfigFile = load_data_file(path)?;
+        file.read_physics(path).map_err(TcsError::Config)?;
+        Ok(file)
+    }
+
+    /// Where the physics model this file names is.
+    ///
+    /// # Arguments
+    ///
+    /// * `sim_path` - Where this file is: the model is named relative to the
+    ///                directory it is in.
+    ///
+    /// # Returns
+    ///
+    /// The model's path, or `None` where the file names none.
+    pub fn physics_path(&self, sim_path: &Path) -> Option<PathBuf> {
+        let named = self.physics.as_deref()?;
+        let directory = sim_path.parent().unwrap_or(Path::new(""));
+        Some(directory.join(named))
+    }
+
+    /// Reads the physics model this file names, and takes its thermal
+    /// masses as the ones its payloads are attached to.
+    ///
+    /// # Arguments
+    ///
+    /// * `sim_path` - Where this file is, which the model is named relative
+    ///                to.
+    ///
+    /// # Errors
+    ///
+    /// [`MOVED_THERMAL_MASS`] for a file that still declares masses itself,
+    /// and the model's own complaint, naming it, where it cannot be read.
+    pub fn read_physics(&mut self, sim_path: &Path) -> Result<(), String> {
+        if self.moved_thermal_mass.is_some() {
+            return Err(format!(
+                "{}: {MOVED_THERMAL_MASS}",
+                sim_path.display()
+            ));
+        }
+        let Some(model) = self.physics_path(sim_path) else {
+            return Ok(());
+        };
+        let model = PhysicsFile::load(&model).map_err(|e| {
+            format!(
+                "{}: physics names a model that cannot be had: {e}",
+                sim_path.display()
+            )
+        })?;
+        self.thermal_mass = model.thermal_masses();
+        Ok(())
     }
 
     /// Where tcssim answers whether it is ready: the `tcssim` section's
@@ -2044,8 +2060,8 @@ impl SimConfigFile {
             (Some(mass), None) => {
                 let Some(declared) = declared(mass) else {
                     return Err(bad(format!(
-                        "it reads \"{mass}\", and no thermal_mass of that name \
-                         is declared"
+                        "it reads \"{mass}\", and the physics model has no \
+                         thermal_mass of that name"
                     )));
                 };
                 if settings.rate.is_some() {
@@ -2109,8 +2125,8 @@ impl SimConfigFile {
             (None, Some(mass)) => {
                 let Some(declared) = declared(mass) else {
                     return Err(bad(format!(
-                        "it heats \"{mass}\", and no thermal_mass of that name \
-                         is declared"
+                        "it heats \"{mass}\", and the physics model has no \
+                         thermal_mass of that name"
                     )));
                 };
                 if settings.output.is_some() {
@@ -4250,14 +4266,20 @@ simulated_payloads:
                 .map(|line| format!("    {line}\n"))
                 .collect::<String>()
         };
-        parse(&format!(
-            "thermal_mass:
+        // The model a file names, read as `read_physics` reads it.
+        let model = PhysicsFile::parse(
+            "physics:
   - name: basic
+    type: thermal_mass
     environment: \"283.15\"
     time_constant: 50 s
     inputs: \"in1,in2\"
     outputs: \"out1,out2,out3\"
-simulated_payloads:
+",
+        )
+        .expect("the model parses");
+        let mut file = parse(&format!(
+            "simulated_payloads:
   - name: DH0
     simulate: true
     type: network
@@ -4271,7 +4293,41 @@ simulated_payloads:
 {}",
             indent(sensor),
             indent(heater)
-        ))
+        ));
+        file.thermal_mass = model.thermal_masses();
+        file
+    }
+
+    /// A simulator file that still declares its masses itself is refused,
+    /// told where they go now, and one naming a model it cannot have is
+    /// refused naming the model.
+    #[test]
+    fn masses_are_the_models_and_not_the_simulator_files() {
+        let dir = tempfile::tempdir().expect("a directory");
+        let sim = dir.path().join("set-sim.yaml");
+        std::fs::write(
+            &sim,
+            "thermal_mass:\n  - name: basic\n    environment: \"1\"\n    \
+             time_constant: 1 s\n",
+        )
+        .expect("written");
+        let why = SimConfigFile::load(&sim).expect_err("moved").to_string();
+        assert!(why.contains("physics model of their own"), "{why}");
+
+        std::fs::write(&sim, "physics: nowhere-physics.yaml\n")
+            .expect("written");
+        let why = SimConfigFile::load(&sim).expect_err("missing").to_string();
+        assert!(why.contains("nowhere-physics.yaml"), "{why}");
+
+        std::fs::write(
+            dir.path().join("set-physics.yaml"),
+            "physics:\n  - name: basic\n    type: thermal_mass\n    \
+             environment: \"1\"\n    time_constant: 1 s\n",
+        )
+        .expect("written");
+        std::fs::write(&sim, "physics: set-physics.yaml\n").expect("written");
+        let file = SimConfigFile::load(&sim).expect("it reads its model");
+        assert_eq!(file.thermal_mass[0].name, "basic");
     }
 
     /// What a sensor and a heater come to when attached to named connections,

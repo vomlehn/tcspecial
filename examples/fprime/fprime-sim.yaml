@@ -14,14 +14,9 @@ description: Simulator settings for the payloads of fprime.ytcs
 tcssim:
   ready: "127.0.0.1:7902"
 
-thermal_mass:
-  # The cabin, starting at and settling to ten degrees, losing any
-  # difference with a hundred second constant.
-  - name: cabin
-    environment: "283.15"
-    time_constant: "100 s"
-    inputs: "in1"
-    outputs: "out1"
+# The physics model the payloads below attach to -- the cabin they read and
+# warm -- which is the vehicle's, not this file's: see the file it names.
+physics: fprime-physics.yaml
 
 simulated_payloads:
   # Driven and never read: its stand-in sends nothing, counts what the

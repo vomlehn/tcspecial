@@ -771,7 +771,8 @@ LIBTCS_SONAME := libtcs.so.$(LIBTCS_ABI)
 # shipped.
 EXAMPLE_FILES = examples/README.html $(shell git ls-files \
 		'examples/*/*.ytcs' 'examples/*/*.xtcs' \
-		'examples/*/*-sim.yaml' 'examples/*/*.svg')
+		'examples/*/*-sim.yaml' 'examples/*/*-physics.yaml' \
+		'examples/*/*.svg')
 
 # Whether what is installed is stripped: 1, the default, or 0.
 #

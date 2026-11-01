@@ -33,16 +33,10 @@ description: Simulator settings for the payloads of thermostat.ytcs
 tcssim:
   ready: "127.0.0.1:7907"
 
-thermal_mass:
-  # The cabin: ten kelvin below the setpoint of thermostat.ytcs, losing the
-  # difference with a fifty second constant -- which at the setpoint is a
-  # fifth of a kelvin a second of cooling. A heater is connected to an input
-  # and a sensor to an output, and any of them may be left unconnected.
-  - name: basic
-    environment: "283.15"
-    time_constant: "50 s"
-    inputs: "in1,in2"
-    outputs: "out1,out2,out3"
+# The physics model the payloads below attach to: the thermostat example's,
+# this being the same vehicle with its payloads on buses, so that the cabin
+# is stated once for both.
+physics: ../../examples/thermostat/thermostat-physics.yaml
 
 simulated_payload_groups:
   # The three sensors are read together, every tenth of a second, as their

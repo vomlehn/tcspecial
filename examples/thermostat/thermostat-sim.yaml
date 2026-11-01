@@ -27,27 +27,9 @@ description: Simulator settings for the payloads of thermostat.ytcs
 tcssim:
   ready: "127.0.0.1:7907"
 
-thermal_mass:
-  # The cabin: ten kelvin below the setpoint of thermostat.ytcs, losing the
-  # difference with a fifty second constant -- which at the setpoint is a
-  # fifth of a kelvin a second of cooling. A heater is connected to an input
-  # and a sensor to an output, and any of them may be left unconnected.
-  #
-  # Its surroundings are not still. They swing three kelvin either side of
-  # 283.15 once every ninety minutes -- a low orbit's sun and shadow -- and
-  # wander half a kelvin besides, over ten minutes or so. The cabin is not
-  # one temperature throughout either: the place out2's sensor is on is a
-  # fifth of a kelvin warmer than the middle, and out3's three tenths
-  # cooler.
-  - name: basic
-    environment: "283.15"
-    time_constant: "50 s"
-    inputs: "in1,in2"
-    outputs: "out1,out2=+0.2,out3=-0.3"
-    swing: "3"
-    period: "90 min"
-    wander: "0.5"
-    wander_time: "10 min"
+# The physics model the payloads below attach to -- the cabin they read and
+# warm -- which is the vehicle's, not this file's: see the file it names.
+physics: thermostat-physics.yaml
 
 simulated_payload_groups:
   # The three sensors are read together, every tenth of a second, as their

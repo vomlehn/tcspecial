@@ -37,81 +37,12 @@
       ],
       "additionalProperties": false
     },
-    "thermal_mass": {
-      "description": "The thermal masses the simulated payloads are attached to. A mass cools towards its environment and is warmed by the heaters that are on, so that what the vehicle reads is a consequence of what the vehicle drove: three sensors reading one mass agree, where three sending random bytes never do. A mass nothing is attached to is refused.",
-      "type": "array",
-      "items": {
-        "type": "object",
-        "properties": {
-          "name": {
-            "type": "string"
-          },
-          "environment": {
-            "type": [
-              "string",
-              "number"
-            ],
-            "description": "The temperature around it, in kelvin. A mass starts here, with its heaters off, because a vehicle coming up cold is the case a thermostat exists for."
-          },
-          "time_constant": {
-            "type": [
-              "string",
-              "number"
-            ],
-            "description": "How fast it loses the difference between itself and its environment, as a length of time: after one of these it has lost all but 1/e of it."
-          },
-          "inputs": {
-            "type": [
-              "string",
-              "null"
-            ],
-            "description": "The names of the places a heater can be connected to it, separated by commas: `in1,in2`. None need be connected."
-          },
-          "outputs": {
-            "type": [
-              "string",
-              "null"
-            ],
-            "description": "The names of the places a sensor can read its temperature from, separated by commas: `out1,out2,out3`. None need be connected. A name may be followed by `=` and how far, in kelvin, that place sits from the mass's temperature: `out2=+0.3`."
-          },
-          "swing": {
-            "type": [
-              "string",
-              "number",
-              "null"
-            ],
-            "description": "How far the environment swings either side of `environment`, in kelvin, as a sine wave: a day and a night, or an orbit's sun and shadow."
-          },
-          "period": {
-            "type": [
-              "string",
-              "null"
-            ],
-            "description": "How long one swing takes, as a length of time. Required with `swing` and refused without it."
-          },
-          "wander": {
-            "type": [
-              "string",
-              "number",
-              "null"
-            ],
-            "description": "How far the environment wanders at random: the standard deviation, in kelvin, of a departure drawn back towards nought with `wander_time` as its time constant."
-          },
-          "wander_time": {
-            "type": [
-              "string",
-              "null"
-            ],
-            "description": "How slowly the environment wanders, as a length of time. Required with `wander` and refused without it."
-          }
-        },
-        "required": [
-          "name",
-          "environment",
-          "time_constant"
-        ],
-        "additionalProperties": false
-      }
+    "physics": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "description": "The physics model the simulated payloads are attached to: a YAML file of its own, named relative to this file's directory, such as `cabin-physics.yaml`. A vehicle's physics outlives any one configuration of its payloads, so it is written once and named by every simulator file that uses it. Its schema is tcspecial-physics.schema.json."
     },
     "simulated_payload_groups": {
       "description": "Settings shared by the payloads that name them.",

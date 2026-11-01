@@ -4,6 +4,8 @@ Schemas for the files tcsgui edits.
     tcspecial.schema.json    the same, written in YAML
     tcspecial-sim.xsd        a simulator configuration, written in XML
     tcspecial-sim.schema.json  the same, written in YAML
+    tcspecial-physics.schema.json  a physics model, which a simulator
+                             configuration names, YAML only
 
 What these are for is the thing an editor cannot do for a file somebody is
 writing by hand or with another tool: tell them, in their own editor, that

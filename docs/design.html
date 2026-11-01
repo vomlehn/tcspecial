@@ -10758,10 +10758,27 @@ it -- so what the vehicle reads is a consequence of what the vehicle drove,
 and the whole loop can be watched closing.</p>
 <dl class="docutils">
 <dt>Requirement</dt>
-<dd>The simulator file may declare thermal masses. Each has a name, the
-temperature of the environment it sits in, and a time constant: how long
-it takes to lose a given fraction of the difference between itself and
-that environment.</dd>
+<dd>Thermal masses are declared in a physics model: a YAML file of its own,
+which the simulator file names with <tt class="docutils literal">physics</tt>, relative to the
+simulator file's directory. A vehicle's physics outlives any one
+configuration of its payloads, so it is stated once and named by every
+simulator file that uses it; the manual's thermostat fixture and the
+thermostat example name one model. A simulator file that still declares
+masses itself is refused, told where they go.</dd>
+<dt>Requirement</dt>
+<dd>The model is a list of elements, each with a name and a <tt class="docutils literal">type</tt>, as a
+configuration is a list of nodes: <tt class="docutils literal">thermal_mass</tt> is the one type so
+far, and an element of any other is refused. Each type's settings, and
+its rules, are stated once, in <tt class="docutils literal"><span class="pre">tcslibgs::physics</span></tt>; its arithmetic is
+the simulator's.</dd>
+<dt>Requirement</dt>
+<dd>A thermal mass has a name, the temperature of the environment it sits
+in, and a time constant: how long it takes to lose a given fraction of
+the difference between itself and that environment.</dd>
+<dt>Requirement</dt>
+<dd><tt class="docutils literal">tcsverify</tt> reads the model a simulator file names, and reports a
+problem with a mass at its line in the model, and a model that cannot
+be read at the simulator file's <tt class="docutils literal">physics</tt> line.</dd>
 <dt>Requirement</dt>
 <dd>A mass may name inputs, where heaters are connected, and outputs, where
 sensors read it. Any of them may be left unconnected. A list naming one
@@ -11019,10 +11036,20 @@ looks like. As there, the error is reported from the payload's end.</dd>
 <div class="section" id="example">
 <h2><a class="toc-backref" href="#toc-entry-131">Example</a></h2>
 <p>This is the shipped <tt class="docutils literal"><span class="pre">examples/thermostat/thermostat-sim.yaml</span></tt>, which
-simulates the three sensors and two heaters of <tt class="docutils literal">thermostat.ytcs</tt>. The three
-sensors are read together and so share a group, which carries their rate and
-the thermal mass they
-report; the mass is what makes three sensors agree about a temperature, each
+simulates the three sensors and two heaters of <tt class="docutils literal">thermostat.ytcs</tt>, attached
+to the thermal mass <tt class="docutils literal">basic</tt> of the model it names,
+<tt class="docutils literal"><span class="pre">thermostat-physics.yaml</span></tt>:</p>
+<pre class="code yaml literal-block">
+<span class="name tag">physics</span><span class="punctuation">:</span><span class="whitespace">
+  </span><span class="punctuation indicator">-</span><span class="whitespace"> </span><span class="name tag">name</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">basic</span><span class="whitespace">
+    </span><span class="name tag">type</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">thermal_mass</span><span class="whitespace">
+    </span><span class="name tag">environment</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal string">&quot;283.15&quot;</span><span class="whitespace">
+    </span><span class="name tag">time_constant</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal string">&quot;50</span><span class="name variable"> </span><span class="literal string">s&quot;</span><span class="whitespace">
+    </span><span class="name tag">inputs</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal string">&quot;in1,in2&quot;</span><span class="whitespace">
+    </span><span class="name tag">outputs</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal string">&quot;out1,out2,out3&quot;</span>
+</pre>
+<p>The three sensors are read together and so share a group, which carries
+their rate and the thermal mass they report; the mass is what makes three sensors agree about a temperature, each
 on an output of its own. The heaters warm the mass, each through an input of
 its own while the vehicle has it on. Every one of them is the far end of a
 UDP socket, which the simulator stands in for with nothing more than a
@@ -11030,12 +11057,7 @@ socket.</p>
 <pre class="code yaml literal-block">
 <span class="name tag">description</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">Simulator settings for the payloads of thermostat.ytcs</span><span class="whitespace">
 
-</span><span class="name tag">thermal_mass</span><span class="punctuation">:</span><span class="whitespace">
-  </span><span class="punctuation indicator">-</span><span class="whitespace"> </span><span class="name tag">name</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">basic</span><span class="whitespace">
-    </span><span class="name tag">environment</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal string">&quot;283.15&quot;</span><span class="whitespace">
-    </span><span class="name tag">time_constant</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal string">&quot;50</span><span class="name variable"> </span><span class="literal string">s&quot;</span><span class="whitespace">
-    </span><span class="name tag">inputs</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal string">&quot;in1,in2&quot;</span><span class="whitespace">
-    </span><span class="name tag">outputs</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal string">&quot;out1,out2,out3&quot;</span><span class="whitespace">
+</span><span class="name tag">physics</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">thermostat-physics.yaml</span><span class="whitespace">
 
 </span><span class="name tag">simulated_payload_groups</span><span class="punctuation">:</span><span class="whitespace">
   </span><span class="punctuation indicator">-</span><span class="whitespace"> </span><span class="name tag">name</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">cabin_temps</span><span class="whitespace">

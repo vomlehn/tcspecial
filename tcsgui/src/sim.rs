@@ -59,15 +59,14 @@ pub struct Simulator {
     /// thing that broke a set that worked.
     #[serde(default)]
     pub tcssim: Settings,
-    /// The thermal masses the file declares, by name.
+    /// The physics model the file names, as it names it: a path relative to
+    /// the file's own directory.
     ///
-    /// Kept so that saving does not drop them. The editor offers no window
-    /// for a mass -- what a mass is is three numbers about the world the
-    /// payloads sit in, and nothing was asked for -- but a file that declares
-    /// one is a file that goes back out with it: an editor that silently
-    /// wrote away a section it does not show is an editor that destroys the
-    /// file it was given.
-    pub masses: BTreeMap<String, Settings>,
+    /// Kept so that saving does not drop it, as the `tcssim` section is. The
+    /// model itself -- the masses the payloads attach to -- is a file of its
+    /// own, which saving this one never touches: see `tcslibgs::physics`.
+    #[serde(default)]
+    pub physics: Option<String>,
     /// The groups of settings, by name.
     pub groups: BTreeMap<String, Settings>,
     /// The simulated payloads, by the name of the payload each stands in for.
@@ -144,7 +143,11 @@ struct File {
     #[serde(default)]
     tcssim: BTreeMap<String, Scalar>,
     #[serde(default)]
-    thermal_mass: Vec<Entry>,
+    physics: Option<Scalar>,
+    /// A section a simulator file held before the physics model had a file
+    /// of its own: read only to be refused, as every program refuses it.
+    #[serde(default)]
+    thermal_mass: Option<serde::de::IgnoredAny>,
     #[serde(default)]
     simulated_payload_groups: Vec<Entry>,
     #[serde(default)]
@@ -257,7 +260,16 @@ pub fn read(path: &Path) -> Result<Simulator, Trouble> {
     let text = std::fs::read_to_string(path).map_err(|e| unreadable(&e))?;
     let file: File = format.parse(&text).map_err(|e| unreadable(&e))?;
 
+    if file.thermal_mass.is_some() {
+        return Err(Trouble::Unusable(
+            tcslibgs::sim_config::MOVED_THERMAL_MASS.to_string(),
+        ));
+    }
     simulator.description = file.description;
+    simulator.physics = file
+        .physics
+        .map(|named| named.as_str().trim().to_string())
+        .filter(|named| !named.is_empty());
     simulator.tcssim = file
         .tcssim
         .into_iter()
@@ -272,7 +284,6 @@ pub fn read(path: &Path) -> Result<Simulator, Trouble> {
     // which is what it would not do if the editor adopted half of it and
     // wrote it back on the next edit.
     for (what, entries) in [
-        ("thermal mass", &file.thermal_mass),
         ("simulated payload group", &file.simulated_payload_groups),
         ("simulated payload", &file.simulated_payloads),
     ] {
@@ -303,7 +314,6 @@ pub fn read(path: &Path) -> Result<Simulator, Trouble> {
             })
             .collect()
     };
-    simulator.masses = settled(file.thermal_mass);
     simulator.groups = settled(file.simulated_payload_groups);
     simulator.payloads = settled(file.simulated_payloads);
     Ok(simulator)
@@ -373,34 +383,11 @@ pub fn to_yaml(simulator: &Simulator, payloads: &[String]) -> String {
         }
     }
 
-    // The masses first, because that is the order the file reads in: a mass
-    // exists and then payloads attach to it. Not written as a form, as the
-    // two lists below are: a mass is three numbers with no defaults, so an
-    // entry invented with them blank would be a declaration the simulator
-    // refuses. What is written is what the file said.
-    if !simulator.masses.is_empty() {
-        out.push_str("\nthermal_mass:\n");
-        for (name, said) in &simulator.masses {
-            out.push_str(&format!("  - name: {}\n", quoted(name)));
-            let mut fields: Vec<&str> =
-                tcslibgs::sim_config::MASS_SETTINGS.to_vec();
-            let theirs: Vec<&str> = said
-                .keys()
-                .map(String::as_str)
-                .filter(|field| !fields.contains(field))
-                .collect();
-            fields.extend(theirs);
-            for field in fields {
-                if let Some(value) = said.get(field).map(|value| value.trim()) {
-                    if !value.is_empty() {
-                        out.push_str(&format!(
-                            "    {field}: {}\n",
-                            quoted(value)
-                        ));
-                    }
-                }
-            }
-        }
+    // The physics model the payloads attach to, before them, because that
+    // is the order the file reads in: a model exists and then payloads attach
+    // to it. Only the name: the model is a file of its own.
+    if let Some(physics) = &simulator.physics {
+        out.push_str(&format!("\nphysics: {}\n", quoted(physics)));
     }
 
     // Each payload of the configuration, then whatever the file holds for a
@@ -581,83 +568,77 @@ mod tests {
         }
     }
 
-    /// A thermal mass the editor does not show still goes back out.
-    ///
-    /// The section has no window: what a mass is is three numbers about the
-    /// world the payloads sit in, and nobody asked to edit them here. That is
-    /// a reason to leave them alone and not a reason to lose them -- an
-    /// editor that wrote away a section it does not show is an editor that
-    /// destroys the file it was opened on, and the loss would show up as a
-    /// simulator that had gone back to sending noise.
+    /// The physics model a file names still goes back out, and the model
+    /// itself is left as it was: saving the simulator file writes that file
+    /// and no other.
     #[test]
-    fn a_thermal_mass_survives_the_editor() {
+    fn the_physics_model_named_survives_the_editor() {
         let where_ = tempfile::tempdir().expect("a directory");
         let path = where_.path().join("vehiclesim.yaml");
-
-        // As a simulator file writes it, including a field from a later build
-        // that this one knows nothing about.
+        let model = where_.path().join("vehicle-physics.yaml");
+        let model_said = concat!(
+            "physics:\n",
+            "  - name: cabin\n",
+            "    type: thermal_mass\n",
+            "    environment: \"283.15\"\n",
+            "    time_constant: \"50 s\"\n",
+            "    outputs: \"out1\"\n",
+        );
+        std::fs::write(&model, model_said).expect("written");
         let given = concat!(
             "tcssim:\n",
             "  ready: \"127.0.0.1:7999\"\n",
             "\n",
-            "thermal_mass:\n",
-            "  - name: cabin\n",
-            "    environment: \"283.15\"\n",
-            "    time_constant: \"50 s\"\n",
-            "    stirred: \"yes\"\n",
+            "physics: vehicle-physics.yaml\n",
             "\n",
             "simulated_payloads:\n",
             "  - name: temp_1\n    simulate: true\n",
-            "    reads: cabin\n",
+            "    reads: cabin\n    output: out1\n",
         );
         std::fs::write(&path, given).expect("written");
 
         let read_in = read(&path).expect("it reads");
-        let cabin = read_in.masses.get("cabin").expect("the mass");
-        assert_eq!(
-            cabin.get("environment").map(String::as_str),
-            Some("283.15")
-        );
-        assert_eq!(
-            cabin.get("time_constant").map(String::as_str),
-            Some("50 s")
-        );
-        assert_eq!(cabin.get("stirred").map(String::as_str), Some("yes"));
+        assert_eq!(read_in.physics.as_deref(), Some("vehicle-physics.yaml"));
 
         // Saved, as every other edit saves the whole file, and read again.
         let payloads = vec!["temp_1".to_string()];
         let written = to_yaml(&read_in, &payloads);
         std::fs::write(&path, &written).expect("written");
         let back = read(&path).expect("it reads again");
-        assert_eq!(back.masses, read_in.masses, "{written}");
-        assert_eq!(
-            back.tcssim.get("ready").map(String::as_str),
-            Some("127.0.0.1:7999"),
-            "{written}"
-        );
+        assert_eq!(back.physics, read_in.physics, "{written}");
         assert_eq!(
             back.payloads["temp_1"].get("reads").map(String::as_str),
             Some("cabin"),
             "what a payload is attached to is a setting like any other"
         );
+        assert_eq!(
+            std::fs::read_to_string(&model).expect("the model"),
+            model_said,
+            "the model is not the editor's to write"
+        );
 
-        // And the simulator's own reader takes what the editor wrote. Without
-        // the invented field, which this build's simulator refuses by name --
-        // being carried through the editor is exactly what lets a file from a
-        // later build be opened here and read by the build it was written
-        // for.
-        let mut this_build = back;
-        this_build
-            .masses
-            .get_mut("cabin")
-            .expect("the mass")
-            .remove("stirred");
-        let plain = where_.path().join("plainsim.yaml");
-        this_build.path = plain.clone();
-        std::fs::write(&plain, to_yaml(&this_build, &payloads))
-            .expect("written");
-        tcslibgs::sim_config::SimConfigFile::load(&plain)
+        // And the simulator's own reader takes what the editor wrote, with
+        // the model it names.
+        let file = tcslibgs::sim_config::SimConfigFile::load(&path)
             .expect("the simulator reads what the editor wrote");
+        assert_eq!(file.thermal_mass[0].name, "cabin");
+    }
+
+    /// A file that still declares its masses itself is refused, told where
+    /// they go now, rather than opened and saved without them.
+    #[test]
+    fn a_file_declaring_masses_itself_is_refused() {
+        let where_ = tempfile::tempdir().expect("a directory");
+        let path = where_.path().join("vehiclesim.yaml");
+        std::fs::write(
+            &path,
+            "thermal_mass:\n  - name: cabin\n    environment: \"1\"\n",
+        )
+        .expect("written");
+        let Err(Trouble::Unusable(why)) = read(&path) else {
+            panic!("a file declaring masses was read");
+        };
+        assert!(why.contains("physics model of their own"), "{why}");
     }
 
     /// What the simulator's own reader makes of what the editor writes.

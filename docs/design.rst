@@ -6740,6 +6740,16 @@ Requirement
     station is not matched for commanding.
 
 Requirement
+    A datum a station sends up to a gateway node, which leaves it by its
+    ``gateway-out`` links to drive a payload, is held to the same match: a
+    station that keeps one sends nothing up, and says so, while it is not
+    matched for commanding. ``tcslib::ping::Uplink`` is the one way up,
+    gated by ``Uplink::gated_by``, and the C/C++ library's ``tcs_uplink``
+    is it, gated so. The ping is the exception, sent ungated by tcsmoc and
+    ``tcs_pinger``: a ping node answers it whatever the configuration, and
+    it drives nothing.
+
+Requirement
     tcsmoc says the same in a pop-up error for every other command pressed
     meanwhile: that the match between the ground's and the vehicle's
     configurations is still in progress, and to check the beacon's checksum

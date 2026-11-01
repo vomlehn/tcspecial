@@ -220,7 +220,20 @@ opens a gateway node, and each <code>tcs_gateway_receive</code> returns
 one datum and the name of the node that produced it. A gateway node
 reads data only while the station is matched for listening: what arrives
 before is dropped and counted, as is whatever is waiting when the match
-begins. So a station that reads data passes its beacons too.</li>
+begins. So a station that reads data passes its beacons too.
+<code>tcs_configuration_sends_values</code> says whether a node’s data
+are <em>values</em> – four bytes of micro-kelvin, which a conversion, a
+vote or a program’s answer makes – as the configuration says, a datum’s
+width being no guide, and <code>tcs_value_kelvin</code> reads one as a
+temperature.</li>
+<li><strong>Data up.</strong> <code>tcs_uplink_open</code> opens the way
+up to a gateway node that binds an address and port aboard, and each
+<code>tcs_uplink_send</code> sends one datum there, which leaves the
+node by its <code>gateway-out</code> links for the nodes they reach: a
+heater driven, a line set. It is tcslib’s <code>ping::Uplink</code>, the
+way the ping goes up. What goes up drives a payload as a command does,
+so it goes only while the station is matched for commanding, and fails
+unsent before, saying the configurations are not yet matched.</li>
 <li><strong>Commands.</strong> <code>tcs_client_open</code> opens the
 two command links the configuration states.
 <code>tcs_client_connect</code> says whether the vehicle is flying this
@@ -303,9 +316,11 @@ went.</p>
 configuration, waits for the first beacon, connects and pings, asks
 about a node and sets one of its attributes, pings the vehicle’s ping
 node and times the answer, and prints the vehicle’s data from a gateway
-node. They take <code>--yaml</code> or <code>--xml</code>, as every
-example program does, and <code>--restart</code> to arm a restart and
-restart the vehicle, which they do only when asked.</p>
+node, a value as a temperature. They take <code>--yaml</code> or
+<code>--xml</code>, as every example program does,
+<code>--restart</code> to arm a restart and restart the vehicle, and
+<code>--send=&lt;text&gt;</code> to send the text up to the gateway
+node, each of which they do only when asked.</p>
 <h2 id="how-the-header-is-kept-honest">How the header is kept
 honest</h2>
 <p>It is written by hand, for people, so the proof that it says what the

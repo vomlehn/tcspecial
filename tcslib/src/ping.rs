@@ -14,6 +14,10 @@
 //! * [`Uplink`] sends to a gateway node: the address and port it binds aboard,
 //!   which is what leaves it by its `gateway-out` links. The answer comes down
 //!   as any node's data does, through [`crate::gateway::GatewayReceiver`].
+//!   It is the one way up to a gateway node, for a ping and for any other
+//!   datum a station sends -- tcslib-c's `tcs_uplink` is it, for C and C++
+//!   -- and a station that keeps a match gates it by that match, as its
+//!   client is gated: see [`Uplink::gated_by`].
 //! * [`Pinger`] keeps what there is to show: the last ping sent and when, the
 //!   last answer and when, and the three times between them.
 //!
@@ -45,6 +49,8 @@ use tcslibgs::graph::telemetry::{self, Via};
 use tcslibgs::graph::{Destination, Graph};
 use tcslibgs::node::vehicle::ping;
 use tcslibgs::EndpointConfig;
+
+use crate::matched::Matched;
 
 /// A `ping` node the ground can reach, and the gateway node between them.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -131,6 +137,9 @@ fn binds(graph: &Graph, gateway: &str) -> bool {
 pub struct Uplink {
     socket: UdpSocket,
     to: SocketAddr,
+    /// Whether the station is matched for commanding, where it is gated by
+    /// that: see [`Uplink::gated_by`].
+    gate: Option<Matched>,
 }
 
 impl Uplink {
@@ -188,7 +197,32 @@ impl Uplink {
                 .map_err(|e| {
                     format!("a socket to send to \"{gateway}\" from: {e}")
                 })?;
-        Ok(Uplink { socket, to })
+        Ok(Uplink {
+            socket,
+            to,
+            gate: None,
+        })
+    }
+
+    /// Sends nothing from now on unless the station is matched for
+    /// commanding, as its client sends nothing but CONNECT, RESTART_ARM and
+    /// RESTART until it is.
+    ///
+    /// What goes up to a gateway node leaves it by its `gateway-out` links
+    /// for a payload, so it drives that payload as a command does: a heater
+    /// switched, a line set. A datum that means one thing under the
+    /// station's configuration may mean another under the vehicle's, so it
+    /// waits on the match a command waits on. A station that keeps no match
+    /// -- one that watches no beacons, such as a test -- has nothing to gate
+    /// by, and sends whatever it is given; so does the ping, whose node
+    /// answers it whatever the configuration.
+    ///
+    /// # Arguments
+    ///
+    /// * `matched` - Whether the station is matched, which its beacon watch
+    ///               keeps.
+    pub fn gated_by(&mut self, matched: Matched) {
+        self.gate = Some(matched);
     }
 
     /// Where it sends to.
@@ -208,8 +242,21 @@ impl Uplink {
     ///
     /// # Errors
     ///
-    /// A message saying where it could not be sent, and why.
+    /// A message saying where it could not be sent, and why, and one saying
+    /// it was not sent where the uplink is gated by a match the station
+    /// does not have.
     pub fn send(&self, data: &[u8]) -> Result<(), String> {
+        if self.gate.as_ref().is_some_and(|m| !m.for_commanding()) {
+            // Allocates, as every refusal here does, to say why: a station
+            // that sends while unmatched has a fault to read about, and this
+            // is the message it reads.
+            return Err(format!(
+                "nothing sent up to {}: the configurations are not yet \
+                 matched. Check that the checksum in the vehicle's beacon is \
+                 this station's configuration's, and Connect",
+                self.to
+            ));
+        }
         self.socket
             .send_to(data, self.to)
             .map(|_| ())
@@ -613,5 +660,46 @@ mod tests {
         assert_eq!(&buffer[..got], b"ping #1 1760900000.000000000");
 
         assert!(Uplink::open(&graph, "nobody").is_err());
+    }
+
+    /// Gated by a match, an uplink sends nothing until the station is
+    /// matched for commanding, saying so, and then sends.
+    #[test]
+    fn a_gated_uplink_sends_only_once_matched_for_commanding() {
+        let vehicle = UdpSocket::bind("127.0.0.1:0").expect("a port");
+        vehicle
+            .set_read_timeout(Some(Duration::from_millis(500)))
+            .expect("a timeout");
+        let port = vehicle.local_addr().expect("an address").port();
+        let dir = tempfile::tempdir().expect("a directory");
+        let path = dir.path().join("vehicle.ytcs");
+        std::fs::write(
+            &path,
+            format!(
+                "gateway:\n  - {{ name: gateway, type: gateway_radio, \
+                 address: \"127.0.0.1\", port: \"{port}\", \
+                 ground_base: \"127.0.0.1:9000\" }}\n"
+            ),
+        )
+        .expect("written");
+        let graph = Graph::load(&path).expect("it reads");
+        let ours = tcslibgs::ConfigDigest([0x5a; 16]);
+        let matched = Matched::for_configuration(ours);
+        let mut uplink = Uplink::open(&graph, "gateway").expect("it binds");
+        uplink.gated_by(matched.clone());
+
+        let refused = uplink.send(b"1").expect_err("not yet matched");
+        assert!(refused.contains("not yet matched"), "{refused}");
+        let mut buffer = [0u8; 8];
+        assert!(vehicle.recv_from(&mut buffer).is_err(), "nothing went");
+
+        // Matched as a station is: a clear beacon of its configuration,
+        // then a CONNECT of its own answered with its checksum.
+        matched.beacon(false, Some(ours), crate::beacon::Stage::Heard, false);
+        let mark = matched.before_connect();
+        matched.connect_answered(ours, mark);
+        uplink.send(b"1").expect("sent once matched");
+        let (got, _) = vehicle.recv_from(&mut buffer).expect("it arrived");
+        assert_eq!(&buffer[..got], b"1");
     }
 }

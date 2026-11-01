@@ -2,9 +2,10 @@
  * tcs.h -- tcslib for C and C++.
  *
  * What a ground station is built on, behind one header: the vehicle's beacons,
- * the vehicle's data from a gateway node, and commands to the vehicle. The same
- * library the Rust ground programs use -- tcslib -- so a C or C++ station reads
- * the configuration, counts ports and ages beacons exactly as tcsmoc does.
+ * the vehicle's data from a gateway node, data up to a gateway node, and
+ * commands to the vehicle. The same library the Rust ground programs use --
+ * tcslib -- so a C or C++ station reads the configuration, counts ports and
+ * ages beacons exactly as tcsmoc does.
  *
  * C and C++ alike. The header is C, includable from C++ as it stands; every
  * declaration has C linkage, and nothing in it is C that C++ will not compile.
@@ -14,7 +15,7 @@
  * Conventions, the same for every function:
  *
  *   - Each thing a station holds -- a configuration, a beacon watch, a gateway
- *     node, a client -- is a handle, made by an _open (or _listen) function
+ *     node, an uplink, a client -- is a handle, made by an _open (or _listen) function
  *     and freed by the matching _close. A _close of NULL does nothing.
  *   - A function that makes a handle returns NULL where it cannot; one that
  *     returns int returns 0 for done and -1 for not done. Either way
@@ -314,6 +315,65 @@ int tcs_gateway_receive(tcs_gateway *gateway, int64_t wait_ms,
  *
  * @param gateway  The gateway node, or NULL to do nothing. */
 void tcs_gateway_close(tcs_gateway *gateway);
+
+/* A value is what a computation that makes one sends: four bytes of a signed
+ * count of micro-kelvin, most significant first, which is a temperature. Only
+ * the configuration says which nodes send values -- every four bytes read as
+ * one, so a datum's width cannot -- and these two are how a station asks it
+ * and reads one. */
+
+/** Says whether a node sends values, as the configuration says: a compute
+ * node whose function is to_kelvin, vote or process.
+ *
+ * @param configuration  The configuration.
+ * @param node           The node's name, as a datum's source gives it.
+ * @param values         Where 1 is written when it sends values, 0 when
+ *                       not.
+ * @return               0, or -1 where there is no such node. */
+int tcs_configuration_sends_values(const tcs_configuration *configuration,
+				   const char *node, int *values);
+
+/** Reads a value as a temperature.
+ *
+ * @param data    The datum's bytes; may be NULL where length is 0.
+ * @param length  How many bytes data holds, which for a value is 4.
+ * @param kelvin  Where the temperature is written, in kelvin.
+ * @return        0, or -1 where the datum is not a value's width. */
+int tcs_value_kelvin(const uint8_t *data, size_t length, double *kelvin);
+
+/* ---- Data up to the vehicle --------------------------------------------- */
+
+/* The way up to a gateway node: the address and port it binds aboard, from
+ * which what is sent leaves by its gateway-out links for the nodes they
+ * reach. What goes up drives those nodes, as a command does, so it goes only
+ * while the station is matched for commanding: see
+ * tcs_configuration_matched(). */
+typedef struct tcs_uplink tcs_uplink;
+
+/** Opens the way up to a gateway node.
+ *
+ * @param configuration  The configuration.
+ * @param gateway        The gateway node's name.
+ * @return               The uplink, or NULL where there is no such gateway
+ *                       node, it binds no address and port aboard, or no
+ *                       socket can be made to send from. */
+tcs_uplink *tcs_uplink_open(const tcs_configuration *configuration,
+			    const char *gateway);
+
+/** Sends one datum up, in one datagram, exactly as given. Until the station
+ * is matched for commanding nothing goes, and it fails saying the
+ * configurations are not yet matched.
+ *
+ * @param uplink  The uplink.
+ * @param data    The datum's bytes; may be NULL where length is 0.
+ * @param length  How many bytes data holds.
+ * @return        0 once it has gone, or -1 on an error. */
+int tcs_uplink_send(tcs_uplink *uplink, const uint8_t *data, size_t length);
+
+/** Closes an uplink.
+ *
+ * @param uplink  The uplink, or NULL to do nothing. */
+void tcs_uplink_close(tcs_uplink *uplink);
 
 /* ---- Commands ----------------------------------------------------------- */
 

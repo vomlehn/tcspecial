@@ -191,6 +191,13 @@ node in a configuration. Name the node, open it, and each call to
 that produced it. The ports the data arrive on are worked out from the
 configuration, the same way tcspecial works them out, so the two ends
 cannot disagree about them.</p></li>
+<li><p><strong>Sending it data.</strong> <code>ping::Uplink</code> sends
+a datum up to a gateway node, to the address and port it binds aboard,
+from which it leaves by the node’s <code>gateway-out</code> links: a
+ping to a ping node, or a command to a heater. Gated by the station’s
+match, with <code>gated_by</code>, it sends only while the station is
+matched for commanding, as <code>TcsClient</code> does every command but
+CONNECT, RESTART_ARM and RESTART.</p></li>
 <li><p><strong>Knowing it is there.</strong> <code>beacon</code> listens
 for the beacon tcspecial sends on its own, every
 <code>beacon.default_interval</code>, whether or not anyone has

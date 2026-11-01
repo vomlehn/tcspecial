@@ -4,16 +4,19 @@
  * What a ground station does, in the order it does it: read the
  * configuration, wait for the vehicle's first beacon, which matches the
  * station for listening, connect, which matches it for commanding, and ping,
- * ask about a node and set one of its attributes, ping the vehicle's ping
- * node and time the answer, take the vehicle's data from a gateway node, and
+ * ask about a node and set one of its attributes, send a datum up to a
+ * gateway node, ping the vehicle's ping node and time the answer, take the
+ * vehicle's data from a gateway node, showing a value as a temperature, and
  * say what it has received. Each step prints one line, and the same program in
  * C++ -- ground.cpp -- prints the same lines.
  *
  * Arguments, all optional: --yaml or --xml, but not both, saying which of
  * the example's two configuration files to read (YAML where neither is
  * given); --restart, to arm a restart of the vehicle and restart it, which a
- * station does only when it means to; the configuration; the gateway node to
- * take data from; and the node to ask about. Run from the repository's root
+ * station does only when it means to; --send=<text>, to send the text up
+ * to the gateway node, which leaves it by its gateway-out links for the
+ * nodes they reach; the configuration; the gateway node to take data from
+ * and send to; and the node to ask about. Run from the repository's root
  * none need be given, and it watches the ping example.
  *
  *     cc ground.c -Iinclude target/debug/libtcs.a -lpthread -ldl -lm
@@ -93,6 +96,7 @@ int main(int argc, char **argv)
 	const char *named[3] = {NULL, NULL, NULL};
 	int count = 0;
 	int restart = 0;
+	const char *up = NULL;
 	char stem_path[512];
 
 	for (int i = 1; i < argc; i++) {
@@ -111,10 +115,13 @@ int main(int argc, char **argv)
 			spelling = asked;
 		} else if (strcmp(argv[i], "--restart") == 0) {
 			restart = 1;
+		} else if (strncmp(argv[i], "--send=", 7) == 0) {
+			up = argv[i] + 7;
 		} else if (argv[i][0] == '-') {
 			fprintf(stderr,
 				"%s is not an option: the options are "
-				"--yaml, --xml and --restart\n", argv[i]);
+				"--yaml, --xml, --restart and --send=<text>\n",
+				argv[i]);
 			return 2;
 		} else if (count == 3) {
 			fprintf(stderr,
@@ -152,6 +159,16 @@ int main(int argc, char **argv)
 	    pinger == NULL) {
 		return fail("open");
 	}
+	/* Only where there is something to send: a gateway node that binds
+	 * nothing aboard has no way up, and a station that sends nothing does
+	 * not need one. */
+	tcs_uplink *uplink = NULL;
+	if (up != NULL) {
+		uplink = tcs_uplink_open(configuration, gateway_name);
+		if (uplink == NULL) {
+			return fail("uplink");
+		}
+	}
 
 	/* Nothing but CONNECT, RESTART_ARM and RESTART goes before a match,
 	 * and this station has heard no beacon yet. */
@@ -159,6 +176,15 @@ int main(int argc, char **argv)
 	       tcs_client_ping(client) != 0 &&
 	       strstr(tcs_last_error(), "not yet matched") != NULL ?
 	       "refused, unsent" : "sent");
+	/* Nor does a datum go up, for it drives what it reaches as a command
+	 * does. */
+	if (uplink != NULL) {
+		printf("send before a match: %s\n",
+		       tcs_uplink_send(uplink, (const uint8_t *)up,
+				       strlen(up)) != 0 &&
+		       strstr(tcs_last_error(), "not yet matched") != NULL ?
+		       "refused, unsent" : "sent");
+	}
 
 	/* The first beacon: what the vehicle is flying, before anything has
 	 * been asked of it. */
@@ -195,6 +221,14 @@ int main(int argc, char **argv)
 	}
 	printf("ping: answered\n");
 
+	if (uplink != NULL) {
+		if (tcs_uplink_send(uplink, (const uint8_t *)up,
+				    strlen(up)) != 0) {
+			return fail("send");
+		}
+		printf("sent up to %s: \"%s\"\n", gateway_name, up);
+	}
+
 	/* A node id means something only once the two ends agree. */
 	if (agrees) {
 		uint32_t node = 0;
@@ -230,6 +264,16 @@ int main(int argc, char **argv)
 						 &taken, &given) != 0) {
 			return fail("sample");
 		}
+		/* Whether its data is a value, a temperature, which the
+		 * configuration says and its width cannot. */
+		int values = 0;
+		if (tcs_configuration_sends_values(configuration, node_name,
+						   &values) != 0) {
+			return fail("values");
+		}
+		printf("%s sends values: %s\n", node_name,
+		       values ? "yes" : "no");
+
 		printf("sample %s: took \"%.*s\" of %u bytes, %s\n",
 		       node_name, (int)taken.length,
 		       (const char *)taken.bytes, (unsigned)taken.total,
@@ -290,9 +334,22 @@ int main(int argc, char **argv)
 			       exchange.up + exchange.down ==
 			       exchange.round_trip ? "yes" : "no");
 		} else {
+			int values = 0;
+			double kelvin = 0.0;
 			data_seen = 1;
-			printf("data from %s: %.*s\n", datum.source,
-			       (int)datum.length, (const char *)datum.data);
+			if (tcs_configuration_sends_values(configuration,
+							   datum.source,
+							   &values) == 0 &&
+			    values && tcs_value_kelvin(datum.data,
+						       datum.length,
+						       &kelvin) == 0) {
+				printf("data from %s: %.6f K\n", datum.source,
+				       kelvin);
+			} else {
+				printf("data from %s: %.*s\n", datum.source,
+				       (int)datum.length,
+				       (const char *)datum.data);
+			}
 		}
 	}
 	if (!data_seen || !exchange.answered) {
@@ -312,6 +369,7 @@ int main(int argc, char **argv)
 	       (unsigned long long)counts.malformed,
 	       (unsigned long long)counts.mismatched);
 
+	tcs_uplink_close(uplink);
 	tcs_pinger_close(pinger);
 	tcs_client_close(client);
 	tcs_gateway_close(gateway);

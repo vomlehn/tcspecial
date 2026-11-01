@@ -8,8 +8,10 @@
 // Arguments, all optional: --yaml or --xml, but not both, saying which of the
 // example's two configuration files to read (YAML where neither is given);
 // --restart, to arm a restart of the vehicle and restart it, which a station
-// does only when it means to; the configuration; the gateway node to take data
-// from; and the node to ask about. Run from the repository's root none need
+// does only when it means to; --send=<text>, to send the text up to the
+// gateway node, which leaves it by its gateway-out links for the nodes they
+// reach; the configuration; the gateway node to take data from and send to;
+// and the node to ask about. Run from the repository's root none need
 // be given, and it watches the ping example.
 //
 //     c++ ground.cpp -Iinclude target/debug/libtcs.a -lpthread -ldl -lm
@@ -64,6 +66,8 @@ using Client =
 	std::unique_ptr<tcs_client, Closer<tcs_client, tcs_client_close>>;
 using PingerHandle =
 	std::unique_ptr<tcs_pinger, Closer<tcs_pinger, tcs_pinger_close>>;
+using UplinkHandle =
+	std::unique_ptr<tcs_uplink, Closer<tcs_uplink, tcs_uplink_close>>;
 
 // Say what failed, and stop.
 int fail(const std::string &what)
@@ -106,6 +110,8 @@ int main(int argc, char **argv)
 	std::string spelling;
 	std::vector<std::string> named;
 	bool restart = false;
+	bool sending = false;
+	std::string up;
 
 	for (int i = 1; i < argc; i++) {
 		const std::string arg = argv[i];
@@ -122,10 +128,14 @@ int main(int argc, char **argv)
 			spelling = asked;
 		} else if (arg == "--restart") {
 			restart = true;
+		} else if (arg.rfind("--send=", 0) == 0) {
+			sending = true;
+			up = arg.substr(7);
 		} else if (!arg.empty() && arg[0] == '-') {
 			std::cerr << arg
 				  << " is not an option: the options are "
-				     "--yaml, --xml and --restart\n";
+				     "--yaml, --xml, --restart and "
+				     "--send=<text>\n";
 			return 2;
 		} else if (named.size() == 3) {
 			std::cerr << arg
@@ -159,6 +169,23 @@ int main(int argc, char **argv)
 	if (!beacons || !gateway || !client || !pinger) {
 		return fail("open");
 	}
+	// Only where there is something to send: a gateway node that binds
+	// nothing aboard has no way up, and a station that sends nothing does
+	// not need one.
+	UplinkHandle uplink;
+	if (sending) {
+		uplink.reset(tcs_uplink_open(configuration.get(),
+					     gateway_name.c_str()));
+		if (!uplink) {
+			return fail("uplink");
+		}
+	}
+	const auto send_up = [&]() {
+		return tcs_uplink_send(
+			uplink.get(),
+			reinterpret_cast<const std::uint8_t *>(up.data()),
+			up.size());
+	};
 
 	// Nothing but CONNECT, RESTART_ARM and RESTART goes before a match,
 	// and this station has heard no beacon yet.
@@ -167,6 +194,15 @@ int main(int argc, char **argv)
 		std::string::npos;
 	std::printf("ping before a match: %s\n",
 		    refused ? "refused, unsent" : "sent");
+	// Nor does a datum go up, for it drives what it reaches as a command
+	// does.
+	if (uplink) {
+		const bool held = send_up() != 0 &&
+			std::string(tcs_last_error()).find("not yet matched") !=
+			std::string::npos;
+		std::printf("send before a match: %s\n",
+			    held ? "refused, unsent" : "sent");
+	}
 
 	// The first beacon: what the vehicle is flying, before anything has
 	// been asked of it.
@@ -203,6 +239,14 @@ int main(int argc, char **argv)
 	}
 	std::printf("ping: answered\n");
 
+	if (uplink) {
+		if (send_up() != 0) {
+			return fail("send");
+		}
+		std::printf("sent up to %s: \"%s\"\n", gateway_name.c_str(),
+			    up.c_str());
+	}
+
 	// A node id means something only once the two ends agree.
 	if (agrees) {
 		std::uint32_t node = 0;
@@ -232,6 +276,17 @@ int main(int argc, char **argv)
 		std::printf("set %s count: %s%s%s\n", node_name.c_str(),
 			    outcome(status).c_str(), *reason ? " -- " : "",
 			    reason);
+
+		// Whether its data is a value, a temperature, which the
+		// configuration says and its width cannot.
+		int values = 0;
+		if (tcs_configuration_sends_values(configuration.get(),
+						   node_name.c_str(),
+						   &values) != 0) {
+			return fail("values");
+		}
+		std::printf("%s sends values: %s\n", node_name.c_str(),
+			    values ? "yes" : "no");
 
 		tcs_sample taken{}, given{};
 		if (tcs_client_query_node_sample(client.get(), node, &status,
@@ -307,9 +362,21 @@ int main(int argc, char **argv)
 				    exchange.up + exchange.down ==
 				    exchange.round_trip ? "yes" : "no");
 		} else {
+			int values = 0;
+			double kelvin = 0.0;
 			data_seen = true;
-			std::printf("data from %s: %s\n", datum.source,
-				    said.c_str());
+			if (tcs_configuration_sends_values(configuration.get(),
+							   datum.source,
+							   &values) == 0 &&
+			    values && tcs_value_kelvin(datum.data,
+						       datum.length,
+						       &kelvin) == 0) {
+				std::printf("data from %s: %.6f K\n",
+					    datum.source, kelvin);
+			} else {
+				std::printf("data from %s: %s\n",
+					    datum.source, said.c_str());
+			}
 		}
 	}
 	if (!data_seen || !exchange.answered) {

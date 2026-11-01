@@ -1,6 +1,11 @@
 # yaml-language-server: $schema=../../tcsgui/share/schema/tcspecial-sim.schema.json
 
 # How tcssim stands in for the payloads of fprime.ytcs.
+#
+# The thermometer reads a thermal mass and the heater warms it, so what the
+# flight computer sends the heater shows in the temperature it reads back:
+# the bridge's test drives the heater on from F´ and watches cabin_temp's
+# channel climb.
 description: Simulator settings for the payloads of fprime.ytcs
 
 # Where tcssim answers whether it has made its stand-ins, which whatever
@@ -9,17 +14,29 @@ description: Simulator settings for the payloads of fprime.ytcs
 tcssim:
   ready: "127.0.0.1:7902"
 
+thermal_mass:
+  # The cabin, starting at and settling to ten degrees, losing any
+  # difference with a hundred second constant.
+  - name: cabin
+    environment: "283.15"
+    time_constant: "100 s"
+
 simulated_payloads:
-  # Driven and never read: its stand-in sends nothing and counts what the
-  # vehicle sends it, so that its panel shows each command reaching it.
+  # Driven and never read: its stand-in sends nothing, counts what the
+  # vehicle sends it, and while it is on warms the cabin by a kelvin a
+  # second.
   - name: heater
     simulate: true
     type: network
     protocol: udp
+    heats: cabin
+    rate: "1.0"
 
-  # One reading a second, sent whole.
+  # One reading a second of the cabin, in the encoding cabin_temp reads:
+  # this file says nothing of the format, which is the conversion's.
   - name: thermometer
     simulate: true
     type: network
     protocol: udp
     packet_interval: 1 s
+    reads: cabin

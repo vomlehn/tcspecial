@@ -71,7 +71,7 @@ TcsBridge::TcsBridge(const char *name)
 	  m_client(nullptr),
 	  m_open(false), m_heard(), m_stopping(false), m_tick(),
 	  m_connectedAt(0), m_connectedNs(0), m_connected(Connected::NEVER),
-	  m_datum(), m_cutShort(0), m_said()
+	  m_datum(), m_cutShort(0), m_notValues(0), m_said()
 {
 }
 
@@ -211,27 +211,49 @@ void TcsBridge::takeData()
 				Fw::String(tcs_last_error()));
 			return;
 		}
-
-		// The first bytes, as many as a channel holds, and the rest of
-		// the channel's bytes cleared, so that a short datum never
-		// shows what a longer one before it left.
-		DatumBytes &bytes = m_datum.get_bytes();
-		for (FwSizeType i = 0; i < DatumBytes::SIZE; i++) {
-			bytes[i] = i < datum.length ? datum.data[i] : 0;
-		}
-		const U32 length = datum.length > UINT32_MAX ?
-			UINT32_MAX : static_cast<U32>(datum.length);
-		m_datum.set_length(length);
-		if (datum.length > DatumBytes::SIZE) {
-			m_cutShort++;
-			this->log_WARNING_LO_DatumCutShort(
-				Fw::String(datum.source), length);
-		}
-		if (!this->writeDatum(datum.source, m_datum)) {
+		if (!this->writeDatum(datum)) {
 			this->log_WARNING_HI_NoChannel(
 				Fw::String(datum.source));
 		}
 	}
+}
+
+const Datum &TcsBridge::asDatum(const tcs_datum &datum)
+{
+	// The first bytes, as many as a channel holds, and the rest of the
+	// channel's bytes cleared, so that a short datum never shows what a
+	// longer one before it left.
+	DatumBytes &bytes = m_datum.get_bytes();
+	for (FwSizeType i = 0; i < DatumBytes::SIZE; i++) {
+		bytes[i] = i < datum.length ? datum.data[i] : 0;
+	}
+	const U32 length = datum.length > UINT32_MAX ?
+		UINT32_MAX : static_cast<U32>(datum.length);
+	m_datum.set_length(length);
+	if (datum.length > DatumBytes::SIZE) {
+		m_cutShort++;
+		this->log_WARNING_LO_DatumCutShort(Fw::String(datum.source),
+						   length);
+	}
+	return m_datum;
+}
+
+bool TcsBridge::asKelvin(const tcs_datum &datum, F64 &kelvin)
+{
+	// Read by tcslib-c, which reads it as the vehicle wrote it, so that
+	// what a value is -- its width, its unit, its byte order -- is said
+	// once. One that is not a value is written to no channel: a number
+	// made of whatever four bytes were there would be a temperature
+	// nobody measured.
+	double read = 0.0;
+	if (tcs_value_kelvin(datum.data, datum.length, &read) != 0) {
+		m_notValues++;
+		this->log_WARNING_LO_NotAValue(Fw::String(datum.source),
+					       Fw::String(tcs_last_error()));
+		return false;
+	}
+	kelvin = read;
+	return true;
 }
 
 void TcsBridge::connectIfDue(const Heard &heard)
@@ -305,6 +327,7 @@ void TcsBridge::writeChannels(const Heard &heard)
 		this->tlmWrite_PacketsMismatched(counts.mismatched);
 	}
 	this->tlmWrite_DataCutShort(m_cutShort);
+	this->tlmWrite_DataNotValues(m_notValues);
 }
 
 bool TcsBridge::open(const char *command, FwOpcodeType opCode, U32 cmdSeq)

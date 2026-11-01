@@ -1789,8 +1789,9 @@ each source its port, so a channel's ID and its port are the one device id
 counted on from two bases. Each source drawn into the node is the channel at
 <tt class="docutils literal">fprime_id_base</tt> plus its device id, named after it; the bridge's own
 channels -- the beacon's stage and restart flag, the two halves of the match,
-the four counts of what has arrived, and how many data were longer than a
-channel holds -- follow every device id the configuration has, so that
+the four counts of what has arrived, how many data were longer than a channel
+holds, and how many from a node of values were not one -- follow every device
+id the configuration has, so that
 drawing a new link never moves one. The component instance's base ID is
 <tt class="docutils literal">fprime_id_base</tt>, so an ID within the component is the device id itself;
 the deployment gives it as <tt class="docutils literal">base id Tcs.TcsBridge.ID_BASE</tt>, a constant of
@@ -1799,7 +1800,8 @@ the model, and the bridge refuses to run under any other.</p>
 once the configuration has been checked and nothing found wrong with it, as
 <tt class="docutils literal">TcsBridgeModel.fppi</tt> -- the constants and every channel, which
 <tt class="docutils literal">TcsBridge.fpp</tt> includes -- and <tt class="docutils literal">TcsBridgeModel.cpp</tt>, which says which
-channel a source's datum is written to and which device id a node's name is.
+channel a source's datum is written to, as what, and which device id a node's
+name is.
 In tcsverify because a model is then made only from a configuration the
 vehicle would load, with every rule about the file in the one place they are
 checked; a step in the component's build would be a second reader of the
@@ -1837,10 +1839,30 @@ Nothing on the ground holds commands back after a RESTART -- the vehicle
 answers them <tt class="docutils literal">Unmatched</tt>, as <a class="reference internal" href="#what-the-ground-may-send-meanwhile">What the ground may send meanwhile</a> says --
 so offering them needs no tie between the beacon watch and the client, each
 of which runs on a thread of its own here.</p>
-<p>A datum is a channel of type <tt class="docutils literal">Tcs.Datum</tt>: its length, and its first 64
-bytes. A longer one goes as its first 64 bytes with its whole length, is
-counted, and is said in an event, so that nothing is cut short quietly. What
-a beacon says is longer than a channel's text may be in F´, so it is an
+<p>A source's channel is of the type the configuration says its data are, and
+the configuration says one thing of a datum's type: that a compute node whose
+function makes a value -- <tt class="docutils literal">to_kelvin</tt>, <tt class="docutils literal">vote</tt>, <tt class="docutils literal">process</tt> -- sends
+values, four bytes of a signed count of micro-kelvin (see <a class="reference internal" href="#compute-elements">Compute
+elements</a>), by <tt class="docutils literal"><span class="pre">tcslibgs::node::vehicle::compute::node_sends_a_value</span></tt>,
+which tcsmoc asks too. Such a source's channel is an <tt class="docutils literal">F64</tt> of kelvin, read
+by tcslib-c's <tt class="docutils literal">tcs_value_kelvin</tt> -- <tt class="docutils literal">from_value</tt>, the one statement of
+what a value is -- and a datum from it that is not a value is written to no
+channel, counted in <tt class="docutils literal">DataNotValues</tt> and said in an event: four bytes made a
+number whatever they held would be a temperature nobody measured. Every other
+source's channel is <tt class="docutils literal">Tcs.Datum</tt>: its length, and its first 64 bytes. A
+longer one goes as its first 64 bytes with its whole length, is counted, and
+is said in an event, so that nothing is cut short quietly.</p>
+<p>Two types and no more, because those are what the configuration describes.
+A sensor's <tt class="docutils literal">format</tt> -- <tt class="docutils literal">i16_be</tt> and the rest -- is written on the
+<tt class="docutils literal">to_kelvin</tt> node that reads it, and says how that one reader takes the
+bytes, not what the sensor sends: a sensor read by two conversions, or by
+none, has two answers or none, and its counts are a number in nobody's unit
+until the conversion has made them a temperature, which is the conversion's
+own channel. A decision is the text <tt class="docutils literal">1</tt> or <tt class="docutils literal">0</tt>, which the flight
+software writes and the configuration says nothing of, and which the bytes
+show as they are. A type for either would be the model stating what the
+configuration does not, and a second statement of what it does.</p>
+<p>What a beacon says is longer than a channel's text may be in F´, so it is an
 event, each time it changes.</p>
 <p>Two threads: the component's own takes each command and each tick of a rate
 group -- on a tick it takes what data has arrived, sends CONNECT if one is
@@ -1861,12 +1883,12 @@ and data handling and CCSDS communications with the bridge on a rate group,
 started by the tests once F´'s test API is listening. The tests, in
 <tt class="docutils literal">fprime/BridgeTest/test</tt>, see the bridge only as F´ does: the bridge
 connects and is matched, and the beacon says the configuration's checksum;
-beacons are heard; a simulated reading arrives as the thermometer's channel;
-a PING is answered; a node is stopped and started again; a node the
+beacons are heard; a simulated reading arrives as the thermometer's channel,
+its two bytes, and the temperature made of it as <tt class="docutils literal">cabin_temp</tt>'s, a number
+of kelvin, with no datum refused as not a value; a PING is answered; a node is stopped and started again; a node the
 configuration lacks is refused unsent; and the deployment stops cleanly.</p>
 <p>Not yet built: data up from the bridge to the gateway node, which the fprime
-example's heater is driven by and tcs.h has no call for; the restart
-commands; and channels of a type other than a datum's bytes.</p>
+example's heater is driven by; and the restart commands.</p>
 </div>
 </div>
 <div class="section" id="what-a-device-node-says">

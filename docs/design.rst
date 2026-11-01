@@ -1297,8 +1297,9 @@ each source its port, so a channel's ID and its port are the one device id
 counted on from two bases. Each source drawn into the node is the channel at
 ``fprime_id_base`` plus its device id, named after it; the bridge's own
 channels -- the beacon's stage and restart flag, the two halves of the match,
-the four counts of what has arrived, and how many data were longer than a
-channel holds -- follow every device id the configuration has, so that
+the four counts of what has arrived, how many data were longer than a channel
+holds, and how many from a node of values were not one -- follow every device
+id the configuration has, so that
 drawing a new link never moves one. The component instance's base ID is
 ``fprime_id_base``, so an ID within the component is the device id itself;
 the deployment gives it as ``base id Tcs.TcsBridge.ID_BASE``, a constant of
@@ -1308,7 +1309,8 @@ the model, and the bridge refuses to run under any other.
 once the configuration has been checked and nothing found wrong with it, as
 ``TcsBridgeModel.fppi`` -- the constants and every channel, which
 ``TcsBridge.fpp`` includes -- and ``TcsBridgeModel.cpp``, which says which
-channel a source's datum is written to and which device id a node's name is.
+channel a source's datum is written to, as what, and which device id a node's
+name is.
 In tcsverify because a model is then made only from a configuration the
 vehicle would load, with every rule about the file in the one place they are
 checked; a step in the component's build would be a second reader of the
@@ -1348,10 +1350,32 @@ answers them ``Unmatched``, as `What the ground may send meanwhile`_ says --
 so offering them needs no tie between the beacon watch and the client, each
 of which runs on a thread of its own here.
 
-A datum is a channel of type ``Tcs.Datum``: its length, and its first 64
-bytes. A longer one goes as its first 64 bytes with its whole length, is
-counted, and is said in an event, so that nothing is cut short quietly. What
-a beacon says is longer than a channel's text may be in F´, so it is an
+A source's channel is of the type the configuration says its data are, and
+the configuration says one thing of a datum's type: that a compute node whose
+function makes a value -- ``to_kelvin``, ``vote``, ``process`` -- sends
+values, four bytes of a signed count of micro-kelvin (see `Compute
+elements`_), by ``tcslibgs::node::vehicle::compute::node_sends_a_value``,
+which tcsmoc asks too. Such a source's channel is an ``F64`` of kelvin, read
+by tcslib-c's ``tcs_value_kelvin`` -- ``from_value``, the one statement of
+what a value is -- and a datum from it that is not a value is written to no
+channel, counted in ``DataNotValues`` and said in an event: four bytes made a
+number whatever they held would be a temperature nobody measured. Every other
+source's channel is ``Tcs.Datum``: its length, and its first 64 bytes. A
+longer one goes as its first 64 bytes with its whole length, is counted, and
+is said in an event, so that nothing is cut short quietly.
+
+Two types and no more, because those are what the configuration describes.
+A sensor's ``format`` -- ``i16_be`` and the rest -- is written on the
+``to_kelvin`` node that reads it, and says how that one reader takes the
+bytes, not what the sensor sends: a sensor read by two conversions, or by
+none, has two answers or none, and its counts are a number in nobody's unit
+until the conversion has made them a temperature, which is the conversion's
+own channel. A decision is the text ``1`` or ``0``, which the flight
+software writes and the configuration says nothing of, and which the bytes
+show as they are. A type for either would be the model stating what the
+configuration does not, and a second statement of what it does.
+
+What a beacon says is longer than a channel's text may be in F´, so it is an
 event, each time it changes.
 
 Two threads: the component's own takes each command and each tick of a rate
@@ -1374,13 +1398,13 @@ and data handling and CCSDS communications with the bridge on a rate group,
 started by the tests once F´'s test API is listening. The tests, in
 ``fprime/BridgeTest/test``, see the bridge only as F´ does: the bridge
 connects and is matched, and the beacon says the configuration's checksum;
-beacons are heard; a simulated reading arrives as the thermometer's channel;
-a PING is answered; a node is stopped and started again; a node the
+beacons are heard; a simulated reading arrives as the thermometer's channel,
+its two bytes, and the temperature made of it as ``cabin_temp``'s, a number
+of kelvin, with no datum refused as not a value; a PING is answered; a node is stopped and started again; a node the
 configuration lacks is refused unsent; and the deployment stops cleanly.
 
 Not yet built: data up from the bridge to the gateway node, which the fprime
-example's heater is driven by and tcs.h has no call for; the restart
-commands; and channels of a type other than a datum's bytes.
+example's heater is driven by; and the restart commands.
 
 What a device node says
 -----------------------

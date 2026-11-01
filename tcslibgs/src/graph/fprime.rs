@@ -11,7 +11,8 @@
 //! dictionary and the vehicle cannot disagree about which channel is which:
 //!
 //! * each source drawn into the node is the channel at `fprime_id_base` plus
-//!   its device id, named after the source;
+//!   its device id, named after the source, and of the type the
+//!   configuration says its data are (see [`Form`]);
 //! * the bridge's own channels -- what it has heard of the beacon, whether it
 //!   is matched, what it has counted -- follow every device id the
 //!   configuration has, so that adding a link never moves one;
@@ -33,6 +34,7 @@ use std::fmt::Write as _;
 use super::telemetry::{self, Via};
 use super::Graph;
 use crate::gateway::GatewayKind;
+use crate::node::vehicle::compute::node_sends_a_value;
 
 /// One of the bridge's own channels: not a source's, and the same in every
 /// model.
@@ -101,7 +103,78 @@ pub const OWN_CHANNELS: &[Own] = &[
         fpp_type: "U32",
         about: "Data longer than a channel holds, whose first bytes went",
     },
+    Own {
+        name: "DataNotValues",
+        fpp_type: "U32",
+        about: "Data from a node that sends values that were not one, and \
+                went to no channel",
+    },
 ];
+
+/// What a source's channel holds: what the configuration says the source's
+/// data are.
+///
+/// It says one thing of a datum's type, and only of some nodes: a compute
+/// node whose function makes a value says, by that function, that what it
+/// sends is a value -- four bytes of a signed count of micro-kelvin, see
+/// [`crate::node::vehicle::compute::from_value`] -- which is a temperature.
+/// Of every other node it says nothing. A sensor's `format` is written on
+/// the conversion that reads it, not on the sensor, and says how that one
+/// reader takes the bytes; a decision is the flight software's own text. So
+/// a value's channel is a temperature, and every other channel is the bytes
+/// as they came.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Form {
+    /// The bytes, as a `Datum`: the length and the first of them.
+    Datum,
+    /// A value, as an `F64` of kelvin, which tcslib-c's `tcs_value_kelvin`
+    /// reads.
+    Kelvin,
+}
+
+impl Form {
+    /// Finds the form of what a node sends, as the configuration says it.
+    ///
+    /// # Arguments
+    ///
+    /// * `graph`  - The configuration.
+    /// * `source` - The node's name.
+    ///
+    /// # Returns
+    ///
+    /// [`Form::Kelvin`] for a node that sends values, as
+    /// [`node_sends_a_value`] says, and [`Form::Datum`] for every other.
+    pub fn of(graph: &Graph, source: &str) -> Form {
+        match graph.node(source) {
+            Some(node)
+                if node_sends_a_value(&node.node_type, &node.attributes) =>
+            {
+                Form::Kelvin
+            }
+            _ => Form::Datum,
+        }
+    }
+
+    /// Gives the channel's type, as FPP writes it.
+    ///
+    /// # Returns
+    ///
+    /// `Datum`, the component's own struct, or `F64`.
+    pub fn fpp_type(self) -> &'static str {
+        match self {
+            Form::Datum => "Datum",
+            Form::Kelvin => "F64",
+        }
+    }
+
+    /// Says what the channel holds, for its annotation.
+    fn about(self) -> &'static str {
+        match self {
+            Form::Datum => "its bytes",
+            Form::Kelvin => "a value, as a temperature in kelvin",
+        }
+    }
+}
 
 /// One channel of a bridge's model.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -113,6 +186,13 @@ pub struct Channel {
     pub local: u32,
     /// Its ID in the deployment: `fprime_id_base` plus `local`.
     pub id: u32,
+}
+
+/// One source drawn into the node: its channel, and what the channel holds.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Source {
+    pub channel: Channel,
+    pub form: Form,
 }
 
 /// One node a command may name, and the device id the vehicle knows it by.
@@ -131,7 +211,7 @@ pub struct Model {
     pub id_base: u32,
     /// A channel for each source drawn into the node, in the order the
     /// links are drawn.
-    pub data: Vec<Channel>,
+    pub data: Vec<Source>,
     /// The bridge's own channels, in [`OWN_CHANNELS`]' order.
     pub own: Vec<Channel>,
     /// Every node in the configuration, in device-id order, which the
@@ -288,7 +368,10 @@ pub fn of(graph: &Graph, gateway: &str) -> Result<Model, Refused> {
                 ),
             });
         }
-        data.push(at(&link.source, link.id)?);
+        data.push(Source {
+            channel: at(&link.source, link.id)?,
+            form: Form::of(graph, &link.source),
+        });
     }
     let own = OWN_CHANNELS
         .iter()
@@ -455,15 +538,17 @@ impl Model {
                 self.gateway
             ),
         );
-        for channel in &self.data {
+        for Source { channel, form } in &self.data {
             line(
                 &mut out,
                 format!(
-                    "@ What {} produces, device id {}\ntelemetry {}: Datum id \
-                     {}",
+                    "@ What {} produces, device id {}: {}\ntelemetry {}: {} \
+                     id {}",
                     channel.name,
                     channel.local,
+                    form.about(),
                     fpp_name(&channel.name),
+                    form.fpp_type(),
                     channel.local
                 ),
             );
@@ -489,8 +574,10 @@ impl Model {
 
     /// Writes the model as C++: the two member functions of `TcsBridge`
     /// that differ from one configuration to another, which say which
-    /// channel a source's datum is written to and which device id a node's
-    /// name is.
+    /// channel a source's datum is written to, as what, and which device id
+    /// a node's name is. A datum is made into a channel's type by the
+    /// component's own `asDatum` and `asKelvin`, which are the same in every
+    /// model; the model says only which.
     ///
     /// # Arguments
     ///
@@ -508,20 +595,30 @@ impl Model {
             "\n#include <cstring>\n\n#include \"Tcs/TcsBridge/TcsBridge.hpp\"\
              \n\nnamespace Tcs {\n\n",
         );
-        out.push_str(
-            "bool TcsBridge::writeDatum(const char *source, const Datum \
-             &datum)\n{\n",
-        );
-        for channel in &self.data {
+        out.push_str("bool TcsBridge::writeDatum(const tcs_datum &datum)\n{\n");
+        for Source { channel, form } in &self.data {
             let _ = writeln!(
                 out,
-                "\tif (std::strcmp(source, {}) == 0) {{\n\t\t\
-                 this->tlmWrite_{}(datum);\n\t\treturn true;\n\t}}",
-                cpp_string(&channel.name),
-                channel.name
+                "\tif (std::strcmp(datum.source, {}) == 0) {{",
+                cpp_string(&channel.name)
             );
+            let _ = match form {
+                Form::Datum => writeln!(
+                    out,
+                    "\t\tthis->tlmWrite_{}(this->asDatum(datum));",
+                    channel.name
+                ),
+                Form::Kelvin => writeln!(
+                    out,
+                    "\t\tF64 kelvin = 0.0;\n\t\t\
+                     if (this->asKelvin(datum, kelvin)) {{\n\t\t\t\
+                     this->tlmWrite_{}(kelvin);\n\t\t}}",
+                    channel.name
+                ),
+            };
+            out.push_str("\t\treturn true;\n\t}\n");
         }
-        out.push_str("\t(void)datum;\n\t(void)source;\n\treturn false;\n}\n\n");
+        out.push_str("\treturn false;\n}\n\n");
         out.push_str(
             "bool TcsBridge::nodeId(const char *name, U32 &id)\n{\n\t\
              static const struct {\n\t\tconst char *name;\n\t\tU32 id;\n\t} \
@@ -638,27 +735,45 @@ mod tests {
         graph
     }
 
-    /// The thermometer, device id 2, is the channel 0x3002, named after it,
-    /// and the bridge's own follow the last device id.
+    /// The thermometer, device id 2, is the channel 0x3002, named after it
+    /// and holding its bytes; cabin_temp, device id 3, a conversion, is
+    /// 0x3003 and holds a temperature; and the bridge's own follow the last
+    /// device id.
     #[test]
     fn a_source_is_its_device_id_past_the_base() {
         let model = of(&example(), "fsw").expect("a model");
         assert_eq!(model.id_base, 0x3000);
+        // In device-id order, which is not always the order of the links.
+        let mut data = model.data.clone();
+        data.sort_by_key(|s| s.channel.local);
         assert_eq!(
-            model.data,
-            vec![Channel {
-                name: "thermometer".to_string(),
-                local: 2,
-                id: 0x3002,
-            }]
+            data,
+            vec![
+                Source {
+                    channel: Channel {
+                        name: "thermometer".to_string(),
+                        local: 2,
+                        id: 0x3002,
+                    },
+                    form: Form::Datum,
+                },
+                Source {
+                    channel: Channel {
+                        name: "cabin_temp".to_string(),
+                        local: 3,
+                        id: 0x3003,
+                    },
+                    form: Form::Kelvin,
+                },
+            ]
         );
         assert_eq!(model.own.len(), OWN_CHANNELS.len());
-        assert_eq!(model.own[0].local, 3);
-        assert_eq!(model.own[0].id, 0x3003);
-        assert_eq!(model.last_id(), 0x3002 + OWN_CHANNELS.len() as u32);
+        assert_eq!(model.own[0].local, 4);
+        assert_eq!(model.own[0].id, 0x3004);
+        assert_eq!(model.last_id(), 0x3003 + OWN_CHANNELS.len() as u32);
         let names: Vec<_> =
             model.nodes.iter().map(|n| n.name.as_str()).collect();
-        assert_eq!(names, ["fsw", "heater", "thermometer"]);
+        assert_eq!(names, ["fsw", "heater", "thermometer", "cabin_temp"]);
         assert_eq!(model.node_name_bytes(), "thermometer".len());
     }
 
@@ -669,11 +784,12 @@ mod tests {
         let graph = example();
         let model = of(&graph, "fsw").expect("a model");
         for link in telemetry::of(&graph).expect("links") {
-            let channel = model
+            let channel = &model
                 .data
                 .iter()
-                .find(|c| c.name == link.source)
-                .expect("a channel for every link");
+                .find(|s| s.channel.name == link.source)
+                .expect("a channel for every link")
+                .channel;
             assert_eq!(channel.local as usize, link.id);
         }
     }
@@ -691,19 +807,31 @@ mod tests {
             "constant ID_BASE = 0x3000",
             "constant NODE_NAME_BYTES = 11",
             "telemetry $thermometer: Datum id 2",
-            "telemetry $BeaconStage: Stage id 3",
-            "telemetry $DataCutShort: U32 id 11",
+            "telemetry $cabin_temp: F64 id 3",
+            "telemetry $BeaconStage: Stage id 4",
+            "telemetry $DataCutShort: U32 id 12",
+            "telemetry $DataNotValues: U32 id 13",
         ] {
             assert!(fpp.contains(said), "{said} in:\n{fpp}");
         }
     }
 
-    /// The C++ writes each source's channel by its name, and knows every
-    /// node's id.
+    /// The C++ writes each source's channel by its name, as its form says,
+    /// and knows every node's id.
     #[test]
     fn the_cpp_says_every_source_and_node() {
         let cpp = of(&example(), "fsw").expect("a model").cpp("x", "0123");
-        assert!(cpp.contains("this->tlmWrite_thermometer(datum);"), "{cpp}");
+        assert!(
+            cpp.contains("this->tlmWrite_thermometer(this->asDatum(datum));"),
+            "{cpp}"
+        );
+        assert!(
+            cpp.contains(
+                "if (this->asKelvin(datum, kelvin)) {\n\t\t\t\
+                 this->tlmWrite_cabin_temp(kelvin);"
+            ),
+            "{cpp}"
+        );
         assert!(cpp.contains("{ \"heater\", 1 },"), "{cpp}");
         assert!(cpp.contains("{ \"thermometer\", 2 },"), "{cpp}");
     }
@@ -791,6 +919,24 @@ mod tests {
 
         let models = every(&add_second("0x4000")).expect("apart");
         assert_eq!(models.len(), 2);
+    }
+
+    /// A value is a temperature by what the configuration says of the node
+    /// that sends it -- a conversion, a vote -- and nothing else is: a
+    /// decision, a sensor, a node the configuration lacks.
+    #[test]
+    fn only_a_node_that_sends_values_has_a_temperature() {
+        let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("..");
+        let thermostat =
+            Graph::load(root.join("examples/thermostat/thermostat.ytcs"))
+                .expect("the example reads");
+        assert_eq!(Form::of(&thermostat, "k_1"), Form::Kelvin);
+        assert_eq!(Form::of(&thermostat, "cabin_temp"), Form::Kelvin);
+        assert_eq!(Form::of(&thermostat, "thermostat"), Form::Datum);
+        assert_eq!(Form::of(&thermostat, "temp_1"), Form::Datum);
+        assert_eq!(Form::of(&thermostat, "nobody"), Form::Datum);
+        assert_eq!(Form::Kelvin.fpp_type(), "F64");
+        assert_eq!(Form::Datum.fpp_type(), "Datum");
     }
 
     /// A C++ literal escapes what would end it or be read as something else.

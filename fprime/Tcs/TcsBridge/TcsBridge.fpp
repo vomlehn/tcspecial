@@ -191,6 +191,15 @@ module Tcs {
       format "{} sent a datum the model has no channel for: rewrite it" \
       throttle 10
 
+    @ A node the configuration says sends values sent a datum that is not
+    @ one: it went to no channel, and is counted in DataNotValues
+    event NotAValue(
+      source: string size NODE_NAME_BYTES @< The node that sent it
+      why: string size 256 @< What tcslib-c said
+    ) severity warning low id 16 \
+      format "{} sent a datum that is not a value: {}" \
+      throttle 10
+
     @ Taking data failed
     event ReceiveFailed(
       why: string size 256 @< What tcslib-c said

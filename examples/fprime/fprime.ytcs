@@ -1,7 +1,8 @@
 # yaml-language-server: $schema=../../tcsgui/share/schema/tcspecial.schema.json
 
-description: "Answering to an F´ flight computer: a reading to its bridge
-  component, and a command from it to a heater"
+description: "Answering to an F´ flight computer: a reading, and the
+  temperature made of it, to its bridge component, and a command from it to
+  a heater"
 
 tcspecial:
   # Every port is in the nine thousands, which no other example uses, so this
@@ -40,7 +41,8 @@ gateway:
   # for the heater. What comes down arrives at bridge_base plus the device id
   # of the node that sent it, and the bridge gives it the F´ ID
   # fprime_id_base plus that same id: the thermometer, device id 2, arrives
-  # at 127.0.0.1:9702 as 0x3002.
+  # at 127.0.0.1:9702 as 0x3002, and cabin_temp, device id 3, at
+  # 127.0.0.1:9703 as 0x3003.
   - name: fsw
     type: gateway_fprime
     address: "127.0.0.1"
@@ -52,20 +54,38 @@ gateway:
       - target: heater
 
 payloads:
-  # A heater, driven by what the flight computer sends: the far end of a UDP
-  # socket.
+  # A heater, driven by what the flight computer sends -- 1 for on, 0 for
+  # off -- the far end of a UDP socket.
   - name: heater
     type: network
     protocol: "udp"
     address: "127.0.0.1"
     port: "9001"
     gateway-in: true
-  # A thermometer whose readings go to the flight computer.
+  # A thermometer, two bytes, signed, big endian, in sixteenths of a degree,
+  # whose readings go to the flight computer as they are, and to cabin_temp
+  # to be made a temperature.
   - name: thermometer
     type: network
     protocol: "udp"
     address: "127.0.0.1"
     port: "9002"
+    payload-out:
+      - target: fsw
+      - target: cabin_temp
+
+# After the payloads, so that the thermometer keeps device id 2: a node's
+# device id is its place in the file.
+vehicle:
+  # The thermometer's readings made a value, a temperature in kelvin, which
+  # the bridge's channel for it holds as one.
+  - name: cabin_temp
+    type: compute
+    format: "i16_be"
+    function: "to_kelvin"
+    offset: "273.15"
+    scale: "0.0625"
+    payload-in: true
     payload-out:
       - target: fsw
 
@@ -74,3 +94,4 @@ tcsgui:
     - { name: fsw, x: 469, y: 34 }
     - { name: heater, x: 34, y: 34 }
     - { name: thermometer, x: 34, y: 134 }
+    - { name: cabin_temp, x: 242, y: 134 }

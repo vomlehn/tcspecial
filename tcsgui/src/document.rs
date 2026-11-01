@@ -165,7 +165,7 @@ impl Concern {
 /// Where one line goes, as a file writes it: its entry.
 ///
 /// A link out of a node is written as an entry under the data source it leaves
-/// by -- `- target: cabin_temp`, and `input: in0` where it feeds a named input
+/// by -- `- target: zone_temp`, and `input: in0` where it feeds a named input
 /// -- so what the writers need is the two apart. Not a type the document holds:
 /// the document holds links, and this is one of them on its way into a file.
 ///
@@ -226,7 +226,7 @@ pub struct Document {
     /// The groups, by name, each with the interval it reads on.
     ///
     /// A group is one of the four things a configuration is made of and it was
-    /// missing here: nodes could say `group: cabin_temps` and nothing declared
+    /// missing here: nodes could say `group: zone_temps` and nothing declared
     /// what that group was, so the editor wrote a configuration the flight
     /// reader refuses. Found by the checker on the shipped example,
     /// which is what a checker is for.
@@ -460,7 +460,7 @@ impl Document {
     /// The node this absolute name refers to.
     ///
     /// Absolute: `temp_1` for a node of the top diagram and
-    /// `cabin/temp_1` for one inside a subdiagram. That is how the editor
+    /// `zone/temp_1` for one inside a subdiagram. That is how the editor
     /// holds a name everywhere except in a file, where it is written relative
     /// to the file it is in -- see [`Qualified::written_from`].
     ///
@@ -1482,7 +1482,7 @@ impl Document {
 
         // By the name a link would have to use, not by the bare one: two
         // subdiagrams may each hold a temp_1, and they are two nodes
-        // because cabin/temp_1 and bay/temp_1 are two names. Counting
+        // because zone/temp_1 and bay/temp_1 are two names. Counting
         // bare names here would refuse the reuse a separate file is for.
         let mut seen: BTreeMap<String, usize> = BTreeMap::new();
         for node in &self.nodes {
@@ -2379,7 +2379,7 @@ impl Document {
             // somebody wrote -- so in practice they agree or there is one.
             let mut comment: Option<String> = None;
             // The links this node is the source of. Compared as the document
-            // holds them -- `cabin/temp_1` from outside the subdiagram it
+            // holds them -- `zone/temp_1` from outside the subdiagram it
             // is in -- because a node's own name is the one inside its file.
             let ours = Qualified::of(&node.name, home).absolute();
             for link in self.links.iter().filter(|l| l.from == ours) {
@@ -2423,7 +2423,7 @@ impl Document {
     ///
     /// Which sink a line arrives at is the stream's own answer: what leaves by
     /// `payload-out` arrives at a `payload-in` and nowhere else, so a
-    /// destination that named an input -- `cabin_temp.in0` -- counts at the
+    /// destination that named an input -- `zone_temp.in0` -- counts at the
     /// stream's sink. Only the sinks something arrives at are written, as a
     /// node with nothing leaving it writes no `payload-out`.
     ///
@@ -2443,7 +2443,7 @@ impl Document {
                 // Which sink of this node the line arrives at, which needs the
                 // terminal it left by: the two are one stream read from either
                 // end. The node it left is found by its whole name, which is
-                // what the link holds -- `cabin/temp_1` for a node in a
+                // what the link holds -- `zone/temp_1` for a node in a
                 // subdiagram, where the node's own name is `temp_1` -- and
                 // which is what tells two nodes of one name apart.
                 let Some(from) = self.nodes.iter().find(|n| {
@@ -2654,7 +2654,7 @@ pub(crate) fn comment_lines(comment: &str, indent: usize) -> Vec<String> {
     out
 }
 
-/// The worked example from `design.rst`: a cabin thermostat.
+/// The worked example from `design.rst`: a zone thermostat.
 ///
 /// Built here rather than written out by hand in two formats, so that the
 /// shipped `tests/manual/thermostat.ytcs` and `.xtcs` are what this editor
@@ -2733,12 +2733,12 @@ pub fn thermostat_example() -> Document {
     // hardware allows.
     document
         .groups
-        .insert("cabin_temps".to_string(), "100 ms".to_string());
+        .insert("zone_temps".to_string(), "100 ms".to_string());
 
     place(&mut document, "temp_1", "i2c", (34, 34));
     set(&mut document, "temp_1", "path", "/dev/i2c-1");
     set(&mut document, "temp_1", "address", "0x48");
-    set(&mut document, "temp_1", "group", "cabin_temps");
+    set(&mut document, "temp_1", "group", "zone_temps");
     set(&mut document, "temp_1", "read_size", "2");
     note(
         &mut document,
@@ -2751,7 +2751,7 @@ pub fn thermostat_example() -> Document {
     place(&mut document, "temp_2", "i2c", (34, 166));
     set(&mut document, "temp_2", "path", "/dev/i2c-1");
     set(&mut document, "temp_2", "address", "0x49");
-    set(&mut document, "temp_2", "group", "cabin_temps");
+    set(&mut document, "temp_2", "group", "zone_temps");
     set(&mut document, "temp_2", "read_size", "2");
     note(
         &mut document,
@@ -2763,7 +2763,7 @@ pub fn thermostat_example() -> Document {
     set(&mut document, "temp_3", "path", "/dev/spidev0.0");
     set(&mut document, "temp_3", "max_speed", "1000000");
     set(&mut document, "temp_3", "spi_mode", "0");
-    set(&mut document, "temp_3", "group", "cabin_temps");
+    set(&mut document, "temp_3", "group", "zone_temps");
     set(&mut document, "temp_3", "read_size", "3");
     note(
         &mut document,
@@ -2785,13 +2785,13 @@ pub fn thermostat_example() -> Document {
         set(&mut document, name, "offset", offset);
     }
 
-    place(&mut document, "cabin_temp", "compute", (469, 166));
-    set(&mut document, "cabin_temp", "function", "vote");
-    set(&mut document, "cabin_temp", "algorithm", "median");
-    set(&mut document, "cabin_temp", "inputs", "in0,in1,in2");
+    place(&mut document, "zone_temp", "compute", (469, 166));
+    set(&mut document, "zone_temp", "function", "vote");
+    set(&mut document, "zone_temp", "algorithm", "median");
+    set(&mut document, "zone_temp", "inputs", "in0,in1,in2");
     note(
         &mut document,
-        "cabin_temp",
+        "zone_temp",
         "One temperature out of the three, by the algorithm named: \
          median\ntakes the middle reading, closest_mean the mean of the two \
          that\nagree best. Either leaves a sensor that has gone wrong out of \
@@ -2867,20 +2867,14 @@ pub fn thermostat_example() -> Document {
     // into the log.
     for (from, input) in [("k_1", "in0"), ("k_2", "in1"), ("k_3", "in2")] {
         link(&mut document, from, "payload-out", "gateway", None);
-        link(
-            &mut document,
-            from,
-            "payload-out",
-            "cabin_temp",
-            Some(input),
-        );
+        link(&mut document, from, "payload-out", "zone_temp", Some(input));
         link(&mut document, from, "payload-out", "housekeeping", None);
     }
 
-    link(&mut document, "cabin_temp", "payload-out", "gateway", None);
+    link(&mut document, "zone_temp", "payload-out", "gateway", None);
     link(
         &mut document,
-        "cabin_temp",
+        "zone_temp",
         "payload-out",
         "thermostat",
         None,
@@ -2938,7 +2932,7 @@ pub fn thermostat_example() -> Document {
         from: "gateway".to_string(),
         sets: "thermostat.setpoint".to_string(),
         comment: Some(
-            "the cabin temperature the heaters are held at, in kelvin"
+            "the zone temperature the heaters are held at, in kelvin"
                 .to_string(),
         ),
     });
@@ -3473,19 +3467,19 @@ mod tests {
     fn a_value_set_on_a_group_reaches_every_payload_in_it() {
         let mut document = Document::new();
         document.apply(&Edit::AddGroup {
-            name: "cabin_temps".into(),
+            name: "zone_temps".into(),
             interval: "3 s".into(),
         });
         for (name, node_type, group) in [
-            ("temp_1", "i2c", Some("cabin_temps")),
-            ("temp_2", "i2c", Some("cabin_temps")),
+            ("temp_1", "i2c", Some("zone_temps")),
+            ("temp_2", "i2c", Some("zone_temps")),
             // In another group, so it is not touched.
             ("temp_3", "i2c", Some("bay")),
             // Not in a group at all.
             ("loose", "i2c", None),
             // In the group and not a payload, which is an oddity the checker
             // has words for and not something to set a bus address on.
-            ("k", "compute", Some("cabin_temps")),
+            ("k", "compute", Some("zone_temps")),
         ] {
             document.apply(&add(name, node_type));
             if let Some(group) = group {
@@ -3499,14 +3493,14 @@ mod tests {
         }
 
         let was: Vec<(String, Option<String>)> = document
-            .payloads_of("cabin_temps")
+            .payloads_of("zone_temps")
             .iter()
             .map(|n| (n.name.clone(), n.attributes.get("path").cloned()))
             .collect();
         assert_eq!(was.len(), 2, "the group's payloads: {was:?}");
 
         document.apply(&Edit::SetGroupAttribute {
-            group: "cabin_temps".into(),
+            group: "zone_temps".into(),
             attribute: "path".into(),
             was,
             now: Some("/dev/i2c-1".into()),
@@ -3532,7 +3526,7 @@ mod tests {
     fn renaming_a_group_renames_it_on_its_members() {
         let mut document = Document::new();
         document.apply(&Edit::AddGroup {
-            name: "cabin_temps".into(),
+            name: "zone_temps".into(),
             interval: "3 s".into(),
         });
         document.apply(&add("temp_1", "i2c"));
@@ -3540,19 +3534,19 @@ mod tests {
             node: "temp_1".into(),
             attribute: "group".into(),
             was: None,
-            now: Some("cabin_temps".into()),
+            now: Some("zone_temps".into()),
         });
 
         document.apply(&Edit::RenameGroup {
-            was: "cabin_temps".into(),
-            now: "cabin".into(),
+            was: "zone_temps".into(),
+            now: "zone".into(),
         });
 
         assert_eq!(
-            document.groups.get("cabin").map(String::as_str),
+            document.groups.get("zone").map(String::as_str),
             Some("3 s")
         );
-        assert!(!document.groups.contains_key("cabin_temps"));
+        assert!(!document.groups.contains_key("zone_temps"));
         assert_eq!(
             document
                 .node("temp_1")
@@ -3560,7 +3554,7 @@ mod tests {
                 .attributes
                 .get("group")
                 .map(String::as_str),
-            Some("cabin")
+            Some("zone")
         );
         // And the group is not left looking empty, which is a fault.
         assert!(
@@ -3583,7 +3577,7 @@ mod tests {
     fn a_group_offers_what_its_payloads_have_in_common() {
         let mut document = Document::new();
         document.apply(&Edit::AddGroup {
-            name: "cabin_temps".into(),
+            name: "zone_temps".into(),
             interval: "3 s".into(),
         });
         for (name, node_type) in [("temp_1", "i2c"), ("temp_3", "spi")] {
@@ -3592,12 +3586,12 @@ mod tests {
                 node: name.into(),
                 attribute: "group".into(),
                 was: None,
-                now: Some("cabin_temps".into()),
+                now: Some("zone_temps".into()),
             });
         }
 
         let offered: Vec<String> = document
-            .group_fields("cabin_temps")
+            .group_fields("zone_temps")
             .into_iter()
             .map(|f| f.attribute)
             .collect();
@@ -3629,13 +3623,13 @@ mod tests {
     fn a_group_field_says_when_its_payloads_disagree() {
         let mut document = Document::new();
         document.apply(&Edit::AddGroup {
-            name: "cabin_temps".into(),
+            name: "zone_temps".into(),
             interval: "3 s".into(),
         });
         for (name, address) in [("temp_1", "0x48"), ("temp_2", "0x49")] {
             document.apply(&add(name, "i2c"));
             for (attribute, value) in [
-                ("group", "cabin_temps"),
+                ("group", "zone_temps"),
                 ("address", address),
                 ("path", "/dev/i2c-1"),
             ] {
@@ -3648,7 +3642,7 @@ mod tests {
             }
         }
 
-        let fields = document.group_fields("cabin_temps");
+        let fields = document.group_fields("zone_temps");
         let field = |name: &str| {
             fields
                 .iter()
@@ -3995,14 +3989,14 @@ mod tests {
             // group have something to act on: a group edit applied to no
             // members trivially round-trips and proves nothing.
             document.apply(&Edit::AddGroup {
-                name: "cabin_temps".into(),
+                name: "zone_temps".into(),
                 interval: "3 s".into(),
             });
             document.apply(&Edit::SetAttribute {
                 node: "a".into(),
                 attribute: "group".into(),
                 was: None,
-                now: Some("cabin_temps".into()),
+                now: Some("zone_temps".into()),
             });
             document
         };
@@ -4112,29 +4106,29 @@ mod tests {
                 interval: "5 s".into(),
             },
             Edit::RemoveGroup {
-                name: "cabin_temps".into(),
+                name: "zone_temps".into(),
                 interval: "3 s".into(),
             },
             Edit::SetGroupInterval {
-                group: "cabin_temps".into(),
+                group: "zone_temps".into(),
                 was: "3 s".into(),
                 now: "1 s".into(),
             },
             Edit::RenameGroup {
-                was: "cabin_temps".into(),
-                now: "cabin".into(),
+                was: "zone_temps".into(),
+                now: "zone".into(),
             },
             // One value for every payload of the group, carrying what each of
             // them had: `a` had no path, so undoing this takes the attribute
             // off again rather than leaving it empty.
             Edit::SetGroupAttribute {
-                group: "cabin_temps".into(),
+                group: "zone_temps".into(),
                 attribute: "path".into(),
                 was: vec![("a".into(), None)],
                 now: Some("/dev/i2c-1".into()),
             },
             Edit::RestoreGroupAttribute {
-                group: "cabin_temps".into(),
+                group: "zone_temps".into(),
                 attribute: "path".into(),
                 was: None,
                 now: vec![("a".into(), Some("/dev/i2c-1".into()))],
@@ -4663,7 +4657,7 @@ mod tests {
     #[test]
     fn a_name_is_only_shared_within_one_home() {
         let mut document = Document::new();
-        for home in [None, Some("cabin".to_string()), Some("bay".to_string())] {
+        for home in [None, Some("zone".to_string()), Some("bay".to_string())] {
             document.apply(&Edit::AddNode {
                 name: "temp_1".to_string(),
                 node_type: "i2c".to_string(),
@@ -4679,7 +4673,7 @@ mod tests {
         document.apply(&Edit::AddNode {
             name: "temp_1".to_string(),
             node_type: "i2c".to_string(),
-            home: Some("cabin".to_string()),
+            home: Some("zone".to_string()),
         });
         assert_eq!(document.sharing_a_name(), vec![1, 3]);
         assert_eq!(document.spare_name(3), "temp_1-1");
@@ -4698,7 +4692,7 @@ mod tests {
         for (name, node_type) in [
             ("sensor", "i2c"),
             ("ground", "gateway_radio"),
-            ("cabin_temp", "compute"),
+            ("zone_temp", "compute"),
             ("housekeeping", "log"),
         ] {
             document.apply(&add(name, node_type));
@@ -4726,7 +4720,7 @@ mod tests {
             link: Link::joining(
                 "sensor",
                 Some("payload-out"),
-                "cabin_temp",
+                "zone_temp",
                 Some("in0"),
             ),
         });
@@ -4742,7 +4736,7 @@ mod tests {
         // payload, vehicle nodes, a gateway link.
         document.apply(&Edit::AddLink {
             link: Link::joining(
-                "cabin_temp",
+                "zone_temp",
                 Some("payload-out"),
                 "ground",
                 None,
@@ -4761,7 +4755,7 @@ mod tests {
         // nothing leaves, and that is what a log is for.
         document.apply(&Edit::AddLink {
             link: Link::joining(
-                "cabin_temp",
+                "zone_temp",
                 Some("payload-out"),
                 "housekeeping",
                 None,
@@ -5128,14 +5122,14 @@ mod tests {
     fn a_subdiagrams_nodes_are_its_own() {
         let mut document = Document::new();
         document.apply(&Edit::AddNode {
-            name: "cabin".into(),
+            name: "zone".into(),
             node_type: "subdiagram".into(),
             home: None,
         });
         document.apply(&Edit::AddNode {
             name: "temp_1".into(),
             node_type: "i2c".into(),
-            home: Some("cabin".into()),
+            home: Some("zone".into()),
         });
         document.apply(&Edit::AddNode {
             name: "gateway".into(),
@@ -5143,12 +5137,12 @@ mod tests {
             home: None,
         });
 
-        assert_eq!(document.subdiagrams(), vec!["cabin".to_string()]);
-        assert_eq!(document.nodes_in(&None).len(), 2, "cabin and gateway");
-        assert_eq!(document.nodes_in(&Some("cabin".into())).len(), 1);
+        assert_eq!(document.subdiagrams(), vec!["zone".to_string()]);
+        assert_eq!(document.nodes_in(&None).len(), 2, "zone and gateway");
+        assert_eq!(document.nodes_in(&Some("zone".into())).len(), 1);
 
         // Named through its home from outside, plainly from inside.
-        assert!(document.node("cabin/temp_1").is_some());
+        assert!(document.node("zone/temp_1").is_some());
         assert!(
             document.node("temp_1").is_none(),
             "a subdiagram's node answered to a bare name from the top diagram"
@@ -5163,7 +5157,7 @@ mod tests {
     #[test]
     fn the_same_name_in_two_subdiagrams_is_two_nodes() {
         let mut document = Document::new();
-        for home in ["cabin", "bay"] {
+        for home in ["zone", "bay"] {
             document.apply(&Edit::AddNode {
                 name: home.into(),
                 node_type: "subdiagram".into(),
@@ -5186,7 +5180,7 @@ mod tests {
             document.faults()
         );
         assert_ne!(
-            document.node("cabin/temp_1").unwrap().home,
+            document.node("zone/temp_1").unwrap().home,
             document.node("bay/temp_1").unwrap().home
         );
     }
@@ -5196,7 +5190,7 @@ mod tests {
     fn a_crossing_link_is_counted_against_the_subdiagram() {
         let mut document = Document::new();
         document.apply(&Edit::AddNode {
-            name: "cabin".into(),
+            name: "zone".into(),
             node_type: "subdiagram".into(),
             home: None,
         });
@@ -5209,20 +5203,20 @@ mod tests {
             document.apply(&Edit::AddNode {
                 name: name.into(),
                 node_type: "i2c".into(),
-                home: Some("cabin".into()),
+                home: Some("zone".into()),
             });
         }
 
         // One link inside, one crossing out.
         document.apply(&Edit::AddLink {
-            link: Link::new("cabin/temp_1", "cabin/k_1", None),
+            link: Link::new("zone/temp_1", "zone/k_1", None),
         });
         document.apply(&Edit::AddLink {
-            link: Link::new("cabin/k_1", "gateway", None),
+            link: Link::new("zone/k_1", "gateway", None),
         });
 
         assert_eq!(
-            document.crossings("cabin"),
+            document.crossings("zone"),
             1,
             "only the link leaving the subdiagram crosses it"
         );
@@ -5238,7 +5232,7 @@ mod tests {
 
     /// A line from a node in a subdiagram is recorded where it arrives.
     ///
-    /// The link holds its source's whole name, `cabin/temp_1`, and the node
+    /// The link holds its source's whole name, `zone/temp_1`, and the node
     /// its own, `temp_1`: compared as they stand they never matched, and the
     /// node the line reached said nothing about it.
     #[test]
@@ -5247,7 +5241,7 @@ mod tests {
 
         let mut document = Document::new();
         document.apply(&Edit::AddNode {
-            name: "cabin".into(),
+            name: "zone".into(),
             node_type: "subdiagram".into(),
             home: None,
         });
@@ -5259,10 +5253,10 @@ mod tests {
         document.apply(&Edit::AddNode {
             name: "temp_1".into(),
             node_type: "i2c".into(),
-            home: Some("cabin".into()),
+            home: Some("zone".into()),
         });
         document.apply(&Edit::AddLink {
-            link: Link::new("cabin/temp_1", "gateway", None),
+            link: Link::new("zone/temp_1", "gateway", None),
         });
 
         let files = document
@@ -5280,7 +5274,7 @@ mod tests {
     ///
     /// A node in a subdiagram may have the name of one in the top diagram.
     /// Found by the bare name, the line from the top diagram's `p` was taken
-    /// for one from `cabin/p`, of another type with another source, and the
+    /// for one from `zone/p`, of another type with another source, and the
     /// ground was written as fed at the wrong sink -- a file that reading it
     /// back refuses, the record disagreeing with the link.
     #[test]
@@ -5289,7 +5283,7 @@ mod tests {
 
         let mut document = Document::new();
         document.apply(&Edit::AddNode {
-            name: "cabin".into(),
+            name: "zone".into(),
             node_type: "subdiagram".into(),
             home: None,
         });
@@ -5298,7 +5292,7 @@ mod tests {
         document.apply(&Edit::AddNode {
             name: "p".into(),
             node_type: "app_payload_veh".into(),
-            home: Some("cabin".into()),
+            home: Some("zone".into()),
         });
         document.apply(&Edit::AddNode {
             name: "p".into(),
@@ -5321,7 +5315,7 @@ mod tests {
         assert!(top.contains("payload-in: true"), "{top}");
         assert!(
             !top.contains("gateway-in"),
-            "the line was recorded at the sink of cabin/p's stream: {top}"
+            "the line was recorded at the sink of zone/p's stream: {top}"
         );
     }
 
@@ -5335,7 +5329,7 @@ mod tests {
 
         let mut document = Document::new();
         document.apply(&Edit::AddNode {
-            name: "cabin".into(),
+            name: "zone".into(),
             node_type: "subdiagram".into(),
             home: None,
         });
@@ -5347,10 +5341,10 @@ mod tests {
         document.apply(&Edit::AddNode {
             name: "temp_1".into(),
             node_type: "i2c".into(),
-            home: Some("cabin".into()),
+            home: Some("zone".into()),
         });
         document.apply(&Edit::AddLink {
-            link: Link::new("cabin/temp_1", "gateway", None),
+            link: Link::new("zone/temp_1", "gateway", None),
         });
 
         let files = document
@@ -5371,7 +5365,7 @@ mod tests {
         // qualify it with.
         let (_, inner) = files
             .iter()
-            .find(|(path, _)| path.ends_with("cabin.ytcs"))
+            .find(|(path, _)| path.ends_with("zone.ytcs"))
             .expect("the subdiagram's file");
         assert!(
             inner.contains("payload-out:\n      - target: gateway\n"),
@@ -5380,7 +5374,7 @@ mod tests {
 
         // And the top file says what it includes.
         let (_, top) = &files[0];
-        assert!(top.contains("include:\n  - cabin"), "{top}");
+        assert!(top.contains("include:\n  - zone"), "{top}");
     }
 
     /// A link into a subdiagram that is not there dangles, and says so.
@@ -5393,7 +5387,7 @@ mod tests {
             home: None,
         });
         document.apply(&Edit::AddLink {
-            link: Link::new("gateway", "cabin/temp_1", None),
+            link: Link::new("gateway", "zone/temp_1", None),
         });
 
         assert!(
@@ -5442,9 +5436,9 @@ mod tests {
             was: None,
             now: Some("0x48".into()),
         });
-        document.apply(&add("cabin_temp", "compute"));
+        document.apply(&add("zone_temp", "compute"));
         document.apply(&Edit::AddLink {
-            link: Link::new("temp_1", "cabin_temp", Some("in0")),
+            link: Link::new("temp_1", "zone_temp", Some("in0")),
         });
 
         let yaml = document.to_yaml();
@@ -5461,7 +5455,7 @@ mod tests {
         assert!(
             yaml.contains(
                 "    payload-out:\n      - target: \
-                           cabin_temp\n        input: in0\n"
+                           zone_temp\n        input: in0\n"
             ),
             "a link into a named input is written as one entry: {yaml}"
         );

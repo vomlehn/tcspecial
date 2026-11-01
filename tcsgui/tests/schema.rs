@@ -307,7 +307,7 @@ fn the_simulator_schemas_take_the_kinds_and_words_the_simulator_reads() {
     let file = dir.path().join("every-sim.xml");
     std::fs::write(
         dir.path().join("every-physics.yaml"),
-        "physics:\n  - name: cabin\n    type: thermal_mass\n    \
+        "physics:\n  - name: zone\n    type: thermal_mass\n    \
          environment: \"280\"\n    time_constant: \"60 s\"\n",
     )
     .expect("written");
@@ -327,13 +327,13 @@ fn the_simulator_schemas_take_the_kinds_and_words_the_simulator_reads() {
     <name>temp</name>
     <group>fast</group>
     <type>i2c</type>
-    <reads>cabin</reads>
+    <reads>zone</reads>
     <drop_percent>1</drop_percent>
   </simulated_payloads>
   <simulated_payloads>
     <name>heater</name>
     <type>gpio</type>
-    <heats>cabin</heats>
+    <heats>zone</heats>
     <rate>0.5</rate>
   </simulated_payloads>
 </simulator>

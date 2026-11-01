@@ -2779,7 +2779,7 @@ mod tests {
                     "type" => "network",
                     "protocol" => "udp",
                     "payload_address" => "127.0.0.1",
-                    "reads" | "heats" => "cabin",
+                    "reads" | "heats" => "zone",
                     "simulate" => "true",
                     _ => "1",
                 };

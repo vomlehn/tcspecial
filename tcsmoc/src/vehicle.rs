@@ -3243,7 +3243,7 @@ payloads:
                 ("k_1".to_string(), 1),
                 ("k_2".to_string(), 2),
                 ("k_3".to_string(), 3),
-                ("cabin_temp".to_string(), 4),
+                ("zone_temp".to_string(), 4),
                 // The decision too, which the ground sees as well as the
                 // heaters.
                 ("thermostat".to_string(), 5),

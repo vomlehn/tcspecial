@@ -345,11 +345,11 @@ with it aboard and on the ground.
 ### thermostat
 
 A control loop, aboard. Three temperature sensors are read together, every
-100 ms, as the group `cabin_temps`: `temp_1`, `temp_2` and `temp_3`. Each
+100 ms, as the group `zone_temps`: `temp_1`, `temp_2` and `temp_3`. Each
 reading goes through a conversion of its own to kelvin -- `k_1`, `k_2`, `k_3`,
 the parts differing in format and scale -- and the three meet at
-`cabin_temp`, which takes their median, so that one sensor failing cannot take
-the cabin's temperature with it. `thermostat` holds that to a setpoint,
+`zone_temp`, which takes their median, so that one sensor failing cannot take
+the zone's temperature with it. `thermostat` holds that to a setpoint,
 293.15 K with a half band of 2 K, and drives two heaters, `heaters_1` and
 `heaters_2`. The ground commands the setpoint, and `housekeeping` logs the
 readings and decisions in `/tmp/telemetry`.

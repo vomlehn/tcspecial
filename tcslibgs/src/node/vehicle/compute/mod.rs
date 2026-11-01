@@ -65,7 +65,7 @@ pub fn kelvin_range() -> (f64, f64) {
 /// which is above anything these nodes are pointed at and below a great deal
 /// that exists -- a thruster's throat is hotter. A temperature outside it is
 /// refused and named rather than wrapped or pinned to the end of the range:
-/// wrapping turns 2200 K into a cabin that is 42 K below zero, pinning turns
+/// wrapping turns 2200 K into a zone that is 42 K below zero, pinning turns
 /// a runaway into a reading that looks like a hot but surviving part, and
 /// either is a thermostat acting confidently on a number nobody produced. A
 /// node that must carry more than this wants a unit of its own, and that is a
@@ -1020,7 +1020,7 @@ mod tests {
     ///
     /// Refused where it is made rather than where it is read, because this is
     /// where the number is still in hand to put in the complaint. Wrapping it
-    /// would turn 2200 K into a cabin 42 K below zero and a thermostat would
+    /// would turn 2200 K into a zone 42 K below zero and a thermostat would
     /// act on that.
     #[test]
     fn a_temperature_outside_the_range_is_refused() {

@@ -42,7 +42,7 @@
         "string",
         "null"
       ],
-      "description": "The physics model the simulated payloads are attached to: a YAML file of its own, named relative to this file's directory, such as `cabin-physics.yaml`. A vehicle's physics outlives any one configuration of its payloads, so it is written once and named by every simulator file that uses it. Its schema is tcspecial-physics.schema.json."
+      "description": "The physics model the simulated payloads are attached to: a YAML file of its own, named relative to this file's directory, such as `zone-physics.yaml`. A vehicle's physics outlives any one configuration of its payloads, so it is written once and named by every simulator file that uses it. Its schema is tcspecial-physics.schema.json."
     },
     "simulated_payload_groups": {
       "description": "Settings shared by the payloads that name them.",

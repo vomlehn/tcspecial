@@ -349,7 +349,7 @@ mod tests {
             Some(Out::byte(b'1'))
         );
 
-        // Ask for a much colder cabin: 290 is now too warm.
+        // Ask for a much colder zone: 290 is now too warm.
         h.set_setpoint(280.0);
         assert_eq!(h.setpoint(), 280.0);
         assert_eq!(

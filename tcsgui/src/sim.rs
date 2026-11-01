@@ -578,7 +578,7 @@ mod tests {
         let model = where_.path().join("vehicle-physics.yaml");
         let model_said = concat!(
             "physics:\n",
-            "  - name: cabin\n",
+            "  - name: zone\n",
             "    type: thermal_mass\n",
             "    environment: \"283.15\"\n",
             "    time_constant: \"50 s\"\n",
@@ -593,7 +593,7 @@ mod tests {
             "\n",
             "simulated_payloads:\n",
             "  - name: temp_1\n    simulate: true\n",
-            "    reads: cabin\n    output: out1\n",
+            "    reads: zone\n    output: out1\n",
         );
         std::fs::write(&path, given).expect("written");
 
@@ -608,7 +608,7 @@ mod tests {
         assert_eq!(back.physics, read_in.physics, "{written}");
         assert_eq!(
             back.payloads["temp_1"].get("reads").map(String::as_str),
-            Some("cabin"),
+            Some("zone"),
             "what a payload is attached to is a setting like any other"
         );
         assert_eq!(
@@ -621,7 +621,7 @@ mod tests {
         // the model it names.
         let file = tcslibgs::sim_config::SimConfigFile::load(&path)
             .expect("the simulator reads what the editor wrote");
-        assert_eq!(file.thermal_mass[0].name, "cabin");
+        assert_eq!(file.thermal_mass[0].name, "zone");
     }
 
     /// A file that still declares its masses itself is refused, told where
@@ -632,7 +632,7 @@ mod tests {
         let path = where_.path().join("vehiclesim.yaml");
         std::fs::write(
             &path,
-            "thermal_mass:\n  - name: cabin\n    environment: \"1\"\n",
+            "thermal_mass:\n  - name: zone\n    environment: \"1\"\n",
         )
         .expect("written");
         let Err(Trouble::Unusable(why)) = read(&path) else {

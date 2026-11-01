@@ -258,8 +258,8 @@ mod tests {
         let start = Instant::now();
         let schedule = Schedule::of(&thermostat(), start);
 
-        assert_eq!(schedule.groups(), vec!["cabin_temps"]);
-        let members = schedule.members("cabin_temps");
+        assert_eq!(schedule.groups(), vec!["zone_temps"]);
+        let members = schedule.members("zone_temps");
         assert_eq!(members.len(), 3, "{members:?}");
         for sensor in ["temp_1", "temp_2", "temp_3"] {
             assert!(
@@ -281,7 +281,7 @@ mod tests {
 
         let due = schedule.due(start);
         assert_eq!(due.len(), 1);
-        assert_eq!(due[0].group, "cabin_temps");
+        assert_eq!(due[0].group, "zone_temps");
         assert_eq!(schedule.until_next(start), Some(Duration::ZERO));
     }
 
@@ -297,7 +297,7 @@ mod tests {
 
         // Read ten milliseconds late, as a real pass would be.
         let late = start + Duration::from_millis(10);
-        let then = schedule.read("cabin_temps", late).expect("a next time");
+        let then = schedule.read("zone_temps", late).expect("a next time");
         assert_eq!(
             then,
             start + Duration::from_millis(100),
@@ -315,7 +315,7 @@ mod tests {
             let due = start
                 + Duration::from_millis(100 * n)
                 + Duration::from_millis(7);
-            schedule.read("cabin_temps", due);
+            schedule.read("zone_temps", due);
         }
         assert_eq!(
             schedule.until_next(start + Duration::from_secs(300)),
@@ -335,9 +335,7 @@ mod tests {
 
         // Ten minutes late: two hundred intervals missed.
         let very_late = start + Duration::from_secs(600);
-        let then = schedule
-            .read("cabin_temps", very_late)
-            .expect("a next time");
+        let then = schedule.read("zone_temps", very_late).expect("a next time");
 
         assert!(
             then > very_late,
@@ -384,13 +382,13 @@ mod tests {
 
         let start = Instant::now();
         let mut schedule = Schedule::of(&graph, start);
-        schedule.read("cabin_temps", start);
+        schedule.read("zone_temps", start);
         schedule.read("slow", start);
 
         // At four seconds the fast one is due and the slow one is not.
         let due = schedule.due(start + Duration::from_secs(4));
         assert_eq!(due.len(), 1, "{due:?}");
-        assert_eq!(due[0].group, "cabin_temps");
+        assert_eq!(due[0].group, "zone_temps");
 
         // And the wait is until the sooner of the two.
         assert_eq!(
@@ -411,9 +409,9 @@ mod tests {
 
         let start = Instant::now();
         let mut schedule = Schedule::of(&graph, start);
-        // cabin_temps was read later, so `other` has waited longer.
+        // zone_temps was read later, so `other` has waited longer.
         schedule.read("other", start);
-        schedule.read("cabin_temps", start + Duration::from_secs(2));
+        schedule.read("zone_temps", start + Duration::from_secs(2));
 
         let due = schedule.due(start + Duration::from_secs(10));
         assert_eq!(due.len(), 2);

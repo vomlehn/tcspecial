@@ -237,7 +237,7 @@ fn terminal_look(
 /// is taken from it.
 ///
 /// `name` is the name the lines use for it, which for a node on a subdiagram's
-/// page is the name qualified by that page -- `cabin/temp_1` -- and so not
+/// page is the name qualified by that page -- `zone/temp_1` -- and so not
 /// always a name the configuration wrote down.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct OnSheet<'a> {

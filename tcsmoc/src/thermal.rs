@@ -636,7 +636,7 @@ mod tests {
         assert_eq!(plot.counts(), (3, 1));
         assert_eq!(plot.plotted("k_2"), Some(Plotted::Sensor(1)));
         assert_eq!(plot.plotted("thermostat"), Some(Plotted::Switch(0)));
-        assert_eq!(plot.plotted("cabin_temp"), None);
+        assert_eq!(plot.plotted("zone_temp"), None);
         assert_eq!(plot.plotted("temp_1"), None);
         assert_eq!(plot.centre(), Some(293.15));
 

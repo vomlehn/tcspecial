@@ -117,7 +117,7 @@ pub enum Edit {
     /// A group was declared, with the interval it reads on.
     ///
     /// A group is one of the four things a configuration is made of, and the
-    /// one the editor could not make: a node could say `group: cabin_temps`
+    /// one the editor could not make: a node could say `group: zone_temps`
     /// and nothing declared what that was.
     AddGroup { name: String, interval: String },
     /// A group was taken away, with the interval it had.
@@ -869,7 +869,7 @@ mod tests {
             attributes: vec![("function".into(), "to_kelvin".into())],
             links: vec![
                 Link::new("temp_1", "k_1", None),
-                Link::new("k_1", "cabin_temp", Some("in0")),
+                Link::new("k_1", "zone_temp", Some("in0")),
             ],
             home: None,
         };

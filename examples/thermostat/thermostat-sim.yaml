@@ -27,7 +27,7 @@ description: Simulator settings for the payloads of thermostat.ytcs
 tcssim:
   ready: "127.0.0.1:7907"
 
-# The physics model the payloads below attach to -- the cabin they read and
+# The physics model the payloads below attach to -- the zone they read and
 # warm -- which is the vehicle's, not this file's: see the file it names.
 physics: thermostat-physics.yaml
 
@@ -40,7 +40,7 @@ simulated_payload_groups:
   #
   # Each sensor drifts too, by a twentieth of a kelvin over half an hour,
   # which is what an ageing part's calibration does.
-  - name: cabin_temps
+  - name: zone_temps
     simulate: true
     packet_interval: 100 ms
     reads: basic
@@ -51,11 +51,11 @@ simulated_payloads:
   # Each sensor on an output of its own, with its part's datasheet errors.
   # temp_1 and temp_2 are one part, a digital sensor of a sixteenth of a
   # kelvin a count: accurate to half a kelvin, three hundredths of a kelvin
-  # of noise, and four seconds behind the cabin in its package.
+  # of noise, and four seconds behind the zone in its package.
   - name: temp_1
     type: network
     protocol: udp
-    group: cabin_temps
+    group: zone_temps
     output: out1
     noise: "0.03"
     accuracy: "0.5"
@@ -64,7 +64,7 @@ simulated_payloads:
   - name: temp_2
     type: network
     protocol: udp
-    group: cabin_temps
+    group: zone_temps
     output: out2
     noise: "0.03"
     accuracy: "0.5"
@@ -75,7 +75,7 @@ simulated_payloads:
   - name: temp_3
     type: network
     protocol: udp
-    group: cabin_temps
+    group: zone_temps
     output: out3
     noise: "0.02"
     accuracy: "0.25"

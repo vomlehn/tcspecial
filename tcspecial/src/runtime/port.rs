@@ -2567,7 +2567,7 @@ mod tests {
         use tcslibgs::node::vehicle::compute::{Algorithm, VoteParams};
 
         let mut port = ComputePort::of(
-            "cabin_temp",
+            "zone_temp",
             Box::new(Vote::of(VoteParams {
                 algorithm: Algorithm::Median,
                 inputs: vec!["in0".to_string(), "in1".to_string()],
@@ -2688,7 +2688,7 @@ mod tests {
         use tcslibgs::node::vehicle::compute::{Algorithm, VoteParams};
 
         let mut port = ComputePort::of(
-            "cabin_temp",
+            "zone_temp",
             Box::new(Vote::of(VoteParams {
                 algorithm: Algorithm::Median,
                 inputs: vec!["in0".to_string(), "in1".to_string()],
@@ -2708,7 +2708,7 @@ mod tests {
         ] {
             let said = port.give(Arriving::named("in0"), datum).unwrap_err();
             assert!(
-                said.contains("cabin_temp") && said.contains("vote"),
+                said.contains("zone_temp") && said.contains("vote"),
                 "the complaint about {what} should name the node and the \
                  computation: {said}"
             );
@@ -2722,7 +2722,7 @@ mod tests {
         use tcslibgs::node::vehicle::compute::{Algorithm, VoteParams};
 
         let mut port = ComputePort::of(
-            "cabin_temp",
+            "zone_temp",
             Box::new(Vote::of(VoteParams {
                 algorithm: Algorithm::Median,
                 inputs: vec!["in0".to_string(), "in1".to_string()],

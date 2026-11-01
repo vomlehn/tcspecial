@@ -747,7 +747,7 @@ mod tests {
 
         let mass = Arc::new(ThermalMass::new(
             &ResolvedMass {
-                name: "cabin".to_string(),
+                name: "zone".to_string(),
                 environment: 283.15,
                 time_constant: Duration::from_secs(50),
                 inputs: vec!["in1".to_string()],

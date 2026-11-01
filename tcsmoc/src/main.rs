@@ -1204,7 +1204,7 @@ mod tests {
         // being nothing in a node that adds a line to it.
         for (what, names) in [
             ("a row of two", vec!["k_1", "k_2"]),
-            ("a row of three", vec!["k_1", "k_2", "cabin_temp"]),
+            ("a row of three", vec!["k_1", "k_2", "zone_temp"]),
         ] {
             let rows: Vec<DHInfo> = names
                 .iter()

@@ -17,7 +17,7 @@
 //! link from this node's `payload-out` terminal to `k_1`, and an entry naming
 //! an `input` as well feeds a named input of the node it reaches. The short
 //! spelling is read too -- `payload-out: k_1`,
-//! `payload-out: [gateway, cabin_temp.in0]` -- and means the same thing; see
+//! `payload-out: [gateway, zone_temp.in0]` -- and means the same thing; see
 //! [`Destinations`].
 //!
 //! So there is no links section, and a node and the links out of it are read,
@@ -785,7 +785,7 @@ impl Link {
 /// ```yaml
 /// payload-out:
 ///   - target: gateway
-///   - target: cabin_temp
+///   - target: zone_temp
 ///     input: in0
 /// ```
 ///
@@ -796,7 +796,7 @@ impl Link {
 /// in it.
 ///
 /// The short spellings are still read: `payload-out: gateway` and
-/// `payload-out: [gateway, cabin_temp.in0]`, the node and its input separated
+/// `payload-out: [gateway, zone_temp.in0]`, the node and its input separated
 /// by a dot. Every configuration written before entries existed says what it
 /// said, and a link to one place is a line somebody can still write in a line.
 /// All of them read into the same thing -- a destination as `node` or
@@ -1042,7 +1042,7 @@ fn said_so<'de, A: serde::de::MapAccess<'de>>(
 
 /// Reads the destination a mapping names, however the mapping got there.
 ///
-/// Two shapes arrive here. An entry -- `{ target: cabin_temp, input: in0 }` --
+/// Two shapes arrive here. An entry -- `{ target: zone_temp, input: in0 }` --
 /// which is what the editor writes and what a person writing a link by hand
 /// now has to write for a link to a named input. And an XML element with text
 /// in it, `<payload-out>gateway</payload-out>`, which quick-xml hands over as a
@@ -1130,7 +1130,7 @@ fn written_as<'de, A: serde::de::MapAccess<'de>>(
 
 /// Which node and which input a destination names.
 ///
-/// `cabin_temp.in0` is the `in0` input of `cabin_temp`; `gateway` is a node
+/// `zone_temp.in0` is the `in0` input of `zone_temp`; `gateway` is a node
 /// that takes one input and does not name it. The separator is a dot because a
 /// node name cannot contain one and an input name cannot either, which is
 /// checked.
@@ -2047,8 +2047,8 @@ mod tests {
         assert_eq!(plain.node, "gateway");
         assert_eq!(plain.input, None);
 
-        let named = Destination::parse("cabin_temp.in0");
-        assert_eq!(named.node, "cabin_temp");
+        let named = Destination::parse("zone_temp.in0");
+        assert_eq!(named.node, "zone_temp");
         assert_eq!(named.input.as_deref(), Some("in0"));
 
         // Total: what is wrong with a destination is the checking's to say,
@@ -2096,7 +2096,7 @@ mod tests {
         );
         assert_eq!(yaml.groups.len(), 1, "the three sensors share one group");
         assert_eq!(
-            yaml.group("cabin_temps").map(|g| g.interval()),
+            yaml.group("zone_temps").map(|g| g.interval()),
             // Ten times a second, which is what holds the band: the heaters
             // move the mass several kelvin a second, so a loop that acted
             // once a second would overshoot the band every time.
@@ -2151,7 +2151,7 @@ mod tests {
         std::fs::write(
             &top,
             "include:
-  - cabin
+  - zone
 tcspecial:
   gateway: radio
   interface: \"ad9aac4dd5a6d88dd5e78824ba8a83ac\"
@@ -2187,9 +2187,9 @@ gateway:
         // the boundary between two files is written in the file the node is
         // in.
         std::fs::write(
-            where_.path().join("cabin.ytcs"),
+            where_.path().join("zone.ytcs"),
             "payloads:\n  \
-             - { name: cabin_sensor, type: i2c, path: \"/dev/i2c-1\", \
+             - { name: zone_sensor, type: i2c, path: \"/dev/i2c-1\", \
              address: \"0x48\", payload-out: gateway }\n",
         )
         .unwrap();
@@ -2197,14 +2197,14 @@ gateway:
         let graph = Graph::load(&top).expect("the pair reads as one");
         assert_eq!(graph.nodes.len(), 2);
         assert!(
-            graph.node("cabin_sensor").is_some(),
+            graph.node("zone_sensor").is_some(),
             "the include was not read"
         );
         assert_eq!(graph.files.len(), 2, "both files should be recorded");
 
         // Which file each node came from, so the digest can cover the set and
         // a complaint can say where to look.
-        assert!(graph.homes["cabin_sensor"].ends_with("cabin.ytcs"));
+        assert!(graph.homes["zone_sensor"].ends_with("zone.ytcs"));
         assert!(graph.homes["gateway"].ends_with("vehicle.ytcs"));
 
         // And a link across the boundary is sound, which is what including a
@@ -2247,8 +2247,8 @@ gateway:
     fn a_file_is_not_included_twice() {
         let where_ = tempfile::tempdir().expect("a directory");
         let top = where_.path().join("vehicle.ytcs");
-        std::fs::write(&top, "include:\n  - cabin\n  - cabin\n").unwrap();
-        std::fs::write(where_.path().join("cabin.ytcs"), "payloads: []\n")
+        std::fs::write(&top, "include:\n  - zone\n  - zone\n").unwrap();
+        std::fs::write(where_.path().join("zone.ytcs"), "payloads: []\n")
             .unwrap();
 
         let said =
@@ -2261,9 +2261,9 @@ gateway:
     fn an_include_does_not_nest() {
         let where_ = tempfile::tempdir().expect("a directory");
         let top = where_.path().join("vehicle.ytcs");
-        std::fs::write(&top, "include:\n  - cabin\n").unwrap();
+        std::fs::write(&top, "include:\n  - zone\n").unwrap();
         std::fs::write(
-            where_.path().join("cabin.ytcs"),
+            where_.path().join("zone.ytcs"),
             "include:\n  - deeper\n",
         )
         .unwrap();
@@ -2310,12 +2310,12 @@ gateway:
 type: compute
 payload-out:
   - target: gateway
-  - target: cabin_temp
+  - target: zone_temp
     input: in0
 ",
         )
         .expect("entries");
-        assert_eq!(said.payload_out, vec!["gateway", "cabin_temp.in0"]);
+        assert_eq!(said.payload_out, vec!["gateway", "zone_temp.in0"]);
 
         // One entry on its own needs no list, as one destination needs no
         // list.

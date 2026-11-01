@@ -1562,13 +1562,13 @@ vehicle:
         let top = dir.path().join("vehicle.ytcs");
         std::fs::write(
             &top,
-            "include:\n  - cabin\ngateway:\n  \
+            "include:\n  - zone\ngateway:\n  \
              - { name: gateway, type: gateway_radio, gateway-out: gateway }\n",
         )
         .unwrap();
         // The included file holds a node nothing links to.
         std::fs::write(
-            dir.path().join("cabin.ytcs"),
+            dir.path().join("zone.ytcs"),
             "payloads:\n  - { name: lonely, type: i2c }\n",
         )
         .unwrap();
@@ -1580,7 +1580,7 @@ vehicle:
             .find(|f| f.message.contains("lonely"))
             .expect("the unconnected node should be reported");
         assert!(
-            lonely.file.ends_with("cabin.ytcs"),
+            lonely.file.ends_with("zone.ytcs"),
             "it should be reported in the file it is in, not {}",
             lonely.file.display()
         );

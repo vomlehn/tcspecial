@@ -46,7 +46,7 @@
          by gateway-out for the heater. What comes down arrives at bridge_base
          plus the device id of the node that sent it, and the bridge gives it
          the F´ ID fprime_id_base plus that same id: the thermometer, device id
-         2, arrives at 127.0.0.1:9702 as 0x3002, cabin_temp, device id 3, at
+         2, arrives at 127.0.0.1:9702 as 0x3002, zone_temp, device id 3, at
          127.0.0.1:9703 as 0x3003, and heater_wanted, device id 4, at
          127.0.0.1:9704 as 0x3004. -->
     <gateway>
@@ -71,7 +71,7 @@
     </payloads>
     <!-- A thermometer, two bytes, signed, big endian, in sixteenths of a
          degree, whose readings go to the flight computer as they are, and to
-         cabin_temp to be made a temperature. -->
+         zone_temp to be made a temperature. -->
     <payloads>
         <name>thermometer</name>
         <type>network</type>
@@ -79,7 +79,7 @@
         <address>127.0.0.1</address>
         <port>9002</port>
         <payload-out><target>fsw</target></payload-out>
-        <payload-out><target>cabin_temp</target></payload-out>
+        <payload-out><target>zone_temp</target></payload-out>
     </payloads>
     <!-- After the payloads, so that the thermometer keeps device id 2: a
          node's device id is its place in the file.
@@ -87,7 +87,7 @@
          The thermometer's readings made a value, a temperature in kelvin,
          which the bridge's channel for it holds as one. -->
     <vehicle>
-        <name>cabin_temp</name>
+        <name>zone_temp</name>
         <type>compute</type>
         <format>i16_be</format>
         <function>to_kelvin</function>
@@ -97,7 +97,7 @@
         <payload-out><target>fsw</target></payload-out>
         <payload-out><target>heater_wanted</target></payload-out>
     </vehicle>
-    <!-- What a thermostat would decide of cabin_temp - on below 283.65 K, off
+    <!-- What a thermostat would decide of zone_temp - on below 283.65 K, off
          above 284.65 K - which the bridge's channel for it holds as a
          decision, true for on. Advice and no more: the heater is the flight
          computer's to drive, and this drives nothing. -->
@@ -114,7 +114,7 @@
         <nodes><name>fsw</name><x>469</x><y>34</y></nodes>
         <nodes><name>heater</name><x>34</x><y>34</y></nodes>
         <nodes><name>thermometer</name><x>34</x><y>134</y></nodes>
-        <nodes><name>cabin_temp</name><x>242</x><y>134</y></nodes>
+        <nodes><name>zone_temp</name><x>242</x><y>134</y></nodes>
         <nodes><name>heater_wanted</name><x>242</x><y>234</y></nodes>
     </tcsgui>
 </configuration>

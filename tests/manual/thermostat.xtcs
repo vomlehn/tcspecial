@@ -30,7 +30,7 @@
         </tcs_cmd>
     </tcspecial>
     <payload_groups>
-        <name>cabin_temps</name>
+        <name>zone_temps</name>
         <interval>100 ms</interval>
     </payload_groups>
     <gateway>
@@ -49,7 +49,7 @@
         <offset>273.15</offset>
         <scale>0.0625</scale>
         <payload-out><target>gateway</target></payload-out>
-        <payload-out><target>cabin_temp</target><input>in0</input></payload-out>
+        <payload-out><target>zone_temp</target><input>in0</input></payload-out>
         <payload-out><target>housekeeping</target></payload-out>
         <payload-in>true</payload-in>
     </vehicle>
@@ -61,7 +61,7 @@
         <offset>273.15</offset>
         <scale>0.0625</scale>
         <payload-out><target>gateway</target></payload-out>
-        <payload-out><target>cabin_temp</target><input>in1</input></payload-out>
+        <payload-out><target>zone_temp</target><input>in1</input></payload-out>
         <payload-out><target>housekeeping</target></payload-out>
         <payload-in>true</payload-in>
     </vehicle>
@@ -73,7 +73,7 @@
         <offset>255.37</offset>
         <scale>0.0078</scale>
         <payload-out><target>gateway</target></payload-out>
-        <payload-out><target>cabin_temp</target><input>in2</input></payload-out>
+        <payload-out><target>zone_temp</target><input>in2</input></payload-out>
         <payload-out><target>housekeeping</target></payload-out>
         <payload-in>true</payload-in>
     </vehicle>
@@ -84,7 +84,7 @@
     <!-- value on every arrival, so one sensor that stops reporting is -->
     <!-- outvoted rather than stopping the vehicle from deciding anything. -->
     <vehicle>
-        <name>cabin_temp</name>
+        <name>zone_temp</name>
         <type>compute</type>
         <algorithm>median</algorithm>
         <function>vote</function>
@@ -126,7 +126,7 @@
         <name>temp_1</name>
         <type>i2c</type>
         <address>0x48</address>
-        <group>cabin_temps</group>
+        <group>zone_temps</group>
         <path>/dev/i2c-1</path>
         <read_size>2</read_size>
         <payload-out><target>k_1</target></payload-out>
@@ -136,7 +136,7 @@
         <name>temp_2</name>
         <type>i2c</type>
         <address>0x49</address>
-        <group>cabin_temps</group>
+        <group>zone_temps</group>
         <path>/dev/i2c-1</path>
         <read_size>2</read_size>
         <payload-out><target>k_2</target></payload-out>
@@ -147,7 +147,7 @@
     <payloads>
         <name>temp_3</name>
         <type>spi</type>
-        <group>cabin_temps</group>
+        <group>zone_temps</group>
         <max_speed>1000000</max_speed>
         <path>/dev/spidev0.0</path>
         <read_size>3</read_size>
@@ -174,7 +174,7 @@
         <path>/dev/gpiochip0</path>
         <gateway-in>true</gateway-in>
     </payloads>
-    <!-- the cabin temperature the heaters are held at, in kelvin -->
+    <!-- the zone temperature the heaters are held at, in kelvin -->
     <commands>
         <from>gateway</from>
         <sets>thermostat.setpoint</sets>
@@ -186,7 +186,7 @@
         <nodes><name>k_1</name><x>242</x><y>34</y></nodes>
         <nodes><name>k_2</name><x>242</x><y>166</y></nodes>
         <nodes><name>k_3</name><x>242</x><y>280</y></nodes>
-        <nodes><name>cabin_temp</name><x>469</x><y>166</y></nodes>
+        <nodes><name>zone_temp</name><x>469</x><y>166</y></nodes>
         <nodes><name>thermostat</name><x>601</x><y>242</y></nodes>
         <nodes><name>gateway</name><x>790</x><y>34</y></nodes>
         <nodes><name>heaters_1</name><x>34</x><y>393</y></nodes>

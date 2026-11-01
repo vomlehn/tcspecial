@@ -550,10 +550,10 @@ mod tests {
     ///
     /// # Returns
     ///
-    /// The mass, named `cabin`.
-    fn cabin() -> ResolvedMass {
+    /// The mass, named `zone`.
+    fn zone() -> ResolvedMass {
         ResolvedMass {
-            name: "cabin".to_string(),
+            name: "zone".to_string(),
             environment: 283.15,
             time_constant: Duration::from_secs(50),
             inputs: vec!["in1".to_string(), "in2".to_string()],
@@ -569,7 +569,7 @@ mod tests {
         let swing = ResolvedMass {
             swing: 5.0,
             period: Duration::from_secs(100),
-            ..cabin()
+            ..zone()
         };
         let start = Instant::now();
         let mass = ThermalMass::new(&swing, start, 0);
@@ -608,7 +608,7 @@ mod tests {
                 size: 0.5,
                 time: Duration::from_secs(30),
             },
-            ..cabin()
+            ..zone()
         };
         let start = Instant::now();
         let mass = ThermalMass::new(&wandering, start, 3);
@@ -641,7 +641,7 @@ mod tests {
     fn an_output_sits_its_offset_away() {
         let mut offsets = BTreeMap::new();
         offsets.insert("out2".to_string(), 0.3);
-        let offset = ResolvedMass { offsets, ..cabin() };
+        let offset = ResolvedMass { offsets, ..zone() };
         let mass = ThermalMass::new(&offset, Instant::now(), 0);
         let out1 = mass.output("out1").expect("out1");
         let out2 = mass.output("out2").expect("out2");
@@ -657,7 +657,7 @@ mod tests {
                 size: 0.5,
                 time: Duration::from_secs(30),
             },
-            ..cabin()
+            ..zone()
         };
         let start = Instant::now();
         let run = |seed| {
@@ -677,7 +677,7 @@ mod tests {
     /// A mass with no heat on it settles at its environment, from either side.
     #[test]
     fn a_mass_settles_at_its_environment() {
-        let mass = ThermalMass::new(&cabin(), Instant::now(), 0);
+        let mass = ThermalMass::new(&zone(), Instant::now(), 0);
         let mut state = mass.held();
 
         // It starts there, which is what a vehicle coming up cold is.
@@ -707,7 +707,7 @@ mod tests {
     /// a reader is owed the arithmetic that turns it into the rate.
     #[test]
     fn the_cooling_rate_at_the_setpoint_is_a_fifth_of_a_kelvin() {
-        let mass = ThermalMass::new(&cabin(), Instant::now(), 0);
+        let mass = ThermalMass::new(&zone(), Instant::now(), 0);
         let mut state = mass.held();
         state.temperature = 293.15;
         let start = state.at;
@@ -725,7 +725,7 @@ mod tests {
     /// twice is one heater.
     #[test]
     fn heaters_warm_it_and_are_counted_once_each() {
-        let mass = ThermalMass::new(&cabin(), Instant::now(), 0);
+        let mass = ThermalMass::new(&zone(), Instant::now(), 0);
 
         // One heater of three kelvin a second: at the environment, where
         // there is nothing to lose, the mass gains very nearly that.
@@ -756,7 +756,7 @@ mod tests {
     /// they can win.
     #[test]
     fn the_heaters_decide_where_it_settles() {
-        let mass = ThermalMass::new(&cabin(), Instant::now(), 0);
+        let mass = ThermalMass::new(&zone(), Instant::now(), 0);
         mass.heater("heaters_1", 3.0, Wander::default(), true);
         mass.heater("heaters_2", 3.0, Wander::default(), true);
 
@@ -836,7 +836,7 @@ mod tests {
     /// one instant must not do.
     #[test]
     fn a_step_of_no_time_changes_nothing() {
-        let mass = ThermalMass::new(&cabin(), Instant::now(), 0);
+        let mass = ThermalMass::new(&zone(), Instant::now(), 0);
         mass.heater("heaters_1", 3.0, Wander::default(), true);
         let first = mass.temperature();
         let again = {
@@ -1011,7 +1011,7 @@ mod tests {
     /// can overshoot by is what they add in the interval it did not look.
     #[test]
     fn the_heaters_hold_the_mass_in_band_through_a_lost_decision() {
-        let mass = Arc::new(ThermalMass::new(&cabin(), Instant::now(), 0));
+        let mass = Arc::new(ThermalMass::new(&zone(), Instant::now(), 0));
 
         // The two encodings of the example, so that what is voted over is
         // readings of one temperature in different formats.

@@ -754,9 +754,7 @@ mod tests {
             }
             assert_eq!(
                 document.commands[0].comment.as_deref(),
-                Some(
-                    "the cabin temperature the heaters are held at, in kelvin"
-                ),
+                Some("the zone temperature the heaters are held at, in kelvin"),
                 "{extension}"
             );
 

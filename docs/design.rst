@@ -1439,10 +1439,10 @@ started by the tests once F´'s test API is listening. The tests, in
 ``fprime/BridgeTest/test``, see the bridge only as F´ does: the bridge
 connects and is matched, and the beacon says the configuration's checksum;
 beacons are heard; a simulated reading arrives as the thermometer's channel,
-its two bytes, and the temperature made of it as ``cabin_temp``'s, a number
+its two bytes, and the temperature made of it as ``zone_temp``'s, a number
 of kelvin, with no datum refused as not a value; a PING is answered; a node is stopped and started again; ``1`` sent up
 drives the heater, whose stand-in warms the thermal mass the thermometer
-reads, so that ``cabin_temp`` climbs and ``heater_wanted``'s decision channel
+reads, so that ``zone_temp`` climbs and ``heater_wanted``'s decision channel
 goes false, with no datum refused as not a decision, and ``0`` turns it off; a node the
 configuration lacks is refused unsent; a restart onto a configuration the
 vehicle does not hold is answered ``NotFound``; a plain restart is armed and
@@ -2024,7 +2024,7 @@ signed count of micro-kelvin reaches 2147.483647 K either way. That is above
 anything these nodes are pointed at and below a great deal that exists -- a
 thruster's throat is hotter -- so a temperature outside it is refused, and
 refused where the value is made, which is where the number is still in hand to
-name in the complaint. Not wrapped, which would turn 2200 K into a cabin 42 K
+name in the complaint. Not wrapped, which would turn 2200 K into a zone 42 K
 below zero, and not pinned to the end of the range, which would turn a runaway
 into a part that looks hot but surviving: either is a thermostat acting
 confidently on a number nobody produced. A node that must carry more than this
@@ -2732,7 +2732,7 @@ What a payload starts in
 A payload the vehicle drives is in whatever state its hardware came up in
 until the vehicle first decides something about it, and that may be a while:
 a thermostat decides when its group has been read, and a heater that came up
-on warms the cabin until then. A payload's ``init`` says what it starts in
+on warms the zone until then. A payload's ``init`` says what it starts in
 instead.
 
 Requirement
@@ -5386,7 +5386,7 @@ These are the checks:
   of them. A source whose record length the configuration does not state --
   every computation -- can feed a variable-length log and not a fixed one.
 
-Example: a cabin thermostat
+Example: a zone thermostat
 ---------------------------
 
 Three temperature sensors of one place, two on an I\ :superscript:`2`\ C bus
@@ -5416,10 +5416,10 @@ addresses are its own. What is here is checked as it stands, with a
 
 .. code-block:: yaml
 
-   description: Cabin thermostat
+   description: Zone thermostat
 
    payload_groups:
-     - { name: cabin_temps, interval: "100 ms" }
+     - { name: zone_temps, interval: "100 ms" }
 
    gateway:
      - { name: gateway, type: gateway_radio, address: "10.0.0.1", port: "5000",
@@ -5428,18 +5428,18 @@ addresses are its own. What is here is checked as it stands, with a
    vehicle:
      - { name: k_1, type: compute, function: to_kelvin, format: i16_be,
          scale: "0.0625", offset: "273.15", payload-in: true,
-         payload-out: [{ target: gateway }, { target: cabin_temp, input: in0 }]
+         payload-out: [{ target: gateway }, { target: zone_temp, input: in0 }]
          }
      - { name: k_2, type: compute, function: to_kelvin, format: i16_be,
          scale: "0.0625", offset: "273.15", payload-in: true,
-         payload-out: [{ target: gateway }, { target: cabin_temp, input: in1 }]
+         payload-out: [{ target: gateway }, { target: zone_temp, input: in1 }]
          }
      - { name: k_3, type: compute, function: to_kelvin, format: u24_be,
          scale: "0.0078", offset: "255.37", payload-in: true,
-         payload-out: [{ target: gateway }, { target: cabin_temp, input: in2 }]
+         payload-out: [{ target: gateway }, { target: zone_temp, input: in2 }]
          }
 
-     - { name: cabin_temp, type: compute, function: vote, algorithm: median,
+     - { name: zone_temp, type: compute, function: vote, algorithm: median,
          inputs: "in0,in1,in2", payload-in: true,
          payload-out: [{ target: gateway }, { target: thermostat }] }
      - { name: thermostat, type: compute, function: hysteresis,
@@ -5448,11 +5448,11 @@ addresses are its own. What is here is checked as it stands, with a
          gateway-out: [{ target: heaters_1 }, { target: heaters_2 }] }
 
    payloads:
-     - { name: temp_1, type: i2c, group: cabin_temps, path: "/dev/i2c-1",
+     - { name: temp_1, type: i2c, group: zone_temps, path: "/dev/i2c-1",
          address: "0x48", read_size: "2", payload-out: [{ target: k_1 }] }
-     - { name: temp_2, type: i2c, group: cabin_temps, path: "/dev/i2c-1",
+     - { name: temp_2, type: i2c, group: zone_temps, path: "/dev/i2c-1",
          address: "0x49", read_size: "2", payload-out: [{ target: k_2 }] }
-     - { name: temp_3, type: spi, group: cabin_temps, path: "/dev/spidev0.0",
+     - { name: temp_3, type: spi, group: zone_temps, path: "/dev/spidev0.0",
          max_speed: "1000000", spi_mode: "0", read_size: "3",
          payload-out: [{ target: k_3 }] }
 
@@ -5472,7 +5472,7 @@ by two terminals, which is the file saying two different things with it -- its
 drives the two heaters.
 
 Several things in that file are refusals waiting to happen, which is the point.
-Drop ``cabin_temp.in2`` from ``k_3``'s links and the configuration is refused
+Drop ``zone_temp.in2`` from ``k_3``'s links and the configuration is refused
 for a vote whose declared inputs are not the ones that arrive, rather than
 voting over two readings and calling it a trio. Give ``temp_2`` an interval of
 its own and it is refused for disagreeing with the group that says when it is
@@ -6549,7 +6549,7 @@ Requirement
     holding its top file, named by the checksum too, and each file the top
     file includes, under the name its include list gives it. The checksum
     takes in those names, so that it says the shape of the tree as well as
-    what is in it, and two configurations that each include a ``cabin``
+    what is in it, and two configurations that each include a ``zone``
     of their own are kept apart. An include name that is a path, begins
     with a dot or is the checksum is refused when the configuration is
     kept and when it is loaded, saying so.
@@ -10888,7 +10888,7 @@ socket.
    physics: thermostat-physics.yaml
 
    simulated_payload_groups:
-     - name: cabin_temps
+     - name: zone_temps
        packet_interval: 100 ms
        reads: basic
 
@@ -10896,19 +10896,19 @@ socket.
      - name: temp_1
        type: network
        protocol: udp
-       group: cabin_temps
+       group: zone_temps
        output: out1
 
      - name: temp_2
        type: network
        protocol: udp
-       group: cabin_temps
+       group: zone_temps
        output: out2
 
      - name: temp_3
        type: network
        protocol: udp
-       group: cabin_temps
+       group: zone_temps
        output: out3
 
      - name: heaters_1

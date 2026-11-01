@@ -698,7 +698,7 @@ journal:
   - !AddLink
     link:
       from: sensor
-      to: cabin
+      to: zone
       input: in0
   - !SetNodeComment
     node: sensor

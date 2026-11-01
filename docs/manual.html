@@ -1060,7 +1060,7 @@ init           what to write to the payload as the vehicle opens it, in
 <p>A payload the vehicle drives is in whatever state its hardware came up in
 until the vehicle first decides something about it, which may be a while: a
 thermostat decides when its group has been read, and a heater circuit that
-came up on is warming the cabin until then. <tt class="docutils literal">init</tt> is what it is set to
+came up on is warming the zone until then. <tt class="docutils literal">init</tt> is what it is set to
 instead, written as the node is opened -- as the vehicle starts, and again
 whenever the ground starts the node after stopping it:</p>
 <pre class="code yaml literal-block">
@@ -2216,14 +2216,14 @@ thermostat example</a>). Each payload is named for what it is,
 which is what a panel in the MOC shows.</p>
 <pre class="code yaml literal-block">
 <span class="name tag">payload_groups</span><span class="punctuation">:</span><span class="whitespace">
-  </span><span class="punctuation indicator">-</span><span class="whitespace"> </span><span class="name tag">name</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal string">&quot;cabin_temps&quot;</span><span class="whitespace">
+  </span><span class="punctuation indicator">-</span><span class="whitespace"> </span><span class="name tag">name</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal string">&quot;zone_temps&quot;</span><span class="whitespace">
     </span><span class="name tag">interval</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal string">&quot;100</span><span class="name variable"> </span><span class="literal string">ms&quot;</span><span class="whitespace">
 
 </span><span class="name tag">payloads</span><span class="punctuation">:</span><span class="whitespace">
   </span><span class="punctuation indicator">-</span><span class="whitespace"> </span><span class="name tag">name</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">temp_1</span><span class="whitespace">
     </span><span class="name tag">type</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">i2c</span><span class="whitespace">
     </span><span class="name tag">address</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal string">&quot;0x48&quot;</span><span class="whitespace">
-    </span><span class="name tag">group</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal string">&quot;cabin_temps&quot;</span><span class="whitespace">
+    </span><span class="name tag">group</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal string">&quot;zone_temps&quot;</span><span class="whitespace">
     </span><span class="name tag">path</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal string">&quot;/dev/i2c-1&quot;</span><span class="whitespace">
     </span><span class="name tag">read_size</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal string">&quot;2&quot;</span><span class="whitespace">
     </span><span class="name tag">payload-out</span><span class="punctuation">:</span><span class="whitespace">
@@ -2232,7 +2232,7 @@ which is what a panel in the MOC shows.</p>
   </span><span class="punctuation indicator">-</span><span class="whitespace"> </span><span class="name tag">name</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">temp_2</span><span class="whitespace">
     </span><span class="name tag">type</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">i2c</span><span class="whitespace">
     </span><span class="name tag">address</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal string">&quot;0x49&quot;</span><span class="whitespace">
-    </span><span class="name tag">group</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal string">&quot;cabin_temps&quot;</span><span class="whitespace">
+    </span><span class="name tag">group</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal string">&quot;zone_temps&quot;</span><span class="whitespace">
     </span><span class="name tag">path</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal string">&quot;/dev/i2c-1&quot;</span><span class="whitespace">
     </span><span class="name tag">read_size</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal string">&quot;2&quot;</span><span class="whitespace">
     </span><span class="name tag">payload-out</span><span class="punctuation">:</span><span class="whitespace">
@@ -2240,7 +2240,7 @@ which is what a panel in the MOC shows.</p>
 
   </span><span class="punctuation indicator">-</span><span class="whitespace"> </span><span class="name tag">name</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">temp_3</span><span class="whitespace">
     </span><span class="name tag">type</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">spi</span><span class="whitespace">
-    </span><span class="name tag">group</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal string">&quot;cabin_temps&quot;</span><span class="whitespace">
+    </span><span class="name tag">group</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal string">&quot;zone_temps&quot;</span><span class="whitespace">
     </span><span class="name tag">max_speed</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal string">&quot;1000000&quot;</span><span class="whitespace">
     </span><span class="name tag">path</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal string">&quot;/dev/spidev0.0&quot;</span><span class="whitespace">
     </span><span class="name tag">read_size</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal string">&quot;3&quot;</span><span class="whitespace">
@@ -2438,7 +2438,7 @@ two heaters.</p>
 </div>
 <p>The worked example of computing aboard, and of surviving a part that fails.
 Three temperature sensors -- <tt class="docutils literal">temp_1</tt>, <tt class="docutils literal">temp_2</tt> and <tt class="docutils literal">temp_3</tt> -- are read
-together ten times a second as the group <tt class="docutils literal">cabin_temps</tt>, which is what a
+together ten times a second as the group <tt class="docutils literal">zone_temps</tt>, which is what a
 group is for: readings that will be compared are taken as close together as
 the hardware allows.</p>
 <p>Every sensor and heater is the far end of a UDP socket on this host, ports
@@ -2455,9 +2455,9 @@ theirs, so that no one part number can take the whole trio out.</p>
 <tt class="docutils literal">k_2</tt> or <tt class="docutils literal">k_3</tt>, and each converted reading goes three ways: to the ground
 through the gateway node -- at its <tt class="docutils literal">ground_base</tt>, <tt class="docutils literal">127.0.0.1:5100</tt>, plus
 each source's device id, so <tt class="docutils literal">k_1</tt>, <tt class="docutils literal">k_2</tt> and <tt class="docutils literal">k_3</tt>, ids 1 to 3, arrive on
-ports 5101 to 5103 -- into <tt class="docutils literal">cabin_temp</tt> as the input <tt class="docutils literal">in0</tt>, <tt class="docutils literal">in1</tt> or
+ports 5101 to 5103 -- into <tt class="docutils literal">zone_temp</tt> as the input <tt class="docutils literal">in0</tt>, <tt class="docutils literal">in1</tt> or
 <tt class="docutils literal">in2</tt>, and into the log <tt class="docutils literal">housekeeping</tt>.</p>
-<p><tt class="docutils literal">cabin_temp</tt> is a <tt class="docutils literal">vote</tt>: one temperature out of the three by the algorithm
+<p><tt class="docutils literal">zone_temp</tt> is a <tt class="docutils literal">vote</tt>: one temperature out of the three by the algorithm
 it names, <tt class="docutils literal">median</tt>, which takes the middle reading. A mean would be the wrong
 arithmetic twice over -- it carries a bad reading into the answer in proportion
 to how wrong it is, and waiting for all three turns one dead sensor into no
@@ -2467,11 +2467,11 @@ that are working. Fed 296.0, 296.1 and 270.0 -- two sensors warm and one stuck
 cold -- it says 296 and the heaters stay off, where a mean would have said
 287.4 and switched them on because one sensor had failed.</p>
 <p>The voted temperature goes to the ground, on port 5104, and to <tt class="docutils literal">thermostat</tt>:
-a hysteresis holding the cabin at its <tt class="docutils literal">setpoint</tt>, 293.15 K, with a
+a hysteresis holding the zone at its <tt class="docutils literal">setpoint</tt>, 293.15 K, with a
 <tt class="docutils literal">half_band</tt> of 2.0, so the heaters switch two degrees either side of it and
 the setpoint is in the middle of its own band. Its decision is logged, sent to
 the ground on port 5105, and drives two heaters, <tt class="docutils literal">heaters_1</tt> and
-<tt class="docutils literal">heaters_2</tt>. Two of them, because one failing must not leave the cabin with
+<tt class="docutils literal">heaters_2</tt>. Two of them, because one failing must not leave the zone with
 no way to be warmed: either alone holds the band, and both together hold it
 twice as fast. They are separate nodes so that the ground can stop one and
 leave the other holding the temperature.</p>
@@ -2752,7 +2752,7 @@ the eight thousands, which no other example uses.</p>
 <h2><a class="toc-backref" href="#toc-entry-40">The fprime example</a></h2>
 <div class="figure">
 <object data="../examples/fprime/fprime.svg" style="width: 100%;" type="image/svg+xml">The fprime example: the thermometer's readings go to fsw, a
-gateway_fprime node, and to cabin_temp, a to_kelvin compute node
+gateway_fprime node, and to zone_temp, a to_kelvin compute node
 whose temperatures go to fsw too and to heater_wanted, a hysteresis
 compute node whose decisions go to fsw, and all three on to the F´
 deployment's TcsBridge component at bridge_base plus the sender's
@@ -2775,15 +2775,15 @@ of the F´ IDs the bridge gives what arrives, counted on by the same device id
 model is made from and nothing aboard reads. A command the bridge sends up to
 <tt class="docutils literal">fsw</tt>, which binds <tt class="docutils literal">127.0.0.1:9600</tt>, leaves it by its <tt class="docutils literal"><span class="pre">gateway-out</span></tt> for
 the <tt class="docutils literal">heater</tt>.</p>
-<p>The thermometer's readings go to <tt class="docutils literal">cabin_temp</tt> too, a <tt class="docutils literal">to_kelvin</tt> compute
+<p>The thermometer's readings go to <tt class="docutils literal">zone_temp</tt> too, a <tt class="docutils literal">to_kelvin</tt> compute
 node that makes each a temperature, and that goes to <tt class="docutils literal">fsw</tt> as well: device
 id 3, <tt class="docutils literal">127.0.0.1:9703</tt>, channel <tt class="docutils literal">0x3003</tt>. The <tt class="docutils literal">vehicle</tt> section is
 written after the payloads so that the thermometer keeps device id 2, a
 node's device id being its place in the file. In the simulator file the
-thermometer reads a thermal mass, <tt class="docutils literal">cabin</tt>, in the encoding <tt class="docutils literal">cabin_temp</tt>
+thermometer reads a thermal mass, <tt class="docutils literal">zone</tt>, in the encoding <tt class="docutils literal">zone_temp</tt>
 reads back, and the heater warms it while it is driven on, so that what the
 flight computer sends the heater shows in the temperature it reads.</p>
-<p><tt class="docutils literal">cabin_temp</tt>'s temperatures go on to <tt class="docutils literal">heater_wanted</tt>, a <tt class="docutils literal">hysteresis</tt>
+<p><tt class="docutils literal">zone_temp</tt>'s temperatures go on to <tt class="docutils literal">heater_wanted</tt>, a <tt class="docutils literal">hysteresis</tt>
 compute node -- on below 283.65 K, off above 284.65 K -- whose decisions go
 to <tt class="docutils literal">fsw</tt>: device id 4, <tt class="docutils literal">127.0.0.1:9704</tt>, channel <tt class="docutils literal">0x3004</tt>. It is
 advice and drives nothing, the heater being the flight computer's to drive,
@@ -2820,7 +2820,7 @@ Each node drawn into the <tt class="docutils literal">gateway_fprime</tt> node i
 at <tt class="docutils literal">fprime_id_base</tt> plus its device id -- <tt class="docutils literal">thermometer</tt>, <tt class="docutils literal">0x3002</tt> --
 of the type the configuration says its data are. A node that sends values, a
 compute node whose function is <tt class="docutils literal">to_kelvin</tt>, <tt class="docutils literal">vote</tt> or <tt class="docutils literal">process</tt>, has an
-<tt class="docutils literal">F64</tt> channel, its temperature in kelvin -- <tt class="docutils literal">cabin_temp</tt>, <tt class="docutils literal">0x3003</tt> --
+<tt class="docutils literal">F64</tt> channel, its temperature in kelvin -- <tt class="docutils literal">zone_temp</tt>, <tt class="docutils literal">0x3003</tt> --
 and a datum from it that is not a value goes to no channel, is counted in
 <tt class="docutils literal">DataNotValues</tt> and is said in a <tt class="docutils literal">NotAValue</tt> event. A node that sends
 decisions, a compute node whose function is <tt class="docutils literal">hysteresis</tt>, has a <tt class="docutils literal">bool</tt>
@@ -2868,9 +2868,9 @@ the channels. <tt class="docutils literal">fprime/BridgeTest</tt> is a deploymen
 (<tt class="docutils literal">tcssim <span class="pre">--sending</span></tt>), waits for it, starts tcspecial and F´'s ground system,
 and runs the tests in <tt class="docutils literal">fprime/BridgeTest/test</tt>, which start <tt class="docutils literal">BridgeTest</tt>
 and hold it to connecting and matching, hearing beacons, a simulated reading
-arriving as the thermometer's channel and as <tt class="docutils literal">cabin_temp</tt>'s temperature, a
+arriving as the thermometer's channel and as <tt class="docutils literal">zone_temp</tt>'s temperature, a
 <tt class="docutils literal">PING</tt> answered, a node stopped and
-started again, <tt class="docutils literal">SEND_DATA 1</tt> warming the cabin until <tt class="docutils literal">cabin_temp</tt> climbs
+started again, <tt class="docutils literal">SEND_DATA 1</tt> warming the zone until <tt class="docutils literal">zone_temp</tt> climbs
 and <tt class="docutils literal">heater_wanted</tt> says off,
 an unknown node refused unsent, a restart onto a configuration the vehicle
 does not hold refused, a plain restart taken and the start that comes back
@@ -3152,13 +3152,13 @@ payload does not override its group's. A payload the file does not name is
 real too.</p>
 <pre class="code yaml literal-block">
 <span class="name tag">simulated_payload_groups</span><span class="punctuation">:</span><span class="whitespace">
-  </span><span class="punctuation indicator">-</span><span class="whitespace"> </span><span class="name tag">name</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">cabin_temps</span><span class="whitespace">
+  </span><span class="punctuation indicator">-</span><span class="whitespace"> </span><span class="name tag">name</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">zone_temps</span><span class="whitespace">
     </span><span class="name tag">simulate</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">true</span><span class="whitespace">          </span><span class="comment single"># temp_1, temp_2 and temp_3 are simulated</span><span class="whitespace">
     </span><span class="name tag">packet_interval</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">100 ms</span><span class="whitespace">
 
 </span><span class="name tag">simulated_payloads</span><span class="punctuation">:</span><span class="whitespace">
   </span><span class="punctuation indicator">-</span><span class="whitespace"> </span><span class="name tag">name</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">temp_1</span><span class="whitespace">
-    </span><span class="name tag">group</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">cabin_temps</span><span class="whitespace">
+    </span><span class="name tag">group</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">zone_temps</span><span class="whitespace">
   </span><span class="punctuation indicator">-</span><span class="whitespace"> </span><span class="name tag">name</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">heaters_1</span><span class="whitespace">
     </span><span class="name tag">simulate</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">false</span><span class="whitespace">         </span><span class="comment single"># the real heater</span>
 </pre>
@@ -3264,12 +3264,12 @@ it cannot be seen working.</p>
 <p>A thermal mass gives them something to agree about. Declare one, attach the
 sensors that report it and the heaters that warm it, and what the vehicle
 reads becomes a consequence of what the vehicle drove.</p>
-<p>A mass is the vehicle's physics and not any one configuration's -- the cabin
+<p>A mass is the vehicle's physics and not any one configuration's -- the zone
 is the same body whichever payloads fly -- so it is declared in a physics
 model: a YAML file of its own, which the simulator file names, relative to
 its own directory. Several simulator files may name one model, which is how
 the manual's thermostat fixture and the thermostat example share their
-cabin. A simulator file that still declares masses itself is refused, told
+zone. A simulator file that still declares masses itself is refused, told
 where they go.</p>
 <pre class="code text literal-block">
 physics                in the simulator file: the physics model's file,
@@ -3335,7 +3335,7 @@ next look, so the mass overshoots by their rate over the sum of the two.</p>
 <p>A heater has to be a payload the simulator can be driven through: a socket,
 or a set of discrete lines, whose stand-in watches the lines the vehicle
 drives.</p>
-<p>The model, <tt class="docutils literal"><span class="pre">cabin-physics.yaml</span></tt>:</p>
+<p>The model, <tt class="docutils literal"><span class="pre">zone-physics.yaml</span></tt>:</p>
 <pre class="code yaml literal-block">
 <span class="name tag">physics</span><span class="punctuation">:</span><span class="whitespace">
   </span><span class="punctuation indicator">-</span><span class="whitespace"> </span><span class="name tag">name</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">basic</span><span class="whitespace">
@@ -3347,19 +3347,19 @@ drives.</p>
 </pre>
 <p>And the simulator file beside it, which names it and attaches the payloads:</p>
 <pre class="code yaml literal-block">
-<span class="name tag">physics</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">cabin-physics.yaml</span><span class="whitespace">
+<span class="name tag">physics</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">zone-physics.yaml</span><span class="whitespace">
 
 </span><span class="name tag">simulated_payload_groups</span><span class="punctuation">:</span><span class="whitespace">
-  </span><span class="punctuation indicator">-</span><span class="whitespace"> </span><span class="name tag">name</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">cabin_temps</span><span class="whitespace">
+  </span><span class="punctuation indicator">-</span><span class="whitespace"> </span><span class="name tag">name</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">zone_temps</span><span class="whitespace">
     </span><span class="name tag">packet_interval</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">100 ms</span><span class="whitespace">
     </span><span class="name tag">reads</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">basic</span><span class="whitespace">
 
 </span><span class="name tag">simulated_payloads</span><span class="punctuation">:</span><span class="whitespace">
-  </span><span class="punctuation indicator">-</span><span class="whitespace"> </span><span class="punctuation indicator">{</span><span class="name tag"> name</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="name variable">temp_1</span><span class="punctuation indicator">,</span><span class="name tag"> type</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="name variable">network</span><span class="punctuation indicator">,</span><span class="name tag"> protocol</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="name variable">udp</span><span class="punctuation indicator">,</span><span class="name tag"> group</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="name variable">cabin_temps</span><span class="punctuation indicator">,</span><span class="whitespace">
+  </span><span class="punctuation indicator">-</span><span class="whitespace"> </span><span class="punctuation indicator">{</span><span class="name tag"> name</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="name variable">temp_1</span><span class="punctuation indicator">,</span><span class="name tag"> type</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="name variable">network</span><span class="punctuation indicator">,</span><span class="name tag"> protocol</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="name variable">udp</span><span class="punctuation indicator">,</span><span class="name tag"> group</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="name variable">zone_temps</span><span class="punctuation indicator">,</span><span class="whitespace">
 </span><span class="name tag">      output</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="name variable">out1</span><span class="whitespace"> </span><span class="punctuation indicator">}</span><span class="whitespace">
-  </span><span class="punctuation indicator">-</span><span class="whitespace"> </span><span class="punctuation indicator">{</span><span class="name tag"> name</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="name variable">temp_2</span><span class="punctuation indicator">,</span><span class="name tag"> type</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="name variable">network</span><span class="punctuation indicator">,</span><span class="name tag"> protocol</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="name variable">udp</span><span class="punctuation indicator">,</span><span class="name tag"> group</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="name variable">cabin_temps</span><span class="punctuation indicator">,</span><span class="whitespace">
+  </span><span class="punctuation indicator">-</span><span class="whitespace"> </span><span class="punctuation indicator">{</span><span class="name tag"> name</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="name variable">temp_2</span><span class="punctuation indicator">,</span><span class="name tag"> type</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="name variable">network</span><span class="punctuation indicator">,</span><span class="name tag"> protocol</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="name variable">udp</span><span class="punctuation indicator">,</span><span class="name tag"> group</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="name variable">zone_temps</span><span class="punctuation indicator">,</span><span class="whitespace">
 </span><span class="name tag">      output</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="name variable">out2</span><span class="whitespace"> </span><span class="punctuation indicator">}</span><span class="whitespace">
-  </span><span class="punctuation indicator">-</span><span class="whitespace"> </span><span class="punctuation indicator">{</span><span class="name tag"> name</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="name variable">temp_3</span><span class="punctuation indicator">,</span><span class="name tag"> type</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="name variable">network</span><span class="punctuation indicator">,</span><span class="name tag"> protocol</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="name variable">udp</span><span class="punctuation indicator">,</span><span class="name tag"> group</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="name variable">cabin_temps</span><span class="punctuation indicator">,</span><span class="whitespace">
+  </span><span class="punctuation indicator">-</span><span class="whitespace"> </span><span class="punctuation indicator">{</span><span class="name tag"> name</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="name variable">temp_3</span><span class="punctuation indicator">,</span><span class="name tag"> type</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="name variable">network</span><span class="punctuation indicator">,</span><span class="name tag"> protocol</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="name variable">udp</span><span class="punctuation indicator">,</span><span class="name tag"> group</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="name variable">zone_temps</span><span class="punctuation indicator">,</span><span class="whitespace">
 </span><span class="name tag">      output</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="name variable">out3</span><span class="whitespace"> </span><span class="punctuation indicator">}</span><span class="whitespace">
   </span><span class="punctuation indicator">-</span><span class="whitespace"> </span><span class="name tag">name</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">heaters_1</span><span class="whitespace">
     </span><span class="name tag">type</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">network</span><span class="whitespace">
@@ -3518,14 +3518,14 @@ refused outright: a device, which tcspecial opens and reads directly, and a
 device on a bus, where the master's own read is the request and a second master
 cannot see it.</p>
 <p>This is the shipped <tt class="docutils literal"><span class="pre">examples/thermostat/thermostat-sim.yaml</span></tt>, which names
-the model the cabin is declared in, <tt class="docutils literal"><span class="pre">thermostat-physics.yaml</span></tt>, beside it.</p>
+the model the zone is declared in, <tt class="docutils literal"><span class="pre">thermostat-physics.yaml</span></tt>, beside it.</p>
 <pre class="code yaml literal-block">
 <span class="name tag">description</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">Simulator settings for the payloads of thermostat.ytcs</span><span class="whitespace">
 
 </span><span class="name tag">physics</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">thermostat-physics.yaml</span><span class="whitespace">
 
 </span><span class="name tag">simulated_payload_groups</span><span class="punctuation">:</span><span class="whitespace">
-  </span><span class="punctuation indicator">-</span><span class="whitespace"> </span><span class="name tag">name</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">cabin_temps</span><span class="whitespace">
+  </span><span class="punctuation indicator">-</span><span class="whitespace"> </span><span class="name tag">name</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">zone_temps</span><span class="whitespace">
     </span><span class="name tag">packet_interval</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">100 ms</span><span class="whitespace">
     </span><span class="name tag">reads</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">basic</span><span class="whitespace">
 
@@ -3533,19 +3533,19 @@ the model the cabin is declared in, <tt class="docutils literal"><span class="pr
   </span><span class="punctuation indicator">-</span><span class="whitespace"> </span><span class="name tag">name</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">temp_1</span><span class="whitespace">
     </span><span class="name tag">type</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">network</span><span class="whitespace">
     </span><span class="name tag">protocol</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">udp</span><span class="whitespace">
-    </span><span class="name tag">group</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">cabin_temps</span><span class="whitespace">
+    </span><span class="name tag">group</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">zone_temps</span><span class="whitespace">
     </span><span class="name tag">output</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">out1</span><span class="whitespace">
 
   </span><span class="punctuation indicator">-</span><span class="whitespace"> </span><span class="name tag">name</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">temp_2</span><span class="whitespace">
     </span><span class="name tag">type</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">network</span><span class="whitespace">
     </span><span class="name tag">protocol</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">udp</span><span class="whitespace">
-    </span><span class="name tag">group</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">cabin_temps</span><span class="whitespace">
+    </span><span class="name tag">group</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">zone_temps</span><span class="whitespace">
     </span><span class="name tag">output</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">out2</span><span class="whitespace">
 
   </span><span class="punctuation indicator">-</span><span class="whitespace"> </span><span class="name tag">name</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">temp_3</span><span class="whitespace">
     </span><span class="name tag">type</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">network</span><span class="whitespace">
     </span><span class="name tag">protocol</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">udp</span><span class="whitespace">
-    </span><span class="name tag">group</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">cabin_temps</span><span class="whitespace">
+    </span><span class="name tag">group</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">zone_temps</span><span class="whitespace">
     </span><span class="name tag">output</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">out3</span><span class="whitespace">
 
   </span><span class="punctuation indicator">-</span><span class="whitespace"> </span><span class="name tag">name</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">heaters_1</span><span class="whitespace">

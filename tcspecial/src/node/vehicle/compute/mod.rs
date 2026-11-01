@@ -394,7 +394,7 @@ mod tests {
             thermostat.give(None, &averaged).expect("a decision")
         }
 
-        // A cold cabin: 280 counts is about 290.6 K, more than two under.
+        // A cold zone: 280 counts is about 290.6 K, more than two under.
         let decision = pass(
             &mut converters,
             &mut voted,
@@ -404,7 +404,7 @@ mod tests {
         assert_eq!(
             decision,
             Some(Out::byte(b'1')),
-            "a cold cabin should assert the heater lines"
+            "a cold zone should assert the heater lines"
         );
 
         // Warming through the band: nothing to say.
@@ -432,7 +432,7 @@ mod tests {
         );
         assert_eq!(decision, None, "the same decision should not be repeated");
 
-        // And the ground asks for a warmer cabin, which the next pass acts on.
+        // And the ground asks for a warmer zone, which the next pass acts on.
         thermostat.set_setpoint(300.0);
         let decision = pass(
             &mut converters,

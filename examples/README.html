@@ -614,13 +614,12 @@ Rust.</td>
 </table>
 <h3 id="thermostat">thermostat</h3>
 <p>A control loop, aboard. Three temperature sensors are read together,
-every 100 ms, as the group <code>cabin_temps</code>:
-<code>temp_1</code>, <code>temp_2</code> and <code>temp_3</code>. Each
-reading goes through a conversion of its own to kelvin –
-<code>k_1</code>, <code>k_2</code>, <code>k_3</code>, the parts
-differing in format and scale – and the three meet at
-<code>cabin_temp</code>, which takes their median, so that one sensor
-failing cannot take the cabin’s temperature with it.
+every 100 ms, as the group <code>zone_temps</code>: <code>temp_1</code>,
+<code>temp_2</code> and <code>temp_3</code>. Each reading goes through a
+conversion of its own to kelvin – <code>k_1</code>, <code>k_2</code>,
+<code>k_3</code>, the parts differing in format and scale – and the
+three meet at <code>zone_temp</code>, which takes their median, so that
+one sensor failing cannot take the zone’s temperature with it.
 <code>thermostat</code> holds that to a setpoint, 293.15 K with a half
 band of 2 K, and drives two heaters, <code>heaters_1</code> and
 <code>heaters_2</code>. The ground commands the setpoint, and

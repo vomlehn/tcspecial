@@ -27,7 +27,9 @@
               "solar_array",
               "load",
               "bus",
-              "battery"
+              "battery",
+              "engine",
+              "body"
             ],
             "description": "What kind of element it is, which decides its terminals and what else it states."
           }
@@ -291,6 +293,87 @@
                 "full",
                 "resistance",
                 "charge"
+              ]
+            }
+          },
+          {
+            "if": {
+              "properties": {
+                "type": {
+                  "const": "engine"
+                }
+              }
+            },
+            "then": {
+              "description": "An engine: its terminals are throttle, an input taking a ratio, which must be joined; force, in N; and flow, the fuel it burns, in kg/s. Its fuel running out is an event, foreseen.",
+              "properties": {
+                "thrust": {
+                  "type": [
+                    "string"
+                  ],
+                  "description": "Its thrust at full throttle, written with its unit: `4500 N`."
+                },
+                "isp": {
+                  "type": [
+                    "string"
+                  ],
+                  "description": "Its specific impulse, as a length of time: `311 s`."
+                },
+                "fuel": {
+                  "type": [
+                    "string"
+                  ],
+                  "description": "The fuel it starts with, written with its unit: `100 kg`."
+                }
+              },
+              "required": [
+                "thrust",
+                "isp",
+                "fuel"
+              ]
+            }
+          },
+          {
+            "if": {
+              "properties": {
+                "type": {
+                  "const": "body"
+                }
+              }
+            },
+            "then": {
+              "description": "A body: its terminals are force, in N, and flow, in kg/s, each the sum of what is joined to it; altitude, in m; velocity, in m/s; and contact, a decision asserted on the ground. Reaching the ground is an event, found ahead of time.",
+              "properties": {
+                "mass": {
+                  "type": [
+                    "string"
+                  ],
+                  "description": "Its mass at the start, fuel and all, written with its unit: `1500 kg`."
+                },
+                "gravity": {
+                  "type": [
+                    "string"
+                  ],
+                  "description": "The gravity it falls in, written with its unit: `1.62 m/s2`."
+                },
+                "altitude": {
+                  "type": [
+                    "string"
+                  ],
+                  "description": "How high it starts, written with its unit: `500 m`. Not below nought."
+                },
+                "velocity": {
+                  "type": [
+                    "string"
+                  ],
+                  "description": "How fast it starts, up more than nought, written with its unit: `-20 m/s`."
+                }
+              },
+              "required": [
+                "mass",
+                "gravity",
+                "altitude",
+                "velocity"
               ]
             }
           }

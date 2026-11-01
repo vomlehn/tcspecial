@@ -1,0 +1,134 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<configuration
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:noNamespaceSchemaLocation="../../tcsgui/share/schema/tcspecial.xsd">
+    <description>A lander's terminal descent: a radar altimeter's altitude flown down by a guidance program throttling the engine, a Doppler velocimeter for the ground, and a switch that says when it is down</description>
+    <tcspecial>
+        <beacon>
+            <default_interval>5 s</default_interval>
+            <recv>127.0.0.1:5650</recv>
+            <reset_interval>1 s</reset_interval>
+            <send>0.0.0.0:5550</send>
+        </beacon>
+        <gateway>radio</gateway>
+        <interface>ad9aac4dd5a6d88dd5e78824ba8a83ac</interface>
+        <log>
+            <directory>/tmp/telemetry</directory>
+            <segment_size>65536</segment_size>
+        </log>
+        <payload_command>
+            <dest_base>0.0.0.0:4200</dest_base>
+            <source_base>127.0.0.1:4300</source_base>
+        </payload_command>
+        <payload_telemetry>
+            <dest_base>127.0.0.1:6100</dest_base>
+            <source_base>0.0.0.0:6000</source_base>
+        </payload_telemetry>
+        <!-- tcspecial counts its starts in this file, which must be on
+             storage that survives a power cycle on a vehicle. -->
+        <state_file>/tmp/tcspecial-descent.state</state_file>
+        <tcs_cmd>
+            <recv>0.0.0.0:4000</recv>
+            <send>127.0.0.1:4100</send>
+        </tcs_cmd>
+    </tcspecial>
+    <gateway>
+        <name>gateway</name>
+        <type>gateway_radio</type>
+        <address>127.0.0.1</address>
+        <ground_base>127.0.0.1:5100</ground_base>
+        <port>5000</port>
+        <payload-in>true</payload-in>
+    </gateway>
+    <!-- The radar's two bytes are centimetres, unsigned, most significant
+         first: up to 655 metres, which is above where the descent starts. -->
+    <vehicle>
+        <name>altitude</name>
+        <type>compute</type>
+        <function>to_value</function>
+        <format>u16_be</format>
+        <offset>0</offset>
+        <scale>0.01</scale>
+        <unit>m</unit>
+        <payload-out><target>gateway</target></payload-out>
+        <payload-out><target>guidance</target></payload-out>
+        <payload-out><target>housekeeping</target></payload-out>
+        <payload-in>true</payload-in>
+    </vehicle>
+    <!-- The velocimeter's two bytes are centimetres a second, signed: up is
+         more than nought, so a descent is less. -->
+    <vehicle>
+        <name>descent_rate</name>
+        <type>compute</type>
+        <function>to_value</function>
+        <format>i16_be</format>
+        <offset>0</offset>
+        <scale>0.01</scale>
+        <unit>m/s</unit>
+        <payload-out><target>gateway</target></payload-out>
+        <payload-out><target>housekeeping</target></payload-out>
+        <payload-in>true</payload-in>
+    </vehicle>
+    <!-- The throttle, from the altitude: a program, flying a descent that
+         slows as the ground nears and cutting the engine half a metre up.
+         A Python 3 script beside this file, named relative to the
+         repository's root because that is where tcspecial is run from. Its
+         answers are a ratio, which is what the engine's throttle takes. -->
+    <vehicle>
+        <name>guidance</name>
+        <type>compute</type>
+        <function>process</function>
+        <executable>examples/descent/guidance.py</executable>
+        <timeout>1 s</timeout>
+        <unit>ratio</unit>
+        <payload-out><target>gateway</target></payload-out>
+        <payload-out><target>housekeeping</target></payload-out>
+        <gateway-out><target>engine</target></gateway-out>
+        <payload-in>true</payload-in>
+    </vehicle>
+    <vehicle>
+        <name>housekeeping</name>
+        <type>log</type>
+        <directory>/tmp/telemetry</directory>
+        <format>variable_ts_rc</format>
+        <payload-in>true</payload-in>
+    </vehicle>
+    <!-- The radar altimeter, which sends ten readings a second. -->
+    <payloads>
+        <name>radar</name>
+        <type>network</type>
+        <protocol>udp</protocol>
+        <address>127.0.0.1</address>
+        <port>5401</port>
+        <payload-out><target>altitude</target></payload-out>
+    </payloads>
+    <!-- The Doppler velocimeter, five a second. -->
+    <payloads>
+        <name>doppler</name>
+        <type>network</type>
+        <protocol>udp</protocol>
+        <address>127.0.0.1</address>
+        <port>5402</port>
+        <payload-out><target>descent_rate</target></payload-out>
+    </payloads>
+    <!-- The switch on a landing leg, whose 1 is the ground's word that the
+         lander is down: straight to the ground and to the log. -->
+    <payloads>
+        <name>touchdown</name>
+        <type>network</type>
+        <protocol>udp</protocol>
+        <address>127.0.0.1</address>
+        <port>5403</port>
+        <payload-out><target>gateway</target></payload-out>
+        <payload-out><target>housekeeping</target></payload-out>
+    </payloads>
+    <!-- The engine's throttle, driven by what guidance answers. -->
+    <payloads>
+        <name>engine</name>
+        <type>network</type>
+        <protocol>udp</protocol>
+        <address>127.0.0.1</address>
+        <port>5404</port>
+        <gateway-in>true</gateway-in>
+    </payloads>
+</configuration>

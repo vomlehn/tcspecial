@@ -355,6 +355,7 @@ fn joined_to_the_world(
     sims: &[ResolvedSim],
     dh_configs: &[DHConfig],
 ) -> Result<Attachments, String> {
+    use tcslibgs::physics::terminal::Kind;
     use tcslibgs::sim_config::Attached;
 
     let model = sim_file.physics().map_err(|e| e.to_string())?;
@@ -397,10 +398,11 @@ fn joined_to_the_world(
     };
 
     // Keeping pace with the wall clock, which the vehicle at the other end
-    // of every link runs on: see `physics::clock`.
+    // of every link runs on, from the first question a running stand-in
+    // asks it: see `physics::clock`.
     let world = Arc::new(physics::world::World::new(
         &model,
-        physics::clock::Clock::keeping_pace(std::time::Instant::now()),
+        physics::clock::Clock::starting_when_asked(1.0),
         seed,
     ));
     // Each terminal is one the model has: `physics` refused a stand-in
@@ -428,10 +430,29 @@ fn joined_to_the_world(
                 )?,
                 sensor: Arc::new(Sensor::new(&name, *sensor, seed)),
             },
-            Some(Attached::Drives { at }) => Attachment::Drives {
+            Some(Attached::Signals { at }) => Attachment::Signals {
                 world: world.clone(),
                 place: place(at)?,
+                said: Arc::new(std::sync::atomic::AtomicU64::new(
+                    f64::NAN.to_bits(),
+                )),
             },
+            Some(Attached::Drives { at, kind }) => {
+                let unit = match kind {
+                    Kind::Value(unit) => {
+                        tcslibgs::graph::simulated::driving_of(
+                            graph, &name, *unit,
+                        )?;
+                        Some(*unit)
+                    }
+                    Kind::Decision => None,
+                };
+                Attachment::Drives {
+                    world: world.clone(),
+                    place: place(at)?,
+                    unit,
+                }
+            }
         };
         attached.insert(name, attachment);
     }

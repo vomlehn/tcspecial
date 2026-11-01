@@ -1,0 +1,60 @@
+# yaml-language-server: $schema=../../tcsgui/share/schema/tcspecial-sim.schema.json
+
+# How tcssim stands in for the payloads of descent.ytcs.
+#
+# The two files are joined by name, and nothing here names a payload that
+# file does not have. Only the payloads named here are simulated.
+#
+# Each stand-in is joined to the physics model: the radar altimeter reports
+# the lander's altitude, the Doppler velocimeter its velocity, and the
+# touchdown switch its contact with the ground; the engine's stand-in takes
+# the throttle the vehicle's guidance sends it. So the loop closes through
+# tcspecial: the radar's altitude decides the throttle, and the throttle
+# decides the altitude.
+description: Simulator settings for the payloads of descent.ytcs
+
+# Where tcssim answers whether it has made its stand-ins, which whatever
+# starts the run asks before it starts tcspecial. A port no other example
+# uses, so that two can be run at once.
+tcssim:
+  ready: "127.0.0.1:7911"
+
+physics: descent-physics.yaml
+
+simulated_payloads:
+  # Ten readings a second, each with two centimetres of noise, which is
+  # what guidance differences into a rate of descent.
+  - name: radar
+    simulate: true
+    type: network
+    protocol: udp
+    packet_interval: 100 ms
+    connects: lander.altitude
+    noise: "0.02 m"
+
+  # Five a second, for the ground: guidance does not take it, a process
+  # taking values in one unit and this one's being metres a second.
+  - name: doppler
+    simulate: true
+    type: network
+    protocol: udp
+    packet_interval: 200 ms
+    connects: lander.velocity
+    noise: "0.01 m/s"
+
+  # A switch on a landing leg: 1 on the ground, 0 off it. Said again every
+  # second, and at once when it changes, which is the moment of touchdown:
+  # the stand-in waits on the model for it rather than for its next turn.
+  - name: touchdown
+    simulate: true
+    type: network
+    protocol: udp
+    packet_interval: 1 s
+    connects: lander.contact
+
+  # Driven and never read: the engine's throttle, as guidance sends it.
+  - name: engine
+    simulate: true
+    type: network
+    protocol: udp
+    connects: engine.throttle

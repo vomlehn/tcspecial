@@ -753,6 +753,7 @@ mod tests {
             attachment: Some(Attachment::Drives {
                 world: world.clone(),
                 place: place("heater_1.on"),
+                unit: None,
             }),
             thermostat: None,
             name: "heaters_1".to_string(),

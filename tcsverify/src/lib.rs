@@ -976,8 +976,9 @@ fn check_graph_simulator(
 }
 
 /// Checks that each sensor joined to the world feeds one conversion, in the
-/// unit of what it reports, which is what tcssim asks of it as it starts:
-/// see `tcslibgs::graph::simulated::reading_of`.
+/// unit of what it reports, and that what reaches each stand-in driving a
+/// value is in that value's unit, which is what tcssim asks of them as it
+/// starts: see `tcslibgs::graph::simulated::reading_of` and `driving_of`.
 ///
 /// # Arguments
 ///
@@ -1002,15 +1003,22 @@ fn sensors_read_as_they_report(
     let Some(resolved) = sim.settled(&handlers) else {
         return;
     };
+    use tcslibgs::graph::simulated::{driving_of, reading_of};
+    use tcslibgs::physics::terminal::Kind;
+    use tcslibgs::sim_config::Attached;
     for (dh, settled) in handlers.iter().zip(&resolved) {
-        let Some(tcslibgs::sim_config::Attached::Reports { unit, .. }) =
-            &settled.attached
-        else {
-            continue;
+        let name = &dh.name.0;
+        let checked = match &settled.attached {
+            Some(Attached::Reports { unit, .. }) => {
+                reading_of(graph, name, *unit).map(|_| ())
+            }
+            Some(Attached::Drives {
+                kind: Kind::Value(unit),
+                ..
+            }) => driving_of(graph, name, *unit),
+            _ => continue,
         };
-        if let Err(why) =
-            tcslibgs::graph::simulated::reading_of(graph, &dh.name.0, *unit)
-        {
+        if let Err(why) = checked {
             if !report.room() {
                 return;
             }
@@ -1328,6 +1336,42 @@ mod tests {
         assert_eq!(report.findings[1].file, sim);
         assert_eq!(report.findings[1].line, line_in(&sim, "- name: heaters_2"));
         assert!(report.findings[1].message.contains("nothing converts"));
+    }
+
+    /// A stand-in driving a value is reported at its entry where what
+    /// reaches it is in another unit: guidance answering newtons to an
+    /// engine whose throttle is a ratio.
+    #[test]
+    fn a_value_driven_in_the_wrong_unit_is_reported() {
+        let root =
+            Path::new(env!("CARGO_MANIFEST_DIR")).join("../examples/descent");
+        let dir = tempfile::tempdir().expect("a directory");
+        for name in ["descent.ytcs", "descent-sim.yaml", "descent-physics.yaml"]
+        {
+            std::fs::copy(root.join(name), dir.path().join(name))
+                .expect("copied");
+        }
+        let (yaml, sim) = (
+            dir.path().join("descent.ytcs"),
+            dir.path().join("descent-sim.yaml"),
+        );
+        assert!(verify(&yaml, Some(&sim), Limits::EVERYTHING)
+            .findings
+            .is_empty());
+
+        let text = std::fs::read_to_string(&yaml).expect("read");
+        std::fs::write(&yaml, text.replace("unit: \"ratio\"", "unit: \"N\""))
+            .expect("written");
+        let report = verify(&yaml, Some(&sim), Limits::EVERYTHING);
+        assert_eq!(report.findings.len(), 1, "{:?}", report.said());
+        let found = &report.findings[0];
+        let line = 1 + std::fs::read_to_string(&sim)
+            .expect("read")
+            .lines()
+            .position(|l| l.trim() == "- name: engine")
+            .expect("the engine's entry");
+        assert_eq!((found.file.clone(), found.line), (sim, line));
+        assert!(found.message.contains("newtons"), "{}", found.message);
     }
 
     /// Two spellings of one configuration: each checked, nothing different.

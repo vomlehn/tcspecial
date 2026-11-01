@@ -2038,6 +2038,7 @@ Requirement
     metre        m       millimetre    2147 km
     metre/second m/s     micro-m/s     2147 m/s
     newton       N       millinewton   2.1 MN
+    kg/second    kg/s    milligram/s   2147 kg/s
     ratio        ratio   millionth     2147
     ============ ======= ============= ==================
 
@@ -10656,8 +10657,9 @@ Requirement
     The model is a list of elements, each with a name and a ``type``, as a
     configuration is a list of nodes, and a list of connections between
     them, as a configuration has links. The types are ``heater``,
-    ``thermal_zone``, ``sun``, ``solar_array``, ``load``, ``bus`` and
-    ``battery``, and an element of any other is refused; a
+    ``thermal_zone``, ``sun``, ``solar_array``, ``load``, ``bus``,
+    ``battery``, ``engine`` and ``body``, and an element of any other is
+    refused; a
     ``thermal_mass``, the one type there was before a model was made of
     parts, is told what it is now. Each type's settings, terminals and rules
     are stated once, in ``tcslibgs::physics``; its arithmetic is the
@@ -10703,10 +10705,23 @@ Requirement
 Requirement
     A simulated payload is joined to one terminal by ``connects``, written
     as a connection's end is: ``connects: zone.temperature``. Joined to an
-    output, it reports it; joined to an input, it drives it, which a
-    stand-in can do only to an input taking a decision, a decision being
-    what a vehicle sends a stand-in. A terminal the model does not have is
-    refused, naming what it has. The settings that joined a payload to a
+    output, it reports it; joined to an input, it drives it. A terminal the
+    model does not have is refused, naming what it has.
+
+Requirement
+    A stand-in reporting a value sends it in the encoding of the conversion
+    its readings go to. One reporting a decision sends the text ``1`` or
+    ``0``, again every packet interval and at once when it changes: it waits
+    on the world for the change, and the world advances itself to each event
+    it foresees at that event's moment on the wall clock, so the vehicle
+    hears of a touchdown when it happens and not at the stand-in's next turn.
+
+Requirement
+    A stand-in driving a decision takes ``1`` or ``0``, as a hysteresis
+    sends it. One driving a value takes four bytes of its unit's steps, as
+    every value on a link is, and what reaches it must be values in that
+    unit: a node sending another is refused, naming both units, since an
+    engine reading newtons as a ratio would be at full throttle. The settings that joined a payload to a
     thermal mass, ``reads``, ``heats``, ``output``, ``input`` and ``rate``,
     are refused, told what says it now.
 
@@ -10737,9 +10752,12 @@ Requirement
     about costs nothing.
 
 Requirement
-    Simulated time tracks the wall clock, a second for a second from when
-    the world was made, because the vehicle at the other end of every link
-    runs on the wall clock. The mapping has a rate, so that a world can run
+    Simulated time tracks the wall clock, a second for a second, because the
+    vehicle at the other end of every link runs on the wall clock. It starts
+    when the run begins -- the first time a running stand-in asks the world
+    anything -- and not when the world is made: the stand-ins start stopped,
+    and a world running on with nobody joined to it would have a lander on
+    the ground before its radar was enabled. The mapping has a rate, so that a world can run
     faster than the wall clock where nothing at the other end needs it to
     keep pace; a run with tcspecial keeps it at one.
 
@@ -10840,6 +10858,42 @@ Requirement
     spacecraft's regulator does. An empty one is held at empty, and what is
     drawn is still drawn, its voltage below ``empty`` showing it: a cell past
     what it is rated for is outside what the model says.
+
+**An engine and a body**
+
+Requirement
+    An engine takes its ``throttle``, a ratio held within nought and one,
+    and gives out its ``force``, its full ``thrust`` times the throttle, and
+    the ``flow`` of fuel that burns, the force over its specific impulse
+    ``isp`` times standard gravity, in kilograms a second. Its ``fuel``
+    falls in a straight line with the throttle held, and reaches nought at a
+    moment it foresees, its next event; from then on it gives out nothing.
+
+Requirement
+    A body takes the sum of the forces joined to its ``force`` and of the
+    flows joined to its ``flow``, and gives out its ``altitude``, its
+    ``velocity``, up more than nought, and ``contact``, a decision asserted
+    on the ground. It falls by the rocket equation with ``gravity``, whose
+    closed form with the force and the flow held is
+
+    .. code-block:: text
+
+       v(t) = v - (F / q) ln(1 - q t / m) - g t
+       x(t) = x + v t - g t^2 / 2 + (F m / q^2) h(q t / m)
+       h(u) = (1 - u) ln(1 - u) + u
+
+    with ``h`` taken by its series where ``u`` is small, where its two terms
+    would cancel; with no flow it is the constant acceleration's.
+
+Requirement
+    Where a body reaches the ground has no closed form, and is found ahead
+    of time, as its next event, by stepping that never passes it: the
+    acceleration it has is the least it will have while the force and the
+    flow are held, so the earliest it could reach the ground is where it
+    would with that acceleration, and each step goes there. The steps close
+    on the ground from above until within a micrometre. There it is set
+    down, altitude and velocity nought and ``contact`` asserted, and stays
+    until a force beating its weight lifts it.
 
 **What the bytes are**
 

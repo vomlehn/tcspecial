@@ -12,9 +12,11 @@
 //! is its [`Attachment`].
 
 pub mod battery;
+pub mod body;
 pub mod bus;
 pub mod clock;
 pub mod element;
+pub mod engine;
 pub mod heater;
 pub mod load;
 pub mod queue;
@@ -25,11 +27,13 @@ pub mod sun;
 pub mod thermal_zone;
 pub mod world;
 
+use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::sync::Arc;
-use std::time::Instant;
+use std::time::{Duration, Instant};
 
-use tcslibgs::node::vehicle::compute::{Format, ToValueParams};
+use tcslibgs::node::vehicle::compute::{from_value, Format, ToValueParams};
 use tcslibgs::physics::Place;
+use tcslibgs::unit::Unit;
 
 use sensor::Sensor;
 use world::World;
@@ -56,8 +60,22 @@ pub enum Attachment {
         /// What the sensor gets wrong, and what it has got wrong so far.
         sensor: Arc<Sensor>,
     },
-    /// It drives this input, a decision, to what the vehicle sends it.
-    Drives { world: Arc<World>, place: Place },
+    /// It signals this output, a decision, as the text `1` or `0`: at once
+    /// when it changes, and again every packet interval.
+    Signals {
+        world: Arc<World>,
+        place: Place,
+        /// What it last said, as the bits of the value: what a change is a
+        /// change from. Shared by the copies of its payload's configuration.
+        said: Arc<AtomicU64>,
+    },
+    /// It drives this input to what the vehicle sends it: a decision where
+    /// `unit` is `None`, and a value in that unit where it is not.
+    Drives {
+        world: Arc<World>,
+        place: Place,
+        unit: Option<Unit>,
+    },
 }
 
 impl Attachment {
@@ -78,37 +96,85 @@ impl Attachment {
     /// A sentence.
     pub fn describe(&self, payload: &str) -> String {
         match self {
+            // Read at simulated time nought, which does not start the
+            // clock: the run begins when a stand-in does.
             Attachment::Reports { world, place, .. } => format!(
                 "{payload} reports {}, which starts at {:.2}",
                 world.name_of(*place),
-                world.read(*place, Instant::now())
+                world.read_at(*place, 0.0)
             ),
-            Attachment::Drives { world, place } => {
+            Attachment::Signals { world, place, .. } => {
+                format!("{payload} signals {}", world.name_of(*place))
+            }
+            Attachment::Drives { world, place, .. } => {
                 format!("{payload} drives {}", world.name_of(*place))
             }
         }
     }
 
-    /// What a reporting stand-in sends now: its terminal, read by its
-    /// sensor, in its encoding.
+    /// What a reporting or signalling stand-in sends now: its terminal,
+    /// read by its sensor, in its encoding, or a decision as the text `1`
+    /// or `0`.
     ///
     /// # Returns
     ///
     /// The bytes, or `None` for one that drives.
     pub fn reading(&self) -> Option<Vec<u8>> {
-        let Attachment::Reports {
-            world,
-            place,
-            offset,
-            reading,
-            sensor,
-        } = self
-        else {
-            return None;
-        };
         let now = Instant::now();
-        let value = world.read(*place, now) + offset;
-        Some(encode(reading, sensor.read(value, world.seconds(now))))
+        match self {
+            Attachment::Reports {
+                world,
+                place,
+                offset,
+                reading,
+                sensor,
+            } => {
+                let value = world.read(*place, now) + offset;
+                Some(encode(reading, sensor.read(value, world.seconds(now))))
+            }
+            Attachment::Signals { world, place, said } => {
+                let value = world.read(*place, now);
+                said.store(value.to_bits(), Ordering::Relaxed);
+                Some(if value > 0.5 { b"1" } else { b"0" }.to_vec())
+            }
+            Attachment::Drives { .. } => None,
+        }
+    }
+
+    /// Waits until a signalling stand-in's decision changes from what it
+    /// last said, or until a moment, whichever is first.
+    ///
+    /// What lets the vehicle hear of a change the moment it happens rather
+    /// than at the stand-in's next turn to send: see
+    /// [`World::await_change`]. A stand-in of any other kind is not woken
+    /// early, and waits out the time.
+    ///
+    /// # Arguments
+    ///
+    /// * `until`   - The moment to stop waiting, on the wall clock.
+    /// * `running` - The payload's flag: cleared, the wait ends within a
+    ///               twentieth of a second.
+    ///
+    /// # Returns
+    ///
+    /// Whether it changed.
+    pub fn await_change(&self, until: Instant, running: &AtomicBool) -> bool {
+        let Attachment::Signals { world, place, said } = self else {
+            return false;
+        };
+        let from = f64::from_bits(said.load(Ordering::Relaxed));
+        while running.load(Ordering::SeqCst) {
+            // In slices, so that a payload told to stop does not wait out a
+            // packet interval first.
+            let slice = (Instant::now() + Duration::from_millis(50)).min(until);
+            if world.await_change(*place, from, slice).is_some() {
+                return true;
+            }
+            if Instant::now() >= until {
+                return false;
+            }
+        }
+        false
     }
 }
 
@@ -117,34 +183,41 @@ impl Attachment {
 ///
 /// What arrives at a heater is the thermostat's decision, which a
 /// hysteresis node sends as the text `1` or `0`: the value to drive a set
-/// of discrete lines to. Anything else is left alone rather than guessed at
-/// -- a stand-in joined to a heater and sent something that is not a
-/// decision is a configuration pointing the wrong link at it, and a
-/// simulator that read it as "off" would hide that by behaving plausibly.
+/// of discrete lines to. What arrives at an engine's throttle is a value,
+/// four bytes of a count of its unit's steps, as every value on a link is.
+/// Anything else is left alone rather than guessed at -- a stand-in sent
+/// something that is not what its input takes is a configuration pointing
+/// the wrong link at it, and a simulator that read it as "off" would hide
+/// that by behaving plausibly.
 ///
-/// Nothing at all for a payload that drives nothing, which is every payload
-/// but a heater: the caller does not have to ask first.
+/// Nothing at all for a payload that drives nothing: the caller does not
+/// have to ask first.
 ///
 /// # Arguments
 ///
 /// * `attachment` - What the payload is to the world, if anything.
 /// * `which`      - The payload's name, for a complaint.
-/// * `data`       - What the vehicle sent it: `1` for on, `0` for off,
-///                  surrounding white space ignored.
+/// * `data`       - What the vehicle sent it.
 pub fn driven(attachment: &Option<Attachment>, which: &str, data: &[u8]) {
-    let Some(Attachment::Drives { world, place }) = attachment else {
+    let Some(Attachment::Drives { world, place, unit }) = attachment else {
         return;
     };
     let now = Instant::now();
-    match data.trim_ascii() {
-        b"1" => world.drive(*place, 1.0, now),
-        b"0" => world.drive(*place, 0.0, now),
-        _ => eprintln!(
-            "{which} drives {} and was sent {} bytes that are not a \
-             decision: a heater is driven to 1 or 0",
-            world.name_of(*place),
-            data.len()
-        ),
+    let value = match unit {
+        Some(unit) => from_value(data, *unit, which),
+        None => match data.trim_ascii() {
+            b"1" => Ok(1.0),
+            b"0" => Ok(0.0),
+            _ => Err(format!(
+                "{which} was sent {} bytes that are not a decision: a \
+                 heater is driven to 1 or 0",
+                data.len()
+            )),
+        },
+    };
+    match value {
+        Ok(value) => world.drive(*place, value, now),
+        Err(why) => eprintln!("{why}, and drives {}", world.name_of(*place)),
     }
 }
 
@@ -355,6 +428,69 @@ connections:
 
         // Out of shadow at a hundred, and charging again.
         assert!((world.read_at(current, 101.0) - 5.0).abs() < 1e-12);
+    }
+
+    /// A lander two metres up and falling at one metre a second, its engine
+    /// joined and shut.
+    const LANDER: &str = "physics:
+  - { name: engine, type: engine, thrust: \"16000 N\", isp: 311 s,
+      fuel: \"800 kg\" }
+  - { name: lander, type: body, mass: \"1500 kg\",
+      gravity: \"1.62 m/s2\", altitude: \"2 m\", velocity: \"-1 m/s\" }
+connections:
+  - { from: engine.force, to: lander.force }
+  - { from: engine.flow, to: lander.flow }
+";
+
+    /// A stand-in waiting on the lander's contact is woken at touchdown --
+    /// the moment the fall reaches the ground, with nothing else asking the
+    /// world anything -- and not before.
+    #[test]
+    fn a_waiting_stand_in_is_woken_at_touchdown() {
+        let started = Instant::now();
+        let (world, place) = world_of(LANDER);
+        let contact = Attachment::Signals {
+            world: world.clone(),
+            place: place("lander.contact"),
+            said: Arc::new(AtomicU64::new(0)),
+        };
+        assert_eq!(contact.reading(), Some(b"0".to_vec()));
+        let running = AtomicBool::new(true);
+        assert!(
+            contact.await_change(started + Duration::from_secs(5), &running)
+        );
+        let woken = started.elapsed().as_secs_f64();
+        // 2 - t - 0.81 t^2 = 0.
+        let landed = (-1.0 + (1.0f64 + 4.0 * 0.81 * 2.0).sqrt()) / 1.62;
+        assert!(
+            woken >= landed && woken < landed + 0.2,
+            "woken at {woken} s, landed at {landed} s"
+        );
+        assert_eq!(contact.reading(), Some(b"1".to_vec()));
+    }
+
+    /// The vehicle's throttle, a value of four bytes, drives the engine,
+    /// whose thrust brakes the lander; something that is not a value drives
+    /// nothing.
+    #[test]
+    fn a_value_from_the_vehicle_drives_the_engine() {
+        let (world, place) = world_of(LANDER);
+        let throttle = Some(Attachment::Drives {
+            world: world.clone(),
+            place: place("engine.throttle"),
+            unit: Some(Unit::Ratio),
+        });
+        let force = place("engine.force");
+        let half =
+            tcslibgs::node::vehicle::compute::value_bytes(0.5, Unit::Ratio)
+                .expect("a ratio");
+        driven(&throttle, "engine", &half);
+        assert!((world.read(force, Instant::now()) - 8000.0).abs() < 1e-6);
+        driven(&throttle, "engine", b"1");
+        assert!(
+            (world.read(force, Instant::now()) - 8000.0).abs() < 1e-6,
+            "one byte is not a value, and changes nothing"
+        );
     }
 
     /// Two suns on one array is an array given two lights, which it takes
@@ -700,6 +836,7 @@ connections:
                     Attachment::Drives {
                         world: world.clone(),
                         place: place(&format!("heater_{}.on", n + 1)),
+                        unit: None,
                     },
                 ));
                 heater.start().expect("a heater starts");

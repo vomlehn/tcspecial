@@ -2525,6 +2525,11 @@ while leaving the range a vehicle needs, and the table of them is
 <td>millinewton</td>
 <td>2.1 MN</td>
 </tr>
+<tr><td>kg/second</td>
+<td>kg/s</td>
+<td>milligram/s</td>
+<td>2147 kg/s</td>
+</tr>
 <tr><td>ratio</td>
 <td>ratio</td>
 <td>millionth</td>
@@ -10910,8 +10915,9 @@ they go.</dd>
 <dd>The model is a list of elements, each with a name and a <tt class="docutils literal">type</tt>, as a
 configuration is a list of nodes, and a list of connections between
 them, as a configuration has links. The types are <tt class="docutils literal">heater</tt>,
-<tt class="docutils literal">thermal_zone</tt>, <tt class="docutils literal">sun</tt>, <tt class="docutils literal">solar_array</tt>, <tt class="docutils literal">load</tt>, <tt class="docutils literal">bus</tt> and
-<tt class="docutils literal">battery</tt>, and an element of any other is refused; a
+<tt class="docutils literal">thermal_zone</tt>, <tt class="docutils literal">sun</tt>, <tt class="docutils literal">solar_array</tt>, <tt class="docutils literal">load</tt>, <tt class="docutils literal">bus</tt>,
+<tt class="docutils literal">battery</tt>, <tt class="docutils literal">engine</tt> and <tt class="docutils literal">body</tt>, and an element of any other is
+refused; a
 <tt class="docutils literal">thermal_mass</tt>, the one type there was before a model was made of
 parts, is told what it is now. Each type's settings, terminals and rules
 are stated once, in <tt class="docutils literal"><span class="pre">tcslibgs::physics</span></tt>; its arithmetic is the
@@ -10951,10 +10957,21 @@ capacity, which turns a heater's watts into kelvin a second.</dd>
 <dt>Requirement</dt>
 <dd>A simulated payload is joined to one terminal by <tt class="docutils literal">connects</tt>, written
 as a connection's end is: <tt class="docutils literal">connects: zone.temperature</tt>. Joined to an
-output, it reports it; joined to an input, it drives it, which a
-stand-in can do only to an input taking a decision, a decision being
-what a vehicle sends a stand-in. A terminal the model does not have is
-refused, naming what it has. The settings that joined a payload to a
+output, it reports it; joined to an input, it drives it. A terminal the
+model does not have is refused, naming what it has.</dd>
+<dt>Requirement</dt>
+<dd>A stand-in reporting a value sends it in the encoding of the conversion
+its readings go to. One reporting a decision sends the text <tt class="docutils literal">1</tt> or
+<tt class="docutils literal">0</tt>, again every packet interval and at once when it changes: it waits
+on the world for the change, and the world advances itself to each event
+it foresees at that event's moment on the wall clock, so the vehicle
+hears of a touchdown when it happens and not at the stand-in's next turn.</dd>
+<dt>Requirement</dt>
+<dd>A stand-in driving a decision takes <tt class="docutils literal">1</tt> or <tt class="docutils literal">0</tt>, as a hysteresis
+sends it. One driving a value takes four bytes of its unit's steps, as
+every value on a link is, and what reaches it must be values in that
+unit: a node sending another is refused, naming both units, since an
+engine reading newtons as a ratio would be at full throttle. The settings that joined a payload to a
 thermal mass, <tt class="docutils literal">reads</tt>, <tt class="docutils literal">heats</tt>, <tt class="docutils literal">output</tt>, <tt class="docutils literal">input</tt> and <tt class="docutils literal">rate</tt>,
 are refused, told what says it now.</dd>
 <dt>Requirement</dt>
@@ -10980,9 +10997,12 @@ it shares, and nothing ticks.</p>
 a stand-in reading an output, or driving an input. A world nobody asks
 about costs nothing.</dd>
 <dt>Requirement</dt>
-<dd>Simulated time tracks the wall clock, a second for a second from when
-the world was made, because the vehicle at the other end of every link
-runs on the wall clock. The mapping has a rate, so that a world can run
+<dd>Simulated time tracks the wall clock, a second for a second, because the
+vehicle at the other end of every link runs on the wall clock. It starts
+when the run begins -- the first time a running stand-in asks the world
+anything -- and not when the world is made: the stand-ins start stopped,
+and a world running on with nobody joined to it would have a lander on
+the ground before its radar was enabled. The mapping has a rate, so that a world can run
 faster than the wall clock where nothing at the other end needs it to
 keep pace; a run with tcspecial keeps it at one.</dd>
 <dt>Requirement</dt>
@@ -11068,6 +11088,39 @@ which is its next event, so it is never stepped past either.</dd>
 spacecraft's regulator does. An empty one is held at empty, and what is
 drawn is still drawn, its voltage below <tt class="docutils literal">empty</tt> showing it: a cell past
 what it is rated for is outside what the model says.</dd>
+</dl>
+<p><strong>An engine and a body</strong></p>
+<dl class="docutils">
+<dt>Requirement</dt>
+<dd>An engine takes its <tt class="docutils literal">throttle</tt>, a ratio held within nought and one,
+and gives out its <tt class="docutils literal">force</tt>, its full <tt class="docutils literal">thrust</tt> times the throttle, and
+the <tt class="docutils literal">flow</tt> of fuel that burns, the force over its specific impulse
+<tt class="docutils literal">isp</tt> times standard gravity, in kilograms a second. Its <tt class="docutils literal">fuel</tt>
+falls in a straight line with the throttle held, and reaches nought at a
+moment it foresees, its next event; from then on it gives out nothing.</dd>
+<dt>Requirement</dt>
+<dd><p class="first">A body takes the sum of the forces joined to its <tt class="docutils literal">force</tt> and of the
+flows joined to its <tt class="docutils literal">flow</tt>, and gives out its <tt class="docutils literal">altitude</tt>, its
+<tt class="docutils literal">velocity</tt>, up more than nought, and <tt class="docutils literal">contact</tt>, a decision asserted
+on the ground. It falls by the rocket equation with <tt class="docutils literal">gravity</tt>, whose
+closed form with the force and the flow held is</p>
+<pre class="code text literal-block">
+v(t) = v - (F / q) ln(1 - q t / m) - g t
+x(t) = x + v t - g t^2 / 2 + (F m / q^2) h(q t / m)
+h(u) = (1 - u) ln(1 - u) + u
+</pre>
+<p class="last">with <tt class="docutils literal">h</tt> taken by its series where <tt class="docutils literal">u</tt> is small, where its two terms
+would cancel; with no flow it is the constant acceleration's.</p>
+</dd>
+<dt>Requirement</dt>
+<dd>Where a body reaches the ground has no closed form, and is found ahead
+of time, as its next event, by stepping that never passes it: the
+acceleration it has is the least it will have while the force and the
+flow are held, so the earliest it could reach the ground is where it
+would with that acceleration, and each step goes there. The steps close
+on the ground from above until within a micrometre. There it is set
+down, altitude and velocity nought and <tt class="docutils literal">contact</tt> asserted, and stays
+until a force beating its weight lifts it.</dd>
 </dl>
 <p><strong>What the bytes are</strong></p>
 <p>A sensor has to send bytes the vehicle will read back as what it reports, and

@@ -34,6 +34,6 @@
     <attributes>
         <name>unit</name>
         <required>true</required>
-        <about>What its answers are numbers of: K, V, A, W, m, m/s, N, or ratio.</about>
+        <about>What its answers are numbers of: K, V, A, W, m, m/s, N, kg/s, or ratio.</about>
     </attributes>
 </node>

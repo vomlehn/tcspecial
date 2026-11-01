@@ -387,6 +387,7 @@ with it aboard and on the ground.
 |---|---|
 | `thermostat` | Three temperature sensors, converted to kelvin, voted on, and fed to a hysteresis thermostat that drives two heaters, every one a UDP socket tcssim stands in for, so that it runs on any desk. The setpoint is commanded from the ground, and tcsmoc plots the temperatures and the heaters. |
 | `battery` | A power bus through an orbit: a power monitor asked over a serial line, a shunt, the battery's charge counted by a Python 3 program, and the science load shed in eclipse by a hysteresis. tcssim stands in for every payload, joined to a physics model of a sun, a solar array, loads, a bus and a battery. |
+| `descent` | A lander's terminal descent: a radar altimeter's altitude flown down by a Python 3 guidance program throttling the engine, a Doppler velocimeter, and a touchdown switch that speaks the moment the lander is down. tcssim stands in for every payload, joined to a physics model of an engine and the body it brakes. |
 | `simple-app` | A payload that is a program rather than a device: an `app_pl` node sending a line of text one word per packet, and a ground station that prints the line. Two programs of its own beside the configuration: the payload in Python 3, the ground station in Rust. |
 
 ### thermostat
@@ -474,6 +475,43 @@ Languages:
   example's.
 - Payload: Rust -- tcssim stands in for the power monitor, with a
   pseudo-terminal at its path, the shunt and the science switch.
+
+### descent
+
+A lander's terminal descent over the Moon: the example of a computation that
+drives a device with a value, and of a device that speaks the moment
+something happens.
+
+`radar`, a radar altimeter on UDP port 5401, sends the altitude ten times a
+second, which `altitude` makes metres. `guidance` is a `process` node running
+`guidance.py`, a Python 3 program beside the configuration that works out the
+rate of descent from the altitudes, flies a rate that slows as the ground
+nears, and answers a throttle, a ratio, which drives `engine`, port 5404:
+four bytes of a value, which the engine's stand-in reads as the ratio it is.
+`doppler`, port 5402, sends the velocity for the ground, and `touchdown`,
+port 5403, a switch on a landing leg, says `1` when the lander is down.
+
+tcssim stands in for all four, joined to the vehicle's physics model,
+`descent-physics.yaml`: an engine and the body it brakes, five hundred metres
+up and falling at twenty metres a second. The body falls by the rocket
+equation, and the moment it reaches the ground is found ahead of time and met
+exactly; the touchdown switch's stand-in waits on the model for it, and
+speaks then. A run lands in about seventy-five seconds.
+
+```
+make run-descent
+```
+
+Press Connect in tcsmoc, and Enable on each payload in tcssim, `engine` and
+`radar` first: the lander does not start falling until a stand-in starts.
+
+Languages:
+
+- MOC: Rust -- tcsmoc.
+- Vehicle: Rust -- tcspecial, whose conversions and log are its own nodes --
+  and Python 3, the guidance, which is a program of the example's.
+- Payload: Rust -- tcssim stands in for the radar, the velocimeter, the
+  switch and the engine.
 
 ### simple-app
 

@@ -34,6 +34,8 @@ help:
 	@echo "  make run-thermostat  - Run tcsmoc on the thermostat example"
 	@echo "  make run-battery     - Run tcsmoc on the battery example:" \
 		"a power bus through an orbit, a load shed in eclipse"
+	@echo "  make run-descent     - Run tcsmoc on the descent example:" \
+		"a lander flown down by a guidance program"
 	@echo "  make run-simple-app  - Run the simple-app example, printing" \
 		"its line"
 	@echo "  make run-beacon      - Run the beacon example: a window" \
@@ -113,6 +115,12 @@ run-thermostat:
 .PHONY: run-battery
 run-battery:
 	$(call runexample_on,battery)
+
+# Run tcsmoc on the descent example: a lander flown down from five hundred
+# metres by a guidance program throttling its engine.
+.PHONY: run-descent
+run-descent:
+	$(call runexample_on,descent)
 
 # Run tcsmoc on the tees example: a command copied back to the ground, a
 # reading copied aboard, and data dropped.

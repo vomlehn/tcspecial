@@ -999,7 +999,7 @@
             ]
           },
           "unit": {
-            "description": "The unit the node's values are in: K, V, A, W, m, m/s, N or ratio. Required of a `to_value` conversion and of a `process` computation, whose answers are numbers of it.",
+            "description": "The unit the node's values are in: K, V, A, W, m, m/s, N, kg/s or ratio. Required of a `to_value` conversion and of a `process` computation, whose answers are numbers of it.",
             "type": [
               "string",
               "number",
@@ -1634,7 +1634,7 @@
             ]
           },
           "unit": {
-            "description": "The unit the node's values are in: K, V, A, W, m, m/s, N or ratio. Required of a `to_value` conversion and of a `process` computation, whose answers are numbers of it.",
+            "description": "The unit the node's values are in: K, V, A, W, m, m/s, N, kg/s or ratio. Required of a `to_value` conversion and of a `process` computation, whose answers are numbers of it.",
             "type": [
               "string",
               "number",
@@ -2289,7 +2289,7 @@
             ]
           },
           "unit": {
-            "description": "The unit the node's values are in: K, V, A, W, m, m/s, N or ratio. Required of a `to_value` conversion and of a `process` computation, whose answers are numbers of it.",
+            "description": "The unit the node's values are in: K, V, A, W, m, m/s, N, kg/s or ratio. Required of a `to_value` conversion and of a `process` computation, whose answers are numbers of it.",
             "type": [
               "string",
               "number",

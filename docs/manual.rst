@@ -1849,10 +1849,11 @@ otherwise produces a payload that looks configured and is not:
 * **A value in the wrong unit, or no value at all**. Every node feeding a
   ``vote``, a ``hysteresis`` or a ``process`` must send values, and in one
   unit: ``to_kelvin`` sends kelvin, ``to_value`` the ``unit`` it names (``K``,
-  ``V``, ``A``, ``W``, ``m``, ``m/s``, ``N`` or ``ratio``), a ``process`` the
-  ``unit`` it must state, and a vote its inputs'. A vote between a temperature
-  and a voltage is refused naming both, and a thermostat reading a sensor's
-  own bytes is told to put a conversion between them.
+  ``V``, ``A``, ``W``, ``m``, ``m/s``, ``N``, ``kg/s`` or ``ratio``), a
+  ``process`` the ``unit`` it must state, and a vote its inputs'. A vote
+  between a temperature and a voltage is refused naming both, and a
+  thermostat reading a sensor's own bytes is told to put a conversion between
+  them.
 * **Two nodes wanting the same thing**. Two at one address cannot both be
   started; two on one device file, serial line or SPI peripheral is worse,
   each taking part of the one stream and reporting it as though it were the
@@ -2265,6 +2266,57 @@ moment: see **How the world moves** below.
 
 ``make -C examples run-battery`` runs it, on any desk: tcssim makes a
 pseudo-terminal for the power monitor at its path, and sockets for the rest.
+
+The descent example
+-------------------
+.. figure:: ../examples/descent/descent.svg
+   :alt: The descent example: a radar altimeter's altitude made metres and
+         flown down by a guidance program, whose throttle drives the
+         engine; a Doppler velocimeter made metres a second; and a touchdown
+         switch. Everything goes to the ground and to a log.
+   :width: 100%
+
+   ``examples/descent``: a lander flown down from five hundred metres by a
+   program, and a switch that says when it is down.
+
+A lander's terminal descent over the Moon, and the example of a computation
+that drives a device with a value, and of a device that speaks the moment
+something happens.
+
+``radar``, a radar altimeter at the far end of a UDP socket, sends the
+altitude ten times a second, in centimetres, which ``altitude`` -- a
+``to_value`` node in metres -- makes a value. ``guidance`` is a ``process``
+node running ``examples/descent/guidance.py``, which works out the rate of
+descent from the altitudes by an alpha-beta filter, flies a rate in proportion
+to the altitude -- six hundredths of it a second, between twenty and one --
+and answers the throttle that holds the lander's weight and closes the gap
+between the rate it has and the rate it wants, as a ``ratio``. Its answers go
+by its ``gateway-out`` link to ``engine``, the engine's throttle, which is
+driven with a value: four bytes of millionths, read by the stand-in as the
+ratio guidance answered. Half a metre up guidance cuts the engine for good,
+and the lander drops the rest.
+
+``doppler``, a Doppler velocimeter, sends the velocity five times a second,
+which ``descent_rate`` makes metres a second, for the ground and the log.
+Guidance does not take it: a process takes values in one unit, and guidance
+takes metres. ``touchdown`` is a switch on a landing leg, sending ``1`` on
+the ground and ``0`` off it, straight to the ground and the log.
+
+The physics model, ``descent-physics.yaml``, is an ``engine`` of four and a
+half kilonewtons with a hundred kilograms of fuel, and a ``body`` of a tonne
+and a half, five hundred metres up and falling at twenty metres a second in
+the Moon's gravity, the engine's force and the fuel it burns joined to it. The
+body falls by the rocket equation in closed form, and the moment it reaches
+the ground -- which no closed form gives -- is found ahead of time and met
+exactly. The touchdown switch's stand-in waits on the model for that moment
+rather than for its next turn to send, so the vehicle hears of the landing
+when it happens. A run lands in about seventy-five seconds, at a metre and a
+half a second, with a third of the fuel left.
+
+``make -C examples run-descent`` runs it, on any desk. The lander does not
+start falling until a stand-in is started -- the run begins when one first
+asks the model anything -- so enable ``engine`` and ``radar`` in tcssim first,
+and the rest after.
 
 The simple-app example
 ----------------------
@@ -3245,6 +3297,21 @@ links. Each element is one simple part, of one of these types:
      resistance           its internal resistance: "0.05 ohm"
      charge               how full it starts, as a fraction: "0.6"
 
+   engine                 a throttled engine and its fuel
+     name                 the name connections and stand-ins use
+     thrust               its thrust at full throttle: "4500 N"
+     isp                  its specific impulse, as a length of time:
+                          "311 s"
+     fuel                 the fuel it starts with: "100 kg"
+
+   body                   a mass falling under gravity, pushed and burning
+     name                 the name connections and stand-ins use
+     mass                 its mass at the start, fuel and all: "1500 kg"
+     gravity              the gravity it falls in: "1.62 m/s2"
+     altitude             how high it starts: "500 m"
+     velocity             how fast it starts, up more than nought:
+                          "-20 m/s"
+
 Every figure is written with its unit, and one without it, or in another
 unit, is refused, saying what to write: a bare ``60`` could be watts or
 kelvin a second. A fraction, which has no unit, is written bare. A
@@ -3275,6 +3342,14 @@ output, carrying a value in one unit or a decision:
                   current       out   A, what flows in: nought into a full
                                       battery, whose charge is shunted
                   charge        out   a ratio, the fraction it holds
+   engine         throttle      in    a ratio, held within nought and one
+                  force         out   N, nothing once its fuel is gone
+                  flow          out   kg/s, the fuel it burns
+   body           force         in    N, the sum of the forces on it
+                  flow          in    kg/s, the sum of the mass it loses
+                  altitude      out   m
+                  velocity      out   m/s, up more than nought
+                  contact       out   a decision: asserted on the ground
 
 A terminal is written as the element's name and its own, joined by a dot:
 ``zone.temperature``. A connection goes from an output to an input of the
@@ -3288,7 +3363,12 @@ the voltage. A battery's charge moves in a straight line with its current,
 and its voltage runs straight from ``empty`` to ``full`` with its charge, plus
 what its resistance drops; full, a charging current is shunted, and empty, it
 is held there with its voltage below ``empty`` showing it. The sun is lit or
-dark, changing all at once twice an orbit. A zone cools towards its environment with its time constant and
+dark, changing all at once twice an orbit. An engine's thrust is its throttle
+times its full thrust, and it burns that over its specific impulse in fuel
+until there is none, when it stops. A body falls by the rocket equation with
+gravity, which has a closed form while its force and its flow are held, and is
+set down when it reaches the ground, a moment found ahead of time and met
+exactly; it stays down until a force beating its weight lifts it. A zone cools towards its environment with its time constant and
 is warmed by the heat joined to it, its capacity turning watts into kelvin a
 second; with a fifty second constant, twenty joules a kelvin and a hundred
 and twenty watts, it would settle three hundred kelvin above its
@@ -3307,8 +3387,14 @@ every other setting may be stated on a group instead:
                           from what its terminal says, in the terminal's
                           unit: "+0.2 K". Optional
 
-A stand-in can drive only an input taking a decision, a decision being what
-the vehicle sends it. An input is driven by one stand-in, and not by one and
+A stand-in joined to an output reports a value in the encoding of the
+conversion its readings go to, and a decision -- a lander's contact with the
+ground -- as the text ``1`` or ``0``: at once when it changes, waiting on the
+model for the moment rather than for its next turn, and again every packet
+interval. A stand-in joined to an input drives it with what the vehicle sends:
+a decision, ``1`` or ``0``, or a value, four bytes of its unit's steps, which
+has to come from a node sending that unit -- an engine's throttle from a
+``process`` answering a ``ratio``. An input is driven by one stand-in, and not by one and
 a connection too: two would each switch it over the other. A heater's ``on``
 that nothing drives is refused, being a part nothing can switch, and so is an
 element nothing is joined to, which is most likely a misspelled ``connects``.
@@ -3394,9 +3480,12 @@ stand-in reads or drives it, and a world nobody asks about costs nothing.
 Between two moments each element is advanced by its closed form, so what a
 sensor reads does not depend on how often it is read. Where an element's
 behaviour would change inside an interval -- a battery reaching full, the
-sun going into shadow -- it foresees the moment as an event, and the world stops there, lets it happen,
-and goes on, the events waiting in order of when they fall. Simulated time
-keeps pace with the wall clock, which the vehicle runs on.
+sun going into shadow, a lander reaching the ground -- it foresees the moment
+as an event, and the world stops there, lets it happen, and goes on, the events waiting in order of when they fall. Simulated time
+keeps pace with the wall clock, which the vehicle runs on, from when the run
+begins: the first time a running stand-in asks the world anything. Until then
+the world waits, so a lander is still where it starts when its radar is
+enabled.
 
 **Physically realistic noise**
 

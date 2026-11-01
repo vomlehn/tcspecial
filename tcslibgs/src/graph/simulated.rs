@@ -123,6 +123,53 @@ pub fn reading_of(
     }
 }
 
+/// Checks that what reaches a stand-in driving a value input is in that
+/// input's unit, which is how the stand-in reads it.
+///
+/// A value on a link is a count of its unit's steps, so the stand-in of an
+/// engine's throttle reads what the vehicle sends it as a ratio, and the
+/// node that sends it has to send ratios: a guidance program answering
+/// newtons would have the engine read thousands of them as full throttle.
+///
+/// # Arguments
+///
+/// * `graph`   - The configuration.
+/// * `payload` - The name of the payload node the stand-in is for.
+/// * `unit`    - The unit of the input it drives.
+///
+/// # Returns
+///
+/// Nothing, where what reaches it is in that unit.
+///
+/// # Errors
+///
+/// A message naming the payload and both units, or saying that what reaches
+/// it is not values, or that nothing does.
+pub fn driving_of(
+    graph: &Graph,
+    payload: &str,
+    unit: crate::unit::Unit,
+) -> Result<(), String> {
+    match crate::graph::units::input_unit(graph, payload) {
+        Some(sent) if sent == unit => Ok(()),
+        Some(sent) => Err(format!(
+            "\"{payload}\" drives an input in {}, and what reaches it is in \
+             {}: the node driving it sends values in the unit of what it \
+             drives",
+            unit.name(),
+            sent.name()
+        )),
+        None => Err(format!(
+            "\"{payload}\" drives an input in {}, and what reaches it is not \
+             values in one unit, or nothing does: link a node that sends \
+             {} to it, such as a process stating unit: {}",
+            unit.name(),
+            unit.name(),
+            unit.symbol()
+        )),
+    }
+}
+
 /// Finds the setpoint and band of a hysteresis node, for a simulator that
 /// stands in for it.
 ///

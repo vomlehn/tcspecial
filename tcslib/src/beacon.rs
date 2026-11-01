@@ -934,6 +934,56 @@ impl Waker {
     }
 }
 
+/// Listens for a configuration's beacons, wherever they arrive: at the
+/// socket its beacon link states, or, for one that answers over a software
+/// bus, from this process's peer of the bus, under `beacon.tlm_msgid`.
+///
+/// # Arguments
+///
+/// * `graph`    - The configuration's graph.
+/// * `schedule` - The stages the last beacon ages through.
+/// * `expected` - This station's own configuration digest, which every
+///                beacon's is compared with, or `None` for none.
+///
+/// # Returns
+///
+/// The watch, or `None` for a configuration with no `tcspecial` section,
+/// which sends no beacons.
+///
+/// # Errors
+///
+/// What is wrong with the `tcspecial` section, or what cannot be bound.
+pub fn open(
+    graph: &tcslibgs::graph::Graph,
+    schedule: Schedule,
+    expected: Option<ConfigDigest>,
+) -> Result<Option<Beacons>, String> {
+    let cannot = |e: io::Error| format!("beacons cannot be received: {e}");
+    if let Some(link) = tcslibgs::graph::parameters::beacon_of(graph)? {
+        return Beacons::listening(link, schedule, expected)
+            .map(Some)
+            .map_err(cannot);
+    }
+    let Some(bus) = crate::bus::bus_of(graph)? else {
+        return Ok(None);
+    };
+    let Some(ground) = crate::bus::Ground::of(graph)? else {
+        return Ok(None);
+    };
+    let socket = ground.receiving(bus.beacon_msgid)?;
+    let at = |addr: SocketAddr| tcslibgs::HostPort {
+        address: addr.ip().to_string(),
+        port: addr.port(),
+    };
+    let link = Link {
+        send: at(ground.delivering()),
+        recv: at(socket.local_addr().map_err(cannot)?),
+    };
+    Beacons::on(socket, link, schedule, expected)
+        .map(Some)
+        .map_err(cannot)
+}
+
 impl Beacons {
     /// Bind where the configuration says beacons are received.
     ///
@@ -963,6 +1013,35 @@ impl Beacons {
         expected: Option<ConfigDigest>,
     ) -> io::Result<Beacons> {
         let socket = UdpSocket::bind(link.recv.to_string())?;
+        Beacons::on(socket, link, schedule, expected)
+    }
+
+    /// Listens on a socket already bound, where `link.recv` is.
+    ///
+    /// For a configuration that answers over a software bus, whose beacons
+    /// the bus's peer sends to a socket it made: see [`open`].
+    ///
+    /// # Arguments
+    ///
+    /// * `socket`   - The socket, bound where `link.recv` says.
+    /// * `link`     - Where beacons are received, and where they come from.
+    /// * `schedule` - The stages the last beacon ages through.
+    /// * `expected` - This station's own configuration digest, which every
+    ///                beacon's is compared with, or `None` for none.
+    ///
+    /// # Returns
+    ///
+    /// The watch, which has heard nothing yet.
+    ///
+    /// # Errors
+    ///
+    /// The `io::Error` from making the socket that wakes it.
+    pub fn on(
+        socket: UdpSocket,
+        link: Link,
+        schedule: Schedule,
+        expected: Option<ConfigDigest>,
+    ) -> io::Result<Beacons> {
         // Aimed at the address the watch is bound to, which is loopback
         // where it is bound to every interface: there is no sending to the
         // unspecified address.

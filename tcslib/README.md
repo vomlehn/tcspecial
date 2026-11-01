@@ -29,8 +29,20 @@ for each:
   `--simulate` mode, so that a harness starts tcspecial only once there is
   something for it to find. It says what it last heard when it gives up.
 
+- **A vehicle on a cFS software bus.** `bus` is the ground's end of a vehicle
+  that answers to cFS. `bus::Ground` is a station's one SBN peer of the bus,
+  on a thread of its own, which turns the bus back into loopback UDP links:
+  `command_links_of`, `beacon::open` and `GatewayReceiver::open` use it
+  themselves for a configuration that answers to cFS, so a station is written
+  the same either way. `bus::StandIn` is the cFS end, as tcssim stands in for
+  it: the vehicle and the station are both its peers. Only a stand-in takes a
+  station: SBN on a real cFS sends no peer what another published, so a
+  station commands a vehicle behind a real cFS through that cFS's own ground
+  system.
+
 The link to tcspecial is UDP, and only UDP: `TcsClient` sends its commands
-through a `UdpConnection`.
+through a `UdpConnection` -- on a bus, to the station's peer of it, which
+publishes each one.
 
 ## What tcslib is not
 

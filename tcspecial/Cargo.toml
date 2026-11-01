@@ -79,6 +79,10 @@ raw = []
 
 [dev-dependencies]
 tempfile = "3.27.0"
+# The ground's end of a cFS software bus, which tests/cfs_ground.rs commands
+# the vehicle through: only the tests are built with it, never the flight
+# program.
+tcslib = { path = "../tcslib" }
 
 [lints]
 workspace = true

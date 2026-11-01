@@ -1,7 +1,7 @@
 //! Subdiagrams: a part of the configuration kept in a file of its own.
 //!
 //! A vehicle's configuration gets large, and the useful way to divide a large
-//! diagram is by the thing it describes -- the cabin's thermostat here, the
+//! diagram is by the thing it describes -- the zone's thermostat here, the
 //! antenna pointing there. So a **subdiagram** is a separate included file,
 //! shown in the diagram that includes it as one box: simplified when closed,
 //! and opened in a window of its own to be worked on.
@@ -50,7 +50,7 @@ pub struct Qualified {
 impl Qualified {
     /// Reads a name as a link wrote it.
     ///
-    /// One separator and no more: `cabin/temp_1` reaches into `cabin`, and
+    /// One separator and no more: `zone/temp_1` reaches into `zone`, and
     /// a name with two separators in it is a name this cannot mean anything
     /// by, so the whole of it after the first is taken as the node's. That
     /// keeps the function total -- a name is always readable as something --
@@ -59,7 +59,7 @@ impl Qualified {
     ///
     /// # Arguments
     ///
-    /// * `name` - The name as a link wrote it, such as `cabin/temp_1` or
+    /// * `name` - The name as a link wrote it, such as `zone/temp_1` or
     ///            `temp_1`.
     ///
     /// # Returns
@@ -85,8 +85,8 @@ impl Qualified {
     ///
     /// Plain where the two are in the same file, qualified where they are not.
     /// This is the half that keeps a subdiagram's own links readable: inside
-    /// `cabin.ytcs` a link says `temp_1`, and only a link reaching out of
-    /// it says `cabin/temp_1`.
+    /// `zone.ytcs` a link says `temp_1`, and only a link reaching out of
+    /// it says `zone/temp_1`.
     ///
     /// # Arguments
     ///
@@ -140,7 +140,7 @@ impl Qualified {
 
 /// The file a subdiagram is kept in, given the name it goes by.
 ///
-/// The name is the file's stem, so `cabin` is `cabin.ytcs` beside the diagram
+/// The name is the file's stem, so `zone` is `zone.ytcs` beside the diagram
 /// that includes it. Which extension is the including file's: a configuration
 /// written in XML keeps its subdiagrams in XML, because a set of files half in
 /// one language and half in the other is a thing nobody meant and everybody
@@ -174,30 +174,30 @@ mod tests {
     /// A name is local until it has to travel.
     #[test]
     fn a_name_is_plain_at_home_and_qualified_away_from_it() {
-        let inside = Qualified::of("temp_1", &Some("cabin".to_string()));
+        let inside = Qualified::of("temp_1", &Some("zone".to_string()));
 
         // Written from inside the same subdiagram: plain.
-        assert_eq!(inside.written_from(&Some("cabin".to_string())), "temp_1");
+        assert_eq!(inside.written_from(&Some("zone".to_string())), "temp_1");
 
         // Written from the top diagram, or from another subdiagram: qualified.
-        assert_eq!(inside.written_from(&None), "cabin/temp_1");
+        assert_eq!(inside.written_from(&None), "zone/temp_1");
         assert_eq!(
             inside.written_from(&Some("antenna".to_string())),
-            "cabin/temp_1"
+            "zone/temp_1"
         );
 
         // And a node of the top diagram is plain from anywhere, there being no
         // file name to qualify it with.
         let top = Qualified::of("gateway", &None);
         assert_eq!(top.written_from(&None), "gateway");
-        assert_eq!(top.written_from(&Some("cabin".to_string())), "gateway");
+        assert_eq!(top.written_from(&Some("zone".to_string())), "gateway");
     }
 
     /// Reading a name back gives what was written.
     #[test]
     fn a_qualified_name_reads_back_as_itself() {
         for (text, in_, node) in [
-            ("cabin/temp_1", Some("cabin"), "temp_1"),
+            ("zone/temp_1", Some("zone"), "temp_1"),
             ("gateway", None, "gateway"),
         ] {
             let read = Qualified::parse(text);
@@ -214,11 +214,11 @@ mod tests {
     /// made two copies collide would take the reuse away.
     #[test]
     fn the_same_name_in_two_subdiagrams_is_two_nodes() {
-        let one = Qualified::of("temp_1", &Some("cabin".to_string()));
+        let one = Qualified::of("temp_1", &Some("zone".to_string()));
         let two = Qualified::of("temp_1", &Some("bay".to_string()));
 
         assert_ne!(one.absolute(), two.absolute());
-        assert_eq!(one.absolute(), "cabin/temp_1");
+        assert_eq!(one.absolute(), "zone/temp_1");
         assert_eq!(two.absolute(), "bay/temp_1");
     }
 
@@ -230,7 +230,7 @@ mod tests {
     /// nothing to attach it to.
     #[test]
     fn an_unusable_name_is_read_as_a_plain_one() {
-        for odd in ["/temp_1", "cabin/", "/", ""] {
+        for odd in ["/temp_1", "zone/", "/", ""] {
             let read = Qualified::parse(odd);
             assert_eq!(read.in_, None, "{odd:?}");
             assert_eq!(read.node, odd, "{odd:?}");
@@ -238,8 +238,8 @@ mod tests {
 
         // More than one separator: everything after the first is the node's,
         // which is a name no node has, so the link dangles and is reported.
-        let read = Qualified::parse("cabin/inner/temp");
-        assert_eq!(read.in_.as_deref(), Some("cabin"));
+        let read = Qualified::parse("zone/inner/temp");
+        assert_eq!(read.in_.as_deref(), Some("zone"));
         assert_eq!(read.node, "inner/temp");
     }
 
@@ -247,14 +247,14 @@ mod tests {
     #[test]
     fn a_subdiagram_is_a_file_beside_its_parent() {
         assert_eq!(
-            file_for("cabin", Path::new("/var/lib/tcs/vehicle.ytcs")),
-            Path::new("/var/lib/tcs/cabin.ytcs")
+            file_for("zone", Path::new("/var/lib/tcs/vehicle.ytcs")),
+            Path::new("/var/lib/tcs/zone.ytcs")
         );
         // XML keeps XML: a set of files half in each language is a thing
         // nobody meant.
         assert_eq!(
-            file_for("cabin", Path::new("/var/lib/tcs/vehicle.xtcs")),
-            Path::new("/var/lib/tcs/cabin.xtcs")
+            file_for("zone", Path::new("/var/lib/tcs/vehicle.xtcs")),
+            Path::new("/var/lib/tcs/zone.xtcs")
         );
     }
 }

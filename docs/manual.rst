@@ -654,7 +654,7 @@ What a payload starts in
 A payload the vehicle drives is in whatever state its hardware came up in
 until the vehicle first decides something about it, which may be a while: a
 thermostat decides when its group has been read, and a heater circuit that
-came up on is warming the cabin until then. ``init`` is what it is set to
+came up on is warming the zone until then. ``init`` is what it is set to
 instead, written as the node is opened -- as the vehicle starts, and again
 whenever the ground starts the node after stopping it:
 
@@ -1866,14 +1866,14 @@ which is what a panel in the MOC shows.
 .. code-block:: yaml
 
    payload_groups:
-     - name: "cabin_temps"
+     - name: "zone_temps"
        interval: "100 ms"
 
    payloads:
      - name: temp_1
        type: i2c
        address: "0x48"
-       group: "cabin_temps"
+       group: "zone_temps"
        path: "/dev/i2c-1"
        read_size: "2"
        payload-out:
@@ -1882,7 +1882,7 @@ which is what a panel in the MOC shows.
      - name: temp_2
        type: i2c
        address: "0x49"
-       group: "cabin_temps"
+       group: "zone_temps"
        path: "/dev/i2c-1"
        read_size: "2"
        payload-out:
@@ -1890,7 +1890,7 @@ which is what a panel in the MOC shows.
 
      - name: temp_3
        type: spi
-       group: "cabin_temps"
+       group: "zone_temps"
        max_speed: "1000000"
        path: "/dev/spidev0.0"
        read_size: "3"
@@ -2110,7 +2110,7 @@ The thermostat example
 
 The worked example of computing aboard, and of surviving a part that fails.
 Three temperature sensors -- ``temp_1``, ``temp_2`` and ``temp_3`` -- are read
-together ten times a second as the group ``cabin_temps``, which is what a
+together ten times a second as the group ``zone_temps``, which is what a
 group is for: readings that will be compared are taken as close together as
 the hardware allows.
 
@@ -2130,10 +2130,10 @@ Each reading is converted to kelvin by its own ``to_kelvin`` node, ``k_1``,
 ``k_2`` or ``k_3``, and each converted reading goes three ways: to the ground
 through the gateway node -- at its ``ground_base``, ``127.0.0.1:5100``, plus
 each source's device id, so ``k_1``, ``k_2`` and ``k_3``, ids 1 to 3, arrive on
-ports 5101 to 5103 -- into ``cabin_temp`` as the input ``in0``, ``in1`` or
+ports 5101 to 5103 -- into ``zone_temp`` as the input ``in0``, ``in1`` or
 ``in2``, and into the log ``housekeeping``.
 
-``cabin_temp`` is a ``vote``: one temperature out of the three by the algorithm
+``zone_temp`` is a ``vote``: one temperature out of the three by the algorithm
 it names, ``median``, which takes the middle reading. A mean would be the wrong
 arithmetic twice over -- it carries a bad reading into the answer in proportion
 to how wrong it is, and waiting for all three turns one dead sensor into no
@@ -2144,11 +2144,11 @@ cold -- it says 296 and the heaters stay off, where a mean would have said
 287.4 and switched them on because one sensor had failed.
 
 The voted temperature goes to the ground, on port 5104, and to ``thermostat``:
-a hysteresis holding the cabin at its ``setpoint``, 293.15 K, with a
+a hysteresis holding the zone at its ``setpoint``, 293.15 K, with a
 ``half_band`` of 2.0, so the heaters switch two degrees either side of it and
 the setpoint is in the middle of its own band. Its decision is logged, sent to
 the ground on port 5105, and drives two heaters, ``heaters_1`` and
-``heaters_2``. Two of them, because one failing must not leave the cabin with
+``heaters_2``. Two of them, because one failing must not leave the zone with
 no way to be warmed: either alone holds the band, and both together hold it
 twice as fast. They are separate nodes so that the ground can stop one and
 leave the other holding the temperature.
@@ -2463,7 +2463,7 @@ The fprime example
 ------------------
 .. figure:: ../examples/fprime/fprime.svg
    :alt: The fprime example: the thermometer's readings go to fsw, a
-         gateway_fprime node, and to cabin_temp, a to_kelvin compute node
+         gateway_fprime node, and to zone_temp, a to_kelvin compute node
          whose temperatures go to fsw too and to heater_wanted, a hysteresis
          compute node whose decisions go to fsw, and all three on to the F´
          deployment's TcsBridge component at bridge_base plus the sender's
@@ -2490,16 +2490,16 @@ model is made from and nothing aboard reads. A command the bridge sends up to
 ``fsw``, which binds ``127.0.0.1:9600``, leaves it by its ``gateway-out`` for
 the ``heater``.
 
-The thermometer's readings go to ``cabin_temp`` too, a ``to_kelvin`` compute
+The thermometer's readings go to ``zone_temp`` too, a ``to_kelvin`` compute
 node that makes each a temperature, and that goes to ``fsw`` as well: device
 id 3, ``127.0.0.1:9703``, channel ``0x3003``. The ``vehicle`` section is
 written after the payloads so that the thermometer keeps device id 2, a
 node's device id being its place in the file. In the simulator file the
-thermometer reads a thermal mass, ``cabin``, in the encoding ``cabin_temp``
+thermometer reads a thermal mass, ``zone``, in the encoding ``zone_temp``
 reads back, and the heater warms it while it is driven on, so that what the
 flight computer sends the heater shows in the temperature it reads.
 
-``cabin_temp``'s temperatures go on to ``heater_wanted``, a ``hysteresis``
+``zone_temp``'s temperatures go on to ``heater_wanted``, a ``hysteresis``
 compute node -- on below 283.65 K, off above 284.65 K -- whose decisions go
 to ``fsw``: device id 4, ``127.0.0.1:9704``, channel ``0x3004``. It is
 advice and drives nothing, the heater being the flight computer's to drive,
@@ -2544,7 +2544,7 @@ Each node drawn into the ``gateway_fprime`` node is a channel named after it,
 at ``fprime_id_base`` plus its device id -- ``thermometer``, ``0x3002`` --
 of the type the configuration says its data are. A node that sends values, a
 compute node whose function is ``to_kelvin``, ``vote`` or ``process``, has an
-``F64`` channel, its temperature in kelvin -- ``cabin_temp``, ``0x3003`` --
+``F64`` channel, its temperature in kelvin -- ``zone_temp``, ``0x3003`` --
 and a datum from it that is not a value goes to no channel, is counted in
 ``DataNotValues`` and is said in a ``NotAValue`` event. A node that sends
 decisions, a compute node whose function is ``hysteresis``, has a ``bool``
@@ -2597,9 +2597,9 @@ the channels. ``fprime/BridgeTest`` is a deployment that does all of that.
 (``tcssim --sending``), waits for it, starts tcspecial and F´'s ground system,
 and runs the tests in ``fprime/BridgeTest/test``, which start ``BridgeTest``
 and hold it to connecting and matching, hearing beacons, a simulated reading
-arriving as the thermometer's channel and as ``cabin_temp``'s temperature, a
+arriving as the thermometer's channel and as ``zone_temp``'s temperature, a
 ``PING`` answered, a node stopped and
-started again, ``SEND_DATA 1`` warming the cabin until ``cabin_temp`` climbs
+started again, ``SEND_DATA 1`` warming the zone until ``zone_temp`` climbs
 and ``heater_wanted`` says off,
 an unknown node refused unsent, a restart onto a configuration the vehicle
 does not hold refused, a plain restart taken and the start that comes back
@@ -2903,13 +2903,13 @@ real too.
 .. code-block:: yaml
 
    simulated_payload_groups:
-     - name: cabin_temps
+     - name: zone_temps
        simulate: true          # temp_1, temp_2 and temp_3 are simulated
        packet_interval: 100 ms
 
    simulated_payloads:
      - name: temp_1
-       group: cabin_temps
+       group: zone_temps
      - name: heaters_1
        simulate: false         # the real heater
 
@@ -3031,12 +3031,12 @@ A thermal mass gives them something to agree about. Declare one, attach the
 sensors that report it and the heaters that warm it, and what the vehicle
 reads becomes a consequence of what the vehicle drove.
 
-A mass is the vehicle's physics and not any one configuration's -- the cabin
+A mass is the vehicle's physics and not any one configuration's -- the zone
 is the same body whichever payloads fly -- so it is declared in a physics
 model: a YAML file of its own, which the simulator file names, relative to
 its own directory. Several simulator files may name one model, which is how
 the manual's thermostat fixture and the thermostat example share their
-cabin. A simulator file that still declares masses itself is refused, told
+zone. A simulator file that still declares masses itself is refused, told
 where they go.
 
 .. code-block:: text
@@ -3113,7 +3113,7 @@ A heater has to be a payload the simulator can be driven through: a socket,
 or a set of discrete lines, whose stand-in watches the lines the vehicle
 drives.
 
-The model, ``cabin-physics.yaml``:
+The model, ``zone-physics.yaml``:
 
 .. code-block:: yaml
 
@@ -3129,19 +3129,19 @@ And the simulator file beside it, which names it and attaches the payloads:
 
 .. code-block:: yaml
 
-   physics: cabin-physics.yaml
+   physics: zone-physics.yaml
 
    simulated_payload_groups:
-     - name: cabin_temps
+     - name: zone_temps
        packet_interval: 100 ms
        reads: basic
 
    simulated_payloads:
-     - { name: temp_1, type: network, protocol: udp, group: cabin_temps,
+     - { name: temp_1, type: network, protocol: udp, group: zone_temps,
          output: out1 }
-     - { name: temp_2, type: network, protocol: udp, group: cabin_temps,
+     - { name: temp_2, type: network, protocol: udp, group: zone_temps,
          output: out2 }
-     - { name: temp_3, type: network, protocol: udp, group: cabin_temps,
+     - { name: temp_3, type: network, protocol: udp, group: zone_temps,
          output: out3 }
      - name: heaters_1
        type: network
@@ -3323,7 +3323,7 @@ device on a bus, where the master's own read is the request and a second master
 cannot see it.
 
 This is the shipped ``examples/thermostat/thermostat-sim.yaml``, which names
-the model the cabin is declared in, ``thermostat-physics.yaml``, beside it.
+the model the zone is declared in, ``thermostat-physics.yaml``, beside it.
 
 .. code-block:: yaml
 
@@ -3332,7 +3332,7 @@ the model the cabin is declared in, ``thermostat-physics.yaml``, beside it.
    physics: thermostat-physics.yaml
 
    simulated_payload_groups:
-     - name: cabin_temps
+     - name: zone_temps
        packet_interval: 100 ms
        reads: basic
 
@@ -3340,19 +3340,19 @@ the model the cabin is declared in, ``thermostat-physics.yaml``, beside it.
      - name: temp_1
        type: network
        protocol: udp
-       group: cabin_temps
+       group: zone_temps
        output: out1
 
      - name: temp_2
        type: network
        protocol: udp
-       group: cabin_temps
+       group: zone_temps
        output: out2
 
      - name: temp_3
        type: network
        protocol: udp
-       group: cabin_temps
+       group: zone_temps
        output: out3
 
      - name: heaters_1

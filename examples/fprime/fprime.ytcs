@@ -41,7 +41,7 @@ gateway:
   # for the heater. What comes down arrives at bridge_base plus the device id
   # of the node that sent it, and the bridge gives it the F´ ID
   # fprime_id_base plus that same id: the thermometer, device id 2, arrives
-  # at 127.0.0.1:9702 as 0x3002, cabin_temp, device id 3, at
+  # at 127.0.0.1:9702 as 0x3002, zone_temp, device id 3, at
   # 127.0.0.1:9703 as 0x3003, and heater_wanted, device id 4, at
   # 127.0.0.1:9704 as 0x3004.
   - name: fsw
@@ -64,7 +64,7 @@ payloads:
     port: "9001"
     gateway-in: true
   # A thermometer, two bytes, signed, big endian, in sixteenths of a degree,
-  # whose readings go to the flight computer as they are, and to cabin_temp
+  # whose readings go to the flight computer as they are, and to zone_temp
   # to be made a temperature.
   - name: thermometer
     type: network
@@ -73,14 +73,14 @@ payloads:
     port: "9002"
     payload-out:
       - target: fsw
-      - target: cabin_temp
+      - target: zone_temp
 
 # After the payloads, so that the thermometer keeps device id 2: a node's
 # device id is its place in the file.
 vehicle:
   # The thermometer's readings made a value, a temperature in kelvin, which
   # the bridge's channel for it holds as one.
-  - name: cabin_temp
+  - name: zone_temp
     type: compute
     format: "i16_be"
     function: "to_kelvin"
@@ -90,7 +90,7 @@ vehicle:
     payload-out:
       - target: fsw
       - target: heater_wanted
-  # What a thermostat would decide of cabin_temp -- on below 283.65 K, off
+  # What a thermostat would decide of zone_temp -- on below 283.65 K, off
   # above 284.65 K -- which the bridge's channel for it holds as a decision,
   # true for on. Advice and no more: the heater is the flight computer's to
   # drive, and this drives nothing.
@@ -108,5 +108,5 @@ tcsgui:
     - { name: fsw, x: 469, y: 34 }
     - { name: heater, x: 34, y: 34 }
     - { name: thermometer, x: 34, y: 134 }
-    - { name: cabin_temp, x: 242, y: 134 }
+    - { name: zone_temp, x: 242, y: 134 }
     - { name: heater_wanted, x: 242, y: 234 }

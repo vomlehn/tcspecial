@@ -13,7 +13,7 @@
 //!
 //! A directory for each, rather than every file in one, because the names
 //! of included files are the configuration's own: two configurations may
-//! each include a `cabin`, and mean two different things by it.
+//! each include a `zone`, and mean two different things by it.
 //!
 //! The rules about what may be kept and what may be loaded are here, once,
 //! for tcspecial, which loads from the store, and tcsverify, which puts a
@@ -568,7 +568,7 @@ mod tests {
         let from = tempfile::tempdir().expect("a directory");
         let store_dir = tempfile::tempdir().expect("a store");
         let store = Store::at(store_dir.path());
-        let top = tree(from.path(), "top", "cabin");
+        let top = tree(from.path(), "top", "zone");
 
         let (digest, kept) = store.keep(&top).expect("kept");
         let at = store_dir.path().join(digest.to_string());
@@ -579,8 +579,8 @@ mod tests {
             .map(|entry| entry.unwrap().file_name().into_string().unwrap())
             .collect();
         names.sort();
-        assert_eq!(names, vec![top_name, "cabin.ytcs".to_string()]);
-        let mode = std::fs::metadata(at.join("cabin.ytcs"))
+        assert_eq!(names, vec![top_name, "zone.ytcs".to_string()]);
+        let mode = std::fs::metadata(at.join("zone.ytcs"))
             .unwrap()
             .permissions()
             .mode();
@@ -589,7 +589,7 @@ mod tests {
 
         let (graph, read_from) = store.load(digest).expect("it loads");
         assert_eq!(read_from, *kept.path());
-        assert_eq!(graph.included(), vec!["cabin".to_string()]);
+        assert_eq!(graph.included(), vec!["zone".to_string()]);
         assert_eq!(graph.nodes.len(), 1, "the included file's node");
         let again = store.keep(&top).expect("kept");
         assert_eq!(again, (digest, Kept::Already(read_from)));
@@ -606,17 +606,17 @@ mod tests {
         let store_dir = tempfile::tempdir().expect("a store");
         let store = Store::at(store_dir.path());
 
-        let (cabin, _) = store.keep(&tree(one.path(), "top", "cabin")).unwrap();
+        let (zone, _) = store.keep(&tree(one.path(), "top", "zone")).unwrap();
         let (hold, _) = store.keep(&tree(two.path(), "top", "hold")).unwrap();
-        assert_ne!(cabin, hold);
-        let mut both = vec![cabin, hold];
+        assert_ne!(zone, hold);
+        let mut both = vec![zone, hold];
         both.sort_by_key(|digest| digest.0);
         assert_eq!(store.held().unwrap(), both);
 
-        let renamed = tree(three.path(), "elsewhere", "cabin");
+        let renamed = tree(three.path(), "elsewhere", "zone");
         assert_eq!(
             crate::config_digest::digest_of_file(&renamed).unwrap(),
-            cabin
+            zone
         );
     }
 
@@ -629,7 +629,7 @@ mod tests {
         let store = Store::at(store_dir.path());
         std::fs::create_dir(from.path().join("sub")).unwrap();
 
-        for name in ["sub/cabin", ".cabin"] {
+        for name in ["sub/zone", ".zone"] {
             let why = store
                 .keep(&tree(from.path(), "top", name))
                 .expect_err("not a file beside it");
@@ -646,11 +646,11 @@ mod tests {
         let from = tempfile::tempdir().expect("a directory");
         let store_dir = tempfile::tempdir().expect("a store");
         let store = Store::at(store_dir.path());
-        let top = tree(from.path(), "top", "cabin");
+        let top = tree(from.path(), "top", "zone");
         let digest = crate::config_digest::digest_of_file(&top).unwrap();
         let cut_short = store_dir.path().join(format!(".{digest}.new"));
         std::fs::create_dir(&cut_short).unwrap();
-        std::fs::write(cut_short.join("cabin.ytcs"), "half").unwrap();
+        std::fs::write(cut_short.join("zone.ytcs"), "half").unwrap();
         assert!(store.held().unwrap().is_empty(), "it is not held");
 
         store.keep(&top).expect("kept");

@@ -2347,7 +2347,7 @@ mod tests {
             &[
                 ("path", "/dev/i2c-1"),
                 ("address", "0x48"),
-                ("group", "cabin_temps"),
+                ("group", "zone_temps"),
             ],
         ))
         .expect("a node in a group");

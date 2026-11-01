@@ -1998,7 +1998,7 @@ mod tests {
         let (mean, mean_port) = recorder();
         let (log, log_port) = recorder();
         fabric.hold("gateway", gateway_port);
-        fabric.hold("cabin_temp", mean_port);
+        fabric.hold("zone_temp", mean_port);
         fabric.hold("housekeeping", log_port);
 
         let moved = fabric.deliver("k_1", &[1, 2, 3, 4]);
@@ -2109,7 +2109,7 @@ vehicle:
         let (mean, mean_port) = recorder();
         let (gateway, gateway_port) = recorder();
         let (log, log_port) = recorder();
-        fabric.hold("cabin_temp", mean_port);
+        fabric.hold("zone_temp", mean_port);
         fabric.hold("gateway", gateway_port);
         fabric.hold("housekeeping", log_port);
 
@@ -2153,7 +2153,7 @@ vehicle:
         let routes = Routes::of(&graph);
 
         let mut fabric = Fabric::new(routes.clone(), 64);
-        for name in ["k_1", "k_2", "k_3", "cabin_temp", "thermostat"] {
+        for name in ["k_1", "k_2", "k_3", "zone_temp", "thermostat"] {
             let node = graph.node(name).expect("a node of the example");
             let inputs = routes.inputs_of(name);
             let port = ComputePort::make(node, &inputs, &Abandon::nothing())
@@ -2240,7 +2240,7 @@ vehicle:
             assert_eq!(
                 driven,
                 vec![b"1".to_vec()],
-                "{which}: a cabin below the band should have its heaters on"
+                "{which}: a zone below the band should have its heaters on"
             );
         }
     }
@@ -2259,7 +2259,7 @@ vehicle:
         let routes = Routes::of(&graph);
 
         let mut fabric = Fabric::new(routes.clone(), 64);
-        for name in ["k_1", "k_2", "k_3", "cabin_temp", "thermostat"] {
+        for name in ["k_1", "k_2", "k_3", "zone_temp", "thermostat"] {
             let node = graph.node(name).expect("a node of the example");
             let inputs = routes.inputs_of(name);
             fabric.hold(
@@ -2341,8 +2341,8 @@ vehicle:
     /// A command from the ground changes what the thermostat decides.
     ///
     /// The last link in the worked example's chain. The example's binding says
-    /// the ground may set `thermostat.setpoint`, and a cabin that was within
-    /// the band becomes a cabin the heaters are wanted in -- without the
+    /// the ground may set `thermostat.setpoint`, and a zone that was within
+    /// the band becomes a zone the heaters are wanted in -- without the
     /// readings changing at all, which is what makes this the command's doing
     /// and not the sensors'.
     #[test]
@@ -2372,21 +2372,21 @@ vehicle:
 
         // 294 kelvin against a setpoint of 293.15 with two degrees either
         // side: inside the band, so nothing is decided.
-        let moved = fabric.deliver("cabin_temp", &kelvin(294.0));
+        let moved = fabric.deliver("zone_temp", &kelvin(294.0));
         assert!(moved.all_delivered(), "{:?}", moved.refused);
         assert!(
             heaters.lock().expect("the record").given.is_empty(),
-            "a cabin inside the band should not have been acted on"
+            "a zone inside the band should not have been acted on"
         );
 
-        // The ground asks for a warmer cabin. The decision is not taken on
+        // The ground asks for a warmer zone. The decision is not taken on
         // the strength of the number -- the next reading decides -- so the
         // heaters are still untouched.
         assert_eq!(fabric.set("thermostat", "setpoint", b"300.0"), Ok(()));
         assert!(heaters.lock().expect("the record").given.is_empty());
 
         // And the same reading now calls for heat.
-        let moved = fabric.deliver("cabin_temp", &kelvin(294.0));
+        let moved = fabric.deliver("zone_temp", &kelvin(294.0));
         assert!(moved.all_delivered(), "{:?}", moved.refused);
         assert_eq!(
             heaters.lock().expect("the record").given,
@@ -2438,7 +2438,7 @@ vehicle:
 
         // Cold: the first decision, which is a change and goes everywhere its
         // links lead.
-        let moved = fabric.deliver("cabin_temp", &kelvin(280.0));
+        let moved = fabric.deliver("zone_temp", &kelvin(280.0));
         assert!(moved.all_delivered(), "{:?}", moved.refused);
         // The decisions a node was handed, and not the temperatures: the
         // example logs the voted temperature and reports it to the ground as
@@ -2462,7 +2462,7 @@ vehicle:
         // heaters again -- it is what they are to be held at -- and the
         // record of it stands at the one transition.
         for _ in 0..4 {
-            let moved = fabric.deliver("cabin_temp", &kelvin(280.0));
+            let moved = fabric.deliver("zone_temp", &kelvin(280.0));
             assert!(moved.all_delivered(), "{:?}", moved.refused);
         }
         assert_eq!(said(&heaters).len(), 5, "{:?}", said(&heaters));
@@ -2485,14 +2485,14 @@ vehicle:
 
         // A reading inside the band decides nothing new, and the heaters are
         // still held at what they were told: that is what the band means.
-        let moved = fabric.deliver("cabin_temp", &kelvin(294.0));
+        let moved = fabric.deliver("zone_temp", &kelvin(294.0));
         assert!(moved.all_delivered(), "{:?}", moved.refused);
         assert_eq!(said(&heaters).len(), 6);
         assert_eq!(said(&log).len(), 1);
 
         // Warm enough to switch them off: a change, so it is recorded with
         // the first one and the heaters are driven to it.
-        let moved = fabric.deliver("cabin_temp", &kelvin(300.0));
+        let moved = fabric.deliver("zone_temp", &kelvin(300.0));
         assert!(moved.all_delivered(), "{:?}", moved.refused);
         assert_eq!(said(&heaters).last(), Some(&b"0".to_vec()));
         assert_eq!(
@@ -2668,7 +2668,7 @@ vehicle:
         log.lock().expect("the record").refuse =
             Some("the device is full".to_string());
         fabric.hold("gateway", gateway_port);
-        fabric.hold("cabin_temp", mean_port);
+        fabric.hold("zone_temp", mean_port);
         fabric.hold("housekeeping", log_port);
 
         let moved = fabric.deliver("k_1", &[9]);
@@ -2696,7 +2696,7 @@ vehicle:
         let mut fabric = Fabric::new(thermostat(), 64);
         let (gateway, gateway_port) = recorder();
         fabric.hold("gateway", gateway_port);
-        // cabin_temp and housekeeping are not held.
+        // zone_temp and housekeeping are not held.
 
         let moved = fabric.deliver("k_1", &[7]);
 

@@ -193,17 +193,17 @@ fn a_vehicle_answering_to_fprime_reports_to_the_bridge_and_takes_its_commands()
     bridge
         .set_read_timeout(Some(Duration::from_millis(100)))
         .expect("a timeout");
-    // And where it hears cabin_temp, device id 3, the reading made a value.
+    // And where it hears zone_temp, device id 3, the reading made a value.
     let value = links
         .iter()
-        .find(|link| link.source == "cabin_temp")
-        .expect("cabin_temp reports")
+        .find(|link| link.source == "zone_temp")
+        .expect("zone_temp reports")
         .ground()
         .expect("over UDP");
     assert_eq!(value.port, base + 3);
     let temperatures =
         UdpSocket::bind(format!("{}:{}", value.address, value.port))
-            .expect("the bridge's port for cabin_temp");
+            .expect("the bridge's port for zone_temp");
     temperatures
         .set_read_timeout(Some(Duration::from_millis(100)))
         .expect("a timeout");
@@ -237,7 +237,7 @@ fn a_vehicle_answering_to_fprime_reports_to_the_bridge_and_takes_its_commands()
     assert_eq!(until_heard(&sensor, to, &reading, &bridge), reading);
     let kelvin = tcslibgs::node::vehicle::compute::from_value(
         &until_heard(&sensor, to, &reading, &temperatures),
-        "cabin_temp",
+        "zone_temp",
     )
     .expect("a value");
     assert!((kelvin - 293.15).abs() < 1e-6, "{kelvin} K");

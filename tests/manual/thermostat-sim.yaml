@@ -34,7 +34,7 @@ tcssim:
   ready: "127.0.0.1:7907"
 
 # The physics model the payloads below attach to: the thermostat example's,
-# this being the same vehicle with its payloads on buses, so that the cabin
+# this being the same vehicle with its payloads on buses, so that the zone
 # is stated once for both.
 physics: ../../examples/thermostat/thermostat-physics.yaml
 
@@ -44,7 +44,7 @@ simulated_payload_groups:
   # encoding the to_kelvin node its readings go to expects: this file says
   # nothing about the format, the scale or the offset, because a scale written
   # in two files is a scale that can disagree with itself.
-  - name: cabin_temps
+  - name: zone_temps
     simulate: true
     packet_interval: 100 ms
     reads: basic
@@ -53,17 +53,17 @@ simulated_payloads:
   # Each sensor on an output of its own.
   - name: temp_1
     type: i2c
-    group: cabin_temps
+    group: zone_temps
     output: out1
 
   - name: temp_2
     type: i2c
-    group: cabin_temps
+    group: zone_temps
     output: out2
 
   - name: temp_3
     type: spi
-    group: cabin_temps
+    group: zone_temps
     output: out3
 
   # Driven and never read: their stand-ins send nothing, count each time the

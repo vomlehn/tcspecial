@@ -626,7 +626,7 @@ mod tests {
         let ids = ids(&example("thermostat"));
         assert_eq!(ids["gateway"], 0);
         assert_eq!(ids["k_1"], 1);
-        assert_eq!(ids["cabin_temp"], 4);
+        assert_eq!(ids["zone_temp"], 4);
         assert_eq!(ids["temp_1"], 7);
         assert_eq!(ids["heaters_1"], 10);
         assert_eq!(ids["heaters_2"], 11);
@@ -643,7 +643,7 @@ mod tests {
                 ("k_1", 1, "127.0.0.1", 5101),
                 ("k_2", 2, "127.0.0.1", 5102),
                 ("k_3", 3, "127.0.0.1", 5103),
-                ("cabin_temp", 4, "127.0.0.1", 5104),
+                ("zone_temp", 4, "127.0.0.1", 5104),
                 // The decision itself, which the ground sees as well as the
                 // heaters: a reader of the telemetry can then say why the
                 // heaters are on without inferring it from the temperature.
@@ -680,7 +680,7 @@ mod tests {
     fn two_sources_on_one_port_are_refused() {
         let mut graph = example("thermostat");
         // temp_2, id 8, unlinked: 6100 + 8 = 6108; a gateway base of 6104 puts
-        // k_1's 6105 ... cabin_temp's 6108 on the same port.
+        // k_1's 6105 ... zone_temp's 6108 on the same port.
         graph.links.retain(|link| link.origin().node != "temp_2");
         let gateway = graph
             .nodes
@@ -692,7 +692,7 @@ mod tests {
             crate::Scalar::of("127.0.0.1:6104"),
         );
         let refused = of(&graph).expect_err("two sources on 6108");
-        assert!(refused.why.contains("cabin_temp"), "{}", refused.why);
+        assert!(refused.why.contains("zone_temp"), "{}", refused.why);
         assert!(refused.why.contains("temp_2"), "{}", refused.why);
         assert!(refused.why.contains("6108"), "{}", refused.why);
     }

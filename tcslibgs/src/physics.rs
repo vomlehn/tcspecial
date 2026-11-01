@@ -3,7 +3,7 @@
 //!
 //! A file of its own, beside the simulator file and named by it, because a
 //! vehicle's physics outlives any one configuration of its payloads: the
-//! cabin is the same body whichever payloads fly. Kept in each simulator
+//! zone is the same body whichever payloads fly. Kept in each simulator
 //! file, the same vehicle would be written once per configuration, and the
 //! copies would drift. One model, named by every simulator file that uses
 //! it, is one statement of it.
@@ -13,7 +13,7 @@
 //!
 //! ```yaml
 //! physics:
-//!   - name: cabin
+//!   - name: zone
 //!     type: thermal_mass
 //!     environment: "283.15"
 //!     time_constant: "50 s"
@@ -222,14 +222,14 @@ mod tests {
     #[test]
     fn a_model_holds_typed_elements() {
         let model = PhysicsFile::parse(
-            "description: a cabin\nphysics:\n  - name: cabin\n    \
+            "description: a zone\nphysics:\n  - name: zone\n    \
              type: thermal_mass\n    environment: \"283.15\"\n    \
              time_constant: \"50 s\"\n    inputs: \"in1\"\n",
         )
         .expect("it parses");
         let masses = model.thermal_masses();
         assert_eq!(masses.len(), 1);
-        assert_eq!(masses[0].name, "cabin");
+        assert_eq!(masses[0].name, "zone");
         assert_eq!(masses[0].environment, "283.15");
         assert_eq!(masses[0].inputs.as_deref(), Some("in1"));
     }
@@ -239,11 +239,8 @@ mod tests {
     #[test]
     fn an_element_of_no_known_type_is_refused() {
         for (text, said) in [
-            (
-                "physics:\n  - name: cabin\n    environment: \"1\"\n",
-                "type",
-            ),
-            ("physics:\n  - name: cabin\n    type: battery\n", "battery"),
+            ("physics:\n  - name: zone\n    environment: \"1\"\n", "type"),
+            ("physics:\n  - name: zone\n    type: battery\n", "battery"),
             (
                 "physics:\n  - name: c\n    type: thermal_mass\n    \
                  environment: \"1\"\n    time_constant: \"1 s\"\n    \
@@ -282,7 +279,7 @@ mod tests {
     /// A model is YAML, and a file named otherwise is refused by its name.
     #[test]
     fn a_model_is_yaml() {
-        let why = PhysicsFile::load("cabin.xml").expect_err("not YAML");
+        let why = PhysicsFile::load("zone.xml").expect_err("not YAML");
         assert!(why.to_string().contains("is YAML"), "{why}");
     }
 }

@@ -1,6 +1,6 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="900" height="655" viewBox="0 0 900 655" role="img" aria-labelledby="title desc">
   <title id="title">The fprime example</title>
-  <desc id="desc">The vehicle answers to an F´ flight computer rather than to the ground. The thermometer's readings go by its payload-out links to fsw, a gateway_fprime node, and to cabin_temp, a to_kelvin compute node that makes each reading a temperature and sends it on to fsw too, and to heater_wanted, a hysteresis compute node that decides whether the heater is wanted, on below 283.65 K and off above 284.65 K, and sends each change of decision to fsw. fsw sends each to the F´ deployment's TcsBridge component at its bridge_base, 9700, plus the sender's device id: the thermometer's, 2, at 127.0.0.1:9702, cabin_temp's, 3, at 127.0.0.1:9703, and heater_wanted's, 4, at 127.0.0.1:9704. The bridge gives each the F´ ID fprime_id_base, 0x3000, plus the same id: the thermometer's bytes are channel 0x3002, cabin_temp's temperature, in kelvin, channel 0x3003, and heater_wanted's decision, true for on, channel 0x3004. heater_wanted is advice and drives nothing. A command from the bridge, 1 or 0, goes up to fsw, which tcspecial binds at 127.0.0.1:9600, and leaves it by its gateway-out link for the heater.</desc>
+  <desc id="desc">The vehicle answers to an F´ flight computer rather than to the ground. The thermometer's readings go by its payload-out links to fsw, a gateway_fprime node, and to zone_temp, a to_kelvin compute node that makes each reading a temperature and sends it on to fsw too, and to heater_wanted, a hysteresis compute node that decides whether the heater is wanted, on below 283.65 K and off above 284.65 K, and sends each change of decision to fsw. fsw sends each to the F´ deployment's TcsBridge component at its bridge_base, 9700, plus the sender's device id: the thermometer's, 2, at 127.0.0.1:9702, zone_temp's, 3, at 127.0.0.1:9703, and heater_wanted's, 4, at 127.0.0.1:9704. The bridge gives each the F´ ID fprime_id_base, 0x3000, plus the same id: the thermometer's bytes are channel 0x3002, zone_temp's temperature, in kelvin, channel 0x3003, and heater_wanted's decision, true for on, channel 0x3004. heater_wanted is advice and drives nothing. A command from the bridge, 1 or 0, goes up to fsw, which tcspecial binds at 127.0.0.1:9600, and leaves it by its gateway-out link for the heater.</desc>
   <defs>
     <style>
       text { font-family: "DejaVu Sans", Helvetica, Arial, sans-serif; fill: #111827; }
@@ -47,7 +47,7 @@
 
   <!-- The conversion, which makes a reading a temperature -->
   <rect class="compute" x="55" y="315" width="200" height="80" rx="10"/>
-  <text class="name" x="71" y="342">cabin_temp</text>
+  <text class="name" x="71" y="342">zone_temp</text>
   <text class="kind" x="71" y="363">compute, to_kelvin, id 3</text>
   <text class="detail" x="71" y="382">i16_be counts to kelvin</text>
 
@@ -74,7 +74,7 @@
   <text class="detail" x="656" y="182">channel 0x3002:</text>
   <text class="detail" x="656" y="198">  thermometer, bytes</text>
   <text class="detail" x="656" y="218">channel 0x3003:</text>
-  <text class="detail" x="656" y="234">  cabin_temp, kelvin</text>
+  <text class="detail" x="656" y="234">  zone_temp, kelvin</text>
   <text class="detail" x="656" y="254">channel 0x3004:</text>
   <text class="detail" x="656" y="270">  heater_wanted, bool</text>
   <text class="note" x="656" y="310">to the ground by</text>
@@ -86,7 +86,7 @@
   <path class="up" d="M340,130 L259,120" marker-end="url(#arrow-amber)"/>
   <text class="label" x="268" y="112">gateway-out</text>
 
-  <!-- Down: a reading, to fsw and to cabin_temp, and the temperature to
+  <!-- Down: a reading, to fsw and to zone_temp, and the temperature to
        fsw, and both on to the bridge -->
   <path class="down" d="M255,240 L336,232" marker-end="url(#arrow-blue)"/>
   <text class="label" x="262" y="226">payload-out</text>

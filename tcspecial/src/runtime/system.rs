@@ -2728,7 +2728,7 @@ vehicle:
             // One decision, reaching both heaters: they are driven together,
             // so that one failing leaves the other warming the mass.
             vec![b"1".to_vec(), b"1".to_vec()],
-            "a cabin below the band should have both its heaters on"
+            "a zone below the band should have both its heaters on"
         );
         assert!(
             vehicle.telemetry.lock().expect("the record").is_empty(),
@@ -2916,7 +2916,7 @@ vehicle:
 
         assert!(
             vehicle.system.polled().is_empty(),
-            "the example's sensors are all in cabin_temps: {:?}",
+            "the example's sensors are all in zone_temps: {:?}",
             vehicle.system.polled()
         );
         assert_eq!(vehicle.system.logs(), ["housekeeping"]);
@@ -3024,7 +3024,7 @@ vehicle:
     #[test]
     fn a_setpoint_the_ground_sets_changes_what_the_vehicle_decides() {
         let start = Instant::now();
-        // A cabin at 289.15 K, which is below the example's band around
+        // A zone at 289.15 K, which is below the example's band around
         // 293.15: the heaters go on.
         let readings = [
             ("temp_1", &[0x01, 0x00][..]),
@@ -3037,10 +3037,10 @@ vehicle:
             vehicle.heaters.lock().expect("the record").clone(),
             // One decision reaching both heaters.
             vec![b"1".to_vec(), b"1".to_vec()],
-            "a cabin below the band has both its heaters on"
+            "a zone below the band has both its heaters on"
         );
 
-        // The ground lowers the setpoint under the cabin, from a thread of
+        // The ground lowers the setpoint under the zone, from a thread of
         // its own as the command interpreter does.
         let bench = vehicle.system.workbench();
         let done = Arc::new(std::sync::atomic::AtomicBool::new(false));
@@ -3093,7 +3093,7 @@ vehicle:
             vehicle.heaters.lock().expect("the record").clone(),
             // On, then off: each decision reaching both heaters.
             vec![b"1".to_vec(), b"1".to_vec(), b"0".to_vec(), b"0".to_vec()],
-            "the same cabin is now above the band, so both heaters go off"
+            "the same zone is now above the band, so both heaters go off"
         );
     }
 

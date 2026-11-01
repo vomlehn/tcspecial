@@ -1195,12 +1195,12 @@ tcsgui:
         let mut editor = Editor::new(&path);
 
         editor.edit(Edit::AddGroup {
-            name: "cabin_temps".into(),
+            name: "zone_temps".into(),
             interval: "3 s".into(),
         });
         editor.edit(add("temp_1", "i2c"));
         for (attribute, value) in [
-            ("group", "cabin_temps"),
+            ("group", "zone_temps"),
             ("path", "/dev/i2c-1"),
             ("address", "0x48"),
         ] {
@@ -1214,7 +1214,7 @@ tcsgui:
         assert!(editor.trouble().is_none(), "{:?}", editor.trouble());
 
         let written = std::fs::read_to_string(&path).expect("the file");
-        assert!(written.contains("cabin_temps"), "{written}");
+        assert!(written.contains("zone_temps"), "{written}");
         assert!(written.contains("3 s"), "{written}");
 
         let reopened = Editor::open(&path, crate::pane::default_dividers());
@@ -1222,12 +1222,12 @@ tcsgui:
             reopened
                 .document()
                 .groups
-                .get("cabin_temps")
+                .get("zone_temps")
                 .map(String::as_str),
             Some("3 s"),
             "the group did not survive a round trip"
         );
-        assert_eq!(reopened.document().payloads_of("cabin_temps").len(), 1);
+        assert_eq!(reopened.document().payloads_of("zone_temps").len(), 1);
     }
 
     /// A session recovered after a crash has the work *and* the undo.
@@ -1392,14 +1392,14 @@ tcsgui:
         let mut editor = Editor::new(&path);
 
         editor.edit(Edit::AddNode {
-            name: "cabin".into(),
+            name: "zone".into(),
             node_type: "subdiagram".into(),
             home: None,
         });
         editor.edit(Edit::AddNode {
             name: "temp_1".into(),
             node_type: "i2c".into(),
-            home: Some("cabin".into()),
+            home: Some("zone".into()),
         });
         editor.edit(Edit::AddNode {
             name: "gateway".into(),
@@ -1408,16 +1408,16 @@ tcsgui:
         });
         // A link that crosses the boundary, which was asked for.
         editor.edit(Edit::AddLink {
-            link: crate::journal::Link::new("cabin/temp_1", "gateway", None),
+            link: crate::journal::Link::new("zone/temp_1", "gateway", None),
         });
         assert!(editor.trouble().is_none(), "{:?}", editor.trouble());
 
         let top = std::fs::read_to_string(&path).expect("the top diagram");
-        let inner = std::fs::read_to_string(where_.path().join("cabin.ytcs"))
+        let inner = std::fs::read_to_string(where_.path().join("zone.ytcs"))
             .expect("the subdiagram");
 
         // The top file names what it includes and holds its own nodes.
-        assert!(top.contains("include:\n  - cabin"), "{top}");
+        assert!(top.contains("include:\n  - zone"), "{top}");
         assert!(top.contains("name: gateway"), "{top}");
         assert!(
             !top.contains("name: temp_1"),
@@ -1449,20 +1449,20 @@ tcsgui:
         let mut editor = Editor::new(&path);
 
         editor.edit(Edit::AddNode {
-            name: "cabin".into(),
+            name: "zone".into(),
             node_type: "subdiagram".into(),
             home: None,
         });
         editor.edit(Edit::AddNode {
             name: "temp_1".into(),
             node_type: "i2c".into(),
-            home: Some("cabin".into()),
+            home: Some("zone".into()),
         });
 
         let top = std::fs::read_to_string(&path).expect("the top diagram");
-        let inner = std::fs::read_to_string(where_.path().join("cabin.xtcs"))
+        let inner = std::fs::read_to_string(where_.path().join("zone.xtcs"))
             .expect("the subdiagram, in XML as its parent is");
-        assert!(top.contains("<include>cabin</include>"), "{top}");
+        assert!(top.contains("<include>zone</include>"), "{top}");
         assert!(inner.starts_with("<?xml"), "{inner}");
         assert!(inner.contains("<name>temp_1</name>"), "{inner}");
     }

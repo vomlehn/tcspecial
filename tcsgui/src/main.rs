@@ -7438,7 +7438,7 @@ mod tests {
         let mut editor = Editor::new(&where_.path().join("vehicle.ytcs"));
 
         editor.edit(Edit::AddNode {
-            name: "cabin".into(),
+            name: "zone".into(),
             node_type: "subdiagram".into(),
             home: None,
         });
@@ -7450,21 +7450,21 @@ mod tests {
         editor.edit(Edit::AddNode {
             name: "temp_1".into(),
             node_type: "i2c".into(),
-            home: Some("cabin".into()),
+            home: Some("zone".into()),
         });
 
         let (top, _) = views_of(&editor, &None, None);
         let names: Vec<String> =
             top.iter().map(|n| n.name.to_string()).collect();
-        assert_eq!(names, vec!["cabin".to_string(), "gateway".to_string()]);
+        assert_eq!(names, vec!["zone".to_string(), "gateway".to_string()]);
 
-        let (inside, _) = views_of(&editor, &Some("cabin".into()), None);
+        let (inside, _) = views_of(&editor, &Some("zone".into()), None);
         let names: Vec<String> =
             inside.iter().map(|n| n.name.to_string()).collect();
         assert_eq!(names, vec!["temp_1".to_string()]);
 
         // The closed box says what is in it, rather than drawing it.
-        let box_ = top.iter().find(|n| n.name == "cabin").unwrap();
+        let box_ = top.iter().find(|n| n.name == "zone").unwrap();
         assert!(box_.openable, "a subdiagram should be openable");
         assert!(
             box_.summary.contains("1 node"),
@@ -7483,7 +7483,7 @@ mod tests {
         let mut editor = Editor::new(&where_.path().join("vehicle.ytcs"));
 
         editor.edit(Edit::AddNode {
-            name: "cabin".into(),
+            name: "zone".into(),
             node_type: "subdiagram".into(),
             home: None,
         });
@@ -7495,21 +7495,21 @@ mod tests {
         editor.edit(Edit::AddNode {
             name: "temp_1".into(),
             node_type: "i2c".into(),
-            home: Some("cabin".into()),
+            home: Some("zone".into()),
         });
         editor.edit(Edit::AddLink {
-            link: Link::new("cabin/temp_1", "gateway", None),
+            link: Link::new("zone/temp_1", "gateway", None),
         });
 
         // Seen from inside the subdiagram: one link, named for where it goes.
-        let (_, inside) = views_of(&editor, &Some("cabin".into()), None);
+        let (_, inside) = views_of(&editor, &Some("zone".into()), None);
         assert_eq!(inside.len(), 1);
         assert_eq!(inside[0].label, "gateway");
 
         // And seen from the top diagram, where its source is off the page.
         let (_, top) = views_of(&editor, &None, None);
         assert_eq!(top.len(), 1);
-        assert_eq!(top[0].label, "cabin/temp_1");
+        assert_eq!(top[0].label, "zone/temp_1");
     }
 
     /// A name is the type, a hyphen and the first free number, and it is
@@ -7547,8 +7547,8 @@ mod tests {
         assert_eq!(fresh_name(&document, "i2c", &None), "i2c-1");
 
         // In a subdiagram, the first number is free again.
-        let cabin = Some("cabin".to_string());
-        assert_eq!(fresh_name(&document, "i2c", &cabin), "i2c-1");
+        let zone = Some("zone".to_string());
+        assert_eq!(fresh_name(&document, "i2c", &zone), "i2c-1");
     }
 
     /// A link's ends are placed on the terminals it is attached to.
@@ -8384,19 +8384,19 @@ mod tests {
         // A mean is the one destination whose arriving end is named by
         // something that is not a terminal, and it still fills its inputs.
         document.apply(&Edit::AddNode {
-            name: "cabin_temp".into(),
+            name: "zone_temp".into(),
             node_type: "compute".into(),
             home: None,
         });
         document.apply(&Edit::SetAttribute {
-            node: "cabin_temp".into(),
+            node: "zone_temp".into(),
             attribute: "inputs".into(),
             was: None,
             now: Some("in0,in1".into()),
         });
-        assert!(declares_inputs(&document, "cabin_temp"));
+        assert!(declares_inputs(&document, "zone_temp"));
         assert_eq!(
-            arriving_at(&document, "cabin_temp", "payload-in").as_deref(),
+            arriving_at(&document, "zone_temp", "payload-in").as_deref(),
             Some("in0"),
             "a mean is filled by name, not by terminal"
         );
@@ -10335,7 +10335,7 @@ mod tests {
         };
         shut(0o500);
         editor.borrow_mut().edit(Edit::AddNode {
-            name: "cabin_temp".into(),
+            name: "zone_temp".into(),
             node_type: "compute".into(),
             home: None,
         });
@@ -10406,7 +10406,7 @@ mod tests {
         for (name, node_type) in [
             ("temp_1", "i2c"),
             ("temp_2", "i2c"),
-            ("cabin_temp", "compute"),
+            ("zone_temp", "compute"),
         ] {
             editor.borrow_mut().edit(Edit::AddNode {
                 name: name.to_string(),
@@ -10463,7 +10463,7 @@ mod tests {
             journal::Link::joining(
                 to,
                 Some("payload-out"),
-                "cabin_temp",
+                "zone_temp",
                 Some("in0"),
             )
         };
@@ -10481,7 +10481,7 @@ mod tests {
         assert!(visible, "the fault was not shown");
         assert!(heading.contains("configuration"), "{heading}");
         assert!(said.contains("two links arrive"), "{said}");
-        assert!(said.contains("cabin_temp.in0"), "{said}");
+        assert!(said.contains("zone_temp.in0"), "{said}");
 
         // Acknowledged, and the next edit does not bring it back: the red on
         // the node and the sentence in its window are still saying it.
@@ -11572,7 +11572,7 @@ mod tests {
             &where_.path().join("vehicle.ytcs"),
             dividers(),
         )));
-        for (name, interval) in [("cabin_temps", "3 s"), ("bay", "5 s")] {
+        for (name, interval) in [("zone_temps", "3 s"), ("bay", "5 s")] {
             editor.borrow_mut().edit(Edit::AddGroup {
                 name: name.into(),
                 interval: interval.into(),
@@ -11619,15 +11619,15 @@ mod tests {
             .filter_map(|row| window.get_choices().row_data(row))
             .map(|name| name.to_string())
             .collect();
-        assert_eq!(offered, vec!["bay".to_string(), "cabin_temps".to_string()]);
+        assert_eq!(offered, vec!["bay".to_string(), "zone_temps".to_string()]);
         // Opened on one of them rather than on an invitation to choose: most
         // configurations have one group, and two presses to reach it would be
         // one too many.
         assert_eq!(window.get_group(), "bay");
 
         // Choosing another shows that one.
-        window.invoke_choose("cabin_temps".into());
-        assert_eq!(window.get_group(), "cabin_temps");
+        window.invoke_choose("zone_temps".into());
+        assert_eq!(window.get_group(), "zone_temps");
         assert_eq!(window.get_interval(), "3 s");
 
         // And a new one is made with an interval, because a group without one
@@ -11703,7 +11703,7 @@ mod tests {
         };
         shut(0o500);
         editor.borrow_mut().edit(Edit::AddNode {
-            name: "cabin_temp".into(),
+            name: "zone_temp".into(),
             node_type: "compute".into(),
             home: None,
         });
@@ -11745,7 +11745,7 @@ mod tests {
             editor.borrow().trouble()
         );
         let written = std::fs::read_to_string(&path).expect("the file");
-        assert!(written.contains("cabin_temp"), "{written}");
+        assert!(written.contains("zone_temp"), "{written}");
     }
 
     /// A click on a node opens a window for it, and another node opens
@@ -11784,7 +11784,7 @@ mod tests {
             let left = dividers().payloads;
             for (name, node_type, at) in [
                 ("to_kelvin", "compute", (left + 120, 88)),
-                ("cabin_temp", "compute", (left + 120, 240)),
+                ("zone_temp", "compute", (left + 120, 240)),
                 // And a payload, in its own pane. Of a different type on
                 // purpose: a click has to open the window for whatever was
                 // clicked, and a payload is the one a person reaches for
@@ -11898,7 +11898,7 @@ mod tests {
         // A second node opens a second window, and the first stays: which is
         // the whole point of this not being a panel.
         click((dividers().payloads + 120, 240), "compute");
-        ui.invoke_node_edit("cabin_temp".into());
+        ui.invoke_node_edit("zone_temp".into());
         assert_eq!(
             views.borrow().attributes.len(),
             2,
@@ -12002,7 +12002,7 @@ mod tests {
         window.invoke_closed();
         assert_eq!(
             views.borrow().attributes.keys().collect::<Vec<_>>(),
-            vec!["askew", "cabin_temp", "sensor"],
+            vec!["askew", "sensor", "zone_temp"],
             "Close should shut one window and leave the others"
         );
     }
@@ -12272,7 +12272,7 @@ mod tests {
         {
             let mut editor = editor.borrow_mut();
             editor.edit(Edit::AddGroup {
-                name: "cabin_temps".to_string(),
+                name: "zone_temps".to_string(),
                 interval: "3 s".to_string(),
             });
             for name in ["temp_1", "temp_2"] {
@@ -12285,7 +12285,7 @@ mod tests {
                     node: name.to_string(),
                     attribute: "group".to_string(),
                     was: None,
-                    now: Some("cabin_temps".to_string()),
+                    now: Some("zone_temps".to_string()),
                 });
             }
         }
@@ -12329,7 +12329,7 @@ mod tests {
             .expect("a group window should have been made")
             .upgrade()
             .expect("and still be there");
-        assert_eq!(window.get_group(), "cabin_temps");
+        assert_eq!(window.get_group(), "zone_temps");
         assert_eq!(window.get_interval(), "3 s");
         assert_eq!(window.get_members_text(), "temp_1, temp_2");
 
@@ -12377,8 +12377,8 @@ mod tests {
         // and the window goes on working afterwards -- its handlers read the
         // group as they run rather than remembering the name they were made
         // with.
-        window.invoke_renamed("cabin".into());
-        assert_eq!(window.get_group(), "cabin");
+        window.invoke_renamed("zone".into());
+        assert_eq!(window.get_group(), "zone");
         assert_eq!(
             editor
                 .borrow()
@@ -12388,7 +12388,7 @@ mod tests {
                 .attributes
                 .get("group")
                 .map(String::as_str),
-            Some("cabin")
+            Some("zone")
         );
         window.invoke_interval_set("500 ms".into());
         assert_eq!(
@@ -12396,7 +12396,7 @@ mod tests {
                 .borrow()
                 .document()
                 .groups
-                .get("cabin")
+                .get("zone")
                 .map(String::as_str),
             Some("500 ms")
         );

@@ -761,7 +761,7 @@ mod tests {
     }
 
     /// The thermometer, device id 2, is the channel 0x3002, named after it
-    /// and holding its bytes; cabin_temp, device id 3, a conversion, is
+    /// and holding its bytes; zone_temp, device id 3, a conversion, is
     /// 0x3003 and holds a temperature; heater_wanted, device id 4, a
     /// thermostat, is 0x3004 and holds a decision; and the bridge's own
     /// follow the last device id.
@@ -785,7 +785,7 @@ mod tests {
                 },
                 Source {
                     channel: Channel {
-                        name: "cabin_temp".to_string(),
+                        name: "zone_temp".to_string(),
                         local: 3,
                         id: 0x3003,
                     },
@@ -809,13 +809,7 @@ mod tests {
             model.nodes.iter().map(|n| n.name.as_str()).collect();
         assert_eq!(
             names,
-            [
-                "fsw",
-                "heater",
-                "thermometer",
-                "cabin_temp",
-                "heater_wanted"
-            ]
+            ["fsw", "heater", "thermometer", "zone_temp", "heater_wanted"]
         );
         assert_eq!(model.node_name_bytes(), "heater_wanted".len());
     }
@@ -850,7 +844,7 @@ mod tests {
             "constant ID_BASE = 0x3000",
             "constant NODE_NAME_BYTES = 13",
             "telemetry $thermometer: Datum id 2",
-            "telemetry $cabin_temp: F64 id 3",
+            "telemetry $zone_temp: F64 id 3",
             "telemetry $heater_wanted: bool id 4",
             "telemetry $BeaconStage: Stage id 5",
             "telemetry $DataCutShort: U32 id 13",
@@ -873,7 +867,7 @@ mod tests {
         assert!(
             cpp.contains(
                 "if (this->asKelvin(datum, kelvin)) {\n\t\t\t\
-                 this->tlmWrite_cabin_temp(kelvin);"
+                 this->tlmWrite_zone_temp(kelvin);"
             ),
             "{cpp}"
         );
@@ -895,7 +889,7 @@ mod tests {
         assert!(is_fprime_name("thermometer"));
         assert!(is_fprime_name("_t2"));
         assert!(is_fprime_name("time"));
-        for bad in ["", "2t", "cabin-temp", "cabin temp", "é"] {
+        for bad in ["", "2t", "zone-temp", "zone temp", "é"] {
             assert!(!is_fprime_name(bad), "{bad:?}");
         }
 
@@ -913,9 +907,9 @@ mod tests {
                 }
             }
         };
-        rename(&mut graph, "cabin-temp");
+        rename(&mut graph, "zone-temp");
         let refused = of(&graph, "fsw").expect_err("not an F´ name");
-        assert_eq!(refused.node, "cabin-temp");
+        assert_eq!(refused.node, "zone-temp");
         assert!(refused.why.contains("letters, digits"), "{}", refused.why);
 
         let mut graph = example();
@@ -984,7 +978,7 @@ mod tests {
             Graph::load(root.join("examples/thermostat/thermostat.ytcs"))
                 .expect("the example reads");
         assert_eq!(Form::of(&thermostat, "k_1"), Form::Kelvin);
-        assert_eq!(Form::of(&thermostat, "cabin_temp"), Form::Kelvin);
+        assert_eq!(Form::of(&thermostat, "zone_temp"), Form::Kelvin);
         assert_eq!(Form::of(&thermostat, "thermostat"), Form::Decision);
         assert_eq!(Form::of(&thermostat, "temp_1"), Form::Datum);
         assert_eq!(Form::of(&thermostat, "nobody"), Form::Datum);

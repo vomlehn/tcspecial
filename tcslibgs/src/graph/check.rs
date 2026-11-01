@@ -2474,10 +2474,10 @@ mod tests {
         };
 
         let g = answering_fprime(
-            vec![node("cabin-temp", "i2c"), node("fsw", "gateway_fprime")],
-            vec![link("cabin-temp", &["fsw"])],
+            vec![node("zone-temp", "i2c"), node("fsw", "gateway_fprime")],
+            vec![link("zone-temp", &["fsw"])],
         );
-        named(&g, "cabin-temp", "letters, digits and underscores");
+        named(&g, "zone-temp", "letters, digits and underscores");
 
         let mut second = node("fsw2", "gateway_fprime");
         second

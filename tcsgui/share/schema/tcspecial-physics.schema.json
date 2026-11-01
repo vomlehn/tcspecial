@@ -22,7 +22,12 @@
           "type": {
             "enum": [
               "heater",
-              "thermal_zone"
+              "thermal_zone",
+              "sun",
+              "solar_array",
+              "load",
+              "bus",
+              "battery"
             ],
             "description": "What kind of element it is, which decides its terminals and what else it states."
           }
@@ -138,6 +143,154 @@
                 "environment",
                 "time_constant",
                 "capacity"
+              ]
+            }
+          },
+          {
+            "if": {
+              "properties": {
+                "type": {
+                  "const": "sun"
+                }
+              }
+            },
+            "then": {
+              "description": "The sun: its terminal is light, a ratio, one in sunlight and nought in shadow. Each change is an event, foreseen from the orbit.",
+              "properties": {
+                "period": {
+                  "type": [
+                    "string"
+                  ],
+                  "description": "How long one orbit takes, as a length of time: `90 min`."
+                },
+                "eclipse": {
+                  "type": [
+                    "string"
+                  ],
+                  "description": "How much of an orbit is in shadow, as a fraction, written bare: `0.35`. From nought up to but not one."
+                },
+                "start": {
+                  "type": [
+                    "string",
+                    "null"
+                  ],
+                  "description": "How far round the orbit it starts, from the start of its sunlight, as a fraction, written bare. Unstated is nought."
+                }
+              },
+              "required": [
+                "period",
+                "eclipse"
+              ]
+            }
+          },
+          {
+            "if": {
+              "properties": {
+                "type": {
+                  "const": "solar_array"
+                }
+              }
+            },
+            "then": {
+              "description": "A solar array: its terminals are light, an input taking a ratio, which must be joined; and current, in A, its full-sun current times the light.",
+              "properties": {
+                "current": {
+                  "type": [
+                    "string"
+                  ],
+                  "description": "What it gives in full sunlight, written with its unit: `7 A`."
+                }
+              },
+              "required": [
+                "current"
+              ]
+            }
+          },
+          {
+            "if": {
+              "properties": {
+                "type": {
+                  "const": "load"
+                }
+              }
+            },
+            "then": {
+              "description": "A load: its terminals are shed, a decision, shedding it while asserted and never where nothing is joined; and current, in A, nought while shed.",
+              "properties": {
+                "current": {
+                  "type": [
+                    "string"
+                  ],
+                  "description": "What it draws while it is on, written with its unit: `2 A`."
+                }
+              },
+              "required": [
+                "current"
+              ]
+            }
+          },
+          {
+            "if": {
+              "properties": {
+                "type": {
+                  "const": "bus"
+                }
+              }
+            },
+            "then": {
+              "description": "A power bus: its terminals are supply and demand, in A, each the sum of what is joined to it, and current, in A, supply less demand. It has no settings.",
+              "properties": {},
+              "required": []
+            }
+          },
+          {
+            "if": {
+              "properties": {
+                "type": {
+                  "const": "battery"
+                }
+              }
+            },
+            "then": {
+              "description": "A battery: its terminals are offered, in A, what the bus has left over, which must be joined; voltage, in V; current, in A, what flows in, nought into a full battery; and charge, a ratio. Reaching full or empty is an event, foreseen.",
+              "properties": {
+                "capacity": {
+                  "type": [
+                    "string"
+                  ],
+                  "description": "How much charge it holds full, written with its unit: `10 Ah`."
+                },
+                "empty": {
+                  "type": [
+                    "string"
+                  ],
+                  "description": "Its open-circuit voltage empty, written with its unit: `24 V`."
+                },
+                "full": {
+                  "type": [
+                    "string"
+                  ],
+                  "description": "Its open-circuit voltage full, more than empty: `33.2 V`."
+                },
+                "resistance": {
+                  "type": [
+                    "string"
+                  ],
+                  "description": "Its internal resistance, written with its unit: `0.05 ohm`."
+                },
+                "charge": {
+                  "type": [
+                    "string"
+                  ],
+                  "description": "How full it starts, as a fraction of its capacity, written bare: `0.6`."
+                }
+              },
+              "required": [
+                "capacity",
+                "empty",
+                "full",
+                "resistance",
+                "charge"
               ]
             }
           }

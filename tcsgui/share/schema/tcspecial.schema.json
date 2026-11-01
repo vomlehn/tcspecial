@@ -964,6 +964,24 @@
               "null"
             ]
           },
+          "age": {
+            "description": "For a `vote`: how old a reading may be and still be voted on, as a length of time: `2 s`. Older ones are left out. Unstated, a reading stands until it is replaced.",
+            "type": [
+              "string",
+              "number",
+              "boolean",
+              "null"
+            ]
+          },
+          "unit": {
+            "description": "The unit the node's values are in: K, V, A, W, m, m/s, N or ratio. Required of a `to_value` conversion and of a `process` computation, whose answers are numbers of it.",
+            "type": [
+              "string",
+              "number",
+              "boolean",
+              "null"
+            ]
+          },
           "executable": {
             "description": "The program this node runs: an app node's application, or the program a `process` computation runs on what arrives. Executed with a leading `~` and `$HOME` expanded as a shell would expand them -- to the home directory and to the value of the environment variable HOME, of whatever runs it. An app node's is run with the node's name as its first argument.",
             "type": [
@@ -1574,6 +1592,24 @@
             ]
           },
           "algorithm": {
+            "type": [
+              "string",
+              "number",
+              "boolean",
+              "null"
+            ]
+          },
+          "age": {
+            "description": "For a `vote`: how old a reading may be and still be voted on, as a length of time: `2 s`. Older ones are left out. Unstated, a reading stands until it is replaced.",
+            "type": [
+              "string",
+              "number",
+              "boolean",
+              "null"
+            ]
+          },
+          "unit": {
+            "description": "The unit the node's values are in: K, V, A, W, m, m/s, N or ratio. Required of a `to_value` conversion and of a `process` computation, whose answers are numbers of it.",
             "type": [
               "string",
               "number",
@@ -2211,6 +2247,24 @@
             ]
           },
           "algorithm": {
+            "type": [
+              "string",
+              "number",
+              "boolean",
+              "null"
+            ]
+          },
+          "age": {
+            "description": "For a `vote`: how old a reading may be and still be voted on, as a length of time: `2 s`. Older ones are left out. Unstated, a reading stands until it is replaced.",
+            "type": [
+              "string",
+              "number",
+              "boolean",
+              "null"
+            ]
+          },
+          "unit": {
+            "description": "The unit the node's values are in: K, V, A, W, m, m/s, N or ratio. Required of a `to_value` conversion and of a `process` computation, whose answers are numbers of it.",
             "type": [
               "string",
               "number",

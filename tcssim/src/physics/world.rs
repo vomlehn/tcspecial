@@ -39,10 +39,15 @@ use std::time::Instant;
 use tcslibgs::physics::terminal::{Direction, Terminal};
 use tcslibgs::physics::{Joined, Model, Place, Resolution};
 
+use super::battery::Battery;
+use super::bus::Bus;
 use super::clock::Clock;
 use super::element::{Element, MOST_TERMINALS};
 use super::heater::Heater;
+use super::load::Load;
 use super::queue::Queue;
+use super::solar_array::SolarArray;
+use super::sun::Sun;
 use super::thermal_zone::ThermalZone;
 
 /// The most events one advance lets happen before it stops, with a word in
@@ -110,6 +115,15 @@ impl World {
                     Resolution::ThermalZone(figures) => Box::new(
                         ThermalZone::new(&element.name, *figures, seed),
                     ),
+                    Resolution::Sun(figures) => Box::new(Sun::new(*figures)),
+                    Resolution::SolarArray(figures) => {
+                        Box::new(SolarArray::new(*figures))
+                    }
+                    Resolution::Load(figures) => Box::new(Load::new(*figures)),
+                    Resolution::Bus => Box::new(Bus::default()),
+                    Resolution::Battery(figures) => {
+                        Box::new(Battery::new(*figures))
+                    }
                 };
                 (element.name.clone(), element.what.terminals(), made)
             })
@@ -278,6 +292,10 @@ impl World {
     /// be, which is the number of them, since the model's connections go
     /// from each element's outputs to another's inputs and a chain without a
     /// loop visits each element once.
+    ///
+    /// # Arguments
+    ///
+    /// * `state` - The world's state, held locked.
     fn hold(&self, state: &mut State) {
         let State {
             now,

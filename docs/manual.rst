@@ -1357,12 +1357,15 @@ different from a CAN interface, where the identifier does exactly that.
 Bringing the interface up is the platform's business, as it is for a CAN
 controller: ``ip link set dev hdlc0 up``, from whatever starts the vehicle.
 
-**There is no stand-in.** Every other experimental type has something in the
-kernel to be run against -- ``vcan`` for a CAN bus, ``i2c-stub`` for a bus
-device, ``gpio-sim`` for discrete lines, ``iio_dummy`` for a sensor -- and
-generic HDLC has none. This type needs a card: a ``wanxl``, a ``pci200syn``, a
-``pc300too`` or a FarSync. tcssim says so rather than pretending, and refuses
-a set with one of these in it.
+**The kernel has no stand-in.** Every other experimental type has something
+in the kernel to be run against -- ``vcan`` for a CAN bus, ``i2c-stub`` for a
+bus device, ``gpio-sim`` for discrete lines, ``iio_dummy`` for a sensor -- and
+generic HDLC has none: the line itself needs a card, a ``wanxl``, a
+``pci200syn``, a ``pc300too`` or a FarSync. A node that gives ``stand_in``, a
+loopback address and port, is reached there over UDP instead under
+``--simulate=some`` or ``all``, and tcssim sends its frames there; one that
+does not is hardware, and tcssim refuses to simulate it. See `Stand-ins or
+hardware: --simulate`_.
 
 An rpmsg Payload
 ----------------
@@ -4006,6 +4009,38 @@ through ``tcslib::simulator::wait``, or ``tcslib.simulator.wait`` in Python.
 Each payload starts silent, until its panel's button is pressed. ``tcssim
 --sending`` starts every one sending instead, for a test with nobody at the
 window: the F´ bridge's is one (see `The F´ bridge`_).
+
+Every stand-in at once
+^^^^^^^^^^^^^^^^^^^^^^
+``make stand-ins-test`` runs tcspecial against tcssim with a payload of each
+type tcssim stands in for, and checks that each one's data reaches the
+ground:
+
+.. code-block:: console
+
+   $ make stand-ins-test
+   ...
+     ok   text: 50 datagrams, 800 bytes, part of tcssim's text
+     ok   line: 50 datagrams, 800 bytes
+     ok   bus: 50 datagrams, 800 bytes
+     ...
+     left out can: no virtual CAN bus is up; make mkvcan makes one, as root
+
+It writes its configuration into ``tests/stand-ins/run``, where the stand-ins'
+paths are: a device file, a serial line, a serial line that is an RS-485 bus,
+a SPI peripheral, an rpmsg channel and an IIO buffer, each a file or
+pseudo-terminal tcssim makes, and an HDLC line reached at its ``stand_in``.
+A CAN payload is added where a virtual CAN bus is up, and a GPIO payload where
+a ``gpio-sim`` chip is there for the user running it; the test makes neither,
+since both need root, and says which it left out. It starts tcssim with
+``--sending``, waits for it, starts tcspecial, connects as a ground station
+does, and listens for ten seconds. Then it stops tcssim with a signal, as a
+harness does, and checks that every stand-in is gone. tcssim's window opens
+for the length of the test, so a display is needed.
+
+Its ports are 47000 to 47999, and it holds ``tcs-ports.lock``, beside the
+checkout, while it runs, so that it never runs at the same time as another
+test that starts tcspecial and tcssim and holds the same lock.
 
 Building tcspecial for a vehicle
 --------------------------------

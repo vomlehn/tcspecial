@@ -1739,8 +1739,8 @@ is a later step.</dd>
 <p>The F´ end is a component in the F´ deployment, <tt class="docutils literal">TcsBridge</tt>, built on
 <tt class="docutils literal"><span class="pre">tcslib-c</span></tt> and so in C++ against the header every C and C++ ground station
 uses. To tcspecial it is a MOC: it opens the same configuration, sends
-<tt class="docutils literal">CONNECT</tt> and compares digests, takes beacons, sends commands and receives
-data, all in the radio's own UDP protocol. To the rest of the deployment it
+<tt class="docutils literal">CONNECT</tt> and compares digests, takes beacons, sends commands and data and
+receives data, all in the radio's own UDP protocol. To the rest of the deployment it
 is a component like any other, with commands in and telemetry channels out,
 and the deployment sends them to the ground with whatever it already uses.</p>
 <pre class="code yaml literal-block">
@@ -1834,7 +1834,18 @@ the bridge sends one for each beacon heard while it is not matched for
 commanding, because nothing comes down until one is answered and a flight
 computer has nobody at it to press a button. A node command naming a node
 the configuration lacks is refused unsent. What tcspecial answers is the
-command's response and an event. The restart commands are not offered yet.
+command's response and an event. The restart commands are not offered yet.</p>
+<p><tt class="docutils literal">SEND_DATA</tt> is the one command that is not tcspecial's: it sends its text
+up to the gateway node, as one datum, by tcslib-c's <tt class="docutils literal">tcs_uplink</tt>, and the
+node leaves it by its <tt class="docutils literal"><span class="pre">gateway-out</span></tt> links for the nodes they reach -- in
+the fprime example, <tt class="docutils literal">1</tt> or <tt class="docutils literal">0</tt> to the heater. Text, because what a
+gateway node's links drive here is a line or a program, which take text, and
+because a byte array is something nobody at F´'s ground system can type. It
+goes only while the bridge is matched for commanding, as tcslib-c holds every
+uplink to (see <a class="reference internal" href="#on-the-ground">On the ground</a>), and is refused, saying so, before. A
+gateway node that binds no address and port aboard has no way up; the
+bridge runs on one, as the far end of a bridge that only listens, and fails
+<tt class="docutils literal">SEND_DATA</tt> alone, saying why.
 Nothing on the ground holds commands back after a RESTART -- the vehicle
 answers them <tt class="docutils literal">Unmatched</tt>, as <a class="reference internal" href="#what-the-ground-may-send-meanwhile">What the ground may send meanwhile</a> says --
 so offering them needs no tie between the beacon watch and the client, each
@@ -1885,10 +1896,11 @@ started by the tests once F´'s test API is listening. The tests, in
 connects and is matched, and the beacon says the configuration's checksum;
 beacons are heard; a simulated reading arrives as the thermometer's channel,
 its two bytes, and the temperature made of it as <tt class="docutils literal">cabin_temp</tt>'s, a number
-of kelvin, with no datum refused as not a value; a PING is answered; a node is stopped and started again; a node the
+of kelvin, with no datum refused as not a value; a PING is answered; a node is stopped and started again; <tt class="docutils literal">1</tt> sent up
+drives the heater, whose stand-in warms the thermal mass the thermometer
+reads, so that <tt class="docutils literal">cabin_temp</tt> climbs, and <tt class="docutils literal">0</tt> turns it off; a node the
 configuration lacks is refused unsent; and the deployment stops cleanly.</p>
-<p>Not yet built: data up from the bridge to the gateway node, which the fprime
-example's heater is driven by; and the restart commands.</p>
+<p>Not yet built: the restart commands.</p>
 </div>
 </div>
 <div class="section" id="what-a-device-node-says">

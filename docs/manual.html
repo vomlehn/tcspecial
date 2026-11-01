@@ -2737,8 +2737,12 @@ CONNECT itself, once for each beacon heard while it is unmatched, and says
 <tt class="docutils literal">ConfigurationDiffers</tt> when it does not. Its commands are <tt class="docutils literal">PING</tt>, and
 <tt class="docutils literal">START_NODE</tt>, <tt class="docutils literal">STOP_NODE</tt> and <tt class="docutils literal">QUERY_NODE</tt>, each given a node's name;
 each is answered as tcspecial answers it, with an event saying what tcspecial
-said. What the vehicle's beacon says is the <tt class="docutils literal">BeaconSaid</tt> event, each time
-it changes.</p>
+said. <tt class="docutils literal">SEND_DATA</tt> sends its text up to the gateway node, which leaves it
+by its <tt class="docutils literal"><span class="pre">gateway-out</span></tt> links -- <tt class="docutils literal">SEND_DATA 1</tt> turns the example's heater on,
+and <tt class="docutils literal">SEND_DATA 0</tt> off -- and is said in a <tt class="docutils literal">DataSent</tt> event; it goes only
+while the bridge is matched for commanding, and is refused before, as every
+command but CONNECT and the restarts is. What the vehicle's beacon says is
+the <tt class="docutils literal">BeaconSaid</tt> event, each time it changes.</p>
 <p>In a deployment of your own, give the instance the base ID the model states,
 and the configuration it was built for as it is set up:</p>
 <pre class="code text literal-block">
@@ -2754,12 +2758,12 @@ and runs the tests in <tt class="docutils literal">fprime/BridgeTest/test</tt>, 
 and hold it to connecting and matching, hearing beacons, a simulated reading
 arriving as the thermometer's channel and as <tt class="docutils literal">cabin_temp</tt>'s temperature, a
 <tt class="docutils literal">PING</tt> answered, a node stopped and
-started again, an unknown node refused unsent, and stopping cleanly. tcssim's
+started again, <tt class="docutils literal">SEND_DATA 1</tt> warming the cabin until <tt class="docutils literal">cabin_temp</tt> climbs,
+an unknown node refused unsent, and stopping cleanly. tcssim's
 window is open while it runs. What a run leaves -- each program's log, and
 F´'s ground system's -- is in <tt class="docutils literal"><span class="pre">fprime/build-test</span></tt>. F´'s ground system
 listens on TCP port 50000.</p>
-<p>The bridge does not yet send data up to the gateway node, so the example's
-heater is not driven from F´; nor does it offer the restart commands.</p>
+<p>The bridge does not yet offer the restart commands.</p>
 </div>
 </div>
 <div class="section" id="the-cfs-example">

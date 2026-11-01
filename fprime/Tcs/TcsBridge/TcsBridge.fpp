@@ -2,8 +2,8 @@
 #
 # To tcspecial the bridge is a ground station: it opens the configuration
 # the vehicle flies, sends CONNECT and compares checksums, takes beacons,
-# sends commands and receives data, all over the radio's UDP protocol,
-# through tcslib-c's tcs.h. To the rest of the deployment it is a component
+# sends commands and data and receives data, all over the radio's UDP
+# protocol, through tcslib-c's tcs.h. To the rest of the deployment it is a component
 # like any other: commands in, events and telemetry channels out.
 #
 # Which channels it has, and their IDs, are the configuration's: the model
@@ -60,7 +60,8 @@ module Tcs {
     import Fw.Channel
 
     # ------------------------------------------------------------------
-    # Commands: one for each tcspecial command the bridge sends
+    # Commands: one for each tcspecial command the bridge sends, and one
+    # for data up to the gateway node
     # ------------------------------------------------------------------
 
     @ Ask whether tcspecial's command link answers
@@ -80,6 +81,13 @@ module Tcs {
     async command QUERY_NODE(
       node: string size NODE_NAME_BYTES @< The node's name
     ) opcode 3
+
+    @ Send a datum up to the gateway node, which leaves it by its
+    @ gateway-out links for the nodes they reach: 1 or 0 to a heater, say.
+    @ Sent only while the bridge is matched for commanding
+    async command SEND_DATA(
+      data: string size DATUM_BYTES @< The datum, as text
+    ) opcode 4
 
     # ------------------------------------------------------------------
     # Events
@@ -199,6 +207,12 @@ module Tcs {
     ) severity warning low id 16 \
       format "{} sent a datum that is not a value: {}" \
       throttle 10
+
+    @ A datum went up to the gateway node
+    event DataSent(
+      length: U32 @< How many bytes it was
+    ) severity activity low id 17 \
+      format "{} bytes sent up to the gateway node"
 
     @ Taking data failed
     event ReceiveFailed(

@@ -234,7 +234,7 @@ fn watch_driven_lines(
         }
         if now != was && !first {
             if sending && now.iter().all(|&v| v == now[0]) {
-                crate::thermal::driven(
+                crate::physics::thermal_mass::thermal_mass::driven(
                     &config.thermal,
                     &config.name,
                     &now[..1],
@@ -316,6 +316,7 @@ mod tests {
             .collect();
         let config = PayloadConfig {
             thermal: None,
+            thermostat: None,
             name: "heaters".to_string(),
             protocol: crate::payload::PayloadProtocol::Gpio,
             address: "/dev/gpiochip3".to_string(),

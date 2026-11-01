@@ -10547,9 +10547,23 @@ Requirement
     that environment.
 
 Requirement
+    A mass may name inputs, where heaters are connected, and outputs, where
+    sensors read it. Any of them may be left unconnected. A list naming one
+    twice is refused.
+
+Requirement
     A simulated payload may be attached to a mass, either as something that
-    reads it or as something that heats it. A heater states what it adds, in
-    kelvin a second.
+    reads one of its outputs or as something that heats it through one of
+    its inputs. A heater states what it adds, in kelvin a second.
+
+Requirement
+    An input is one heater's. Two heaters on one input would each switch the
+    other's heat, and which was on would depend on which the vehicle drove
+    last.
+
+Requirement
+    The mass is one lump at one temperature, so every output reads the
+    same. What the names say is which sensor is on which.
 
 Requirement
     A mass nothing is attached to is refused. It would be a state nothing
@@ -10630,12 +10644,45 @@ Requirement
     looks must not leave it acting on a decision that is older every pass.
 
 Requirement
-    A heater must be a kind of payload the simulator can be driven through,
-    which today means a socket. A heater on discrete lines is driven through
-    ``gpio-sim``, which the simulator drives and cannot yet be driven
-    through, so the shipped thermostat example attaches its sensors to a mass
-    and its heaters to nothing: what that example shows is the vehicle's half
-    of the loop.
+    A heater must be a kind of payload the simulator can be driven through:
+    a socket, or discrete lines on ``gpio-sim``, whose stand-in watches the
+    lines the vehicle drives.
+
+**A Stood-in Thermostat**
+
+The loop closes through tcspecial when the heaters are attached: the
+sensors report the mass, the vehicle decides, the heaters warm it. To watch
+the mass and the heaters with no tcspecial running, tcssim can stand in for
+the vehicle's thermostat too. It is ``tcssim::node::vehicle::thermostat``,
+the one vehicle node the simulator has: everything else a vehicle computes
+runs on a workstation as it runs aboard.
+
+Requirement
+    The simulator file's ``tcssim`` section may name a hysteresis node of
+    the configuration. tcssim then stands in for it, taking its ``setpoint``
+    and ``half_band`` from the configuration, which states them once.
+
+Requirement
+    Its sensors are the simulated payloads reading a thermal mass whose data
+    reaches the node, and its heaters the simulated payloads heating one that
+    data from the node reaches. A node that is not a hysteresis node, or
+    that no such sensor reaches, or that reaches no such heater, is refused.
+
+Requirement
+    It reads what each sensor's stand-in sends, as it leaves: a dropped
+    reading never arrives, and a truncated or corrupted one arrives as the
+    vehicle would see it. The bytes are read as the conversion the sensor
+    feeds reads them, ``Format::counts`` in tcslibgs being the one reading
+    both use, and a reading that conversion would refuse is ignored.
+
+Requirement
+    It decides on the median of each sensor's latest reading, as the example
+    votes them, and asserts the decision to every heater on every reading,
+    as the hysteresis node does aboard.
+
+Requirement
+    It is never named with tcspecial running, whose own thermostat switches
+    the same heaters.
 
 Fault Injection
 ---------------
@@ -10745,38 +10792,58 @@ Requirement
 Example
 -------
 This is the shipped ``examples/thermostat/thermostat-sim.yaml``, which
-simulates the three sensors of ``thermostat.ytcs``. All three are read together
-and so share a group, which carries their rate and the thermal mass they
-report; the mass is what makes three sensors agree about a temperature. The
-heaters are not simulated: they are discrete lines, which the simulator drives
-rather than being driven through.
+simulates the three sensors and two heaters of ``thermostat.ytcs``. The three
+sensors are read together and so share a group, which carries their rate and
+the thermal mass they
+report; the mass is what makes three sensors agree about a temperature, each
+on an output of its own. The heaters are discrete lines, each warming the
+mass through an input of its own while the vehicle has it on.
 
 .. code-block:: yaml
 
    description: Simulator settings for the payloads of thermostat.ytcs
 
    thermal_mass:
-     - name: cabin
+     - name: basic
        environment: "283.15"
        time_constant: "50 s"
+       inputs: "in1,in2"
+       outputs: "out1,out2,out3"
 
    simulated_payload_groups:
      - name: cabin_temps
        packet_interval: 100 ms
-       reads: cabin
+       reads: basic
 
    simulated_payloads:
      - name: temp_1
        type: i2c
        group: cabin_temps
+       output: out1
 
      - name: temp_2
        type: i2c
        group: cabin_temps
+       output: out2
 
      - name: temp_3
        type: spi
        group: cabin_temps
+       output: out3
+
+     - name: heaters_1
+       simulate: true
+       type: gpio
+       heats: basic
+       input: in1
+       rate: "3.0"
+
+     - name: heaters_2
+       simulate: true
+       type: gpio
+       heats: basic
+       input: in2
+       rate: "3.0"
 
 Testing
 =======

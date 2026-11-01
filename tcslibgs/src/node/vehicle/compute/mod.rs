@@ -464,6 +464,49 @@ impl Format {
             _ => 2,
         }
     }
+
+    /// Reads the number of counts these bytes hold.
+    ///
+    /// Exactly the width and no more: a reading longer than the format is a
+    /// sensor that was read wrongly or a bus that returned something else,
+    /// and taking the first two bytes of it would turn that into a plausible
+    /// temperature. Shorter is the same mistake the other way.
+    ///
+    /// Here rather than with the conversion that uses it, so that the
+    /// simulator, which stands in for that conversion's thermostat, reads a
+    /// sensor's bytes as the vehicle does.
+    ///
+    /// # Arguments
+    ///
+    /// * `data` - The reading, which must be exactly this format's width.
+    ///
+    /// # Returns
+    ///
+    /// The counts.
+    ///
+    /// # Errors
+    ///
+    /// A message saying how long the reading should be if `data` is longer
+    /// or shorter.
+    pub fn counts(self, data: &[u8]) -> Result<f64, String> {
+        if data.len() != self.width() {
+            return Err(format!(
+                "a {:?} reading is {} bytes and {} arrived",
+                self,
+                self.width(),
+                data.len()
+            ));
+        }
+
+        Ok(match self {
+            Format::I16Be => i16::from_be_bytes([data[0], data[1]]) as f64,
+            Format::U16Be => u16::from_be_bytes([data[0], data[1]]) as f64,
+            Format::I16Le => i16::from_le_bytes([data[0], data[1]]) as f64,
+            Format::U24Be => {
+                u32::from_be_bytes([0, data[0], data[1], data[2]]) as f64
+            }
+        })
+    }
 }
 
 /// What to do when an external program stops.

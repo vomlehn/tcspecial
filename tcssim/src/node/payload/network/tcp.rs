@@ -180,6 +180,7 @@ mod tests {
     ) -> SimulatedPayload {
         SimulatedPayload::new(PayloadConfig {
             thermal: None,
+            thermostat: None,
             name: "DH0".to_string(),
             protocol: PayloadProtocol::Tcp,
             address: "127.0.0.1".to_string(),

@@ -106,7 +106,12 @@ pub struct PayloadConfig {
     /// simulator file that declares no mass: such a payload sends bytes from
     /// a random number generator, which is what this simulator did for
     /// everything before there was a mass to read.
-    pub thermal: Option<crate::thermal::Thermal>,
+    pub thermal: Option<crate::physics::thermal_mass::thermal_mass::Thermal>,
+    /// The thermostat this sensor reports to, where the simulator stands in
+    /// for the vehicle's: every reading it sends goes there as it leaves.
+    /// `None` for every other payload, and for every payload of a run with
+    /// tcspecial's own thermostat.
+    pub thermostat: Option<Arc<crate::node::vehicle::thermostat::Thermostat>>,
     pub packet_interval_ms: Arc<AtomicU32>,
     pub segment_interval_ms: Arc<AtomicU32>,
     /// Whether this payload sends: its panel's button.
@@ -667,7 +672,10 @@ pub(crate) fn a_packet_from<R: Rng>(
     // packet of its own would be bytes nothing reads. Its packet interval is
     // how often it looks for that decision, which is the one thing its pacing
     // still means.
-    if matches!(config.thermal, Some(crate::thermal::Thermal::Heats { .. })) {
+    if matches!(
+        config.thermal,
+        Some(crate::physics::thermal_mass::thermal_mass::Thermal::Heats { .. })
+    ) {
         return Produce::Nothing;
     }
 
@@ -682,9 +690,10 @@ pub(crate) fn a_packet_from<R: Rng>(
     }
 
     // A sensor attached to a thermal mass sends what the mass is, in the
-    // encoding its own conversion reads back: see `crate::thermal`. Every
-    // other payload sends bytes from the generator, which is what this
-    // simulator did for everything before there was a mass to read.
+    // encoding its own conversion reads back: see
+    // `crate::physics::thermal_mass::thermal_mass`. Every other payload sends
+    // bytes from the generator, which is what this simulator did for
+    // everything before there was a mass to read.
     //
     // The packet size is not consulted. What a reading of this sensor is, is
     // the format's business -- two bytes or three -- and a size that
@@ -692,9 +701,26 @@ pub(crate) fn a_packet_from<R: Rng>(
     // payload configuration whose read_size does not match its conversion's
     // format is a fault in that file, and the vehicle finds it.
     let mut packet: Vec<u8> = match &config.thermal {
-        Some(crate::thermal::Thermal::Reads { mass, reading }) => {
-            crate::thermal::encode(reading, mass.temperature())
-        }
+        Some(crate::physics::thermal_mass::thermal_mass::Thermal::Reads {
+            mass,
+            output,
+            reading,
+        }) => match mass.output(output) {
+            Some(kelvin) => crate::physics::thermal_mass::thermal_mass::encode(
+                reading, kelvin,
+            ),
+            // The simulator file was checked for this before anything
+            // started, so it is a fault here rather than in the file.
+            None => {
+                eprintln!(
+                    "{} reads output {output} of the thermal mass {}, which \
+                     has no such output",
+                    config.name,
+                    mass.name()
+                );
+                return Produce::Nothing;
+            }
+        },
         _ => generate(rng, pacing.packet_size),
     };
 
@@ -714,6 +740,11 @@ pub(crate) fn a_packet_from<R: Rng>(
     if !packet.is_empty() && happens(faults.corrupt_percent, rng) {
         let which = rng.gen_range(0..packet.len());
         packet[which] = corrupt(packet[which], rng);
+    }
+
+    // What leaves the sensor is what the thermostat reads, faults and all.
+    if let Some(thermostat) = &config.thermostat {
+        thermostat.sample(&config.name, &packet);
     }
 
     Produce::Send(packet)
@@ -918,6 +949,7 @@ mod tests {
     fn with(faults: Faults) -> PayloadConfig {
         PayloadConfig {
             thermal: None,
+            thermostat: None,
             name: "DH0".to_string(),
             protocol: PayloadProtocol::Udp,
             address: "127.0.0.1".to_string(),
@@ -1337,6 +1369,7 @@ mod tests {
     fn test_payload_config() {
         let config = PayloadConfig {
             thermal: None,
+            thermostat: None,
             name: "DH0".to_string(),
             protocol: PayloadProtocol::Udp,
             address: "127.0.0.1".to_string(),

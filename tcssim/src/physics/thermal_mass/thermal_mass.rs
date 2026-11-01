@@ -60,7 +60,8 @@ struct State {
     temperature: f64,
     /// When `temperature` was last brought up to date.
     at: Instant,
-    /// Which heaters are on, by name, and how hard each warms it.
+    /// Which inputs have their heater on, by input name, and how hard each
+    /// warms it.
     ///
     /// By name rather than a count, because the same heater being driven
     /// twice is one heater: a vehicle sends a command whenever its decision
@@ -81,6 +82,8 @@ pub struct ThermalMass {
     environment: f64,
     /// How quickly it loses the difference, in seconds.
     time_constant: f64,
+    /// The names of the places a sensor reads its temperature from.
+    outputs: Vec<String>,
     state: Mutex<State>,
 }
 
@@ -101,6 +104,7 @@ impl ThermalMass {
             name: mass.name.clone(),
             environment: mass.environment,
             time_constant: mass.time_constant.as_secs_f64(),
+            outputs: mass.outputs.clone(),
             state: Mutex::new(State {
                 temperature: mass.environment,
                 at: now,
@@ -113,6 +117,26 @@ impl ThermalMass {
         &self.name
     }
 
+    /// What one of its outputs reads now.
+    ///
+    /// The mass is one lump, at one temperature throughout, so every output
+    /// reads the same: what tells them apart is which sensor is on which.
+    ///
+    /// # Arguments
+    ///
+    /// * `output` - The output's name.
+    ///
+    /// # Returns
+    ///
+    /// Its temperature in kelvin, or `None` for a name the mass does not
+    /// list among its outputs.
+    pub fn output(&self, output: &str) -> Option<f64> {
+        self.outputs
+            .iter()
+            .any(|o| o == output)
+            .then(|| self.temperature())
+    }
+
     /// What it is now, in kelvin.
     pub fn temperature(&self) -> f64 {
         let mut state = self.held();
@@ -120,7 +144,7 @@ impl ThermalMass {
         state.temperature
     }
 
-    /// Tells it that a heater is on, or off.
+    /// Tells it that the heater on one of its inputs is on, or off.
     ///
     /// The mass is stepped first, so the rate that was in force applies up to
     /// this moment and the new one from here: a heater switched on halfway
@@ -128,7 +152,7 @@ impl ThermalMass {
     ///
     /// # Arguments
     ///
-    /// * `which` - The heater's name; the same name twice is one heater.
+    /// * `which` - The input's name; the same input twice is one heater.
     /// * `rate`  - How hard it warms the mass while on, in kelvin a second.
     /// * `on`    - Whether it is now on.
     pub fn heater(&self, which: &str, rate: f64, on: bool) {
@@ -192,16 +216,23 @@ impl ThermalMass {
 /// and a heater's thread tells it when the vehicle drives it.
 #[derive(Debug, Clone)]
 pub enum Thermal {
-    /// It reports this mass's temperature, in this encoding.
+    /// It reports the temperature at this output of this mass, in this
+    /// encoding.
     Reads {
         mass: Arc<ThermalMass>,
+        output: String,
         /// Taken from the conversion the readings go to, so the vehicle reads
         /// back the temperature the mass is at: see
         /// `tcslibgs::graph::simulated::reading_of`.
         reading: ToKelvinParams,
     },
-    /// It warms this mass, by this many kelvin a second while it is on.
-    Heats { mass: Arc<ThermalMass>, rate: f64 },
+    /// It warms this mass through this input, by this many kelvin a second
+    /// while it is on.
+    Heats {
+        mass: Arc<ThermalMass>,
+        input: String,
+        rate: f64,
+    },
 }
 
 /// Tells the mass what the vehicle just drove this heater to, if it is one.
@@ -219,16 +250,16 @@ pub enum Thermal {
 /// # Arguments
 ///
 /// * `thermal` - What the payload is to a thermal mass, if anything.
-/// * `which`   - The payload's name, which names the heater.
+/// * `which`   - The payload's name, for a complaint.
 /// * `data`    - What the vehicle sent it: `1` for on, `0` for off,
 ///               surrounding white space ignored.
 pub fn driven(thermal: &Option<Thermal>, which: &str, data: &[u8]) {
-    let Some(Thermal::Heats { mass, rate }) = thermal else {
+    let Some(Thermal::Heats { mass, input, rate }) = thermal else {
         return;
     };
     match data.trim_ascii() {
-        b"1" => mass.heater(which, *rate, true),
-        b"0" => mass.heater(which, *rate, false),
+        b"1" => mass.heater(input, *rate, true),
+        b"0" => mass.heater(input, *rate, false),
         _ => eprintln!(
             "{which} warms the thermal mass {} and was sent {} bytes that are \
              not a decision: a heater is driven to 1 or 0",
@@ -305,6 +336,8 @@ mod tests {
             name: "cabin".to_string(),
             environment: 283.15,
             time_constant: Duration::from_secs(50),
+            inputs: vec!["in1".to_string(), "in2".to_string()],
+            outputs: ["out1", "out2", "out3"].map(String::from).to_vec(),
         }
     }
 
@@ -529,6 +562,7 @@ mod tests {
     ) -> PayloadConfig {
         PayloadConfig {
             thermal: Some(thermal),
+            thermostat: None,
             name: name.to_string(),
             protocol: PayloadProtocol::Udp,
             address: "127.0.0.1".to_string(),
@@ -686,6 +720,7 @@ mod tests {
                 SAMPLE_MS,
                 Thermal::Reads {
                     mass: mass.clone(),
+                    output: format!("out{}", n + 1),
                     reading,
                 },
             ));
@@ -718,6 +753,7 @@ mod tests {
                     LOOK_MS,
                     Thermal::Heats {
                         mass: mass.clone(),
+                        input: format!("in{}", n + 1),
                         rate: HEATER_RATE,
                     },
                 ));

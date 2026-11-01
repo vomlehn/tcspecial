@@ -20,6 +20,8 @@ thermal_mass:
   - name: cabin
     environment: "283.15"
     time_constant: "100 s"
+    inputs: "in1"
+    outputs: "out1"
 
 simulated_payloads:
   # Driven and never read: its stand-in sends nothing, counts what the
@@ -30,6 +32,7 @@ simulated_payloads:
     type: network
     protocol: udp
     heats: cabin
+    input: in1
     rate: "1.0"
 
   # One reading a second of the cabin, in the encoding cabin_temp reads:
@@ -40,3 +43,4 @@ simulated_payloads:
     protocol: udp
     packet_interval: 1 s
     reads: cabin
+    output: out1

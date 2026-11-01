@@ -339,7 +339,7 @@ with it aboard and on the ground.
 
 | Directory | Description |
 |---|---|
-| `thermostat` | Three temperature sensors, converted to kelvin, voted on, and fed to a hysteresis thermostat that drives two heaters, every one a UDP socket tcssim stands in for, so that it runs on any desk. The setpoint is commanded from the ground. |
+| `thermostat` | Three temperature sensors, converted to kelvin, voted on, and fed to a hysteresis thermostat that drives two heaters, every one a UDP socket tcssim stands in for, so that it runs on any desk. The setpoint is commanded from the ground, and tcsmoc plots the temperatures and the heaters. |
 | `simple-app` | A payload that is a program rather than a device: an `app_pl` node sending a line of text one word per packet, and a ground station that prints the line. Two programs of its own beside the configuration: the payload in Python 3, the ground station in Rust. |
 
 ### thermostat
@@ -360,19 +360,21 @@ touches no hardware. Aboard they would be on I2C, SPI and GPIO, as
 `tests/manual/thermostat.ytcs` has them; those buses are flown against
 stand-ins by `make stand-ins-test` and `make kernel-stand-ins-test`.
 
-tcssim stands in for the sensors with a thermal mass, `cabin`, that all three
-read, so their readings agree and the vote produces a temperature. The mass
-cools towards 283.15 K, ten kelvin below the setpoint, and what the example
-shows is the vehicle deciding to heat it. The heaters are not attached to the
-mass, so the loop is not closed here: tcssim counts what the vehicle decides
-and warms nothing. tcssim's own tests close it.
+tcssim stands in for the sensors with a thermal mass, `basic`, that all three
+read, each on an output of its own, so their readings agree and the vote
+produces a temperature. The mass cools towards 283.15 K, ten kelvin below the
+setpoint, and the heaters warm it, each through an input of its own while the
+vehicle has it on: the loop closes through tcspecial.
 
 ```
 make run-thermostat
 ```
 
-That runs tcsmoc on the example, as `run-simple` does. Press Connect in
-tcsmoc, and Enable on each sensor in tcssim, to start the data.
+That runs tcsmoc on the example, as `run-simple` does, and tcsmoc opens its
+temperatures window beside its own: each sensor's temperature over the last
+ten seconds, centred on the setpoint, with the heaters' state under it. Press
+Connect in tcsmoc, and Enable on each payload in tcssim, to start the data
+and the heating.
 
 Languages:
 

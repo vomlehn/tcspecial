@@ -61,12 +61,13 @@ use tcsverify::startup::Startup;
 use crate::beacon_receive::BeaconReceive;
 use crate::ci_link::{CiLink, Commanded};
 use crate::oc_link::{Arrival, Arrivals};
+use crate::thermal::{self, Plot, Plotted};
 use crate::{
     ask_for_the_edge, child_program, grid_shape, handle_close, handle_quit,
     installed_directory, present, show_arrivals, stop, window_size, DHInfo,
-    Edge, MainWindow, MenuAction, PingWindow, ProcessManager, Sizes, CHILDREN,
-    CONNECTED_STATUS, DISCONNECTED_STATUS, ERROR_STATUS, NO_TRANSFER_TIME,
-    PANEL_REFRESH_INTERVAL,
+    Edge, MainWindow, MenuAction, PingWindow, ProcessManager, Sizes,
+    ThermalWindow, CHILDREN, CONNECTED_STATUS, DISCONNECTED_STATUS,
+    ERROR_STATUS, NO_TRANSFER_TIME, PANEL_REFRESH_INTERVAL,
 };
 
 /// What the window says of ARM Restart and Initiate restart pressed where
@@ -2033,12 +2034,16 @@ fn show_ping(window: &PingWindow, shown: &PingShown) {
 /// * `arrivals`     - Where the last arrival for each panel is left, by row.
 /// * `pings`        - The pinger to hand the ping node's answers to, where
 ///                    they come down through this gateway node.
+/// * `plot`         - The temperatures window's plot, where there is one, to
+///                    hand each sensor's temperature and each switch's
+///                    decision to.
 fn serve(
     mut gateway: GatewayReceiver,
     rows: Arc<BTreeMap<String, usize>>,
     sends_values: Arc<BTreeSet<String>>,
     arrivals: Arrivals,
     pings: Option<PingFeed>,
+    plot: Option<Arc<Mutex<Plot>>>,
 ) {
     // What each source is to this receiver, by its place in the gateway node's
     // sources, worked out before the loop: a datum says which source sent it
@@ -2049,6 +2054,8 @@ fn serve(
         sends_values: bool,
         /// Whether it is the ping node whose answers the pinger times.
         pings: bool,
+        /// What it is to the temperatures window's plot, if anything.
+        plotted: Option<Plotted>,
         /// How many have arrived from it since the MOC started.
         packets: u64,
     }
@@ -2059,6 +2066,9 @@ fn serve(
             row: rows.get(source).copied(),
             sends_values: sends_values.contains(source),
             pings: pings.as_ref().is_some_and(|feed| feed.node == source),
+            plotted: plot
+                .as_ref()
+                .and_then(|plot| plot.lock().ok()?.plotted(source)),
             packets: 0,
         })
         .collect();
@@ -2081,6 +2091,9 @@ fn serve(
             if let Ok(at) = tcslibgs::node::vehicle::ping::now() {
                 take_answer(feed, data, at);
             }
+        }
+        if let (Some(plotted), Some(plot)) = (source.plotted, plot.as_ref()) {
+            thermal::take(plot, plotted, data, std::time::Instant::now());
         }
         let Some(row) = source.row else {
             continue;
@@ -2512,6 +2525,16 @@ pub fn run(
     // stopped.
     let _answers = pings.as_ref().map(|(_, feed)| show_answers(feed.clone()));
 
+    // The temperatures window, where a sensor's temperature reaches the
+    // ground: opened by Temperatures, and redrawn by a timer of its own,
+    // kept for as long as the window runs. See thermal.rs.
+    let thermal_window = ThermalWindow::new().unwrap();
+    let plot = Plot::of(&graph, |name| links.iter().any(|l| l.source == name))
+        .map(|plot| Arc::new(Mutex::new(plot)));
+    let _plotting = plot
+        .as_ref()
+        .map(|plot| thermal::show(&ui, &thermal_window, plot.clone()));
+
     let arrivals: Arrivals = Arc::new(Mutex::new(vec![None; count]));
     let gateways: Vec<&str> = graph
         .nodes
@@ -2548,12 +2571,13 @@ pub fn run(
         let rows = rows.clone();
         let sends_values = sends_values.clone();
         let arrivals = arrivals.clone();
+        let plot = plot.clone();
         let feed = pings
             .as_ref()
             .filter(|(through, _)| through == gateway.name())
             .map(|(_, feed)| feed.clone());
         thread::spawn(move || {
-            serve(gateway, rows, sends_values, arrivals, feed)
+            serve(gateway, rows, sends_values, arrivals, feed, plot)
         });
     }
 
@@ -3066,6 +3090,7 @@ vehicle:
                 Arc::new(BTreeSet::new()),
                 arrivals,
                 Some(feed),
+                None,
             )
         });
 
@@ -3132,7 +3157,7 @@ payloads:
         {
             let arrivals = arrivals.clone();
             thread::spawn(move || {
-                serve(gateway, rows, sends_values, arrivals, None)
+                serve(gateway, rows, sends_values, arrivals, None, None)
             });
         }
 

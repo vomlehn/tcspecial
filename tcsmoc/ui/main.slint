@@ -679,6 +679,10 @@ export component MainWindow inherits Window {
     // time and times the answer.
     in property <bool> can-ping-node: false;
     callback ping-node-clicked();
+    // Whether the configuration has a sensor whose temperature reaches the
+    // ground, and so whether there is a Temperatures button: see thermal.rs.
+    in property <bool> can-plot: false;
+    callback temperatures-clicked();
     callback query-all-clicked();
     // One callback for the one button a panel has. Which command it sends is
     // Rust's to decide, from the status the button's own label comes from.
@@ -889,6 +893,14 @@ export component MainWindow inherits Window {
                         clicked => { ping-node-clicked(); }
                     }
 
+                    // The temperatures window, where the configuration has a
+                    // sensor whose temperature reaches the ground: in this
+                    // row for the reason Ping node is.
+                    if can-plot: Button {
+                        text: "Temperatures";
+                        clicked => { temperatures-clicked(); }
+                    }
+
                 }
 
                 // What a restart restarts onto, under the button that sends
@@ -1038,6 +1050,221 @@ export component MainWindow inherits Window {
     }
 }
 
+
+// One sensor's trace in the temperatures window: its path, in pixels across
+// the plot, its colour, and its name with its latest reading for the legend.
+export struct TraceShown {
+    said: string,
+    commands: string,
+    colour: color,
+}
+
+// A stretch of time a heater switch was in one state, in pixels across the
+// plot.
+export struct SpanShown {
+    x: float,
+    width: float,
+    on: bool,
+}
+
+// One heater switch: its name and what it drives, its state in words, and
+// its spans.
+export struct SwitchShown {
+    label: string,
+    state: string,
+    spans: [SpanShown],
+}
+
+// The temperatures window, opened by Temperatures: each sensor's
+// temperature, and whether the heaters are on, over the last ten seconds.
+// What is drawn is worked out in Rust: see thermal.rs, which says what is
+// plotted and why. A window of its own for the reason the ping panel is one.
+//
+// The colours are Okabe and Ito's, told apart with each common kind of
+// colour blindness, and never alone: each trace is named in the legend with
+// its latest reading, and each switch's state is said in words. Vermillion is
+// the heaters' alone, so that nothing that is a temperature is the colour of
+// a heater on.
+export component ThermalWindow inherits Window {
+    default-font-size: Fonts.window;
+    title: "tcsmoc: temperatures";
+    background: Colors.window;
+    preferred-width: 760px;
+    preferred-height: 480px;
+    min-width: 480px;
+    min-height: 360px;
+
+    in property <[TraceShown]> traces;
+    in property <[SwitchShown]> switches;
+    // What the top, middle and bottom of the plot are, in kelvin.
+    in property <string> top-said: "";
+    in property <string> centre-said: "";
+    in property <string> bottom-said: "";
+    // The plot's size, which Rust draws the paths to.
+    out property <length> plot-width: plot.width;
+    out property <length> plot-height: plot.height;
+
+    property <color> heater-on: #D55E00;
+    property <color> heater-on-shade: #D55E0024;
+    property <color> heater-off: #D4D8DD;
+    property <color> rule: #E5E7EB;
+    property <length> axis-width: 92px;
+
+    VerticalLayout {
+        padding: 10px;
+        spacing: 6px;
+
+        Text {
+            text: "The last 10 s, 30 K either side of " + root.centre-said;
+            font-italic: true;
+        }
+
+        HorizontalLayout {
+            spacing: 6px;
+            vertical-stretch: 1;
+
+            VerticalLayout {
+                width: root.axis-width;
+                Text {
+                    text: root.top-said;
+                    horizontal-alignment: right;
+                    font-family: Fonts.mono;
+                }
+                Rectangle { }
+                Text {
+                    text: root.centre-said;
+                    horizontal-alignment: right;
+                    font-family: Fonts.mono;
+                }
+                Rectangle { }
+                Text {
+                    text: root.bottom-said;
+                    horizontal-alignment: right;
+                    font-family: Fonts.mono;
+                }
+            }
+
+            plot := Rectangle {
+                min-height: 200px;
+                background: #ffffff;
+                border-width: 1px;
+                border-color: #9CA3AF;
+                clip: true;
+
+                // While a heater is on, the plot behind the traces is shaded
+                // its colour, so that what the heaters did lines up with what
+                // the temperatures did.
+                for switch in root.switches: Rectangle {
+                    for span in switch.spans: Rectangle {
+                        x: span.x * 1px;
+                        y: 0;
+                        width: span.width * 1px;
+                        height: parent.height;
+                        background: span.on ? root.heater-on-shade
+                                            : transparent;
+                    }
+                }
+
+                // A rule every ten kelvin, the middle one darker.
+                for i in [1, 2, 4, 5]: Rectangle {
+                    x: 0;
+                    y: parent.height * i / 6;
+                    width: parent.width;
+                    height: 1px;
+                    background: root.rule;
+                }
+                Rectangle {
+                    x: 0;
+                    y: parent.height / 2;
+                    width: parent.width;
+                    height: 1px;
+                    background: #9CA3AF;
+                }
+
+                for trace in root.traces: Path {
+                    x: 0;
+                    y: 0;
+                    width: parent.width;
+                    height: parent.height;
+                    viewbox-width: self.width / 1px;
+                    viewbox-height: self.height / 1px;
+                    commands: trace.commands;
+                    stroke: trace.colour;
+                    stroke-width: 2px;
+                }
+            }
+        }
+
+        // Each heater switch, under the plot and as wide as it, so that a
+        // change lines up with the temperatures above it.
+        for switch in root.switches: HorizontalLayout {
+            spacing: 6px;
+            Text {
+                width: root.axis-width;
+                text: switch.state;
+                horizontal-alignment: right;
+                vertical-alignment: center;
+                font-weight: 700;
+            }
+            VerticalLayout {
+                spacing: 2px;
+                Text { text: switch.label; }
+                Rectangle {
+                    height: 16px;
+                    border-width: 1px;
+                    border-color: #9CA3AF;
+                    clip: true;
+                    for span in switch.spans: Rectangle {
+                        x: span.x * 1px;
+                        y: 0;
+                        width: span.width * 1px;
+                        height: parent.height;
+                        background: span.on ? root.heater-on
+                                            : root.heater-off;
+                    }
+                }
+            }
+        }
+
+        // The legend: each trace's colour, name and latest reading, and the
+        // heaters' two colours in words.
+        HorizontalLayout {
+            spacing: 14px;
+            alignment: start;
+            for trace in root.traces: HorizontalLayout {
+                spacing: 4px;
+                Rectangle {
+                    width: 18px;
+                    height: 3px;
+                    y: (parent.height - self.height) / 2;
+                    background: trace.colour;
+                }
+                Text {
+                    text: trace.said;
+                    font-family: Fonts.mono;
+                    vertical-alignment: center;
+                }
+            }
+            if root.switches.length > 0: HorizontalLayout {
+                spacing: 4px;
+                Rectangle {
+                    width: 14px;
+                    height: 12px;
+                    y: (parent.height - self.height) / 2;
+                    background: root.heater-on;
+                }
+                Text { text: "heater on"; vertical-alignment: center; }
+                Rectangle {
+                    width: 14px;
+                    height: 12px;
+                    y: (parent.height - self.height) / 2;
+                    background: root.heater-off;
+                }
+                Text { text: "heater off"; vertical-alignment: center; }
+            }
+        }
+    }
+}
 
 // The ping panel, in a window of its own beside the MOC's, opened by Ping
 // node. A window rather than a row of the main one, because the main

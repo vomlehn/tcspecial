@@ -1,0 +1,69 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<configuration
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:noNamespaceSchemaLocation="../../tcsgui/share/schema/tcspecial.xsd">
+    <description>A sensor's sample buffer, read through the IIO subsystem, its samples going to the ground</description>
+    <tcspecial>
+        <!-- Every port is in the thirty-two hundreds to thirty-seven
+             hundreds, ending in 40 or 50, which no other example uses, so
+             this one can be left running while another is looked at. -->
+        <beacon>
+            <default_interval>5 s</default_interval>
+            <recv>127.0.0.1:3550</recv>
+            <reset_interval>1 s</reset_interval>
+            <send>0.0.0.0:3540</send>
+        </beacon>
+        <gateway>radio</gateway>
+        <interface>ad9aac4dd5a6d88dd5e78824ba8a83ac</interface>
+        <log>
+            <directory>/tmp/telemetry</directory>
+            <segment_size>65536</segment_size>
+        </log>
+        <payload_command>
+            <dest_base>0.0.0.0:3340</dest_base>
+            <source_base>127.0.0.1:3350</source_base>
+        </payload_command>
+        <payload_telemetry>
+            <dest_base>127.0.0.1:3450</dest_base>
+            <source_base>0.0.0.0:3440</source_base>
+        </payload_telemetry>
+        <!-- tcspecial counts its starts in this file, which must be on
+             storage that survives a power cycle on a vehicle. -->
+        <state_file>/tmp/tcspecial-iio.state</state_file>
+        <tcs_cmd>
+            <recv>0.0.0.0:3240</recv>
+            <send>127.0.0.1:3250</send>
+        </tcs_cmd>
+    </tcspecial>
+    <!-- The ground's end of the link. Nothing goes up to an IIO sensor,
+         which is read and never written, so nothing leaves this node by
+         gateway-out; what comes down arrives at ground_base plus the device
+         id of the node that sent it: the sensor, device id 1, at
+         127.0.0.1:3741. -->
+    <gateway>
+        <name>ground</name>
+        <type>gateway_radio</type>
+        <address>127.0.0.1</address>
+        <port>3640</port>
+        <ground_base>127.0.0.1:3740</ground_base>
+        <payload-in>true</payload-in>
+    </gateway>
+    <!-- A sensor's buffer, which hands over whole sample sets as they are
+         taken. Which channels are in a set and how often one is taken are
+         the sensor's settings, made in sysfs by whoever brings it up, and
+         nothing here. The device is /dev/iio:device1, which is what the
+         kernel's iio_dummy sensor is numbered on a host with one sensor of
+         its own; bin/mk-kernel-stand-ins makes that sensor, enables its
+         buffer and prints the number it was given, which is the path to
+         write here. -->
+    <payloads>
+        <name>sensor</name>
+        <type>iio</type>
+        <path>/dev/iio:device1</path>
+        <payload-out><target>ground</target></payload-out>
+    </payloads>
+    <tcsgui>
+        <nodes><name>ground</name><x>469</x><y>34</y></nodes>
+        <nodes><name>sensor</name><x>34</x><y>34</y></nodes>
+    </tcsgui>
+</configuration>

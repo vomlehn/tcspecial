@@ -118,8 +118,8 @@ pub fn payload_config_attached(
             // every member's frames to every other, so the simulator opens a
             // socket on the same interface and sends the payload's frames with
             // the payload's identifier. Nothing has to stand in for anything --
-            // which makes this the one experimental kind whose stand-in is as
-            // faithful as a socket.
+            // which makes this the one kind whose stand-in is as faithful as a
+            // socket.
             (EndpointConfig::Can(can), None) => {
                 (PayloadProtocol::Can, can.interface.clone(), 0, 0)
             }

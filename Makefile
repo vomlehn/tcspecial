@@ -190,6 +190,10 @@ help:
 		"it, tested from the cFS's ground"
 	@echo "                     (CFS_PRISTINE, SBN_SRC and CFS_SCRATCH:" \
 		"see cfs/Makefile)"
+	@echo "  make kernel-stand-ins-test - Run tcspecial against the" \
+		"kernel's vcan, gpio-sim and iio_dummy"
+	@echo "                     (make them first with sudo" \
+		"bin/mk-kernel-stand-ins)"
 	@echo "  make check       - cargo check, clippy, and a format check"
 	@echo "  make format      - Reformat the source"
 	@echo "  make release     - Build with optimizations"
@@ -1195,6 +1199,19 @@ cfs-build:
 .PHONY: cfs-test
 cfs-test:
 	$(MAKE) -C cfs test TCS_PORTS_LOCK=$(PORTS_LOCK)
+
+# Fly tcspecial against the kernel's own stand-ins for a CAN bus, a GPIO chip
+# and an IIO sensor, playing each device's far end through the kernel: see
+# tcspecial/tests/kernel-stand-ins.rs. The same tests cargo test runs, run
+# alone and saying which flew and which were skipped, and why: a test whose
+# device is not there skips, naming the command that makes it. Making the
+# devices needs root, so this does not; run `sudo bin/mk-kernel-stand-ins`
+# first, once after each boot. The tests bind no fixed port, so they take no
+# lock.
+.PHONY: kernel-stand-ins-test
+kernel-stand-ins-test:
+	cd $(RUST) && cargo test -p tcspecial --test kernel-stand-ins \
+		-- --nocapture
 
 # Format code
 .PHONY: format

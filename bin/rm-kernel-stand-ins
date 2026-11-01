@@ -1,0 +1,29 @@
+#!/bin/bash
+#
+# Remove what bin/mk-kernel-stand-ins makes:
+#
+#   sudo bin/rm-kernel-stand-ins
+#
+# Every one of the three, whichever were made: each script it calls --
+# bin/rmvcan, bin/rmgpio and bin/rmiio -- says so and does nothing where
+# there is nothing of its own to remove, and each removes only what this tree
+# made, leaving a host's own chips and sensors alone. In the reverse of the
+# order they are made in, which costs nothing and reads as undoing.
+#
+# Each takes its device out from under anything using it, so do not run this
+# while a test, tcspecial or tcssim is running on one.
+
+set -euo pipefail
+
+me="rm-kernel-stand-ins"
+
+if [ "$(id -u)" -ne 0 ]; then
+	echo "$me: removing a kernel device needs root: run it as sudo $0" >&2
+	exit 1
+fi
+
+here="$(cd -- "$(dirname -- "$0")" && pwd)"
+"$here/rmiio"
+"$here/rmgpio"
+"$here/rmvcan"
+echo "$me: done"

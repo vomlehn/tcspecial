@@ -279,13 +279,13 @@ pub enum GroupKind {
     Serial(SerialParams),
     I2c(I2cParams),
     Spi(SpiParams),
-    /// Experimental; see [`crate::node::payload::can`].
+    /// See [`crate::node::payload::can`].
     Can(CanParams),
     /// Experimental; see [`crate::node::payload::iio`].
     Iio(IioParams),
     /// Experimental; see [`crate::node::payload::rpmsg`].
     Rpmsg(RpmsgParams),
-    /// Experimental; see [`crate::node::payload::gpio`].
+    /// See [`crate::node::payload::gpio`].
     Gpio(GpioParams),
     /// Experimental; see [`crate::node::payload::hdlc`].
     Hdlc(crate::node::payload::hdlc::HdlcParams),
@@ -478,8 +478,7 @@ pub enum EndpointLocation {
     /// An interface rather than a path: a CAN controller is a network
     /// interface, not a device file. Both are needed for the reason an I2C
     /// device needs both -- several payloads commonly share one bus and
-    /// differ only in the identifier. Experimental; see
-    /// [`crate::node::payload::can`].
+    /// differ only in the identifier. See [`crate::node::payload::can`].
     Can { interface: String, can_id: u32 },
 }
 

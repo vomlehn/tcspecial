@@ -61,7 +61,7 @@ pub struct PayloadConfig {
     ///
     /// Apart from `bus_address` because a CAN identifier is twenty-nine bits
     /// where an I2C address is ten, and because the two are compared against
-    /// different things. Experimental; see [`crate::node::payload::can`].
+    /// different things. See [`crate::node::payload::can`].
     pub can_id: u32,
     /// Whether a CAN payload's frames are CAN FD, which decides how much one
     /// carries.
@@ -69,7 +69,7 @@ pub struct PayloadConfig {
     /// Which lines a GPIO payload moves, and empty for every other kind.
     ///
     /// Not bytes and not a size: what a simulated set of discretes produces
-    /// is an edge on each of these every interval. Experimental; see
+    /// is an edge on each of these every interval. See
     /// [`crate::node::payload::gpio`].
     pub gpio_lines: Vec<u32>,
     /// Whether this payload answers requests rather than sending on its own.
@@ -221,7 +221,7 @@ pub enum PayloadProtocol {
     /// of its own: see [`crate::node::payload::network::unix`].
     UnixDgram,
     /// A payload on a CAN bus, which the simulator joins as another member of
-    /// the same bus: see [`crate::node::payload::can`]. Experimental.
+    /// the same bus: see [`crate::node::payload::can`].
     Can,
     /// A sensor's sample buffer, which the simulator stands in for with a pty
     /// -- the samples but not the sysfs around them: see
@@ -231,7 +231,7 @@ pub enum PayloadProtocol {
     /// with a pty: see [`crate::node::payload::rpmsg`]. Experimental.
     Rpmsg,
     /// A set of discrete lines, which the simulator moves through the
-    /// kernel's gpio-sim: see [`crate::node::payload::gpio`]. Experimental.
+    /// kernel's gpio-sim: see [`crate::node::payload::gpio`].
     Gpio,
 }
 

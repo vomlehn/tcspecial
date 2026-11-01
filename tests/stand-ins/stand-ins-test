@@ -143,15 +143,16 @@ def gpio_sim():
     Returns:
         The chip's device path and None, or None and why there is none.
     """
-    names = sorted(glob.glob(
-        "/sys/devices/platform/gpio-sim.*/bank*/chip_name"))
-    if not names:
+    # A chip's lines are in a directory named after the chip, under its
+    # gpio-sim platform device, as simulated_chips() in
+    # tcslibgs/src/node/payload/gpio says for everything that looks.
+    chips = sorted(glob.glob("/sys/devices/platform/gpio-sim.*/gpiochip*"))
+    if not chips:
         return None, ("no gpio-sim chip is there; make mkstubs makes one, "
                       "as root")
-    for name in names:
-        with open(name) as chip:
-            device = "/dev/" + chip.read().strip()
-        pull = os.path.join(os.path.dirname(name), "sim_gpio0", "pull")
+    for chip in chips:
+        device = "/dev/" + os.path.basename(chip)
+        pull = os.path.join(chip, "sim_gpio0", "pull")
         if (os.access(device, os.R_OK | os.W_OK)
                 and os.access(pull, os.W_OK)):
             return device, None

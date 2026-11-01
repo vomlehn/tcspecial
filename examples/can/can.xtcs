@@ -1,0 +1,82 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<configuration
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:noNamespaceSchemaLocation="../../tcsgui/share/schema/tcspecial.xsd">
+    <description>A payload on a CAN bus: its frames to the ground, and the ground's commands to it as frames</description>
+    <tcspecial>
+        <!-- Every port is in the thirty-two hundreds to thirty-seven
+             hundreds, ending in 00 or 10, which no other example uses, so
+             this one can be left running while another is looked at. -->
+        <beacon>
+            <default_interval>5 s</default_interval>
+            <recv>127.0.0.1:3510</recv>
+            <reset_interval>1 s</reset_interval>
+            <send>0.0.0.0:3500</send>
+        </beacon>
+        <gateway>radio</gateway>
+        <interface>ad9aac4dd5a6d88dd5e78824ba8a83ac</interface>
+        <log>
+            <directory>/tmp/telemetry</directory>
+            <segment_size>65536</segment_size>
+        </log>
+        <payload_command>
+            <dest_base>0.0.0.0:3300</dest_base>
+            <source_base>127.0.0.1:3310</source_base>
+        </payload_command>
+        <payload_telemetry>
+            <dest_base>127.0.0.1:3410</dest_base>
+            <source_base>0.0.0.0:3400</source_base>
+        </payload_telemetry>
+        <!-- tcspecial counts its starts in this file, which must be on
+             storage that survives a power cycle on a vehicle. -->
+        <state_file>/tmp/tcspecial-can.state</state_file>
+        <tcs_cmd>
+            <recv>0.0.0.0:3200</recv>
+            <send>127.0.0.1:3210</send>
+        </tcs_cmd>
+    </tcspecial>
+    <!-- The ground's end of the link, both ways. What the ground sends goes
+         up to address:port, which this node binds aboard, and leaves it by
+         gateway-out for the motor's commands. What comes down arrives at
+         ground_base plus the device id of the node that sent it: the motor's
+         status, device id 1, at 127.0.0.1:3701. -->
+    <gateway>
+        <name>ground</name>
+        <type>gateway_radio</type>
+        <address>127.0.0.1</address>
+        <port>3600</port>
+        <ground_base>127.0.0.1:3700</ground_base>
+        <payload-in>true</payload-in>
+        <gateway-out><target>motor_command</target></gateway-out>
+    </gateway>
+    <!-- A motor controller on the CAN bus vcan0, which sends its status in
+         frames carrying the identifier 0x123 and takes commands in frames
+         carrying 0x124: two identifiers, so two payloads, each of whose
+         sockets hears its own identifier and nothing else on the bus. vcan0
+         is the kernel's virtual bus, which bin/mk-kernel-stand-ins makes; on
+         a vehicle it is the controller's interface, such as can0.
+
+         Each status frame goes to the ground as it arrives. -->
+    <payloads>
+        <name>motor_status</name>
+        <type>can</type>
+        <interface>vcan0</interface>
+        <can_id>0x123</can_id>
+        <payload-out><target>ground</target></payload-out>
+    </payloads>
+    <!-- Each command the ground sends goes to the motor as one frame, so a
+         command is at most eight bytes, which is all a classic frame
+         carries. -->
+    <payloads>
+        <name>motor_command</name>
+        <type>can</type>
+        <interface>vcan0</interface>
+        <can_id>0x124</can_id>
+        <gateway-in>true</gateway-in>
+    </payloads>
+    <tcsgui>
+        <nodes><name>ground</name><x>469</x><y>34</y></nodes>
+        <nodes><name>motor_status</name><x>34</x><y>34</y></nodes>
+        <nodes><name>motor_command</name><x>34</x><y>134</y></nodes>
+    </tcsgui>
+</configuration>

@@ -486,6 +486,99 @@ answers.</li>
 <li>Payload: none. The <code>ping</code> node is the vehicle’s own, and
 nothing is simulated.</li>
 </ul>
+<h2 id="payloads-the-kernel-stands-in-for">Payloads the kernel stands in
+for</h2>
+<p>Each is one of the payload types whose far end is a device the kernel
+makes rather than a file or a socket tcssim can make, and each is flown
+against the kernel’s own stand-in for that device by
+<code>tcspecial/tests/kernel-stand-ins.rs</code>, which plays the
+device’s far end through the kernel: that is what makes CAN and GPIO
+supported. IIO stays experimental until its test has passed, which it
+cannot on a kernel whose <code>iio_dummy</code> has no buffer, such as
+Ubuntu’s: see “What Is Supported and What Is Experimental” in
+<code>docs/design.rst</code>. The devices need root to make, so nothing
+here makes them. Run this once, from the account that runs the examples
+and the tests:</p>
+<pre><code>sudo bin/mk-kernel-stand-ins</code></pre>
+<p>With no arguments it makes the CAN bus and the GPIO chip;
+<code>sudo bin/mk-kernel-stand-ins iio</code> makes the IIO sensor, and
+<code>can gpio iio</code> all three. It refuses, and makes nothing,
+where this kernel lacks a module one of the types named needs, saying
+which. It gives what it makes to the user who ran it, and prints the
+number the kernel gave the GPIO chip and the IIO sensor.
+<code>sudo bin/rm-kernel-stand-ins</code> takes away whichever were
+made. Nothing either does survives a reboot.</p>
+<table>
+<colgroup>
+<col style="width: 50%" />
+<col style="width: 50%" />
+</colgroup>
+<thead>
+<tr>
+<th>Directory</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>can</code></td>
+<td>A motor controller on the CAN bus <code>vcan0</code>, as two
+payloads: its status frames, identifier 0x123, go to the ground, and
+each command the ground sends goes to it as one frame with identifier
+0x124.</td>
+</tr>
+<tr>
+<td><code>gpio</code></td>
+<td>Two lines of a GPIO chip: each edge of a switch on line 0 goes to
+the ground as a sixteen-byte record, and a 1 or 0 from the ground drives
+a lamp on line 1.</td>
+</tr>
+<tr>
+<td><code>iio</code></td>
+<td>Experimental. A sensor’s sample buffer, read through the kernel’s
+IIO subsystem, its whole sample sets going to the ground. Nothing goes
+up: a buffer is read and never written.</td>
+</tr>
+</tbody>
+</table>
+<h3 id="can">can</h3>
+<p><code>vcan0</code> is the kernel’s virtual CAN bus: a bus with no
+wire, whose members are the sockets bound to it. tcspecial joins it as
+two of them, one for each identifier, and tcssim joins it as the motor,
+sending a status frame a second and counting the commands. On a vehicle
+the interface is the controller’s, such as <code>can0</code>, and
+nothing else changes.</p>
+<pre><code>make run-can</code></pre>
+<h3 id="gpio">gpio</h3>
+<p>The chip is one of the kernel’s <code>gpio-sim</code>, whose lines
+exist in memory: a line’s <code>pull</code> file sets what an input is
+pulled to, which the kernel reports to tcspecial as an edge, and its
+<code>value</code> file says what an output is driven to. tcssim pulls
+the switch’s line the other way every second and counts the lamp’s
+changes. The configuration names <code>/dev/gpiochip1</code>, which is
+what the simulated chip is on a host with one chip of its own; the
+number is given as chips appear, so write the one
+<code>bin/mk-kernel-stand-ins</code> printed.</p>
+<pre><code>make run-gpio</code></pre>
+<h3 id="iio">iio</h3>
+<p>The sensor is one of the kernel’s <code>iio_dummy</code>, whose
+buffer a software trigger fills a hundred times a second: the kernel
+stands in for it entirely, and tcssim makes nothing. Its buffer is there
+only where the kernel’s <code>iio_dummy</code> was built with
+<code>CONFIG_IIO_SIMPLE_DUMMY_BUFFER</code>, which a stock distribution
+kernel’s is not; <code>bin/mk-kernel-stand-ins iio</code> says so where
+it was not, and that is why the type is still experimental. The
+configuration names <code>/dev/iio:device1</code>, which is what the
+dummy is on a host with one sensor of its own; write the number
+<code>bin/mk-kernel-stand-ins</code> printed.</p>
+<pre><code>make run-iio</code></pre>
+<p>Languages, for all three:</p>
+<ul>
+<li>MOC: Rust – tcsmoc.</li>
+<li>Vehicle: Rust – tcspecial.</li>
+<li>Payload: the kernel’s stand-in, with tcssim playing the device’s far
+end for CAN and GPIO.</li>
+</ul>
 <h2 id="more-complex-examples">More complex examples</h2>
 <p>Each puts the vehicle to work on its payloads: what they send, and
 what is done with it aboard and on the ground.</p>

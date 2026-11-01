@@ -378,14 +378,16 @@ tcs_client *tcs_client_open(const tcs_configuration *configuration);
  * it is matched for listening: see tcs_configuration_matched(). A start of
  * tcspecial sets the restart flag in its beacons, which ends the match, so
  * after one nothing but CONNECT, RESTART_ARM and RESTART goes until a
- * Connect is answered again. A Connect goes during a wait begun by a
- * RESTART, without ending it.
+ * Connect is answered again. A vehicle that has taken a RESTART refuses
+ * every CONNECT until it has gone, which is an error here: it matches
+ * nothing, and agrees is not written. Connect again once the beacons of the
+ * start that comes back arrive.
  *
  * @param client  The client.
  * @param agrees  Where 1 is written when the vehicle is flying this
  *                configuration -- the digests match -- and 0 when it is
  *                not, in which case no node command should be sent.
- * @return        0, or -1 on an error. */
+ * @return        0, or -1 on an error, a refused CONNECT among them. */
 int tcs_client_connect(tcs_client *client, int *agrees);
 
 /** Sends PING, to ask whether the vehicle's command link answers. Not sent

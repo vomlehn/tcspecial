@@ -4554,7 +4554,9 @@ Initiate restart
   at once, and from then on beacons every ``beacon.default_interval``. A
   ``Connect`` taken after the restart is initiated and before the old
   tcspecial has gone neither clears the flag nor slows the beacons: the
-  restart is still under way.
+  restart is still under way. It is refused, and ``Last Response`` says
+  so; the first beacon of the tcspecial that comes back takes the link
+  down, and ``Connect`` is pressed then.
 
   A tcspecial that starts again for any other reason -- it crashed and its
   supervisor started it, or the vehicle lost power -- also starts its

@@ -932,9 +932,30 @@ impl Serving {
             // checksum the ground has matched this start: the restart flag
             // clears, the beacons go back to their interval and the downlink
             // and the other commands open. One carrying another checksum is
-            // answered the same and changes nothing else, and after a
-            // RESTART is taken no CONNECT does: see `Matched::connected`.
+            // answered the same and changes nothing else. After a RESTART
+            // is taken every CONNECT is refused Unmatched, below.
             Command::Connect(cmd) => {
+                let answer = ConnectTelemetry::new(
+                    sequence,
+                    self.flying.version,
+                    self.flying.digest,
+                    self.newest.unwrap_or(sequence),
+                );
+                // A start that has taken a RESTART is going, and a station
+                // that took this answer for a match would be matched with
+                // it. Refused, so that no station counts it, and still
+                // saying what is flying. The station hears of the start
+                // that comes back from its beacons.
+                if self.matched.is_ending() {
+                    warn!(
+                        "a CONNECT came after a RESTART was taken: answered \
+                         Unmatched, since this start is ending, and nothing \
+                         else changed"
+                    );
+                    return Telemetry::Connect(
+                        answer.refused(CommandStatus::Unmatched),
+                    );
+                }
                 if cmd.digest == self.flying.digest {
                     // Newly matched: the running configuration is the
                     // confirmed one, and its trials go back to nought, so
@@ -954,12 +975,7 @@ impl Serving {
                         cmd.digest, self.flying.digest
                     );
                 }
-                Telemetry::Connect(ConnectTelemetry::new(
-                    sequence,
-                    self.flying.version,
-                    self.flying.digest,
-                    self.newest.unwrap_or(sequence),
-                ))
+                Telemetry::Connect(answer)
             }
 
             Command::StartNode(cmd) => {
@@ -2369,6 +2385,22 @@ mod tests {
         // And the arm is used up.
         assert_eq!(restart(8, 42, running), CommandStatus::NotArmed);
         assert_eq!(ASKED.load(Ordering::SeqCst), 1);
+
+        // A CONNECT carrying the running configuration's checksum, to a
+        // start that is ending, is refused Unmatched: a station that took
+        // its answer for a match would be matched with a start that is
+        // going. It still says what is flying.
+        match ask(
+            &ground,
+            at,
+            &Command::Connect(tcslibgs::ConnectCommand::new(9, running)),
+        ) {
+            Some(Telemetry::Connect(tm)) => {
+                assert_eq!(tm.header.status, CommandStatus::Unmatched);
+                assert_eq!(tm.digest, running);
+            }
+            other => panic!("expected a connect answer, got {other:?}"),
+        }
     }
 
     /// A RESTART is taken only onto the target its arm named, even where

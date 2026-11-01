@@ -4574,7 +4574,9 @@ configuration's checksum. When it does it clears the flag, sends a beacon
 at once, and from then on beacons every <tt class="docutils literal">beacon.default_interval</tt>. A
 <tt class="docutils literal">Connect</tt> taken after the restart is initiated and before the old
 tcspecial has gone neither clears the flag nor slows the beacons: the
-restart is still under way.</p>
+restart is still under way. It is refused, and <tt class="docutils literal">Last Response</tt> says
+so; the first beacon of the tcspecial that comes back takes the link
+down, and <tt class="docutils literal">Connect</tt> is pressed then.</p>
 <p>A tcspecial that starts again for any other reason -- it crashed and its
 supervisor started it, or the vehicle lost power -- also starts its
 beacons again at #1 with the flag set, and runs with the configuration it

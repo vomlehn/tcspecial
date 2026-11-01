@@ -4,7 +4,7 @@
 //! each the sum of what is joined to it, and `current`, what is left over,
 //! all in amperes.
 
-use super::element::Element;
+use super::component::Component;
 
 /// Its terminals' places, in `tcslibgs::physics::bus::TERMINALS`'s order,
 /// which a test holds this to.
@@ -20,7 +20,7 @@ pub struct Bus {
     demand: f64,
 }
 
-impl Element for Bus {
+impl Component for Bus {
     fn hold(&mut self, inputs: &[f64]) {
         self.supply = inputs[SUPPLY];
         self.demand = inputs[DEMAND];

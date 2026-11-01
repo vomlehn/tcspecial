@@ -959,7 +959,7 @@ fn check_graph_simulator(
 
     // The model itself, in its words and at its lines: everything wrong
     // with it alone, and where it stands alone, how the stand-ins join it --
-    // an element nothing is joined to is refused there, and a misspelled
+    // a component nothing is joined to is refused there, and a misspelled
     // connects would read as one, so only where the payloads are named
     // well.
     if let Some((model, model_text)) = model {
@@ -1298,7 +1298,7 @@ mod tests {
     }
 
     /// What is wrong with the physics model is reported at its lines, every
-    /// element's, and a stand-in joined to an output its readings are not
+    /// component's, and a stand-in joined to an output its readings are not
     /// converted from is reported at its entry, whatever else is wrong with
     /// the model's joins.
     #[test]

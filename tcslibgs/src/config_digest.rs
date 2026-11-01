@@ -266,7 +266,7 @@ pub fn interpretation_of_simulator(
         })
         .collect();
     let physics = file.model.as_ref().map(|model| {
-        let mut components: Vec<&crate::physics::Element> =
+        let mut components: Vec<&crate::physics::Component> =
             model.physics.iter().collect();
         components.sort_by(|a, b| a.name().cmp(b.name()));
         let mut connections: Vec<(&str, &str)> = model

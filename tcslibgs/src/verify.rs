@@ -39,9 +39,9 @@ pub enum About {
     Node(String),
     /// A group of nodes, by name.
     NodeGroup(String),
-    /// An element of a physics model, by name: found in the model's file,
+    /// A component of a physics model, by name: found in the model's file,
     /// not the simulator file that names it.
-    PhysicsElement(String),
+    PhysicsComponent(String),
 }
 
 /// Something wrong with a configuration file.

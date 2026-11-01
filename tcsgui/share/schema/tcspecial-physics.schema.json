@@ -2,7 +2,7 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://github.com/vomlehn/tcspecial/schema/tcspecial-physics.schema.json",
   "title": "tcspecial physics model",
-  "description": "The vehicle's physical elements, which tcssim's stand-ins measure and act on, and how they are joined: a file of its own, named by each simulator file that uses it, because a vehicle's physics outlives any one configuration of its payloads. Each element is a part simulated alone, with fixed terminals of its type's; a connection joins an output to an input of the same kind. A stand-in joins a terminal in the simulator file, with connects: element.terminal. Every figure is written with its unit. YAML only.",
+  "description": "The vehicle's physical components, which tcssim's stand-ins measure and act on, and how they are joined: a file of its own, named by each simulator file that uses it, because a vehicle's physics outlives any one configuration of its payloads. Each element is a part simulated alone, with fixed terminals of its type's; a connection joins an output to an input of the same kind. A stand-in joins a terminal in the simulator file, with connects: element.terminal. Every figure is written with its unit. YAML only.",
   "type": "object",
   "properties": {
     "description": {
@@ -86,13 +86,13 @@
     },
     "connections": {
       "type": "array",
-      "description": "How the elements are joined, each from an output to an input of the same kind. An input that takes one output may be given one; a zone's heat takes the sum of every heater's.",
+      "description": "How the components are joined, each from an output to an input of the same kind. An input that takes one output may be given one; a zone's heat takes the sum of every heater's.",
       "items": {
         "type": "object",
         "properties": {
           "from": {
             "type": "string",
-            "description": "An output, as the element's name and the terminal's joined by a dot: `heater_1.heat`."
+            "description": "An output, as the component's name and the terminal's joined by a dot: `heater_1.heat`."
           },
           "to": {
             "type": "string",

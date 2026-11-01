@@ -1,5 +1,5 @@
-//! The physics model: the vehicle's physical elements, which the simulator's
-//! stand-ins measure and act on.
+//! The physics model: the vehicle's physical components, which the
+//! simulator's stand-ins measure and act on.
 //!
 //! A file of its own, beside the simulator file and named by it, because a
 //! vehicle's physics outlives any one configuration of its payloads: the
@@ -82,7 +82,7 @@ use crate::verify::About;
 pub use setting::Wander;
 use terminal::{At, Direction, Terminal};
 
-/// Every element type a physics model may hold, by the name a file writes
+/// Every component type a physics model may hold, by the name a file writes
 /// after `type` in the entry its components are grouped under. The one list
 /// of them.
 pub const TYPES: &[&str] = &[
@@ -107,21 +107,21 @@ pub struct PhysicsFile {
     /// Its components, in name order, whatever order the file writes them
     /// in: see [`grouped`].
     #[serde(default, deserialize_with = "grouped::components")]
-    pub physics: Vec<Element>,
-    /// How its elements are joined, each an output to an input.
+    pub physics: Vec<Component>,
+    /// How its components are joined, each an output to an input.
     #[serde(default)]
     pub connections: Vec<Connection>,
 }
 
-/// One element of a physics model, of one of the [`TYPES`]: a component, as
-/// a file names it.
+/// One component of a physics model, of one of the [`TYPES`], as a file
+/// names it.
 ///
 /// Read by [`grouped`], the type being the entry's it is written under, and
 /// written out with its type beside it for the simulator file's digest: see
 /// [`crate::config_digest::interpretation_of_simulator`].
 #[derive(Debug, Clone, Serialize, PartialEq)]
 #[serde(tag = "type")]
-pub enum Element {
+pub enum Component {
     #[serde(rename = "heater")]
     Heater(heater::Heater),
     #[serde(rename = "thermal_zone")]
@@ -146,7 +146,7 @@ pub enum Element {
     ThermalMass(Moved),
 }
 
-/// An element of a type there is no longer, read only to be refused.
+/// A component of a type there is no longer, read only to be refused.
 #[derive(Debug, Clone, Deserialize, Serialize, PartialEq)]
 pub struct Moved {
     #[serde(rename = "component")]
@@ -165,7 +165,7 @@ pub const MASS_MADE_OF_PARTS: &str = "a thermal_mass is now made of parts: \
     output, input and rate. examples/thermostat/thermostat-physics.yaml is \
     one written so";
 
-/// A connection between two elements, as a file writes it.
+/// A connection between two components, as a file writes it.
 #[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
 #[serde(deny_unknown_fields)]
 pub struct Connection {
@@ -175,7 +175,7 @@ pub struct Connection {
     pub to: String,
 }
 
-impl Element {
+impl Component {
     /// What it is called.
     ///
     /// # Returns
@@ -183,16 +183,16 @@ impl Element {
     /// Its name, as the file writes it.
     pub fn name(&self) -> &str {
         match self {
-            Element::Heater(e) => &e.name,
-            Element::ThermalZone(e) => &e.name,
-            Element::Sun(e) => &e.name,
-            Element::SolarArray(e) => &e.name,
-            Element::Load(e) => &e.name,
-            Element::Bus(e) => &e.name,
-            Element::Battery(e) => &e.name,
-            Element::Engine(e) => &e.name,
-            Element::Body(e) => &e.name,
-            Element::ThermalMass(e) => &e.name,
+            Component::Heater(e) => &e.name,
+            Component::ThermalZone(e) => &e.name,
+            Component::Sun(e) => &e.name,
+            Component::SolarArray(e) => &e.name,
+            Component::Load(e) => &e.name,
+            Component::Bus(e) => &e.name,
+            Component::Battery(e) => &e.name,
+            Component::Engine(e) => &e.name,
+            Component::Body(e) => &e.name,
+            Component::ThermalMass(e) => &e.name,
         }
     }
 
@@ -203,22 +203,22 @@ impl Element {
     /// Its type, as a file writes it.
     pub fn type_name(&self) -> &'static str {
         match self {
-            Element::Heater(_) => "heater",
-            Element::ThermalZone(_) => "thermal_zone",
-            Element::Sun(_) => "sun",
-            Element::SolarArray(_) => "solar_array",
-            Element::Load(_) => "load",
-            Element::Bus(_) => "bus",
-            Element::Battery(_) => "battery",
-            Element::Engine(_) => "engine",
-            Element::Body(_) => "body",
-            Element::ThermalMass(_) => "thermal_mass",
+            Component::Heater(_) => "heater",
+            Component::ThermalZone(_) => "thermal_zone",
+            Component::Sun(_) => "sun",
+            Component::SolarArray(_) => "solar_array",
+            Component::Load(_) => "load",
+            Component::Bus(_) => "bus",
+            Component::Battery(_) => "battery",
+            Component::Engine(_) => "engine",
+            Component::Body(_) => "body",
+            Component::ThermalMass(_) => "thermal_mass",
         }
     }
 }
 
-/// The settings an element of a type states, the `component` naming it
-/// apart: the one list for each, from which an editor builds an element's
+/// The settings a component of a type states, the `component` naming it
+/// apart: the one list for each, from which an editor builds a component's
 /// form.
 ///
 /// # Arguments
@@ -243,7 +243,7 @@ pub fn settings_of(type_name: &str) -> Option<&'static [&'static str]> {
     }
 }
 
-/// The terminals of an element of a type.
+/// The terminals of a component of a type.
 ///
 /// # Arguments
 ///
@@ -285,26 +285,26 @@ pub fn is_yaml_name(path: &Path) -> bool {
 /// Something wrong with a physics model.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct PhysicsProblem {
-    /// The element it is about, or `None` for one about the connections.
-    pub element: Option<String>,
+    /// The component it is about, or `None` for one about the connections.
+    pub component: Option<String>,
     /// What is wrong.
     pub why: String,
 }
 
 impl PhysicsProblem {
-    /// Makes a problem with an element.
+    /// Makes a problem with a component.
     ///
     /// # Arguments
     ///
-    /// * `element` - The element's name.
+    /// * `component` - The component's name.
     /// * `why`     - What is wrong.
     ///
     /// # Returns
     ///
     /// The problem.
-    fn of(element: &str, why: impl Into<String>) -> PhysicsProblem {
+    fn of(component: &str, why: impl Into<String>) -> PhysicsProblem {
         PhysicsProblem {
-            element: Some(element.to_string()),
+            component: Some(component.to_string()),
             why: why.into(),
         }
     }
@@ -320,7 +320,7 @@ impl PhysicsProblem {
     /// The problem.
     fn joining(why: impl Into<String>) -> PhysicsProblem {
         PhysicsProblem {
-            element: None,
+            component: None,
             why: why.into(),
         }
     }
@@ -330,10 +330,10 @@ impl PhysicsProblem {
     ///
     /// # Returns
     ///
-    /// Its element, or the connections.
+    /// Its component, or the connections.
     pub fn about(&self) -> About {
-        match &self.element {
-            Some(name) => About::PhysicsElement(name.clone()),
+        match &self.component {
+            Some(name) => About::PhysicsComponent(name.clone()),
             None => About::Section("connections"),
         }
     }
@@ -341,7 +341,7 @@ impl PhysicsProblem {
 
 impl std::fmt::Display for PhysicsProblem {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match &self.element {
+        match &self.component {
             Some(name) => {
                 write!(f, "physics component \"{name}\": {}", self.why)
             }
@@ -352,29 +352,29 @@ impl std::fmt::Display for PhysicsProblem {
 
 /// A physics model with every figure read and every connection found.
 ///
-/// In one order, whatever order its file is written in: the elements by
-/// name, so that an element's place -- by which the world holds it, and by
+/// In one order, whatever order its file is written in: the components by
+/// name, so that a component's place -- by which the world holds it, and by
 /// which two of its events due at one moment are taken -- is its place among
 /// the names; and the connections by the names of the terminals they join,
 /// from and then to, so that what is summed at an input is summed in one
 /// order.
 #[derive(Debug, Clone, PartialEq, Default)]
 pub struct Model {
-    /// Its elements, in name order.
-    pub elements: Vec<Resolved>,
+    /// Its components, in name order.
+    pub components: Vec<Resolved>,
     /// Its connections, each from an output to an input, in the order of
     /// the names of the terminals they join.
     pub connections: Vec<Joined>,
 }
 
-/// One element with its figures read.
+/// One component with its figures read.
 #[derive(Debug, Clone, PartialEq)]
 pub struct Resolved {
     pub name: String,
     pub what: Resolution,
 }
 
-/// What an element is, with its figures read.
+/// What a component is, with its figures read.
 #[derive(Debug, Clone, PartialEq)]
 pub enum Resolution {
     Heater(heater::Resolved),
@@ -429,11 +429,11 @@ impl Resolution {
     }
 }
 
-/// A terminal of a model, by place: which element, and which of its type's
+/// A terminal of a model, by place: which component, and which of its type's
 /// terminals.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct Place {
-    pub element: usize,
+    pub component: usize,
     pub terminal: usize,
 }
 
@@ -449,7 +449,7 @@ impl Model {
     ///
     /// # Arguments
     ///
-    /// * `at` - The element and terminal, as named.
+    /// * `at` - The component and terminal, as named.
     ///
     /// # Returns
     ///
@@ -457,17 +457,17 @@ impl Model {
     ///
     /// # Errors
     ///
-    /// A message naming what there is, for an element the model has not or
+    /// A message naming what there is, for a component the model has not or
     /// a terminal its type has not.
     pub fn find(&self, at: &At) -> Result<(Place, Terminal), String> {
-        let Some(element) =
-            self.elements.iter().position(|e| e.name == at.element)
+        let Some(component) =
+            self.components.iter().position(|e| e.name == at.component)
         else {
             let every: Vec<&str> =
-                self.elements.iter().map(|e| e.name.as_str()).collect();
+                self.components.iter().map(|e| e.name.as_str()).collect();
             return Err(format!(
                 "{at}: the physics model has no component \"{}\"; it has {}",
-                at.element,
+                at.component,
                 if every.is_empty() {
                     "none".to_string()
                 } else {
@@ -475,7 +475,7 @@ impl Model {
                 }
             ));
         };
-        let what = &self.elements[element].what;
+        let what = &self.components[component].what;
         let terminals = what.terminals();
         let Some(terminal) =
             terminals.iter().position(|t| t.name == at.terminal)
@@ -488,7 +488,13 @@ impl Model {
                 every.join(", ")
             ));
         };
-        Ok((Place { element, terminal }, terminals[terminal]))
+        Ok((
+            Place {
+                component,
+                terminal,
+            },
+            terminals[terminal],
+        ))
     }
 
     /// Says what a terminal is.
@@ -499,13 +505,13 @@ impl Model {
     ///
     /// # Returns
     ///
-    /// Its element's name and its own, joined as a file writes them.
+    /// Its component's name and its own, joined as a file writes them.
     pub fn name_of(&self, place: Place) -> String {
-        let element = &self.elements[place.element];
+        let component = &self.components[place.component];
         format!(
             "{}.{}",
-            element.name,
-            element.what.terminals()[place.terminal].name
+            component.name,
+            component.what.terminals()[place.terminal].name
         )
     }
 }
@@ -585,7 +591,7 @@ impl PhysicsFile {
         }
     }
 
-    /// Everything wrong with the model as it stands alone: an element whose
+    /// Everything wrong with the model as it stands alone: a component whose
     /// figures do not read, two of one name, a connection that names no
     /// terminal, joins two outputs or two inputs, joins a value in one unit
     /// to an input in another, or is a second output on an input that takes
@@ -596,7 +602,7 @@ impl PhysicsFile {
     ///
     /// # Returns
     ///
-    /// Each problem, the elements' first, in name order.
+    /// Each problem, the components' first, in name order.
     pub fn problems(&self) -> Vec<PhysicsProblem> {
         self.built().1
     }
@@ -605,17 +611,17 @@ impl PhysicsFile {
     ///
     /// # Returns
     ///
-    /// Every element that read and every connection found, and each
+    /// Every component that read and every connection found, and each
     /// problem.
     fn built(&self) -> (Model, Vec<PhysicsProblem>) {
         let mut problems = Vec::new();
         let mut model = Model::default();
         // By name, as [`grouped`] holds them already: a model made some
         // other way is in one order too.
-        let mut elements: Vec<&Element> = self.physics.iter().collect();
-        elements.sort_by(|a, b| a.name().cmp(b.name()));
-        for element in elements {
-            let name = element.name();
+        let mut components: Vec<&Component> = self.physics.iter().collect();
+        components.sort_by(|a, b| a.name().cmp(b.name()));
+        for component in components {
+            let name = component.name();
             if name.trim().is_empty() || name.contains('.') {
                 problems.push(PhysicsProblem::of(
                     name,
@@ -624,7 +630,7 @@ impl PhysicsFile {
                 ));
                 continue;
             }
-            if model.elements.iter().any(|e| e.name == name) {
+            if model.components.iter().any(|e| e.name == name) {
                 problems.push(PhysicsProblem::of(
                     name,
                     "two components have this name, and a connection or a \
@@ -632,24 +638,26 @@ impl PhysicsFile {
                 ));
                 continue;
             }
-            let what = match element {
-                Element::Heater(e) => e.resolve().map(Resolution::Heater),
-                Element::ThermalZone(e) => {
+            let what = match component {
+                Component::Heater(e) => e.resolve().map(Resolution::Heater),
+                Component::ThermalZone(e) => {
                     e.resolve().map(Resolution::ThermalZone)
                 }
-                Element::Sun(e) => e.resolve().map(Resolution::Sun),
-                Element::SolarArray(e) => {
+                Component::Sun(e) => e.resolve().map(Resolution::Sun),
+                Component::SolarArray(e) => {
                     e.resolve().map(Resolution::SolarArray)
                 }
-                Element::Load(e) => e.resolve().map(Resolution::Load),
-                Element::Bus(_) => Ok(Resolution::Bus),
-                Element::Battery(e) => e.resolve().map(Resolution::Battery),
-                Element::Engine(e) => e.resolve().map(Resolution::Engine),
-                Element::Body(e) => e.resolve().map(Resolution::Body),
-                Element::ThermalMass(_) => Err(MASS_MADE_OF_PARTS.to_string()),
+                Component::Load(e) => e.resolve().map(Resolution::Load),
+                Component::Bus(_) => Ok(Resolution::Bus),
+                Component::Battery(e) => e.resolve().map(Resolution::Battery),
+                Component::Engine(e) => e.resolve().map(Resolution::Engine),
+                Component::Body(e) => e.resolve().map(Resolution::Body),
+                Component::ThermalMass(_) => {
+                    Err(MASS_MADE_OF_PARTS.to_string())
+                }
             };
             match what {
-                Ok(what) => model.elements.push(Resolved {
+                Ok(what) => model.components.push(Resolved {
                     name: name.to_string(),
                     what,
                 }),
@@ -657,8 +665,8 @@ impl PhysicsFile {
             }
         }
 
-        // The connections only where every element read: one naming an
-        // element that did not would be reported as naming nothing, which
+        // The connections only where every component read: one naming a
+        // component that did not would be reported as naming nothing, which
         // is the wrong fault.
         if !problems.is_empty() {
             return (model, problems);
@@ -686,7 +694,7 @@ impl PhysicsFile {
 ///
 /// # Arguments
 ///
-/// * `model`      - The model, with its elements read.
+/// * `model`      - The model, with its components read.
 /// * `connection` - The connection.
 ///
 /// # Returns
@@ -753,7 +761,7 @@ fn crowded(model: &Model) -> Vec<String> {
         .iter()
         .filter(|(to, from)| {
             from.len() > 1
-                && !model.elements[to.element].what.terminals()[to.terminal]
+                && !model.components[to.component].what.terminals()[to.terminal]
                     .sums
         })
         .map(|(to, from)| {
@@ -797,27 +805,27 @@ connections:
     to: zone.heat
 ";
 
-    /// A model's elements are typed, their figures read in their units, and
+    /// A model's components are typed, their figures read in their units, and
     /// its connections are found; and each is held in name order, however
     /// the file wrote them.
     #[test]
-    fn a_model_holds_typed_elements_and_their_connections() {
+    fn a_model_holds_typed_components_and_their_connections() {
         let model = PhysicsFile::parse(ZONE)
             .expect("it parses")
             .resolve()
             .expect("it resolves");
-        assert_eq!(model.elements.len(), 3);
+        assert_eq!(model.components.len(), 3);
         let names: Vec<&str> =
-            model.elements.iter().map(|e| e.name.as_str()).collect();
+            model.components.iter().map(|e| e.name.as_str()).collect();
         assert_eq!(names, ["heater_1", "heater_2", "zone"]);
         assert_eq!(model.name_of(model.connections[0].from), "heater_1.heat");
-        let Resolution::Heater(heater) = &model.elements[1].what else {
-            panic!("a heater: {:?}", model.elements[1]);
+        let Resolution::Heater(heater) = &model.components[1].what else {
+            panic!("a heater: {:?}", model.components[1]);
         };
         assert_eq!((heater.power, heater.voltage), (60.0, 28.0));
         assert_eq!(heater.supply.size, 0.02);
-        let Resolution::ThermalZone(zone) = &model.elements[2].what else {
-            panic!("a zone: {:?}", model.elements[2]);
+        let Resolution::ThermalZone(zone) = &model.components[2].what else {
+            panic!("a zone: {:?}", model.components[2]);
         };
         assert_eq!((zone.environment, zone.capacity), (283.15, 20.0));
         assert_eq!(model.connections.len(), 2);
@@ -866,10 +874,10 @@ physics:
         );
     }
 
-    /// An element of no type, or of one there is none of, or with a
+    /// A component of no type, or of one there is none of, or with a
     /// setting its type has not, is refused, naming what is wrong.
     #[test]
-    fn an_element_of_no_known_type_is_refused() {
+    fn an_component_of_no_known_type_is_refused() {
         for (text, said) in [
             ("physics:\n  - component: zone\n", "is not a type"),
             (
@@ -910,7 +918,7 @@ physics:
         )
         .expect("it parses, to be refused");
         let problem = file.resolve().expect_err("refused");
-        assert_eq!(problem.about(), About::PhysicsElement("basic".into()));
+        assert_eq!(problem.about(), About::PhysicsComponent("basic".into()));
         assert!(problem.why.contains("thermal_zone"), "{problem}");
         assert!(problem.why.contains("connects:"), "{problem}");
     }
@@ -931,13 +939,13 @@ physics:
         }
     }
 
-    /// A figure without its unit is refused, at its element.
+    /// A figure without its unit is refused, at its component.
     #[test]
     fn a_figure_without_its_unit_is_refused() {
         let text = ZONE.replace("\"60 W\"", "\"60\"");
         let problems = PhysicsFile::parse(&text).expect("parses").problems();
         assert_eq!(problems.len(), 2, "{problems:?}");
-        assert_eq!(problems[0].element.as_deref(), Some("heater_1"));
+        assert_eq!(problems[0].component.as_deref(), Some("heater_1"));
         assert!(problems[0].why.contains("\"60 W\""), "{problems:?}");
     }
 
@@ -967,13 +975,13 @@ physics:
             assert!(
                 problems
                     .iter()
-                    .any(|p| p.element.is_none() && p.why.contains(says)),
+                    .any(|p| p.component.is_none() && p.why.contains(says)),
                 "{from} -> {to}: {problems:?}"
             );
         }
     }
 
-    /// Two elements of one name, or a name with a dot, are refused.
+    /// Two components of one name, or a name with a dot, are refused.
     #[test]
     fn names_are_one_each_and_dotless() {
         let twice = ZONE.replace("component: heater_2", "component: heater_1");

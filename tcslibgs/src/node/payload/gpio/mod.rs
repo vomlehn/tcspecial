@@ -1,8 +1,9 @@
 //! GPIO payloads: discrete lines, as events.
 //!
-//! **Experimental, and not yet supported.** The terms parse and reach a
-//! handler, and the handler watches the lines; nothing has been run against
-//! hardware, only against the kernel's simulated chip.
+//! **Supported**, as flown against the kernel's simulated chip, `gpio-sim`,
+//! by `tcspecial/tests/kernel-stand-ins.rs`; nothing has been run against
+//! hardware. See "What Is Supported and What Is Experimental" in
+//! `docs/design.rst`.
 //!
 //! A payload is not always a stream of data. A deployment switch, an arming
 //! line, a thermostat's output, a payload's own "I am alive" line: each is one

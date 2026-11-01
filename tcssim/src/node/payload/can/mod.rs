@@ -1,9 +1,10 @@
 //! A simulated device on a CAN bus.
 //!
-//! **Experimental, and not yet supported.** Run against the kernel's virtual
-//! bus and against no CAN controller.
+//! A supported type, flown against the kernel's virtual bus by
+//! `tcspecial/tests/kernel-stand-ins.rs`, which plays the device's end itself
+//! rather than through this.
 //!
-//! The one experimental kind whose stand-in is as faithful as a socket. A CAN
+//! The one kind whose stand-in is as faithful as a socket. A CAN
 //! controller carries every member's frames to every other member, so the
 //! simulator does not have to stand in for anything: it opens a socket on the
 //! same interface the handler is on, sends the device's frames with the

@@ -45,6 +45,12 @@ help:
 		"playing the F´ bridge"
 	@echo "  make run-cfs         - Run tcsmoc on the cfs example," \
 		"tcssim standing in for the cFS end"
+	@echo "  make run-can         - Run tcsmoc on the can example, on the" \
+		"kernel's virtual CAN bus"
+	@echo "  make run-gpio        - Run tcsmoc on the gpio example, on the" \
+		"kernel's gpio-sim chip"
+	@echo "  make run-iio         - Run tcsmoc on the iio example, on the" \
+		"kernel's iio_dummy sensor"
 	@echo "  make check-python3   - Check for the Python 3 simple-app's" \
 		"payload needs"
 	@echo "  make check-tkinter   - Check for the tkinter the ping" \
@@ -116,6 +122,24 @@ run-fprime:
 .PHONY: run-cfs
 run-cfs:
 	$(call runexample_on,cfs)
+
+# Run tcsmoc on the examples whose payloads are devices the kernel stands in
+# for: a virtual CAN bus, a gpio-sim chip and an iio_dummy sensor. Each
+# device has to be there first, and making one needs root, so these do not:
+# `sudo bin/mk-kernel-stand-ins`, in the top-level directory, makes all
+# three and gives them to the user who ran it. See "Payloads the kernel
+# stands in for" in README.md.
+.PHONY: run-can
+run-can:
+	$(call runexample_on,can)
+
+.PHONY: run-gpio
+run-gpio:
+	$(call runexample_on,gpio)
+
+.PHONY: run-iio
+run-iio:
+	$(call runexample_on,iio)
 
 # Run tcspecial on the simple-app example: a payload that is a program,
 # sending a line of text a word at a time.

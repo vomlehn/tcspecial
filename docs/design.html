@@ -508,7 +508,7 @@ ul.auto-toc {
 <li><a class="reference internal" href="#payloads" id="toc-entry-103">Payloads</a><ul>
 <li><a class="reference internal" href="#how-a-payload-is-made-to-send" id="toc-entry-104">How a Payload Is Made to Send</a></li>
 <li><a class="reference internal" href="#link-terms" id="toc-entry-105">Link Terms</a><ul>
-<li><a class="reference internal" href="#what-is-experimental" id="toc-entry-106">What Is Experimental</a></li>
+<li><a class="reference internal" href="#what-is-supported-and-what-is-experimental" id="toc-entry-106">What Is Supported and What Is Experimental</a></li>
 <li><a class="reference internal" href="#gpio-payloads-discrete-lines" id="toc-entry-107">GPIO Payloads: Discrete Lines</a></li>
 <li><a class="reference internal" href="#two-ways-of-watching-and-a-set-of-lines-may-ask-for-either-or-both" id="toc-entry-108">Two ways of watching, and a set of lines may ask for either or both</a></li>
 <li><a class="reference internal" href="#rpmsg-payloads-another-core" id="toc-entry-109">rpmsg Payloads: Another Core</a></li>
@@ -661,9 +661,10 @@ the type decides what is needed to open it and what terms it is operated
 on.</dd>
 <dt>endpoint type</dt>
 <dd>What an endpoint is made of, and so what locates it and what else must be
-said about it. Five are supported -- <tt class="docutils literal">network</tt>, <tt class="docutils literal"><span class="pre">device-file</span></tt>,
-<tt class="docutils literal">serial</tt>, <tt class="docutils literal">i2c</tt> and <tt class="docutils literal">spi</tt> -- and five more are experimental:
-<tt class="docutils literal">can</tt>, <tt class="docutils literal">iio</tt>, <tt class="docutils literal">rpmsg</tt>, <tt class="docutils literal">gpio</tt> and <tt class="docutils literal">hdlc</tt>. A type is not a protocol -- a network endpoint
+said about it. Eight are supported -- <tt class="docutils literal">network</tt>, <tt class="docutils literal"><span class="pre">device-file</span></tt>,
+<tt class="docutils literal">serial</tt>, <tt class="docutils literal">i2c</tt>, <tt class="docutils literal">spi</tt>, <tt class="docutils literal">can</tt>, <tt class="docutils literal">iio</tt> and <tt class="docutils literal">gpio</tt> -- and two
+more are experimental: <tt class="docutils literal">rpmsg</tt> and <tt class="docutils literal">hdlc</tt>. A type is not a protocol --
+a network endpoint
 carries the protocol it runs over, and no other type is addressed that
 way.</dd>
 <dt>device</dt>
@@ -8235,8 +8236,8 @@ Most of the endpoint types are opened through an entry in <tt class="docutils li
 an entry is depends on what is at the end of it, and not on the entry's name:
 the name says where to look, and the type says what else must be said about it
 and which implementation opens it. The two that are not device files at all
-are <tt class="docutils literal">network</tt>, which is a socket at an address, and the experimental
-<tt class="docutils literal">can</tt>, which is a socket on an interface.</p>
+are <tt class="docutils literal">network</tt>, which is a socket at an address, and <tt class="docutils literal">can</tt>, which is a
+socket on an interface.</p>
 <p><strong>Endpoints Opened Through Device Files</strong></p>
 <table border="1" class="docutils">
 <colgroup>
@@ -9102,25 +9103,73 @@ way whichever of the two stated it, so both are checked the same way.</dd>
 whether it sends of its own accord or on a trigger -- and one word cannot
 mean both.</dd>
 </dl>
-<div class="section" id="what-is-experimental">
-<h3><a class="toc-backref" href="#toc-entry-106">What Is Experimental</a></h3>
-<p>Some of what follows is <strong>experimental and not yet supported</strong>: RS-485 on a
-serial line, and the <tt class="docutils literal">can</tt>, <tt class="docutils literal">iio</tt>, <tt class="docutils literal">rpmsg</tt>, <tt class="docutils literal">gpio</tt> and <tt class="docutils literal">hdlc</tt> types
-of payload. Each is written, parses, reaches a handler and has tests of its
-rules; none has been run against the hardware it describes, and no shipped
-configuration uses one. <tt class="docutils literal">hdlc</tt> is the furthest out of them: every other has
-something in the kernel to be exercised against, and a synchronous line has
-nothing but a card.</p>
-<p>The requirements for them are written the way every other requirement here is,
-because that is what they are for: a statement of what the configuration will
-be, settled before there is equipment to try it against. They may change,
-where the five supported types -- <tt class="docutils literal">network</tt>, <tt class="docutils literal"><span class="pre">device-file</span></tt>, <tt class="docutils literal">serial</tt>,
-<tt class="docutils literal">i2c</tt>
-and <tt class="docutils literal">spi</tt> -- will not.</p>
+<div class="section" id="what-is-supported-and-what-is-experimental">
+<h3><a class="toc-backref" href="#toc-entry-106">What Is Supported and What Is Experimental</a></h3>
+<p>Eight types of payload are supported: <tt class="docutils literal">network</tt>, <tt class="docutils literal"><span class="pre">device-file</span></tt>,
+<tt class="docutils literal">serial</tt>, <tt class="docutils literal">i2c</tt>, <tt class="docutils literal">spi</tt>, <tt class="docutils literal">can</tt>, <tt class="docutils literal">gpio</tt> and <tt class="docutils literal">iio</tt>. The last three
+were experimental, and became supported when each was flown against the
+kernel's own stand-in for its device: a CAN bus of <tt class="docutils literal">vcan</tt>, a chip of
+<tt class="docutils literal"><span class="pre">gpio-sim</span></tt>, and a sensor of <tt class="docutils literal">iio_dummy</tt>.</p>
+<dl class="docutils">
+<dt>Requirement</dt>
+<dd>A type of payload is supported only once tcspecial's own node code for it
+has been run, by a test in the tree, against the device it describes or
+against the kernel's stand-in for that device, with the device's far end
+played through the kernel and not by tcssim. The test shows the device's
+data reaching the ground and, where the type has an output, the ground's
+commands reaching the device. For <tt class="docutils literal">can</tt>, <tt class="docutils literal">gpio</tt> and <tt class="docutils literal">iio</tt> that test
+is <tt class="docutils literal"><span class="pre">tcspecial/tests/kernel-stand-ins.rs</span></tt>, and it flies
+<tt class="docutils literal">examples/can</tt>, <tt class="docutils literal">examples/gpio</tt> and <tt class="docutils literal">examples/iio</tt>. Why: a type
+whose rules are tested and whose code has never met a device is a type
+whose first meeting with one is in flight, which the ranking of
+reliability first forbids.</dd>
+<dt>Requirement</dt>
+<dd><p class="first">Making a kernel's stand-in needs root, so a test never makes one. One
+script, <tt class="docutils literal"><span class="pre">bin/mk-kernel-stand-ins</span></tt>, run once with sudo, makes all three
+and gives them to the user who ran it, and <tt class="docutils literal"><span class="pre">bin/rm-kernel-stand-ins</span></tt>
+removes them. The script checks, before it changes anything, that the
+kernel has every module the types asked for need -- <tt class="docutils literal">vcan</tt> and
+<tt class="docutils literal"><span class="pre">can-raw</span></tt>; <tt class="docutils literal"><span class="pre">gpio-sim</span></tt>; <tt class="docutils literal"><span class="pre">industrialio-configfs</span></tt>,
+<tt class="docutils literal"><span class="pre">iio-trig-hrtimer</span></tt> and an <tt class="docutils literal">iio_dummy</tt> built with
+<tt class="docutils literal">CONFIG_IIO_SIMPLE_DUMMY_BUFFER</tt> -- and refuses, making nothing, where
+it lacks one, naming the type and what is missing. A test whose device is
+not there, or not the user's to use, skips, saying which device and the
+command that makes it, so that <tt class="docutils literal">cargo test</tt> passes on a host never set
+up. What it then shows about that type on that host is nothing, which is
+why the skip is said.</p>
+<p class="last">What a stand-in does not show is a real controller, chip or sensor: a
+bus's bitrate and error handling, a line's electrical behaviour, a
+driver's own channels. Supported means the code is right against the
+kernel's interface, which is the same interface a real device's driver
+presents.</p>
+</dd>
+</dl>
+<p>Some of what follows is still <strong>experimental and not yet supported</strong>: RS-485
+on a serial line, and the <tt class="docutils literal">rpmsg</tt> and <tt class="docutils literal">hdlc</tt> types of payload. Each is
+written, parses, reaches a handler and has tests of its rules; none has been
+run against the hardware it describes, and no shipped configuration uses one.</p>
+<dl class="docutils">
+<dt>Requirement</dt>
+<dd>A type stays experimental while nothing in the kernel stands in for its
+device, and is promoted only by a run against hardware. An rpmsg channel
+needs a remote processor and its firmware, and the kernel has no
+loopback channel; generic HDLC has no virtual interface, so a
+synchronous line needs a card; and RS-485's direction control is the
+driver of a real UART, set with <tt class="docutils literal">TIOCSRS485</tt>, which a pseudo-terminal
+refuses. tcssim's stand-ins for rpmsg and HDLC -- a pseudo-terminal, a
+UDP socket at <tt class="docutils literal">stand_in</tt> -- carry the bytes, and do not reach the code
+that differs.</dd>
+</dl>
+<p>The requirements for the experimental ones are written the way every other
+requirement here is, because that is what they are for: a statement of what
+the configuration will be, settled before there is equipment to try it
+against. They may change, where the eight supported types will not.</p>
 </div>
 <div class="section" id="gpio-payloads-discrete-lines">
 <h3><a class="toc-backref" href="#toc-entry-107">GPIO Payloads: Discrete Lines</a></h3>
-<p><strong>Experimental, not yet supported.</strong></p>
+<p><strong>Supported</strong>, as flown against a chip of the kernel's <tt class="docutils literal"><span class="pre">gpio-sim</span></tt> by
+<tt class="docutils literal"><span class="pre">tcspecial/tests/kernel-stand-ins.rs</span></tt>: see <a class="reference internal" href="#what-is-supported-and-what-is-experimental">What Is Supported and What Is
+Experimental</a>.</p>
 <p>Not every payload is a stream of data. A deployment switch, an arming line, a
 thermostat's output: each is one wire that is high or low, and what the ground
 wants to know is when it changed. Linux offers those through a chip's
@@ -9284,7 +9333,8 @@ edge on each of its lines every packet interval.</dd>
 </div>
 <div class="section" id="rpmsg-payloads-another-core">
 <h3><a class="toc-backref" href="#toc-entry-109">rpmsg Payloads: Another Core</a></h3>
-<p><strong>Experimental, not yet supported.</strong></p>
+<p><strong>Experimental, not yet supported</strong>, for want of anything in the kernel to run
+it against: see <a class="reference internal" href="#what-is-supported-and-what-is-experimental">What Is Supported and What Is Experimental</a>.</p>
 <p>A flight computer is commonly one package with cores of more than one type in
 it, and the payload is then software on another core rather than anything on a
 wire. Linux talks to it over rpmsg: the remote announces a named channel,
@@ -9333,7 +9383,9 @@ the stand-in differs from the thing.</dd>
 </div>
 <div class="section" id="iio-payloads-a-sensor-s-buffer">
 <h3><a class="toc-backref" href="#toc-entry-110">IIO Payloads: a Sensor's Buffer</a></h3>
-<p><strong>Experimental, not yet supported.</strong></p>
+<p><strong>Supported</strong>, as flown against a sensor of the kernel's <tt class="docutils literal">iio_dummy</tt> by
+<tt class="docutils literal"><span class="pre">tcspecial/tests/kernel-stand-ins.rs</span></tt>: see <a class="reference internal" href="#what-is-supported-and-what-is-experimental">What Is Supported and What Is
+Experimental</a>.</p>
 <p>The kernel's Industrial I/O subsystem is what a sensor looks like on Linux. A
 program that wants a stream of samples enables the channels it cares about and
 a buffer, both through <tt class="docutils literal">sysfs</tt>, and then reads <tt class="docutils literal">/dev/iio:deviceN</tt>, which
@@ -9379,11 +9431,13 @@ handler too, which touches none of those attributes.</dd>
 </div>
 <div class="section" id="can-payloads-a-bus-of-peers">
 <h3><a class="toc-backref" href="#toc-entry-111">CAN Payloads: a Bus of Peers</a></h3>
-<p><strong>Experimental, not yet supported.</strong></p>
+<p><strong>Supported</strong>, as flown against a bus of the kernel's <tt class="docutils literal">vcan</tt> by
+<tt class="docutils literal"><span class="pre">tcspecial/tests/kernel-stand-ins.rs</span></tt>: see <a class="reference internal" href="#what-is-supported-and-what-is-experimental">What Is Supported and What Is
+Experimental</a>.</p>
 <p>A CAN controller is a network interface rather than a device file, so a CAN
 payload is located by an interface and by the identifier its frames carry.
 Both ends of the link are sockets on that interface, which is what makes this
-the one experimental type whose stand-in is as faithful as a socket: a bus
+the one type whose stand-in is as faithful as a socket: a bus
 carries every member's frames to every other member, so the simulator joins
 the bus rather than standing in for something on it.</p>
 <p>The rules are in <tt class="docutils literal"><span class="pre">tcslibgs::endpoint_config_can</span></tt>, the endpoint in
@@ -9480,7 +9534,8 @@ is what will not have it.</dd>
 </div>
 <div class="section" id="rs-485-a-two-wire-bus">
 <h3><a class="toc-backref" href="#toc-entry-113">RS-485: a Two-Wire Bus</a></h3>
-<p><strong>Experimental, not yet supported.</strong></p>
+<p><strong>Experimental, not yet supported</strong>, for want of anything in the kernel to run
+it against: see <a class="reference internal" href="#what-is-supported-and-what-is-experimental">What Is Supported and What Is Experimental</a>.</p>
 <p>A start-stop line may be half of an RS-485 bus rather than one end of a
 point-to-point link: one pair of wires, several transmitters, and each of them
 obliged to stop driving the pair the instant it has finished. The turnaround
@@ -9584,7 +9639,7 @@ so there is always a rule deciding where one read ends.</dd>
 <div class="section" id="hdlc-payloads-a-synchronous-line">
 <h3><a class="toc-backref" href="#toc-entry-114">HDLC Payloads: a Synchronous Line</a></h3>
 <p><strong>Experimental, not yet supported, and the one type with nothing to be run
-against.</strong></p>
+against</strong>: see <a class="reference internal" href="#what-is-supported-and-what-is-experimental">What Is Supported and What Is Experimental</a>.</p>
 <p>A synchronous serial line: bits carried on a clock, framed as HDLC. Linux calls
 the mechanism <strong>generic HDLC</strong>, and what it presents is a network interface --
 <tt class="docutils literal">hdlc0</tt> -- not a device file. The terms of the line are set with one ioctl on
@@ -11320,8 +11375,9 @@ and part simulation.</dd>
 <h3><a class="toc-backref" href="#toc-entry-139">Which Types Can Be Simulated</a></h3>
 <p>A simulated payload has to be whatever is at the far end of its handler's
 payload endpoint, and the types of endpoint are not equally easy to be. The
-experimental types are covered where each of them is: a CAN bus of peers, a
-sensor's buffer, a channel to another core and a set of discrete lines.</p>
+<tt class="docutils literal">can</tt>, <tt class="docutils literal">iio</tt>, <tt class="docutils literal">rpmsg</tt> and <tt class="docutils literal">gpio</tt> types are covered where each of them
+is: a CAN bus of peers, a sensor's buffer, a channel to another core and a set
+of discrete lines.</p>
 <dl class="docutils">
 <dt>Requirement</dt>
 <dd>A synchronous line is the one type nothing stands in for at its own
@@ -12680,9 +12736,10 @@ of them does instead is described in <tt class="docutils literal">design.rst</tt
 and <tt class="docutils literal">manual.rst</tt> mean by it: written, parsing, reaching a handler and tested,
 but never run against the hardware it describes and in no configuration
 this tree ships.
-Six things are in that state, all of them types of payload interface:
-RS-485 on a serial line, and the <tt class="docutils literal">can</tt>, <tt class="docutils literal">iio</tt>, <tt class="docutils literal">rpmsg</tt>, <tt class="docutils literal">gpio</tt> and
-<tt class="docutils literal">hdlc</tt> types.</p>
+Three things are in that state, all of them types of payload interface:
+RS-485 on a serial line, and the <tt class="docutils literal">rpmsg</tt> and <tt class="docutils literal">hdlc</tt> types. The <tt class="docutils literal">can</tt>,
+<tt class="docutils literal">iio</tt> and <tt class="docutils literal">gpio</tt> types were once, and are supported now that each has been
+flown against the kernel's stand-in for its device.</p>
 </div>
 <div class="section" id="the-name-of-the-project-is-tcspecial">
 <h2><a class="toc-backref" href="#toc-entry-149">The name of the project is TCSpecial</a></h2>
@@ -12739,15 +12796,16 @@ and one for commands about a payload.</p>
 <p class="first admonition-title">Note</p>
 <p class="last">Implemented differently. There is no <tt class="docutils literal">DH_UDP</tt>. A node's endpoint is per
 type -- <tt class="docutils literal">UdpEndpoint</tt>, <tt class="docutils literal">TcpEndpoint</tt>, <tt class="docutils literal">SerialEndpoint</tt>,
-<tt class="docutils literal">I2cEndpoint</tt>, <tt class="docutils literal">SpiEndpoint</tt>, <tt class="docutils literal">DeviceEndpoint</tt>, the Unix socket pair,
-and the experimental <tt class="docutils literal">CanEndpoint</tt>, <tt class="docutils literal">IioEndpoint</tt>, <tt class="docutils literal">RpmsgEndpoint</tt>
-and <tt class="docutils literal">GpioEndpoint</tt>. Telemetry no longer leaves from the payload's own
-node: every payload had an OC endpoint of its own, and a node's data now
-reaches the ground along the links the configuration draws, through the
-gateway node, which is the one UDP socket to the ground whatever types the
-nodes behind it are. What that is for is that the graph decides where a
-datum goes -- to the ground, to a log, to a computation, or to all three --
-and a payload wired to send its own telemetry could only decide the one.</p>
+<tt class="docutils literal">I2cEndpoint</tt>, <tt class="docutils literal">SpiEndpoint</tt>, <tt class="docutils literal">DeviceEndpoint</tt>, <tt class="docutils literal">CanEndpoint</tt>,
+<tt class="docutils literal">IioEndpoint</tt>, <tt class="docutils literal">GpioEndpoint</tt>, the Unix socket pair, and the
+experimental <tt class="docutils literal">RpmsgEndpoint</tt>. Telemetry no longer leaves from the
+payload's own node: every payload had an OC endpoint of its own, and a
+node's data now reaches the ground along the links the configuration
+draws, through the gateway node, which is the one UDP socket to the
+ground whatever types the nodes behind it are. What that is for is that
+the graph decides where a datum goes -- to the ground, to a log, to a
+computation, or to all three -- and a payload wired to send its own
+telemetry could only decide the one.</p>
 </div>
 <p>CI must support the following functions for implementing commands: ping(), exit(), status(), config(), start_dh(), stop_dh(), status_dh()</p>
 <div class="admonition note">

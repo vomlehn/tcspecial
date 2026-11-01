@@ -55,8 +55,8 @@ impl Queue {
     /// # Arguments
     ///
     /// * `component` - Which component.
-    /// * `at`      - When, in simulated seconds, or `None` for none it
-    ///               knows of.
+    /// * `at`        - When, in simulated seconds, or `None` for none it
+    ///                 knows of.
     pub fn set(&mut self, component: usize, at: Option<f64>) {
         // Within the room the queue was made with, so neither the removal
         // nor the insertion allocates: a component has one entry at most.

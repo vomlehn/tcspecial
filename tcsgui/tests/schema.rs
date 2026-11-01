@@ -578,7 +578,11 @@ fn every_shipped_xml_file_is_valid_against_its_schema() {
 ///
 /// # Returns
 ///
-/// `Ok` if it is valid, and else what `xmllint` said.
+/// `Ok` if it is valid.
+///
+/// # Errors
+///
+/// What `xmllint` said, where it is not.
 ///
 /// # Panics
 ///

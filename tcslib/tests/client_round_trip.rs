@@ -21,8 +21,7 @@ use tcslibgs::{
     ArmKey, Command, CommandStatus, ConfigDigest, ConfigVersion,
     ConnectTelemetry, DHSample, NodeCounts, NodeId, NodeTelemetry,
     PingTelemetry, QueryNodeSampleTelemetry, QueryNodeTelemetry, Reason,
-    RestartArmTelemetry, RestartTelemetry, SetNodeTelemetry, TcsError,
-    Telemetry,
+    RestartArmTelemetry, RestartTelemetry, SetNodeTelemetry, Telemetry,
 };
 
 fn stub_sample(first: u8) -> DHSample {
@@ -326,7 +325,7 @@ fn a_client_with_no_node_link_refuses_a_node_command() {
 
 #[test]
 fn every_operation_reaches_the_spacecraft_and_comes_back() {
-    let (addr, stub) = stub_spacecraft(9);
+    let (addr, stub) = stub_spacecraft(10);
     let mut client = client_to(&addr);
 
     assert!(client.ping().unwrap().header.status.is_success());
@@ -346,22 +345,19 @@ fn every_operation_reaches_the_spacecraft_and_comes_back() {
         CommandStatus::Success
     );
 
-    // Nothing but a CONNECT, an arm and a restart may follow a RESTART
-    // until a beacon says it is done: the rest are refused here, unsent, so
-    // the stand-in is not asked them. A PING among them.
-    let start = |client: &mut tcslib::TcsClient| {
-        client.start_node(NodeId::of(2)).map(|(status, _)| status)
-    };
-    let refused = start(&mut client).expect_err("refused while waiting");
-    assert!(
-        matches!(refused, TcsError::AwaitingRestart(_)),
-        "{refused:?}"
+    // Nothing is held back after a RESTART: the vehicle is what refuses a
+    // command that follows it, answering it Unmatched until the start that
+    // comes back is matched. The stand-in answers everything, so these all
+    // succeed, a PING among them.
+    assert_eq!(
+        client
+            .start_node(NodeId::of(2))
+            .map(|(status, _)| status)
+            .unwrap(),
+        CommandStatus::Success
     );
-    assert!(refused.to_string().contains("starts again"));
-    assert!(matches!(client.ping(), Err(TcsError::AwaitingRestart(_))));
-    // The three that go, none of them ending the wait: the CONNECT is
-    // answered by the start the RESTART went to, and the second RESTART
-    // says nothing of whether the first was taken.
+    assert!(client.ping().unwrap().header.status.is_success());
+    // And the three go again, as they go at any time.
     assert_eq!(client.connect(digest).unwrap(), (version, digest));
     assert_eq!(
         client.restart_arm(ArmKey(0x5678), digest).unwrap(),
@@ -371,17 +367,6 @@ fn every_operation_reaches_the_spacecraft_and_comes_back() {
         client.restart(ArmKey(0x5678), digest).unwrap(),
         CommandStatus::Success
     );
-    assert!(client.restart_wait().is_some());
-    // Not by the old start's beacons, though they carry the flag.
-    assert!(!client.beacon_heard(false));
-    assert!(client.restart_wait().is_some());
-    // By the next start.
-    assert!(client.beacon_heard(true), "it ends the wait");
-    assert!(client.restart_wait().is_none());
-    // Here the station's match is not fed the beacons, so the command
-    // goes; at a real station the new start's flagged beacons end the
-    // match, and nothing but the three goes until a CONNECT is answered.
-    assert_eq!(start(&mut client).unwrap(), CommandStatus::Success);
 
     stub.join().expect("the stand-in answered every command");
 }

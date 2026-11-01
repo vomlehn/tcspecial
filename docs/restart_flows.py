@@ -306,6 +306,110 @@ GROUND = [
         "commanding"),
 ]
 
+# The figures of `The restart and the beacon, in time`: the beacons are
+# numbered, because what the ground judges a start by is the number going
+# back, and the flag is what ends a match.
+
+BEACONS = [
+    note("vehicle", 0, "Running A, matched; a beacon every "
+         "default_interval"),
+    note("moc", 0, "Using A, matched"),
+    msg("down", "any", "beacon #41, normal", 1, 2, "matched"),
+    msg("up", "any", "RESTART_ARM to A", 3, 4, "armed"),
+    msg("down", "any", "answer: armed", 4.5, 5.5, "taken"),
+    msg("up", "any", "RESTART to A", 6.5, 7.5, "taken: state file written; "
+        "flag set; nothing but the three acted on from now"),
+    msg("down", "any", "answer: Success", 9, 10, "taken"),
+    msg("down", "any", "beacon #42, restart", 10.6, 12, "flag set: the "
+        "match ends; the station sends nothing but the three"),
+    note("vehicle", 13, "Cleans up; a beacon every reset_interval"),
+    msg("down", "any", "beacon #43, restart", 13.5, 14.5, "number goes up: "
+        "the same start, ending"),
+    note("vehicle", 15.5, "exec: the new start loads A; its first beacon "
+         "goes at once"),
+    msg("down", "any", "beacon #1, restart", 17, 18, "number went back: a "
+        "new start; tcsmoc takes the link down: press Connect"),
+    msg("up", "any", "CONNECT with A", 20, 21, "checksums match: flag "
+        "cleared; downlink opens; a beacon at once"),
+    msg("down", "any", "answer: running A", 21.5, 22.5, "CONNECT answered "
+        "with this station's checksum"),
+    msg("down", "any", "beacon #2, normal", 22.6, 24, "matched for "
+        "commanding"),
+    note("vehicle", 25.5, "A beacon every default_interval"),
+    msg("down", "any", "beacon #3, normal", 26.5, 27.5, "matched"),
+]
+
+LOST_UP = [
+    note("vehicle", 0, "Running A, matched"),
+    note("moc", 0, "Using A, matched"),
+    msg("up", "any", "RESTART_ARM to B", 1, 2, "armed: the arm stands for "
+        "restart_arm_valid"),
+    msg("down", "any", "answer: armed", 2.5, 3.5, "taken"),
+    msg("up", "any", "RESTART to B", 4.5, 6, "never arrives", taken=False),
+    note("moc", 7.5, "No answer: the client times out. Not sent again on "
+         "that alone"),
+    msg("down", "any", "beacon #42, normal", 9, 10, "number up, flag clear, "
+        "at default_interval: the RESTART was not taken"),
+    msg("up", "A", "START_NODE", 11.5, 12.5, "acted on: still matched with "
+        "A"),
+    msg("down", "A", "answer: Success", 13, 14, "taken: nothing held it "
+        "back"),
+    msg("up", "any", "RESTART to B, same key", 15.5, 16.5, "taken: the arm "
+        "still stands; flag set"),
+    msg("down", "any", "answer: Success", 17.5, 18.5, "taken"),
+    msg("down", "any", "beacon #43, restart", 19.1, 20.5, "flag set: the "
+        "match ends; the restart is under way"),
+]
+
+LOST_ANSWER = [
+    note("vehicle", 0, "Running A, matched, armed for B"),
+    note("moc", 0, "Using A, matched"),
+    msg("up", "any", "RESTART to B", 1, 2, "taken: flag set"),
+    msg("down", "any", "answer: Success", 3, 4.5, "never arrives",
+        taken=False),
+    msg("down", "any", "beacon #42, restart", 4, 6, "flag set: the "
+        "RESTART was taken, though no answer came; the match ends"),
+    note("moc", 8, "The client times out on the answer"),
+    msg("up", "any", "RESTART to B, again", 8.5, 9.5, "not acted on: the "
+        "first used the arm up"),
+    msg("down", "any", "answer: NotArmed", 10, 11, "taken: restarts "
+        "nothing; the beacons have said the first was taken"),
+    note("moc", 12.8, "A station that watches the beacons refuses a "
+         "START_NODE unsent from #42; one that does not sends it"),
+    msg("up", "A", "START_NODE", 14.5, 15.5, "not acted on: a RESTART was "
+        "taken; answered Unmatched", taken=False),
+    msg("down", "A", "answer: Unmatched", 16.5, 17.5, "tells it why "
+        "nothing happened"),
+    note("vehicle", 18.5, "exec: the new start loads B"),
+    msg("down", "any", "beacon #1, restart", 19.5, 20.5, "number went back, "
+        "with B's checksum: load B and Connect"),
+]
+
+LOST_BEACONS = [
+    note("vehicle", 0, "Started a moment ago, running A, matched"),
+    note("moc", 0, "Using A, matched"),
+    msg("down", "any", "beacon #2, normal", 1, 2, "matched"),
+    msg("up", "any", "RESTART to A", 3, 4, "taken: flag set"),
+    msg("down", "any", "answer: Success", 5, 6, "taken"),
+    msg("down", "any", "beacon #3, restart", 6.2, 7.6, "flag set: the "
+        "match ends"),
+    note("vehicle", 8.5, "exec: the new start loads A"),
+    msg("down", "any", "beacons #1 to #3, restart", 10, 11, "all lost",
+        taken=False),
+    msg("down", "any", "beacon #4, restart", 12.5, 13.5, "number up from "
+        "#3: not seen as a new start, so the link stays up; flag set: "
+        "still not matched"),
+    note("moc", 15.5, "A START_NODE pressed now is refused here, unsent: "
+         "not matched"),
+    note("moc", 18, "The operator presses Disconnect, then Connect"),
+    msg("up", "any", "CONNECT with A", 19.5, 20.5, "checksums match: flag "
+        "cleared; a beacon at once"),
+    msg("down", "any", "answer: running A", 21, 22, "answered with this "
+        "station's checksum"),
+    msg("down", "any", "beacon #5, normal", 22.6, 24, "matched for "
+        "commanding"),
+]
+
 if __name__ == "__main__":
     draw("restart-commanded", "A commanded restart from A to B",
          "The vehicle runs configuration A and the station is matched with "
@@ -341,3 +445,47 @@ if __name__ == "__main__":
          "the station is matched for listening and reads with A. Its own "
          "CONNECT with A matches it for commanding.",
          GROUND)
+    draw("restart-beacons", "A commanded restart, every beacon heard",
+         "The vehicle runs A, matched, beaconing every default interval; "
+         "beacon 41 says normal. The station arms and sends RESTART. The "
+         "vehicle takes it, sets the restart flag, answers Success, and "
+         "sends beacon 42 at once with the flag set, which ends the "
+         "station's match. While it cleans up it beacons every reset "
+         "interval, the number still going up. After the exec the new "
+         "start's first beacon, number 1, goes at once with the flag set; "
+         "the number going back says a new start, and tcsmoc takes its link "
+         "down. The station sends CONNECT with A, which matches: the "
+         "vehicle clears the flag, answers, and sends beacon 2, normal, at "
+         "once, and from then beacons every default interval.",
+         BEACONS)
+    draw("restart-lost-up", "A RESTART that never arrives",
+         "The station arms a restart to B and sends RESTART, which is lost. "
+         "No answer comes and the client times out. The next beacon, 42, "
+         "counts up at the default interval with the flag clear, which says "
+         "the RESTART was not taken. Nothing on the ground is held back: a "
+         "START_NODE goes and is acted on. The station sends RESTART again "
+         "with the same key while the arm still stands; it is taken, and "
+         "beacon 43 carries the flag.",
+         LOST_UP)
+    draw("restart-lost-answer", "A RESTART taken whose answer is lost",
+         "The vehicle takes a RESTART to B; its answer is lost, but beacon "
+         "42 carries the restart flag, which says the RESTART was taken and "
+         "ends the station's match. A RESTART sent again is refused "
+         "NotArmed, since the first used the arm up, and restarts nothing. "
+         "A station that watches the beacons refuses a START_NODE unsent "
+         "from then; one that does not sends it, and the vehicle answers it "
+         "Unmatched and does nothing. The new start "
+         "beacons number 1 with the flag set and B's checksum.",
+         LOST_ANSWER)
+    draw("restart-lost-beacons", "A new start whose first beacons are lost",
+         "The vehicle started only a moment ago, so its beacon numbers are "
+         "low. It takes a RESTART and beacon 3 carries the flag, ending the "
+         "match. The new start's beacons 1 to 3 are all lost, so beacon 4 "
+         "looks like the next of the old start and the link stays up; but "
+         "its flag is set, so the station is still not matched and would "
+         "refuse a START_NODE unsent. The operator presses Disconnect and "
+         "Connect; "
+         "the CONNECT matches, the vehicle clears the flag, and beacon 5, "
+         "normal, makes the station matched for commanding. Nothing is "
+         "stuck.",
+         LOST_BEACONS)

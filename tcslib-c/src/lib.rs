@@ -619,9 +619,6 @@ pub struct tcs_beacons {
     said: Text<TEXT_BYTES>,
     remarks: Notes,
     warnings: Notes,
-    /// Whether the beacon the last pass heard says tcspecial started again,
-    /// for `tcs_client_beacon_heard`: `None` where the last pass heard none.
-    last: Option<bool>,
     /// The configuration's match, which every pass is handed to.
     matched: Matched,
 }
@@ -676,7 +673,6 @@ pub unsafe extern "C" fn tcs_beacons_listen(
             said,
             remarks: Notes::EMPTY,
             warnings: Notes::EMPTY,
-            last: None,
             matched: configuration.matched.clone(),
         })))
     })
@@ -727,8 +723,6 @@ pub unsafe extern "C" fn tcs_beacons_pass(
             restarted: c_int::from(found.restarted),
             restart_flag: c_int::from(found.restart_flag),
         };
-        watch.last = (found.arrived == tcslib::beacon::Arrived::Beacon)
-            .then_some(found.restarted);
         watch.said.set(&found.said);
         watch.remarks.set(&found.remarks);
         watch.warnings.set(&found.warnings);
@@ -1462,87 +1456,6 @@ unsafe fn target_of(
              32 lower-case hex digits tcsverify prints for the configuration \
              to restart onto, or NULL for this configuration's"
         ))
-    })
-}
-
-/// Hands the client what the last pass of `beacons` heard, so that a wait
-/// begun by a RESTART can end.
-///
-/// # Arguments
-///
-/// * `client`  - The client.
-/// * `beacons` - The beacon watch, just passed.
-///
-/// # Returns
-///
-/// 1 when this ended a wait, because the beacon's number says tcspecial has
-/// started again; 0 when it did not end one, -1 on an error.
-///
-/// # Safety
-///
-/// `client` as [`tcs_client_restart_arm`]; `beacons` as
-/// [`tcs_beacons_said`].
-#[no_mangle]
-pub unsafe extern "C" fn tcs_client_beacon_heard(
-    client: *mut tcs_client,
-    beacons: *const tcs_beacons,
-) -> c_int {
-    guard(-1, || {
-        let link = handle_of_mut(client, "the client")?;
-        let watch = handle_of(beacons, "the beacons")?;
-        let Some(restarted) = watch.last else {
-            return Ok(0);
-        };
-        Ok(c_int::from(link.client.beacon_heard(restarted)))
-    })
-}
-
-/// Says whether the client is waiting for a beacon to say a RESTART is
-/// done.
-///
-/// # Arguments
-///
-/// * `client` - The client.
-///
-/// # Returns
-///
-/// 1 when it is, and every command but this is refused; 0 when it is not;
-/// -1 on an error.
-///
-/// # Safety
-///
-/// `client` as [`tcs_client_restart_arm`].
-#[no_mangle]
-pub unsafe extern "C" fn tcs_client_awaiting_restart(
-    client: *const tcs_client,
-) -> c_int {
-    guard(-1, || {
-        let link = handle_of(client, "the client")?;
-        Ok(c_int::from(link.client.restart_wait().is_some()))
-    })
-}
-
-/// Ends a wait for a RESTART by hand, for an operator who knows the RESTART
-/// was never taken.
-///
-/// # Arguments
-///
-/// * `client` - The client.
-///
-/// # Returns
-///
-/// 1 when there was one to end, 0 when there was not, -1 on an error.
-///
-/// # Safety
-///
-/// `client` as [`tcs_client_restart_arm`].
-#[no_mangle]
-pub unsafe extern "C" fn tcs_client_end_restart_wait(
-    client: *mut tcs_client,
-) -> c_int {
-    guard(-1, || {
-        let link = handle_of_mut(client, "the client")?;
-        Ok(c_int::from(link.client.end_restart_wait().is_some()))
     })
 }
 

@@ -57,9 +57,10 @@ linkage throughout, and nothing in it that C++ will not compile.
   needed. `tcs_client_restart_arm` and `tcs_client_restart` name the
   configuration to restart onto by its checksum, NULL meaning this one's; a
   vehicle that does not hold it answers `TCS_STATUS_NOT_FOUND`.
-  `tcs_client_beacon_heard` tells the client of each pass's beacon; after a
-  restart is sent it is what ends the wait for the vehicle to come back,
-  during which nothing but connect, arm and restart goes. A status this
+  Nothing is held back after a restart is sent: the vehicle answers every
+  command but connect, arm and restart `TCS_STATUS_UNMATCHED` from the
+  moment it takes the restart until the start that comes back is matched,
+  and that start's beacons end the station's match. A status this
   library does not know -- a vehicle of a later build may add one -- is
   written as the number it came as: it is a refusal, and
   `tcs_status_name` gives "" for it, so a station says it by its number.

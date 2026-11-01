@@ -1,0 +1,52 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="940" height="825" viewBox="0 0 940 825" role="img" aria-labelledby="title desc">
+<title id="title">A RESTART taken whose answer is lost</title>
+<desc id="desc">The vehicle takes a RESTART to B; its answer is lost, but beacon 42 carries the restart flag, which says the RESTART was taken and ends the station&#x27;s match. A RESTART sent again is refused NotArmed, since the first used the arm up, and restarts nothing. A station that watches the beacons refuses a START_NODE unsent from then; one that does not sends it, and the vehicle answers it Unmatched and does nothing. The new start beacons number 1 with the flag set and B&#x27;s checksum.</desc>
+<rect width="940" height="825" fill="#ffffff"/>
+<text x="40" y="24" style="font-family: Helvetica, Arial, sans-serif; font-size: 15px; font-weight: bold">A RESTART taken whose answer is lost</text>
+<line x1="40" y1="46" x2="110" y2="46" stroke="#0072B2" stroke-width="2.5" stroke-dasharray=""/>
+<text x="120" y="50" style="font-family: Helvetica, Arial, sans-serif; font-size: 12px">[A] made with configuration A: solid line</text>
+<line x1="40" y1="64" x2="110" y2="64" stroke="#555555" stroke-width="2.5" stroke-dasharray="2 4"/>
+<text x="120" y="68" style="font-family: Helvetica, Arial, sans-serif; font-size: 12px">[any] layout never changes (beacon, CONNECT, RESTART_ARM, RESTART, their answers): dotted line</text>
+<text x="40" y="86" style="font-family: Helvetica, Arial, sans-serif; font-size: 12px">Arrowhead: read or acted on. Cross: dropped and counted, or not acted on. The words at each end say which.</text>
+<text x="300" y="128" text-anchor="middle" style="font-family: Helvetica, Arial, sans-serif; font-size: 13px; font-weight: bold">Vehicle (tcspecial)</text>
+<line x1="300" y1="138" x2="300" y2="815" stroke="#000000" stroke-width="1.5"/>
+<text x="640" y="128" text-anchor="middle" style="font-family: Helvetica, Arial, sans-serif; font-size: 13px; font-weight: bold">MOC (ground station)</text>
+<line x1="640" y1="138" x2="640" y2="815" stroke="#000000" stroke-width="1.5"/>
+<text x="288" y="154" text-anchor="end" style="font-family: Helvetica, Arial, sans-serif; font-size: 12px; font-style: italic; fill: #000000"><tspan x="288" dy="0">Running A, matched, armed for B</tspan></text>
+<text x="652" y="154" text-anchor="start" style="font-family: Helvetica, Arial, sans-serif; font-size: 12px; font-style: italic; fill: #000000"><tspan x="652" dy="0">Using A, matched</tspan></text>
+<line x1="640" y1="180" x2="314" y2="210" stroke="#555555" stroke-width="2.5" stroke-dasharray="2 4"/>
+<polygon points="300,210 310,205 310,215" fill="#555555"/>
+<text x="531.2" y="183.6" text-anchor="middle" style="font-family: Helvetica, Arial, sans-serif; font-size: 12px; fill: #000000; paint-order: stroke; stroke: #ffffff; stroke-width: 4px">[any] RESTART to B</text>
+<text x="288" y="214" text-anchor="end" style="font-family: Helvetica, Arial, sans-serif; font-size: 12px; fill: #000000"><tspan x="288" dy="0">taken: flag set</tspan></text>
+<line x1="300" y1="240" x2="626" y2="285" stroke="#555555" stroke-width="2.5" stroke-dasharray="2 4"/>
+<path d="M620,279 L632,291 M620,291 L632,279" stroke="#555555" stroke-width="2.5"/>
+<text x="408.8" y="248.4" text-anchor="middle" style="font-family: Helvetica, Arial, sans-serif; font-size: 12px; fill: #000000; paint-order: stroke; stroke: #ffffff; stroke-width: 4px">[any] answer: Success</text>
+<text x="652" y="289" text-anchor="start" style="font-family: Helvetica, Arial, sans-serif; font-size: 12px; fill: #000000"><tspan x="652" dy="0">never arrives</tspan></text>
+<line x1="300" y1="270" x2="626" y2="330" stroke="#555555" stroke-width="2.5" stroke-dasharray="2 4"/>
+<polygon points="640,330 630,325 630,335" fill="#555555"/>
+<text x="408.8" y="283.2" text-anchor="middle" style="font-family: Helvetica, Arial, sans-serif; font-size: 12px; fill: #000000; paint-order: stroke; stroke: #ffffff; stroke-width: 4px">[any] beacon #42, restart</text>
+<text x="652" y="334" text-anchor="start" style="font-family: Helvetica, Arial, sans-serif; font-size: 12px; fill: #000000"><tspan x="652" dy="0">flag set: the RESTART was taken,</tspan><tspan x="652" dy="14">though no answer came; the match</tspan><tspan x="652" dy="14">ends</tspan></text>
+<text x="652" y="394" text-anchor="start" style="font-family: Helvetica, Arial, sans-serif; font-size: 12px; font-style: italic; fill: #000000"><tspan x="652" dy="0">The client times out on the answer</tspan></text>
+<line x1="640" y1="405" x2="314" y2="435" stroke="#555555" stroke-width="2.5" stroke-dasharray="2 4"/>
+<polygon points="300,435 310,430 310,440" fill="#555555"/>
+<text x="531.2" y="408.6" text-anchor="middle" style="font-family: Helvetica, Arial, sans-serif; font-size: 12px; fill: #000000; paint-order: stroke; stroke: #ffffff; stroke-width: 4px">[any] RESTART to B, again</text>
+<text x="288" y="439" text-anchor="end" style="font-family: Helvetica, Arial, sans-serif; font-size: 12px; fill: #000000"><tspan x="288" dy="0">not acted on: the first used the arm</tspan><tspan x="288" dy="14">up</tspan></text>
+<line x1="300" y1="450" x2="626" y2="480" stroke="#555555" stroke-width="2.5" stroke-dasharray="2 4"/>
+<polygon points="640,480 630,475 630,485" fill="#555555"/>
+<text x="408.8" y="453.6" text-anchor="middle" style="font-family: Helvetica, Arial, sans-serif; font-size: 12px; fill: #000000; paint-order: stroke; stroke: #ffffff; stroke-width: 4px">[any] answer: NotArmed</text>
+<text x="652" y="484" text-anchor="start" style="font-family: Helvetica, Arial, sans-serif; font-size: 12px; fill: #000000"><tspan x="652" dy="0">taken: restarts nothing; the beacons</tspan><tspan x="652" dy="14">have said the first was taken</tspan></text>
+<text x="652" y="538" text-anchor="start" style="font-family: Helvetica, Arial, sans-serif; font-size: 12px; font-style: italic; fill: #000000"><tspan x="652" dy="0">A station that watches the beacons</tspan><tspan x="652" dy="14">refuses a START_NODE unsent from</tspan><tspan x="652" dy="14">#42; one that does not sends it</tspan></text>
+<line x1="640" y1="585" x2="314" y2="615" stroke="#0072B2" stroke-width="2.5" stroke-dasharray=""/>
+<path d="M308,609 L320,621 M308,621 L320,609" stroke="#0072B2" stroke-width="2.5"/>
+<text x="531.2" y="588.6" text-anchor="middle" style="font-family: Helvetica, Arial, sans-serif; font-size: 12px; fill: #000000; paint-order: stroke; stroke: #ffffff; stroke-width: 4px">[A] START_NODE</text>
+<text x="288" y="619" text-anchor="end" style="font-family: Helvetica, Arial, sans-serif; font-size: 12px; fill: #000000"><tspan x="288" dy="0">not acted on: a RESTART was taken;</tspan><tspan x="288" dy="14">answered Unmatched</tspan></text>
+<line x1="300" y1="645" x2="626" y2="675" stroke="#0072B2" stroke-width="2.5" stroke-dasharray=""/>
+<polygon points="640,675 630,670 630,680" fill="#0072B2"/>
+<text x="408.8" y="648.6" text-anchor="middle" style="font-family: Helvetica, Arial, sans-serif; font-size: 12px; fill: #000000; paint-order: stroke; stroke: #ffffff; stroke-width: 4px">[A] answer: Unmatched</text>
+<text x="652" y="679" text-anchor="start" style="font-family: Helvetica, Arial, sans-serif; font-size: 12px; fill: #000000"><tspan x="652" dy="0">tells it why nothing happened</tspan></text>
+<text x="288" y="709" text-anchor="end" style="font-family: Helvetica, Arial, sans-serif; font-size: 12px; font-style: italic; fill: #000000"><tspan x="288" dy="0">exec: the new start loads B</tspan></text>
+<line x1="300" y1="735" x2="626" y2="765" stroke="#555555" stroke-width="2.5" stroke-dasharray="2 4"/>
+<polygon points="640,765 630,760 630,770" fill="#555555"/>
+<text x="408.8" y="738.6" text-anchor="middle" style="font-family: Helvetica, Arial, sans-serif; font-size: 12px; fill: #000000; paint-order: stroke; stroke: #ffffff; stroke-width: 4px">[any] beacon #1, restart</text>
+<text x="652" y="769" text-anchor="start" style="font-family: Helvetica, Arial, sans-serif; font-size: 12px; fill: #000000"><tspan x="652" dy="0">number went back, with B&#x27;s checksum:</tspan><tspan x="652" dy="14">load B and Connect</tspan></text>
+</svg>

@@ -232,13 +232,14 @@ answer carries a generation, and none is needed.
 <code>tcs_client_restart_arm</code> and <code>tcs_client_restart</code>
 name the configuration to restart onto by its checksum, NULL meaning
 this one’s; a vehicle that does not hold it answers
-<code>TCS_STATUS_NOT_FOUND</code>. <code>tcs_client_beacon_heard</code>
-tells the client of each pass’s beacon; after a restart is sent it is
-what ends the wait for the vehicle to come back, during which nothing
-but connect, arm and restart goes. A status this library does not know –
-a vehicle of a later build may add one – is written as the number it
-came as: it is a refusal, and <code>tcs_status_name</code> gives “” for
-it, so a station says it by its number.</li>
+<code>TCS_STATUS_NOT_FOUND</code>. Nothing is held back after a restart
+is sent: the vehicle answers every command but connect, arm and restart
+<code>TCS_STATUS_UNMATCHED</code> from the moment it takes the restart
+until the start that comes back is matched, and that start’s beacons end
+the station’s match. A status this library does not know – a vehicle of
+a later build may add one – is written as the number it came as: it is a
+refusal, and <code>tcs_status_name</code> gives “” for it, so a station
+says it by its number.</li>
 <li><strong>Pinging a ping node.</strong> <code>tcs_pinger_open</code>
 finds the first <code>ping</code> node the ground can reach both ways
 and its gateway node. <code>tcs_pinger_ping</code> sends a ping up; its

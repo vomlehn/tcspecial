@@ -4527,27 +4527,32 @@ Initiate restart
   and the startup summary on tcspecial's error output says whether the
   start was commanded.
 
-  Once a station has sent a restart it sends nothing more to the vehicle
-  but ``Connect``, ``Arm restart`` and ``Initiate restart`` until a beacon
-  arrives whose number has gone back: the vehicle that comes back may read
-  packets differently from the one that went, and the beacon -- not the
-  answer to the restart, which may never arrive -- is what says it is back.
-  Any other command tried in between, a ping among them, is refused by the
-  station, unsent. The three that go do not end the wait. ``Connect`` asks
-  what is flying and changes nothing the restart depends on; ``Arm
-  restart`` and ``Initiate restart`` are how a restart that may never have
-  arrived is sent again. A restart answered as refused ends the wait it
-  began, since nothing was started; one sent again during the wait does
-  not end it, refused or not, since the first may have been taken.
+  A station that has sent a restart holds nothing back: every button goes
+  on working as it did. The vehicle is what refuses a command that follows
+  a restart. From the moment it takes one, and in the tcspecial that comes
+  back until a ``Connect`` carrying its checksum, it answers every command
+  but ``Connect``, ``Arm restart`` and ``Initiate restart`` ``Unmatched``
+  and does nothing with it, since the command may have been built with a
+  configuration it is no longer running. The beacons, not the answer to the
+  restart, which may never arrive, say what became of it: a beacon saying
+  ``restart`` where the last said ``normal``, or one whose number has gone
+  back, says it was taken; beacons that go on counting up at the usual
+  interval and still say ``normal`` say it never arrived, and the restart
+  can be sent again. A restart sent again after the first was taken is
+  refused ``NotArmed`` and restarts nothing.
 
-  Any beacon whose number has gone back, waited for or not, takes the
-  command link down: the status beside the address reads ``Disconnected``,
-  what the last ``Connect`` agreed is forgotten, and the next thing to press
-  is ``Connect``, which every start needs before anything else is sent.
-  ``Last Response`` says ``tcspecial has started again: press Connect``, or,
-  where the beacon also ends the wait, ``tcspecial has started again after
-  the restart initiated here: press Connect``. It does not say whether the
-  start that came back is the one the restart asked for.
+  The first flagged beacon ends the station's match, so from then on the
+  station itself refuses every command but the three, unsent, until it is
+  matched again. Any beacon whose number has gone back takes the command
+  link down: the status beside the address reads ``Disconnected``, what the
+  last ``Connect`` agreed is forgotten, and the next thing to press is
+  ``Connect``, which every start needs before anything else is sent.
+  ``Last Response`` says ``tcspecial has started again: press Connect``. It
+  does not say whether the start that came back is the one the restart
+  asked for. Should the new tcspecial's first beacons all be lost, so that
+  no number is seen to go back, the link stays up while the beacons' flag
+  says the vehicle is not matched: press ``Disconnect`` and then
+  ``Connect``, which sends the ``Connect`` the new tcspecial is waiting for.
 
   A command carries its sequence number and nothing that counts starts,
   and so does its answer: there is no generation number. A start of the

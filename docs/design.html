@@ -825,14 +825,14 @@ numbers and a zero.</p>
 <p>A link is written as an <strong>attribute of the node it leaves</strong>, named after
 the data source it leaves by, with one entry per line:</p>
 <pre class="code yaml literal-block">
-<span class="punctuation indicator">-</span><span class="whitespace"> </span><span class="name tag">name</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">k_fore</span><span class="whitespace">
-  </span><span class="name tag">type</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">compute</span><span class="whitespace">
-  </span><span class="name tag">function</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal string">&quot;to_kelvin&quot;</span><span class="whitespace">
-  </span><span class="name tag">payload-out</span><span class="punctuation">:</span><span class="whitespace">
-    </span><span class="punctuation indicator">-</span><span class="whitespace"> </span><span class="name tag">target</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">gateway</span><span class="whitespace">
-    </span><span class="punctuation indicator">-</span><span class="whitespace"> </span><span class="name tag">target</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">mean_temp</span><span class="whitespace">
-      </span><span class="name tag">input</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">in0</span><span class="whitespace">
-    </span><span class="punctuation indicator">-</span><span class="whitespace"> </span><span class="name tag">target</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">housekeeping</span>
+<span class="punctuation indicator">-</span><span class="whitespace"> </span><span class="name tag">type compute</span><span class="punctuation">:</span><span class="whitespace">
+    </span><span class="punctuation indicator">-</span><span class="whitespace"> </span><span class="name tag">compute</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">k_fore</span><span class="whitespace">
+      </span><span class="name tag">function</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal string">&quot;to_kelvin&quot;</span><span class="whitespace">
+      </span><span class="name tag">payload-out</span><span class="punctuation">:</span><span class="whitespace">
+        </span><span class="punctuation indicator">-</span><span class="whitespace"> </span><span class="name tag">target</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">gateway</span><span class="whitespace">
+        </span><span class="punctuation indicator">-</span><span class="whitespace"> </span><span class="name tag">target</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">mean_temp</span><span class="whitespace">
+          </span><span class="name tag">input</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">in0</span><span class="whitespace">
+        </span><span class="punctuation indicator">-</span><span class="whitespace"> </span><span class="name tag">target</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">housekeeping</span>
 </pre>
 <p>An entry's <tt class="docutils literal">target</tt> is the node the line goes to and its <tt class="docutils literal">input</tt> is
 which of that node's inputs it feeds, where it feeds a named one. One entry
@@ -856,14 +856,14 @@ is in, once, however far it reaches.</p>
 <p>The node a link arrives at says so as well, under the data sink it arrives
 at:</p>
 <pre class="code yaml literal-block">
-<span class="punctuation indicator">-</span><span class="whitespace"> </span><span class="name tag">name</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">mean_temp</span><span class="whitespace">
-  </span><span class="name tag">type</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">compute</span><span class="whitespace">
-  </span><span class="name tag">function</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal string">&quot;mean&quot;</span><span class="whitespace">
-  </span><span class="name tag">inputs</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal string">&quot;in0,in1,in2&quot;</span><span class="whitespace">
-  </span><span class="name tag">payload-out</span><span class="punctuation">:</span><span class="whitespace">
-    </span><span class="punctuation indicator">-</span><span class="whitespace"> </span><span class="name tag">target</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">gateway</span><span class="whitespace">
-    </span><span class="punctuation indicator">-</span><span class="whitespace"> </span><span class="name tag">target</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">thermostat</span><span class="whitespace">
-  </span><span class="name tag">payload-in</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">true</span>
+<span class="punctuation indicator">-</span><span class="whitespace"> </span><span class="name tag">type compute</span><span class="punctuation">:</span><span class="whitespace">
+    </span><span class="punctuation indicator">-</span><span class="whitespace"> </span><span class="name tag">compute</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">mean_temp</span><span class="whitespace">
+      </span><span class="name tag">function</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal string">&quot;mean&quot;</span><span class="whitespace">
+      </span><span class="name tag">inputs</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal string">&quot;in0,in1,in2&quot;</span><span class="whitespace">
+      </span><span class="name tag">payload-out</span><span class="punctuation">:</span><span class="whitespace">
+        </span><span class="punctuation indicator">-</span><span class="whitespace"> </span><span class="name tag">target</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">gateway</span><span class="whitespace">
+        </span><span class="punctuation indicator">-</span><span class="whitespace"> </span><span class="name tag">target</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">thermostat</span><span class="whitespace">
+      </span><span class="name tag">payload-in</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">true</span>
 </pre>
 <p>That is a record of the links above and not a link. The point of it is a
 node whose entry said nothing about what fed it: a sensor's entry named
@@ -912,7 +912,7 @@ rather than being whatever the compute element happens to accept.</dd>
 <p>A configuration's nodes are written in three sections, and they are the three
 working panes of the editor:</p>
 <dl class="docutils">
-<dt><tt class="docutils literal">gateway</tt></dt>
+<dt><tt class="docutils literal">gateways</tt></dt>
 <dd>the ground links: the other end of the link, which is not the vehicle at
 all.</dd>
 <dt><tt class="docutils literal">vehicle</tt></dt>
@@ -926,10 +926,56 @@ something aboard.</dd>
 statement of it: <tt class="docutils literal"><span class="pre">tcslibgs::graph::section_of</span></tt>. The editor's panes read it
 and so does the file reader, so a file and a drawing cannot come to disagree
 about what a node is.</p>
+<p>Within a section the nodes are grouped by type, and a node says no type of its
+own: it is of the type it is written under. Each node is named by the word for
+its section -- <tt class="docutils literal">gateway</tt>, <tt class="docutils literal">compute</tt> for any vehicle node, or <tt class="docutils literal">payload</tt>
+-- with its name as the value:</p>
+<pre class="code yaml literal-block">
+<span class="name tag">payloads</span><span class="punctuation">:</span><span class="whitespace">
+  </span><span class="punctuation indicator">-</span><span class="whitespace"> </span><span class="name tag">type i2c</span><span class="punctuation">:</span><span class="whitespace">
+      </span><span class="punctuation indicator">-</span><span class="whitespace"> </span><span class="name tag">payload</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">temp_1</span><span class="whitespace">
+        </span><span class="name tag">address</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal string">&quot;0x48&quot;</span><span class="whitespace">
+        </span><span class="name tag">path</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">/dev/i2c-1</span><span class="whitespace">
+      </span><span class="punctuation indicator">-</span><span class="whitespace"> </span><span class="name tag">payload</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">temp_2</span><span class="whitespace">
+        </span><span class="name tag">address</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal string">&quot;0x49&quot;</span><span class="whitespace">
+        </span><span class="name tag">path</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">/dev/i2c-1</span>
+</pre>
+<p>and in XML a <tt class="docutils literal">&lt;type <span class="pre">name=&quot;...&quot;&gt;</span></tt> element holding <tt class="docutils literal">&lt;gateway&gt;</tt>,
+<tt class="docutils literal">&lt;compute&gt;</tt> or <tt class="docutils literal">&lt;payload&gt;</tt> elements named by their <tt class="docutils literal">name</tt> attribute:</p>
+<pre class="code xml literal-block">
+<span class="name tag">&lt;payloads&gt;</span><span class="whitespace">
+    </span><span class="name tag">&lt;type</span><span class="whitespace"> </span><span class="name attribute">name=</span><span class="literal string">&quot;i2c&quot;</span><span class="name tag">&gt;</span><span class="whitespace">
+        </span><span class="name tag">&lt;payload</span><span class="whitespace"> </span><span class="name attribute">name=</span><span class="literal string">&quot;temp_1&quot;</span><span class="name tag">&gt;</span><span class="whitespace">
+            </span><span class="name tag">&lt;address&gt;</span>0x48<span class="name tag">&lt;/address&gt;</span><span class="whitespace">
+            </span><span class="name tag">&lt;path&gt;</span>/dev/i2c-1<span class="name tag">&lt;/path&gt;</span><span class="whitespace">
+        </span><span class="name tag">&lt;/payload&gt;</span><span class="whitespace">
+        </span><span class="name tag">&lt;payload</span><span class="whitespace"> </span><span class="name attribute">name=</span><span class="literal string">&quot;temp_2&quot;</span><span class="name tag">&gt;</span><span class="whitespace">
+            </span><span class="name tag">&lt;address&gt;</span>0x49<span class="name tag">&lt;/address&gt;</span><span class="whitespace">
+            </span><span class="name tag">&lt;path&gt;</span>/dev/i2c-1<span class="name tag">&lt;/path&gt;</span><span class="whitespace">
+        </span><span class="name tag">&lt;/payload&gt;</span><span class="whitespace">
+    </span><span class="name tag">&lt;/type&gt;</span><span class="whitespace">
+</span><span class="name tag">&lt;/payloads&gt;</span>
+</pre>
+<p>A type is written once in a section, so a section reads as a list of what
+kinds of thing the vehicle has and how many of each, and changing a node's
+type is moving it rather than editing a word on it. The order of the types,
+of the nodes of a type and of a node's attributes means nothing (see <a class="reference internal" href="#what-each-end-read">What
+Each End Read</a>); the editor writes all three by name.</p>
 <dl class="docutils">
 <dt>Requirement</dt>
-<dd>A node written in the wrong section is refused where the file is read,
-naming the node, the section it is in and the one it belongs in. A payload
+<dd>A file in the shape before this -- each node an entry with a <tt class="docutils literal">name</tt> and
+a <tt class="docutils literal">type</tt> of its own, the ground links in a section called <tt class="docutils literal">gateway</tt>,
+the editor's positions as <tt class="docutils literal">name:</tt> entries -- is refused as it is read,
+in either spelling, naming the line of the first such thing and showing
+how it is written now. <tt class="docutils literal"><span class="pre">tools/convert-format.py</span></tt> rewrites such a file,
+keeping its comments. The refusal is <tt class="docutils literal"><span class="pre">tcslibgs::graph::reshaped</span></tt>'s.</dd>
+<dt>Requirement</dt>
+<dd>A type written twice in one section, a type with no nodes under it, and a
+node that states a <tt class="docutils literal">type</tt> of its own are each refused where the file is
+read, naming it.</dd>
+<dt>Requirement</dt>
+<dd>A type written in the wrong section is refused where the file is read,
+naming the type, the section it is in and the one it belongs in. A payload
 written under <tt class="docutils literal">vehicle</tt> is a file whose own arrangement contradicts the
 rule the editor enforces everywhere else, and a reader would have to be
 told which of the two to believe.</dd>
@@ -1199,10 +1245,11 @@ And one socket is one queue: a command about a payload that takes its time to
 start was ahead of a command about one that would have answered at once.</p>
 <p><tt class="docutils literal">payload_telemetry</tt> is where each payload's own data link is, and it has two
 bases because the link has two ends. tcspecial binds its end at
-<tt class="docutils literal">payload_telemetry.source_base</tt> plus the payload's own id -- the position the
-payload has in the configuration -- and the MOC binds its end at
-<tt class="docutils literal">payload_telemetry.dest_base</tt> plus the same id. Four payloads based at 6000 and 6100 are at 6000 to 6003 on the
-vehicle and 6100 to 6103 on the ground.</p>
+<tt class="docutils literal">payload_telemetry.source_base</tt> plus the payload's own id -- the position its
+name has among the names of the configuration's nodes -- and the MOC binds its
+end at <tt class="docutils literal">payload_telemetry.dest_base</tt> plus the same id. Four payloads based at
+6000 and 6100 are at 6000 to 6003 on the vehicle and 6100 to 6103 on the
+ground.</p>
 <p>Both ends come out of the one file both ends read, so neither has to be told
 the other's: tcspecial sends a payload's telemetry to the end the MOC binds,
 from the first datagram, and the MOC sends nothing at all.</p>
@@ -1253,7 +1300,7 @@ commands and the restart -- see <a class="reference internal" href="#f-gateway-f
 the bus is built too: tcssim stands in for the cFS end, and tcslib's SBN
 transport, <tt class="docutils literal"><span class="pre">tcslib::bus</span></tt>, lets tcsmoc and every station on tcslib command
 a vehicle that answers to cFS through it (see <a class="reference internal" href="#what-crosses-the-bus">What crosses the bus</a>).</p>
-<p>The gateway nodes are written in the <tt class="docutils literal">gateway</tt> section, linked through
+<p>The gateway nodes are written in the <tt class="docutils literal">gateways</tt> section, linked through
 <tt class="docutils literal"><span class="pre">gateway-in</span></tt> and <tt class="docutils literal"><span class="pre">gateway-out</span></tt>, with <tt class="docutils literal"><span class="pre">tee-gateway</span></tt>, <tt class="docutils literal"><span class="pre">null-gateway</span></tt> and
 <tt class="docutils literal">app_gateway_veh</tt> beside them. Each of those was named for the MOC while the
 ground was the only thing a vehicle answered to: the section and the radio's
@@ -1261,7 +1308,10 @@ node type were <tt class="docutils literal">moc</tt>, the links <tt class="docut
 <tt class="docutils literal"><span class="pre">tee-moc</span></tt>, <tt class="docutils literal"><span class="pre">null-moc</span></tt> and <tt class="docutils literal">app_moc_veh</tt>, and an app's argument for the
 stream <tt class="docutils literal"><span class="pre">app-moc-arg</span></tt>. The rename was held back to land with the <tt class="docutils literal">payload</tt>
 rename and no longer is; the <tt class="docutils literal">payload</tt> rename still is, so <tt class="docutils literal">payloads:</tt>,
-<tt class="docutils literal"><span class="pre">payload-in</span></tt> and <tt class="docutils literal"><span class="pre">payload-out</span></tt> keep their names.</p>
+<tt class="docutils literal"><span class="pre">payload-in</span></tt> and <tt class="docutils literal"><span class="pre">payload-out</span></tt> keep their names. The section was then
+<tt class="docutils literal">gateway</tt>, and became <tt class="docutils literal">gateways</tt> when the nodes were grouped by type; a
+file in that older shape is refused as well, saying how the node it found
+first is written now.</p>
 <dl class="docutils">
 <dt>Requirement</dt>
 <dd>A file that still writes one of the old words -- the <tt class="docutils literal">moc</tt> section, a
@@ -1320,7 +1370,7 @@ UDP protocol module</td>
 </tr>
 </tbody>
 </table>
-<p>All four are in the <tt class="docutils literal">gateway</tt> section, and all four have the terminals
+<p>All four are in the <tt class="docutils literal">gateways</tt> section, and all four have the terminals
 the radio's has: <tt class="docutils literal"><span class="pre">payload-in</span></tt>, which takes as many sources as the
 configuration gives it, and <tt class="docutils literal"><span class="pre">gateway-out</span></tt>.</p>
 <div class="section" id="one-kind-per-configuration">
@@ -1338,7 +1388,7 @@ has no default. What the vehicle answers to is a mission fact, and a file
 given an answer it was never asked for is a vehicle that listens for
 commands where nobody sends them.</dd>
 <dt>Requirement</dt>
-<dd>Every node in the <tt class="docutils literal">gateway</tt> section is of the kind <tt class="docutils literal">tcspecial.gateway</tt>
+<dd>Every node in the <tt class="docutils literal">gateways</tt> section is of the kind <tt class="docutils literal">tcspecial.gateway</tt>
 names, and one that is not is refused, naming the node, its type and the
 kind the configuration states.</dd>
 </dl>
@@ -1442,12 +1492,12 @@ is stated once, in <tt class="docutils literal">tcspecial</tt>:</p>
   </span><span class="name tag">beacon</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="punctuation indicator">{</span><span class="name tag"> default_interval</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal string">&quot;5</span><span class="name variable"> </span><span class="literal string">s&quot;</span><span class="punctuation indicator">,</span><span class="name tag"> reset_interval</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal string">&quot;1</span><span class="name variable"> </span><span class="literal string">s&quot;</span><span class="punctuation indicator">,</span><span class="whitespace">
 </span><span class="name tag">            tlm_msgid</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal string">&quot;0x4201&quot;</span><span class="whitespace"> </span><span class="punctuation indicator">}</span><span class="whitespace">
 
-</span><span class="name tag">gateway</span><span class="punctuation">:</span><span class="whitespace">
-  </span><span class="punctuation indicator">-</span><span class="whitespace"> </span><span class="name tag">name</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">fsw</span><span class="whitespace">
-    </span><span class="name tag">type</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">gateway_cfs</span><span class="whitespace">
-    </span><span class="name tag">cmd_msgid</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal string">&quot;0x4281&quot;</span><span class="whitespace">
-    </span><span class="name tag">tlm_base</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal string">&quot;0x4240&quot;</span><span class="whitespace">
-    </span><span class="name tag">payload-in</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">true</span>
+</span><span class="name tag">gateways</span><span class="punctuation">:</span><span class="whitespace">
+  </span><span class="punctuation indicator">-</span><span class="whitespace"> </span><span class="name tag">type gateway_cfs</span><span class="punctuation">:</span><span class="whitespace">
+      </span><span class="punctuation indicator">-</span><span class="whitespace"> </span><span class="name tag">gateway</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">fsw</span><span class="whitespace">
+        </span><span class="name tag">cmd_msgid</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal string">&quot;0x4281&quot;</span><span class="whitespace">
+        </span><span class="name tag">tlm_base</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal string">&quot;0x4240&quot;</span><span class="whitespace">
+        </span><span class="name tag">payload-in</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">true</span>
 </pre>
 <p>(The numbers are illustrative, and laid out for the message-ID mapping below;
 the allotment is the mission's. <tt class="docutils literal">beacon.reset_interval</tt> is required here as
@@ -1755,14 +1805,14 @@ and the deployment sends them to the ground with whatever it already uses.</p>
   </span><span class="name tag">gateway</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">fprime</span><span class="whitespace">
   </span><span class="comment single"># tcs_cmd, payload_command, payload_telemetry and beacon as for the radio</span><span class="whitespace">
 
-</span><span class="name tag">gateway</span><span class="punctuation">:</span><span class="whitespace">
-  </span><span class="punctuation indicator">-</span><span class="whitespace"> </span><span class="name tag">name</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">fsw</span><span class="whitespace">
-    </span><span class="name tag">type</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">gateway_fprime</span><span class="whitespace">
-    </span><span class="name tag">address</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal string">&quot;0.0.0.0&quot;</span><span class="whitespace">
-    </span><span class="name tag">port</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal string">&quot;7600&quot;</span><span class="whitespace">
-    </span><span class="name tag">bridge_base</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal string">&quot;10.0.0.1:7700&quot;</span><span class="whitespace">
-    </span><span class="name tag">fprime_id_base</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal string">&quot;0x3000&quot;</span><span class="whitespace">
-    </span><span class="name tag">payload-in</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">true</span>
+</span><span class="name tag">gateways</span><span class="punctuation">:</span><span class="whitespace">
+  </span><span class="punctuation indicator">-</span><span class="whitespace"> </span><span class="name tag">type gateway_fprime</span><span class="punctuation">:</span><span class="whitespace">
+      </span><span class="punctuation indicator">-</span><span class="whitespace"> </span><span class="name tag">gateway</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">fsw</span><span class="whitespace">
+        </span><span class="name tag">address</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal string">&quot;0.0.0.0&quot;</span><span class="whitespace">
+        </span><span class="name tag">port</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal string">&quot;7600&quot;</span><span class="whitespace">
+        </span><span class="name tag">bridge_base</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal string">&quot;10.0.0.1:7700&quot;</span><span class="whitespace">
+        </span><span class="name tag">fprime_id_base</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal string">&quot;0x3000&quot;</span><span class="whitespace">
+        </span><span class="name tag">payload-in</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">true</span>
 </pre>
 <p>A type of its own although the wire is the radio's, because what is at the far
 end decides what the configuration has to say and what can be made from it.</p>
@@ -2020,9 +2070,9 @@ stream payload comes to be addressed as datagrams.</dd>
 <dd>A gateway node is the ground's end of the vehicle's data, and states where
 the ground is as <tt class="docutils literal">ground_base</tt>, <tt class="docutils literal">address:port</tt>. What each node drawn
 into it produces is sent by tcspecial as UDP datagrams to that address, at
-that port plus the source node's device id -- its position among all the
-configuration's nodes, in the order the files write them
-(<tt class="docutils literal"><span class="pre">tcslibgs::graph::order</span></tt>). So each source arrives
+that port plus the source node's device id -- its position among the
+names of all the configuration's nodes, in the canonical order (see
+<a class="reference internal" href="#what-each-end-read">What Each End Read</a>). So each source arrives
 on a port of its own and the ground tells them apart by the port, and the
 vehicle sends from the first reading without being spoken to.
 <tt class="docutils literal"><span class="pre">tcslibgs::graph::telemetry</span></tt> is the one place that counts the ports, for
@@ -2032,10 +2082,10 @@ both ends; two sources landing on one port are refused.</dd>
 configuration files they read with one function,
 <tt class="docutils literal"><span class="pre">tcslibgs::config_digest::digest_of_graph</span></tt>: an MD5 over everything the
 vehicle and the ground act on -- the <tt class="docutils literal">tcspecial</tt> section, the payload
-groups, the nodes in the order the files write them with their
-attributes, the links and the command bindings -- across every included
-file, the same for either spelling, and not the editor's layout or the
-description. tcspecial says its digest as it starts and sends it in a
+groups, the nodes with their attributes, the links and the command
+bindings -- across every included file, in the canonical order, the same
+for either spelling and whatever order the files wrote, and not the
+editor's layout or the description. tcspecial says its digest as it starts and sends it in a
 beacon every <tt class="docutils literal">beacon.default_interval</tt>, from <tt class="docutils literal">beacon.send</tt> to
 <tt class="docutils literal">beacon.recv</tt>. tcsmoc compares the digest in each beacon with the one it
 computed itself; when they differ it says so on the beacon line and the
@@ -2226,9 +2276,10 @@ differently from every other length of time in the files.</p>
 </div>
 <div class="section" id="the-logging-node">
 <h2><a class="toc-backref" href="#toc-entry-19">The logging node</a></h2>
-<p>Keyword <tt class="docutils literal">type: log</tt> records what reaches it, built on <tt class="docutils literal">tcslog</tt> -- the same library
-the telemetry log already uses, so a log node is a generalisation of something
-the software does rather than a new mechanism to trust. Two attributes:</p>
+<p>Keyword <tt class="docutils literal">type log</tt> records what reaches it, built on <tt class="docutils literal">tcslog</tt> -- the same
+library the telemetry log already uses, so a log node is a generalisation of
+something the software does rather than a new mechanism to trust. Two
+attributes:</p>
 <pre class="code text literal-block">
 directory      where the log's segment files are written
 format         fixed: &lt;n&gt; | variable_simple | variable_ts_rc
@@ -2319,15 +2370,22 @@ why the failure must be visible: a silent one would be a log that stopped
 recording with everything else still working.</dd>
 </dl>
 <pre class="code yaml literal-block">
-<span class="name tag">nodes</span><span class="punctuation">:</span><span class="whitespace">
-  </span><span class="punctuation indicator">-</span><span class="whitespace"> </span><span class="punctuation indicator">{</span><span class="name tag"> name</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="name variable">housekeeping</span><span class="punctuation indicator">,</span><span class="name tag"> type</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="name variable">log</span><span class="punctuation indicator">,</span><span class="name tag"> directory</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="name variable">/var/log/tcspecial</span><span class="punctuation indicator">,</span><span class="whitespace">
-</span><span class="name tag">      format</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="name variable">variable_ts_rc</span><span class="whitespace"> </span><span class="punctuation indicator">}</span><span class="whitespace">
-
-</span><span class="name tag">links</span><span class="punctuation">:</span><span class="whitespace">
-  </span><span class="punctuation indicator">-</span><span class="whitespace"> </span><span class="punctuation indicator">{</span><span class="name tag"> from</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="name variable">k_fore</span><span class="punctuation indicator">,</span><span class="name tag"> to</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="punctuation indicator">[</span><span class="name variable">gateway</span><span class="punctuation indicator">,</span><span class="whitespace"> </span><span class="name variable">mean_temp.in0</span><span class="punctuation indicator">,</span><span class="whitespace"> </span><span class="name variable">housekeeping</span><span class="punctuation indicator">]</span><span class="whitespace"> </span><span class="punctuation indicator">}</span><span class="whitespace">
-  </span><span class="punctuation indicator">-</span><span class="whitespace"> </span><span class="punctuation indicator">{</span><span class="name tag"> from</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="name variable">k_aft</span><span class="punctuation indicator">,</span><span class="name tag"> to</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="punctuation indicator">[</span><span class="name variable">gateway</span><span class="punctuation indicator">,</span><span class="whitespace"> </span><span class="name variable">mean_temp.in1</span><span class="punctuation indicator">,</span><span class="whitespace"> </span><span class="name variable">housekeeping</span><span class="punctuation indicator">]</span><span class="whitespace"> </span><span class="punctuation indicator">}</span><span class="whitespace">
-  </span><span class="punctuation indicator">-</span><span class="whitespace"> </span><span class="punctuation indicator">{</span><span class="name tag"> from</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="name variable">k_bay</span><span class="punctuation indicator">,</span><span class="name tag"> to</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="punctuation indicator">[</span><span class="name variable">gateway</span><span class="punctuation indicator">,</span><span class="whitespace"> </span><span class="name variable">mean_temp.in2</span><span class="punctuation indicator">,</span><span class="whitespace"> </span><span class="name variable">housekeeping</span><span class="punctuation indicator">]</span><span class="whitespace"> </span><span class="punctuation indicator">}</span><span class="whitespace">
-  </span><span class="punctuation indicator">-</span><span class="whitespace"> </span><span class="punctuation indicator">{</span><span class="name tag"> from</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="name variable">thermostat</span><span class="punctuation indicator">,</span><span class="name tag"> to</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="punctuation indicator">[</span><span class="name variable">heaters</span><span class="punctuation indicator">,</span><span class="whitespace"> </span><span class="name variable">housekeeping</span><span class="punctuation indicator">]</span><span class="whitespace"> </span><span class="punctuation indicator">}</span>
+<span class="name tag">vehicle</span><span class="punctuation">:</span><span class="whitespace">
+  </span><span class="punctuation indicator">-</span><span class="whitespace"> </span><span class="name tag">type compute</span><span class="punctuation">:</span><span class="whitespace">
+      </span><span class="comment single"># Each a conversion, its function and its terms as above.</span><span class="whitespace">
+      </span><span class="punctuation indicator">-</span><span class="whitespace"> </span><span class="name tag">compute</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">k_aft</span><span class="whitespace">
+        </span><span class="name tag">payload-out</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="punctuation indicator">[</span><span class="name variable">gateway</span><span class="punctuation indicator">,</span><span class="whitespace"> </span><span class="name variable">mean_temp.in1</span><span class="punctuation indicator">,</span><span class="whitespace"> </span><span class="name variable">housekeeping</span><span class="punctuation indicator">]</span><span class="whitespace">
+      </span><span class="punctuation indicator">-</span><span class="whitespace"> </span><span class="name tag">compute</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">k_bay</span><span class="whitespace">
+        </span><span class="name tag">payload-out</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="punctuation indicator">[</span><span class="name variable">gateway</span><span class="punctuation indicator">,</span><span class="whitespace"> </span><span class="name variable">mean_temp.in2</span><span class="punctuation indicator">,</span><span class="whitespace"> </span><span class="name variable">housekeeping</span><span class="punctuation indicator">]</span><span class="whitespace">
+      </span><span class="punctuation indicator">-</span><span class="whitespace"> </span><span class="name tag">compute</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">k_fore</span><span class="whitespace">
+        </span><span class="name tag">payload-out</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="punctuation indicator">[</span><span class="name variable">gateway</span><span class="punctuation indicator">,</span><span class="whitespace"> </span><span class="name variable">mean_temp.in0</span><span class="punctuation indicator">,</span><span class="whitespace"> </span><span class="name variable">housekeeping</span><span class="punctuation indicator">]</span><span class="whitespace">
+      </span><span class="punctuation indicator">-</span><span class="whitespace"> </span><span class="name tag">compute</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">thermostat</span><span class="whitespace">
+        </span><span class="name tag">gateway-out</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="punctuation indicator">[</span><span class="name variable">heaters</span><span class="punctuation indicator">]</span><span class="whitespace">
+        </span><span class="name tag">payload-out</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="punctuation indicator">[</span><span class="name variable">housekeeping</span><span class="punctuation indicator">]</span><span class="whitespace">
+  </span><span class="punctuation indicator">-</span><span class="whitespace"> </span><span class="name tag">type log</span><span class="punctuation">:</span><span class="whitespace">
+      </span><span class="punctuation indicator">-</span><span class="whitespace"> </span><span class="name tag">compute</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">housekeeping</span><span class="whitespace">
+        </span><span class="name tag">directory</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">/var/log/tcspecial</span><span class="whitespace">
+        </span><span class="name tag">format</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">variable_ts_rc</span>
 </pre>
 <p>That is the thermostat's three converted readings and what the comparison
 decided, in one log, in the order they happened -- which is what reconstructing
@@ -2356,18 +2414,21 @@ arrives at its <tt class="docutils literal"><span class="pre">payload-in</span><
 <tt class="docutils literal"><span class="pre">gateway-out</span></tt>.</dd>
 </dl>
 <pre class="code yaml literal-block">
-<span class="name tag">gateway</span><span class="punctuation">:</span><span class="whitespace">
-  </span><span class="punctuation indicator">-</span><span class="whitespace"> </span><span class="punctuation indicator">{</span><span class="name tag"> name</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="name variable">ground</span><span class="punctuation indicator">,</span><span class="name tag"> type</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="name variable">gateway_radio</span><span class="punctuation indicator">,</span><span class="name tag"> address</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="name variable">127.0.0.1</span><span class="punctuation indicator">,</span><span class="name tag"> port</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal string">&quot;5000&quot;</span><span class="punctuation indicator">,</span><span class="whitespace">
-</span><span class="name tag">      ground_base</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal string">&quot;127.0.0.1:5100&quot;</span><span class="punctuation indicator">,</span><span class="name tag"> gateway-out</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="name variable">echo</span><span class="whitespace"> </span><span class="punctuation indicator">}</span><span class="whitespace">
+<span class="name tag">gateways</span><span class="punctuation">:</span><span class="whitespace">
+  </span><span class="punctuation indicator">-</span><span class="whitespace"> </span><span class="name tag">type gateway_radio</span><span class="punctuation">:</span><span class="whitespace">
+      </span><span class="punctuation indicator">-</span><span class="whitespace"> </span><span class="punctuation indicator">{</span><span class="name tag"> gateway</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="name variable">ground</span><span class="punctuation indicator">,</span><span class="name tag"> address</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="name variable">127.0.0.1</span><span class="punctuation indicator">,</span><span class="name tag"> port</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal string">&quot;5000&quot;</span><span class="punctuation indicator">,</span><span class="whitespace">
+</span><span class="name tag">          ground_base</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal string">&quot;127.0.0.1:5100&quot;</span><span class="punctuation indicator">,</span><span class="name tag"> gateway-out</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="name variable">echo</span><span class="whitespace"> </span><span class="punctuation indicator">}</span><span class="whitespace">
 </span><span class="name tag">payloads</span><span class="punctuation">:</span><span class="whitespace">
-  </span><span class="punctuation indicator">-</span><span class="whitespace"> </span><span class="punctuation indicator">{</span><span class="name tag"> name</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="name variable">heater</span><span class="punctuation indicator">,</span><span class="name tag"> type</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="name variable">gpio</span><span class="punctuation indicator">,</span><span class="name tag"> direction</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="name variable">output</span><span class="punctuation indicator">,</span><span class="name tag"> lines</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal string">&quot;4&quot;</span><span class="punctuation indicator">,</span><span class="whitespace">
-</span><span class="name tag">      path</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="name variable">/dev/gpiochip0</span><span class="whitespace"> </span><span class="punctuation indicator">}</span><span class="whitespace">
+  </span><span class="punctuation indicator">-</span><span class="whitespace"> </span><span class="name tag">type gpio</span><span class="punctuation">:</span><span class="whitespace">
+      </span><span class="punctuation indicator">-</span><span class="whitespace"> </span><span class="punctuation indicator">{</span><span class="name tag"> payload</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="name variable">heater</span><span class="punctuation indicator">,</span><span class="name tag"> direction</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="name variable">output</span><span class="punctuation indicator">,</span><span class="name tag"> lines</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal string">&quot;4&quot;</span><span class="punctuation indicator">,</span><span class="whitespace">
+</span><span class="name tag">          path</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="name variable">/dev/gpiochip0</span><span class="whitespace"> </span><span class="punctuation indicator">}</span><span class="whitespace">
 </span><span class="name tag">vehicle</span><span class="punctuation">:</span><span class="whitespace">
-  </span><span class="comment single"># What the ground sends the heater, and back to the ground to be seen.</span><span class="whitespace">
-  </span><span class="punctuation indicator">-</span><span class="whitespace"> </span><span class="name tag">name</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">echo</span><span class="whitespace">
-    </span><span class="name tag">type</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">tee-gateway</span><span class="whitespace">
-    </span><span class="name tag">gateway-out</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="punctuation indicator">[</span><span class="name variable">heater</span><span class="punctuation indicator">]</span><span class="whitespace">
-    </span><span class="name tag">payload-out</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="punctuation indicator">[</span><span class="name variable">ground</span><span class="punctuation indicator">]</span>
+  </span><span class="punctuation indicator">-</span><span class="whitespace"> </span><span class="name tag">type tee-gateway</span><span class="punctuation">:</span><span class="whitespace">
+      </span><span class="comment single"># What the ground sends the heater, and back to the ground to be</span><span class="whitespace">
+      </span><span class="comment single"># seen.</span><span class="whitespace">
+      </span><span class="punctuation indicator">-</span><span class="whitespace"> </span><span class="name tag">compute</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">echo</span><span class="whitespace">
+        </span><span class="name tag">gateway-out</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="punctuation indicator">[</span><span class="name variable">heater</span><span class="punctuation indicator">]</span><span class="whitespace">
+        </span><span class="name tag">payload-out</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="punctuation indicator">[</span><span class="name variable">ground</span><span class="punctuation indicator">]</span>
 </pre>
 <dl class="docutils">
 <dt>Requirement</dt>
@@ -2391,16 +2452,18 @@ the reader.</dd>
 </div>
 <div class="section" id="the-ping-node">
 <h2><a class="toc-backref" href="#toc-entry-21">The ping node</a></h2>
-<p><tt class="docutils literal">type: ping</tt> answers the ground. Each message the MOC sends it comes back
-with the time the vehicle had it written on the end, so that the ground can
+<p>A node of <tt class="docutils literal">type ping</tt> answers the ground. Each message the MOC sends it comes
+back with the time the vehicle had it written on the end, so that the ground can
 see how long a message takes to reach the vehicle and to come back, and how
 far apart the two clocks are -- which a ping is the one exchange able to show.</p>
 <pre class="code yaml literal-block">
-<span class="name tag">gateway</span><span class="punctuation">:</span><span class="whitespace">
-  </span><span class="punctuation indicator">-</span><span class="whitespace"> </span><span class="punctuation indicator">{</span><span class="name tag"> name</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="name variable">ground</span><span class="punctuation indicator">,</span><span class="name tag"> type</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="name variable">gateway_radio</span><span class="punctuation indicator">,</span><span class="name tag"> address</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="name variable">127.0.0.1</span><span class="punctuation indicator">,</span><span class="name tag"> port</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal string">&quot;5000&quot;</span><span class="punctuation indicator">,</span><span class="whitespace">
-</span><span class="name tag">      ground_base</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal string">&quot;127.0.0.1:5100&quot;</span><span class="punctuation indicator">,</span><span class="name tag"> gateway-out</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="name variable">pinger</span><span class="whitespace"> </span><span class="punctuation indicator">}</span><span class="whitespace">
+<span class="name tag">gateways</span><span class="punctuation">:</span><span class="whitespace">
+  </span><span class="punctuation indicator">-</span><span class="whitespace"> </span><span class="name tag">type gateway_radio</span><span class="punctuation">:</span><span class="whitespace">
+      </span><span class="punctuation indicator">-</span><span class="whitespace"> </span><span class="punctuation indicator">{</span><span class="name tag"> gateway</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="name variable">ground</span><span class="punctuation indicator">,</span><span class="name tag"> address</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="name variable">127.0.0.1</span><span class="punctuation indicator">,</span><span class="name tag"> port</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal string">&quot;5000&quot;</span><span class="punctuation indicator">,</span><span class="whitespace">
+</span><span class="name tag">          ground_base</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal string">&quot;127.0.0.1:5100&quot;</span><span class="punctuation indicator">,</span><span class="name tag"> gateway-out</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="name variable">pinger</span><span class="whitespace"> </span><span class="punctuation indicator">}</span><span class="whitespace">
 </span><span class="name tag">vehicle</span><span class="punctuation">:</span><span class="whitespace">
-  </span><span class="punctuation indicator">-</span><span class="whitespace"> </span><span class="punctuation indicator">{</span><span class="name tag"> name</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="name variable">pinger</span><span class="punctuation indicator">,</span><span class="name tag"> type</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="name variable">ping</span><span class="punctuation indicator">,</span><span class="name tag"> payload-out</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="name variable">ground</span><span class="whitespace"> </span><span class="punctuation indicator">}</span>
+  </span><span class="punctuation indicator">-</span><span class="whitespace"> </span><span class="name tag">type ping</span><span class="punctuation">:</span><span class="whitespace">
+      </span><span class="punctuation indicator">-</span><span class="whitespace"> </span><span class="punctuation indicator">{</span><span class="name tag"> compute</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="name variable">pinger</span><span class="punctuation indicator">,</span><span class="name tag"> payload-out</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="name variable">ground</span><span class="whitespace"> </span><span class="punctuation indicator">}</span>
 </pre>
 <p>The ground sends its pings to the gateway link's <tt class="docutils literal">address</tt> and <tt class="docutils literal">port</tt>, and
 the answers arrive at its <tt class="docutils literal">ground_base</tt> plus the ping node's device id, as any
@@ -2637,8 +2700,9 @@ without the configuration changing shape.</li>
 node names its application with, a program being a program -- says how long it
 may take, and says whether it may be restarted:</p>
 <pre class="code yaml literal-block">
-<span class="punctuation indicator">-</span><span class="whitespace"> </span><span class="punctuation indicator">{</span><span class="name tag"> name</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="name variable">attitude</span><span class="punctuation indicator">,</span><span class="name tag"> type</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="name variable">compute</span><span class="punctuation indicator">,</span><span class="name tag"> function</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="name variable">process</span><span class="punctuation indicator">,</span><span class="whitespace">
-</span><span class="name tag">    executable</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="name variable">/opt/flight/attitude</span><span class="punctuation indicator">,</span><span class="name tag"> timeout</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="name variable">500 ms</span><span class="punctuation indicator">,</span><span class="name tag"> restart</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="name variable">false</span><span class="whitespace"> </span><span class="punctuation indicator">}</span>
+<span class="punctuation indicator">-</span><span class="whitespace"> </span><span class="name tag">type compute</span><span class="punctuation">:</span><span class="whitespace">
+    </span><span class="punctuation indicator">-</span><span class="whitespace"> </span><span class="punctuation indicator">{</span><span class="name tag"> compute</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="name variable">attitude</span><span class="punctuation indicator">,</span><span class="name tag"> function</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="name variable">process</span><span class="punctuation indicator">,</span><span class="whitespace">
+</span><span class="name tag">        executable</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="name variable">/opt/flight/attitude</span><span class="punctuation indicator">,</span><span class="name tag"> timeout</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="name variable">500 ms</span><span class="punctuation indicator">,</span><span class="name tag"> restart</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="name variable">false</span><span class="whitespace"> </span><span class="punctuation indicator">}</span>
 </pre>
 <p>What the program sees is a line per arrival on its standard input and a line
 per answer on its standard output:</p>
@@ -2848,17 +2912,17 @@ payload data, <tt class="docutils literal"><span class="pre">app-gateway-arg</sp
 payload before gateway where a kind has both:</p>
 <pre class="code yaml literal-block">
 <span class="name tag">vehicle</span><span class="punctuation">:</span><span class="whitespace">
-  </span><span class="punctuation indicator">-</span><span class="whitespace"> </span><span class="name tag">name</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">through</span><span class="whitespace">
-    </span><span class="name tag">type</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">app_all_veh</span><span class="whitespace">
-    </span><span class="name tag">executable</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">$HOME/libexec/tcs/through</span><span class="whitespace">
-    </span><span class="name tag">app-payload-arg</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">--readings</span><span class="whitespace">
-    </span><span class="name tag">app-gateway-arg</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">--commands</span><span class="whitespace">
+  </span><span class="punctuation indicator">-</span><span class="whitespace"> </span><span class="name tag">type app_all_veh</span><span class="punctuation">:</span><span class="whitespace">
+      </span><span class="punctuation indicator">-</span><span class="whitespace"> </span><span class="name tag">compute</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">through</span><span class="whitespace">
+        </span><span class="name tag">executable</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">$HOME/libexec/tcs/through</span><span class="whitespace">
+        </span><span class="name tag">app-payload-arg</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">--readings</span><span class="whitespace">
+        </span><span class="name tag">app-gateway-arg</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">--commands</span><span class="whitespace">
 
 </span><span class="name tag">payloads</span><span class="punctuation">:</span><span class="whitespace">
-  </span><span class="punctuation indicator">-</span><span class="whitespace"> </span><span class="name tag">name</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">bay_2</span><span class="whitespace">
-    </span><span class="name tag">type</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">app_pl</span><span class="whitespace">
-    </span><span class="name tag">executable</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">~/libexec/tcs/bay-2</span><span class="whitespace">
-    </span><span class="name tag">app-payload-arg</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">--bay-2</span>
+  </span><span class="punctuation indicator">-</span><span class="whitespace"> </span><span class="name tag">type app_pl</span><span class="punctuation">:</span><span class="whitespace">
+      </span><span class="punctuation indicator">-</span><span class="whitespace"> </span><span class="name tag">payload</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">bay_2</span><span class="whitespace">
+        </span><span class="name tag">executable</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">~/libexec/tcs/bay-2</span><span class="whitespace">
+        </span><span class="name tag">app-payload-arg</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">--bay-2</span>
 </pre>
 <p>which are run as <tt class="docutils literal">through <span class="pre">--readings</span> <span class="pre">--commands</span></tt> and <tt class="docutils literal">bay_2 <span class="pre">--bay-2</span></tt>, each
 after its program's own path. Both attributes are required of the kinds that
@@ -3509,8 +3573,9 @@ again.</dd>
 </div>
 <div class="section" id="how-a-command-names-a-node">
 <h3><a class="toc-backref" href="#toc-entry-33">How a command names a node</a></h3>
-<p>By its node id: the number the node has from the order the configuration
-declares it, counted across every node whatever its kind. It is not a number
+<p>By its node id: the node's position among the names of all the
+configuration's nodes, counted across every node whatever its kind (see <a class="reference internal" href="#what-each-end-read">What
+Each End Read</a>). It is not a number
 invented for commands -- it is the one a node's link to the ground is already
 counted by, a gateway node's <tt class="docutils literal">ground_base</tt> plus that node's id -- so the id
 in a command and the port its telemetry arrives on are the same number, worked
@@ -3522,16 +3587,15 @@ length. A name is text of no particular length, and every message carrying
 one is a message whose construction and parsing have a length to get
 right; a number is a field like the sequence and the type beside it.</dd>
 <dt>Requirement</dt>
-<dd>Node ids are given by one algorithm, in one place, from the order the
-configuration is read in. Two components that compute them separately
+<dd>Node ids are given by one algorithm, in one place, from the canonical
+order. Two components that compute them separately
 would be two tables that can drift apart, and the drift would show as
 commands about the wrong node rather than as an error.</dd>
 <dt>Requirement</dt>
 <dd>What makes the two ends' ids the same is the digest. It is computed over
-the configuration <em>including the order the nodes appear in</em> -- see
+the configuration in the canonical order the ids are counted in -- see
 <a class="reference internal" href="#what-each-end-read">What Each End Read</a> -- so two ends whose digests agree have read the
-same nodes in the same order and cannot disagree about which node an id
-names. Agreeing about the digest is what <tt class="docutils literal">CONNECT</tt> establishes, and it
+same names and cannot disagree about which node an id names. Agreeing about the digest is what <tt class="docutils literal">CONNECT</tt> establishes, and it
 is asked on the spacecraft's link before any node command is sent.</dd>
 <dt>Requirement</dt>
 <dd>A ground station whose digest does not match the vehicle's does not send
@@ -4132,7 +4196,8 @@ end it is written at, and a comment the editor kept in a derived line would be
 a comment it moved. It is the fourth kind in the list above.</p>
 <p>The attribute order is not kept either: the editor writes a node's attributes
 and the section's parameters in the order a dictionary gives them, which is
-alphabetical, where a hand-written file usually groups them by what they mean.
+alphabetical, where a hand-written file usually groups them by what they mean;
+and it writes the types of a section and the nodes of a type by name.
 So a hand-written configuration opened and saved stays correct and stops
 looking hand-written. For the shipped examples that is what <tt class="docutils literal">git diff</tt> is
 for; for a working configuration it is worth knowing before the first Save.</p>
@@ -4225,8 +4290,8 @@ section at the end of the file rather than on the node it is about:</p>
 <pre class="code yaml literal-block">
 <span class="name tag">tcsgui</span><span class="punctuation">:</span><span class="whitespace">
   </span><span class="name tag">nodes</span><span class="punctuation">:</span><span class="whitespace">
-    </span><span class="punctuation indicator">-</span><span class="whitespace"> </span><span class="punctuation indicator">{</span><span class="name tag"> name</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="name variable">payload</span><span class="punctuation indicator">,</span><span class="name tag"> x</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="name variable">40</span><span class="punctuation indicator">,</span><span class="name tag"> y</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="name variable">160</span><span class="whitespace"> </span><span class="punctuation indicator">}</span><span class="whitespace">
-    </span><span class="punctuation indicator">-</span><span class="whitespace"> </span><span class="punctuation indicator">{</span><span class="name tag"> name</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="name variable">gateway</span><span class="punctuation indicator">,</span><span class="name tag"> x</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="name variable">784</span><span class="punctuation indicator">,</span><span class="name tag"> y</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="name variable">40</span><span class="whitespace"> </span><span class="punctuation indicator">}</span>
+    </span><span class="punctuation indicator">-</span><span class="whitespace"> </span><span class="punctuation indicator">{</span><span class="name tag"> node</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="name variable">gateway</span><span class="punctuation indicator">,</span><span class="name tag"> x</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="name variable">784</span><span class="punctuation indicator">,</span><span class="name tag"> y</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="name variable">40</span><span class="whitespace"> </span><span class="punctuation indicator">}</span><span class="whitespace">
+    </span><span class="punctuation indicator">-</span><span class="whitespace"> </span><span class="punctuation indicator">{</span><span class="name tag"> node</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="name variable">payload</span><span class="punctuation indicator">,</span><span class="name tag"> x</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="name variable">40</span><span class="punctuation indicator">,</span><span class="name tag"> y</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="name variable">160</span><span class="whitespace"> </span><span class="punctuation indicator">}</span>
 </pre>
 <p>Last, and in a section of its own, because it is a different kind of thing.
 The sections above say what the vehicle carries and what it is told; this says
@@ -4997,7 +5062,7 @@ highest below -- and then the sheet is scrolled so the new node's top is at the
 top of the view. A node placed where it cannot be seen is a press that did
 nothing as far as the person who made it can tell.</p>
 <p><strong>Edit -&gt; Arrange the nodes</strong> applies that rule to every node at once: each to
-the top of its own pane, in the order the file holds them, nothing covering
+the top of its own pane, in the order of their names, nothing covering
 anything, and the view back at the top of the sheet. The sheet is 960 by 2400
 and a window shows a few hundred pixels of it, so a configuration read out of a
 file -- or one left spread about by a morning's dragging -- can have most of
@@ -5228,10 +5293,12 @@ to whoever installs them.</p>
 <p>Two things follow from that division. A node's attributes are the union over
 every node type -- a bus address, a baud rate and a setpoint are all allowed on
 any node -- because a schema that knew which type takes which would be a second
-copy of rules that already exist. And the XSD cannot say that a node's <tt class="docutils literal">name</tt>
-appears exactly once: <tt class="docutils literal"><span class="pre">payload-out</span></tt> may appear many times, several destinations
-being several elements, and XSD 1.0 allows neither repeats nor a mixture inside
-<tt class="docutils literal">xs:all</tt>. A node with two names is refused where the file is read instead.</p>
+copy of rules that already exist. And the XSD cannot say that a node's
+<tt class="docutils literal">group</tt> appears at most once: <tt class="docutils literal"><span class="pre">payload-out</span></tt> may appear many times, several
+destinations being several elements, and XSD 1.0 allows neither repeats nor a
+mixture inside <tt class="docutils literal">xs:all</tt>. A node that says a word twice is refused where the
+file is read instead, and so is a type written twice in a section. A node's
+name is an attribute of its element, which the XSD does require exactly once.</p>
 <p>A schema an editor has to be pointed at by hand is a schema nobody points it
 at, so every configuration this project writes names its own. In XML
 that is the two attributes every XML tool reads:</p>
@@ -5620,45 +5687,49 @@ addresses are its own. What is here is checked as it stands, with a
 </span><span class="name tag">payload_groups</span><span class="punctuation">:</span><span class="whitespace">
   </span><span class="punctuation indicator">-</span><span class="whitespace"> </span><span class="punctuation indicator">{</span><span class="name tag"> name</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="name variable">zone_temps</span><span class="punctuation indicator">,</span><span class="name tag"> interval</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal string">&quot;100</span><span class="name variable"> </span><span class="literal string">ms&quot;</span><span class="whitespace"> </span><span class="punctuation indicator">}</span><span class="whitespace">
 
-</span><span class="name tag">gateway</span><span class="punctuation">:</span><span class="whitespace">
-  </span><span class="punctuation indicator">-</span><span class="whitespace"> </span><span class="punctuation indicator">{</span><span class="name tag"> name</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="name variable">gateway</span><span class="punctuation indicator">,</span><span class="name tag"> type</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="name variable">gateway_radio</span><span class="punctuation indicator">,</span><span class="name tag"> address</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal string">&quot;10.0.0.1&quot;</span><span class="punctuation indicator">,</span><span class="name tag"> port</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal string">&quot;5000&quot;</span><span class="punctuation indicator">,</span><span class="whitespace">
-</span><span class="name tag">      ground_base</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal string">&quot;10.0.0.2:5100&quot;</span><span class="punctuation indicator">,</span><span class="name tag"> payload-in</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="name variable">true</span><span class="whitespace"> </span><span class="punctuation indicator">}</span><span class="whitespace">
+</span><span class="name tag">gateways</span><span class="punctuation">:</span><span class="whitespace">
+  </span><span class="punctuation indicator">-</span><span class="whitespace"> </span><span class="name tag">type gateway_radio</span><span class="punctuation">:</span><span class="whitespace">
+      </span><span class="punctuation indicator">-</span><span class="whitespace"> </span><span class="punctuation indicator">{</span><span class="name tag"> gateway</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="name variable">gateway</span><span class="punctuation indicator">,</span><span class="name tag"> address</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal string">&quot;10.0.0.1&quot;</span><span class="punctuation indicator">,</span><span class="name tag"> port</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal string">&quot;5000&quot;</span><span class="punctuation indicator">,</span><span class="whitespace">
+</span><span class="name tag">          ground_base</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal string">&quot;10.0.0.2:5100&quot;</span><span class="punctuation indicator">,</span><span class="name tag"> payload-in</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="name variable">true</span><span class="whitespace"> </span><span class="punctuation indicator">}</span><span class="whitespace">
 
 </span><span class="name tag">vehicle</span><span class="punctuation">:</span><span class="whitespace">
-  </span><span class="punctuation indicator">-</span><span class="whitespace"> </span><span class="punctuation indicator">{</span><span class="name tag"> name</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="name variable">k_1</span><span class="punctuation indicator">,</span><span class="name tag"> type</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="name variable">compute</span><span class="punctuation indicator">,</span><span class="name tag"> function</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="name variable">to_kelvin</span><span class="punctuation indicator">,</span><span class="name tag"> format</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="name variable">i16_be</span><span class="punctuation indicator">,</span><span class="whitespace">
-</span><span class="name tag">      scale</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal string">&quot;0.0625&quot;</span><span class="punctuation indicator">,</span><span class="name tag"> offset</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal string">&quot;273.15&quot;</span><span class="punctuation indicator">,</span><span class="name tag"> payload-in</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="name variable">true</span><span class="punctuation indicator">,</span><span class="whitespace">
-</span><span class="name tag">      payload-out</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="punctuation indicator">[{</span><span class="name tag"> target</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="name variable">gateway</span><span class="whitespace"> </span><span class="punctuation indicator">},</span><span class="whitespace"> </span><span class="punctuation indicator">{</span><span class="name tag"> target</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="name variable">zone_temp</span><span class="punctuation indicator">,</span><span class="name tag"> input</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="name variable">in0</span><span class="whitespace"> </span><span class="punctuation indicator">}]</span><span class="whitespace">
-      </span><span class="punctuation indicator">}</span><span class="whitespace">
-  </span><span class="punctuation indicator">-</span><span class="whitespace"> </span><span class="punctuation indicator">{</span><span class="name tag"> name</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="name variable">k_2</span><span class="punctuation indicator">,</span><span class="name tag"> type</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="name variable">compute</span><span class="punctuation indicator">,</span><span class="name tag"> function</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="name variable">to_kelvin</span><span class="punctuation indicator">,</span><span class="name tag"> format</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="name variable">i16_be</span><span class="punctuation indicator">,</span><span class="whitespace">
-</span><span class="name tag">      scale</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal string">&quot;0.0625&quot;</span><span class="punctuation indicator">,</span><span class="name tag"> offset</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal string">&quot;273.15&quot;</span><span class="punctuation indicator">,</span><span class="name tag"> payload-in</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="name variable">true</span><span class="punctuation indicator">,</span><span class="whitespace">
-</span><span class="name tag">      payload-out</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="punctuation indicator">[{</span><span class="name tag"> target</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="name variable">gateway</span><span class="whitespace"> </span><span class="punctuation indicator">},</span><span class="whitespace"> </span><span class="punctuation indicator">{</span><span class="name tag"> target</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="name variable">zone_temp</span><span class="punctuation indicator">,</span><span class="name tag"> input</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="name variable">in1</span><span class="whitespace"> </span><span class="punctuation indicator">}]</span><span class="whitespace">
-      </span><span class="punctuation indicator">}</span><span class="whitespace">
-  </span><span class="punctuation indicator">-</span><span class="whitespace"> </span><span class="punctuation indicator">{</span><span class="name tag"> name</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="name variable">k_3</span><span class="punctuation indicator">,</span><span class="name tag"> type</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="name variable">compute</span><span class="punctuation indicator">,</span><span class="name tag"> function</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="name variable">to_kelvin</span><span class="punctuation indicator">,</span><span class="name tag"> format</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="name variable">u24_be</span><span class="punctuation indicator">,</span><span class="whitespace">
-</span><span class="name tag">      scale</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal string">&quot;0.0078&quot;</span><span class="punctuation indicator">,</span><span class="name tag"> offset</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal string">&quot;255.37&quot;</span><span class="punctuation indicator">,</span><span class="name tag"> payload-in</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="name variable">true</span><span class="punctuation indicator">,</span><span class="whitespace">
-</span><span class="name tag">      payload-out</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="punctuation indicator">[{</span><span class="name tag"> target</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="name variable">gateway</span><span class="whitespace"> </span><span class="punctuation indicator">},</span><span class="whitespace"> </span><span class="punctuation indicator">{</span><span class="name tag"> target</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="name variable">zone_temp</span><span class="punctuation indicator">,</span><span class="name tag"> input</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="name variable">in2</span><span class="whitespace"> </span><span class="punctuation indicator">}]</span><span class="whitespace">
-      </span><span class="punctuation indicator">}</span><span class="whitespace">
+  </span><span class="punctuation indicator">-</span><span class="whitespace"> </span><span class="name tag">type compute</span><span class="punctuation">:</span><span class="whitespace">
+      </span><span class="punctuation indicator">-</span><span class="whitespace"> </span><span class="punctuation indicator">{</span><span class="name tag"> compute</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="name variable">k_1</span><span class="punctuation indicator">,</span><span class="name tag"> function</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="name variable">to_kelvin</span><span class="punctuation indicator">,</span><span class="name tag"> format</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="name variable">i16_be</span><span class="punctuation indicator">,</span><span class="whitespace">
+</span><span class="name tag">          scale</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal string">&quot;0.0625&quot;</span><span class="punctuation indicator">,</span><span class="name tag"> offset</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal string">&quot;273.15&quot;</span><span class="punctuation indicator">,</span><span class="name tag"> payload-in</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="name variable">true</span><span class="punctuation indicator">,</span><span class="whitespace">
+</span><span class="name tag">          payload-out</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="punctuation indicator">[{</span><span class="name tag"> target</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="name variable">gateway</span><span class="whitespace"> </span><span class="punctuation indicator">},</span><span class="whitespace">
+                        </span><span class="punctuation indicator">{</span><span class="name tag"> target</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="name variable">zone_temp</span><span class="punctuation indicator">,</span><span class="name tag"> input</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="name variable">in0</span><span class="whitespace"> </span><span class="punctuation indicator">}]</span><span class="whitespace"> </span><span class="punctuation indicator">}</span><span class="whitespace">
+      </span><span class="punctuation indicator">-</span><span class="whitespace"> </span><span class="punctuation indicator">{</span><span class="name tag"> compute</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="name variable">k_2</span><span class="punctuation indicator">,</span><span class="name tag"> function</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="name variable">to_kelvin</span><span class="punctuation indicator">,</span><span class="name tag"> format</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="name variable">i16_be</span><span class="punctuation indicator">,</span><span class="whitespace">
+</span><span class="name tag">          scale</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal string">&quot;0.0625&quot;</span><span class="punctuation indicator">,</span><span class="name tag"> offset</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal string">&quot;273.15&quot;</span><span class="punctuation indicator">,</span><span class="name tag"> payload-in</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="name variable">true</span><span class="punctuation indicator">,</span><span class="whitespace">
+</span><span class="name tag">          payload-out</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="punctuation indicator">[{</span><span class="name tag"> target</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="name variable">gateway</span><span class="whitespace"> </span><span class="punctuation indicator">},</span><span class="whitespace">
+                        </span><span class="punctuation indicator">{</span><span class="name tag"> target</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="name variable">zone_temp</span><span class="punctuation indicator">,</span><span class="name tag"> input</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="name variable">in1</span><span class="whitespace"> </span><span class="punctuation indicator">}]</span><span class="whitespace"> </span><span class="punctuation indicator">}</span><span class="whitespace">
+      </span><span class="punctuation indicator">-</span><span class="whitespace"> </span><span class="punctuation indicator">{</span><span class="name tag"> compute</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="name variable">k_3</span><span class="punctuation indicator">,</span><span class="name tag"> function</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="name variable">to_kelvin</span><span class="punctuation indicator">,</span><span class="name tag"> format</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="name variable">u24_be</span><span class="punctuation indicator">,</span><span class="whitespace">
+</span><span class="name tag">          scale</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal string">&quot;0.0078&quot;</span><span class="punctuation indicator">,</span><span class="name tag"> offset</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal string">&quot;255.37&quot;</span><span class="punctuation indicator">,</span><span class="name tag"> payload-in</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="name variable">true</span><span class="punctuation indicator">,</span><span class="whitespace">
+</span><span class="name tag">          payload-out</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="punctuation indicator">[{</span><span class="name tag"> target</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="name variable">gateway</span><span class="whitespace"> </span><span class="punctuation indicator">},</span><span class="whitespace">
+                        </span><span class="punctuation indicator">{</span><span class="name tag"> target</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="name variable">zone_temp</span><span class="punctuation indicator">,</span><span class="name tag"> input</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="name variable">in2</span><span class="whitespace"> </span><span class="punctuation indicator">}]</span><span class="whitespace"> </span><span class="punctuation indicator">}</span><span class="whitespace">
 
-  </span><span class="punctuation indicator">-</span><span class="whitespace"> </span><span class="punctuation indicator">{</span><span class="name tag"> name</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="name variable">zone_temp</span><span class="punctuation indicator">,</span><span class="name tag"> type</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="name variable">compute</span><span class="punctuation indicator">,</span><span class="name tag"> function</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="name variable">vote</span><span class="punctuation indicator">,</span><span class="name tag"> algorithm</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="name variable">median</span><span class="punctuation indicator">,</span><span class="whitespace">
-</span><span class="name tag">      inputs</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal string">&quot;in0,in1,in2&quot;</span><span class="punctuation indicator">,</span><span class="name tag"> payload-in</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="name variable">true</span><span class="punctuation indicator">,</span><span class="whitespace">
-</span><span class="name tag">      payload-out</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="punctuation indicator">[{</span><span class="name tag"> target</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="name variable">gateway</span><span class="whitespace"> </span><span class="punctuation indicator">},</span><span class="whitespace"> </span><span class="punctuation indicator">{</span><span class="name tag"> target</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="name variable">thermostat</span><span class="whitespace"> </span><span class="punctuation indicator">}]</span><span class="whitespace"> </span><span class="punctuation indicator">}</span><span class="whitespace">
-  </span><span class="punctuation indicator">-</span><span class="whitespace"> </span><span class="punctuation indicator">{</span><span class="name tag"> name</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="name variable">thermostat</span><span class="punctuation indicator">,</span><span class="name tag"> type</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="name variable">compute</span><span class="punctuation indicator">,</span><span class="name tag"> function</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="name variable">hysteresis</span><span class="punctuation indicator">,</span><span class="whitespace">
-</span><span class="name tag">      setpoint</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal string">&quot;293.15&quot;</span><span class="punctuation indicator">,</span><span class="name tag"> half_band</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal string">&quot;2.0&quot;</span><span class="punctuation indicator">,</span><span class="name tag"> payload-in</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="name variable">true</span><span class="punctuation indicator">,</span><span class="whitespace">
-</span><span class="name tag">      payload-out</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="punctuation indicator">[{</span><span class="name tag"> target</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="name variable">gateway</span><span class="whitespace"> </span><span class="punctuation indicator">}],</span><span class="whitespace">
-</span><span class="name tag">      gateway-out</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="punctuation indicator">[{</span><span class="name tag"> target</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="name variable">heaters_1</span><span class="whitespace"> </span><span class="punctuation indicator">},</span><span class="whitespace"> </span><span class="punctuation indicator">{</span><span class="name tag"> target</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="name variable">heaters_2</span><span class="whitespace"> </span><span class="punctuation indicator">}]</span><span class="whitespace"> </span><span class="punctuation indicator">}</span><span class="whitespace">
+      </span><span class="punctuation indicator">-</span><span class="whitespace"> </span><span class="punctuation indicator">{</span><span class="name tag"> compute</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="name variable">thermostat</span><span class="punctuation indicator">,</span><span class="name tag"> function</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="name variable">hysteresis</span><span class="punctuation indicator">,</span><span class="whitespace">
+</span><span class="name tag">          setpoint</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal string">&quot;293.15&quot;</span><span class="punctuation indicator">,</span><span class="name tag"> half_band</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal string">&quot;2.0&quot;</span><span class="punctuation indicator">,</span><span class="name tag"> payload-in</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="name variable">true</span><span class="punctuation indicator">,</span><span class="whitespace">
+</span><span class="name tag">          payload-out</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="punctuation indicator">[{</span><span class="name tag"> target</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="name variable">gateway</span><span class="whitespace"> </span><span class="punctuation indicator">}],</span><span class="whitespace">
+</span><span class="name tag">          gateway-out</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="punctuation indicator">[{</span><span class="name tag"> target</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="name variable">heaters_1</span><span class="whitespace"> </span><span class="punctuation indicator">},</span><span class="whitespace"> </span><span class="punctuation indicator">{</span><span class="name tag"> target</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="name variable">heaters_2</span><span class="whitespace"> </span><span class="punctuation indicator">}]</span><span class="whitespace"> </span><span class="punctuation indicator">}</span><span class="whitespace">
+      </span><span class="punctuation indicator">-</span><span class="whitespace"> </span><span class="punctuation indicator">{</span><span class="name tag"> compute</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="name variable">zone_temp</span><span class="punctuation indicator">,</span><span class="name tag"> function</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="name variable">vote</span><span class="punctuation indicator">,</span><span class="name tag"> algorithm</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="name variable">median</span><span class="punctuation indicator">,</span><span class="whitespace">
+</span><span class="name tag">          inputs</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal string">&quot;in0,in1,in2&quot;</span><span class="punctuation indicator">,</span><span class="name tag"> payload-in</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="name variable">true</span><span class="punctuation indicator">,</span><span class="whitespace">
+</span><span class="name tag">          payload-out</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="punctuation indicator">[{</span><span class="name tag"> target</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="name variable">gateway</span><span class="whitespace"> </span><span class="punctuation indicator">},</span><span class="whitespace"> </span><span class="punctuation indicator">{</span><span class="name tag"> target</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="name variable">thermostat</span><span class="whitespace"> </span><span class="punctuation indicator">}]</span><span class="whitespace"> </span><span class="punctuation indicator">}</span><span class="whitespace">
 
 </span><span class="name tag">payloads</span><span class="punctuation">:</span><span class="whitespace">
-  </span><span class="punctuation indicator">-</span><span class="whitespace"> </span><span class="punctuation indicator">{</span><span class="name tag"> name</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="name variable">temp_1</span><span class="punctuation indicator">,</span><span class="name tag"> type</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="name variable">i2c</span><span class="punctuation indicator">,</span><span class="name tag"> group</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="name variable">zone_temps</span><span class="punctuation indicator">,</span><span class="name tag"> path</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal string">&quot;/dev/i2c-1&quot;</span><span class="punctuation indicator">,</span><span class="whitespace">
-</span><span class="name tag">      address</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal string">&quot;0x48&quot;</span><span class="punctuation indicator">,</span><span class="name tag"> read_size</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal string">&quot;2&quot;</span><span class="punctuation indicator">,</span><span class="name tag"> payload-out</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="punctuation indicator">[{</span><span class="name tag"> target</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="name variable">k_1</span><span class="whitespace"> </span><span class="punctuation indicator">}]</span><span class="whitespace"> </span><span class="punctuation indicator">}</span><span class="whitespace">
-  </span><span class="punctuation indicator">-</span><span class="whitespace"> </span><span class="punctuation indicator">{</span><span class="name tag"> name</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="name variable">temp_2</span><span class="punctuation indicator">,</span><span class="name tag"> type</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="name variable">i2c</span><span class="punctuation indicator">,</span><span class="name tag"> group</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="name variable">zone_temps</span><span class="punctuation indicator">,</span><span class="name tag"> path</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal string">&quot;/dev/i2c-1&quot;</span><span class="punctuation indicator">,</span><span class="whitespace">
-</span><span class="name tag">      address</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal string">&quot;0x49&quot;</span><span class="punctuation indicator">,</span><span class="name tag"> read_size</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal string">&quot;2&quot;</span><span class="punctuation indicator">,</span><span class="name tag"> payload-out</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="punctuation indicator">[{</span><span class="name tag"> target</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="name variable">k_2</span><span class="whitespace"> </span><span class="punctuation indicator">}]</span><span class="whitespace"> </span><span class="punctuation indicator">}</span><span class="whitespace">
-  </span><span class="punctuation indicator">-</span><span class="whitespace"> </span><span class="punctuation indicator">{</span><span class="name tag"> name</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="name variable">temp_3</span><span class="punctuation indicator">,</span><span class="name tag"> type</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="name variable">spi</span><span class="punctuation indicator">,</span><span class="name tag"> group</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="name variable">zone_temps</span><span class="punctuation indicator">,</span><span class="name tag"> path</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal string">&quot;/dev/spidev0.0&quot;</span><span class="punctuation indicator">,</span><span class="whitespace">
-</span><span class="name tag">      max_speed</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal string">&quot;1000000&quot;</span><span class="punctuation indicator">,</span><span class="name tag"> spi_mode</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal string">&quot;0&quot;</span><span class="punctuation indicator">,</span><span class="name tag"> read_size</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal string">&quot;3&quot;</span><span class="punctuation indicator">,</span><span class="whitespace">
-</span><span class="name tag">      payload-out</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="punctuation indicator">[{</span><span class="name tag"> target</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="name variable">k_3</span><span class="whitespace"> </span><span class="punctuation indicator">}]</span><span class="whitespace"> </span><span class="punctuation indicator">}</span><span class="whitespace">
-
-  </span><span class="punctuation indicator">-</span><span class="whitespace"> </span><span class="punctuation indicator">{</span><span class="name tag"> name</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="name variable">heaters_1</span><span class="punctuation indicator">,</span><span class="name tag"> type</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="name variable">gpio</span><span class="punctuation indicator">,</span><span class="name tag"> direction</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="name variable">output</span><span class="punctuation indicator">,</span><span class="name tag"> path</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal string">&quot;/dev/gpiochip0&quot;</span><span class="punctuation indicator">,</span><span class="whitespace">
-</span><span class="name tag">      lines</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal string">&quot;3,4,5&quot;</span><span class="punctuation indicator">,</span><span class="name tag"> gateway-in</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="name variable">true</span><span class="whitespace"> </span><span class="punctuation indicator">}</span><span class="whitespace">
-  </span><span class="punctuation indicator">-</span><span class="whitespace"> </span><span class="punctuation indicator">{</span><span class="name tag"> name</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="name variable">heaters_2</span><span class="punctuation indicator">,</span><span class="name tag"> type</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="name variable">gpio</span><span class="punctuation indicator">,</span><span class="name tag"> direction</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="name variable">output</span><span class="punctuation indicator">,</span><span class="name tag"> path</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal string">&quot;/dev/gpiochip0&quot;</span><span class="punctuation indicator">,</span><span class="whitespace">
-</span><span class="name tag">      lines</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal string">&quot;6,7,8&quot;</span><span class="punctuation indicator">,</span><span class="name tag"> gateway-in</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="name variable">true</span><span class="whitespace"> </span><span class="punctuation indicator">}</span><span class="whitespace">
+  </span><span class="punctuation indicator">-</span><span class="whitespace"> </span><span class="name tag">type gpio</span><span class="punctuation">:</span><span class="whitespace">
+      </span><span class="punctuation indicator">-</span><span class="whitespace"> </span><span class="punctuation indicator">{</span><span class="name tag"> payload</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="name variable">heaters_1</span><span class="punctuation indicator">,</span><span class="name tag"> direction</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="name variable">output</span><span class="punctuation indicator">,</span><span class="name tag"> path</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal string">&quot;/dev/gpiochip0&quot;</span><span class="punctuation indicator">,</span><span class="whitespace">
+</span><span class="name tag">          lines</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal string">&quot;3,4,5&quot;</span><span class="punctuation indicator">,</span><span class="name tag"> gateway-in</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="name variable">true</span><span class="whitespace"> </span><span class="punctuation indicator">}</span><span class="whitespace">
+      </span><span class="punctuation indicator">-</span><span class="whitespace"> </span><span class="punctuation indicator">{</span><span class="name tag"> payload</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="name variable">heaters_2</span><span class="punctuation indicator">,</span><span class="name tag"> direction</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="name variable">output</span><span class="punctuation indicator">,</span><span class="name tag"> path</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal string">&quot;/dev/gpiochip0&quot;</span><span class="punctuation indicator">,</span><span class="whitespace">
+</span><span class="name tag">          lines</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal string">&quot;6,7,8&quot;</span><span class="punctuation indicator">,</span><span class="name tag"> gateway-in</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="name variable">true</span><span class="whitespace"> </span><span class="punctuation indicator">}</span><span class="whitespace">
+  </span><span class="punctuation indicator">-</span><span class="whitespace"> </span><span class="name tag">type i2c</span><span class="punctuation">:</span><span class="whitespace">
+      </span><span class="punctuation indicator">-</span><span class="whitespace"> </span><span class="punctuation indicator">{</span><span class="name tag"> payload</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="name variable">temp_1</span><span class="punctuation indicator">,</span><span class="name tag"> group</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="name variable">zone_temps</span><span class="punctuation indicator">,</span><span class="name tag"> path</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal string">&quot;/dev/i2c-1&quot;</span><span class="punctuation indicator">,</span><span class="whitespace">
+</span><span class="name tag">          address</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal string">&quot;0x48&quot;</span><span class="punctuation indicator">,</span><span class="name tag"> read_size</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal string">&quot;2&quot;</span><span class="punctuation indicator">,</span><span class="name tag"> payload-out</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="punctuation indicator">[{</span><span class="name tag"> target</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="name variable">k_1</span><span class="whitespace"> </span><span class="punctuation indicator">}]</span><span class="whitespace"> </span><span class="punctuation indicator">}</span><span class="whitespace">
+      </span><span class="punctuation indicator">-</span><span class="whitespace"> </span><span class="punctuation indicator">{</span><span class="name tag"> payload</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="name variable">temp_2</span><span class="punctuation indicator">,</span><span class="name tag"> group</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="name variable">zone_temps</span><span class="punctuation indicator">,</span><span class="name tag"> path</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal string">&quot;/dev/i2c-1&quot;</span><span class="punctuation indicator">,</span><span class="whitespace">
+</span><span class="name tag">          address</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal string">&quot;0x49&quot;</span><span class="punctuation indicator">,</span><span class="name tag"> read_size</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal string">&quot;2&quot;</span><span class="punctuation indicator">,</span><span class="name tag"> payload-out</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="punctuation indicator">[{</span><span class="name tag"> target</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="name variable">k_2</span><span class="whitespace"> </span><span class="punctuation indicator">}]</span><span class="whitespace"> </span><span class="punctuation indicator">}</span><span class="whitespace">
+  </span><span class="punctuation indicator">-</span><span class="whitespace"> </span><span class="name tag">type spi</span><span class="punctuation">:</span><span class="whitespace">
+      </span><span class="punctuation indicator">-</span><span class="whitespace"> </span><span class="punctuation indicator">{</span><span class="name tag"> payload</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="name variable">temp_3</span><span class="punctuation indicator">,</span><span class="name tag"> group</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="name variable">zone_temps</span><span class="punctuation indicator">,</span><span class="name tag"> path</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal string">&quot;/dev/spidev0.0&quot;</span><span class="punctuation indicator">,</span><span class="whitespace">
+</span><span class="name tag">          max_speed</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal string">&quot;1000000&quot;</span><span class="punctuation indicator">,</span><span class="name tag"> spi_mode</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal string">&quot;0&quot;</span><span class="punctuation indicator">,</span><span class="name tag"> read_size</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal string">&quot;3&quot;</span><span class="punctuation indicator">,</span><span class="whitespace">
+</span><span class="name tag">          payload-out</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="punctuation indicator">[{</span><span class="name tag"> target</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="name variable">k_3</span><span class="whitespace"> </span><span class="punctuation indicator">}]</span><span class="whitespace"> </span><span class="punctuation indicator">}</span><span class="whitespace">
 
 </span><span class="name tag">commands</span><span class="punctuation">:</span><span class="whitespace">
   </span><span class="punctuation indicator">-</span><span class="whitespace"> </span><span class="punctuation indicator">{</span><span class="name tag"> from</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="name variable">gateway</span><span class="punctuation indicator">,</span><span class="name tag"> sets</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="name variable">thermostat.setpoint</span><span class="whitespace"> </span><span class="punctuation indicator">}</span>
@@ -7976,14 +8047,23 @@ compares the payloads they produce.</p>
 a child element in XML.</p>
 <dl class="docutils">
 <dt>Requirement</dt>
-<dd>In XML every value is a child element and never an attribute. The two
-formats then say the same thing in the same shape, and one reader of a
-configuration file learns one convention.</dd>
+<dd>In XML every value is a child element and never an attribute, but for
+names. The two formats then say the same thing in the same shape, and one
+reader of a configuration file learns one convention.</dd>
+<dt>Requirement</dt>
+<dd>A name is an attribute in XML: a type's, <tt class="docutils literal">&lt;type <span class="pre">name=&quot;i2c&quot;&gt;</span></tt>, a
+node's, <tt class="docutils literal">&lt;payload <span class="pre">name=&quot;temp_1&quot;&gt;</span></tt>, and a placed node's,
+<tt class="docutils literal">&lt;node <span class="pre">name=&quot;temp_1&quot;</span> <span class="pre">x=&quot;34&quot;</span> <span class="pre">y=&quot;34&quot;/&gt;</span></tt>. It is what the element is rather
+than something it says, as the YAML's <tt class="docutils literal">- type i2c:</tt> and <tt class="docutils literal">payload:
+temp_1</tt> are, and it is what the element is found and sorted by.</dd>
 <dt>Requirement</dt>
 <dd>A sequence in XML is repeated sibling elements named for the field, and
 the repeats are contiguous. There is no wrapper element around a list:
-two payloads are two <tt class="docutils literal">&lt;payloads&gt;</tt> elements, which is how a sequence
-reaches serde from quick-xml.</dd>
+two payload groups are two <tt class="docutils literal">&lt;payload_groups&gt;</tt> elements, and two nodes
+of a type two <tt class="docutils literal">&lt;payload&gt;</tt> elements in its <tt class="docutils literal">&lt;type&gt;</tt>, which is how a
+sequence reaches serde from quick-xml. A node section is the exception,
+one element -- <tt class="docutils literal">&lt;gateways&gt;</tt>, <tt class="docutils literal">&lt;vehicle&gt;</tt> or <tt class="docutils literal">&lt;payloads&gt;</tt> -- holding
+its types, as the YAML's section is one key holding a list.</dd>
 <dt>Requirement</dt>
 <dd>An optional value nothing states is an omitted element, not an empty one.
 An empty element is a value of no characters, which is a different thing
@@ -8856,7 +8936,8 @@ window has to, and the vehicle on a thread of its own beside it; the
 window looks at the table every 40 milliseconds, well inside
 <tt class="docutils literal">LINE_BLINK</tt>. A delivery says which line of the drawing it travelled by
 the line's place among the configuration's links counted one per
-destination in the file's order, which is the order tcsgui draws them in.</dd>
+destination, by the node each leaves and then by where it goes, which is
+the order tcsgui draws them in.</dd>
 </dl>
 </div>
 <div class="section" id="tcslib">
@@ -8938,52 +9019,74 @@ agree, so the two formats a set is written in digest alike, and so do
 two files differing only in comments, indentation, the order of their
 sections or the order of one payload's attributes.</dd>
 <dt>Requirement</dt>
-<dd>The order of the payloads does change the digest. Ids will be assigned in
-the order the payloads appear, so that order is configuration rather than
-spelling.</dd>
+<dd>Nothing in a configuration is in an order that means anything. The order
+of the sections, of the types in a section, of the nodes of a type, of a
+node's attributes, of its links and their destinations, of the payload
+groups, of the command bindings, of the included files and of the entries
+of an attribute that is a set are all spelling, and two files that differ
+only in them are one configuration.</dd>
 <dt>Requirement</dt>
-<dd>Each payload is given a sequence number as the file is read: the first is
-0. A file may not state it -- the number is what this program read, not
-something a file gets to assert.</dd>
+<dd>There is one canonical order, and everything that needs an order takes
+it: nodes by name; a node's attributes by name; links by the node they
+leave, each one's destinations by name; payload groups by name; command
+bindings by where they come from and then what they set; included files
+by name; and the entries of a set-valued attribute -- a vote's
+<tt class="docutils literal">inputs</tt>, gpio <tt class="docutils literal">lines</tt>, <tt class="docutils literal">terminators</tt> -- in one spelling, sorted.
+<tt class="docutils literal"><span class="pre">tcslibgs::config_digest::interpretation_of_graph</span></tt> is the one place it
+is written down.</dd>
 <dt>Requirement</dt>
-<dd>The digest takes the payloads in order of their sequence numbers. Two ends
-that read the same file then agree about which came first whatever either
-has since done with its own list.</dd>
+<dd>The digest is taken over the configuration in the canonical order. So
+two files that differ only in order digest alike, as two that differ only
+in format or comments do.</dd>
+<dt>Requirement</dt>
+<dd>Device ids are counted in the canonical order: a node's id is its
+position among the names of all the configuration's nodes, across every
+included file and whatever its kind, the first being 0. The ids are
+therefore a function of the names alone. Two ends whose digests agree
+have read the same names, so they agree about every id, and about every
+port and identifier counted from one -- <tt class="docutils literal">ground_base</tt> plus an id, a
+<tt class="docutils literal">payload_command</tt> <tt class="docutils literal">dest_base</tt> plus an id, an F´ id.</dd>
+<dt>Requirement</dt>
+<dd>Anywhere else an order would decide something -- which of two equally
+overdue reads goes first, which stream several destinations share, which
+route a ping takes, the order offered settings are listed in -- the tie
+is broken by name, so that what tcspecial does cannot depend on how a
+file was written.</dd>
+<dt>Requirement</dt>
+<dd>A file has no way to state an id or a position: the language has no
+attribute for either, and an attribute it does not have is refused. A
+node's number is what the canonical order gives it, not something a file
+gets to assert.</dd>
+<dt>Requirement</dt>
+<dd>Each node's name is a value, never a key: <tt class="docutils literal">payload: temp_1</tt> in YAML and
+<tt class="docutils literal">&lt;payload <span class="pre">name=&quot;temp_1&quot;&gt;</span></tt> in XML. A name as a YAML key would make the
+nodes a map, whose order the YAML parser may not keep, and the name is
+what the node is sorted by, so it is the one thing that must be read
+exactly.</dd>
 </dl>
-<p>The numbering rests on one assumption: that a parser hands entries to the code
-above it in the order the file gave them. Both formats here do, and a format
-that did not would be unusable for a language whose payload order means
-something.</p>
-<p>The payloads are numbered as the list is deserialized, which is the one place
-every format arrives through, so nothing can hold a configuration whose
-payloads do not know which ones they are. A file stating a number of its own
-is refused by name.</p>
-<p>Carried by the data rather than left to the order a list happens to keep. The
-order used to live only in that, so anything sorting the payloads -- for a
-lookup, for a display -- would have changed what the configuration said about
-which payload came first, and the only thing in the way was that nothing did
-it yet. The two halves of the check are then independent: walking by sequence
-number is what makes a list in some other order digest the same, and hashing
-the numbers themselves is what makes a <em>file</em> in some other order digest
-differently.</p>
-<p>A sequence number and not a line number. A line is not something these parsers
-hand to the code that builds a document, and it would be a different number in
-each of the two formats one set is written in, where the sequence number is
-the same in both -- which is what lets them digest alike.</p>
+<p>Why by name and not as the file has them: ids used to be file position, and
+the digest took the nodes in that order so that two ends would agree about
+them. That made order configuration. Moving one node above another, which an
+editor does whenever it rewrites a file, renumbered the nodes after it and
+moved their ports, and a tool that sorted a list for display was one step from
+changing what the configuration said. Counting by name makes reordering
+harmless: what a file says is its names and what each node is, and the ids
+and ports follow from that. The cost is that adding a node renumbers the nodes
+whose names sort after it, as adding one used to renumber the nodes written
+after it; the digest changes in both cases, so neither end can miss it.</p>
+<p>Names are unique across a configuration, so the order is total: no two nodes
+tie, and sorting by name never leaves a choice to the sort.</p>
 <p>How it is reached: a file is parsed into the document it describes and that
 document is written back out as a tree of values, which is where the format
 stops showing through -- a number is a number rather than the text that spelled
 it, a list is a list rather than XML's repeated sibling elements, and an
-attribute nobody stated is absent rather than missing. The tree is then written
-to bytes with every map's keys in order and every list in the order it was
-given, and those bytes are what the MD5 is of.</p>
+attribute nobody stated is absent rather than missing. Each list is put in the
+canonical order, the tree is written to bytes with every map's keys in order,
+and those bytes are what the MD5 is of.</p>
 <p>A map's keys are put in order twice over, deliberately. The document is a set
 of Rust structs, and a struct writes its fields in the order it declares them
 however the file gave them, so the order a file used is already gone; sorting
-is what keeps the rule true of anything that is a map rather than a struct.
-What a file's own order does reach the digest through is the sequence number
-each payload was given as it was read, which is the one ordering that means
-something.</p>
+is what keeps the rule true of anything that is a map rather than a struct.</p>
 </div>
 </div>
 <div class="section" id="payloads">
@@ -12896,8 +12999,8 @@ is watching the window for.</p>
 <dl class="docutils">
 <dt>Requirement</dt>
 <dd>A panel says which payload of the configuration it is, beside the name:
-<tt class="docutils literal"><span class="pre">auto-send</span> (dev id 0)</tt>. The number is the payload's place in the payload
-configuration, counted from nought in the order the file describes them,
+<tt class="docutils literal"><span class="pre">auto-send</span> (dev id 0)</tt>. The number is the payload's device id, its
+place among the names of the configuration's nodes, counted from nought,
 and nothing in the file states it -- a payload stated a <tt class="docutils literal">dh_id</tt> once and
 that was a second identity to keep consistent by hand. Both windows count
 the same way, which is the use of it: the two are read side by side, and a

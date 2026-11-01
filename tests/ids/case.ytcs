@@ -1,0 +1,79 @@
+# yaml-language-server: $schema=../../tcsgui/share/schema/tcspecial.schema.json
+
+description: "Names that differ only in case, and digits that sort as text"
+
+tcspecial:
+  # tcspecial sends beacons from the interface the send attribute names, and
+  # the MOC receives them on the address the recv attribute names.
+  beacon:
+    default_interval: "5 s"
+    recv: "127.0.0.1:5650"
+    reset_interval: "1 s"
+    send: "0.0.0.0:5550"
+  gateway: "radio"
+  interface: "ad9aac4dd5a6d88dd5e78824ba8a83ac"
+  log:
+    directory: "/tmp/telemetry"
+    segment_size: "65536"
+  # Commands to a payload are sent to tcspecial at dest_base plus the
+  # payload's device id, and the responses are read on the network interface
+  # source_base names.
+  #
+  # Simple payloads, such as this sensor, do not use payload commands: what a
+  # simple payload is configured with is in this file, and it is not changed
+  # while tcspecial is running. At present only applications use the
+  # payload_command values.
+  payload_command:
+    dest_base: "0.0.0.0:4200"
+    source_base: "127.0.0.1:4300"
+  # tcspecial sends telemetry from the network interface source_base names,
+  # plus the payload's device id, and the MOC receives it on the network
+  # interface dest_base names, plus the payload's device id.
+  payload_telemetry:
+    dest_base: "127.0.0.1:6100"
+    source_base: "0.0.0.0:6000"
+  # tcspecial counts its starts in this file, which must be on storage
+  # that survives a power cycle on a vehicle.
+  state_file: "/tmp/tcspecial-case.state"
+  # Commands to tcspecial are sent from the MOC's address, tcs_cmd.send, to
+  # tcspecial at tcs_cmd.recv, and tcspecial sends its responses back to
+  # tcs_cmd.send.
+  tcs_cmd:
+    recv: "0.0.0.0:4000"
+    send: "127.0.0.1:4100"
+
+payloads:
+  - type network:
+      # Written in no order: the ids are the names' places in case.ids.
+      - payload: "zone"
+        address: "127.0.0.1"
+        port: "5001"
+        protocol: "udp"
+      - payload: "t9"
+        address: "127.0.0.1"
+        port: "5002"
+        protocol: "udp"
+      - payload: "Apple"
+        address: "127.0.0.1"
+        port: "5003"
+        protocol: "udp"
+      - payload: "_under"
+        address: "127.0.0.1"
+        port: "5004"
+        protocol: "udp"
+      - payload: "t10"
+        address: "127.0.0.1"
+        port: "5005"
+        protocol: "udp"
+      - payload: "B-2"
+        address: "127.0.0.1"
+        port: "5006"
+        protocol: "udp"
+      - payload: "apple"
+        address: "127.0.0.1"
+        port: "5007"
+        protocol: "udp"
+      - payload: "Zone"
+        address: "127.0.0.1"
+        port: "5008"
+        protocol: "udp"

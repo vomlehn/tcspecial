@@ -10540,15 +10540,61 @@ tcssim
     Simulator`_. It is required, and every shipped simulator file states one.
 
 simulated payload groups
-    Named groups of settings. A group carries what several simulated payloads
-    have in common, and may say whether they are simulated, with
-    ``simulate``.
+    Named groups of settings, each named by ``group``. A group carries what
+    several simulated payloads have in common, and may say whether they are
+    simulated, with ``simulate``.
 
 simulated payloads
-    The simulated payloads themselves. Each names the data handler it stands in
-    for, may name a group, and may state settings of its own. Each has
-    ``simulate``, from itself or from its group but not both: see `Saying
-    Which Payloads Are Simulated`_.
+    The simulated payloads themselves, grouped by type as a configuration's
+    nodes are. Each names the data handler it stands in for, by
+    ``payload``, may name a group, and may state settings of its own. Each
+    has ``simulate``, from itself or from its group but not both: see
+    `Saying Which Payloads Are Simulated`_.
+
+.. code-block:: yaml
+
+   simulated_payload_groups:
+     - group: zone_temps
+       packet_interval: 100 ms
+       simulate: true
+
+   simulated_payloads:
+     - type network:
+         - payload: temp_1
+           group: zone_temps
+           protocol: udp
+
+In XML a group is ``<group name="zone_temps">`` in one
+``<simulated_payload_groups>``, and a payload ``<payload name="temp_1">`` in
+a ``<type name="network">`` in one ``<simulated_payloads>``.
+
+Requirement
+    A simulated payload's type is said once, by the entry it is written
+    under: ``- type network:`` in YAML, ``<type name="network">`` in XML. A
+    payload that says a type of its own is refused, and so is a group that
+    says one, a group's payloads each having the type they are written
+    under. A type is written once in a file, with at least one payload
+    under it, and a word that is no type of payload is refused, listing the
+    types.
+
+Requirement
+    An entry is named by its word -- ``payload`` for a simulated payload,
+    ``group`` for a group, the ``name`` attribute of its element in XML --
+    and one named by ``name:`` is refused, saying how one is named.
+
+Requirement
+    Nothing in a simulator file is in an order that means anything: not the
+    types, not the payloads of one, not the groups, and not the settings of
+    an entry. Each list is held in name order, whatever order the file
+    wrote it in, and tcssim makes and shows its stand-ins in the
+    configuration's order, which is by name.
+
+Requirement
+    A simulator file in the shape before this one, each payload an entry of
+    its own with ``name:`` and ``type:`` and each group named by ``name:``,
+    is refused at the line of its first entry, shown that entry in the shape
+    it has now and told that ``tools/convert-format.py`` rewrites the file,
+    keeping its comments.
 
 **Settings**
 
@@ -10584,7 +10630,10 @@ that the two files can be checked against each other.
 | type                | string | The type of payload this stands in for, in  |
 |                     |        | the payload configuration's own word:       |
 |                     |        | ``network``, ``device-file``, ``serial``,   |
-|                     |        | ``i2c``, or ``spi``                         |
+|                     |        | ``i2c``, ``spi``, ``can``, ``iio``,         |
+|                     |        | ``rpmsg``, ``gpio`` or ``hdlc``. Not a      |
+|                     |        | setting of the entry: the type it is        |
+|                     |        | written under                               |
 +---------------------+--------+---------------------------------------------+
 | protocol            | string | Which transport, for a network payload.     |
 |                     |        | Refused for every other type                |
@@ -10671,10 +10720,10 @@ payload that never sends. So each simulated payload says what it stands in
 for, and the statement is compared rather than used.
 
 Requirement
-    A simulated payload states the type of payload it stands in for, and a
-    network payload the transport as well. Neither is taken from this file:
-    the payload configuration decides both, and a payload that stated neither
-    could not be checked against anything.
+    A simulated payload states the type of payload it stands in for, by the
+    type it is written under, and a network payload the transport as well.
+    Neither is taken from this file: the payload configuration decides both,
+    and a payload that stated neither could not be checked against anything.
 
 Requirement
     The two files cannot disagree about a payload's type or its transport. A
@@ -10736,11 +10785,12 @@ Requirement
     datagram payload a path beside the handler's.
 
 Requirement
-    A group may carry the type and the transport, like every other setting a
-    payload does not state. A group whose payloads are not all reached the
-    same way leaves them with the payloads: the thermostat's sensors share a
-    rate and a terminal, and two of the three are on a different kind of
-    bus from the third.
+    A group may carry the transport, like every other setting a payload does
+    not state, and never the type, which is the one a payload is written
+    under. A group whose payloads are not all reached the same way leaves the
+    transport with the payloads: the thermostat's sensors share a rate and a
+    terminal, and two of the three are on a different kind of bus from the
+    third.
 
 The Physics Model
 -----------------
@@ -10767,16 +10817,32 @@ Requirement
     they go.
 
 Requirement
-    The model is a list of elements, each with a name and a ``type``, as a
-    configuration is a list of nodes, and a list of connections between
-    them, as a configuration has links. The types are ``heater``,
-    ``thermal_zone``, ``sun``, ``solar_array``, ``load``, ``bus``,
-    ``battery``, ``engine`` and ``body``, and an element of any other is
-    refused; a
-    ``thermal_mass``, the one type there was before a model was made of
-    parts, is told what it is now. Each type's settings, terminals and rules
-    are stated once, in ``tcslibgs::physics``; its arithmetic is the
-    simulator's, in ``tcssim::physics``.
+    The model is its elements, the components it is made of, grouped by type
+    as a configuration's nodes are, and a list of connections between them,
+    as a configuration has links. Each entry of ``physics`` is ``type`` and a
+    type, ``- type heater:``, holding the components of that type, each
+    named by ``component``. The types are ``heater``, ``thermal_zone``,
+    ``sun``, ``solar_array``, ``load``, ``bus``, ``battery``, ``engine`` and
+    ``body``, and a type of any other is refused; a ``thermal_mass``, the one
+    type there was before a model was made of parts, is told what it is now.
+    A type is written once, with a component under it. Each type's settings,
+    terminals and rules are stated once, in ``tcslibgs::physics``; its
+    arithmetic is the simulator's, in ``tcssim::physics``.
+
+Requirement
+    Nothing in a model is in an order that means anything: not the types,
+    the components of one, or the connections. The components are held in
+    name order and the connections in the order of the names of the
+    terminals they join, so that what tcssim does with a model is the same
+    however it is written: an input that sums is given its outputs in that
+    order, and of two events due at one moment, the one whose component's
+    name sorts first happens first.
+
+Requirement
+    A model in the shape before this one, each element with a ``name`` and a
+    ``type`` of its own, is refused at the line of its first element, shown
+    it in the shape it has now and told that ``tools/convert-format.py``
+    rewrites the file.
 
 Requirement
     Each type is one simple part, with its own words for what goes in and
@@ -11257,19 +11323,18 @@ zone.
 .. code-block:: yaml
 
    physics:
-     - name: heater_1
-       type: heater
-       power: "60 W"
-       voltage: "28 V"
-     - name: heater_2
-       type: heater
-       power: "60 W"
-       voltage: "28 V"
-     - name: zone
-       type: thermal_zone
-       environment: "283.15 K"
-       time_constant: "50 s"
-       capacity: "20 J/K"
+     - type heater:
+         - component: heater_1
+           power: "60 W"
+           voltage: "28 V"
+         - component: heater_2
+           power: "60 W"
+           voltage: "28 V"
+     - type thermal_zone:
+         - component: zone
+           capacity: "20 J/K"
+           environment: "283.15 K"
+           time_constant: "50 s"
 
    connections:
      - from: heater_1.heat
@@ -11291,40 +11356,36 @@ with nothing more than a socket.
    physics: thermostat-physics.yaml
 
    simulated_payload_groups:
-     - name: zone_temps
-       simulate: true
-       packet_interval: 100 ms
+     - group: zone_temps
        connects: zone.temperature
+       packet_interval: 100 ms
+       simulate: true
 
    simulated_payloads:
-     - name: temp_1
-       type: network
-       protocol: udp
-       group: zone_temps
+     - type network:
+         - payload: heaters_1
+           connects: heater_1.on
+           protocol: udp
+           simulate: true
 
-     - name: temp_2
-       type: network
-       protocol: udp
-       group: zone_temps
-       offset: "+0.2 K"
+         - payload: heaters_2
+           connects: heater_2.on
+           protocol: udp
+           simulate: true
 
-     - name: temp_3
-       type: network
-       protocol: udp
-       group: zone_temps
-       offset: "-0.3 K"
+         - payload: temp_1
+           group: zone_temps
+           protocol: udp
 
-     - name: heaters_1
-       simulate: true
-       type: network
-       protocol: udp
-       connects: heater_1.on
+         - payload: temp_2
+           group: zone_temps
+           offset: "+0.2 K"
+           protocol: udp
 
-     - name: heaters_2
-       simulate: true
-       type: network
-       protocol: udp
-       connects: heater_2.on
+         - payload: temp_3
+           group: zone_temps
+           offset: "-0.3 K"
+           protocol: udp
 
 Testing
 =======
@@ -11760,7 +11821,14 @@ Requirement
 Requirement
     The answer also says what the simulator is set up for: the digest of the
     tcspecial configuration it read, the digest of its simulator file, and its
-    ``--simulate`` mode. The harness compares the three with its own before
+    ``--simulate`` mode. The simulator file's digest is taken as the
+    configuration's is, of what it says and not of its bytes: its
+    ``tcssim`` section, its groups and its simulated payloads by name, each
+    with its type and settings, and the physics model it names, its
+    components by name and its connections in order -- the description and
+    the model's file name left out. A comment or another order is then the
+    same simulator file, and a figure changed in the model beside it is
+    not. The harness compares the three with its own before
     it starts tcspecial, and refuses to go on when any differs, saying which
     and what each side has. A simulator started yesterday on another
     configuration, or under another mode, then stops the run before tcspecial

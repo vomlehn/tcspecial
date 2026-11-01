@@ -16,11 +16,13 @@ use std::process::Command;
 use std::collections::BTreeSet;
 
 use tcslibgs::graph::telemetry::{self, ApidCarries, Via};
-use tcslibgs::graph::Graph;
+use tcslibgs::graph::{Destination, Graph};
 
 mod common;
 
-use common::{generated_mdb, here, with_more_nodes, worked_out, Element};
+use common::{
+    generated_mdb, here, read_xml, with_more_nodes, worked_out, Element,
+};
 
 /// What `ping_yamcs.py --describe` says, as `name value` pairs.
 ///
@@ -235,11 +237,63 @@ fn mdb_apids(xtce: &Element) -> BTreeSet<(String, u16)> {
     found
 }
 
+/// The command the ping node's interface document, `tcslibgs/xtce/ping.xtce`,
+/// states: what a gateway node whose data goes only to ping nodes takes.
+///
+/// # Returns
+///
+/// Its name.
+///
+/// # Panics
+///
+/// The document does not read, or states no one command.
+fn ping_command() -> String {
+    let path = here().join("../../tcslibgs/xtce/ping.xtce");
+    let document = read_xml(&std::fs::read_to_string(path).expect("it reads"));
+    let mut commands = Vec::new();
+    document.within("MetaCommand", &mut commands);
+    let [command] = commands.as_slice() else {
+        panic!("ping.xtce states one command");
+    };
+    command.attribute("name").expect("a name").to_string()
+}
+
+/// The command the ground sends a gateway node by: the ping node's
+/// document's, where every node its data goes to is a ping node, and else
+/// one named after the node, which carries its data whole.
+///
+/// # Arguments
+///
+/// * `graph`   - The configuration's graph.
+/// * `gateway` - The gateway node's name.
+///
+/// # Returns
+///
+/// The command's name.
+fn uplink_command(graph: &Graph, gateway: &str) -> String {
+    let mut types = BTreeSet::new();
+    for link in &graph.links {
+        if link.origin().node != gateway {
+            continue;
+        }
+        for destination in link.to.each() {
+            let node = Destination::parse(destination).node;
+            let node = graph.node(&node).expect("a node it reaches");
+            types.insert(node.node_type.clone());
+        }
+    }
+    if types.len() == 1 && types.contains("ping") {
+        ping_command()
+    } else {
+        gateway.to_string()
+    }
+}
+
 /// What the Rust says the wrapper for `path` must have: for every APID
 /// `telemetry::apids` counts, the container or the command named for what
 /// it carries -- the beacon's and the answers' containers and CONNECT, a
-/// command named after each gateway node, and a container named after each
-/// node whose data reaches the ground.
+/// command for each gateway node (see [`uplink_command`]), and a container
+/// named after each node whose data reaches the ground.
 ///
 /// # Arguments
 ///
@@ -270,7 +324,9 @@ fn rust_apids(path: &Path) -> BTreeSet<(String, u16)> {
             ApidCarries::Commands => {
                 vec!["AnswerPacket".to_string(), "Connect".to_string()]
             }
-            ApidCarries::Uplink(gateway) => vec![gateway.clone()],
+            ApidCarries::Uplink(gateway) => {
+                vec![uplink_command(&graph, gateway)]
+            }
             ApidCarries::Downlink { link, .. } => vec![source(link)],
             ApidCarries::PayloadTelemetry(link) => vec![source(link)],
         };

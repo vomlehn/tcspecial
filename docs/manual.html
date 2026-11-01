@@ -2841,13 +2841,14 @@ Python.</p>
 <div class="section" id="the-ping-yamcs-example">
 <h2><a class="toc-backref" href="#toc-entry-41">The ping-yamcs example</a></h2>
 <div class="figure">
-<object data="../examples/ping-yamcs/ping-yamcs.svg" style="width: 100%;" type="image/svg+xml">The ping-yamcs example: Yamcs, driven by ping_yamcs.py, sends a ping
+<object data="../examples/ping-yamcs/ping-yamcs.svg" style="width: 100%;" type="image/svg+xml">The ping-yamcs example: ping_yamcs.py, through Yamcs, sends a ping
 as a CCSDS telecommand up to the gateway_yamcs node, which takes the
 header off and hands it to the ping node; the answer goes back down
 through the gateway node, which puts a header on it, to Yamcs, beside
-the beacon, also with a header.</object>
-<p class="caption"><tt class="docutils literal"><span class="pre">examples/ping-yamcs</span></tt>: the ping example with Yamcs as the ground
-station, over CCSDS packets.</p>
+the beacon, also with a header, and ping_yamcs.py's window shows
+both.</object>
+<p class="caption"><tt class="docutils literal"><span class="pre">examples/ping-yamcs</span></tt>: the ping example with Yamcs between the ground
+station and the vehicle, over CCSDS packets.</p>
 </div>
 <p>The ping example with Yamcs (<a class="reference external" href="https://yamcs.org">https://yamcs.org</a>) at the ground end. The
 vehicle is the same -- a <tt class="docutils literal">ping</tt> node that answers each ping with its time
@@ -2861,8 +2862,8 @@ telemetry of APID <tt class="docutils literal">0x100</tt>; CONNECT and its answe
 <p><tt class="docutils literal"><span class="pre">examples/ping-yamcs/ping_yamcs.py</span></tt> runs it, given a Yamcs release unpacked
 somewhere (<tt class="docutils literal">bin/yamcsd</tt> under it):</p>
 <pre class="code sh literal-block">
-python3<span class="whitespace"> </span>examples/ping-yamcs/ping_yamcs.py<span class="whitespace"> </span>--yamcs<span class="whitespace"> </span>~/yamcs-5.14.0<span class="whitespace"> </span>--pings<span class="whitespace"> </span><span class="literal number">3</span><span class="whitespace">
-</span>make<span class="whitespace"> </span>-C<span class="whitespace"> </span>examples<span class="whitespace"> </span>run-ping-yamcs<span class="whitespace"> </span><span class="name variable">YAMCS_HOME</span><span class="operator">=</span>~/yamcs-5.14.0
+make<span class="whitespace"> </span>-C<span class="whitespace"> </span>examples<span class="whitespace"> </span>run-ping-yamcs<span class="whitespace"> </span><span class="name variable">YAMCS_HOME</span><span class="operator">=</span>~/yamcs-5.14.0<span class="whitespace">
+</span>python3<span class="whitespace"> </span>examples/ping-yamcs/ping_yamcs.py<span class="whitespace"> </span>--yamcs<span class="whitespace"> </span>~/yamcs-5.14.0<span class="whitespace"> </span>--pings<span class="whitespace"> </span><span class="literal number">3</span>
 </pre>
 <p>It writes a Yamcs configuration from the tcspecial one into a run directory,
 <tt class="docutils literal"><span class="pre">/tmp/ping-yamcs</span></tt> unless <tt class="docutils literal"><span class="pre">--run-dir</span></tt> says, so that the ports and APIDs
@@ -2871,15 +2872,23 @@ are stated once. The mission database is tcspecial's own XTCE,
 <tt class="docutils literal"><span class="pre">examples/ping-yamcs/yamcs/tcs-ccsds.xtce.in</span></tt>: the CCSDS header, what
 follows it on each APID, and CONNECT and the ping behind a header. It starts
 Yamcs on that, and tcspecial on the configuration, each stopped when it
-exits; has Yamcs send CONNECT until the vehicle answers with the
-configuration's checksum; and then sends pings through Yamcs and reads the
-answers back, over Yamcs's REST API, printing each exchange:</p>
+exits, however it exits -- the kernel is told to kill both if it is killed;
+has Yamcs send CONNECT until the vehicle answers with the configuration's
+checksum; and then sends pings through Yamcs and reads the answers back,
+over Yamcs's REST API.</p>
+<p>Its window is the ping example's, the beacon panel and the ping panel, with
+<tt class="docutils literal">Send ping</tt> sending each ping through Yamcs. The beacon panel is given the
+beacon's own bytes, which <tt class="docutils literal"><span class="pre">tcs-ccsds.xtce</span></tt> keeps whole as the
+<tt class="docutils literal">BeaconBody</tt> parameter, so that it checks the configuration's checksum and
+the beacon's number, and ages the indicator, as the ping example's does from
+its socket. With <tt class="docutils literal"><span class="pre">--pings</span></tt> there is no window, and it prints the first
+beacon and each exchange:</p>
 <pre class="code text literal-block">
 connected: the vehicle is running this configuration
-beacon: name tcspecial, version 0.1.0, number 2, flag normal
-sent: ping #1 1793520566.926236889
-received: ping #1 1793520566.926236889 1793520566.947812205
-times: round trip 21.763111 ms, up 21.575316 ms, down 0.187795 ms
+beacon: tcspecial v0.1.0 md5 27bf79b237069fc4c5d13325e1ac0bb6
+sent: ping #1 1793562467.079578927
+received: ping #1 1793562467.079578927 1793562467.091478556
+times: round trip 11.421073 ms, up 11.899629 ms, down -0.478556 ms
 </pre>
 <p>Yamcs's web interface, at <tt class="docutils literal"><span class="pre">http://localhost:16090</span></tt>, shows every packet and
 parameter meanwhile. An answer's arrival time is when Yamcs acquired it,

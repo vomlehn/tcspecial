@@ -722,7 +722,7 @@ winner decided by the order the files happened to be read in.
 Gateways: what the vehicle answers to
 -------------------------------------
 
-**Specified, and built but for the far ends.** ``tcspecial.gateway`` is read
+**Specified and built.** ``tcspecial.gateway`` is read
 and required, and ``radio``, ``cfs`` and ``fprime`` are all accepted --
 ``tcslibgs::gateway`` is the one place that says which kinds are built, which
 node type is which kind's, which are on a bus, and what each calls its far
@@ -735,10 +735,10 @@ against a test playing the cFS end. The bridge at the F´ end is built too:
 its F´ model is written from the configuration by ``tcsverify
 --fprime-model``, and the ``TcsBridge`` component in ``fprime/`` is tested in
 an F´ deployment against tcspecial and tcssim -- see `F´: gateway_fprime`_,
-which says what it does not yet do. Not yet built: tcssim standing in for the
-cFS end and tcslib's SBN transport, so that tcsmoc cannot yet command a
-vehicle that answers to cFS (see `What crosses the bus`_), and the run against
-cFS's own Linux build.
+which says what it does not yet do. The ground's end of the bus is built too:
+tcssim stands in for the cFS end, and tcslib's SBN transport,
+``tcslib::bus``, lets tcsmoc and every station on tcslib command a vehicle
+that answers to cFS through it (see `What crosses the bus`_).
 
 The gateway nodes are written in the ``gateway`` section, linked through
 ``gateway-in`` and ``gateway-out``, with ``tee-gateway``, ``null-gateway`` and
@@ -1121,13 +1121,73 @@ Requirement
     build, with SBN, is the test that the wire format is SBN's and not only
     ours.
 
-    **Not yet built.** Until it is, ``tcspecial/tests/cfs.rs`` plays the cFS
-    end -- a UDP socket speaking SBN's wire format from ``tcslibgs::sbn`` --
-    against the vehicle flying ``examples/cfs``, and tcslib, tcsmoc and the
-    C/C++ library refuse a configuration that answers to cFS, saying it is
-    to be commanded from the cFS side. A ``gateway_cfs`` node, like the other
-    gateway nodes, has no stand-in of its own in tcssim: it is the far end
-    that is stood in for, not the node.
+    **Built** (2026-10-31). ``tcslib::bus`` holds both ground-side ends.
+    ``StandIn`` is the cFS end as tcssim runs it: it binds ``sbn.peer``, is
+    processor ``sbn.peer_processor_id`` to the vehicle, subscribes to every
+    message ID the vehicle publishes, and is a bus to the ground stations
+    that join it -- what the vehicle publishes goes to each station that
+    subscribed to it, and what a station publishes goes to the vehicle where
+    the vehicle subscribed to it. Like SBN on a cFS it never speaks first.
+    ``Ground`` is a station's one peer of it, kept on a thread of its own,
+    which announces, sends heartbeats and refuses a far end of another
+    protocol version or ident as the vehicle does, and turns the bus back
+    into the loopback UDP links a station already speaks: tcslib's
+    ``command_links_of``, ``beacon::open`` and ``GatewayReceiver::open`` use
+    it themselves, so tcsmoc, the C/C++ library and every other station are
+    written the same for a radio and a bus, and the bus is spoken in one
+    place, from ``tcslibgs::sbn`` and ``tcslibgs::cfs``. A station is
+    processor ``tcslibgs::sbn::ground_processor_id``, one more than the
+    larger of the two the configuration states. ``tcspecial/tests/cfs.rs``
+    still plays the cFS end byte by byte; ``tcspecial/tests/cfs_ground.rs``
+    commands the vehicle flying ``examples/cfs`` through the stand-in from
+    tcslib, and ``make run-cfs`` in ``examples/`` runs tcsmoc on it.
+
+    tcssim stands in for the cFS end of every configuration that answers to
+    cFS, whenever it runs, and so is not run beside a real cFS: the far end
+    is one socket, and two programs cannot both be it. Whether it is stood
+    in for is not written in the simulator file, because nothing would read
+    it but tcssim, and a run against a real cFS is a run without tcssim. A
+    ``gateway_cfs`` node, like the other gateway nodes, has no stand-in of
+    its own in tcssim: it is the far end that is stood in for, not the node,
+    and the mode does not count it (``tcslibgs::simulate::counted``).
+
+    Only a stand-in takes a ground station as a peer. SBN on a real cFS
+    passes nothing from one peer on to another: each peer's pipe is made
+    with ``CFE_SB_PIPEOPTS_IGNOREMINE`` (``sbn_app.c``, v7.0.1), so what SBN
+    itself published from one peer is never sent out to another, and a
+    station joining a real cFS's SBN would be heard by nothing. The ground
+    commands a vehicle behind a real cFS through that cFS's own ground
+    system, as it commands the cFS.
+
+    The run against cFS's own Linux build is built too. ``make cfs-test``
+    builds cFS -- the cFS checkout's cFE, OSAL and PSP, with CI_LAB, TO_LAB
+    and SBN v7.0.1 with its UDP module, SBN taken from a git checkout so
+    that ``SBN_IDENT`` is git's -- for the machine it runs on, in a scratch
+    directory (``cfs/Makefile``), with the extended header and the version 2
+    mapping. It flies ``examples/cfs`` peered with that cFS's SBN, and
+    ``tcspecial/tests/cfs_flight.rs`` commands the vehicle through CI_LAB
+    and reads it through TO_LAB, so that the beacon, a CONNECT and its
+    answer, a reading, a command to a ``gateway_cfs`` node and a node
+    command each cross SBN itself. Run on 31 October 2026, SBN reported
+    tcspecial's peer connected with a matching protocol version, and every
+    one of those arrived; flown with another ``sbn.ident``, SBN refused the
+    peer ("version number mismatch") and disconnected it, as tcspecial
+    refused SBN.
+
+Requirement
+    A cFS that tcspecial is a peer of accepts every message ID in
+    ``msgid_range``. cFE's software bus refuses a message ID above
+    ``CFE_PLATFORM_SB_HIGHEST_VALID_MSGID`` (``cfe_sb_msg_id_util.c``), whose
+    default, ``0x1FFF``, is below a subsystem such as the examples'
+    ``0x42``: with it, SBN cannot subscribe on tcspecial's behalf and
+    nothing tcspecial publishes is delivered, and the only sign is an event
+    on the cFS side. So the manual says so where ``msgid_range`` is
+    described, and the cFS that ``make cfs-test`` builds raises it to
+    ``0xFFFF``. A cFS built with ``MISSION_MSGID_V2`` must also map cFE's
+    own topics onto that mapping: cFE's default bases are version 1's, under
+    which every cFE command reads as telemetry, and ``cfs/defs`` shows one
+    mapping that keeps them clear of tcspecial's IDs. Neither is anything
+    tcspecial can see or check.
 
 Requirement
     A message ID is read and written by cFE's version 2 mapping, which a cFS

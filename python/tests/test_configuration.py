@@ -125,6 +125,49 @@ class ConfigurationTest(unittest.TestCase):
             self.assertEqual(xml.tcspecial, yaml.tcspecial, example)
             self.assertEqual(xml.nodes, yaml.nodes, example)
 
+    def test_a_configuration_on_a_cfs_bus_says_its_message_ids(self):
+        # tcspecial/tests/cfs.rs's numbers, read from either spelling.
+        stem = ROOT / "examples" / "cfs" / "cfs"
+        xml = configuration.load(stem.with_suffix(".xtcs"))
+        yaml = configuration.load(stem.with_suffix(".ytcs"))
+        self.assertEqual(xml.tcspecial, yaml.tcspecial)
+        self.assertEqual(xml.nodes, yaml.nodes)
+        for config in (xml, yaml):
+            bus = config.bus()
+            self.assertEqual(bus.sbn.peer, HostPort("127.0.0.1", 2234))
+            self.assertEqual((bus.sbn.processor_id, bus.sbn.peer_processor_id,
+                              bus.sbn.spacecraft_id), (2, 1, 0x42))
+            self.assertEqual(bus.sbn.ground_processor_id(), 3)
+            self.assertEqual(bus.sbn.release.protocol_version, 11)
+            self.assertEqual((bus.cmd_msgid, bus.response_msgid,
+                              bus.beacon_msgid), (0x4280, 0x4200, 0x4201))
+            self.assertEqual(config.downlink_msgid("fsw", "thermometer"),
+                             0x4242)
+            for k, name in enumerate(["fsw", "heater", "thermometer"]):
+                self.assertEqual(config.node_command_msgid(name), 0x4290 + k)
+                self.assertEqual(config.node_answer_msgid(name), 0x4210 + k)
+            self.assertEqual(config.telemetry_msgids(),
+                             [0x4200, 0x4201, 0x4210, 0x4211, 0x4212,
+                              0x4242])
+            # What is a socket elsewhere is a message ID here, and is said
+            # so rather than looked for.
+            with self.assertRaisesRegex(ValueError, "software bus"):
+                config.beacon_link()
+            with self.assertRaisesRegex(ValueError, "software bus"):
+                config.command_link()
+            with self.assertRaisesRegex(ValueError, "downlink_msgid"):
+                config.downlink("fsw", "thermometer")
+        self.assertIsNone(configuration.load(PING).bus())
+
+    def test_a_whole_number_is_read_as_the_rust_reads_one(self):
+        for said in ["1000", "1_000", "0x3e8", "0X3E8", "0x3_e8", " 1000 "]:
+            self.assertEqual(configuration.whole("x", said), 1000, said)
+        for wrong in ["", "_", "0x", "ten", "1.5", "-1", "0b101", "48g"]:
+            with self.assertRaisesRegex(ValueError, "whole number"):
+                configuration.whole("x", wrong)
+        with self.assertRaisesRegex(ValueError, "most"):
+            configuration.whole("x", "0x10000", 0xFFFF)
+
     def test_a_file_that_is_neither_spelling_is_refused(self):
         with self.assertRaisesRegex(ValueError, r"\.ytcs.*\.xtcs"):
             configuration.load(ROOT / "examples" / "ping" / "ping.svg")

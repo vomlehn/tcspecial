@@ -50,7 +50,7 @@ use tcslib::matched::Matched;
 use tcslib::ping::{route_of, Pinger, Uplink, NO_MESSAGE};
 use tcslib::{command_links_of, CommandStatus, TcsClient};
 use tcslibgs::config_digest::{digest_of_graph, ConfigDigest};
-use tcslibgs::graph::parameters::{beacon_interval_of, beacon_of};
+use tcslibgs::graph::parameters::beacon_interval_of;
 use tcslibgs::graph::{telemetry, Graph};
 use tcslibgs::{ArmKey, DHSample, NodeId, DH_SAMPLE_BYTES};
 
@@ -623,7 +623,9 @@ pub struct tcs_beacons {
     matched: Matched,
 }
 
-/// Listens where the configuration says beacons arrive.
+/// Listens where the configuration says beacons arrive: at a socket, or,
+/// for a configuration that answers to cFS, from this process's peer of
+/// its software bus.
 ///
 /// # Arguments
 ///
@@ -646,23 +648,21 @@ pub unsafe extern "C" fn tcs_beacons_listen(
         let configuration = handle_of(configuration, "the configuration")?;
         let graph = &configuration.graph;
         let place = configuration.path.display();
-        let link = beacon_of(graph)
-            .map_err(|e| fail(format_args!("{place}: {e}")))?
-            .ok_or_else(|| {
-                fail(format_args!(
-                    "{place} has no tcspecial section, so sends no beacons"
-                ))
-            })?;
         let interval = beacon_interval_of(graph)
             .map_err(|e| fail(format_args!("{place}: {e}")))?
             .unwrap_or(STANDARD_INTERVAL);
-        let beacons = Beacons::listening(
-            link,
+        // At the socket the beacon link states, or from this process's
+        // peer of a software bus.
+        let beacons = tcslib::beacon::open(
+            graph,
             Schedule::for_interval(interval),
             Some(configuration.digest),
         )
-        .map_err(|e| {
-            fail(format_args!("{place}: beacons cannot be received: {e}"))
+        .map_err(|e| fail(format_args!("{place}: {e}")))?
+        .ok_or_else(|| {
+            fail(format_args!(
+                "{place} has no tcspecial section, so sends no beacons"
+            ))
         })?;
         let mut said = Text::EMPTY;
         said.set(tcslib::beacon::NO_BEACON_MESSAGE);

@@ -316,8 +316,10 @@ software bus as an SBN peer, a <code>gateway_cfs</code> node publishes
 each reading as its <code>tlm_base</code> plus the reading’s device id,
 and a command published as its <code>cmd_msgid</code> goes on to a
 heater. Every link is carried over the one peer, as message IDs.
-<code>tcspecial/tests/cfs.rs</code> flies it against a test playing the
-cFS side.</td>
+<code>make run-cfs</code> runs tcsmoc on it, tcssim standing in for the
+cFS side; <code>tcspecial/tests/cfs.rs</code> flies it against a test
+playing the cFS side, and <code>tcspecial/tests/cfs_ground.rs</code>
+commands it from tcslib.</td>
 </tr>
 </tbody>
 </table>

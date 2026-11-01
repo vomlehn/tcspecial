@@ -1009,6 +1009,32 @@ fn main() {
             }
         };
 
+    // The cFS end of a configuration that answers to cFS: tcssim is the
+    // software bus the vehicle joins as an SBN peer, and the ground joins
+    // too, as the radio's far end is the ground itself. Made before the
+    // readiness socket says ready, so that a vehicle started then finds it;
+    // kept until tcssim ends. See `tcslib::bus`.
+    let _cfs_end = match Graph::load(&payload_path)
+        .map_err(|e| format!("{payload_path}: {e}"))
+        .and_then(|graph| tcslib::bus::StandIn::open(&graph))
+    {
+        Ok(stand_in) => {
+            if let Some(stand_in) = &stand_in {
+                eprintln!(
+                    "standing in for the cFS end at {}",
+                    stand_in.local_addr()
+                );
+            }
+            stand_in
+        }
+        Err(e) => {
+            let mut refused = Startup::default();
+            refused.error(e);
+            present(&refused);
+            process::exit(1);
+        }
+    };
+
     eprintln!(
         "Simulating {} payloads from {} and {}",
         configs.len(),

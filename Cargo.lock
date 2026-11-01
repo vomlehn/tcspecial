@@ -4610,6 +4610,7 @@ dependencies = [
  "socket2",
  "tcsapp",
  "tcsdiagram",
+ "tcslib",
  "tcslibgs",
  "tcslog",
  "tcsverify",

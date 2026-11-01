@@ -43,6 +43,8 @@ help:
 		"and null nodes"
 	@echo "  make run-fprime      - Run tcsmoc on the fprime example," \
 		"playing the F´ bridge"
+	@echo "  make run-cfs         - Run tcsmoc on the cfs example," \
+		"tcssim standing in for the cFS end"
 	@echo "  make check-python3   - Check for the Python 3 simple-app's" \
 		"payload needs"
 	@echo "  make check-tkinter   - Check for the tkinter the ping" \
@@ -107,6 +109,13 @@ run-tees:
 .PHONY: run-fprime
 run-fprime:
 	$(call runexample_on,fprime)
+
+# Run tcsmoc on the cfs example: a vehicle that answers to a cFS flight
+# computer, tcssim standing in for the cFS end of the software bus and tcsmoc
+# joining that bus as the ground.
+.PHONY: run-cfs
+run-cfs:
+	$(call runexample_on,cfs)
 
 # Run tcspecial on the simple-app example: a payload that is a program,
 # sending a line of text a word at a time.

@@ -3,15 +3,18 @@
 # Make the kernel stand-ins the CAN, GPIO and IIO tests fly tcspecial against,
 # and give them to the user who ran this:
 #
-#   sudo bin/mk-kernel-stand-ins            # all three
-#   sudo bin/mk-kernel-stand-ins can gpio   # only those named
+#   sudo bin/mk-kernel-stand-ins                # can gpio
+#   sudo bin/mk-kernel-stand-ins can gpio iio   # only those named
 #
-# The three types are supported because tcspecial's own node code is run
-# against the kernel's stand-in for each -- vcan for a CAN bus, gpio-sim for
-# a GPIO chip, iio_dummy for an IIO sensor -- by tcspecial/tests/
-# kernel-stand-ins.rs. Making any of them needs root, so the tests do not:
-# each finds its device and, where it is not there, skips and names this
-# script. This is run once, with sudo, and the tests then run as the user.
+# CAN and GPIO are supported because tcspecial's own node code is run against
+# the kernel's stand-in for each -- vcan for a CAN bus, gpio-sim for a GPIO
+# chip -- by tcspecial/tests/kernel-stand-ins.rs. IIO has a test there too,
+# against an iio_dummy sensor, and stays experimental until it has passed:
+# a stock distribution kernel builds iio_dummy without the buffer it reads,
+# so it is made only when asked for, and refused where the kernel lacks it.
+# Making any of them needs root, so the tests do not: each finds its device
+# and, where it is not there, skips and names this script. This is run
+# once, with sudo, and the tests then run as the user.
 #
 # One script per type does the making -- bin/mkvcan, bin/mkgpio and
 # bin/mkiio, which `make mkstubs` also runs -- and this calls them rather
@@ -46,7 +49,7 @@ fi
 
 wanted=("$@")
 if [ "${#wanted[@]}" -eq 0 ]; then
-	wanted=(can gpio iio)
+	wanted=(can gpio)
 fi
 for kind in "${wanted[@]}"; do
 	case "$kind" in

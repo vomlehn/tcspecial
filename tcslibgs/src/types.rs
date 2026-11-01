@@ -233,7 +233,7 @@ pub enum DHType {
     Can,
     /// A handler whose payload is a sensor's buffered samples.
     ///
-    /// See [`crate::node::payload::iio`].
+    /// Experimental; see [`crate::node::payload::iio`].
     Iio,
     /// A handler whose payload is software on another core, reached over an
     /// rpmsg channel.
@@ -1147,7 +1147,7 @@ pub struct RpmsgConfig {
 
 /// Configuration for an endpoint that is a sensor's sample buffer
 ///
-/// See [`crate::node::payload::iio`].
+/// Experimental; see [`crate::node::payload::iio`].
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct IioConfig {
     /// The character device the buffer is read from: `/dev/iio:device0`.
@@ -1224,7 +1224,7 @@ pub enum EndpointConfig {
     Spi(SpiConfig),
     /// See [`CanConfig`].
     Can(CanConfig),
-    /// See [`IioConfig`].
+    /// Experimental; see [`IioConfig`].
     Iio(IioConfig),
     /// Experimental; see [`RpmsgConfig`].
     Rpmsg(RpmsgConfig),

@@ -1,5 +1,8 @@
 //! tcspecial flown against the kernel's own stand-ins for a CAN bus, a GPIO
-//! chip and an IIO sensor: what makes those three types supported.
+//! chip and an IIO sensor: what makes CAN and GPIO supported, and what will
+//! promote IIO, which stays experimental until its test has passed against a
+//! kernel whose `iio_dummy` has a buffer -- which a stock distribution
+//! kernel's has not.
 //!
 //! Each test flies an example -- `examples/can`, `examples/gpio` or
 //! `examples/iio` -- with its sockets moved to ports nothing holds and its

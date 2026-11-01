@@ -258,26 +258,30 @@ Languages:
 Each is one of the payload types whose far end is a device the kernel makes
 rather than a file or a socket tcssim can make, and each is flown against the
 kernel's own stand-in for that device by `tcspecial/tests/kernel-stand-ins.rs`,
-which plays the device's far end through the kernel: that is what makes the
-three types supported. The devices need root to make, so nothing here makes
-them. Run this once, from the account that runs the examples and the tests:
+which plays the device's far end through the kernel: that is what makes CAN
+and GPIO supported. IIO stays experimental until its test has passed, which it
+cannot on a kernel whose `iio_dummy` has no buffer, such as Ubuntu's: see
+"What Is Supported and What Is Experimental" in `docs/design.rst`. The
+devices need root to make, so nothing here makes them. Run this once, from
+the account that runs the examples and the tests:
 
 ```
 sudo bin/mk-kernel-stand-ins
 ```
 
-It refuses, and makes nothing, where this kernel lacks a module one of the
-three needs, saying which; `sudo bin/mk-kernel-stand-ins can gpio` makes only
-those named. It gives what it makes to the user who ran it, and prints the
-number the kernel gave the GPIO chip and the IIO sensor. `sudo
-bin/rm-kernel-stand-ins` takes them all away again. Nothing either does
-survives a reboot.
+With no arguments it makes the CAN bus and the GPIO chip; `sudo
+bin/mk-kernel-stand-ins iio` makes the IIO sensor, and `can gpio iio` all
+three. It refuses, and makes nothing, where this kernel lacks a module one
+of the types named needs, saying which. It gives what it makes to the user
+who ran it, and prints the number the kernel gave the GPIO chip and the IIO
+sensor. `sudo bin/rm-kernel-stand-ins` takes away whichever were made.
+Nothing either does survives a reboot.
 
 | Directory | Description |
 |---|---|
 | `can` | A motor controller on the CAN bus `vcan0`, as two payloads: its status frames, identifier 0x123, go to the ground, and each command the ground sends goes to it as one frame with identifier 0x124. |
 | `gpio` | Two lines of a GPIO chip: each edge of a switch on line 0 goes to the ground as a sixteen-byte record, and a 1 or 0 from the ground drives a lamp on line 1. |
-| `iio` | A sensor's sample buffer, read through the kernel's IIO subsystem, its whole sample sets going to the ground. Nothing goes up: a buffer is read and never written. |
+| `iio` | Experimental. A sensor's sample buffer, read through the kernel's IIO subsystem, its whole sample sets going to the ground. Nothing goes up: a buffer is read and never written. |
 
 ### can
 
@@ -310,8 +314,9 @@ make run-gpio
 The sensor is one of the kernel's `iio_dummy`, whose buffer a software
 trigger fills a hundred times a second: the kernel stands in for it entirely,
 and tcssim makes nothing. Its buffer is there only where the kernel's
-`iio_dummy` was built with `CONFIG_IIO_SIMPLE_DUMMY_BUFFER`, which not every
-distribution's is; `bin/mk-kernel-stand-ins` says so where it was not. The
+`iio_dummy` was built with `CONFIG_IIO_SIMPLE_DUMMY_BUFFER`, which a stock
+distribution kernel's is not; `bin/mk-kernel-stand-ins iio` says so where it
+was not, and that is why the type is still experimental. The
 configuration names `/dev/iio:device1`, which is what the dummy is on a host
 with one sensor of its own; write the number `bin/mk-kernel-stand-ins`
 printed.

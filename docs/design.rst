@@ -77,9 +77,9 @@ endpoint
 
 endpoint type
     What an endpoint is made of, and so what locates it and what else must be
-    said about it. Eight are supported -- ``network``, ``device-file``,
-    ``serial``, ``i2c``, ``spi``, ``can``, ``iio`` and ``gpio`` -- and two
-    more are experimental: ``rpmsg`` and ``hdlc``. A type is not a protocol --
+    said about it. Seven are supported -- ``network``, ``device-file``,
+    ``serial``, ``i2c``, ``spi``, ``can`` and ``gpio`` -- and three more are
+    experimental: ``iio``, ``rpmsg`` and ``hdlc``. A type is not a protocol --
     a network endpoint
     carries the protocol it runs over, and no other type is addressed that
     way.
@@ -8981,11 +8981,11 @@ Requirement
 
 What Is Supported and What Is Experimental
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-Eight types of payload are supported: ``network``, ``device-file``,
-``serial``, ``i2c``, ``spi``, ``can``, ``gpio`` and ``iio``. The last three
-were experimental, and became supported when each was flown against the
-kernel's own stand-in for its device: a CAN bus of ``vcan``, a chip of
-``gpio-sim``, and a sensor of ``iio_dummy``.
+Seven types of payload are supported: ``network``, ``device-file``,
+``serial``, ``i2c``, ``spi``, ``can`` and ``gpio``. The last two were
+experimental, and became supported when each was flown against the kernel's
+own stand-in for its device: a CAN bus of ``vcan`` and a chip of
+``gpio-sim``.
 
 Requirement
     A type of payload is supported only once tcspecial's own node code for it
@@ -8993,17 +8993,19 @@ Requirement
     against the kernel's stand-in for that device, with the device's far end
     played through the kernel and not by tcssim. The test shows the device's
     data reaching the ground and, where the type has an output, the ground's
-    commands reaching the device. For ``can``, ``gpio`` and ``iio`` that test
-    is ``tcspecial/tests/kernel-stand-ins.rs``, and it flies
-    ``examples/can``, ``examples/gpio`` and ``examples/iio``. Why: a type
+    commands reaching the device. For ``can`` and ``gpio`` that test is
+    ``tcspecial/tests/kernel-stand-ins.rs``, and it flies ``examples/can``
+    and ``examples/gpio``. Why: a type
     whose rules are tested and whose code has never met a device is a type
     whose first meeting with one is in flight, which the ranking of
     reliability first forbids.
 
 Requirement
     Making a kernel's stand-in needs root, so a test never makes one. One
-    script, ``bin/mk-kernel-stand-ins``, run once with sudo, makes all three
-    and gives them to the user who ran it, and ``bin/rm-kernel-stand-ins``
+    script, ``bin/mk-kernel-stand-ins``, run once with sudo, makes them --
+    the CAN bus and the GPIO chip unless told otherwise, and the IIO sensor
+    where it is named (see `IIO stays experimental`_) -- and gives them to
+    the user who ran it, and ``bin/rm-kernel-stand-ins``
     removes them. The script checks, before it changes anything, that the
     kernel has every module the types asked for need -- ``vcan`` and
     ``can-raw``; ``gpio-sim``; ``industrialio-configfs``,
@@ -9022,9 +9024,25 @@ Requirement
     presents.
 
 Some of what follows is still **experimental and not yet supported**: RS-485
-on a serial line, and the ``rpmsg`` and ``hdlc`` types of payload. Each is
-written, parses, reaches a handler and has tests of its rules; none has been
-run against the hardware it describes, and no shipped configuration uses one.
+on a serial line, and the ``iio``, ``rpmsg`` and ``hdlc`` types of payload.
+Each is written, parses, reaches a handler and has tests of its rules; none
+has been run against the hardware it describes or against a stand-in the
+kernel makes, and the one shipped configuration that uses one,
+``examples/iio``, is there for the test below to fly.
+
+.. _IIO stays experimental:
+
+Requirement
+    ``iio`` stays experimental although the kernel has a stand-in for it,
+    ``iio_dummy``, because a stock distribution kernel -- Ubuntu's among
+    them -- builds that module without ``CONFIG_IIO_SIMPLE_DUMMY_BUFFER``,
+    and without the buffer the dummy has no ``/dev/iio:deviceN`` for
+    tcspecial to read: the IIO test of ``tcspecial/tests/kernel-stand-ins.rs``
+    has not run. It is written, flies ``examples/iio``, and skips saying
+    why. The type is promoted once that test has passed against a kernel
+    that has the option, by the requirement above; until then it is no
+    better attested than the other experimental types, and is not called
+    supported.
 
 Requirement
     A type stays experimental while nothing in the kernel stands in for its
@@ -9040,7 +9058,7 @@ Requirement
 The requirements for the experimental ones are written the way every other
 requirement here is, because that is what they are for: a statement of what
 the configuration will be, settled before there is equipment to try it
-against. They may change, where the eight supported types will not.
+against. They may change, where the seven supported types will not.
 
 GPIO Payloads: Discrete Lines
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -9290,9 +9308,8 @@ Requirement
 
 IIO Payloads: a Sensor's Buffer
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-**Supported**, as flown against a sensor of the kernel's ``iio_dummy`` by
-``tcspecial/tests/kernel-stand-ins.rs``: see `What Is Supported and What Is
-Experimental`_.
+**Experimental, not yet supported**, until its test has run against a kernel
+whose ``iio_dummy`` has a buffer: see `IIO stays experimental`_.
 
 The kernel's Industrial I/O subsystem is what a sensor looks like on Linux. A
 program that wants a stream of samples enables the channels it cares about and
@@ -12717,10 +12734,10 @@ Where a note calls something **experimental**, it means what ``design.rst``
 and ``manual.rst`` mean by it: written, parsing, reaching a handler and tested,
 but never run against the hardware it describes and in no configuration
 this tree ships.
-Three things are in that state, all of them types of payload interface:
-RS-485 on a serial line, and the ``rpmsg`` and ``hdlc`` types. The ``can``,
-``iio`` and ``gpio`` types were once, and are supported now that each has been
-flown against the kernel's stand-in for its device.
+Four things are in that state, all of them types of payload interface:
+RS-485 on a serial line, and the ``iio``, ``rpmsg`` and ``hdlc`` types. The
+``can`` and ``gpio`` types were once, and are supported now that each has
+been flown against the kernel's stand-in for its device.
 
 The name of the project is TCSpecial
 ------------------------------------
@@ -12775,8 +12792,8 @@ DH_UDP must implement DH and use UDP to send telemetry to tcslib
    Implemented differently. There is no ``DH_UDP``. A node's endpoint is per
    type -- ``UdpEndpoint``, ``TcpEndpoint``, ``SerialEndpoint``,
    ``I2cEndpoint``, ``SpiEndpoint``, ``DeviceEndpoint``, ``CanEndpoint``,
-   ``IioEndpoint``, ``GpioEndpoint``, the Unix socket pair, and the
-   experimental ``RpmsgEndpoint``. Telemetry no longer leaves from the
+   ``GpioEndpoint``, the Unix socket pair, and the experimental
+   ``IioEndpoint`` and ``RpmsgEndpoint``. Telemetry no longer leaves from the
    payload's own node: every payload had an OC endpoint of its own, and a
    node's data now reaches the ground along the links the configuration
    draws, through the gateway node, which is the one UDP socket to the

@@ -37,12 +37,9 @@ use crate::payload::{
     could_not_stand_in, wait_out_packet, Pacing, PayloadConfig, PayloadStats,
 };
 
-/// Where the kernel puts a simulated chip's lines.
-///
-/// A `gpio-sim` chip appears as a platform device, and under it one directory
-/// per bank with one per line: `pull` is what the line is being pulled to,
-/// which is what a simulator writes.
-const SIM_DEVICES: &str = "/sys/devices/platform";
+/// Where the kernel puts a simulated chip's lines: see
+/// [`tcslibgs::node::payload::gpio::simulated_chips`].
+const SIM_DEVICES: &str = tcslibgs::node::payload::gpio::SIM_DEVICES;
 
 /// How many bytes one line event takes as device data, which is what this
 /// counts as having sent.
@@ -70,9 +67,10 @@ const WATCH_EVERY: std::time::Duration = std::time::Duration::from_millis(20);
 
 /// Finds the simulated lines of a chip, where the kernel has any.
 ///
-/// What matches the chip is a simulated bank whose `chip_name` file holds
-/// its node's name. The number is not an identity: a simulated chip's node
-/// is numbered as chips appear, exactly as an `i2c-stub` adapter's bus is.
+/// Where they are is tcslibgs's to say, once, for everything that looks:
+/// see [`tcslibgs::node::payload::gpio::simulated_chips`]. The chip is
+/// matched by its node's name, not its number, which is given out as chips
+/// appear, exactly as an `i2c-stub` adapter's bus is.
 ///
 /// # Arguments
 ///
@@ -85,55 +83,22 @@ const WATCH_EVERY: std::time::Duration = std::time::Duration::from_millis(20);
 ///
 /// # Returns
 ///
-/// The wanted lines of the matching bank, or `None` if no bank matches or
-/// `devices` cannot be read.
+/// The wanted lines of the matching chip, or `None` if no simulated chip is
+/// that one or `devices` cannot be read.
 pub(crate) fn lines_of(
     devices: &Path,
     chip: &str,
     lines: &[u32],
 ) -> Option<Vec<SimulatedLine>> {
-    let node = Path::new(chip).file_name()?.to_string_lossy().into_owned();
-
-    for device in std::fs::read_dir(devices).ok()? {
-        let Ok(device) = device else { continue };
-        if !device
-            .file_name()
-            .to_string_lossy()
-            .starts_with("gpio-sim.")
-        {
-            continue;
-        }
-
-        // One directory per bank, each with the node it became.
-        let Ok(banks) = std::fs::read_dir(device.path()) else {
-            continue;
-        };
-        for bank in banks {
-            let Ok(bank) = bank else { continue };
-            let named = bank.path().join("chip_name");
-            let Ok(name) = std::fs::read_to_string(&named) else {
-                continue;
-            };
-            if name.trim() != node {
-                continue;
-            }
-
-            // The bank is this chip, so its line directories are the lines.
-            return Some(
-                lines
-                    .iter()
-                    .map(|line| SimulatedLine {
-                        pull: bank
-                            .path()
-                            .join(format!("sim_gpio{line}"))
-                            .join("pull"),
-                    })
-                    .collect(),
-            );
-        }
-    }
-
-    None
+    let dir = tcslibgs::node::payload::gpio::simulated_chip(devices, chip)?;
+    Some(
+        lines
+            .iter()
+            .map(|line| SimulatedLine {
+                pull: dir.join(format!("sim_gpio{line}")).join("pull"),
+            })
+            .collect(),
+    )
 }
 
 /// What to say when there is no simulated chip to be.
@@ -303,11 +268,13 @@ mod tests {
         std::fs::create_dir(tree.path().join("serial8250"))
             .expect("another device");
 
-        // And one that is, whose bank became gpiochip3.
-        let bank = tree.path().join("gpio-sim.0").join("gpiochip1");
-        std::fs::create_dir_all(&bank).expect("the bank");
-        std::fs::write(bank.join("chip_name"), "gpiochip3\n")
-            .expect("what it became");
+        // And one that is, gpiochip3, whose lines the kernel puts in a
+        // directory of the chip's name under its gpio-sim device.
+        let bank = tree.path().join("gpio-sim.1").join("gpiochip3");
+        std::fs::create_dir_all(&bank).expect("the chip");
+        // And another simulated chip, which is not the one wanted.
+        std::fs::create_dir_all(tree.path().join("gpio-sim.0/gpiochip1"))
+            .expect("another chip");
 
         let found = lines_of(tree.path(), "/dev/gpiochip3", &[0, 5])
             .expect("the chip standing in for gpiochip3");
@@ -428,8 +395,6 @@ mod tests {
         let tree = tempfile::tempdir().expect("a tree of our own");
         let bank = tree.path().join("gpio-sim.0").join("gpiochip0");
         std::fs::create_dir_all(bank.join("sim_gpio2")).expect("the line");
-        std::fs::write(bank.join("chip_name"), "gpiochip0")
-            .expect("what it became");
 
         let lines =
             lines_of(tree.path(), "/dev/gpiochip0", &[2]).expect("the line");

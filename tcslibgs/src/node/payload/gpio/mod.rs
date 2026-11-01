@@ -403,6 +403,83 @@ pub fn judged(
     }
 }
 
+/// Where the kernel puts the chips of its `gpio-sim`, under `/sys`.
+pub const SIM_DEVICES: &str = "/sys/devices/platform";
+
+/// Lists the chips of the kernel's `gpio-sim`, with the directory each one's
+/// lines are in.
+///
+/// The one statement of where those are, which tcssim, the tests and the
+/// scripts in `bin/` all follow. A `gpio-sim` device is a platform device,
+/// `gpio-sim.<n>`; under it is one directory per bank, named after the chip
+/// that bank became -- `gpiochip1` for `/dev/gpiochip1` -- and in that one
+/// directory per line, `sim_gpio<offset>`, holding `pull`, which sets what
+/// the line is pulled to, and `value`, which says what it is. The bank's own
+/// name, `bank0`, and its `chip_name` are in configfs, not here. The chip's
+/// number is given out as chips appear and says nothing.
+///
+/// # Arguments
+///
+/// * `devices` - Where the platform devices are: [`SIM_DEVICES`], or a tree
+///               a test made to look like it.
+///
+/// # Returns
+///
+/// Each chip's node name, such as `gpiochip1`, and its lines' directory,
+/// sorted by name; none where `devices` cannot be read.
+pub fn simulated_chips(
+    devices: &std::path::Path,
+) -> Vec<(String, std::path::PathBuf)> {
+    let mut chips = Vec::new();
+    let Ok(entries) = std::fs::read_dir(devices) else {
+        return chips;
+    };
+    for device in entries.flatten() {
+        if !device
+            .file_name()
+            .to_string_lossy()
+            .starts_with("gpio-sim.")
+        {
+            continue;
+        }
+        let Ok(banks) = std::fs::read_dir(device.path()) else {
+            continue;
+        };
+        for bank in banks.flatten() {
+            let name = bank.file_name().to_string_lossy().into_owned();
+            if name.starts_with("gpiochip") && bank.path().is_dir() {
+                chips.push((name, bank.path()));
+            }
+        }
+    }
+    chips.sort();
+    chips
+}
+
+/// Finds the directory a `gpio-sim` chip's lines are in, by the chip's
+/// device path: see [`simulated_chips`] for where that is.
+///
+/// # Arguments
+///
+/// * `devices` - Where the platform devices are, as for
+///               [`simulated_chips`].
+/// * `chip`    - The chip's device path, such as `/dev/gpiochip1`.
+///
+/// # Returns
+///
+/// The directory, holding a `sim_gpio<offset>` per line; `None` where no
+/// simulated chip is that one.
+pub fn simulated_chip(
+    devices: &std::path::Path,
+    chip: &str,
+) -> Option<std::path::PathBuf> {
+    let node = std::path::Path::new(chip).file_name()?.to_string_lossy();
+    simulated_chips(devices)
+        .into_iter()
+        .find(|(name, _)| *name == node)
+        .map(|(_, lines)| lines)
+}
+
 /// Judges a chip by where its kernel directory is.
 ///
 /// # Arguments
@@ -464,6 +541,27 @@ mod stand_in_tests {
             judged.found,
             "/dev/gpiochip0 is a real chip, on INTC1056:00"
         );
+    }
+
+    /// A simulated chip's lines are found where the kernel puts them: in a
+    /// directory named after the chip, under its `gpio-sim` device, with
+    /// no bank directory between -- the layout a live chip has.
+    #[test]
+    fn a_simulated_chips_lines_are_under_the_chips_own_name() {
+        let tree = tempfile::tempdir().unwrap();
+        let chip = tree.path().join("gpio-sim.0").join("gpiochip1");
+        std::fs::create_dir_all(chip.join("sim_gpio0")).unwrap();
+        // Another platform device, and a file beside the chip, passed over.
+        std::fs::create_dir_all(tree.path().join("serial8250")).unwrap();
+        std::fs::write(tree.path().join("gpio-sim.0").join("uevent"), "")
+            .unwrap();
+
+        assert_eq!(
+            simulated_chips(tree.path()),
+            vec![("gpiochip1".to_string(), chip.clone())]
+        );
+        assert_eq!(simulated_chip(tree.path(), "/dev/gpiochip1"), Some(chip));
+        assert_eq!(simulated_chip(tree.path(), "/dev/gpiochip0"), None);
     }
 }
 

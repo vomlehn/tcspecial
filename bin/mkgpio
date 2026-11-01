@@ -73,12 +73,17 @@ echo 1 > "$gpio_sim/$sim_device/live"
 #
 # Both are assigned as devices appear and neither is an identity, which is why
 # this reads them rather than assuming gpio-sim.0 and gpiochip0: the number a
-# payload set names has to be the number of the run it is in. dev_name is what
-# configfs says the device is called once it is live, and chip_name is the node
-# the bank became -- the same file lines_of() matches against.
+# payload set names has to be the number of the run it is in. Both are in
+# configfs once the device is live: dev_name is the platform device, and the
+# bank's chip_name is the node the bank became.
+#
+# The lines are in sysfs, under the platform device in a directory named
+# after the chip -- /sys/devices/platform/gpio-sim.0/gpiochip1/sim_gpio0 --
+# with no bank directory between, as simulated_chips() in
+# tcslibgs/src/node/payload/gpio says for everything that looks.
 dev_name="$(cat "$gpio_sim/$sim_device/dev_name")"
-bank="/sys/devices/platform/$dev_name/$sim_bank"
-chip="$(cat "$bank/chip_name")"
+chip="$(cat "$gpio_sim/$sim_device/$sim_bank/chip_name")"
+bank="/sys/devices/platform/$dev_name/$chip"
 
 # The file a simulated payload writes. If this is missing the chip is live but
 # not usable, and saying so here beats a payload failing on it later.

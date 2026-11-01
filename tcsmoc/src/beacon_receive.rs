@@ -23,9 +23,8 @@ use std::thread;
 
 use slint::{SharedString, Weak};
 
-use tcslib::beacon::{Arrived, Beacons, Contact, Link, Schedule};
+use tcslib::beacon::{Arrived, Beacons, Contact};
 use tcslib::matched::Matched;
-use tcslibgs::ConfigDigest;
 use tcsui::Shown;
 
 use crate::MainWindow;
@@ -92,30 +91,26 @@ pub fn contact_made(was: Contact, now: Contact) -> bool {
 /// It holds nothing. The thread owns the socket and what it has heard, and the
 /// contact flag belongs to the caller, which hands it in so that the rest of
 /// the window can read it. What this is for is saying whether the watch
-/// started at all: `None` from [`BeaconReceive::new`] is a socket that could
-/// not be bound, which is a ground station that will never hear a beacon.
+/// started at all: a window holding none has nowhere beacons arrive, which
+/// is a ground station that will never hear one.
 pub struct BeaconReceive;
 
 impl BeaconReceive {
-    /// Starts watching, on a thread of its own, and returns nothing where
-    /// the socket cannot be bound.
+    /// Starts watching, on a thread of its own.
     ///
-    /// A ground station that cannot bind where beacons arrive is a ground
-    /// station that will never hear one, which is said here rather than left
-    /// to look like a spacecraft that is not beaconing.
+    /// The watch is opened by the caller, with `tcslib::beacon::open`, so
+    /// that a ground station that cannot bind where beacons arrive says so
+    /// with the rest of what it found at startup, rather than leaving it to
+    /// look like a spacecraft that is not beaconing.
     ///
     /// # Arguments
     ///
     /// * `ui_weak`  - The window each pass's reading and the hold are shown
     ///                in.
-    /// * `link`     - Where the beacons arrive.
-    /// * `schedule` - How often beacons are expected, and so when one is
-    ///                late.
+    /// * `beacons`  - The watch: where the beacons arrive, how often they
+    ///                are expected, and the digest each is compared with.
     /// * `decided`  - The contact flag each pass writes and the hold each
     ///                beacon is handed to.
-    /// * `expected` - The digest of the configuration this MOC read, which
-    ///                each beacon's is compared with; `None` compares
-    ///                nothing.
     /// * `ask`      - Asks the operator whether to continue when the beacons
     ///                announce a configuration that differs; `None` only
     ///                says so on the console.
@@ -123,29 +118,19 @@ impl BeaconReceive {
     ///
     /// # Returns
     ///
-    /// The watch, or `None` if the beacon socket could not be bound, which
-    /// is said on standard error.
+    /// The watch, running.
     pub fn new(
         ui_weak: Weak<MainWindow>,
-        link: Link,
-        schedule: Schedule,
+        mut beacons: Beacons,
         decided: Decided,
-        expected: Option<ConfigDigest>,
         ask: Option<Ask>,
         contacts: Contacts,
-    ) -> Option<BeaconReceive> {
+    ) -> BeaconReceive {
         let Decided {
             contact,
             heard,
             matched,
         } = decided;
-        let mut beacons = match Beacons::listening(link, schedule, expected) {
-            Ok(beacons) => beacons,
-            Err(e) => {
-                eprintln!("beacons cannot be received: {e}");
-                return None;
-            }
-        };
 
         let held = contact.clone();
         thread::spawn(move || loop {
@@ -228,7 +213,7 @@ impl BeaconReceive {
             });
         });
 
-        Some(BeaconReceive)
+        BeaconReceive
     }
 }
 

@@ -14,6 +14,7 @@
 //! through [`listening`], since the vehicle sends nothing down until one.
 
 pub mod beacon;
+pub mod bus;
 pub mod client;
 pub mod connection;
 pub mod gateway;

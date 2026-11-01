@@ -373,6 +373,30 @@ pub fn read_subscriptions<'a>(
         }))
 }
 
+/// The processor ID a ground station joins a stand-in for the cFS end as:
+/// one more than the larger of the vehicle's and the far end's.
+///
+/// Only a stand-in takes a ground station as a peer. SBN on a real cFS
+/// passes nothing from one peer on to another -- each peer's pipe is made
+/// with `CFE_SB_PIPEOPTS_IGNOREMINE`, so what SBN itself published is never
+/// sent out again -- so a ground station joining a real cFS's SBN would be
+/// heard by nothing. The ID is worked out rather than stated because the
+/// configuration flies, and a station's ID is no fact of the vehicle's; it
+/// is worked out here, once, because the station and the stand-in must both
+/// arrive at it.
+///
+/// # Arguments
+///
+/// * `processor_id`      - `sbn.processor_id`, the vehicle's.
+/// * `peer_processor_id` - `sbn.peer_processor_id`, the far end's.
+///
+/// # Returns
+///
+/// The ground station's processor ID, which is neither.
+pub fn ground_processor_id(processor_id: u32, peer_processor_id: u32) -> u32 {
+    processor_id.max(peer_processor_id).saturating_add(1)
+}
+
 /// What a peer is due to do, by the clock.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Due {
@@ -593,6 +617,14 @@ mod tests {
             read_subscriptions(&room[..size - 1], &ident),
             Err(SubscriptionRefusal::Malformed(_))
         ));
+    }
+
+    /// A ground station's processor ID is neither of the two the
+    /// configuration states.
+    #[test]
+    fn a_ground_station_is_a_third_processor() {
+        assert_eq!(ground_processor_id(2, 1), 3);
+        assert_eq!(ground_processor_id(1, 7), 8);
     }
 
     /// A release this build does not speak is refused naming the ones it

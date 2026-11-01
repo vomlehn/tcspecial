@@ -1,0 +1,8 @@
+CFE_APP, ci_lab,      CI_LAB_AppMain,     CI_LAB_APP,   60,   16384, 0x0, 0;
+CFE_APP, to_lab,      TO_LAB_AppMain,     TO_LAB_APP,   70,   16384, 0x0, 0;
+CFE_APP, sbn,         SBN_AppMain,        SBN,          80,  100000, 0x0, 0;
+!
+! The cfs test's cFS: the lab apps, through which the test commands it and
+! takes its telemetry over UDP, and SBN, which loads its UDP module itself
+! as its configuration table says (apps/sbn/fsw/tables/sbn_conf_tbl.c).
+! Fields as in cFE's sample startup script.

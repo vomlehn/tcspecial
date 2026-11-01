@@ -178,36 +178,49 @@ there.</p>
 <p>A ground station does three things with a spacecraft, and tcslib has
 one part for each:</p>
 <ul>
-<li><strong>Commanding it.</strong> <code>TcsClient</code> sends
+<li><p><strong>Commanding it.</strong> <code>TcsClient</code> sends
 commands to tcspecial’s command interpreter and returns its answers:
 ping it, start, stop, set and query a node, arm and restart the vehicle,
 change how often it beacons. A mission control system such as YAMCS or
 MCT drives a <code>TcsClient</code> instead of speaking the command and
-telemetry protocol itself.</li>
-<li><strong>Receiving its data.</strong>
+telemetry protocol itself.</p></li>
+<li><p><strong>Receiving its data.</strong>
 <code>gateway::GatewayReceiver</code> is the ground’s end of a gateway
 node in a configuration. Name the node, open it, and each call to
 <code>receive</code> returns one datum along with the name of the node
 that produced it. The ports the data arrive on are worked out from the
 configuration, the same way tcspecial works them out, so the two ends
-cannot disagree about them.</li>
-<li><strong>Knowing it is there.</strong> <code>beacon</code> listens
+cannot disagree about them.</p></li>
+<li><p><strong>Knowing it is there.</strong> <code>beacon</code> listens
 for the beacon tcspecial sends on its own, every
 <code>beacon.default_interval</code>, whether or not anyone has
 connected. It says which build is running, which configuration it is
 serving and the digest of the files it read. It is the one thing a
 ground station can know about a spacecraft without having asked it
-anything.</li>
-<li><strong>Waiting for the simulator.</strong>
+anything.</p></li>
+<li><p><strong>Waiting for the simulator.</strong>
 <code>simulator::wait</code> asks tcssim, at the address its simulator
 file gives as <code>tcssim.ready</code>, until it has made its stand-ins
 and is set up for the same configuration, simulator file and
 <code>--simulate</code> mode, so that a harness starts tcspecial only
 once there is something for it to find. It says what it last heard when
-it gives up.</li>
+it gives up.</p></li>
+<li><p><strong>A vehicle on a cFS software bus.</strong>
+<code>bus</code> is the ground’s end of a vehicle that answers to cFS.
+<code>bus::Ground</code> is a station’s one SBN peer of the bus, on a
+thread of its own, which turns the bus back into loopback UDP links:
+<code>command_links_of</code>, <code>beacon::open</code> and
+<code>GatewayReceiver::open</code> use it themselves for a configuration
+that answers to cFS, so a station is written the same either way.
+<code>bus::StandIn</code> is the cFS end, as tcssim stands in for it:
+the vehicle and the station are both its peers. Only a stand-in takes a
+station: SBN on a real cFS sends no peer what another published, so a
+station commands a vehicle behind a real cFS through that cFS’s own
+ground system.</p></li>
 </ul>
 <p>The link to tcspecial is UDP, and only UDP: <code>TcsClient</code>
-sends its commands through a <code>UdpConnection</code>.</p>
+sends its commands through a <code>UdpConnection</code> – on a bus, to
+the station’s peer of it, which publishes each one.</p>
 <h2 id="what-tcslib-is-not">What tcslib is not</h2>
 <p>tcslib has no windows. Showing what it receives is the job of the
 programs built on it: <code>tcsui</code> holds the panels the ground

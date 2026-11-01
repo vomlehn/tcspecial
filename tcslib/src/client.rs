@@ -64,14 +64,14 @@ pub struct CommandLinks {
 /// # Returns
 ///
 /// The links, or `None` for a configuration with no `tcspecial` section,
-/// which states no ports and so nowhere to command.
+/// which states no ports and so nowhere to command. For a configuration
+/// that answers to cFS they are the loopback links of this process's peer
+/// of the bus, started here if it was not already: see [`crate::bus`].
 ///
 /// # Errors
 ///
 /// A message saying what is wrong with the `tcspecial` section's command
-/// interpreter settings, and for a configuration that answers to cFS, whose
-/// commands are published on its software bus and which tcslib has no
-/// transport for yet.
+/// interpreter settings, or why the peer of a bus cannot be started.
 pub fn command_links_of(
     graph: &tcslibgs::graph::Graph,
 ) -> Result<Option<CommandLinks>, String> {
@@ -82,12 +82,24 @@ pub fn command_links_of(
     };
     let ci = ci_config_of(&flatten(section))?.to_ci_config()?;
     let Some(ci) = ci.sockets() else {
-        return Err(format!(
-            "this configuration answers to {}, whose commands go over its \
-             software bus, and tcslib speaks only UDP so far: command it from \
-             the cFS side",
-            ci.gateway
-        ));
+        // Over a software bus: the station's peer of it, whose loopback
+        // links are commanded as the UDP ones are. See `crate::bus`.
+        let Some(ground) = crate::bus::Ground::of(graph)? else {
+            return Ok(None);
+        };
+        let anywhere = tcslibgs::HostPort {
+            address: "127.0.0.1".to_string(),
+            port: 0,
+        };
+        return Ok(Some(CommandLinks {
+            from: anywhere.to_string(),
+            interpreter: ground.spacecraft().to_string(),
+            nodes_from: anywhere,
+            nodes_to: tcslibgs::HostPort {
+                address: ground.nodes().ip().to_string(),
+                port: ground.nodes().port(),
+            },
+        }));
     };
     Ok(Some(CommandLinks {
         from: ci.moc_cmd_send.to_string(),

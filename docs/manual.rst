@@ -2534,7 +2534,12 @@ message ID or a base where a radio's configuration has a socket:
   ID the configuration states, or counts to from a base, must lie in it, be
   used once, and be a command's (``0x80`` set) where tcspecial takes it and
   telemetry's (``0x80`` clear) where it publishes it; tcsverify says which
-  one is not, and why.
+  one is not, and why. The cFS side must accept every ID in the block:
+  cFE refuses one above ``CFE_PLATFORM_SB_HIGHEST_VALID_MSGID``, which is
+  ``0x1FFF`` unless the build raises it, so for ``0x4200`` to ``0x42FF`` it
+  must be raised to at least ``0x42FF``. Otherwise SBN cannot subscribe for
+  tcspecial, nothing tcspecial publishes is delivered, and only an event on
+  the cFS side says why.
 - Commands about the spacecraft are published for tcspecial as
   ``tcs_cmd.cmd_msgid`` and answered as ``tcs_cmd.response_msgid``. A command
   about node *k* is published as ``payload_command.cmd_base`` plus *k* and
@@ -2582,14 +2587,46 @@ subscriptions carry another ident, is refused and disconnected, and the
 refusal is logged with what was expected and what arrived each time it
 connects again.
 
-tcsmoc cannot command a vehicle that answers to cFS yet, nor tcssim stand in
-for the cFS side, so there is no ``run-cfs`` target: the cFS side commands
-it. ``tcspecial/tests/cfs.rs`` flies the example against a test that plays
+``make -C examples run-cfs`` runs tcsmoc on the example as
+``run-fprime`` does on its own. tcssim stands in for the cFS side as well as
+for the payloads: it binds ``sbn.peer`` and is the software bus, with the
+vehicle and tcsmoc both its peers, so tcsmoc's beacon light, its panels and
+its commands work as they do for a vehicle on the radio. tcsmoc joins as
+processor 3, one more than the larger of ``processor_id`` and
+``peer_processor_id``, and needs nothing more in the file. Everything built
+on tcslib -- the C/C++ library included -- does the same with no change to
+the station.
+
+Two things follow. tcssim stands in for the cFS side whenever it runs on a
+configuration that answers to cFS, so it is not run beside a real cFS, which
+would be holding ``sbn.peer`` itself; tcssim says so and stops if it finds
+the address taken. And a ground station can join only the stand-in: SBN on a
+real cFS never sends one peer what another published, so behind a real cFS
+the vehicle is commanded from that cFS's own ground system, under the
+message IDs above.
+
+``tcspecial/tests/cfs.rs`` flies the example against a test that plays
 the cFS side's SBN: tcspecial subscribes, the beacon and a reading are
 published, a CONNECT and a node command are answered under their answer IDs,
 a command whose checksum is wrong is not, and a command for ``fsw`` reaches
-the heater. The payloads' ports are in the eighty-six hundreds, which no
-other example uses.
+the heater. ``tcspecial/tests/cfs_ground.rs`` commands it from tcslib
+through the stand-in. The payloads' ports are in the eighty-six hundreds,
+which no other example uses.
+
+``make cfs-test`` flies the example against a real cFS. It builds cFS with
+SBN v7.0.1 and its UDP module in ``CFS_SCRATCH`` (by default
+``../cfs-scratch``) from a cFS checkout, ``CFS_PRISTINE``, and a git
+checkout of SBN, ``SBN_SRC``, and installs nothing; the first build fetches
+the cFS checkout's submodules at the commits it pins. It then starts that
+cFS and tcspecial, and ``tcspecial/tests/cfs_flight.rs`` commands the vehicle
+from the cFS's own ground, through CI_LAB and TO_LAB: the beacon, a CONNECT,
+a reading, a command for ``fsw`` and a node command each cross SBN. It binds
+fixed ports -- 2234, 8634, 8601, 8602, 1234 and 1235 -- and holds the lock
+``TCS_PORTS_LOCK`` names while it runs, so that it does not meet another run
+on them. ``cfs/defs`` is what that cFS is configured with, and shows what a
+mission's own needs: tcspecial in its SBN peer table, the extended header,
+the version 2 mapping with cFE's own topics mapped onto it, and a highest
+message ID above the block allotted tcspecial.
 
 The Simulator Configuration
 ===========================

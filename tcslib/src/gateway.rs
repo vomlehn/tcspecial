@@ -140,7 +140,7 @@ impl GatewayReceiver {
                  ever arrive at it"
             ));
         }
-        GatewayReceiver::binding(gateway, ours)
+        GatewayReceiver::binding(graph, gateway, ours)
     }
 
     /// Open the ground's end of every payload that reports over the
@@ -174,13 +174,15 @@ impl GatewayReceiver {
         if ours.is_empty() {
             return Ok(None);
         }
-        GatewayReceiver::binding(PAYLOAD_TELEMETRY, ours).map(Some)
+        GatewayReceiver::binding(graph, PAYLOAD_TELEMETRY, ours).map(Some)
     }
 
     /// Binds each link's ground end, as one node.
     ///
     /// # Arguments
     ///
+    /// * `graph` - The configuration's graph, whose bus a link published on
+    ///             one is read from.
     /// * `name`  - What the node is called.
     /// * `links` - The links whose ground ends it binds.
     ///
@@ -190,21 +192,32 @@ impl GatewayReceiver {
     ///
     /// # Errors
     ///
-    /// A message saying which source's port cannot be bound.
+    /// A message saying which source's port cannot be bound, or why the
+    /// bus's peer cannot be started.
     fn binding(
+        graph: &Graph,
         name: &str,
         links: Vec<Telemetered>,
     ) -> Result<GatewayReceiver, String> {
         let mut ports = Vec::new();
         for link in links {
-            // A link on a software bus has no ground socket to bind, and
-            // tcslib has no transport for one yet.
+            // A link on a software bus has no ground socket of its own: the
+            // bus's peer sends what is published under its message ID to a
+            // socket it makes for it, as tcspecial would over UDP.
             let Some(ground) = link.ground() else {
-                return Err(format!(
-                    "\"{name}\": \"{}\" is published on a cFS software bus, \
-                     which tcslib cannot listen on yet",
-                    link.source
-                ));
+                let msgid = link.msgid().unwrap_or_default();
+                let peer = crate::bus::Ground::of(graph)?.ok_or_else(|| {
+                    format!(
+                        "\"{name}\": \"{}\" is published on a software bus \
+                         the configuration does not state",
+                        link.source
+                    )
+                })?;
+                let socket = peer.receiving(msgid).map_err(|e| {
+                    format!("\"{name}\": \"{}\": {e}", link.source)
+                })?;
+                ports.push((link.source, socket));
+                continue;
             };
             let at = format!("{}:{}", ground.address, ground.port);
             let socket = UdpSocket::bind(&at).map_err(|e| {

@@ -14,49 +14,6 @@ use tcslibgs::node::vehicle::compute::{Format, ToKelvinParams};
 
 use super::{Function, Out};
 
-/// Reads the number these bytes hold.
-///
-/// Exactly the width and no more: a reading longer than the format is a
-/// sensor that was read wrongly or a bus that returned something else, and
-/// taking the first two bytes of it would turn that into a plausible
-/// temperature. Shorter is the same mistake the other way.
-///
-/// The format itself is `tcslibgs::node::vehicle::compute::Format`, where the
-/// ground tool can see it; what a byte means is arithmetic and lives here.
-///
-/// # Arguments
-///
-/// * `format` - How the sensor lays out its counts.
-/// * `data`   - The reading, which must be exactly `format`'s width.
-///
-/// # Returns
-///
-/// The counts.
-///
-/// # Errors
-///
-/// A message saying how long the reading should be if `data` is longer or
-/// shorter.
-fn read(format: Format, data: &[u8]) -> Result<f64, String> {
-    if data.len() != format.width() {
-        return Err(format!(
-            "a {:?} reading is {} bytes and {} arrived",
-            format,
-            format.width(),
-            data.len()
-        ));
-    }
-
-    Ok(match format {
-        Format::I16Be => i16::from_be_bytes([data[0], data[1]]) as f64,
-        Format::U16Be => u16::from_be_bytes([data[0], data[1]]) as f64,
-        Format::I16Le => i16::from_le_bytes([data[0], data[1]]) as f64,
-        Format::U24Be => {
-            u32::from_be_bytes([0, data[0], data[1], data[2]]) as f64
-        }
-    })
-}
-
 /// Counts to kelvin: read, scale, offset.
 #[derive(Debug)]
 pub struct ToKelvin {
@@ -94,7 +51,7 @@ impl Function for ToKelvin {
         _input: Option<&str>,
         data: &[u8],
     ) -> Result<Option<Out>, String> {
-        let counts = read(self.format, data)?;
+        let counts = self.format.counts(data)?;
         // A scale and an offset that put the part's counts outside what a
         // value carries are refused here, naming the temperature: a part
         // read with somebody else's scale is the likeliest way to get one,

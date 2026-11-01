@@ -57,31 +57,40 @@
       <xs:element name="silent_after" type="xs:string"/>
       <xs:element name="close_after" type="xs:string"/>
       <xs:element name="ignore_trigger_percent" type="xs:string"/>
-      <!-- What a payload is attached to: the thermal mass it reports, or the
-           one it warms and how fast. -->
+      <!-- What a payload is attached to: the thermal mass it reports and the
+           output it reads, or the one it warms, the input it warms it
+           through, and how fast. -->
       <xs:element name="reads" type="xs:string"/>
+      <xs:element name="output" type="xs:string"/>
       <xs:element name="heats" type="xs:string"/>
+      <xs:element name="input" type="xs:string"/>
       <xs:element name="rate" type="xs:string"/>
     </xs:choice>
   </xs:complexType>
 
   <!-- A thermal mass: what the simulated sensors read and the simulated
-       heaters warm. All three are required, as they are where the file is
-       read; the order is free. -->
+       heaters warm. The first three are required, as they are where the
+       file is read; inputs and outputs are lists of names separated by
+       commas, and either may be left out. The order is free. -->
   <xs:complexType name="thermal_mass">
     <xs:all>
       <xs:element name="name" type="xs:string"/>
       <xs:element name="environment" type="xs:string"/>
       <xs:element name="time_constant" type="xs:string"/>
+      <xs:element name="inputs" type="xs:string" minOccurs="0"/>
+      <xs:element name="outputs" type="xs:string" minOccurs="0"/>
     </xs:all>
   </xs:complexType>
 
   <!-- What tcssim itself is told: the UDP address, as address:port, at
-       which it answers whether it has made its stand-ins. Required by tcssim
-       to start, and by a harness to wait for it. -->
+       which it answers whether it has made its stand-ins, required by tcssim
+       to start and by a harness to wait for it; and the hysteresis node it
+       stands in for, if any, which is never stated with tcspecial running.
+       -->
   <xs:complexType name="tcssim">
     <xs:all>
       <xs:element name="ready" type="xs:string"/>
+      <xs:element name="thermostat" type="xs:string" minOccurs="0"/>
     </xs:all>
   </xs:complexType>
 

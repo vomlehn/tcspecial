@@ -2482,12 +2482,15 @@ decides by it. An attribute no binding mentions is refused, which is the
 point of writing the bindings down, and the refusal says why: tcsmoc shows
 the reason the vehicle sends -- <tt class="docutils literal">no command binding says the ground may set
 <span class="pre">&quot;thermostat.half-band&quot;:</span> it is spelled half_band</tt> -- beside the status.</p>
-<p>The simulator file beside it declares a thermal mass, <tt class="docutils literal">cabin</tt>, and attaches
-the three sensors to it, so that what they report is one temperature rather
-than three streams of noise, which is what a thermal mass is for: see <strong>The
-Simulator Configuration</strong> below. Its heaters are not
-attached to the mass, discrete lines being a kind the simulator drives rather
-than being driven through, so what it shows is the vehicle's half of the loop.</p>
+<p>The simulator file beside it declares a thermal mass, <tt class="docutils literal">basic</tt>, with
+inputs <tt class="docutils literal">in1</tt> and <tt class="docutils literal">in2</tt> and outputs <tt class="docutils literal">out1</tt>, <tt class="docutils literal">out2</tt> and <tt class="docutils literal">out3</tt>. Each
+sensor reads an output of its own, so that what the three report is one
+temperature rather than three streams of noise, which is what a thermal mass
+is for; each heater warms it through an input of its own while the vehicle
+has it on. So the loop closes through tcspecial: see <strong>The Simulator
+Configuration</strong> below. Naming the <tt class="docutils literal">thermostat</tt> node in the file's
+<tt class="docutils literal">tcssim</tt> section closes it in tcssim alone instead, with no tcspecial
+running.</p>
 <p>The sensors and heaters are hardware, so <tt class="docutils literal">make <span class="pre">-C</span> examples <span class="pre">run-thermostat</span></tt>
 needs <tt class="docutils literal"><span class="pre">/dev/i2c-1</span></tt>, <tt class="docutils literal">/dev/spidev0.0</tt> and <tt class="docutils literal">/dev/gpiochip0</tt>; <tt class="docutils literal">make
 mkstubs</tt> provides stand-ins for some of them where there is no hardware.</p>
@@ -3257,17 +3260,30 @@ thermal_mass            optional
   environment          the temperature around it, in kelvin
   time_constant        how fast it loses the difference, as a length
                        of time
+  inputs               the names a heater can be connected to, separated
+                       by commas: &quot;in1,in2&quot;
+  outputs              the names a sensor can read from, separated by
+                       commas: &quot;out1,out2,out3&quot;
 </pre>
 <p>Each mass cools towards its environment with that time constant and is warmed
 by the heaters that are on. It starts at its environment with the heaters off,
 because a vehicle coming up cold is the case a thermostat exists for. A mass
 nothing is attached to is refused: it would be a state nothing reads and
 nothing changes.</p>
+<p>A mass is one lump at one temperature, so every output reads the same; what
+the names say is which sensor is on which. Any input and any output may be
+left unconnected. An input is one heater's: two heaters on one input would
+each switch the other's heat, and are refused, as is a list that names one
+twice.</p>
 <p>The attachments are settings of a payload, and like every other setting they
 may be stated on a group instead:</p>
 <pre class="code text literal-block">
 reads                  the mass this payload reports
+output                 which of that mass's outputs it reads. With
+                       ``reads`` and refused without it
 heats                  the mass this payload warms
+input                  which of that mass's inputs it warms it through.
+                       With ``heats`` and refused without it
 rate                   what it adds while it is on, in kelvin a second.
                        With ``heats`` and refused without it
 </pre>
@@ -3282,38 +3298,65 @@ the one thing pacing still means for a payload that sends nothing, and it
 wants to be shorter than the sample interval: the vehicle cannot see the band
 crossed until its next sample and the heaters cannot hear about it until they
 next look, so the mass overshoots by their rate over the sum of the two.</p>
-<p>A heater has to be a payload the simulator can be driven through, which today
-means a socket. The thermostat example's heaters are discrete lines, which the
-simulator drives rather than being driven through, so that file attaches its
-sensors to a mass and its heaters to nothing.</p>
+<p>A heater has to be a payload the simulator can be driven through: a socket,
+or a set of discrete lines, whose stand-in watches the lines the vehicle
+drives.</p>
 <pre class="code yaml literal-block">
 <span class="name tag">thermal_mass</span><span class="punctuation">:</span><span class="whitespace">
-  </span><span class="punctuation indicator">-</span><span class="whitespace"> </span><span class="name tag">name</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">cabin</span><span class="whitespace">
+  </span><span class="punctuation indicator">-</span><span class="whitespace"> </span><span class="name tag">name</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">basic</span><span class="whitespace">
     </span><span class="name tag">environment</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal string">&quot;283.15&quot;</span><span class="whitespace">      </span><span class="comment single"># ten kelvin below the setpoint</span><span class="whitespace">
     </span><span class="name tag">time_constant</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal string">&quot;50</span><span class="name variable"> </span><span class="literal string">s&quot;</span><span class="whitespace">      </span><span class="comment single"># a fifth of a kelvin a second at it</span><span class="whitespace">
+    </span><span class="name tag">inputs</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal string">&quot;in1,in2&quot;</span><span class="whitespace">
+    </span><span class="name tag">outputs</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal string">&quot;out1,out2,out3&quot;</span><span class="whitespace">
 
 </span><span class="name tag">simulated_payload_groups</span><span class="punctuation">:</span><span class="whitespace">
   </span><span class="punctuation indicator">-</span><span class="whitespace"> </span><span class="name tag">name</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">cabin_temps</span><span class="whitespace">
     </span><span class="name tag">packet_interval</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">100 ms</span><span class="whitespace">
-    </span><span class="name tag">reads</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">cabin</span><span class="whitespace">
+    </span><span class="name tag">reads</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">basic</span><span class="whitespace">
 
 </span><span class="name tag">simulated_payloads</span><span class="punctuation">:</span><span class="whitespace">
-  </span><span class="punctuation indicator">-</span><span class="whitespace"> </span><span class="punctuation indicator">{</span><span class="name tag"> name</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="name variable">temp_1</span><span class="punctuation indicator">,</span><span class="name tag"> type</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="name variable">network</span><span class="punctuation indicator">,</span><span class="name tag"> protocol</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="name variable">udp</span><span class="punctuation indicator">,</span><span class="name tag"> group</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="name variable">cabin_temps</span><span class="whitespace"> </span><span class="punctuation indicator">}</span><span class="whitespace">
-  </span><span class="punctuation indicator">-</span><span class="whitespace"> </span><span class="punctuation indicator">{</span><span class="name tag"> name</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="name variable">temp_2</span><span class="punctuation indicator">,</span><span class="name tag"> type</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="name variable">network</span><span class="punctuation indicator">,</span><span class="name tag"> protocol</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="name variable">udp</span><span class="punctuation indicator">,</span><span class="name tag"> group</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="name variable">cabin_temps</span><span class="whitespace"> </span><span class="punctuation indicator">}</span><span class="whitespace">
-  </span><span class="punctuation indicator">-</span><span class="whitespace"> </span><span class="punctuation indicator">{</span><span class="name tag"> name</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="name variable">temp_3</span><span class="punctuation indicator">,</span><span class="name tag"> type</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="name variable">network</span><span class="punctuation indicator">,</span><span class="name tag"> protocol</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="name variable">udp</span><span class="punctuation indicator">,</span><span class="name tag"> group</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="name variable">cabin_temps</span><span class="whitespace"> </span><span class="punctuation indicator">}</span><span class="whitespace">
+  </span><span class="punctuation indicator">-</span><span class="whitespace"> </span><span class="punctuation indicator">{</span><span class="name tag"> name</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="name variable">temp_1</span><span class="punctuation indicator">,</span><span class="name tag"> type</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="name variable">network</span><span class="punctuation indicator">,</span><span class="name tag"> protocol</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="name variable">udp</span><span class="punctuation indicator">,</span><span class="name tag"> group</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="name variable">cabin_temps</span><span class="punctuation indicator">,</span><span class="whitespace">
+</span><span class="name tag">      output</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="name variable">out1</span><span class="whitespace"> </span><span class="punctuation indicator">}</span><span class="whitespace">
+  </span><span class="punctuation indicator">-</span><span class="whitespace"> </span><span class="punctuation indicator">{</span><span class="name tag"> name</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="name variable">temp_2</span><span class="punctuation indicator">,</span><span class="name tag"> type</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="name variable">network</span><span class="punctuation indicator">,</span><span class="name tag"> protocol</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="name variable">udp</span><span class="punctuation indicator">,</span><span class="name tag"> group</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="name variable">cabin_temps</span><span class="punctuation indicator">,</span><span class="whitespace">
+</span><span class="name tag">      output</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="name variable">out2</span><span class="whitespace"> </span><span class="punctuation indicator">}</span><span class="whitespace">
+  </span><span class="punctuation indicator">-</span><span class="whitespace"> </span><span class="punctuation indicator">{</span><span class="name tag"> name</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="name variable">temp_3</span><span class="punctuation indicator">,</span><span class="name tag"> type</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="name variable">network</span><span class="punctuation indicator">,</span><span class="name tag"> protocol</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="name variable">udp</span><span class="punctuation indicator">,</span><span class="name tag"> group</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="name variable">cabin_temps</span><span class="punctuation indicator">,</span><span class="whitespace">
+</span><span class="name tag">      output</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="name variable">out3</span><span class="whitespace"> </span><span class="punctuation indicator">}</span><span class="whitespace">
   </span><span class="punctuation indicator">-</span><span class="whitespace"> </span><span class="name tag">name</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">heaters_1</span><span class="whitespace">
     </span><span class="name tag">type</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">network</span><span class="whitespace">
     </span><span class="name tag">protocol</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">udp</span><span class="whitespace">
-    </span><span class="name tag">heats</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">cabin</span><span class="whitespace">
+    </span><span class="name tag">heats</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">basic</span><span class="whitespace">
+    </span><span class="name tag">input</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">in1</span><span class="whitespace">
     </span><span class="name tag">rate</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal string">&quot;3.0&quot;</span><span class="whitespace">
     </span><span class="name tag">packet_interval</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">20 ms</span><span class="whitespace">     </span><span class="comment single"># how often it looks for a decision</span><span class="whitespace">
   </span><span class="punctuation indicator">-</span><span class="whitespace"> </span><span class="name tag">name</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">heaters_2</span><span class="whitespace">
     </span><span class="name tag">type</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">network</span><span class="whitespace">
     </span><span class="name tag">protocol</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">udp</span><span class="whitespace">
-    </span><span class="name tag">heats</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">cabin</span><span class="whitespace">
+    </span><span class="name tag">heats</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">basic</span><span class="whitespace">
+    </span><span class="name tag">input</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">in2</span><span class="whitespace">
     </span><span class="name tag">rate</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal string">&quot;3.0&quot;</span><span class="whitespace">
     </span><span class="name tag">packet_interval</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">20 ms</span>
 </pre>
+<p><strong>Standing in for the thermostat</strong></p>
+<p>tcssim can stand in for a hysteresis node as well, so that the loop closes
+in the simulator alone, with no tcspecial running. Name the node in the
+<tt class="docutils literal">tcssim</tt> section:</p>
+<pre class="code yaml literal-block">
+<span class="name tag">tcssim</span><span class="punctuation">:</span><span class="whitespace">
+  </span><span class="name tag">ready</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal string">&quot;127.0.0.1:7907&quot;</span><span class="whitespace">
+  </span><span class="name tag">thermostat</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">thermostat</span>
+</pre>
+<p>tcssim then takes the node's <tt class="docutils literal">setpoint</tt> and <tt class="docutils literal">half_band</tt> from the
+tcspecial configuration. Its sensors are the simulated payloads reading a
+thermal mass whose data reaches the node, and its heaters the simulated
+payloads heating one that data from the node reaches. It reads each sensor's
+bytes as they leave the stand-in -- a dropped reading never arrives, and a
+truncated or corrupted one arrives as the vehicle would see it -- as the
+conversion the sensor feeds reads them, and decides on the median of each
+sensor's latest reading: more than the half band over the setpoint, off;
+more than it under, on; between the two, what it last decided. The decision
+is asserted to every heater on every reading, as the node does aboard.</p>
+<p>Never name a thermostat with tcspecial running: its own thermostat switches
+the same heaters, and the two would fight.</p>
 <p><strong>Fault injection</strong></p>
 <p>A payload that always works exercises only the path where everything works.
 These settings have a simulated payload misbehave on purpose, so that a
@@ -3379,27 +3422,38 @@ cannot see it.</p>
 <span class="name tag">description</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">Simulator settings for the payloads of thermostat.ytcs</span><span class="whitespace">
 
 </span><span class="name tag">thermal_mass</span><span class="punctuation">:</span><span class="whitespace">
-  </span><span class="punctuation indicator">-</span><span class="whitespace"> </span><span class="name tag">name</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">cabin</span><span class="whitespace">
+  </span><span class="punctuation indicator">-</span><span class="whitespace"> </span><span class="name tag">name</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">basic</span><span class="whitespace">
     </span><span class="name tag">environment</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal string">&quot;283.15&quot;</span><span class="whitespace">
     </span><span class="name tag">time_constant</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal string">&quot;50</span><span class="name variable"> </span><span class="literal string">s&quot;</span><span class="whitespace">
+    </span><span class="name tag">inputs</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal string">&quot;in1,in2&quot;</span><span class="whitespace">
+    </span><span class="name tag">outputs</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal string">&quot;out1,out2,out3&quot;</span><span class="whitespace">
 
 </span><span class="name tag">simulated_payload_groups</span><span class="punctuation">:</span><span class="whitespace">
   </span><span class="punctuation indicator">-</span><span class="whitespace"> </span><span class="name tag">name</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">cabin_temps</span><span class="whitespace">
     </span><span class="name tag">packet_interval</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">100 ms</span><span class="whitespace">
-    </span><span class="name tag">reads</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">cabin</span><span class="whitespace">
+    </span><span class="name tag">reads</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">basic</span><span class="whitespace">
 
 </span><span class="name tag">simulated_payloads</span><span class="punctuation">:</span><span class="whitespace">
   </span><span class="punctuation indicator">-</span><span class="whitespace"> </span><span class="name tag">name</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">temp_1</span><span class="whitespace">
     </span><span class="name tag">type</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">i2c</span><span class="whitespace">
     </span><span class="name tag">group</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">cabin_temps</span><span class="whitespace">
+    </span><span class="name tag">output</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">out1</span><span class="whitespace">
 
   </span><span class="punctuation indicator">-</span><span class="whitespace"> </span><span class="name tag">name</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">temp_2</span><span class="whitespace">
     </span><span class="name tag">type</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">i2c</span><span class="whitespace">
     </span><span class="name tag">group</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">cabin_temps</span><span class="whitespace">
+    </span><span class="name tag">output</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">out2</span><span class="whitespace">
 
   </span><span class="punctuation indicator">-</span><span class="whitespace"> </span><span class="name tag">name</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">temp_3</span><span class="whitespace">
     </span><span class="name tag">type</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">spi</span><span class="whitespace">
     </span><span class="name tag">group</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">cabin_temps</span><span class="whitespace">
+    </span><span class="name tag">output</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">out3</span><span class="whitespace">
+
+  </span><span class="punctuation indicator">-</span><span class="whitespace"> </span><span class="name tag">name</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">heaters_1</span><span class="whitespace">
+    </span><span class="name tag">type</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">gpio</span><span class="whitespace">
+    </span><span class="name tag">heats</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">basic</span><span class="whitespace">
+    </span><span class="name tag">input</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">in1</span><span class="whitespace">
+    </span><span class="name tag">rate</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal string">&quot;3.0&quot;</span><span class="whitespace">
 
   </span><span class="punctuation indicator">-</span><span class="whitespace"> </span><span class="name tag">name</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">udp-fast</span><span class="whitespace">
     </span><span class="name tag">type</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">network</span><span class="whitespace">

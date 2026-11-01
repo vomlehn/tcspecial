@@ -2163,12 +2163,15 @@ point of writing the bindings down, and the refusal says why: tcsmoc shows
 the reason the vehicle sends -- ``no command binding says the ground may set
 "thermostat.half-band": it is spelled half_band`` -- beside the status.
 
-The simulator file beside it declares a thermal mass, ``cabin``, and attaches
-the three sensors to it, so that what they report is one temperature rather
-than three streams of noise, which is what a thermal mass is for: see **The
-Simulator Configuration** below. Its heaters are not
-attached to the mass, discrete lines being a kind the simulator drives rather
-than being driven through, so what it shows is the vehicle's half of the loop.
+The simulator file beside it declares a thermal mass, ``basic``, with
+inputs ``in1`` and ``in2`` and outputs ``out1``, ``out2`` and ``out3``. Each
+sensor reads an output of its own, so that what the three report is one
+temperature rather than three streams of noise, which is what a thermal mass
+is for; each heater warms it through an input of its own while the vehicle
+has it on. So the loop closes through tcspecial: see **The Simulator
+Configuration** below. Naming the ``thermostat`` node in the file's
+``tcssim`` section closes it in tcssim alone instead, with no tcspecial
+running.
 
 The sensors and heaters are hardware, so ``make -C examples run-thermostat``
 needs ``/dev/i2c-1``, ``/dev/spidev0.0`` and ``/dev/gpiochip0``; ``make
@@ -3025,6 +3028,10 @@ reads becomes a consequence of what the vehicle drove.
      environment          the temperature around it, in kelvin
      time_constant        how fast it loses the difference, as a length
                           of time
+     inputs               the names a heater can be connected to, separated
+                          by commas: "in1,in2"
+     outputs              the names a sensor can read from, separated by
+                          commas: "out1,out2,out3"
 
 Each mass cools towards its environment with that time constant and is warmed
 by the heaters that are on. It starts at its environment with the heaters off,
@@ -3032,13 +3039,23 @@ because a vehicle coming up cold is the case a thermostat exists for. A mass
 nothing is attached to is refused: it would be a state nothing reads and
 nothing changes.
 
+A mass is one lump at one temperature, so every output reads the same; what
+the names say is which sensor is on which. Any input and any output may be
+left unconnected. An input is one heater's: two heaters on one input would
+each switch the other's heat, and are refused, as is a list that names one
+twice.
+
 The attachments are settings of a payload, and like every other setting they
 may be stated on a group instead:
 
 .. code-block:: text
 
    reads                  the mass this payload reports
+   output                 which of that mass's outputs it reads. With
+                          ``reads`` and refused without it
    heats                  the mass this payload warms
+   input                  which of that mass's inputs it warms it through.
+                          With ``heats`` and refused without it
    rate                   what it adds while it is on, in kelvin a second.
                           With ``heats`` and refused without it
 
@@ -3055,39 +3072,71 @@ wants to be shorter than the sample interval: the vehicle cannot see the band
 crossed until its next sample and the heaters cannot hear about it until they
 next look, so the mass overshoots by their rate over the sum of the two.
 
-A heater has to be a payload the simulator can be driven through, which today
-means a socket. The thermostat example's heaters are discrete lines, which the
-simulator drives rather than being driven through, so that file attaches its
-sensors to a mass and its heaters to nothing.
+A heater has to be a payload the simulator can be driven through: a socket,
+or a set of discrete lines, whose stand-in watches the lines the vehicle
+drives.
 
 .. code-block:: yaml
 
    thermal_mass:
-     - name: cabin
+     - name: basic
        environment: "283.15"      # ten kelvin below the setpoint
        time_constant: "50 s"      # a fifth of a kelvin a second at it
+       inputs: "in1,in2"
+       outputs: "out1,out2,out3"
 
    simulated_payload_groups:
      - name: cabin_temps
        packet_interval: 100 ms
-       reads: cabin
+       reads: basic
 
    simulated_payloads:
-     - { name: temp_1, type: network, protocol: udp, group: cabin_temps }
-     - { name: temp_2, type: network, protocol: udp, group: cabin_temps }
-     - { name: temp_3, type: network, protocol: udp, group: cabin_temps }
+     - { name: temp_1, type: network, protocol: udp, group: cabin_temps,
+         output: out1 }
+     - { name: temp_2, type: network, protocol: udp, group: cabin_temps,
+         output: out2 }
+     - { name: temp_3, type: network, protocol: udp, group: cabin_temps,
+         output: out3 }
      - name: heaters_1
        type: network
        protocol: udp
-       heats: cabin
+       heats: basic
+       input: in1
        rate: "3.0"
        packet_interval: 20 ms     # how often it looks for a decision
      - name: heaters_2
        type: network
        protocol: udp
-       heats: cabin
+       heats: basic
+       input: in2
        rate: "3.0"
        packet_interval: 20 ms
+
+**Standing in for the thermostat**
+
+tcssim can stand in for a hysteresis node as well, so that the loop closes
+in the simulator alone, with no tcspecial running. Name the node in the
+``tcssim`` section:
+
+.. code-block:: yaml
+
+   tcssim:
+     ready: "127.0.0.1:7907"
+     thermostat: thermostat
+
+tcssim then takes the node's ``setpoint`` and ``half_band`` from the
+tcspecial configuration. Its sensors are the simulated payloads reading a
+thermal mass whose data reaches the node, and its heaters the simulated
+payloads heating one that data from the node reaches. It reads each sensor's
+bytes as they leave the stand-in -- a dropped reading never arrives, and a
+truncated or corrupted one arrives as the vehicle would see it -- as the
+conversion the sensor feeds reads them, and decides on the median of each
+sensor's latest reading: more than the half band over the setpoint, off;
+more than it under, on; between the two, what it last decided. The decision
+is asserted to every heater on every reading, as the node does aboard.
+
+Never name a thermostat with tcspecial running: its own thermostat switches
+the same heaters, and the two would fight.
 
 **Fault injection**
 
@@ -3163,27 +3212,38 @@ This is the shipped ``examples/thermostat/thermostat-sim.yaml``.
    description: Simulator settings for the payloads of thermostat.ytcs
 
    thermal_mass:
-     - name: cabin
+     - name: basic
        environment: "283.15"
        time_constant: "50 s"
+       inputs: "in1,in2"
+       outputs: "out1,out2,out3"
 
    simulated_payload_groups:
      - name: cabin_temps
        packet_interval: 100 ms
-       reads: cabin
+       reads: basic
 
    simulated_payloads:
      - name: temp_1
        type: i2c
        group: cabin_temps
+       output: out1
 
      - name: temp_2
        type: i2c
        group: cabin_temps
+       output: out2
 
      - name: temp_3
        type: spi
        group: cabin_temps
+       output: out3
+
+     - name: heaters_1
+       type: gpio
+       heats: basic
+       input: in1
+       rate: "3.0"
 
      - name: udp-fast
        type: network

@@ -51,15 +51,18 @@ use tcslibgs::{
     payload_parameters, DHConfig, DHSample, Edge, NO_TRANSFER_TIME,
 };
 
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, HashMap};
+
+use crate::node::vehicle::thermostat::Thermostat;
+use crate::physics::thermal_mass::thermal_mass::{Thermal, ThermalMass};
 
 mod endpoint;
 mod grid;
 mod node;
 mod payload;
+mod physics;
 mod pty;
 mod ready;
-mod thermal;
 
 use endpoint::{endpoint_description, payload_config_attached};
 use payload::{PayloadConfig, PayloadStats, SimulatedPayload};
@@ -309,12 +312,18 @@ fn update_row(
     }
 }
 
+/// What each attached payload is to its thermal mass, by payload name, and
+/// the thermostat the simulator stands in for, if any.
+type Attachments = (BTreeMap<String, Thermal>, Option<Arc<Thermostat>>);
+
 /// Works out what each simulated payload is to a thermal mass, by payload
-/// name.
+/// name, and makes the thermostat the simulator stands in for, if the file
+/// names one.
 ///
-/// One `ThermalMass` per declared mass, shared by every payload attached to
-/// it: the sensors read the state the heaters warm, which is what makes a
-/// simulated control loop a loop rather than three payloads sending noise.
+/// One `ThermalMass` per declared mass, kept in a map by its name and shared
+/// by every payload attached to it: the sensors read the state the heaters
+/// warm, which is what makes a simulated control loop a loop rather than
+/// three payloads sending noise.
 ///
 /// A sensor's encoding comes from the conversion its readings go to -- see
 /// `tcslibgs::graph::simulated::reading_of` -- so the bytes it sends are the
@@ -331,24 +340,35 @@ fn update_row(
 ///
 /// # Returns
 ///
-/// What each attached payload is to its mass, by payload name; empty if
-/// the file declares no mass.
+/// What each attached payload is to its mass, by payload name, empty if the
+/// file declares no mass; and the thermostat, if the file names one.
 ///
 /// # Errors
 ///
 /// A message if the masses are wrongly declared, a mass is declared but no
-/// graph was read, or a sensor's conversion cannot be found in the graph.
+/// graph was read, a sensor's conversion cannot be found in the graph, or
+/// the thermostat is not a hysteresis node or has no sensors or no heaters.
 fn thermal_masses(
     sim_file: &SimConfigFile,
     graph: Option<&tcslibgs::graph::Graph>,
     sims: &[ResolvedSim],
     dh_configs: &[DHConfig],
-) -> Result<BTreeMap<String, crate::thermal::Thermal>, String> {
+) -> Result<Attachments, String> {
     use tcslibgs::sim_config::Attached;
 
     let declared = sim_file.masses().map_err(|e| e.to_string())?;
+    let stands_in = sim_file
+        .tcssim
+        .as_ref()
+        .and_then(|tcssim| tcssim.thermostat.clone());
     if declared.is_empty() {
-        return Ok(BTreeMap::new());
+        if let Some(name) = stands_in {
+            return Err(format!(
+                "thermostat: {name} is to be stood in for, and no \
+                 thermal_mass is declared for it to read or warm"
+            ));
+        }
+        return Ok((BTreeMap::new(), None));
     }
 
     // A mass needs a graph to take its sensors' encodings from: without the
@@ -366,15 +386,11 @@ fn thermal_masses(
         ));
     };
 
+    // Each mass by its name, which is what a payload names to reach it.
     let now = std::time::Instant::now();
-    let built: BTreeMap<String, Arc<crate::thermal::ThermalMass>> = declared
+    let built: HashMap<String, Arc<ThermalMass>> = declared
         .iter()
-        .map(|mass| {
-            (
-                mass.name.clone(),
-                Arc::new(crate::thermal::ThermalMass::new(mass, now)),
-            )
-        })
+        .map(|mass| (mass.name.clone(), Arc::new(ThermalMass::new(mass, now))))
         .collect();
 
     let mut attached = BTreeMap::new();
@@ -382,30 +398,93 @@ fn thermal_masses(
         let name = dh.name.0.clone();
         match &sim.attached {
             None => {}
-            Some(Attached::Reads(mass)) => {
+            Some(Attached::Reads { mass, output }) => {
                 let reading =
                     tcslibgs::graph::simulated::reading_of(graph, &name)?;
                 attached.insert(
                     name,
-                    crate::thermal::Thermal::Reads {
+                    Thermal::Reads {
                         // The mass is known: `masses` refused one that is not.
                         mass: built[mass].clone(),
+                        output: output.clone(),
                         reading,
                     },
                 );
             }
-            Some(Attached::Heats { mass, rate }) => {
+            Some(Attached::Heats { mass, input, rate }) => {
                 attached.insert(
                     name,
-                    crate::thermal::Thermal::Heats {
+                    Thermal::Heats {
                         mass: built[mass].clone(),
+                        input: input.clone(),
                         rate: *rate,
                     },
                 );
             }
         }
     }
-    Ok(attached)
+
+    let thermostat = match stands_in {
+        None => None,
+        Some(name) => Some(Arc::new(thermostat_of(graph, &name, &attached)?)),
+    };
+    Ok((attached, thermostat))
+}
+
+/// Makes the thermostat the simulator stands in for a hysteresis node with.
+///
+/// Its sensors are the payloads reading a thermal mass whose data reaches
+/// the node, and its heaters the payloads heating one that data from the
+/// node reaches.
+///
+/// # Arguments
+///
+/// * `graph`    - The tcspecial configuration's graph.
+/// * `name`     - The hysteresis node.
+/// * `attached` - What each attached payload is to its mass.
+///
+/// # Returns
+///
+/// The thermostat.
+///
+/// # Errors
+///
+/// A message if the node is not a hysteresis node, or no sensor reaches it,
+/// or it reaches no heater.
+fn thermostat_of(
+    graph: &tcslibgs::graph::Graph,
+    name: &str,
+    attached: &BTreeMap<String, Thermal>,
+) -> Result<Thermostat, String> {
+    use tcslibgs::graph::simulated::{hysteresis_of, reaches};
+
+    let params = hysteresis_of(graph, name)?;
+    let mut sensors = BTreeMap::new();
+    let mut heaters = Vec::new();
+    for (payload, thermal) in attached {
+        match thermal {
+            Thermal::Reads { reading, .. } if reaches(graph, payload, name) => {
+                sensors.insert(payload.clone(), *reading);
+            }
+            Thermal::Heats { .. } if reaches(graph, name, payload) => {
+                heaters.push((payload.clone(), thermal.clone()));
+            }
+            _ => {}
+        }
+    }
+    if sensors.is_empty() {
+        return Err(format!(
+            "thermostat: no simulated sensor reading a thermal mass sends \
+             data that reaches {name}"
+        ));
+    }
+    if heaters.is_empty() {
+        return Err(format!(
+            "thermostat: data from {name} reaches no simulated heater warming \
+             a thermal mass"
+        ));
+    }
+    Ok(Thermostat::new(name, params, sensors, heaters))
 }
 
 /// What [`load`] reads out of the pair: the handlers the simulator stands in
@@ -514,9 +593,9 @@ fn load(
     // The thermal masses, built once and shared: the sensors attached to one
     // read the same state the heaters attached to it warm, which is the whole
     // point of a mass being a thing rather than a figure per payload.
-    let masses =
+    let (masses, thermostat) =
         match thermal_masses(&sim_file, graph.as_ref(), &sims, &dh_configs) {
-            Ok(masses) => masses,
+            Ok(found) => found,
             Err(e) => {
                 startup.error(format!("Error in {sim_path}: {e}"));
                 return None;
@@ -527,9 +606,17 @@ fn load(
         .iter()
         .zip(&sims)
         .map(|(dh, sim)| {
-            payload_config_attached(dh, sim, masses.get(&dh.name.0).cloned())
+            let mut config = payload_config_attached(
+                dh,
+                sim,
+                masses.get(&dh.name.0).cloned(),
+            )?;
+            // A sensor the stood-in thermostat reads reports to it.
+            config.thermostat =
+                thermostat.as_ref().filter(|t| t.reads(&dh.name.0)).cloned();
+            Ok(config)
         })
-        .collect()
+        .collect::<Result<_, String>>()
     {
         Ok(configs) => configs,
         Err(e) => {
@@ -542,16 +629,25 @@ fn load(
 
     for (name, thermal) in &masses {
         match thermal {
-            crate::thermal::Thermal::Reads { mass, .. } => eprintln!(
-                "{name} reports the thermal mass {}, which starts at {:.2} K",
+            Thermal::Reads { mass, output, .. } => eprintln!(
+                "{name} reports output {output} of the thermal mass {}, which \
+                 starts at {:.2} K",
                 mass.name(),
                 mass.temperature()
             ),
-            crate::thermal::Thermal::Heats { mass, rate } => eprintln!(
-                "{name} warms the thermal mass {} by {rate} K/s while it is on",
+            Thermal::Heats { mass, input, rate } => eprintln!(
+                "{name} warms the thermal mass {} through input {input} by \
+                 {rate} K/s while it is on",
                 mass.name()
             ),
         }
+    }
+    if let Some(thermostat) = &thermostat {
+        eprintln!(
+            "tcssim stands in for the thermostat {}, switching the heaters \
+             from the sensors' readings",
+            thermostat.name()
+        );
     }
 
     if configs.is_empty() {
@@ -2381,6 +2477,47 @@ mod tests {
                 payload_path.display()
             );
         }
+    }
+
+    /// Asked to stand in for the thermostat example's hysteresis node, tcssim
+    /// reads the three sensors and switches the two heaters, and only the
+    /// sensors report to it.
+    #[test]
+    fn tcssim_stands_in_for_the_examples_thermostat() {
+        let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("..");
+        let payload_path = root.join("examples/thermostat/thermostat.ytcs");
+        let mut sim_file = SimConfigFile::load(
+            root.join("examples/thermostat/thermostat-sim.yaml"),
+        )
+        .expect("the simulator file reads");
+        sim_file
+            .tcssim
+            .as_mut()
+            .expect("a tcssim section")
+            .thermostat = Some("thermostat".to_string());
+        let graph = tcslibgs::graph::Graph::load(&payload_path).expect("reads");
+        let dh_configs = simulated_payloads_of(&payload_path, &sim_file);
+        let sims = sim_file.resolve(&dh_configs).expect("it fits");
+
+        let (attached, thermostat) =
+            thermal_masses(&sim_file, Some(&graph), &sims, &dh_configs)
+                .expect("the masses and the thermostat are made");
+        let thermostat = thermostat.expect("a thermostat");
+        assert_eq!(thermostat.name(), "thermostat");
+        for sensor in ["temp_1", "temp_2", "temp_3"] {
+            assert!(thermostat.reads(sensor), "{sensor}");
+        }
+        assert!(!thermostat.reads("heaters_1"));
+        assert_eq!(attached.len(), 5);
+
+        // Naming a node that is not a hysteresis node is refused.
+        sim_file
+            .tcssim
+            .as_mut()
+            .expect("a tcssim section")
+            .thermostat = Some("k_1".to_string());
+        assert!(thermal_masses(&sim_file, Some(&graph), &sims, &dh_configs)
+            .is_err());
     }
 
     /// A shipped tcspecial configuration states a packet interval only where a

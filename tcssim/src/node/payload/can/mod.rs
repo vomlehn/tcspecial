@@ -490,6 +490,7 @@ mod tests {
     ) -> PayloadConfig {
         PayloadConfig {
             thermal: None,
+            thermostat: None,
             name: "can-device".to_string(),
             protocol: PayloadProtocol::Can,
             address: interface.to_string(),

@@ -10760,9 +10760,20 @@ temperature of the environment it sits in, and a time constant: how long
 it takes to lose a given fraction of the difference between itself and
 that environment.</dd>
 <dt>Requirement</dt>
+<dd>A mass may name inputs, where heaters are connected, and outputs, where
+sensors read it. Any of them may be left unconnected. A list naming one
+twice is refused.</dd>
+<dt>Requirement</dt>
 <dd>A simulated payload may be attached to a mass, either as something that
-reads it or as something that heats it. A heater states what it adds, in
-kelvin a second.</dd>
+reads one of its outputs or as something that heats it through one of
+its inputs. A heater states what it adds, in kelvin a second.</dd>
+<dt>Requirement</dt>
+<dd>An input is one heater's. Two heaters on one input would each switch the
+other's heat, and which was on would depend on which the vehicle drove
+last.</dd>
+<dt>Requirement</dt>
+<dd>The mass is one lump at one temperature, so every output reads the
+same. What the names say is which sensor is on which.</dd>
 <dt>Requirement</dt>
 <dd>A mass nothing is attached to is refused. It would be a state nothing
 reads and nothing changes, which is a file saying something it cannot
@@ -10833,12 +10844,40 @@ thing in the queue. A decision is not a reading -- it says what the
 device should be now -- so a vehicle deciding faster than the heater
 looks must not leave it acting on a decision that is older every pass.</dd>
 <dt>Requirement</dt>
-<dd>A heater must be a kind of payload the simulator can be driven through,
-which today means a socket. A heater on discrete lines is driven through
-<tt class="docutils literal"><span class="pre">gpio-sim</span></tt>, which the simulator drives and cannot yet be driven
-through, so the shipped thermostat example attaches its sensors to a mass
-and its heaters to nothing: what that example shows is the vehicle's half
-of the loop.</dd>
+<dd>A heater must be a kind of payload the simulator can be driven through:
+a socket, or discrete lines on <tt class="docutils literal"><span class="pre">gpio-sim</span></tt>, whose stand-in watches the
+lines the vehicle drives.</dd>
+</dl>
+<p><strong>A Stood-in Thermostat</strong></p>
+<p>The loop closes through tcspecial when the heaters are attached: the
+sensors report the mass, the vehicle decides, the heaters warm it. To watch
+the mass and the heaters with no tcspecial running, tcssim can stand in for
+the vehicle's thermostat too. It is <tt class="docutils literal"><span class="pre">tcssim::node::vehicle::thermostat</span></tt>,
+the one vehicle node the simulator has: everything else a vehicle computes
+runs on a workstation as it runs aboard.</p>
+<dl class="docutils">
+<dt>Requirement</dt>
+<dd>The simulator file's <tt class="docutils literal">tcssim</tt> section may name a hysteresis node of
+the configuration. tcssim then stands in for it, taking its <tt class="docutils literal">setpoint</tt>
+and <tt class="docutils literal">half_band</tt> from the configuration, which states them once.</dd>
+<dt>Requirement</dt>
+<dd>Its sensors are the simulated payloads reading a thermal mass whose data
+reaches the node, and its heaters the simulated payloads heating one that
+data from the node reaches. A node that is not a hysteresis node, or
+that no such sensor reaches, or that reaches no such heater, is refused.</dd>
+<dt>Requirement</dt>
+<dd>It reads what each sensor's stand-in sends, as it leaves: a dropped
+reading never arrives, and a truncated or corrupted one arrives as the
+vehicle would see it. The bytes are read as the conversion the sensor
+feeds reads them, <tt class="docutils literal"><span class="pre">Format::counts</span></tt> in tcslibgs being the one reading
+both use, and a reading that conversion would refuse is ignored.</dd>
+<dt>Requirement</dt>
+<dd>It decides on the median of each sensor's latest reading, as the example
+votes them, and asserts the decision to every heater on every reading,
+as the hysteresis node does aboard.</dd>
+<dt>Requirement</dt>
+<dd>It is never named with tcspecial running, whose own thermostat switches
+the same heaters.</dd>
 </dl>
 </div>
 <div class="section" id="fault-injection">
@@ -10938,36 +10977,56 @@ looks like. As there, the error is reported from the payload's end.</dd>
 <div class="section" id="example">
 <h2><a class="toc-backref" href="#toc-entry-131">Example</a></h2>
 <p>This is the shipped <tt class="docutils literal"><span class="pre">examples/thermostat/thermostat-sim.yaml</span></tt>, which
-simulates the three sensors of <tt class="docutils literal">thermostat.ytcs</tt>. All three are read together
-and so share a group, which carries their rate and the thermal mass they
-report; the mass is what makes three sensors agree about a temperature. The
-heaters are not simulated: they are discrete lines, which the simulator drives
-rather than being driven through.</p>
+simulates the three sensors and two heaters of <tt class="docutils literal">thermostat.ytcs</tt>. The three
+sensors are read together and so share a group, which carries their rate and
+the thermal mass they
+report; the mass is what makes three sensors agree about a temperature, each
+on an output of its own. The heaters are discrete lines, each warming the
+mass through an input of its own while the vehicle has it on.</p>
 <pre class="code yaml literal-block">
 <span class="name tag">description</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">Simulator settings for the payloads of thermostat.ytcs</span><span class="whitespace">
 
 </span><span class="name tag">thermal_mass</span><span class="punctuation">:</span><span class="whitespace">
-  </span><span class="punctuation indicator">-</span><span class="whitespace"> </span><span class="name tag">name</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">cabin</span><span class="whitespace">
+  </span><span class="punctuation indicator">-</span><span class="whitespace"> </span><span class="name tag">name</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">basic</span><span class="whitespace">
     </span><span class="name tag">environment</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal string">&quot;283.15&quot;</span><span class="whitespace">
     </span><span class="name tag">time_constant</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal string">&quot;50</span><span class="name variable"> </span><span class="literal string">s&quot;</span><span class="whitespace">
+    </span><span class="name tag">inputs</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal string">&quot;in1,in2&quot;</span><span class="whitespace">
+    </span><span class="name tag">outputs</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal string">&quot;out1,out2,out3&quot;</span><span class="whitespace">
 
 </span><span class="name tag">simulated_payload_groups</span><span class="punctuation">:</span><span class="whitespace">
   </span><span class="punctuation indicator">-</span><span class="whitespace"> </span><span class="name tag">name</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">cabin_temps</span><span class="whitespace">
     </span><span class="name tag">packet_interval</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">100 ms</span><span class="whitespace">
-    </span><span class="name tag">reads</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">cabin</span><span class="whitespace">
+    </span><span class="name tag">reads</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">basic</span><span class="whitespace">
 
 </span><span class="name tag">simulated_payloads</span><span class="punctuation">:</span><span class="whitespace">
   </span><span class="punctuation indicator">-</span><span class="whitespace"> </span><span class="name tag">name</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">temp_1</span><span class="whitespace">
     </span><span class="name tag">type</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">i2c</span><span class="whitespace">
     </span><span class="name tag">group</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">cabin_temps</span><span class="whitespace">
+    </span><span class="name tag">output</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">out1</span><span class="whitespace">
 
   </span><span class="punctuation indicator">-</span><span class="whitespace"> </span><span class="name tag">name</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">temp_2</span><span class="whitespace">
     </span><span class="name tag">type</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">i2c</span><span class="whitespace">
     </span><span class="name tag">group</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">cabin_temps</span><span class="whitespace">
+    </span><span class="name tag">output</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">out2</span><span class="whitespace">
 
   </span><span class="punctuation indicator">-</span><span class="whitespace"> </span><span class="name tag">name</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">temp_3</span><span class="whitespace">
     </span><span class="name tag">type</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">spi</span><span class="whitespace">
-    </span><span class="name tag">group</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">cabin_temps</span>
+    </span><span class="name tag">group</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">cabin_temps</span><span class="whitespace">
+    </span><span class="name tag">output</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">out3</span><span class="whitespace">
+
+  </span><span class="punctuation indicator">-</span><span class="whitespace"> </span><span class="name tag">name</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">heaters_1</span><span class="whitespace">
+    </span><span class="name tag">simulate</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">true</span><span class="whitespace">
+    </span><span class="name tag">type</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">gpio</span><span class="whitespace">
+    </span><span class="name tag">heats</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">basic</span><span class="whitespace">
+    </span><span class="name tag">input</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">in1</span><span class="whitespace">
+    </span><span class="name tag">rate</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal string">&quot;3.0&quot;</span><span class="whitespace">
+
+  </span><span class="punctuation indicator">-</span><span class="whitespace"> </span><span class="name tag">name</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">heaters_2</span><span class="whitespace">
+    </span><span class="name tag">simulate</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">true</span><span class="whitespace">
+    </span><span class="name tag">type</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">gpio</span><span class="whitespace">
+    </span><span class="name tag">heats</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">basic</span><span class="whitespace">
+    </span><span class="name tag">input</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">in2</span><span class="whitespace">
+    </span><span class="name tag">rate</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal string">&quot;3.0&quot;</span>
 </pre>
 </div>
 </div>

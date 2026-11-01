@@ -274,7 +274,12 @@ pub fn run_unix_dgram_node(
     // see `tcspecial::node::payload::network::unix::UnixDatagramEndpoint::
     // reaching`.
     if config.driven
-        || matches!(config.thermal, Some(crate::thermal::Thermal::Heats { .. }))
+        || matches!(
+            config.thermal,
+            Some(
+                crate::physics::thermal_mass::thermal_mass::Thermal::Heats { .. }
+            )
+        )
     {
         run_driven_unix_dgram_node(config, running, stats, &handler);
         return;
@@ -480,7 +485,7 @@ fn run_driven_unix_dgram_node(
             // panel has the device switched off: what arrives is counted, as
             // every stand-in counts it, and acted on by nothing.
             if pacing.sending {
-                crate::thermal::driven(
+                crate::physics::thermal_mass::thermal_mass::driven(
                     &config.thermal,
                     &config.name,
                     &buf[..n],
@@ -534,6 +539,7 @@ mod tests {
     fn device_at(path: &Path, protocol: PayloadProtocol) -> SimulatedPayload {
         SimulatedPayload::new(PayloadConfig {
             thermal: None,
+            thermostat: None,
             name: "DH0".to_string(),
             protocol,
             address: path.display().to_string(),
@@ -669,6 +675,7 @@ mod tests {
         std::fs::remove_file(&path).ok();
         let mut device = SimulatedPayload::new(PayloadConfig {
             thermal: None,
+            thermostat: None,
             name: "temp".to_string(),
             protocol: PayloadProtocol::UnixDgram,
             address: path.display().to_string(),
@@ -730,7 +737,9 @@ mod tests {
     /// to land and the mass would never have warmed.
     #[test]
     fn a_driven_datagram_device_waits_where_the_vehicle_sends() {
-        use crate::thermal::{Thermal, ThermalMass};
+        use crate::physics::thermal_mass::thermal_mass::{
+            Thermal, ThermalMass,
+        };
         use tcslibgs::sim_config::ResolvedMass;
 
         let path = a_path("driven");
@@ -741,6 +750,8 @@ mod tests {
                 name: "cabin".to_string(),
                 environment: 283.15,
                 time_constant: Duration::from_secs(50),
+                inputs: vec!["in1".to_string()],
+                outputs: Vec::new(),
             },
             Instant::now(),
         ));
@@ -752,8 +763,10 @@ mod tests {
         let mut device = SimulatedPayload::new(PayloadConfig {
             thermal: Some(Thermal::Heats {
                 mass: mass.clone(),
+                input: "in1".to_string(),
                 rate: 3.0,
             }),
+            thermostat: None,
             name: "heaters_1".to_string(),
             protocol: PayloadProtocol::UnixDgram,
             address: path.display().to_string(),

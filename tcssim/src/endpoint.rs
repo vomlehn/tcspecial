@@ -45,9 +45,9 @@ pub fn payload_config_from(
 
 /// And the same, with the thermal mass this payload is attached to.
 ///
-/// `thermal` is what [`crate::thermal`] made of the attachment the simulator
-/// file states: `None` for a payload attached to nothing, which is every
-/// payload of a file that declares no mass.
+/// `thermal` is what [`crate::physics::thermal_mass::thermal_mass`] made of
+/// the attachment the simulator file states: `None` for a payload attached
+/// to nothing, which is every payload of a file that declares no mass.
 ///
 /// Apart from the function above so that every test of the pacing, the
 /// faults and the addresses goes on saying nothing about thermal masses:
@@ -71,7 +71,7 @@ pub fn payload_config_from(
 pub fn payload_config_attached(
     dh: &DHConfig,
     sim: &ResolvedSim,
-    thermal: Option<crate::thermal::Thermal>,
+    thermal: Option<crate::physics::thermal_mass::thermal_mass::Thermal>,
 ) -> Result<PayloadConfig, String> {
     // What the simulator cannot be, which is tcslibgs's rule so that tcsverify
     // asks it too: see `tcslibgs::simulable`.
@@ -215,6 +215,7 @@ pub fn payload_config_attached(
 
     Ok(PayloadConfig {
         thermal,
+        thermostat: None,
         bus_address,
         can_id,
         can_fd,

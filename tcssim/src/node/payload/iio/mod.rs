@@ -158,6 +158,7 @@ mod tests {
     fn sensor_at(path: &str) -> PayloadConfig {
         PayloadConfig {
             thermal: None,
+            thermostat: None,
             name: "sensor".to_string(),
             protocol: PayloadProtocol::Iio,
             address: path.to_string(),

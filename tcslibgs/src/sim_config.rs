@@ -987,6 +987,11 @@ pub struct SimSettings {
     /// exercised: nothing else in a simulator makes two payloads agree.
     #[serde(default, deserialize_with = "blank_is_unstated")]
     pub reads: Option<String>,
+    /// Which of its mass's outputs a sensor reads: one of the names the
+    /// mass's `outputs` lists. Required of a payload that reads and refused
+    /// of one that does not.
+    #[serde(default, deserialize_with = "blank_is_unstated")]
+    pub output: Option<String>,
     /// And the thermal mass this payload warms, for a heater.
     ///
     /// The other half of the loop: the vehicle drives the heater, the
@@ -994,6 +999,11 @@ pub struct SimSettings {
     /// report afterwards is a consequence of what the vehicle decided.
     #[serde(default, deserialize_with = "blank_is_unstated")]
     pub heats: Option<String>,
+    /// Which of its mass's inputs a heater drives: one of the names the
+    /// mass's `inputs` lists, and no other heater's. Required of a payload
+    /// that heats and refused of one that does not.
+    #[serde(default, deserialize_with = "blank_is_unstated")]
+    pub input: Option<String>,
     /// How hard it warms it, in kelvin a second, while it is on.
     ///
     /// Each heater's own, so that two heaters of one mass can differ and a
@@ -1090,6 +1100,53 @@ pub struct SimSettings {
     pub ignore_trigger_percent: Option<u32>,
 }
 
+/// The names a mass's `inputs` or `outputs` lists, without checking them.
+///
+/// # Arguments
+///
+/// * `said` - The list as the file states it, if it does.
+///
+/// # Returns
+///
+/// Each name, trimmed, in order; nothing for no list.
+fn listed(said: &Option<String>) -> impl Iterator<Item = &str> {
+    said.as_deref()
+        .unwrap_or("")
+        .split(',')
+        .map(str::trim)
+        .filter(|name| !name.is_empty())
+}
+
+/// Reads a mass's `inputs` or `outputs`.
+///
+/// # Arguments
+///
+/// * `said` - The list as the file states it, if it does.
+///
+/// # Returns
+///
+/// Each name, in order; empty for no list.
+///
+/// # Errors
+///
+/// What is wrong, if a name is empty or listed twice.
+fn connections(said: &Option<String>) -> Result<Vec<String>, String> {
+    let Some(said) = said else {
+        return Ok(Vec::new());
+    };
+    let mut names: Vec<String> = Vec::new();
+    for name in said.split(',').map(str::trim) {
+        if name.is_empty() {
+            return Err(format!("\"{said}\" has an empty name in it"));
+        }
+        if names.iter().any(|n| n == name) {
+            return Err(format!("\"{said}\" names {name} twice"));
+        }
+        names.push(name.to_string());
+    }
+    Ok(names)
+}
+
 /// A setting written empty is a setting not stated.
 ///
 /// `packet_interval_ms: ""` and no `packet_interval_ms` at all mean the same
@@ -1164,7 +1221,9 @@ pub const SETTINGS: &[&str] = &[
     "close_after",
     "ignore_trigger_percent",
     "reads",
+    "output",
     "heats",
+    "input",
     "rate",
 ];
 
@@ -1174,7 +1233,8 @@ pub const SETTINGS: &[&str] = &[
 /// for the reason [`SETTINGS`] is: the editor keeps a mass a file carried and
 /// writes it back, and a field missing from this list is a field it would
 /// write away.
-pub const MASS_SETTINGS: &[&str] = &["environment", "time_constant"];
+pub const MASS_SETTINGS: &[&str] =
+    &["environment", "time_constant", "inputs", "outputs"];
 
 impl SimSettings {
     /// This settings' values, falling back to `base` for whatever it does not
@@ -1203,7 +1263,9 @@ impl SimSettings {
             // what a trio of sensors read together is: the group says the
             // mass once and the three entries say nothing.
             reads: self.reads.clone().or_else(|| base.reads.clone()),
+            output: self.output.clone().or_else(|| base.output.clone()),
             heats: self.heats.clone().or_else(|| base.heats.clone()),
+            input: self.input.clone().or_else(|| base.input.clone()),
             rate: self.rate.clone().or_else(|| base.rate.clone()),
             packet_interval: self
                 .packet_interval
@@ -1294,6 +1356,15 @@ pub struct SimTcssim {
     /// The UDP address, as `address:port`, at which tcssim answers whether it
     /// has made its stand-ins: see `crate::ready`.
     pub ready: String,
+    /// The hysteresis node of the configuration tcssim stands in for, if
+    /// any: tcssim then reads the sensors that feed it and switches the
+    /// heaters it drives itself, with the node's setpoint and band, so that
+    /// a thermal mass's loop closes with no tcspecial running.
+    ///
+    /// Unstated for a run with tcspecial, whose own thermostat would
+    /// otherwise be switching the same heaters.
+    #[serde(default, deserialize_with = "blank_is_unstated")]
+    pub thermostat: Option<String>,
 }
 
 /// A thermal mass, as a simulator file states it.
@@ -1320,15 +1391,30 @@ pub struct SimThermalMass {
     /// how far from its surroundings the mass happens to be, and the constant
     /// does not: one figure describes the mass at every temperature.
     pub time_constant: String,
+    /// The names of the places a heater can be connected to it, separated
+    /// by commas: `in1,in2`. None need be connected, and none is an empty
+    /// list.
+    #[serde(default, deserialize_with = "blank_is_unstated")]
+    pub inputs: Option<String>,
+    /// The names of the places a sensor can read its temperature from,
+    /// separated by commas: `out1,out2,out3`. None need be connected, and
+    /// none is an empty list.
+    #[serde(default, deserialize_with = "blank_is_unstated")]
+    pub outputs: Option<String>,
 }
 
 /// What a payload is to its thermal mass.
 #[derive(Debug, Clone, PartialEq)]
 pub enum Attached {
-    /// It reports that mass's temperature.
-    Reads(String),
-    /// It warms that mass, by this many kelvin a second while it is on.
-    Heats { mass: String, rate: f64 },
+    /// It reports that mass's temperature, from that output.
+    Reads { mass: String, output: String },
+    /// It warms that mass through that input, by this many kelvin a second
+    /// while it is on.
+    Heats {
+        mass: String,
+        input: String,
+        rate: f64,
+    },
 }
 
 /// A thermal mass with its figures read.
@@ -1338,6 +1424,10 @@ pub struct ResolvedMass {
     /// Kelvin.
     pub environment: f64,
     pub time_constant: Duration,
+    /// The names of its inputs, in the order the file lists them.
+    pub inputs: Vec<String>,
+    /// The names of its outputs, in the order the file lists them.
+    pub outputs: Vec<String>,
 }
 
 /// What simulating one data handler takes, with every value settled.
@@ -1450,7 +1540,9 @@ impl SimConfigFile {
     ///
     /// [`SimConfigError::BadThermalMass`] for the first mass whose
     /// environment is not a number, whose time constant is not a length of
-    /// time, or that no payload reads or heats.
+    /// time, whose inputs or outputs name one twice or name an empty one,
+    /// two of whose heaters share an input, or that no payload reads or
+    /// heats.
     pub fn masses(&self) -> Result<Vec<ResolvedMass>, SimConfigError> {
         let mut masses = Vec::new();
         for mass in &self.thermal_mass {
@@ -1476,6 +1568,37 @@ impl SimConfigFile {
                 crate::graph::parse_interval(mass.time_constant.trim())
                     .map_err(|why| named("time_constant", &why))?;
 
+            let inputs = connections(&mass.inputs)
+                .map_err(|why| named("inputs", &why))?;
+            let outputs = connections(&mass.outputs)
+                .map_err(|why| named("outputs", &why))?;
+
+            // An input is one heater's: two heaters on one input would each
+            // switch the other's heat, and which was on would depend on
+            // which the vehicle drove last.
+            let mut driven: BTreeMap<String, String> = BTreeMap::new();
+            for payload in &self.simulated_payloads {
+                let settings = self.settings_of(payload);
+                if settings.heats.as_deref() != Some(mass.name.as_str()) {
+                    continue;
+                }
+                let Some(input) = settings.input else {
+                    continue;
+                };
+                if let Some(other) =
+                    driven.insert(input.clone(), payload.name.clone())
+                {
+                    return Err(named(
+                        "inputs",
+                        &format!(
+                            "{other} and {} both heat it through {input}, and \
+                             an input is one heater's",
+                            payload.name
+                        ),
+                    ));
+                }
+            }
+
             if !self.simulated_payloads.iter().any(|payload| {
                 let settings = self.settings_of(payload);
                 settings.reads.as_deref() == Some(mass.name.as_str())
@@ -1495,6 +1618,8 @@ impl SimConfigFile {
                 name: mass.name.clone(),
                 environment,
                 time_constant,
+                inputs,
+                outputs,
             });
         }
         Ok(masses)
@@ -1602,15 +1727,18 @@ impl SimConfigFile {
     /// # Errors
     ///
     /// [`SimConfigError::BadAttachment`] if it both reads and heats, names a
-    /// mass not declared, states a `rate` where it heats nothing, or heats
-    /// with no `rate` or one that is not a positive number.
+    /// mass not declared, states a `rate` or an `input` where it heats
+    /// nothing or an `output` where it reads nothing, reads with no `output`
+    /// or one the mass does not list, or heats with no `input` or one the
+    /// mass does not list, or with no `rate` or one that is not a positive
+    /// number.
     fn attachment(
         &self,
         payload: &str,
         settings: &SimSettings,
     ) -> Result<Option<Attached>, SimConfigError> {
-        let known =
-            |name: &str| self.thermal_mass.iter().any(|m| m.name == name);
+        let declared =
+            |name: &str| self.thermal_mass.iter().find(|m| m.name == name);
         let bad = |why: String| SimConfigError::BadAttachment {
             payload: payload.to_string(),
             why,
@@ -1626,12 +1754,12 @@ impl SimConfigFile {
                     .to_string(),
             )),
             (Some(mass), None) => {
-                if !known(mass) {
+                let Some(declared) = declared(mass) else {
                     return Err(bad(format!(
                         "it reads \"{mass}\", and no thermal_mass of that name \
                          is declared"
                     )));
-                }
+                };
                 if settings.rate.is_some() {
                     return Err(bad(
                         "rate is how hard a heater warms a mass, and this one \
@@ -1639,13 +1767,58 @@ impl SimConfigFile {
                             .to_string(),
                     ));
                 }
-                Ok(Some(Attached::Reads(mass.to_string())))
+                if settings.input.is_some() {
+                    return Err(bad(
+                        "input is where a heater warms a mass, and this one \
+                         reads it"
+                            .to_string(),
+                    ));
+                }
+                let output = settings.output.as_deref().ok_or_else(|| {
+                    bad(format!(
+                        "output is not set: a sensor says which output of \
+                         \"{mass}\" it reads"
+                    ))
+                })?;
+                if !listed(&declared.outputs).any(|o| o == output) {
+                    return Err(bad(format!(
+                        "it reads output \"{output}\" of \"{mass}\", whose \
+                         outputs are: {}",
+                        listed(&declared.outputs)
+                            .collect::<Vec<_>>()
+                            .join(", ")
+                    )));
+                }
+                Ok(Some(Attached::Reads {
+                    mass: mass.to_string(),
+                    output: output.to_string(),
+                }))
             }
             (None, Some(mass)) => {
-                if !known(mass) {
+                let Some(declared) = declared(mass) else {
                     return Err(bad(format!(
                         "it heats \"{mass}\", and no thermal_mass of that name \
                          is declared"
+                    )));
+                };
+                if settings.output.is_some() {
+                    return Err(bad(
+                        "output is where a sensor reads a mass, and this one \
+                         heats it"
+                            .to_string(),
+                    ));
+                }
+                let input = settings.input.as_deref().ok_or_else(|| {
+                    bad(format!(
+                        "input is not set: a heater says which input of \
+                         \"{mass}\" it warms"
+                    ))
+                })?;
+                if !listed(&declared.inputs).any(|i| i == input) {
+                    return Err(bad(format!(
+                        "it heats input \"{input}\" of \"{mass}\", whose \
+                         inputs are: {}",
+                        listed(&declared.inputs).collect::<Vec<_>>().join(", ")
                     )));
                 }
                 let said = settings.rate.as_deref().ok_or_else(|| {
@@ -1669,16 +1842,23 @@ impl SimConfigFile {
                 }
                 Ok(Some(Attached::Heats {
                     mass: mass.to_string(),
+                    input: input.to_string(),
                     rate,
                 }))
             }
             (None, None) => {
-                if settings.rate.is_some() {
-                    return Err(bad(
-                        "rate is how hard a heater warms a mass, and this \
-                         payload is attached to none"
-                            .to_string(),
-                    ));
+                for (what, said) in [
+                    ("rate", &settings.rate),
+                    ("input", &settings.input),
+                    ("output", &settings.output),
+                ] {
+                    if said.is_some() {
+                        return Err(bad(format!(
+                            "{what} says how a payload is attached to a \
+                             thermal mass, and this payload is attached to \
+                             none"
+                        )));
+                    }
                 }
                 Ok(None)
             }
@@ -3707,6 +3887,144 @@ simulated_payloads:
         assert!(
             said.contains("raw socket") && said.contains("CAP_NET_RAW"),
             "{said}"
+        );
+    }
+
+    /// A simulator file with a mass `basic` of two inputs and three
+    /// outputs, a sensor DH0 and a heater DH1, each with what `sensor` and
+    /// `heater` say of it.
+    ///
+    /// # Arguments
+    ///
+    /// * `sensor` - The sensor's attachment settings, one per line.
+    /// * `heater` - The heater's.
+    ///
+    /// # Returns
+    ///
+    /// The file, parsed.
+    fn attached(sensor: &str, heater: &str) -> SimConfigFile {
+        let indent = |lines: &str| {
+            lines
+                .lines()
+                .map(|line| format!("    {line}\n"))
+                .collect::<String>()
+        };
+        parse(&format!(
+            "thermal_mass:
+  - name: basic
+    environment: \"283.15\"
+    time_constant: 50 s
+    inputs: \"in1,in2\"
+    outputs: \"out1,out2,out3\"
+simulated_payloads:
+  - name: DH0
+    simulate: true
+    type: network
+    protocol: udp
+    packet_interval: 100 ms
+{}  - name: DH1
+    simulate: true
+    type: network
+    protocol: udp
+    packet_interval: 100 ms
+{}",
+            indent(sensor),
+            indent(heater)
+        ))
+    }
+
+    /// What a sensor and a heater come to when attached to named connections,
+    /// and the mass's names as they resolve.
+    #[test]
+    fn a_sensor_and_a_heater_take_their_connections() {
+        let file = attached(
+            "reads: basic\noutput: out2",
+            "heats: basic\ninput: in1\nrate: \"3.0\"",
+        );
+        let resolved = file
+            .resolve(&[handler("DH0", 2), handler("DH1", 1)])
+            .unwrap();
+        assert_eq!(
+            resolved[0].attached,
+            Some(Attached::Reads {
+                mass: "basic".to_string(),
+                output: "out2".to_string(),
+            })
+        );
+        assert_eq!(
+            resolved[1].attached,
+            Some(Attached::Heats {
+                mass: "basic".to_string(),
+                input: "in1".to_string(),
+                rate: 3.0,
+            })
+        );
+        let masses = file.masses().unwrap();
+        assert_eq!(masses[0].inputs, ["in1", "in2"]);
+        assert_eq!(masses[0].outputs, ["out1", "out2", "out3"]);
+    }
+
+    /// A connection that is missing, misplaced or not the mass's is refused,
+    /// saying which.
+    #[test]
+    fn a_wrong_connection_is_refused() {
+        let heater = "heats: basic\ninput: in1\nrate: \"3.0\"";
+        let sensor = "reads: basic\noutput: out1";
+        for (sensor, heater, said) in [
+            ("reads: basic", heater, "output is not set"),
+            ("reads: basic\noutput: out9", heater, "outputs are: out1"),
+            ("reads: basic\noutput: out1\ninput: in2", heater, "input is"),
+            (sensor, "heats: basic\nrate: \"3.0\"", "input is not set"),
+            (
+                sensor,
+                "heats: basic\ninput: in9\nrate: \"3.0\"",
+                "inputs are",
+            ),
+            (sensor, "output: out1", "attached to none"),
+        ] {
+            let file = attached(sensor, heater);
+            let err = file
+                .resolve(&[handler("DH0", 2), handler("DH1", 1)])
+                .unwrap_err()
+                .to_string();
+            assert!(err.contains(said), "{said:?} not in: {err}");
+        }
+    }
+
+    /// Two heaters on one input, or a list naming one twice, is refused
+    /// where the masses are read; an input or output left unconnected is
+    /// not.
+    #[test]
+    fn inputs_are_one_heaters_each() {
+        let file = attached(
+            "heats: basic\ninput: in1\nrate: \"1.0\"",
+            "heats: basic\ninput: in1\nrate: \"3.0\"",
+        );
+        let err = file.masses().unwrap_err().to_string();
+        assert!(err.contains("both heat it through in1"), "{err}");
+
+        let mut file = attached("reads: basic\noutput: out1", "");
+        file.thermal_mass[0].outputs = Some("out1, out1".to_string());
+        let err = file.masses().unwrap_err().to_string();
+        assert!(err.contains("names out1 twice"), "{err}");
+
+        // Nothing on in1, in2, out2 or out3: still a mass.
+        let file = attached("reads: basic\noutput: out1", "");
+        assert!(file.masses().is_ok());
+    }
+
+    /// The tcssim section may name the thermostat tcssim stands in for.
+    #[test]
+    fn the_tcssim_section_names_a_thermostat() {
+        let file = parse(
+            "tcssim:
+  ready: \"127.0.0.1:7999\"
+  thermostat: thermostat
+",
+        );
+        assert_eq!(
+            file.tcssim.and_then(|t| t.thermostat).as_deref(),
+            Some("thermostat")
         );
     }
 }

@@ -110,6 +110,81 @@ pub fn reading_of(
     }
 }
 
+/// Finds the setpoint and band of a hysteresis node, for a simulator that
+/// stands in for it.
+///
+/// # Arguments
+///
+/// * `graph` - The configuration.
+/// * `name`  - The node's name.
+///
+/// # Returns
+///
+/// Its setpoint and half band.
+///
+/// # Errors
+///
+/// A message saying so if there is no such node, or it is not a compute node
+/// whose function is `hysteresis`, or its attributes are wrong.
+pub fn hysteresis_of(
+    graph: &Graph,
+    name: &str,
+) -> Result<crate::node::vehicle::compute::HysteresisParams, String> {
+    use crate::node::vehicle::compute::{params_of, Computation};
+
+    let node = graph.node(name).ok_or_else(|| {
+        format!("thermostat: there is no node \"{name}\" in the configuration")
+    })?;
+    if node.node_type != "compute" {
+        return Err(format!(
+            "thermostat: \"{name}\" is a {} node, and a thermostat is a \
+             compute node whose function is hysteresis",
+            node.node_type
+        ));
+    }
+    match params_of(name, &node.attributes)? {
+        Computation::Hysteresis(params) => Ok(params),
+        other => Err(format!(
+            "thermostat: \"{name}\" computes {}, and a thermostat computes \
+             hysteresis",
+            other.function()
+        )),
+    }
+}
+
+/// Says whether data leaving one node reaches another, over any number of
+/// links and the nodes between them.
+///
+/// # Arguments
+///
+/// * `graph` - The configuration.
+/// * `from`  - The node data leaves.
+/// * `to`    - The node it is to reach.
+///
+/// # Returns
+///
+/// Whether some chain of links leads from `from` to `to`; a node does not
+/// reach itself unless a chain leads back to it.
+pub fn reaches(graph: &Graph, from: &str, to: &str) -> bool {
+    let mut seen: std::collections::BTreeSet<String> =
+        std::collections::BTreeSet::new();
+    let mut waiting = vec![from.to_string()];
+    while let Some(node) = waiting.pop() {
+        for link in graph.links.iter().filter(|l| l.origin().node == node) {
+            for destination in link.to.each() {
+                let next = Destination::parse(destination).node;
+                if next == to {
+                    return true;
+                }
+                if seen.insert(next.clone()) {
+                    waiting.push(next);
+                }
+            }
+        }
+    }
+    false
+}
+
 /// Makes what the simulator takes for each payload node the simulator file
 /// names, in the order the configuration declares them.
 ///
@@ -289,5 +364,28 @@ mod tests {
             .collect();
         assert!(sized.contains(&("temp_1", 2)), "{sized:?}");
         assert!(sized.contains(&("temp_3", 3)), "{sized:?}");
+    }
+
+    /// The thermostat example's sensors reach its hysteresis node and the
+    /// node reaches its heaters, and not the other way round.
+    #[test]
+    fn data_reaches_along_the_links() {
+        let (graph, _) = example("thermostat");
+        assert!(reaches(&graph, "temp_1", "thermostat"));
+        assert!(reaches(&graph, "temp_3", "thermostat"));
+        assert!(reaches(&graph, "thermostat", "heaters_2"));
+        assert!(!reaches(&graph, "thermostat", "temp_1"));
+        assert!(!reaches(&graph, "heaters_1", "thermostat"));
+    }
+
+    /// A hysteresis node gives its setpoint and band; any other is refused.
+    #[test]
+    fn a_thermostat_is_a_hysteresis_node() {
+        let (graph, _) = example("thermostat");
+        let params = hysteresis_of(&graph, "thermostat").unwrap();
+        assert_eq!((params.setpoint, params.half_band), (293.15, 2.0));
+        for name in ["k_1", "temp_1", "nowhere"] {
+            assert!(hysteresis_of(&graph, name).is_err(), "{name}");
+        }
     }
 }

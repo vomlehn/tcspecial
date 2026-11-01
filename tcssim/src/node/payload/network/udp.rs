@@ -61,7 +61,12 @@ pub fn run_udp_node(
     // first binds nothing, and for a heater neither end would ever speak if
     // this one waited to be asked.
     if config.driven
-        || matches!(config.thermal, Some(crate::thermal::Thermal::Heats { .. }))
+        || matches!(
+            config.thermal,
+            Some(
+                crate::physics::thermal_mass::thermal_mass::Thermal::Heats { .. }
+            )
+        )
     {
         run_driven_udp_node(config, running, stats, &handler);
         return;
@@ -136,7 +141,7 @@ pub fn run_udp_node(
                 // A heater is driven by what arrives: the mass is told before
                 // the statistics are, so that nothing holds the stats lock
                 // across the mass's own.
-                crate::thermal::driven(
+                crate::physics::thermal_mass::thermal_mass::driven(
                     &config.thermal,
                     &config.name,
                     &buf[..n],
@@ -249,7 +254,7 @@ fn run_driven_udp_node(
             // panel has the device switched off: what arrives is counted, as
             // every stand-in counts it, and acted on by nothing.
             if pacing.sending {
-                crate::thermal::driven(
+                crate::physics::thermal_mass::thermal_mass::driven(
                     &config.thermal,
                     &config.name,
                     &buf[..n],
@@ -297,6 +302,7 @@ mod tests {
 
         let mut device = SimulatedPayload::new(PayloadConfig {
             thermal: None,
+            thermostat: None,
             name: "DH0".to_string(),
             protocol: PayloadProtocol::Udp,
             address: at.ip().to_string(),
@@ -379,6 +385,7 @@ mod tests {
             .expect("a free port");
         let mut device = SimulatedPayload::new(PayloadConfig {
             thermal: None,
+            thermostat: None,
             name: "DH0".to_string(),
             protocol: PayloadProtocol::Udp,
             address: at.ip().to_string(),
@@ -446,6 +453,7 @@ mod tests {
     ) -> SimulatedPayload {
         SimulatedPayload::new(PayloadConfig {
             thermal: None,
+            thermostat: None,
             name: "DH0".to_string(),
             protocol: PayloadProtocol::Udp,
             address: at.ip().to_string(),
@@ -509,6 +517,7 @@ mod tests {
 
         let config = PayloadConfig {
             thermal: None,
+            thermostat: None,
             name: "serial-line".to_string(),
             protocol: PayloadProtocol::Udp,
             address: at.ip().to_string(),
@@ -808,6 +817,7 @@ mod tests {
 
         let mut device = SimulatedPayload::new(PayloadConfig {
             thermal: None,
+            thermostat: None,
             name: "DH0".to_string(),
             protocol: PayloadProtocol::Udp,
             address: at.ip().to_string(),

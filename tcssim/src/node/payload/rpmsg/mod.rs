@@ -143,6 +143,7 @@ mod tests {
     ) -> PayloadConfig {
         PayloadConfig {
             thermal: None,
+            thermostat: None,
             name: "remote".to_string(),
             protocol: PayloadProtocol::Rpmsg,
             address: path.to_string(),

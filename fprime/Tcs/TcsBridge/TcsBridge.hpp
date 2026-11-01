@@ -69,8 +69,10 @@ private:
 		char why[TCS_ERROR_BYTES];  /* why, where it did */
 	};
 
-	/* How the last CONNECT came out, so that each outcome is said once
-	 * as it changes rather than at every attempt. */
+	/* How the last CONNECT came out, so that another configuration is
+	 * said once as it is found rather than at every beacon. An agreement
+	 * is said every time: a CONNECT goes only while the bridge is not
+	 * matched, so each one agreed is a match begun again. */
 	enum class Connected { NEVER, AGREED, DIFFERED, FAILED };
 
 	// ---- Handlers ----------------------------------------------------
@@ -85,6 +87,10 @@ private:
 				   const Fw::CmdStringArg &node) override;
 	void SEND_DATA_cmdHandler(FwOpcodeType opCode, U32 cmdSeq,
 				  const Fw::CmdStringArg &data) override;
+	void RESTART_ARM_cmdHandler(FwOpcodeType opCode, U32 cmdSeq, U64 key,
+				    const Fw::CmdStringArg &target) override;
+	void RESTART_cmdHandler(FwOpcodeType opCode, U32 cmdSeq, U64 key,
+				const Fw::CmdStringArg &target) override;
 
 	// ---- The model, written from the configuration --------------------
 
@@ -168,6 +174,22 @@ private:
 			 int (*send)(tcs_client *, uint32_t, tcs_status *),
 			 FwOpcodeType opCode, U32 cmdSeq,
 			 const Fw::CmdStringArg &node);
+
+	/** Sends RESTART_ARM or RESTART, and answers the F´ command by what
+	 * tcspecial answered.
+	 *
+	 * @param command  The command's name, for its events.
+	 * @param send     tcs_client_restart_arm or tcs_client_restart.
+	 * @param opCode   The F´ command's opcode.
+	 * @param cmdSeq   Its sequence number.
+	 * @param key      The key.
+	 * @param target   The target's checksum, or empty for this
+	 *                 configuration's. */
+	void restartCommand(const char *command,
+			    int (*send)(tcs_client *, uint64_t, const char *,
+					tcs_status *),
+			    FwOpcodeType opCode, U32 cmdSeq, U64 key,
+			    const Fw::CmdStringArg &target);
 
 	/** Finds a node's device id, and fails the command where there is no
 	 * such node.

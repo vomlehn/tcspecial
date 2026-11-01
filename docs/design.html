@@ -1246,11 +1246,11 @@ of the vehicle carried over one SBN peer (<tt class="docutils literal"><span cla
 against a test playing the cFS end. The bridge at the F´ end is built too:
 its F´ model is written from the configuration by <tt class="docutils literal">tcsverify
 <span class="pre">--fprime-model</span></tt>, and the <tt class="docutils literal">TcsBridge</tt> component in <tt class="docutils literal">fprime/</tt> is tested in
-an F´ deployment against tcspecial and tcssim -- see <a class="reference internal" href="#f-gateway-fprime">F´: gateway_fprime</a>,
-which says what it does not yet do. The ground's end of the bus is built too:
-tcssim stands in for the cFS end, and tcslib's SBN transport,
-<tt class="docutils literal"><span class="pre">tcslib::bus</span></tt>, lets tcsmoc and every station on tcslib command a vehicle
-that answers to cFS through it (see <a class="reference internal" href="#what-crosses-the-bus">What crosses the bus</a>).</p>
+an F´ deployment against tcspecial and tcssim, data both ways, the node
+commands and the restart -- see <a class="reference internal" href="#f-gateway-fprime">F´: gateway_fprime</a>. The ground's end of
+the bus is built too: tcssim stands in for the cFS end, and tcslib's SBN
+transport, <tt class="docutils literal"><span class="pre">tcslib::bus</span></tt>, lets tcsmoc and every station on tcslib command
+a vehicle that answers to cFS through it (see <a class="reference internal" href="#what-crosses-the-bus">What crosses the bus</a>).</p>
 <p>The gateway nodes are written in the <tt class="docutils literal">gateway</tt> section, linked through
 <tt class="docutils literal"><span class="pre">gateway-in</span></tt> and <tt class="docutils literal"><span class="pre">gateway-out</span></tt>, with <tt class="docutils literal"><span class="pre">tee-gateway</span></tt>, <tt class="docutils literal"><span class="pre">null-gateway</span></tt> and
 <tt class="docutils literal">app_gateway_veh</tt> beside them. Each of those was named for the MOC while the
@@ -1827,14 +1827,14 @@ refuses to run on any other, saying so in an event: a bridge flying a
 configuration its channels were not written from would put one node's
 data under another's name.</dd>
 </dl>
-<p>The commands are one for each tcspecial command the bridge sends: <tt class="docutils literal">PING</tt>,
-and <tt class="docutils literal">START_NODE</tt>, <tt class="docutils literal">STOP_NODE</tt> and <tt class="docutils literal">QUERY_NODE</tt>, each naming a node by
-its name, which the model turns into the device id. CONNECT is not a command:
-the bridge sends one for each beacon heard while it is not matched for
-commanding, because nothing comes down until one is answered and a flight
+<p>The commands are one for each tcspecial command the bridge sends: <tt class="docutils literal">PING</tt>;
+<tt class="docutils literal">START_NODE</tt>, <tt class="docutils literal">STOP_NODE</tt> and <tt class="docutils literal">QUERY_NODE</tt>, each naming a node by its
+name, which the model turns into the device id; and <tt class="docutils literal">RESTART_ARM</tt> and
+<tt class="docutils literal">RESTART</tt>. CONNECT is not a command: the bridge sends one for each
+beacon heard while it is not matched for commanding, because nothing comes down until one is answered and a flight
 computer has nobody at it to press a button. A node command naming a node
 the configuration lacks is refused unsent. What tcspecial answers is the
-command's response and an event. The restart commands are not offered yet.</p>
+command's response and an event.</p>
 <p><tt class="docutils literal">SEND_DATA</tt> is the one command that is not tcspecial's: it sends its text
 up to the gateway node, as one datum, by tcslib-c's <tt class="docutils literal">tcs_uplink</tt>, and the
 node leaves it by its <tt class="docutils literal"><span class="pre">gateway-out</span></tt> links for the nodes they reach -- in
@@ -1845,11 +1845,26 @@ goes only while the bridge is matched for commanding, as tcslib-c holds every
 uplink to (see <a class="reference internal" href="#on-the-ground">On the ground</a>), and is refused, saying so, before. A
 gateway node that binds no address and port aboard has no way up; the
 bridge runs on one, as the far end of a bridge that only listens, and fails
-<tt class="docutils literal">SEND_DATA</tt> alone, saying why.
-Nothing on the ground holds commands back after a RESTART -- the vehicle
-answers them <tt class="docutils literal">Unmatched</tt>, as <a class="reference internal" href="#what-the-ground-may-send-meanwhile">What the ground may send meanwhile</a> says --
-so offering them needs no tie between the beacon watch and the client, each
-of which runs on a thread of its own here.</p>
+<tt class="docutils literal">SEND_DATA</tt> alone, saying why.</p>
+<p><tt class="docutils literal">RESTART_ARM</tt> and <tt class="docutils literal">RESTART</tt> each take the key and the target: the
+checksum of the configuration to restart onto, as tcsverify prints it, or
+nothing for this configuration's, a plain restart. They are plain commands
+through <tt class="docutils literal">tcs_client_restart_arm</tt> and <tt class="docutils literal">tcs_client_restart</tt>, answered with
+what tcspecial answered -- <tt class="docutils literal">NotFound</tt> for a configuration the vehicle does
+not hold, <tt class="docutils literal">NotArmed</tt> for a RESTART no arm matches -- in a
+<tt class="docutils literal">RestartAnswered</tt> event. Nothing on the ground holds commands back after a
+RESTART: the vehicle answers every command but CONNECT, RESTART_ARM and
+RESTART <tt class="docutils literal">Unmatched</tt> from the moment it takes one until the start that comes
+back is matched, and the start that took it refuses a CONNECT too, as <a class="reference internal" href="#what-the-ground-may-send-meanwhile">What
+the ground may send meanwhile</a> says. So offering them needs no tie between the beacon watch
+and the client, each of which runs on a thread of its own here. The start
+that comes back beacons with the restart flag set, which ends the bridge's
+match, and the bridge connects to it as it connects to any start, on the next
+beacon, and says <tt class="docutils literal">Matched</tt> again: every CONNECT that agrees is said, since
+one goes only while the bridge is not matched. A restart onto another
+configuration leaves a bridge built for this one with a vehicle it will not
+match, saying <tt class="docutils literal">ConfigurationDiffers</tt>: its model is this configuration's,
+and a bridge for the other is built from that one's.</p>
 <p>A source's channel is of the type the configuration says its data are, and
 the configuration says one thing of a datum's type: that a compute node whose
 function makes a value -- <tt class="docutils literal">to_kelvin</tt>, <tt class="docutils literal">vote</tt>, <tt class="docutils literal">process</tt> -- sends
@@ -1899,8 +1914,10 @@ its two bytes, and the temperature made of it as <tt class="docutils literal">ca
 of kelvin, with no datum refused as not a value; a PING is answered; a node is stopped and started again; <tt class="docutils literal">1</tt> sent up
 drives the heater, whose stand-in warms the thermal mass the thermometer
 reads, so that <tt class="docutils literal">cabin_temp</tt> climbs, and <tt class="docutils literal">0</tt> turns it off; a node the
-configuration lacks is refused unsent; and the deployment stops cleanly.</p>
-<p>Not yet built: the restart commands.</p>
+configuration lacks is refused unsent; a restart onto a configuration the
+vehicle does not hold is answered <tt class="docutils literal">NotFound</tt>; a plain restart is armed and
+taken, the beacons carry the restart flag, and the bridge is matched with the
+start that comes back and commands it; and the deployment stops cleanly.</p>
 </div>
 </div>
 <div class="section" id="what-a-device-node-says">

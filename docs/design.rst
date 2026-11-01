@@ -734,11 +734,11 @@ of the vehicle carried over one SBN peer (``tcspecial::runtime::bus``, on
 against a test playing the cFS end. The bridge at the F´ end is built too:
 its F´ model is written from the configuration by ``tcsverify
 --fprime-model``, and the ``TcsBridge`` component in ``fprime/`` is tested in
-an F´ deployment against tcspecial and tcssim -- see `F´: gateway_fprime`_,
-which says what it does not yet do. The ground's end of the bus is built too:
-tcssim stands in for the cFS end, and tcslib's SBN transport,
-``tcslib::bus``, lets tcsmoc and every station on tcslib command a vehicle
-that answers to cFS through it (see `What crosses the bus`_).
+an F´ deployment against tcspecial and tcssim, data both ways, the node
+commands and the restart -- see `F´: gateway_fprime`_. The ground's end of
+the bus is built too: tcssim stands in for the cFS end, and tcslib's SBN
+transport, ``tcslib::bus``, lets tcsmoc and every station on tcslib command
+a vehicle that answers to cFS through it (see `What crosses the bus`_).
 
 The gateway nodes are written in the ``gateway`` section, linked through
 ``gateway-in`` and ``gateway-out``, with ``tee-gateway``, ``null-gateway`` and
@@ -1337,14 +1337,14 @@ Requirement
     configuration its channels were not written from would put one node's
     data under another's name.
 
-The commands are one for each tcspecial command the bridge sends: ``PING``,
-and ``START_NODE``, ``STOP_NODE`` and ``QUERY_NODE``, each naming a node by
-its name, which the model turns into the device id. CONNECT is not a command:
-the bridge sends one for each beacon heard while it is not matched for
-commanding, because nothing comes down until one is answered and a flight
+The commands are one for each tcspecial command the bridge sends: ``PING``;
+``START_NODE``, ``STOP_NODE`` and ``QUERY_NODE``, each naming a node by its
+name, which the model turns into the device id; and ``RESTART_ARM`` and
+``RESTART``. CONNECT is not a command: the bridge sends one for each
+beacon heard while it is not matched for commanding, because nothing comes down until one is answered and a flight
 computer has nobody at it to press a button. A node command naming a node
 the configuration lacks is refused unsent. What tcspecial answers is the
-command's response and an event. The restart commands are not offered yet.
+command's response and an event.
 
 ``SEND_DATA`` is the one command that is not tcspecial's: it sends its text
 up to the gateway node, as one datum, by tcslib-c's ``tcs_uplink``, and the
@@ -1357,10 +1357,26 @@ uplink to (see `On the ground`_), and is refused, saying so, before. A
 gateway node that binds no address and port aboard has no way up; the
 bridge runs on one, as the far end of a bridge that only listens, and fails
 ``SEND_DATA`` alone, saying why.
-Nothing on the ground holds commands back after a RESTART -- the vehicle
-answers them ``Unmatched``, as `What the ground may send meanwhile`_ says --
-so offering them needs no tie between the beacon watch and the client, each
-of which runs on a thread of its own here.
+
+``RESTART_ARM`` and ``RESTART`` each take the key and the target: the
+checksum of the configuration to restart onto, as tcsverify prints it, or
+nothing for this configuration's, a plain restart. They are plain commands
+through ``tcs_client_restart_arm`` and ``tcs_client_restart``, answered with
+what tcspecial answered -- ``NotFound`` for a configuration the vehicle does
+not hold, ``NotArmed`` for a RESTART no arm matches -- in a
+``RestartAnswered`` event. Nothing on the ground holds commands back after a
+RESTART: the vehicle answers every command but CONNECT, RESTART_ARM and
+RESTART ``Unmatched`` from the moment it takes one until the start that comes
+back is matched, and the start that took it refuses a CONNECT too, as `What
+the ground may send meanwhile`_ says. So offering them needs no tie between the beacon watch
+and the client, each of which runs on a thread of its own here. The start
+that comes back beacons with the restart flag set, which ends the bridge's
+match, and the bridge connects to it as it connects to any start, on the next
+beacon, and says ``Matched`` again: every CONNECT that agrees is said, since
+one goes only while the bridge is not matched. A restart onto another
+configuration leaves a bridge built for this one with a vehicle it will not
+match, saying ``ConfigurationDiffers``: its model is this configuration's,
+and a bridge for the other is built from that one's.
 
 A source's channel is of the type the configuration says its data are, and
 the configuration says one thing of a datum's type: that a compute node whose
@@ -1415,9 +1431,10 @@ its two bytes, and the temperature made of it as ``cabin_temp``'s, a number
 of kelvin, with no datum refused as not a value; a PING is answered; a node is stopped and started again; ``1`` sent up
 drives the heater, whose stand-in warms the thermal mass the thermometer
 reads, so that ``cabin_temp`` climbs, and ``0`` turns it off; a node the
-configuration lacks is refused unsent; and the deployment stops cleanly.
-
-Not yet built: the restart commands.
+configuration lacks is refused unsent; a restart onto a configuration the
+vehicle does not hold is answered ``NotFound``; a plain restart is armed and
+taken, the beacons carry the restart flag, and the bridge is matched with the
+start that comes back and commands it; and the deployment stops cleanly.
 
 What a device node says
 -----------------------

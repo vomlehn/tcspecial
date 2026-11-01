@@ -26,6 +26,11 @@ MATCHING = 60
 ARRIVING = 30
 ANSWERING = 15
 
+# The key restarts are armed with, and a checksum of no configuration the
+# vehicle holds.
+ARM_KEY = 0x5EED
+NOWHERE = "0" * 32
+
 
 class Contains(predicates.predicate):
     """Whether a channel's text holds some text, as F´'s test API asks a
@@ -189,4 +194,52 @@ def test_a_node_the_configuration_lacks_is_refused_unsent(fprime_test_api):
     fprime_test_api.send_command(of_bridge("QUERY_NODE"), ["nosuch"])
     fprime_test_api.assert_event(
         of_bridge("NoSuchNode"), ["QUERY_NODE", "nosuch"], timeout=ANSWERING
+    )
+
+
+def test_a_restart_onto_a_configuration_not_held_is_refused(fprime_test_api):
+    fprime_test_api.send_command(
+        of_bridge("RESTART_ARM"), [ARM_KEY, NOWHERE]
+    )
+    fprime_test_api.assert_event(
+        of_bridge("RestartAnswered"),
+        ["RESTART_ARM", "NotFound"],
+        timeout=ANSWERING,
+    )
+
+
+def test_the_vehicle_restarts_and_is_matched_again(fprime_test_api):
+    # Last, for it restarts tcspecial. Armed and restarted onto this
+    # configuration, which empty names; then the beacons carry the restart
+    # flag, and the bridge, connecting by itself, is matched with the start
+    # that comes back and commands it.
+    for command in ("RESTART_ARM", "RESTART"):
+        fprime_test_api.send_and_assert_command(
+            of_bridge(command),
+            [ARM_KEY, ""],
+            timeout=ANSWERING,
+            commander=COMMANDER,
+        )
+        answered = fprime_test_api.assert_event(
+            of_bridge("RestartAnswered"),
+            [command, "Success"],
+            timeout=ANSWERING,
+        )
+    # From when the RESTART was answered, by the deployment's clock: what
+    # the bridge says of the start that comes back may be said before the
+    # first of these asks, so it is looked for from then, not from now.
+    restarted = answered.get_time()
+    fprime_test_api.assert_telemetry(
+        of_bridge("RestartFlag"), value=True, start=restarted,
+        timeout=ARRIVING,
+    )
+    fprime_test_api.assert_event(
+        of_bridge("Matched"), start=restarted, timeout=MATCHING
+    )
+    fprime_test_api.assert_telemetry(
+        of_bridge("CommandingMatched"), value=True, start=restarted,
+        timeout=ARRIVING,
+    )
+    fprime_test_api.send_and_assert_command(
+        of_bridge("PING"), timeout=ANSWERING, commander=COMMANDER
     )

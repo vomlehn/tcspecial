@@ -679,10 +679,10 @@ export component MainWindow inherits Window {
     // time and times the answer.
     in property <bool> can-ping-node: false;
     callback ping-node-clicked();
-    // Whether the configuration has a sensor whose temperature reaches the
-    // ground, and so whether there is a Temperatures button: see thermal.rs.
+    // Whether the configuration has a value or a switch that reaches the
+    // ground, and so whether there is a Plot button: see plot.rs.
     in property <bool> can-plot: false;
-    callback temperatures-clicked();
+    callback plot-clicked();
     callback query-all-clicked();
     // One callback for the one button a panel has. Which command it sends is
     // Rust's to decide, from the status the button's own label comes from.
@@ -893,12 +893,12 @@ export component MainWindow inherits Window {
                         clicked => { ping-node-clicked(); }
                     }
 
-                    // The temperatures window, where the configuration has a
-                    // sensor whose temperature reaches the ground: in this
-                    // row for the reason Ping node is.
+                    // The plot window, where the configuration has a value
+                    // or a switch that reaches the ground: in this row for
+                    // the reason Ping node is.
                     if can-plot: Button {
-                        text: "Temperatures";
-                        clicked => { temperatures-clicked(); }
+                        text: "Plot";
+                        clicked => { plot-clicked(); }
                     }
 
                 }
@@ -1051,154 +1051,235 @@ export component MainWindow inherits Window {
 }
 
 
-// One sensor's trace in the temperatures window: its path, in pixels across
-// the plot, its colour, and its name with its latest reading for the legend.
+// One value's trace in the plot window: its path, in pixels across its
+// panel, its colour, and its name with its latest reading for the legend.
 export struct TraceShown {
     said: string,
     commands: string,
     colour: color,
 }
 
-// A stretch of time a heater switch was in one state, in pixels across the
-// plot.
+// One tick of a panel's axis: how far down the panel, in pixels, and its
+// value.
+export struct TickShown {
+    y: float,
+    said: string,
+}
+
+// The values in one unit: the unit's name, their traces, the axis's ticks,
+// and how far down each thermostat setpoint in this unit is, in pixels.
+export struct PanelShown {
+    unit: string,
+    traces: [TraceShown],
+    ticks: [TickShown],
+    setpoints: [float],
+}
+
+// A stretch of time a switch was in one state, in pixels across the plot.
 export struct SpanShown {
     x: float,
     width: float,
     on: bool,
 }
 
-// One heater switch: its name and what it drives, its state in words, and
-// its spans.
+// One switch: its name and what it drives, its state in words, and its
+// spans.
 export struct SwitchShown {
     label: string,
     state: string,
     spans: [SpanShown],
 }
 
-// The temperatures window, opened by Temperatures: each sensor's
-// temperature, and whether the heaters are on, over the last ten seconds.
-// What is drawn is worked out in Rust: see thermal.rs, which says what is
-// plotted and why. A window of its own for the reason the ping panel is one.
+// The plot window, opened by Plot: every value that reaches the ground, a
+// panel for each unit, and every switch's decisions under them, over the
+// span chosen with the buttons at the top. What is drawn is worked out in
+// Rust: see plot.rs, which says what is plotted and why. A window of its own
+// for the reason the ping panel is one.
 //
 // The colours are Okabe and Ito's, told apart with each common kind of
-// colour blindness, and never alone: each trace is named in the legend with
-// its latest reading, and each switch's state is said in words. Vermillion is
-// the heaters' alone, so that nothing that is a temperature is the colour of
-// a heater on.
-export component ThermalWindow inherits Window {
+// colour blindness, and never alone: each trace is named in its panel's
+// legend with its latest reading, each switch's state is said in words, and
+// a setpoint's rule is labelled. Vermillion is the switches' alone, so that
+// no value is the colour of a switch on.
+export component PlotWindow inherits Window {
     default-font-size: Fonts.window;
-    title: "tcsmoc: temperatures";
+    title: "tcsmoc: plot";
     background: Colors.window;
-    preferred-width: 760px;
-    preferred-height: 480px;
-    min-width: 480px;
-    min-height: 360px;
+    preferred-width: 820px;
+    preferred-height: 620px;
+    min-width: 520px;
+    min-height: 400px;
 
-    in property <[TraceShown]> traces;
+    in property <[PanelShown]> panels;
     in property <[SwitchShown]> switches;
-    // What the top, middle and bottom of the plot are, in kelvin.
-    in property <string> top-said: "";
-    in property <string> centre-said: "";
-    in property <string> bottom-said: "";
-    // The plot's size, which Rust draws the paths to.
-    out property <length> plot-width: plot.width;
-    out property <length> plot-height: plot.height;
+    // What the span is, over the plot.
+    in property <string> said: "";
+    // Which span button is chosen: its place in plot.rs's `Span::ALL`.
+    in-out property <int> span: 0;
+    callback span-chosen(int);
+    // Each panel's size, which Rust draws the paths to. The panels share
+    // the plotting area's height, a gap between each, and each has its
+    // legend on a strip of its own above it, so that the legend never hides
+    // what is drawn.
+    out property <length> plot-width: area.width - root.axis-width - root.gap;
+    out property <length> panel-height: root.slot-height - root.legend-height;
+    property <length> slot-height:
+        (area.height - (root.panels.length - 1) * root.gap)
+            / max(1, root.panels.length);
 
-    property <color> heater-on: #D55E00;
-    property <color> heater-on-shade: #D55E0024;
-    property <color> heater-off: #D4D8DD;
+    property <color> switch-on: #D55E00;
+    property <color> switch-on-shade: #D55E0024;
+    property <color> switch-off: #D4D8DD;
     property <color> rule: #E5E7EB;
+    property <color> edge: #9CA3AF;
     property <length> axis-width: 92px;
+    property <length> gap: 8px;
+    property <length> legend-height: 24px;
 
     VerticalLayout {
         padding: 10px;
         spacing: 6px;
 
-        Text {
-            text: "The last 10 s, 30 K either side of " + root.centre-said;
-            font-italic: true;
-        }
-
         HorizontalLayout {
             spacing: 6px;
-            vertical-stretch: 1;
-
-            VerticalLayout {
-                width: root.axis-width;
-                Text {
-                    text: root.top-said;
-                    horizontal-alignment: right;
-                    font-family: Fonts.mono;
-                }
-                Rectangle { }
-                Text {
-                    text: root.centre-said;
-                    horizontal-alignment: right;
-                    font-family: Fonts.mono;
-                }
-                Rectangle { }
-                Text {
-                    text: root.bottom-said;
-                    horizontal-alignment: right;
-                    font-family: Fonts.mono;
+            Text {
+                text: root.said;
+                font-italic: true;
+                vertical-alignment: center;
+                horizontal-stretch: 1;
+            }
+            for name[i] in ["10 s", "1 min", "10 min", "Whole run"]: Button {
+                text: name;
+                primary: root.span == i;
+                clicked => {
+                    root.span = i;
+                    root.span-chosen(i);
                 }
             }
+        }
 
-            plot := Rectangle {
-                min-height: 200px;
-                background: #ffffff;
-                border-width: 1px;
-                border-color: #9CA3AF;
-                clip: true;
+        area := Rectangle {
+            vertical-stretch: 1;
+            min-height: 200px;
 
-                // While a heater is on, the plot behind the traces is shaded
-                // its colour, so that what the heaters did lines up with what
-                // the temperatures did.
-                for switch in root.switches: Rectangle {
-                    for span in switch.spans: Rectangle {
-                        x: span.x * 1px;
-                        y: 0;
-                        width: span.width * 1px;
-                        height: parent.height;
-                        background: span.on ? root.heater-on-shade
-                                            : transparent;
+            for panel[p] in root.panels: Rectangle {
+                x: 0;
+                y: p * (root.slot-height + root.gap);
+                width: parent.width;
+                height: root.slot-height;
+
+                // The legend: the unit, then each trace's colour, name and
+                // latest reading.
+                HorizontalLayout {
+                    x: root.axis-width + root.gap;
+                    y: 0;
+                    width: root.plot-width;
+                    height: root.legend-height;
+                    spacing: 12px;
+                    alignment: start;
+                    Text {
+                        text: panel.unit;
+                        font-weight: 700;
+                        vertical-alignment: center;
+                    }
+                    for trace in panel.traces: HorizontalLayout {
+                        spacing: 4px;
+                        Rectangle {
+                            width: 18px;
+                            height: 3px;
+                            y: (parent.height - self.height) / 2;
+                            background: trace.colour;
+                        }
+                        Text {
+                            text: trace.said;
+                            font-family: Fonts.mono;
+                            vertical-alignment: center;
+                        }
                     }
                 }
 
-                // A rule every ten kelvin, the middle one darker.
-                for i in [1, 2, 4, 5]: Rectangle {
+                // The axis: each tick's value, centred on its rule. The top
+                // and bottom ones stand out of the panel by half a line,
+                // beside the legend's strip and into the gap below, where
+                // nothing else is written in the axis's column.
+                for tick in panel.ticks: Text {
                     x: 0;
-                    y: parent.height * i / 6;
-                    width: parent.width;
-                    height: 1px;
-                    background: root.rule;
-                }
-                Rectangle {
-                    x: 0;
-                    y: parent.height / 2;
-                    width: parent.width;
-                    height: 1px;
-                    background: #9CA3AF;
+                    width: root.axis-width;
+                    y: root.legend-height + tick.y * 1px - self.height / 2;
+                    text: tick.said;
+                    horizontal-alignment: right;
+                    font-family: Fonts.mono;
                 }
 
-                for trace in root.traces: Path {
-                    x: 0;
-                    y: 0;
-                    width: parent.width;
-                    height: parent.height;
-                    viewbox-width: self.width / 1px;
-                    viewbox-height: self.height / 1px;
-                    commands: trace.commands;
-                    stroke: trace.colour;
-                    stroke-width: 2px;
+                Rectangle {
+                    x: root.axis-width + root.gap;
+                    y: root.legend-height;
+                    width: root.plot-width;
+                    height: root.panel-height;
+                    background: #ffffff;
+                    border-width: 1px;
+                    border-color: root.edge;
+                    clip: true;
+
+                    // While a switch is on, the plot behind the traces is
+                    // shaded its colour, so that what the switches did lines
+                    // up with what the values did.
+                    for switch in root.switches: Rectangle {
+                        for span in switch.spans: Rectangle {
+                            x: span.x * 1px;
+                            y: 0;
+                            width: span.width * 1px;
+                            height: parent.height;
+                            background: span.on ? root.switch-on-shade
+                                                : transparent;
+                        }
+                    }
+
+                    for tick in panel.ticks: Rectangle {
+                        x: 0;
+                        y: tick.y * 1px;
+                        width: parent.width;
+                        height: 1px;
+                        background: root.rule;
+                    }
+
+                    // Each setpoint, a rule darker and thicker than the
+                    // ticks', and said in words at its right end, so that it
+                    // is told from them by more than its shade.
+                    for setpoint in panel.setpoints: Rectangle {
+                        x: 0;
+                        y: setpoint * 1px - 1px;
+                        width: parent.width;
+                        height: 2px;
+                        background: #6B7280;
+                        Text {
+                            x: parent.width - self.width - 4px;
+                            y: -self.height;
+                            text: "setpoint";
+                            color: #4B5563;
+                            font-italic: true;
+                        }
+                    }
+
+                    for trace in panel.traces: Path {
+                        x: 0;
+                        y: 0;
+                        width: parent.width;
+                        height: parent.height;
+                        viewbox-width: self.width / 1px;
+                        viewbox-height: self.height / 1px;
+                        commands: trace.commands;
+                        stroke: trace.colour;
+                        stroke-width: 2px;
+                    }
                 }
             }
         }
 
-        // Each heater switch, under the plot and as wide as it, so that a
-        // change lines up with the temperatures above it.
+        // Each switch, under the panels and as wide as them, so that a
+        // change lines up with the values above it.
         for switch in root.switches: HorizontalLayout {
-            spacing: 6px;
+            spacing: root.gap;
             Text {
                 width: root.axis-width;
                 text: switch.state;
@@ -1212,56 +1293,39 @@ export component ThermalWindow inherits Window {
                 Rectangle {
                     height: 16px;
                     border-width: 1px;
-                    border-color: #9CA3AF;
+                    border-color: root.edge;
                     clip: true;
                     for span in switch.spans: Rectangle {
                         x: span.x * 1px;
                         y: 0;
                         width: span.width * 1px;
                         height: parent.height;
-                        background: span.on ? root.heater-on
-                                            : root.heater-off;
+                        background: span.on ? root.switch-on
+                                            : root.switch-off;
                     }
                 }
             }
         }
 
-        // The legend: each trace's colour, name and latest reading, and the
-        // heaters' two colours in words.
-        HorizontalLayout {
-            spacing: 14px;
+        // The switches' two colours, in words.
+        if root.switches.length > 0: HorizontalLayout {
+            spacing: 4px;
             alignment: start;
-            for trace in root.traces: HorizontalLayout {
-                spacing: 4px;
-                Rectangle {
-                    width: 18px;
-                    height: 3px;
-                    y: (parent.height - self.height) / 2;
-                    background: trace.colour;
-                }
-                Text {
-                    text: trace.said;
-                    font-family: Fonts.mono;
-                    vertical-alignment: center;
-                }
+            Rectangle {
+                width: 14px;
+                height: 12px;
+                y: (parent.height - self.height) / 2;
+                background: root.switch-on;
             }
-            if root.switches.length > 0: HorizontalLayout {
-                spacing: 4px;
-                Rectangle {
-                    width: 14px;
-                    height: 12px;
-                    y: (parent.height - self.height) / 2;
-                    background: root.heater-on;
-                }
-                Text { text: "heater on"; vertical-alignment: center; }
-                Rectangle {
-                    width: 14px;
-                    height: 12px;
-                    y: (parent.height - self.height) / 2;
-                    background: root.heater-off;
-                }
-                Text { text: "heater off"; vertical-alignment: center; }
+            Text { text: "switch on"; vertical-alignment: center; }
+            Rectangle { width: 10px; }
+            Rectangle {
+                width: 14px;
+                height: 12px;
+                y: (parent.height - self.height) / 2;
+                background: root.switch-off;
             }
+            Text { text: "switch off"; vertical-alignment: center; }
         }
     }
 }

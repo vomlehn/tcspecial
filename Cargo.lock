@@ -4496,9 +4496,9 @@ dependencies = [
 
 [[package]]
 name = "tcs-xtce"
-version = "0.4.0"
+version = "0.5.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "a6b48a7ab9f6d49500422801328b93791403dc6fd7536e7a5ff070361fbb23e2"
+checksum = "3eb71ca23055eb40fc251e933f3843df6937843746095c3483774a6151fe5440"
 dependencies = [
  "bnum",
 ]

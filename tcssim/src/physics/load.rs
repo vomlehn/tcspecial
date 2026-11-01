@@ -5,7 +5,7 @@
 
 use tcslibgs::physics::load::Resolved;
 
-use super::element::Element;
+use super::component::Component;
 
 /// Its terminals' places, in `tcslibgs::physics::load::TERMINALS`'s order,
 /// which a test holds this to.
@@ -38,7 +38,7 @@ impl Load {
     }
 }
 
-impl Element for Load {
+impl Component for Load {
     fn hold(&mut self, inputs: &[f64]) {
         self.shed = inputs[SHED] > 0.5;
     }

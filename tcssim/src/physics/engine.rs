@@ -10,7 +10,7 @@
 
 use tcslibgs::physics::engine::Resolved;
 
-use super::element::Element;
+use super::component::Component;
 
 /// Its terminals' places, in `tcslibgs::physics::engine::TERMINALS`'s
 /// order, which a test holds this to.
@@ -74,7 +74,7 @@ impl Engine {
     }
 }
 
-impl Element for Engine {
+impl Component for Engine {
     fn hold(&mut self, inputs: &[f64]) {
         // A throttle is a valve, which opens no further than fully and
         // closes no further than shut, whatever it is told.

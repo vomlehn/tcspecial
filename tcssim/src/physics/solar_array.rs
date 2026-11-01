@@ -5,7 +5,7 @@
 
 use tcslibgs::physics::solar_array::Resolved;
 
-use super::element::Element;
+use super::component::Component;
 
 /// Its terminals' places, in `tcslibgs::physics::solar_array::TERMINALS`'s
 /// order, which a test holds this to.
@@ -38,7 +38,7 @@ impl SolarArray {
     }
 }
 
-impl Element for SolarArray {
+impl Component for SolarArray {
     fn hold(&mut self, inputs: &[f64]) {
         self.light = inputs[LIGHT];
     }

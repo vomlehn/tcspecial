@@ -180,7 +180,7 @@
               "string",
               "null"
             ],
-            "description": "The terminal of the physics model this stand-in is joined to, as the element's name and the terminal's joined by a dot: `zone.temperature`, `heater_1.on`. Joined to an output, it reports it, in the encoding the conversion -- `to_kelvin` or `to_value` -- its readings go to expects, so the format, the scale and the offset are taken from that node and not stated here. A decision output is sent as `1` or `0`, at once when it changes and again every packet interval. Joined to an input, it drives it with what the vehicle sends -- a decision, or a value in the input's unit -- and sends nothing, being driven the whole of what it is for; its packet interval is how often it looks for what the vehicle sent."
+            "description": "The terminal of the physics model this stand-in is joined to, as the component's name and the terminal's joined by a dot: `zone.temperature`, `heater_1.on`. Joined to an output, it reports it, in the encoding the conversion -- `to_kelvin` or `to_value` -- its readings go to expects, so the format, the scale and the offset are taken from that node and not stated here. A decision output is sent as `1` or `0`, at once when it changes and again every packet interval. Joined to an input, it drives it with what the vehicle sends -- a decision, or a value in the input's unit -- and sends nothing, being driven the whole of what it is for; its packet interval is how often it looks for what the vehicle sent."
           },
           "offset": {
             "type": [
@@ -408,7 +408,7 @@
             "string",
             "null"
           ],
-          "description": "The terminal of the physics model this stand-in is joined to, as the element's name and the terminal's joined by a dot: `zone.temperature`, `heater_1.on`. Joined to an output, it reports it, in the encoding the conversion -- `to_kelvin` or `to_value` -- its readings go to expects, so the format, the scale and the offset are taken from that node and not stated here. A decision output is sent as `1` or `0`, at once when it changes and again every packet interval. Joined to an input, it drives it with what the vehicle sends -- a decision, or a value in the input's unit -- and sends nothing, being driven the whole of what it is for; its packet interval is how often it looks for what the vehicle sent."
+          "description": "The terminal of the physics model this stand-in is joined to, as the component's name and the terminal's joined by a dot: `zone.temperature`, `heater_1.on`. Joined to an output, it reports it, in the encoding the conversion -- `to_kelvin` or `to_value` -- its readings go to expects, so the format, the scale and the offset are taken from that node and not stated here. A decision output is sent as `1` or `0`, at once when it changes and again every packet interval. Joined to an input, it drives it with what the vehicle sends -- a decision, or a value in the input's unit -- and sends nothing, being driven the whole of what it is for; its packet interval is how often it looks for what the vehicle sent."
         },
         "offset": {
           "type": [

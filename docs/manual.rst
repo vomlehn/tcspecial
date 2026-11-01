@@ -2366,9 +2366,10 @@ The fprime example
 ------------------
 .. figure:: ../examples/fprime/fprime.svg
    :alt: The fprime example: the thermometer's readings go to fsw, a
-         gateway_fprime node, and on to the F´ deployment's TcsBridge
-         component at bridge_base plus the thermometer's device id; a command
-         from the bridge goes up to fsw and on to the heater.
+         gateway_fprime node, and to cabin_temp, a to_kelvin compute node
+         whose temperatures go to fsw too, and both on to the F´ deployment's
+         TcsBridge component at bridge_base plus the sender's device id; a
+         command from the bridge goes up to fsw and on to the heater.
    :width: 100%
 
    ``examples/fprime``: a vehicle that answers to an F´ flight computer.
@@ -2390,11 +2391,20 @@ model is made from and nothing aboard reads. A command the bridge sends up to
 ``fsw``, which binds ``127.0.0.1:9600``, leaves it by its ``gateway-out`` for
 the ``heater``.
 
+The thermometer's readings go to ``cabin_temp`` too, a ``to_kelvin`` compute
+node that makes each a temperature, and that goes to ``fsw`` as well: device
+id 3, ``127.0.0.1:9703``, channel ``0x3003``. The ``vehicle`` section is
+written after the payloads so that the thermometer keeps device id 2, a
+node's device id being its place in the file. In the simulator file the
+thermometer reads a thermal mass, ``cabin``, in the encoding ``cabin_temp``
+reads back, and the heater warms it while it is driven on, so that what the
+flight computer sends the heater shows in the temperature it reads.
+
 ``make -C examples run-fprime`` runs tcsmoc on the example, which starts
 tcspecial and tcssim; tcsmoc plays the bridge's part, the two speaking the one
 protocol. ``tcspecial/tests/fprime.rs`` flies it, with its sockets moved to
-ports nothing holds: a reading reaches the bridge, and a command from the
-bridge reaches the heater. Every port the example uses is in the nine
+ports nothing holds: a reading reaches the bridge as it is and as a
+temperature, and a command from the bridge reaches the heater. Every port the example uses is in the nine
 thousands, which no other example uses.
 
 The F´ bridge
@@ -2425,14 +2435,20 @@ fprime example unless told otherwise, with
 which checks the configuration first and writes nothing from one with errors.
 Each node drawn into the ``gateway_fprime`` node is a channel named after it,
 at ``fprime_id_base`` plus its device id -- ``thermometer``, ``0x3002`` --
-holding a datum's length and its first 64 bytes. A node drawn into it must be
+of the type the configuration says its data are. A node that sends values, a
+compute node whose function is ``to_kelvin``, ``vote`` or ``process``, has an
+``F64`` channel, its temperature in kelvin -- ``cabin_temp``, ``0x3003`` --
+and a datum from it that is not a value goes to no channel, is counted in
+``DataNotValues`` and is said in a ``NotAValue`` event. Every other node's
+channel holds a datum's length and its first 64 bytes. A node drawn into it
+must be
 named as F´ names things, with letters, digits and underscores, and every
 program that checks a configuration refuses one that is not, as it refuses
 two ``gateway_fprime`` nodes whose F´ IDs overlap. The bridge's own channels
 follow every device id: ``BeaconStage``, ``RestartFlag``,
 ``ListeningMatched``, ``CommandingMatched``, ``PacketsReceived``,
-``PacketsProcessed``, ``PacketsMalformed``, ``PacketsMismatched`` and
-``DataCutShort``.
+``PacketsProcessed``, ``PacketsMalformed``, ``PacketsMismatched``,
+``DataCutShort`` and ``DataNotValues``.
 
 The bridge is built for that configuration and runs on no other: given
 another, it says so in a ``ModelDiffers`` event and does nothing. It sends
@@ -2460,7 +2476,8 @@ the channels. ``fprime/BridgeTest`` is a deployment that does all of that.
 (``tcssim --sending``), waits for it, starts tcspecial and F´'s ground system,
 and runs the tests in ``fprime/BridgeTest/test``, which start ``BridgeTest``
 and hold it to connecting and matching, hearing beacons, a simulated reading
-arriving as the thermometer's channel, a ``PING`` answered, a node stopped and
+arriving as the thermometer's channel and as ``cabin_temp``'s temperature, a
+``PING`` answered, a node stopped and
 started again, an unknown node refused unsent, and stopping cleanly. tcssim's
 window is open while it runs. What a run leaves -- each program's log, and
 F´'s ground system's -- is in ``fprime/build-test``. F´'s ground system

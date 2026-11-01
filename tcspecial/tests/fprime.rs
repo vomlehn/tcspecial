@@ -1,6 +1,7 @@
 //! The fprime example, flown: a vehicle that answers to an F´ flight computer
-//! sends each reading to the bridge component at its `bridge_base`, and takes
-//! the bridge's commands on to the heater.
+//! sends each reading, and the temperature made of it, to the bridge
+//! component at its `bridge_base`, and takes the bridge's commands on to the
+//! heater.
 //!
 //! What is run is `examples/fprime/fprime.ytcs` itself, with each of its
 //! sockets moved to a port nothing holds -- so that this runs beside anything
@@ -186,6 +187,20 @@ fn a_vehicle_answering_to_fprime_reports_to_the_bridge_and_takes_its_commands()
     bridge
         .set_read_timeout(Some(Duration::from_millis(100)))
         .expect("a timeout");
+    // And where it hears cabin_temp, device id 3, the reading made a value.
+    let value = links
+        .iter()
+        .find(|link| link.source == "cabin_temp")
+        .expect("cabin_temp reports")
+        .ground()
+        .expect("over UDP");
+    assert_eq!(value.port, base + 3);
+    let temperatures =
+        UdpSocket::bind(format!("{}:{}", value.address, value.port))
+            .expect("the bridge's port for cabin_temp");
+    temperatures
+        .set_read_timeout(Some(Duration::from_millis(100)))
+        .expect("a timeout");
 
     let _flying = Flying(
         Command::new(env!("CARGO_BIN_EXE_tcspecial"))
@@ -205,12 +220,21 @@ fn a_vehicle_answering_to_fprime_reports_to_the_bridge_and_takes_its_commands()
         format!("127.0.0.1:{take_at}").parse().expect("an address");
     common::connect(&commands, take, 1, common::checksum_of(&configuration));
 
-    // A reading: from the thermometer to the bridge.
+    // A reading: from the thermometer to the bridge, as it is -- 320
+    // sixteenths of a degree above 273.15 K, i16_be -- and made a value,
+    // 293.15 K in micro-kelvin.
     let sensor = bound();
     let to: SocketAddr = format!("127.0.0.1:{thermometer}")
         .parse()
         .expect("an address");
-    assert_eq!(until_heard(&sensor, to, b"293.15", &bridge), b"293.15");
+    let reading = 320i16.to_be_bytes();
+    assert_eq!(until_heard(&sensor, to, &reading, &bridge), reading);
+    let kelvin = tcslibgs::node::vehicle::compute::from_value(
+        &until_heard(&sensor, to, &reading, &temperatures),
+        "cabin_temp",
+    )
+    .expect("a value");
+    assert!((kelvin - 293.15).abs() < 1e-6, "{kelvin} K");
 
     // A command: from the bridge, up to the gateway node, and on to the
     // heater.

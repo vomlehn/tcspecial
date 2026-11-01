@@ -302,7 +302,8 @@ and on aboard, and a <code>null-gateway</code> and a
 <tr>
 <td><code>fprime</code></td>
 <td>A vehicle that answers to an F´ flight computer rather than to the
-ground: a <code>gateway_fprime</code> node sends each reading to the
+ground: a <code>gateway_fprime</code> node sends each reading, and the
+temperature a <code>to_kelvin</code> node makes of it, to the
 deployment’s bridge component at its <code>bridge_base</code>, and takes
 the bridge’s commands on to a heater.
 <code>tcspecial/tests/fprime.rs</code> flies it, and

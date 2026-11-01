@@ -86,14 +86,15 @@ private:
 
 	// ---- The model, written from the configuration --------------------
 
-	/** Writes a datum to the channel of the node that produced it. In
-	 * model/TcsBridgeModel.cpp, which tcsverify --fprime-model writes.
+	/** Writes a datum to the channel of the node that produced it, as
+	 * what the configuration says its data are: through asDatum() or
+	 * asKelvin(). In model/TcsBridgeModel.cpp, which tcsverify
+	 * --fprime-model writes.
 	 *
-	 * @param source  The node's name.
-	 * @param datum   The datum.
-	 * @return        true, or false where the model has no channel for
-	 *                the node. */
-	bool writeDatum(const char *source, const Datum &datum);
+	 * @param datum  The datum, and the node that produced it.
+	 * @return       true, or false where the model has no channel for the
+	 *               node. */
+	bool writeDatum(const tcs_datum &datum);
 
 	/** Finds the device id of a node, by its name. In
 	 * model/TcsBridgeModel.cpp, which tcsverify --fprime-model writes.
@@ -103,6 +104,25 @@ private:
 	 * @return      true, or false where the configuration has no such
 	 *              node. */
 	static bool nodeId(const char *name, U32 &id);
+
+	// ---- What the model writes a datum's channel with -----------------
+
+	/** Makes a datum the bytes a Datum channel holds: its first
+	 * DATUM_BYTES, with its whole length, counting and saying it where
+	 * it was longer.
+	 *
+	 * @param datum  The datum.
+	 * @return       The channel's value, a member, good until the next
+	 *               datum. */
+	const Datum &asDatum(const tcs_datum &datum);
+
+	/** Reads a datum as a value, a temperature, as tcslib-c reads one,
+	 * counting and saying it where it is not one.
+	 *
+	 * @param datum   The datum.
+	 * @param kelvin  Where the temperature is written.
+	 * @return        true where it was a value. */
+	bool asKelvin(const tcs_datum &datum, F64 &kelvin);
 
 	// ---- The rest ----------------------------------------------------
 
@@ -185,6 +205,7 @@ private:
 	Connected m_connected;
 	Datum m_datum;           // what each datum is taken into
 	U32 m_cutShort;          // data longer than a channel holds
+	U32 m_notValues;         // data from a node of values, not one
 	char m_said[TCS_TEXT_BYTES]; // what the beacon last said, as an event
 };
 

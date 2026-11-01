@@ -111,10 +111,26 @@ def test_a_simulated_reading_arrives_as_a_channel_value(fprime_test_api):
         of_bridge("thermometer"), timeout=ARRIVING
     )
     value = reading.get_val()
-    assert value["length"] > 0, value
+    # Two bytes, i16_be, as cabin_temp reads them and tcssim sends them.
+    assert value["length"] == 2, value
     fprime_test_api.assert_telemetry(
         of_bridge("PacketsProcessed"), value=predicates.greater_than(0),
         timeout=ARRIVING,
+    )
+
+
+def test_a_value_arrives_as_a_temperature(fprime_test_api):
+    # cabin_temp's readings are values, and its channel a number of
+    # kelvin: the cabin, which starts at its environment, 283.15 K, and is
+    # warmed only from F´, so is no colder than that, and no hotter than a
+    # heater left on for the length of a run could make it.
+    fprime_test_api.assert_telemetry(
+        of_bridge("cabin_temp"),
+        value=predicates.within_range(283.0, 400.0),
+        timeout=ARRIVING,
+    )
+    fprime_test_api.assert_telemetry(
+        of_bridge("DataNotValues"), value=0, timeout=ARRIVING
     )
 
 

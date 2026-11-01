@@ -3,8 +3,8 @@
  *
  * To tcspecial the bridge is a ground station built on tcslib-c: it opens
  * the configuration the vehicle flies, takes its beacons, sends CONNECT
- * until the two agree, sends the commands F´ gives it and takes the data
- * the vehicle sends down. To F´ it is an active component: commands in,
+ * until the two agree, sends the commands and the data F´ gives it and
+ * takes the data the vehicle sends down. To F´ it is an active component: commands in,
  * events and channels out. See TcsBridge.fpp for what each is.
  *
  * Nothing is allocated once the deployment is running. Every handle is
@@ -83,6 +83,8 @@ private:
 				  const Fw::CmdStringArg &node) override;
 	void QUERY_NODE_cmdHandler(FwOpcodeType opCode, U32 cmdSeq,
 				   const Fw::CmdStringArg &node) override;
+	void SEND_DATA_cmdHandler(FwOpcodeType opCode, U32 cmdSeq,
+				  const Fw::CmdStringArg &data) override;
 
 	// ---- The model, written from the configuration --------------------
 
@@ -186,7 +188,9 @@ private:
 	tcs_beacons *m_beacons;
 	tcs_beacons_waker *m_waker;
 	tcs_gateway *m_gateway;
+	tcs_uplink *m_uplink;    // NULL where the gateway node binds nothing
 	tcs_client *m_client;
+	char m_noUplink[TCS_ERROR_BYTES]; // why m_uplink is NULL
 
 	// Whether configure() opened everything and found the configuration
 	// to be the model's.

@@ -165,6 +165,26 @@ def test_a_node_is_stopped_and_started_again(fprime_test_api):
     )
 
 
+def test_data_sent_up_drives_the_heater(fprime_test_api):
+    # 1 up to fsw, and on to the heater, whose stand-in warms the cabin a
+    # kelvin a second while it is on: cabin_temp, read back, climbs past
+    # anything the cabin left to itself reaches. Then 0, to turn it off.
+    fprime_test_api.send_and_assert_command(
+        of_bridge("SEND_DATA"), ["1"], timeout=ANSWERING, commander=COMMANDER
+    )
+    fprime_test_api.assert_event(
+        of_bridge("DataSent"), [1], timeout=ANSWERING
+    )
+    fprime_test_api.assert_telemetry(
+        of_bridge("cabin_temp"),
+        value=predicates.greater_than(286.0),
+        timeout=ARRIVING,
+    )
+    fprime_test_api.send_and_assert_command(
+        of_bridge("SEND_DATA"), ["0"], timeout=ANSWERING, commander=COMMANDER
+    )
+
+
 def test_a_node_the_configuration_lacks_is_refused_unsent(fprime_test_api):
     fprime_test_api.send_command(of_bridge("QUERY_NODE"), ["nosuch"])
     fprime_test_api.assert_event(

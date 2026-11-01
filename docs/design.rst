@@ -1241,8 +1241,8 @@ F´: ``gateway_fprime``
 The F´ end is a component in the F´ deployment, ``TcsBridge``, built on
 ``tcslib-c`` and so in C++ against the header every C and C++ ground station
 uses. To tcspecial it is a MOC: it opens the same configuration, sends
-``CONNECT`` and compares digests, takes beacons, sends commands and receives
-data, all in the radio's own UDP protocol. To the rest of the deployment it
+``CONNECT`` and compares digests, takes beacons, sends commands and data and
+receives data, all in the radio's own UDP protocol. To the rest of the deployment it
 is a component like any other, with commands in and telemetry channels out,
 and the deployment sends them to the ground with whatever it already uses.
 
@@ -1345,6 +1345,18 @@ commanding, because nothing comes down until one is answered and a flight
 computer has nobody at it to press a button. A node command naming a node
 the configuration lacks is refused unsent. What tcspecial answers is the
 command's response and an event. The restart commands are not offered yet.
+
+``SEND_DATA`` is the one command that is not tcspecial's: it sends its text
+up to the gateway node, as one datum, by tcslib-c's ``tcs_uplink``, and the
+node leaves it by its ``gateway-out`` links for the nodes they reach -- in
+the fprime example, ``1`` or ``0`` to the heater. Text, because what a
+gateway node's links drive here is a line or a program, which take text, and
+because a byte array is something nobody at F´'s ground system can type. It
+goes only while the bridge is matched for commanding, as tcslib-c holds every
+uplink to (see `On the ground`_), and is refused, saying so, before. A
+gateway node that binds no address and port aboard has no way up; the
+bridge runs on one, as the far end of a bridge that only listens, and fails
+``SEND_DATA`` alone, saying why.
 Nothing on the ground holds commands back after a RESTART -- the vehicle
 answers them ``Unmatched``, as `What the ground may send meanwhile`_ says --
 so offering them needs no tie between the beacon watch and the client, each
@@ -1400,11 +1412,12 @@ started by the tests once F´'s test API is listening. The tests, in
 connects and is matched, and the beacon says the configuration's checksum;
 beacons are heard; a simulated reading arrives as the thermometer's channel,
 its two bytes, and the temperature made of it as ``cabin_temp``'s, a number
-of kelvin, with no datum refused as not a value; a PING is answered; a node is stopped and started again; a node the
+of kelvin, with no datum refused as not a value; a PING is answered; a node is stopped and started again; ``1`` sent up
+drives the heater, whose stand-in warms the thermal mass the thermometer
+reads, so that ``cabin_temp`` climbs, and ``0`` turns it off; a node the
 configuration lacks is refused unsent; and the deployment stops cleanly.
 
-Not yet built: data up from the bridge to the gateway node, which the fprime
-example's heater is driven by; and the restart commands.
+Not yet built: the restart commands.
 
 What a device node says
 -----------------------

@@ -68,7 +68,7 @@ Stage stageOf(tcs_stage stage)
 TcsBridge::TcsBridge(const char *name)
 	: TcsBridgeComponentBase(name), m_configuration(nullptr),
 	  m_beacons(nullptr), m_waker(nullptr), m_gateway(nullptr),
-	  m_client(nullptr),
+	  m_uplink(nullptr), m_client(nullptr), m_noUplink(),
 	  m_open(false), m_heard(), m_stopping(false), m_tick(),
 	  m_connectedAt(0), m_connectedNs(0), m_connected(Connected::NEVER),
 	  m_datum(), m_cutShort(0), m_notValues(0), m_said()
@@ -122,6 +122,14 @@ void TcsBridge::configure(const char *configuration)
 		this->log_WARNING_HI_OpenFailed(Fw::String(tcs_last_error()));
 		return;
 	}
+	// The way up, which a gateway node that binds no address and port
+	// aboard does not have. Its want fails SEND_DATA alone, saying why,
+	// rather than the bridge: such a node is the far end of a bridge
+	// that only listens, and is one a configuration may describe.
+	m_uplink = tcs_uplink_open(m_configuration, TcsBridge_GATEWAY_NODE);
+	if (m_uplink == nullptr) {
+		copy(m_noUplink, sizeof m_noUplink, tcs_last_error());
+	}
 
 	Os::Task::Arguments arguments(Fw::String("TcsBeacons"),
 				      TcsBridge::watchBeacons, this,
@@ -149,6 +157,8 @@ void TcsBridge::stop()
 	m_client = nullptr;
 	tcs_gateway_close(m_gateway);
 	m_gateway = nullptr;
+	tcs_uplink_close(m_uplink);
+	m_uplink = nullptr;
 	m_open = false;
 }
 
@@ -435,6 +445,36 @@ void TcsBridge::QUERY_NODE_cmdHandler(FwOpcodeType opCode, U32 cmdSeq,
 		return;
 	}
 	this->log_ACTIVITY_HI_NodeQueried(node, enabled != 0);
+	this->cmdResponse_out(opCode, cmdSeq, Fw::CmdResponse::OK);
+}
+
+void TcsBridge::SEND_DATA_cmdHandler(FwOpcodeType opCode, U32 cmdSeq,
+				     const Fw::CmdStringArg &data)
+{
+	if (!this->open("SEND_DATA", opCode, cmdSeq)) {
+		return;
+	}
+	if (m_uplink == nullptr) {
+		this->log_WARNING_LO_CommandFailed(Fw::String("SEND_DATA"),
+						   Fw::String(m_noUplink));
+		this->cmdResponse_out(opCode, cmdSeq,
+				      Fw::CmdResponse::EXECUTION_ERROR);
+		return;
+	}
+	// The text's bytes, as F´ gave them, without its NUL: one datum, in
+	// one datagram, refused by tcslib-c unless the bridge is matched for
+	// commanding.
+	const FwSizeType length = data.length();
+	if (tcs_uplink_send(m_uplink,
+			    reinterpret_cast<const uint8_t *>(data.toChar()),
+			    static_cast<size_t>(length)) != 0) {
+		this->log_WARNING_LO_CommandFailed(
+			Fw::String("SEND_DATA"), Fw::String(tcs_last_error()));
+		this->cmdResponse_out(opCode, cmdSeq,
+				      Fw::CmdResponse::EXECUTION_ERROR);
+		return;
+	}
+	this->log_ACTIVITY_LO_DataSent(static_cast<U32>(length));
 	this->cmdResponse_out(opCode, cmdSeq, Fw::CmdResponse::OK);
 }
 

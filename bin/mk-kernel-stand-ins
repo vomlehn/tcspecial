@@ -73,7 +73,8 @@ has_module() {
 # Whether this kernel was built with an option, where its configuration can
 # be read: "yes", "no", or "unknown" where it cannot.
 kernel_option() {
-	local config="/boot/config-$(uname -r)"
+	local config
+	config="/boot/config-$(uname -r)"
 	if [ -r "$config" ]; then
 		if grep -q "^$1=[ym]" "$config"; then
 			echo yes

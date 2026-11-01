@@ -65,13 +65,23 @@
       <xs:element name="heats" type="xs:string"/>
       <xs:element name="input" type="xs:string"/>
       <xs:element name="rate" type="xs:string"/>
+      <!-- What a sensor gets wrong, and how a heater's supply varies. -->
+      <xs:element name="noise" type="xs:string"/>
+      <xs:element name="accuracy" type="xs:string"/>
+      <xs:element name="drift" type="xs:string"/>
+      <xs:element name="drift_time" type="xs:string"/>
+      <xs:element name="lag" type="xs:string"/>
+      <xs:element name="ripple" type="xs:string"/>
+      <xs:element name="ripple_time" type="xs:string"/>
     </xs:choice>
   </xs:complexType>
 
   <!-- A thermal mass: what the simulated sensors read and the simulated
        heaters warm. The first three are required, as they are where the
        file is read; inputs and outputs are lists of names separated by
-       commas, and either may be left out. The order is free. -->
+       commas, an output's name perhaps followed by =offset in kelvin, and
+       either may be left out; so may the environment's swing and period and
+       its wander and wander_time. The order is free. -->
   <xs:complexType name="thermal_mass">
     <xs:all>
       <xs:element name="name" type="xs:string"/>
@@ -79,18 +89,23 @@
       <xs:element name="time_constant" type="xs:string"/>
       <xs:element name="inputs" type="xs:string" minOccurs="0"/>
       <xs:element name="outputs" type="xs:string" minOccurs="0"/>
+      <xs:element name="swing" type="xs:string" minOccurs="0"/>
+      <xs:element name="period" type="xs:string" minOccurs="0"/>
+      <xs:element name="wander" type="xs:string" minOccurs="0"/>
+      <xs:element name="wander_time" type="xs:string" minOccurs="0"/>
     </xs:all>
   </xs:complexType>
 
   <!-- What tcssim itself is told: the UDP address, as address:port, at
        which it answers whether it has made its stand-ins, required by tcssim
-       to start and by a harness to wait for it; and the hysteresis node it
-       stands in for, if any, which is never stated with tcspecial running.
-       -->
+       to start and by a harness to wait for it; the hysteresis node it
+       stands in for, if any, which is never stated with tcspecial running;
+       and the seed its random numbers start from. -->
   <xs:complexType name="tcssim">
     <xs:all>
       <xs:element name="ready" type="xs:string"/>
       <xs:element name="thermostat" type="xs:string" minOccurs="0"/>
+      <xs:element name="seed" type="xs:string" minOccurs="0"/>
     </xs:all>
   </xs:complexType>
 

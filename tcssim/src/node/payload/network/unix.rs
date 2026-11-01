@@ -740,7 +740,7 @@ mod tests {
         use crate::physics::thermal_mass::thermal_mass::{
             Thermal, ThermalMass,
         };
-        use tcslibgs::sim_config::ResolvedMass;
+        use tcslibgs::sim_config::{ResolvedMass, Wander};
 
         let path = a_path("driven");
         std::fs::remove_file(&path).ok();
@@ -752,8 +752,10 @@ mod tests {
                 time_constant: Duration::from_secs(50),
                 inputs: vec!["in1".to_string()],
                 outputs: Vec::new(),
+                ..Default::default()
             },
             Instant::now(),
+            0,
         ));
         let cold = mass.temperature();
 
@@ -765,6 +767,7 @@ mod tests {
                 mass: mass.clone(),
                 input: "in1".to_string(),
                 rate: 3.0,
+                supply: Wander::default(),
             }),
             thermostat: None,
             name: "heaters_1".to_string(),

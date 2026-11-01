@@ -32,11 +32,22 @@ thermal_mass:
   # difference with a fifty second constant -- which at the setpoint is a
   # fifth of a kelvin a second of cooling. A heater is connected to an input
   # and a sensor to an output, and any of them may be left unconnected.
+  #
+  # Its surroundings are not still. They swing three kelvin either side of
+  # 283.15 once every ninety minutes -- a low orbit's sun and shadow -- and
+  # wander half a kelvin besides, over ten minutes or so. The cabin is not
+  # one temperature throughout either: the place out2's sensor is on is a
+  # fifth of a kelvin warmer than the middle, and out3's three tenths
+  # cooler.
   - name: basic
     environment: "283.15"
     time_constant: "50 s"
     inputs: "in1,in2"
-    outputs: "out1,out2,out3"
+    outputs: "out1,out2=+0.2,out3=-0.3"
+    swing: "3"
+    period: "90 min"
+    wander: "0.5"
+    wander_time: "10 min"
 
 simulated_payload_groups:
   # The three sensors are read together, every tenth of a second, as their
@@ -44,33 +55,53 @@ simulated_payload_groups:
   # encoding the to_kelvin node its readings go to expects: this file says
   # nothing about the format, the scale or the offset, because a scale written
   # in two files is a scale that can disagree with itself.
+  #
+  # Each sensor drifts too, by a twentieth of a kelvin over half an hour,
+  # which is what an ageing part's calibration does.
   - name: cabin_temps
     simulate: true
     packet_interval: 100 ms
     reads: basic
+    drift: "0.05"
+    drift_time: "30 min"
 
 simulated_payloads:
-  # Each sensor on an output of its own.
+  # Each sensor on an output of its own, with its part's datasheet errors.
+  # temp_1 and temp_2 are one part, a digital sensor of a sixteenth of a
+  # kelvin a count: accurate to half a kelvin, three hundredths of a kelvin
+  # of noise, and four seconds behind the cabin in its package.
   - name: temp_1
     type: network
     protocol: udp
     group: cabin_temps
     output: out1
+    noise: "0.03"
+    accuracy: "0.5"
+    lag: 4 s
 
   - name: temp_2
     type: network
     protocol: udp
     group: cabin_temps
     output: out2
+    noise: "0.03"
+    accuracy: "0.5"
+    lag: 4 s
 
+  # A better part, in a heavier package: accurate to a quarter of a kelvin,
+  # two hundredths of noise, and slower to follow.
   - name: temp_3
     type: network
     protocol: udp
     group: cabin_temps
     output: out3
+    noise: "0.02"
+    accuracy: "0.25"
+    lag: 6 s
 
   # Driven and never read: their stand-ins send nothing, count each decision
-  # the vehicle sends them, and warm the mass while on.
+  # the vehicle sends them, and warm the mass while on. Their supply varies
+  # by two percent over twenty seconds or so, and their heat with its square.
   - name: heaters_1
     simulate: true
     type: network
@@ -78,6 +109,8 @@ simulated_payloads:
     heats: basic
     input: in1
     rate: "3.0"
+    ripple: "0.02"
+    ripple_time: 20 s
 
   - name: heaters_2
     simulate: true
@@ -86,3 +119,5 @@ simulated_payloads:
     heats: basic
     input: in2
     rate: "3.0"
+    ripple: "0.02"
+    ripple_time: 20 s

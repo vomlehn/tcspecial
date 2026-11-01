@@ -54,6 +54,7 @@ use tcslibgs::{
 use std::collections::{BTreeMap, HashMap};
 
 use crate::node::vehicle::thermostat::Thermostat;
+use crate::physics::thermal_mass::sensor::Sensor;
 use crate::physics::thermal_mass::thermal_mass::{Thermal, ThermalMass};
 
 mod endpoint;
@@ -386,11 +387,30 @@ fn thermal_masses(
         ));
     };
 
+    // What the masses' and sensors' random draws start from: the file's,
+    // or one of tcssim's own, said so that the run can be had again.
+    let seed = match sim_file.tcssim.as_ref().and_then(|t| t.seed) {
+        Some(seed) => seed,
+        None => {
+            let seed: u64 = rand::random();
+            eprintln!(
+                "the thermal masses' noise starts from seed {seed}: state \
+                 seed: {seed} in the tcssim section to have it again"
+            );
+            seed
+        }
+    };
+
     // Each mass by its name, which is what a payload names to reach it.
     let now = std::time::Instant::now();
     let built: HashMap<String, Arc<ThermalMass>> = declared
         .iter()
-        .map(|mass| (mass.name.clone(), Arc::new(ThermalMass::new(mass, now))))
+        .map(|mass| {
+            (
+                mass.name.clone(),
+                Arc::new(ThermalMass::new(mass, now, seed)),
+            )
+        })
         .collect();
 
     let mut attached = BTreeMap::new();
@@ -398,9 +418,14 @@ fn thermal_masses(
         let name = dh.name.0.clone();
         match &sim.attached {
             None => {}
-            Some(Attached::Reads { mass, output }) => {
+            Some(Attached::Reads {
+                mass,
+                output,
+                sensor,
+            }) => {
                 let reading =
                     tcslibgs::graph::simulated::reading_of(graph, &name)?;
+                let sensor = Arc::new(Sensor::new(&name, *sensor, seed));
                 attached.insert(
                     name,
                     Thermal::Reads {
@@ -408,16 +433,23 @@ fn thermal_masses(
                         mass: built[mass].clone(),
                         output: output.clone(),
                         reading,
+                        sensor,
                     },
                 );
             }
-            Some(Attached::Heats { mass, input, rate }) => {
+            Some(Attached::Heats {
+                mass,
+                input,
+                rate,
+                supply,
+            }) => {
                 attached.insert(
                     name,
                     Thermal::Heats {
                         mass: built[mass].clone(),
                         input: input.clone(),
                         rate: *rate,
+                        supply: *supply,
                     },
                 );
             }
@@ -635,7 +667,9 @@ fn load(
                 mass.name(),
                 mass.temperature()
             ),
-            Thermal::Heats { mass, input, rate } => eprintln!(
+            Thermal::Heats {
+                mass, input, rate, ..
+            } => eprintln!(
                 "{name} warms the thermal mass {} through input {input} by \
                  {rate} K/s while it is on",
                 mass.name()

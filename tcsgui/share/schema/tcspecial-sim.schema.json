@@ -22,6 +22,14 @@
             "null"
           ],
           "description": "The hysteresis node of the configuration tcssim stands in for: it reads the simulated sensors whose data reaches that node and switches the simulated heaters the node's data reaches, with the node's setpoint and band, so the loop closes with no tcspecial running. Never with tcspecial running, whose own thermostat switches the same heaters."
+        },
+        "seed": {
+          "type": [
+            "integer",
+            "string",
+            "null"
+          ],
+          "description": "What the simulation's random numbers start from, so that a run's noise can be had again. Unstated is a seed of tcssim's choosing, which it reports as it starts."
         }
       },
       "required": [
@@ -64,7 +72,37 @@
               "string",
               "null"
             ],
-            "description": "The names of the places a sensor can read its temperature from, separated by commas: `out1,out2,out3`. None need be connected."
+            "description": "The names of the places a sensor can read its temperature from, separated by commas: `out1,out2,out3`. None need be connected. A name may be followed by `=` and how far, in kelvin, that place sits from the mass's temperature: `out2=+0.3`."
+          },
+          "swing": {
+            "type": [
+              "string",
+              "number",
+              "null"
+            ],
+            "description": "How far the environment swings either side of `environment`, in kelvin, as a sine wave: a day and a night, or an orbit's sun and shadow."
+          },
+          "period": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "How long one swing takes, as a length of time. Required with `swing` and refused without it."
+          },
+          "wander": {
+            "type": [
+              "string",
+              "number",
+              "null"
+            ],
+            "description": "How far the environment wanders at random: the standard deviation, in kelvin, of a departure drawn back towards nought with `wander_time` as its time constant."
+          },
+          "wander_time": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "How slowly the environment wanders, as a length of time. Required with `wander` and refused without it."
           }
         },
         "required": [
@@ -261,6 +299,59 @@
               "null"
             ],
             "description": "What a heater adds while it is on, in kelvin a second. With `heats` and refused without it."
+          },
+          "noise": {
+            "type": [
+              "string",
+              "number",
+              "null"
+            ],
+            "description": "A sensor's random error on each reading: the standard deviation, in kelvin, of the normally distributed noise its electronics add. With `reads` and refused without it."
+          },
+          "accuracy": {
+            "type": [
+              "string",
+              "number",
+              "null"
+            ],
+            "description": "The most a sensor's calibration is off by, in kelvin, as its datasheet's accuracy. A fixed error is drawn once a run, normally distributed with a third of this as its standard deviation and never past it. With `reads` and refused without it."
+          },
+          "drift": {
+            "type": [
+              "string",
+              "number",
+              "null"
+            ],
+            "description": "How far a sensor's error wanders, slowly: the standard deviation, in kelvin, of an error drawn back towards nought with `drift_time` as its time constant. With `reads` and refused without it."
+          },
+          "drift_time": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "How slowly a sensor's drift wanders, as a length of time. Required with `drift` and refused without it."
+          },
+          "lag": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "A sensor's own time constant, as a length of time: how far behind the body it is on it follows. With `reads` and refused without it."
+          },
+          "ripple": {
+            "type": [
+              "string",
+              "number",
+              "null"
+            ],
+            "description": "How much a heater's supply voltage varies: its standard deviation as a fraction of nominal. A heater's power goes as the square of its voltage. With `heats` and refused without it."
+          },
+          "ripple_time": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "How slowly a heater's supply varies, as a length of time. Required with `ripple` and refused without it."
           }
         },
         "required": [
@@ -462,6 +553,59 @@
               "null"
             ],
             "description": "What a heater adds while it is on, in kelvin a second. With `heats` and refused without it."
+          },
+          "noise": {
+            "type": [
+              "string",
+              "number",
+              "null"
+            ],
+            "description": "A sensor's random error on each reading: the standard deviation, in kelvin, of the normally distributed noise its electronics add. With `reads` and refused without it."
+          },
+          "accuracy": {
+            "type": [
+              "string",
+              "number",
+              "null"
+            ],
+            "description": "The most a sensor's calibration is off by, in kelvin, as its datasheet's accuracy. A fixed error is drawn once a run, normally distributed with a third of this as its standard deviation and never past it. With `reads` and refused without it."
+          },
+          "drift": {
+            "type": [
+              "string",
+              "number",
+              "null"
+            ],
+            "description": "How far a sensor's error wanders, slowly: the standard deviation, in kelvin, of an error drawn back towards nought with `drift_time` as its time constant. With `reads` and refused without it."
+          },
+          "drift_time": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "How slowly a sensor's drift wanders, as a length of time. Required with `drift` and refused without it."
+          },
+          "lag": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "A sensor's own time constant, as a length of time: how far behind the body it is on it follows. With `reads` and refused without it."
+          },
+          "ripple": {
+            "type": [
+              "string",
+              "number",
+              "null"
+            ],
+            "description": "How much a heater's supply voltage varies: its standard deviation as a fraction of nominal. A heater's power goes as the square of its voltage. With `heats` and refused without it."
+          },
+          "ripple_time": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "How slowly a heater's supply varies, as a length of time. Required with `ripple` and refused without it."
           }
         },
         "required": [

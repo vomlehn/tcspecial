@@ -46,6 +46,11 @@ RUN = $(CURDIR)/build-test
 # targets empty theirs.
 TELEMETRY ?= /tmp/telemetry
 
+# The lock every run that binds the fixed ports holds, so that two never
+# run at once: the same file the other tests that bind them use. The top
+# Makefile hands its own PORTS_LOCK in.
+TCS_PORTS_LOCK ?= $(HOME)/working/tcs-ports.lock
+
 .PHONY: all
 all: build
 
@@ -65,7 +70,8 @@ help:
 	@echo "Variables: FPRIME_FRAMEWORK ($(FPRIME_FRAMEWORK)),"
 	@echo "  FPRIME_VENV ($(FPRIME_VENV)),"
 	@echo "  FPRIME_CONFIG ($(FPRIME_CONFIG)),"
-	@echo "  FPRIME_SIM ($(FPRIME_SIM)), JOBS ($(JOBS))"
+	@echo "  FPRIME_SIM ($(FPRIME_SIM)), JOBS ($(JOBS)),"
+	@echo "  TCS_PORTS_LOCK ($(TCS_PORTS_LOCK))"
 
 # Stop, saying what to do, unless the F´ checkout and its tools are there.
 .PHONY: check-fprime
@@ -135,12 +141,13 @@ build: settings model
 
 # The bridge's test: tcssim standing in for the configuration's payloads,
 # tcspecial flying it, BridgeTest running the bridge, and F´'s ground system
-# commanding it and reading its channels. See bridge-test.
+# commanding it and reading its channels, holding the ports' lock while it
+# runs. See bridge-test.
 .PHONY: test
 test: build
 	rm -rf $(TELEMETRY)
 	mkdir $(TELEMETRY)
-	FPRIME_BIN=$(FPRIME_BIN) $(CURDIR)/bridge-test $(TOP) $(FPRIME_CONFIG) \
+	FPRIME_BIN=$(FPRIME_BIN) flock $(TCS_PORTS_LOCK) $(CURDIR)/bridge-test $(TOP) $(FPRIME_CONFIG) \
 		$(FPRIME_SIM) $(ARTIFACTS) $(RUN)
 
 .PHONY: clean

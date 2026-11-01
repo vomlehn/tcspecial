@@ -1745,6 +1745,7 @@ vehicle:
             sockets.framing = Some(tcslibgs::CcsdsFraming {
                 beacon_apid: 0x100,
                 cmd_apid: 0x101,
+                payload_apid_base: 0x300,
             });
         }
         let commands = Commands::start(

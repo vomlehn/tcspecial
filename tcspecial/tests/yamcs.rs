@@ -8,8 +8,10 @@
 //! and once matched, a ping sent to the `gateway_yamcs` node under its
 //! `apid_base` comes back from the ping node under `apid_base` plus that
 //! node's device id. `tcs_cmd.send` is written with port 0, so commands
-//! from any port of the ground's host are taken, as Yamcs sends them. The
-//! test is the ground station.
+//! from any port of the ground's host are taken, as Yamcs sends them. A
+//! payload nothing in the drawing touches reports over `payload_telemetry`,
+//! framed too: as telemetry under `payload_telemetry.apid_base` plus its
+//! device id, at `dest_base` plus the same. The test is the ground station.
 
 use std::net::{SocketAddr, UdpSocket};
 use std::time::{Duration, Instant};
@@ -88,7 +90,8 @@ fn a_vehicle_answering_to_yamcs_frames_every_packet() {
   beacon: {{ default_interval: \"100 ms\", reset_interval: \"100 ms\", recv: \
             \"127.0.0.1:{}\", send: \"{}\", apid: \"0x100\" }}
   payload_command: {{ dest_base: \"{}\", source_base: \"{}\" }}
-  payload_telemetry: {{ dest_base: \"{}\", source_base: \"{}\" }}
+  payload_telemetry: {{ dest_base: \"{}\", source_base: \"{}\", \
+            apid_base: \"0x300\" }}
   state_file: \"{state}\"
   tcs_cmd: {{ recv: \"127.0.0.1:{take_at}\", send: \"127.0.0.1:0\", apid: \
             \"0x101\" }}
@@ -186,4 +189,126 @@ vehicle:
         .send_to(b"ping #2 1760900000.000000001", gateway)
         .expect("sent");
     assert_eq!(heard(&downlink, Duration::from_secs(1)), None, "bare");
+}
+
+/// Sends CONNECT with `digest`, framed under `apid`, from `from` to `to`
+/// until tcspecial answers, as a Yamcs ground station does once tcspecial
+/// is up: until then nothing goes down but beacons.
+///
+/// # Arguments
+///
+/// * `from`   - The ground's socket, with a short read timeout.
+/// * `to`     - Where tcspecial takes commands, `tcs_cmd.recv`.
+/// * `apid`   - `tcs_cmd.apid`.
+/// * `digest` - The configuration's checksum.
+///
+/// # Panics
+///
+/// If nothing answers, framed, within 20 seconds.
+fn connect_framed(
+    from: &UdpSocket,
+    to: SocketAddr,
+    apid: u16,
+    digest: tcslibgs::config_digest::ConfigDigest,
+) {
+    let connect = Command::Connect(ConnectCommand::new(1, digest)).to_bytes();
+    let mut tc = Sender::new(PacketType::Telecommand, apid).unwrap();
+    let deadline = Instant::now() + Duration::from_secs(20);
+    while Instant::now() < deadline {
+        send_framed(&mut tc, from, to, &connect);
+        let Some(answer) = heard(from, Duration::from_millis(500)) else {
+            continue;
+        };
+        let data = read_header(&answer, PacketType::Telemetry, apid)
+            .expect("a framed answer");
+        match Telemetry::read(data).expect("an answer under the header") {
+            Telemetry::Connect(connected) => {
+                assert_eq!(connected.digest, digest);
+                return;
+            }
+            other => panic!("expected a CONNECT's answer: {other:?}"),
+        }
+    }
+    panic!("nothing answered a CONNECT at {to}");
+}
+
+/// A payload nothing touches reports over payload_telemetry, and under
+/// Yamcs each datagram goes as CCSDS telemetry under
+/// payload_telemetry.apid_base plus the payload's device id, to dest_base
+/// plus the same.
+#[test]
+fn an_untouched_payload_reports_framed_under_its_counted_apid() {
+    let dir = tempfile::tempdir().expect("a directory");
+    let beacons = bound();
+    let commands = bound();
+    // "first" and "second" are the only nodes, so "second" is device id
+    // 1: its telemetry goes to dest_base plus one, the ground socket's
+    // port, under apid_base plus one.
+    let telemetry = bound();
+    let take_at = free();
+    let first_at = free();
+    let second_at = free();
+    let at = || format!("127.0.0.1:{}", free());
+
+    let configuration = dir.path().join("vehicle.ytcs");
+    let state = dir.path().join("tcspecial.state").display().to_string();
+    std::fs::write(
+        &configuration,
+        format!(
+            "tcspecial:
+  gateway: yamcs
+  interface: \"{}\"
+  beacon: {{ default_interval: \"100 ms\", reset_interval: \"100 ms\", recv: \
+            \"127.0.0.1:{}\", send: \"{}\", apid: \"0x100\" }}
+  payload_command: {{ dest_base: \"{}\", source_base: \"{}\" }}
+  payload_telemetry: {{ dest_base: \"127.0.0.1:{}\", source_base: \"{}\", \
+            apid_base: \"0x300\" }}
+  state_file: \"{state}\"
+  tcs_cmd: {{ recv: \"127.0.0.1:{take_at}\", send: \"127.0.0.1:0\", apid: \
+            \"0x101\" }}
+payloads:
+  - type network:
+      - payload: first
+        address: \"127.0.0.1\"
+        port: \"{first_at}\"
+        protocol: \"udp\"
+      - payload: second
+        address: \"127.0.0.1\"
+        port: \"{second_at}\"
+        protocol: \"udp\"
+",
+            tcslibgs::InterfaceDigest::of_this_build(),
+            port(&beacons),
+            at(),
+            at(),
+            at(),
+            port(&telemetry) - 1,
+            at(),
+        ),
+    )
+    .expect("written");
+    let digest = checksum_of(&configuration);
+    let _vehicle =
+        Flying::logged(&configuration, &dir.path().join("tcspecial.log"));
+
+    // Nothing goes down but beacons until the ground has matched.
+    let to: SocketAddr = format!("127.0.0.1:{take_at}").parse().unwrap();
+    connect_framed(&commands, to, 0x101, digest);
+
+    // The payload speaks first, from a socket of its own, to the address its
+    // node states, which the vehicle binds. Sent until something arrives:
+    // the vehicle may not have bound it the moment it answered.
+    let payload = bound();
+    let second: SocketAddr = format!("127.0.0.1:{second_at}").parse().unwrap();
+    let deadline = Instant::now() + Duration::from_secs(10);
+    let packet = loop {
+        assert!(Instant::now() < deadline, "no telemetry from \"second\"");
+        payload.send_to(b"reading 42", second).expect("sent");
+        if let Some(packet) = heard(&telemetry, Duration::from_millis(500)) {
+            break packet;
+        }
+    };
+    let data = read_header(&packet, PacketType::Telemetry, 0x301)
+        .expect("framed under payload_telemetry.apid_base plus 1");
+    assert_eq!(data, b"reading 42");
 }

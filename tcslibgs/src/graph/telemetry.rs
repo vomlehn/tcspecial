@@ -44,10 +44,12 @@
 //! # Under Yamcs
 //!
 //! A configuration that answers to Yamcs has ports as the radio's does, and
-//! every packet on them is a CCSDS Space Packet: what goes through a
-//! `gateway_yamcs` node carries the node's `apid_base` plus the source's
-//! device id as its APID. [`apids`] is every APID such a configuration uses,
-//! and holds each to being one and used once.
+//! every packet on them is a CCSDS Space Packet, its APID counted as its port
+//! is: what goes through a `gateway_yamcs` node carries the node's
+//! `apid_base` plus the source's device id, and the telemetry of a payload
+//! nothing touches the section's `payload_telemetry.apid_base` plus the
+//! payload's device id. [`apids`] is every APID such a configuration uses,
+//! and holds each to being one, at most 0x7FF, and used once.
 //!
 //! This is the one place that says all of it. The flight software routes by
 //! it, the checking judges a configuration by it, and a ground station or
@@ -99,9 +101,10 @@ pub struct Telemetered {
     pub via: Via,
     /// How it is reached.
     pub reaches: Reaches,
-    /// The APID its packets carry as CCSDS telemetry, for a link through a
-    /// gateway node whose packets are CCSDS Space Packets, or `None` for a
-    /// link whose packets carry no header.
+    /// The APID its packets carry as CCSDS telemetry, where they are CCSDS
+    /// Space Packets -- a link through a `gateway_yamcs` node, or over
+    /// `payload_telemetry` in a configuration that answers to Yamcs -- or
+    /// `None` for a link whose packets carry no header.
     pub apid: Option<u16>,
 }
 
@@ -233,8 +236,8 @@ pub fn counted_apid(base: u16, id: usize) -> Result<u16, String> {
         .ok_or_else(|| {
             format!(
                 "{base:#x} plus the device id {id} is past an APID's eleven \
-                 bits, {:#x}: lower apid_base, or write the node earlier in \
-                 the configuration",
+                 bits, {:#x}: lower the base, or give the node a name that \
+                 sorts earlier",
                 crate::ccsds::MAX_APID
             )
         })
@@ -363,6 +366,23 @@ pub fn of(graph: &Graph) -> Result<Vec<Telemetered>, Refused> {
                 continue;
             }
             let id = ids[&node.name];
+            // Under Yamcs, payload_telemetry.apid_base counted on by the
+            // payload's id, as its port is.
+            let apid = match ci.sockets().and_then(|s| s.framing) {
+                None => None,
+                Some(framing) => {
+                    Some(counted_apid(framing.payload_apid_base, id).map_err(
+                        |why| Refused {
+                            node: Some(node.name.clone()),
+                            why: format!(
+                                "\"{}\"'s telemetry: \
+                                 payload_telemetry.apid_base {why}",
+                                node.name
+                            ),
+                        },
+                    )?)
+                }
+            };
             let reaches = match &ci.links {
                 Links::Sockets(sockets) => Reaches::Socket {
                     vehicle: sockets
@@ -388,7 +408,7 @@ pub fn of(graph: &Graph) -> Result<Vec<Telemetered>, Refused> {
                 id,
                 via: Via::PayloadTelemetry,
                 reaches,
-                apid: None,
+                apid,
             });
         }
     }
@@ -650,6 +670,9 @@ pub enum ApidCarries {
         /// The link's name.
         link: String,
     },
+    /// The telemetry of a payload nothing touches, over the section's
+    /// `payload_telemetry`: one of [`of`]'s links, by its name.
+    PayloadTelemetry(String),
 }
 
 /// One APID a configuration whose packets are CCSDS Space Packets uses.
@@ -698,7 +721,8 @@ impl ApidUse {
 /// each checked: an APID, and used once.
 ///
 /// The beacon's and the command links', each `gateway_yamcs` node's
-/// `apid_base`, and every link [`of`] finds through one. A Yamcs ground
+/// `apid_base`, every link [`of`] finds through one, and every payload's
+/// link over `payload_telemetry`. A Yamcs ground
 /// station sorts what arrives into streams by APID, so two kinds of packet
 /// under one would each be read as the other. The one exception is a
 /// gateway node's own `apid_base` and the first APID counted from it, the
@@ -717,7 +741,7 @@ impl ApidUse {
 /// # Errors
 ///
 /// [`Refused`] naming the two uses an APID is given, the APID and what to
-/// change, or a downlink's APID that is past eleven bits.
+/// change, or an APID counted from a base that is past eleven bits.
 pub fn apids(graph: &Graph) -> Result<Vec<ApidUse>, Refused> {
     let Some(section) = graph.tcspecial.as_ref() else {
         return Ok(Vec::new());
@@ -762,21 +786,34 @@ pub fn apids(graph: &Graph) -> Result<Vec<ApidUse>, Refused> {
         });
     }
     for link in of(graph)? {
-        let (Some(apid), Via::Gateway(gateway)) = (link.apid, &link.via) else {
+        let Some(apid) = link.apid else {
             continue;
         };
-        used.push(ApidUse {
-            apid,
-            what: format!(
-                "the APID of what \"{}\" sends to \"{gateway}\", its \
-                 apid_base plus the device id {}",
-                link.source, link.id
-            ),
-            change: format!("the apid_base of \"{gateway}\""),
-            node: Some(gateway.clone()),
-            carries: ApidCarries::Downlink {
-                gateway: gateway.clone(),
-                link: link.name.clone(),
+        used.push(match &link.via {
+            Via::Gateway(gateway) => ApidUse {
+                apid,
+                what: format!(
+                    "the APID of what \"{}\" sends to \"{gateway}\", its \
+                     apid_base plus the device id {}",
+                    link.source, link.id
+                ),
+                change: format!("the apid_base of \"{gateway}\""),
+                node: Some(gateway.clone()),
+                carries: ApidCarries::Downlink {
+                    gateway: gateway.clone(),
+                    link: link.name.clone(),
+                },
+            },
+            Via::PayloadTelemetry => ApidUse {
+                apid,
+                what: format!(
+                    "the APID of \"{}\"'s telemetry, \
+                     payload_telemetry.apid_base plus its device id {}",
+                    link.source, link.id
+                ),
+                change: "payload_telemetry.apid_base".to_string(),
+                node: Some(link.source.clone()),
+                carries: ApidCarries::PayloadTelemetry(link.name.clone()),
             },
         });
     }

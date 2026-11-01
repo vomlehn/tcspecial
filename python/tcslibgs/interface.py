@@ -23,6 +23,17 @@ from ._xtce import digest as _digest
 DOCUMENTS = Path(__file__).resolve().parent / "xtce"
 INTERFACE = (DOCUMENTS / "link.xtce",)
 
+#: The interface documents of the node types that have one: what a node of
+#: the type takes from the ground and gives back, stated in XTCE for the
+#: ground stations that read it, as ``python/tcslibgs/yamcs.py`` does for
+#: Yamcs. A type's document is its own and the type's code is its other
+#: spelling -- ``ping.xtce`` is what ``tcslibgs::node::vehicle::ping``
+#: writes and reads, and a test there holds the two together -- so it is
+#: named here by the type, and by nothing in a configuration. None of them
+#: is part of the interface, which is tcspecial's commands, and like every
+#: XTCE document they stay on the ground.
+NODE_DOCUMENTS = {"ping": DOCUMENTS / "ping.xtce"}
+
 
 def of_files(paths):
     """The interface the XTCE documents at ``paths`` state, as one set: its
@@ -34,6 +45,19 @@ def of_this_tree():
     """The interface this tree's documents state: what a tcspecial built
     from this tree speaks."""
     return of_files(INTERFACE)
+
+
+def node_document(node_type):
+    """A node type's interface document.
+
+    Args:
+        node_type: The type, as a configuration names it.
+
+    Returns:
+        The document's path, or ``None`` for a type with none, whose data
+        no XTCE lays out.
+    """
+    return NODE_DOCUMENTS.get(node_type)
 
 
 def of_hex(said):

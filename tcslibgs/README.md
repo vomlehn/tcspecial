@@ -46,6 +46,12 @@ the editor is the one the vehicle would have refused the file with.
   pins its digest as it does `fixed.xtce`'s; what each field says is checked here and
   in `../python/tcslibgs/beacon.py`, held to each other by the same examples
   in their tests.
+- `node::vehicle::ping`: what a ping and its answer say. The ping node's
+  interface document, `xtce/ping.xtce`, states the same field by field for
+  the ground stations that read XTCE; its tests pack and unpack pings with
+  the code generated from it, `src/ping_packet.rs` and
+  `../python/tcslibgs/ping_packet.py` (`make ping-packet`), and hold the
+  bytes to this module's. It is no part of the interface.
 - `interface`: the digest of `xtce/link.xtce`, which every beacon carries,
   and which every configuration names as its `tcspecial` section's
   `interface`, so that a configuration written for another interface is

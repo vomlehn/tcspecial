@@ -24,6 +24,9 @@ help:
 	@echo "  make beacon-packet   - Regenerate the beacon's Rust and Python" \
 		"codecs"
 	@echo "                         from xtce/beacon.xtce"
+	@echo "  make ping-packet     - Regenerate the ping's Rust and Python" \
+		"codecs"
+	@echo "                         from xtce/ping.xtce"
 	@echo "  make interface-digest - Regenerate the digest of the" \
 		"interface,"
 	@echo "                         src/interface_digest.rs, from" \
@@ -151,6 +154,31 @@ $(BEACON_PY): $(BEACON_XML) | tcs-xtce
 		--lang python --source-name tcslibgs/$(BEACON_XML)
 	sed -i 's/^from tcs_xtce import packet as pk$$/from ._xtce import packet as pk/' \
 		$(BEACON_PY)
+
+# A ping and the ping node's answer are stated in xtce/ping.xtce, the ping
+# node's own interface document. tcspecial and the ground stations write and
+# read them with src/node/vehicle/ping/mod.rs and ../python/tcslibgs/ping.py;
+# the code generated from the document is what holds it to those, in their
+# tests, and what python/tcslibgs/yamcs.py's ground station splits a ping
+# into the fields it sends with.
+PING_XML := xtce/ping.xtce
+PING_RS := src/ping_packet.rs
+PING_PY := ../python/tcslibgs/ping_packet.py
+
+.PHONY: ping-packet
+ping-packet: $(PING_RS) $(PING_PY)
+
+$(PING_RS): $(PING_XML) | tcs-xtce
+	$(XTCE_COMPILE) $(CURDIR)/$(PING_XML) $(CURDIR)/$(PING_RS) \
+		--lang rust --dynamic-allocations false \
+		--source-name tcslibgs/$(PING_XML)
+	rustfmt --edition 2021 $(PING_RS)
+
+$(PING_PY): $(PING_XML) | tcs-xtce
+	$(XTCE_COMPILE) $(CURDIR)/$(PING_XML) $(abspath $(PING_PY)) \
+		--lang python --source-name tcslibgs/$(PING_XML)
+	sed -i 's/^from tcs_xtce import packet as pk$$/from ._xtce import packet as pk/' \
+		$(PING_PY)
 
 # The digest of the interface: the tcs-xtce digest of xtce/link.xtce, which
 # every beacon carries and every configuration names as its `interface`, so

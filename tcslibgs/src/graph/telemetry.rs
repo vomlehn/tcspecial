@@ -878,6 +878,28 @@ mod tests {
             .expect("the example reads")
     }
 
+    /// Names that differ only in case are two names, and ids follow the
+    /// names' code points, as tests/ids/case.ids says and the Python's test
+    /// of the same file holds it to.
+    #[test]
+    fn ids_tell_case_apart_and_sort_by_code_point() {
+        let dir = Path::new(env!("CARGO_MANIFEST_DIR")).join("../tests/ids");
+        let graph = Graph::load(dir.join("case.ytcs")).expect("the file reads");
+        let table = std::fs::read_to_string(dir.join("case.ids"))
+            .expect("the table reads");
+        let expected: BTreeMap<String, usize> = table
+            .lines()
+            .filter(|line| !line.starts_with('#'))
+            .map(|line| {
+                let (name, id) =
+                    line.split_once(' ').expect("a name and an id");
+                (name.to_string(), id.parse().expect("an id"))
+            })
+            .collect();
+        assert_eq!(expected.len(), 8);
+        assert_eq!(ids(&graph), expected);
+    }
+
     /// Sums up links to the ground for comparison.
     ///
     /// # Arguments

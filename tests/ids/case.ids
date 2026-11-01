@@ -1,0 +1,11 @@
+# Each node of case.ytcs and its device id: its place among the
+# names sorted by code point, upper and lower case being
+# different letters. Read by tcslibgs's Rust and Python tests.
+Apple 0
+B-2 1
+Zone 2
+_under 3
+apple 4
+t10 5
+t9 6
+zone 7

@@ -85,6 +85,22 @@ class ConfigurationTest(unittest.TestCase):
             with self.assertRaises(ValueError, msg=refused):
                 parse(refused)
 
+    def test_ids_tell_case_apart_and_sort_by_code_point(self):
+        """Names that differ only in case are two names, and ids follow the
+        names' code points, as tests/ids/case.ids says and tcslibgs's Rust
+        test of the same file holds it to."""
+        ids = Path(__file__).resolve().parents[2] / "tests" / "ids"
+        config = configuration.load(str(ids / "case.ytcs"))
+        expected = {}
+        for line in (ids / "case.ids").read_text().splitlines():
+            if not line.startswith("#"):
+                name, id = line.split(" ")
+                expected[name] = int(id)
+        self.assertEqual(len(expected), 8)
+        self.assertEqual({node.name: config.device_id(node.name)
+                          for node in config.nodes},
+                         expected)
+
     def test_a_device_id_is_a_nodes_place_among_the_names(self):
         # Whatever section each is in, and whatever order the file writes
         # them in: the id is the place among every node's name.

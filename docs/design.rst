@@ -8876,6 +8876,28 @@ Requirement
     is written down.
 
 Requirement
+    Names are compared exactly, and upper and lower case are different
+    letters: ``Zone`` and ``zone`` are two names, and they never sort as
+    equal. Which total order is used matters less than that there is
+    exactly one and both ends use it; the one used is by Unicode code point,
+    which Rust's and Python's string comparison both give, so ``Zone`` sorts
+    before ``apple`` and ``t10`` before ``t9``.
+
+Requirement
+    A set-valued attribute is a set wherever it is used, not only in the
+    digest. Where its entries are numbered, they are numbered in the
+    canonical order: bit *n* of a gpio node's report is the *n*-th of its
+    ``lines`` in sorted order, whatever order the file lists them in.
+
+Requirement
+    The same rule holds for simulator files and physics models. Their type
+    groups, entries, settings and groups are in no meaningful order; the
+    simulator file's digest is taken over what it and its model say, in
+    canonical order; and in a physics model, events due at the same instant
+    are taken by component name, and a terminal's inputs are summed in the
+    order of the names of the terminals they come from.
+
+Requirement
     The digest is taken over the configuration in the canonical order. So
     two files that differ only in order digest alike, as two that differ only
     in format or comments do.

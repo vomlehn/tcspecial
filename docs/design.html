@@ -9077,6 +9077,25 @@ by name; and the entries of a set-valued attribute -- a vote's
 <tt class="docutils literal"><span class="pre">tcslibgs::config_digest::interpretation_of_graph</span></tt> is the one place it
 is written down.</dd>
 <dt>Requirement</dt>
+<dd>Names are compared exactly, and upper and lower case are different
+letters: <tt class="docutils literal">Zone</tt> and <tt class="docutils literal">zone</tt> are two names, and they never sort as
+equal. Which total order is used matters less than that there is
+exactly one and both ends use it; the one used is by Unicode code point,
+which Rust's and Python's string comparison both give, so <tt class="docutils literal">Zone</tt> sorts
+before <tt class="docutils literal">apple</tt> and <tt class="docutils literal">t10</tt> before <tt class="docutils literal">t9</tt>.</dd>
+<dt>Requirement</dt>
+<dd>A set-valued attribute is a set wherever it is used, not only in the
+digest. Where its entries are numbered, they are numbered in the
+canonical order: bit <em>n</em> of a gpio node's report is the <em>n</em>-th of its
+<tt class="docutils literal">lines</tt> in sorted order, whatever order the file lists them in.</dd>
+<dt>Requirement</dt>
+<dd>The same rule holds for simulator files and physics models. Their type
+groups, entries, settings and groups are in no meaningful order; the
+simulator file's digest is taken over what it and its model say, in
+canonical order; and in a physics model, events due at the same instant
+are taken by component name, and a terminal's inputs are summed in the
+order of the names of the terminals they come from.</dd>
+<dt>Requirement</dt>
 <dd>The digest is taken over the configuration in the canonical order. So
 two files that differ only in order digest alike, as two that differ only
 in format or comments do.</dd>

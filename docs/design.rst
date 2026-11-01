@@ -6470,7 +6470,15 @@ they are checked where the file is read: each counted APID at most
 id 0's downlink excepted, told apart by the packet type
 (``tcslibgs::graph::telemetry::apids``). Yamcs's mission database
 is tcspecial's own XTCE with a wrapper that puts the header around it, which
-the ping-yamcs example writes.
+``python/tcslibgs/yamcs.py`` generates from the configuration, as it does
+Yamcs's links: a fixed part, ``python/tcslibgs/yamcs.xtce``, that says the
+header and the beacon's and the answers' layouts, with a container or a
+command added for every APID the configuration counts, each named after its
+node, its data a binary parameter since no XTCE lays a node's data out. So
+nothing per APID is stated twice, and a node added is decoded once the
+mission database is regenerated; the ping-yamcs example's tests hold the
+generated APIDs to the Rust's and work the containers as Yamcs would on
+packets the vehicle frames.
 
 A command link's sender written with port nought takes commands from any
 port of its host. Yamcs sends from a port the system chooses and takes the

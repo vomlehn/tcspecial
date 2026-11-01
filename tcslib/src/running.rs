@@ -196,13 +196,20 @@ fn a_datum_received_into_a_buffer_allocates_nothing() {
     std::fs::write(
         &path,
         format!(
-            "gateway:
-  - {{ name: ground, type: gateway_radio, ground_base: \"127.0.0.1:{}\" }}
+            "gateways:
+  - type gateway_radio:
+      - gateway: ground
+        ground_base: \"127.0.0.1:{}\"
 payloads:
-  - {{ name: a, type: network, protocol: udp, address: \"127.0.0.1\", \
-    port: \"7001\", payload-out: ground }}
+  - type network:
+      - payload: a
+        address: \"127.0.0.1\"
+        port: \"7001\"
+        protocol: udp
+        payload-out:
+          - target: ground
 ",
-            port - 1
+            port
         ),
     )
     .expect("written");
@@ -241,13 +248,20 @@ fn a_datum_longer_than_the_buffer_is_refused() {
     std::fs::write(
         &path,
         format!(
-            "gateway:
-  - {{ name: ground, type: gateway_radio, ground_base: \"127.0.0.1:{}\" }}
+            "gateways:
+  - type gateway_radio:
+      - gateway: ground
+        ground_base: \"127.0.0.1:{}\"
 payloads:
-  - {{ name: a, type: network, protocol: udp, address: \"127.0.0.1\", \
-    port: \"7001\", payload-out: ground }}
+  - type network:
+      - payload: a
+        address: \"127.0.0.1\"
+        port: \"7001\"
+        protocol: udp
+        payload-out:
+          - target: ground
 ",
-            port - 1
+            port
         ),
     )
     .expect("written");

@@ -541,7 +541,7 @@ class Configuration:
 
     def gateway_nodes(self):
         """The gateway nodes -- the links to what the vehicle answers to -- in
-        the order written."""
+        the order of their names."""
         return [node for node in self.nodes if node.node_type in GATEWAY_BASES]
 
     def uplink(self, gateway):

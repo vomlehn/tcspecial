@@ -460,17 +460,30 @@ tcspecial:
   gateway: radio
   interface: \"{}\"
   tcs_cmd: {{ recv: \"127.0.0.1:1\", send: \"127.0.0.1:2\" }}
-  payload_command: {{ source_base: \"127.0.0.1:3\", dest_base: \"127.0.0.1:4\" }}
-  payload_telemetry: {{ source_base: \"127.0.0.1:5\", dest_base: \"127.0.0.1:6\" }}
-  beacon: {{ default_interval: \"1 s\", reset_interval: \"1 s\", send: \"127.0.0.1:7\", recv: \"127.0.0.1:8\" }}
+  payload_command: {{ source_base: \"127.0.0.1:3\", dest_base: \
+            \"127.0.0.1:4\" }}
+  payload_telemetry: {{ source_base: \"127.0.0.1:5\", dest_base: \
+            \"127.0.0.1:6\" }}
+  beacon: {{ default_interval: \"1 s\", reset_interval: \"1 s\", send: \
+            \"127.0.0.1:7\", recv: \"127.0.0.1:8\" }}
   state_file: \"{}\"
   configurations: \"{}\"
   load_trials: \"{trials}\"
-gateway:
-  - {{ name: g, type: gateway_radio, address: \"127.0.0.1\", port: \"{}\", \
-ground_base: \"127.0.0.1:10\", payload-in: true, gateway-out: p }}
+gateways:
+  - type gateway_radio:
+      - gateway: g
+        address: \"127.0.0.1\"
+        ground_base: \"127.0.0.1:10\"
+        port: \"{}\"
+        gateway-out:
+          - target: p
+        payload-in: true
 vehicle:
-  - {{ name: p, type: ping, gateway-in: true, payload-out: g }}
+  - type ping:
+      - compute: p
+        payload-out:
+          - target: g
+        gateway-in: true
 ",
                 tcslibgs::InterfaceDigest::of_this_build(),
                 dir.path().join("tcspecial.state").display(),

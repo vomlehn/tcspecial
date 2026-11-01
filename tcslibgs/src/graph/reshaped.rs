@@ -67,11 +67,12 @@ pub fn refused(text: &str, format: ConfigFormat) -> Option<String> {
 ///
 /// # Returns
 ///
-/// The lines, indented to be shown under a sentence.
+/// The shape, in YAML's flow style so that it fits on the one line a
+/// refusal is printed on.
 fn yaml_now(section: &str, word: &str, name: &str, node_type: &str) -> String {
     format!(
-        "\n\n    {section}:\n      - type {node_type}:\n          - {word}: \
-         {name}\n            ...\n\n"
+        "`{section}: [ {{ type {node_type}: [ {{ {word}: {name}, ... }} ] }} \
+         ]`"
     )
 }
 
@@ -169,7 +170,7 @@ fn in_yaml(text: &str) -> Option<String> {
                 "at line {line}, {what} the node \"{name}\" is written as a \
                  node was before nodes were grouped by type, with name: and \
                  type: of its own. Write it under its type now, named by the \
-                 word {word}:{}{CONVERTER}",
+                 word {word}, as {}; {CONVERTER}",
                 yaml_now(section, word, &name, &node_type)
             ),
         ));
@@ -409,20 +410,14 @@ fn node_refused(old: &Old) -> String {
     } else {
         String::new()
     };
-    let now = [
-        format!("    <{section}>"),
-        format!("        <type name=\"{node_type}\">"),
-        format!("            <{word} name=\"{name}\">"),
-        "                ...".to_string(),
-        format!("            </{word}>"),
-        "        </type>".to_string(),
-        format!("    </{section}>"),
-    ]
-    .join("\n");
+    let now = format!(
+        "<{section}><type name=\"{node_type}\"><{word} name=\"{name}\">...\
+         </{word}></type></{section}>"
+    );
     format!(
         "at line {}, {what} the node \"{name}\" is written as a node was \
          before nodes were grouped by type, as a <{}> element with <name> and \
-         <type> in it. Write it under its type now:\n\n{now}\n\n{CONVERTER}",
+         <type> in it. Write it under its type now, as {now}; {CONVERTER}",
         old.line, old.section
     )
 }
@@ -465,8 +460,8 @@ mod tests {
                     type: i2c\n";
         let why = refused(text, ConfigFormat::Yaml).expect("refused");
         assert!(why.starts_with("at line 4, in payloads,"), "{why}");
-        assert!(why.contains("- type i2c:"), "{why}");
-        assert!(why.contains("- payload: temp_1"), "{why}");
+        assert!(why.contains("type i2c:"), "{why}");
+        assert!(why.contains("payload: temp_1"), "{why}");
         assert!(why.contains("convert-format.py"), "{why}");
     }
 
@@ -477,8 +472,9 @@ mod tests {
         let why = refused(text, ConfigFormat::Yaml).expect("refused");
         assert!(why.starts_with("at line 2, the gateway section"), "{why}");
         assert!(why.contains("gateways:"), "{why}");
-        assert!(why.contains("- type gateway_radio:"), "{why}");
-        assert!(why.contains("- gateway: down"), "{why}");
+        assert!(why.contains("type gateway_radio:"), "{why}");
+        assert!(why.contains("gateway: down"), "{why}");
+        assert!(!why.contains('\n'), "one line: {why}");
 
         let why = refused("gateway: []\n", ConfigFormat::Yaml).expect("it");
         assert!(why.starts_with("at line 1, the gateway section"), "{why}");

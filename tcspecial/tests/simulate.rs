@@ -34,21 +34,21 @@ fn configuration(dir: &std::path::Path) -> std::path::PathBuf {
             "tcspecial:
   gateway: radio
   interface: \"ad9aac4dd5a6d88dd5e78824ba8a83ac\"
-  beacon: {{ default_interval: \"5 s\", reset_interval: \"1 s\", \
-  recv: \"127.0.0.1:1\", send: \"127.0.0.1:2\" }}
+  beacon: {{ default_interval: \"5 s\", reset_interval: \"1 s\", recv: \
+            \"127.0.0.1:1\", send: \"127.0.0.1:2\" }}
   log: {{ directory: \"{}\", segment_size: \"65536\" }}
-  payload_command: {{ dest_base: \"127.0.0.1:3\", \
-  source_base: \"127.0.0.1:4\" }}
-  payload_telemetry: {{ dest_base: \"127.0.0.1:5\", \
-  source_base: \"127.0.0.1:6\" }}
+  payload_command: {{ dest_base: \"127.0.0.1:3\", source_base: \
+            \"127.0.0.1:4\" }}
+  payload_telemetry: {{ dest_base: \"127.0.0.1:5\", source_base: \
+            \"127.0.0.1:6\" }}
   state_file: \"{state}\"
   tcs_cmd: {{ recv: \"127.0.0.1:7\", send: \"127.0.0.1:8\" }}
 payloads:
-  - name: sensor
-    type: network
-    protocol: \"udp\"
-    address: \"127.0.0.1\"
-    port: \"9\"
+  - type network:
+      - payload: sensor
+        address: \"127.0.0.1\"
+        port: \"9\"
+        protocol: \"udp\"
 ",
             missing.display()
         ),
@@ -131,20 +131,20 @@ fn a_stand_in_is_where_a_simulated_channel_is_reached() {
             "tcspecial:
   gateway: radio
   interface: \"ad9aac4dd5a6d88dd5e78824ba8a83ac\"
-  beacon: {{ default_interval: \"5 s\", reset_interval: \"1 s\", \
-  recv: \"127.0.0.1:1\", send: \"127.0.0.1:2\" }}
-  payload_command: {{ dest_base: \"127.0.0.1:3\", \
-  source_base: \"127.0.0.1:4\" }}
-  payload_telemetry: {{ dest_base: \"127.0.0.1:5\", \
-  source_base: \"127.0.0.1:6\" }}
+  beacon: {{ default_interval: \"5 s\", reset_interval: \"1 s\", recv: \
+            \"127.0.0.1:1\", send: \"127.0.0.1:2\" }}
+  payload_command: {{ dest_base: \"127.0.0.1:3\", source_base: \
+            \"127.0.0.1:4\" }}
+  payload_telemetry: {{ dest_base: \"127.0.0.1:5\", source_base: \
+            \"127.0.0.1:6\" }}
   state_file: \"{state}\"
   tcs_cmd: {{ recv: \"127.0.0.1:7\", send: \"127.0.0.1:8\" }}
 payloads:
-  - name: channel
-    type: rpmsg
-    path: \"/nonexistent/rpmsg0\"
-    service: \"payload-telemetry\"
-    stand_in: \"127.0.0.1:9\"
+  - type rpmsg:
+      - payload: channel
+        path: \"/nonexistent/rpmsg0\"
+        service: \"payload-telemetry\"
+        stand_in: \"127.0.0.1:9\"
 "
         ),
     )

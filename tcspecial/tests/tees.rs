@@ -84,7 +84,8 @@ fn a_tee_sends_each_datum_both_ways() {
     let shipped =
         telemetry::of(&Graph::load(&example).expect("the example reads"))
             .expect("its links to the ground work out");
-    for (source, at) in [("echo", 8704), ("readings", 8705)] {
+    // echo is device id 1 and readings 4, by the order of the names.
+    for (source, at) in [("echo", 8701), ("readings", 8704)] {
         let link = shipped
             .iter()
             .find(|link| link.source == source)

@@ -207,9 +207,12 @@ mod tests {
   gateway: radio
   interface: \"{}\"
   tcs_cmd: {{ recv: \"127.0.0.1:{vehicle}\", send: \"127.0.0.1:{}\" }}
-  payload_command: {{ source_base: \"127.0.0.1:{}\", dest_base: \"127.0.0.1:{}\" }}
-  payload_telemetry: {{ source_base: \"127.0.0.1:{}\", dest_base: \"127.0.0.1:{}\" }}
-  beacon: {{ default_interval: \"1 s\", reset_interval: \"1 s\", send: \"127.0.0.1:{}\", recv: \"127.0.0.1:{}\" }}
+  payload_command: {{ source_base: \"127.0.0.1:{}\", dest_base: \
+            \"127.0.0.1:{}\" }}
+  payload_telemetry: {{ source_base: \"127.0.0.1:{}\", dest_base: \
+            \"127.0.0.1:{}\" }}
+  beacon: {{ default_interval: \"1 s\", reset_interval: \"1 s\", send: \
+            \"127.0.0.1:{}\", recv: \"127.0.0.1:{}\" }}
   state_file: \"/tmp/listening.state\"
 ",
                 tcslibgs::InterfaceDigest::of_this_build(),
@@ -284,8 +287,14 @@ mod tests {
     fn a_configuration_with_no_section_has_nothing_to_connect_to() {
         let dir = tempfile::tempdir().expect("a directory");
         let path = dir.path().join("none.ytcs");
-        std::fs::write(&path, "vehicle:\n  - { name: p, type: ping }\n")
-            .unwrap();
+        std::fs::write(
+            &path,
+            "vehicle:
+  - type ping:
+      - compute: p
+",
+        )
+        .unwrap();
         let graph = Graph::load(&path).unwrap();
         assert!(Listening::open(&graph).expect("it reads").is_none());
     }

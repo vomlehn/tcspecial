@@ -292,7 +292,8 @@ given its data whole, as a binary parameter named after it, and a gateway
 node whose data goes anywhere else a command named after it that carries
 its data whole. Nothing in the wrapper is written by hand per APID, so a
 node added to the configuration is decoded by Yamcs the next time the
-example runs. It starts Yamcs and tcspecial, has Yamcs send CONNECT until the vehicle answers with the
+example runs, and no line of it is wider than 80 columns. It starts Yamcs
+and tcspecial, has Yamcs send CONNECT until the vehicle answers with the
 configuration's checksum, then pings through Yamcs -- the ping split into
 the document's fields by the code tcs-xtce generates from it,
 `python/tcslibgs/ping_packet.py` -- and reads the answers back over Yamcs's
@@ -328,8 +329,8 @@ wrapper as Yamcs would, decoding the beacon, the answers -- a ping's field
 by field, every byte of it read -- and each added node's data as the
 vehicle frames them, and encoding CONNECT and a ping, its fields as text,
 for the vehicle to unframe and read as the ping `tcslibgs` writes; and
-`python.rs` runs `test_ping_yamcs.py`. None needs Yamcs or opens a
-window.
+`python.rs` runs `test_ping_yamcs.py`, which also holds every line of the
+written wrapper to 80 columns. None needs Yamcs or opens a window.
 
 `YAMCS_HOME` is where a Yamcs release is unpacked, holding `bin/yamcsd`;
 <https://github.com/yamcs/yamcs/releases> has them, and it was written

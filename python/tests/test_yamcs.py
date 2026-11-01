@@ -404,5 +404,36 @@ class MdbTest(unittest.TestCase):
         self.assertEqual(ran.returncode, 0, ran.stderr)
 
 
+class WrittenTest(unittest.TestCase):
+    """The wrapper as it is written: no line wider than the template's."""
+
+    def test_a_wide_start_tag_has_an_attribute_on_each_line(self):
+        root = ElementTree.Element(generated._tag("SpaceSystem"),
+                                   {"name": "TcsYamcs"})
+        ElementTree.SubElement(root, generated._tag("Argument"),
+                               {"name": "SentNanoseconds",
+                                "argumentTypeRef": "PingNanosecondsArg",
+                                "initialValue": "000000000"})
+        ElementTree.SubElement(root, generated._tag("Parameter"),
+                               {"name": "A", "parameterTypeRef": "B"})
+        self.assertEqual(generated.serialized(root), [
+            '<SpaceSystem xmlns="http://www.omg.org/spec/XTCE/20180204" '
+            'name="TcsYamcs">',
+            '  <Argument name="SentNanoseconds"',
+            '            argumentTypeRef="PingNanosecondsArg"',
+            '            initialValue="000000000"/>',
+            '  <Parameter name="A" parameterTypeRef="B"/>',
+            "</SpaceSystem>"])
+
+    def test_text_and_attributes_are_escaped(self):
+        root = ElementTree.Element(generated._tag("Comparison"),
+                                   {"value": '<"&>'})
+        root.text = "a < b & c"
+        written = "\n".join(generated.serialized(root))
+        self.assertEqual(ElementTree.fromstring(written).get("value"),
+                         '<"&>')
+        self.assertEqual(ElementTree.fromstring(written).text, "a < b & c")
+
+
 if __name__ == "__main__":
     unittest.main()

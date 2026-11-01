@@ -4517,6 +4517,10 @@ copy says the same is copied: strings, integers and binary values of a
 fixed size or ended by a character, and entries one after another; a
 document that says more is refused, naming what. Yamcs's web interface
 then shows a ping and its answer as text.
+
+The mission database is written as the fixed part is, two spaces to a
+level, and no line of it wider than 80 columns: an element whose start tag
+would be wider has one attribute on each line, each under the first.
 ``examples/ping-yamcs/ping_yamcs.py`` writes a Yamcs instance with it: see
 `The ping-yamcs example`_.
 

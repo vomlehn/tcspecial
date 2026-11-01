@@ -562,13 +562,13 @@ text they are. A node with no such document is given its data whole, as
 a binary parameter named after it, and a gateway node whose data goes
 anywhere else a command named after it that carries its data whole.
 Nothing in the wrapper is written by hand per APID, so a node added to
-the configuration is decoded by Yamcs the next time the example runs. It
-starts Yamcs and tcspecial, has Yamcs send CONNECT until the vehicle
-answers with the configuration’s checksum, then pings through Yamcs –
-the ping split into the document’s fields by the code tcs-xtce generates
-from it, <code>python/tcslibgs/ping_packet.py</code> – and reads the
-answers back over Yamcs’s REST API, putting each together again from its
-fields.</p>
+the configuration is decoded by Yamcs the next time the example runs,
+and no line of it is wider than 80 columns. It starts Yamcs and
+tcspecial, has Yamcs send CONNECT until the vehicle answers with the
+configuration’s checksum, then pings through Yamcs – the ping split into
+the document’s fields by the code tcs-xtce generates from it,
+<code>python/tcslibgs/ping_packet.py</code> – and reads the answers back
+over Yamcs’s REST API, putting each together again from its fields.</p>
 <p>Its window is the ping example’s: the beacon panel, and the ping
 panel with its <code>Send ping</code> button. The beacon panel is fed
 the beacon’s own bytes, which the Yamcs wrapper keeps whole as the
@@ -597,7 +597,8 @@ ping’s field by field, every byte of it read – and each added node’s
 data as the vehicle frames them, and encoding CONNECT and a ping, its
 fields as text, for the vehicle to unframe and read as the ping
 <code>tcslibgs</code> writes; and <code>python.rs</code> runs
-<code>test_ping_yamcs.py</code>. None needs Yamcs or opens a window.</p>
+<code>test_ping_yamcs.py</code>, which also holds every line of the
+written wrapper to 80 columns. None needs Yamcs or opens a window.</p>
 <p><code>YAMCS_HOME</code> is where a Yamcs release is unpacked, holding
 <code>bin/yamcsd</code>; <a
 href="https://github.com/yamcs/yamcs/releases"

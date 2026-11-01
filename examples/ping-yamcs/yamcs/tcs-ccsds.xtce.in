@@ -48,6 +48,20 @@
           </Variable>
         </StringDataEncoding>
       </StringParameterType>
+      <!-- The beacon as tcspecial sent it: every octet after the header,
+           read again whole so that the ground station can check it as the
+           ping example's does, from the bytes and not from Yamcs's
+           reading of them. -->
+      <BinaryParameterType name="BeaconBodyType">
+        <BinaryDataEncoding>
+          <SizeInBits>
+            <DynamicValue>
+              <ParameterInstanceRef parameterRef="CcsdsLength"/>
+              <LinearAdjustment slope="8" intercept="8"/>
+            </DynamicValue>
+          </SizeInBits>
+        </BinaryDataEncoding>
+      </BinaryParameterType>
     </ParameterTypeSet>
     <ParameterSet>
       <Parameter name="CcsdsVersion" parameterTypeRef="U3Type"/>
@@ -61,6 +75,7 @@
            is one of the fixed commands' answers or another's. -->
       <Parameter name="AnswerOpcode" parameterTypeRef="U8Type"/>
       <Parameter name="PingReply" parameterTypeRef="PingReplyType"/>
+      <Parameter name="BeaconBody" parameterTypeRef="BeaconBodyType"/>
     </ParameterSet>
     <ContainerSet>
       <SequenceContainer name="CCSDSPacket">
@@ -78,6 +93,11 @@
       <SequenceContainer name="BeaconPacket">
         <EntryList>
           <ContainerRefEntry containerRef="/TcsBeacon/Beacon"/>
+          <ParameterRefEntry parameterRef="BeaconBody">
+            <LocationInContainerInBits referenceLocation="containerStart">
+              <FixedValue>48</FixedValue>
+            </LocationInContainerInBits>
+          </ParameterRefEntry>
         </EntryList>
         <BaseContainer containerRef="CCSDSPacket">
           <RestrictionCriteria>

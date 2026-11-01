@@ -292,11 +292,12 @@ the Rust.</td>
 </tr>
 <tr>
 <td><code>ping-yamcs</code></td>
-<td>The ping example with Yamcs as the ground station: a
-<code>gateway_yamcs</code> gateway puts a CCSDS primary header on every
-packet to and from the ground, the beacon included, and
+<td>The ping example with Yamcs between the ground station and the
+vehicle: a <code>gateway_yamcs</code> gateway puts a CCSDS primary
+header on every packet to and from the ground, the beacon included, and
 <code>ping_yamcs.py</code> runs Yamcs on tcspecial’s own XTCE and pings
-through it. Needs a Yamcs release unpacked somewhere.</td>
+through it from the ping example’s window. Needs a Yamcs release
+unpacked somewhere.</td>
 </tr>
 <tr>
 <td><code>tees</code></td>
@@ -542,10 +543,30 @@ database of tcspecial’s own XTCE and
 <code>yamcs/tcs-ccsds.xtce.in</code>, which puts the header around it.
 It starts Yamcs and tcspecial, has Yamcs send CONNECT until the vehicle
 answers with the configuration’s checksum, then pings through Yamcs and
-reads the answers back over Yamcs’s REST API:</p>
-<pre><code>make run-ping-yamcs YAMCS_HOME=~/yamcs-5.14.0
+reads the answers back over Yamcs’s REST API.</p>
+<p>Its window is the ping example’s: the beacon panel, and the ping
+panel with its <code>Send ping</code> button. The beacon panel is fed
+the beacon’s own bytes, which the Yamcs wrapper keeps whole as the
+<code>BeaconBody</code> parameter, so it checks the configuration’s
+checksum and the beacon’s number and ages the indicator just as the ping
+example’s does. With <code>--pings</code> there is no window: it prints
+the first beacon and each exchange, and stops.</p>
+<pre><code>make run-ping-yamcs YAMCS_HOME=~/yamcs-5.14.0     # the window
 python3 examples/ping-yamcs/ping_yamcs.py --yamcs ~/yamcs-5.14.0 --pings 3
 python3 examples/ping-yamcs/ping_yamcs.py --describe   # what it read</code></pre>
+<p>Yamcs and tcspecial are stopped when the window is closed or the
+pings are done, and are killed with <code>ping_yamcs.py</code> if it is
+killed or crashes, so neither is left holding the example’s ports.</p>
+<p>An answer’s arrival time is when Yamcs received it, to the
+millisecond, as finely as Yamcs says; so a half of a sub-millisecond
+round trip can come out a fraction of a millisecond negative.</p>
+<p>The Rust crate beside it is its tests, which <code>cargo test</code>
+runs: <code>agrees.rs</code> holds the ports, APIDs and checksum
+<code>ping_yamcs.py --describe</code> reads from
+<code>ping-yamcs.xtcs</code> to what <code>tcslibgs</code> reads from
+<code>ping-yamcs.ytcs</code>, and <code>python.rs</code> runs
+<code>test_ping_yamcs.py</code>. Neither needs Yamcs or opens a
+window.</p>
 <p><code>YAMCS_HOME</code> is where a Yamcs release is unpacked, holding
 <code>bin/yamcsd</code>; <a
 href="https://github.com/yamcs/yamcs/releases"

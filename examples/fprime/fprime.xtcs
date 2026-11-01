@@ -41,80 +41,83 @@
             <send>127.0.0.1:9210</send>
         </tcs_cmd>
     </tcspecial>
-    <!-- The F´ bridge's end of the link, both ways. What the bridge sends
-         goes up to address:port, which this node binds aboard, and leaves it
-         by gateway-out for the heater. What comes down arrives at bridge_base
-         plus the device id of the node that sent it, and the bridge gives it
-         the F´ ID fprime_id_base plus that same id: the thermometer, device id
-         2, arrives at 127.0.0.1:9702 as 0x3002, zone_temp, device id 3, at
-         127.0.0.1:9703 as 0x3003, and heater_wanted, device id 4, at
-         127.0.0.1:9704 as 0x3004. -->
-    <gateway>
-        <name>fsw</name>
-        <type>gateway_fprime</type>
-        <address>127.0.0.1</address>
-        <port>9600</port>
-        <bridge_base>127.0.0.1:9700</bridge_base>
-        <fprime_id_base>0x3000</fprime_id_base>
-        <payload-in>true</payload-in>
-        <gateway-out><target>heater</target></gateway-out>
-    </gateway>
-    <!-- A heater, driven by what the flight computer sends - 1 for on, 0 for
-         off - the far end of a UDP socket. -->
+    <gateways>
+        <type name="gateway_fprime">
+            <!-- The F´ bridge's end of the link, both ways. What the bridge
+                 sends goes up to address:port, which this node binds
+                 aboard, and leaves it by gateway-out for the heater. What
+                 comes down arrives at bridge_base plus the device id of the
+                 node that sent it, and the bridge gives it the F´ ID
+                 fprime_id_base plus that same id: heater_wanted, device id
+                 2, arrives at 127.0.0.1:9702 as 0x3002, the thermometer,
+                 device id 3, at 127.0.0.1:9703 as 0x3003, and
+                 zone_temp, device id 4, at 127.0.0.1:9704 as 0x3004. -->
+            <gateway name="fsw">
+                <address>127.0.0.1</address>
+                <bridge_base>127.0.0.1:9700</bridge_base>
+                <fprime_id_base>0x3000</fprime_id_base>
+                <port>9600</port>
+                <gateway-out><target>heater</target></gateway-out>
+                <payload-in>true</payload-in>
+            </gateway>
+        </type>
+    </gateways>
     <payloads>
-        <name>heater</name>
-        <type>network</type>
-        <protocol>udp</protocol>
-        <address>127.0.0.1</address>
-        <port>9001</port>
-        <gateway-in>true</gateway-in>
+        <type name="network">
+            <!-- A heater, driven by what the flight computer sends - 1 for
+                 on, 0 for off - the far end of a UDP socket. -->
+            <payload name="heater">
+                <address>127.0.0.1</address>
+                <port>9001</port>
+                <protocol>udp</protocol>
+                <gateway-in>true</gateway-in>
+            </payload>
+            <!-- A thermometer, two bytes, signed, big endian, in sixteenths
+                 of a degree, whose readings go to the flight computer as
+                 they are, and to zone_temp to be made a temperature. -->
+            <payload name="thermometer">
+                <address>127.0.0.1</address>
+                <port>9002</port>
+                <protocol>udp</protocol>
+                <payload-out><target>fsw</target></payload-out>
+                <payload-out><target>zone_temp</target></payload-out>
+            </payload>
+        </type>
     </payloads>
-    <!-- A thermometer, two bytes, signed, big endian, in sixteenths of a
-         degree, whose readings go to the flight computer as they are, and to
-         zone_temp to be made a temperature. -->
-    <payloads>
-        <name>thermometer</name>
-        <type>network</type>
-        <protocol>udp</protocol>
-        <address>127.0.0.1</address>
-        <port>9002</port>
-        <payload-out><target>fsw</target></payload-out>
-        <payload-out><target>zone_temp</target></payload-out>
-    </payloads>
-    <!-- After the payloads, so that the thermometer keeps device id 2: a
-         node's device id is its place in the file.
-
-         The thermometer's readings made a value, a temperature in kelvin,
-         which the bridge's channel for it holds as one. -->
     <vehicle>
-        <name>zone_temp</name>
-        <type>compute</type>
-        <format>i16_be</format>
-        <function>to_kelvin</function>
-        <offset>273.15</offset>
-        <scale>0.0625</scale>
-        <payload-in>true</payload-in>
-        <payload-out><target>fsw</target></payload-out>
-        <payload-out><target>heater_wanted</target></payload-out>
-    </vehicle>
-    <!-- What a thermostat would decide of zone_temp - on below 283.65 K, off
-         above 284.65 K - which the bridge's channel for it holds as a
-         decision, true for on. Advice and no more: the heater is the flight
-         computer's to drive, and this drives nothing. -->
-    <vehicle>
-        <name>heater_wanted</name>
-        <type>compute</type>
-        <function>hysteresis</function>
-        <half_band>0.5</half_band>
-        <setpoint>284.15</setpoint>
-        <payload-in>true</payload-in>
-        <payload-out><target>fsw</target></payload-out>
+        <type name="compute">
+            <!-- What a thermostat would decide of zone_temp - on below
+                 283.65 K, off above 284.65 K - which the bridge's channel
+                 for it holds as a decision, true for on. Advice and no
+                 more: the heater is the flight computer's to drive, and
+                 this drives nothing. -->
+            <compute name="heater_wanted">
+                <function>hysteresis</function>
+                <half_band>0.5</half_band>
+                <setpoint>284.15</setpoint>
+                <payload-out><target>fsw</target></payload-out>
+                <payload-in>true</payload-in>
+            </compute>
+            <!-- The thermometer's readings made a value, a temperature in
+                 kelvin, which the bridge's channel for it holds as one. -->
+            <compute name="zone_temp">
+                <format>i16_be</format>
+                <function>to_kelvin</function>
+                <offset>273.15</offset>
+                <scale>0.0625</scale>
+                <payload-out><target>fsw</target></payload-out>
+                <payload-out><target>heater_wanted</target></payload-out>
+                <payload-in>true</payload-in>
+            </compute>
+        </type>
     </vehicle>
     <tcsgui>
-        <nodes><name>fsw</name><x>469</x><y>34</y></nodes>
-        <nodes><name>heater</name><x>34</x><y>34</y></nodes>
-        <nodes><name>thermometer</name><x>34</x><y>134</y></nodes>
-        <nodes><name>zone_temp</name><x>242</x><y>134</y></nodes>
-        <nodes><name>heater_wanted</name><x>242</x><y>234</y></nodes>
+        <nodes>
+            <node name="fsw" x="469" y="34"/>
+            <node name="heater" x="34" y="34"/>
+            <node name="heater_wanted" x="242" y="234"/>
+            <node name="thermometer" x="34" y="134"/>
+            <node name="zone_temp" x="242" y="134"/>
+        </nodes>
     </tcsgui>
 </configuration>

@@ -28,117 +28,112 @@ tcspecial:
     recv: "0.0.0.0:4000"
     send: "127.0.0.1:4100"
 
-gateway:
-  - name: gateway
-    type: gateway_radio
-    address: "127.0.0.1"
-    ground_base: "127.0.0.1:5100"
-    port: "5000"
-    payload-in: true
+gateways:
+  - type gateway_radio:
+      - gateway: gateway
+        address: "127.0.0.1"
+        ground_base: "127.0.0.1:5100"
+        port: "5000"
+        payload-in: true
 
 vehicle:
-  # The power monitor's two bytes are millivolts, unsigned, most
-  # significant first: up to 65 volts, which is twice the bus.
-  - name: bus_volts
-    type: compute
-    function: "to_value"
-    format: "u16_be"
-    offset: "0"
-    scale: "0.001"
-    unit: "V"
-    payload-out:
-      - target: gateway
-      - target: housekeeping
-    payload-in: true
-  # The shunt's two bytes are milliamperes, signed, most significant
-  # first: charging is more than nought, discharging less.
-  - name: battery_amps
-    type: compute
-    function: "to_value"
-    format: "i16_be"
-    offset: "0"
-    scale: "0.001"
-    unit: "A"
-    payload-out:
-      - target: gateway
-      - target: charge
-      - target: housekeeping
-    payload-in: true
-  # The battery's state of charge, which nothing aboard measures: a
-  # program counts the charge in and out from the shunt's readings,
-  # coulomb by coulomb, and answers the fraction of its capacity the
-  # battery holds. A program rather than a built-in, because how a
-  # battery's charge is estimated is a mission's own business. It is a
-  # Python 3 script beside this file, named relative to the repository's
-  # root because that is where tcspecial is run from.
-  - name: charge
-    type: compute
-    function: "process"
-    executable: "examples/battery/charge.py"
-    timeout: "1 s"
-    unit: "ratio"
-    payload-out:
-      - target: gateway
-      - target: shedding
-      - target: housekeeping
-    payload-in: true
-  # Sheds the science load when the charge runs low: asserted below the
-  # band, shedding it, and unasserted above it, restoring it. The band is
-  # wide, a fifth of the battery, so that one eclipse sheds it once
-  # rather than the load chattering on and off at the edge.
-  - name: shedding
-    type: compute
-    function: "hysteresis"
-    half_band: "0.1"
-    setpoint: "0.4"
-    payload-out:
-      - target: housekeeping
-      - target: gateway
-    gateway-out:
-      - target: science
-    payload-in: true
-  - name: housekeeping
-    type: log
-    directory: "/tmp/telemetry"
-    format: "variable_ts_rc"
-    payload-in: true
+  - type compute:
+      # The shunt's two bytes are milliamperes, signed, most significant
+      # first: charging is more than nought, discharging less.
+      - compute: battery_amps
+        format: "i16_be"
+        function: "to_value"
+        offset: "0"
+        scale: "0.001"
+        unit: "A"
+        payload-out:
+          - target: charge
+          - target: gateway
+          - target: housekeeping
+        payload-in: true
+      # The power monitor's two bytes are millivolts, unsigned, most
+      # significant first: up to 65 volts, which is twice the bus.
+      - compute: bus_volts
+        format: "u16_be"
+        function: "to_value"
+        offset: "0"
+        scale: "0.001"
+        unit: "V"
+        payload-out:
+          - target: gateway
+          - target: housekeeping
+        payload-in: true
+      # The battery's state of charge, which nothing aboard measures: a
+      # program counts the charge in and out from the shunt's readings,
+      # coulomb by coulomb, and answers the fraction of its capacity the
+      # battery holds. A program rather than a built-in, because how a
+      # battery's charge is estimated is a mission's own business. It is a
+      # Python 3 script beside this file, named relative to the repository's
+      # root because that is where tcspecial is run from.
+      - compute: charge
+        executable: "examples/battery/charge.py"
+        function: "process"
+        timeout: "1 s"
+        unit: "ratio"
+        payload-out:
+          - target: gateway
+          - target: housekeeping
+          - target: shedding
+        payload-in: true
+      # Sheds the science load when the charge runs low: asserted below the
+      # band, shedding it, and unasserted above it, restoring it. The band is
+      # wide, a fifth of the battery, so that one eclipse sheds it once
+      # rather than the load chattering on and off at the edge.
+      - compute: shedding
+        function: "hysteresis"
+        half_band: "0.1"
+        setpoint: "0.4"
+        gateway-out:
+          - target: science
+        payload-out:
+          - target: gateway
+          - target: housekeeping
+        payload-in: true
+  - type log:
+      - compute: housekeeping
+        directory: "/tmp/telemetry"
+        format: "variable_ts_rc"
+        payload-in: true
 
 payloads:
   # Every payload is the far end of a UDP socket or a serial line, which
   # tcssim stands in for, so that the example runs on any desk and touches
   # no hardware.
-  #
-  # The power monitor, on a serial line: asked for the bus voltage twice a
-  # second, it answers two bytes.
-  - name: monitor
-    type: serial
-    path: "/tmp/tcs-battery-monitor"
-    datarate: "9600"
-    byte_length: "8"
-    stop_bits: "1"
-    max_length: "2"
-    read_timeout: "none"
-    trigger: '"V?\r"'
-    trigger_interval: "500 ms"
-    payload-out:
-      - target: bus_volts
-  # The shunt in the battery's lead, which sends its current twice a
-  # second of its own accord.
-  - name: shunt
-    type: network
-    protocol: "udp"
-    address: "127.0.0.1"
-    port: "5301"
-    payload-out:
-      - target: battery_amps
-  # The science instrument's power switch, driven by what shedding decides
-  # -- 1 to shed it, 0 to restore it.
-  - name: science
-    type: network
-    protocol: "udp"
-    address: "127.0.0.1"
-    port: "5302"
-    gateway-in: true
+  - type network:
+      # The science instrument's power switch, driven by what shedding decides
+      # -- 1 to shed it, 0 to restore it.
+      - payload: science
+        address: "127.0.0.1"
+        port: "5302"
+        protocol: "udp"
+        gateway-in: true
+      # The shunt in the battery's lead, which sends its current twice a
+      # second of its own accord.
+      - payload: shunt
+        address: "127.0.0.1"
+        port: "5301"
+        protocol: "udp"
+        payload-out:
+          - target: battery_amps
+  - type serial:
+      # The power monitor, on a serial line: asked for the bus voltage twice a
+      # second, it answers two bytes.
+      - payload: monitor
+        byte_length: "8"
+        datarate: "9600"
+        max_length: "2"
+        path: "/tmp/tcs-battery-monitor"
+        read_timeout: "none"
+        stop_bits: "1"
+        trigger: '"V?\r"'
+        trigger_interval: "500 ms"
+        payload-out:
+          - target: bus_volts
 
 commands:
   # the state of charge the science load is shed around, as a fraction

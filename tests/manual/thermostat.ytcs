@@ -27,140 +27,134 @@ payload_groups:
   - name: "zone_temps"
     interval: "100 ms"
 
-gateway:
-  - name: gateway
-    type: gateway_radio
-    address: "10.0.0.1"
-    ground_base: "10.0.0.2:5100"
-    port: "5000"
-    payload-in: true
+gateways:
+  - type gateway_radio:
+      - gateway: gateway
+        address: "10.0.0.1"
+        ground_base: "10.0.0.2:5100"
+        port: "5000"
+        payload-in: true
 
 vehicle:
-  - name: k_1
-    type: compute
-    format: "i16_be"
-    function: "to_kelvin"
-    offset: "273.15"
-    scale: "0.0625"
-    payload-out:
-      - target: gateway
-      - target: zone_temp
-        input: in0
-      - target: housekeeping
-    payload-in: true
-  - name: k_2
-    type: compute
-    format: "i16_be"
-    function: "to_kelvin"
-    offset: "273.15"
-    scale: "0.0625"
-    payload-out:
-      - target: gateway
-      - target: zone_temp
-        input: in1
-      - target: housekeeping
-    payload-in: true
-  - name: k_3
-    type: compute
-    format: "u24_be"
-    function: "to_kelvin"
-    offset: "255.37"
-    scale: "0.0078"
-    payload-out:
-      - target: gateway
-      - target: zone_temp
-        input: in2
-      - target: housekeeping
-    payload-in: true
-  # One temperature out of the three, by the algorithm named: median
-  # takes the middle reading, closest_mean the mean of the two that
-  # agree best. Either leaves a sensor that has gone wrong out of the
-  # answer, which a mean over all three would not, and it produces a
-  # value on every arrival, so one sensor that stops reporting is
-  # outvoted rather than stopping the vehicle from deciding anything.
-  - name: zone_temp
-    type: compute
-    algorithm: "median"
-    function: "vote"
-    inputs: "in0,in1,in2"
-    payload-out:
-      - target: gateway
-      - target: thermostat
-    payload-in: true
-  # setpoint is set from the ground; half_band is how far either side
-  # of it the heaters are switched at, the setpoint being in the middle
-  # of the band.
-  - name: thermostat
-    type: compute
-    function: "hysteresis"
-    half_band: "2.0"
-    setpoint: "293.15"
-    payload-out:
-      - target: housekeeping
-      - target: gateway
-    # asserted below the setpoint, unasserted above it. Two heaters,
-    # because one failing must not leave the mass with no way to be
-    # warmed: either alone holds the band, and both together hold it
-    # twice as fast.
-    gateway-out:
-      - target: heaters_1
-      - target: heaters_2
-    payload-in: true
-  - name: housekeeping
-    type: log
-    directory: "/var/log/tcspecial"
-    format: "variable_ts_rc"
-    payload-in: true
+  - type compute:
+      - compute: k_1
+        format: "i16_be"
+        function: "to_kelvin"
+        offset: "273.15"
+        scale: "0.0625"
+        payload-out:
+          - target: gateway
+          - target: housekeeping
+          - target: zone_temp
+            input: in0
+        payload-in: true
+      - compute: k_2
+        format: "i16_be"
+        function: "to_kelvin"
+        offset: "273.15"
+        scale: "0.0625"
+        payload-out:
+          - target: gateway
+          - target: housekeeping
+          - target: zone_temp
+            input: in1
+        payload-in: true
+      - compute: k_3
+        format: "u24_be"
+        function: "to_kelvin"
+        offset: "255.37"
+        scale: "0.0078"
+        payload-out:
+          - target: gateway
+          - target: housekeeping
+          - target: zone_temp
+            input: in2
+        payload-in: true
+      # setpoint is set from the ground; half_band is how far either side
+      # of it the heaters are switched at, the setpoint being in the middle
+      # of the band.
+      - compute: thermostat
+        function: "hysteresis"
+        half_band: "2.0"
+        setpoint: "293.15"
+        # asserted below the setpoint, unasserted above it. Two heaters,
+        # because one failing must not leave the mass with no way to be
+        # warmed: either alone holds the band, and both together hold it
+        # twice as fast.
+        gateway-out:
+          - target: heaters_1
+          - target: heaters_2
+        payload-out:
+          - target: gateway
+          - target: housekeeping
+        payload-in: true
+      # One temperature out of the three, by the algorithm named: median
+      # takes the middle reading, closest_mean the mean of the two that
+      # agree best. Either leaves a sensor that has gone wrong out of the
+      # answer, which a mean over all three would not, and it produces a
+      # value on every arrival, so one sensor that stops reporting is
+      # outvoted rather than stopping the vehicle from deciding anything.
+      - compute: zone_temp
+        algorithm: "median"
+        function: "vote"
+        inputs: "in0,in1,in2"
+        payload-out:
+          - target: gateway
+          - target: thermostat
+        payload-in: true
+  - type log:
+      - compute: housekeeping
+        directory: "/var/log/tcspecial"
+        format: "variable_ts_rc"
+        payload-in: true
 
 payloads:
-  # One of three sensors of the same place, a trio, so that the
-  # temperature survives one of them going wrong. Two bytes, signed,
-  # big endian.
-  - name: temp_1
-    type: i2c
-    address: "0x48"
-    group: "zone_temps"
-    path: "/dev/i2c-1"
-    read_size: "2"
-    payload-out:
-      - target: k_1
-  # The second of the trio; the same part as temp_1, on the same bus.
-  - name: temp_2
-    type: i2c
-    address: "0x49"
-    group: "zone_temps"
-    path: "/dev/i2c-1"
-    read_size: "2"
-    payload-out:
-      - target: k_2
-  # The third. A different part on a different bus: three bytes,
-  # unsigned, its own scale and so its own conversion, so that no one
-  # bus and no one part number can take the whole trio out.
-  - name: temp_3
-    type: spi
-    group: "zone_temps"
-    max_speed: "1000000"
-    path: "/dev/spidev0.0"
-    read_size: "3"
-    spi_mode: "0"
-    payload-out:
-      - target: k_3
-  # Two heaters, each three circuits driven together, both near the
-  # sensors on the same thermal mass. Separate nodes rather than six
-  # lines on one, so that one can be stopped from the ground while the
-  # other goes on holding the temperature.
-  - name: heaters_1
-    type: gpio
-    direction: "output"
-    lines: "3,4,5"
-    path: "/dev/gpiochip0"
-    gateway-in: true
-  - name: heaters_2
-    type: gpio
-    direction: "output"
-    lines: "6,7,8"
-    path: "/dev/gpiochip0"
-    gateway-in: true
+  - type gpio:
+      # Two heaters, each three circuits driven together, both near the
+      # sensors on the same thermal mass. Separate nodes rather than six
+      # lines on one, so that one can be stopped from the ground while the
+      # other goes on holding the temperature.
+      - payload: heaters_1
+        direction: "output"
+        lines: "3,4,5"
+        path: "/dev/gpiochip0"
+        gateway-in: true
+      - payload: heaters_2
+        direction: "output"
+        lines: "6,7,8"
+        path: "/dev/gpiochip0"
+        gateway-in: true
+  - type i2c:
+      # One of three sensors of the same place, a trio, so that the
+      # temperature survives one of them going wrong. Two bytes, signed,
+      # big endian.
+      - payload: temp_1
+        address: "0x48"
+        group: "zone_temps"
+        path: "/dev/i2c-1"
+        read_size: "2"
+        payload-out:
+          - target: k_1
+      # The second of the trio; the same part as temp_1, on the same bus.
+      - payload: temp_2
+        address: "0x49"
+        group: "zone_temps"
+        path: "/dev/i2c-1"
+        read_size: "2"
+        payload-out:
+          - target: k_2
+  - type spi:
+      # The third. A different part on a different bus: three bytes,
+      # unsigned, its own scale and so its own conversion, so that no one
+      # bus and no one part number can take the whole trio out.
+      - payload: temp_3
+        group: "zone_temps"
+        max_speed: "1000000"
+        path: "/dev/spidev0.0"
+        read_size: "3"
+        spi_mode: "0"
+        payload-out:
+          - target: k_3
 
 commands:
   # the zone temperature the heaters are held at, in kelvin
@@ -168,15 +162,15 @@ commands:
 
 tcsgui:
   nodes:
-    - { name: temp_1, x: 34, y: 34 }
-    - { name: temp_2, x: 34, y: 166 }
-    - { name: temp_3, x: 34, y: 280 }
-    - { name: k_1, x: 242, y: 34 }
-    - { name: k_2, x: 242, y: 166 }
-    - { name: k_3, x: 242, y: 280 }
-    - { name: zone_temp, x: 469, y: 166 }
-    - { name: thermostat, x: 601, y: 242 }
-    - { name: gateway, x: 790, y: 34 }
-    - { name: heaters_1, x: 34, y: 393 }
-    - { name: heaters_2, x: 34, y: 470 }
-    - { name: housekeeping, x: 469, y: 374 }
+    - { node: gateway, x: 790, y: 34 }
+    - { node: heaters_1, x: 34, y: 393 }
+    - { node: heaters_2, x: 34, y: 470 }
+    - { node: housekeeping, x: 469, y: 374 }
+    - { node: k_1, x: 242, y: 34 }
+    - { node: k_2, x: 242, y: 166 }
+    - { node: k_3, x: 242, y: 280 }
+    - { node: temp_1, x: 34, y: 34 }
+    - { node: temp_2, x: 34, y: 166 }
+    - { node: temp_3, x: 34, y: 280 }
+    - { node: thermostat, x: 601, y: 242 }
+    - { node: zone_temp, x: 469, y: 166 }

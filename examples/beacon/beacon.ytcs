@@ -34,17 +34,17 @@ tcspecial:
     send: "127.0.0.1:4700"
 
 payloads:
-  # A beacon is sent because tcspecial is running rather than because a
-  # payload has anything to say, so this example needs a payload only because
-  # a configuration describes a vehicle and a vehicle with nothing aboard is
-  # not one. Its readings go to the ground over payload_telemetry, as any
-  # payload's do when nothing aboard touches them.
-  - name: sensor
-    type: network
-    protocol: "udp"
-    address: "127.0.0.1"
-    port: "5101"
+  - type network:
+      # A beacon is sent because tcspecial is running rather than because a
+      # payload has anything to say, so this example needs a payload only
+      # because a configuration describes a vehicle and a vehicle with nothing
+      # aboard is not one. Its readings go to the ground over payload_telemetry,
+      # as any payload's do when nothing aboard touches them.
+      - payload: sensor
+        address: "127.0.0.1"
+        port: "5101"
+        protocol: "udp"
 
 tcsgui:
   nodes:
-    - { name: sensor, x: 34, y: 34 }
+    - { node: sensor, x: 34, y: 34 }

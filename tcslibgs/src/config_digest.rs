@@ -12,8 +12,12 @@
 //! The digest is of what a file *says*, not of its bytes. A payload set is
 //! shipped in YAML and XML, and the two are one configuration written two
 //! ways: two ends reading different spellings of one set have read the same
-//! set and must agree. Comments, indentation, the order of the sections
-//! and the order of a payload's attributes are all spelling too.
+//! set and must agree. Comments, indentation and order are all spelling too:
+//! the order of the sections, of the types in a section, of the nodes of a
+//! type, of a node's attributes, of its links and their destinations, of the
+//! groups and the command bindings, and of the entries of an attribute that
+//! is a set. Nothing in a configuration is in an order that means anything,
+//! so the digest is taken over it in one order, by name.
 
 use std::path::Path;
 
@@ -157,12 +161,17 @@ pub fn digest_of_file<P: AsRef<Path>>(path: P) -> TcsResult<ConfigDigest> {
 /// Taken over the configuration as loaded rather than over a file's text, so
 /// that its included files are in it and so that the YAML and the XML
 /// spellings of one configuration digest alike. In it: the `tcspecial`
-/// section, the payload groups, the nodes in the order the files declare them
-/// -- which is what a node's device id is, and so which port its data reaches
-/// the ground on -- with their attributes, the links, the command
-/// bindings, and the names its include list gives its other files. Not in
-/// it: the editor's own section, where the nodes are drawn,
+/// section, the payload groups, the nodes with their attributes, the links,
+/// the command bindings, and the names its include list gives its other
+/// files. Not in it: the editor's own section, where the nodes are drawn,
 /// and the description, neither of which changes what anything does.
+///
+/// Each list in one order, whatever order the files wrote it in: the nodes
+/// by name -- which is also the order their device ids are counted in, so
+/// the digest says which port each node's data reaches the ground on -- the
+/// links by the node they leave, each one's destinations sorted, the groups
+/// by name, the bindings by where they come from and what they set, and the
+/// included files by name. See [`interpretation_of_graph`].
 pub fn digest_of_graph(graph: &crate::graph::Graph) -> TcsResult<ConfigDigest> {
     digest_of_value(&interpretation_of_graph(graph))
 }
@@ -200,6 +209,11 @@ pub fn interpretation_of_file<P: AsRef<Path>>(
 /// Writes out what a configuration is read as: see [`digest_of_graph`],
 /// which says what is in it and what is not.
 ///
+/// In canonical order, so that two configurations that differ only in the
+/// order they are written in are read as the same tree: every list is
+/// sorted, and an attribute whose value is a set of entries -- see
+/// [`unordered`] -- is written with its entries sorted, in one spelling.
+///
 /// # Arguments
 ///
 /// * `graph` - The configuration.
@@ -225,14 +239,19 @@ pub fn interpretation_of_graph(
                 .collect()
         })
         .unwrap_or_default();
-    let nodes: Vec<Value> = graph
-        .nodes
-        .iter()
+    let mut sorted: Vec<&crate::graph::Node> = graph.nodes.iter().collect();
+    sorted.sort_by(|a, b| a.name.cmp(&b.name));
+    let nodes: Vec<Value> = sorted
+        .into_iter()
         .map(|node| {
             let attributes: Map<String, Value> = node
                 .attributes
                 .iter()
-                .map(|(name, value)| (name.clone(), text(value)))
+                .map(|(name, value)| {
+                    let said = unordered(&node.node_type, name, value.as_str())
+                        .unwrap_or_else(|| value.as_str().to_string());
+                    (name.clone(), Value::String(said))
+                })
                 .collect();
             json!({
                 "name": node.name,
@@ -242,20 +261,35 @@ pub fn interpretation_of_graph(
             })
         })
         .collect();
-    let links: Vec<Value> = graph
+    let mut links: Vec<(&str, Vec<&str>)> = graph
         .links
         .iter()
-        .map(|link| json!({ "from": link.from, "to": link.to.each() }))
+        .map(|link| {
+            let mut to = link.to.each();
+            to.sort_unstable();
+            (link.from.as_str(), to)
+        })
         .collect();
-    let groups: Vec<Value> = graph
-        .groups
-        .iter()
+    links.sort();
+    let links: Vec<Value> = links
+        .into_iter()
+        .map(|(from, to)| json!({ "from": from, "to": to }))
+        .collect();
+    let mut groups: Vec<&crate::graph::Group> = graph.groups.iter().collect();
+    groups.sort_by(|a, b| (&a.name, &a.interval).cmp(&(&b.name, &b.interval)));
+    let groups: Vec<Value> = groups
+        .into_iter()
         .map(|group| json!({ "name": group.name, "interval": group.interval }))
         .collect();
-    let commands: Vec<Value> = graph
+    let mut commands: Vec<(&str, &str)> = graph
         .commands
         .iter()
-        .map(|binding| json!({ "from": binding.from, "sets": binding.sets }))
+        .map(|binding| (binding.from.as_str(), binding.sets.as_str()))
+        .collect();
+    commands.sort_unstable();
+    let commands: Vec<Value> = commands
+        .into_iter()
+        .map(|(from, sets)| json!({ "from": from, "sets": sets }))
         .collect();
 
     let mut interpretation = json!({
@@ -270,11 +304,60 @@ pub fn interpretation_of_graph(
     // configuration is named by says the shape of its tree too: see
     // `crate::store`. Only where there are some, so that a configuration
     // of one file keeps the checksum it always had.
-    let included = graph.included();
+    let mut included = graph.included();
+    included.sort();
     if !included.is_empty() {
         interpretation["include"] = json!(included);
     }
     interpretation
+}
+
+/// Writes an attribute whose value is a set of entries in its one spelling.
+///
+/// Some attributes list things whose order means nothing: a vote's `inputs`,
+/// the `lines` of a GPIO chip a payload watches or drives, and the
+/// `terminators` any of which ends a read. Written in another order, or
+/// with other spaces or commas between the entries, they say the same thing,
+/// and are digested as the same thing: the entries split as the attribute's
+/// reader splits them, trimmed, sorted, and joined by a comma and a space.
+///
+/// An attribute whose order is its meaning is left as it is written: a
+/// `trigger`'s bytes and an `init` sequence are runs of bytes sent in order.
+///
+/// # Arguments
+///
+/// * `node_type` - The type of the node the attribute is on.
+/// * `attribute` - The attribute's name.
+/// * `value`     - Its value, as read.
+///
+/// # Returns
+///
+/// The value in its one spelling, or `None` for an attribute that is not a
+/// set.
+pub fn unordered(
+    node_type: &str,
+    attribute: &str,
+    value: &str,
+) -> Option<String> {
+    let mut entries: Vec<&str> = match (node_type, attribute) {
+        // As `node::vehicle::compute` reads a vote's inputs.
+        ("compute", "inputs") => value.split([',', ' ']).collect(),
+        // As `node::payload::gpio::lines_of` reads them.
+        ("gpio", "lines") => value.split([',', ' ', '\t']).collect(),
+        // A listed attribute, held with its entries joined: see
+        // `graph::LISTED`.
+        (_, listed) if crate::graph::LISTED.contains(&listed) => {
+            crate::graph::entries(value)
+        }
+        _ => return None,
+    };
+    entries = entries
+        .into_iter()
+        .map(str::trim)
+        .filter(|entry| !entry.is_empty())
+        .collect();
+    entries.sort_unstable();
+    Some(entries.join(", "))
 }
 
 /// Digests any document that can be written out as a value tree.
@@ -306,10 +389,10 @@ fn digest_of_value<T: Serialize>(document: &T) -> TcsResult<ConfigDigest> {
 ///
 /// * A map is written with its keys in order, so the sections of a file may
 ///   be given in any order, and so may the attributes of one payload.
-/// * A list is written in the order it was given, because that order means
-///   something: it is the order the file was written in. The payloads reach
-///   here sorted by the sequence number each recorded as it was read, so "the
-///   order it was given" is the order the file gave.
+/// * A list is written in the order it was given. Nothing in a configuration
+///   is in an order that means anything, and [`interpretation_of_graph`]
+///   has already put every list in one order, by name, so "the order it was
+///   given" is that order and never the file's.
 /// * A scalar is written as its text, which is the same text whichever format
 ///   it was read from.
 ///
@@ -489,10 +572,128 @@ mod tests {
             digest
         );
 
-        // Two nodes swapped are two device ids swapped, and two ports.
+        // Two nodes swapped are the same configuration: a node's device id
+        // is its place among the names, not its place in a file.
         let mut reordered = graph.clone();
         reordered.nodes.swap(1, 2);
-        assert_ne!(digest_of_graph(&reordered).expect("it digests"), digest);
+        assert_eq!(digest_of_graph(&reordered).expect("it digests"), digest);
+    }
+
+    /// Nothing in a configuration is in an order that means anything: the
+    /// same graph with every list in another order digests alike.
+    #[test]
+    fn a_graph_in_another_order_digests_alike() {
+        let graph = example_graph("thermostat", "ytcs");
+        let digest = digest_of_graph(&graph).expect("it digests");
+
+        let mut shuffled = graph.clone();
+        shuffled.nodes.reverse();
+        shuffled.links.reverse();
+        for link in &mut shuffled.links {
+            let mut to: Vec<String> =
+                link.to.each().into_iter().map(str::to_string).collect();
+            to.reverse();
+            link.to = crate::graph::Destinations::of(to);
+        }
+        shuffled.groups.reverse();
+        shuffled.commands.reverse();
+        assert_eq!(digest_of_graph(&shuffled).expect("it digests"), digest);
+    }
+
+    /// Writes a file into a directory.
+    ///
+    /// # Arguments
+    ///
+    /// * `dir`  - The directory.
+    /// * `name` - The file's name.
+    /// * `text` - What it holds.
+    ///
+    /// # Returns
+    ///
+    /// The file's path.
+    ///
+    /// # Panics
+    ///
+    /// If it cannot be written.
+    fn written(dir: &Path, name: &str, text: &str) -> std::path::PathBuf {
+        let path = dir.join(name);
+        std::fs::write(&path, text).expect("written");
+        path
+    }
+
+    /// Two files that differ only in the order they write things in are one
+    /// configuration: the types of a section, the nodes of a type, a node's
+    /// attributes, its links and their destinations, the groups, the
+    /// command bindings, the includes, and the entries of an attribute that
+    /// is a set.
+    #[test]
+    fn a_file_in_another_order_digests_alike() {
+        let dir = tempfile::tempdir().expect("a directory");
+        let one = written(
+            dir.path(),
+            "one.ytcs",
+            "include:\n  - a\n  - b\n\
+             payload_groups:\n  - { name: g1, interval: 1 s }\n  \
+             - { name: g2, interval: 2 s }\n\
+             vehicle:\n  - type compute:\n      - compute: v\n        \
+             function: vote\n        inputs: \"in0,in1,in2\"\n        \
+             payload-out:\n          - target: x\n          - target: y\n  \
+             - type log:\n      - compute: x\n      - compute: y\n\
+             payloads:\n  - type gpio:\n      - payload: p\n        \
+             lines: \"0, 1\"\n        chip: c\n  \
+             - type serial:\n      - payload: s\n        \
+             terminators:\n          - '[0A]'\n          - '[0D]'\n\
+             commands:\n  - { from: x, sets: v.a }\n  \
+             - { from: y, sets: v.b }\n",
+        );
+        let two = written(
+            dir.path(),
+            "two.ytcs",
+            "commands:\n  - { from: y, sets: v.b }\n  \
+             - { from: x, sets: v.a }\n\
+             payloads:\n  - type serial:\n      - payload: s\n        \
+             terminators:\n          - '[0D]'\n          - '[0A]'\n  \
+             - type gpio:\n      - payload: p\n        chip: c\n        \
+             lines: \"1 0\"\n\
+             vehicle:\n  - type log:\n      - compute: y\n      \
+             - compute: x\n  - type compute:\n      - compute: v\n        \
+             payload-out:\n          - target: y\n          \
+             - target: x\n        inputs: \"in2, in1 in0\"\n        \
+             function: vote\n\
+             payload_groups:\n  - { name: g2, interval: 2 s }\n  \
+             - { name: g1, interval: 1 s }\n\
+             include:\n  - b\n  - a\n",
+        );
+        written(
+            dir.path(),
+            "a.ytcs",
+            "payloads:\n  - type i2c:\n      - payload: pa\n",
+        );
+        written(
+            dir.path(),
+            "b.ytcs",
+            "payloads:\n  - type i2c:\n      - payload: pb\n",
+        );
+        let first = digest_of_file(&one).expect("one digests");
+        assert_eq!(digest_of_file(&two).expect("two digests"), first);
+
+        // And the node ids are the same, the include order and all.
+        let ids = |path: &Path| {
+            crate::graph::telemetry::ids(
+                &crate::graph::Graph::load(path).expect("it reads"),
+            )
+        };
+        assert_eq!(ids(&one), ids(&two));
+        assert_eq!(ids(&one)["pa"], 1);
+        assert_eq!(ids(&one)["y"], 6);
+
+        // A set's entries are a set, and a trigger's bytes are not.
+        assert_eq!(
+            unordered("compute", "inputs", "in2, in1 in0").as_deref(),
+            Some("in0, in1, in2")
+        );
+        assert_eq!(unordered("serial", "trigger", "[01 02]"), None);
+        assert_eq!(unordered("serial", "init", "[01 02]"), None);
     }
 
     /// The version is three bytes, and says what this build is.

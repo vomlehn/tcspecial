@@ -24,7 +24,12 @@ struct Due {
 /// Every element's next event, soonest first.
 #[derive(Debug)]
 pub struct Queue {
-    /// Soonest first; of two at one moment, the element first made.
+    /// Soonest first; of two at one moment, the element whose place is
+    /// first, which is the element whose name sorts first: the world's
+    /// elements are in name order, as `tcslibgs::physics::Model` holds them,
+    /// and never in the order a file wrote them. A name is one element's
+    /// alone, so this is the whole of the order, and no second key is
+    /// wanted.
     due: Vec<Due>,
 }
 
@@ -113,8 +118,9 @@ mod tests {
         assert_eq!(queue.take(), None);
     }
 
-    /// Two at one moment come in the order their elements were made, and
-    /// a moment that is no moment is none.
+    /// Two at one moment come in the order of their elements' places --
+    /// their names' order, in a world -- and a moment that is no moment is
+    /// none.
     #[test]
     fn a_tie_goes_to_the_first_element() {
         let mut queue = Queue::new(3);

@@ -30,8 +30,11 @@
 //!     to: zone.heat
 //! ```
 //!
-//! The order of the types, and of the components of one, means nothing: the
-//! components are held in name order.
+//! Nothing in it is in an order that means anything: not the types, not the
+//! components of one, and not the connections. The components are held in
+//! name order and the connections in the order of the terminals they join,
+//! by name, so that the world made of a model, and every tie in it, is the
+//! same however the file is written: see [`Model`].
 //!
 //! Each type is a simple part, simulated alone, with its own words for what
 //! goes in and comes out: a heater is switched `on` and gives out `heat`; a
@@ -348,11 +351,19 @@ impl std::fmt::Display for PhysicsProblem {
 }
 
 /// A physics model with every figure read and every connection found.
+///
+/// In one order, whatever order its file is written in: the elements by
+/// name, so that an element's place -- by which the world holds it, and by
+/// which two of its events due at one moment are taken -- is its place among
+/// the names; and the connections by the names of the terminals they join,
+/// from and then to, so that what is summed at an input is summed in one
+/// order.
 #[derive(Debug, Clone, PartialEq, Default)]
 pub struct Model {
     /// Its elements, in name order.
     pub elements: Vec<Resolved>,
-    /// Its connections, each from an output to an input.
+    /// Its connections, each from an output to an input, in the order of
+    /// the names of the terminals they join.
     pub connections: Vec<Joined>,
 }
 
@@ -660,6 +671,13 @@ impl PhysicsFile {
         }
         problems
             .extend(crowded(&model).into_iter().map(PhysicsProblem::joining));
+        // In the order of what they join, by name, and not as the file lists
+        // them: an input that sums is given its outputs in this order.
+        let mut connections = std::mem::take(&mut model.connections);
+        connections.sort_by_cached_key(|c| {
+            (model.name_of(c.from), model.name_of(c.to))
+        });
+        model.connections = connections;
         (model, problems)
     }
 }
@@ -773,15 +791,15 @@ physics:
         power: \"60 W\"
         voltage: \"28 V\"
 connections:
-  - from: heater_1.heat
-    to: zone.heat
   - from: heater_2.heat
+    to: zone.heat
+  - from: heater_1.heat
     to: zone.heat
 ";
 
     /// A model's elements are typed, their figures read in their units, and
-    /// its connections are found; and its elements are held in name order,
-    /// however the file wrote them.
+    /// its connections are found; and each is held in name order, however
+    /// the file wrote them.
     #[test]
     fn a_model_holds_typed_elements_and_their_connections() {
         let model = PhysicsFile::parse(ZONE)
@@ -792,6 +810,7 @@ connections:
         let names: Vec<&str> =
             model.elements.iter().map(|e| e.name.as_str()).collect();
         assert_eq!(names, ["heater_1", "heater_2", "zone"]);
+        assert_eq!(model.name_of(model.connections[0].from), "heater_1.heat");
         let Resolution::Heater(heater) = &model.elements[1].what else {
             panic!("a heater: {:?}", model.elements[1]);
         };
@@ -809,6 +828,42 @@ connections:
             .find(&At::parse("t", "zone.temperature").expect("a terminal"))
             .expect("it is there");
         assert_eq!(terminal.kind, terminal::Kind::Value(Unit::Kelvin));
+    }
+
+    /// A model written in another order is the same model: its components,
+    /// and so their places, by name, and its connections by what they
+    /// join, so that the world made of it sums and breaks ties alike.
+    #[test]
+    fn a_model_in_another_order_is_the_same_model() {
+        let other = "\
+connections:
+  - from: heater_1.heat
+    to: zone.heat
+  - from: heater_2.heat
+    to: zone.heat
+physics:
+  - type heater:
+      - component: heater_1
+        voltage: \"28 V\"
+        power: \"60 W\"
+      - component: heater_2
+        ripple_time: 20 s
+        ripple: \"0.02\"
+        voltage: \"28 V\"
+        power: \"60 W\"
+  - type thermal_zone:
+      - component: zone
+        capacity: \"20 J/K\"
+        time_constant: 50 s
+        environment: \"283.15 K\"
+";
+        let one = PhysicsFile::parse(ZONE).expect("parses");
+        let two = PhysicsFile::parse(other).expect("parses");
+        assert_eq!(one.physics, two.physics);
+        assert_eq!(
+            one.resolve().expect("resolves"),
+            two.resolve().expect("resolves")
+        );
     }
 
     /// An element of no type, or of one there is none of, or with a

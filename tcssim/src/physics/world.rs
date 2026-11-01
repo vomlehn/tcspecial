@@ -26,6 +26,15 @@
 //! out from every element's outputs as they stand, and held, at the start
 //! of each interval: an element's output is what the interval starts with.
 //!
+//! # Order
+//!
+//! Nothing the world does follows the order a model's file is written in.
+//! Its elements are in name order and its connections in the order of the
+//! names of what they join, as `tcslibgs::physics::Model` holds them, so the
+//! outputs an input sums are added in one order, and of two events due at
+//! one moment the element whose name sorts first has its event first: see
+//! [`Queue`].
+//!
 //! # Sharing
 //!
 //! Every stand-in's thread asks the one world, so its state is behind a

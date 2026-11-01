@@ -308,36 +308,50 @@ fn each_section_takes_the_node_types_the_software_knows() {
     }
 }
 
-/// A simulated payload stands in for one of the interfaces, in both
+/// A simulated payload is written under one of the interfaces, in both
 /// schemas, and an XML simulator file with every word in it is valid and
 /// reads.
 ///
-/// The kinds are `DHType`'s, which is what the simulator reads a `type`
-/// with. Empty is allowed, as not stated. And the XSD offers every setting
-/// the one list of them has, which the XSD once did not: it was missing
-/// what attaches a payload to the physics model.
+/// The kinds are `DHType`'s, which is what the simulator reads a type with.
+/// And the XSD offers every setting the one list of them has, which the XSD
+/// once did not: it was missing what attaches a payload to the physics
+/// model.
 #[test]
 fn the_simulator_schemas_take_the_kinds_and_words_the_simulator_reads() {
-    let mut kinds: Vec<String> = tcslibgs::DHType::ALL
+    let kinds: Vec<String> = tcslibgs::DHType::ALL
         .iter()
         .map(|kind| kind.spelling().to_string())
         .collect();
-    kinds.push(String::new());
 
+    // In JSON, an entry of simulated_payloads is one key, the word type and
+    // the kind, holding payloads named by `payload`; a group is named by
+    // `group` and says no type.
     let json = read("tcspecial-sim.schema.json");
-    for section in ["simulated_payloads", "simulated_payload_groups"] {
-        let enumerated = json["properties"][section]["items"]["properties"]
-            ["type"]["enum"]
-            .as_array()
-            .unwrap_or_else(|| {
-                panic!("{section}: the JSON schema lists no kinds")
-            });
-        let said: Vec<String> = enumerated
-            .iter()
-            .filter_map(|value| value.as_str().map(str::to_string))
-            .collect();
-        assert_eq!(said, kinds, "{section}, in the JSON schema");
-        assert!(enumerated.contains(&serde_json::Value::Null), "{section}");
+    let items = &json["properties"]["simulated_payloads"]["items"];
+    assert_eq!(items["maxProperties"], 1, "one type an entry");
+    let said: Vec<String> = json["$defs"]["simulatedType"]["enum"]
+        .as_array()
+        .expect("the JSON schema lists the kinds")
+        .iter()
+        .map(|value| {
+            value
+                .as_str()
+                .and_then(|key| key.strip_prefix("type "))
+                .expect("a type key is the word type and a kind")
+                .to_string()
+        })
+        .collect();
+    assert_eq!(said, kinds, "in the JSON schema");
+    assert_eq!(
+        json["$defs"]["simulatedPayload"]["required"],
+        serde_json::json!(["payload"])
+    );
+    let group = &json["properties"]["simulated_payload_groups"]["items"];
+    assert_eq!(group["required"], serde_json::json!(["group"]));
+    for words in [&json["$defs"]["simulatedPayload"], group] {
+        let words = words["properties"].as_object().expect("its words");
+        assert!(!words.contains_key("type"), "an entry says no type");
+        assert!(!words.contains_key("name"), "an entry has no name key");
     }
 
     let xsd = text_of("tcspecial-sim.xsd");
@@ -358,10 +372,16 @@ fn the_simulator_schemas_take_the_kinds_and_words_the_simulator_reads() {
     let file = dir.path().join("every-sim.xml");
     std::fs::write(
         dir.path().join("every-physics.yaml"),
-        "physics:\n  - name: heater\n    type: heater\n    \
-         power: \"60 W\"\n    voltage: \"28 V\"\n  - name: zone\n    \
-         type: thermal_zone\n    environment: \"280 K\"\n    \
-         time_constant: \"60 s\"\n    capacity: \"20 J/K\"\n",
+        "physics:\n  \
+         - type heater:\n      \
+         - component: heater\n        \
+         power: \"60 W\"\n        \
+         voltage: \"28 V\"\n  \
+         - type thermal_zone:\n      \
+         - component: zone\n        \
+         capacity: \"20 J/K\"\n        \
+         environment: \"280 K\"\n        \
+         time_constant: \"60 s\"\n",
     )
     .expect("written");
     std::fs::write(
@@ -371,24 +391,25 @@ fn the_simulator_schemas_take_the_kinds_and_words_the_simulator_reads() {
   <description>every word</description>
   <physics>every-physics.yaml</physics>
   <simulated_payload_groups>
-    <name>fast</name>
-    <type>network</type>
-    <protocol>udp</protocol>
-    <packet_interval>100 ms</packet_interval>
+    <group name=\"fast\">
+      <packet_interval>100 ms</packet_interval>
+    </group>
   </simulated_payload_groups>
   <simulated_payloads>
-    <name>temp</name>
-    <group>fast</group>
-    <type>i2c</type>
-    <connects>zone.temperature</connects>
-    <offset>+0.2 K</offset>
-    <noise>0.03 K</noise>
-    <drop_percent>1</drop_percent>
-  </simulated_payloads>
-  <simulated_payloads>
-    <name>heater</name>
-    <type>gpio</type>
-    <connects>heater.on</connects>
+    <type name=\"i2c\">
+      <payload name=\"temp\">
+        <group>fast</group>
+        <connects>zone.temperature</connects>
+        <offset>+0.2 K</offset>
+        <noise>0.03 K</noise>
+        <drop_percent>1</drop_percent>
+      </payload>
+    </type>
+    <type name=\"gpio\">
+      <payload name=\"heater\">
+        <connects>heater.on</connects>
+      </payload>
+    </type>
   </simulated_payloads>
 </simulator>
 ",
@@ -422,7 +443,7 @@ fn the_simulator_schemas_take_the_kinds_and_words_the_simulator_reads() {
     );
     // And a kind that is not one is refused.
     let output =
-        valid(&every.replace("<type>gpio</type>", "<type>ping</type>"));
+        valid(&every.replace("<type name=\"gpio\">", "<type name=\"ping\">"));
     assert!(!output.status.success(), "ping is not a kind of payload");
 }
 
@@ -464,20 +485,40 @@ fn the_tcspecial_section_is_what_the_parameters_say() {
 fn the_simulator_schema_is_what_the_settings_say() {
     let schema = read("tcspecial-sim.schema.json");
 
-    for section in ["simulated_payloads", "simulated_payload_groups"] {
-        let said = properties(&schema, &[section]);
+    let words = |entry: &serde_json::Value| -> BTreeSet<String> {
+        entry["properties"]
+            .as_object()
+            .expect("its words")
+            .keys()
+            .cloned()
+            .collect()
+    };
+    for (section, said) in [
+        (
+            "simulated_payloads",
+            words(&schema["$defs"]["simulatedPayload"]),
+        ),
+        (
+            "simulated_payload_groups",
+            words(&schema["properties"]["simulated_payload_groups"]["items"]),
+        ),
+    ] {
         for setting in tcslibgs::sim_config::SETTINGS {
             assert!(
                 said.contains(*setting),
                 "{section} has no {setting}: {said:?}"
             );
         }
-        assert!(said.contains("name"));
-        // A payload takes its group's settings for whatever it does not state;
-        // a group names no group of its own.
+        // A payload is named by `payload`, and takes its group's settings
+        // for whatever it does not state; a group is named by `group`, which
+        // is all `group` is in a group.
+        let payload = section == "simulated_payloads";
+        assert_eq!(said.contains("payload"), payload, "{section}: {said:?}");
+        assert!(said.contains("group"), "{section}: {said:?}");
+        let extra = if payload { 2 } else { 1 };
         assert_eq!(
-            said.contains("group"),
-            section == "simulated_payloads",
+            said.len(),
+            tcslibgs::sim_config::SETTINGS.len() + extra,
             "{section}: {said:?}"
         );
     }
@@ -711,6 +752,107 @@ fn every_key_of_a_shipped_configuration_is_in_the_schema() {
                                  {attribute}, which the schema does not allow"
                             );
                         }
+                    }
+                }
+            }
+        }
+    }
+}
+
+/// Every key of every shipped simulator file and physics model is one its
+/// schema allows, in the shape it allows: the simulated payloads and the
+/// components grouped by type, each named by its word, and the groups named
+/// by `group`. The same shallow check as the configurations', for the same
+/// reason.
+#[test]
+fn every_key_of_a_shipped_simulator_file_and_model_is_in_its_schema() {
+    let sim = read("tcspecial-sim.schema.json");
+    let physics = read("tcspecial-physics.schema.json");
+    let words = |entry: &serde_json::Value| -> BTreeSet<String> {
+        entry["properties"]
+            .as_object()
+            .expect("its words")
+            .keys()
+            .cloned()
+            .collect()
+    };
+    let payload = words(&sim["$defs"]["simulatedPayload"]);
+    let group = words(&sim["properties"]["simulated_payload_groups"]["items"]);
+
+    /// Checks one entry: named by its word, saying only what is allowed.
+    ///
+    /// # Arguments
+    ///
+    /// * `file`    - The file, for a message.
+    /// * `entry`   - The entry.
+    /// * `word`    - The word that names it.
+    /// * `allowed` - What it may say.
+    fn check(
+        file: &str,
+        entry: &serde_norway::Value,
+        word: &str,
+        allowed: &BTreeSet<String>,
+    ) {
+        let entry = entry.as_mapping().expect("an entry is a mapping");
+        assert!(entry.contains_key(word), "{file}: not named by {word}");
+        for (key, _) in entry {
+            let key = key.as_str().expect("named");
+            assert!(allowed.contains(key), "{file}: {key} is not allowed");
+        }
+    }
+
+    let mut files = examples("-sim.yaml");
+    files.push("example-sim.yaml".to_string());
+    files.push("tests/manual/thermostat-sim.yaml".to_string());
+    files.extend(examples("-physics.yaml"));
+    for file in &files {
+        let text = std::fs::read_to_string(root().join(file))
+            .unwrap_or_else(|e| panic!("{file}: {e}"));
+        let said: serde_norway::Value = serde_norway::from_str(&text)
+            .unwrap_or_else(|e| panic!("{file}: {e}"));
+        let model = file.ends_with("-physics.yaml");
+        let schema = if model { &physics } else { &sim };
+        let sections = properties(schema, &[]);
+        for (key, value) in said.as_mapping().expect("a mapping") {
+            let key = key.as_str().expect("a section is named");
+            assert!(sections.contains(key), "{file}: {key} is not allowed");
+            let typed = match key {
+                "simulated_payload_groups" => {
+                    for entry in value.as_sequence().expect("a list") {
+                        check(file, entry, "group", &group);
+                    }
+                    continue;
+                }
+                "simulated_payloads" => None,
+                "physics" if model => Some(&physics),
+                _ => continue,
+            };
+            for entry in value.as_sequence().expect("a list of types") {
+                let entry = entry.as_mapping().expect("a mapping");
+                assert_eq!(entry.len(), 1, "{file}: one type an entry");
+                for (kind, entries) in entry {
+                    let kind = kind.as_str().expect("a type key");
+                    let named =
+                        kind.strip_prefix("type ").expect("type and the type");
+                    let (word, allowed) = match typed {
+                        None => {
+                            let kinds = &sim["$defs"]["simulatedType"]["enum"];
+                            assert!(
+                                kinds
+                                    .as_array()
+                                    .expect("kinds")
+                                    .iter()
+                                    .any(|k| k.as_str() == Some(kind)),
+                                "{file}: {kind} is not allowed"
+                            );
+                            ("payload", payload.clone())
+                        }
+                        Some(schema) => {
+                            ("component", words(&schema["$defs"][named]))
+                        }
+                    };
+                    for one in entries.as_sequence().expect("a list") {
+                        check(file, one, word, &allowed);
                     }
                 }
             }
@@ -952,31 +1094,36 @@ fn every_node_is_described_once_and_in_one_spelling() {
 }
 
 /// The physics model's schema offers every element type the model reads,
-/// and for each type every setting the one list of its settings has: the
-/// schema an editor checks a hand-written model against says what tcssim
-/// reads.
+/// each an entry `type <type>` holding that type's components, and for each
+/// type every setting the one list of its settings has, beside the
+/// `component` naming it: the schema an editor checks a hand-written model
+/// against says what tcssim reads.
 #[test]
 fn the_physics_schema_takes_the_types_and_settings_the_model_reads() {
     let json = read("tcspecial-physics.schema.json");
     let item = &json["properties"]["physics"]["items"];
-    let types: Vec<&str> = item["properties"]["type"]["enum"]
-        .as_array()
-        .expect("the schema lists the types")
-        .iter()
-        .map(|value| value.as_str().expect("a type is a word"))
+    assert_eq!(item["maxProperties"], 1, "one type an entry");
+    let entries = item["properties"].as_object().expect("one entry a type");
+    let types: BTreeSet<&str> = entries
+        .keys()
+        .map(|key| key.strip_prefix("type ").expect("the word type and a type"))
         .collect();
-    assert_eq!(types, tcslibgs::physics::TYPES);
-    let branches = item["allOf"].as_array().expect("one branch a type");
-    assert_eq!(branches.len(), types.len());
-    for branch in branches {
-        let name = branch["if"]["properties"]["type"]["const"]
-            .as_str()
-            .expect("a branch is for one type");
-        let mut said: Vec<&str> = branch["then"]["properties"]
+    let wanted: BTreeSet<&str> =
+        tcslibgs::physics::TYPES.iter().copied().collect();
+    assert_eq!(types, wanted);
+    for name in types {
+        let component = &json["$defs"][name];
+        assert_eq!(
+            entries[&format!("type {name}")]["items"]["$ref"],
+            format!("#/$defs/{name}"),
+            "{name}"
+        );
+        let mut said: Vec<&str> = component["properties"]
             .as_object()
             .expect("its settings")
             .keys()
             .map(String::as_str)
+            .filter(|key| *key != "component")
             .collect();
         said.sort_unstable();
         let mut wanted = tcslibgs::physics::settings_of(name)
@@ -984,5 +1131,6 @@ fn the_physics_schema_takes_the_types_and_settings_the_model_reads() {
             .to_vec();
         wanted.sort_unstable();
         assert_eq!(said, wanted, "{name}");
+        assert_eq!(component["required"][0], "component", "{name}");
     }
 }

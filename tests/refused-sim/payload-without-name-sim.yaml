@@ -1,0 +1,3 @@
+simulated_payloads:
+  - type spi:
+      - simulate: true

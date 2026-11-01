@@ -283,19 +283,18 @@ pub(crate) mod tests {
     /// each on the zone, which is ten kelvin below a setpoint of 293.15 and
     /// loses the difference with a fifty second constant.
     pub(crate) const ZONE: &str = "physics:
-  - name: heater_1
-    type: heater
-    power: \"60 W\"
-    voltage: \"28 V\"
-  - name: heater_2
-    type: heater
-    power: \"60 W\"
-    voltage: \"28 V\"
-  - name: zone
-    type: thermal_zone
-    environment: \"283.15 K\"
-    time_constant: 50 s
-    capacity: \"20 J/K\"
+  - type heater:
+      - component: heater_1
+        power: \"60 W\"
+        voltage: \"28 V\"
+      - component: heater_2
+        power: \"60 W\"
+        voltage: \"28 V\"
+  - type thermal_zone:
+      - component: zone
+        capacity: \"20 J/K\"
+        environment: \"283.15 K\"
+        time_constant: 50 s
 connections:
   - from: heater_1.heat
     to: zone.heat
@@ -333,28 +332,27 @@ connections:
     /// hundred seconds, forty of them in shadow, and a battery of a
     /// hundredth of an ampere-hour, so that a test sees it fill and drain.
     const POWER: &str = "physics:
-  - name: sun
-    type: sun
-    period: 100 s
-    eclipse: \"0.4\"
-  - name: array
-    type: solar_array
-    current: \"7 A\"
-  - name: avionics
-    type: load
-    current: \"2 A\"
-  - name: science
-    type: load
-    current: \"2 A\"
-  - name: bus
-    type: bus
-  - name: battery
-    type: battery
-    capacity: \"0.01 Ah\"
-    empty: \"24 V\"
-    full: \"32 V\"
-    resistance: \"0.1 ohm\"
-    charge: \"0.5\"
+  - type battery:
+      - component: battery
+        capacity: \"0.01 Ah\"
+        charge: \"0.5\"
+        empty: \"24 V\"
+        full: \"32 V\"
+        resistance: \"0.1 ohm\"
+  - type bus:
+      - component: bus
+  - type load:
+      - component: avionics
+        current: \"2 A\"
+      - component: science
+        current: \"2 A\"
+  - type solar_array:
+      - component: array
+        current: \"7 A\"
+  - type sun:
+      - component: sun
+        eclipse: \"0.4\"
+        period: 100 s
 connections:
   - { from: sun.light, to: array.light }
   - { from: array.current, to: bus.supply }
@@ -433,10 +431,17 @@ connections:
     /// A lander two metres up and falling at one metre a second, its engine
     /// joined and shut.
     const LANDER: &str = "physics:
-  - { name: engine, type: engine, thrust: \"16000 N\", isp: 311 s,
-      fuel: \"800 kg\" }
-  - { name: lander, type: body, mass: \"1500 kg\",
-      gravity: \"1.62 m/s2\", altitude: \"2 m\", velocity: \"-1 m/s\" }
+  - type body:
+      - component: lander
+        altitude: \"2 m\"
+        gravity: \"1.62 m/s2\"
+        mass: \"1500 kg\"
+        velocity: \"-1 m/s\"
+  - type engine:
+      - component: engine
+        fuel: \"800 kg\"
+        isp: 311 s
+        thrust: \"16000 N\"
 connections:
   - { from: engine.force, to: lander.force }
   - { from: engine.flow, to: lander.flow }
@@ -499,7 +504,7 @@ connections:
     fn an_input_that_takes_one_output_is_given_one() {
         let text = POWER.replace(
             "connections:\n",
-            "  - name: moon\n    type: sun\n    period: 100 s\n    \
+            "      - component: moon\n        period: 100 s\n        \
              eclipse: \"0.5\"\nconnections:\n  - { from: moon.light, to: \
              array.light }\n",
         );

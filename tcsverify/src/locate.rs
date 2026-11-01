@@ -132,7 +132,8 @@ impl Where {
 /// The key an entry of a section is named by in YAML.
 ///
 /// A node is named by the word for its section -- `- payload: temp_1` --
-/// and everything else by `name`.
+/// a simulated payload by `payload`, a group of their settings by `group`,
+/// a physics component by `component`, and everything else by `name`.
 ///
 /// # Arguments
 ///
@@ -142,10 +143,15 @@ impl Where {
 ///
 /// The key, with its colon.
 fn name_key(section: &str) -> String {
-    let word = tcslibgs::graph::Section::ALL
-        .into_iter()
-        .find(|s| s.name() == section)
-        .map_or("name", |s| s.node_word());
+    let word = match section {
+        "simulated_payloads" => "payload",
+        "simulated_payload_groups" => "group",
+        "physics" => "component",
+        _ => tcslibgs::graph::Section::ALL
+            .into_iter()
+            .find(|s| s.name() == section)
+            .map_or("name", |s| s.node_word()),
+    };
     format!("{word}:")
 }
 
@@ -239,10 +245,10 @@ fn yaml(text: &str) -> Where {
 /// Finds what an XML file says where.
 ///
 /// The sections are the elements under the root and the entries are named
-/// in them: a node by the `name` attribute of its element, under the
-/// `<type>` it is written in, and a group, a simulated payload and the rest
-/// by a `name` child. The `name` of a `<type>` is a type and not an entry,
-/// and is passed over.
+/// in them: a node, a simulated payload and a group of their settings by
+/// the `name` attribute of its element, under the `<type>` it is written in
+/// where it is one, and the rest by a `name` child. The `name` of a `<type>`
+/// is a type and not an entry, and is passed over.
 ///
 /// # Arguments
 ///
@@ -455,17 +461,41 @@ version: \"1.0\"
 description: settings
 
 simulated_payload_groups:
-  - name: steady
+  - group: steady
     packet_interval: 1 s
 
 simulated_payloads:
-  - name: DH0
-    type: device-file
-    group: steady
+  - type device-file:
+      - payload: DH0
+        group: steady
 ";
         let found = Where::of(text, ConfigFormat::Yaml);
         assert_eq!(found.line_of(&About::SimGroup("steady".to_string())), 5);
-        assert_eq!(found.line_of(&About::SimPayload("DH0".to_string())), 9);
+        assert_eq!(found.line_of(&About::SimPayload("DH0".to_string())), 10);
+        // A type's name is not a payload's, and a payload's group is not
+        // the group.
+        assert_eq!(
+            found.line_of(&About::SimPayload("device-file".to_string())),
+            8
+        );
+    }
+
+    /// A simulator file in XML, and a physics model, say where each entry
+    /// is by the word that names it.
+    #[test]
+    fn a_simulator_file_in_xml_and_a_model_say_where_each_entry_is() {
+        let text = "<simulator>\n  <simulated_payload_groups>\n    \
+                    <group name=\"steady\"/>\n  </simulated_payload_groups>\n  \
+                    <simulated_payloads>\n    <type name=\"spi\">\n      \
+                    <payload name=\"DH0\"/>\n    </type>\n  \
+                    </simulated_payloads>\n</simulator>\n";
+        let found = Where::of(text, ConfigFormat::Xml);
+        assert_eq!(found.line_of(&About::SimGroup("steady".to_string())), 3);
+        assert_eq!(found.line_of(&About::SimPayload("DH0".to_string())), 7);
+
+        let model = "physics:\n  - type heater:\n      - component: h\n";
+        let found = Where::of(model, ConfigFormat::Yaml);
+        assert_eq!(found.line_of(&About::PhysicsElement("h".to_string())), 3);
     }
 
     #[test]

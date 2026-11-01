@@ -1,0 +1,7 @@
+<simulator>
+    <simulated_payloads>
+        <type name="netwrok">
+            <payload name="sensor"/>
+        </type>
+    </simulated_payloads>
+</simulator>

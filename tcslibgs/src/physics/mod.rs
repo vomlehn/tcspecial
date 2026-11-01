@@ -10,25 +10,31 @@
 //!
 //! # What it holds
 //!
-//! A list of elements, each of a type, as a configuration holds nodes, and
+//! Its components, grouped by type as a configuration groups its nodes, and
 //! the connections between them, as a configuration holds links:
 //!
 //! ```yaml
 //! physics:
-//!   - name: heater_1
-//!     type: heater
-//!     power: "60 W"
-//!     voltage: "28 V"
-//!   - name: zone
-//!     type: thermal_zone
-//!     environment: "283.15 K"
-//!     time_constant: "50 s"
-//!     capacity: "20 J/K"
+//!   - type heater:
+//!       - component: heater_1
+//!         power: "60 W"
+//!         voltage: "28 V"
+//!   - type thermal_zone:
+//!       - component: zone
+//!         environment: "283.15 K"
+//!         time_constant: "50 s"
+//!         capacity: "20 J/K"
 //!
 //! connections:
 //!   - from: heater_1.heat
 //!     to: zone.heat
 //! ```
+//!
+//! Nothing in it is in an order that means anything: not the types, not the
+//! components of one, and not the connections. The components are held in
+//! name order and the connections in the order of the terminals they join,
+//! by name, so that the world made of a model, and every tie in it, is the
+//! same however the file is written: see [`Model`].
 //!
 //! Each type is a simple part, simulated alone, with its own words for what
 //! goes in and comes out: a heater is switched `on` and gives out `heat`; a
@@ -56,6 +62,7 @@ pub mod battery;
 pub mod body;
 pub mod bus;
 pub mod engine;
+pub mod grouped;
 pub mod heater;
 pub mod load;
 pub mod setting;
@@ -68,15 +75,16 @@ use std::collections::BTreeMap;
 use std::path::Path;
 
 use serde::de::IgnoredAny;
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 
 use crate::error::{TcsError, TcsResult};
 use crate::verify::About;
 pub use setting::Wander;
 use terminal::{At, Direction, Terminal};
 
-/// Every element type a physics model may hold, by the name a file writes as
-/// its `type`. The one list of them.
+/// Every element type a physics model may hold, by the name a file writes
+/// after `type` in the entry its components are grouped under. The one list
+/// of them.
 pub const TYPES: &[&str] = &[
     "heater",
     "thermal_zone",
@@ -96,16 +104,22 @@ pub struct PhysicsFile {
     /// What the model is of.
     #[serde(default)]
     pub description: Option<String>,
-    /// Its elements, in the order the file lists them.
-    #[serde(default)]
+    /// Its components, in name order, whatever order the file writes them
+    /// in: see [`grouped`].
+    #[serde(default, deserialize_with = "grouped::components")]
     pub physics: Vec<Element>,
     /// How its elements are joined, each an output to an input.
     #[serde(default)]
     pub connections: Vec<Connection>,
 }
 
-/// One element of a physics model, of one of the [`TYPES`].
-#[derive(Debug, Clone, Deserialize, PartialEq)]
+/// One element of a physics model, of one of the [`TYPES`]: a component, as
+/// a file names it.
+///
+/// Read by [`grouped`], the type being the entry's it is written under, and
+/// written out with its type beside it for the simulator file's digest: see
+/// [`crate::config_digest::interpretation_of_simulator`].
+#[derive(Debug, Clone, Serialize, PartialEq)]
 #[serde(tag = "type")]
 pub enum Element {
     #[serde(rename = "heater")]
@@ -133,10 +147,11 @@ pub enum Element {
 }
 
 /// An element of a type there is no longer, read only to be refused.
-#[derive(Debug, Clone, Deserialize, PartialEq)]
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq)]
 pub struct Moved {
+    #[serde(rename = "component")]
     pub name: String,
-    #[serde(flatten)]
+    #[serde(flatten, skip_serializing)]
     pub rest: BTreeMap<String, IgnoredAny>,
 }
 
@@ -151,7 +166,7 @@ pub const MASS_MADE_OF_PARTS: &str = "a thermal_mass is now made of parts: \
     one written so";
 
 /// A connection between two elements, as a file writes it.
-#[derive(Debug, Clone, Deserialize, PartialEq, Eq)]
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
 #[serde(deny_unknown_fields)]
 pub struct Connection {
     /// An output: `heater_1.heat`.
@@ -202,8 +217,9 @@ impl Element {
     }
 }
 
-/// The settings an element of a type states, `name` and `type` apart: the
-/// one list for each, from which an editor builds an element's form.
+/// The settings an element of a type states, the `component` naming it
+/// apart: the one list for each, from which an editor builds an element's
+/// form.
 ///
 /// # Arguments
 ///
@@ -326,18 +342,28 @@ impl PhysicsProblem {
 impl std::fmt::Display for PhysicsProblem {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match &self.element {
-            Some(name) => write!(f, "physics element \"{name}\": {}", self.why),
+            Some(name) => {
+                write!(f, "physics component \"{name}\": {}", self.why)
+            }
             None => write!(f, "connections: {}", self.why),
         }
     }
 }
 
 /// A physics model with every figure read and every connection found.
+///
+/// In one order, whatever order its file is written in: the elements by
+/// name, so that an element's place -- by which the world holds it, and by
+/// which two of its events due at one moment are taken -- is its place among
+/// the names; and the connections by the names of the terminals they join,
+/// from and then to, so that what is summed at an input is summed in one
+/// order.
 #[derive(Debug, Clone, PartialEq, Default)]
 pub struct Model {
-    /// Its elements, in the order the file lists them.
+    /// Its elements, in name order.
     pub elements: Vec<Resolved>,
-    /// Its connections, each from an output to an input.
+    /// Its connections, each from an output to an input, in the order of
+    /// the names of the terminals they join.
     pub connections: Vec<Joined>,
 }
 
@@ -440,7 +466,7 @@ impl Model {
             let every: Vec<&str> =
                 self.elements.iter().map(|e| e.name.as_str()).collect();
             return Err(format!(
-                "{at}: the physics model has no element \"{}\"; it has {}",
+                "{at}: the physics model has no component \"{}\"; it has {}",
                 at.element,
                 if every.is_empty() {
                     "none".to_string()
@@ -511,7 +537,10 @@ impl PhysicsFile {
         }
         let text = std::fs::read_to_string(path)
             .map_err(|e| named(format!("cannot be read: {e}")))?;
-        PhysicsFile::parse(&text).map_err(|e| named(e.to_string()))
+        PhysicsFile::parse(&text).map_err(|e| match e {
+            TcsError::Config(why) => named(why),
+            other => named(other.to_string()),
+        })
     }
 
     /// Reads a physics model from its text.
@@ -526,8 +555,15 @@ impl PhysicsFile {
     ///
     /// # Errors
     ///
-    /// What the YAML reader says, with the line it says it at.
+    /// What the YAML reader says, with the line it says it at, and a model
+    /// in the shape it had before its components were grouped by type, at
+    /// its line.
     pub fn parse(text: &str) -> TcsResult<PhysicsFile> {
+        // A model written before its components were grouped by type,
+        // refused by its line and shown the shape now.
+        if let Some(why) = crate::sim_reshaped::physics_refused(text) {
+            return Err(TcsError::Config(why));
+        }
         crate::format::ConfigFormat::Yaml.parse(text)
     }
 
@@ -560,7 +596,7 @@ impl PhysicsFile {
     ///
     /// # Returns
     ///
-    /// Each problem, elements first in the order the file lists them.
+    /// Each problem, the elements' first, in name order.
     pub fn problems(&self) -> Vec<PhysicsProblem> {
         self.built().1
     }
@@ -574,7 +610,11 @@ impl PhysicsFile {
     fn built(&self) -> (Model, Vec<PhysicsProblem>) {
         let mut problems = Vec::new();
         let mut model = Model::default();
-        for element in &self.physics {
+        // By name, as [`grouped`] holds them already: a model made some
+        // other way is in one order too.
+        let mut elements: Vec<&Element> = self.physics.iter().collect();
+        elements.sort_by(|a, b| a.name().cmp(b.name()));
+        for element in elements {
             let name = element.name();
             if name.trim().is_empty() || name.contains('.') {
                 problems.push(PhysicsProblem::of(
@@ -587,7 +627,7 @@ impl PhysicsFile {
             if model.elements.iter().any(|e| e.name == name) {
                 problems.push(PhysicsProblem::of(
                     name,
-                    "two elements have this name, and a connection or a \
+                    "two components have this name, and a connection or a \
                      stand-in names one",
                 ));
                 continue;
@@ -631,6 +671,13 @@ impl PhysicsFile {
         }
         problems
             .extend(crowded(&model).into_iter().map(PhysicsProblem::joining));
+        // In the order of what they join, by name, and not as the file lists
+        // them: an input that sums is given its outputs in this order.
+        let mut connections = std::mem::take(&mut model.connections);
+        connections.sort_by_cached_key(|c| {
+            (model.name_of(c.from), model.name_of(c.to))
+        });
+        model.connections = connections;
         (model, problems)
     }
 }
@@ -729,30 +776,30 @@ mod tests {
     /// The thermostat's model: two heaters warming one zone.
     const ZONE: &str = "\
 physics:
-  - name: heater_1
-    type: heater
-    power: \"60 W\"
-    voltage: \"28 V\"
-  - name: heater_2
-    type: heater
-    power: \"60 W\"
-    voltage: \"28 V\"
-    ripple: \"0.02\"
-    ripple_time: 20 s
-  - name: zone
-    type: thermal_zone
-    environment: \"283.15 K\"
-    time_constant: 50 s
-    capacity: \"20 J/K\"
+  - type thermal_zone:
+      - component: zone
+        environment: \"283.15 K\"
+        time_constant: 50 s
+        capacity: \"20 J/K\"
+  - type heater:
+      - component: heater_2
+        power: \"60 W\"
+        voltage: \"28 V\"
+        ripple: \"0.02\"
+        ripple_time: 20 s
+      - component: heater_1
+        power: \"60 W\"
+        voltage: \"28 V\"
 connections:
-  - from: heater_1.heat
-    to: zone.heat
   - from: heater_2.heat
+    to: zone.heat
+  - from: heater_1.heat
     to: zone.heat
 ";
 
     /// A model's elements are typed, their figures read in their units, and
-    /// its connections are found.
+    /// its connections are found; and each is held in name order, however
+    /// the file wrote them.
     #[test]
     fn a_model_holds_typed_elements_and_their_connections() {
         let model = PhysicsFile::parse(ZONE)
@@ -760,6 +807,10 @@ connections:
             .resolve()
             .expect("it resolves");
         assert_eq!(model.elements.len(), 3);
+        let names: Vec<&str> =
+            model.elements.iter().map(|e| e.name.as_str()).collect();
+        assert_eq!(names, ["heater_1", "heater_2", "zone"]);
+        assert_eq!(model.name_of(model.connections[0].from), "heater_1.heat");
         let Resolution::Heater(heater) = &model.elements[1].what else {
             panic!("a heater: {:?}", model.elements[1]);
         };
@@ -779,17 +830,68 @@ connections:
         assert_eq!(terminal.kind, terminal::Kind::Value(Unit::Kelvin));
     }
 
+    /// A model written in another order is the same model: its components,
+    /// and so their places, by name, and its connections by what they
+    /// join, so that the world made of it sums and breaks ties alike.
+    #[test]
+    fn a_model_in_another_order_is_the_same_model() {
+        let other = "\
+connections:
+  - from: heater_1.heat
+    to: zone.heat
+  - from: heater_2.heat
+    to: zone.heat
+physics:
+  - type heater:
+      - component: heater_1
+        voltage: \"28 V\"
+        power: \"60 W\"
+      - component: heater_2
+        ripple_time: 20 s
+        ripple: \"0.02\"
+        voltage: \"28 V\"
+        power: \"60 W\"
+  - type thermal_zone:
+      - component: zone
+        capacity: \"20 J/K\"
+        time_constant: 50 s
+        environment: \"283.15 K\"
+";
+        let one = PhysicsFile::parse(ZONE).expect("parses");
+        let two = PhysicsFile::parse(other).expect("parses");
+        assert_eq!(one.physics, two.physics);
+        assert_eq!(
+            one.resolve().expect("resolves"),
+            two.resolve().expect("resolves")
+        );
+    }
+
     /// An element of no type, or of one there is none of, or with a
     /// setting its type has not, is refused, naming what is wrong.
     #[test]
     fn an_element_of_no_known_type_is_refused() {
         for (text, said) in [
-            ("physics:\n  - name: zone\n    environment: \"1\"\n", "type"),
-            ("physics:\n  - name: zone\n    type: boiler\n", "boiler"),
+            ("physics:\n  - component: zone\n", "is not a type"),
             (
-                "physics:\n  - name: h\n    type: heater\n    \
-                 power: \"1 W\"\n    voltage: \"1 V\"\n    colour: red\n",
+                "physics:\n  - type boiler:\n      - component: zone\n",
+                "boiler",
+            ),
+            ("physics:\n  - type heater:\n", "no components"),
+            (
+                "physics:\n  - type heater:\n      - component: h\n        \
+                 power: \"1 W\"\n        voltage: \"1 V\"\n        \
+                 colour: red\n",
                 "colour",
+            ),
+            (
+                "physics:\n  - type bus:\n      - component: a\n  \
+                 - type bus:\n      - component: b\n",
+                "written twice",
+            ),
+            (
+                "physics:\n  - type bus:\n      - component: a\n        \
+                 type: bus\n",
+                "type",
             ),
         ] {
             let why = PhysicsFile::parse(text).expect_err(text).to_string();
@@ -802,8 +904,9 @@ connections:
     #[test]
     fn a_thermal_mass_is_told_what_it_is_now() {
         let file = PhysicsFile::parse(
-            "physics:\n  - name: basic\n    type: thermal_mass\n    \
-             environment: \"283.15\"\n    inputs: \"in1\"\n",
+            "physics:\n  - type thermal_mass:\n      \
+             - component: basic\n        \
+             environment: \"283.15\"\n        inputs: \"in1\"\n",
         )
         .expect("it parses, to be refused");
         let problem = file.resolve().expect_err("refused");
@@ -819,9 +922,10 @@ connections:
         for name in TYPES {
             let settings = settings_of(name).expect("its settings");
             assert!(terminals_of(name).is_some_and(|t| !t.is_empty()));
-            let mut text = format!("physics:\n  - name: x\n    type: {name}\n");
+            let mut text =
+                format!("physics:\n  - type {name}:\n      - component: x\n");
             for setting in settings {
-                text.push_str(&format!("    {setting}: \"1\"\n"));
+                text.push_str(&format!("        {setting}: \"1\"\n"));
             }
             assert!(PhysicsFile::parse(&text).is_ok(), "{text}");
         }
@@ -846,7 +950,7 @@ connections:
                 "zone.nowhere",
                 "has no terminal \"nowhere\"",
             ),
-            ("heater_9.heat", "zone.heat", "no element \"heater_9\""),
+            ("heater_9.heat", "zone.heat", "no component \"heater_9\""),
             ("zone.heat", "heater_1.on", "which is an input"),
             ("heater_1.heat", "zone.temperature", "which is an output"),
             (
@@ -872,10 +976,10 @@ connections:
     /// Two elements of one name, or a name with a dot, are refused.
     #[test]
     fn names_are_one_each_and_dotless() {
-        let twice = ZONE.replace("name: heater_2", "name: heater_1");
+        let twice = ZONE.replace("component: heater_2", "component: heater_1");
         let problems = PhysicsFile::parse(&twice).expect("parses").problems();
-        assert!(problems[0].why.contains("two elements"), "{problems:?}");
-        let dotted = ZONE.replace("name: zone", "name: the.zone");
+        assert!(problems[0].why.contains("two components"), "{problems:?}");
+        let dotted = ZONE.replace("component: zone", "component: the.zone");
         let problems = PhysicsFile::parse(&dotted).expect("parses").problems();
         assert!(problems[0].why.contains("no dot"), "{problems:?}");
     }

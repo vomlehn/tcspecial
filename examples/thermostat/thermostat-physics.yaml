@@ -13,40 +13,39 @@
 description: The physics of the vehicle of thermostat.ytcs
 
 physics:
-  # Two heaters of sixty watts on a 28 volt bus, which on the zone below is
-  # three kelvin a second each. The supply wanders by two percent over
-  # twenty seconds or so, and a heater's power with its square.
-  - name: heater_1
-    type: heater
-    power: "60 W"
-    voltage: "28 V"
-    ripple: "0.02"
-    ripple_time: "20 s"
+  - type heater:
+      # Two heaters of sixty watts on a 28 volt bus, which on the zone below is
+      # three kelvin a second each. The supply wanders by two percent over
+      # twenty seconds or so, and a heater's power with its square.
+      - component: heater_1
+        power: "60 W"
+        ripple: "0.02"
+        ripple_time: "20 s"
+        voltage: "28 V"
 
-  - name: heater_2
-    type: heater
-    power: "60 W"
-    voltage: "28 V"
-    ripple: "0.02"
-    ripple_time: "20 s"
+      - component: heater_2
+        power: "60 W"
+        ripple: "0.02"
+        ripple_time: "20 s"
+        voltage: "28 V"
 
-  # The zone: ten kelvin below the setpoint of thermostat.ytcs, losing the
-  # difference with a fifty second constant -- which at the setpoint is a
-  # fifth of a kelvin a second of cooling -- and twenty joules to warm a
-  # kelvin, so that each heater's sixty watts is three kelvin a second.
-  #
-  # Its surroundings are not still. They swing three kelvin either side of
-  # 283.15 once every ninety minutes -- a low orbit's sun and shadow -- and
-  # wander half a kelvin besides, over ten minutes or so.
-  - name: zone
-    type: thermal_zone
-    environment: "283.15 K"
-    time_constant: "50 s"
-    capacity: "20 J/K"
-    swing: "3 K"
-    period: "90 min"
-    wander: "0.5 K"
-    wander_time: "10 min"
+  - type thermal_zone:
+      # The zone: ten kelvin below the setpoint of thermostat.ytcs, losing the
+      # difference with a fifty second constant -- which at the setpoint is a
+      # fifth of a kelvin a second of cooling -- and twenty joules to warm a
+      # kelvin, so that each heater's sixty watts is three kelvin a second.
+      #
+      # Its surroundings are not still. They swing three kelvin either side of
+      # 283.15 once every ninety minutes -- a low orbit's sun and shadow -- and
+      # wander half a kelvin besides, over ten minutes or so.
+      - component: zone
+        capacity: "20 J/K"
+        environment: "283.15 K"
+        period: "90 min"
+        swing: "3 K"
+        time_constant: "50 s"
+        wander: "0.5 K"
+        wander_time: "10 min"
 
 connections:
   # Both heaters warm the zone, whose heat is the sum of what reaches it.

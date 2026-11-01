@@ -14,9 +14,9 @@ tcssim:
   ready: "127.0.0.1:7901"
 
 simulated_payloads:
-  # One packet a second, sent whole.
-  - name: sensor
-    simulate: true
-    type: network
-    protocol: udp
-    packet_interval: 1 s
+  - type network:
+      # One packet a second, sent whole.
+      - payload: sensor
+        packet_interval: 1 s
+        protocol: udp
+        simulate: true

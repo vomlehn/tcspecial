@@ -2256,7 +2256,7 @@ to the ground, on ports 5100 to 5102 and 5107, and to the log
 binding.
 
 The physics model, ``battery-physics.yaml``, is the power system as its parts:
-a ``sun``, a ``solar_array`` of seven amperes, two ``load`` elements of two
+a ``sun``, a ``solar_array`` of seven amperes, two ``load`` components of two
 amperes each -- ``avionics``, never shed, and ``science`` -- a ``bus`` and a
 ``battery``, joined under ``connections``. The orbit is six minutes, four
 tenths of it in shadow, and the battery a fifth of an ampere-hour, so that a
@@ -3078,22 +3078,36 @@ there and wrong is still refused, naming it.
 .. code-block:: text
 
    simulated_payload_groups        optional
-     name                 the name payloads refer to
+     group                the name payloads refer to, naming the entry
      simulate             true or false, for every payload in the group
      ...                  any of the settings below
 
-   simulated_payloads
-     name                 the payload this one stands in for
-     simulate             true for tcssim to stand in for it, false for the
+   simulated_payloads              a list of types
+     type <type>          the type of payload, as the tcspecial
+                          configuration writes it, holding the list of
+                          the simulated payloads of that type
+       payload            the payload this one stands in for, naming the
+                          entry
+       simulate           true for tcssim to stand in for it, false for the
                           real device: required, here or in its group
-     type                 the type of payload it is, as the tcspecial
-                          configuration says
-     protocol             which transport, for a network payload
-     payload_address      the socket the payload answers from, if this file
+       protocol           which transport, for a network payload
+       payload_address    the socket the payload answers from, if this file
                           cares to say
-     payload_port         which port it answers from, likewise
-     group                the group to take unstated settings from, if any
-     ...                  any of the settings below
+       payload_port       which port it answers from, likewise
+       group              the group to take unstated settings from, if any
+       ...                any of the settings below
+
+The simulated payloads are grouped by type, as a configuration's nodes are:
+each entry of ``simulated_payloads`` is ``type`` and a type, holding the
+payloads of that type, each named by ``payload``. A group is named by
+``group`` and says no type, a payload's being the one it is written under. In
+XML, ``<simulated_payloads>`` holds ``<type name="...">`` elements of
+``<payload name="...">`` elements, and ``<simulated_payload_groups>`` holds
+``<group name="...">`` elements. Nothing in the file is in an order that
+means anything: the types, the payloads of one and the groups may be written
+in any order. A file in the shape before this one, each payload with
+``name:`` and ``type:`` of its own, is refused at the line of its first
+entry; ``tools/convert-format.py`` rewrites it, keeping its comments.
 
 **Simulated or real: simulate**
 
@@ -3107,15 +3121,16 @@ real too.
 .. code-block:: yaml
 
    simulated_payload_groups:
-     - name: zone_temps
-       simulate: true          # temp_1, temp_2 and temp_3 are simulated
+     - group: zone_temps
        packet_interval: 100 ms
+       simulate: true          # temp_1, temp_2 and temp_3 are simulated
 
    simulated_payloads:
-     - name: temp_1
-       group: zone_temps
-     - name: heaters_1
-       simulate: false         # the real heater
+     - type network:
+         - payload: heaters_1
+           simulate: false     # the real heater
+         - payload: temp_1
+           group: zone_temps
 
 Before it stands in for anything, tcssim compares each payload's ``simulate``
 with what is at the payload's endpoint, by the same rules tcspecial judges a
@@ -3142,19 +3157,20 @@ nothing -- a heater warms no mass -- and still counts what reaches it.
 
 **What it stands in for**
 
-Two of the attributes describe the payload rather than the simulation, and are
-required for that reason. The two files are joined by handler name and by
-nothing else -- and a name is what a set copied from another one keeps -- so a
-simulator configuration written for one set parses happily against another
-set's payloads, and the run that follows looks like a payload that never
-sends. Stating the type here makes that pairing an error instead.
+Two things describe the payload rather than the simulation, and are required
+for that reason. The two files are joined by handler name and by nothing else
+-- and a name is what a set copied from another one keeps -- so a simulator
+configuration written for one set parses happily against another set's
+payloads, and the run that follows looks like a payload that never sends.
+Stating the type here makes that pairing an error instead.
 
 .. code-block:: text
 
-   type                   the type of payload this stands in for, in the
+   type                   the type the payload is written under, in the
                           tcspecial configuration's own word: network,
-                          device, serial, i2c, spi, can, iio, rpmsg or
-                          gpio. Must be what that configuration says
+                          device-file, serial, i2c, spi, can, iio, rpmsg,
+                          gpio or hdlc. Must be the type that configuration
+                          writes it under
    protocol               which transport, for a network payload, and refused
                           for any other type. Must be what that configuration
                           says
@@ -3178,12 +3194,12 @@ socket the simulated payload answers from.
 .. code-block:: yaml
 
    simulated_payloads:
-     - name: auto-send
-       type: network
-       protocol: udp
-       payload_address: 127.0.0.1   # the socket this payload answers from,
-       payload_port: 7000           # not the one the handler waits at
-       packet_interval: 1 s
+     - type network:
+         - payload: auto-send
+           packet_interval: 1 s
+           payload_address: 127.0.0.1   # the socket this payload answers
+           payload_port: 7000           # from, not the one the handler
+           protocol: udp                # waits at
 
 Nothing in the link needs it -- a handler learns where its payload is from the
 first packet it gets -- but something outside the simulation may: a rule on a
@@ -3249,14 +3265,24 @@ still declares masses itself is refused, told where they go.
    physics                in the simulator file: the physics model's file,
                           relative to this one. Optional
 
-The model holds a list of elements, under ``physics``, and the connections
-between them, under ``connections``, as a configuration holds nodes and
-links. Each element is one simple part, of one of these types:
+The model holds its elements, the components it is made of, under
+``physics``, and the connections between them, under ``connections``, as a
+configuration holds nodes and links. The components are grouped by type, as
+a configuration's nodes are: each entry of ``physics`` is ``type`` and a
+type, holding the components of that type, each named by ``component``.
+Nothing in the model is in an order that means anything -- not the types,
+the components of one, or the connections -- and tcssim runs it the same
+however it is written: two events due at one moment come in the order of
+their components' names, and the outputs an input sums are added in the order
+of theirs. A model in the shape before this one, each element with ``name:``
+and ``type:`` of its own, is refused at the line of its first element;
+``tools/convert-format.py`` rewrites it. Each element is one simple part, of
+one of these types:
 
 .. code-block:: text
 
    heater                 a resistance on a supply, switched on and off
-     name                 the name connections and stand-ins use
+     component            the name connections and stand-ins use
      power                what it gives out while on, at its nominal
                           voltage: "60 W"
      voltage              its supply's nominal voltage: "28 V"
@@ -3266,7 +3292,7 @@ links. Each element is one simple part, of one of these types:
                           ripple and refused without it
 
    thermal_zone           one body at one temperature
-     name                 the name connections and stand-ins use
+     component            the name connections and stand-ins use
      environment          the temperature around it: "283.15 K"
      time_constant        how fast it loses the difference, as a length
                           of time
@@ -3282,7 +3308,7 @@ links. Each element is one simple part, of one of these types:
                           wander and refused without it
 
    sun                    sunlight and shadow, through an orbit
-     name                 the name connections and stand-ins use
+     component            the name connections and stand-ins use
      period               how long one orbit takes: "90 min"
      eclipse              how much of it is in shadow, as a fraction,
                           written bare: "0.35"
@@ -3290,18 +3316,18 @@ links. Each element is one simple part, of one of these types:
                           of its sunlight, as a fraction. Optional
 
    solar_array            panels turning light into current
-     name                 the name connections and stand-ins use
+     component            the name connections and stand-ins use
      current              what it gives in full sunlight: "7 A"
 
    load                   something on the bus that draws a current
-     name                 the name connections and stand-ins use
+     component            the name connections and stand-ins use
      current              what it draws while it is on: "2 A"
 
    bus                    where the sources' currents and the loads' meet
-     name                 the name connections and stand-ins use
+     component            the name connections and stand-ins use
 
    battery                a store of charge on the bus
-     name                 the name connections and stand-ins use
+     component            the name connections and stand-ins use
      capacity             how much it holds full: "10 Ah"
      empty                its open-circuit voltage empty: "24 V"
      full                 its open-circuit voltage full, more than empty:
@@ -3310,14 +3336,14 @@ links. Each element is one simple part, of one of these types:
      charge               how full it starts, as a fraction: "0.6"
 
    engine                 a throttled engine and its fuel
-     name                 the name connections and stand-ins use
+     component            the name connections and stand-ins use
      thrust               its thrust at full throttle: "4500 N"
      isp                  its specific impulse, as a length of time:
                           "311 s"
      fuel                 the fuel it starts with: "100 kg"
 
    body                   a mass falling under gravity, pushed and burning
-     name                 the name connections and stand-ins use
+     component            the name connections and stand-ins use
      mass                 its mass at the start, fuel and all: "1500 kg"
      gravity              the gravity it falls in: "1.62 m/s2"
      altitude             how high it starts: "500 m"
@@ -3437,19 +3463,18 @@ The model, ``zone-physics.yaml``:
 .. code-block:: yaml
 
    physics:
-     - name: heater_1
-       type: heater
-       power: "60 W"              # three kelvin a second on the zone
-       voltage: "28 V"
-     - name: heater_2
-       type: heater
-       power: "60 W"
-       voltage: "28 V"
-     - name: zone
-       type: thermal_zone
-       environment: "283.15 K"    # ten kelvin below the setpoint
-       time_constant: "50 s"      # a fifth of a kelvin a second at it
-       capacity: "20 J/K"
+     - type heater:
+         - component: heater_1
+           power: "60 W"            # three kelvin a second on the zone
+           voltage: "28 V"
+         - component: heater_2
+           power: "60 W"
+           voltage: "28 V"
+     - type thermal_zone:
+         - component: zone
+           capacity: "20 J/K"
+           environment: "283.15 K"  # ten kelvin below the setpoint
+           time_constant: "50 s"    # a fifth of a kelvin a second at it
 
    connections:
      - { from: heater_1.heat, to: zone.heat }
@@ -3463,26 +3488,25 @@ it:
    physics: zone-physics.yaml
 
    simulated_payload_groups:
-     - name: zone_temps
-       packet_interval: 100 ms
+     - group: zone_temps
        connects: zone.temperature
+       packet_interval: 100 ms
 
    simulated_payloads:
-     - { name: temp_1, type: network, protocol: udp, group: zone_temps }
-     - { name: temp_2, type: network, protocol: udp, group: zone_temps,
-         offset: "+0.2 K" }
-     - { name: temp_3, type: network, protocol: udp, group: zone_temps,
-         offset: "-0.3 K" }
-     - name: heaters_1
-       type: network
-       protocol: udp
-       connects: heater_1.on
-       packet_interval: 20 ms     # how often it looks for a decision
-     - name: heaters_2
-       type: network
-       protocol: udp
-       connects: heater_2.on
-       packet_interval: 20 ms
+     - type network:
+         - payload: heaters_1
+           connects: heater_1.on
+           packet_interval: 20 ms   # how often it looks for a decision
+           protocol: udp
+         - payload: heaters_2
+           connects: heater_2.on
+           packet_interval: 20 ms
+           protocol: udp
+         - { payload: temp_1, group: zone_temps, protocol: udp }
+         - { payload: temp_2, group: zone_temps, offset: "+0.2 K",
+             protocol: udp }
+         - { payload: temp_3, group: zone_temps, offset: "-0.3 K",
+             protocol: udp }
 
 **How the world moves**
 
@@ -3632,12 +3656,12 @@ so a run is not left to be guessed at afterwards.
 .. code-block:: yaml
 
    simulated_payloads:
-     - name: auto-send
-       type: network
-       protocol: udp
-       packet_interval: 500 ms
-       drop_percent: 10        # one packet in ten never arrives
-       jitter: 50 ms            # and the rest are up to 50 ms late
+     - type network:
+         - payload: auto-send
+           drop_percent: 10        # one packet in ten never arrives
+           jitter: 50 ms           # and the rest are up to 50 ms late
+           packet_interval: 500 ms
+           protocol: udp
 
 The two files are joined by name. Every data handler needs a simulated payload
 naming it, and a name here that no handler has is an error rather than a line
@@ -3662,37 +3686,47 @@ the model the zone is declared in, ``thermostat-physics.yaml``, beside it.
    physics: thermostat-physics.yaml
 
    simulated_payload_groups:
-     - name: zone_temps
-       packet_interval: 100 ms
+     - group: zone_temps
        connects: zone.temperature
+       drift: "0.05 K"
+       drift_time: "30 min"
+       packet_interval: 100 ms
+       simulate: true
 
    simulated_payloads:
-     - name: temp_1
-       type: network
-       protocol: udp
-       group: zone_temps
+     - type network:
+         - payload: heaters_1
+           connects: heater_1.on
+           protocol: udp
+           simulate: true
 
-     - name: temp_2
-       type: network
-       protocol: udp
-       group: zone_temps
-       offset: "+0.2 K"
+         - payload: heaters_2
+           connects: heater_2.on
+           protocol: udp
+           simulate: true
 
-     - name: temp_3
-       type: network
-       protocol: udp
-       group: zone_temps
-       offset: "-0.3 K"
+         - payload: temp_1
+           accuracy: "0.5 K"
+           group: zone_temps
+           lag: 4 s
+           noise: "0.03 K"
+           protocol: udp
 
-     - name: heaters_1
-       type: network
-       protocol: udp
-       connects: heater_1.on
+         - payload: temp_2
+           accuracy: "0.5 K"
+           group: zone_temps
+           lag: 4 s
+           noise: "0.03 K"
+           offset: "+0.2 K"
+           protocol: udp
 
-     - name: udp-fast
-       type: network
-       protocol: udp
-       packet_interval: 500 ms
+         - payload: temp_3
+           accuracy: "0.25 K"
+           group: zone_temps
+           lag: 6 s
+           noise: "0.02 K"
+           offset: "-0.3 K"
+           protocol: udp
 
 Installing
 ==========
@@ -4798,8 +4832,12 @@ tcsmoc does the waiting itself. Under ``some`` or ``all`` it asks at that
 address first; a simulator already running on the same configuration,
 simulator file and mode is used and left running, one set up for anything
 else is refused, saying what differs, and otherwise tcsmoc starts tcssim and
-waits for it. Under ``none`` it starts tcspecial alone. For a run started by
-hand, ``tcssim --wait`` is the waiting:
+waits for it. The simulator file is compared as the configuration is, by a
+digest of what it says rather than of its bytes: of its settings and of the
+physics model it names, in one order, so that a comment or another order is
+the same file and a figure changed in the model is not. Under ``none`` it
+starts tcspecial alone. For a run started by hand, ``tcssim --wait`` is the
+waiting:
 
 .. code-block:: console
 

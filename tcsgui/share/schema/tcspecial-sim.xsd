@@ -13,11 +13,12 @@
 <xs:schema xmlns:xs="http://www.w3.org/2001/XMLSchema"
            elementFormDefault="qualified">
 
-  <!-- What kind of payload an entry stands in for: one of the interfaces a
-       payload is reached over, as DHType spells them. A payload that is a
-       program is the program itself and needs no stand-in. Empty is not
-       stated, which is what the editor writes into the form it makes.
-       xs:token, so that the whitespace around a word is not part of it. -->
+  <!-- What kind of payload the simulated payloads of a <type> stand in for:
+       one of the interfaces a payload is reached over, as DHType spells
+       them, which is the type the configuration writes the payload under. A
+       payload that is a program is the program itself and needs no
+       stand-in. xs:token, so that the whitespace around a word is not part
+       of it. -->
   <xs:simpleType name="kind">
     <xs:restriction base="xs:token">
       <xs:enumeration value="network"/>
@@ -30,20 +31,16 @@
       <xs:enumeration value="rpmsg"/>
       <xs:enumeration value="gpio"/>
       <xs:enumeration value="hdlc"/>
-      <xs:enumeration value=""/>
     </xs:restriction>
   </xs:simpleType>
 
-  <!-- One entry of either list: a name, and the settings it states. A choice
+  <!-- The settings a group or a simulated payload may state. A choice
        repeated rather than xs:all, so that the order is free. -->
-  <xs:complexType name="entry">
-    <xs:choice minOccurs="0" maxOccurs="unbounded">
-      <xs:element name="name" type="xs:string"/>
-      <xs:element name="group" type="xs:string"/>
+  <xs:group name="settings">
+    <xs:choice>
       <!-- Whether the payload is simulated, true or false: from the payload
            or its group, never both. -->
       <xs:element name="simulate" type="xs:string"/>
-      <xs:element name="type" type="kind"/>
       <xs:element name="protocol" type="xs:string"/>
       <xs:element name="payload_address" type="xs:string"/>
       <xs:element name="payload_port" type="xs:string"/>
@@ -68,6 +65,50 @@
       <xs:element name="drift_time" type="xs:string"/>
       <xs:element name="lag" type="xs:string"/>
     </xs:choice>
+  </xs:group>
+
+  <!-- A group of settings, named by its attribute. It says no type: a
+       payload's type is the type it is written under. -->
+  <xs:complexType name="group">
+    <xs:choice minOccurs="0" maxOccurs="unbounded">
+      <xs:group ref="settings"/>
+    </xs:choice>
+    <xs:attribute name="name" type="xs:string" use="required"/>
+  </xs:complexType>
+
+  <!-- A simulated payload, named by its attribute: the payload of the
+       configuration it stands in for. It may name a group to take the
+       settings it does not state from. -->
+  <xs:complexType name="payload">
+    <xs:choice minOccurs="0" maxOccurs="unbounded">
+      <xs:element name="group" type="xs:string"/>
+      <xs:group ref="settings"/>
+    </xs:choice>
+    <xs:attribute name="name" type="xs:string" use="required"/>
+  </xs:complexType>
+
+  <!-- The groups, in any order. -->
+  <xs:complexType name="groups">
+    <xs:sequence>
+      <xs:element name="group" type="group"
+                  minOccurs="0" maxOccurs="unbounded"/>
+    </xs:sequence>
+  </xs:complexType>
+
+  <!-- One type's simulated payloads, the type named by its attribute. -->
+  <xs:complexType name="typed">
+    <xs:sequence>
+      <xs:element name="payload" type="payload" maxOccurs="unbounded"/>
+    </xs:sequence>
+    <xs:attribute name="name" type="kind" use="required"/>
+  </xs:complexType>
+
+  <!-- The simulated payloads, grouped by type, in any order. -->
+  <xs:complexType name="payloads">
+    <xs:sequence>
+      <xs:element name="type" type="typed"
+                  minOccurs="0" maxOccurs="unbounded"/>
+    </xs:sequence>
   </xs:complexType>
 
   <!-- What tcssim itself is told: the UDP address, as address:port, at
@@ -88,11 +129,11 @@
       <xs:choice minOccurs="0" maxOccurs="unbounded">
         <xs:element name="description" type="xs:string"/>
         <xs:element name="tcssim" type="tcssim"/>
-        <xs:element name="simulated_payload_groups" type="entry"/>
+        <xs:element name="simulated_payload_groups" type="groups"/>
         <!-- The physics model the payloads are attached to: a YAML file of
              its own, named relative to this file's directory. -->
         <xs:element name="physics" type="xs:string"/>
-        <xs:element name="simulated_payloads" type="entry"/>
+        <xs:element name="simulated_payloads" type="payloads"/>
       </xs:choice>
     </xs:complexType>
   </xs:element>

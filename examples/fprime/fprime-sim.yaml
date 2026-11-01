@@ -20,20 +20,19 @@ tcssim:
 physics: fprime-physics.yaml
 
 simulated_payloads:
-  # Driven and never read: its stand-in sends nothing, counts what the
-  # vehicle sends it, and switches the heater, which while it is on warms
-  # the zone by a kelvin a second.
-  - name: heater
-    simulate: true
-    type: network
-    protocol: udp
-    connects: heater.on
+  - type network:
+      # Driven and never read: its stand-in sends nothing, counts what the
+      # vehicle sends it, and switches the heater, which while it is on warms
+      # the zone by a kelvin a second.
+      - payload: heater
+        connects: heater.on
+        protocol: udp
+        simulate: true
 
-  # One reading a second of the zone, in the encoding zone_temp reads:
-  # this file says nothing of the format, which is the conversion's.
-  - name: thermometer
-    simulate: true
-    type: network
-    protocol: udp
-    packet_interval: 1 s
-    connects: zone.temperature
+      # One reading a second of the zone, in the encoding zone_temp reads:
+      # this file says nothing of the format, which is the conversion's.
+      - payload: thermometer
+        connects: zone.temperature
+        packet_interval: 1 s
+        protocol: udp
+        simulate: true

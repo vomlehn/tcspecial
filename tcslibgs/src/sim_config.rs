@@ -11,30 +11,33 @@
 //!
 //! ```yaml
 //! simulated_payload_groups:
-//!   - name: steady_1hz
+//!   - group: steady_1hz
 //!     packet_interval: 1 s
 //!     segment_interval: 1 s
 //!
 //! simulated_payloads:
-//!   - name: DH0
-//!     type: network
-//!     protocol: udp
-//!     group: steady_1hz
-//!   - name: DH3
-//!     type: network
-//!     protocol: tcp
-//!     packet_interval: 500 ms
+//!   - type network:
+//!       - payload: DH0
+//!         protocol: udp
+//!         group: steady_1hz
+//!       - payload: DH3
+//!         protocol: tcp
+//!         packet_interval: 500 ms
 //! ```
 //!
-//! The kind and the transport are the payload configuration's, not this file's:
-//! they are stated here only so that a simulator file paired with the wrong
-//! tcspecial configuration is an error rather than a run that produces nothing.
+//! The simulated payloads are grouped by type, as a configuration's nodes
+//! are, and a group is named by the word `group`: see [`crate::sim_grouped`].
+//! The kind and the transport are the payload configuration's, not this
+//! file's: they are stated here only so that a simulator file paired with the
+//! wrong tcspecial configuration is an error rather than a run that produces
+//! nothing. Nothing in the file is in an order that means anything: its
+//! payloads and its groups are held in name order.
 //!
 //! A group carries what several simulated payloads have in common; a payload
-//! overrides any of it for itself. The format is chosen from the file extension
-//! by [`crate::load_data_file`], so the same configuration can be written
-//! in YAML or XML; a simulator file keeps its language's extension, `.yaml`,
-//! where a tcspecial configuration's is `.ytcs`.
+//! overrides any of it for itself. The format is chosen from the file
+//! extension by [`ConfigFormat::from_data_path`], so the same configuration
+//! can be written in YAML or XML; a simulator file keeps its language's
+//! extension, `.yaml`, where a tcspecial configuration's is `.ytcs`.
 
 use std::collections::{BTreeMap, BTreeSet};
 use std::fmt;
@@ -46,8 +49,8 @@ use crate::physics::terminal::{At, Direction, Kind};
 use crate::physics::{Model, PhysicsFile, PhysicsProblem};
 use crate::verify::About;
 use crate::{
-    load_data_file, one_host, DHConfig, DHType, EndpointConfig,
-    NetworkProtocol, TcsError, TcsResult,
+    one_host, ConfigFormat, DHConfig, DHType, EndpointConfig, NetworkProtocol,
+    TcsError, TcsResult,
 };
 use serde::de::IgnoredAny;
 use serde::{Deserialize, Serialize};
@@ -278,11 +281,11 @@ impl fmt::Display for SimConfigError {
             SimConfigError::NoKind { payload, actually } => write!(
                 f,
                 "simulated payload \"{}\" does not say what kind of payload it \
-                 stands in for: state type: {}, as the payload configuration \
-                 does. It is stated in both files so that the two can be \
-                 checked against each other, which is the only thing that \
-                 catches a simulator file paired with the wrong tcspecial \
-                 configuration",
+                 stands in for: write it under type {}, as the payload \
+                 configuration does. It is stated in both files so that the \
+                 two can be checked against each other, which is the only \
+                 thing that catches a simulator file paired with the wrong \
+                 tcspecial configuration",
                 payload,
                 actually.spelling()
             ),
@@ -300,12 +303,12 @@ impl fmt::Display for SimConfigError {
                 in_sim_file,
             } => write!(
                 f,
-                "simulated payload \"{}\" is a {} payload here and a {} \
-                 payload in the payload configuration. Both files describe the \
-                 one payload, so they cannot disagree about its kind: either \
-                 this is not the tcspecial configuration these settings were \
-                 written for, or one of the two has been changed and the other \
-                 has not",
+                "simulated payload \"{}\" is written under type {} here and \
+                 under type {} in the payload configuration. Both files \
+                 describe the one payload, so they cannot disagree about its \
+                 kind: either this is not the tcspecial configuration these \
+                 settings were written for, or one of the two has been changed \
+                 and the other has not",
                 payload,
                 in_sim_file.spelling(),
                 in_payload_file.spelling()
@@ -1011,8 +1014,12 @@ pub struct SimSettings {
     // are joined by name alone, and a name is exactly what a payload set
     // copied from another one keeps.
     /// What kind of payload this is, in the payload configuration's own word
-    /// for it: network, device, serial, i2c, or spi.
-    #[serde(rename = "type", default, deserialize_with = "blank_is_unstated")]
+    /// for it: network, device-file, serial, i2c, spi and so on.
+    ///
+    /// Not a setting a file writes beside the others: it is the type the
+    /// payload is written under, set by [`crate::sim_grouped`] as the file is
+    /// read, and a group has none.
+    #[serde(skip)]
     pub dh_type: Option<String>,
     /// Which transport, for a network payload, and refused for every other
     /// kind.
@@ -1210,10 +1217,10 @@ where
 ///
 /// In the order the manual introduces them: what the payload is, where it
 /// answers from, how fast it sends, what it does wrong, and what it is
-/// attached to.
+/// attached to. A payload's type is not among them: it is the type the
+/// payload is written under.
 pub const SETTINGS: &[&str] = &[
     "simulate",
-    "type",
     "protocol",
     "payload_address",
     "payload_port",
@@ -1297,6 +1304,9 @@ impl SimSettings {
 /// A named group of settings that several simulated payloads share.
 #[derive(Debug, Clone, Deserialize)]
 pub struct SimGroup {
+    /// Its name, written `group: <name>`: see [`crate::sim_grouped`], which
+    /// refuses one that is not there.
+    #[serde(default)]
     pub name: String,
     #[serde(flatten)]
     pub settings: SimSettings,
@@ -1315,7 +1325,10 @@ pub struct SimGroup {
 /// its settings from, and whatever it states for itself.
 #[derive(Debug, Clone, Deserialize)]
 pub struct SimPayload {
-    /// Name of the data handler this payload simulates.
+    /// Name of the data handler this payload simulates, written `payload:
+    /// <name>`: see [`crate::sim_grouped`], which refuses one that is not
+    /// there.
+    #[serde(default)]
     pub name: String,
     /// Name of the group supplying settings this payload does not state.
     #[serde(default)]
@@ -1340,7 +1353,8 @@ pub struct SimConfigFile {
     /// tcssim to start, and a harness to wait: see [`SimConfigFile::ready`].
     #[serde(default)]
     pub tcssim: Option<SimTcssim>,
-    #[serde(default)]
+    /// The groups of settings, in name order.
+    #[serde(default, deserialize_with = "crate::sim_grouped::groups")]
     pub simulated_payload_groups: Vec<SimGroup>,
     /// The physics model the payloads are attached to, as this file names
     /// it: a path, relative to the directory this file is in.
@@ -1364,7 +1378,8 @@ pub struct SimConfigFile {
     /// what the vehicle reads is a consequence of what it drove.
     #[serde(skip)]
     pub model: Option<PhysicsFile>,
-    #[serde(default)]
+    /// The simulated payloads, of every type, in name order.
+    #[serde(default, deserialize_with = "crate::sim_grouped::payloads")]
     pub simulated_payloads: Vec<SimPayload>,
 }
 
@@ -1510,9 +1525,40 @@ impl SimConfigFile {
     /// [`SimConfigFile::read_physics`] refuses its model.
     pub fn load<P: AsRef<Path>>(path: P) -> TcsResult<Self> {
         let path = path.as_ref();
-        let mut file: SimConfigFile = load_data_file(path)?;
+        let format = ConfigFormat::from_data_path(path).ok_or_else(|| {
+            TcsError::Config(format!(
+                "{}: a simulator file is named .yaml, .yml or .xml, and this \
+                 is none of those",
+                path.display()
+            ))
+        })?;
+        let text = std::fs::read_to_string(path)?;
+        let mut file = SimConfigFile::parse(&text, format)?;
         file.read_physics(path).map_err(TcsError::Config)?;
         Ok(file)
+    }
+
+    /// Reads a simulator file from its text, without the physics model it
+    /// names.
+    ///
+    /// # Arguments
+    ///
+    /// * `text`   - The file's text.
+    /// * `format` - What it is written in.
+    ///
+    /// # Returns
+    ///
+    /// The file.
+    ///
+    /// # Errors
+    ///
+    /// A file in the shape it had before its payloads were grouped by type,
+    /// at its line, and whatever the parser refuses.
+    pub fn parse(text: &str, format: ConfigFormat) -> TcsResult<Self> {
+        if let Some(why) = crate::sim_reshaped::sim_refused(text, format) {
+            return Err(TcsError::Config(why));
+        }
+        format.parse(text)
     }
 
     /// Where the physics model this file names is.
@@ -2508,19 +2554,22 @@ mod tests {
             .iter()
             .map(|name| {
                 let value = match *name {
-                    "type" => "network",
                     "protocol" => "udp",
                     "payload_address" => "127.0.0.1",
                     "connects" => "zone.temperature",
                     "simulate" => "true",
                     _ => "1",
                 };
-                format!("    {name}: {value}")
+                format!("{name}: {value}")
             })
             .collect();
         let text = format!(
-            "simulated_payloads:\n  - name: DH0\n{}\n",
-            said.join("\n")
+            "simulated_payloads:\n  - type network:\n      - payload: DH0\n\
+             {}\n",
+            said.iter()
+                .map(|line| format!("        {line}"))
+                .collect::<Vec<_>>()
+                .join("\n")
         );
 
         let file = parse(&text);
@@ -2533,8 +2582,11 @@ mod tests {
 
         // A group states the same settings as a payload.
         let text = format!(
-            "simulated_payload_groups:\n  - name: g\n{}\n",
-            said.join("\n")
+            "simulated_payload_groups:\n  - group: g\n{}\n",
+            said.iter()
+                .map(|line| format!("    {line}"))
+                .collect::<Vec<_>>()
+                .join("\n")
         );
         assert!(parse(&text).simulated_payload_groups[0].unknown.is_empty());
 
@@ -2570,15 +2622,15 @@ mod tests {
         let file = parse(
             "
 simulated_payload_groups:
-  - name: steady_1hz
-    simulate: true
+  - group: steady_1hz
     packet_interval: 1 s
     segment_interval: 250 ms
+    simulate: true
 simulated_payloads:
-  - name: DH0
-    type: network
-    protocol: udp
-    group: steady_1hz
+  - type network:
+      - payload: DH0
+        group: steady_1hz
+        protocol: udp
 ",
         );
 
@@ -2606,17 +2658,17 @@ simulated_payloads:
         let file = parse(
             "
 simulated_payload_groups:
-  - name: steady_1hz
-    simulate: true
+  - group: steady_1hz
     packet_interval: 1 s
     segment_interval: 1 s
+    simulate: true
 simulated_payloads:
-  - name: DH0
-    type: network
-    protocol: udp
-    group: steady_1hz
-    packet_interval: 500 ms
-    segment_size: 4
+  - type network:
+      - payload: DH0
+        group: steady_1hz
+        packet_interval: 500 ms
+        protocol: udp
+        segment_size: 4
 ",
         );
 
@@ -2632,11 +2684,11 @@ simulated_payloads:
         let file = parse(
             "
 simulated_payloads:
-  - name: DH0
-    simulate: true
-    type: network
-    protocol: udp
-    packet_interval: 500 ms
+  - type network:
+      - payload: DH0
+        packet_interval: 500 ms
+        protocol: udp
+        simulate: true
 ",
         );
 
@@ -2651,16 +2703,15 @@ simulated_payloads:
         let file = parse(
             "
 simulated_payloads:
-  - name: DH1
-    simulate: true
-    type: network
-    protocol: udp
-    packet_interval: 1 ms
-  - name: DH0
-    simulate: true
-    type: network
-    protocol: udp
-    packet_interval: continuous
+  - type network:
+      - payload: DH0
+        packet_interval: continuous
+        protocol: udp
+        simulate: true
+      - payload: DH1
+        packet_interval: 1 ms
+        protocol: udp
+        simulate: true
 ",
         );
 
@@ -2677,11 +2728,11 @@ simulated_payloads:
         let file = parse(
             "
 simulated_payloads:
-  - name: DH0
-    simulate: true
-    type: network
-    protocol: udp
-    packet_interval: continuous
+  - type network:
+      - payload: DH0
+        packet_interval: continuous
+        protocol: udp
+        simulate: true
 ",
         );
 
@@ -2698,16 +2749,15 @@ simulated_payloads:
         let file = parse(
             "
 simulated_payloads:
-  - name: DH0
-    simulate: true
-    type: network
-    protocol: udp
-    packet_interval: continuous
-  - name: DH7
-    simulate: true
-    type: network
-    protocol: udp
-    packet_interval: continuous
+  - type network:
+      - payload: DH0
+        packet_interval: continuous
+        protocol: udp
+        simulate: true
+      - payload: DH7
+        packet_interval: continuous
+        protocol: udp
+        simulate: true
 ",
         );
 
@@ -2724,10 +2774,10 @@ simulated_payloads:
         let file = parse(
             "
 simulated_payloads:
-  - name: DH0
-    type: network
-    protocol: udp
-    group: nonesuch
+  - type network:
+      - payload: DH0
+        group: nonesuch
+        protocol: udp
 ",
         );
 
@@ -2747,10 +2797,10 @@ simulated_payloads:
         let neither = parse(
             "
 simulated_payloads:
-  - name: DH0
-    type: network
-    protocol: udp
-    packet_interval: 1 s
+  - type network:
+      - payload: DH0
+        packet_interval: 1 s
+        protocol: udp
 ",
         );
         assert_eq!(
@@ -2763,15 +2813,15 @@ simulated_payloads:
         let both = parse(
             "
 simulated_payload_groups:
-  - name: g
-    simulate: true
+  - group: g
     packet_interval: 1 s
-simulated_payloads:
-  - name: DH0
     simulate: true
-    type: network
-    protocol: udp
-    group: g
+simulated_payloads:
+  - type network:
+      - payload: DH0
+        group: g
+        protocol: udp
+        simulate: true
 ",
         );
         assert_eq!(
@@ -2785,11 +2835,12 @@ simulated_payloads:
         let from_the_group = parse(
             "
 simulated_payload_groups:
-  - name: g
+  - group: g
     simulate: false
 simulated_payloads:
-  - name: DH0
-    group: g
+  - type network:
+      - payload: DH0
+        group: g
 ",
         );
         assert_eq!(
@@ -2808,10 +2859,10 @@ simulated_payloads:
         let quiet = parse(
             "
 simulated_payloads:
-  - name: heater
-    simulate: true
-    type: network
-    protocol: udp
+  - type network:
+      - payload: heater
+        protocol: udp
+        simulate: true
 ",
         );
         assert!(quiet.resolve(std::slice::from_ref(&heater)).is_ok());
@@ -2819,11 +2870,11 @@ simulated_payloads:
         let timed = parse(
             "
 simulated_payloads:
-  - name: heater
-    simulate: true
-    type: network
-    protocol: udp
-    packet_interval: 1 s
+  - type network:
+      - payload: heater
+        packet_interval: 1 s
+        protocol: udp
+        simulate: true
 ",
         );
         assert_eq!(
@@ -2843,13 +2894,13 @@ simulated_payloads:
         let file = parse(
             "
 simulated_payloads:
-  - name: DH0
-    simulate: true
-    type: network
-    protocol: udp
-    packet_interval: 1 s
-  - name: heater
-    simulate: false
+  - type network:
+      - payload: DH0
+        packet_interval: 1 s
+        protocol: udp
+        simulate: true
+      - payload: heater
+        simulate: false
 ",
         );
         assert!(file.simulates("DH0"));
@@ -2884,13 +2935,17 @@ simulated_payloads:
     #[test]
     fn a_setting_written_empty_is_a_setting_not_stated() {
         let file = parse(
-            "simulated_payloads:\n  - name: DH0\n    simulate: true\n    type: \
-             \"\"\n    \
-             protocol: \"\"\n    packet_interval: \"\"\n    \
-             drop_percent: \"\"\n    silent_after: \"\"\n",
+            "simulated_payloads:\n  \
+             - type network:\n      \
+             - payload: DH0\n        \
+             drop_percent: \"\"\n        \
+             packet_interval: \"\"\n        \
+             protocol: \"\"\n        \
+             silent_after: \"\"\n        \
+             simulate: true\n",
         );
         let said = &file.simulated_payloads[0].settings;
-        assert_eq!(said.dh_type, None, "an empty kind is no kind");
+        assert_eq!(said.dh_type.as_deref(), Some("network"), "its type's");
         assert_eq!(said.protocol, None);
         assert_eq!(said.packet_interval, None);
         assert_eq!(said.drop_percent, None);
@@ -2903,9 +2958,12 @@ simulated_payloads:
         let said = format!(
             "{}",
             parse(
-                "simulated_payloads:\n  - name: DH0\n    simulate: true\n    \
-                 type: network\n    \
-                 protocol: udp\n    packet_interval: often\n"
+                "simulated_payloads:\n  \
+                 - type network:\n      \
+                 - payload: DH0\n        \
+                 packet_interval: often\n        \
+                 protocol: udp\n        \
+                 simulate: true\n"
             )
             .resolve(&[handler("DH0", 12)])
             .expect_err("\"often\" is not a length of time")
@@ -2933,9 +2991,10 @@ simulated_payloads:
             "payload_interface: localhost:5000",
         ] {
             let file = parse(&format!(
-                "simulated_payloads:\n  - name: DH0\n    simulate: true\n    \
-                 type: network\n    \
-                 protocol: udp\n    packet_interval: 100 ms\n    {plain}\n"
+                "simulated_payloads:\n  - type network:\n      \
+                 - payload: DH0\n        simulate: true\n        \
+                 protocol: udp\n        \
+                 packet_interval: 100 ms\n        {plain}\n"
             ));
             let said =
                 format!("{}", file.resolve(&[handler("DH0", 4)]).unwrap_err());
@@ -2953,12 +3012,16 @@ simulated_payloads:
 
         // A group is read the same way.
         let file = parse(
-            "simulated_payload_groups:\n  - name: g\n    simulate: true\n    \
+            "simulated_payload_groups:\n  \
+             - group: g\n    \
              packet_interval: 100 ms\n    \
-             port: 5000\n\
-             simulated_payloads:\n  - name: DH0\n    type: network\n    \
-             protocol: udp\n    \
-             group: g\n",
+             port: 5000\n    \
+             simulate: true\n\
+             simulated_payloads:\n  \
+             - type network:\n      \
+             - payload: DH0\n        \
+             group: g\n        \
+             protocol: udp\n",
         );
         let said =
             format!("{}", file.resolve(&[handler("DH0", 4)]).unwrap_err());
@@ -2979,9 +3042,10 @@ simulated_payloads:
     fn a_datagram_payload_may_be_told_what_to_bind() {
         let settled = |extra: &str, dh: &DHConfig| {
             parse(&format!(
-                "simulated_payloads:\n  - name: DH0\n    simulate: true\n    \
-                 type: network\n    \
-                 protocol: udp\n    packet_interval: 100 ms\n{extra}"
+                "simulated_payloads:\n  - type network:\n      \
+                 - payload: DH0\n        simulate: true\n        \
+                 protocol: udp\n        \
+                 packet_interval: 100 ms\n{extra}"
             ))
             .resolve(std::slice::from_ref(dh))
         };
@@ -2996,7 +3060,7 @@ simulated_payloads:
         );
 
         let told = settled(
-            "    payload_address: 127.0.0.1\n    payload_port: 7000\n",
+            "        payload_address: 127.0.0.1\n        payload_port: 7000\n",
             &udp,
         )
         .expect("resolves");
@@ -3005,8 +3069,8 @@ simulated_payloads:
 
         // A port alone is the common case -- bind this port on any interface
         // -- and an address alone leaves the port to the system.
-        assert!(settled("    payload_port: 7000\n", &udp).is_ok());
-        assert!(settled("    payload_address: 127.0.0.1\n", &udp).is_ok());
+        assert!(settled("        payload_port: 7000\n", &udp).is_ok());
+        assert!(settled("        payload_address: 127.0.0.1\n", &udp).is_ok());
 
         // But not the handler's own socket: two sockets cannot be one, and a
         // payload told to bind it would fail at the bind with nothing to say
@@ -3014,7 +3078,8 @@ simulated_payloads:
         let said = format!(
             "{}",
             settled(
-                "    payload_address: localhost\n    payload_port: 5000\n",
+                "        payload_address: localhost\n        \
+                 payload_port: 5000\n",
                 &udp
             )
             .unwrap_err()
@@ -3036,9 +3101,10 @@ simulated_payloads:
             Some(crate::SendsFrom::Socket("127.0.0.1:7001".parse().unwrap()));
         let file = |extra: &str| {
             parse(&format!(
-                "simulated_payloads:\n  - name: DH0\n    simulate: true\n    \
-                 type: network\n    \
-                 protocol: udp\n    packet_interval: 100 ms\n{extra}"
+                "simulated_payloads:\n  - type network:\n      \
+                 - payload: DH0\n        simulate: true\n        \
+                 protocol: udp\n        \
+                 packet_interval: 100 ms\n{extra}"
             ))
         };
 
@@ -3056,7 +3122,7 @@ simulated_payloads:
         for stated in ["payload_address: 127.0.0.1", "payload_port: 7001"] {
             let said = format!(
                 "{}",
-                file(&format!("    {stated}\n"))
+                file(&format!("        {stated}\n"))
                     .resolve(std::slice::from_ref(&sending))
                     .unwrap_err()
             );
@@ -3077,8 +3143,8 @@ simulated_payloads:
         };
         let file = |extra: &str| {
             parse(&format!(
-                "simulated_payloads:\n  - name: DH0\n    simulate: true\n    \
-                 type: network\n    \
+                "simulated_payloads:\n  - type network:\n      \
+                 - payload: DH0\n        simulate: true\n        \
                  protocol: udp\n{extra}"
             ))
         };
@@ -3089,7 +3155,7 @@ simulated_payloads:
         for stated in ["payload_address: 127.0.0.1", "payload_port: 7000"] {
             let said = format!(
                 "{}",
-                file(&format!("    {stated}\n"))
+                file(&format!("        {stated}\n"))
                     .resolve(std::slice::from_ref(&asked))
                     .unwrap_err()
             );
@@ -3115,9 +3181,13 @@ simulated_payloads:
             port: 5000,
         });
         let file = parse(
-            "simulated_payloads:\n  - name: DH0\n    simulate: true\n    type: \
-             network\n    protocol: tcp\n    \
-             packet_interval: 100 ms\n    payload_port: 7000\n",
+            "simulated_payloads:\n  \
+             - type network:\n      \
+             - payload: DH0\n        \
+             packet_interval: 100 ms\n        \
+             payload_port: 7000\n        \
+             protocol: tcp\n        \
+             simulate: true\n",
         );
         let said = format!("{}", file.resolve(&[stream]).unwrap_err());
         assert!(
@@ -3136,15 +3206,18 @@ simulated_payloads:
         });
         let path = |extra: &str| {
             parse(&format!(
-                "simulated_payloads:\n  - name: DH0\n    simulate: true\n    \
-                 type: network\n    \
-                 protocol: unix_dgram\n    packet_interval: 100 ms\n{extra}"
+                "simulated_payloads:\n  - type network:\n      \
+                 - payload: DH0\n        simulate: true\n        \
+                 protocol: unix_dgram\n        \
+                 packet_interval: 100 ms\n{extra}"
             ))
             .resolve(std::slice::from_ref(&socket))
         };
-        assert!(path("    payload_address: /tmp/dh-payload.sock\n").is_ok());
+        let own = "        payload_address: /tmp/dh-payload.sock\n";
+        assert!(path(own).is_ok());
 
-        let said = format!("{}", path("    payload_port: 7000\n").unwrap_err());
+        let said =
+            format!("{}", path("        payload_port: 7000\n").unwrap_err());
         assert!(
             said.contains("payload_port") && said.contains("named by a path"),
             "{said}"
@@ -3153,15 +3226,18 @@ simulated_payloads:
         // And not the handler's own path.
         let said = format!(
             "{}",
-            path("    payload_address: /tmp/dh.sock\n").unwrap_err()
+            path("        payload_address: /tmp/dh.sock\n").unwrap_err()
         );
         assert!(said.contains("/tmp/dh.sock"), "{said}");
 
         // A device has no address at all.
         let file = parse(
-            "simulated_payloads:\n  - name: DH0\n    simulate: true\n    type: \
-             device-file\n    \
-             packet_interval: continuous\n    payload_port: 7000\n",
+            "simulated_payloads:\n  \
+             - type device-file:\n      \
+             - payload: DH0\n        \
+             packet_interval: continuous\n        \
+             payload_port: 7000\n        \
+             simulate: true\n",
         );
         let said = format!("{}", file.resolve(&[device("DH0")]).unwrap_err());
         assert!(
@@ -3181,11 +3257,12 @@ simulated_payloads:
     fn two_simulator_files_may_name_their_payloads_alike() {
         let a_set = |interval: &str| {
             parse(&format!(
-                "simulated_payload_groups:\n  - name: steady\n    simulate: \
+                "simulated_payload_groups:\n  - group: steady\n    simulate: \
                  true\n    \
                  packet_interval: {interval}\n\
-                 simulated_payloads:\n  - name: DH0\n    type: network\n    \
-                 protocol: udp\n    group: steady\n"
+                 simulated_payloads:\n  - type network:\n      \
+                 - payload: DH0\n        protocol: udp\n        \
+                 group: steady\n"
             ))
         };
 
@@ -3215,9 +3292,13 @@ simulated_payloads:
     #[test]
     fn a_word_that_is_not_a_setting_is_refused() {
         let file = parse(
-            "simulated_payloads:\n  - name: DH0\n    simulate: true\n    type: \
-             network\n    \
-             protocol: udp\n    packet_interval: 100 ms\n    drop_percnt: 10\n",
+            "simulated_payloads:\n  \
+             - type network:\n      \
+             - payload: DH0\n        \
+             drop_percnt: 10\n        \
+             packet_interval: 100 ms\n        \
+             protocol: udp\n        \
+             simulate: true\n",
         );
         let said =
             format!("{}", file.resolve(&[handler("DH0", 4)]).unwrap_err());
@@ -3230,10 +3311,15 @@ simulated_payloads:
         // misspelling hides best: it is read once and applies to every
         // payload that names it.
         let file = parse(
-            "simulated_payload_groups:\n  - name: slow\n    simulate: \
-             true\n    packet_intervl_ms: 100\n\
-             simulated_payloads:\n  - name: DH0\n    type: network\n    \
-             protocol: udp\n    group: slow\n",
+            "simulated_payload_groups:\n  \
+             - group: slow\n    \
+             packet_intervl_ms: 100\n    \
+             simulate: true\n\
+             simulated_payloads:\n  \
+             - type network:\n      \
+             - payload: DH0\n        \
+             group: slow\n        \
+             protocol: udp\n",
         );
         let said =
             format!("{}", file.resolve(&[handler("DH0", 4)]).unwrap_err());
@@ -3276,9 +3362,12 @@ simulated_payloads:
         // The simulator file of the datagram set, against the tcspecial
         // configuration of the stream set.
         let file = parse(
-            "simulated_payloads:\n  - name: DH0\n    simulate: true\n    type: \
-             network\n    \
-             protocol: udp\n    packet_interval: 1 s\n",
+            "simulated_payloads:\n  \
+             - type network:\n      \
+             - payload: DH0\n        \
+             packet_interval: 1 s\n        \
+             protocol: udp\n        \
+             simulate: true\n",
         );
 
         let mut stream = handler("DH0", 4);
@@ -3307,9 +3396,11 @@ simulated_payloads:
     #[test]
     fn the_two_files_cannot_disagree_about_the_kind() {
         let file = parse(
-            "simulated_payloads:\n  - name: DH0\n    simulate: true\n    type: \
-             device-file\n    \
-             packet_interval: 1 s\n",
+            "simulated_payloads:\n  \
+             - type device-file:\n      \
+             - payload: DH0\n        \
+             packet_interval: 1 s\n        \
+             simulate: true\n",
         );
         let said =
             format!("{}", file.resolve(&[handler("DH0", 4)]).unwrap_err());
@@ -3321,28 +3412,30 @@ simulated_payloads:
 
     /// Saying nothing is not agreement.
     ///
-    /// A payload that stated no kind could not be checked against anything, so
-    /// it is refused -- and told which kind the tcspecial configuration makes
-    /// it, since that is the one thing an error here always knows.
+    /// A payload that stated no kind could not be checked against anything,
+    /// so a simulated payload is written under its type, and one that is not
+    /// is refused as the file is read, shown how one is written.
     #[test]
     fn a_simulated_payload_says_what_it_stands_in_for() {
-        let file = parse(
-            "simulated_payloads:\n  - name: DH0\n    simulate: true\n    \
-             packet_interval: 1 s\n",
-        );
-        let said =
-            format!("{}", file.resolve(&[handler("DH0", 4)]).unwrap_err());
+        let e = crate::ConfigFormat::Yaml
+            .parse::<SimConfigFile>(
+                "simulated_payloads:\n  - payload: DH0\n    \
+                 simulate: true\n    packet_interval: 1 s\n",
+            )
+            .expect_err("a payload under no type");
         assert!(
-            said.contains("type: network"),
-            "the error should say what to write: {said}"
+            e.to_string().contains("`- type network:`"),
+            "the error should say what to write: {e}"
         );
 
         // A network payload says which transport, too, for the same reason:
         // the kind alone would not have caught the pairing above.
         let file = parse(
-            "simulated_payloads:\n  - name: DH0\n    simulate: true\n    type: \
-             network\n    \
-             packet_interval: 1 s\n",
+            "simulated_payloads:\n  \
+             - type network:\n      \
+             - payload: DH0\n        \
+             packet_interval: 1 s\n        \
+             simulate: true\n",
         );
         let said =
             format!("{}", file.resolve(&[handler("DH0", 4)]).unwrap_err());
@@ -3356,9 +3449,12 @@ simulated_payloads:
     #[test]
     fn only_a_network_payload_has_a_transport() {
         let file = parse(
-            "simulated_payloads:\n  - name: DH0\n    simulate: true\n    type: \
-             device-file\n    \
-             protocol: udp\n    packet_interval: continuous\n",
+            "simulated_payloads:\n  \
+             - type device-file:\n      \
+             - payload: DH0\n        \
+             packet_interval: continuous\n        \
+             protocol: udp\n        \
+             simulate: true\n",
         );
         let said = format!("{}", file.resolve(&[device("DH0")]).unwrap_err());
         assert!(
@@ -3369,8 +3465,11 @@ simulated_payloads:
         // And a device that states none resolves, which is the whole of what
         // a device has to say about how it is reached.
         let file = parse(
-            "simulated_payloads:\n  - name: DH0\n    simulate: true\n    type: \
-             device-file\n    packet_interval: continuous\n",
+            "simulated_payloads:\n  \
+             - type device-file:\n      \
+             - payload: DH0\n        \
+             packet_interval: continuous\n        \
+             simulate: true\n",
         );
         file.resolve(&[device("DH0")])
             .expect("a device needs no transport");
@@ -3380,13 +3479,16 @@ simulated_payloads:
     /// that would have worked.
     #[test]
     fn a_kind_or_a_transport_that_is_neither_is_refused() {
-        let file = parse(
-            "simulated_payloads:\n  - name: DH0\n    simulate: true\n    type: \
-             netwrok\n    \
-             packet_interval: 1 s\n",
-        );
-        let said =
-            format!("{}", file.resolve(&[handler("DH0", 4)]).unwrap_err());
+        let said = crate::ConfigFormat::Yaml
+            .parse::<SimConfigFile>(
+                "simulated_payloads:\n  \
+                 - type netwrok:\n      \
+                 - payload: DH0\n        \
+                 packet_interval: 1 s\n        \
+                 simulate: true\n",
+            )
+            .expect_err("no kind of payload")
+            .to_string();
         assert!(
             said.contains("netwrok")
                 && said.contains("network")
@@ -3395,9 +3497,12 @@ simulated_payloads:
         );
 
         let file = parse(
-            "simulated_payloads:\n  - name: DH0\n    simulate: true\n    type: \
-             network\n    \
-             protocol: udb\n    packet_interval: 1 s\n",
+            "simulated_payloads:\n  \
+             - type network:\n      \
+             - payload: DH0\n        \
+             packet_interval: 1 s\n        \
+             protocol: udb\n        \
+             simulate: true\n",
         );
         let said =
             format!("{}", file.resolve(&[handler("DH0", 4)]).unwrap_err());
@@ -3407,19 +3512,119 @@ simulated_payloads:
         );
     }
 
-    /// What a payload stands in for may come from its group, like everything
-    /// else a payload does not state.
+    /// How a payload is reached may come from its group, like everything
+    /// else a payload does not state but its type.
     #[test]
     fn a_group_may_carry_what_its_payloads_stand_in_for() {
         let file = parse(
-            "simulated_payload_groups:\n  - name: datagrams\n    simulate: \
-             true\n    type: network\n    \
-             protocol: udp\n    packet_interval: 1 s\n\
-             simulated_payloads:\n  - name: DH0\n    group: datagrams\n  \
-             - name: DH1\n    group: datagrams\n",
+            "simulated_payload_groups:\n  \
+             - group: datagrams\n    \
+             packet_interval: 1 s\n    \
+             protocol: udp\n    \
+             simulate: true\n\
+             simulated_payloads:\n  \
+             - type network:\n      \
+             - payload: DH0\n        \
+             group: datagrams\n      \
+             - payload: DH1\n        \
+             group: datagrams\n",
         );
         file.resolve(&[handler("DH0", 4), handler("DH1", 4)])
             .expect("a group of payloads reached the same way");
+    }
+
+    /// A type is said by the entry a payload is written under and nowhere
+    /// else: a group says none, and a payload none of its own; and an entry
+    /// is named by its word, and not by `name`.
+    #[test]
+    fn a_type_is_the_one_a_payload_is_written_under() {
+        for (text, says) in [
+            (
+                "simulated_payload_groups:\n  - group: g\n    type: network\n",
+                "says no type",
+            ),
+            (
+                "simulated_payloads:\n  - type network:\n      \
+                 - payload: DH0\n        type: network\n",
+                "no type of its own",
+            ),
+            (
+                "simulated_payloads:\n  - type network:\n      \
+                 - name: DH0\n",
+                "`- payload: <name>`",
+            ),
+            (
+                "simulated_payload_groups:\n  - name: g\n",
+                "`- group: <name>`",
+            ),
+            (
+                "simulated_payloads:\n  - type network:\n      \
+                 - payload: a\n  - type network:\n      - payload: b\n",
+                "written twice",
+            ),
+            ("simulated_payloads:\n  - type spi:\n", "no payloads"),
+            (
+                "simulated_payloads:\n  - type spi:\n      - simulate: true\n",
+                "no name",
+            ),
+        ] {
+            let e = crate::ConfigFormat::Yaml
+                .parse::<SimConfigFile>(text)
+                .expect_err(text)
+                .to_string();
+            assert!(e.contains(says), "{text}: {e}");
+            assert!(e.contains("line"), "{text}: {e}");
+        }
+    }
+
+    /// The XML spelling is grouped as the YAML is, a payload named by the
+    /// name attribute of its element, and reads the same; and either is
+    /// held in name order, whatever order it is written in.
+    #[test]
+    fn the_xml_spelling_is_grouped_as_the_yaml_is() {
+        let xml: SimConfigFile = crate::ConfigFormat::Xml
+            .parse(
+                "<simulator>\
+                 <simulated_payload_groups><group name=\"g\">\
+                 <simulate>true</simulate>\
+                 <packet_interval>1 s</packet_interval></group>\
+                 </simulated_payload_groups>\
+                 <simulated_payloads><type name=\"network\">\
+                 <payload name=\"DH1\"><protocol>udp</protocol>\
+                 <group>g</group></payload>\
+                 <payload name=\"DH0\"><protocol>udp</protocol>\
+                 <group>g</group></payload>\
+                 </type></simulated_payloads></simulator>",
+            )
+            .expect("parses");
+        let yaml = parse(
+            "simulated_payloads:\n  - type network:\n      \
+             - payload: DH0\n        protocol: udp\n        group: g\n      \
+             - payload: DH1\n        protocol: udp\n        group: g\n\
+             simulated_payload_groups:\n  - group: g\n    simulate: true\n    \
+             packet_interval: 1 s\n",
+        );
+        let names = |file: &SimConfigFile| -> Vec<String> {
+            file.simulated_payloads
+                .iter()
+                .map(|p| p.name.clone())
+                .collect()
+        };
+        assert_eq!(names(&xml), ["DH0", "DH1"]);
+        assert_eq!(names(&xml), names(&yaml));
+        let handlers = [handler("DH0", 4), handler("DH1", 4)];
+        assert_eq!(xml.resolve(&handlers), yaml.resolve(&handlers));
+        assert!(xml.resolve(&handlers).is_ok());
+
+        let e = crate::ConfigFormat::Xml
+            .parse::<SimConfigFile>(
+                "<simulator><simulated_payloads><type name=\"network\">\
+                 <payload name=\"a\" type=\"network\"/>\
+                 </type></simulated_payloads></simulator>",
+            )
+            .expect_err("a type of its own")
+            .to_string();
+        assert!(e.contains("no type of its own"), "{e}");
     }
 
     /// The faults are the simulator's alone, and are checked for being
@@ -3429,9 +3634,13 @@ simulated_payloads:
         // A percentage is nought to a hundred. Anything else is a
         // misunderstanding rather than a severe fault.
         let file = parse(
-            "simulated_payloads:\n  - name: DH0\n    simulate: true\n    type: \
-             network\n    protocol: udp\n    packet_interval: 100 ms\n    \
-             drop_percent: 150\n",
+            "simulated_payloads:\n  \
+             - type network:\n      \
+             - payload: DH0\n        \
+             drop_percent: 150\n        \
+             packet_interval: 100 ms\n        \
+             protocol: udp\n        \
+             simulate: true\n",
         );
         let e = file.resolve(&[handler("DH0", 4)]).unwrap_err();
         let said = format!("{e}");
@@ -3443,9 +3652,13 @@ simulated_payloads:
         // A payload that sends on its own is never asked for anything, so it
         // has no request to ignore.
         let file = parse(
-            "simulated_payloads:\n  - name: DH0\n    simulate: true\n    type: \
-             network\n    protocol: udp\n    packet_interval: 100 ms\n    \
-             ignore_trigger_percent: 50\n",
+            "simulated_payloads:\n  \
+             - type network:\n      \
+             - payload: DH0\n        \
+             ignore_trigger_percent: 50\n        \
+             packet_interval: 100 ms\n        \
+             protocol: udp\n        \
+             simulate: true\n",
         );
         let e = file.resolve(&[handler("DH0", 4)]).unwrap_err();
         let said = format!("{e}");
@@ -3458,9 +3671,13 @@ simulated_payloads:
         // And hanging up needs a link to hang up. handler() makes a UDP
         // payload, which has none.
         let file = parse(
-            "simulated_payloads:\n  - name: DH0\n    simulate: true\n    type: \
-             network\n    protocol: udp\n    packet_interval: 100 ms\n    \
-             close_after: 10\n",
+            "simulated_payloads:\n  \
+             - type network:\n      \
+             - payload: DH0\n        \
+             close_after: 10\n        \
+             packet_interval: 100 ms\n        \
+             protocol: udp\n        \
+             simulate: true\n",
         );
         let e = file.resolve(&[handler("DH0", 4)]).unwrap_err();
         let said = format!("{e}");
@@ -3493,12 +3710,18 @@ simulated_payloads:
         };
 
         let file = parse(
-            "simulated_payload_groups:\n  - name: flaky\n    simulate: \
-             true\n    packet_interval: 100 ms\n    \
-             drop_percent: 10\n    jitter: 25 ms\n\
-             simulated_payloads:\n  - name: DH0\n    type: network\n    \
-             protocol: tcp\n    group: flaky\n    \
-             close_after: 7\n",
+            "simulated_payload_groups:\n  \
+             - group: flaky\n    \
+             drop_percent: 10\n    \
+             jitter: 25 ms\n    \
+             packet_interval: 100 ms\n    \
+             simulate: true\n\
+             simulated_payloads:\n  \
+             - type network:\n      \
+             - payload: DH0\n        \
+             close_after: 7\n        \
+             group: flaky\n        \
+             protocol: tcp\n",
         );
 
         let resolved = file.resolve(&[stream("DH0")]).expect("resolves");
@@ -3521,9 +3744,12 @@ simulated_payloads:
     #[test]
     fn a_file_with_no_faults_asks_for_a_payload_that_works() {
         let file = parse(
-            "simulated_payloads:\n  - name: DH0\n    simulate: \
-                          true\n    type: network\n    protocol: udp\n    \
-                          packet_interval: 100 ms\n",
+            "simulated_payloads:\n  \
+             - type network:\n      \
+             - payload: DH0\n        \
+             packet_interval: 100 ms\n        \
+             protocol: udp\n        \
+             simulate: true\n",
         );
         let resolved = file.resolve(&[handler("DH0", 4)]).expect("resolves");
         assert_eq!(resolved[0].faults, Faults::default());
@@ -3564,9 +3790,9 @@ simulated_payloads:
 
             // Stated by the payload itself.
             let file = parse(&format!(
-                "simulated_payloads:\n  - name: DH0\n    simulate: true\n    \
-                 type: network\n    \
-                 protocol: tcp\n    {stated}\n"
+                "simulated_payloads:\n  - type network:\n      \
+                 - payload: DH0\n        simulate: true\n        \
+                 protocol: tcp\n        {stated}\n"
             ));
             let said =
                 format!("{}", file.resolve(&[triggered("DH0")]).unwrap_err());
@@ -3581,10 +3807,11 @@ simulated_payloads:
             // may not state would be governed by a group it
             // only joined for the settings it may.
             let file = parse(&format!(
-                "simulated_payload_groups:\n  - name: driven\n    simulate: \
+                "simulated_payload_groups:\n  - group: driven\n    simulate: \
                  true\n    {stated}\n\
-                 simulated_payloads:\n  - name: DH0\n    type: network\n    \
-                 protocol: tcp\n    group: driven\n"
+                 simulated_payloads:\n  - type network:\n      \
+                 - payload: DH0\n        protocol: tcp\n        \
+                 group: driven\n"
             ));
             let said =
                 format!("{}", file.resolve(&[triggered("DH0")]).unwrap_err());
@@ -3598,9 +3825,12 @@ simulated_payloads:
         // What such a payload may still say is how it divides an answer:
         // that is its own business, however it was prompted.
         let file = parse(
-            "simulated_payloads:\n  - name: DH0\n    simulate: true\n    type: \
-             network\n    protocol: tcp\n    \
-             segment_size: 2\n",
+            "simulated_payloads:\n  \
+             - type network:\n      \
+             - payload: DH0\n        \
+             protocol: tcp\n        \
+             segment_size: 2\n        \
+             simulate: true\n",
         );
         let resolved = file
             .resolve(&[triggered("DH0")])
@@ -3653,8 +3883,12 @@ simulated_payloads:
 
         // Stated, and refused in terms of where it belongs.
         let file = parse(
-            "simulated_payloads:\n  - name: DH0\n    simulate: true\n    type: \
-             network\n    protocol: tcp\n    packet_interval: 1 s\n",
+            "simulated_payloads:\n  \
+             - type network:\n      \
+             - payload: DH0\n        \
+             packet_interval: 1 s\n        \
+             protocol: tcp\n        \
+             simulate: true\n",
         );
         let e = file.resolve(&[triggered("DH0")]).unwrap_err();
         let said = format!("{e}");
@@ -3668,8 +3902,12 @@ simulated_payloads:
         // the segment settings still apply, since how a payload divides an
         // answer is its own business.
         let file = parse(
-            "simulated_payloads:\n  - name: DH0\n    simulate: true\n    type: \
-             network\n    protocol: tcp\n    segment_size: 2\n",
+            "simulated_payloads:\n  \
+             - type network:\n      \
+             - payload: DH0\n        \
+             protocol: tcp\n        \
+             segment_size: 2\n        \
+             simulate: true\n",
         );
         let resolved = file
             .resolve(&[triggered("DH0")])
@@ -3705,8 +3943,10 @@ simulated_payloads:
             driven: false,
         };
         let file = parse(
-            "simulated_payloads:\n  - name: DH0\n    simulate: true\n    type: \
-             device-file\n",
+            "simulated_payloads:\n  \
+             - type device-file:\n      \
+             - payload: DH0\n        \
+             simulate: true\n",
         );
         let problems = file.problems(&[device]);
         assert!(
@@ -3729,14 +3969,14 @@ simulated_payloads:
         let file = parse(
             "
 simulated_payload_groups:
-  - name: sizes_only
-    simulate: true
+  - group: sizes_only
     segment_size: 4
+    simulate: true
 simulated_payloads:
-  - name: DH0
-    type: network
-    protocol: udp
-    group: sizes_only
+  - type network:
+      - payload: DH0
+        group: sizes_only
+        protocol: udp
 ",
         );
 
@@ -3761,11 +4001,11 @@ simulated_payloads:
         let file = parse(
             "
 simulated_payloads:
-  - name: DH0
-    simulate: true
-    type: network
-    protocol: udp
-    packet_interval: continuous
+  - type network:
+      - payload: DH0
+        packet_interval: continuous
+        protocol: udp
+        simulate: true
 ",
         );
         let resolved = file
@@ -3777,12 +4017,12 @@ simulated_payloads:
         let file = parse(
             "
 simulated_payloads:
-  - name: DH0
-    simulate: true
-    type: network
-    protocol: udp
-    packet_interval: 1 s
-    segment_interval: continuous
+  - type network:
+      - payload: DH0
+        packet_interval: 1 s
+        protocol: udp
+        segment_interval: continuous
+        simulate: true
 ",
         );
         let resolved = file
@@ -3798,11 +4038,11 @@ simulated_payloads:
             let file = parse(&format!(
                 "
 simulated_payloads:
-  - name: DH0
-    simulate: true
-    type: network
-    protocol: udp
-    packet_interval: {nought}
+  - type network:
+      - payload: DH0
+        packet_interval: {nought}
+        protocol: udp
+        simulate: true
 "
             ));
             let why = file
@@ -3818,12 +4058,12 @@ simulated_payloads:
         let file = parse(
             "
 simulated_payloads:
-  - name: DH0
-    simulate: true
-    type: network
-    protocol: udp
-    packet_interval: 1 s
-    jitter: continuous
+  - type network:
+      - payload: DH0
+        jitter: continuous
+        packet_interval: 1 s
+        protocol: udp
+        simulate: true
 ",
         );
         let why = file
@@ -3838,17 +4078,17 @@ simulated_payloads:
         let file = parse(
             "
 simulated_payload_groups:
-  - name: steady_1hz
-    simulate: true
-    packet_interval: 1 s
-  - name: continuous
-    simulate: true
+  - group: continuous
     packet_interval: continuous
+    simulate: true
+  - group: steady_1hz
+    packet_interval: 1 s
+    simulate: true
 simulated_payloads:
-  - name: DH0
-    type: network
-    protocol: udp
-    group: steady_1hz
+  - type network:
+      - payload: DH0
+        group: steady_1hz
+        protocol: udp
 ",
         );
 
@@ -3867,14 +4107,14 @@ simulated_payloads:
         let file = parse(
             "
 simulated_payload_groups:
-  - name: steady_1hz
-    simulate: true
+  - group: steady_1hz
     packet_interval: 1 s
+    simulate: true
 simulated_payloads:
-  - name: DH0
-    type: network
-    protocol: udp
-    group: steady_1hx
+  - type network:
+      - payload: DH0
+        group: steady_1hx
+        protocol: udp
 ",
         );
 
@@ -3892,17 +4132,17 @@ simulated_payloads:
         let groups = parse(
             "
 simulated_payload_groups:
-  - name: g
-    simulate: true
+  - group: g
     packet_interval: 1 ms
-  - name: g
     simulate: true
+  - group: g
     packet_interval: 2 ms
+    simulate: true
 simulated_payloads:
-  - name: DH0
-    type: network
-    protocol: udp
-    group: g
+  - type network:
+      - payload: DH0
+        group: g
+        protocol: udp
 ",
         );
         assert_eq!(
@@ -3916,16 +4156,15 @@ simulated_payloads:
         let payloads = parse(
             "
 simulated_payloads:
-  - name: DH0
-    simulate: true
-    type: network
-    protocol: udp
-    packet_interval: 1 ms
-  - name: DH0
-    simulate: true
-    type: network
-    protocol: udp
-    packet_interval: 2 ms
+  - type network:
+      - payload: DH0
+        packet_interval: 1 ms
+        protocol: udp
+        simulate: true
+      - payload: DH0
+        packet_interval: 2 ms
+        protocol: udp
+        simulate: true
 ",
         );
         assert_eq!(
@@ -3942,10 +4181,10 @@ simulated_payloads:
         let file = parse(
             "
 simulated_payloads:
-  - name: DEV
-    simulate: true
-    type: device-file
-    packet_interval: continuous
+  - type device-file:
+      - payload: DEV
+        packet_interval: continuous
+        simulate: true
 ",
         );
 
@@ -3982,19 +4221,18 @@ simulated_payloads:
     /// The physics model the attachment tests join to: two heaters warming
     /// one zone, as the thermostat example's does.
     const MODEL: &str = "physics:
-  - name: heater_1
-    type: heater
-    power: \"60 W\"
-    voltage: \"28 V\"
-  - name: heater_2
-    type: heater
-    power: \"60 W\"
-    voltage: \"28 V\"
-  - name: zone
-    type: thermal_zone
-    environment: \"283.15 K\"
-    time_constant: 50 s
-    capacity: \"20 J/K\"
+  - type heater:
+      - component: heater_1
+        power: \"60 W\"
+        voltage: \"28 V\"
+      - component: heater_2
+        power: \"60 W\"
+        voltage: \"28 V\"
+  - type thermal_zone:
+      - component: zone
+        capacity: \"20 J/K\"
+        environment: \"283.15 K\"
+        time_constant: 50 s
 connections:
   - from: heater_1.heat
     to: zone.heat
@@ -4019,18 +4257,18 @@ connections:
         let indent = |lines: &str| {
             lines
                 .lines()
-                .map(|line| format!("    {line}\n"))
+                .map(|line| format!("        {line}\n"))
                 .collect::<String>()
         };
         let entry = |name: &str, lines: &str| {
             format!(
-                "  - name: {name}\n    simulate: true\n    type: network\n    \
-                 protocol: udp\n    packet_interval: 100 ms\n{}",
+                "      - payload: {name}\n        simulate: true\n        \
+                 protocol: udp\n        packet_interval: 100 ms\n{}",
                 indent(lines)
             )
         };
         let mut file = parse(&format!(
-            "simulated_payloads:\n{}{}{}",
+            "simulated_payloads:\n  - type network:\n{}{}{}",
             entry("DH0", sensor),
             entry("DH1", heater),
             entry("DH2", other)
@@ -4113,7 +4351,7 @@ connections:
         for (sensor, said) in [
             ("connects: zone", "joined by a dot"),
             ("connects: zone.colour", "no terminal \"colour\""),
-            ("connects: room.temperature", "no element \"room\""),
+            ("connects: room.temperature", "no component \"room\""),
             ("connects: zone.heat", "which a connection joins too"),
             ("noise: \"0.1 K\"", "connects to none"),
         ] {
@@ -4143,11 +4381,17 @@ connections:
         file.model = Some(
             PhysicsFile::parse(
                 "physics:
-  - { name: engine, type: engine, thrust: \"16000 N\", isp: 311 s,
-      fuel: \"800 kg\" }
-  - { name: lander, type: body, mass: \"1500 kg\",
-      gravity: \"1.62 m/s2\", altitude: \"500 m\",
-      velocity: \"-20 m/s\" }
+  - type body:
+      - component: lander
+        altitude: \"500 m\"
+        gravity: \"1.62 m/s2\"
+        mass: \"1500 kg\"
+        velocity: \"-20 m/s\"
+  - type engine:
+      - component: engine
+        fuel: \"800 kg\"
+        isp: 311 s
+        thrust: \"16000 N\"
 connections:
   - { from: engine.force, to: lander.force }
   - { from: engine.flow, to: lander.flow }

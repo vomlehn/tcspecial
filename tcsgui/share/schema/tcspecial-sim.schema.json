@@ -45,7 +45,7 @@
       "description": "The physics model the simulated payloads are attached to: a YAML file of its own, named relative to this file's directory, such as `zone-physics.yaml`. A vehicle's physics outlives any one configuration of its payloads, so it is written once and named by every simulator file that uses it. Its schema is tcspecial-physics.schema.json."
     },
     "simulated_payload_groups": {
-      "description": "Settings shared by the payloads that name them.",
+      "description": "Settings shared by the payloads that name them, each group named by its first key, `group: <name>`. A group says no type: a payload's type is the type it is written under.",
       "type": "array",
       "items": {
         "type": "object",
@@ -58,29 +58,9 @@
             ],
             "description": "Whether the payloads that name this group are simulated: true for tcssim to stand in for them, false for the real devices. A payload in a group that states it does not state it too."
           },
-          "name": {
+          "group": {
+            "description": "The group's name, which a simulated payload names with group: to take its settings from it. An entry is named by this, its first key.",
             "type": "string"
-          },
-          "type": {
-            "description": "What kind of payload this stands in for: one of the interfaces a payload is reached over, a payload that is a program being the program itself and needing no stand-in. Said here as well as in the configuration so that a simulator file paired with the wrong configuration is caught rather than simulating the wrong thing. Empty is not stated.",
-            "type": [
-              "string",
-              "null"
-            ],
-            "enum": [
-              "network",
-              "device-file",
-              "serial",
-              "i2c",
-              "spi",
-              "can",
-              "iio",
-              "rpmsg",
-              "gpio",
-              "hdlc",
-              "",
-              null
-            ]
           },
           "protocol": {
             "description": "Which transport, for a network payload: udp, tcp or unix.",
@@ -246,225 +226,237 @@
           }
         },
         "required": [
-          "name"
+          "group"
         ],
         "additionalProperties": false
       }
     },
     "simulated_payloads": {
-      "description": "One entry per payload of the configuration. Every data handler needs one, and a name here that no handler has is an error rather than a line with no effect.",
+      "description": "The payloads tcssim stands in for, grouped by type: each entry is one key, `type` and the type, whose value is the list of that type's simulated payloads, each named by its first key, `payload: <name>`. The type is the kind of payload it stands in for, the type the configuration writes that payload under: one of the interfaces a payload is reached over, a payload that is a program being the program itself and needing no stand-in. Said here as well as in the configuration so that a simulator file paired with the wrong configuration is caught rather than simulating the wrong thing.",
       "type": "array",
       "items": {
         "type": "object",
-        "properties": {
-          "simulate": {
-            "type": [
-              "boolean",
-              "string",
-              "null"
-            ],
-            "description": "Whether this payload is simulated: true for tcssim to stand in for it, false for the real device. Required, from this payload or from its group, and not from both: a payload does not override its group's. Empty is not stated."
-          },
-          "name": {
-            "type": "string"
-          },
-          "group": {
-            "description": "A group whose settings this payload takes for whatever it does not state itself.",
-            "type": [
-              "string",
-              "null"
-            ]
-          },
-          "type": {
-            "description": "What kind of payload this stands in for: one of the interfaces a payload is reached over, a payload that is a program being the program itself and needing no stand-in. Said here as well as in the configuration so that a simulator file paired with the wrong configuration is caught rather than simulating the wrong thing. Empty is not stated.",
-            "type": [
-              "string",
-              "null"
-            ],
-            "enum": [
-              "network",
-              "device-file",
-              "serial",
-              "i2c",
-              "spi",
-              "can",
-              "iio",
-              "rpmsg",
-              "gpio",
-              "hdlc",
-              "",
-              null
-            ]
-          },
-          "protocol": {
-            "description": "Which transport, for a network payload: udp, tcp or unix.",
-            "type": [
-              "string",
-              "null"
-            ]
-          },
-          "payload_address": {
-            "description": "Where the stand-in answers from, where it has an address of its own to bind.",
-            "type": [
-              "string",
-              "null"
-            ]
-          },
-          "payload_port": {
-            "type": [
-              "string",
-              "number",
-              "boolean",
-              "null"
-            ],
-            "description": "And the port with it."
-          },
-          "packet_interval": {
-            "type": [
-              "string",
-              "number",
-              "boolean",
-              "null"
-            ],
-            "description": "How often it sends, as a length of time or the word `continuous` for as fast as the payload can be driven; a triggered payload states none, there being nothing for an interval to mean."
-          },
-          "segment_interval": {
-            "type": [
-              "string",
-              "number",
-              "boolean",
-              "null"
-            ],
-            "description": "How often a segment of a packet goes, as a length of time or the word `continuous`; defaults to the packet interval."
-          },
-          "segment_size": {
-            "type": [
-              "string",
-              "number",
-              "boolean",
-              "null"
-            ],
-            "description": "How large a segment is."
-          },
-          "drop_percent": {
-            "type": [
-              "string",
-              "number",
-              "boolean",
-              "null"
-            ],
-            "description": "How often a packet is thrown away."
-          },
-          "corrupt_percent": {
-            "type": [
-              "string",
-              "number",
-              "boolean",
-              "null"
-            ],
-            "description": "How often one arrives altered."
-          },
-          "truncate_percent": {
-            "type": [
-              "string",
-              "number",
-              "boolean",
-              "null"
-            ],
-            "description": "How often one arrives short."
-          },
-          "jitter": {
-            "type": [
-              "string",
-              "number",
-              "boolean",
-              "null"
-            ],
-            "description": "How late a packet may be, as a length of time, chosen afresh for each one and waited out inside the interval. A length of time and nothing else: leave it out for no jitter."
-          },
-          "silent_after": {
-            "type": [
-              "string",
-              "number",
-              "boolean",
-              "null"
-            ],
-            "description": "How many packets before it stops talking."
-          },
-          "close_after": {
-            "type": [
-              "string",
-              "number",
-              "boolean",
-              "null"
-            ],
-            "description": "How many before it hangs up, where it has a connection to hang up."
-          },
-          "ignore_trigger_percent": {
-            "type": [
-              "string",
-              "number",
-              "boolean",
-              "null"
-            ],
-            "description": "How often it does not answer when it is asked."
-          },
-          "connects": {
-            "type": [
-              "string",
-              "null"
-            ],
-            "description": "The terminal of the physics model this stand-in is joined to, as the element's name and the terminal's joined by a dot: `zone.temperature`, `heater_1.on`. Joined to an output, it reports it, in the encoding the conversion -- `to_kelvin` or `to_value` -- its readings go to expects, so the format, the scale and the offset are taken from that node and not stated here. A decision output is sent as `1` or `0`, at once when it changes and again every packet interval. Joined to an input, it drives it with what the vehicle sends -- a decision, or a value in the input's unit -- and sends nothing, being driven the whole of what it is for; its packet interval is how often it looks for what the vehicle sent."
-          },
-          "offset": {
-            "type": [
-              "string",
-              "null"
-            ],
-            "description": "How far the place a reporting stand-in is on sits from what its terminal says, in the terminal's unit: `+0.2 K`. With `connects` to an output and refused otherwise."
-          },
-          "noise": {
-            "type": [
-              "string",
-              "null"
-            ],
-            "description": "A sensor's random error on each reading: the standard deviation, in its terminal's unit, of the normally distributed noise its electronics add: `0.03 K`. With `connects` to an output and refused otherwise."
-          },
-          "accuracy": {
-            "type": [
-              "string",
-              "null"
-            ],
-            "description": "The most a sensor's calibration is off by, in its terminal's unit, as its datasheet's accuracy: `0.5 K`. A fixed error is drawn once a run, normally distributed with a third of this as its standard deviation and never past it. With `connects` to an output and refused otherwise."
-          },
-          "drift": {
-            "type": [
-              "string",
-              "null"
-            ],
-            "description": "How far a sensor's error wanders, slowly: the standard deviation, in its terminal's unit, of an error drawn back towards nought with `drift_time` as its time constant. With `connects` to an output and refused otherwise."
-          },
-          "drift_time": {
-            "type": [
-              "string",
-              "null"
-            ],
-            "description": "How slowly a sensor's drift wanders, as a length of time. Required with `drift` and refused without it."
-          },
-          "lag": {
-            "type": [
-              "string",
-              "null"
-            ],
-            "description": "A sensor's own time constant, as a length of time: how far behind the body it is on it follows. With `connects` to an output and refused otherwise."
-          }
+        "minProperties": 1,
+        "maxProperties": 1,
+        "propertyNames": {
+          "$ref": "#/$defs/simulatedType"
         },
-        "required": [
-          "name"
-        ],
-        "additionalProperties": false
+        "additionalProperties": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "$ref": "#/$defs/simulatedPayload"
+          }
+        }
       }
     }
   },
-  "additionalProperties": false
+  "additionalProperties": false,
+  "$defs": {
+    "simulatedType": {
+      "description": "The key of an entry of simulated_payloads: the word type, a space, and a kind of payload.",
+      "enum": [
+        "type network",
+        "type device-file",
+        "type serial",
+        "type i2c",
+        "type spi",
+        "type can",
+        "type iio",
+        "type rpmsg",
+        "type gpio",
+        "type hdlc"
+      ]
+    },
+    "simulatedPayload": {
+      "type": "object",
+      "properties": {
+        "simulate": {
+          "type": [
+            "boolean",
+            "string",
+            "null"
+          ],
+          "description": "Whether this payload is simulated: true for tcssim to stand in for it, false for the real device. Required, from this payload or from its group, and not from both: a payload does not override its group's. Empty is not stated."
+        },
+        "payload": {
+          "description": "The payload of the configuration this stands in for, by its name: the two files are joined by it. An entry is named by this, its first key.",
+          "type": "string"
+        },
+        "group": {
+          "description": "A group whose settings this payload takes for whatever it does not state itself.",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "protocol": {
+          "description": "Which transport, for a network payload: udp, tcp or unix.",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "payload_address": {
+          "description": "Where the stand-in answers from, where it has an address of its own to bind.",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "payload_port": {
+          "type": [
+            "string",
+            "number",
+            "boolean",
+            "null"
+          ],
+          "description": "And the port with it."
+        },
+        "packet_interval": {
+          "type": [
+            "string",
+            "number",
+            "boolean",
+            "null"
+          ],
+          "description": "How often it sends, as a length of time or the word `continuous` for as fast as the payload can be driven; a triggered payload states none, there being nothing for an interval to mean."
+        },
+        "segment_interval": {
+          "type": [
+            "string",
+            "number",
+            "boolean",
+            "null"
+          ],
+          "description": "How often a segment of a packet goes, as a length of time or the word `continuous`; defaults to the packet interval."
+        },
+        "segment_size": {
+          "type": [
+            "string",
+            "number",
+            "boolean",
+            "null"
+          ],
+          "description": "How large a segment is."
+        },
+        "drop_percent": {
+          "type": [
+            "string",
+            "number",
+            "boolean",
+            "null"
+          ],
+          "description": "How often a packet is thrown away."
+        },
+        "corrupt_percent": {
+          "type": [
+            "string",
+            "number",
+            "boolean",
+            "null"
+          ],
+          "description": "How often one arrives altered."
+        },
+        "truncate_percent": {
+          "type": [
+            "string",
+            "number",
+            "boolean",
+            "null"
+          ],
+          "description": "How often one arrives short."
+        },
+        "jitter": {
+          "type": [
+            "string",
+            "number",
+            "boolean",
+            "null"
+          ],
+          "description": "How late a packet may be, as a length of time, chosen afresh for each one and waited out inside the interval. A length of time and nothing else: leave it out for no jitter."
+        },
+        "silent_after": {
+          "type": [
+            "string",
+            "number",
+            "boolean",
+            "null"
+          ],
+          "description": "How many packets before it stops talking."
+        },
+        "close_after": {
+          "type": [
+            "string",
+            "number",
+            "boolean",
+            "null"
+          ],
+          "description": "How many before it hangs up, where it has a connection to hang up."
+        },
+        "ignore_trigger_percent": {
+          "type": [
+            "string",
+            "number",
+            "boolean",
+            "null"
+          ],
+          "description": "How often it does not answer when it is asked."
+        },
+        "connects": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "description": "The terminal of the physics model this stand-in is joined to, as the element's name and the terminal's joined by a dot: `zone.temperature`, `heater_1.on`. Joined to an output, it reports it, in the encoding the conversion -- `to_kelvin` or `to_value` -- its readings go to expects, so the format, the scale and the offset are taken from that node and not stated here. A decision output is sent as `1` or `0`, at once when it changes and again every packet interval. Joined to an input, it drives it with what the vehicle sends -- a decision, or a value in the input's unit -- and sends nothing, being driven the whole of what it is for; its packet interval is how often it looks for what the vehicle sent."
+        },
+        "offset": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "description": "How far the place a reporting stand-in is on sits from what its terminal says, in the terminal's unit: `+0.2 K`. With `connects` to an output and refused otherwise."
+        },
+        "noise": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "description": "A sensor's random error on each reading: the standard deviation, in its terminal's unit, of the normally distributed noise its electronics add: `0.03 K`. With `connects` to an output and refused otherwise."
+        },
+        "accuracy": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "description": "The most a sensor's calibration is off by, in its terminal's unit, as its datasheet's accuracy: `0.5 K`. A fixed error is drawn once a run, normally distributed with a third of this as its standard deviation and never past it. With `connects` to an output and refused otherwise."
+        },
+        "drift": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "description": "How far a sensor's error wanders, slowly: the standard deviation, in its terminal's unit, of an error drawn back towards nought with `drift_time` as its time constant. With `connects` to an output and refused otherwise."
+        },
+        "drift_time": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "description": "How slowly a sensor's drift wanders, as a length of time. Required with `drift` and refused without it."
+        },
+        "lag": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "description": "A sensor's own time constant, as a length of time: how far behind the body it is on it follows. With `connects` to an output and refused otherwise."
+        }
+      },
+      "required": [
+        "payload"
+      ],
+      "additionalProperties": false
+    }
+  }
 }

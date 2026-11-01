@@ -896,7 +896,7 @@ fn check_graph_simulator(
         return;
     };
 
-    let mut sim: SimConfigFile = match format.parse(&text) {
+    let mut sim = match SimConfigFile::parse(&text, format) {
         Ok(sim) => sim,
         Err(parse_error) => {
             report.add(path, line_of(&parse_error), parse_error.to_string());
@@ -1200,6 +1200,9 @@ fn line_of(e: &TcsError) -> usize {
             e.location().map_or(THE_FILE_ITSELF, |at| at.line())
         }
         TcsError::Xml { line, .. } => *line,
+        // A file in a shape that was right once, refused by its line in
+        // the sentence that tells it the shape now.
+        TcsError::Config(why) => line_in_message(why),
         _ => THE_FILE_ITSELF,
     }
 }
@@ -1326,8 +1329,8 @@ mod tests {
         assert_eq!(
             found,
             [
-                (model.clone(), line_in(&model, "- name: heater_1")),
-                (model.clone(), line_in(&model, "- name: heater_2")),
+                (model.clone(), line_in(&model, "- component: heater_1")),
+                (model.clone(), line_in(&model, "- component: heater_2")),
             ],
             "{:?}",
             report.said()
@@ -1344,11 +1347,14 @@ mod tests {
         assert_eq!(report.findings[0].file, model);
         assert_eq!(
             report.findings[0].line,
-            line_in(&model, "- name: heater_2")
+            line_in(&model, "- component: heater_2")
         );
         assert!(report.findings[0].message.contains("heater_2.on is joined"));
         assert_eq!(report.findings[1].file, sim);
-        assert_eq!(report.findings[1].line, line_in(&sim, "- name: heaters_2"));
+        assert_eq!(
+            report.findings[1].line,
+            line_in(&sim, "- payload: heaters_2")
+        );
         assert!(report.findings[1].message.contains("nothing converts"));
     }
 
@@ -1382,7 +1388,7 @@ mod tests {
         let line = 1 + std::fs::read_to_string(&sim)
             .expect("read")
             .lines()
-            .position(|l| l.trim() == "- name: engine")
+            .position(|l| l.trim() == "- payload: engine")
             .expect("the engine's entry");
         assert_eq!((found.file.clone(), found.line), (sim, line));
         assert!(found.message.contains("newtons"), "{}", found.message);
@@ -1634,18 +1640,16 @@ gateways:
             "        port: \"5000\"\n",
             "        port: \"5000\"\n        gateway-out: echo\n",
         );
-        let sim = "\
-simulated_payloads:
-  - name: sensor
-    simulate: true
-    type: i2c
-    packet_interval: 1 s
-  - name: heater
-    simulate: true
-    type: network
-    protocol: udp
-    packet_interval: 1 s
-";
+        let sim = "simulated_payloads:\n  \
+                   - type i2c:\n      \
+                   - payload: sensor\n        \
+                   packet_interval: 1 s\n        \
+                   simulate: true\n  \
+                   - type network:\n      \
+                   - payload: heater\n        \
+                   packet_interval: 1 s\n        \
+                   protocol: udp\n        \
+                   simulate: true\n";
         let set = written(".ytcs", &configuration, sim);
         let report = verify(&set.payload, Some(&set.sim), Limits::EVERYTHING);
         let said: Vec<&Finding> = report
@@ -1659,17 +1663,14 @@ simulated_payloads:
             "{}",
             said[0].message
         );
-        assert_eq!(said[0].line, 6, "the heater's entry");
+        assert_eq!(said[0].line, 7, "the heater's entry");
 
         // And without the interval, nothing: a driven payload is simulated,
         // its stand-in counting what the vehicle sends it.
         let set = written(
             ".ytcs",
             &configuration,
-            &sim.replace(
-                "    protocol: udp\n    packet_interval: 1 s\n",
-                "    protocol: udp\n",
-            ),
+            &sim.replace("heater\n        packet_interval: 1 s\n", "heater\n"),
         );
         let report = verify(&set.payload, Some(&set.sim), Limits::EVERYTHING);
         assert!(
@@ -1837,8 +1838,11 @@ gateways:
 
         std::fs::write(
             &sim,
-            "simulated_payloads:\n  - name: sensor\n    simulate: true\n    \
-             type: i2c\n    packet_interval: 1 s\n",
+            "simulated_payloads:\n  \
+             - type i2c:\n      \
+             - payload: sensor\n        \
+             packet_interval: 1 s\n        \
+             simulate: true\n",
         )
         .unwrap();
         let report = verify(&path, Some(&sim), Limits::EVERYTHING);
@@ -1847,8 +1851,9 @@ gateways:
 
         std::fs::write(
             &sim,
-            "simulated_payloads:\n  - name: sensor\n    simulate: true\n  \
-             - name: sensr\n    group: none\n",
+            "simulated_payloads:\n  - type i2c:\n      \
+             - payload: sensor\n        simulate: true\n      \
+             - payload: sensr\n        group: none\n",
         )
         .unwrap();
         let report = verify(&path, Some(&sim), Limits::EVERYTHING);
@@ -1859,7 +1864,7 @@ gateways:
         assert!(all.contains("names group \"none\""), "{all}");
         for finding in &report.findings {
             assert_eq!(finding.file, sim, "{finding}");
-            assert_eq!(finding.line, 4, "{finding}");
+            assert_eq!(finding.line, 5, "{finding}");
         }
     }
 
@@ -1961,19 +1966,17 @@ payloads:
         protocol: udp
 ";
 
-    const GOOD_SIM: &str = "\
-description: settings
-simulated_payloads:
-  - name: DH0
-    simulate: true
-    type: device-file
-    packet_interval: 1 s
-  - name: DH1
-    simulate: true
-    type: network
-    protocol: udp
-    packet_interval: 1 s
-";
+    const GOOD_SIM: &str = "description: settings\n\
+                            simulated_payloads:\n  \
+                            - type device-file:\n      \
+                            - payload: DH0\n        \
+                            packet_interval: 1 s\n        \
+                            simulate: true\n  \
+                            - type network:\n      \
+                            - payload: DH1\n        \
+                            packet_interval: 1 s\n        \
+                            protocol: udp\n        \
+                            simulate: true\n";
 
     #[test]
     fn a_good_set_has_nothing_to_say() {
@@ -2225,18 +2228,15 @@ simulated_payloads:
     /// The simulator file's problems are its own, reported from its lines.
     #[test]
     fn the_simulator_file_is_checked_against_the_payload_file() {
-        let sim = "\
-description: settings
-simulated_payloads:
-  - name: DH0
-    simulate: true
-    type: device-file
-    packet_interval: 1 s
-  - name: nobody
-    simulate: true
-    type: device-file
-    packet_interval: 1 s
-";
+        let sim = "description: settings\n\
+                   simulated_payloads:\n  \
+                   - type device-file:\n      \
+                   - payload: DH0\n        \
+                   packet_interval: 1 s\n        \
+                   simulate: true\n      \
+                   - payload: nobody\n        \
+                   packet_interval: 1 s\n        \
+                   simulate: true\n";
         let set = written(".ytcs", GOOD, sim);
         let report = verify(&set.payload, Some(&set.sim), Limits::EVERYTHING);
 

@@ -180,6 +180,11 @@ impl Form {
     }
 
     /// Says what the channel holds, for its annotation.
+    ///
+    /// # Returns
+    ///
+    /// The words, which follow "What <node> produces, device id <n>:" in
+    /// the annotation the FPP gives the channel.
     fn about(self) -> &'static str {
         match self {
             Form::Datum => "its bytes",

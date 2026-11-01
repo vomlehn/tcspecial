@@ -732,8 +732,7 @@ impl EndpointWritable for GpioEndpoint {
     /// to the same state. Three heater circuits switched one at a time would
     /// be three different thermal states of a vehicle on the way to the one
     /// that was asked for, and the configuration has no way to say which line
-    /// is which -- they are a set, named by offsets in the order the file gave
-    /// them.
+    /// is which -- they are a set, named by offsets, held lowest first.
     ///
     /// What arrives is a value as everything on a link is: see `state_of`
     /// for how it is read and `values_for` for what the kernel is then

@@ -272,14 +272,14 @@ link
 
     .. code-block:: yaml
 
-       - name: k_fore
-         type: compute
-         function: "to_kelvin"
-         payload-out:
-           - target: gateway
-           - target: mean_temp
-             input: in0
-           - target: housekeeping
+       - type compute:
+           - compute: k_fore
+             function: "to_kelvin"
+             payload-out:
+               - target: gateway
+               - target: mean_temp
+                 input: in0
+               - target: housekeeping
 
     An entry's ``target`` is the node the line goes to and its ``input`` is
     which of that node's inputs it feeds, where it feeds a named one. One entry
@@ -308,14 +308,14 @@ link
 
     .. code-block:: yaml
 
-       - name: mean_temp
-         type: compute
-         function: "mean"
-         inputs: "in0,in1,in2"
-         payload-out:
-           - target: gateway
-           - target: thermostat
-         payload-in: true
+       - type compute:
+           - compute: mean_temp
+             function: "mean"
+             inputs: "in0,in1,in2"
+             payload-out:
+               - target: gateway
+               - target: thermostat
+             payload-in: true
 
     That is a record of the links above and not a link. The point of it is a
     node whose entry said nothing about what fed it: a sensor's entry named
@@ -369,7 +369,7 @@ The three sections
 A configuration's nodes are written in three sections, and they are the three
 working panes of the editor:
 
-``gateway``
+``gateways``
     the ground links: the other end of the link, which is not the vehicle at
     all.
 
@@ -386,9 +386,62 @@ statement of it: ``tcslibgs::graph::section_of``. The editor's panes read it
 and so does the file reader, so a file and a drawing cannot come to disagree
 about what a node is.
 
+Within a section the nodes are grouped by type, and a node says no type of its
+own: it is of the type it is written under. Each node is named by the word for
+its section -- ``gateway``, ``compute`` for any vehicle node, or ``payload``
+-- with its name as the value:
+
+.. code-block:: yaml
+
+   payloads:
+     - type i2c:
+         - payload: temp_1
+           address: "0x48"
+           path: /dev/i2c-1
+         - payload: temp_2
+           address: "0x49"
+           path: /dev/i2c-1
+
+and in XML a ``<type name="...">`` element holding ``<gateway>``,
+``<compute>`` or ``<payload>`` elements named by their ``name`` attribute:
+
+.. code-block:: xml
+
+   <payloads>
+       <type name="i2c">
+           <payload name="temp_1">
+               <address>0x48</address>
+               <path>/dev/i2c-1</path>
+           </payload>
+           <payload name="temp_2">
+               <address>0x49</address>
+               <path>/dev/i2c-1</path>
+           </payload>
+       </type>
+   </payloads>
+
+A type is written once in a section, so a section reads as a list of what
+kinds of thing the vehicle has and how many of each, and changing a node's
+type is moving it rather than editing a word on it. The order of the types,
+of the nodes of a type and of a node's attributes means nothing (see `What
+Each End Read`_); the editor writes all three by name.
+
 Requirement
-    A node written in the wrong section is refused where the file is read,
-    naming the node, the section it is in and the one it belongs in. A payload
+    A file in the shape before this -- each node an entry with a ``name`` and
+    a ``type`` of its own, the ground links in a section called ``gateway``,
+    the editor's positions as ``name:`` entries -- is refused as it is read,
+    in either spelling, naming the line of the first such thing and showing
+    how it is written now. ``tools/convert-format.py`` rewrites such a file,
+    keeping its comments. The refusal is ``tcslibgs::graph::reshaped``'s.
+
+Requirement
+    A type written twice in one section, a type with no nodes under it, and a
+    node that states a ``type`` of its own are each refused where the file is
+    read, naming it.
+
+Requirement
+    A type written in the wrong section is refused where the file is read,
+    naming the type, the section it is in and the one it belongs in. A payload
     written under ``vehicle`` is a file whose own arrangement contradicts the
     rule the editor enforces everywhere else, and a reader would have to be
     told which of the two to believe.
@@ -680,10 +733,11 @@ start was ahead of a command about one that would have answered at once.
 
 ``payload_telemetry`` is where each payload's own data link is, and it has two
 bases because the link has two ends. tcspecial binds its end at
-``payload_telemetry.source_base`` plus the payload's own id -- the position the
-payload has in the configuration -- and the MOC binds its end at
-``payload_telemetry.dest_base`` plus the same id. Four payloads based at 6000 and 6100 are at 6000 to 6003 on the
-vehicle and 6100 to 6103 on the ground.
+``payload_telemetry.source_base`` plus the payload's own id -- the position its
+name has among the names of the configuration's nodes -- and the MOC binds its
+end at ``payload_telemetry.dest_base`` plus the same id. Four payloads based at
+6000 and 6100 are at 6000 to 6003 on the vehicle and 6100 to 6103 on the
+ground.
 
 Both ends come out of the one file both ends read, so neither has to be told
 the other's: tcspecial sends a payload's telemetry to the end the MOC binds,
@@ -742,7 +796,7 @@ the bus is built too: tcssim stands in for the cFS end, and tcslib's SBN
 transport, ``tcslib::bus``, lets tcsmoc and every station on tcslib command
 a vehicle that answers to cFS through it (see `What crosses the bus`_).
 
-The gateway nodes are written in the ``gateway`` section, linked through
+The gateway nodes are written in the ``gateways`` section, linked through
 ``gateway-in`` and ``gateway-out``, with ``tee-gateway``, ``null-gateway`` and
 ``app_gateway_veh`` beside them. Each of those was named for the MOC while the
 ground was the only thing a vehicle answered to: the section and the radio's
@@ -750,7 +804,10 @@ node type were ``moc``, the links ``moc-in`` and ``moc-out``, the others
 ``tee-moc``, ``null-moc`` and ``app_moc_veh``, and an app's argument for the
 stream ``app-moc-arg``. The rename was held back to land with the ``payload``
 rename and no longer is; the ``payload`` rename still is, so ``payloads:``,
-``payload-in`` and ``payload-out`` keep their names.
+``payload-in`` and ``payload-out`` keep their names. The section was then
+``gateway``, and became ``gateways`` when the nodes were grouped by type; a
+file in that older shape is refused as well, saying how the node it found
+first is written now.
 
 Requirement
     A file that still writes one of the old words -- the ``moc`` section, a
@@ -798,7 +855,7 @@ node, and there are three kinds of gateway:
      - UDP, in the radio's own protocol, the bridge playing the MOC
      - ``address``, ``port``, ``bridge_base``, ``fprime_id_base``
 
-All four are in the ``gateway`` section, and all four have the terminals
+All four are in the ``gateways`` section, and all four have the terminals
 the radio's has: ``payload-in``, which takes as many sources as the
 configuration gives it, and ``gateway-out``.
 
@@ -820,7 +877,7 @@ Requirement
     commands where nobody sends them.
 
 Requirement
-    Every node in the ``gateway`` section is of the kind ``tcspecial.gateway``
+    Every node in the ``gateways`` section is of the kind ``tcspecial.gateway``
     names, and one that is not is refused, naming the node, its type and the
     kind the configuration states.
 
@@ -920,12 +977,12 @@ is stated once, in ``tcspecial``:
      beacon: { default_interval: "5 s", reset_interval: "1 s",
                tlm_msgid: "0x4201" }
 
-   gateway:
-     - name: fsw
-       type: gateway_cfs
-       cmd_msgid: "0x4281"
-       tlm_base: "0x4240"
-       payload-in: true
+   gateways:
+     - type gateway_cfs:
+         - gateway: fsw
+           cmd_msgid: "0x4281"
+           tlm_base: "0x4240"
+           payload-in: true
 
 (The numbers are illustrative, and laid out for the message-ID mapping below;
 the allotment is the mission's. ``beacon.reset_interval`` is required here as
@@ -1258,14 +1315,14 @@ and the deployment sends them to the ground with whatever it already uses.
      gateway: fprime
      # tcs_cmd, payload_command, payload_telemetry and beacon as for the radio
 
-   gateway:
-     - name: fsw
-       type: gateway_fprime
-       address: "0.0.0.0"
-       port: "7600"
-       bridge_base: "10.0.0.1:7700"
-       fprime_id_base: "0x3000"
-       payload-in: true
+   gateways:
+     - type gateway_fprime:
+         - gateway: fsw
+           address: "0.0.0.0"
+           port: "7600"
+           bridge_base: "10.0.0.1:7700"
+           fprime_id_base: "0x3000"
+           payload-in: true
 
 A type of its own although the wire is the radio's, because what is at the far
 end decides what the configuration has to say and what can be made from it.
@@ -1549,9 +1606,9 @@ Requirement
     A gateway node is the ground's end of the vehicle's data, and states where
     the ground is as ``ground_base``, ``address:port``. What each node drawn
     into it produces is sent by tcspecial as UDP datagrams to that address, at
-    that port plus the source node's device id -- its position among all the
-    configuration's nodes, in the order the files write them
-    (``tcslibgs::graph::order``). So each source arrives
+    that port plus the source node's device id -- its position among the
+    names of all the configuration's nodes, in the canonical order (see
+    `What Each End Read`_). So each source arrives
     on a port of its own and the ground tells them apart by the port, and the
     vehicle sends from the first reading without being spoken to.
     ``tcslibgs::graph::telemetry`` is the one place that counts the ports, for
@@ -1562,10 +1619,10 @@ Requirement
     configuration files they read with one function,
     ``tcslibgs::config_digest::digest_of_graph``: an MD5 over everything the
     vehicle and the ground act on -- the ``tcspecial`` section, the payload
-    groups, the nodes in the order the files write them with their
-    attributes, the links and the command bindings -- across every included
-    file, the same for either spelling, and not the editor's layout or the
-    description. tcspecial says its digest as it starts and sends it in a
+    groups, the nodes with their attributes, the links and the command
+    bindings -- across every included file, in the canonical order, the same
+    for either spelling and whatever order the files wrote, and not the
+    editor's layout or the description. tcspecial says its digest as it starts and sends it in a
     beacon every ``beacon.default_interval``, from ``beacon.send`` to
     ``beacon.recv``. tcsmoc compares the digest in each beacon with the one it
     computed itself; when they differ it says so on the beacon line and the
@@ -1748,9 +1805,10 @@ differently from every other length of time in the files.
 The logging node
 ----------------
 
-Keyword ``type: log`` records what reaches it, built on ``tcslog`` -- the same library
-the telemetry log already uses, so a log node is a generalisation of something
-the software does rather than a new mechanism to trust. Two attributes:
+Keyword ``type log`` records what reaches it, built on ``tcslog`` -- the same
+library the telemetry log already uses, so a log node is a generalisation of
+something the software does rather than a new mechanism to trust. Two
+attributes:
 
 .. code-block:: text
 
@@ -1855,15 +1913,22 @@ Requirement
 
 .. code-block:: yaml
 
-   nodes:
-     - { name: housekeeping, type: log, directory: /var/log/tcspecial,
-         format: variable_ts_rc }
-
-   links:
-     - { from: k_fore, to: [gateway, mean_temp.in0, housekeeping] }
-     - { from: k_aft, to: [gateway, mean_temp.in1, housekeeping] }
-     - { from: k_bay, to: [gateway, mean_temp.in2, housekeeping] }
-     - { from: thermostat, to: [heaters, housekeeping] }
+   vehicle:
+     - type compute:
+         # Each a conversion, its function and its terms as above.
+         - compute: k_aft
+           payload-out: [gateway, mean_temp.in1, housekeeping]
+         - compute: k_bay
+           payload-out: [gateway, mean_temp.in2, housekeeping]
+         - compute: k_fore
+           payload-out: [gateway, mean_temp.in0, housekeeping]
+         - compute: thermostat
+           gateway-out: [heaters]
+           payload-out: [housekeeping]
+     - type log:
+         - compute: housekeeping
+           directory: /var/log/tcspecial
+           format: variable_ts_rc
 
 That is the thermostat's three converted readings and what the comparison
 decided, in one log, in the order they happened -- which is what reconstructing
@@ -1895,18 +1960,21 @@ in the file showed.
 
 .. code-block:: yaml
 
-   gateway:
-     - { name: ground, type: gateway_radio, address: 127.0.0.1, port: "5000",
-         ground_base: "127.0.0.1:5100", gateway-out: echo }
+   gateways:
+     - type gateway_radio:
+         - { gateway: ground, address: 127.0.0.1, port: "5000",
+             ground_base: "127.0.0.1:5100", gateway-out: echo }
    payloads:
-     - { name: heater, type: gpio, direction: output, lines: "4",
-         path: /dev/gpiochip0 }
+     - type gpio:
+         - { payload: heater, direction: output, lines: "4",
+             path: /dev/gpiochip0 }
    vehicle:
-     # What the ground sends the heater, and back to the ground to be seen.
-     - name: echo
-       type: tee-gateway
-       gateway-out: [heater]
-       payload-out: [ground]
+     - type tee-gateway:
+         # What the ground sends the heater, and back to the ground to be
+         # seen.
+         - compute: echo
+           gateway-out: [heater]
+           payload-out: [ground]
 
 Requirement
     A tee delivers each datum that arrives at it to every link leaving each of
@@ -1932,18 +2000,20 @@ Requirement
 The ping node
 -------------
 
-``type: ping`` answers the ground. Each message the MOC sends it comes back
-with the time the vehicle had it written on the end, so that the ground can
+A node of ``type ping`` answers the ground. Each message the MOC sends it comes
+back with the time the vehicle had it written on the end, so that the ground can
 see how long a message takes to reach the vehicle and to come back, and how
 far apart the two clocks are -- which a ping is the one exchange able to show.
 
 .. code-block:: yaml
 
-   gateway:
-     - { name: ground, type: gateway_radio, address: 127.0.0.1, port: "5000",
-         ground_base: "127.0.0.1:5100", gateway-out: pinger }
+   gateways:
+     - type gateway_radio:
+         - { gateway: ground, address: 127.0.0.1, port: "5000",
+             ground_base: "127.0.0.1:5100", gateway-out: pinger }
    vehicle:
-     - { name: pinger, type: ping, payload-out: ground }
+     - type ping:
+         - { compute: pinger, payload-out: ground }
 
 The ground sends its pings to the gateway link's ``address`` and ``port``, and
 the answers arrive at its ``ground_base`` plus the ping node's device id, as any
@@ -2150,8 +2220,9 @@ may take, and says whether it may be restarted:
 
 .. code-block:: yaml
 
-   - { name: attitude, type: compute, function: process,
-       executable: /opt/flight/attitude, timeout: 500 ms, restart: false }
+   - type compute:
+       - { compute: attitude, function: process,
+           executable: /opt/flight/attitude, timeout: 500 ms, restart: false }
 
 What the program sees is a line per arrival on its standard input and a line
 per answer on its standard output:
@@ -2384,17 +2455,17 @@ payload before gateway where a kind has both:
 .. code-block:: yaml
 
    vehicle:
-     - name: through
-       type: app_all_veh
-       executable: $HOME/libexec/tcs/through
-       app-payload-arg: --readings
-       app-gateway-arg: --commands
+     - type app_all_veh:
+         - compute: through
+           executable: $HOME/libexec/tcs/through
+           app-payload-arg: --readings
+           app-gateway-arg: --commands
 
    payloads:
-     - name: bay_2
-       type: app_pl
-       executable: ~/libexec/tcs/bay-2
-       app-payload-arg: --bay-2
+     - type app_pl:
+         - payload: bay_2
+           executable: ~/libexec/tcs/bay-2
+           app-payload-arg: --bay-2
 
 which are run as ``through --readings --commands`` and ``bay_2 --bay-2``, each
 after its program's own path. Both attributes are required of the kinds that
@@ -3122,8 +3193,9 @@ Requirement
 How a command names a node
 ~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-By its node id: the number the node has from the order the configuration
-declares it, counted across every node whatever its kind. It is not a number
+By its node id: the node's position among the names of all the
+configuration's nodes, counted across every node whatever its kind (see `What
+Each End Read`_). It is not a number
 invented for commands -- it is the one a node's link to the ground is already
 counted by, a gateway node's ``ground_base`` plus that node's id -- so the id
 in a command and the port its telemetry arrives on are the same number, worked
@@ -3136,17 +3208,16 @@ Requirement
     right; a number is a field like the sequence and the type beside it.
 
 Requirement
-    Node ids are given by one algorithm, in one place, from the order the
-    configuration is read in. Two components that compute them separately
+    Node ids are given by one algorithm, in one place, from the canonical
+    order. Two components that compute them separately
     would be two tables that can drift apart, and the drift would show as
     commands about the wrong node rather than as an error.
 
 Requirement
     What makes the two ends' ids the same is the digest. It is computed over
-    the configuration *including the order the nodes appear in* -- see
+    the configuration in the canonical order the ids are counted in -- see
     `What Each End Read`_ -- so two ends whose digests agree have read the
-    same nodes in the same order and cannot disagree about which node an id
-    names. Agreeing about the digest is what ``CONNECT`` establishes, and it
+    same names and cannot disagree about which node an id names. Agreeing about the digest is what ``CONNECT`` establishes, and it
     is asked on the spacecraft's link before any node command is sent.
 
 Requirement
@@ -3825,7 +3896,8 @@ a comment it moved. It is the fourth kind in the list above.
 
 The attribute order is not kept either: the editor writes a node's attributes
 and the section's parameters in the order a dictionary gives them, which is
-alphabetical, where a hand-written file usually groups them by what they mean.
+alphabetical, where a hand-written file usually groups them by what they mean;
+and it writes the types of a section and the nodes of a type by name.
 So a hand-written configuration opened and saved stays correct and stops
 looking hand-written. For the shipped examples that is what ``git diff`` is
 for; for a working configuration it is worth knowing before the first Save.
@@ -3930,8 +4002,8 @@ section at the end of the file rather than on the node it is about:
 
    tcsgui:
      nodes:
-       - { name: payload, x: 40, y: 160 }
-       - { name: gateway, x: 784, y: 40 }
+       - { node: gateway, x: 784, y: 40 }
+       - { node: payload, x: 40, y: 160 }
 
 Last, and in a section of its own, because it is a different kind of thing.
 The sections above say what the vehicle carries and what it is told; this says
@@ -4804,7 +4876,7 @@ top of the view. A node placed where it cannot be seen is a press that did
 nothing as far as the person who made it can tell.
 
 **Edit -> Arrange the nodes** applies that rule to every node at once: each to
-the top of its own pane, in the order the file holds them, nothing covering
+the top of its own pane, in the order of their names, nothing covering
 anything, and the view back at the top of the sheet. The sheet is 960 by 2400
 and a window shows a few hundred pixels of it, so a configuration read out of a
 file -- or one left spread about by a morning's dragging -- can have most of
@@ -5067,10 +5139,12 @@ to whoever installs them.
 Two things follow from that division. A node's attributes are the union over
 every node type -- a bus address, a baud rate and a setpoint are all allowed on
 any node -- because a schema that knew which type takes which would be a second
-copy of rules that already exist. And the XSD cannot say that a node's ``name``
-appears exactly once: ``payload-out`` may appear many times, several destinations
-being several elements, and XSD 1.0 allows neither repeats nor a mixture inside
-``xs:all``. A node with two names is refused where the file is read instead.
+copy of rules that already exist. And the XSD cannot say that a node's
+``group`` appears at most once: ``payload-out`` may appear many times, several
+destinations being several elements, and XSD 1.0 allows neither repeats nor a
+mixture inside ``xs:all``. A node that says a word twice is refused where the
+file is read instead, and so is a type written twice in a section. A node's
+name is an attribute of its element, which the XSD does require exactly once.
 
 A schema an editor has to be pointed at by hand is a schema nobody points it
 at, so every configuration this project writes names its own. In XML
@@ -5197,7 +5271,7 @@ Requirement
     know.
 
     Which payloads there are is the configuration's to say, so the entries are
-    its payload nodes in its own order -- a computation, a log and the ground
+    its payload nodes, by name -- a computation, a log and the ground
     link are not simulated and get none. An entry the file already held for a
     name that is not a payload is written out after them: it is somebody's
     typing, and ``tcsverify`` is what says a simulated payload names no
@@ -5498,45 +5572,49 @@ addresses are its own. What is here is checked as it stands, with a
    payload_groups:
      - { name: zone_temps, interval: "100 ms" }
 
-   gateway:
-     - { name: gateway, type: gateway_radio, address: "10.0.0.1", port: "5000",
-         ground_base: "10.0.0.2:5100", payload-in: true }
+   gateways:
+     - type gateway_radio:
+         - { gateway: gateway, address: "10.0.0.1", port: "5000",
+             ground_base: "10.0.0.2:5100", payload-in: true }
 
    vehicle:
-     - { name: k_1, type: compute, function: to_kelvin, format: i16_be,
-         scale: "0.0625", offset: "273.15", payload-in: true,
-         payload-out: [{ target: gateway }, { target: zone_temp, input: in0 }]
-         }
-     - { name: k_2, type: compute, function: to_kelvin, format: i16_be,
-         scale: "0.0625", offset: "273.15", payload-in: true,
-         payload-out: [{ target: gateway }, { target: zone_temp, input: in1 }]
-         }
-     - { name: k_3, type: compute, function: to_kelvin, format: u24_be,
-         scale: "0.0078", offset: "255.37", payload-in: true,
-         payload-out: [{ target: gateway }, { target: zone_temp, input: in2 }]
-         }
+     - type compute:
+         - { compute: k_1, function: to_kelvin, format: i16_be,
+             scale: "0.0625", offset: "273.15", payload-in: true,
+             payload-out: [{ target: gateway },
+                           { target: zone_temp, input: in0 }] }
+         - { compute: k_2, function: to_kelvin, format: i16_be,
+             scale: "0.0625", offset: "273.15", payload-in: true,
+             payload-out: [{ target: gateway },
+                           { target: zone_temp, input: in1 }] }
+         - { compute: k_3, function: to_kelvin, format: u24_be,
+             scale: "0.0078", offset: "255.37", payload-in: true,
+             payload-out: [{ target: gateway },
+                           { target: zone_temp, input: in2 }] }
 
-     - { name: zone_temp, type: compute, function: vote, algorithm: median,
-         inputs: "in0,in1,in2", payload-in: true,
-         payload-out: [{ target: gateway }, { target: thermostat }] }
-     - { name: thermostat, type: compute, function: hysteresis,
-         setpoint: "293.15", half_band: "2.0", payload-in: true,
-         payload-out: [{ target: gateway }],
-         gateway-out: [{ target: heaters_1 }, { target: heaters_2 }] }
+         - { compute: thermostat, function: hysteresis,
+             setpoint: "293.15", half_band: "2.0", payload-in: true,
+             payload-out: [{ target: gateway }],
+             gateway-out: [{ target: heaters_1 }, { target: heaters_2 }] }
+         - { compute: zone_temp, function: vote, algorithm: median,
+             inputs: "in0,in1,in2", payload-in: true,
+             payload-out: [{ target: gateway }, { target: thermostat }] }
 
    payloads:
-     - { name: temp_1, type: i2c, group: zone_temps, path: "/dev/i2c-1",
-         address: "0x48", read_size: "2", payload-out: [{ target: k_1 }] }
-     - { name: temp_2, type: i2c, group: zone_temps, path: "/dev/i2c-1",
-         address: "0x49", read_size: "2", payload-out: [{ target: k_2 }] }
-     - { name: temp_3, type: spi, group: zone_temps, path: "/dev/spidev0.0",
-         max_speed: "1000000", spi_mode: "0", read_size: "3",
-         payload-out: [{ target: k_3 }] }
-
-     - { name: heaters_1, type: gpio, direction: output, path: "/dev/gpiochip0",
-         lines: "3,4,5", gateway-in: true }
-     - { name: heaters_2, type: gpio, direction: output, path: "/dev/gpiochip0",
-         lines: "6,7,8", gateway-in: true }
+     - type gpio:
+         - { payload: heaters_1, direction: output, path: "/dev/gpiochip0",
+             lines: "3,4,5", gateway-in: true }
+         - { payload: heaters_2, direction: output, path: "/dev/gpiochip0",
+             lines: "6,7,8", gateway-in: true }
+     - type i2c:
+         - { payload: temp_1, group: zone_temps, path: "/dev/i2c-1",
+             address: "0x48", read_size: "2", payload-out: [{ target: k_1 }] }
+         - { payload: temp_2, group: zone_temps, path: "/dev/i2c-1",
+             address: "0x49", read_size: "2", payload-out: [{ target: k_2 }] }
+     - type spi:
+         - { payload: temp_3, group: zone_temps, path: "/dev/spidev0.0",
+             max_speed: "1000000", spi_mode: "0", read_size: "3",
+             payload-out: [{ target: k_3 }] }
 
    commands:
      - { from: gateway, sets: thermostat.setpoint }
@@ -7876,15 +7954,25 @@ A section is a key in YAML and an element in XML; a value is a key in YAML and
 a child element in XML.
 
 Requirement
-    In XML every value is a child element and never an attribute. The two
-    formats then say the same thing in the same shape, and one reader of a
-    configuration file learns one convention.
+    In XML every value is a child element and never an attribute, but for
+    names. The two formats then say the same thing in the same shape, and one
+    reader of a configuration file learns one convention.
+
+Requirement
+    A name is an attribute in XML: a type's, ``<type name="i2c">``, a
+    node's, ``<payload name="temp_1">``, and a placed node's,
+    ``<node name="temp_1" x="34" y="34"/>``. It is what the element is rather
+    than something it says, as the YAML's ``- type i2c:`` and ``payload:
+    temp_1`` are, and it is what the element is found and sorted by.
 
 Requirement
     A sequence in XML is repeated sibling elements named for the field, and
     the repeats are contiguous. There is no wrapper element around a list:
-    two payloads are two ``<payloads>`` elements, which is how a sequence
-    reaches serde from quick-xml.
+    two payload groups are two ``<payload_groups>`` elements, and two nodes
+    of a type two ``<payload>`` elements in its ``<type>``, which is how a
+    sequence reaches serde from quick-xml. A node section is the exception,
+    one element -- ``<gateways>``, ``<vehicle>`` or ``<payloads>`` -- holding
+    its types, as the YAML's section is one key holding a list.
 
 Requirement
     An optional value nothing states is an omitted element, not an empty one.
@@ -8638,7 +8726,8 @@ Requirement
     window looks at the table every 40 milliseconds, well inside
     ``LINE_BLINK``. A delivery says which line of the drawing it travelled by
     the line's place among the configuration's links counted one per
-    destination in the file's order, which is the order tcsgui draws them in.
+    destination, by the node each leaves and then by where it goes, which is
+    the order tcsgui draws them in.
 
 tcslib
 ------
@@ -8726,59 +8815,83 @@ Requirement
     sections or the order of one payload's attributes.
 
 Requirement
-    The order of the payloads does change the digest. Ids will be assigned in
-    the order the payloads appear, so that order is configuration rather than
-    spelling.
+    Nothing in a configuration is in an order that means anything. The order
+    of the sections, of the types in a section, of the nodes of a type, of a
+    node's attributes, of its links and their destinations, of the payload
+    groups, of the command bindings, of the included files and of the entries
+    of an attribute that is a set are all spelling, and two files that differ
+    only in them are one configuration.
 
 Requirement
-    Each payload is given a sequence number as the file is read: the first is
-    0. A file may not state it -- the number is what this program read, not
-    something a file gets to assert.
+    There is one canonical order, and everything that needs an order takes
+    it: nodes by name; a node's attributes by name; links by the node they
+    leave, each one's destinations by name; payload groups by name; command
+    bindings by where they come from and then what they set; included files
+    by name; and the entries of a set-valued attribute -- a vote's
+    ``inputs``, gpio ``lines``, ``terminators`` -- in one spelling, sorted.
+    ``tcslibgs::config_digest::interpretation_of_graph`` is the one place it
+    is written down.
 
 Requirement
-    The digest takes the payloads in order of their sequence numbers. Two ends
-    that read the same file then agree about which came first whatever either
-    has since done with its own list.
+    The digest is taken over the configuration in the canonical order. So
+    two files that differ only in order digest alike, as two that differ only
+    in format or comments do.
 
-The numbering rests on one assumption: that a parser hands entries to the code
-above it in the order the file gave them. Both formats here do, and a format
-that did not would be unusable for a language whose payload order means
-something.
+Requirement
+    Device ids are counted in the canonical order: a node's id is its
+    position among the names of all the configuration's nodes, across every
+    included file and whatever its kind, the first being 0. The ids are
+    therefore a function of the names alone. Two ends whose digests agree
+    have read the same names, so they agree about every id, and about every
+    port and identifier counted from one -- ``ground_base`` plus an id, a
+    ``payload_command`` ``dest_base`` plus an id, an F´ id.
 
-The payloads are numbered as the list is deserialized, which is the one place
-every format arrives through, so nothing can hold a configuration whose
-payloads do not know which ones they are. A file stating a number of its own
-is refused by name.
+Requirement
+    Anywhere else an order would decide something -- which of two equally
+    overdue reads goes first, which stream several destinations share, which
+    route a ping takes, the order offered settings are listed in -- the tie
+    is broken by name, so that what tcspecial does cannot depend on how a
+    file was written.
 
-Carried by the data rather than left to the order a list happens to keep. The
-order used to live only in that, so anything sorting the payloads -- for a
-lookup, for a display -- would have changed what the configuration said about
-which payload came first, and the only thing in the way was that nothing did
-it yet. The two halves of the check are then independent: walking by sequence
-number is what makes a list in some other order digest the same, and hashing
-the numbers themselves is what makes a *file* in some other order digest
-differently.
+Requirement
+    A file has no way to state an id or a position: the language has no
+    attribute for either, and an attribute it does not have is refused. A
+    node's number is what the canonical order gives it, not something a file
+    gets to assert.
 
-A sequence number and not a line number. A line is not something these parsers
-hand to the code that builds a document, and it would be a different number in
-each of the two formats one set is written in, where the sequence number is
-the same in both -- which is what lets them digest alike.
+Requirement
+    Each node's name is a value, never a key: ``payload: temp_1`` in YAML and
+    ``<payload name="temp_1">`` in XML. A name as a YAML key would make the
+    nodes a map, whose order the YAML parser may not keep, and the name is
+    what the node is sorted by, so it is the one thing that must be read
+    exactly.
+
+Why by name and not as the file has them: ids used to be file position, and
+the digest took the nodes in that order so that two ends would agree about
+them. That made order configuration. Moving one node above another, which an
+editor does whenever it rewrites a file, renumbered the nodes after it and
+moved their ports, and a tool that sorted a list for display was one step from
+changing what the configuration said. Counting by name makes reordering
+harmless: what a file says is its names and what each node is, and the ids
+and ports follow from that. The cost is that adding a node renumbers the nodes
+whose names sort after it, as adding one used to renumber the nodes written
+after it; the digest changes in both cases, so neither end can miss it.
+
+Names are unique across a configuration, so the order is total: no two nodes
+tie, and sorting by name never leaves a choice to the sort.
 
 How it is reached: a file is parsed into the document it describes and that
 document is written back out as a tree of values, which is where the format
 stops showing through -- a number is a number rather than the text that spelled
 it, a list is a list rather than XML's repeated sibling elements, and an
-attribute nobody stated is absent rather than missing. The tree is then written
-to bytes with every map's keys in order and every list in the order it was
-given, and those bytes are what the MD5 is of.
+attribute nobody stated is absent rather than missing. Each list is put in the
+canonical order, the tree is written to bytes with every map's keys in order,
+and those bytes are what the MD5 is of.
 
 A map's keys are put in order twice over, deliberately. The document is a set
 of Rust structs, and a struct writes its fields in the order it declares them
 however the file gave them, so the order a file used is already gone; sorting
 is what keeps the rule true of anything that is a map rather than a struct.
-What a file's own order does reach the digest through is the sequence number
-each payload was given as it was read, which is the one ordering that means
-something.
 
 Payloads
 ========
@@ -12837,8 +12950,8 @@ is watching the window for.
 
 Requirement
     A panel says which payload of the configuration it is, beside the name:
-    ``auto-send (dev id 0)``. The number is the payload's place in the payload
-    configuration, counted from nought in the order the file describes them,
+    ``auto-send (dev id 0)``. The number is the payload's device id, its
+    place among the names of the configuration's nodes, counted from nought,
     and nothing in the file states it -- a payload stated a ``dh_id`` once and
     that was a second identity to keep consistent by hand. Both windows count
     the same way, which is the use of it: the two are read side by side, and a

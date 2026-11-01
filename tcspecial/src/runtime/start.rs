@@ -872,11 +872,20 @@ mod tests {
         let path = where_.path().join("wrong.ytcs");
         std::fs::write(
             &path,
-            "payloads:\n\
-             \x20 - { name: a, type: i2c, path: /dev/i2c-1, address: \"0x48\", \
-             payload-out: nobody }\n\
-             vehicle:\n\
-             \x20 - { name: a, type: compute, function: mean }\n",
+            "payloads:
+  - type i2c:
+      - payload: a
+        address: \"0x48\"
+        path: /dev/i2c-1
+        payload-out:
+          - target: nobody
+vehicle:
+  - type compute:
+      - compute: b
+        function: mean
+        payload-out:
+          - target: b
+",
         )
         .expect("the file is written");
 
@@ -887,7 +896,7 @@ mod tests {
             "every problem should be given: {problems:?}"
         );
         assert!(
-            problems.iter().any(|p| p.contains("two nodes are called")),
+            problems.iter().any(|p| p.contains("linked to itself")),
             "{problems:?}"
         );
         assert!(

@@ -8,12 +8,13 @@
 //!
 //! # Device ids
 //!
-//! Every node has one: its position among the configuration's nodes, counting
-//! from nought, in the order the files declare them -- the order they are
-//! written, whatever the sections are, the top file first and then the files
-//! it includes, in the order it names them (see `crate::graph::order`). So
-//! adding or removing a node moves the ids of the nodes written after it, and
-//! a ground station working from the same file counts the same way.
+//! Every node has one: its position among the configuration's nodes sorted
+//! by name, counting from nought, across every file the configuration is
+//! made of. The order the files write their nodes in, and the order the top
+//! file includes the others in, mean nothing and change no id. So adding or
+//! removing a node moves the ids of the nodes whose names sort after it, and
+//! a ground station working from the same file counts the same way. See
+//! [`ids`].
 //!
 //! # Two kinds of link
 //!
@@ -150,7 +151,15 @@ pub struct Refused {
     pub why: String,
 }
 
-/// Gives every node's device id, which is its place in the configuration.
+/// Gives every node's device id, which is its place among the
+/// configuration's nodes sorted by name.
+///
+/// By name, because nothing else about a node is in an order: the order a
+/// file writes its types, its nodes and the files it includes means nothing,
+/// and two files that differ only in it are one configuration with one set of
+/// ids. A node's name is unique across the configuration, so the order is a
+/// whole one, and a node added or renamed moves only the ids of the nodes
+/// whose names sort after it.
 ///
 /// # Arguments
 ///
@@ -160,11 +169,12 @@ pub struct Refused {
 ///
 /// Each node's device id, by name.
 pub fn ids(graph: &Graph) -> BTreeMap<String, usize> {
-    graph
-        .nodes
-        .iter()
+    let names: std::collections::BTreeSet<&str> =
+        graph.nodes.iter().map(|node| node.name.as_str()).collect();
+    names
+        .into_iter()
         .enumerate()
-        .map(|(id, node)| (node.name.clone(), id))
+        .map(|(id, name)| (name.to_string(), id))
         .collect()
 }
 
@@ -252,8 +262,8 @@ pub fn payload_link_name(payload: &str) -> String {
 ///
 /// # Returns
 ///
-/// The links: those drawn into a gateway node, in the order they are drawn,
-/// then one for each payload nothing touches.
+/// The links: those drawn into a gateway node, by source and then by
+/// gateway, then one for each payload nothing touches.
 ///
 /// # Errors
 ///
@@ -264,7 +274,8 @@ pub fn of(graph: &Graph) -> Result<Vec<Telemetered>, Refused> {
     let ids = ids(graph);
     let mut links = Vec::new();
 
-    // Links drawn into a gateway node, in the order they are drawn.
+    // Links drawn into a gateway node, in the order the configuration holds
+    // them: by the node they leave, and then by where they go.
     let mut seen: BTreeSet<(String, String)> = BTreeSet::new();
     for link in &graph.links {
         let source = link.origin().node;
@@ -514,7 +525,9 @@ pub fn msgids(graph: &Graph) -> Result<Vec<MsgIdUse>, Refused> {
             carries: Carries::Beacon,
         },
     ];
-    for (id, node) in graph.nodes.iter().enumerate() {
+    let ids = ids(graph);
+    for node in &graph.nodes {
+        let id = ids[&node.name];
         let counted_for = |name: &str, base: u16| {
             counted(base, id).map_err(|why| Refused {
                 node: Some(node.name.clone()),
@@ -852,16 +865,29 @@ mod tests {
             .collect()
     }
 
-    /// Every node is counted, whatever its kind, in the order it is read.
+    /// Every node is counted, whatever its kind, in the order of the
+    /// names.
     #[test]
     fn every_node_has_a_device_id() {
         let ids = ids(&example("thermostat"));
         assert_eq!(ids["gateway"], 0);
-        assert_eq!(ids["k_1"], 1);
-        assert_eq!(ids["zone_temp"], 4);
+        assert_eq!(ids["heaters_1"], 1);
+        assert_eq!(ids["heaters_2"], 2);
+        assert_eq!(ids["k_1"], 4);
         assert_eq!(ids["temp_1"], 7);
-        assert_eq!(ids["heaters_1"], 10);
-        assert_eq!(ids["heaters_2"], 11);
+        assert_eq!(ids["zone_temp"], 11);
+    }
+
+    /// The order the nodes are in means nothing: shuffled, they have the
+    /// ids they had.
+    #[test]
+    fn the_order_of_the_nodes_changes_no_id() {
+        let graph = example("thermostat");
+        let mut shuffled = graph.clone();
+        shuffled.nodes.reverse();
+        shuffled.nodes.swap(0, 5);
+        assert_eq!(ids(&shuffled), ids(&graph));
+        assert_eq!(of(&shuffled), of(&graph));
     }
 
     /// What is drawn into a gateway node goes to its ground_base plus the
@@ -872,14 +898,14 @@ mod tests {
         assert_eq!(
             summary(&links),
             vec![
-                ("k_1", 1, "127.0.0.1", 5101),
-                ("k_2", 2, "127.0.0.1", 5102),
-                ("k_3", 3, "127.0.0.1", 5103),
-                ("zone_temp", 4, "127.0.0.1", 5104),
+                ("k_1", 4, "127.0.0.1", 5104),
+                ("k_2", 5, "127.0.0.1", 5105),
+                ("k_3", 6, "127.0.0.1", 5106),
                 // The decision itself, which the ground sees as well as the
                 // heaters: a reader of the telemetry can then say why the
                 // heaters are on without inferring it from the temperature.
-                ("thermostat", 5, "127.0.0.1", 5105),
+                ("thermostat", 10, "127.0.0.1", 5110),
+                ("zone_temp", 11, "127.0.0.1", 5111),
             ]
         );
         assert!(links
@@ -911,8 +937,8 @@ mod tests {
     #[test]
     fn two_sources_on_one_port_are_refused() {
         let mut graph = example("thermostat");
-        // temp_2, id 8, unlinked: 6100 + 8 = 6108; a gateway base of 6104 puts
-        // k_1's 6105 ... zone_temp's 6108 on the same port.
+        // temp_2, id 8, unlinked: 6100 + 8 = 6108; a gateway base of 6104
+        // puts k_1, id 4, on the same port.
         graph.links.retain(|link| link.origin().node != "temp_2");
         let gateway = graph
             .nodes
@@ -924,7 +950,7 @@ mod tests {
             crate::Scalar::of("127.0.0.1:6104"),
         );
         let refused = of(&graph).expect_err("two sources on 6108");
-        assert!(refused.why.contains("zone_temp"), "{}", refused.why);
+        assert!(refused.why.contains("k_1"), "{}", refused.why);
         assert!(refused.why.contains("temp_2"), "{}", refused.why);
         assert!(refused.why.contains("6108"), "{}", refused.why);
     }

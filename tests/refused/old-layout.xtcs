@@ -1,0 +1,5 @@
+<?xml version="1.0"?>
+<!-- Refused: a position in the old shape. -->
+<configuration>
+    <tcsgui><nodes><name>a</name><x>1</x><y>2</y></nodes></tcsgui>
+</configuration>

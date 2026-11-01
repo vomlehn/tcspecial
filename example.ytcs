@@ -21,25 +21,25 @@ tcspecial:
     recv: "0.0.0.0:4000"
     send: "127.0.0.1:4100"
 
-gateway:
-  - name: gateway-1
-    type: gateway_radio
-    address: "127.0.0.1"
-    ground_base: "127.0.0.1:5100"
-    port: "5000"
-    payload-in: true
+gateways:
+  - type gateway_radio:
+      - gateway: gateway-1
+        address: "127.0.0.1"
+        ground_base: "127.0.0.1:5100"
+        port: "5000"
+        payload-in: true
 
 payloads:
-  - name: spi-1
-    type: spi
-    max_speed: "1000000"
-    path: "/dev/spidev0.0"
-    spi_mode: "0"
-    stand_in: "127.0.0.1:7951"
-    payload-out:
-      - target: gateway-1
+  - type spi:
+      - payload: spi-1
+        max_speed: "1000000"
+        path: "/dev/spidev0.0"
+        spi_mode: "0"
+        stand_in: "127.0.0.1:7951"
+        payload-out:
+          - target: gateway-1
 
 tcsgui:
   nodes:
-    - { name: gateway-1, x: 469, y: 34 }
-    - { name: spi-1, x: 15, y: 34 }
+    - { node: gateway-1, x: 469, y: 34 }
+    - { node: spi-1, x: 15, y: 34 }

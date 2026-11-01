@@ -29,82 +29,81 @@ tcspecial:
     recv: "0.0.0.0:8200"
     send: "127.0.0.1:8210"
 
-gateway:
-  # The ground's end of the link, both ways. What the ground sends goes up to
-  # address:port, which this node binds aboard, and leaves it by gateway-out for
-  # the tee. What comes down arrives at ground_base plus the device id of the
-  # node that sent it.
-  - name: ground
-    type: gateway_radio
-    address: "127.0.0.1"
-    port: "8600"
-    ground_base: "127.0.0.1:8700"
-    payload-in: true
-    gateway-out:
-      - target: echo
+gateways:
+  - type gateway_radio:
+      # The ground's end of the link, both ways. What the ground sends goes up
+      # to address:port, which this node binds aboard, and leaves it by
+      # gateway-out for the tee. What comes down arrives at ground_base plus the
+      # device id of the node that sent it.
+      - gateway: ground
+        address: "127.0.0.1"
+        ground_base: "127.0.0.1:8700"
+        port: "8600"
+        gateway-out:
+          - target: echo
+        payload-in: true
 
 payloads:
-  # A heater, driven by what the ground sends: the far end of a UDP socket.
-  - name: heater
-    type: network
-    protocol: "udp"
-    address: "127.0.0.1"
-    port: "8001"
-    gateway-in: true
-  # A sensor whose readings go to the ground and are copied aboard.
-  - name: sensor
-    type: network
-    protocol: "udp"
-    address: "127.0.0.1"
-    port: "8002"
-    payload-out:
-      - target: readings
-  # A payload whose data nobody wants yet.
-  - name: spare
-    type: network
-    protocol: "udp"
-    address: "127.0.0.1"
-    port: "8003"
-    payload-out:
-      - target: unheard
+  - type network:
+      # A heater, driven by what the ground sends: the far end of a UDP socket.
+      - payload: heater
+        address: "127.0.0.1"
+        port: "8001"
+        protocol: "udp"
+        gateway-in: true
+      # A sensor whose readings go to the ground and are copied aboard.
+      - payload: sensor
+        address: "127.0.0.1"
+        port: "8002"
+        protocol: "udp"
+        payload-out:
+          - target: readings
+      # A payload whose data nobody wants yet.
+      - payload: spare
+        address: "127.0.0.1"
+        port: "8003"
+        protocol: "udp"
+        payload-out:
+          - target: unheard
 
 vehicle:
-  # Each command the ground sends goes on to the heater, as it was going, and
-  # back down to the ground as payload data, so that the ground sees what the
-  # vehicle was told. A tee has two data sources, so each link names its own.
-  - name: echo
-    type: tee-gateway
-    gateway-in: true
-    gateway-out:
-      - target: heater
-    payload-out:
-      - target: ground
-  # Each reading goes on to the ground, as it was going, and again
-  # vehicleward -- here to a node that drops it, standing where something
-  # aboard that took readings as commands would be.
-  - name: readings
-    type: tee-payload
-    payload-in: true
-    payload-out:
-      - target: ground
-    gateway-out:
-      - target: dropped
-  # Takes what arrives from the ground's side and drops it.
-  - name: dropped
-    type: null-gateway
-    gateway-in: true
-  # Takes the spare payload's data and drops it.
-  - name: unheard
-    type: null-payload
-    payload-in: true
+  - type null-gateway:
+      # Takes what arrives from the ground's side and drops it.
+      - compute: dropped
+        gateway-in: true
+  - type null-payload:
+      # Takes the spare payload's data and drops it.
+      - compute: unheard
+        payload-in: true
+  - type tee-gateway:
+      # Each command the ground sends goes on to the heater, as it was going,
+      # and back down to the ground as payload data, so that the ground sees
+      # what the vehicle was told. A tee has two data sources, so each link
+      # names its own.
+      - compute: echo
+        gateway-out:
+          - target: heater
+        payload-out:
+          - target: ground
+        gateway-in: true
+  - type tee-payload:
+      # Each reading goes on to the ground, as it was going, and again
+      # vehicleward -- here to a node that drops it, standing where something
+      # aboard that took readings as commands would be.
+      - compute: readings
+        gateway-out:
+          - target: dropped
+        payload-out:
+          - target: ground
+        payload-in: true
 
 tcsgui:
   nodes:
-    - { name: ground, x: 469, y: 34 }
-    - { name: heater, x: 34, y: 34 }
-    - { name: sensor, x: 34, y: 134 }
-    - { name: spare, x: 34, y: 234 }
-    - { name: echo, x: 34, y: 34 }
-    - { name: readings, x: 34, y: 134 }
-    - { name: dropped, x: 234, y: 134 }
-    - { name: unheard, x: 34, y: 234 }
+    - { node: dropped, x: 234, y: 134 }
+    - { node: echo, x: 34, y: 34 }
+    - { node: ground, x: 469, y: 34 }
+    - { node: heater, x: 34, y: 34 }
+    - { node: readings, x: 34, y: 134 }
+    - { node: sensor, x: 34, y: 134 }
+    - { node: spare, x: 34, y: 234 }
+    - { node: unheard, x: 34, y: 234 }

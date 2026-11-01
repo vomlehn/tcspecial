@@ -139,8 +139,9 @@ struct Line {
     comment: Option<String>,
 }
 
-/// Lists every line of the configuration, one per destination, in the
-/// file's order: the order the route table numbers them in. See
+/// Lists every line of the configuration, one per destination, in the order
+/// the configuration holds them: the order the route table numbers them in.
+/// See
 /// `crate::runtime::route::Delivery::line`.
 ///
 /// # Arguments
@@ -302,8 +303,11 @@ fn draw(
     let top = graph.files.first();
     let here = |name: &str| graph.homes.get(name) == top || top.is_none();
 
-    let mut placing: Vec<Placing> = graph
-        .nodes
+    // In the order of the names, as the editor settles them: see
+    // tcsgui's Document::settle.
+    let mut nodes: Vec<&tcslibgs::graph::Node> = graph.nodes.iter().collect();
+    nodes.sort_by(|a, b| a.name.cmp(&b.name));
+    let mut placing: Vec<Placing> = nodes
         .iter()
         .map(|node| Placing {
             node_type: &node.node_type,
@@ -315,8 +319,7 @@ fn draw(
         .collect();
     pane::settle(&mut placing, dividers);
 
-    let sheet: Vec<OnSheet> = graph
-        .nodes
+    let sheet: Vec<OnSheet> = nodes
         .iter()
         .zip(&placing)
         .map(|(node, placed)| OnSheet {

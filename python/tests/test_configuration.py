@@ -66,7 +66,7 @@ class ConfigurationTest(unittest.TestCase):
         self.assertEqual(link.send, HostPort("0.0.0.0", 7500))
         self.assertEqual(link.recv, HostPort("127.0.0.1", 7510))
         self.assertEqual(config.uplink("gateway"), HostPort("127.0.0.1", 7600))
-        # ping is the second node written, device id 1.
+        # ping is the second of the two names, device id 1.
         self.assertEqual(config.device_id("ping"), 1)
         self.assertEqual(config.downlink("gateway", "ping"),
                          HostPort("127.0.0.1", 7701))
@@ -85,27 +85,38 @@ class ConfigurationTest(unittest.TestCase):
             with self.assertRaises(ValueError, msg=refused):
                 parse(refused)
 
-    def test_a_device_id_counts_every_node_in_the_order_written(self):
-        # Sections interleave in XML, and the id is the position among all of
-        # them, not within a section.
+    def test_a_device_id_is_a_nodes_place_among_the_names(self):
+        # Whatever section each is in, and whatever order the file writes
+        # them in: the id is the place among every node's name.
         directory, path = written(
-            "<payloads><name>a</name><type>i2c</type></payloads>"
-            "<gateway><name>m</name><type>gateway_radio</type>"
-            "<ground_base>127.0.0.1:9000</ground_base></gateway>"
-            "<vehicle><name>p</name><type>ping</type>"
-            "<payload-out><target>m</target></payload-out></vehicle>"
-            "<payloads><name>b</name><type>i2c</type></payloads>"
-        )
+            '<payloads><type name="i2c"><payload name="b"/><payload name="a"/>'
+            '</type></payloads><gateways><type name="gateway_radio"><gateway '
+            'name="m"><ground_base>127.0.0.1:9000</ground_base></gateway>'
+            '</type></gateways>'
+            '<vehicle><type name="ping"><compute name="p"><payload-out>'
+            '<target>m</target></payload-out></compute></type></vehicle>')
         with directory:
             config = configuration.load(path)
-            self.assertEqual([config.device_id(n) for n in "ampb"],
+            self.assertEqual([config.device_id(n) for n in "abmp"],
                              [0, 1, 2, 3])
+            self.assertEqual([node.name for node in config.nodes],
+                             ["a", "b", "m", "p"])
             self.assertEqual(config.downlink("m", "p"),
-                             HostPort("127.0.0.1", 9002))
+                             HostPort("127.0.0.1", 9003))
             with self.assertRaisesRegex(ValueError, "sends nothing"):
                 config.downlink("m", "a")
             with self.assertRaisesRegex(ValueError, "binds nothing aboard"):
                 config.uplink("m")
+
+    def test_every_file_the_two_readers_refuse_is_refused(self):
+        # tests/refused, which tcslibgs::graph::grouped holds the Rust reader
+        # to as well: the two refuse the same things, at the line of each.
+        files = sorted((ROOT / "tests" / "refused").iterdir())
+        self.assertGreater(len(files), 20)
+        for path in files:
+            with self.subTest(path=path.name):
+                with self.assertRaisesRegex(ValueError, "line"):
+                    configuration.load(path)
 
     def test_an_include_is_refused_rather_than_counted_wrong(self):
         directory, path = written("<include>more</include>")
@@ -115,8 +126,8 @@ class ConfigurationTest(unittest.TestCase):
 
     def test_the_two_spellings_read_alike(self):
         # The YAML and the XML of one example say the same thing, so they are
-        # read into the same configuration: every node in the same order, with
-        # the same attributes and links, and the same tcspecial section.
+        # read into the same configuration: every node, by name, with the
+        # same attributes and links, and the same tcspecial section.
         for example in ["ping", "beacon", "minimal", "thermostat",
                         "simple-app"]:
             stem = ROOT / "examples" / example / example

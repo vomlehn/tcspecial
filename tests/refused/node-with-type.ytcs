@@ -1,0 +1,5 @@
+# Refused: a node that says a type of its own.
+payloads:
+  - type i2c:
+      - payload: a
+        type: i2c

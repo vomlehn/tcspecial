@@ -13,8 +13,8 @@ use std::path::PathBuf;
 use std::process::{Child, Command, Stdio};
 
 /// A configuration whose gateway node takes `lorem`'s words on a port nothing
-/// holds, and that port: `lorem` is the second node read, device id 1, so it
-/// is the base plus one.
+/// holds, and that port: `lorem` sorts after `gateway-1`, the only other
+/// node, so it is device id 1 and its port is the base plus one.
 ///
 /// # Returns
 ///
@@ -35,11 +35,18 @@ fn configuration() -> (tempfile::TempDir, PathBuf, u16) {
     std::fs::write(
         &path,
         format!(
-            "gateway:
-  - {{ name: gateway, type: gateway_radio, ground_base: \"127.0.0.1:{}\" }}
+            "gateways:
+  - type gateway_radio:
+      - gateway: gateway
+        ground_base: \"127.0.0.1:{}\"
 payloads:
-  - {{ name: lorem, type: network, protocol: udp, address: \"127.0.0.1\", \
-port: \"7001\", payload-out: gateway }}
+  - type network:
+      - payload: lorem
+        address: \"127.0.0.1\"
+        port: \"7001\"
+        protocol: udp
+        payload-out:
+          - target: gateway
 ",
             port - 1
         ),
@@ -192,15 +199,25 @@ fn it_connects_until_matched_and_then_prints_the_line() {
   gateway: radio
   interface: \"{}\"
   tcs_cmd: {{ recv: \"127.0.0.1:{take_at}\", send: \"127.0.0.1:{}\" }}
-  payload_command: {{ source_base: \"127.0.0.1:{}\", dest_base: \"127.0.0.1:{}\" }}
-  payload_telemetry: {{ source_base: \"127.0.0.1:{}\", dest_base: \"127.0.0.1:{}\" }}
-  beacon: {{ default_interval: \"1 s\", reset_interval: \"1 s\", send: \"127.0.0.1:{}\", recv: \"127.0.0.1:{}\" }}
+  payload_command: {{ source_base: \"127.0.0.1:{}\", dest_base: \
+            \"127.0.0.1:{}\" }}
+  payload_telemetry: {{ source_base: \"127.0.0.1:{}\", dest_base: \
+            \"127.0.0.1:{}\" }}
+  beacon: {{ default_interval: \"1 s\", reset_interval: \"1 s\", send: \
+            \"127.0.0.1:{}\", recv: \"127.0.0.1:{}\" }}
   state_file: \"/tmp/lorem-test.state\"
-gateway:
-  - {{ name: gateway, type: gateway_radio, ground_base: \"127.0.0.1:{}\" }}
+gateways:
+  - type gateway_radio:
+      - gateway: gateway
+        ground_base: \"127.0.0.1:{}\"
 payloads:
-  - {{ name: lorem, type: network, protocol: udp, address: \"127.0.0.1\", \
-port: \"7001\", payload-out: gateway }}
+  - type network:
+      - payload: lorem
+        address: \"127.0.0.1\"
+        port: \"7001\"
+        protocol: udp
+        payload-out:
+          - target: gateway
 ",
             tcslib::InterfaceDigest::of_this_build(),
             free(),

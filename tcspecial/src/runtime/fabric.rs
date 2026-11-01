@@ -2048,28 +2048,34 @@ mod tests {
         let path = dir.path().join("tees.ytcs");
         std::fs::write(
             &path,
-            "gateway:
-  - name: ground
-    type: gateway_radio
-    gateway-out: [commands]
+            "gateways:
+  - type gateway_radio:
+      - gateway: ground
+        gateway-out:
+          - target: commands
 payloads:
-  - name: valve
-    type: network
-    protocol: udp
-    address: \"127.0.0.1\"
-    port: \"7001\"
-    payload-out: [readings]
+  - type network:
+      - payload: valve
+        address: \"127.0.0.1\"
+        port: \"7001\"
+        protocol: udp
+        payload-out:
+          - target: readings
 vehicle:
-  - name: commands
-    type: tee-gateway
-    gateway-out: [valve]
-    payload-out: [ground]
-  - name: readings
-    type: tee-payload
-    payload-out: [ground]
-    gateway-out: [dropped]
-  - name: dropped
-    type: null-gateway
+  - type null-gateway:
+      - compute: dropped
+  - type tee-gateway:
+      - compute: commands
+        gateway-out:
+          - target: valve
+        payload-out:
+          - target: ground
+  - type tee-payload:
+      - compute: readings
+        gateway-out:
+          - target: dropped
+        payload-out:
+          - target: ground
 ",
         )
         .expect("written");

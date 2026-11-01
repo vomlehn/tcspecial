@@ -269,9 +269,11 @@ fn every_example_is_in_the_manual() {
 /// An example in the manual is copied as often as one in `examples/`, and a
 /// rule that changes leaves it behind without anything saying so: the manual
 /// once showed TCP payloads by attributes the reader had retired, which
-/// tcsverify refused. So every YAML block of the manual that is a node, or a
-/// set of them under `payload_groups`, is put in a file with the worked
-/// example's `tcspecial` section and checked, warnings counting.
+/// tcsverify refused. So every YAML block of the manual that is a node --
+/// a section of them, a type and its nodes, or a node in the shape before
+/// nodes were grouped by type, which is refused -- or a set of them under
+/// `payload_groups`, is put in a file with the worked example's `tcspecial`
+/// section and checked, warnings counting.
 ///
 /// Except a block that draws a link. It is a piece of a graph shown for the
 /// link, and the node at the other end is somewhere else in the text or
@@ -291,8 +293,23 @@ fn every_node_in_the_manual_verifies() {
     let mut checked = 0;
     for (line, block) in yaml_blocks(&text) {
         let first = block.lines().next().unwrap_or_default();
-        let file = if first.starts_with("payload_groups:") {
+        let sections = tcslibgs::graph::Section::ALL;
+        let file = if first.starts_with("payload_groups:")
+            || sections
+                .iter()
+                .any(|s| first.starts_with(&format!("{}:", s.name())))
+        {
             format!("{section}{block}")
+        } else if let Some(node_type) = first
+            .strip_prefix("- type ")
+            .and_then(|rest| rest.strip_suffix(':'))
+        {
+            // A type and its nodes, as a section groups them: put under the
+            // section that type belongs to.
+            let nested: String =
+                block.lines().map(|l| format!("{l}\n")).collect();
+            let under = tcslibgs::graph::section_of(node_type.trim()).name();
+            format!("{section}{under}:\n{nested}")
         } else if first.starts_with("- name:") {
             let node_type = block
                 .lines()

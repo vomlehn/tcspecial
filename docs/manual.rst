@@ -131,7 +131,7 @@ gateway
     over the radio, as a ``gateway_radio`` node, a Yamcs ground station, as a
     ``gateway_yamcs``, an F´ flight computer, as a ``gateway_fprime``, or a cFS
     flight computer's software bus, as a ``gateway_cfs`` -- written in the
-    ``gateway`` section: a link carrying
+    ``gateways`` section: a link carrying
     telemetry down and commands up. It was called ``moc`` while the
     ground was the only thing at the other end, and a configuration that still
     says ``moc``, ``moc-in``, ``moc-out``, ``tee-moc``, ``null-moc``,
@@ -214,12 +214,12 @@ terminal
 
     .. code-block:: yaml
 
-       - name: k_fore
-         type: compute
-         payload-out:
-           - target: gateway
-           - target: mean_temp
-             input: in0
+       - type compute:
+           - compute: k_fore
+             payload-out:
+               - target: gateway
+               - target: mean_temp
+                 input: in0
 
     An entry's ``target`` is the node the line goes to; its ``input`` is which
     of that node's inputs it feeds, or which of its data sinks it arrives at,
@@ -282,10 +282,10 @@ terminal
 
     .. code-block:: yaml
 
-       - name: echo
-         type: tee-gateway
-         gateway-out: [heater]
-         payload-out: [gateway]
+       - type tee-gateway:
+           - compute: echo
+             gateway-out: [heater]
+             payload-out: [gateway]
 
     They take no attributes.
 
@@ -361,13 +361,13 @@ Platform
    carried to a real-time operating system.
 
 Number of nodes
-   A node's id is its position among all the configuration's nodes -- the
-   gateway, vehicle and payload sections, the top file first and then the files
-   it includes -- counting from nought, and it is 32 bits. A node's
-   telemetry port is a base plus its id, so a base of *B* leaves room for
-   ids up to 65535 - *B*, counting every node, not only payloads. A
-   configuration whose ports would pass 65535, or that puts two sources on
-   the same address and port, is refused when the file is read.
+   A node's id is its position among the names of all the configuration's nodes
+   -- the gateways, vehicle and payloads sections, in the top file and in the
+   files it includes, sorted by name -- counting from nought, and it is 32 bits.
+   A node's telemetry port is a base plus its id, so a base of *B* leaves room
+   for ids up to 65535 - *B*, counting every node, not only payloads. A
+   configuration whose ports would pass 65535, or that puts two sources on the
+   same address and port, is refused when the file is read.
 
 Times
    Times are 64-bit counts of microseconds since the UNIX epoch, which run
@@ -434,12 +434,12 @@ are suggestions, nothing more.
 
 the configuration
     Everything tcspecial is configured with. Its ``tcspecial`` section is the
-    command interpreter's own settings -- the ports it takes commands on,
-    where beacons go and how often, and where the telemetry log goes -- and
-    its ``gateway``, ``vehicle`` and ``payloads`` sections say which nodes there
-    are, what each of them does and how the lines between them run. Named on
-    the command line of every program that reads it, which is tcspecial,
-    tcsmoc, tcssim and tcsverify.
+    command interpreter's own settings -- the ports it takes commands on, where
+    beacons go and how often, and where the telemetry log goes -- and its
+    ``gateways``, ``vehicle`` and ``payloads`` sections say which nodes there
+    are, what each of them does and how the lines between them run. Named on the
+    command line of every program that reads it, which is tcspecial, tcsmoc,
+    tcssim and tcsverify.
 
 the simulator configuration file
     How a simulated payload behaves: how often it produces a packet, how it
@@ -475,10 +475,12 @@ the rest of what it is for itself.
      interval     how often the group is read, as a length of time
 
    payloads
-     name         the handler's name, which commands address it by and the
+     type <type>  one for each type of payload there is, holding its
+                  payloads
+       payload    the handler's name, which commands address it by and the
                   panels show
-     group        the group it is read with, if any
-     ...          any of the attributes below
+       group      the group it is read with, if any
+       ...        any of the attributes below
 
 The shipped examples each carry a ``tcspecial`` section, first in the file, so
 one file says what the set is and where its command interpreter belongs.
@@ -489,9 +491,10 @@ loaded -- a section that could never place a command interpreter is refused
 where it is read.
 
 What follows is the attributes every payload has, whatever it is, and then one
-section per type of payload for the attributes only that type has. A payload
-states its type in ``type`` and is then held to that type's attributes and no
-others: a device file stating a ``port``, or a network payload stating a
+section per type of payload for the attributes only that type has. A payload's
+type is the ``type`` it is written under -- ``- type i2c:`` in YAML, ``<type
+name="i2c">`` in XML -- and the payload is then held to that type's attributes
+and no others: a device file stating a ``port``, or a network payload stating a
 ``path``, is refused.
 
 Supported and experimental interfaces
@@ -536,12 +539,15 @@ Attributes Every Payload Has
 ----------------------------
 .. code-block:: text
 
-   name           the handler's name, which commands address it by and the
-                  panels show
+   payload        the handler's name, which commands address it by and the
+                  panels show: payload: temp_1 in YAML, <payload
+                  name="temp_1"> in XML
    group          the group it is read with, if any. Optional: a payload in
                   no group states its own rate, or is read on every pass --
                   see `How a Payload's Data Is Read`_
-   type           network | device-file | serial | i2c | spi | can | gpio,
+   type           not an attribute but the type it is written under, as
+                  - type network: or <type name="network">, one of
+                  network | device-file | serial | i2c | spi | can | gpio,
                   or one of the experimental iio | rpmsg | hdlc
 
 How a payload is driven
@@ -566,12 +572,12 @@ so there is nothing to send it. A simulated one that sends is driven at the
 rate its simulator configuration gives it, which is how fast a stand-in
 produces data rather than how fast the payload would.
 
-``name`` belongs to a handler and never to a group: it is what tells one
-handler of a group from another, and what every command about a handler names
-it by. There is no number beside it -- a handler used to state a ``dh_id`` as
-well, which was a second identity for one payload to keep consistent by hand.
-An OC address and an OC port are given together or not at all, and a handler
-needs them before it can be started.
+A payload's name -- ``payload: temp_1`` -- belongs to a handler and never to a
+group: it is what tells one handler of a group from another, and what every
+command about a handler names it by. There is no number beside it -- a handler
+used to state a ``dh_id`` as well, which was a second identity for one payload
+to keep consistent by hand. An OC address and an OC port are given together or
+not at all, and a handler needs them before it can be started.
 
 The two types of payload
 ------------------------
@@ -672,12 +678,12 @@ whenever the ground starts the node after stopping it:
 
 .. code-block:: yaml
 
-   - name: heaters_1
-     type: gpio
-     path: /dev/gpiochip0
-     lines: "4"
-     direction: output
-     init: '"0"'
+   - type gpio:
+       - payload: heaters_1
+         path: /dev/gpiochip0
+         lines: "4"
+         direction: output
+         init: '"0"'
 
 It is not only for what is driven. A sensor whose register has to be set
 before it reads sensibly states that register's write here, and is then read
@@ -685,11 +691,11 @@ as any other:
 
 .. code-block:: yaml
 
-   - name: temp_1
-     type: i2c
-     path: /dev/i2c-1
-     address: "0x48"
-     init: '"\x01\x60"'
+   - type i2c:
+       - payload: temp_1
+         path: /dev/i2c-1
+         address: "0x48"
+         init: '"\x01\x60"'
 
 A write that fails is a node that did not open: the vehicle does not start,
 or a ``START_NODE`` is answered with the failure, saying which node and that
@@ -985,27 +991,26 @@ attribute, in the node description tree, as its ``kind``: ``interval`` or
        interval: "500 ms"
 
    payloads:
-     # Sends on its own: nothing here about timing. A TCP payload is a
-     # stream, so it says where a packet ends: twelve bytes at a time.
-     - name: auto-send
-       type: network
-       protocol: tcp
-       address: 127.0.0.1
-       port: 5000
-       max_length: 12
-       read_timeout: none
+     - type network:
+         # Sends on its own: nothing here about timing. A TCP payload is a
+         # stream, so it says where a packet ends: twelve bytes at a time.
+         - payload: auto-send
+           protocol: tcp
+           address: 127.0.0.1
+           port: 5000
+           max_length: 12
+           read_timeout: none
 
-     # Answers a request: the trigger is the question, and the group it is in
-     # is how often the question is asked.
-     - name: triggered-send
-       type: network
-       protocol: tcp
-       address: 127.0.0.1
-       port: 5001
-       max_length: 12
-       read_timeout: none
-       group: every_half_second
-       trigger: '"READ\r"'      # text, so a C string
+         # Answers a request: the trigger is the question, and the group it
+         # is in is how often the question is asked.
+         - payload: triggered-send
+           protocol: tcp
+           address: 127.0.0.1
+           port: 5001
+           max_length: 12
+           read_timeout: none
+           group: every_half_second
+           trigger: '"READ\r"'      # text, so a C string
 
 A file that gives one payload two clocks is refused rather than run: a
 payload in a group that states a ``trigger_interval`` as well, or a payload
@@ -1039,12 +1044,12 @@ alone, strangers counted as above:
 
 .. code-block:: yaml
 
-   - name: sounder_feed
-     type: network
-     protocol: udp
-     address: 0.0.0.0
-     port: 7000
-     sends_from: 10.0.0.7:7001
+   - type network:
+       - payload: sounder_feed
+         protocol: udp
+         address: 0.0.0.0
+         port: 7000
+         sends_from: 10.0.0.7:7001
 
 ``sends_from`` is a host and a port over ``udp`` -- an IP address, not a name
 -- and a path over ``unix_dgram``, and never the node's own address, which is
@@ -1058,7 +1063,7 @@ simulator's stand-in sends from there, and a simulator file that names a
 
 A Network Payload
 -----------------
-Keyword ``type: network``. A socket, which the transport decides the shape of.
+Keyword ``type network``. A socket, which the transport decides the shape of.
 
 .. code-block:: text
 
@@ -1093,14 +1098,14 @@ record split across two segments is not sent as two halves:
 
 .. code-block:: yaml
 
-   - name: logger
-     type: network
-     protocol: tcp
-     address: 10.0.0.9
-     port: 7000
-     max_length: 512
-     terminators: '"\r\n"'
-     read_timeout: 1 s
+   - type network:
+       - payload: logger
+         protocol: tcp
+         address: 10.0.0.9
+         port: 7000
+         max_length: 512
+         terminators: '"\r\n"'
+         read_timeout: 1 s
 
 A datagram is a packet already, so a ``udp``, ``unix_dgram`` or ``raw`` node
 that gives these attributes is refused.
@@ -1119,15 +1124,15 @@ and refuses a simulator file that asks it to.
 
 .. code-block:: yaml
 
-   - name: sounder
-     type: network
-     protocol: raw
-     ip_protocol: 253
-     address: 10.0.0.7
+   - type network:
+       - payload: sounder
+         protocol: raw
+         ip_protocol: 253
+         address: 10.0.0.7
 
 A Device File Payload
 ---------------------
-Keyword ``type: device-file``. A file in the filesystem, opened and read as
+Keyword ``type device-file``. A file in the filesystem, opened and read as
 the data comes.
 
 .. code-block:: text
@@ -1155,7 +1160,7 @@ own, which is why each has a type of its own below.
 
 A CAN Payload
 -------------
-Keyword ``type: can``. **Supported**, as flown against the kernel's virtual
+Keyword ``type can``. **Supported**, as flown against the kernel's virtual
 bus: see `Supported and experimental interfaces`_. A payload on a CAN bus,
 which is not a device file at all: a CAN controller is a network interface,
 and a payload on it is addressed by the identifier its frames carry.
@@ -1233,7 +1238,7 @@ makes the bus; see `Making the Kernel's Stand-ins`_.
 
 A GPIO Payload
 --------------
-Keyword ``type: gpio``. **Supported**, as flown against the kernel's simulated
+Keyword ``type gpio``. **Supported**, as flown against the kernel's simulated
 chip: see `Supported and experimental interfaces`_. A set of discrete lines --
 a deployment switch, an arming line, a payload's own "alive" line -- watched
 for changes, or a set of circuits driven: a heater, a valve, a latch.
@@ -1353,7 +1358,7 @@ pulls, to the user who ran it; see `Making the Kernel's Stand-ins`_.
 
 An HDLC Payload
 ---------------
-Keyword ``type: hdlc``. **Experimental, not yet supported.** A synchronous
+Keyword ``type hdlc``. **Experimental, not yet supported.** A synchronous
 serial line -- bits carried on a clock, framed as HDLC -- which Linux drives as
 a network interface rather than as a device file.
 
@@ -1415,7 +1420,7 @@ hardware: --simulate`_.
 
 An rpmsg Payload
 ----------------
-Keyword ``type: rpmsg``. **Experimental, not yet supported.** Software on
+Keyword ``type rpmsg``. **Experimental, not yet supported.** Software on
 another core of the same package -- a real-time core beside the Linux one --
 reached over an rpmsg channel, which Linux presents as a character device
 carrying whole messages both ways.
@@ -1449,7 +1454,7 @@ payload writes faster than the handler reads.
 
 An IIO Payload
 --------------
-Keyword ``type: iio``. **Experimental, not yet supported**, until its test has
+Keyword ``type iio``. **Experimental, not yet supported**, until its test has
 run against a kernel whose dummy sensor has a buffer: see `Supported and
 experimental interfaces`_. A sensor's buffered samples, read from a character
 device: what a thermistor, an accelerometer or an ADC looks like on Linux.
@@ -1498,7 +1503,7 @@ what promotes the type, once it has passed.
 
 A Serial Payload
 ----------------
-Keyword ``type: serial``. A line, with terms that say how it is driven. A
+Keyword ``type serial``. A line, with terms that say how it is driven. A
 payload states them beside everything else it states, or takes them from its
 ``payload_groups`` group the way it takes the rest.
 
@@ -1644,15 +1649,15 @@ terminator keeps its terminator. So with ``length_prefix: u8`` the bytes
 
 .. code-block:: yaml
 
-   - name: imu
-     type: serial
-     path: /dev/ttyS2
-     datarate: 115200
-     byte_length: 8
-     stop_bits: 1
-     max_length: 260
-     length_prefix: u16be
-     read_timeout: 50 ms
+   - type serial:
+       - payload: imu
+         path: /dev/ttyS2
+         datarate: 115200
+         byte_length: 8
+         stop_bits: 1
+         max_length: 260
+         length_prefix: u16be
+         read_timeout: 50 ms
 
 A prefixed line says ``read_timeout`` too, if only as ``none``. A byte lost on
 the line puts every later prefix in the wrong place, and nothing in the bytes
@@ -1685,7 +1690,7 @@ node on one that gives the attributes is refused.
 
 An I\ :superscript:`2`\ C Payload
 ---------------------------------
-Keyword ``type: i2c``. A device on a bus, which is why it gives two things to
+Keyword ``type i2c``. A device on a bus, which is why it gives two things to
 be found by: the bus and the address on it. Two payloads commonly sit on the
 same bus and differ only in which device the master addresses.
 
@@ -1734,7 +1739,7 @@ afterwards: ``./bin/mki2c 0x50`` reloads it with a chip there.
 
 A SPI Payload
 -------------
-Keyword ``type: spi``. A peripheral on a clocked, full-duplex link.
+Keyword ``type spi``. A peripheral on a clocked, full-duplex link.
 
 .. code-block:: text
 
@@ -1891,47 +1896,45 @@ which is what a panel in the MOC shows.
        interval: "100 ms"
 
    payloads:
-     - name: temp_1
-       type: i2c
-       address: "0x48"
-       group: "zone_temps"
-       path: "/dev/i2c-1"
-       read_size: "2"
-       payload-out:
-         - target: k_1
+     - type gpio:
+         - payload: heaters_1
+           direction: "output"
+           lines: "3,4,5"
+           path: "/dev/gpiochip0"
+           gateway-in: true
 
-     - name: temp_2
-       type: i2c
-       address: "0x49"
-       group: "zone_temps"
-       path: "/dev/i2c-1"
-       read_size: "2"
-       payload-out:
-         - target: k_2
+         - payload: heaters_2
+           direction: "output"
+           lines: "6,7,8"
+           path: "/dev/gpiochip0"
+           gateway-in: true
 
-     - name: temp_3
-       type: spi
-       group: "zone_temps"
-       max_speed: "1000000"
-       path: "/dev/spidev0.0"
-       read_size: "3"
-       spi_mode: "0"
-       payload-out:
-         - target: k_3
+     - type i2c:
+         - payload: temp_1
+           address: "0x48"
+           group: "zone_temps"
+           path: "/dev/i2c-1"
+           read_size: "2"
+           payload-out:
+             - target: k_1
 
-     - name: heaters_1
-       type: gpio
-       direction: "output"
-       lines: "3,4,5"
-       path: "/dev/gpiochip0"
-       gateway-in: true
+         - payload: temp_2
+           address: "0x49"
+           group: "zone_temps"
+           path: "/dev/i2c-1"
+           read_size: "2"
+           payload-out:
+             - target: k_2
 
-     - name: heaters_2
-       type: gpio
-       direction: "output"
-       lines: "6,7,8"
-       path: "/dev/gpiochip0"
-       gateway-in: true
+     - type spi:
+         - payload: temp_3
+           group: "zone_temps"
+           max_speed: "1000000"
+           path: "/dev/spidev0.0"
+           read_size: "3"
+           spi_mode: "0"
+           payload-out:
+             - target: k_3
 
 The same configuration in the other spelling is
 ``tests/manual/thermostat.xtcs``, which a test holds to saying the same
@@ -2013,11 +2016,11 @@ configuration beside it, ``<name>-sim.yaml``. Every example is checked by
 ``tcsverify`` on every test run and must pass with no errors and no warnings,
 so an example is always a configuration that can be copied.
 
-Every node has a *device id*: its position among the configuration's nodes,
-counting from nought, in the order the file writes them -- whatever the
-sections are, and in the XML spelling however they interleave -- the top file
-first and then the files it includes. The ids say which port each node's data
-reaches the ground on.
+Every node has a *device id*: its position among the names of all the
+configuration's nodes, sorted, counting from nought -- whatever section or
+type each is written under, and across the top file and the files it
+includes. Where a node is written in a file makes no difference to it. The
+ids say which port each node's data reaches the ground on.
 
 A gateway node is the ground's end of the vehicle's data. tcspecial sends what
 each node drawn into a gateway node produces as UDP datagrams to the address in
@@ -2071,11 +2074,11 @@ since the vehicle started, not since it was last enabled, so a payload
 stopped and started again has moved what it moved before.
 
 A command names a node by the device id its panel shows, which is the node's
-position in the configuration. That is why nothing is sent until ``CONNECT``
-has agreed: the same id means a different node in a different configuration,
-and a command sent under that misunderstanding would stop something nobody
-chose. Until then, and for a vehicle whose answer disagreed, the controls say
-so rather than sending.
+position among the names of the configuration's nodes. That is why nothing is
+sent until ``CONNECT`` has agreed: the same id means a different node in a
+different configuration, and a command sent under that misunderstanding would
+stop something nobody chose. Until then, and for a vehicle whose answer
+disagreed, the controls say so rather than sending.
 
 A payload that nothing in the configuration touches -- no line to it or from
 it, and no command binding naming it -- reports over the ``tcspecial``
@@ -2150,8 +2153,8 @@ theirs, so that no one part number can take the whole trio out.
 Each reading is converted to kelvin by its own ``to_kelvin`` node, ``k_1``,
 ``k_2`` or ``k_3``, and each converted reading goes three ways: to the ground
 through the gateway node -- at its ``ground_base``, ``127.0.0.1:5100``, plus
-each source's device id, so ``k_1``, ``k_2`` and ``k_3``, ids 1 to 3, arrive on
-ports 5101 to 5103 -- into ``zone_temp`` as the input ``in0``, ``in1`` or
+each source's device id, so ``k_1``, ``k_2`` and ``k_3``, ids 4 to 6, arrive on
+ports 5104 to 5106 -- into ``zone_temp`` as the input ``in0``, ``in1`` or
 ``in2``, and into the log ``housekeeping``.
 
 ``zone_temp`` is a ``vote``: one temperature out of the three by the algorithm
@@ -2168,11 +2171,11 @@ word. Fed 296.0, 296.1 and 270.0 -- two sensors warm and one stuck
 cold -- it says 296 and the heaters stay off, where a mean would have said
 287.4 and switched them on because one sensor had failed.
 
-The voted temperature goes to the ground, on port 5104, and to ``thermostat``:
+The voted temperature goes to the ground, on port 5111, and to ``thermostat``:
 a hysteresis holding the zone at its ``setpoint``, 293.15 K, with a
 ``half_band`` of 2.0, so the heaters switch two degrees either side of it and
 the setpoint is in the middle of its own band. Its decision is logged, sent to
-the ground on port 5105, and drives two heaters, ``heaters_1`` and
+the ground on port 5110, and drives two heaters, ``heaters_1`` and
 ``heaters_2``. Two of them, because one failing must not leave the zone with
 no way to be warmed: either alone holds the band, and both together hold it
 twice as fast. They are separate nodes so that the ground can stop one and
@@ -2248,8 +2251,9 @@ what would charge it is shunted.
 ``science``, sheds the science instrument; above half it is unasserted and
 the instrument comes back. The band is wide so that an eclipse sheds the load
 once rather than at every reading near the edge. Every value and decision goes
-to the ground, on ports 5101 to 5104, and to the log ``housekeeping``, and the
-ground may set the setpoint through the command binding.
+to the ground, on ports 5100 to 5102 and 5107, and to the log
+``housekeeping``, and the ground may set the setpoint through the command
+binding.
 
 The physics model, ``battery-physics.yaml``, is the power system as its parts:
 a ``sun``, a ``solar_array`` of seven amperes, two ``load`` elements of two
@@ -2644,8 +2648,8 @@ the ground sends goes up to the gateway node ``ground``, which binds
 tee sends each command on by its ``gateway-out`` to the ``heater``, as it was
 going, and again by its ``payload-out`` back to ``ground`` -- so the ground sees
 what the vehicle was told, arriving at ``ground_base`` plus ``echo``'s device
-id, ``127.0.0.1:8704``. The ``sensor``'s readings go to ``readings``, a
-``tee-payload``, which sends each down to the ground at ``127.0.0.1:8705`` and
+id, ``127.0.0.1:8701``. The ``sensor``'s readings go to ``readings``, a
+``tee-payload``, which sends each down to the ground at ``127.0.0.1:8704`` and
 again by its ``gateway-out`` to ``dropped``, a ``null-gateway``, standing where
 something aboard that took readings as commands would be. The ``spare``
 payload's data goes to ``unheard``, a ``null-payload``: nobody wants it yet.
@@ -2684,25 +2688,23 @@ and everything in the ``tcspecial`` section is written as it is for a radio.
 What differs is the gateway node. Where a gateway node says where the ground
 station is as ``ground_base``, a ``gateway_fprime`` node says where the bridge
 is as ``bridge_base``, counted on the same way: the ``thermometer``, device id
-2, reports to ``127.0.0.1:9702``. It also states ``fprime_id_base``, the first
+3, reports to ``127.0.0.1:9703``. It also states ``fprime_id_base``, the first
 of the F´ IDs the bridge gives what arrives, counted on by the same device id
--- the thermometer's readings are F´ channel ``0x3002`` -- which the bridge's
+-- the thermometer's readings are F´ channel ``0x3003`` -- which the bridge's
 model is made from and nothing aboard reads. A command the bridge sends up to
 ``fsw``, which binds ``127.0.0.1:9600``, leaves it by its ``gateway-out`` for
 the ``heater``.
 
 The thermometer's readings go to ``zone_temp`` too, a ``to_kelvin`` compute
 node that makes each a temperature, and that goes to ``fsw`` as well: device
-id 3, ``127.0.0.1:9703``, channel ``0x3003``. The ``vehicle`` section is
-written after the payloads so that the thermometer keeps device id 2, a
-node's device id being its place in the file. In the simulator file the
+id 4, ``127.0.0.1:9704``, channel ``0x3004``. In the simulator file the
 thermometer reports a zone of the physics model, in the encoding ``zone_temp``
 reads back, and the heater's stand-in switches a heater warming it, so that what the
 flight computer sends the heater shows in the temperature it reads.
 
 ``zone_temp``'s temperatures go on to ``heater_wanted``, a ``hysteresis``
 compute node -- on below 283.65 K, off above 284.65 K -- whose decisions go
-to ``fsw``: device id 4, ``127.0.0.1:9704``, channel ``0x3004``. It is
+to ``fsw``: device id 2, ``127.0.0.1:9702``, channel ``0x3002``. It is
 advice and drives nothing, the heater being the flight computer's to drive,
 and it shows the bridge a node that sends decisions.
 
@@ -2742,15 +2744,15 @@ fprime example unless told otherwise, with
 
 which checks the configuration first and writes nothing from one with errors.
 Each node drawn into the ``gateway_fprime`` node is a channel named after it,
-at ``fprime_id_base`` plus its device id -- ``thermometer``, ``0x3002`` --
+at ``fprime_id_base`` plus its device id -- ``thermometer``, ``0x3003`` --
 of the type the configuration says its data are. A node that sends values, a
 compute node whose function is ``to_kelvin``, ``to_value``, ``vote`` or
 ``process``, has an ``F64`` channel in that node's unit, formatted with it --
-``zone_temp``, ``0x3003``, in kelvin --
+``zone_temp``, ``0x3004``, in kelvin --
 and a datum from it that is not a value goes to no channel, is counted in
 ``DataNotValues`` and is said in a ``NotAValue`` event. A node that sends
 decisions, a compute node whose function is ``hysteresis``, has a ``bool``
-channel, true for on -- ``heater_wanted``, ``0x3004`` -- and a datum from it
+channel, true for on -- ``heater_wanted``, ``0x3002`` -- and a datum from it
 that is not ``1`` or ``0`` goes to no channel, is counted in
 ``DataNotDecisions`` and is said in a ``NotADecision`` event. A thermostat
 sends the ground only a change of decision, so its channel shows what was
@@ -2989,7 +2991,7 @@ on the bus, filtered to its identifier, so ``motor_status`` hears the status
 frames and nothing else, and ``motor_command`` hears nothing it has not sent.
 Each status frame's data goes by ``motor_status``'s ``payload-out`` to the
 gateway node ``ground`` and down to the MOC at ``ground_base`` plus its
-device id, ``127.0.0.1:3701``. What the ground sends up to ``ground``, which
+device id, ``127.0.0.1:3702``. What the ground sends up to ``ground``, which
 binds ``127.0.0.1:3600``, leaves it by its ``gateway-out`` for
 ``motor_command`` and goes out as one frame, so a command is at most eight
 bytes.
@@ -3017,7 +3019,7 @@ Two lines of one chip, each a payload of its own because one is read and the
 other driven, and a payload's lines all go one way. ``switch`` watches line 0
 for both edges: each becomes a sixteen-byte record -- when, which line, and
 what it became -- that goes by its ``payload-out`` to ``ground`` and down to
-the MOC at ``127.0.0.1:3721``. ``lamp`` drives line 1: what the ground sends
+the MOC at ``127.0.0.1:3722``. ``lamp`` drives line 1: what the ground sends
 up to ``127.0.0.1:3620`` leaves ``ground`` by its ``gateway-out`` for it, the
 text ``1`` lighting the lamp and ``0`` putting it out.
 
@@ -4097,10 +4099,13 @@ on, saying what each file says:
 
 .. code-block:: console
 
-   examples/thermostat/thermostat.ytcs:87: error: nodes / thermostat / attributes / setpoint: examples/thermostat/thermostat.xtcs says "290" and examples/thermostat/thermostat.ytcs says "293.15"
+   examples/thermostat/thermostat.ytcs:81: error: nodes / thermostat / attributes / setpoint: examples/thermostat/thermostat.xtcs says "290" and examples/thermostat/thermostat.ytcs says "293.15"
 
-The order nodes are written in is compared too, a node's place in the file
-being its device id. A file that cannot be read is not compared, and says so.
+The order anything is written in is not compared: nothing in a configuration
+is in an order that means anything, and a node's device id comes from its
+name, not from where the file writes it. A list is compared as the set it is,
+so one entry missing is one difference. A file that cannot be read is not
+compared, and says so.
 
 A good set prints nothing. A bad one prints a line per problem, each naming
 the file, the line and what is wrong there:
@@ -4145,7 +4150,7 @@ that::
 and before the problems::
 
    $ cargo run --bin tcsverify -- --digest examples/thermostat/thermostat.ytcs
-   examples/thermostat/thermostat.ytcs: md5 292a329b534cb88156e1a52870469c4a
+   examples/thermostat/thermostat.ytcs: md5 8136194fda73c86685a82efbd5b955a5
 
 That is the digest tcspecial prints as it starts and puts in every beacon, and
 the MOC compares with its own: two ends whose digests agree have read one
@@ -4358,10 +4363,10 @@ A configuration that says nothing is refused too, rather than given ``radio``:
 what a vehicle answers to is a fact about the mission, and the kind decides
 how every link below is written.
 
-The gateway nodes are written in the ``gateway`` section: a radio's with
-``type: gateway_radio``, a Yamcs station's with ``type: gateway_yamcs``, an F´
-bridge's with ``type: gateway_fprime``, a cFS
-software bus's with ``type: gateway_cfs``. Every
+The gateway nodes are written in the ``gateways`` section: a radio's under
+``- type gateway_radio:``, a Yamcs station's under ``- type gateway_yamcs:``,
+an F´ bridge's under ``- type gateway_fprime:``, a cFS software bus's under
+``- type gateway_cfs:``, each one ``- gateway:`` and its name. Every
 node there is of the kind ``tcspecial.gateway`` names, and one of another kind is refused,
 naming both, because a vehicle answers to one: commands, beacons and data all go
 the one way.
@@ -4389,10 +4394,10 @@ counting its own sequence per APID. Each link states its APID:
        apid: "0x100"     # the beacon
      tcs_cmd:
        apid: "0x101"     # commands, and their answers
-   gateway:
-     - name: gateway
-       type: gateway_yamcs
-       apid_base: "0x200"
+   gateways:
+     - type gateway_yamcs:
+         - gateway: gateway
+           apid_base: "0x200"
 
 A gateway node's uplink takes telecommands of its ``apid_base``, and each
 source sends through it as telemetry of ``apid_base`` plus its device id.
@@ -4572,7 +4577,8 @@ command about a quick one.
 bases because the link has two ends. Every payload has a UDP interface for
 exchanging data with the ground; tcspecial binds its end at
 ``payload_telemetry.source_base`` plus **the payload's own id** -- the position
-the payload has in the configuration, counting from nought -- and the MOC binds
+its name has among the names of the configuration's nodes, counting from
+nought -- and the MOC binds
 its end at ``payload_telemetry.dest_base`` plus the same id. So a set of four
 payloads based at 6000 and 6100 has tcspecial at 6000 to 6003 and the ground at
 6100 to 6103.
@@ -4744,12 +4750,12 @@ opened, so the configuration that flies is the one that was tested:
 .. code-block:: yaml
 
    payloads:
-     - name: link
-       type: hdlc
-       interface: hdlc0
-       standard: v35
-       clock_type: external
-       stand_in: "127.0.0.1:7950"
+     - type hdlc:
+         - payload: link
+           interface: hdlc0
+           standard: v35
+           clock_type: external
+           stand_in: "127.0.0.1:7950"
 
 The Makefiles' run targets give every program ``--simulate=$(SIMULATE)``,
 which is ``all`` unless the command line says otherwise:
@@ -5040,9 +5046,9 @@ window, which stops the tcspecial and tcssim the MOC started.
 
 Each panel shows its handler's name and number, its status, how it is
 reached, and its packet size; then two readings and one count. The number is
-the payload's place in the payload configuration, counted from nought in the
-order the file describes them -- ``auto-send (dev id 0)`` -- and nothing in
-the file states it. Both windows count the same way, so a payload is the same
+the payload's device id, its place among the names of the configuration's
+nodes, counted from nought -- ``auto-send (dev id 0)`` -- and nothing in the
+file states it. Both windows count the same way, so a payload is the same
 number in each. The status is ``Active``,
 ``Stopped``, ``Stale`` or ``Unknown``, and where each comes from is under
 `Beaconing`_: the spacecraft's answer to the last ``Enable`` or ``Disable``,
@@ -5208,12 +5214,12 @@ The verdict is reached on the software version and the digest. They are the
 same payload
 set if the digests match: the digest is of what a file says rather than of its
 bytes, so the YAML and the XML of one set digest alike, and so do two files
-differing only in comments, spacing, the order of their sections or the order
-of one payload's attributes. The order of the payloads does count -- ids follow
-it -- so each payload is given a sequence number as the file is read, the
-digest takes them in that order, and a file may not state a number of its own.
-Both formats number them alike, which is what lets the YAML and the XML of
-one set digest the same. In a set written as several files, the names its
+differing only in comments, spacing or order -- of their sections, types,
+nodes, attributes, links, groups or bindings. Nothing in a configuration is in
+an order that means anything: the digest takes everything in one canonical
+order, by name, and device ids are counted in that same order, so a node's id
+is its position among the names of all the nodes. In a set written as several
+files, the names its
 include list gives them count too; the top file's own name does not.
 
 A difference means the two ends are not serving the same set. The usual cause

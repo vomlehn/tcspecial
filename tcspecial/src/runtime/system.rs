@@ -1477,22 +1477,41 @@ mod tests {
         let where_ = tempfile::tempdir().expect("a directory");
         let path = where_.path().join("paced.ytcs");
         let mut text = String::from(
-            "gateway:
-  - { name: ground, type: gateway_radio, ground_base: \"127.0.0.1:5100\" }
+            "gateways:
+  - type gateway_radio:
+      - gateway: ground
+        ground_base: \"127.0.0.1:5100\"
 payloads:
-  - { name: exchanged, type: i2c, path: \"/dev/i2c-1\", address: \"0x48\",
-      trigger: \"55\", trigger_interval: \"100 ms\", payload-out: ground }
-  - { name: asked, type: network, protocol: udp, address: \"127.0.0.1\", \
-  port: \"7002\",
-      trigger: \"55\", trigger_interval: \"100 ms\", payload-out: ground }
-  - { name: floored, type: network, protocol: udp, address: \"127.0.0.1\", \
-  port: \"7001\",
-      poll_interval: \"100 ms\", payload-out: ground }
+  - type i2c:
+      - payload: exchanged
+        address: \"0x48\"
+        path: \"/dev/i2c-1\"
+        trigger: \"55\"
+        trigger_interval: \"100 ms\"
+        payload-out:
+          - target: ground
+  - type network:
+      - payload: asked
+        address: \"127.0.0.1\"
+        port: \"7002\"
+        protocol: udp
+        trigger: \"55\"
+        trigger_interval: \"100 ms\"
+        payload-out:
+          - target: ground
+      - payload: floored
+        address: \"127.0.0.1\"
+        poll_interval: \"100 ms\"
+        port: \"7001\"
+        protocol: udp
+        payload-out:
+          - target: ground
 ",
         );
         if every_pass {
             text.push_str(
-                "  - { name: always, type: network, protocol: udp, address: \
+                // One more network node, under the type the text ends with.
+                "      - { payload: always, protocol: udp, address: \
                  \"127.0.0.1\", port: \"7003\", payload-out: ground }\n",
             );
         }
@@ -1628,14 +1647,27 @@ payloads:
         let path = where_.path().join("quiet.ytcs");
         std::fs::write(
             &path,
-            "gateway:
-  - { name: ground, type: gateway_radio, ground_base: \"127.0.0.1:5100\" }
+            "gateways:
+  - type gateway_radio:
+      - gateway: ground
+        ground_base: \"127.0.0.1:5100\"
 payloads:
-  - { name: exchanged, type: i2c, path: \"/dev/i2c-1\", address: \"0x48\",
-      trigger: \"55\", trigger_interval: \"100 ms\", payload-out: ground }
-  - { name: floored, type: network, protocol: udp, address: \"127.0.0.1\", \
-  port: \"7001\",
-      poll_interval: \"300 ms\", payload-out: ground }
+  - type i2c:
+      - payload: exchanged
+        address: \"0x48\"
+        path: \"/dev/i2c-1\"
+        trigger: \"55\"
+        trigger_interval: \"100 ms\"
+        payload-out:
+          - target: ground
+  - type network:
+      - payload: floored
+        address: \"127.0.0.1\"
+        poll_interval: \"300 ms\"
+        port: \"7001\"
+        protocol: udp
+        payload-out:
+          - target: ground
 ",
         )
         .expect("written");
@@ -1692,11 +1724,20 @@ payloads:
         std::fs::write(
             &path,
             "payloads:
-  - { name: asked, type: network, protocol: udp, address: \"127.0.0.1\", \
-  port: \"7005\",
-      trigger: \"55\", trigger_interval: \"100 ms\", payload-out: average }
+  - type network:
+      - payload: asked
+        address: \"127.0.0.1\"
+        port: \"7005\"
+        protocol: udp
+        trigger: \"55\"
+        trigger_interval: \"100 ms\"
+        payload-out:
+          - target: average
 vehicle:
-  - { name: average, type: compute, function: mean, inputs: 1 }
+  - type compute:
+      - compute: average
+        function: mean
+        inputs: 1
 ",
         )
         .expect("written");
@@ -1807,11 +1848,20 @@ vehicle:
         std::fs::write(
             &path,
             "payloads:
-  - { name: asked, type: network, protocol: udp, address: \"127.0.0.1\", \
-  port: \"7009\",
-      trigger: \"55\", trigger_interval: \"100 ms\", payload-out: average }
+  - type network:
+      - payload: asked
+        address: \"127.0.0.1\"
+        port: \"7009\"
+        protocol: udp
+        trigger: \"55\"
+        trigger_interval: \"100 ms\"
+        payload-out:
+          - target: average
 vehicle:
-  - { name: average, type: compute, function: mean, inputs: 1 }
+  - type compute:
+      - compute: average
+        function: mean
+        inputs: 1
 ",
         )
         .expect("written");
@@ -1940,11 +1990,20 @@ vehicle:
         std::fs::write(
             &path,
             "payloads:
-  - { name: asked, type: network, protocol: udp, address: \"127.0.0.1\", \
-  port: \"7010\",
-      trigger: \"[55]\", trigger_interval: \"100 ms\", payload-out: average }
+  - type network:
+      - payload: asked
+        address: \"127.0.0.1\"
+        port: \"7010\"
+        protocol: udp
+        trigger: \"[55]\"
+        trigger_interval: \"100 ms\"
+        payload-out:
+          - target: average
 vehicle:
-  - { name: average, type: compute, function: mean, inputs: 1 }
+  - type compute:
+      - compute: average
+        function: mean
+        inputs: 1
 ",
         )
         .expect("written");
@@ -1994,11 +2053,19 @@ vehicle:
         std::fs::write(
             &path,
             "payloads:
-  - { name: asked, type: network, protocol: udp, address: \"127.0.0.1\", \
-  port: \"7006\",
-      poll_interval: \"100 ms\", payload-out: average }
+  - type network:
+      - payload: asked
+        address: \"127.0.0.1\"
+        poll_interval: \"100 ms\"
+        port: \"7006\"
+        protocol: udp
+        payload-out:
+          - target: average
 vehicle:
-  - { name: average, type: compute, function: mean, inputs: 1 }
+  - type compute:
+      - compute: average
+        function: mean
+        inputs: 1
 ",
         )
         .expect("written");
@@ -2082,11 +2149,19 @@ vehicle:
         std::fs::write(
             &path,
             "payloads:
-  - { name: asked, type: network, protocol: udp, address: \"127.0.0.1\", \
-  port: \"7007\",
-      poll_interval: \"100 ms\", payload-out: average }
+  - type network:
+      - payload: asked
+        address: \"127.0.0.1\"
+        poll_interval: \"100 ms\"
+        port: \"7007\"
+        protocol: udp
+        payload-out:
+          - target: average
 vehicle:
-  - { name: average, type: compute, function: mean, inputs: 1 }
+  - type compute:
+      - compute: average
+        function: mean
+        inputs: 1
 ",
         )
         .expect("written");
@@ -2833,12 +2908,20 @@ vehicle:
         let path = where_.path().join("ping.ytcs");
         std::fs::write(
             &path,
-            "gateway:\n\
-             \x20 - { name: ground, type: gateway_radio, address: 127.0.0.1, \
-             port: \"5000\", ground_base: \"127.0.0.1:5100\", \
-             gateway-out: pinger }\n\
-             vehicle:\n\
-             \x20 - { name: pinger, type: ping, payload-out: ground }\n",
+            "gateways:
+  - type gateway_radio:
+      - gateway: ground
+        address: 127.0.0.1
+        ground_base: \"127.0.0.1:5100\"
+        port: \"5000\"
+        gateway-out:
+          - target: pinger
+vehicle:
+  - type ping:
+      - compute: pinger
+        payload-out:
+          - target: ground
+",
         )
         .expect("written");
         let graph = Graph::load(&path).expect("it reads");
@@ -2925,13 +3008,21 @@ vehicle:
         std::fs::write(
             &path,
             format!(
-                "gateway:\n\
-                 \x20 - {{ name: ground, type: gateway_yamcs, \
-                 address: 127.0.0.1, port: \"{gateway_port}\", \
-                 ground_base: \"127.0.0.1:{}\", apid_base: \"0x200\", \
-                 gateway-out: pinger }}\n\
-                 vehicle:\n\
-                 \x20 - {{ name: pinger, type: ping, payload-out: ground }}\n",
+                "gateways:
+  - type gateway_yamcs:
+      - gateway: ground
+        address: 127.0.0.1
+        apid_base: \"0x200\"
+        ground_base: \"127.0.0.1:{}\"
+        port: \"{gateway_port}\"
+        gateway-out:
+          - target: pinger
+vehicle:
+  - type ping:
+      - compute: pinger
+        payload-out:
+          - target: ground
+",
                 ground_port - 1
             ),
         )

@@ -455,13 +455,14 @@ mod tests {
         let text = if ext == "xtcs" {
             format!(
                 "<configuration><description>{n}</description>\
-                 <vehicle><name>p{n}</name><type>ping</type></vehicle>\
+                 <vehicle><type name=\"ping\"><compute name=\"p{n}\"/>\
+                 </type></vehicle>\
                  </configuration>\n"
             )
         } else {
             format!(
-                "description: \"{n}\"\nvehicle:\n  - {{ name: p{n}, type: ping \
-                 }}\n"
+                "description: \"{n}\"\nvehicle:\n  - type ping:\n      \
+                 - {{ compute: p{n} }}\n"
             )
         };
         std::fs::write(&path, text).expect("written");
@@ -550,7 +551,7 @@ mod tests {
     fn tree(dir: &Path, top: &str, name: &str) -> PathBuf {
         std::fs::write(
             dir.join(format!("{name}.ytcs")),
-            "vehicle:\n  - { name: p, type: ping }\n",
+            "vehicle:\n  - type ping:\n      - { compute: p }\n",
         )
         .unwrap();
         let path = dir.join(format!("{top}.ytcs"));

@@ -32,103 +32,102 @@
             <send>127.0.0.1:4100</send>
         </tcs_cmd>
     </tcspecial>
-    <gateway>
-        <name>gateway</name>
-        <type>gateway_radio</type>
-        <address>127.0.0.1</address>
-        <ground_base>127.0.0.1:5100</ground_base>
-        <port>5000</port>
-        <payload-in>true</payload-in>
-    </gateway>
-    <!-- The radar's two bytes are centimetres, unsigned, most significant
-         first: up to 655 metres, which is above where the descent starts. -->
+    <gateways>
+        <type name="gateway_radio">
+            <gateway name="gateway">
+                <address>127.0.0.1</address>
+                <ground_base>127.0.0.1:5100</ground_base>
+                <port>5000</port>
+                <payload-in>true</payload-in>
+            </gateway>
+        </type>
+    </gateways>
     <vehicle>
-        <name>altitude</name>
-        <type>compute</type>
-        <function>to_value</function>
-        <format>u16_be</format>
-        <offset>0</offset>
-        <scale>0.01</scale>
-        <unit>m</unit>
-        <payload-out><target>gateway</target></payload-out>
-        <payload-out><target>guidance</target></payload-out>
-        <payload-out><target>housekeeping</target></payload-out>
-        <payload-in>true</payload-in>
+        <type name="compute">
+            <!-- The radar's two bytes are centimetres, unsigned, most
+                 significant first: up to 655 metres, which is above where
+                 the descent starts. -->
+            <compute name="altitude">
+                <format>u16_be</format>
+                <function>to_value</function>
+                <offset>0</offset>
+                <scale>0.01</scale>
+                <unit>m</unit>
+                <payload-out><target>gateway</target></payload-out>
+                <payload-out><target>guidance</target></payload-out>
+                <payload-out><target>housekeeping</target></payload-out>
+                <payload-in>true</payload-in>
+            </compute>
+            <!-- The velocimeter's two bytes are centimetres a second,
+                 signed: up is more than nought, so a descent is less. -->
+            <compute name="descent_rate">
+                <format>i16_be</format>
+                <function>to_value</function>
+                <offset>0</offset>
+                <scale>0.01</scale>
+                <unit>m/s</unit>
+                <payload-out><target>gateway</target></payload-out>
+                <payload-out><target>housekeeping</target></payload-out>
+                <payload-in>true</payload-in>
+            </compute>
+            <!-- The throttle, from the altitude: a program, flying a
+                 descent that slows as the ground nears and cutting the
+                 engine half a metre up. A Python 3 script beside this file,
+                 named relative to the repository's root because that is
+                 where tcspecial is run from. Its answers are a ratio, which
+                 is what the engine's throttle takes. -->
+            <compute name="guidance">
+                <executable>examples/descent/guidance.py</executable>
+                <function>process</function>
+                <timeout>1 s</timeout>
+                <unit>ratio</unit>
+                <gateway-out><target>engine</target></gateway-out>
+                <payload-out><target>gateway</target></payload-out>
+                <payload-out><target>housekeeping</target></payload-out>
+                <payload-in>true</payload-in>
+            </compute>
+        </type>
+        <type name="log">
+            <compute name="housekeeping">
+                <directory>/tmp/telemetry</directory>
+                <format>variable_ts_rc</format>
+                <payload-in>true</payload-in>
+            </compute>
+        </type>
     </vehicle>
-    <!-- The velocimeter's two bytes are centimetres a second, signed: up is
-         more than nought, so a descent is less. -->
-    <vehicle>
-        <name>descent_rate</name>
-        <type>compute</type>
-        <function>to_value</function>
-        <format>i16_be</format>
-        <offset>0</offset>
-        <scale>0.01</scale>
-        <unit>m/s</unit>
-        <payload-out><target>gateway</target></payload-out>
-        <payload-out><target>housekeeping</target></payload-out>
-        <payload-in>true</payload-in>
-    </vehicle>
-    <!-- The throttle, from the altitude: a program, flying a descent that
-         slows as the ground nears and cutting the engine half a metre up.
-         A Python 3 script beside this file, named relative to the
-         repository's root because that is where tcspecial is run from. Its
-         answers are a ratio, which is what the engine's throttle takes. -->
-    <vehicle>
-        <name>guidance</name>
-        <type>compute</type>
-        <function>process</function>
-        <executable>examples/descent/guidance.py</executable>
-        <timeout>1 s</timeout>
-        <unit>ratio</unit>
-        <payload-out><target>gateway</target></payload-out>
-        <payload-out><target>housekeeping</target></payload-out>
-        <gateway-out><target>engine</target></gateway-out>
-        <payload-in>true</payload-in>
-    </vehicle>
-    <vehicle>
-        <name>housekeeping</name>
-        <type>log</type>
-        <directory>/tmp/telemetry</directory>
-        <format>variable_ts_rc</format>
-        <payload-in>true</payload-in>
-    </vehicle>
-    <!-- The radar altimeter, which sends ten readings a second. -->
     <payloads>
-        <name>radar</name>
-        <type>network</type>
-        <protocol>udp</protocol>
-        <address>127.0.0.1</address>
-        <port>5401</port>
-        <payload-out><target>altitude</target></payload-out>
-    </payloads>
-    <!-- The Doppler velocimeter, five a second. -->
-    <payloads>
-        <name>doppler</name>
-        <type>network</type>
-        <protocol>udp</protocol>
-        <address>127.0.0.1</address>
-        <port>5402</port>
-        <payload-out><target>descent_rate</target></payload-out>
-    </payloads>
-    <!-- The switch on a landing leg, whose 1 is the ground's word that the
-         lander is down: straight to the ground and to the log. -->
-    <payloads>
-        <name>touchdown</name>
-        <type>network</type>
-        <protocol>udp</protocol>
-        <address>127.0.0.1</address>
-        <port>5403</port>
-        <payload-out><target>gateway</target></payload-out>
-        <payload-out><target>housekeeping</target></payload-out>
-    </payloads>
-    <!-- The engine's throttle, driven by what guidance answers. -->
-    <payloads>
-        <name>engine</name>
-        <type>network</type>
-        <protocol>udp</protocol>
-        <address>127.0.0.1</address>
-        <port>5404</port>
-        <gateway-in>true</gateway-in>
+        <type name="network">
+            <!-- The Doppler velocimeter, five a second. -->
+            <payload name="doppler">
+                <address>127.0.0.1</address>
+                <port>5402</port>
+                <protocol>udp</protocol>
+                <payload-out><target>descent_rate</target></payload-out>
+            </payload>
+            <!-- The engine's throttle, driven by what guidance answers. -->
+            <payload name="engine">
+                <address>127.0.0.1</address>
+                <port>5404</port>
+                <protocol>udp</protocol>
+                <gateway-in>true</gateway-in>
+            </payload>
+            <!-- The radar altimeter, which sends ten readings a second. -->
+            <payload name="radar">
+                <address>127.0.0.1</address>
+                <port>5401</port>
+                <protocol>udp</protocol>
+                <payload-out><target>altitude</target></payload-out>
+            </payload>
+            <!-- The switch on a landing leg, whose 1 is the ground's word
+                 that the lander is down: straight to the ground and to the
+                 log. -->
+            <payload name="touchdown">
+                <address>127.0.0.1</address>
+                <port>5403</port>
+                <protocol>udp</protocol>
+                <payload-out><target>gateway</target></payload-out>
+                <payload-out><target>housekeeping</target></payload-out>
+            </payload>
+        </type>
     </payloads>
 </configuration>

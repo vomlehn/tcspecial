@@ -70,41 +70,45 @@
             <response_msgid>0x4200</response_msgid>
         </tcs_cmd>
     </tcspecial>
-    <!-- The software bus's end of the link, both ways. What the bus
-         publishes as cmd_msgid, 0x4281, is taken by this node and leaves it
-         by gateway-out for the heater. What comes down is published as
-         tlm_base plus the device id of the node that sent it: the
-         thermometer, device id 2, as 0x4242. -->
-    <gateway>
-        <name>fsw</name>
-        <type>gateway_cfs</type>
-        <cmd_msgid>0x4281</cmd_msgid>
-        <tlm_base>0x4240</tlm_base>
-        <payload-in>true</payload-in>
-        <gateway-out><target>heater</target></gateway-out>
-    </gateway>
-    <!-- A heater, driven by what the flight computer sends: the far end of a
-         UDP socket. -->
+    <gateways>
+        <type name="gateway_cfs">
+            <!-- The software bus's end of the link, both ways. What the bus
+                 publishes as cmd_msgid, 0x4281, is taken by this node and
+                 leaves it by gateway-out for the heater. What comes down is
+                 published as tlm_base plus the device id of the node that
+                 sent it: the thermometer, device id 2, as 0x4242. -->
+            <gateway name="fsw">
+                <cmd_msgid>0x4281</cmd_msgid>
+                <tlm_base>0x4240</tlm_base>
+                <gateway-out><target>heater</target></gateway-out>
+                <payload-in>true</payload-in>
+            </gateway>
+        </type>
+    </gateways>
     <payloads>
-        <name>heater</name>
-        <type>network</type>
-        <protocol>udp</protocol>
-        <address>127.0.0.1</address>
-        <port>8601</port>
-        <gateway-in>true</gateway-in>
-    </payloads>
-    <!-- A thermometer whose readings go to the flight computer. -->
-    <payloads>
-        <name>thermometer</name>
-        <type>network</type>
-        <protocol>udp</protocol>
-        <address>127.0.0.1</address>
-        <port>8602</port>
-        <payload-out><target>fsw</target></payload-out>
+        <type name="network">
+            <!-- A heater, driven by what the flight computer sends: the far
+                 end of a UDP socket. -->
+            <payload name="heater">
+                <address>127.0.0.1</address>
+                <port>8601</port>
+                <protocol>udp</protocol>
+                <gateway-in>true</gateway-in>
+            </payload>
+            <!-- A thermometer whose readings go to the flight computer. -->
+            <payload name="thermometer">
+                <address>127.0.0.1</address>
+                <port>8602</port>
+                <protocol>udp</protocol>
+                <payload-out><target>fsw</target></payload-out>
+            </payload>
+        </type>
     </payloads>
     <tcsgui>
-        <nodes><name>fsw</name><x>469</x><y>34</y></nodes>
-        <nodes><name>heater</name><x>34</x><y>34</y></nodes>
-        <nodes><name>thermometer</name><x>34</x><y>134</y></nodes>
+        <nodes>
+            <node name="fsw" x="469" y="34"/>
+            <node name="heater" x="34" y="34"/>
+            <node name="thermometer" x="34" y="134"/>
+        </nodes>
     </tcsgui>
 </configuration>

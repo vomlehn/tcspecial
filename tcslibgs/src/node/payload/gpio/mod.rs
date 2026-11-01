@@ -132,7 +132,7 @@ impl Direction {
 /// What a GPIO node's lines are set to.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct GpioParams {
-    /// The offsets of the lines, in the order the file gave them.
+    /// The offsets of the lines, lowest first: see [`lines_of`].
     pub lines: Vec<u32>,
     /// Whether they are read or driven.
     pub direction: Direction,
@@ -177,6 +177,11 @@ fn length_of_time(
 /// board commonly copies the offsets out of a schematic in whichever form the
 /// schematic used.
 ///
+/// The order they are written in means nothing, as no order in a
+/// configuration does: they are held lowest first, so that the first line of
+/// a report, its lowest bit, is the lowest offset however the file listed
+/// them.
+///
 /// # Arguments
 ///
 /// * `name`   - The node's name, for the messages.
@@ -184,7 +189,7 @@ fn length_of_time(
 ///
 /// # Returns
 ///
-/// The offsets, in the order given.
+/// The offsets, lowest first.
 ///
 /// # Errors
 ///
@@ -229,6 +234,7 @@ pub fn lines_of(name: &str, stated: &Scalar) -> EndpointConfigResult<Vec<u32>> {
         ));
     }
 
+    lines.sort_unstable();
     Ok(lines)
 }
 
@@ -707,6 +713,8 @@ mod tests {
         assert_eq!(params(&[("lines", "0 1 17")]).lines, vec![0, 1, 17]);
         assert_eq!(params(&[("lines", "0x0a,0x0b")]).lines, vec![10, 11]);
         assert_eq!(params(&[("lines", " 3 ")]).lines, vec![3]);
+        // In no order but the offsets' own.
+        assert_eq!(params(&[("lines", "17, 0 1")]).lines, vec![0, 1, 17]);
     }
 
     /// A payload that names no lines, or one twice, is refused.

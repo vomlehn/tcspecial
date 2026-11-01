@@ -6210,15 +6210,18 @@ mod tests {
     /// configuration until it was correct could not be used to correct one.
     #[test]
     fn a_node_nobody_fixed_is_still_drawn_in_its_pane() {
+        // Made in the editor rather than read: a file naming a type no
+        // section has is refused as it is read, but a document can still
+        // come to hold one, and has to be drawn while it does.
         let where_ = tempfile::tempdir().expect("a directory");
         let path = where_.path().join("vehicle.ytcs");
-        std::fs::write(
-            &path,
-            "vehicle:\n  - name: odd\n    type: contraption\n",
-        )
-        .expect("a configuration naming a type this build has not got");
-
-        let editor = Editor::open(&path, dividers());
+        let mut editor = Editor::open(&path, dividers());
+        editor.edit(Edit::AddNode {
+            name: "odd".into(),
+            node_type: "contraption".into(),
+            home: None,
+        });
+        editor.arrange(dividers());
         assert!(
             !troubles_of(editor.document()).is_empty(),
             "the unknown type should be a problem"
@@ -6257,8 +6260,9 @@ mod tests {
         std::fs::write(
             &path,
             "payload_groups:\n  - name: idle\n    interval: 3 s\n\
-             payloads:\n  - name: a\n    type: i2c\n    payload-out: gateway\n\
-             gateway:\n  - name: gateway\n    type: gateway_radio\n",
+             payloads:\n  - type i2c:\n      - payload: a\n        \
+             payload-out: gateway\n\
+             gateways:\n  - type gateway_radio:\n      - gateway: gateway\n",
         )
         .expect("a configuration with an empty group and an unfinished node");
 
@@ -8707,8 +8711,8 @@ mod tests {
         let path = where_.path().join("vehicle.ytcs");
         std::fs::write(
             &path,
-            "payloads:\n  - name: bay\n    type: app_pl\n    \
-             executable: /bin/true\n    app-payload-arg: \"--bay\"\n",
+            "payloads:\n  - type app_pl:\n      - payload: bay\n        \
+             executable: /bin/true\n        app-payload-arg: \"--bay\"\n",
         )
         .expect("a payload that is a program");
         let editor = Editor::open(&path, dividers());
@@ -8760,8 +8764,8 @@ mod tests {
         let path = where_.path().join("vehicle.ytcs");
         std::fs::write(
             &path,
-            "payloads:\n  - name: bay\n    type: app_pl\n    \
-             executable: /bin/true\n    app-payload-arg: \"--bay\"\n",
+            "payloads:\n  - type app_pl:\n      - payload: bay\n        \
+             executable: /bin/true\n        app-payload-arg: \"--bay\"\n",
         )
         .expect("a payload that is a program");
         let editor = Editor::open(&path, dividers());
@@ -9445,8 +9449,9 @@ mod tests {
             );
             assert!(!document.links.is_empty(), "and no links");
 
-            // Every route, laid in the file's order as the canvas lays them,
-            // so that each is checked against the ones already on it.
+            // Every route, laid in the order the configuration holds the
+            // links, as the canvas lays them, so that each is checked against
+            // the ones already on it.
             let mut taken: Vec<Vec<(f32, f32)>> = Vec::new();
             // How much of the drawing is one line lying along another, and
             // how much it would be if each route were laid in ignorance of
@@ -9502,27 +9507,26 @@ mod tests {
             }
 
             // A budget rather than nothing, and the budget is what the
-            // router actually reaches on this drawing: twenty-two
-            // lane-widths, against the hundred and seven the same routes
-            // share when each is laid in ignorance of the others. Four fifths
-            // of it gone, and what is left is the cases with no lane free --
-            // a column with nodes either side of it, where every lane the
-            // shapes offer is taken or blocked.
+            // router actually reaches on this drawing: nothing. With the
+            // links in the order the configuration holds them, by the node
+            // each leaves, no two routes share a run -- where in the order a
+            // file once wrote them twenty-two lane-widths did, against a
+            // hundred and seven laid in ignorance of each other, the rest
+            // being the cases with no lane free.
             //
             // Stated as a number for two reasons: a change that brings
-            // wholesale overlap back fails here, and the day somebody teaches
-            // the router to clear the rest, this number comes down rather
-            // than the rule being quietly satisfied by a drawing that got
-            // simpler.
+            // overlap back fails here, and a drawing that comes to need some
+            // has to say so by raising it rather than the rule being quietly
+            // loosened.
             assert!(
-                along <= 22,
+                along == 0,
                 "thermostat.{extension}: {along} lane-widths of line lie along \
-                 another line, and the budget is 22"
+                 another line, and the budget is none"
             );
             // And laying each route against the others has to beat laying
             // each in ignorance of them, which is the whole claim.
             assert!(
-                blind > along * 2,
+                along == 0 || blind > along * 2,
                 "thermostat.{extension}: laying the routes against each other \
                  should more than halve the overlap, and it was {along} \
                  against {blind}"
@@ -9586,8 +9590,8 @@ mod tests {
         let path = where_.path().join("vehicle.ytcs");
         std::fs::write(
             &path,
-            "payloads:\n  - name: bay\n    type: app_pl\n    \
-             executable: /bin/true\n    app-payload-arg: \"1\"\n",
+            "payloads:\n  - type app_pl:\n      - payload: bay\n        \
+             executable: /bin/true\n        app-payload-arg: \"1\"\n",
         )
         .expect("a payload that is a program");
         let editor = Rc::new(RefCell::new(Editor::open(&path, dividers())));
@@ -9640,8 +9644,8 @@ mod tests {
         // kept as a value: this is the other road to the same file.
         std::fs::write(
             &path,
-            "payloads:\n  - name: bay\n    type: app_pl\n    \
-             executable: /bin/true\n    app-payload-arg: \"\"\n",
+            "payloads:\n  - type app_pl:\n      - payload: bay\n        \
+             executable: /bin/true\n        app-payload-arg: \"\"\n",
         )
         .expect("a payload whose argument is stated as nothing");
         let mut reopened = Editor::open(&path, dividers());

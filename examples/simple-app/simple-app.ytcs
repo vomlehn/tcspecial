@@ -27,37 +27,35 @@ tcspecial:
     recv: "0.0.0.0:4000"
     send: "127.0.0.1:4100"
 
-gateway:
-  # The ground's end of the vehicle's data. tcspecial sends
-  # what each node drawn into it produces as UDP datagrams to
-  # ground_base's address, at its port plus that node's
-  # device id: lorem is id 1, so its words go to 127.0.0.1:5101. Ground
-  # software gets them from this node with a function call,
-  # tcslib::gateway::GatewayReceiver::receive: run `lorem_gateway` to be that
-  # ground. It states no address or port of its own, because nothing comes back
-  # up.
-  - name: gateway-1
-    type: gateway_radio
-    ground_base: "127.0.0.1:5100"
-    payload-in: true
+gateways:
+  - type gateway_radio:
+      # The ground's end of the vehicle's data. tcspecial sends what each node
+      # drawn into it produces as UDP datagrams to ground_base's address, at its
+      # port plus that node's device id: lorem is id 1, so its words go to
+      # 127.0.0.1:5101. Ground software gets them from this node with a function
+      # call, tcslib::gateway::GatewayReceiver::receive: run `lorem_gateway` to
+      # be that ground. It states no address or port of its own, because nothing
+      # comes back up.
+      - gateway: gateway-1
+        ground_base: "127.0.0.1:5100"
+        payload-in: true
 
 payloads:
   # A payload that is a program rather than a device: it is never
   # asked, and reports one word of its line at a time, then a packet
   # holding the line terminator. `app-payload-arg` is which line it
   # sends, counting from one.
-  # 
-  # The program is a Python 3 script beside this file, named relative
-  # to the repository's root because that is where tcspecial is
-  # run from: see examples/Makefile.
-  - name: lorem
-    type: app_pl
-    app-payload-arg: "1"
-    executable: "examples/simple-app/lorem_pl.py"
-    payload-out:
-      - target: gateway-1
+  - type app_pl:
+      # The program is a Python 3 script beside this file, named relative
+      # to the repository's root because that is where tcspecial is
+      # run from: see examples/Makefile.
+      - payload: lorem
+        app-payload-arg: "1"
+        executable: "examples/simple-app/lorem_pl.py"
+        payload-out:
+          - target: gateway-1
 
 tcsgui:
   nodes:
-    - { name: gateway-1, x: 790, y: 129 }
-    - { name: lorem, x: 15, y: 204 }
+    - { node: gateway-1, x: 790, y: 129 }
+    - { node: lorem, x: 15, y: 204 }

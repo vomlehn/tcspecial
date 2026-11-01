@@ -130,10 +130,10 @@
   <text class="label" x="560" y="598">gateway-out: the throttle, a ratio</text>
 
   <!-- Each source's port on the ground: ground_base plus its device id -->
-  <text class="portno" x="985" y="113">5101</text>
-  <text class="portno" x="985" y="128">5102</text>
-  <text class="portno" x="985" y="143">5103</text>
-  <text class="portno" x="985" y="158">5107</text>
+  <text class="portno" x="985" y="113">5100</text>
+  <text class="portno" x="985" y="128">5101</text>
+  <text class="portno" x="985" y="143">5105</text>
+  <text class="portno" x="985" y="158">5108</text>
 
   <!-- The ground software gets the data with a function call -->
   <path class="call" d="M1145,192 L1145,426" marker-end="url(#arrow-call)"/>

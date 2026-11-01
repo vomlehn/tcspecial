@@ -1,0 +1,6 @@
+<?xml version="1.0"?>
+<!-- Refused: a section written twice. -->
+<configuration>
+    <payloads><type name="i2c"><payload name="a"/></type></payloads>
+    <payloads><type name="spi"><payload name="b"/></type></payloads>
+</configuration>

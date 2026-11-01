@@ -23,6 +23,1997 @@
         "target"
       ],
       "additionalProperties": false
+    },
+    "gatewayNode": {
+      "type": "object",
+      "properties": {
+        "gateway": {
+          "description": "What this node is called, unique across the configuration: the first key of the node, the word for a node of the section and the name after it.",
+          "type": "string",
+          "minLength": 1
+        },
+        "group": {
+          "description": "The payload group that reads it, where it is in one. Optional, though a payload that states a trigger needs one: the interval of its group is how often it is asked.",
+          "type": "string"
+        },
+        "payload-out": {
+          "description": "The lines that leave this node by its `payload-out`, one entry each. An entry names the node the line goes to as its `target`, and `input` where it feeds a named input of that node. The short spellings are read too: the destination as a string, `node` or `node.terminal`, alone or in a list.",
+          "oneOf": [
+            {
+              "description": "One line, written as an entry.",
+              "$ref": "#/$defs/linkEntry"
+            },
+            {
+              "description": "One line, written as the node it reaches: `node` or `node.terminal`.",
+              "type": "string",
+              "pattern": "^[A-Za-z_][A-Za-z0-9_./-]*(\\.[A-Za-z_][A-Za-z0-9_-]*)?$"
+            },
+            {
+              "description": "Several lines, each an entry or a destination.",
+              "type": "array",
+              "items": {
+                "oneOf": [
+                  {
+                    "$ref": "#/$defs/linkEntry"
+                  },
+                  {
+                    "type": "string",
+                    "pattern": "^[A-Za-z_][A-Za-z0-9_./-]*(\\.[A-Za-z_][A-Za-z0-9_-]*)?$"
+                  }
+                ]
+              },
+              "minItems": 1
+            }
+          ]
+        },
+        "gateway-out": {
+          "description": "The lines that leave this node by its `gateway-out`, one entry each. An entry names the node the line goes to as its `target`, and `input` where it feeds a named input of that node. The short spellings are read too: the destination as a string, `node` or `node.terminal`, alone or in a list.",
+          "oneOf": [
+            {
+              "description": "One line, written as an entry.",
+              "$ref": "#/$defs/linkEntry"
+            },
+            {
+              "description": "One line, written as the node it reaches: `node` or `node.terminal`.",
+              "type": "string",
+              "pattern": "^[A-Za-z_][A-Za-z0-9_./-]*(\\.[A-Za-z_][A-Za-z0-9_-]*)?$"
+            },
+            {
+              "description": "Several lines, each an entry or a destination.",
+              "type": "array",
+              "items": {
+                "oneOf": [
+                  {
+                    "$ref": "#/$defs/linkEntry"
+                  },
+                  {
+                    "type": "string",
+                    "pattern": "^[A-Za-z_][A-Za-z0-9_./-]*(\\.[A-Za-z_][A-Za-z0-9_-]*)?$"
+                  }
+                ]
+              },
+              "minItems": 1
+            }
+          ]
+        },
+        "payload-in": {
+          "description": "Whether a line arrives at this node's `payload-in` sink. A record of the links written on the nodes they leave, and not a link: which node a line comes from is written on that node. A file may leave it out; one that disagrees with the links is refused where it is read.",
+          "type": "boolean"
+        },
+        "gateway-in": {
+          "description": "Whether a line arrives at this node's `gateway-in` sink. A record of the links written on the nodes they leave, and not a link: which node a line comes from is written on that node. A file may leave it out; one that disagrees with the links is refused where it is read.",
+          "type": "boolean"
+        },
+        "path": {
+          "type": [
+            "string",
+            "number",
+            "boolean",
+            "null"
+          ]
+        },
+        "address": {
+          "type": [
+            "string",
+            "number",
+            "boolean",
+            "null"
+          ]
+        },
+        "port": {
+          "type": [
+            "string",
+            "number",
+            "boolean",
+            "null"
+          ]
+        },
+        "ground_base": {
+          "description": "Where the ground station is, as address:port. What each node linked into this gateway node produces is sent to that address, at that port plus the node's device id.",
+          "type": [
+            "string",
+            "number",
+            "boolean",
+            "null"
+          ]
+        },
+        "bridge_base": {
+          "description": "Where the F´ bridge component is, as address:port: a gateway_fprime node's ground_base. What each node linked into it produces is sent to that address, at that port plus the node's device id.",
+          "type": [
+            "string",
+            "number",
+            "boolean",
+            "null"
+          ]
+        },
+        "apid_base": {
+          "description": "The APID, 0 to 0x7FF, of the CCSDS telecommands the ground sends a gateway_yamcs node: what each node linked into it produces goes to the ground as CCSDS telemetry under this APID plus its own device id. Decimal, or hexadecimal with 0x.",
+          "type": [
+            "string",
+            "number",
+            "boolean",
+            "null"
+          ]
+        },
+        "fprime_id_base": {
+          "description": "The first of the F´ IDs the bridge gives what arrives at a gateway_fprime node: each node linked into it is this ID plus its own device id. Decimal, or hexadecimal with 0x.",
+          "type": [
+            "string",
+            "number",
+            "boolean",
+            "null"
+          ]
+        },
+        "cmd_msgid": {
+          "description": "The message ID what a gateway_cfs node sends on is published under on the cFS software bus: a command's, with 0x80 set. Required where a line or a command binding leaves the node.",
+          "type": [
+            "string",
+            "number",
+            "boolean",
+            "null"
+          ]
+        },
+        "tlm_base": {
+          "description": "The first of the message IDs what arrives at a gateway_cfs node is published under: each node linked into it is this plus its own device id.",
+          "type": [
+            "string",
+            "number",
+            "boolean",
+            "null"
+          ]
+        },
+        "protocol": {
+          "type": [
+            "string",
+            "number",
+            "boolean",
+            "null"
+          ]
+        },
+        "ip_protocol": {
+          "description": "The IP protocol number a node reached with `protocol: raw` reads and writes, 1 to 254. For a raw socket and nothing else.",
+          "type": [
+            "string",
+            "number",
+            "boolean",
+            "null"
+          ]
+        },
+        "sends_from": {
+          "description": "Where a datagram payload that speaks first sends from -- a host and a port over udp, as 10.0.0.7:7001, or a path over unix_dgram -- and so the one address it is read from: anything else that reaches the vehicle's socket is turned away and counted. Optional; without it the payload is learnt from the first datagram that arrives. Not on a payload that is asked or only driven, which is reached at its address.",
+          "type": "string"
+        },
+        "stand_in": {
+          "description": "Where an hdlc, spi, rpmsg or iio payload is reached over UDP when it is simulated, as a loopback address and port: 127.0.0.1:7950. Used under --simulate=some or all, and not under none, the flight setting, when the device is opened.",
+          "type": "string"
+        },
+        "interface": {
+          "type": [
+            "string",
+            "number",
+            "boolean",
+            "null"
+          ]
+        },
+        "can_id": {
+          "type": [
+            "string",
+            "number",
+            "boolean",
+            "null"
+          ]
+        },
+        "read_size": {
+          "type": [
+            "string",
+            "number",
+            "boolean",
+            "null"
+          ]
+        },
+        "trigger_interval": {
+          "description": "How often the trigger goes out, as a length of time: how often this payload is asked. For a payload that states a trigger and is in no group -- a payload in one is asked when its group is read. A payload with no trigger has nothing to send, and states `poll_interval` instead.",
+          "type": [
+            "string",
+            "number",
+            "boolean",
+            "null"
+          ]
+        },
+        "poll_interval": {
+          "description": "The least time between issuing one read of this node and issuing the next, as a length of time: a floor on the reading of a part nothing asks, not a cadence -- there is no telling how soon a descriptor will have anything, and what the interval prevents is reading again immediately for an answer already given. For a node in no group, and never beside a `trigger` -- a node that is asked is read because it was asked, which is `trigger_interval`.",
+          "type": [
+            "string",
+            "number",
+            "boolean",
+            "null"
+          ]
+        },
+        "read_delay": {
+          "description": "How long to wait between sending the trigger and reading the answer, as a length of time: what the part's interface document says it takes to answer. With one, a pass asks, waits and reads the answer to the question it just asked; with none, a pass reads what the last ask produced and asks again, so the reading is one interval old. Only beside a `trigger`.",
+          "type": [
+            "string",
+            "number",
+            "boolean",
+            "null"
+          ]
+        },
+        "init": {
+          "description": "What to write to this payload as the vehicle opens it -- at startup, and whenever the ground starts it again -- written as a trigger is: parts one after another, each a C string in quotes or bytes in hexadecimal in square brackets: '\"READ\\r\"', '[55]', '\"AT\" [0D 0A]'. A write that fails stops the node from starting. Not on lines that are watched, a sensor's sample buffer, or a datagram payload that speaks first.",
+          "type": [
+            "string",
+            "number",
+            "boolean",
+            "null"
+          ]
+        },
+        "trigger": {
+          "description": "What to write to make this payload answer: parts one after another, each a C string in quotes or bytes in hexadecimal in square brackets: '\"READ\\r\"', '[55]', '\"AT\" [0D 0A]'. A payload that states one is asked and is read at the interval of the payload group it is in; one that states none is only read, and a line delivering into it is refused. A payload says what asks it or that it sends on its own, never both, and there is no mode attribute: which it is follows from whether it has a trigger.",
+          "type": [
+            "string",
+            "number",
+            "boolean",
+            "null"
+          ]
+        },
+        "max_length": {
+          "type": [
+            "string",
+            "number",
+            "boolean",
+            "null"
+          ]
+        },
+        "read_timeout": {
+          "type": [
+            "string",
+            "number",
+            "boolean",
+            "null"
+          ]
+        },
+        "terminators": {
+          "description": "The byte sequences that each end a packet of a stream -- a line, or a tcp or unix_stream socket -- where the first of them arrives whole, which is the packet's last bytes. A list, one entry per terminator, each written as a trigger is: parts one after another, each a C string in quotes or bytes in hexadecimal in square brackets: '\"READ\\r\"', '[55]', '\"AT\" [0D 0A]'. Not beside a length_prefix.",
+          "type": [
+            "array",
+            "string",
+            "null"
+          ],
+          "items": {
+            "type": "string"
+          }
+        },
+        "length_prefix": {
+          "description": "What a packet's first bytes say its length is, counting the bytes after them: u8, or u16be or u16le for two bytes with the more or the less significant first. The packet is delivered prefix and all. Needs a read_timeout, which may be none, and is not beside terminators.",
+          "enum": [
+            "u8",
+            "u16be",
+            "u16le"
+          ]
+        },
+        "datarate": {
+          "type": [
+            "string",
+            "number",
+            "boolean",
+            "null"
+          ]
+        },
+        "byte_length": {
+          "type": [
+            "string",
+            "number",
+            "boolean",
+            "null"
+          ]
+        },
+        "stop_bits": {
+          "type": [
+            "string",
+            "number",
+            "boolean",
+            "null"
+          ]
+        },
+        "parity": {
+          "type": [
+            "string",
+            "number",
+            "boolean",
+            "null"
+          ]
+        },
+        "standard": {
+          "type": [
+            "string",
+            "number",
+            "boolean",
+            "null"
+          ]
+        },
+        "clock_rate": {
+          "type": [
+            "string",
+            "number",
+            "boolean",
+            "null"
+          ]
+        },
+        "clock_type": {
+          "type": [
+            "string",
+            "number",
+            "boolean",
+            "null"
+          ]
+        },
+        "encoding": {
+          "type": [
+            "string",
+            "number",
+            "boolean",
+            "null"
+          ]
+        },
+        "frame_check": {
+          "type": [
+            "string",
+            "number",
+            "boolean",
+            "null"
+          ]
+        },
+        "loopback": {
+          "type": [
+            "string",
+            "number",
+            "boolean",
+            "null"
+          ]
+        },
+        "rs485": {
+          "type": [
+            "string",
+            "number",
+            "boolean",
+            "null"
+          ]
+        },
+        "rs485_rts_on_send": {
+          "type": [
+            "string",
+            "number",
+            "boolean",
+            "null"
+          ]
+        },
+        "rs485_delay_before_send": {
+          "type": [
+            "string",
+            "number",
+            "boolean",
+            "null"
+          ]
+        },
+        "rs485_delay_after_send": {
+          "type": [
+            "string",
+            "number",
+            "boolean",
+            "null"
+          ]
+        },
+        "ten_bit": {
+          "type": [
+            "string",
+            "number",
+            "boolean",
+            "null"
+          ]
+        },
+        "pec": {
+          "type": [
+            "string",
+            "number",
+            "boolean",
+            "null"
+          ]
+        },
+        "retries": {
+          "type": [
+            "string",
+            "number",
+            "boolean",
+            "null"
+          ]
+        },
+        "timeout": {
+          "type": [
+            "string",
+            "number",
+            "boolean",
+            "null"
+          ]
+        },
+        "max_speed": {
+          "type": [
+            "string",
+            "number",
+            "boolean",
+            "null"
+          ]
+        },
+        "spi_mode": {
+          "type": [
+            "string",
+            "number",
+            "boolean",
+            "null"
+          ]
+        },
+        "bits_per_word": {
+          "type": [
+            "string",
+            "number",
+            "boolean",
+            "null"
+          ]
+        },
+        "bit_order": {
+          "type": [
+            "string",
+            "number",
+            "boolean",
+            "null"
+          ]
+        },
+        "cs_active": {
+          "type": [
+            "string",
+            "number",
+            "boolean",
+            "null"
+          ]
+        },
+        "can_fd": {
+          "type": [
+            "string",
+            "number",
+            "boolean",
+            "null"
+          ]
+        },
+        "service": {
+          "type": [
+            "string",
+            "number",
+            "boolean",
+            "null"
+          ]
+        },
+        "max_message_bytes": {
+          "type": [
+            "string",
+            "number",
+            "boolean",
+            "null"
+          ]
+        },
+        "lines": {
+          "type": [
+            "string",
+            "number",
+            "boolean",
+            "null"
+          ]
+        },
+        "direction": {
+          "type": [
+            "string",
+            "number",
+            "boolean",
+            "null"
+          ]
+        },
+        "edge": {
+          "type": [
+            "string",
+            "number",
+            "boolean",
+            "null"
+          ]
+        },
+        "bias": {
+          "type": [
+            "string",
+            "number",
+            "boolean",
+            "null"
+          ]
+        },
+        "state_interval": {
+          "description": "How often to report what a set of discrete lines is, as a length of time: 5 s. Events say when a line changed and this says what the lines are, so a payload may ask for either or both. It exists for the two things edges cannot do: a line that has not changed since the vehicle started tells the ground nothing, and the kernel's event queue is finite, so a burst can leave the ground holding a value that is wrong. Inputs only.",
+          "type": [
+            "string",
+            "number",
+            "boolean",
+            "null"
+          ]
+        },
+        "debounce": {
+          "type": [
+            "string",
+            "number",
+            "boolean",
+            "null"
+          ]
+        },
+        "function": {
+          "type": [
+            "string",
+            "number",
+            "boolean",
+            "null"
+          ]
+        },
+        "inputs": {
+          "type": [
+            "string",
+            "number",
+            "boolean",
+            "null"
+          ]
+        },
+        "format": {
+          "type": [
+            "string",
+            "number",
+            "boolean",
+            "null"
+          ]
+        },
+        "scale": {
+          "type": [
+            "string",
+            "number",
+            "boolean",
+            "null"
+          ]
+        },
+        "offset": {
+          "type": [
+            "string",
+            "number",
+            "boolean",
+            "null"
+          ]
+        },
+        "setpoint": {
+          "type": [
+            "string",
+            "number",
+            "boolean",
+            "null"
+          ]
+        },
+        "half_band": {
+          "type": [
+            "string",
+            "number",
+            "boolean",
+            "null"
+          ]
+        },
+        "algorithm": {
+          "type": [
+            "string",
+            "number",
+            "boolean",
+            "null"
+          ]
+        },
+        "age": {
+          "description": "For a `vote`: how old a reading may be and still be voted on, as a length of time: `2 s`. Older ones are left out. Unstated, a reading stands until it is replaced.",
+          "type": [
+            "string",
+            "number",
+            "boolean",
+            "null"
+          ]
+        },
+        "unit": {
+          "description": "The unit the node's values are in: K, V, A, W, m, m/s, N, kg/s or ratio. Required of a `to_value` conversion and of a `process` computation, whose answers are numbers of it.",
+          "type": [
+            "string",
+            "number",
+            "boolean",
+            "null"
+          ]
+        },
+        "executable": {
+          "description": "The program this node runs: an app node's application, or the program a `process` computation runs on what arrives. Executed with a leading `~` and `$HOME` expanded as a shell would expand them -- to the home directory and to the value of the environment variable HOME, of whatever runs it. An app node's is run with the node's name as its first argument.",
+          "type": [
+            "string",
+            "number",
+            "boolean",
+            "null"
+          ]
+        },
+        "restart": {
+          "type": [
+            "string",
+            "number",
+            "boolean",
+            "null"
+          ]
+        },
+        "directory": {
+          "type": [
+            "string",
+            "number",
+            "boolean",
+            "null"
+          ]
+        },
+        "segment_bytes": {
+          "type": [
+            "string",
+            "number",
+            "boolean",
+            "null"
+          ]
+        },
+        "file": {
+          "type": [
+            "string",
+            "number",
+            "boolean",
+            "null"
+          ]
+        }
+      },
+      "required": [
+        "gateway"
+      ],
+      "additionalProperties": false
+    },
+    "gatewaysType": {
+      "description": "The key an entry of the section groups its nodes by: the word type, one space, and the configuration's own word for the type, which is every node's under it. A link to the ground over the radio is gateway_radio; one to a Yamcs ground station is gateway_yamcs; one to an F´ bridge component is gateway_fprime; one to a cFS software bus is gateway_cfs. The order of the entries, and of the nodes under each, means nothing.",
+      "type": "string",
+      "enum": [
+        "type gateway_radio",
+        "type gateway_cfs",
+        "type gateway_fprime",
+        "type gateway_yamcs"
+      ]
+    },
+    "computeNode": {
+      "type": "object",
+      "properties": {
+        "compute": {
+          "description": "What this node is called, unique across the configuration: the first key of the node, the word for a node of the section and the name after it.",
+          "type": "string",
+          "minLength": 1
+        },
+        "group": {
+          "description": "The payload group that reads it, where it is in one. Optional, though a payload that states a trigger needs one: the interval of its group is how often it is asked.",
+          "type": "string"
+        },
+        "payload-out": {
+          "description": "The lines that leave this node by its `payload-out`, one entry each. An entry names the node the line goes to as its `target`, and `input` where it feeds a named input of that node. The short spellings are read too: the destination as a string, `node` or `node.terminal`, alone or in a list.",
+          "oneOf": [
+            {
+              "description": "One line, written as an entry.",
+              "$ref": "#/$defs/linkEntry"
+            },
+            {
+              "description": "One line, written as the node it reaches: `node` or `node.terminal`.",
+              "type": "string",
+              "pattern": "^[A-Za-z_][A-Za-z0-9_./-]*(\\.[A-Za-z_][A-Za-z0-9_-]*)?$"
+            },
+            {
+              "description": "Several lines, each an entry or a destination.",
+              "type": "array",
+              "items": {
+                "oneOf": [
+                  {
+                    "$ref": "#/$defs/linkEntry"
+                  },
+                  {
+                    "type": "string",
+                    "pattern": "^[A-Za-z_][A-Za-z0-9_./-]*(\\.[A-Za-z_][A-Za-z0-9_-]*)?$"
+                  }
+                ]
+              },
+              "minItems": 1
+            }
+          ]
+        },
+        "gateway-out": {
+          "description": "The lines that leave this node by its `gateway-out`, one entry each. An entry names the node the line goes to as its `target`, and `input` where it feeds a named input of that node. The short spellings are read too: the destination as a string, `node` or `node.terminal`, alone or in a list.",
+          "oneOf": [
+            {
+              "description": "One line, written as an entry.",
+              "$ref": "#/$defs/linkEntry"
+            },
+            {
+              "description": "One line, written as the node it reaches: `node` or `node.terminal`.",
+              "type": "string",
+              "pattern": "^[A-Za-z_][A-Za-z0-9_./-]*(\\.[A-Za-z_][A-Za-z0-9_-]*)?$"
+            },
+            {
+              "description": "Several lines, each an entry or a destination.",
+              "type": "array",
+              "items": {
+                "oneOf": [
+                  {
+                    "$ref": "#/$defs/linkEntry"
+                  },
+                  {
+                    "type": "string",
+                    "pattern": "^[A-Za-z_][A-Za-z0-9_./-]*(\\.[A-Za-z_][A-Za-z0-9_-]*)?$"
+                  }
+                ]
+              },
+              "minItems": 1
+            }
+          ]
+        },
+        "payload-in": {
+          "description": "Whether a line arrives at this node's `payload-in` sink. A record of the links written on the nodes they leave, and not a link: which node a line comes from is written on that node. A file may leave it out; one that disagrees with the links is refused where it is read.",
+          "type": "boolean"
+        },
+        "gateway-in": {
+          "description": "Whether a line arrives at this node's `gateway-in` sink. A record of the links written on the nodes they leave, and not a link: which node a line comes from is written on that node. A file may leave it out; one that disagrees with the links is refused where it is read.",
+          "type": "boolean"
+        },
+        "path": {
+          "type": [
+            "string",
+            "number",
+            "boolean",
+            "null"
+          ]
+        },
+        "address": {
+          "type": [
+            "string",
+            "number",
+            "boolean",
+            "null"
+          ]
+        },
+        "port": {
+          "type": [
+            "string",
+            "number",
+            "boolean",
+            "null"
+          ]
+        },
+        "protocol": {
+          "type": [
+            "string",
+            "number",
+            "boolean",
+            "null"
+          ]
+        },
+        "ip_protocol": {
+          "description": "The IP protocol number a node reached with `protocol: raw` reads and writes, 1 to 254. For a raw socket and nothing else.",
+          "type": [
+            "string",
+            "number",
+            "boolean",
+            "null"
+          ]
+        },
+        "sends_from": {
+          "description": "Where a datagram payload that speaks first sends from -- a host and a port over udp, as 10.0.0.7:7001, or a path over unix_dgram -- and so the one address it is read from: anything else that reaches the vehicle's socket is turned away and counted. Optional; without it the payload is learnt from the first datagram that arrives. Not on a payload that is asked or only driven, which is reached at its address.",
+          "type": "string"
+        },
+        "stand_in": {
+          "description": "Where an hdlc, spi, rpmsg or iio payload is reached over UDP when it is simulated, as a loopback address and port: 127.0.0.1:7950. Used under --simulate=some or all, and not under none, the flight setting, when the device is opened.",
+          "type": "string"
+        },
+        "interface": {
+          "type": [
+            "string",
+            "number",
+            "boolean",
+            "null"
+          ]
+        },
+        "can_id": {
+          "type": [
+            "string",
+            "number",
+            "boolean",
+            "null"
+          ]
+        },
+        "read_size": {
+          "type": [
+            "string",
+            "number",
+            "boolean",
+            "null"
+          ]
+        },
+        "trigger_interval": {
+          "description": "How often the trigger goes out, as a length of time: how often this payload is asked. For a payload that states a trigger and is in no group -- a payload in one is asked when its group is read. A payload with no trigger has nothing to send, and states `poll_interval` instead.",
+          "type": [
+            "string",
+            "number",
+            "boolean",
+            "null"
+          ]
+        },
+        "poll_interval": {
+          "description": "The least time between issuing one read of this node and issuing the next, as a length of time: a floor on the reading of a part nothing asks, not a cadence -- there is no telling how soon a descriptor will have anything, and what the interval prevents is reading again immediately for an answer already given. For a node in no group, and never beside a `trigger` -- a node that is asked is read because it was asked, which is `trigger_interval`.",
+          "type": [
+            "string",
+            "number",
+            "boolean",
+            "null"
+          ]
+        },
+        "read_delay": {
+          "description": "How long to wait between sending the trigger and reading the answer, as a length of time: what the part's interface document says it takes to answer. With one, a pass asks, waits and reads the answer to the question it just asked; with none, a pass reads what the last ask produced and asks again, so the reading is one interval old. Only beside a `trigger`.",
+          "type": [
+            "string",
+            "number",
+            "boolean",
+            "null"
+          ]
+        },
+        "init": {
+          "description": "What to write to this payload as the vehicle opens it -- at startup, and whenever the ground starts it again -- written as a trigger is: parts one after another, each a C string in quotes or bytes in hexadecimal in square brackets: '\"READ\\r\"', '[55]', '\"AT\" [0D 0A]'. A write that fails stops the node from starting. Not on lines that are watched, a sensor's sample buffer, or a datagram payload that speaks first.",
+          "type": [
+            "string",
+            "number",
+            "boolean",
+            "null"
+          ]
+        },
+        "trigger": {
+          "description": "What to write to make this payload answer: parts one after another, each a C string in quotes or bytes in hexadecimal in square brackets: '\"READ\\r\"', '[55]', '\"AT\" [0D 0A]'. A payload that states one is asked and is read at the interval of the payload group it is in; one that states none is only read, and a line delivering into it is refused. A payload says what asks it or that it sends on its own, never both, and there is no mode attribute: which it is follows from whether it has a trigger.",
+          "type": [
+            "string",
+            "number",
+            "boolean",
+            "null"
+          ]
+        },
+        "max_length": {
+          "type": [
+            "string",
+            "number",
+            "boolean",
+            "null"
+          ]
+        },
+        "read_timeout": {
+          "type": [
+            "string",
+            "number",
+            "boolean",
+            "null"
+          ]
+        },
+        "terminators": {
+          "description": "The byte sequences that each end a packet of a stream -- a line, or a tcp or unix_stream socket -- where the first of them arrives whole, which is the packet's last bytes. A list, one entry per terminator, each written as a trigger is: parts one after another, each a C string in quotes or bytes in hexadecimal in square brackets: '\"READ\\r\"', '[55]', '\"AT\" [0D 0A]'. Not beside a length_prefix.",
+          "type": [
+            "array",
+            "string",
+            "null"
+          ],
+          "items": {
+            "type": "string"
+          }
+        },
+        "length_prefix": {
+          "description": "What a packet's first bytes say its length is, counting the bytes after them: u8, or u16be or u16le for two bytes with the more or the less significant first. The packet is delivered prefix and all. Needs a read_timeout, which may be none, and is not beside terminators.",
+          "enum": [
+            "u8",
+            "u16be",
+            "u16le"
+          ]
+        },
+        "datarate": {
+          "type": [
+            "string",
+            "number",
+            "boolean",
+            "null"
+          ]
+        },
+        "byte_length": {
+          "type": [
+            "string",
+            "number",
+            "boolean",
+            "null"
+          ]
+        },
+        "stop_bits": {
+          "type": [
+            "string",
+            "number",
+            "boolean",
+            "null"
+          ]
+        },
+        "parity": {
+          "type": [
+            "string",
+            "number",
+            "boolean",
+            "null"
+          ]
+        },
+        "standard": {
+          "type": [
+            "string",
+            "number",
+            "boolean",
+            "null"
+          ]
+        },
+        "clock_rate": {
+          "type": [
+            "string",
+            "number",
+            "boolean",
+            "null"
+          ]
+        },
+        "clock_type": {
+          "type": [
+            "string",
+            "number",
+            "boolean",
+            "null"
+          ]
+        },
+        "encoding": {
+          "type": [
+            "string",
+            "number",
+            "boolean",
+            "null"
+          ]
+        },
+        "frame_check": {
+          "type": [
+            "string",
+            "number",
+            "boolean",
+            "null"
+          ]
+        },
+        "loopback": {
+          "type": [
+            "string",
+            "number",
+            "boolean",
+            "null"
+          ]
+        },
+        "rs485": {
+          "type": [
+            "string",
+            "number",
+            "boolean",
+            "null"
+          ]
+        },
+        "rs485_rts_on_send": {
+          "type": [
+            "string",
+            "number",
+            "boolean",
+            "null"
+          ]
+        },
+        "rs485_delay_before_send": {
+          "type": [
+            "string",
+            "number",
+            "boolean",
+            "null"
+          ]
+        },
+        "rs485_delay_after_send": {
+          "type": [
+            "string",
+            "number",
+            "boolean",
+            "null"
+          ]
+        },
+        "ten_bit": {
+          "type": [
+            "string",
+            "number",
+            "boolean",
+            "null"
+          ]
+        },
+        "pec": {
+          "type": [
+            "string",
+            "number",
+            "boolean",
+            "null"
+          ]
+        },
+        "retries": {
+          "type": [
+            "string",
+            "number",
+            "boolean",
+            "null"
+          ]
+        },
+        "timeout": {
+          "type": [
+            "string",
+            "number",
+            "boolean",
+            "null"
+          ]
+        },
+        "max_speed": {
+          "type": [
+            "string",
+            "number",
+            "boolean",
+            "null"
+          ]
+        },
+        "spi_mode": {
+          "type": [
+            "string",
+            "number",
+            "boolean",
+            "null"
+          ]
+        },
+        "bits_per_word": {
+          "type": [
+            "string",
+            "number",
+            "boolean",
+            "null"
+          ]
+        },
+        "bit_order": {
+          "type": [
+            "string",
+            "number",
+            "boolean",
+            "null"
+          ]
+        },
+        "cs_active": {
+          "type": [
+            "string",
+            "number",
+            "boolean",
+            "null"
+          ]
+        },
+        "can_fd": {
+          "type": [
+            "string",
+            "number",
+            "boolean",
+            "null"
+          ]
+        },
+        "service": {
+          "type": [
+            "string",
+            "number",
+            "boolean",
+            "null"
+          ]
+        },
+        "max_message_bytes": {
+          "type": [
+            "string",
+            "number",
+            "boolean",
+            "null"
+          ]
+        },
+        "lines": {
+          "type": [
+            "string",
+            "number",
+            "boolean",
+            "null"
+          ]
+        },
+        "direction": {
+          "type": [
+            "string",
+            "number",
+            "boolean",
+            "null"
+          ]
+        },
+        "edge": {
+          "type": [
+            "string",
+            "number",
+            "boolean",
+            "null"
+          ]
+        },
+        "bias": {
+          "type": [
+            "string",
+            "number",
+            "boolean",
+            "null"
+          ]
+        },
+        "state_interval": {
+          "description": "How often to report what a set of discrete lines is, as a length of time: 5 s. Events say when a line changed and this says what the lines are, so a payload may ask for either or both. It exists for the two things edges cannot do: a line that has not changed since the vehicle started tells the ground nothing, and the kernel's event queue is finite, so a burst can leave the ground holding a value that is wrong. Inputs only.",
+          "type": [
+            "string",
+            "number",
+            "boolean",
+            "null"
+          ]
+        },
+        "debounce": {
+          "type": [
+            "string",
+            "number",
+            "boolean",
+            "null"
+          ]
+        },
+        "function": {
+          "type": [
+            "string",
+            "number",
+            "boolean",
+            "null"
+          ]
+        },
+        "inputs": {
+          "type": [
+            "string",
+            "number",
+            "boolean",
+            "null"
+          ]
+        },
+        "format": {
+          "type": [
+            "string",
+            "number",
+            "boolean",
+            "null"
+          ]
+        },
+        "scale": {
+          "type": [
+            "string",
+            "number",
+            "boolean",
+            "null"
+          ]
+        },
+        "offset": {
+          "type": [
+            "string",
+            "number",
+            "boolean",
+            "null"
+          ]
+        },
+        "setpoint": {
+          "type": [
+            "string",
+            "number",
+            "boolean",
+            "null"
+          ]
+        },
+        "half_band": {
+          "type": [
+            "string",
+            "number",
+            "boolean",
+            "null"
+          ]
+        },
+        "algorithm": {
+          "type": [
+            "string",
+            "number",
+            "boolean",
+            "null"
+          ]
+        },
+        "age": {
+          "description": "For a `vote`: how old a reading may be and still be voted on, as a length of time: `2 s`. Older ones are left out. Unstated, a reading stands until it is replaced.",
+          "type": [
+            "string",
+            "number",
+            "boolean",
+            "null"
+          ]
+        },
+        "unit": {
+          "description": "The unit the node's values are in: K, V, A, W, m, m/s, N, kg/s or ratio. Required of a `to_value` conversion and of a `process` computation, whose answers are numbers of it.",
+          "type": [
+            "string",
+            "number",
+            "boolean",
+            "null"
+          ]
+        },
+        "executable": {
+          "description": "The program this node runs: an app node's application, or the program a `process` computation runs on what arrives. Executed with a leading `~` and `$HOME` expanded as a shell would expand them -- to the home directory and to the value of the environment variable HOME, of whatever runs it. An app node's is run with the node's name as its first argument.",
+          "type": [
+            "string",
+            "number",
+            "boolean",
+            "null"
+          ]
+        },
+        "app-payload-arg": {
+          "description": "What an app node's program is told about the payload stream, as the argument after the node's name. Said by the kinds that handle payload data -- app_payload_veh, app_all_veh, app_pl, app_all_pl -- and required of them, the arguments being a fixed list.",
+          "type": [
+            "string",
+            "number",
+            "boolean",
+            "null"
+          ]
+        },
+        "app-gateway-arg": {
+          "description": "And what it is told about the gateway stream, as the argument after the payload one where a kind has both. Said by the kinds that handle gateway data -- app_gateway_veh, app_all_veh, app_all_pl -- and required of them.",
+          "type": [
+            "string",
+            "number",
+            "boolean",
+            "null"
+          ]
+        },
+        "restart": {
+          "type": [
+            "string",
+            "number",
+            "boolean",
+            "null"
+          ]
+        },
+        "directory": {
+          "type": [
+            "string",
+            "number",
+            "boolean",
+            "null"
+          ]
+        },
+        "segment_bytes": {
+          "type": [
+            "string",
+            "number",
+            "boolean",
+            "null"
+          ]
+        },
+        "file": {
+          "type": [
+            "string",
+            "number",
+            "boolean",
+            "null"
+          ]
+        }
+      },
+      "required": [
+        "compute"
+      ],
+      "additionalProperties": false
+    },
+    "vehicleType": {
+      "description": "The key an entry of the section groups its nodes by: the word type, one space, and the configuration's own word for the type, which is every node's under it. One of the vehicle's own: a computation, a log, a node that drops one stream, a tee that sends one stream on both ways, a node that answers pings, or a program of the vehicle's. The order of the entries, and of the nodes under each, means nothing.",
+      "type": "string",
+      "enum": [
+        "type compute",
+        "type log",
+        "type null-gateway",
+        "type null-payload",
+        "type tee-gateway",
+        "type tee-payload",
+        "type ping",
+        "type app_payload_veh",
+        "type app_gateway_veh",
+        "type app_all_veh"
+      ]
+    },
+    "payloadNode": {
+      "type": "object",
+      "properties": {
+        "payload": {
+          "description": "What this node is called, unique across the configuration: the first key of the node, the word for a node of the section and the name after it.",
+          "type": "string",
+          "minLength": 1
+        },
+        "group": {
+          "description": "The payload group that reads it, where it is in one. Optional, though a payload that states a trigger needs one: the interval of its group is how often it is asked.",
+          "type": "string"
+        },
+        "payload-out": {
+          "description": "The lines that leave this node by its `payload-out`, one entry each. An entry names the node the line goes to as its `target`, and `input` where it feeds a named input of that node. The short spellings are read too: the destination as a string, `node` or `node.terminal`, alone or in a list.",
+          "oneOf": [
+            {
+              "description": "One line, written as an entry.",
+              "$ref": "#/$defs/linkEntry"
+            },
+            {
+              "description": "One line, written as the node it reaches: `node` or `node.terminal`.",
+              "type": "string",
+              "pattern": "^[A-Za-z_][A-Za-z0-9_./-]*(\\.[A-Za-z_][A-Za-z0-9_-]*)?$"
+            },
+            {
+              "description": "Several lines, each an entry or a destination.",
+              "type": "array",
+              "items": {
+                "oneOf": [
+                  {
+                    "$ref": "#/$defs/linkEntry"
+                  },
+                  {
+                    "type": "string",
+                    "pattern": "^[A-Za-z_][A-Za-z0-9_./-]*(\\.[A-Za-z_][A-Za-z0-9_-]*)?$"
+                  }
+                ]
+              },
+              "minItems": 1
+            }
+          ]
+        },
+        "gateway-out": {
+          "description": "The lines that leave this node by its `gateway-out`, one entry each. An entry names the node the line goes to as its `target`, and `input` where it feeds a named input of that node. The short spellings are read too: the destination as a string, `node` or `node.terminal`, alone or in a list.",
+          "oneOf": [
+            {
+              "description": "One line, written as an entry.",
+              "$ref": "#/$defs/linkEntry"
+            },
+            {
+              "description": "One line, written as the node it reaches: `node` or `node.terminal`.",
+              "type": "string",
+              "pattern": "^[A-Za-z_][A-Za-z0-9_./-]*(\\.[A-Za-z_][A-Za-z0-9_-]*)?$"
+            },
+            {
+              "description": "Several lines, each an entry or a destination.",
+              "type": "array",
+              "items": {
+                "oneOf": [
+                  {
+                    "$ref": "#/$defs/linkEntry"
+                  },
+                  {
+                    "type": "string",
+                    "pattern": "^[A-Za-z_][A-Za-z0-9_./-]*(\\.[A-Za-z_][A-Za-z0-9_-]*)?$"
+                  }
+                ]
+              },
+              "minItems": 1
+            }
+          ]
+        },
+        "payload-in": {
+          "description": "Whether a line arrives at this node's `payload-in` sink. A record of the links written on the nodes they leave, and not a link: which node a line comes from is written on that node. A file may leave it out; one that disagrees with the links is refused where it is read.",
+          "type": "boolean"
+        },
+        "gateway-in": {
+          "description": "Whether a line arrives at this node's `gateway-in` sink. A record of the links written on the nodes they leave, and not a link: which node a line comes from is written on that node. A file may leave it out; one that disagrees with the links is refused where it is read.",
+          "type": "boolean"
+        },
+        "path": {
+          "type": [
+            "string",
+            "number",
+            "boolean",
+            "null"
+          ]
+        },
+        "address": {
+          "type": [
+            "string",
+            "number",
+            "boolean",
+            "null"
+          ]
+        },
+        "port": {
+          "type": [
+            "string",
+            "number",
+            "boolean",
+            "null"
+          ]
+        },
+        "protocol": {
+          "type": [
+            "string",
+            "number",
+            "boolean",
+            "null"
+          ]
+        },
+        "ip_protocol": {
+          "description": "The IP protocol number a node reached with `protocol: raw` reads and writes, 1 to 254. For a raw socket and nothing else.",
+          "type": [
+            "string",
+            "number",
+            "boolean",
+            "null"
+          ]
+        },
+        "sends_from": {
+          "description": "Where a datagram payload that speaks first sends from -- a host and a port over udp, as 10.0.0.7:7001, or a path over unix_dgram -- and so the one address it is read from: anything else that reaches the vehicle's socket is turned away and counted. Optional; without it the payload is learnt from the first datagram that arrives. Not on a payload that is asked or only driven, which is reached at its address.",
+          "type": "string"
+        },
+        "stand_in": {
+          "description": "Where an hdlc, spi, rpmsg or iio payload is reached over UDP when it is simulated, as a loopback address and port: 127.0.0.1:7950. Used under --simulate=some or all, and not under none, the flight setting, when the device is opened.",
+          "type": "string"
+        },
+        "interface": {
+          "type": [
+            "string",
+            "number",
+            "boolean",
+            "null"
+          ]
+        },
+        "can_id": {
+          "type": [
+            "string",
+            "number",
+            "boolean",
+            "null"
+          ]
+        },
+        "read_size": {
+          "type": [
+            "string",
+            "number",
+            "boolean",
+            "null"
+          ]
+        },
+        "trigger_interval": {
+          "description": "How often the trigger goes out, as a length of time: how often this payload is asked. For a payload that states a trigger and is in no group -- a payload in one is asked when its group is read. A payload with no trigger has nothing to send, and states `poll_interval` instead.",
+          "type": [
+            "string",
+            "number",
+            "boolean",
+            "null"
+          ]
+        },
+        "poll_interval": {
+          "description": "The least time between issuing one read of this node and issuing the next, as a length of time: a floor on the reading of a part nothing asks, not a cadence -- there is no telling how soon a descriptor will have anything, and what the interval prevents is reading again immediately for an answer already given. For a node in no group, and never beside a `trigger` -- a node that is asked is read because it was asked, which is `trigger_interval`.",
+          "type": [
+            "string",
+            "number",
+            "boolean",
+            "null"
+          ]
+        },
+        "read_delay": {
+          "description": "How long to wait between sending the trigger and reading the answer, as a length of time: what the part's interface document says it takes to answer. With one, a pass asks, waits and reads the answer to the question it just asked; with none, a pass reads what the last ask produced and asks again, so the reading is one interval old. Only beside a `trigger`.",
+          "type": [
+            "string",
+            "number",
+            "boolean",
+            "null"
+          ]
+        },
+        "init": {
+          "description": "What to write to this payload as the vehicle opens it -- at startup, and whenever the ground starts it again -- written as a trigger is: parts one after another, each a C string in quotes or bytes in hexadecimal in square brackets: '\"READ\\r\"', '[55]', '\"AT\" [0D 0A]'. A write that fails stops the node from starting. Not on lines that are watched, a sensor's sample buffer, or a datagram payload that speaks first.",
+          "type": [
+            "string",
+            "number",
+            "boolean",
+            "null"
+          ]
+        },
+        "trigger": {
+          "description": "What to write to make this payload answer: parts one after another, each a C string in quotes or bytes in hexadecimal in square brackets: '\"READ\\r\"', '[55]', '\"AT\" [0D 0A]'. A payload that states one is asked and is read at the interval of the payload group it is in; one that states none is only read, and a line delivering into it is refused. A payload says what asks it or that it sends on its own, never both, and there is no mode attribute: which it is follows from whether it has a trigger.",
+          "type": [
+            "string",
+            "number",
+            "boolean",
+            "null"
+          ]
+        },
+        "max_length": {
+          "type": [
+            "string",
+            "number",
+            "boolean",
+            "null"
+          ]
+        },
+        "read_timeout": {
+          "type": [
+            "string",
+            "number",
+            "boolean",
+            "null"
+          ]
+        },
+        "terminators": {
+          "description": "The byte sequences that each end a packet of a stream -- a line, or a tcp or unix_stream socket -- where the first of them arrives whole, which is the packet's last bytes. A list, one entry per terminator, each written as a trigger is: parts one after another, each a C string in quotes or bytes in hexadecimal in square brackets: '\"READ\\r\"', '[55]', '\"AT\" [0D 0A]'. Not beside a length_prefix.",
+          "type": [
+            "array",
+            "string",
+            "null"
+          ],
+          "items": {
+            "type": "string"
+          }
+        },
+        "length_prefix": {
+          "description": "What a packet's first bytes say its length is, counting the bytes after them: u8, or u16be or u16le for two bytes with the more or the less significant first. The packet is delivered prefix and all. Needs a read_timeout, which may be none, and is not beside terminators.",
+          "enum": [
+            "u8",
+            "u16be",
+            "u16le"
+          ]
+        },
+        "datarate": {
+          "type": [
+            "string",
+            "number",
+            "boolean",
+            "null"
+          ]
+        },
+        "byte_length": {
+          "type": [
+            "string",
+            "number",
+            "boolean",
+            "null"
+          ]
+        },
+        "stop_bits": {
+          "type": [
+            "string",
+            "number",
+            "boolean",
+            "null"
+          ]
+        },
+        "parity": {
+          "type": [
+            "string",
+            "number",
+            "boolean",
+            "null"
+          ]
+        },
+        "standard": {
+          "type": [
+            "string",
+            "number",
+            "boolean",
+            "null"
+          ]
+        },
+        "clock_rate": {
+          "type": [
+            "string",
+            "number",
+            "boolean",
+            "null"
+          ]
+        },
+        "clock_type": {
+          "type": [
+            "string",
+            "number",
+            "boolean",
+            "null"
+          ]
+        },
+        "encoding": {
+          "type": [
+            "string",
+            "number",
+            "boolean",
+            "null"
+          ]
+        },
+        "frame_check": {
+          "type": [
+            "string",
+            "number",
+            "boolean",
+            "null"
+          ]
+        },
+        "loopback": {
+          "type": [
+            "string",
+            "number",
+            "boolean",
+            "null"
+          ]
+        },
+        "rs485": {
+          "type": [
+            "string",
+            "number",
+            "boolean",
+            "null"
+          ]
+        },
+        "rs485_rts_on_send": {
+          "type": [
+            "string",
+            "number",
+            "boolean",
+            "null"
+          ]
+        },
+        "rs485_delay_before_send": {
+          "type": [
+            "string",
+            "number",
+            "boolean",
+            "null"
+          ]
+        },
+        "rs485_delay_after_send": {
+          "type": [
+            "string",
+            "number",
+            "boolean",
+            "null"
+          ]
+        },
+        "ten_bit": {
+          "type": [
+            "string",
+            "number",
+            "boolean",
+            "null"
+          ]
+        },
+        "pec": {
+          "type": [
+            "string",
+            "number",
+            "boolean",
+            "null"
+          ]
+        },
+        "retries": {
+          "type": [
+            "string",
+            "number",
+            "boolean",
+            "null"
+          ]
+        },
+        "timeout": {
+          "type": [
+            "string",
+            "number",
+            "boolean",
+            "null"
+          ]
+        },
+        "max_speed": {
+          "type": [
+            "string",
+            "number",
+            "boolean",
+            "null"
+          ]
+        },
+        "spi_mode": {
+          "type": [
+            "string",
+            "number",
+            "boolean",
+            "null"
+          ]
+        },
+        "bits_per_word": {
+          "type": [
+            "string",
+            "number",
+            "boolean",
+            "null"
+          ]
+        },
+        "bit_order": {
+          "type": [
+            "string",
+            "number",
+            "boolean",
+            "null"
+          ]
+        },
+        "cs_active": {
+          "type": [
+            "string",
+            "number",
+            "boolean",
+            "null"
+          ]
+        },
+        "can_fd": {
+          "type": [
+            "string",
+            "number",
+            "boolean",
+            "null"
+          ]
+        },
+        "service": {
+          "type": [
+            "string",
+            "number",
+            "boolean",
+            "null"
+          ]
+        },
+        "max_message_bytes": {
+          "type": [
+            "string",
+            "number",
+            "boolean",
+            "null"
+          ]
+        },
+        "lines": {
+          "type": [
+            "string",
+            "number",
+            "boolean",
+            "null"
+          ]
+        },
+        "direction": {
+          "type": [
+            "string",
+            "number",
+            "boolean",
+            "null"
+          ]
+        },
+        "edge": {
+          "type": [
+            "string",
+            "number",
+            "boolean",
+            "null"
+          ]
+        },
+        "bias": {
+          "type": [
+            "string",
+            "number",
+            "boolean",
+            "null"
+          ]
+        },
+        "state_interval": {
+          "description": "How often to report what a set of discrete lines is, as a length of time: 5 s. Events say when a line changed and this says what the lines are, so a payload may ask for either or both. It exists for the two things edges cannot do: a line that has not changed since the vehicle started tells the ground nothing, and the kernel's event queue is finite, so a burst can leave the ground holding a value that is wrong. Inputs only.",
+          "type": [
+            "string",
+            "number",
+            "boolean",
+            "null"
+          ]
+        },
+        "debounce": {
+          "type": [
+            "string",
+            "number",
+            "boolean",
+            "null"
+          ]
+        },
+        "function": {
+          "type": [
+            "string",
+            "number",
+            "boolean",
+            "null"
+          ]
+        },
+        "inputs": {
+          "type": [
+            "string",
+            "number",
+            "boolean",
+            "null"
+          ]
+        },
+        "format": {
+          "type": [
+            "string",
+            "number",
+            "boolean",
+            "null"
+          ]
+        },
+        "scale": {
+          "type": [
+            "string",
+            "number",
+            "boolean",
+            "null"
+          ]
+        },
+        "offset": {
+          "type": [
+            "string",
+            "number",
+            "boolean",
+            "null"
+          ]
+        },
+        "setpoint": {
+          "type": [
+            "string",
+            "number",
+            "boolean",
+            "null"
+          ]
+        },
+        "half_band": {
+          "type": [
+            "string",
+            "number",
+            "boolean",
+            "null"
+          ]
+        },
+        "algorithm": {
+          "type": [
+            "string",
+            "number",
+            "boolean",
+            "null"
+          ]
+        },
+        "age": {
+          "description": "For a `vote`: how old a reading may be and still be voted on, as a length of time: `2 s`. Older ones are left out. Unstated, a reading stands until it is replaced.",
+          "type": [
+            "string",
+            "number",
+            "boolean",
+            "null"
+          ]
+        },
+        "unit": {
+          "description": "The unit the node's values are in: K, V, A, W, m, m/s, N, kg/s or ratio. Required of a `to_value` conversion and of a `process` computation, whose answers are numbers of it.",
+          "type": [
+            "string",
+            "number",
+            "boolean",
+            "null"
+          ]
+        },
+        "executable": {
+          "description": "The program this node runs: an app node's application, or the program a `process` computation runs on what arrives. Executed with a leading `~` and `$HOME` expanded as a shell would expand them -- to the home directory and to the value of the environment variable HOME, of whatever runs it. An app node's is run with the node's name as its first argument.",
+          "type": [
+            "string",
+            "number",
+            "boolean",
+            "null"
+          ]
+        },
+        "app-payload-arg": {
+          "description": "What an app node's program is told about the payload stream, as the argument after the node's name. Said by the kinds that handle payload data -- app_payload_veh, app_all_veh, app_pl, app_all_pl -- and required of them, the arguments being a fixed list.",
+          "type": [
+            "string",
+            "number",
+            "boolean",
+            "null"
+          ]
+        },
+        "app-gateway-arg": {
+          "description": "And what it is told about the gateway stream, as the argument after the payload one where a kind has both. Said by the kinds that handle gateway data -- app_gateway_veh, app_all_veh, app_all_pl -- and required of them.",
+          "type": [
+            "string",
+            "number",
+            "boolean",
+            "null"
+          ]
+        },
+        "restart": {
+          "type": [
+            "string",
+            "number",
+            "boolean",
+            "null"
+          ]
+        },
+        "directory": {
+          "type": [
+            "string",
+            "number",
+            "boolean",
+            "null"
+          ]
+        },
+        "segment_bytes": {
+          "type": [
+            "string",
+            "number",
+            "boolean",
+            "null"
+          ]
+        },
+        "file": {
+          "type": [
+            "string",
+            "number",
+            "boolean",
+            "null"
+          ]
+        }
+      },
+      "required": [
+        "payload"
+      ],
+      "additionalProperties": false
+    },
+    "payloadsType": {
+      "description": "The key an entry of the section groups its nodes by: the word type, one space, and the configuration's own word for the type, which is every node's under it. One of the interfaces a payload is reached over, or a payload that is a program. The order of the entries, and of the nodes under each, means nothing.",
+      "type": "string",
+      "enum": [
+        "type network",
+        "type device-file",
+        "type serial",
+        "type i2c",
+        "type spi",
+        "type can",
+        "type iio",
+        "type rpmsg",
+        "type gpio",
+        "type hdlc",
+        "type app_pl",
+        "type app_all_pl"
+      ]
     }
   },
   "type": "object",
@@ -373,1995 +2364,61 @@
         "additionalProperties": false
       }
     },
-    "gateway": {
-      "description": "The ground links: what the editor's gateway working pane holds.",
+    "gateways": {
+      "description": "The ground links: what the editor's gateway working pane holds. Grouped by type: each entry is one key, `type` and the type, whose value is the list of that type's nodes, each named by its first key, `gateway: <name>`.",
       "type": "array",
       "items": {
         "type": "object",
-        "properties": {
-          "name": {
-            "description": "What this node is called, unique across the configuration.",
-            "type": "string"
-          },
-          "type": {
-            "description": "What it is: the configuration's own word for the type. A link to the ground over the radio is gateway_radio; one to a Yamcs ground station is gateway_yamcs; one to an F´ bridge component is gateway_fprime; one to a cFS software bus is gateway_cfs.",
-            "type": "string",
-            "enum": [
-              "gateway_radio",
-              "gateway_cfs",
-              "gateway_fprime",
-              "gateway_yamcs"
-            ]
-          },
-          "group": {
-            "description": "The payload group that reads it, where it is in one. Optional, though a payload that states a trigger needs one: the interval of its group is how often it is asked.",
-            "type": "string"
-          },
-          "payload-out": {
-            "description": "The lines that leave this node by its `payload-out`, one entry each. An entry names the node the line goes to as its `target`, and `input` where it feeds a named input of that node. The short spellings are read too: the destination as a string, `node` or `node.terminal`, alone or in a list.",
-            "oneOf": [
-              {
-                "description": "One line, written as an entry.",
-                "$ref": "#/$defs/linkEntry"
-              },
-              {
-                "description": "One line, written as the node it reaches: `node` or `node.terminal`.",
-                "type": "string",
-                "pattern": "^[A-Za-z_][A-Za-z0-9_./-]*(\\.[A-Za-z_][A-Za-z0-9_-]*)?$"
-              },
-              {
-                "description": "Several lines, each an entry or a destination.",
-                "type": "array",
-                "items": {
-                  "oneOf": [
-                    { "$ref": "#/$defs/linkEntry" },
-                    {
-                      "type": "string",
-                      "pattern": "^[A-Za-z_][A-Za-z0-9_./-]*(\\.[A-Za-z_][A-Za-z0-9_-]*)?$"
-                    }
-                  ]
-                },
-                "minItems": 1
-              }
-            ]
-          },
-          "gateway-out": {
-            "description": "The lines that leave this node by its `gateway-out`, one entry each. An entry names the node the line goes to as its `target`, and `input` where it feeds a named input of that node. The short spellings are read too: the destination as a string, `node` or `node.terminal`, alone or in a list.",
-            "oneOf": [
-              {
-                "description": "One line, written as an entry.",
-                "$ref": "#/$defs/linkEntry"
-              },
-              {
-                "description": "One line, written as the node it reaches: `node` or `node.terminal`.",
-                "type": "string",
-                "pattern": "^[A-Za-z_][A-Za-z0-9_./-]*(\\.[A-Za-z_][A-Za-z0-9_-]*)?$"
-              },
-              {
-                "description": "Several lines, each an entry or a destination.",
-                "type": "array",
-                "items": {
-                  "oneOf": [
-                    { "$ref": "#/$defs/linkEntry" },
-                    {
-                      "type": "string",
-                      "pattern": "^[A-Za-z_][A-Za-z0-9_./-]*(\\.[A-Za-z_][A-Za-z0-9_-]*)?$"
-                    }
-                  ]
-                },
-                "minItems": 1
-              }
-            ]
-          },
-          "payload-in": {
-            "description": "Whether a line arrives at this node's `payload-in` sink. A record of the links written on the nodes they leave, and not a link: which node a line comes from is written on that node. A file may leave it out; one that disagrees with the links is refused where it is read.",
-            "type": "boolean"
-          },
-          "gateway-in": {
-            "description": "Whether a line arrives at this node's `gateway-in` sink. A record of the links written on the nodes they leave, and not a link: which node a line comes from is written on that node. A file may leave it out; one that disagrees with the links is refused where it is read.",
-            "type": "boolean"
-          },
-          "path": {
-            "type": [
-              "string",
-              "number",
-              "boolean",
-              "null"
-            ]
-          },
-          "address": {
-            "type": [
-              "string",
-              "number",
-              "boolean",
-              "null"
-            ]
-          },
-          "port": {
-            "type": [
-              "string",
-              "number",
-              "boolean",
-              "null"
-            ]
-          },
-          "ground_base": {
-            "description": "Where the ground station is, as address:port. What each node linked into this gateway node produces is sent to that address, at that port plus the node's device id.",
-            "type": [
-              "string",
-              "number",
-              "boolean",
-              "null"
-            ]
-          },
-          "bridge_base": {
-            "description": "Where the F´ bridge component is, as address:port: a gateway_fprime node's ground_base. What each node linked into it produces is sent to that address, at that port plus the node's device id.",
-            "type": [
-              "string",
-              "number",
-              "boolean",
-              "null"
-            ]
-          },
-          "apid_base": {
-            "description": "The APID, 0 to 0x7FF, of the CCSDS telecommands the ground sends a gateway_yamcs node: what each node linked into it produces goes to the ground as CCSDS telemetry under this APID plus its own device id. Decimal, or hexadecimal with 0x.",
-            "type": [
-              "string",
-              "number",
-              "boolean",
-              "null"
-            ]
-          },
-          "fprime_id_base": {
-            "description": "The first of the F´ IDs the bridge gives what arrives at a gateway_fprime node: each node linked into it is this ID plus its own device id. Decimal, or hexadecimal with 0x.",
-            "type": [
-              "string",
-              "number",
-              "boolean",
-              "null"
-            ]
-          },
-          "cmd_msgid": {
-            "description": "The message ID what a gateway_cfs node sends on is published under on the cFS software bus: a command's, with 0x80 set. Required where a line or a command binding leaves the node.",
-            "type": [
-              "string",
-              "number",
-              "boolean",
-              "null"
-            ]
-          },
-          "tlm_base": {
-            "description": "The first of the message IDs what arrives at a gateway_cfs node is published under: each node linked into it is this plus its own device id.",
-            "type": [
-              "string",
-              "number",
-              "boolean",
-              "null"
-            ]
-          },
-          "protocol": {
-            "type": [
-              "string",
-              "number",
-              "boolean",
-              "null"
-            ]
-          },
-          "ip_protocol": {
-            "description": "The IP protocol number a node reached with `protocol: raw` reads and writes, 1 to 254. For a raw socket and nothing else.",
-            "type": [
-              "string",
-              "number",
-              "boolean",
-              "null"
-            ]
-          },
-          "sends_from": {
-            "description": "Where a datagram payload that speaks first sends from -- a host and a port over udp, as 10.0.0.7:7001, or a path over unix_dgram -- and so the one address it is read from: anything else that reaches the vehicle's socket is turned away and counted. Optional; without it the payload is learnt from the first datagram that arrives. Not on a payload that is asked or only driven, which is reached at its address.",
-            "type": "string"
-          },
-          "stand_in": {
-            "description": "Where an hdlc, spi, rpmsg or iio payload is reached over UDP when it is simulated, as a loopback address and port: 127.0.0.1:7950. Used under --simulate=some or all, and not under none, the flight setting, when the device is opened.",
-            "type": "string"
-          },
-          "interface": {
-            "type": [
-              "string",
-              "number",
-              "boolean",
-              "null"
-            ]
-          },
-          "can_id": {
-            "type": [
-              "string",
-              "number",
-              "boolean",
-              "null"
-            ]
-          },
-          "read_size": {
-            "type": [
-              "string",
-              "number",
-              "boolean",
-              "null"
-            ]
-          },
-          "trigger_interval": {
-            "description": "How often the trigger goes out, as a length of time: how often this payload is asked. For a payload that states a trigger and is in no group -- a payload in one is asked when its group is read. A payload with no trigger has nothing to send, and states `poll_interval` instead.",
-            "type": [
-              "string",
-              "number",
-              "boolean",
-              "null"
-            ]
-          },
-          "poll_interval": {
-            "description": "The least time between issuing one read of this node and issuing the next, as a length of time: a floor on the reading of a part nothing asks, not a cadence -- there is no telling how soon a descriptor will have anything, and what the interval prevents is reading again immediately for an answer already given. For a node in no group, and never beside a `trigger` -- a node that is asked is read because it was asked, which is `trigger_interval`.",
-            "type": [
-              "string",
-              "number",
-              "boolean",
-              "null"
-            ]
-          },
-          "read_delay": {
-            "description": "How long to wait between sending the trigger and reading the answer, as a length of time: what the part's interface document says it takes to answer. With one, a pass asks, waits and reads the answer to the question it just asked; with none, a pass reads what the last ask produced and asks again, so the reading is one interval old. Only beside a `trigger`.",
-            "type": [
-              "string",
-              "number",
-              "boolean",
-              "null"
-            ]
-          },
-          "init": {
-            "description": "What to write to this payload as the vehicle opens it -- at startup, and whenever the ground starts it again -- written as a trigger is: parts one after another, each a C string in quotes or bytes in hexadecimal in square brackets: '\"READ\\r\"', '[55]', '\"AT\" [0D 0A]'. A write that fails stops the node from starting. Not on lines that are watched, a sensor's sample buffer, or a datagram payload that speaks first.",
-            "type": [
-              "string",
-              "number",
-              "boolean",
-              "null"
-            ]
-          },
-          "trigger": {
-            "description": "What to write to make this payload answer: parts one after another, each a C string in quotes or bytes in hexadecimal in square brackets: '\"READ\\r\"', '[55]', '\"AT\" [0D 0A]'. A payload that states one is asked and is read at the interval of the payload group it is in; one that states none is only read, and a line delivering into it is refused. A payload says what asks it or that it sends on its own, never both, and there is no mode attribute: which it is follows from whether it has a trigger.",
-            "type": [
-              "string",
-              "number",
-              "boolean",
-              "null"
-            ]
-          },
-          "max_length": {
-            "type": [
-              "string",
-              "number",
-              "boolean",
-              "null"
-            ]
-          },
-          "read_timeout": {
-            "type": [
-              "string",
-              "number",
-              "boolean",
-              "null"
-            ]
-          },
-          "terminators": {
-            "description": "The byte sequences that each end a packet of a stream -- a line, or a tcp or unix_stream socket -- where the first of them arrives whole, which is the packet's last bytes. A list, one entry per terminator, each written as a trigger is: parts one after another, each a C string in quotes or bytes in hexadecimal in square brackets: '\"READ\\r\"', '[55]', '\"AT\" [0D 0A]'. Not beside a length_prefix.",
-            "type": [
-              "array",
-              "string",
-              "null"
-            ],
-            "items": {
-              "type": "string"
-            }
-          },
-          "length_prefix": {
-            "description": "What a packet's first bytes say its length is, counting the bytes after them: u8, or u16be or u16le for two bytes with the more or the less significant first. The packet is delivered prefix and all. Needs a read_timeout, which may be none, and is not beside terminators.",
-            "enum": [
-              "u8",
-              "u16be",
-              "u16le"
-            ]
-          },
-          "datarate": {
-            "type": [
-              "string",
-              "number",
-              "boolean",
-              "null"
-            ]
-          },
-          "byte_length": {
-            "type": [
-              "string",
-              "number",
-              "boolean",
-              "null"
-            ]
-          },
-          "stop_bits": {
-            "type": [
-              "string",
-              "number",
-              "boolean",
-              "null"
-            ]
-          },
-          "parity": {
-            "type": [
-              "string",
-              "number",
-              "boolean",
-              "null"
-            ]
-          },
-          "standard": {
-            "type": [
-              "string",
-              "number",
-              "boolean",
-              "null"
-            ]
-          },
-          "clock_rate": {
-            "type": [
-              "string",
-              "number",
-              "boolean",
-              "null"
-            ]
-          },
-          "clock_type": {
-            "type": [
-              "string",
-              "number",
-              "boolean",
-              "null"
-            ]
-          },
-          "encoding": {
-            "type": [
-              "string",
-              "number",
-              "boolean",
-              "null"
-            ]
-          },
-          "frame_check": {
-            "type": [
-              "string",
-              "number",
-              "boolean",
-              "null"
-            ]
-          },
-          "loopback": {
-            "type": [
-              "string",
-              "number",
-              "boolean",
-              "null"
-            ]
-          },
-          "rs485": {
-            "type": [
-              "string",
-              "number",
-              "boolean",
-              "null"
-            ]
-          },
-          "rs485_rts_on_send": {
-            "type": [
-              "string",
-              "number",
-              "boolean",
-              "null"
-            ]
-          },
-          "rs485_delay_before_send": {
-            "type": [
-              "string",
-              "number",
-              "boolean",
-              "null"
-            ]
-          },
-          "rs485_delay_after_send": {
-            "type": [
-              "string",
-              "number",
-              "boolean",
-              "null"
-            ]
-          },
-          "ten_bit": {
-            "type": [
-              "string",
-              "number",
-              "boolean",
-              "null"
-            ]
-          },
-          "pec": {
-            "type": [
-              "string",
-              "number",
-              "boolean",
-              "null"
-            ]
-          },
-          "retries": {
-            "type": [
-              "string",
-              "number",
-              "boolean",
-              "null"
-            ]
-          },
-          "timeout": {
-            "type": [
-              "string",
-              "number",
-              "boolean",
-              "null"
-            ]
-          },
-          "max_speed": {
-            "type": [
-              "string",
-              "number",
-              "boolean",
-              "null"
-            ]
-          },
-          "spi_mode": {
-            "type": [
-              "string",
-              "number",
-              "boolean",
-              "null"
-            ]
-          },
-          "bits_per_word": {
-            "type": [
-              "string",
-              "number",
-              "boolean",
-              "null"
-            ]
-          },
-          "bit_order": {
-            "type": [
-              "string",
-              "number",
-              "boolean",
-              "null"
-            ]
-          },
-          "cs_active": {
-            "type": [
-              "string",
-              "number",
-              "boolean",
-              "null"
-            ]
-          },
-          "can_fd": {
-            "type": [
-              "string",
-              "number",
-              "boolean",
-              "null"
-            ]
-          },
-          "service": {
-            "type": [
-              "string",
-              "number",
-              "boolean",
-              "null"
-            ]
-          },
-          "max_message_bytes": {
-            "type": [
-              "string",
-              "number",
-              "boolean",
-              "null"
-            ]
-          },
-          "lines": {
-            "type": [
-              "string",
-              "number",
-              "boolean",
-              "null"
-            ]
-          },
-          "direction": {
-            "type": [
-              "string",
-              "number",
-              "boolean",
-              "null"
-            ]
-          },
-          "edge": {
-            "type": [
-              "string",
-              "number",
-              "boolean",
-              "null"
-            ]
-          },
-          "bias": {
-            "type": [
-              "string",
-              "number",
-              "boolean",
-              "null"
-            ]
-          },
-          "state_interval": {
-            "description": "How often to report what a set of discrete lines is, as a length of time: 5 s. Events say when a line changed and this says what the lines are, so a payload may ask for either or both. It exists for the two things edges cannot do: a line that has not changed since the vehicle started tells the ground nothing, and the kernel's event queue is finite, so a burst can leave the ground holding a value that is wrong. Inputs only.",
-            "type": [
-              "string",
-              "number",
-              "boolean",
-              "null"
-            ]
-          },
-          "debounce": {
-            "type": [
-              "string",
-              "number",
-              "boolean",
-              "null"
-            ]
-          },
-          "function": {
-            "type": [
-              "string",
-              "number",
-              "boolean",
-              "null"
-            ]
-          },
-          "inputs": {
-            "type": [
-              "string",
-              "number",
-              "boolean",
-              "null"
-            ]
-          },
-          "format": {
-            "type": [
-              "string",
-              "number",
-              "boolean",
-              "null"
-            ]
-          },
-          "scale": {
-            "type": [
-              "string",
-              "number",
-              "boolean",
-              "null"
-            ]
-          },
-          "offset": {
-            "type": [
-              "string",
-              "number",
-              "boolean",
-              "null"
-            ]
-          },
-          "setpoint": {
-            "type": [
-              "string",
-              "number",
-              "boolean",
-              "null"
-            ]
-          },
-          "half_band": {
-            "type": [
-              "string",
-              "number",
-              "boolean",
-              "null"
-            ]
-          },
-          "algorithm": {
-            "type": [
-              "string",
-              "number",
-              "boolean",
-              "null"
-            ]
-          },
-          "age": {
-            "description": "For a `vote`: how old a reading may be and still be voted on, as a length of time: `2 s`. Older ones are left out. Unstated, a reading stands until it is replaced.",
-            "type": [
-              "string",
-              "number",
-              "boolean",
-              "null"
-            ]
-          },
-          "unit": {
-            "description": "The unit the node's values are in: K, V, A, W, m, m/s, N, kg/s or ratio. Required of a `to_value` conversion and of a `process` computation, whose answers are numbers of it.",
-            "type": [
-              "string",
-              "number",
-              "boolean",
-              "null"
-            ]
-          },
-          "executable": {
-            "description": "The program this node runs: an app node's application, or the program a `process` computation runs on what arrives. Executed with a leading `~` and `$HOME` expanded as a shell would expand them -- to the home directory and to the value of the environment variable HOME, of whatever runs it. An app node's is run with the node's name as its first argument.",
-            "type": [
-              "string",
-              "number",
-              "boolean",
-              "null"
-            ]
-          },
-          "restart": {
-            "type": [
-              "string",
-              "number",
-              "boolean",
-              "null"
-            ]
-          },
-          "directory": {
-            "type": [
-              "string",
-              "number",
-              "boolean",
-              "null"
-            ]
-          },
-          "segment_bytes": {
-            "type": [
-              "string",
-              "number",
-              "boolean",
-              "null"
-            ]
-          },
-          "file": {
-            "type": [
-              "string",
-              "number",
-              "boolean",
-              "null"
-            ]
-          }
+        "minProperties": 1,
+        "maxProperties": 1,
+        "propertyNames": {
+          "$ref": "#/$defs/gatewaysType"
         },
-        "required": [
-          "name",
-          "type"
-        ],
-        "additionalProperties": false
+        "additionalProperties": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "$ref": "#/$defs/gatewayNode"
+          }
+        }
       }
     },
     "vehicle": {
-      "description": "What the vehicle itself runs: computations, logs, pass-throughs, pages of their own.",
+      "description": "What the vehicle itself runs: computations, logs, pass-throughs, pages of their own. Grouped by type: each entry is one key, `type` and the type, whose value is the list of that type's nodes, each named by its first key, `compute: <name>`.",
       "type": "array",
       "items": {
         "type": "object",
-        "properties": {
-          "name": {
-            "description": "What this node is called, unique across the configuration.",
-            "type": "string"
-          },
-          "type": {
-            "description": "What it is: the configuration's own word for the type. One of the vehicle's own: a computation, a log, a node that drops one stream, a tee that sends one stream on both ways, a node that answers pings, or a program of the vehicle's.",
-            "type": "string",
-            "enum": [
-              "compute",
-              "log",
-              "null-gateway",
-              "null-payload",
-              "tee-gateway",
-              "tee-payload",
-              "ping",
-              "app_payload_veh",
-              "app_gateway_veh",
-              "app_all_veh"
-            ]
-          },
-          "group": {
-            "description": "The payload group that reads it, where it is in one. Optional, though a payload that states a trigger needs one: the interval of its group is how often it is asked.",
-            "type": "string"
-          },
-          "payload-out": {
-            "description": "The lines that leave this node by its `payload-out`, one entry each. An entry names the node the line goes to as its `target`, and `input` where it feeds a named input of that node. The short spellings are read too: the destination as a string, `node` or `node.terminal`, alone or in a list.",
-            "oneOf": [
-              {
-                "description": "One line, written as an entry.",
-                "$ref": "#/$defs/linkEntry"
-              },
-              {
-                "description": "One line, written as the node it reaches: `node` or `node.terminal`.",
-                "type": "string",
-                "pattern": "^[A-Za-z_][A-Za-z0-9_./-]*(\\.[A-Za-z_][A-Za-z0-9_-]*)?$"
-              },
-              {
-                "description": "Several lines, each an entry or a destination.",
-                "type": "array",
-                "items": {
-                  "oneOf": [
-                    { "$ref": "#/$defs/linkEntry" },
-                    {
-                      "type": "string",
-                      "pattern": "^[A-Za-z_][A-Za-z0-9_./-]*(\\.[A-Za-z_][A-Za-z0-9_-]*)?$"
-                    }
-                  ]
-                },
-                "minItems": 1
-              }
-            ]
-          },
-          "gateway-out": {
-            "description": "The lines that leave this node by its `gateway-out`, one entry each. An entry names the node the line goes to as its `target`, and `input` where it feeds a named input of that node. The short spellings are read too: the destination as a string, `node` or `node.terminal`, alone or in a list.",
-            "oneOf": [
-              {
-                "description": "One line, written as an entry.",
-                "$ref": "#/$defs/linkEntry"
-              },
-              {
-                "description": "One line, written as the node it reaches: `node` or `node.terminal`.",
-                "type": "string",
-                "pattern": "^[A-Za-z_][A-Za-z0-9_./-]*(\\.[A-Za-z_][A-Za-z0-9_-]*)?$"
-              },
-              {
-                "description": "Several lines, each an entry or a destination.",
-                "type": "array",
-                "items": {
-                  "oneOf": [
-                    { "$ref": "#/$defs/linkEntry" },
-                    {
-                      "type": "string",
-                      "pattern": "^[A-Za-z_][A-Za-z0-9_./-]*(\\.[A-Za-z_][A-Za-z0-9_-]*)?$"
-                    }
-                  ]
-                },
-                "minItems": 1
-              }
-            ]
-          },
-          "payload-in": {
-            "description": "Whether a line arrives at this node's `payload-in` sink. A record of the links written on the nodes they leave, and not a link: which node a line comes from is written on that node. A file may leave it out; one that disagrees with the links is refused where it is read.",
-            "type": "boolean"
-          },
-          "gateway-in": {
-            "description": "Whether a line arrives at this node's `gateway-in` sink. A record of the links written on the nodes they leave, and not a link: which node a line comes from is written on that node. A file may leave it out; one that disagrees with the links is refused where it is read.",
-            "type": "boolean"
-          },
-          "path": {
-            "type": [
-              "string",
-              "number",
-              "boolean",
-              "null"
-            ]
-          },
-          "address": {
-            "type": [
-              "string",
-              "number",
-              "boolean",
-              "null"
-            ]
-          },
-          "port": {
-            "type": [
-              "string",
-              "number",
-              "boolean",
-              "null"
-            ]
-          },
-          "protocol": {
-            "type": [
-              "string",
-              "number",
-              "boolean",
-              "null"
-            ]
-          },
-          "ip_protocol": {
-            "description": "The IP protocol number a node reached with `protocol: raw` reads and writes, 1 to 254. For a raw socket and nothing else.",
-            "type": [
-              "string",
-              "number",
-              "boolean",
-              "null"
-            ]
-          },
-          "sends_from": {
-            "description": "Where a datagram payload that speaks first sends from -- a host and a port over udp, as 10.0.0.7:7001, or a path over unix_dgram -- and so the one address it is read from: anything else that reaches the vehicle's socket is turned away and counted. Optional; without it the payload is learnt from the first datagram that arrives. Not on a payload that is asked or only driven, which is reached at its address.",
-            "type": "string"
-          },
-          "stand_in": {
-            "description": "Where an hdlc, spi, rpmsg or iio payload is reached over UDP when it is simulated, as a loopback address and port: 127.0.0.1:7950. Used under --simulate=some or all, and not under none, the flight setting, when the device is opened.",
-            "type": "string"
-          },
-          "interface": {
-            "type": [
-              "string",
-              "number",
-              "boolean",
-              "null"
-            ]
-          },
-          "can_id": {
-            "type": [
-              "string",
-              "number",
-              "boolean",
-              "null"
-            ]
-          },
-          "read_size": {
-            "type": [
-              "string",
-              "number",
-              "boolean",
-              "null"
-            ]
-          },
-          "trigger_interval": {
-            "description": "How often the trigger goes out, as a length of time: how often this payload is asked. For a payload that states a trigger and is in no group -- a payload in one is asked when its group is read. A payload with no trigger has nothing to send, and states `poll_interval` instead.",
-            "type": [
-              "string",
-              "number",
-              "boolean",
-              "null"
-            ]
-          },
-          "poll_interval": {
-            "description": "The least time between issuing one read of this node and issuing the next, as a length of time: a floor on the reading of a part nothing asks, not a cadence -- there is no telling how soon a descriptor will have anything, and what the interval prevents is reading again immediately for an answer already given. For a node in no group, and never beside a `trigger` -- a node that is asked is read because it was asked, which is `trigger_interval`.",
-            "type": [
-              "string",
-              "number",
-              "boolean",
-              "null"
-            ]
-          },
-          "read_delay": {
-            "description": "How long to wait between sending the trigger and reading the answer, as a length of time: what the part's interface document says it takes to answer. With one, a pass asks, waits and reads the answer to the question it just asked; with none, a pass reads what the last ask produced and asks again, so the reading is one interval old. Only beside a `trigger`.",
-            "type": [
-              "string",
-              "number",
-              "boolean",
-              "null"
-            ]
-          },
-          "init": {
-            "description": "What to write to this payload as the vehicle opens it -- at startup, and whenever the ground starts it again -- written as a trigger is: parts one after another, each a C string in quotes or bytes in hexadecimal in square brackets: '\"READ\\r\"', '[55]', '\"AT\" [0D 0A]'. A write that fails stops the node from starting. Not on lines that are watched, a sensor's sample buffer, or a datagram payload that speaks first.",
-            "type": [
-              "string",
-              "number",
-              "boolean",
-              "null"
-            ]
-          },
-          "trigger": {
-            "description": "What to write to make this payload answer: parts one after another, each a C string in quotes or bytes in hexadecimal in square brackets: '\"READ\\r\"', '[55]', '\"AT\" [0D 0A]'. A payload that states one is asked and is read at the interval of the payload group it is in; one that states none is only read, and a line delivering into it is refused. A payload says what asks it or that it sends on its own, never both, and there is no mode attribute: which it is follows from whether it has a trigger.",
-            "type": [
-              "string",
-              "number",
-              "boolean",
-              "null"
-            ]
-          },
-          "max_length": {
-            "type": [
-              "string",
-              "number",
-              "boolean",
-              "null"
-            ]
-          },
-          "read_timeout": {
-            "type": [
-              "string",
-              "number",
-              "boolean",
-              "null"
-            ]
-          },
-          "terminators": {
-            "description": "The byte sequences that each end a packet of a stream -- a line, or a tcp or unix_stream socket -- where the first of them arrives whole, which is the packet's last bytes. A list, one entry per terminator, each written as a trigger is: parts one after another, each a C string in quotes or bytes in hexadecimal in square brackets: '\"READ\\r\"', '[55]', '\"AT\" [0D 0A]'. Not beside a length_prefix.",
-            "type": [
-              "array",
-              "string",
-              "null"
-            ],
-            "items": {
-              "type": "string"
-            }
-          },
-          "length_prefix": {
-            "description": "What a packet's first bytes say its length is, counting the bytes after them: u8, or u16be or u16le for two bytes with the more or the less significant first. The packet is delivered prefix and all. Needs a read_timeout, which may be none, and is not beside terminators.",
-            "enum": [
-              "u8",
-              "u16be",
-              "u16le"
-            ]
-          },
-          "datarate": {
-            "type": [
-              "string",
-              "number",
-              "boolean",
-              "null"
-            ]
-          },
-          "byte_length": {
-            "type": [
-              "string",
-              "number",
-              "boolean",
-              "null"
-            ]
-          },
-          "stop_bits": {
-            "type": [
-              "string",
-              "number",
-              "boolean",
-              "null"
-            ]
-          },
-          "parity": {
-            "type": [
-              "string",
-              "number",
-              "boolean",
-              "null"
-            ]
-          },
-          "standard": {
-            "type": [
-              "string",
-              "number",
-              "boolean",
-              "null"
-            ]
-          },
-          "clock_rate": {
-            "type": [
-              "string",
-              "number",
-              "boolean",
-              "null"
-            ]
-          },
-          "clock_type": {
-            "type": [
-              "string",
-              "number",
-              "boolean",
-              "null"
-            ]
-          },
-          "encoding": {
-            "type": [
-              "string",
-              "number",
-              "boolean",
-              "null"
-            ]
-          },
-          "frame_check": {
-            "type": [
-              "string",
-              "number",
-              "boolean",
-              "null"
-            ]
-          },
-          "loopback": {
-            "type": [
-              "string",
-              "number",
-              "boolean",
-              "null"
-            ]
-          },
-          "rs485": {
-            "type": [
-              "string",
-              "number",
-              "boolean",
-              "null"
-            ]
-          },
-          "rs485_rts_on_send": {
-            "type": [
-              "string",
-              "number",
-              "boolean",
-              "null"
-            ]
-          },
-          "rs485_delay_before_send": {
-            "type": [
-              "string",
-              "number",
-              "boolean",
-              "null"
-            ]
-          },
-          "rs485_delay_after_send": {
-            "type": [
-              "string",
-              "number",
-              "boolean",
-              "null"
-            ]
-          },
-          "ten_bit": {
-            "type": [
-              "string",
-              "number",
-              "boolean",
-              "null"
-            ]
-          },
-          "pec": {
-            "type": [
-              "string",
-              "number",
-              "boolean",
-              "null"
-            ]
-          },
-          "retries": {
-            "type": [
-              "string",
-              "number",
-              "boolean",
-              "null"
-            ]
-          },
-          "timeout": {
-            "type": [
-              "string",
-              "number",
-              "boolean",
-              "null"
-            ]
-          },
-          "max_speed": {
-            "type": [
-              "string",
-              "number",
-              "boolean",
-              "null"
-            ]
-          },
-          "spi_mode": {
-            "type": [
-              "string",
-              "number",
-              "boolean",
-              "null"
-            ]
-          },
-          "bits_per_word": {
-            "type": [
-              "string",
-              "number",
-              "boolean",
-              "null"
-            ]
-          },
-          "bit_order": {
-            "type": [
-              "string",
-              "number",
-              "boolean",
-              "null"
-            ]
-          },
-          "cs_active": {
-            "type": [
-              "string",
-              "number",
-              "boolean",
-              "null"
-            ]
-          },
-          "can_fd": {
-            "type": [
-              "string",
-              "number",
-              "boolean",
-              "null"
-            ]
-          },
-          "service": {
-            "type": [
-              "string",
-              "number",
-              "boolean",
-              "null"
-            ]
-          },
-          "max_message_bytes": {
-            "type": [
-              "string",
-              "number",
-              "boolean",
-              "null"
-            ]
-          },
-          "lines": {
-            "type": [
-              "string",
-              "number",
-              "boolean",
-              "null"
-            ]
-          },
-          "direction": {
-            "type": [
-              "string",
-              "number",
-              "boolean",
-              "null"
-            ]
-          },
-          "edge": {
-            "type": [
-              "string",
-              "number",
-              "boolean",
-              "null"
-            ]
-          },
-          "bias": {
-            "type": [
-              "string",
-              "number",
-              "boolean",
-              "null"
-            ]
-          },
-          "state_interval": {
-            "description": "How often to report what a set of discrete lines is, as a length of time: 5 s. Events say when a line changed and this says what the lines are, so a payload may ask for either or both. It exists for the two things edges cannot do: a line that has not changed since the vehicle started tells the ground nothing, and the kernel's event queue is finite, so a burst can leave the ground holding a value that is wrong. Inputs only.",
-            "type": [
-              "string",
-              "number",
-              "boolean",
-              "null"
-            ]
-          },
-          "debounce": {
-            "type": [
-              "string",
-              "number",
-              "boolean",
-              "null"
-            ]
-          },
-          "function": {
-            "type": [
-              "string",
-              "number",
-              "boolean",
-              "null"
-            ]
-          },
-          "inputs": {
-            "type": [
-              "string",
-              "number",
-              "boolean",
-              "null"
-            ]
-          },
-          "format": {
-            "type": [
-              "string",
-              "number",
-              "boolean",
-              "null"
-            ]
-          },
-          "scale": {
-            "type": [
-              "string",
-              "number",
-              "boolean",
-              "null"
-            ]
-          },
-          "offset": {
-            "type": [
-              "string",
-              "number",
-              "boolean",
-              "null"
-            ]
-          },
-          "setpoint": {
-            "type": [
-              "string",
-              "number",
-              "boolean",
-              "null"
-            ]
-          },
-          "half_band": {
-            "type": [
-              "string",
-              "number",
-              "boolean",
-              "null"
-            ]
-          },
-          "algorithm": {
-            "type": [
-              "string",
-              "number",
-              "boolean",
-              "null"
-            ]
-          },
-          "age": {
-            "description": "For a `vote`: how old a reading may be and still be voted on, as a length of time: `2 s`. Older ones are left out. Unstated, a reading stands until it is replaced.",
-            "type": [
-              "string",
-              "number",
-              "boolean",
-              "null"
-            ]
-          },
-          "unit": {
-            "description": "The unit the node's values are in: K, V, A, W, m, m/s, N, kg/s or ratio. Required of a `to_value` conversion and of a `process` computation, whose answers are numbers of it.",
-            "type": [
-              "string",
-              "number",
-              "boolean",
-              "null"
-            ]
-          },
-          "executable": {
-            "description": "The program this node runs: an app node's application, or the program a `process` computation runs on what arrives. Executed with a leading `~` and `$HOME` expanded as a shell would expand them -- to the home directory and to the value of the environment variable HOME, of whatever runs it. An app node's is run with the node's name as its first argument.",
-            "type": [
-              "string",
-              "number",
-              "boolean",
-              "null"
-            ]
-          },
-          "app-payload-arg": {
-            "description": "What an app node's program is told about the payload stream, as the argument after the node's name. Said by the kinds that handle payload data -- app_payload_veh, app_all_veh, app_pl, app_all_pl -- and required of them, the arguments being a fixed list.",
-            "type": [
-              "string",
-              "number",
-              "boolean",
-              "null"
-            ]
-          },
-          "app-gateway-arg": {
-            "description": "And what it is told about the gateway stream, as the argument after the payload one where a kind has both. Said by the kinds that handle gateway data -- app_gateway_veh, app_all_veh, app_all_pl -- and required of them.",
-            "type": [
-              "string",
-              "number",
-              "boolean",
-              "null"
-            ]
-          },
-          "restart": {
-            "type": [
-              "string",
-              "number",
-              "boolean",
-              "null"
-            ]
-          },
-          "directory": {
-            "type": [
-              "string",
-              "number",
-              "boolean",
-              "null"
-            ]
-          },
-          "segment_bytes": {
-            "type": [
-              "string",
-              "number",
-              "boolean",
-              "null"
-            ]
-          },
-          "file": {
-            "type": [
-              "string",
-              "number",
-              "boolean",
-              "null"
-            ]
-          }
+        "minProperties": 1,
+        "maxProperties": 1,
+        "propertyNames": {
+          "$ref": "#/$defs/vehicleType"
         },
-        "required": [
-          "name",
-          "type"
-        ],
-        "additionalProperties": false
+        "additionalProperties": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "$ref": "#/$defs/computeNode"
+          }
+        }
       }
     },
     "payloads": {
-      "description": "What the vehicle carries this flight.",
+      "description": "What the vehicle carries this flight. Grouped by type: each entry is one key, `type` and the type, whose value is the list of that type's nodes, each named by its first key, `payload: <name>`.",
       "type": "array",
       "items": {
         "type": "object",
-        "properties": {
-          "name": {
-            "description": "What this node is called, unique across the configuration.",
-            "type": "string"
-          },
-          "type": {
-            "description": "What it is: the configuration's own word for the type. One of the interfaces a payload is reached over, or a payload that is a program.",
-            "type": "string",
-            "enum": [
-              "network",
-              "device-file",
-              "serial",
-              "i2c",
-              "spi",
-              "can",
-              "iio",
-              "rpmsg",
-              "gpio",
-              "hdlc",
-              "app_pl",
-              "app_all_pl"
-            ]
-          },
-          "group": {
-            "description": "The payload group that reads it, where it is in one. Optional, though a payload that states a trigger needs one: the interval of its group is how often it is asked.",
-            "type": "string"
-          },
-          "payload-out": {
-            "description": "The lines that leave this node by its `payload-out`, one entry each. An entry names the node the line goes to as its `target`, and `input` where it feeds a named input of that node. The short spellings are read too: the destination as a string, `node` or `node.terminal`, alone or in a list.",
-            "oneOf": [
-              {
-                "description": "One line, written as an entry.",
-                "$ref": "#/$defs/linkEntry"
-              },
-              {
-                "description": "One line, written as the node it reaches: `node` or `node.terminal`.",
-                "type": "string",
-                "pattern": "^[A-Za-z_][A-Za-z0-9_./-]*(\\.[A-Za-z_][A-Za-z0-9_-]*)?$"
-              },
-              {
-                "description": "Several lines, each an entry or a destination.",
-                "type": "array",
-                "items": {
-                  "oneOf": [
-                    { "$ref": "#/$defs/linkEntry" },
-                    {
-                      "type": "string",
-                      "pattern": "^[A-Za-z_][A-Za-z0-9_./-]*(\\.[A-Za-z_][A-Za-z0-9_-]*)?$"
-                    }
-                  ]
-                },
-                "minItems": 1
-              }
-            ]
-          },
-          "gateway-out": {
-            "description": "The lines that leave this node by its `gateway-out`, one entry each. An entry names the node the line goes to as its `target`, and `input` where it feeds a named input of that node. The short spellings are read too: the destination as a string, `node` or `node.terminal`, alone or in a list.",
-            "oneOf": [
-              {
-                "description": "One line, written as an entry.",
-                "$ref": "#/$defs/linkEntry"
-              },
-              {
-                "description": "One line, written as the node it reaches: `node` or `node.terminal`.",
-                "type": "string",
-                "pattern": "^[A-Za-z_][A-Za-z0-9_./-]*(\\.[A-Za-z_][A-Za-z0-9_-]*)?$"
-              },
-              {
-                "description": "Several lines, each an entry or a destination.",
-                "type": "array",
-                "items": {
-                  "oneOf": [
-                    { "$ref": "#/$defs/linkEntry" },
-                    {
-                      "type": "string",
-                      "pattern": "^[A-Za-z_][A-Za-z0-9_./-]*(\\.[A-Za-z_][A-Za-z0-9_-]*)?$"
-                    }
-                  ]
-                },
-                "minItems": 1
-              }
-            ]
-          },
-          "payload-in": {
-            "description": "Whether a line arrives at this node's `payload-in` sink. A record of the links written on the nodes they leave, and not a link: which node a line comes from is written on that node. A file may leave it out; one that disagrees with the links is refused where it is read.",
-            "type": "boolean"
-          },
-          "gateway-in": {
-            "description": "Whether a line arrives at this node's `gateway-in` sink. A record of the links written on the nodes they leave, and not a link: which node a line comes from is written on that node. A file may leave it out; one that disagrees with the links is refused where it is read.",
-            "type": "boolean"
-          },
-          "path": {
-            "type": [
-              "string",
-              "number",
-              "boolean",
-              "null"
-            ]
-          },
-          "address": {
-            "type": [
-              "string",
-              "number",
-              "boolean",
-              "null"
-            ]
-          },
-          "port": {
-            "type": [
-              "string",
-              "number",
-              "boolean",
-              "null"
-            ]
-          },
-          "protocol": {
-            "type": [
-              "string",
-              "number",
-              "boolean",
-              "null"
-            ]
-          },
-          "ip_protocol": {
-            "description": "The IP protocol number a node reached with `protocol: raw` reads and writes, 1 to 254. For a raw socket and nothing else.",
-            "type": [
-              "string",
-              "number",
-              "boolean",
-              "null"
-            ]
-          },
-          "sends_from": {
-            "description": "Where a datagram payload that speaks first sends from -- a host and a port over udp, as 10.0.0.7:7001, or a path over unix_dgram -- and so the one address it is read from: anything else that reaches the vehicle's socket is turned away and counted. Optional; without it the payload is learnt from the first datagram that arrives. Not on a payload that is asked or only driven, which is reached at its address.",
-            "type": "string"
-          },
-          "stand_in": {
-            "description": "Where an hdlc, spi, rpmsg or iio payload is reached over UDP when it is simulated, as a loopback address and port: 127.0.0.1:7950. Used under --simulate=some or all, and not under none, the flight setting, when the device is opened.",
-            "type": "string"
-          },
-          "interface": {
-            "type": [
-              "string",
-              "number",
-              "boolean",
-              "null"
-            ]
-          },
-          "can_id": {
-            "type": [
-              "string",
-              "number",
-              "boolean",
-              "null"
-            ]
-          },
-          "read_size": {
-            "type": [
-              "string",
-              "number",
-              "boolean",
-              "null"
-            ]
-          },
-          "trigger_interval": {
-            "description": "How often the trigger goes out, as a length of time: how often this payload is asked. For a payload that states a trigger and is in no group -- a payload in one is asked when its group is read. A payload with no trigger has nothing to send, and states `poll_interval` instead.",
-            "type": [
-              "string",
-              "number",
-              "boolean",
-              "null"
-            ]
-          },
-          "poll_interval": {
-            "description": "The least time between issuing one read of this node and issuing the next, as a length of time: a floor on the reading of a part nothing asks, not a cadence -- there is no telling how soon a descriptor will have anything, and what the interval prevents is reading again immediately for an answer already given. For a node in no group, and never beside a `trigger` -- a node that is asked is read because it was asked, which is `trigger_interval`.",
-            "type": [
-              "string",
-              "number",
-              "boolean",
-              "null"
-            ]
-          },
-          "read_delay": {
-            "description": "How long to wait between sending the trigger and reading the answer, as a length of time: what the part's interface document says it takes to answer. With one, a pass asks, waits and reads the answer to the question it just asked; with none, a pass reads what the last ask produced and asks again, so the reading is one interval old. Only beside a `trigger`.",
-            "type": [
-              "string",
-              "number",
-              "boolean",
-              "null"
-            ]
-          },
-          "init": {
-            "description": "What to write to this payload as the vehicle opens it -- at startup, and whenever the ground starts it again -- written as a trigger is: parts one after another, each a C string in quotes or bytes in hexadecimal in square brackets: '\"READ\\r\"', '[55]', '\"AT\" [0D 0A]'. A write that fails stops the node from starting. Not on lines that are watched, a sensor's sample buffer, or a datagram payload that speaks first.",
-            "type": [
-              "string",
-              "number",
-              "boolean",
-              "null"
-            ]
-          },
-          "trigger": {
-            "description": "What to write to make this payload answer: parts one after another, each a C string in quotes or bytes in hexadecimal in square brackets: '\"READ\\r\"', '[55]', '\"AT\" [0D 0A]'. A payload that states one is asked and is read at the interval of the payload group it is in; one that states none is only read, and a line delivering into it is refused. A payload says what asks it or that it sends on its own, never both, and there is no mode attribute: which it is follows from whether it has a trigger.",
-            "type": [
-              "string",
-              "number",
-              "boolean",
-              "null"
-            ]
-          },
-          "max_length": {
-            "type": [
-              "string",
-              "number",
-              "boolean",
-              "null"
-            ]
-          },
-          "read_timeout": {
-            "type": [
-              "string",
-              "number",
-              "boolean",
-              "null"
-            ]
-          },
-          "terminators": {
-            "description": "The byte sequences that each end a packet of a stream -- a line, or a tcp or unix_stream socket -- where the first of them arrives whole, which is the packet's last bytes. A list, one entry per terminator, each written as a trigger is: parts one after another, each a C string in quotes or bytes in hexadecimal in square brackets: '\"READ\\r\"', '[55]', '\"AT\" [0D 0A]'. Not beside a length_prefix.",
-            "type": [
-              "array",
-              "string",
-              "null"
-            ],
-            "items": {
-              "type": "string"
-            }
-          },
-          "length_prefix": {
-            "description": "What a packet's first bytes say its length is, counting the bytes after them: u8, or u16be or u16le for two bytes with the more or the less significant first. The packet is delivered prefix and all. Needs a read_timeout, which may be none, and is not beside terminators.",
-            "enum": [
-              "u8",
-              "u16be",
-              "u16le"
-            ]
-          },
-          "datarate": {
-            "type": [
-              "string",
-              "number",
-              "boolean",
-              "null"
-            ]
-          },
-          "byte_length": {
-            "type": [
-              "string",
-              "number",
-              "boolean",
-              "null"
-            ]
-          },
-          "stop_bits": {
-            "type": [
-              "string",
-              "number",
-              "boolean",
-              "null"
-            ]
-          },
-          "parity": {
-            "type": [
-              "string",
-              "number",
-              "boolean",
-              "null"
-            ]
-          },
-          "standard": {
-            "type": [
-              "string",
-              "number",
-              "boolean",
-              "null"
-            ]
-          },
-          "clock_rate": {
-            "type": [
-              "string",
-              "number",
-              "boolean",
-              "null"
-            ]
-          },
-          "clock_type": {
-            "type": [
-              "string",
-              "number",
-              "boolean",
-              "null"
-            ]
-          },
-          "encoding": {
-            "type": [
-              "string",
-              "number",
-              "boolean",
-              "null"
-            ]
-          },
-          "frame_check": {
-            "type": [
-              "string",
-              "number",
-              "boolean",
-              "null"
-            ]
-          },
-          "loopback": {
-            "type": [
-              "string",
-              "number",
-              "boolean",
-              "null"
-            ]
-          },
-          "rs485": {
-            "type": [
-              "string",
-              "number",
-              "boolean",
-              "null"
-            ]
-          },
-          "rs485_rts_on_send": {
-            "type": [
-              "string",
-              "number",
-              "boolean",
-              "null"
-            ]
-          },
-          "rs485_delay_before_send": {
-            "type": [
-              "string",
-              "number",
-              "boolean",
-              "null"
-            ]
-          },
-          "rs485_delay_after_send": {
-            "type": [
-              "string",
-              "number",
-              "boolean",
-              "null"
-            ]
-          },
-          "ten_bit": {
-            "type": [
-              "string",
-              "number",
-              "boolean",
-              "null"
-            ]
-          },
-          "pec": {
-            "type": [
-              "string",
-              "number",
-              "boolean",
-              "null"
-            ]
-          },
-          "retries": {
-            "type": [
-              "string",
-              "number",
-              "boolean",
-              "null"
-            ]
-          },
-          "timeout": {
-            "type": [
-              "string",
-              "number",
-              "boolean",
-              "null"
-            ]
-          },
-          "max_speed": {
-            "type": [
-              "string",
-              "number",
-              "boolean",
-              "null"
-            ]
-          },
-          "spi_mode": {
-            "type": [
-              "string",
-              "number",
-              "boolean",
-              "null"
-            ]
-          },
-          "bits_per_word": {
-            "type": [
-              "string",
-              "number",
-              "boolean",
-              "null"
-            ]
-          },
-          "bit_order": {
-            "type": [
-              "string",
-              "number",
-              "boolean",
-              "null"
-            ]
-          },
-          "cs_active": {
-            "type": [
-              "string",
-              "number",
-              "boolean",
-              "null"
-            ]
-          },
-          "can_fd": {
-            "type": [
-              "string",
-              "number",
-              "boolean",
-              "null"
-            ]
-          },
-          "service": {
-            "type": [
-              "string",
-              "number",
-              "boolean",
-              "null"
-            ]
-          },
-          "max_message_bytes": {
-            "type": [
-              "string",
-              "number",
-              "boolean",
-              "null"
-            ]
-          },
-          "lines": {
-            "type": [
-              "string",
-              "number",
-              "boolean",
-              "null"
-            ]
-          },
-          "direction": {
-            "type": [
-              "string",
-              "number",
-              "boolean",
-              "null"
-            ]
-          },
-          "edge": {
-            "type": [
-              "string",
-              "number",
-              "boolean",
-              "null"
-            ]
-          },
-          "bias": {
-            "type": [
-              "string",
-              "number",
-              "boolean",
-              "null"
-            ]
-          },
-          "state_interval": {
-            "description": "How often to report what a set of discrete lines is, as a length of time: 5 s. Events say when a line changed and this says what the lines are, so a payload may ask for either or both. It exists for the two things edges cannot do: a line that has not changed since the vehicle started tells the ground nothing, and the kernel's event queue is finite, so a burst can leave the ground holding a value that is wrong. Inputs only.",
-            "type": [
-              "string",
-              "number",
-              "boolean",
-              "null"
-            ]
-          },
-          "debounce": {
-            "type": [
-              "string",
-              "number",
-              "boolean",
-              "null"
-            ]
-          },
-          "function": {
-            "type": [
-              "string",
-              "number",
-              "boolean",
-              "null"
-            ]
-          },
-          "inputs": {
-            "type": [
-              "string",
-              "number",
-              "boolean",
-              "null"
-            ]
-          },
-          "format": {
-            "type": [
-              "string",
-              "number",
-              "boolean",
-              "null"
-            ]
-          },
-          "scale": {
-            "type": [
-              "string",
-              "number",
-              "boolean",
-              "null"
-            ]
-          },
-          "offset": {
-            "type": [
-              "string",
-              "number",
-              "boolean",
-              "null"
-            ]
-          },
-          "setpoint": {
-            "type": [
-              "string",
-              "number",
-              "boolean",
-              "null"
-            ]
-          },
-          "half_band": {
-            "type": [
-              "string",
-              "number",
-              "boolean",
-              "null"
-            ]
-          },
-          "algorithm": {
-            "type": [
-              "string",
-              "number",
-              "boolean",
-              "null"
-            ]
-          },
-          "age": {
-            "description": "For a `vote`: how old a reading may be and still be voted on, as a length of time: `2 s`. Older ones are left out. Unstated, a reading stands until it is replaced.",
-            "type": [
-              "string",
-              "number",
-              "boolean",
-              "null"
-            ]
-          },
-          "unit": {
-            "description": "The unit the node's values are in: K, V, A, W, m, m/s, N, kg/s or ratio. Required of a `to_value` conversion and of a `process` computation, whose answers are numbers of it.",
-            "type": [
-              "string",
-              "number",
-              "boolean",
-              "null"
-            ]
-          },
-          "executable": {
-            "description": "The program this node runs: an app node's application, or the program a `process` computation runs on what arrives. Executed with a leading `~` and `$HOME` expanded as a shell would expand them -- to the home directory and to the value of the environment variable HOME, of whatever runs it. An app node's is run with the node's name as its first argument.",
-            "type": [
-              "string",
-              "number",
-              "boolean",
-              "null"
-            ]
-          },
-          "app-payload-arg": {
-            "description": "What an app node's program is told about the payload stream, as the argument after the node's name. Said by the kinds that handle payload data -- app_payload_veh, app_all_veh, app_pl, app_all_pl -- and required of them, the arguments being a fixed list.",
-            "type": [
-              "string",
-              "number",
-              "boolean",
-              "null"
-            ]
-          },
-          "app-gateway-arg": {
-            "description": "And what it is told about the gateway stream, as the argument after the payload one where a kind has both. Said by the kinds that handle gateway data -- app_gateway_veh, app_all_veh, app_all_pl -- and required of them.",
-            "type": [
-              "string",
-              "number",
-              "boolean",
-              "null"
-            ]
-          },
-          "restart": {
-            "type": [
-              "string",
-              "number",
-              "boolean",
-              "null"
-            ]
-          },
-          "directory": {
-            "type": [
-              "string",
-              "number",
-              "boolean",
-              "null"
-            ]
-          },
-          "segment_bytes": {
-            "type": [
-              "string",
-              "number",
-              "boolean",
-              "null"
-            ]
-          },
-          "file": {
-            "type": [
-              "string",
-              "number",
-              "boolean",
-              "null"
-            ]
-          }
+        "minProperties": 1,
+        "maxProperties": 1,
+        "propertyNames": {
+          "$ref": "#/$defs/payloadsType"
         },
-        "required": [
-          "name",
-          "type"
-        ],
-        "additionalProperties": false
+        "additionalProperties": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "$ref": "#/$defs/payloadNode"
+          }
+        }
       }
     },
     "commands": {
@@ -2387,7 +2444,7 @@
       }
     },
     "tcsgui": {
-      "description": "What the editor arranged: where each node was drawn. Last in the file and in a section of its own, because the sections above say what the vehicle carries and this says where somebody put the boxes on a screen. The flight software ignores it.",
+      "description": "What the editor arranged: where each node was drawn. Last in the file and in a section of its own, because the sections above say what the vehicle carries and this says where somebody put the boxes on a screen. The flight software ignores it. Each entry names the node it is about by its first key, `node: <name>`, as the sections name theirs.",
       "type": "object",
       "properties": {
         "nodes": {
@@ -2395,9 +2452,10 @@
           "items": {
             "type": "object",
             "properties": {
-              "name": {
+              "node": {
                 "description": "The node this is about.",
-                "type": "string"
+                "type": "string",
+                "minLength": 1
               },
               "x": {
                 "type": "integer"
@@ -2407,9 +2465,33 @@
               }
             },
             "required": [
-              "name",
+              "node",
               "x",
               "y"
+            ],
+            "additionalProperties": false
+          }
+        },
+        "set-aside": {
+          "description": "The concerns the editor was told not to go on raising: a node, and the kind of concern somebody looked at and left.",
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "node": {
+                "description": "The node this is about.",
+                "type": "string",
+                "minLength": 1
+              },
+              "concern": {
+                "description": "The editor's own word for the kind of concern.",
+                "type": "string",
+                "minLength": 1
+              }
+            },
+            "required": [
+              "node",
+              "concern"
             ],
             "additionalProperties": false
           }

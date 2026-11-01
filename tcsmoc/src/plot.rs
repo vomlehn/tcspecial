@@ -296,7 +296,12 @@ impl Plot {
         let mut panels: Vec<Panel> = Vec::new();
         let mut switches = Vec::new();
         let mut setpoints = Vec::new();
-        for node in &graph.nodes {
+        // By name, the one order a configuration has: the panels, traces
+        // and switches are drawn in it.
+        let mut nodes: Vec<&tcslibgs::graph::Node> =
+            graph.nodes.iter().collect();
+        nodes.sort_by(|a, b| a.name.cmp(&b.name));
+        for node in nodes {
             if !reaches(&node.name) {
                 continue;
             }
@@ -859,7 +864,7 @@ fn how_long(out: &mut String, long: Duration) {
 ///
 /// # Returns
 ///
-/// The names of the nodes its data goes to, but the ground.
+/// The names of the nodes its data goes to, but the ground, sorted.
 fn drives(graph: &Graph, switch: &str) -> Vec<String> {
     let mut driven = Vec::new();
     for link in &graph.links {
@@ -878,6 +883,7 @@ fn drives(graph: &Graph, switch: &str) -> Vec<String> {
             }
         }
     }
+    driven.sort();
     driven
 }
 

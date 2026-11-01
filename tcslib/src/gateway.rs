@@ -518,7 +518,8 @@ mod tests {
     /// # Arguments
     ///
     /// * `port` - Where the `ground_base` puts the first source -- device
-    ///            id 1; the second goes on the one after.
+    ///            id 0, its name sorting before the gateway node's; the
+    ///            second goes on the one after.
     ///
     /// # Returns
     ///
@@ -529,15 +530,26 @@ mod tests {
         std::fs::write(
             &path,
             format!(
-                "gateway:
-  - {{ name: ground, type: gateway_radio, ground_base: \"127.0.0.1:{}\" }}
+                "gateways:
+  - type gateway_radio:
+      - gateway: ground
+        ground_base: \"127.0.0.1:{}\"
 payloads:
-  - {{ name: a, type: network, protocol: udp, address: \"127.0.0.1\", \
-    port: \"7001\", payload-out: ground }}
-  - {{ name: b, type: network, protocol: udp, address: \"127.0.0.1\", \
-    port: \"7002\", payload-out: ground }}
+  - type network:
+      - payload: a
+        address: \"127.0.0.1\"
+        port: \"7001\"
+        protocol: udp
+        payload-out:
+          - target: ground
+      - payload: b
+        address: \"127.0.0.1\"
+        port: \"7002\"
+        protocol: udp
+        payload-out:
+          - target: ground
 ",
-                port - 1
+                port
             ),
         )
         .expect("written");
@@ -591,14 +603,21 @@ payloads:
         std::fs::write(
             &path,
             format!(
-                "gateway:
-  - {{ name: fsw, type: gateway_fprime, bridge_base: \"127.0.0.1:{}\", \
-    fprime_id_base: \"0x3000\" }}
+                "gateways:
+  - type gateway_fprime:
+      - gateway: fsw
+        bridge_base: \"127.0.0.1:{}\"
+        fprime_id_base: \"0x3000\"
 payloads:
-  - {{ name: a, type: network, protocol: udp, address: \"127.0.0.1\", \
-    port: \"7001\", payload-out: fsw }}
+  - type network:
+      - payload: a
+        address: \"127.0.0.1\"
+        port: \"7001\"
+        protocol: udp
+        payload-out:
+          - target: fsw
 ",
-                port - 1
+                port
             ),
         )
         .expect("written");

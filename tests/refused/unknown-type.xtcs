@@ -1,0 +1,5 @@
+<?xml version="1.0"?>
+<!-- Refused: no section has a type called bogus. -->
+<configuration>
+    <payloads><type name="bogus"><payload name="a"/></type></payloads>
+</configuration>

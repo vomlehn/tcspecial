@@ -62,29 +62,42 @@ fn each_ping_is_answered_and_timed_and_the_beacon_is_heard() {
     <tcspecial>
         <gateway>radio</gateway>
         <interface>ad9aac4dd5a6d88dd5e78824ba8a83ac</interface>
-        <beacon><default_interval>5 s</default_interval>\
-<reset_interval>1 s</reset_interval><recv>127.0.0.1:{beacons}</recv>\
-<send>127.0.0.1:{}</send></beacon>
-        <tcs_cmd><recv>127.0.0.1:{}</recv>\
-<send>127.0.0.1:{ground_commands}</send></tcs_cmd>
+        <beacon>
+            <default_interval>5 s</default_interval>
+            <reset_interval>1 s</reset_interval>
+            <recv>127.0.0.1:{beacons}</recv>
+            <send>127.0.0.1:{}</send>
+        </beacon>
+        <tcs_cmd>
+            <recv>127.0.0.1:{}</recv>
+            <send>127.0.0.1:{ground_commands}</send>
+        </tcs_cmd>
     </tcspecial>
-    <gateway>
-        <name>gateway</name><type>gateway_radio</type>
-        <address>127.0.0.1</address><port>{}</port>
-        <ground_base>127.0.0.1:{}</ground_base>
-        <payload-in>true</payload-in>
-        <gateway-out><target>ping</target></gateway-out>
-    </gateway>
+    <gateways>
+        <type name=\"gateway_radio\">
+            <gateway name=\"gateway\">
+                <address>127.0.0.1</address>
+                <ground_base>127.0.0.1:{}</ground_base>
+                <port>{}</port>
+                <gateway-out><target>ping</target></gateway-out>
+                <payload-in>true</payload-in>
+            </gateway>
+        </type>
+    </gateways>
     <vehicle>
-        <name>ping</name><type>ping</type><gateway-in>true</gateway-in>
-        <payload-out><target>gateway</target></payload-out>
+        <type name=\"ping\">
+            <compute name=\"ping\">
+                <payload-out><target>gateway</target></payload-out>
+                <gateway-in>true</gateway-in>
+            </compute>
+        </type>
     </vehicle>
 </configuration>
 ",
             port(&beacon),
             port(&commands),
-            port(&uplink),
             answers - 1,
+            port(&uplink),
         ),
     )
     .expect("written");

@@ -28,7 +28,7 @@ use crate::format::ConfigFormat;
 enum Place {
     /// A section of its own, at the top of the file.
     Section,
-    /// A node's `type`.
+    /// A type a section groups its nodes by.
     NodeType,
     /// A key of a node: one of its links, or what it is told.
     Key,
@@ -47,7 +47,7 @@ const RENAMED: &[Renamed] = &[
     Renamed {
         old: "moc",
         place: Place::Section,
-        new: "gateway",
+        new: "gateways",
     },
     Renamed {
         old: "moc",
@@ -148,22 +148,22 @@ fn in_yaml(text: &str) -> Option<(usize, &'static Renamed)> {
         {
             found.push(said);
         }
-        // Every section of nodes is a list of them; anything else in the file
-        // has neither types nor links.
-        let nodes = value.as_sequence().into_iter().flatten();
-        for node in nodes.filter_map(serde_norway::Value::as_mapping) {
-            for (key, value) in node {
-                let Some(key) = key.as_str() else {
-                    continue;
-                };
-                if let Some(said) = renamed(Place::Key, key) {
-                    found.push(said);
-                }
-                let typed = value.as_str().filter(|_| key == "type");
+        // Every section of nodes is a list of types, each an entry of one
+        // key, `type` and the type, holding a list of nodes; anything else in
+        // the file has neither types nor links.
+        let entries = value.as_sequence().into_iter().flatten();
+        for entry in entries.filter_map(serde_norway::Value::as_mapping) {
+            for (key, nodes) in entry {
+                let typed = key.as_str().and_then(|k| k.strip_prefix("type "));
                 if let Some(said) =
                     typed.and_then(|t| renamed(Place::NodeType, t.trim()))
                 {
                     found.push(said);
+                }
+                let nodes = nodes.as_sequence().into_iter().flatten();
+                for node in nodes.filter_map(serde_norway::Value::as_mapping) {
+                    let keys = node.keys().filter_map(|key| key.as_str());
+                    found.extend(keys.filter_map(|k| renamed(Place::Key, k)));
                 }
             }
         }
@@ -205,8 +205,15 @@ fn yaml_line(text: &str, said: &Renamed) -> usize {
             // A key, anywhere a node writes one: after the margin, a list's
             // dash, or a flow mapping's brace or comma.
             Place::Key => keys(line).any(|key| key == said.old),
-            Place::NodeType => keys_and_values(line)
-                .any(|(key, value)| key == "type" && value == said.old),
+            // An entry's key: `- type moc:`, quoted or not.
+            Place::NodeType => {
+                let entry = line.trim_start().trim_start_matches("- ");
+                entry.trim_end().strip_suffix(':').is_some_and(|key| {
+                    unquoted(key)
+                        .strip_prefix("type ")
+                        .is_some_and(|t| t.trim() == said.old)
+                })
+            }
         };
         if hit {
             return at + 1;
@@ -225,7 +232,7 @@ fn yaml_line(text: &str, said: &Renamed) -> usize {
 ///
 /// What is before a `#` that begins a comment: one at the start of the line
 /// or after a space, and outside quotes.
-fn uncommented(line: &str) -> &str {
+pub(super) fn uncommented(line: &str) -> &str {
     let mut quote = None;
     let mut before = ' ';
     for (at, c) in line.char_indices() {
@@ -251,7 +258,9 @@ fn uncommented(line: &str) -> &str {
 ///
 /// Each key and the value after it, which is empty for a key whose value is
 /// on the lines below.
-fn keys_and_values(line: &str) -> impl Iterator<Item = (&str, &str)> {
+pub(super) fn keys_and_values(
+    line: &str,
+) -> impl Iterator<Item = (&str, &str)> {
     line.split(['{', ',', '}'])
         .filter_map(|part| {
             let part = part.trim_start().trim_start_matches("- ").trim_start();
@@ -290,7 +299,8 @@ fn keys(line: &str) -> impl Iterator<Item = &str> {
 /// Finds the first old word an XML file writes, by line.
 ///
 /// The configuration is the root element; its sections are the elements in
-/// it, one for each node, and a node's type and links are elements in that.
+/// it, their types the `<type>` elements in those, named by an attribute,
+/// and a node's links and attributes the elements in the node.
 ///
 /// # Arguments
 ///
@@ -312,37 +322,42 @@ fn in_xml(text: &str) -> Option<(usize, &'static Renamed)> {
             + 1
     };
     let mut depth = 0usize;
-    // Inside a node's `type` element, where its text is the type.
-    let mut in_type = false;
     loop {
         let event = reader.read_event().ok()?;
         let at = line_at(reader.buffer_position());
-        let element = |name: &str, depth: usize| match depth {
-            2 => renamed(Place::Section, name),
-            3 => renamed(Place::Key, name),
-            _ => None,
+        // A section is a child of the root, a type a child of a section, a
+        // node a child of a type, and a node's links and attributes children
+        // of the node.
+        let element = |tag: &quick_xml::events::BytesStart, depth: usize| {
+            let name = tag.name().as_ref().to_string();
+            match depth {
+                2 => renamed(Place::Section, &name),
+                3 if name == "type" => {
+                    tag.attributes().flatten().find_map(|attribute| {
+                        (attribute.key.as_ref() == "name")
+                            .then(|| {
+                                renamed(Place::NodeType, attribute.value.trim())
+                            })
+                            .flatten()
+                    })
+                }
+                5 => renamed(Place::Key, &name),
+                _ => None,
+            }
         };
         match event {
             Event::Start(tag) => {
                 depth += 1;
-                if let Some(said) = element(tag.name().as_ref(), depth) {
+                if let Some(said) = element(&tag, depth) {
                     return Some((at, said));
                 }
-                in_type = depth == 3 && tag.name().as_ref() == "type";
             }
             Event::Empty(tag) => {
-                if let Some(said) = element(tag.name().as_ref(), depth + 1) {
-                    return Some((at, said));
-                }
-            }
-            Event::Text(said) if in_type => {
-                let said = said.into_inner();
-                if let Some(said) = renamed(Place::NodeType, said.trim()) {
+                if let Some(said) = element(&tag, depth + 1) {
                     return Some((at, said));
                 }
             }
             Event::End(_) => {
-                in_type = false;
                 depth = depth.saturating_sub(1);
             }
             Event::Eof => return None,
@@ -368,22 +383,25 @@ mod tests {
     /// The file's text.
     fn yaml_with(new: &str, old: &str) -> String {
         let text = "description: a file\n\
-                    gateway:\n  \
-                    - name: down\n    \
-                    type: gateway_radio\n    \
-                    gateway-out:\n      \
-                    - target: sensor\n      \
-                    - target: echo\n      \
-                    - target: drop\n      \
+                    gateways:\n  \
+                    - type gateway_radio:\n      \
+                    - gateway: down\n        \
+                    gateway-out:\n          \
+                    - target: sensor\n          \
+                    - target: echo\n          \
+                    - target: drop\n          \
                     - target: app\n\
                     payloads:\n  \
-                    - { name: sensor, type: i2c, gateway-in: true }\n\
+                    - type i2c:\n      \
+                    - { payload: sensor, gateway-in: true }\n\
                     vehicle:\n  \
-                    - { name: echo, type: tee-gateway, gateway-in: true }\n  \
-                    - { name: drop, type: null-gateway, gateway-in: true }\n  \
-                    - name: app\n    \
-                    type: app_gateway_veh\n    \
-                    gateway-in: true\n    \
+                    - type tee-gateway:\n      \
+                    - { compute: echo, gateway-in: true }\n  \
+                    - type null-gateway:\n      \
+                    - { compute: drop, gateway-in: true }\n  \
+                    - type app_gateway_veh:\n      \
+                    - compute: app\n        \
+                    gateway-in: true\n        \
                     app-gateway-arg: \"1\"\n";
         assert!(text.contains(new), "{new}");
         text.replacen(new, old, 1)
@@ -403,25 +421,32 @@ mod tests {
         let text = "<?xml version=\"1.0\"?>\n\
                     <configuration>\n\
                     <description>a file</description>\n\
-                    <gateway>\n\
-                    <name>down</name>\n\
-                    <type>gateway_radio</type>\n\
+                    <gateways>\n\
+                    <type name=\"gateway_radio\">\n\
+                    <gateway name=\"down\">\n\
                     <gateway-out><target>sensor</target></gateway-out>\n\
                     <gateway-out><target>echo</target></gateway-out>\n\
                     <gateway-out><target>drop</target></gateway-out>\n\
                     <gateway-out><target>app</target></gateway-out>\n\
                     </gateway>\n\
+                    </type>\n\
+                    </gateways>\n\
                     <payloads>\n\
-                    <name>sensor</name><type>i2c</type>\n\
+                    <type name=\"i2c\">\n\
+                    <payload name=\"sensor\">\n\
                     <gateway-in>true</gateway-in>\n\
+                    </payload>\n\
+                    </type>\n\
                     </payloads>\n\
-                    <vehicle><name>echo</name><type>tee-gateway</type>\
-                    <gateway-in>true</gateway-in></vehicle>\n\
-                    <vehicle><name>drop</name><type>null-gateway</type>\
-                    <gateway-in>true</gateway-in></vehicle>\n\
-                    <vehicle><name>app</name><type>app_gateway_veh</type>\n\
+                    <vehicle>\n\
+                    <type name=\"tee-gateway\"><compute name=\"echo\">\
+                    <gateway-in>true</gateway-in></compute></type>\n\
+                    <type name=\"null-gateway\"><compute name=\"drop\">\
+                    <gateway-in>true</gateway-in></compute></type>\n\
+                    <type name=\"app_gateway_veh\"><compute name=\"app\">\n\
                     <gateway-in>true</gateway-in>\n\
-                    <app-gateway-arg>1</app-gateway-arg></vehicle>\n\
+                    <app-gateway-arg>1</app-gateway-arg></compute></type>\n\
+                    </vehicle>\n\
                     </configuration>\n";
         assert!(text.contains(new), "{new}");
         text.replace(new, old)
@@ -468,28 +493,28 @@ mod tests {
     #[test]
     fn each_old_word_is_refused_in_yaml_with_the_new_one() {
         for (new, old, word, now) in [
-            ("gateway:\n", "moc:\n", "the moc section", "gateway"),
+            ("gateways:\n", "moc:\n", "the moc section", "gateways"),
             (
-                "type: gateway_radio",
-                "type: moc",
+                "type gateway_radio:",
+                "type moc:",
                 "the node type moc",
                 "gateway_radio",
             ),
             (
-                "type: tee-gateway",
-                "type: \"tee-moc\"",
+                "type tee-gateway:",
+                "\"type tee-moc\":",
                 "the node type tee-moc",
                 "tee-gateway",
             ),
             (
-                "type: null-gateway",
-                "type: null-moc",
+                "type null-gateway:",
+                "type null-moc:",
                 "the node type null-moc",
                 "null-gateway",
             ),
             (
-                "type: app_gateway_veh",
-                "type: app_moc_veh",
+                "type app_gateway_veh:",
+                "type app_moc_veh:",
                 "the node type app_moc_veh",
                 "app_gateway_veh",
             ),
@@ -525,35 +550,35 @@ mod tests {
     #[test]
     fn each_old_word_is_refused_in_xml_with_the_new_one() {
         for (new, old, word, now) in [
-            ("gateway>", "moc>", "the moc section", "gateway"),
+            ("gateways>", "moc>", "the moc section", "gateways"),
             (
-                "<type>gateway_radio</type>",
-                "<type>moc</type>",
+                "<type name=\"gateway_radio\">",
+                "<type name=\"moc\">",
                 "the node type moc",
                 "gateway_radio",
             ),
             (
-                "<type>tee-gateway</type>",
-                "<type> tee-moc </type>",
+                "<type name=\"tee-gateway\">",
+                "<type name=\" tee-moc \">",
                 "the node type tee-moc",
                 "tee-gateway",
             ),
             (
-                "<type>null-gateway</type>",
-                "<type>null-moc</type>",
+                "<type name=\"null-gateway\">",
+                "<type name=\"null-moc\">",
                 "the node type null-moc",
                 "null-gateway",
             ),
             (
-                "<type>app_gateway_veh</type>",
-                "<type>app_moc_veh</type>",
+                "<type name=\"app_gateway_veh\">",
+                "<type name=\"app_moc_veh\">",
                 "the node type app_moc_veh",
                 "app_gateway_veh",
             ),
             ("gateway-in>", "moc-in>", "moc-in", "gateway-in"),
             (
-                "<gateway-in>true</gateway-in>\n</payloads>",
-                "<moc-in/>\n</payloads>",
+                "<gateway-in>true</gateway-in>\n</payload>",
+                "<moc-in/>\n</payload>",
                 "moc-in",
                 "gateway-in",
             ),
@@ -585,15 +610,16 @@ mod tests {
         let yaml = format!(
             "# moc: was the section, and type: moc the radio\n\
              description: \"moc: type: moc, moc-in: true\"\n{}",
-            yaml_with("name: down", "name: moc")
+            yaml_with("gateway: down", "gateway: moc")
         );
         assert_eq!(refused(&yaml, ConfigFormat::Yaml), None);
 
-        let xml = xml_with("<name>down</name>", "<name>moc</name>").replace(
-            "<description>a file</description>",
-            "<!-- <moc><type>moc</type><moc-in/></moc> -->\n\
+        let xml = xml_with("<gateway name=\"down\">", "<gateway name=\"moc\">")
+            .replace(
+                "<description>a file</description>",
+                "<!-- <moc><type>moc</type><moc-in/></moc> -->\n\
              <description>&lt;moc&gt; type moc</description>",
-        );
+            );
         assert_eq!(refused(&xml, ConfigFormat::Xml), None);
     }
 
@@ -648,10 +674,10 @@ mod tests {
     fn old_piece(said: &Renamed, extension: &str) -> String {
         match (said.place, extension) {
             (Place::Section, "ytcs") => format!("{}:", said.old),
-            (Place::NodeType, "ytcs") => format!("type: {}", said.old),
+            (Place::NodeType, "ytcs") => format!("type {}:", said.old),
             (Place::Key, "ytcs") => format!("{}:", said.old),
             (Place::Section, _) => format!("<{}>", said.old),
-            (Place::NodeType, _) => format!("<type>{}</type>", said.old),
+            (Place::NodeType, _) => format!("<type name=\"{}\">", said.old),
             (Place::Key, _) => format!("<{}", said.old),
         }
     }
@@ -667,10 +693,10 @@ mod tests {
     /// The file's text.
     fn yaml_with_old(said: &Renamed) -> String {
         match said.place {
-            Place::Section => yaml_with("gateway:\n", "moc:\n"),
+            Place::Section => yaml_with("gateways:\n", "moc:\n"),
             Place::NodeType => yaml_with(
-                &format!("type: {}", said.new),
-                &format!("type: {}", said.old),
+                &format!("type {}:", said.new),
+                &format!("type {}:", said.old),
             ),
             Place::Key => {
                 yaml_with(&format!("{}:", said.new), &format!("{}:", said.old))
@@ -689,10 +715,10 @@ mod tests {
     /// The file's text.
     fn xml_with_old(said: &Renamed) -> String {
         match said.place {
-            Place::Section => xml_with("gateway>", "moc>"),
+            Place::Section => xml_with("gateways>", "moc>"),
             Place::NodeType => xml_with(
-                &format!("<type>{}</type>", said.new),
-                &format!("<type>{}</type>", said.old),
+                &format!("<type name=\"{}\">", said.new),
+                &format!("<type name=\"{}\">", said.old),
             ),
             Place::Key => {
                 xml_with(&format!("<{}", said.new), &format!("<{}", said.old))

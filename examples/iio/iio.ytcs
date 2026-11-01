@@ -30,33 +30,33 @@ tcspecial:
     recv: "0.0.0.0:3240"
     send: "127.0.0.1:3250"
 
-gateway:
-  # The ground's end of the link. Nothing goes up to an IIO sensor, which is
-  # read and never written, so nothing leaves this node by gateway-out; what
-  # comes down arrives at ground_base plus the device id of the node that
-  # sent it: the sensor, device id 1, at 127.0.0.1:3741.
-  - name: ground
-    type: gateway_radio
-    address: "127.0.0.1"
-    port: "3640"
-    ground_base: "127.0.0.1:3740"
-    payload-in: true
+gateways:
+  - type gateway_radio:
+      # The ground's end of the link. Nothing goes up to an IIO sensor, which is
+      # read and never written, so nothing leaves this node by gateway-out; what
+      # comes down arrives at ground_base plus the device id of the node that
+      # sent it: the sensor, device id 1, at 127.0.0.1:3741.
+      - gateway: ground
+        address: "127.0.0.1"
+        ground_base: "127.0.0.1:3740"
+        port: "3640"
+        payload-in: true
 
 payloads:
-  # A sensor's buffer, which hands over whole sample sets as they are taken.
-  # Which channels are in a set and how often one is taken are the sensor's
-  # settings, made in sysfs by whoever brings it up, and nothing here. The
-  # device is /dev/iio:device1, which is what the kernel's iio_dummy sensor
-  # is numbered on a host with one sensor of its own;
-  # bin/mk-kernel-stand-ins makes that sensor, enables its buffer and prints
-  # the number it was given, which is the path to write here.
-  - name: sensor
-    type: iio
-    path: "/dev/iio:device1"
-    payload-out:
-      - target: ground
+  - type iio:
+      # A sensor's buffer, which hands over whole sample sets as they are taken.
+      # Which channels are in a set and how often one is taken are the sensor's
+      # settings, made in sysfs by whoever brings it up, and nothing here. The
+      # device is /dev/iio:device1, which is what the kernel's iio_dummy sensor
+      # is numbered on a host with one sensor of its own;
+      # bin/mk-kernel-stand-ins makes that sensor, enables its buffer and prints
+      # the number it was given, which is the path to write here.
+      - payload: sensor
+        path: "/dev/iio:device1"
+        payload-out:
+          - target: ground
 
 tcsgui:
   nodes:
-    - { name: ground, x: 469, y: 34 }
-    - { name: sensor, x: 34, y: 34 }
+    - { node: ground, x: 469, y: 34 }
+    - { node: sensor, x: 34, y: 34 }

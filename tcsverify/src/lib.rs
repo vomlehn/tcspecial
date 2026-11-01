@@ -525,12 +525,6 @@ pub fn compare(first: &Path, second: &Path, report: &mut Report) {
                 "{}: {first_name} does not have this and {second_name} does",
                 path.join(" / ")
             ),
-            Said::Order(a, b) => format!(
-                "{}: {first_name} gives them in the order {a} and \
-                 {second_name} in the order {b}, and the order is part of \
-                 what they mean",
-                path.join(" / ")
-            ),
         };
         report.add(second, line, message);
     }
@@ -544,8 +538,6 @@ enum Said {
     /// named by the path and would be a page if it were printed.
     OnlyFirst(Option<String>),
     OnlySecond(Option<String>),
-    /// The same entries, in a different order.
-    Order(String, String),
 }
 
 /// Shows a value as a reader would write it in a message.
@@ -581,43 +573,78 @@ fn alone(value: &serde_json::Value) -> Option<String> {
     }
 }
 
-/// Finds what tells the entries of a list apart, where something does: a
-/// node by its name, a link by where it leaves from.
+/// Finds what tells the entries of two lists apart, where something does: a
+/// node by its name, a link by where it leaves from, a command binding by
+/// where it comes from and what it sets, and a list of words -- a link's
+/// destinations, the included files -- by each word.
+///
+/// One rule for both lists, the first that tells apart the entries of each,
+/// so that an entry is matched with its like whatever else either list has.
 ///
 /// # Arguments
 ///
-/// * `list` - The list's entries.
+/// * `one` - One list's entries.
+/// * `two` - The other's.
 ///
 /// # Returns
 ///
-/// Each entry's `name`, or failing that its `from`, in order; `None` for a
-/// list whose entries have no such key, or whose keys repeat, which is then
-/// compared place by place.
-fn keys_of(list: &[serde_json::Value]) -> Option<Vec<String>> {
-    for key in ["name", "from"] {
-        let keys: Option<Vec<String>> = list
+/// Each list's keys, in order; `None` where no rule tells the entries of
+/// both apart, and the two are then compared place by place.
+fn keys_of(
+    one: &[serde_json::Value],
+    two: &[serde_json::Value],
+) -> Option<(Vec<String>, Vec<String>)> {
+    /// Each entry's key under one rule, where every entry has one and no two
+    /// share it.
+    ///
+    /// # Arguments
+    ///
+    /// * `list` - The entries.
+    /// * `rule` - The keys an entry is told apart by, none for a word.
+    ///
+    /// # Returns
+    ///
+    /// The keys, or `None`.
+    fn keyed(list: &[serde_json::Value], rule: &[&str]) -> Option<Vec<String>> {
+        let keys: Vec<String> = list
             .iter()
             .map(|entry| {
-                entry.get(key).and_then(|k| k.as_str()).map(str::to_string)
+                if rule.is_empty() {
+                    return entry.as_str().map(str::to_string);
+                }
+                rule.iter()
+                    .map(|part| {
+                        entry
+                            .get(part)
+                            .and_then(|k| k.as_str())
+                            .map(str::to_string)
+                    })
+                    .collect::<Option<Vec<String>>>()
+                    .map(|parts| parts.join(" "))
             })
-            .collect();
-        if let Some(keys) = keys {
-            let mut unique = keys.clone();
-            unique.sort();
-            unique.dedup();
-            if unique.len() == keys.len() {
-                return Some(keys);
-            }
-        }
+            .collect::<Option<Vec<String>>>()?;
+        let mut unique = keys.clone();
+        unique.sort();
+        unique.dedup();
+        (unique.len() == keys.len()).then_some(keys)
     }
-    None
+
+    if one.is_empty() && two.is_empty() {
+        return None;
+    }
+    let rules: [&[&str]; 4] = [&[], &["name"], &["from"], &["from", "sets"]];
+    rules
+        .into_iter()
+        .find_map(|rule| Some((keyed(one, rule)?, keyed(two, rule)?)))
 }
 
 /// Finds every place two value trees differ, each with the path to it.
 ///
-/// Objects are compared key by key, lists of named entries name by name and
-/// then for order, other lists place by place. A key that is null on one
-/// side and missing on the other is no difference.
+/// Objects are compared key by key, lists of keyed entries as sets, key by
+/// key, and other lists place by place. The order of a list is never a
+/// difference: nothing in a configuration is in an order that means
+/// anything, so two spellings that differ only in order agree. A key that is
+/// null on one side and missing on the other is no difference.
 ///
 /// # Arguments
 ///
@@ -654,10 +681,11 @@ fn differences_between(
                 path.pop();
             }
         }
-        (Value::Array(a), Value::Array(b)) => match (keys_of(a), keys_of(b)) {
-            // Entries with names: matched by name, so one entry missing is
-            // one difference rather than every entry after it.
-            (Some(ka), Some(kb)) => {
+        (Value::Array(a), Value::Array(b)) => match keys_of(a, b) {
+            // Entries with keys: matched by key, so one entry missing is one
+            // difference rather than every entry after it, and the order
+            // they come in is none.
+            Some((ka, kb)) => {
                 for (key, x) in ka.iter().zip(a) {
                     path.push(key.clone());
                     match kb.iter().position(|k| k == key) {
@@ -674,20 +702,6 @@ fn differences_between(
                         out.push((path.clone(), Said::OnlySecond(alone(y))));
                         path.pop();
                     }
-                }
-                // And the order, which is part of what they mean: a node's
-                // place is its device id.
-                let common = |keys: &[String],
-                              other: &[String]|
-                 -> Vec<String> {
-                    keys.iter().filter(|k| other.contains(k)).cloned().collect()
-                };
-                let (oa, ob) = (common(&ka, &kb), common(&kb, &ka));
-                if oa != ob {
-                    out.push((
-                        path.clone(),
-                        Said::Order(oa.join(", "), ob.join(", ")),
-                    ));
                 }
             }
             _ => {
@@ -1251,7 +1265,7 @@ mod tests {
         let line_of = |name: &str| {
             1 + text
                 .lines()
-                .position(|line| line.trim() == format!("- name: {name}"))
+                .position(|line| line.trim() == format!("- payload: {name}"))
                 .expect("the node is in the example")
         };
         assert_eq!(
@@ -1424,11 +1438,11 @@ mod tests {
     fn a_node_one_spelling_renames_is_missing_from_the_other() {
         // Compared and not verified, so the simulator file is not wanted.
         let (_dir, xml, yaml, _) = thermostat_pair(|xml| {
-            xml.replace("<name>heaters_1</name>", "<name>heater</name>")
-                .replace(
-                    "<target>heaters_1</target>",
-                    "<target>heater</target>",
-                )
+            xml.replace(
+                "<payload name=\"heaters_1\">",
+                "<payload name=\"heater\">",
+            )
+            .replace("<target>heaters_1</target>", "<target>heater</target>")
         });
         let mut report = Report::default();
         compare(&yaml, &xml, &mut report);
@@ -1444,29 +1458,58 @@ mod tests {
             said.iter().any(|m| m.contains("nodes / heater:")),
             "{said:?}"
         );
-        assert!(
-            said.iter().any(
-                |m| m.contains("\"heaters_1\"") && m.contains("\"heater\"")
-            ),
-            "{said:?}"
-        );
+        // And the line to it, a destination one has and the other does not,
+        // each way: a link's destinations are a set, whatever order they are
+        // written in.
+        for name in ["heaters_1", "heater"] {
+            assert!(
+                said.iter().any(|m| m.contains(&format!("/ to / {name}:"))),
+                "{said:?}"
+            );
+        }
         assert!(said.len() <= 4, "{said:?}");
     }
 
-    /// The order nodes are written in is part of what they mean -- a node's
-    /// place is its device id -- so two spellings that give them in two
-    /// orders differ.
+    /// The order anything is written in means nothing -- a node's device id
+    /// is its place among the names -- so two spellings that differ only in
+    /// order agree, and a list is compared as the set it is.
     #[test]
-    fn nodes_in_another_order_differ() {
-        let one =
-            serde_json::json!({ "nodes": [{ "name": "a" }, { "name": "b" }] });
-        let two =
-            serde_json::json!({ "nodes": [{ "name": "b" }, { "name": "a" }] });
+    fn lists_in_another_order_agree() {
+        let one = serde_json::json!({
+            "nodes": [{ "name": "a" }, { "name": "b" }],
+            "links": [{ "from": "a", "to": ["x", "y"] }],
+            "commands": [
+                { "from": "g", "sets": "a.p" },
+                { "from": "g", "sets": "b.q" }
+            ],
+        });
+        let two = serde_json::json!({
+            "nodes": [{ "name": "b" }, { "name": "a" }],
+            "links": [{ "from": "a", "to": ["y", "x"] }],
+            "commands": [
+                { "from": "g", "sets": "b.q" },
+                { "from": "g", "sets": "a.p" }
+            ],
+        });
         let mut out = Vec::new();
         differences_between(&one, &two, &mut Vec::new(), &mut out);
-        assert_eq!(out.len(), 1);
-        assert!(
-            matches!(&out[0].1, Said::Order(a, b) if a == "a, b" && b == "b, a")
+        assert!(out.is_empty(), "{}", out.len());
+
+        // And what one has and the other does not is one difference, however
+        // the rest is ordered.
+        let three = serde_json::json!({
+            "nodes": [{ "name": "b" }],
+            "links": [{ "from": "a", "to": ["y"] }],
+            "commands": [{ "from": "g", "sets": "b.q" }],
+        });
+        let mut out = Vec::new();
+        differences_between(&one, &three, &mut Vec::new(), &mut out);
+        let paths: Vec<String> =
+            out.iter().map(|(path, _)| path.join(" / ")).collect();
+        assert_eq!(
+            paths,
+            ["commands / g a.p", "links / a / to / x", "nodes / a"],
+            "{paths:?}"
         );
     }
 
@@ -1529,8 +1572,7 @@ mod tests {
         (dir, path)
     }
 
-    const SOUND_GRAPH: &str = "\
-tcspecial:
+    const SOUND_GRAPH: &str = "tcspecial:
   gateway: radio
   interface: \"ad9aac4dd5a6d88dd5e78824ba8a83ac\"
   state_file: /tmp/tcspecial-test.state
@@ -1552,11 +1594,19 @@ payload_groups:
   - name: temps
     interval: \"3 s\"
 payloads:
-  - { name: sensor, type: i2c, group: temps, path: \"/dev/i2c-1\", \
-address: \"0x48\", payload-out: gateway }
-gateway:
-  - { name: gateway, type: gateway_radio, address: \"10.0.0.1\", \
-port: \"5000\", ground_base: \"10.0.0.2:5100\" }
+  - type i2c:
+      - payload: sensor
+        address: \"0x48\"
+        group: temps
+        path: \"/dev/i2c-1\"
+        payload-out:
+          - target: gateway
+gateways:
+  - type gateway_radio:
+      - gateway: gateway
+        address: \"10.0.0.1\"
+        ground_base: \"10.0.0.2:5100\"
+        port: \"5000\"
 ";
 
     /// A simulator file that names a payload the simulator will not stand in
@@ -1570,17 +1620,19 @@ port: \"5000\", ground_base: \"10.0.0.2:5100\" }
         // The sound graph with a heater the ground drives through a tee.
         let configuration = format!(
             "{SOUND_GRAPH}vehicle:
-  - {{ name: echo, type: tee-gateway, gateway-out: heater }}
+  - type tee-gateway:
+      - {{ compute: echo, gateway-out: heater }}
 "
         )
         .replace(
-            "payload-out: gateway }\n",
-            "payload-out: gateway }\n  - { name: heater, type: network, \
-             protocol: udp, address: \"127.0.0.1\", port: \"8001\" }\n",
+            "          - target: gateway\ngateways:\n",
+            "          - target: gateway\n  - type network:\n      \
+             - { payload: heater, protocol: udp, address: \"127.0.0.1\", \
+             port: \"8001\" }\ngateways:\n",
         )
         .replace(
-            "ground_base: \"10.0.0.2:5100\" }",
-            "ground_base: \"10.0.0.2:5100\", gateway-out: echo }",
+            "        port: \"5000\"\n",
+            "        port: \"5000\"\n        gateway-out: echo\n",
         );
         let sim = "\
 simulated_payloads:
@@ -1662,16 +1714,26 @@ simulated_payloads:
     fn a_graphs_problems_are_reported_with_their_lines() {
         let (_dir, path) = graph_written(
             ".ytcs",
-            "\
-payload_groups:
+            "payload_groups:
   - name: temps
     interval: soon
 payloads:
-  - { name: a, type: i2c, group: temps, path: \"/dev/i2c-1\", \
-payload-out: nowhere }
-  - { name: a, type: spi, path: \"/dev/spidev0.0\" }
+  - type i2c:
+      - payload: a
+        group: temps
+        path: \"/dev/i2c-1\"
+        payload-out:
+          - target: nowhere
+  - type spi:
+      - payload: b
+        path: \"/dev/spidev0.0\"
+        payload-out:
+          - target: b
 vehicle:
-  - { name: m, type: compute, function: mean, inputs: \"in0\" }
+  - type compute:
+      - compute: m
+        function: mean
+        inputs: \"in0\"
 ",
         );
 
@@ -1680,7 +1742,7 @@ vehicle:
             report.findings.iter().map(|f| f.to_string()).collect();
         let all = said.join("\n");
 
-        assert!(all.contains("two nodes are called \"a\""), "{all}");
+        assert!(all.contains("\"b\" is linked to itself"), "{all}");
         assert!(all.contains("is not a length of time"), "{all}");
         assert!(all.contains("there is no node called \"nowhere\""), "{all}");
         assert_eq!(report.status(), 1);
@@ -1704,7 +1766,7 @@ vehicle:
             &top,
             "description: an old file\n\
              moc:\n  \
-             - { name: down, type: gateway_radio }\n",
+             - type gateway_radio:\n      - { gateway: down }\n",
         )
         .unwrap();
 
@@ -1715,7 +1777,7 @@ vehicle:
             .find(|f| f.message.contains("rename it"))
             .expect("the old section should be reported");
         assert_eq!(old.line, 2, "{old}");
-        assert!(old.message.contains("is called gateway now"), "{old}");
+        assert!(old.message.contains("is called gateways now"), "{old}");
     }
 
     /// A problem about a node is reported in the file the node is in.
@@ -1729,14 +1791,23 @@ vehicle:
         let top = dir.path().join("vehicle.ytcs");
         std::fs::write(
             &top,
-            "include:\n  - zone\ngateway:\n  \
-             - { name: gateway, type: gateway_radio, gateway-out: gateway }\n",
+            "include:
+  - zone
+gateways:
+  - type gateway_radio:
+      - gateway: gateway
+        gateway-out:
+          - target: gateway
+",
         )
         .unwrap();
         // The included file holds a node nothing links to.
         std::fs::write(
             dir.path().join("zone.ytcs"),
-            "payloads:\n  - { name: lonely, type: i2c }\n",
+            "payloads:
+  - type i2c:
+      - payload: lonely
+",
         )
         .unwrap();
 
@@ -1751,7 +1822,7 @@ vehicle:
             "it should be reported in the file it is in, not {}",
             lonely.file.display()
         );
-        assert_eq!(lonely.line, 2, "{lonely}");
+        assert_eq!(lonely.line, 3, "{lonely}");
     }
 
     /// A configuration's simulator file is joined to it by name.
@@ -1817,14 +1888,15 @@ vehicle:
     fn a_graph_in_xml_is_checked_too() {
         let (_dir, path) = graph_written(
             ".xtcs",
-            "\
-<?xml version=\"1.0\" encoding=\"UTF-8\"?>
+            "<?xml version=\"1.0\" encoding=\"UTF-8\"?>
 <configuration>
     <payloads>
-        <name>a</name>
-        <type>i2c</type>
-        <path>/dev/i2c-1</path>
-        <payload-out>nowhere</payload-out>
+        <type name=\"i2c\">
+            <payload name=\"a\">
+                <path>/dev/i2c-1</path>
+                <payload-out><target>nowhere</target></payload-out>
+            </payload>
+        </type>
     </payloads>
 </configuration>
 ",
@@ -1855,8 +1927,7 @@ vehicle:
     /// over `payload_telemetry` -- the shape of `examples/minimal`. The tests
     /// below are about the reporting rather than about any one kind of node,
     /// so what they are given is the simplest thing that reads.
-    const GOOD: &str = "\
-description: two payloads
+    const GOOD: &str = "description: two payloads
 tcspecial:
   gateway: radio
   interface: \"ad9aac4dd5a6d88dd5e78824ba8a83ac\"
@@ -1879,15 +1950,15 @@ tcspecial:
     recv: \"0.0.0.0:4000\"
     send: \"127.0.0.1:4100\"
 payloads:
-  - name: DH0
-    type: device-file
-    path: /dev/zero
-    read_size: \"4\"
-  - name: DH1
-    type: network
-    protocol: udp
-    address: \"127.0.0.1\"
-    port: \"5000\"
+  - type device-file:
+      - payload: DH0
+        path: /dev/zero
+        read_size: \"4\"
+  - type network:
+      - payload: DH1
+        address: \"127.0.0.1\"
+        port: \"5000\"
+        protocol: udp
 ";
 
     const GOOD_SIM: &str = "\
@@ -1933,25 +2004,22 @@ simulated_payloads:
         // a drawing somebody is working on. What the file is wrong about has
         // changed; that every one of them is reported has not.
         let text = GOOD.replace(
-            "payloads:",
-            "\
-payloads:
-  - name: first
-    type: device-file
-    path: /dev/urandom
-    payload-out:
-      - target: nowhere
-  - name: second
-    type: device-file
-    path: /dev/full
-    payload-out:
-      - target: elsewhere
-  - name: third
-    type: device-file
-    path: /dev/random
-    payload-out:
-      - target: anywhere
-# what GOOD's own payloads were:",
+            "  - type device-file:\n",
+            "  - type device-file:
+      - payload: first
+        path: /dev/urandom
+        payload-out:
+          - target: nowhere
+      - payload: second
+        path: /dev/full
+        payload-out:
+          - target: elsewhere
+      - payload: third
+        path: /dev/random
+        payload-out:
+          - target: anywhere
+      # and GOOD's own:
+",
         );
         let set = written(".ytcs", &text, GOOD_SIM);
         let report = verify(&set.payload, None, Limits::EVERYTHING);
@@ -1959,10 +2027,11 @@ payloads:
         assert_eq!(report.findings.len(), 3, "{:?}", report.findings);
         assert_eq!(report.status(), 1);
 
-        // Each beside the node it is about, in the order the file wrote them.
+        // Each beside the node it is about, in the order of the nodes'
+        // names, which is the one order a configuration has.
         let lines: Vec<usize> =
             report.findings.iter().map(|f| f.line).collect();
-        assert_eq!(lines, vec![24, 29, 34], "{:?}", report.findings);
+        assert_eq!(lines, vec![25, 29, 33], "{:?}", report.findings);
         for (finding, missing) in
             report
                 .findings
@@ -2034,8 +2103,11 @@ payloads:
     /// A file that does not parse is reported from where the parser stopped.
     #[test]
     fn a_file_that_does_not_parse_says_where_it_stopped() {
-        let text = GOOD
-            .replace("payloads:", "payloads:\n  - name: bad\n   type: oops");
+        // The node's second key out of line with its first.
+        let text = GOOD.replace(
+            "payloads:",
+            "payloads:\n  - type i2c:\n      - payload: bad\n     path: oops",
+        );
         let set = written(".ytcs", &text, GOOD_SIM);
         let report = verify(&set.payload, None, Limits::EVERYTHING);
         assert_eq!(report.findings.len(), 1, "{:?}", report.findings);
@@ -2064,8 +2136,8 @@ payloads:
                 .expect("the edit is in the file")
         };
         for (from, to) in [
-            // An element the editor's section has no field for.
-            ("<x>34</x>", "<z>34</z>"),
+            // An attribute the editor's section has no field for.
+            ("x=\"34\"", "z=\"34\""),
             // A closing tag that is not its element's.
             ("5 s</default_interval>", "5 s</default_intervl>"),
         ] {
@@ -2249,13 +2321,12 @@ simulated_payloads:
     /// The configuration and a good simulator file, in a directory of their
     /// own.
     fn with_errors(count: usize) -> Set {
-        let mut payloads = "payloads:\n".to_string();
+        let mut payloads = "payloads:\n  - type device-file:\n".to_string();
         for id in 0..count {
             // A link to a node that is not there, which is one error each.
             payloads.push_str(&format!(
-                "  - name: DH{id}\n    type: device-file\n    \
-                 path: /dev/null{id}\n    \
-                 payload-out:\n      - target: nowhere{id}\n"
+                "      - payload: DH{id}\n        path: /dev/null{id}\n        \
+                 payload-out:\n          - target: nowhere{id}\n"
             ));
         }
         let head = GOOD
@@ -2281,11 +2352,13 @@ simulated_payloads:
             // Placed and not yet filled in or linked, as the editor writes a
             // node the moment it is dropped: see
             // an_unfinished_graph_warns_and_passes.
-            extra.push_str(&format!("  - {{ name: spare{id}, type: i2c }}\n"));
+            extra.push_str(&format!("      - {{ payload: spare{id} }}\n"));
         }
+        // Under the sound graph's own i2c payloads.
         graph_written(
             ".ytcs",
-            &SOUND_GRAPH.replace("gateway:\n", &format!("{extra}gateway:\n")),
+            &SOUND_GRAPH
+                .replace("  - type i2c:\n", &format!("  - type i2c:\n{extra}")),
         )
     }
 
@@ -2526,8 +2599,10 @@ simulated_payloads:
         std::fs::write(
             &path,
             said.replace(
-                "payloads:\n",
-                "payloads:\n  - name: temp_new\n    type: i2c\n",
+                "  - type i2c:\n",
+                "  - type i2c:
+      - payload: temp_new
+",
             ),
         )
         .unwrap();

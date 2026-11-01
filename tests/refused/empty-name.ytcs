@@ -1,0 +1,4 @@
+# Refused: a node whose name is empty.
+payloads:
+  - type i2c:
+      - payload: ""

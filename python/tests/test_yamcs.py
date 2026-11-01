@@ -54,15 +54,13 @@ class YamcsGatewayTest(unittest.TestCase):
                 "<configuration>"
                 "<tcspecial><gateway>yamcs</gateway>"
                 f"<interface>{interface.of_this_tree().hex()}</interface>"
-                "<tcs_cmd><send>127.0.0.1:0</send>"
-                "<recv>127.0.0.1:4000</recv></tcs_cmd></tcspecial>"
-                "<gateway><name>m</name><type>gateway_yamcs</type>"
-                "<ground_base>127.0.0.1:9000</ground_base>"
-                "<apid_base>0x200</apid_base></gateway>"
-                "<vehicle><name>p</name><type>ping</type>"
-                "<payload-out><target>m</target></payload-out></vehicle>"
-                "</configuration>"
-            )
+                "<tcs_cmd><send>127.0.0.1:0</send><recv>127.0.0.1:4000</recv>"
+                "</tcs_cmd></tcspecial><gateways><type name=\"gateway_yamcs\">"
+                "<gateway name=\"m\"><ground_base>127.0.0.1:9000</ground_base>"
+                "<apid_base>0x200</apid_base></gateway></type></gateways>"
+                "<vehicle><type name=\"ping\"><compute name=\"p\">"
+                "<payload-out><target>m</target></payload-out></compute>"
+                "</type></vehicle></configuration>")
             config = configuration.load(path)
             self.assertEqual(config.downlink("m", "p"),
                              HostPort("127.0.0.1", 9001))

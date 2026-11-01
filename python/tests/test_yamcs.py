@@ -112,15 +112,18 @@ commands:
 """
 
 
-def yamcs(directory, base="0x300", gateway="yamcs", renamed=None):
+def yamcs(directory, base="0x300", gateway="yamcs", renamed=None,
+          ping_from_m=False):
     """Writes :data:`YAMCS` and reads it.
 
     Args:
-        directory: Where to write it.
-        base:      Its ``payload_telemetry.apid_base``.
-        gateway:   Its ``tcspecial.gateway``.
-        renamed:   Each node to rename, and its new name: the names a test
-                   gives must keep the device ids' order.
+        directory:   Where to write it.
+        base:        Its ``payload_telemetry.apid_base``.
+        gateway:     Its ``tcspecial.gateway``.
+        renamed:     Each node to rename, and its new name: the names a
+                     test gives must keep the device ids' order.
+        ping_from_m: Whether "m" binds aboard and its data goes to "p", as
+                     a ping goes up to a ping node.
 
     Returns:
         The :class:`configuration.Configuration`.
@@ -128,6 +131,13 @@ def yamcs(directory, base="0x300", gateway="yamcs", renamed=None):
     path = Path(directory) / "vehicle.ytcs"
     text = (YAMCS.format(interface=interface.of_this_tree().hex(), base=base)
             .replace("gateway: yamcs", f"gateway: {gateway}"))
+    if ping_from_m:
+        text = text.replace('        ground_base: "127.0.0.1:9000"\n',
+                            '        ground_base: "127.0.0.1:9000"\n'
+                            '        address: "127.0.0.1"\n'
+                            '        port: "9500"\n'
+                            "        gateway-out:\n"
+                            "          - target: p\n")
     for old, new in (renamed or {}).items():
         text = (text.replace(f": {old}\n", f": {new}\n")
                 .replace(f"from: {old},", f"from: {new},"))
@@ -245,11 +255,95 @@ class MdbTest(unittest.TestCase):
                 assigned[command.get("name")] = int(
                     assignment.get("argumentValue"))
         self.assertEqual(assigned, {"Connect": 0x101, "m": 0x200})
-        # Each node's data is its parameter, what follows the header whole.
-        for name in ("p", "n"):
-            parameter, = self.find(root, f".//x:Parameter[@name='{name}']")
-            self.assertEqual(parameter.get("parameterTypeRef"),
-                             generated.BODY_TYPE)
+        # The data of a node with no document is its parameter, what
+        # follows the header whole.
+        parameter, = self.find(root, ".//x:Parameter[@name='n']")
+        self.assertEqual(parameter.get("parameterTypeRef"),
+                         generated.BODY_TYPE)
+        self.assertEqual(self.find(root, ".//x:Parameter[@name='p']"), [])
+
+    def test_a_ping_nodes_answer_is_laid_out_by_its_document(self):
+        root = generated.mdb(yamcs(self.directory.name)).getroot()
+        container, = self.find(root, ".//x:SequenceContainer"
+                                     "[@name='pPacket']")
+        self.assertEqual([entry.get("parameterRef") for entry
+                          in self.find(container, "./x:EntryList/*")],
+                         ["ReplyPrefix", "ReplyCount", "ReplySentSeconds",
+                          "ReplySentNanoseconds", "ReplySpace",
+                          "ReplyAnsweredSeconds", "ReplyAnsweredNanoseconds"])
+        # Each parameter and type is the document's, copied once.
+        count, = self.find(root, ".//x:Parameter[@name='ReplyCount']")
+        self.assertEqual(count.get("parameterTypeRef"), "PingCountType")
+        kind, = self.find(root, ".//x:StringParameterType"
+                                "[@name='PingCountType']")
+        self.assertEqual(self.find(kind, ".//x:TerminationChar")[0].text,
+                         "20")
+        self.assertEqual(len(self.find(root, ".//x:StringParameterType"
+                                             "[@name='PingSecondsType']")),
+                         1)
+
+    def test_a_gateway_node_to_a_ping_node_takes_the_ping(self):
+        config = yamcs(self.directory.name, ping_from_m=True)
+        uplink, = generated.uplinks(config)
+        self.assertEqual((uplink.name, uplink.command, uplink.document),
+                         ("m", "Ping", interface.node_document("ping")))
+        root = generated.mdb(config).getroot()
+        command, = self.find(root, ".//x:MetaCommand[@name='Ping']")
+        self.assertEqual(
+            int(self.find(command, ".//x:ArgumentAssignment")[0]
+                .get("argumentValue")), 0x200)
+        self.assertEqual([argument.get("name") for argument
+                          in self.find(command, "./x:ArgumentList/*")],
+                         ["Count", "SentSeconds", "SentNanoseconds"])
+        entries = self.find(command, "./x:CommandContainer/x:EntryList/*")
+        self.assertEqual(entries[0].get("binaryValue"), b"ping #".hex()
+                         .upper())
+        self.assertEqual(self.find(root, ".//x:MetaCommand[@name='m']"), [])
+
+    def test_a_gateway_node_to_other_nodes_too_sends_data_whole(self):
+        config = yamcs(self.directory.name, ping_from_m=True)
+        path = Path(config.path)
+        path.write_text(path.read_text().replace(
+            "          - target: p\n",
+            "          - target: p\n          - target: n\n"))
+        config = configuration.load(path)
+        uplink, = generated.uplinks(config)
+        self.assertEqual((uplink.command, uplink.document), ("m", None))
+
+    def test_a_document_the_wrapper_cannot_copy_is_refused(self):
+        document = interface.node_document("ping").read_text()
+        cases = (
+            # A type that refers to another value.
+            ("<TerminationChar>20</TerminationChar>",
+             "<TerminationChar>20</TerminationChar><Dummy/>",
+             "Dummy, which the Yamcs wrapper does not copy"),
+            # A second answer.
+            ("</ContainerSet>",
+             '<SequenceContainer name="More"><EntryList/>'
+             "</SequenceContainer></ContainerSet>",
+             "2 containers that are not abstract"),
+            # A restriction that is not a constant.
+            ('<Comparison parameterRef="ReplySpace" value=" "/>',
+             '<Comparison parameterRef="ReplySpace" value=" " '
+             'comparisonOperator="!="/>',
+             "other than a parameter being equal"),
+            # A reference outside the document.
+            ('parameterRef="ReplyCount"/>',
+             'parameterRef="/Other/ReplyCount"/>',
+             "which the document does not have"))
+        for old, new, says in cases:
+            with self.subTest(says=says):
+                path = Path(self.directory.name) / "ping.xtce"
+                path.write_text(document.replace(old, new, 1))
+                saved = dict(interface.NODE_DOCUMENTS)
+                interface.NODE_DOCUMENTS["ping"] = path
+                try:
+                    with self.assertRaisesRegex(ValueError, says):
+                        generated.mdb(yamcs(self.directory.name,
+                                            ping_from_m=True))
+                finally:
+                    interface.NODE_DOCUMENTS.clear()
+                    interface.NODE_DOCUMENTS.update(saved)
 
     def test_the_links_follow_the_configuration(self):
         config = yamcs(self.directory.name)
@@ -283,9 +377,11 @@ class MdbTest(unittest.TestCase):
         """Well-formed, and valid against the XTCE schema: the XTCE 1.2
         schema Yamcs reads, where ``$XTCE_XSD`` names it, or else XTCE
         1.3's in the tcs-xtce checkout beside this tree, the namespace
-        moved to 1.3's."""
+        moved to 1.3's. With the ping's command in it, copied from the
+        ping node's document."""
         path = Path(self.directory.name) / "tcs-ccsds.xtce"
-        generated.write_mdb(yamcs(self.directory.name), path)
+        generated.write_mdb(yamcs(self.directory.name, ping_from_m=True),
+                            path)
         ElementTree.parse(path)
         references = (Path(__file__).resolve().parents[3] / "tcs-xtce"
                       / "references")
@@ -306,6 +402,37 @@ class MdbTest(unittest.TestCase):
                               str(schema), str(path)],
                              capture_output=True, text=True, env=environment)
         self.assertEqual(ran.returncode, 0, ran.stderr)
+
+
+class WrittenTest(unittest.TestCase):
+    """The wrapper as it is written: no line wider than the template's."""
+
+    def test_a_wide_start_tag_has_an_attribute_on_each_line(self):
+        root = ElementTree.Element(generated._tag("SpaceSystem"),
+                                   {"name": "TcsYamcs"})
+        ElementTree.SubElement(root, generated._tag("Argument"),
+                               {"name": "SentNanoseconds",
+                                "argumentTypeRef": "PingNanosecondsArg",
+                                "initialValue": "000000000"})
+        ElementTree.SubElement(root, generated._tag("Parameter"),
+                               {"name": "A", "parameterTypeRef": "B"})
+        self.assertEqual(generated.serialized(root), [
+            '<SpaceSystem xmlns="http://www.omg.org/spec/XTCE/20180204" '
+            'name="TcsYamcs">',
+            '  <Argument name="SentNanoseconds"',
+            '            argumentTypeRef="PingNanosecondsArg"',
+            '            initialValue="000000000"/>',
+            '  <Parameter name="A" parameterTypeRef="B"/>',
+            "</SpaceSystem>"])
+
+    def test_text_and_attributes_are_escaped(self):
+        root = ElementTree.Element(generated._tag("Comparison"),
+                                   {"value": '<"&>'})
+        root.text = "a < b & c"
+        written = "\n".join(generated.serialized(root))
+        self.assertEqual(ElementTree.fromstring(written).get("value"),
+                         '<"&>')
+        self.assertEqual(ElementTree.fromstring(written).text, "a < b & c")
 
 
 if __name__ == "__main__":

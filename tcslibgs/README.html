@@ -222,6 +222,14 @@ fields, packed and unpacked by the code generated from it,
 <code>fixed.xtce</code>’s; what each field says is checked here and in
 <code>../python/tcslibgs/beacon.py</code>, held to each other by the
 same examples in their tests.</li>
+<li><code>node::vehicle::ping</code>: what a ping and its answer say.
+The ping node’s interface document, <code>xtce/ping.xtce</code>, states
+the same field by field for the ground stations that read XTCE; its
+tests pack and unpack pings with the code generated from it,
+<code>src/ping_packet.rs</code> and
+<code>../python/tcslibgs/ping_packet.py</code>
+(<code>make ping-packet</code>), and hold the bytes to this module’s. It
+is no part of the interface.</li>
 <li><code>interface</code>: the digest of <code>xtce/link.xtce</code>,
 which every beacon carries, and which every configuration names as its
 <code>tcspecial</code> section’s <code>interface</code>, so that a

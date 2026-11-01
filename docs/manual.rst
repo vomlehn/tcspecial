@@ -2596,14 +2596,20 @@ are stated once. The mission database is tcspecial's own XTCE,
 ``tcslibgs/xtce``, as it is, and ``tcs-ccsds.xtce``, generated from the
 configuration by ``python/tcslibgs/yamcs.py`` with a container or a command
 for every APID it counts: the CCSDS header, what follows it on each APID,
-and CONNECT and the gateway node's command, which a ping goes as, behind a
-header. Yamcs's links, one on each port, are generated alongside: see
-`What the vehicle answers to`_. Nothing in it is written by hand per APID,
-so a node added to the configuration -- a payload nothing touches, or
-another source drawn into the gateway node -- has its container in Yamcs
-the next time the example runs. A ping goes up as the gateway node's
-command, ``/TcsYamcs/gateway``, and its answer comes down as the ping
-node's parameter, ``/TcsYamcs/ping``, each the ping's text as bytes. It starts
+and CONNECT and the ping, behind a header. Yamcs's links, one on each port,
+are generated alongside: see `What the vehicle answers to`_. Nothing in it
+is written by hand per APID, so a node added to the configuration -- a
+payload nothing touches, or another source drawn into the gateway node --
+has its container in Yamcs the next time the example runs. The ping and its
+answer are laid out by the ping node's interface document,
+``tcslibgs/xtce/ping.xtce``: a ping goes up as the document's command,
+``/TcsYamcs/Ping``, its text split into the arguments ``Count``,
+``SentSeconds`` and ``SentNanoseconds`` by the code tcs-xtce generates from
+the document, ``python/tcslibgs/ping_packet.py``, and its answer comes down
+as the document's parameters, ``/TcsYamcs/ReplyCount``,
+``/TcsYamcs/ReplySentSeconds`` and the rest, which are put together again
+into the answer's text. Yamcs shows both, in its command history and its
+parameters, as the text they are. It starts
 Yamcs on that, and tcspecial on the configuration, each stopped when it
 exits, however it exits -- the kernel is told to kill both if it is killed;
 has Yamcs send CONNECT until the vehicle answers with the configuration's
@@ -4475,14 +4481,16 @@ as soon as it is regenerated:
 * the beacon's container, ``BeaconPacket``, and the answers',
   ``AnswerPacket``, restricted to ``beacon.apid`` and ``tcs_cmd.apid``, and
   ``Connect`` on ``tcs_cmd.apid``;
-* a command named after each ``gateway_yamcs`` node, on its ``apid_base``,
-  which carries its ``Data`` argument whole, ``DataBits`` saying how many
-  bits it is;
+* a command for each ``gateway_yamcs`` node, on its ``apid_base``: the
+  command of the nodes' interface document, where every node its data goes
+  to has the same one (see below); otherwise named after the node, carrying
+  its ``Data`` argument whole, ``DataBits`` saying how many bits it is;
 * for each source drawn into a ``gateway_yamcs`` node, and each payload
-  nothing touches, a container ``<node>Packet`` on its APID, holding a
-  binary parameter named after the node: what follows the header, whole,
-  since no XTCE says how a node's data is laid out. (A source drawn into two
-  such nodes gets one for each, named ``<node>_to_<gateway>``);
+  nothing touches, a container ``<node>Packet`` on its APID, holding the
+  fields of its interface document's container, where its type has one,
+  and otherwise a binary parameter named after the node: what follows the
+  header, whole. (A source drawn into two such nodes gets one for each,
+  named ``<node>_to_<gateway>``);
 * a link on the command link, on the beacon, to each ``gateway_yamcs``
   node's ``address`` and ``port``, and on each port a source's data arrives
   at.
@@ -4492,6 +4500,27 @@ the answers' layouts, which it takes from ``tcslibgs/xtce``, and CONNECT --
 is ``python/tcslibgs/yamcs.xtce``, to which the generated parts are added.
 A node whose name XTCE does not allow, or that is a name the mission
 database already has, is refused, naming the node, as is an APID used twice.
+
+A node type may have an *interface document*: XTCE that states what a node
+of the type takes from the ground and gives back. The ``ping`` type has
+one, ``tcslibgs/xtce/ping.xtce``, which lays a ping out field by field --
+the prefix ``ping #``, the count ended by a space, the seconds ended by a
+point and nine digits of nanoseconds -- and its answer as the same, a
+space, and the vehicle's time. The document goes with the type, not with a
+configuration, so nothing in a configuration names it; it is the ground's,
+like every XTCE document, and the vehicle answers pings as it always has.
+Its command (``Ping``, with ``Count``, ``SentSeconds`` and
+``SentNanoseconds``) and its container's parameters (``ReplyCount``,
+``ReplySentSeconds`` and the rest) are copied into the mission database
+under the document's names, the command behind the header. Only what the
+copy says the same is copied: strings, integers and binary values of a
+fixed size or ended by a character, and entries one after another; a
+document that says more is refused, naming what. Yamcs's web interface
+then shows a ping and its answer as text.
+
+The mission database is written as the fixed part is, two spaces to a
+level, and no line of it wider than 80 columns: an element whose start tag
+would be wider has one attribute on each line, each under the first.
 ``examples/ping-yamcs/ping_yamcs.py`` writes a Yamcs instance with it: see
 `The ping-yamcs example`_.
 
@@ -4604,7 +4633,10 @@ checksums, which cover ``interface``. None covers
 ``tcslibgs/xtce/fixed.xtce``, where the fixed commands are laid out, or
 ``tcslibgs/xtce/beacon.xtce``, where the beacon is. Each is the same in
 every build, so there is nothing to compare, and a test in ``tcslibgs``
-fails if either is ever changed.
+fails if either is ever changed. Nor does any cover
+``tcslibgs/xtce/ping.xtce``, the ping node's interface document, which is
+the ping node's and not tcspecial's: a test in ``tcslibgs`` holds it to the
+code that writes and reads a ping instead.
 
 Where the links are
 -------------------

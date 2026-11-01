@@ -15,10 +15,13 @@
 //!   with more nodes, a payload's data through the gateway node and a
 //!   payload's telemetry -- framed by `tcslibgs` and
 //!   decoded by the wrapper, must land in the container meant for it, with
-//!   the header's fields and the body where the wrapper says;
-//! * each command Yamcs sends up -- CONNECT and a ping -- encoded by the
-//!   wrapper, with its length filled in as Yamcs fills it in, must be
-//!   unframed by `tcslibgs` and read as the command it is.
+//!   the header's fields and the body where the wrapper says: a ping's
+//!   answer field by field, as the ping node's interface document
+//!   (`tcslibgs/xtce/ping.xtce`) lays it out, every byte of it read;
+//! * each command Yamcs sends up -- CONNECT and a ping, the ping as the
+//!   document's fields -- encoded by the wrapper, with its length filled in
+//!   as Yamcs fills it in, must be unframed by `tcslibgs` and read as the
+//!   command it is: the ping as the text `tcslibgs` writes.
 //!
 //! The interpreter here does what the wrapper uses of XTCE and no more: a
 //! wrapper that grows past it fails here, saying what it does not know,
@@ -168,6 +171,71 @@ fn start_of(entry: &Element, after: Option<usize>) -> usize {
     }
 }
 
+/// A string's termination character, where its type ends it by one rather
+/// than by a fixed size.
+///
+/// # Arguments
+///
+/// * `kind` - The string's type.
+///
+/// # Returns
+///
+/// The character's byte and the most bits the string takes, the character
+/// counted; `None` for a string of a fixed size.
+///
+/// # Panics
+///
+/// The type is not one this test reads: a character of more than a byte.
+fn terminated(kind: &Element) -> Option<(u8, usize)> {
+    let variable = kind.child("StringDataEncoding")?.child("Variable")?;
+    let most = variable
+        .attribute("maxSizeInBits")
+        .expect("a string's largest size")
+        .parse()
+        .expect("a number");
+    let character = variable
+        .child("TerminationChar")
+        .expect("what ends the string")
+        .text
+        .trim();
+    assert_eq!(character.len(), 2, "a one-byte termination character");
+    let byte = u8::from_str_radix(character, 16).expect("hex");
+    Some((byte, most))
+}
+
+/// Reads a string that a character ends: its bytes, up to the character.
+///
+/// # Arguments
+///
+/// * `packet` - The packet.
+/// * `at`     - The bit it starts at, on an octet.
+/// * `ended`  - Its termination character and the most bits it takes.
+///
+/// # Returns
+///
+/// The string's bytes, the character not among them, and the bits it
+/// took, the character among them.
+///
+/// # Panics
+///
+/// The character is not there before the string's largest size, or the
+/// packet's end.
+fn read_terminated(
+    packet: &[u8],
+    at: usize,
+    ended: (u8, usize),
+) -> (Vec<u8>, usize) {
+    let (character, most) = ended;
+    assert!(at.is_multiple_of(8), "a string on an octet");
+    let start = at / 8;
+    let room = &packet[start..packet.len().min(start + most / 8)];
+    let end = room
+        .iter()
+        .position(|&b| b == character)
+        .unwrap_or_else(|| panic!("no {character:#04x} ends the string"));
+    (room[..end].to_vec(), 8 * (end + 1))
+}
+
 /// What a packet decoded to.
 #[derive(Debug, Default)]
 struct Decoded {
@@ -180,6 +248,8 @@ struct Decoded {
     /// Each container of another document it refers to, and the bit it
     /// starts at.
     refers: Vec<(String, usize)>,
+    /// Where its last entry ended, where that is known.
+    end: Option<usize>,
 }
 
 /// Whether a comparison holds.
@@ -303,6 +373,12 @@ fn decode(xtce: &Element, packet: &[u8]) -> Decoded {
                         .iter()
                         .find(|k| k.attribute("name") == Some(kind_name))
                         .expect("its type");
+                    if let Some(ended) = terminated(kind) {
+                        let (said, size) = read_terminated(packet, at, ended);
+                        decoded.bytes.insert(name.to_string(), said);
+                        after = Some(at + size);
+                        continue;
+                    }
                     let size = width(kind, &decoded.integers);
                     if kind.name == "IntegerParameterType" {
                         decoded
@@ -345,6 +421,7 @@ fn decode(xtce: &Element, packet: &[u8]) -> Decoded {
             })
         });
         let Some(derived) = next.next() else {
+            decoded.end = after;
             return decoded;
         };
         let name = derived.attribute("name").expect("a name").to_string();
@@ -362,6 +439,20 @@ fn decode(xtce: &Element, packet: &[u8]) -> Decoded {
 enum Given<'a> {
     Integer(u64),
     Bytes(&'a [u8]),
+    /// A string, which its type ends with a character or pads to its size.
+    Text(&'a str),
+}
+
+/// Appends bytes to bits, most significant first.
+///
+/// # Arguments
+///
+/// * `bits`  - Where they go.
+/// * `bytes` - The bytes.
+fn push_bytes(bits: &mut Vec<bool>, bytes: &[u8]) {
+    for byte in bytes {
+        bits.extend((0..8).rev().map(|b| byte >> b & 1 == 1));
+    }
 }
 
 /// Encodes a command as Yamcs would by the wrapper: its base command's
@@ -419,6 +510,7 @@ fn encode(xtce: &Element, command: &str, given: &[(&str, Given)]) -> Vec<u8> {
         }
     }
     let mut bytes = BTreeMap::new();
+    let mut texts = BTreeMap::new();
     for (name, value) in given {
         match value {
             Given::Integer(value) => {
@@ -426,6 +518,9 @@ fn encode(xtce: &Element, command: &str, given: &[(&str, Given)]) -> Vec<u8> {
             }
             Given::Bytes(value) => {
                 bytes.insert(name.to_string(), *value);
+            }
+            Given::Text(value) => {
+                texts.insert(name.to_string(), *value);
             }
         }
     }
@@ -436,12 +531,47 @@ fn encode(xtce: &Element, command: &str, given: &[(&str, Given)]) -> Vec<u8> {
     for meta in &chain {
         let container = meta.child("CommandContainer").expect("a container");
         for entry in &container.child("EntryList").expect("entries").children {
+            if entry.name == "FixedValueEntry" {
+                let size: usize = entry
+                    .attribute("sizeInBits")
+                    .expect("a size")
+                    .parse()
+                    .expect("a number");
+                let value = entry.attribute("binaryValue").expect("a value");
+                assert_eq!(value.len() * 4, size, "a fixed value's size");
+                let value: Vec<u8> = (0..value.len())
+                    .step_by(2)
+                    .map(|i| u8::from_str_radix(&value[i..i + 2], 16))
+                    .collect::<Result<_, _>>()
+                    .expect("hex");
+                push_bytes(&mut bits, &value);
+                continue;
+            }
+            assert_eq!(entry.name, "ArgumentRefEntry", "an entry this reads");
             let name = entry.attribute("argumentRef").expect("an argument");
             let kind = types[0]
                 .children
                 .iter()
                 .find(|k| k.attribute("name") == Some(kinds[name]))
                 .expect("its type");
+            if let Some(text) = texts.get(name) {
+                assert_eq!(kind.name, "StringArgumentType", "{name}: text");
+                let mut said = text.as_bytes().to_vec();
+                match terminated(kind) {
+                    Some((character, most)) => {
+                        assert!(!said.contains(&character), "{name} ends");
+                        said.push(character);
+                        assert!(said.len() * 8 <= most, "{name} fits");
+                    }
+                    None => {
+                        let size = width(kind, &integers);
+                        assert!(said.len() * 8 <= size, "{name} fits");
+                        said.resize(size / 8, 0);
+                    }
+                }
+                push_bytes(&mut bits, &said);
+                continue;
+            }
             let size = width(kind, &integers);
             match (integers.get(name), bytes.get(name)) {
                 (Some(&value), _) if kind.name.starts_with("Integer") => {
@@ -450,9 +580,7 @@ fn encode(xtce: &Element, command: &str, given: &[(&str, Given)]) -> Vec<u8> {
                 }
                 (_, Some(value)) => {
                     assert_eq!(value.len() * 8, size, "{name}'s size");
-                    for byte in value.iter() {
-                        bits.extend((0..8).rev().map(|b| byte >> b & 1 == 1));
-                    }
+                    push_bytes(&mut bits, value);
                 }
                 _ => panic!("{name} is given no value"),
             }
@@ -515,20 +643,68 @@ fn a_beacon_decodes_as_the_vehicle_framed_it() {
     assert_eq!(decoded.bytes["BeaconBody"], body);
 }
 
+/// The text of each of a ping's answer's fields, as the ping node's
+/// interface document names them, for an answer `tcslibgs` writes.
+///
+/// # Arguments
+///
+/// * `count`    - The ping's count.
+/// * `sent`     - When it was sent.
+/// * `answered` - When it was answered.
+///
+/// # Returns
+///
+/// The answer, and each field's name and text.
+fn answer_and_fields(
+    count: u64,
+    sent: Duration,
+    answered: Duration,
+) -> (Vec<u8>, Vec<(&'static str, String)>) {
+    let message = ping::message(count, sent).expect("a ping");
+    let answer = ping::reply(message.as_bytes(), answered)
+        .expect("an answer")
+        .as_bytes()
+        .to_vec();
+    let nanoseconds = |at: Duration| format!("{:09}", at.subsec_nanos());
+    let fields = vec![
+        ("ReplyPrefix", "ping #".to_string()),
+        ("ReplyCount", count.to_string()),
+        ("ReplySentSeconds", sent.as_secs().to_string()),
+        ("ReplySentNanoseconds", nanoseconds(sent)),
+        ("ReplySpace", " ".to_string()),
+        ("ReplyAnsweredSeconds", answered.as_secs().to_string()),
+        ("ReplyAnsweredNanoseconds", nanoseconds(answered)),
+    ];
+    (answer, fields)
+}
+
 /// A ping's answer, framed under `apid_base` plus the ping node's device
-/// id, is the ping node's container, its parameter the answer whole.
+/// id, is the ping node's container, its parameters the answer's text field
+/// by field, as the ping node's interface document lays it out, and every
+/// byte of it read.
 #[test]
 fn a_pings_answer_decodes_as_its_text() {
     let xtce = wrapper();
+    let largest = Duration::new(u64::MAX, 999_999_999);
     let sent = Duration::new(1_793_562_467, 79_578_927);
-    let message = ping::message(1, sent).expect("a ping");
-    let answer =
-        ping::reply(message.as_bytes(), sent + Duration::from_millis(5))
-            .expect("an answer");
-    let packet = framed(apid("reply_apid"), answer.as_bytes());
-    let decoded = decode(&xtce, &packet);
-    assert_eq!(decoded.container, "pingPacket");
-    assert_eq!(decoded.bytes["ping"], answer.as_bytes());
+    for (count, sent, answered) in [
+        (1, sent, sent + Duration::from_millis(5)),
+        (1, Duration::ZERO, Duration::ZERO),
+        (u64::MAX, largest, largest),
+    ] {
+        let (answer, fields) = answer_and_fields(count, sent, answered);
+        let packet = framed(apid("reply_apid"), &answer);
+        let decoded = decode(&xtce, &packet);
+        assert_eq!(decoded.container, "pingPacket");
+        for (name, text) in &fields {
+            assert_eq!(
+                String::from_utf8_lossy(&decoded.bytes[*name]),
+                *text,
+                "{name}"
+            );
+        }
+        assert_eq!(decoded.end, Some(packet.len() * 8), "all of it is read");
+    }
 }
 
 /// CONNECT's answer, on `tcs_cmd.apid`, is a FixedAnswerPacket, the fixed
@@ -590,34 +766,59 @@ fn connect_encodes_as_the_vehicle_reads_it() {
     }
 }
 
-/// A ping, as Yamcs sends it by the wrapper as the gateway node's command,
-/// is unframed by the vehicle under the gateway node's `apid_base`, its
-/// text whole.
+/// A ping, as Yamcs sends it by the wrapper as the ping node's document's
+/// command, its fields as text, is unframed by the vehicle under the
+/// gateway node's `apid_base` and read as the ping `tcslibgs` writes; and
+/// the vehicle's answer to it decodes back into the same fields.
 #[test]
 fn a_ping_encodes_as_its_text() {
     let xtce = wrapper();
-    let message = ping::message(4, Duration::new(1_793_562_467, 160_521_331))
-        .expect("a ping");
-    let packet = encode(
-        &xtce,
-        "gateway",
-        &[
-            ("Data", Given::Bytes(message.as_bytes())),
-            ("DataBits", Given::Integer(8 * message.len() as u64)),
-        ],
-    );
-    let body =
-        read_header(&packet, PacketType::Telecommand, apid("uplink_apid"))
-            .expect("the vehicle takes its header");
-    assert_eq!(body, message.as_bytes());
-    ping::read_message(body).expect("the vehicle reads the ping");
+    let largest = Duration::new(u64::MAX, 999_999_999);
+    for (count, sent) in [
+        (4, Duration::new(1_793_562_467, 160_521_331)),
+        (1, Duration::ZERO),
+        (u64::MAX, largest),
+    ] {
+        let message = ping::message(count, sent).expect("a ping");
+        let seconds = sent.as_secs().to_string();
+        let nanoseconds = format!("{:09}", sent.subsec_nanos());
+        let count_text = count.to_string();
+        let packet = encode(
+            &xtce,
+            "Ping",
+            &[
+                ("Count", Given::Text(&count_text)),
+                ("SentSeconds", Given::Text(&seconds)),
+                ("SentNanoseconds", Given::Text(&nanoseconds)),
+            ],
+        );
+        let body =
+            read_header(&packet, PacketType::Telecommand, apid("uplink_apid"))
+                .expect("the vehicle takes its header");
+        assert_eq!(body, message.as_bytes());
+        let read = ping::read_message(body).expect("the vehicle reads it");
+        assert_eq!((read.count, read.sent), (count, sent));
+
+        // And round again: the vehicle's answer, as Yamcs reads it.
+        let answered = sent.saturating_add(Duration::from_millis(1));
+        let answer = ping::reply(body, answered).expect("an answer");
+        let decoded =
+            decode(&xtce, &framed(apid("reply_apid"), answer.as_bytes()));
+        for (name, said) in [
+            ("ReplyCount", &count_text),
+            ("ReplySentSeconds", &seconds),
+            ("ReplySentNanoseconds", &nanoseconds),
+        ] {
+            assert_eq!(String::from_utf8_lossy(&decoded.bytes[name]), *said);
+        }
+    }
 }
 
 /// In a copy of the example with more nodes, the data of each, framed under
 /// the APID `tcslibgs` counts for it -- "pong"'s through the gateway node,
 /// "sensor"'s and "tank"'s over `payload_telemetry` -- is that node's
 /// container, its parameter the data whole; and the ping node's answers
-/// and the gateway node's command are as they were.
+/// and the ping are as they were.
 #[test]
 fn added_nodes_decode_into_their_own_containers() {
     let dir = tempfile::tempdir().expect("a directory");
@@ -630,8 +831,16 @@ fn added_nodes_decode_into_their_own_containers() {
     sources.sort_unstable();
     assert_eq!(sources, ["ping", "pong", "sensor", "tank"]);
     for link in &links {
-        let data = format!("{} says hello", link.source).into_bytes();
         let apid = link.apid.expect("framed");
+        if link.source == "ping" {
+            let at = Duration::new(1_793_562_467, 1);
+            let (answer, fields) = answer_and_fields(2, at, at);
+            let decoded = decode(&xtce, &framed(apid, &answer));
+            assert_eq!(decoded.container, "pingPacket");
+            assert_eq!(decoded.bytes["ReplyCount"], fields[1].1.as_bytes());
+            continue;
+        }
+        let data = format!("{} says hello", link.source).into_bytes();
         let decoded = decode(&xtce, &framed(apid, &data));
         assert_eq!(decoded.container, format!("{}Packet", link.source));
         assert_eq!(decoded.integers["CcsdsApid"], u64::from(apid));
@@ -639,14 +848,15 @@ fn added_nodes_decode_into_their_own_containers() {
     }
     let packet = encode(
         &xtce,
-        "gateway",
+        "Ping",
         &[
-            ("Data", Given::Bytes(b"up")),
-            ("DataBits", Given::Integer(16)),
+            ("Count", Given::Text("3")),
+            ("SentSeconds", Given::Text("1793562467")),
+            ("SentNanoseconds", Given::Text("000000001")),
         ],
     );
     let body =
         read_header(&packet, PacketType::Telecommand, apid("uplink_apid"))
             .expect("the vehicle takes its header");
-    assert_eq!(body, b"up");
+    assert_eq!(body, b"ping #3 1793562467.000000001");
 }

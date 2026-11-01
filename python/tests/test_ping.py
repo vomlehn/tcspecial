@@ -11,11 +11,55 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
-from tcslibgs import ping  # noqa: E402
+from tcslibgs import ping, ping_packet  # noqa: E402
 
 SECOND = 1_000_000_000
 SENT = 1_760_900_000 * SECOND + 1
 ANSWERED = 1_760_900_000 * SECOND + 250_000_000
+
+
+class DocumentTest(unittest.TestCase):
+    """``tcslibgs/xtce/ping.xtce``, the ping node's interface document, held
+    to this module as ``xtce_holds_to_the_rust`` holds it to the Rust: with
+    the code tcs-xtce generates from it, ``tcslibgs/ping_packet.py``."""
+
+    #: Pings and answers: each count, when it was sent and when answered.
+    EXAMPLES = ((1, 0, 0), (1, SENT, ANSWERED),
+                (42, 1_793_562_467 * SECOND + 79_578_927, ANSWERED),
+                (ping.LARGEST, ping.LARGEST * SECOND + 999_999_999,
+                 ping.LARGEST * SECOND + 999_999_999))
+
+    def test_the_document_packs_and_unpacks_what_this_writes(self):
+        for count, sent, answered in self.EXAMPLES:
+            message = ping.message(count, sent).encode()
+            seconds, nanoseconds = ping.time_text(sent).split(".")
+            fields = ping_packet.Ping(count=str(count), sent_seconds=seconds,
+                                      sent_nanoseconds=nanoseconds)
+            self.assertEqual(fields.to_bytes(), message)
+            self.assertEqual(ping_packet.Ping.decode(message), fields)
+
+            answer = ping.reply(message, answered)
+            seconds, nanoseconds = ping.time_text(answered).split(".")
+            fields = ping_packet.PingReply(
+                reply_count=fields.count,
+                reply_sent_seconds=fields.sent_seconds,
+                reply_sent_nanoseconds=fields.sent_nanoseconds,
+                reply_answered_seconds=seconds,
+                reply_answered_nanoseconds=nanoseconds)
+            self.assertEqual(fields.to_bytes(), answer)
+            self.assertEqual(ping_packet.PingReply.decode(answer), fields)
+
+    def test_the_documents_largest_sizes_are_this_modules(self):
+        self.assertEqual(ping_packet.Ping.MAX_BYTES, ping.MESSAGE_BYTES)
+        self.assertEqual(ping_packet.PingReply.MAX_BYTES, ping.REPLY_BYTES)
+
+    def test_an_answer_with_another_prefix_or_space_is_refused(self):
+        for answer in (b"pong #1 1760900000.000000001 1760900000.250000000",
+                       b"ping #1 1760900000.000000001_1760900000.250000000"):
+            with self.assertRaises(ValueError):
+                ping.read_reply(answer)
+            with self.assertRaises(ping_packet.pk.PacketError):
+                ping_packet.PingReply.decode(answer)
 
 
 class PingTest(unittest.TestCase):

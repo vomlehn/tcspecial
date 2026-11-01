@@ -2504,8 +2504,10 @@ environment holding F´'s tools, ``fprime-util`` among them:
    $ make fprime-build FPRIME_FRAMEWORK=$HOME/fprime FPRIME_VENV=$HOME/fprime-venv
    $ make fprime-test FPRIME_FRAMEWORK=$HOME/fprime FPRIME_VENV=$HOME/fprime-venv
 
-Left out, the two are looked for in ``../fprime-scratch``, beside this tree, as
-``fprime`` and ``venv``; ``FPRIME_SCRATCH`` names another such directory.
+Left out, the two are looked for in ``fprime-scratch``, beside the checkout,
+as ``fprime`` and ``venv``; ``FPRIME_SCRATCH`` names another such directory.
+Beside the checkout means beside the main checkout, which git finds, so a
+worktree of the tree looks in the same place (``beside.mk``).
 ``make help`` in ``fprime/`` says the rest.
 
 Which channels the bridge has is the configuration's, and is never written by
@@ -2724,7 +2726,8 @@ which no other example uses.
 
 ``make cfs-test`` flies the example against a real cFS. It builds cFS with
 SBN v7.0.1 and its UDP module in ``CFS_SCRATCH`` (by default
-``../cfs-scratch``) from a cFS checkout, ``CFS_PRISTINE``, and a git
+``cfs-scratch``, beside the checkout, as ``fprime-scratch`` is) from a cFS
+checkout, ``CFS_PRISTINE``, and a git
 checkout of SBN, ``SBN_SRC``, and installs nothing; the first build fetches
 the cFS checkout's submodules at the commits it pins. It then starts that
 cFS and tcspecial, and ``tcspecial/tests/cfs_flight.rs`` commands the vehicle
@@ -4274,7 +4277,7 @@ harness does, and checks that every stand-in is gone. tcssim's window opens
 for the length of the test, so a display is needed.
 
 Its ports are 47000 to 47999, and it holds ``tcs-ports.lock``, beside the
-checkout, while it runs, so that it never runs at the same time as another
+main checkout (``TCS_PORTS_LOCK``, from ``beside.mk``), while it runs, so that it never runs at the same time as another
 test that starts tcspecial and tcssim and holds the same lock.
 
 Building tcspecial for a vehicle

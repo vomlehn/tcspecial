@@ -13,25 +13,23 @@
 # sample mission is in defs/, and says why in each file. See "What crosses
 # the bus" in docs/design.rst for what the run is the test of.
 
-# The tcspecial tree this directory is in.
+# The tcspecial tree this directory is in, and what sits beside it: see
+# beside.mk, which also names TCS_PORTS_LOCK.
 TOP := $(abspath $(CURDIR)/..)
+include $(TOP)/beside.mk
 
 # A checkout of nasa/cFS, a git checkout of SBN v7.0.1 -- git, so that its
 # SBN_IDENT is expanded -- and the directory the build is made in: by
 # default, directories beside this tree.
-CFS_PRISTINE ?= $(abspath $(TOP)/../cfs-pristine)
-SBN_SRC ?= $(abspath $(TOP)/../fprime-scratch/sbn-src/sbn)
-CFS_SCRATCH ?= $(abspath $(TOP)/../cfs-scratch)
+CFS_PRISTINE ?= $(BESIDE)/cfs-pristine
+SBN_SRC ?= $(BESIDE)/fprime-scratch/sbn-src/sbn
+CFS_SCRATCH ?= $(BESIDE)/cfs-scratch
 
 # The configuration flown.
 CFS_CONFIG ?= $(TOP)/examples/cfs/cfs.ytcs
 
 # How many jobs the build runs at once.
 JOBS ?= 6
-
-# The lock every run that binds the fixed ports holds, so that two never
-# run at once: the same file the other tests that bind them use.
-TCS_PORTS_LOCK ?= $(HOME)/working/tcs-ports.lock
 
 # The tree prepare makes, and where cFS's build puts the one processor's
 # executable and its files.

@@ -2593,9 +2593,17 @@ somewhere (``bin/yamcsd`` under it):
 It writes a Yamcs configuration from the tcspecial one into a run directory,
 ``/tmp/ping-yamcs`` unless ``--run-dir`` says, so that the ports and APIDs
 are stated once. The mission database is tcspecial's own XTCE,
-``tcslibgs/xtce``, as it is, and ``tcs-ccsds.xtce``, written from
-``examples/ping-yamcs/yamcs/tcs-ccsds.xtce.in``: the CCSDS header, what
-follows it on each APID, and CONNECT and the ping behind a header. It starts
+``tcslibgs/xtce``, as it is, and ``tcs-ccsds.xtce``, generated from the
+configuration by ``python/tcslibgs/yamcs.py`` with a container or a command
+for every APID it counts: the CCSDS header, what follows it on each APID,
+and CONNECT and the gateway node's command, which a ping goes as, behind a
+header. Yamcs's links, one on each port, are generated alongside: see
+`What the vehicle answers to`_. Nothing in it is written by hand per APID,
+so a node added to the configuration -- a payload nothing touches, or
+another source drawn into the gateway node -- has its container in Yamcs
+the next time the example runs. A ping goes up as the gateway node's
+command, ``/TcsYamcs/gateway``, and its answer comes down as the ping
+node's parameter, ``/TcsYamcs/ping``, each the ping's text as bytes. It starts
 Yamcs on that, and tcspecial on the configuration, each stopped when it
 exits, however it exits -- the kernel is told to kill both if it is killed;
 has Yamcs send CONNECT until the vehicle answers with the configuration's
@@ -4455,6 +4463,36 @@ A command link's sender may be written with port ``0`` -- ``tcs_cmd.send:
 "127.0.0.1:0"`` -- to take commands from any port of that host, each answer
 still going back to the port its command came from. Yamcs needs it, sending
 its commands from a port the system chooses.
+
+A Yamcs ground station needs a container in its mission database for every
+APID the vehicle sends down, a command for every APID it sends up, and a
+link on every port. ``python/tcslibgs/yamcs.py`` works all of them out of
+the configuration, as ``tcslibgs`` counts the APIDs, so none is written by
+hand and a node added to the configuration is in Yamcs's mission database
+as soon as it is regenerated:
+
+* the beacon's container, ``BeaconPacket``, and the answers',
+  ``AnswerPacket``, restricted to ``beacon.apid`` and ``tcs_cmd.apid``, and
+  ``Connect`` on ``tcs_cmd.apid``;
+* a command named after each ``gateway_yamcs`` node, on its ``apid_base``,
+  which carries its ``Data`` argument whole, ``DataBits`` saying how many
+  bits it is;
+* for each source drawn into a ``gateway_yamcs`` node, and each payload
+  nothing touches, a container ``<node>Packet`` on its APID, holding a
+  binary parameter named after the node: what follows the header, whole,
+  since no XTCE says how a node's data is laid out. (A source drawn into two
+  such nodes gets one for each, named ``<node>_to_<gateway>``);
+* a link on the command link, on the beacon, to each ``gateway_yamcs``
+  node's ``address`` and ``port``, and on each port a source's data arrives
+  at.
+
+What does not depend on the configuration -- the header, the beacon's and
+the answers' layouts, which it takes from ``tcslibgs/xtce``, and CONNECT --
+is ``python/tcslibgs/yamcs.xtce``, to which the generated parts are added.
+A node whose name XTCE does not allow, or that is a name the mission
+database already has, is refused, naming the node, as is an APID used twice.
+``examples/ping-yamcs/ping_yamcs.py`` writes a Yamcs instance with it: see
+`The ping-yamcs example`_.
 
 Configurations kept on board
 ----------------------------

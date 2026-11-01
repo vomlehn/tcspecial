@@ -2394,15 +2394,16 @@ mod tests {
             &["beacon.apid", "apid_base of \"ground\"", "0x100", "change"]
         ));
 
-        // A downlink under the beacon's: the source at device id 1 counted
-        // from 0xFF is 0x100, the beacon's.
+        // A downlink under the beacon's: the source at device id 1 -- its
+        // name sorts after the gateway's -- counted from 0xFF is 0x100, the
+        // beacon's.
         let mut ground = node("ground", "gateway_yamcs");
         ground
             .attributes
             .insert("apid_base".to_string(), Scalar::of("0xFF"));
         let g = answering_yamcs(
-            vec![ground, node("a", "i2c")],
-            vec![link("a", &["ground"])],
+            vec![ground, node("s", "i2c")],
+            vec![link("s", &["ground"])],
         );
         assert!(says(
             &g,
@@ -2432,15 +2433,16 @@ mod tests {
             .insert("ground_base".into(), Scalar::of("10.0.0.2:6100"));
         second
             .attributes
-            .insert("apid_base".into(), Scalar::of("0x201"));
+            .insert("apid_base".into(), Scalar::of("0x202"));
+        // The source is device id 2, its name sorting after both gateways'.
         let g = answering_yamcs(
-            vec![node("ground", "gateway_yamcs"), node("a", "i2c"), second],
-            vec![link("a", &["ground"])],
+            vec![node("ground", "gateway_yamcs"), node("s", "i2c"), second],
+            vec![link("s", &["ground"])],
         );
         assert!(says(
             &g,
             Some("ground"),
-            &["apid_base of \"other\"", "sends to \"ground\"", "0x201"]
+            &["apid_base of \"other\"", "sends to \"ground\"", "0x202"]
         ));
 
         // Past eleven bits.
@@ -2449,8 +2451,8 @@ mod tests {
             .attributes
             .insert("apid_base".to_string(), Scalar::of("0x7FF"));
         let g = answering_yamcs(
-            vec![ground, node("a", "i2c")],
-            vec![link("a", &["ground"])],
+            vec![ground, node("s", "i2c")],
+            vec![link("s", &["ground"])],
         );
         assert!(says(&g, Some("ground"), &["apid_base", "0x7ff", "lower"]));
 

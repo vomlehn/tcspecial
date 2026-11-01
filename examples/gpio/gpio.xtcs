@@ -35,51 +35,57 @@
             <send>127.0.0.1:3230</send>
         </tcs_cmd>
     </tcspecial>
-    <!-- The ground's end of the link, both ways. What the ground sends goes
-         up to address:port, which this node binds aboard, and leaves it by
-         gateway-out for the lamp. What comes down arrives at ground_base
-         plus the device id of the node that sent it: the switch, device id
-         1, at 127.0.0.1:3721. -->
-    <gateway>
-        <name>ground</name>
-        <type>gateway_radio</type>
-        <address>127.0.0.1</address>
-        <port>3620</port>
-        <ground_base>127.0.0.1:3720</ground_base>
-        <payload-in>true</payload-in>
-        <gateway-out><target>lamp</target></gateway-out>
-    </gateway>
-    <!-- Two lines of one chip, each a payload of its own because one is read
-         and the other driven, and a payload's lines go one way. The chip
-         here is /dev/gpiochip1, which is what the kernel's gpio-sim chip is
-         numbered on a host with one chip of its own; bin/mk-kernel-stand-ins
-         makes that chip and prints the number it was given, which is the
-         path to write here.
+    <gateways>
+        <type name="gateway_radio">
+            <!-- The ground's end of the link, both ways. What the ground
+                 sends goes up to address:port, which this node binds
+                 aboard, and leaves it by gateway-out for the lamp. What
+                 comes down arrives at ground_base plus the device id of the
+                 node that sent it: the switch, device id 2, at
+                 127.0.0.1:3722. -->
+            <gateway name="ground">
+                <address>127.0.0.1</address>
+                <ground_base>127.0.0.1:3720</ground_base>
+                <port>3620</port>
+                <gateway-out><target>lamp</target></gateway-out>
+                <payload-in>true</payload-in>
+            </gateway>
+        </type>
+    </gateways>
+    <payloads>
+        <type name="gpio">
+            <!-- A lamp on line 1, driven by what the ground sends: the text
+                 1 to light it, 0 to put it out, and anything else refused. -->
+            <payload name="lamp">
+                <direction>output</direction>
+                <lines>1</lines>
+                <path>/dev/gpiochip1</path>
+                <gateway-in>true</gateway-in>
+            </payload>
+            <!-- Two lines of one chip, each a payload of its own because
+                 one is read and the other driven, and a payload's lines go
+                 one way. The chip here is /dev/gpiochip1, which is what the
+                 kernel's gpio-sim chip is numbered on a host with one chip
+                 of its own; bin/mk-kernel-stand-ins makes that chip and
+                 prints the number it was given, which is the path to write
+                 here.
 
-         A switch on line 0. Each time it changes, the kernel's edge becomes
-         a sixteen-byte record - when, which line, and what it became - and
-         the record goes to the ground. -->
-    <payloads>
-        <name>switch</name>
-        <type>gpio</type>
-        <path>/dev/gpiochip1</path>
-        <lines>0</lines>
-        <edge>both</edge>
-        <payload-out><target>ground</target></payload-out>
-    </payloads>
-    <!-- A lamp on line 1, driven by what the ground sends: the text 1 to
-         light it, 0 to put it out, and anything else refused. -->
-    <payloads>
-        <name>lamp</name>
-        <type>gpio</type>
-        <path>/dev/gpiochip1</path>
-        <lines>1</lines>
-        <direction>output</direction>
-        <gateway-in>true</gateway-in>
+                 A switch on line 0. Each time it changes, the kernel's edge
+                 becomes a sixteen-byte record - when, which line, and what
+                 it became - and the record goes to the ground. -->
+            <payload name="switch">
+                <edge>both</edge>
+                <lines>0</lines>
+                <path>/dev/gpiochip1</path>
+                <payload-out><target>ground</target></payload-out>
+            </payload>
+        </type>
     </payloads>
     <tcsgui>
-        <nodes><name>ground</name><x>469</x><y>34</y></nodes>
-        <nodes><name>switch</name><x>34</x><y>34</y></nodes>
-        <nodes><name>lamp</name><x>34</x><y>134</y></nodes>
+        <nodes>
+            <node name="ground" x="469" y="34"/>
+            <node name="lamp" x="34" y="134"/>
+            <node name="switch" x="34" y="34"/>
+        </nodes>
     </tcsgui>
 </configuration>

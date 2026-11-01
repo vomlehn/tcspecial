@@ -35,48 +35,54 @@
             <send>127.0.0.1:3210</send>
         </tcs_cmd>
     </tcspecial>
-    <!-- The ground's end of the link, both ways. What the ground sends goes
-         up to address:port, which this node binds aboard, and leaves it by
-         gateway-out for the motor's commands. What comes down arrives at
-         ground_base plus the device id of the node that sent it: the motor's
-         status, device id 1, at 127.0.0.1:3701. -->
-    <gateway>
-        <name>ground</name>
-        <type>gateway_radio</type>
-        <address>127.0.0.1</address>
-        <port>3600</port>
-        <ground_base>127.0.0.1:3700</ground_base>
-        <payload-in>true</payload-in>
-        <gateway-out><target>motor_command</target></gateway-out>
-    </gateway>
-    <!-- A motor controller on the CAN bus vcan0, which sends its status in
-         frames carrying the identifier 0x123 and takes commands in frames
-         carrying 0x124: two identifiers, so two payloads, each of whose
-         sockets hears its own identifier and nothing else on the bus. vcan0
-         is the kernel's virtual bus, which bin/mk-kernel-stand-ins makes; on
-         a vehicle it is the controller's interface, such as can0.
+    <gateways>
+        <type name="gateway_radio">
+            <!-- The ground's end of the link, both ways. What the ground
+                 sends goes up to address:port, which this node binds
+                 aboard, and leaves it by gateway-out for the motor's
+                 commands. What comes down arrives at ground_base plus the
+                 device id of the node that sent it: the motor's status,
+                 device id 2, at 127.0.0.1:3702. -->
+            <gateway name="ground">
+                <address>127.0.0.1</address>
+                <ground_base>127.0.0.1:3700</ground_base>
+                <port>3600</port>
+                <gateway-out><target>motor_command</target></gateway-out>
+                <payload-in>true</payload-in>
+            </gateway>
+        </type>
+    </gateways>
+    <payloads>
+        <type name="can">
+            <!-- Each command the ground sends goes to the motor as one
+                 frame, so a command is at most eight bytes, which is all a
+                 classic frame carries. -->
+            <payload name="motor_command">
+                <can_id>0x124</can_id>
+                <interface>vcan0</interface>
+                <gateway-in>true</gateway-in>
+            </payload>
+            <!-- A motor controller on the CAN bus vcan0, which sends its
+                 status in frames carrying the identifier 0x123 and takes
+                 commands in frames carrying 0x124: two identifiers, so two
+                 payloads, each of whose sockets hears its own identifier
+                 and nothing else on the bus. vcan0 is the kernel's virtual
+                 bus, which bin/mk-kernel-stand-ins makes; on a vehicle it
+                 is the controller's interface, such as can0.
 
-         Each status frame goes to the ground as it arrives. -->
-    <payloads>
-        <name>motor_status</name>
-        <type>can</type>
-        <interface>vcan0</interface>
-        <can_id>0x123</can_id>
-        <payload-out><target>ground</target></payload-out>
-    </payloads>
-    <!-- Each command the ground sends goes to the motor as one frame, so a
-         command is at most eight bytes, which is all a classic frame
-         carries. -->
-    <payloads>
-        <name>motor_command</name>
-        <type>can</type>
-        <interface>vcan0</interface>
-        <can_id>0x124</can_id>
-        <gateway-in>true</gateway-in>
+                 Each status frame goes to the ground as it arrives. -->
+            <payload name="motor_status">
+                <can_id>0x123</can_id>
+                <interface>vcan0</interface>
+                <payload-out><target>ground</target></payload-out>
+            </payload>
+        </type>
     </payloads>
     <tcsgui>
-        <nodes><name>ground</name><x>469</x><y>34</y></nodes>
-        <nodes><name>motor_status</name><x>34</x><y>34</y></nodes>
-        <nodes><name>motor_command</name><x>34</x><y>134</y></nodes>
+        <nodes>
+            <node name="ground" x="469" y="34"/>
+            <node name="motor_command" x="34" y="134"/>
+            <node name="motor_status" x="34" y="34"/>
+        </nodes>
     </tcsgui>
 </configuration>

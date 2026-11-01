@@ -40,33 +40,33 @@ tcspecial:
     recv: "0.0.0.0:16200"
     send: "127.0.0.1:0"
 
-gateway:
-  # Yamcs's end of the link, both ways. A ping goes up to address:port as a
-  # telecommand of APID apid_base, which this node binds aboard, and leaves
-  # it by gateway-out for the ping node. The answer comes back to Yamcs at
-  # ground_base plus the ping node's device id -- ping is the second node
-  # written, device id 1, so 16701 -- as telemetry of APID apid_base plus
-  # that device id, 0x201.
-  - name: gateway
-    type: gateway_yamcs
-    address: "127.0.0.1"
-    port: "16600"
-    ground_base: "127.0.0.1:16700"
-    apid_base: "0x200"
-    payload-in: true
-    gateway-out:
-      - target: ping
+gateways:
+  - type gateway_yamcs:
+      # Yamcs's end of the link, both ways. A ping goes up to address:port as a
+      # telecommand of APID apid_base, which this node binds aboard, and leaves
+      # it by gateway-out for the ping node. The answer comes back to Yamcs at
+      # ground_base plus the ping node's device id -- ping is the second name
+      # of the two, device id 1, so 16701 -- as telemetry of APID apid_base plus
+      # that device id, 0x201.
+      - gateway: gateway
+        address: "127.0.0.1"
+        apid_base: "0x200"
+        ground_base: "127.0.0.1:16700"
+        port: "16600"
+        gateway-out:
+          - target: ping
+        payload-in: true
 
 vehicle:
-  # Answers each ping with the vehicle's time on the end: see
-  # tcslibgs::node::vehicle::ping for what a ping and its answer say.
-  - name: ping
-    type: ping
-    gateway-in: true
-    payload-out:
-      - target: gateway
+  - type ping:
+      # Answers each ping with the vehicle's time on the end: see
+      # tcslibgs::node::vehicle::ping for what a ping and its answer say.
+      - compute: ping
+        payload-out:
+          - target: gateway
+        gateway-in: true
 
 tcsgui:
   nodes:
-    - { name: gateway, x: 469, y: 34 }
-    - { name: ping, x: 34, y: 34 }
+    - { node: gateway, x: 469, y: 34 }
+    - { node: ping, x: 34, y: 34 }

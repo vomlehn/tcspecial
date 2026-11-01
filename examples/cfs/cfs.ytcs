@@ -57,39 +57,38 @@ tcspecial:
     cmd_msgid: "0x4280"
     response_msgid: "0x4200"
 
-gateway:
-  # The software bus's end of the link, both ways. What the bus publishes as
-  # cmd_msgid, 0x4281, is taken by this node and leaves it by gateway-out for
-  # the heater. What comes down is published as tlm_base plus the device id
-  # of the node that sent it: the thermometer, device id 2, as 0x4242.
-  - name: fsw
-    type: gateway_cfs
-    cmd_msgid: "0x4281"
-    tlm_base: "0x4240"
-    payload-in: true
-    gateway-out:
-      - target: heater
+gateways:
+  - type gateway_cfs:
+      # The software bus's end of the link, both ways. What the bus publishes as
+      # cmd_msgid, 0x4281, is taken by this node and leaves it by gateway-out
+      # for the heater. What comes down is published as tlm_base plus the device
+      # id of the node that sent it: the thermometer, device id 2, as 0x4242.
+      - gateway: fsw
+        cmd_msgid: "0x4281"
+        tlm_base: "0x4240"
+        gateway-out:
+          - target: heater
+        payload-in: true
 
 payloads:
-  # A heater, driven by what the flight computer sends: the far end of a UDP
-  # socket.
-  - name: heater
-    type: network
-    protocol: "udp"
-    address: "127.0.0.1"
-    port: "8601"
-    gateway-in: true
-  # A thermometer whose readings go to the flight computer.
-  - name: thermometer
-    type: network
-    protocol: "udp"
-    address: "127.0.0.1"
-    port: "8602"
-    payload-out:
-      - target: fsw
+  - type network:
+      # A heater, driven by what the flight computer sends: the far end of a UDP
+      # socket.
+      - payload: heater
+        address: "127.0.0.1"
+        port: "8601"
+        protocol: "udp"
+        gateway-in: true
+      # A thermometer whose readings go to the flight computer.
+      - payload: thermometer
+        address: "127.0.0.1"
+        port: "8602"
+        protocol: "udp"
+        payload-out:
+          - target: fsw
 
 tcsgui:
   nodes:
-    - { name: fsw, x: 469, y: 34 }
-    - { name: heater, x: 34, y: 34 }
-    - { name: thermometer, x: 34, y: 134 }
+    - { node: fsw, x: 469, y: 34 }
+    - { node: heater, x: 34, y: 34 }
+    - { node: thermometer, x: 34, y: 134 }

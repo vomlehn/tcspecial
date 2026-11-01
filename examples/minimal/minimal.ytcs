@@ -43,13 +43,13 @@ tcspecial:
     send: "127.0.0.1:4100"
 
 payloads:
-  # Software on this host that sends its readings over UDP.
-  - name: sensor
-    type: network
-    protocol: "udp"
-    address: "127.0.0.1"
-    port: "5001"
+  - type network:
+      # Software on this host that sends its readings over UDP.
+      - payload: sensor
+        address: "127.0.0.1"
+        port: "5001"
+        protocol: "udp"
 
 tcsgui:
   nodes:
-    - { name: sensor, x: 34, y: 34 }
+    - { node: sensor, x: 34, y: 34 }

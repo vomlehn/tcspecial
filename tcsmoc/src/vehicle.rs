@@ -1811,13 +1811,13 @@ fn no_command_link(ui: &MainWindow) {
     });
 }
 
-/// Hand a beacon to the window's commands, and show the link down where its
-/// number says tcspecial has started again: see [`take_down_at_a_start`].
+/// Show the link down where a beacon's number says tcspecial has started
+/// again: see [`take_down_at_a_start`].
 ///
 /// # Arguments
 ///
 /// * `weak`      - The window.
-/// * `link`      - The command link, whose client is handed the beacon.
+/// * `link`      - The command link.
 /// * `agreed`    - What the last Connect agreed, forgotten with the link.
 /// * `restarted` - Whether the beacon's number says tcspecial started again.
 fn beacon_to_commands(
@@ -1846,8 +1846,8 @@ fn beacon_to_commands(
     });
 }
 
-/// Hand a beacon to the link's client, and take the link down where its
-/// number says tcspecial has started again.
+/// Take the link down where a beacon's number says tcspecial has started
+/// again.
 ///
 /// The start that came back knows nothing of this window, and may be flying
 /// other definitions, so what was agreed was agreed with a start that has
@@ -1861,7 +1861,7 @@ fn beacon_to_commands(
 ///
 /// # Arguments
 ///
-/// * `link`      - The command link, whose client is handed the beacon.
+/// * `link`      - The command link.
 /// * `agreed`    - What the last Connect agreed, forgotten with the link.
 /// * `restarted` - Whether the beacon's number says tcspecial started again.
 ///
@@ -1874,27 +1874,21 @@ fn take_down_at_a_start(
     agreed: &Agreed,
     restarted: bool,
 ) -> Option<(String, &'static str)> {
-    let (ended, address) = {
+    if !restarted {
+        return None;
+    }
+    let address = {
         let mut guard = link.lock().ok()?;
-        // A link that is down has nothing to take down, and no wait.
-        let ended = guard.client()?.beacon_heard(restarted);
-        if !restarted {
-            return None;
-        }
+        // A link that is down has nothing to take down.
+        guard.client()?;
         let address = guard.address().to_string();
         guard.disconnect();
-        (ended, address)
+        address
     };
     if let Ok(mut held) = agreed.lock() {
         *held = None;
     }
-    let said = if ended {
-        "tcspecial has started again after the restart initiated here: \
-         press Connect"
-    } else {
-        "tcspecial has started again: press Connect"
-    };
-    Some((address, said))
+    Some((address, "tcspecial has started again: press Connect"))
 }
 
 /// What the window says of the packets that have come from the vehicle:

@@ -446,14 +446,13 @@ int tcs_client_restart_arm(tcs_client *client, uint64_t key,
  * and nothing restarts.
  *
  * Look at the beacons before sending it again for want of an answer: they
- * say whether it was taken. From the moment it is sent, every command on
- * this client but CONNECT, RESTART_ARM and RESTART is refused, unsent, until
- * a beacon whose number starts again says tcspecial has started again, and
- * then until the station is matched for commanding again: the beacon is the
- * acknowledgement, and the answer to the RESTART may never arrive. Hand the
- * client each pass's beacon with tcs_client_beacon_heard. A RESTART
- * answered as refused ends the wait it began at once; one sent again during
- * the wait does not end it either way.
+ * say whether it was taken, and the answer may never arrive. Nothing is held
+ * back on this client after it: the vehicle that takes it answers every
+ * command but CONNECT, RESTART_ARM and RESTART TCS_STATUS_UNMATCHED until it
+ * has gone, and the start that comes back does the same until a CONNECT
+ * carries its checksum. Its beacons carry the restart flag, which ends the
+ * station's match, so the client refuses the rest, unsent, from then until
+ * it is matched again.
  *
  * @param client  The client.
  * @param key     The key the last RESTART_ARM armed the restart with.
@@ -463,34 +462,6 @@ int tcs_client_restart_arm(tcs_client *client, uint64_t key,
  * @return        0, or -1 on an error. */
 int tcs_client_restart(tcs_client *client, uint64_t key, const char *target,
 		       tcs_status *status);
-
-/** Hands the client what the last pass of beacons heard, so that a wait
- * begun by a RESTART can end.
- *
- * @param client   The client.
- * @param beacons  The beacon watch, just passed.
- * @return         1 when that ended the wait, because the beacon's number
- *                 says tcspecial has started again; 0 when it did not end
- *                 one; -1 on an error. Whether the start that came back is
- *                 the one the RESTART asked for is not said: every start
- *                 sets the restart flag, and the checksum in its beacons
- *                 says which configuration it runs. */
-int tcs_client_beacon_heard(tcs_client *client, const tcs_beacons *beacons);
-
-/** Says whether the client is waiting for a beacon to say a RESTART is
- * done, during which every command is refused.
- *
- * @param client  The client.
- * @return        1 when it is, 0 when not, -1 on an error. */
-int tcs_client_awaiting_restart(const tcs_client *client);
-
-/** Ends the wait for a RESTART by hand, for an operator who knows the
- * RESTART was never taken.
- *
- * @param client  The client.
- * @return        1 when there was a wait to end, 0 when not, -1 on an
- *                error. */
-int tcs_client_end_restart_wait(tcs_client *client);
 
 /* The longest attribute name, and the longest value, a SET_NODE carries, in
  * bytes. Longer is refused here, and not sent. */

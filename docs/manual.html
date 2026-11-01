@@ -4548,26 +4548,31 @@ had. The beacons do not say which kind of start
 it was: the checksum they carry says which configuration it is running,
 and the startup summary on tcspecial's error output says whether the
 start was commanded.</p>
-<p>Once a station has sent a restart it sends nothing more to the vehicle
-but <tt class="docutils literal">Connect</tt>, <tt class="docutils literal">Arm restart</tt> and <tt class="docutils literal">Initiate restart</tt> until a beacon
-arrives whose number has gone back: the vehicle that comes back may read
-packets differently from the one that went, and the beacon -- not the
-answer to the restart, which may never arrive -- is what says it is back.
-Any other command tried in between, a ping among them, is refused by the
-station, unsent. The three that go do not end the wait. <tt class="docutils literal">Connect</tt> asks
-what is flying and changes nothing the restart depends on; <tt class="docutils literal">Arm
-restart</tt> and <tt class="docutils literal">Initiate restart</tt> are how a restart that may never have
-arrived is sent again. A restart answered as refused ends the wait it
-began, since nothing was started; one sent again during the wait does
-not end it, refused or not, since the first may have been taken.</p>
-<p>Any beacon whose number has gone back, waited for or not, takes the
-command link down: the status beside the address reads <tt class="docutils literal">Disconnected</tt>,
-what the last <tt class="docutils literal">Connect</tt> agreed is forgotten, and the next thing to press
-is <tt class="docutils literal">Connect</tt>, which every start needs before anything else is sent.
-<tt class="docutils literal">Last Response</tt> says <tt class="docutils literal">tcspecial has started again: press Connect</tt>, or,
-where the beacon also ends the wait, <tt class="docutils literal">tcspecial has started again after
-the restart initiated here: press Connect</tt>. It does not say whether the
-start that came back is the one the restart asked for.</p>
+<p>A station that has sent a restart holds nothing back: every button goes
+on working as it did. The vehicle is what refuses a command that follows
+a restart. From the moment it takes one, and in the tcspecial that comes
+back until a <tt class="docutils literal">Connect</tt> carrying its checksum, it answers every command
+but <tt class="docutils literal">Connect</tt>, <tt class="docutils literal">Arm restart</tt> and <tt class="docutils literal">Initiate restart</tt> <tt class="docutils literal">Unmatched</tt>
+and does nothing with it, since the command may have been built with a
+configuration it is no longer running. The beacons, not the answer to the
+restart, which may never arrive, say what became of it: a beacon saying
+<tt class="docutils literal">restart</tt> where the last said <tt class="docutils literal">normal</tt>, or one whose number has gone
+back, says it was taken; beacons that go on counting up at the usual
+interval and still say <tt class="docutils literal">normal</tt> say it never arrived, and the restart
+can be sent again. A restart sent again after the first was taken is
+refused <tt class="docutils literal">NotArmed</tt> and restarts nothing.</p>
+<p>The first flagged beacon ends the station's match, so from then on the
+station itself refuses every command but the three, unsent, until it is
+matched again. Any beacon whose number has gone back takes the command
+link down: the status beside the address reads <tt class="docutils literal">Disconnected</tt>, what the
+last <tt class="docutils literal">Connect</tt> agreed is forgotten, and the next thing to press is
+<tt class="docutils literal">Connect</tt>, which every start needs before anything else is sent.
+<tt class="docutils literal">Last Response</tt> says <tt class="docutils literal">tcspecial has started again: press Connect</tt>. It
+does not say whether the start that came back is the one the restart
+asked for. Should the new tcspecial's first beacons all be lost, so that
+no number is seen to go back, the link stays up while the beacons' flag
+says the vehicle is not matched: press <tt class="docutils literal">Disconnect</tt> and then
+<tt class="docutils literal">Connect</tt>, which sends the <tt class="docutils literal">Connect</tt> the new tcspecial is waiting for.</p>
 <p>A command carries its sequence number and nothing that counts starts,
 and so does its answer: there is no generation number. A start of the
 vehicle is noticed from its beacons, which carry the restart flag and so

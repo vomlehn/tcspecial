@@ -251,12 +251,6 @@ int main(int argc, char **argv)
 		printf("restart: armed %s, restarted %s\n",
 		       outcome(armed, said_armed),
 		       outcome(restarted, said_restarted));
-		/* Nothing more goes to the vehicle until a beacon whose number
-		 * starts again says it is back: the beacon is the restart's
-		 * acknowledgement. */
-		printf("restart: awaiting a beacon that starts again: "
-		       "%s\n",
-		       tcs_client_awaiting_restart(client) == 1 ? "yes" : "no");
 	}
 
 	/* The ping node, through its gateway node, and the vehicle's data from

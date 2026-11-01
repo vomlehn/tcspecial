@@ -421,7 +421,6 @@ vehicle:
             .to_string(),
         "sample ping: took \"ping\" of 6 bytes, gave nothing".to_string(),
         "restart: armed done, restarted done".to_string(),
-        "restart: awaiting a beacon that starts again: yes".to_string(),
         "ping ping through gateway: sent".to_string(),
         "data from ping: hello from ping".to_string(),
         "ping ping: answered, round trip timed, up and down summing to it \

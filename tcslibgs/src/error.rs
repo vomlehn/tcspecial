@@ -54,12 +54,6 @@ pub enum TcsError {
     #[error("Not armed for restart")]
     NotArmed,
 
-    /// A command refused by the ground's own client, unsent: a RESTART was
-    /// sent, and nothing but CONNECT, RESTART_ARM and RESTART may be until a
-    /// beacon says it is done.
-    #[error("{0}")]
-    AwaitingRestart(String),
-
     /// A command refused by the ground's own client, unsent: the station is
     /// not matched for commanding -- the last beacon it heard does not
     /// carry its configuration's checksum with the restart flag clear, is

@@ -1,0 +1,66 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="940" height="1035" viewBox="0 0 940 1035" role="img" aria-labelledby="title desc">
+<title id="title">A commanded restart, every beacon heard</title>
+<desc id="desc">The vehicle runs A, matched, beaconing every default interval; beacon 41 says normal. The station arms and sends RESTART. The vehicle takes it, sets the restart flag, answers Success, and sends beacon 42 at once with the flag set, which ends the station&#x27;s match. While it cleans up it beacons every reset interval, the number still going up. After the exec the new start&#x27;s first beacon, number 1, goes at once with the flag set; the number going back says a new start, and tcsmoc takes its link down. The station sends CONNECT with A, which matches: the vehicle clears the flag, answers, and sends beacon 2, normal, at once, and from then beacons every default interval.</desc>
+<rect width="940" height="1035" fill="#ffffff"/>
+<text x="40" y="24" style="font-family: Helvetica, Arial, sans-serif; font-size: 15px; font-weight: bold">A commanded restart, every beacon heard</text>
+<line x1="40" y1="46" x2="110" y2="46" stroke="#555555" stroke-width="2.5" stroke-dasharray="2 4"/>
+<text x="120" y="50" style="font-family: Helvetica, Arial, sans-serif; font-size: 12px">[any] layout never changes (beacon, CONNECT, RESTART_ARM, RESTART, their answers): dotted line</text>
+<text x="40" y="68" style="font-family: Helvetica, Arial, sans-serif; font-size: 12px">Arrowhead: read or acted on. Cross: dropped and counted, or not acted on. The words at each end say which.</text>
+<text x="300" y="128" text-anchor="middle" style="font-family: Helvetica, Arial, sans-serif; font-size: 13px; font-weight: bold">Vehicle (tcspecial)</text>
+<line x1="300" y1="138" x2="300" y2="1025" stroke="#000000" stroke-width="1.5"/>
+<text x="640" y="128" text-anchor="middle" style="font-family: Helvetica, Arial, sans-serif; font-size: 13px; font-weight: bold">MOC (ground station)</text>
+<line x1="640" y1="138" x2="640" y2="1025" stroke="#000000" stroke-width="1.5"/>
+<text x="288" y="154" text-anchor="end" style="font-family: Helvetica, Arial, sans-serif; font-size: 12px; font-style: italic; fill: #000000"><tspan x="288" dy="0">Running A, matched; a beacon every</tspan><tspan x="288" dy="14">default_interval</tspan></text>
+<text x="652" y="154" text-anchor="start" style="font-family: Helvetica, Arial, sans-serif; font-size: 12px; font-style: italic; fill: #000000"><tspan x="652" dy="0">Using A, matched</tspan></text>
+<line x1="300" y1="180" x2="626" y2="210" stroke="#555555" stroke-width="2.5" stroke-dasharray="2 4"/>
+<polygon points="640,210 630,205 630,215" fill="#555555"/>
+<text x="408.8" y="183.6" text-anchor="middle" style="font-family: Helvetica, Arial, sans-serif; font-size: 12px; fill: #000000; paint-order: stroke; stroke: #ffffff; stroke-width: 4px">[any] beacon #41, normal</text>
+<text x="652" y="214" text-anchor="start" style="font-family: Helvetica, Arial, sans-serif; font-size: 12px; fill: #000000"><tspan x="652" dy="0">matched</tspan></text>
+<line x1="640" y1="240" x2="314" y2="270" stroke="#555555" stroke-width="2.5" stroke-dasharray="2 4"/>
+<polygon points="300,270 310,265 310,275" fill="#555555"/>
+<text x="531.2" y="243.6" text-anchor="middle" style="font-family: Helvetica, Arial, sans-serif; font-size: 12px; fill: #000000; paint-order: stroke; stroke: #ffffff; stroke-width: 4px">[any] RESTART_ARM to A</text>
+<text x="288" y="274" text-anchor="end" style="font-family: Helvetica, Arial, sans-serif; font-size: 12px; fill: #000000"><tspan x="288" dy="0">armed</tspan></text>
+<line x1="300" y1="285" x2="626" y2="315" stroke="#555555" stroke-width="2.5" stroke-dasharray="2 4"/>
+<polygon points="640,315 630,310 630,320" fill="#555555"/>
+<text x="408.8" y="288.6" text-anchor="middle" style="font-family: Helvetica, Arial, sans-serif; font-size: 12px; fill: #000000; paint-order: stroke; stroke: #ffffff; stroke-width: 4px">[any] answer: armed</text>
+<text x="652" y="319" text-anchor="start" style="font-family: Helvetica, Arial, sans-serif; font-size: 12px; fill: #000000"><tspan x="652" dy="0">taken</tspan></text>
+<line x1="640" y1="345" x2="314" y2="375" stroke="#555555" stroke-width="2.5" stroke-dasharray="2 4"/>
+<polygon points="300,375 310,370 310,380" fill="#555555"/>
+<text x="531.2" y="348.6" text-anchor="middle" style="font-family: Helvetica, Arial, sans-serif; font-size: 12px; fill: #000000; paint-order: stroke; stroke: #ffffff; stroke-width: 4px">[any] RESTART to A</text>
+<text x="288" y="379" text-anchor="end" style="font-family: Helvetica, Arial, sans-serif; font-size: 12px; fill: #000000"><tspan x="288" dy="0">taken: state file written; flag set;</tspan><tspan x="288" dy="14">nothing but the three acted on from</tspan><tspan x="288" dy="14">now</tspan></text>
+<line x1="300" y1="420" x2="626" y2="450" stroke="#555555" stroke-width="2.5" stroke-dasharray="2 4"/>
+<polygon points="640,450 630,445 630,455" fill="#555555"/>
+<text x="408.8" y="423.6" text-anchor="middle" style="font-family: Helvetica, Arial, sans-serif; font-size: 12px; fill: #000000; paint-order: stroke; stroke: #ffffff; stroke-width: 4px">[any] answer: Success</text>
+<text x="652" y="454" text-anchor="start" style="font-family: Helvetica, Arial, sans-serif; font-size: 12px; fill: #000000"><tspan x="652" dy="0">taken</tspan></text>
+<line x1="300" y1="468" x2="626" y2="510" stroke="#555555" stroke-width="2.5" stroke-dasharray="2 4"/>
+<polygon points="640,510 630,505 630,515" fill="#555555"/>
+<text x="408.8" y="475.44" text-anchor="middle" style="font-family: Helvetica, Arial, sans-serif; font-size: 12px; fill: #000000; paint-order: stroke; stroke: #ffffff; stroke-width: 4px">[any] beacon #42, restart</text>
+<text x="652" y="514" text-anchor="start" style="font-family: Helvetica, Arial, sans-serif; font-size: 12px; fill: #000000"><tspan x="652" dy="0">flag set: the match ends; the</tspan><tspan x="652" dy="14">station sends nothing but the three</tspan></text>
+<text x="288" y="544" text-anchor="end" style="font-family: Helvetica, Arial, sans-serif; font-size: 12px; font-style: italic; fill: #000000"><tspan x="288" dy="0">Cleans up; a beacon every</tspan><tspan x="288" dy="14">reset_interval</tspan></text>
+<line x1="300" y1="555" x2="626" y2="585" stroke="#555555" stroke-width="2.5" stroke-dasharray="2 4"/>
+<polygon points="640,585 630,580 630,590" fill="#555555"/>
+<text x="408.8" y="558.6" text-anchor="middle" style="font-family: Helvetica, Arial, sans-serif; font-size: 12px; fill: #000000; paint-order: stroke; stroke: #ffffff; stroke-width: 4px">[any] beacon #43, restart</text>
+<text x="652" y="589" text-anchor="start" style="font-family: Helvetica, Arial, sans-serif; font-size: 12px; fill: #000000"><tspan x="652" dy="0">number goes up: the same start,</tspan><tspan x="652" dy="14">ending</tspan></text>
+<text x="288" y="619" text-anchor="end" style="font-family: Helvetica, Arial, sans-serif; font-size: 12px; font-style: italic; fill: #000000"><tspan x="288" dy="0">exec: the new start loads A; its</tspan><tspan x="288" dy="14">first beacon goes at once</tspan></text>
+<line x1="300" y1="660" x2="626" y2="690" stroke="#555555" stroke-width="2.5" stroke-dasharray="2 4"/>
+<polygon points="640,690 630,685 630,695" fill="#555555"/>
+<text x="408.8" y="663.6" text-anchor="middle" style="font-family: Helvetica, Arial, sans-serif; font-size: 12px; fill: #000000; paint-order: stroke; stroke: #ffffff; stroke-width: 4px">[any] beacon #1, restart</text>
+<text x="652" y="694" text-anchor="start" style="font-family: Helvetica, Arial, sans-serif; font-size: 12px; fill: #000000"><tspan x="652" dy="0">number went back: a new start;</tspan><tspan x="652" dy="14">tcsmoc takes the link down: press</tspan><tspan x="652" dy="14">Connect</tspan></text>
+<line x1="640" y1="750" x2="314" y2="780" stroke="#555555" stroke-width="2.5" stroke-dasharray="2 4"/>
+<polygon points="300,780 310,775 310,785" fill="#555555"/>
+<text x="531.2" y="753.6" text-anchor="middle" style="font-family: Helvetica, Arial, sans-serif; font-size: 12px; fill: #000000; paint-order: stroke; stroke: #ffffff; stroke-width: 4px">[any] CONNECT with A</text>
+<text x="288" y="784" text-anchor="end" style="font-family: Helvetica, Arial, sans-serif; font-size: 12px; fill: #000000"><tspan x="288" dy="0">checksums match: flag cleared;</tspan><tspan x="288" dy="14">downlink opens; a beacon at once</tspan></text>
+<line x1="300" y1="795" x2="626" y2="825" stroke="#555555" stroke-width="2.5" stroke-dasharray="2 4"/>
+<polygon points="640,825 630,820 630,830" fill="#555555"/>
+<text x="408.8" y="798.6" text-anchor="middle" style="font-family: Helvetica, Arial, sans-serif; font-size: 12px; fill: #000000; paint-order: stroke; stroke: #ffffff; stroke-width: 4px">[any] answer: running A</text>
+<text x="652" y="829" text-anchor="start" style="font-family: Helvetica, Arial, sans-serif; font-size: 12px; fill: #000000"><tspan x="652" dy="0">CONNECT answered with this station&#x27;s</tspan><tspan x="652" dy="14">checksum</tspan></text>
+<line x1="300" y1="828" x2="626" y2="870" stroke="#555555" stroke-width="2.5" stroke-dasharray="2 4"/>
+<polygon points="640,870 630,865 630,875" fill="#555555"/>
+<text x="408.8" y="835.44" text-anchor="middle" style="font-family: Helvetica, Arial, sans-serif; font-size: 12px; fill: #000000; paint-order: stroke; stroke: #ffffff; stroke-width: 4px">[any] beacon #2, normal</text>
+<text x="652" y="874" text-anchor="start" style="font-family: Helvetica, Arial, sans-serif; font-size: 12px; fill: #000000"><tspan x="652" dy="0">matched for commanding</tspan></text>
+<text x="288" y="919" text-anchor="end" style="font-family: Helvetica, Arial, sans-serif; font-size: 12px; font-style: italic; fill: #000000"><tspan x="288" dy="0">A beacon every default_interval</tspan></text>
+<line x1="300" y1="945" x2="626" y2="975" stroke="#555555" stroke-width="2.5" stroke-dasharray="2 4"/>
+<polygon points="640,975 630,970 630,980" fill="#555555"/>
+<text x="408.8" y="948.6" text-anchor="middle" style="font-family: Helvetica, Arial, sans-serif; font-size: 12px; fill: #000000; paint-order: stroke; stroke: #ffffff; stroke-width: 4px">[any] beacon #3, normal</text>
+<text x="652" y="979" text-anchor="start" style="font-family: Helvetica, Arial, sans-serif; font-size: 12px; fill: #000000"><tspan x="652" dy="0">matched</tspan></text>
+</svg>

@@ -3,9 +3,12 @@ O = ../OUT
 .PHONY: all
 all:	design.html manual.html third-party.html
 
-# The message-flow figures of "In-flight data across a restart", drawn by
+# The message-flow figures of "In-flight data across a restart" and "The
+# restart and the beacon, in time", drawn by
 # restart_flows.py from the lists of messages it holds.
-FLOWS = restart-commanded.svg restart-crash.svg restart-ground.svg
+FLOWS = restart-commanded.svg restart-crash.svg restart-ground.svg \
+	restart-beacons.svg restart-lost-up.svg restart-lost-answer.svg \
+	restart-lost-beacons.svg
 
 design.html: design.rst $(FLOWS)
 	rst2html design.rst design.html

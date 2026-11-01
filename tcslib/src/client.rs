@@ -123,15 +123,9 @@ pub struct TcsClient {
     /// says *sent at this time, nothing back since* rather than blanking.
     last_sent: Option<Timestamp>,
     last_received: Option<Timestamp>,
-    /// How many commands have gone out, so that a caller can tell whether
-    /// the one it asked for did.
-    sent: u64,
     /// How many answers arrived that were not to the command being waited
     /// for, and were dropped: see [`answer_to`].
     answers_dropped: u64,
-    /// What a RESTART that went out is waiting for, until a beacon says it
-    /// came: see [`RestartWait`].
-    restart_wait: Option<RestartWait>,
     /// Whether the station is matched with the vehicle, which its beacon
     /// watch keeps: until it is matched for commanding, nothing but
     /// CONNECT, RESTART_ARM and RESTART is sent. Every answer that arrives
@@ -144,58 +138,6 @@ pub struct TcsClient {
     /// caller takes it again from the configuration it now uses, and the
     /// refusal here stops it in the meantime.
     matched: Matched,
-}
-
-/// A RESTART went out, and nothing but what [`RestartWait::lets`] may follow
-/// it until a beacon says tcspecial has started again.
-///
-/// Every other command until then is refused here, unsent: from the moment
-/// the vehicle takes the RESTART it is ending, and the vehicle that comes
-/// back is another start, possibly with other definitions -- a command sent
-/// in between would be read by whichever of the two it reached. See "What
-/// the ground may send meanwhile" in `docs/design.rst`.
-///
-/// It no longer says how the restart ended: every start of tcspecial begins
-/// with the restart flag set, so the flag says nothing of whether the start
-/// that came back is the one the RESTART asked for. The checksum in its
-/// beacons says which configuration it runs, and matching it is what lets
-/// the station command it again.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub struct RestartWait;
-
-impl RestartWait {
-    /// Says whether a command of this kind may go while the wait lasts.
-    ///
-    /// The three that go before a match, because the vehicle is ending and
-    /// the start that comes back is not yet matched:
-    /// [`tcslibgs::CommandType::taken_unmatched`]. A RESTART sent again that
-    /// reaches the start that came back is refused `NotArmed` there, since
-    /// that start holds no arm, and restarts nothing.
-    ///
-    /// # Arguments
-    ///
-    /// * `command` - The kind of command to be sent.
-    ///
-    /// # Returns
-    ///
-    /// `true` where it may go.
-    pub fn lets(&self, command: CommandType) -> bool {
-        command.taken_unmatched()
-    }
-
-    /// Says why a command is refused while this lasts.
-    ///
-    /// # Returns
-    ///
-    /// A `TcsError::AwaitingRestart` saying what the wait is for.
-    fn refusal(&self) -> TcsError {
-        TcsError::AwaitingRestart(
-            "not sent: a RESTART went out, and nothing but CONNECT, \
-             RESTART_ARM and RESTART may follow it until a beacon whose \
-             number starts again says tcspecial has started again"
-                .to_string(),
-        )
-    }
 }
 
 impl TcsClient {
@@ -234,9 +176,7 @@ impl TcsClient {
             timeout: DEFAULT_TIMEOUT,
             last_sent: None,
             last_received: None,
-            sent: 0,
             answers_dropped: 0,
-            restart_wait: None,
             matched,
         }
     }
@@ -298,56 +238,15 @@ impl TcsClient {
             timeout: DEFAULT_TIMEOUT,
             last_sent: None,
             last_received: None,
-            sent: 0,
             answers_dropped: 0,
-            restart_wait: None,
             matched,
         }
-    }
-
-    /// Takes note that a beacon has arrived: whether its number says
-    /// tcspecial has started again since the one before it -- what
-    /// [`crate::beacon::Pass::restarted`] says of it.
-    ///
-    /// A station that sends RESTART passes on every beacon it hears, because
-    /// a beacon is what ends the wait a RESTART begins. Whether the station
-    /// is matched is its [`Matched`]'s, which the beacon watch keeps from the
-    /// same beacons: a start's beacons carry the restart flag, which ends
-    /// the match, so nothing but the three goes until a CONNECT of the
-    /// station's own is answered with its checksum again.
-    ///
-    /// # Arguments
-    ///
-    /// * `restarted` - Whether the beacon's number says tcspecial started
-    ///                 again.
-    ///
-    /// # Returns
-    ///
-    /// Whether this ended a wait for a restart, for the station to say so.
-    pub fn beacon_heard(&mut self, restarted: bool) -> bool {
-        if !restarted {
-            return false;
-        }
-        self.restart_wait.take().is_some()
     }
 
     /// Whether the station is matched with the vehicle, which this client's
     /// commands wait for, and what it has received.
     pub fn matched(&self) -> &Matched {
         &self.matched
-    }
-
-    /// What a RESTART that went out is waiting for, if one is.
-    pub fn restart_wait(&self) -> Option<RestartWait> {
-        self.restart_wait
-    }
-
-    /// End a wait by hand, for an operator who knows the RESTART was never
-    /// taken -- the beacons go on counting up, at their interval, with the
-    /// restart flag clear -- and returns it so that the station can
-    /// record that it did. Nothing else ends a wait but a beacon or a refusal.
-    pub fn end_restart_wait(&mut self) -> Option<RestartWait> {
-        self.restart_wait.take()
     }
 
     /// When the last command went out, if one has.
@@ -466,23 +365,6 @@ impl TcsClient {
         self.may_go(command.cmd_type())
     }
 
-    /// Says whether `command` may go while a RESTART is waited on, if one
-    /// is: see [`RestartWait::lets`].
-    ///
-    /// # Arguments
-    ///
-    /// * `command` - The command to be sent.
-    ///
-    /// # Errors
-    ///
-    /// `TcsError::AwaitingRestart` where a wait refuses it.
-    fn wait_lets(&self, command: &Command) -> TcsResult<()> {
-        match &self.restart_wait {
-            Some(wait) if !wait.lets(command.cmd_type()) => Err(wait.refusal()),
-            _ => Ok(()),
-        }
-    }
-
     /// Sends a command on its link, and waits for the answer, timing both.
     ///
     /// # Arguments
@@ -495,13 +377,10 @@ impl TcsClient {
     ///
     /// # Errors
     ///
-    /// `TcsError::AwaitingRestart` while a RESTART is awaited and the wait
-    /// does not let this command go, `TcsError::Config` if the client has no
-    /// link for it, `TcsError::Unmatched` if the station is not matched for
-    /// commanding, and `TcsError::Io` if it cannot be sent or no answer
-    /// comes in time.
+    /// `TcsError::Config` if the client has no link for it,
+    /// `TcsError::Unmatched` if the station is not matched for commanding,
+    /// and `TcsError::Io` if it cannot be sent or no answer comes in time.
     fn send_command(&mut self, command: Command) -> TcsResult<Telemetry> {
-        self.wait_lets(&command)?;
         // A command with no link to go on says so before anything is said
         // of the match: that is the client's own configuration, and no
         // beacon would change it.
@@ -516,7 +395,6 @@ impl TcsClient {
         // spacecraft's own time in the answer cannot say.
         link.send(&command)?;
         self.last_sent = Some(Timestamp::now());
-        self.sent += 1;
 
         let mut dropped = 0;
         let matched = self.matched.clone();
@@ -564,7 +442,6 @@ impl TcsClient {
     ///
     /// # Errors
     ///
-    /// `TcsError::AwaitingRestart` while a RESTART is awaited,
     /// `TcsError::Unmatched` if the station is not matched for commanding,
     /// `TcsError::Io` if it cannot be sent or no answer comes in time,
     /// and `TcsError::Protocol` if the answer is not this command's.
@@ -599,7 +476,6 @@ impl TcsClient {
     ///
     /// # Errors
     ///
-    /// `TcsError::AwaitingRestart` while a RESTART is awaited,
     /// `TcsError::Unmatched` if the station is not matched for commanding,
     /// `TcsError::Io` if it cannot be sent or no answer comes in time,
     /// and `TcsError::Protocol` if the answer is not this command's.
@@ -633,9 +509,7 @@ impl TcsClient {
     /// Where the answer is a success the sequence count goes on from past
     /// the newest command the vehicle has taken.
     ///
-    /// It goes during a wait for a restart too, without ending it: see
-    /// [`RestartWait::lets`]. And it goes before the station is matched,
-    /// which is what it is for: answered with the station's own checksum,
+    /// It goes before the station is matched, which is what it is for: answered with the station's own checksum,
     /// it makes the station matched for commanding once it is matched for
     /// listening -- see [`Matched::connect_answered`]. Answered with
     /// another, it matches nothing, and the vehicle changes nothing.
@@ -700,14 +574,14 @@ impl TcsClient {
 
     /// Send a RESTART command
     ///
-    /// From the moment it goes, every command but CONNECT, RESTART_ARM and
-    /// RESTART is refused here until a beacon passed to
-    /// [`TcsClient::beacon_heard`] says tcspecial has started again: see
-    /// [`RestartWait`]. A RESTART the vehicle answers as refused ends the
-    /// wait it began, because nothing was initiated; one whose answer does
-    /// not come does not, because it may have been taken. One sent again
-    /// during a wait ends it neither way: the first may have been taken, and
-    /// what is said of this one says nothing of that.
+    /// Nothing is held back here after it goes. The vehicle that takes it
+    /// answers every command but CONNECT, RESTART_ARM and RESTART
+    /// `Unmatched` until it has gone, and the start that comes back does
+    /// the same until a CONNECT carries its checksum, so a command sent
+    /// after a RESTART is refused there rather than read with definitions
+    /// it was not built with. The beacons say whether the RESTART was
+    /// taken, and their restart flag ends the station's match: see "The
+    /// beacon across a restart" in `docs/design.rst`.
     ///
     /// # Arguments
     ///
@@ -720,8 +594,6 @@ impl TcsClient {
     ///
     /// # Errors
     ///
-    /// `TcsError::AwaitingRestart` while a RESTART is awaited,
-    /// `TcsError::Unmatched` if the station is not matched for commanding,
     /// `TcsError::Io` if it cannot be sent or no answer comes in time,
     /// and `TcsError::Protocol` if the answer is not this command's.
     pub fn restart(
@@ -731,22 +603,10 @@ impl TcsClient {
     ) -> TcsResult<CommandStatus> {
         let seq = self.next_sequence();
         let cmd = Command::Restart(RestartCommand::new(seq, arm_key, target));
-        let sent = self.sent;
-        let waiting = self.restart_wait.is_some();
-        let response = self.send_command(cmd);
-        // Begun once it has gone, whatever comes back -- an answer lost is a
-        // RESTART that may have been taken -- and not where it never went.
-        if self.sent != sent && !waiting {
-            self.restart_wait = Some(RestartWait);
-        }
+        let response = self.send_command(cmd)?;
 
-        match response? {
-            Telemetry::Restart(tm) => {
-                if !tm.header.status.is_success() && !waiting {
-                    self.restart_wait = None;
-                }
-                Ok(tm.header.status)
-            }
+        match response {
+            Telemetry::Restart(tm) => Ok(tm.header.status),
             _ => {
                 Err(TcsError::Protocol("Unexpected telemetry type".to_string()))
             }
@@ -778,7 +638,6 @@ impl TcsClient {
     /// # Errors
     ///
     /// `TcsError::Config` if the client has no node link,
-    /// `TcsError::AwaitingRestart` while a RESTART is awaited,
     /// `TcsError::Unmatched` if the station is not matched for commanding,
     /// `TcsError::Io` if it cannot be sent or no answer comes in time,
     /// and `TcsError::Protocol` if the answer is not this command's.
@@ -812,7 +671,6 @@ impl TcsClient {
     /// # Errors
     ///
     /// `TcsError::Config` if the client has no node link,
-    /// `TcsError::AwaitingRestart` while a RESTART is awaited,
     /// `TcsError::Unmatched` if the station is not matched for commanding,
     /// `TcsError::Io` if it cannot be sent or no answer comes in time,
     /// and `TcsError::Protocol` if the answer is not this command's.
@@ -862,7 +720,6 @@ impl TcsClient {
     /// `VALUE_BYTES` is a `TcsError::Command` and is not sent: the vehicle
     /// would refuse it unanswered. Otherwise
     /// `TcsError::Config` if the client has no node link,
-    /// `TcsError::AwaitingRestart` while a RESTART is awaited,
     /// `TcsError::Unmatched` if the station is not matched for commanding,
     /// `TcsError::Io` if it cannot be sent or no answer comes in time,
     /// and `TcsError::Protocol` if the answer is not this command's.
@@ -907,7 +764,6 @@ impl TcsClient {
     /// # Errors
     ///
     /// `TcsError::Config` if the client has no node link,
-    /// `TcsError::AwaitingRestart` while a RESTART is awaited,
     /// `TcsError::Unmatched` if the station is not matched for commanding,
     /// `TcsError::Io` if it cannot be sent or no answer comes in time,
     /// and `TcsError::Protocol` if the answer is not this command's.
@@ -946,7 +802,6 @@ impl TcsClient {
     /// # Errors
     ///
     /// `TcsError::Config` if the client has no node link,
-    /// `TcsError::AwaitingRestart` while a RESTART is awaited,
     /// `TcsError::Unmatched` if the station is not matched for commanding,
     /// `TcsError::Io` if it cannot be sent or no answer comes in time,
     /// and `TcsError::Protocol` if the answer is not this command's.
@@ -1146,24 +1001,6 @@ mod tests {
         matched
     }
 
-    /// A wait ends at a beacon whose number says tcspecial has started
-    /// again; a beacon of the old start does not end it.
-    #[test]
-    fn a_restart_wait_ends_at_the_next_start() {
-        let mut client = TcsClient::spacecraft_only(
-            Canned::answering(Telemetry::Ping(tcslibgs::PingTelemetry::new(
-                1,
-                CommandStatus::Success,
-            ))),
-            commanding(),
-        );
-        client.restart_wait = Some(RestartWait);
-        assert!(!client.beacon_heard(false), "the old start");
-        assert_eq!(client.restart_wait(), Some(RestartWait));
-        assert!(client.beacon_heard(true), "a new start ends it");
-        assert_eq!(client.restart_wait(), None);
-    }
-
     /// While the station is not matched for commanding, every command but
     /// CONNECT, RESTART_ARM and RESTART is refused unsent, saying the
     /// configurations are not yet matched; the three go, and a CONNECT
@@ -1306,36 +1143,6 @@ mod tests {
             }
             other => panic!("an arm and a restart: {other:?}"),
         }
-    }
-
-    /// A RESTART refused ends the wait it began, and one sent again during
-    /// a wait and refused does not: the first may have been taken.
-    #[test]
-    fn only_the_restart_that_began_a_wait_ends_it_by_a_refusal() {
-        let mut client = TcsClient::spacecraft_only(
-            Canned::answering(Telemetry::Restart(
-                tcslibgs::RestartTelemetry::new(1, CommandStatus::NotArmed),
-            )),
-            commanding(),
-        );
-        assert_eq!(
-            client.restart(ArmKey(1), OURS).expect("answered"),
-            CommandStatus::NotArmed
-        );
-        assert_eq!(client.restart_wait(), None, "nothing was initiated");
-
-        client.restart_wait = Some(RestartWait);
-        assert_eq!(
-            client
-                .restart(ArmKey(1), OURS)
-                .expect("sent during the wait"),
-            CommandStatus::NotArmed
-        );
-        assert_eq!(
-            client.restart_wait(),
-            Some(RestartWait),
-            "the first may stand"
-        );
     }
 
     #[test]
@@ -1639,12 +1446,11 @@ mod tests {
             matched.clone(),
         );
         client.stop_node(NodeId(2)).expect("matched, so sent");
-        client.beacon_heard(false);
+        matched.beacon(false, Some(OURS), Stage::Heard, false);
         client.stop_node(NodeId(2)).expect("the same start goes on");
         assert_eq!(asked.lock().unwrap().len(), 2);
 
         // The start that came back: its beacon carries the flag.
-        client.beacon_heard(true);
         matched.beacon(true, Some(OURS), Stage::Heard, true);
         assert!(matches!(
             client.stop_node(NodeId(2)),

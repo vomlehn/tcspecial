@@ -1282,11 +1282,11 @@ the bridge sends one for each beacon heard while it is not matched for
 commanding, because nothing comes down until one is answered and a flight
 computer has nobody at it to press a button. A node command naming a node
 the configuration lacks is refused unsent. What tcspecial answers is the
-command's response and an event. The restart commands are not offered yet:
-after a RESTART a client waits for a beacon to say the vehicle is back, handed
-it with ``tcs_client_beacon_heard``, and the beacon watch and the client are
-each used from a thread of their own here, so that wait needs a design of its
-own rather than a line.
+command's response and an event. The restart commands are not offered yet.
+Nothing on the ground holds commands back after a RESTART -- the vehicle
+answers them ``Unmatched``, as `What the ground may send meanwhile`_ says --
+so offering them needs no tie between the beacon watch and the client, each
+of which runs on a thread of its own here.
 
 A datum is a channel of type ``Tcs.Datum``: its length, and its first 64
 bytes. A longer one goes as its first 64 bytes with its whole length, is
@@ -5854,10 +5854,10 @@ is the one it follows.
    and slows when a CONNECT carrying the running configuration's checksum
    is taken. ``tcslibgs::interface`` gives the interface digest in Rust and
    Python, and ``tcsverify --interface-digest`` prints it. ``tcslib``'s
-   ``TcsClient``, and through it the C/C++ library, holds a station's
-   commands from a RESTART until a beacon whose number went back says it is
-   done, and the beacon watches in Rust and Python judge a restart by the
-   beacon's number alone. Commands and answers have no header, as `The link
+   ``TcsClient``, and through it the C/C++ library, holds nothing back after a
+   RESTART, the vehicle refusing what follows it, and the beacon watches in
+   Rust and Python judge a start by the beacon's number alone. Commands and
+   answers have no header, as `The link
    without a header`_ says: the fixed commands are stated in
    ``tcslibgs/xtce/fixed.xtce``, the beacon in ``tcslibgs/xtce/beacon.xtce``
    and every other command in ``tcslibgs/xtce/link.xtce``, packed and unpacked
@@ -6386,10 +6386,9 @@ Configurations named by their checksum
    station's; ARM Restart and Initiate restart pressed, with the link up,
    before a CONNECT has been answered ask first, Go on sending the command
    and Cancel sending nothing. A press with the link down says Connect, as
-   before, since that is what to press.
-
-   *Not yet built:* removing what `What this replaces`_ lists as still
-   standing.
+   before, since that is what to press. The ground's wait after a RESTART,
+   for a beacon whose number went back, is gone, as `What this replaces`_
+   says: nothing of the scheme it replaces is still standing.
 
 A configuration is known by its *checksum*: the MD5 ``tcsverify``
 computes of it, the configuration digest (``tcslibgs::config_digest``).
@@ -6771,17 +6770,21 @@ Replaced already, and rewritten where they stand to say what runs:
   whichever kind it is, and a start nobody commanded may load the
   confirmed or the command line's configuration when the one the state
   file names will not load or is given up.
-
-Replaced once the rest is built, and describing what runs until then:
-
-- `What the ground may send meanwhile`_: the wait for a beacon whose
-  number went back, and the commands allowed during it.
+- `What the ground may send meanwhile`_: the ground's wait after a
+  RESTART for a beacon whose number went back, during which its client
+  sent nothing but the three. It guarded on the ground what the vehicle
+  already guards: a vehicle that has taken a RESTART, and a start not yet
+  matched, answer every other command ``Unmatched``. What it added was a
+  way to be stuck -- a new start whose first beacons were all lost never
+  ended it -- and ``TcsClient::restart_wait``, ``end_restart_wait`` and
+  ``beacon_heard``, with ``tcs_client_awaiting_restart``,
+  ``tcs_client_end_restart_wait`` and ``tcs_client_beacon_heard``, went
+  with it.
 - In `Holes in this, and what closes them`_ under `Fault Resiliency`_: the
-  entries on the generation, the state file, downlinked data and commands
-  across a restart, a restart nobody commanded, a wait that never ends, a
-  stray packet, and a restart whose first beacons are lost. The holes of
-  this scheme are those in `Holes in the checksum scheme, and what closes
-  them`_.
+  entries on commands across a restart, a wait that never ends, and a
+  restart whose first beacons are lost, which are rewritten for the
+  checksum scheme. The holes of the scheme as a whole are those in `Holes
+  in the checksum scheme, and what closes them`_.
 
 The load sets, SWITCH, the golden build and the fallback interface, once in
 `The Interface and the Link`_, are dropped: a new build is installed from
@@ -7013,7 +7016,7 @@ Requirement
     reached rather than with a failure. RESTART is the one exception, and is
     not sent again on a timeout alone: the beacon, not an answer, says
     whether one was taken. An operator who has looked at
-    the beacons may send a RESTART again during the wait; one that reaches
+    the beacons may send a RESTART again; one that reaches
     the start that came back is refused ``NotArmed`` there, since that start
     holds no arm, and restarts nothing. See `What the ground may send
     meanwhile`_.
@@ -7177,64 +7180,71 @@ What the ground may send meanwhile
 The beacon is the acknowledgement of a RESTART, not the answer to it. The
 answer is a packet like any other on a link that loses them, and the vehicle
 may be gone before it is sent again, so the ground may never hear one; the
-beacons keep coming whatever happens to the answer. A beacon whose number has
-gone back says the old start has gone; its restart flag is set, as every
-start's is, so it does not say whether the start that replaced it is the one
-the RESTART asked for. Until that beacon, the ground cannot know which
-definitions a packet it sends would be read with, so it sends none.
+beacons keep coming whatever happens to the answer. The vehicle sets the
+restart flag the moment it takes the RESTART and beacons at once, so the
+first beacon after it says it was taken; a beacon whose number has gone back
+says the old start has gone. `The restart and the beacon, in time`_ follows
+both through the ways a restart can go.
+
+What keeps a command from being read with definitions it was not written for
+is the vehicle, not a wait on the ground. Once a RESTART is taken the old
+start acts on nothing but the three, and the start that comes back acts on
+nothing but the three until a CONNECT carries its checksum: see `Starting,
+and the restart flag`_. A command the ground sends after the RESTART reaches
+one of the two, in order, and is answered ``Unmatched`` by either. So the
+ground does not hold its commands back after a RESTART: a station that did
+would gain nothing the vehicle does not already give, and would be stuck
+whenever the beacon it waited for was lost.
 
 Requirement
-    Once the MOC has sent a RESTART it sends no command
-    but CONNECT, RESTART_ARM and RESTART until it has a beacon whose number
-    is lower than the one before it: a beacon saying that tcspecial has
-    started again, and is using the definitions it has started with. Then
-    it sends nothing but those three until it is matched for commanding --
-    see `On the ground`_ -- which a CONNECT answered with its checksum, and
-    a beacon with the flag clear, make it.
-    ``tcslib``'s ``TcsClient`` holds to this itself, refusing any other
-    command in between, unsent, and ``RestartWait::lets`` is where the three
-    are named. CONNECT changes nothing the restart depends on, and is how an
-    operator asks what is flying; RESTART_ARM and RESTART are how a RESTART
-    that may never have arrived is sent again. One that reaches the start
-    that came back is refused there ``NotArmed``, since that start holds no
-    arm.
+    Sending a RESTART does not, of itself, stop a ground station sending
+    anything. ``tcslib``'s ``TcsClient``, and through it the C/C++ library,
+    sends what it is asked to once the RESTART has gone just as before it,
+    subject to the match (see `On the ground`_), and a command that reaches
+    the vehicle after the RESTART is answered ``Unmatched`` there and not
+    acted on.
 
 Requirement
-    A beacon whose number has gone back, waited for or not, ends the
-    station's connection: tcsmoc takes its command link down, shows it
-    Disconnected and forgets what the last CONNECT agreed, because the
-    start that came back may be flying other definitions and knows nothing
-    of the station.
+    The beacons end the station's match across a restart. The old start's
+    beacons carry the restart flag from the moment it takes the RESTART,
+    and every start's from its first, and a beacon with the flag set ends
+    a match; a beacon whose number has gone back ends the commanding half
+    whatever it says, since the CONNECT that half rested on was answered by
+    a start that has gone. From then the station sends nothing but CONNECT,
+    RESTART_ARM and RESTART until it is matched for commanding again, which
+    a CONNECT answered with its checksum, and a beacon with the flag clear,
+    make it.
 
 Requirement
-    The wait says that it ended, and not how. Every start begins with the
-    restart flag set, so the flag cannot tell the start the RESTART asked
-    for from one nobody commanded -- the vehicle crashed or
-    lost power before the command was taken. The checksum in the new
-    start's beacons says which configuration it runs, and matching it is
-    what lets the station command it again; the vehicle's own log says
-    whether the start was commanded.
+    A beacon whose number has gone back ends the station's connection:
+    tcsmoc takes its command link down, shows it Disconnected and forgets
+    what the last CONNECT agreed, because the start that came back may be
+    flying other definitions and knows nothing of the station. It says
+    that tcspecial has started again, and not whether the start is the one
+    a RESTART asked for: every start begins with the restart flag set, the
+    checksum in its beacons says which configuration it runs, and the
+    vehicle's own log says whether the start was commanded.
 
 Requirement
-    The wait does not depend on the answer: one that never arrives leaves it
-    standing until the beacon comes. An answer that does arrive and says
-    the command was refused ends it, because then nothing was initiated and
-    the definitions have not changed -- the answer to the command that
-    began the wait, not to one sent again during it, since the first may
-    have been taken. An operator can end it by hand, which the station
-    records; nothing else ends it, a CONNECT answered during it included.
+    A RESTART is not sent again for want of an answer alone. The beacons
+    say whether it was taken: a flagged beacon of the old start, or a
+    beacon whose number went back, says it was; beacons of the old start
+    that go on counting up at ``default_interval`` with the flag clear say
+    it was not. One sent again that reaches the old start after the first
+    was taken, or the start that came back, is refused ``NotArmed``, since
+    the first used the arm up and a new start holds none, and restarts
+    nothing.
 
 Requirement
     A command carries its sequence and no generation, and an answer
     carries none either: there is none. What keeps a command from being
     read with definitions it was not written for is the order of the link
-    and the ground's client. The link delivers in order -- see `What is
-    assumed`_ -- so a command sent before a RESTART arrives before it, and
-    the client sends nothing after a RESTART but CONNECT, RESTART_ARM and
-    RESTART until a beacon says a start came back, and then nothing but
-    those three until it is matched for commanding. A start's beacons carry
-    the restart flag, which ends a match, so the same holds after a start
-    nobody commanded. Before a match a PING is refused besides, by
+    and the vehicle's refusing every command but the three from a RESTART,
+    and from a start, until a matching CONNECT. The link delivers in order
+    -- see `What is assumed`_ -- so a command sent before a RESTART arrives
+    before it and is read by the start whose definitions it was built
+    with, and one sent after it arrives after it and is refused. Before a
+    match a PING is refused besides, by
     ``tcslibgs::CommandType::taken_unmatched``.
 
 Requirement
@@ -7258,8 +7268,10 @@ Requirement
     count as taken. PING and CONNECT are answered however old they are, by
     ``tcslibgs::CommandType::always_taken``. The newest taken is not kept
     across a restart, and need not be: a command sent before a RESTART
-    arrives before it, in order, and the ground sends none after it until
-    the new start's beacon.
+    arrives before it, in order, and every command but the three that
+    reaches the start that came back before a matching CONNECT is refused
+    ``Unmatched`` before its sequence is looked at. The CONNECT's answer
+    is where the station's count goes on from.
 
 Requirement
     The answer to a CONNECT carries the newest command sequence this start
@@ -7277,6 +7289,158 @@ Requirement
     generation, and needs none: a start the station has not matched is a
     start it does not command. After a CONNECT its count goes on from past
     the newest command the vehicle says it has taken, forward only.
+
+The restart and the beacon, in time
+-----------------------------------
+
+What the ground knows of a restart it knows from the beacons, so this section
+follows them through the ways a restart can go. What the vehicle does is
+fixed, and is the same in each:
+
+#. It takes the RESTART: checks that the target will load, writes the state
+   file to say the next start is commanded, uses up the arm, and sets the
+   restart flag. From here it acts on nothing but the three.
+#. It answers the RESTART, and then sends a beacon at once, carrying the
+   flag and the next number of the old start's count. A periodic beacon
+   that falls between setting the flag and answering carries the flag
+   too.
+#. It cleans up -- nodes stopped, threads joined, links closed, the log
+   flushed -- beaconing every ``reset_interval``, the number still going
+   up. A CONNECT that arrives meanwhile is answered with the old start's
+   checksum and changes nothing: the flag stays set and the beacons fast.
+   Once the command links are closed nothing is answered.
+#. It ``exec``\ s. The new start reads and writes the state file and sends
+   its first beacon at once: #1, with the flag set and the checksum of the
+   configuration it loaded. It beacons every ``reset_interval`` until a
+   CONNECT carrying that checksum, which clears the flag, sends a beacon at
+   once, and slows the beacons to ``default_interval``.
+
+The ground judges from two things in each beacon. The flag set ends the
+station's match, and the station then refuses every command but the three,
+unsent. A number lower than the last ends the commanding half of the match
+whatever the beacon says, and tcsmoc takes its command link down. A number
+the same as the last is a beacon delivered twice, and counts for nothing; a
+number higher by more than one says how many were missed.
+
+.. list-table::
+   :header-rows: 1
+   :widths: 24 38 38
+
+   * - What happens
+     - What the station hears
+     - What it does
+   * - Every beacon heard (first figure)
+     - The old start's next beacon with the flag set, then its beacons
+       counting up every ``reset_interval``, then #1 of the new start.
+     - Unmatched at the flagged beacon; link down at #1; Connect.
+   * - The RESTART never arrives (second figure)
+     - No answer. The old start's beacons go on counting up at
+       ``default_interval`` with the flag clear.
+     - Still matched, and commands as before. Sends the RESTART again,
+       which is taken while the arm stands -- ``restart_arm_valid``, 20
+       minutes unless the configuration says -- or arms again first.
+   * - The RESTART is taken and its answer lost (third figure)
+     - No answer, but the flagged beacon.
+     - Unmatched at the flagged beacon. A RESTART sent again is refused
+       ``NotArmed`` by either start and restarts nothing.
+   * - The old start's flagged beacons are all lost
+     - #1 of the new start, flagged.
+     - Unmatched, and link down, at #1: the same end by another beacon.
+   * - The new start's first beacons are all lost (fourth figure)
+     - A beacon of the new start whose number is higher than the old
+       start's last, flagged. Possible only while the old start's count was
+       low: the new start must lose every beacon up to it.
+     - Unmatched at the old start's flagged beacon, or at this one; the
+       link stays up, since no number went back. Disconnect and Connect
+       match the new start.
+   * - A crash or a power cycle: no RESTART
+     - No flagged beacon of the old start, then #1 of the new.
+     - Unmatched, and link down, at #1: see `A restart on the same
+       configuration`_.
+   * - A command sent after the RESTART, before the flagged beacon is
+       heard
+     - Its answer, ``Unmatched``, from whichever start it reached, or none
+       where it arrived between the old start's closing its links and the
+       new start's opening them.
+     - Nothing was acted on. The answer is dropped and counted if the
+       flagged beacon was heard first.
+   * - A CONNECT sent while the old start is ending
+     - Its answer, carrying the old start's checksum.
+     - Nothing changes on the vehicle. The station is not matched for
+       commanding until a beacon with the flag clear, which only a CONNECT
+       taken by the new start brings.
+   * - Every beacon lost for a while
+     - Nothing.
+     - The beacon goes overdue, which ends the match as a flagged one
+       does: see `On the ground`_.
+
+No case leaves the station unable to command a vehicle it can hear. What it
+cannot do, in any of them, is have a command acted on by a start it has not
+matched.
+
+.. figure:: restart-beacons.svg
+   :alt: A sequence diagram of a commanded restart onto the same
+         configuration, every beacon heard. The vehicle runs A, matched,
+         and beacon 41 says normal. The station arms a restart and sends
+         RESTART. The vehicle takes it, setting the flag, answers Success,
+         and sends beacon 42 at once with the flag set, which ends the
+         station's match. While it cleans up it beacons every
+         reset_interval, and beacon 43 counts up: the same start, ending.
+         After the exec the new start's beacon 1 goes at once with the
+         flag set; the number went back, so the station takes its link
+         down. The station sends CONNECT with A, which matches: the vehicle
+         clears the flag, answers, and sends beacon 2, normal, at once,
+         making the station matched for commanding; from then it beacons
+         every default_interval.
+   :width: 100%
+
+   A commanded restart, every beacon heard.
+
+.. figure:: restart-lost-up.svg
+   :alt: A sequence diagram of a RESTART that never arrives. The station
+         arms a restart to B and sends RESTART, which is lost. No answer
+         comes and the client times out. Beacon 42 counts up at the
+         default interval with the flag clear, which says the RESTART was
+         not taken. A START_NODE goes, nothing on the ground holding it
+         back, and is acted on. The station sends RESTART again with the
+         same key while the arm still stands; it is taken, and beacon 43
+         carries the flag, ending the match.
+   :width: 100%
+
+   A RESTART that never arrives.
+
+.. figure:: restart-lost-answer.svg
+   :alt: A sequence diagram of a RESTART that is taken but whose answer is
+         lost. Beacon 42 carries the flag, which says the RESTART was taken
+         and ends the station's match. A RESTART sent again is refused
+         NotArmed, since the first used the arm up, and restarts nothing. A
+         station that watches the beacons refuses a START_NODE unsent from
+         beacon 42; one that does not sends it, and the vehicle answers it
+         Unmatched and does nothing. The new start beacons number 1 with
+         the flag set and B's checksum.
+   :width: 100%
+
+   A RESTART taken whose answer is lost.
+
+.. figure:: restart-lost-beacons.svg
+   :alt: A sequence diagram of a new start whose first beacons are lost.
+         The vehicle had started only a moment before, so its numbers are
+         low. It takes a RESTART, and beacon 3 carries the flag, ending the
+         match. The new start's beacons 1 to 3 are all lost, so its beacon
+         4 looks like the next of the old start and the link stays up; but
+         its flag is set, so the station is still not matched, and a
+         START_NODE pressed now is refused unsent. The operator presses
+         Disconnect and Connect; the CONNECT matches, the vehicle clears the
+         flag, and beacon 5, normal, makes the station matched for
+         commanding.
+   :width: 100%
+
+   A new start whose first beacons are lost.
+
+The last figure is the case the ground's old wait could not get out of: it
+ended only on a beacon whose number went back, and here none does. With the
+wait gone, the flag decides, and a CONNECT ends it as it ends every other
+start.
 
 Downlinked data across a restart
 --------------------------------
@@ -7350,21 +7514,23 @@ A restart nobody commanded changing the format
 
 Commands in flight across the restart
     A command sent before the RESTART arrives before it, because the link
-    delivers in order, and the ground sends none after it until the new
-    start's beacon. What is left open is a start nobody commanded that
-    changes the definitions -- one that gives up a configuration for the
-    confirmed or the command line's -- with
-    commands already on their way: they arrive at the new start and are
-    read with its definitions. Should that matter, the remedy is the
-    ground's: send nothing but PING and CONNECT while the beacons are
-    overdue enough to say the vehicle may be starting again.
+    delivers in order, and is read by the start whose definitions it was
+    built with. One sent after it reaches a start that has taken a RESTART,
+    or one not yet matched, and is answered ``Unmatched`` by either. The
+    same holds for a start nobody commanded, one that gives up a
+    configuration for the confirmed or the command line's among them: it
+    acts on nothing but the three until a CONNECT carries its checksum, so
+    commands already on their way when it began are refused, not read with
+    its definitions.
 
-A wait that never ends
-    If the RESTART was refused, or never arrived, no beacon starts again.
-    A refusal ends the wait; a RESTART that never arrived shows as beacons
-    that go on counting at their own interval, not every
-    ``reset_interval``, and without the restart flag, and the operator may
-    end the wait by hand.
+A RESTART that never arrives
+    No answer comes, and the old start's beacons go on counting up at
+    ``default_interval`` with the flag clear: the RESTART was not taken.
+    Nothing on the ground is held back meanwhile, and the RESTART is sent
+    again, under the arm while it stands. The ground once held its
+    commands until a beacon whose number went back, which here never came
+    and had to be ended by hand; there is no such wait now. See `The
+    restart and the beacon, in time`_.
 
 A stray packet slowing the beacons or clearing the flag
     Only a CONNECT, valid, from the address the configuration says the MOC
@@ -7377,26 +7543,20 @@ The interface breaking the way in
     whose digests are pinned, and no build changes either.
 
 A restart whose first beacons are all lost
-    A restart is judged from the beacons by their number going back alone,
+    A start is judged from the beacons by their number going back alone,
     so one is missed where every beacon of the new start up to the old
     start's last number is lost: an old start that had sent only three
     beacons, and a new one whose #1 to #3 were all lost, has its #4 read as
     the next beacon of the old. The new start begins at ``reset_interval``,
-    so the window is short. A station that is not waiting on a restart
-    hears of one nobody commanded from the restart flag in the new start's
-    beacons, which ends its match, and from the ``Unmatched`` answer to its
-    next command. A station waiting on a commanded restart sends nothing but
-    CONNECT, RESTART_ARM and RESTART, and its wait does not end without a
-    beacon whose number went back, so the restart is not taken for done:
-    the wait goes on. The flag cannot end it,
-    because the old start's last beacons carried it too. The station is not
-    matched meanwhile in any case: the new start's beacons carry the flag
-    until a matching CONNECT. What ends it is
-    ``TcsClient::end_restart_wait``, by hand, which tcsmoc does not yet
-    offer: until it does, an operator in that state starts tcsmoc again.
-    Should a missed restart nobody commanded ever matter, the remedy is a
-    count of starts in the beacon, as a field of its own, at the cost of up
-    to ten more digits in every beacon.
+    so the window is short. Nothing depends on seeing it: the new start's
+    beacons carry the restart flag until a matching CONNECT, which ends the
+    station's match, and a command that reaches it is answered
+    ``Unmatched``. What is lost is tcsmoc's taking its link down and saying
+    that tcspecial started again; the operator presses Disconnect and
+    Connect to send the CONNECT the start needs. Should a missed start
+    ever matter more than that, the remedy is a count of starts in the
+    beacon, as a field of its own, at the cost of up to ten more digits in
+    every beacon.
 
 A confirmed configuration that later fails at every start
     A crash keeps the definitions it had, so a configuration that fails at

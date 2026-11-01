@@ -15,7 +15,7 @@
 
 use std::time::Duration;
 
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 
 use super::setting::{positive, time_of};
 use super::terminal::{Kind, Terminal};
@@ -28,15 +28,17 @@ pub const TERMINALS: &[Terminal] = &[
     Terminal::output("flow", Kind::Value(Unit::KilogramPerSecond)),
 ];
 
-/// Everything it states, by the name a file writes, `name` and `type`
-/// apart: the one list, from which an editor builds its form.
+/// Everything it states, by the name a file writes, the
+/// `component` naming it apart: the one list, from which an editor builds
+/// its form.
 pub const SETTINGS: &[&str] = &["thrust", "isp", "fuel"];
 
 /// An engine, as a physics model states it.
-#[derive(Debug, Clone, Deserialize, PartialEq, Eq)]
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
 #[serde(deny_unknown_fields)]
 pub struct Engine {
     /// What it is called, which is how a connection or a stand-in names it.
+    #[serde(rename = "component")]
     pub name: String,
     /// Its thrust at full throttle: `"16000 N"`.
     pub thrust: String,

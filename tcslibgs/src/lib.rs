@@ -65,6 +65,12 @@ pub mod sbn;
 /// configuration language read by two programs cannot live inside one of
 /// them.
 pub mod sim_config;
+/// How a simulator file groups its simulated payloads by type and names its
+/// groups.
+pub mod sim_grouped;
+/// The shapes simulator files and physics models were written in before
+/// that, refused by line.
+pub mod sim_reshaped;
 /// The simulation mode, `--simulate`, as tcspecial, tcssim and tcsmoc take it.
 pub mod simulate;
 /// Configurations kept on board, named by their checksum.

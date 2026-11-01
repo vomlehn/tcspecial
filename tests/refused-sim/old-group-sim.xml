@@ -1,0 +1,16 @@
+<simulator>
+    <tcssim><ready>127.0.0.1:7999</ready></tcssim>
+    <simulated_payload_groups>
+        <name>steady</name>
+        <simulate>true</simulate>
+        <packet_interval>1 s</packet_interval>
+    </simulated_payload_groups>
+    <simulated_payloads>
+        <type name="network">
+            <payload name="sensor">
+                <protocol>udp</protocol>
+                <group>steady</group>
+            </payload>
+        </type>
+    </simulated_payloads>
+</simulator>

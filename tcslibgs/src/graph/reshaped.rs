@@ -34,7 +34,7 @@ use super::renamed::{keys_and_values, uncommented};
 use crate::format::ConfigFormat;
 
 /// What the refusal ends with: where to find the converter.
-const CONVERTER: &str =
+pub(crate) const CONVERTER: &str =
     "tools/convert-format.py rewrites a file in the old shape into this one";
 
 /// Says how a file still written in the old shape must be written now.
@@ -190,7 +190,7 @@ fn in_yaml(text: &str) -> Option<String> {
 /// # Returns
 ///
 /// Its text, or `<name>`-like placeholders for none.
-fn scalar(value: Option<&serde_norway::Value>) -> String {
+pub(crate) fn scalar(value: Option<&serde_norway::Value>) -> String {
     match value {
         Some(serde_norway::Value::String(s)) => s.clone(),
         Some(serde_norway::Value::Number(n)) => n.to_string(),
@@ -209,7 +209,7 @@ fn scalar(value: Option<&serde_norway::Value>) -> String {
 /// # Returns
 ///
 /// The line, from 1, or 1 where it cannot be found.
-fn line_of_section(text: &str, section: &str) -> usize {
+pub(crate) fn line_of_section(text: &str, section: &str) -> usize {
     text.lines()
         .position(|line| {
             let line = uncommented(line);
@@ -232,7 +232,12 @@ fn line_of_section(text: &str, section: &str) -> usize {
 /// # Returns
 ///
 /// The line, from 1, or the section's where it cannot be found.
-fn line_of_key(text: &str, section: &str, key: &str, value: &str) -> usize {
+pub(crate) fn line_of_key(
+    text: &str,
+    section: &str,
+    key: &str,
+    value: &str,
+) -> usize {
     let start = line_of_section(text, section);
     text.lines()
         .enumerate()

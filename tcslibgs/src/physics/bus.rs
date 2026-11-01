@@ -7,7 +7,7 @@
 //! settings: a bus is its connections. The arithmetic is tcssim's
 //! `physics::bus`.
 
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 
 use super::terminal::{Kind, Terminal};
 use crate::unit::Unit;
@@ -19,14 +19,15 @@ pub const TERMINALS: &[Terminal] = &[
     Terminal::output("current", Kind::Value(Unit::Ampere)),
 ];
 
-/// Everything it states, by the name a file writes, `name` and `type`
-/// apart: nothing.
+/// Everything it states, by the name a file writes, the
+/// `component` naming it apart: nothing.
 pub const SETTINGS: &[&str] = &[];
 
 /// A bus, as a physics model states it.
-#[derive(Debug, Clone, Deserialize, PartialEq, Eq)]
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
 #[serde(deny_unknown_fields)]
 pub struct Bus {
     /// What it is called, which is how a connection or a stand-in names it.
+    #[serde(rename = "component")]
     pub name: String,
 }

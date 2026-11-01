@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
-"""Rewrite tcspecial configurations from the old shape into the new one.
+"""Rewrite tcspecial configurations, simulator files and physics models from
+the old shape into the new one.
 
 The old shape wrote each node as an entry of its own, its name and its type
 beside what it is told, in sections called ``gateway``, ``vehicle`` and
@@ -36,6 +37,35 @@ paragraph, which stays with the node, and the section keeps the rest at its
 top. A comment that cannot be kept where it was is said on standard error,
 with the file and what became of it.
 
+A simulator file is rewritten the same way. Its simulated payloads are grouped
+by type, each named by the word ``payload``, and its groups of settings are
+named by the word ``group`` and say no type, a payload that took its type from
+its group being written under it::
+
+    simulated_payload_groups:
+      - group: zone_temps
+        packet_interval: 100 ms
+
+    simulated_payloads:
+      - type network:
+          - payload: temp_1
+            group: zone_temps
+
+In XML, ``<simulated_payloads>`` holds ``<type name="...">`` elements of
+``<payload name="...">`` elements, and ``<simulated_payload_groups>`` holds
+``<group name="...">`` elements. A physics model's components are grouped by
+type, each named by the word ``component``::
+
+    physics:
+      - type heater:
+          - component: heater_1
+            power: "60 W"
+
+Which kind of file it is shows in what it holds: a ``simulated_payloads`` or
+``simulated_payload_groups`` section is a simulator file, a ``physics`` list a
+physics model, and an XML root ``<simulator>`` a simulator file. Each entry's
+settings are written in name order.
+
 A file already in the new shape is left as it is, so running this twice
 changes nothing the second time. Every section, and everything else in the
 file, is left where it was.
@@ -47,8 +77,9 @@ Usage::
     tools/convert-format.py --xml - < old.xtcs > new.xtcs
 
 Each FILE is rewritten in place, YAML or XML by its extension (``.ytcs`` or
-``.xtcs``). ``-`` reads standard input and writes standard output, in the
-language ``--yaml`` or ``--xml`` names.
+``.xtcs`` for a configuration, ``.yaml``, ``.yml`` or ``.xml`` for a simulator
+file or a physics model). ``-`` reads standard input and writes standard
+output, in the language ``--yaml`` or ``--xml`` names.
 """
 
 import re
@@ -283,11 +314,15 @@ def yaml_is_old(document):
     return old
 
 
-def top_blocks(lines):
+def top_blocks(lines, blank_inside=False):
     """Split a YAML file into its top-level keys and what lies between them.
 
     Args:
-        lines: The file's lines, without their ends.
+        lines:        The file's lines, without their ends.
+        blank_inside: Whether an empty line followed by more of a key's
+                      indented lines is the key's, as it is in a simulator
+                      file or a physics model, whose entries are set apart
+                      by empty lines.
 
     Returns:
         A list of items, each ``("loose", [lines])`` for lines that belong to
@@ -296,8 +331,21 @@ def top_blocks(lines):
     items = []
     loose = []
     current = None
+    held = []
     key = re.compile(r'^(["\']?)([A-Za-z_][\w-]*)\1\s*:')
     for line in lines:
+        if blank_inside and current is not None and not line.strip():
+            held.append(line)
+            continue
+        if held:
+            if (line.startswith((" ", "-", "\t"))
+                    or (is_comment(line) and indentation(line) > 0)):
+                current[3].extend(held)
+            else:
+                items.append(current)
+                current = None
+                loose.extend(held)
+            held = []
         found = key.match(line)
         if found:
             # The comment lines right above the key, with no blank line
@@ -325,6 +373,7 @@ def top_blocks(lines):
         loose.append(line)
     if current is not None:
         items.append(current)
+    loose.extend(held)
     if loose:
         items.append(("loose", loose))
     return items
@@ -421,13 +470,15 @@ class YamlNode:
         self.keys = []
 
 
-def yaml_entries(body, report, section):
+def yaml_entries(body, report, section, need_type=True):
     """Take a section's entries apart.
 
     Args:
-        body:    The section's lines under its key.
-        report:  Where to say what cannot be kept.
-        section: The section's old name, for the report.
+        body:      The section's lines under its key.
+        report:    Where to say what cannot be kept.
+        section:   The section's old name, for the report.
+        need_type: Whether each entry must say its type: see
+                   :func:`yaml_node`.
 
     Returns:
         The nodes, and the comment lines left at the section's end.
@@ -463,19 +514,22 @@ def yaml_entries(body, report, section):
     trailing = pending
     nodes = []
     for above, own in entries:
-        nodes.append(yaml_node(above, own, margin, report, section))
+        nodes.append(yaml_node(above, own, margin, report, section,
+                               need_type))
     return nodes, trailing
 
 
-def yaml_node(above, own, margin, report, section):
+def yaml_node(above, own, margin, report, section, need_type=True):
     """Take one entry of the old shape apart.
 
     Args:
-        above:   The comment lines above it.
-        own:     Its lines, the first beginning with its dash.
-        margin:  The indentation of its dash.
-        report:  Where to say what cannot be kept.
-        section: The section's old name, for the report.
+        above:     The comment lines above it.
+        own:       Its lines, the first beginning with its dash.
+        margin:    The indentation of its dash.
+        report:    Where to say what cannot be kept.
+        section:   The section's old name, for the report.
+        need_type: Whether it must say its type: a simulated payload may take
+                   its from its group, and a group need say none.
 
     Returns:
         The :class:`YamlNode`.
@@ -544,13 +598,13 @@ def yaml_node(above, own, margin, report, section):
                                   + chunk[0].split(":", 1)[1].partition("#")[2])
             continue
         node.keys.append((key, comments, chunk, parsed.get(key)))
-    if node.name is None or node.node_type is None:
+    if node.name is None or (need_type and node.node_type is None):
         raise ValueError(f"{section}: an entry has no name or no type: "
                          f"{text!r}")
     return node
 
 
-def yaml_key_lines(node, key, comments, chunk, value, report):
+def yaml_key_lines(node, key, comments, chunk, value, report, at=YAML_KEY):
     """Write one key of a node in the new shape.
 
     Args:
@@ -561,18 +615,19 @@ def yaml_key_lines(node, key, comments, chunk, value, report):
                   indentation.
         value:    Its value, as parsed.
         report:   Where to say what cannot be kept.
+        at:       How far to indent it.
 
     Returns:
         Its lines, indented.
     """
-    pad = " " * YAML_KEY
-    out = yaml_comment(comments, YAML_KEY, report)
+    pad = " " * at
+    out = yaml_comment(comments, at, report)
     if key in LINKS:
         inner = [line.strip() for line in chunk[1:] if is_comment(line)]
         if inner or "#" in chunk[0].split(":", 1)[1]:
             report.say(f"the comments inside the {key} of \"{node.name}\" are "
                        "put above it")
-            out.extend(yaml_comment(inner, YAML_KEY, report))
+            out.extend(yaml_comment(inner, at, report))
         out.append(f"{pad}{key}:")
         for target, entry in destinations_of(value, report, key):
             out.append(f"{pad}  - target: {target}")
@@ -957,7 +1012,7 @@ def comments_at(comments, to, report):
     return out
 
 
-def xml_node(top_text, top_column, above, report):
+def xml_node(top_text, top_column, above, report, need_type=True):
     """Take one node element of the old shape apart.
 
     Args:
@@ -965,6 +1020,7 @@ def xml_node(top_text, top_column, above, report):
         top_column: The column it began at.
         above:      The comments above it, each ``(text, column)``.
         report:     Where to say what cannot be kept.
+        need_type:  Whether it must say its type: see :func:`yaml_node`.
 
     Returns:
         The :class:`XmlNode`.
@@ -991,7 +1047,7 @@ def xml_node(top_text, top_column, above, report):
         report.say(f"the comment at the end of \"{node.name}\" is put at the "
                    "end of it")
         node.children.append((None, pending, None))
-    if node.name is None or node.node_type is None:
+    if node.name is None or (need_type and node.node_type is None):
         raise ValueError(f"a <{node.section}> has no <name> or no <type>")
     return node
 
@@ -1018,25 +1074,27 @@ def xml_destination(child):
     return (text_of(target), None if entry is None else text_of(entry))
 
 
-def xml_node_lines(node, word, report):
+def xml_node_lines(node, word, report, at=XML_NODE):
     """Write one node in the new shape.
 
     Args:
         node:   The node.
         word:   The element its section writes a node as.
         report: Where to say what cannot be kept.
+        at:     The column it is written at, its children four further in.
 
     Returns:
         Its lines.
     """
-    out = comments_at(node.above, XML_NODE, report)
-    pad = " " * XML_CHILD
+    child_at = at + 4
+    out = comments_at(node.above, at, report)
+    pad = " " * child_at
     keyed = [c for c in node.children if c[0] is not None]
     loose = [c for c in node.children if c[0] is None]
     if not keyed and not loose:
-        out.append(f"{' ' * XML_NODE}<{word} name={quoteattr(node.name)}/>")
+        out.append(f"{' ' * at}<{word} name={quoteattr(node.name)}/>")
         return out
-    out.append(f"{' ' * XML_NODE}<{word} name={quoteattr(node.name)}>")
+    out.append(f"{' ' * at}<{word} name={quoteattr(node.name)}>")
     # Each attribute in name order; then the links, each destination in
     # order; then the sinks.
     links = {}
@@ -1055,7 +1113,7 @@ def xml_node_lines(node, word, report):
             for link in sorted(links):
                 out.extend(xml_link_lines(link, *links[link], report))
             links = {}
-        out.extend(comments_at(comments, XML_CHILD, report))
+        out.extend(comments_at(comments, child_at, report))
         if len(child):
             raise ValueError(f"\"{node.name}\": <{key}> holds elements, which "
                              "an attribute does not")
@@ -1063,8 +1121,8 @@ def xml_node_lines(node, word, report):
     for link in sorted(links):
         out.extend(xml_link_lines(link, *links[link], report))
     for _, comments, _ in loose:
-        out.extend(comments_at(comments, XML_CHILD, report))
-    out.append(f"{' ' * XML_NODE}</{word}>")
+        out.extend(comments_at(comments, child_at, report))
+    out.append(f"{' ' * at}</{word}>")
     return out
 
 
@@ -1289,6 +1347,331 @@ def convert_xml(text, report):
     return out.decode("utf-8")
 
 
+# ------------------------------------------------- simulator and physics
+
+
+#: The sections of a simulator file whose entries are grouped by type now,
+#: and the word for one of their entries.
+SIM_PAYLOADS = ("simulated_payloads", "payload")
+SIM_GROUPS = ("simulated_payload_groups", "group")
+
+#: The section of a physics model, and the word for one of its components.
+PHYSICS = ("physics", "component")
+
+#: The indentation of a group's keys in YAML, under ``- group: <name>``.
+YAML_GROUP_KEY = 4
+
+
+def kind_of_file(document):
+    """Which kind of file a YAML document is, by what it holds.
+
+    Args:
+        document: The parsed file.
+
+    Returns:
+        ``simulator``, ``physics`` or ``configuration``.
+    """
+    if not isinstance(document, dict):
+        return "configuration"
+    if SIM_PAYLOADS[0] in document or SIM_GROUPS[0] in document:
+        return "simulator"
+    if isinstance(document.get(PHYSICS[0]), list):
+        return "physics"
+    return "configuration"
+
+
+def old_entries(document, section):
+    """Whether a section of a simulator file or physics model, as parsed,
+    holds an entry of the old shape.
+
+    Args:
+        document: The parsed file.
+        section:  The section's key.
+
+    Returns:
+        Whether one of its entries has a ``name`` or a ``type`` of its own.
+    """
+    value = document.get(section) if isinstance(document, dict) else None
+    return (isinstance(value, list)
+            and any(isinstance(entry, dict)
+                    and ("name" in entry or "type" in entry)
+                    for entry in value))
+
+
+def group_types(document):
+    """The type each group of an old simulator file says, if it says one.
+
+    Args:
+        document: The parsed file.
+
+    Returns:
+        Each group's type, by its name.
+    """
+    out = {}
+    for entry in document.get(SIM_GROUPS[0]) or []:
+        if isinstance(entry, dict) and "name" in entry and "type" in entry:
+            out[str(entry["name"])] = str(entry["type"])
+    return out
+
+
+def yaml_typed(section, word, above, body, report, inherited=None):
+    """Write a section of a simulator file or physics model grouped by type.
+
+    Args:
+        section:   The section's key.
+        word:      The word an entry is named by.
+        above:     The comment lines above the section's key.
+        body:      Its lines under its key.
+        report:    Where to say what cannot be kept.
+        inherited: For simulated payloads, each group's type by its name, for
+                   a payload that took its type from its group.
+
+    Returns:
+        Its lines.
+    """
+    nodes, trailing = yaml_entries(body, report, section,
+                                   need_type=inherited is None)
+    for node in nodes:
+        if node.node_type is not None:
+            continue
+        group = next((value for key, _, _, value in node.keys
+                      if key == "group"), None)
+        node.node_type = (inherited or {}).get(str(group))
+        if node.node_type is None:
+            raise ValueError(f"{section}: \"{node.name}\" says no type, and "
+                             "nor does a group it names")
+    out = list(above)
+    out.append(f"{section}:")
+    if nodes:
+        about, node_part = section_split(nodes[0].above,
+                                         lambda c: c.strip() == "#")
+        nodes[0].above = node_part
+        if about:
+            report.say(f"{section}: the first paragraphs of the comment above "
+                       f"\"{nodes[0].name}\" are taken to be about the "
+                       "section, and kept at its top")
+        out.extend(yaml_comment(about, YAML_TYPE, report))
+    # Its entries set apart by empty lines, where the file set them apart.
+    spaced = any(not line.strip() for line in body)
+    by_type = {}
+    for node in nodes:
+        by_type.setdefault(node.node_type, []).append(node)
+    for count, node_type in enumerate(sorted(by_type)):
+        if spaced and count:
+            out.append("")
+        out.append(f"{' ' * YAML_TYPE}- type {node_type}:")
+        for at, node in enumerate(sorted(by_type[node_type],
+                                         key=lambda n: n.name)):
+            if spaced and at:
+                out.append("")
+            out.extend(yaml_comment(node.above, YAML_NODE, report))
+            out.append(f"{' ' * YAML_NODE}- {word}: {node.name_text}")
+            for key, comments, chunk, value in sorted(node.keys,
+                                                      key=lambda k: k[0]):
+                out.extend(yaml_key_lines(node, key, comments, chunk, value,
+                                          report))
+    if trailing:
+        report.say(f"{section}: the comment at the end of the section is kept "
+                   "at its end")
+        out.extend(yaml_comment([comment_text(c) for c in trailing], YAML_TYPE,
+                                report))
+    return out
+
+
+def yaml_groups(above, body, report):
+    """Write a simulator file's groups, each named by the word ``group`` and
+    saying no type.
+
+    Args:
+        above:  The comment lines above the section's key.
+        body:   Its lines under its key.
+        report: Where to say what cannot be kept.
+
+    Returns:
+        Its lines.
+    """
+    section, word = SIM_GROUPS
+    nodes, trailing = yaml_entries(body, report, section, need_type=False)
+    out = list(above)
+    out.append(f"{section}:")
+    if nodes:
+        about, node_part = section_split(nodes[0].above,
+                                         lambda c: c.strip() == "#")
+        nodes[0].above = node_part
+        out.extend(yaml_comment(about, YAML_TYPE, report))
+        if about:
+            out.append(f"{' ' * YAML_TYPE}#")
+    spaced = any(not line.strip() for line in body)
+    for at, node in enumerate(sorted(nodes, key=lambda n: n.name)):
+        if spaced and at:
+            out.append("")
+        if node.node_type is not None:
+            report.say(f"{section}: the type of \"{node.name}\" is dropped: "
+                       "each payload in it is written under that type")
+        out.extend(yaml_comment(node.above, YAML_TYPE, report))
+        out.append(f"{' ' * YAML_TYPE}- {word}: {node.name_text}")
+        for key, comments, chunk, value in sorted(node.keys,
+                                                  key=lambda k: k[0]):
+            out.extend(yaml_key_lines(node, key, comments, chunk, value,
+                                      report, at=YAML_GROUP_KEY))
+    if trailing:
+        out.extend(yaml_comment([comment_text(c) for c in trailing], YAML_TYPE,
+                                report))
+    return out
+
+
+def convert_sim_yaml(text, document, report):
+    """Rewrite a YAML simulator file or physics model in the new shape.
+
+    Args:
+        text:     The file's text.
+        document: The file, as parsed.
+        report:   Where to say what cannot be kept.
+
+    Returns:
+        The new text; the same text for a file already in the new shape.
+    """
+    kind = kind_of_file(document)
+    sections = [SIM_PAYLOADS[0], SIM_GROUPS[0]] if kind == "simulator" \
+        else [PHYSICS[0]]
+    old = [s for s in sections if old_entries(document, s)]
+    if not old:
+        return text
+    inherited = group_types(document)
+    out = []
+    for item in top_blocks(text.split("\n"), blank_inside=True):
+        if item[0] == "loose":
+            out.extend(item[1])
+            continue
+        _, key, above, own = item
+        # Its blank lines after are not its own.
+        body = own[1:]
+        tail = []
+        while body and not body[-1].strip():
+            tail.insert(0, body.pop())
+        if key not in old:
+            out.extend(above + own)
+            continue
+        if key == SIM_GROUPS[0]:
+            out.extend(yaml_groups(above, body, report))
+        elif key == SIM_PAYLOADS[0]:
+            out.extend(yaml_typed(key, SIM_PAYLOADS[1], above, body, report,
+                                  inherited))
+        else:
+            out.extend(yaml_typed(key, PHYSICS[1], above, body, report))
+        out.extend(tail)
+    return "\n".join(out)
+
+
+def convert_sim_xml(text, report):
+    """Rewrite an XML simulator file in the new shape.
+
+    Each old ``<simulated_payloads>`` element, one for each payload, becomes a
+    ``<payload name="...">`` under its ``<type name="...">`` in one
+    ``<simulated_payloads>``, and each old ``<simulated_payload_groups>`` a
+    ``<group name="...">`` in one ``<simulated_payload_groups>``. Each takes
+    the place of the first of its kind in the file.
+
+    Args:
+        text:   The file's text.
+        report: Where to say what cannot be kept.
+
+    Returns:
+        The new text; the same text for a file already in the new shape.
+    """
+    tops, data = xml_tops(text)
+    edits = []
+    found = {SIM_PAYLOADS[0]: [], SIM_GROUPS[0]: []}
+    first = {}
+    for at, top in enumerate(tops):
+        if top.what != "element" or top.tag not in found:
+            continue
+        fragment = data[top.start:top.end].decode("utf-8")
+        if xml_children(fragment).find("name") is None:
+            continue
+        above = []
+        begin = top.start
+        back = at - 1
+        while back >= 0 and tops[back].what == "comment":
+            between = data[tops[back].end:begin]
+            if between.strip() or between.count(b"\n") > 1:
+                break
+            above.insert(0, tops[back])
+            begin = tops[back].start
+            back -= 1
+        said = [(data[c.start:c.end].decode("utf-8"), column_of(data, c.start))
+                for c in above]
+        node = xml_node(fragment, column_of(data, top.start), said, report,
+                        need_type=False)
+        found[top.tag].append(node)
+        start, end = line_span(data, begin, top.end)
+        if top.tag not in first:
+            first[top.tag] = start
+            edits.append((start, end, None))
+        else:
+            edits.append((start, end, ""))
+    if not edits:
+        return text
+    inherited = {n.name: n.node_type for n in found[SIM_GROUPS[0]]
+                 if n.node_type is not None}
+    sections = {}
+    groups = sorted(found[SIM_GROUPS[0]], key=lambda n: n.name)
+    if groups:
+        out = [f"{' ' * XML_SECTION}<{SIM_GROUPS[0]}>"]
+        for node in groups:
+            if node.node_type is not None:
+                report.say(f"{SIM_GROUPS[0]}: the type of \"{node.name}\" is "
+                           "dropped: each payload in it is written under that "
+                           "type")
+            out.extend(xml_node_lines(node, SIM_GROUPS[1], report,
+                                      at=XML_TYPE))
+        out.append(f"{' ' * XML_SECTION}</{SIM_GROUPS[0]}>")
+        sections[SIM_GROUPS[0]] = "\n".join(out) + "\n"
+    payloads = found[SIM_PAYLOADS[0]]
+    if payloads:
+        by_type = {}
+        for node in payloads:
+            if node.node_type is None:
+                group = next((text_of(child) for key, _, child
+                              in node.children if key == "group"), None)
+                node.node_type = inherited.get(group)
+            if node.node_type is None:
+                raise ValueError(f"{SIM_PAYLOADS[0]}: \"{node.name}\" says no "
+                                 "type, and nor does a group it names")
+            by_type.setdefault(node.node_type, []).append(node)
+        out = [f"{' ' * XML_SECTION}<{SIM_PAYLOADS[0]}>"]
+        for node_type in sorted(by_type):
+            out.append(f"{' ' * XML_TYPE}<type name={quoteattr(node_type)}>")
+            for node in sorted(by_type[node_type], key=lambda n: n.name):
+                out.extend(xml_node_lines(node, SIM_PAYLOADS[1], report))
+            out.append(f"{' ' * XML_TYPE}</type>")
+        out.append(f"{' ' * XML_SECTION}</{SIM_PAYLOADS[0]}>")
+        sections[SIM_PAYLOADS[0]] = "\n".join(out) + "\n"
+    out = bytearray()
+    done = 0
+    for start, end, replacement in sorted(edits):
+        out += data[done:start]
+        if replacement is None:
+            replacement = "".join(sections[name] for name in sections
+                                  if first.get(name) == start)
+        out += replacement.encode("utf-8")
+        done = end
+    out += data[done:]
+    return out.decode("utf-8")
+
+
+def xml_root(text):
+    """The name of an XML file's root element.
+
+    Args:
+        text: The file's text.
+
+    Returns:
+        The name.
+    """
+    return ElementTree.fromstring(text.encode("utf-8")).tag
+
+
 # ---------------------------------------------------------------- main
 
 
@@ -1305,7 +1688,12 @@ def convert(text, language, name):
     """
     report = Report(name)
     if language == "yaml":
+        document = yaml.safe_load(text)
+        if kind_of_file(document) != "configuration":
+            return convert_sim_yaml(text, document, report), report
         return convert_yaml(text, report), report
+    if xml_root(text) == "simulator":
+        return convert_sim_xml(text, report), report
     return convert_xml(text, report), report
 
 
@@ -1342,12 +1730,13 @@ def main(argv):
             new, report = convert(sys.stdin.read(), language, "-")
             sys.stdout.write(new)
         else:
-            if path.endswith(".ytcs"):
+            if path.endswith((".ytcs", ".yaml", ".yml")):
                 said = "yaml"
-            elif path.endswith(".xtcs"):
+            elif path.endswith((".xtcs", ".xml")):
                 said = "xml"
             else:
-                print(f"{path}: a configuration is named .ytcs or .xtcs",
+                print(f"{path}: a configuration is named .ytcs or .xtcs, and "
+                      "a simulator file or physics model .yaml, .yml or .xml",
                       file=sys.stderr)
                 status = 1
                 continue

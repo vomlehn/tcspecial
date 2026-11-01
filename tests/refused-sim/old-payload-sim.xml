@@ -1,0 +1,10 @@
+<simulator>
+    <tcssim><ready>127.0.0.1:7999</ready></tcssim>
+    <simulated_payloads>
+        <name>sensor</name>
+        <simulate>true</simulate>
+        <type>network</type>
+        <protocol>udp</protocol>
+        <packet_interval>1 s</packet_interval>
+    </simulated_payloads>
+</simulator>

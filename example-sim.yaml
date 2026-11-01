@@ -14,8 +14,8 @@ tcssim:
   ready: "127.0.0.1:7900"
 
 simulated_payloads:
-  # One packet a second.
-  - name: spi-1
-    simulate: true
-    type: spi
-    packet_interval: 1 s
+  - type spi:
+      # One packet a second.
+      - payload: spi-1
+        packet_interval: 1 s
+        simulate: true

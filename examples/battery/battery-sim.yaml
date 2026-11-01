@@ -22,29 +22,28 @@ tcssim:
 physics: battery-physics.yaml
 
 simulated_payloads:
-  # Asked, and answering: a triggered payload has no rate of its own here.
-  # Accurate to twenty millivolts, with five of noise on each reading.
-  - name: monitor
-    simulate: true
-    type: serial
-    connects: battery.voltage
-    accuracy: "0.02 V"
-    noise: "0.005 V"
+  - type network:
+      # Driven and never read: its stand-in sends nothing, counts each decision
+      # the vehicle sends it, and sheds the science load while it is told to.
+      - payload: science
+        connects: science.shed
+        protocol: udp
+        simulate: true
 
-  # Twice a second, with ten milliamperes of noise: the charge program
-  # counts it, noise and all, which is what a real count does.
-  - name: shunt
-    simulate: true
-    type: network
-    protocol: udp
-    packet_interval: 500 ms
-    connects: battery.current
-    noise: "0.01 A"
+      # Twice a second, with ten milliamperes of noise: the charge program
+      # counts it, noise and all, which is what a real count does.
+      - payload: shunt
+        connects: battery.current
+        noise: "0.01 A"
+        packet_interval: 500 ms
+        protocol: udp
+        simulate: true
 
-  # Driven and never read: its stand-in sends nothing, counts each decision
-  # the vehicle sends it, and sheds the science load while it is told to.
-  - name: science
-    simulate: true
-    type: network
-    protocol: udp
-    connects: science.shed
+  - type serial:
+      # Asked, and answering: a triggered payload has no rate of its own here.
+      # Accurate to twenty millivolts, with five of noise on each reading.
+      - payload: monitor
+        accuracy: "0.02 V"
+        connects: battery.voltage
+        noise: "0.005 V"
+        simulate: true

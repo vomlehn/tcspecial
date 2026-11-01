@@ -76,6 +76,12 @@ pub struct Simulator {
     /// rather than a line with no effect. So the editor offers one entry per
     /// payload node and never invents a name.
     pub payloads: BTreeMap<String, Settings>,
+    /// The type each simulated payload was written under in the file, by
+    /// its name: not a setting, and offered by no window, the configuration
+    /// deciding a payload's type. Kept for an entry the configuration has
+    /// no payload of, which is written back under the type it came with.
+    #[serde(default)]
+    pub kinds: BTreeMap<String, String>,
 }
 
 impl Simulator {
@@ -122,13 +128,29 @@ impl Simulator {
 
 /// One entry of either list, as a file writes it.
 ///
-/// `name` and everything else: the settings are taken as the words they are,
-/// so that one nothing recognises is kept rather than thrown away.
+/// Its name, the type a simulated payload is written under, and everything
+/// else: the settings are taken as the words they are, so that one nothing
+/// recognises is kept rather than thrown away. Read by
+/// `tcslibgs::sim_grouped`, as the simulator reads its own, so that the two
+/// read the one shape.
 #[derive(Debug, Deserialize)]
 struct Entry {
+    #[serde(default)]
     name: String,
+    #[serde(skip)]
+    kind: Option<String>,
     #[serde(flatten)]
     said: BTreeMap<String, Scalar>,
+}
+
+impl tcslibgs::sim_grouped::SimEntry for Entry {
+    fn name(&self) -> &str {
+        &self.name
+    }
+
+    fn written_under(&mut self, kind: &str) {
+        self.kind = Some(kind.to_string());
+    }
 }
 
 /// A simulator configuration file, as it parses.
@@ -148,9 +170,9 @@ struct File {
     /// of its own: read only to be refused, as every program refuses it.
     #[serde(default)]
     thermal_mass: Option<serde::de::IgnoredAny>,
-    #[serde(default)]
+    #[serde(default, deserialize_with = "tcslibgs::sim_grouped::groups")]
     simulated_payload_groups: Vec<Entry>,
-    #[serde(default)]
+    #[serde(default, deserialize_with = "tcslibgs::sim_grouped::payloads")]
     simulated_payloads: Vec<Entry>,
 }
 
@@ -244,7 +266,8 @@ impl Trouble {
 ///
 /// [`Trouble::Unreadable`] for a name that is not YAML or a file that cannot be
 /// read or parsed; [`Trouble::Unusable`] for a file with two entries of one
-/// name in a list.
+/// name in a list, or written in the shape before its payloads were grouped
+/// by type.
 pub fn read(path: &Path) -> Result<Simulator, Trouble> {
     must_be_yaml(path).map_err(Trouble::Unreadable)?;
 
@@ -258,6 +281,12 @@ pub fn read(path: &Path) -> Result<Simulator, Trouble> {
     let format = ConfigFormat::from_data_path(path)
         .ok_or_else(|| unreadable(&"not named .yaml"))?;
     let text = std::fs::read_to_string(path).map_err(|e| unreadable(&e))?;
+    // A file in the shape it had before its payloads were grouped by type
+    // is refused and left as it is, as every program refuses it: read as
+    // nothing, it would be written away at the next edit.
+    if let Some(why) = tcslibgs::sim_reshaped::sim_refused(&text, format) {
+        return Err(Trouble::Unusable(why));
+    }
     let file: File = format.parse(&text).map_err(|e| unreadable(&e))?;
 
     if file.thermal_mass.is_some() {
@@ -314,6 +343,11 @@ pub fn read(path: &Path) -> Result<Simulator, Trouble> {
             })
             .collect()
     };
+    simulator.kinds = file
+        .simulated_payloads
+        .iter()
+        .filter_map(|entry| Some((entry.name.clone(), entry.kind.clone()?)))
+        .collect();
     simulator.groups = settled(file.simulated_payload_groups);
     simulator.payloads = settled(file.simulated_payloads);
     Ok(simulator)
@@ -329,23 +363,27 @@ pub fn read(path: &Path) -> Result<Simulator, Trouble> {
 /// what makes a half-filled form a file that still loads: see
 /// `tcslibgs::sim_config`.
 ///
-/// `payloads` is the configuration's payload nodes, in the order the
-/// configuration describes them, because it is the configuration that decides
-/// which payloads there are to simulate. An entry the simulator file holds for
-/// a name that is not among them is written out too, after them: it is
+/// `payloads` is the configuration's payload nodes and their types, because
+/// it is the configuration that decides which payloads there are to simulate
+/// and what each is. An entry the simulator file holds for a name that is not
+/// among them is written out too, under the type the file gave it: it is
 /// somebody's typing, and `tcsverify` is what says a simulated payload names
 /// no payload.
+///
+/// In the one order a simulator file has, whatever order anything was made
+/// in: the groups by name, the simulated payloads grouped by type, the types
+/// by name and a type's payloads by name, and each entry's settings by name.
 ///
 /// # Arguments
 ///
 /// * `simulator` - The simulator configuration to write.
-/// * `payloads`  - The configuration's payload nodes, in its order; each gets
-///                 an entry.
+/// * `payloads`  - The configuration's payload nodes, each with its type;
+///                 each gets an entry.
 ///
 /// # Returns
 ///
 /// The file's text.
-pub fn to_yaml(simulator: &Simulator, payloads: &[String]) -> String {
+pub fn to_yaml(simulator: &Simulator, payloads: &[(String, String)]) -> String {
     let mut out = String::new();
 
     // Which schema describes this file, in the spelling a YAML language
@@ -390,66 +428,93 @@ pub fn to_yaml(simulator: &Simulator, payloads: &[String]) -> String {
         out.push_str(&format!("\nphysics: {}\n", quoted(physics)));
     }
 
-    // Each payload of the configuration, then whatever the file holds for a
-    // name that is not one.
-    let mut named: Vec<&String> = payloads.iter().collect();
-    named.extend(
-        simulator
-            .payloads
-            .keys()
-            .filter(|name| !payloads.contains(name)),
-    );
+    // Each group, in name order, as the map holds them.
+    if !simulator.groups.is_empty() {
+        out.push_str("\nsimulated_payload_groups:\n");
+        for (name, said) in &simulator.groups {
+            out.push_str(&format!("  - group: {}\n", quoted(name)));
+            entry_settings(&mut out, false, said, "    ");
+        }
+    }
 
+    // Each payload of the configuration under its type, then whatever the
+    // file holds for a name that is not one, under the type the file gave
+    // it. A name with no type from either -- which reading a file never
+    // makes, every entry read being written under one -- has nowhere to be
+    // written, and is left out.
+    let mut typed: BTreeMap<&str, BTreeMap<&str, &Settings>> = BTreeMap::new();
     let empty = Settings::new();
-    let groups: Vec<(&String, &Settings)> = simulator.groups.iter().collect();
-    let payloads: Vec<(&String, &Settings)> = named
-        .into_iter()
-        .map(|name| (name, simulator.payloads.get(name).unwrap_or(&empty)))
-        .collect();
-
-    for (section, entries, payload) in [
-        ("simulated_payload_groups", groups, false),
-        ("simulated_payloads", payloads, true),
-    ] {
-        if entries.is_empty() {
+    for (name, kind) in payloads {
+        typed
+            .entry(kind.as_str())
+            .or_default()
+            .insert(name, simulator.payloads.get(name).unwrap_or(&empty));
+    }
+    for (name, said) in &simulator.payloads {
+        if payloads.iter().any(|(theirs, _)| theirs == name) {
             continue;
         }
-        out.push_str(&format!("\n{section}:\n"));
-        for (name, said) in entries {
-            out.push_str(&format!("  - name: {}\n", quoted(name)));
-            // Every setting this kind of entry may state, in the order the
-            // window offers them, and then anything the file carried that
-            // this build does not know about -- which is kept for the reason
-            // the window shows it: a line nobody can see is a line that gets
-            // written back out without anybody knowing it is there.
-            let mut settings: Vec<&str> = Simulator::fields(payload);
-            let theirs: Vec<&str> = said
-                .keys()
-                .map(String::as_str)
-                .filter(|setting| !settings.contains(setting))
-                .collect();
-            settings.extend(theirs);
-            for setting in settings {
-                // A setting nobody has answered is written with nothing after
-                // the colon rather than with an empty string. The two read the
-                // same -- see `blank_is_unstated` -- and they do not say the
-                // same: `""` is a value somebody could have typed, and nothing
-                // at all is a question not yet answered, which is what the
-                // form is for. The name stays in the file either way, because
-                // what the form is for is saying which questions there are.
-                match said.get(setting).map(|value| value.trim()) {
-                    Some(value) if !value.is_empty() => {
-                        out.push_str(&format!(
-                            "    {setting}: {}\n",
-                            quoted(value)
-                        ));
-                    }
-                    _ => out.push_str(&format!("    {setting}:\n")),
-                }
+        if let Some(kind) = simulator.kinds.get(name) {
+            typed.entry(kind.as_str()).or_default().insert(name, said);
+        }
+    }
+    if !typed.is_empty() {
+        out.push_str("\nsimulated_payloads:\n");
+        for (kind, entries) in typed {
+            out.push_str(&format!("  - type {kind}:\n"));
+            for (name, said) in entries {
+                out.push_str(&format!("      - payload: {}\n", quoted(name)));
+                entry_settings(&mut out, true, said, "        ");
             }
         }
     }
     out
+}
+
+/// Writes every setting an entry may state, by name, and then anything the
+/// file carried that this build does not know about -- which is kept for the
+/// reason the window shows it: a line nobody can see is a line that gets
+/// written back out without anybody knowing it is there.
+///
+/// # Arguments
+///
+/// * `out`     - Where the lines are written.
+/// * `payload` - Whether the entry is a payload's, which has `group`, rather
+///               than a group's.
+/// * `said`    - What the entry says.
+/// * `indent`  - What each line begins with.
+fn entry_settings(
+    out: &mut String,
+    payload: bool,
+    said: &Settings,
+    indent: &str,
+) {
+    let mut settings: Vec<&str> = Simulator::fields(payload);
+    let theirs: Vec<&str> = said
+        .keys()
+        .map(String::as_str)
+        .filter(|setting| !settings.contains(setting))
+        .collect();
+    settings.extend(theirs);
+    settings.sort_unstable();
+    for setting in settings {
+        // A setting nobody has answered is written with nothing after the
+        // colon rather than with an empty string. The two read the same --
+        // see `blank_is_unstated` -- and they do not say the same: `""` is a
+        // value somebody could have typed, and nothing at all is a question
+        // not yet answered, which is what the form is for. The name stays in
+        // the file either way, because what the form is for is saying which
+        // questions there are.
+        match said.get(setting).map(|value| value.trim()) {
+            Some(value) if !value.is_empty() => {
+                out.push_str(&format!(
+                    "{indent}{setting}: {}\n",
+                    quoted(value)
+                ));
+            }
+            _ => out.push_str(&format!("{indent}{setting}:\n")),
+        }
+    }
 }
 
 /// A YAML scalar, quoted unless it is a plain whole number.
@@ -515,7 +580,6 @@ mod tests {
             simulator.payloads.insert(
                 "payload".to_string(),
                 [
-                    ("type", "network"),
                     ("protocol", "udp"),
                     ("group", "steady_1hz"),
                     ("drop_percent", "10"),
@@ -527,10 +591,11 @@ mod tests {
                 .collect(),
             );
 
-            let payloads = vec!["payload".to_string()];
+            let payloads = [("payload".to_string(), "network".to_string())];
             std::fs::write(&path, to_yaml(&simulator, &payloads))
                 .expect("written");
             let read_back = read(&path).expect("read back");
+            assert_eq!(read_back.kinds["payload"], "network", "{extension}");
 
             assert_eq!(
                 read_back.description, simulator.description,
@@ -578,11 +643,11 @@ mod tests {
         let model = where_.path().join("vehicle-physics.yaml");
         let model_said = concat!(
             "physics:\n",
-            "  - name: zone\n",
-            "    type: thermal_zone\n",
-            "    environment: \"283.15 K\"\n",
-            "    time_constant: \"50 s\"\n",
-            "    capacity: \"20 J/K\"\n",
+            "  - type thermal_zone:\n",
+            "      - component: zone\n",
+            "        environment: \"283.15 K\"\n",
+            "        time_constant: \"50 s\"\n",
+            "        capacity: \"20 J/K\"\n",
         );
         std::fs::write(&model, model_said).expect("written");
         let given = concat!(
@@ -592,8 +657,9 @@ mod tests {
             "physics: vehicle-physics.yaml\n",
             "\n",
             "simulated_payloads:\n",
-            "  - name: temp_1\n    simulate: true\n",
-            "    connects: zone.temperature\n",
+            "  - type i2c:\n",
+            "      - payload: temp_1\n        simulate: true\n",
+            "        connects: zone.temperature\n",
         );
         std::fs::write(&path, given).expect("written");
 
@@ -601,7 +667,7 @@ mod tests {
         assert_eq!(read_in.physics.as_deref(), Some("vehicle-physics.yaml"));
 
         // Saved, as every other edit saves the whole file, and read again.
-        let payloads = vec!["temp_1".to_string()];
+        let payloads = [("temp_1".to_string(), "i2c".to_string())];
         let written = to_yaml(&read_in, &payloads);
         std::fs::write(&path, &written).expect("written");
         let back = read(&path).expect("it reads again");
@@ -667,7 +733,6 @@ mod tests {
                 .map(|name| {
                     let value = match name {
                         "group" => "steady_1hz",
-                        "type" => "network",
                         "protocol" => "udp",
                         "payload_address" => "127.0.0.1",
                         "simulate" => "true",
@@ -678,7 +743,7 @@ mod tests {
                 .collect(),
         );
 
-        let payloads = vec!["payload".to_string()];
+        let payloads = [("payload".to_string(), "network".to_string())];
         std::fs::write(&path, to_yaml(&simulator, &payloads)).expect("written");
         let theirs = tcslibgs::sim_config::SimConfigFile::load(&path)
             .expect("the simulator should read what the editor wrote");
@@ -714,8 +779,9 @@ mod tests {
         let path = where_.path().join("vehiclesim.yaml");
         std::fs::write(
             &path,
-            "simulated_payloads:\n  - name: payload\n    simulate: \
-             true\n    future_thing: 7\n",
+            "simulated_payloads:\n  - type spi:\n      \
+             - payload: payload\n        \
+             simulate: true\n        future_thing: 7\n",
         )
         .expect("a file");
 
@@ -726,8 +792,57 @@ mod tests {
                 .map(String::as_str),
             Some("7")
         );
-        let payloads = vec!["payload".to_string()];
+        let payloads = [("payload".to_string(), "spi".to_string())];
         assert!(to_yaml(&simulator, &payloads).contains("future_thing"));
+
+        // And an entry the configuration has no payload of goes back out
+        // under the type it came with.
+        let written = to_yaml(&simulator, &[]);
+        assert!(
+            written.contains("  - type spi:\n      - payload: \"payload\"\n"),
+            "{written}"
+        );
+    }
+
+    /// The editor writes the one order a simulator file has, whatever order
+    /// it came to hold things in: types by name, a type's payloads by name,
+    /// and an entry's settings by name; and a file in the shape before
+    /// payloads were grouped by type is refused and left as it is.
+    #[test]
+    fn the_editor_writes_in_name_order_and_refuses_the_old_shape() {
+        let where_ = tempfile::tempdir().expect("a directory");
+        let path = where_.path().join("vehiclesim.yaml");
+        let mut simulator = Simulator::new(&path);
+        for name in ["b", "a", "c"] {
+            simulator.payloads.insert(
+                name.to_string(),
+                [("simulate", "true"), ("packet_interval", "1 s")]
+                    .into_iter()
+                    .map(|(k, v)| (k.to_string(), v.to_string()))
+                    .collect(),
+            );
+        }
+        let payloads = [
+            ("c".to_string(), "spi".to_string()),
+            ("b".to_string(), "network".to_string()),
+            ("a".to_string(), "spi".to_string()),
+        ];
+        let written = to_yaml(&simulator, &payloads);
+        let at = |what: &str| written.find(what).expect(what);
+        assert!(at("type network:") < at("type spi:"), "{written}");
+        assert!(at("payload: \"a\"") < at("payload: \"c\""), "{written}");
+        assert!(at("packet_interval:") < at("simulate:"), "{written}");
+        std::fs::write(&path, &written).expect("written");
+        tcslibgs::sim_config::SimConfigFile::load(&path)
+            .expect("the simulator reads it");
+
+        let old = "simulated_payloads:\n  - name: a\n    type: spi\n";
+        std::fs::write(&path, old).expect("written");
+        let Err(Trouble::Unusable(why)) = read(&path) else {
+            panic!("a file in the old shape was read");
+        };
+        assert!(why.contains("convert-format.py"), "{why}");
+        assert_eq!(std::fs::read_to_string(&path).expect("read"), old);
     }
 
     /// Every field a window offers is a setting, and the group is one of them

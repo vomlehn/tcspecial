@@ -45,7 +45,10 @@ published, so it is taken from a checkout of
 need are linked into `tcslibgs/_xtce`, and the XTCE documents it is taken
 over into `tcslibgs/xtce`, a link to the crate's `tcslibgs/xtce`: so there
 is one copy of each, and installing the package installs them, and an
-installed station needs nothing from the source tree. A beacon itself is
+installed station needs nothing from the source tree. In a git worktree of
+the tree, where `../tcs-xtce` beside the worktree is not there, the modules
+are taken from the tcs-xtce beside the main checkout instead, as the
+Makefiles take it (`beside.mk`). A beacon itself is
 plain text and needs nothing to read.
 
 `pyproject.toml` makes the three packages one distribution,

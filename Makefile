@@ -63,7 +63,7 @@ TCS_HELPERS_REQUIRED := 0.5.0
 # runtime python/tcslibgs/_xtce links to: a checkout of
 # https://github.com/vomlehn/tcs-xtce beside this one, always, since a link
 # cannot follow a variable. See the tcs-xtce target in tcslibgs/Makefile.
-TCS_XTCE := $(abspath $(CURDIR)/../tcs-xtce)
+TCS_XTCE := $(BESIDE)/tcs-xtce
 BINDIR = $(PREFIX)/bin
 SBINDIR = $(PREFIX)/sbin
 LIBEXECDIR = $(PREFIX)/libexec

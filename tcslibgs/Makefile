@@ -45,10 +45,12 @@ README.html: README.md
 # Python package, used from a checkout of
 # https://github.com/vomlehn/tcs-xtce beside this repository, at the release
 # the tcs-xtce crate is pinned to in Cargo.toml, as the code it writes calls
-# that crate: see the tcs-xtce target. Always ../tcs-xtce, because
-# python/tcslibgs/_xtce links to its Python runtime there, and a link
-# cannot follow a variable.
-TCS_XTCE := $(abspath $(CURDIR)/../../tcs-xtce)
+# that crate: see the tcs-xtce target. Always the one beside the main
+# checkout, from a worktree too (../beside.mk), because that is where
+# python/tcslibgs/_xtce finds its Python runtime, and a link cannot follow a
+# variable.
+include $(CURDIR)/../beside.mk
+TCS_XTCE := $(BESIDE)/tcs-xtce
 XTCE_PIN := $(shell sed -n 's/^tcs-xtce = "=\(.*\)"$$/\1/p' Cargo.toml)
 XTCE_COMPILE := cd $(TCS_XTCE)/python && python3 -m tcs_xtce
 XTCE_DIGEST := cd $(TCS_XTCE)/python && python3 -m tcs_xtce.digest_cli

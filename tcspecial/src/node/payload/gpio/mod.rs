@@ -36,6 +36,7 @@ use std::time::{Duration, Instant, SystemTime};
 use nix::poll::PollFlags;
 use tcslibgs::{
     node::payload::gpio::{Direction, EVENT_BYTES},
+    node::vehicle::compute::from_decision,
     Bias, GpioConfig, LineEdge, TcsError, TcsResult, Timestamp,
 };
 
@@ -526,7 +527,9 @@ fn ask_for_lines(
 /// element's decision looks like on a link, and what a ground station can
 /// send by hand. Anything else is refused rather than taken for one of them:
 /// the thing on the other end of this is a heater or a valve, and a datum
-/// that cannot be read is not guessed at.
+/// that cannot be read is not guessed at. What a decision is, is
+/// `tcslibgs::node::vehicle::compute::from_decision`, which the ground reads
+/// one by too.
 ///
 /// # Arguments
 ///
@@ -541,17 +544,7 @@ fn ask_for_lines(
 ///
 /// `TcsError::Endpoint` if `data` is not the text `1` or `0`.
 fn state_of(what: &str, data: &[u8]) -> TcsResult<bool> {
-    match std::str::from_utf8(data).map(str::trim) {
-        Ok("1") => Ok(true),
-        Ok("0") => Ok(false),
-        Ok(other) => Err(TcsError::Endpoint(format!(
-            "{what}: \"{other}\" is neither 1 nor 0, and these lines drive \
-             something: a value that cannot be read is not guessed at"
-        ))),
-        Err(_) => Err(TcsError::Endpoint(format!(
-            "{what}: what arrived is not text, so it is not 1 or 0"
-        ))),
-    }
+    from_decision(data, what).map_err(TcsError::Endpoint)
 }
 
 /// Builds what the kernel is asked for: every line of the request at the one

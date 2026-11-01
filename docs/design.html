@@ -1867,27 +1867,37 @@ configuration leaves a bridge built for this one with a vehicle it will not
 match, saying <tt class="docutils literal">ConfigurationDiffers</tt>: its model is this configuration's,
 and a bridge for the other is built from that one's.</p>
 <p>A source's channel is of the type the configuration says its data are, and
-the configuration says one thing of a datum's type: that a compute node whose
+the configuration says one thing of a datum's type: what a compute node
+sends, by its function, as
+<tt class="docutils literal"><span class="pre">tcslibgs::node::vehicle::compute::node_produces</span></tt> says. A node whose
 function makes a value -- <tt class="docutils literal">to_kelvin</tt>, <tt class="docutils literal">vote</tt>, <tt class="docutils literal">process</tt> -- sends
 values, four bytes of a signed count of micro-kelvin (see <a class="reference internal" href="#compute-elements">Compute
-elements</a>), by <tt class="docutils literal"><span class="pre">tcslibgs::node::vehicle::compute::node_sends_a_value</span></tt>,
-which tcsmoc asks too. Such a source's channel is an <tt class="docutils literal">F64</tt> of kelvin, read
-by tcslib-c's <tt class="docutils literal">tcs_value_kelvin</tt> -- <tt class="docutils literal">from_value</tt>, the one statement of
-what a value is -- and a datum from it that is not a value is written to no
-channel, counted in <tt class="docutils literal">DataNotValues</tt> and said in an event: four bytes made a
-number whatever they held would be a temperature nobody measured. Every other
-source's channel is <tt class="docutils literal">Tcs.Datum</tt>: its length, and its first 64 bytes. A
-longer one goes as its first 64 bytes with its whole length, is counted, and
-is said in an event, so that nothing is cut short quietly.</p>
-<p>Two types and no more, because those are what the configuration describes.
+elements</a>), which tcsmoc asks too. Such a source's channel is an <tt class="docutils literal">F64</tt> of
+kelvin, read by tcslib-c's <tt class="docutils literal">tcs_value_kelvin</tt> -- <tt class="docutils literal">from_value</tt>, the one
+statement of what a value is -- and a datum from it that is not a value is
+written to no channel, counted in <tt class="docutils literal">DataNotValues</tt> and said in an event:
+four bytes made a number whatever they held would be a temperature nobody
+measured. A <tt class="docutils literal">hysteresis</tt> node sends decisions, the text <tt class="docutils literal">1</tt> or <tt class="docutils literal">0</tt>, and
+its channel is a <tt class="docutils literal">bool</tt>, true for on, read by <tt class="docutils literal">tcs_decision_on</tt> --
+<tt class="docutils literal">from_decision</tt>, the one statement of what a decision is, by which a
+<tt class="docutils literal">gpio</tt> node aboard reads the state its lines are driven to -- and a datum
+from it that is not one is written to no channel, counted in
+<tt class="docutils literal">DataNotDecisions</tt> and said in an event. Every other source's channel is
+<tt class="docutils literal">Tcs.Datum</tt>: its length, and its first 64 bytes. A longer one goes as its
+first 64 bytes with its whole length, is counted, and is said in an event,
+so that nothing is cut short quietly.</p>
+<p>A thermostat sends only a change of decision to anything but the lines it
+drives (see <a class="reference internal" href="#compute-elements">Compute elements</a>), so a decision's channel says what was last
+decided while the bridge was matched: one made before, the first of a start
+among them, is not on it until the next change.</p>
+<p>Three types and no more, because those are what the configuration
+describes.
 A sensor's <tt class="docutils literal">format</tt> -- <tt class="docutils literal">i16_be</tt> and the rest -- is written on the
 <tt class="docutils literal">to_kelvin</tt> node that reads it, and says how that one reader takes the
 bytes, not what the sensor sends: a sensor read by two conversions, or by
 none, has two answers or none, and its counts are a number in nobody's unit
 until the conversion has made them a temperature, which is the conversion's
-own channel. A decision is the text <tt class="docutils literal">1</tt> or <tt class="docutils literal">0</tt>, which the flight
-software writes and the configuration says nothing of, and which the bytes
-show as they are. A type for either would be the model stating what the
+own channel. A type for a sensor's bytes would be the model stating what the
 configuration does not, and a second statement of what it does.</p>
 <p>What a beacon says is longer than a channel's text may be in F´, so it is an
 event, each time it changes.</p>
@@ -1914,7 +1924,8 @@ beacons are heard; a simulated reading arrives as the thermometer's channel,
 its two bytes, and the temperature made of it as <tt class="docutils literal">cabin_temp</tt>'s, a number
 of kelvin, with no datum refused as not a value; a PING is answered; a node is stopped and started again; <tt class="docutils literal">1</tt> sent up
 drives the heater, whose stand-in warms the thermal mass the thermometer
-reads, so that <tt class="docutils literal">cabin_temp</tt> climbs, and <tt class="docutils literal">0</tt> turns it off; a node the
+reads, so that <tt class="docutils literal">cabin_temp</tt> climbs and <tt class="docutils literal">heater_wanted</tt>'s decision channel
+goes false, with no datum refused as not a decision, and <tt class="docutils literal">0</tt> turns it off; a node the
 configuration lacks is refused unsent; a restart onto a configuration the
 vehicle does not hold is answered <tt class="docutils literal">NotFound</tt>; a plain restart is armed and
 taken, the beacons carry the restart flag, and the bridge is matched with the

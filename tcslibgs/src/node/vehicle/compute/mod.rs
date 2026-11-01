@@ -200,15 +200,24 @@ pub fn from_value(data: &[u8], what: &str) -> Result<f64, String> {
     Ok(f64::from(i32::from_be_bytes(bytes)) / MICRO_KELVIN)
 }
 
-/// Tells whether what this computation produces is a value.
+/// What a computation produces, as the ground reads it back.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Produces {
+    /// A value: four bytes of micro-kelvin, which [`from_value`] reads.
+    Value,
+    /// A decision: the text `1` or `0`, which [`from_decision`] reads.
+    Decision,
+}
+
+/// Tells what this computation produces.
 ///
-/// Three of the four are: a conversion makes one out of a part's counts, a
-/// vote makes one out of several, and a program's answer is read as one. A
-/// hysteresis is the exception -- what it produces is a decision, the text
-/// `1` or `0`, because what it drives is a set of discrete lines.
+/// Three of the four make a value: a conversion makes one out of a part's
+/// counts, a vote makes one out of several, and a program's answer is read as
+/// one. A hysteresis is the exception -- what it produces is a decision, the
+/// text `1` or `0`, because what it drives is a set of discrete lines.
 ///
 /// Asked by whoever has to read a datum back: the ground shows a reading as a
-/// temperature and a decision as what it is, and the only thing that can tell
+/// temperature and a decision as on or off, and the only thing that can tell
 /// them apart is the configuration. Not the width -- every four bytes are a
 /// value, so a decision of four characters would read as a temperature, which
 /// is the one guess this exists to avoid.
@@ -219,25 +228,65 @@ pub fn from_value(data: &[u8], what: &str) -> Result<f64, String> {
 ///
 /// # Returns
 ///
-/// `true` for `to_kelvin`, `vote` and `process`; `false` for `hysteresis`
-/// and for a name that is not a computation.
-pub fn result_is_a_value(function: &str) -> bool {
+/// [`Produces::Value`] for `to_kelvin`, `vote` and `process`,
+/// [`Produces::Decision`] for `hysteresis`, and `None` for a name that is not
+/// a computation.
+pub fn produces(function: &str) -> Option<Produces> {
     match function {
-        "to_kelvin" | "vote" | "process" => true,
-        "hysteresis" => false,
-        // Not a computation at all. Said as "no" rather than refused: this
+        "to_kelvin" | "vote" | "process" => Some(Produces::Value),
+        "hysteresis" => Some(Produces::Decision),
+        // Not a computation at all. Said as nothing rather than refused: this
         // answers how to show a datum, and a node nobody can name does not
-        // have its data read as a temperature on the strength of a typo.
-        _ => false,
+        // have its data read as a temperature or a decision on the strength
+        // of a typo.
+        _ => None,
     }
 }
 
-/// Tells whether what this node sends is a value.
+/// Tells whether what this computation produces is a value: see
+/// [`produces`].
 ///
-/// Only a computation makes one, and only three of the four: see
-/// [`result_is_a_value`]. Everything else sends what it was given or what its
-/// part produced -- a sensor's own bytes, a log record, whatever a program
-/// wrote -- and none of that is a number in this form.
+/// # Arguments
+///
+/// * `function` - The computation's `function`.
+///
+/// # Returns
+///
+/// `true` for `to_kelvin`, `vote` and `process`; `false` for `hysteresis`
+/// and for a name that is not a computation.
+pub fn result_is_a_value(function: &str) -> bool {
+    produces(function) == Some(Produces::Value)
+}
+
+/// Tells what a node sends, where it is a value or a decision.
+///
+/// Only a computation makes either: see [`produces`]. Everything else sends
+/// what it was given or what its part produced -- a sensor's own bytes, a log
+/// record, whatever a program wrote -- and none of that is a number in this
+/// form or a decision.
+///
+/// # Arguments
+///
+/// * `node_type`  - The node's type.
+/// * `attributes` - The node's attributes, which name its function.
+///
+/// # Returns
+///
+/// What a compute node's function produces, and `None` for every other
+/// node.
+pub fn node_produces(
+    node_type: &str,
+    attributes: &BTreeMap<String, Scalar>,
+) -> Option<Produces> {
+    if node_type != "compute" {
+        return None;
+    }
+    attributes
+        .get("function")
+        .and_then(|function| produces(function.as_str()))
+}
+
+/// Tells whether what this node sends is a value: see [`node_produces`].
 ///
 /// # Arguments
 ///
@@ -251,10 +300,72 @@ pub fn node_sends_a_value(
     node_type: &str,
     attributes: &BTreeMap<String, Scalar>,
 ) -> bool {
-    node_type == "compute"
-        && attributes
-            .get("function")
-            .is_some_and(|function| result_is_a_value(function.as_str()))
+    node_produces(node_type, attributes) == Some(Produces::Value)
+}
+
+/// Tells whether what this node sends is a decision: see
+/// [`node_produces`].
+///
+/// # Arguments
+///
+/// * `node_type`  - The node's type.
+/// * `attributes` - The node's attributes, which name its function.
+///
+/// # Returns
+///
+/// `true` for a compute node whose function makes a decision.
+pub fn node_sends_a_decision(
+    node_type: &str,
+    attributes: &BTreeMap<String, Scalar>,
+) -> bool {
+    node_produces(node_type, attributes) == Some(Produces::Decision)
+}
+
+/// A decision to assert, as it travels: the one byte `1`.
+///
+/// Text, like every other datum a person may read on a link or in a log, so
+/// a telemetry log shows the decision rather than a byte; and `1` and `0`
+/// because that is the value a set of discrete lines is driven to.
+pub const DECISION_ON: u8 = b'1';
+
+/// A decision to unassert, as it travels: the one byte `0`.
+pub const DECISION_OFF: u8 = b'0';
+
+/// Reads a decision: the text `1` or `0`.
+///
+/// White space either side is allowed, because a decision may come from a
+/// program that writes lines as well as from a thermostat; anything else is
+/// refused, because what reads a decision drives something with it, and a
+/// decision that cannot be read is not guessed at.
+///
+/// The one statement of what a decision is, read by the lines that a
+/// decision drives aboard and by the ground that shows one.
+///
+/// # Arguments
+///
+/// * `data` - The decision's bytes as they arrived.
+/// * `what` - Who is reading it, for the message.
+///
+/// # Returns
+///
+/// True to assert, false to unassert.
+///
+/// # Errors
+///
+/// A message when `data` is not `1` or `0`.
+pub fn from_decision(data: &[u8], what: &str) -> Result<bool, String> {
+    match std::str::from_utf8(data).map(str::trim) {
+        Ok(text) if text.as_bytes() == [DECISION_ON] => Ok(true),
+        Ok(text) if text.as_bytes() == [DECISION_OFF] => Ok(false),
+        Ok(other) => Err(format!(
+            "{what}: {other:?} is neither 1 nor 0, which is what a \
+             decision is, and one that cannot be read is not guessed at"
+        )),
+        Err(_) => Err(format!(
+            "{what}: what arrived is not text, so it is not the decision 1 \
+             or 0"
+        )),
+    }
 }
 
 /// A value as a program reads and writes one: decimal text.
@@ -928,6 +1039,8 @@ mod tests {
             "a decision is not a value"
         );
         assert!(!result_is_a_value("to_kelvan"), "nor is a misspelling");
+        assert_eq!(produces("hysteresis"), Some(Produces::Decision));
+        assert_eq!(produces("to_kelvan"), None);
 
         let node = |pairs: &[(&str, &str)]| attributes(pairs);
         assert!(node_sends_a_value(
@@ -941,6 +1054,15 @@ mod tests {
         // A compute node with no function is a node that will be refused;
         // until then it does not have its data read as a temperature.
         assert!(!node_sends_a_value("compute", &node(&[])));
+        assert!(node_sends_a_decision(
+            "compute",
+            &node(&[("function", "hysteresis")])
+        ));
+        assert!(!node_sends_a_decision(
+            "compute",
+            &node(&[("function", "vote")])
+        ));
+        assert!(!node_sends_a_decision("compute", &node(&[])));
         // And nothing else makes one, whatever it says.
         for node_type in
             ["i2c", "gpio", "network", "log", "gateway_radio", "app_pl"]
@@ -949,7 +1071,32 @@ mod tests {
                 !node_sends_a_value(node_type, &node(&[("function", "vote")])),
                 "{node_type}"
             );
+            assert!(
+                !node_sends_a_decision(
+                    node_type,
+                    &node(&[("function", "hysteresis")])
+                ),
+                "{node_type}"
+            );
         }
+    }
+
+    /// A decision is 1 or 0, with white space either side, and nothing
+    /// else: not a value, not a word, not bytes that are not text.
+    #[test]
+    fn a_decision_is_1_or_0() {
+        assert_eq!(from_decision(b"1", "x"), Ok(true));
+        assert_eq!(from_decision(b"0", "x"), Ok(false));
+        assert_eq!(from_decision(b" 1\n", "x"), Ok(true));
+        assert_eq!(from_decision(&[DECISION_OFF], "x"), Ok(false));
+        for bad in [&b""[..], b"2", b"10", b"on", b"\x00\x00\x00\x01"] {
+            let why = from_decision(bad, "heater_wanted")
+                .expect_err("not a decision");
+            assert!(why.contains("heater_wanted"), "{why}");
+            assert!(why.contains("neither 1 nor 0"), "{why}");
+        }
+        let why = from_decision(&[0xff], "x").expect_err("not text");
+        assert!(why.contains("not text"), "{why}");
     }
 
     /// A program's pipe carries a decimal, and it round-trips.

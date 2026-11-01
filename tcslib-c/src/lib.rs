@@ -52,7 +52,9 @@ use tcslib::{command_links_of, CommandStatus, TcsClient};
 use tcslibgs::config_digest::{digest_of_graph, ConfigDigest};
 use tcslibgs::graph::parameters::beacon_interval_of;
 use tcslibgs::graph::{telemetry, Graph};
-use tcslibgs::node::vehicle::compute::{from_value, node_sends_a_value};
+use tcslibgs::node::vehicle::compute::{
+    from_decision, from_value, node_sends_a_decision, node_sends_a_value,
+};
 use tcslibgs::{ArmKey, DHSample, NodeId, DH_SAMPLE_BYTES};
 
 /// The size of the buffer `tcs_last_error` returns, its NUL included:
@@ -1135,6 +1137,82 @@ pub unsafe extern "C" fn tcs_value_kelvin(
     })
 }
 
+/// Says whether what a node sends is a decision: the text `1` or `0`, which
+/// [`tcs_decision_on`] reads. The configuration's answer,
+/// `tcslibgs::node::vehicle::compute::node_sends_a_decision`.
+///
+/// # Arguments
+///
+/// * `configuration` - The configuration.
+/// * `node`          - The node's name.
+/// * `decisions`     - Where 1 is written when it sends decisions, 0 when
+///                     not.
+///
+/// # Returns
+///
+/// 0, or -1 where there is no such node or an argument is NULL.
+///
+/// # Safety
+///
+/// As [`tcs_configuration_sends_values`].
+#[no_mangle]
+pub unsafe extern "C" fn tcs_configuration_sends_decisions(
+    configuration: *const tcs_configuration,
+    node: *const c_char,
+    decisions: *mut c_int,
+) -> c_int {
+    guard(-1, || {
+        let configuration = handle_of(configuration, "the configuration")?;
+        let name = text_of(node, "the node's name")?;
+        let out = out_of(decisions, "decisions")?;
+        let node = configuration.graph.node(name).ok_or_else(|| {
+            fail(format_args!(
+                "{}: there is no node called \"{name}\"",
+                configuration.path.display()
+            ))
+        })?;
+        *out = c_int::from(node_sends_a_decision(
+            &node.node_type,
+            &node.attributes,
+        ));
+        Ok(0)
+    })
+}
+
+/// Reads a decision -- the text `1` or `0` -- as on or off, by
+/// `tcslibgs::node::vehicle::compute::from_decision`, the one statement of
+/// what a decision is.
+///
+/// # Arguments
+///
+/// * `data`   - The datum's bytes.
+/// * `length` - How many bytes `data` holds.
+/// * `on`     - Where 1 is written for on, 0 for off.
+///
+/// # Returns
+///
+/// 0, or -1 where the datum is not a decision or an argument is NULL.
+///
+/// # Safety
+///
+/// `data` NULL with `length` 0, or `length` readable bytes; `on` NULL or
+/// writable.
+#[no_mangle]
+pub unsafe extern "C" fn tcs_decision_on(
+    data: *const u8,
+    length: usize,
+    on: *mut c_int,
+) -> c_int {
+    guard(-1, || {
+        let out = out_of(on, "on")?;
+        let data = bytes_of(data, length)?;
+        // Allocates, in tcslibgs, only where what arrived is not a decision,
+        // to say why. Copied here into a fixed buffer.
+        *out = c_int::from(from_decision(data, "the datum").map_err(fail)?);
+        Ok(0)
+    })
+}
+
 /// Reads bytes from C.
 ///
 /// # Arguments
@@ -2106,6 +2184,33 @@ mod tests {
         assert!(why.to_string_lossy().contains("micro-kelvin"), "{why:?}");
     }
 
+    /// A decision from C reads as the vehicle writes one, and anything else
+    /// is refused, saying what a decision is.
+    #[test]
+    fn a_decision_reads_as_the_vehicle_writes_it() {
+        use super::*;
+
+        let mut on = -1;
+        for (written, said) in [(&b"1"[..], 1), (b"0", 0)] {
+            // SAFETY: readable bytes, and a writable int.
+            let read = unsafe {
+                tcs_decision_on(written.as_ptr(), written.len(), &mut on)
+            };
+            assert_eq!((read, on), (0, said), "{written:?}");
+        }
+
+        let value = tcslibgs::node::vehicle::compute::value_bytes(293.15)
+            .expect("a value");
+        // SAFETY: four readable bytes, and a writable int.
+        let read =
+            unsafe { tcs_decision_on(value.as_ptr(), value.len(), &mut on) };
+        assert_eq!(read, -1);
+        // SAFETY: this thread's error buffer, which `Text` keeps terminated
+        // and which lives as long as the thread.
+        let why = unsafe { CStr::from_ptr(tcs_last_error()) };
+        assert!(why.to_string_lossy().contains("neither 1 nor 0"), "{why:?}");
+    }
+
     /// Which nodes send values is the configuration's: in the thermostat
     /// example, a conversion and the vote do, the hysteresis and a sensor
     /// do not, and a node it lacks is refused.
@@ -2149,6 +2254,40 @@ mod tests {
             )
         };
         assert_eq!(said, -1);
+        // SAFETY: made by tcs_configuration_open and not yet closed.
+        unsafe { tcs_configuration_close(configuration) };
+    }
+
+    /// Which nodes send decisions is the configuration's too: in the
+    /// thermostat example, the hysteresis does, and a conversion and a
+    /// sensor do not.
+    #[test]
+    fn a_node_sends_decisions_as_the_configuration_says() {
+        use super::*;
+
+        let path = CString::new(concat!(
+            env!("CARGO_MANIFEST_DIR"),
+            "/../examples/thermostat/thermostat.ytcs"
+        ))
+        .expect("a path");
+        // SAFETY: a NUL-terminated path that outlives the call.
+        let configuration = unsafe { tcs_configuration_open(path.as_ptr()) };
+        assert!(!configuration.is_null(), "the example opens");
+        for (node, sends) in
+            [(c"thermostat", 1), (c"cabin_temp", 0), (c"temp_1", 0)]
+        {
+            let mut decisions = -1;
+            // SAFETY: a live configuration, a NUL-terminated name and a
+            // writable int.
+            let said = unsafe {
+                tcs_configuration_sends_decisions(
+                    configuration,
+                    node.as_ptr(),
+                    &mut decisions,
+                )
+            };
+            assert_eq!((said, decisions), (0, sends), "{node:?}");
+        }
         // SAFETY: made by tcs_configuration_open and not yet closed.
         unsafe { tcs_configuration_close(configuration) };
     }

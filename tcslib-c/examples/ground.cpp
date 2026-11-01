@@ -277,16 +277,24 @@ int main(int argc, char **argv)
 			    outcome(status).c_str(), *reason ? " -- " : "",
 			    reason);
 
-		// Whether its data is a value, a temperature, which the
-		// configuration says and its width cannot.
-		int values = 0;
+		// Whether its data is a value, a temperature, or a decision,
+		// on or off, which the configuration says and its width
+		// cannot.
+		int values = 0, decisions = 0;
 		if (tcs_configuration_sends_values(configuration.get(),
 						   node_name.c_str(),
 						   &values) != 0) {
 			return fail("values");
 		}
+		if (tcs_configuration_sends_decisions(configuration.get(),
+						      node_name.c_str(),
+						      &decisions) != 0) {
+			return fail("decisions");
+		}
 		std::printf("%s sends values: %s\n", node_name.c_str(),
 			    values ? "yes" : "no");
+		std::printf("%s sends decisions: %s\n", node_name.c_str(),
+			    decisions ? "yes" : "no");
 
 		tcs_sample taken{}, given{};
 		if (tcs_client_query_node_sample(client.get(), node, &status,
@@ -362,7 +370,7 @@ int main(int argc, char **argv)
 				    exchange.up + exchange.down ==
 				    exchange.round_trip ? "yes" : "no");
 		} else {
-			int values = 0;
+			int values = 0, decisions = 0, on = 0;
 			double kelvin = 0.0;
 			data_seen = true;
 			if (tcs_configuration_sends_values(configuration.get(),
@@ -373,6 +381,14 @@ int main(int argc, char **argv)
 						       &kelvin) == 0) {
 				std::printf("data from %s: %.6f K\n",
 					    datum.source, kelvin);
+			} else if (tcs_configuration_sends_decisions(
+					   configuration.get(), datum.source,
+					   &decisions) == 0 &&
+				   decisions &&
+				   tcs_decision_on(datum.data, datum.length,
+						   &on) == 0) {
+				std::printf("data from %s: %s\n",
+					    datum.source, on ? "on" : "off");
 			} else {
 				std::printf("data from %s: %s\n",
 					    datum.source, said.c_str());

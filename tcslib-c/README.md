@@ -52,6 +52,9 @@ peer (see "A vehicle on a cFS software bus" in
   -- four bytes of micro-kelvin, which a conversion, a vote or a program's
   answer makes -- as the configuration says, a datum's width being no
   guide, and `tcs_value_kelvin` reads one as a temperature.
+  `tcs_configuration_sends_decisions` says whether they are *decisions* --
+  the text `1` or `0`, which a thermostat makes -- and `tcs_decision_on`
+  reads one as on or off.
 - **Data up.** `tcs_uplink_open` opens the way up to a gateway node that
   binds an address and port aboard, and each `tcs_uplink_send` sends one
   datum there, which leaves the node by its `gateway-out` links for the

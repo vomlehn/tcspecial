@@ -1,6 +1,6 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="900" height="540" viewBox="0 0 900 540" role="img" aria-labelledby="title desc">
+<svg xmlns="http://www.w3.org/2000/svg" width="900" height="655" viewBox="0 0 900 655" role="img" aria-labelledby="title desc">
   <title id="title">The fprime example</title>
-  <desc id="desc">The vehicle answers to an F´ flight computer rather than to the ground. The thermometer's readings go by its payload-out links to fsw, a gateway_fprime node, and to cabin_temp, a to_kelvin compute node that makes each reading a temperature and sends it on to fsw too. fsw sends each to the F´ deployment's TcsBridge component at its bridge_base, 9700, plus the sender's device id: the thermometer's, 2, at 127.0.0.1:9702, and cabin_temp's, 3, at 127.0.0.1:9703. The bridge gives each the F´ ID fprime_id_base, 0x3000, plus the same id: the thermometer's bytes are channel 0x3002, and cabin_temp's temperature, in kelvin, channel 0x3003. A command from the bridge, 1 or 0, goes up to fsw, which tcspecial binds at 127.0.0.1:9600, and leaves it by its gateway-out link for the heater.</desc>
+  <desc id="desc">The vehicle answers to an F´ flight computer rather than to the ground. The thermometer's readings go by its payload-out links to fsw, a gateway_fprime node, and to cabin_temp, a to_kelvin compute node that makes each reading a temperature and sends it on to fsw too, and to heater_wanted, a hysteresis compute node that decides whether the heater is wanted, on below 283.65 K and off above 284.65 K, and sends each change of decision to fsw. fsw sends each to the F´ deployment's TcsBridge component at its bridge_base, 9700, plus the sender's device id: the thermometer's, 2, at 127.0.0.1:9702, cabin_temp's, 3, at 127.0.0.1:9703, and heater_wanted's, 4, at 127.0.0.1:9704. The bridge gives each the F´ ID fprime_id_base, 0x3000, plus the same id: the thermometer's bytes are channel 0x3002, cabin_temp's temperature, in kelvin, channel 0x3003, and heater_wanted's decision, true for on, channel 0x3004. heater_wanted is advice and drives nothing. A command from the bridge, 1 or 0, goes up to fsw, which tcspecial binds at 127.0.0.1:9600, and leaves it by its gateway-out link for the heater.</desc>
   <defs>
     <style>
       text { font-family: "DejaVu Sans", Helvetica, Arial, sans-serif; fill: #111827; }
@@ -25,13 +25,13 @@
     </marker>
   </defs>
 
-  <rect width="900" height="540" fill="#ffffff"/>
+  <rect width="900" height="655" fill="#ffffff"/>
 
   <!-- Column headings -->
   <text class="heading" x="45" y="44">TCSPECIAL (PAYLOAD PROCESSOR)</text>
   <text class="heading" x="640" y="44">F´ FLIGHT COMPUTER</text>
 
-  <rect class="boundary" x="30" y="58" width="560" height="352" rx="14"/>
+  <rect class="boundary" x="30" y="58" width="560" height="467" rx="14"/>
 
   <!-- The heater, driven -->
   <rect class="socket" x="55" y="80" width="200" height="80" rx="10"/>
@@ -51,6 +51,12 @@
   <text class="kind" x="71" y="363">compute, to_kelvin, id 3</text>
   <text class="detail" x="71" y="382">i16_be counts to kelvin</text>
 
+  <!-- The thermostat, whose decisions are advice and drive nothing -->
+  <rect class="compute" x="55" y="430" width="200" height="80" rx="10"/>
+  <text class="name" x="71" y="457">heater_wanted</text>
+  <text class="kind" x="71" y="478">compute, hysteresis, id 4</text>
+  <text class="detail" x="71" y="497">on 283.65, off 284.65 K</text>
+
   <!-- The gateway node, the bridge's end of the link both ways -->
   <rect class="socket" x="340" y="110" width="220" height="190" rx="10"/>
   <text class="name" x="356" y="137">fsw</text>
@@ -62,15 +68,17 @@
   <text class="detail" x="356" y="248">  0x3000</text>
 
   <!-- The F´ deployment's bridge component -->
-  <rect class="ground" x="640" y="110" width="235" height="190" rx="10"/>
+  <rect class="ground" x="640" y="110" width="235" height="235" rx="10"/>
   <text class="name" x="656" y="137">TcsBridge</text>
   <text class="kind" x="656" y="158">F´ component, on tcslib-c</text>
   <text class="detail" x="656" y="182">channel 0x3002:</text>
   <text class="detail" x="656" y="198">  thermometer, bytes</text>
   <text class="detail" x="656" y="218">channel 0x3003:</text>
   <text class="detail" x="656" y="234">  cabin_temp, kelvin</text>
-  <text class="note" x="656" y="266">to the ground by</text>
-  <text class="note" x="656" y="282">the deployment's own link</text>
+  <text class="detail" x="656" y="254">channel 0x3004:</text>
+  <text class="detail" x="656" y="270">  heater_wanted, bool</text>
+  <text class="note" x="656" y="310">to the ground by</text>
+  <text class="note" x="656" y="326">the deployment's own link</text>
 
   <!-- Up: a command from the bridge, to fsw and on to the heater -->
   <path class="up" d="M636,140 L564,140" marker-end="url(#arrow-amber)"/>
@@ -86,23 +94,32 @@
   <text class="label" x="163" y="301">payload-out</text>
   <path class="down" d="M255,355 L380,355 L380,304" marker-end="url(#arrow-blue)"/>
   <text class="label" x="262" y="347">payload-out</text>
-  <path class="down" d="M560,200 L636,200" marker-end="url(#arrow-blue)"/>
-  <text class="label" x="566" y="192">reading</text>
-  <text class="detail" x="566" y="216">:9702</text>
-  <path class="down" d="M560,250 L636,250" marker-end="url(#arrow-blue)"/>
-  <text class="label" x="566" y="242">kelvin</text>
-  <text class="detail" x="566" y="266">:9703</text>
+  <path class="down" d="M560,195 L636,195" marker-end="url(#arrow-blue)"/>
+  <text class="label" x="566" y="187">reading</text>
+  <text class="detail" x="566" y="209">:9702</text>
+  <path class="down" d="M560,240 L636,240" marker-end="url(#arrow-blue)"/>
+  <text class="label" x="566" y="232">kelvin</text>
+  <text class="detail" x="566" y="254">:9703</text>
+  <path class="down" d="M560,285 L636,285" marker-end="url(#arrow-blue)"/>
+  <text class="label" x="566" y="277">on/off</text>
+  <text class="detail" x="566" y="301">:9704</text>
+
+  <!-- Down: the temperature to heater_wanted, and its decisions to fsw -->
+  <path class="down" d="M155,395 L155,426" marker-end="url(#arrow-blue)"/>
+  <text class="label" x="163" y="416">payload-out</text>
+  <path class="down" d="M255,470 L470,470 L470,304" marker-end="url(#arrow-blue)"/>
+  <text class="label" x="262" y="462">payload-out</text>
 
   <!-- Legend -->
-  <line x1="45" y1="435" x2="860" y2="435" stroke="#e5e7eb" stroke-width="1"/>
-  <path class="up" d="M45,467 L95,467" marker-end="url(#arrow-amber)"/>
-  <text class="label" x="105" y="471">command, from the flight computer</text>
-  <path class="down" d="M370,467 L420,467" marker-end="url(#arrow-blue)"/>
-  <text class="label" x="430" y="471">reading, to the flight computer</text>
-  <rect class="socket" x="45" y="491" width="22" height="16" rx="4"/>
-  <text class="label" x="75" y="504">opened by tcspecial</text>
-  <rect class="compute" x="260" y="491" width="22" height="16" rx="4"/>
-  <text class="label" x="290" y="504">computed aboard</text>
-  <rect class="ground" x="450" y="491" width="22" height="16" rx="4"/>
-  <text class="label" x="480" y="504">the F´ deployment</text>
+  <line x1="45" y1="550" x2="860" y2="550" stroke="#e5e7eb" stroke-width="1"/>
+  <path class="up" d="M45,582 L95,582" marker-end="url(#arrow-amber)"/>
+  <text class="label" x="105" y="586">command, from the flight computer</text>
+  <path class="down" d="M370,582 L420,582" marker-end="url(#arrow-blue)"/>
+  <text class="label" x="430" y="586">reading, to the flight computer</text>
+  <rect class="socket" x="45" y="606" width="22" height="16" rx="4"/>
+  <text class="label" x="75" y="619">opened by tcspecial</text>
+  <rect class="compute" x="260" y="606" width="22" height="16" rx="4"/>
+  <text class="label" x="290" y="619">computed aboard</text>
+  <rect class="ground" x="450" y="606" width="22" height="16" rx="4"/>
+  <text class="label" x="480" y="619">the F´ deployment</text>
 </svg>

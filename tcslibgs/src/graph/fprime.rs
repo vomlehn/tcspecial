@@ -34,7 +34,7 @@ use std::fmt::Write as _;
 use super::telemetry::{self, Via};
 use super::Graph;
 use crate::gateway::GatewayKind;
-use crate::node::vehicle::compute::node_sends_a_value;
+use crate::node::vehicle::compute::{node_produces, Produces};
 
 /// One of the bridge's own channels: not a source's, and the same in every
 /// model.
@@ -109,20 +109,27 @@ pub const OWN_CHANNELS: &[Own] = &[
         about: "Data from a node that sends values that were not one, and \
                 went to no channel",
     },
+    Own {
+        name: "DataNotDecisions",
+        fpp_type: "U32",
+        about: "Data from a node that sends decisions that were not one, \
+                and went to no channel",
+    },
 ];
 
 /// What a source's channel holds: what the configuration says the source's
 /// data are.
 ///
 /// It says one thing of a datum's type, and only of some nodes: a compute
-/// node whose function makes a value says, by that function, that what it
-/// sends is a value -- four bytes of a signed count of micro-kelvin, see
-/// [`crate::node::vehicle::compute::from_value`] -- which is a temperature.
-/// Of every other node it says nothing. A sensor's `format` is written on
-/// the conversion that reads it, not on the sensor, and says how that one
-/// reader takes the bytes; a decision is the flight software's own text. So
-/// a value's channel is a temperature, and every other channel is the bytes
-/// as they came.
+/// node says, by its function, what it sends. A value -- four bytes of a
+/// signed count of micro-kelvin, see
+/// [`crate::node::vehicle::compute::from_value`] -- is a temperature; a
+/// decision -- the text `1` or `0`, see
+/// [`crate::node::vehicle::compute::from_decision`] -- is on or off. Of every
+/// other node it says nothing. A sensor's `format` is written on the
+/// conversion that reads it, not on the sensor, and says how that one reader
+/// takes the bytes. So a value's channel is a temperature, a decision's is a
+/// `bool`, and every other channel is the bytes as they came.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Form {
     /// The bytes, as a `Datum`: the length and the first of them.
@@ -130,6 +137,9 @@ pub enum Form {
     /// A value, as an `F64` of kelvin, which tcslib-c's `tcs_value_kelvin`
     /// reads.
     Kelvin,
+    /// A decision, as a `bool`, true for on, which tcslib-c's
+    /// `tcs_decision_on` reads.
+    Decision,
 }
 
 impl Form {
@@ -142,16 +152,17 @@ impl Form {
     ///
     /// # Returns
     ///
-    /// [`Form::Kelvin`] for a node that sends values, as
-    /// [`node_sends_a_value`] says, and [`Form::Datum`] for every other.
+    /// [`Form::Kelvin`] for a node that sends values and [`Form::Decision`]
+    /// for one that sends decisions, as [`node_produces`] says, and
+    /// [`Form::Datum`] for every other.
     pub fn of(graph: &Graph, source: &str) -> Form {
-        match graph.node(source) {
-            Some(node)
-                if node_sends_a_value(&node.node_type, &node.attributes) =>
-            {
-                Form::Kelvin
-            }
-            _ => Form::Datum,
+        let produces = graph
+            .node(source)
+            .and_then(|node| node_produces(&node.node_type, &node.attributes));
+        match produces {
+            Some(Produces::Value) => Form::Kelvin,
+            Some(Produces::Decision) => Form::Decision,
+            None => Form::Datum,
         }
     }
 
@@ -159,11 +170,12 @@ impl Form {
     ///
     /// # Returns
     ///
-    /// `Datum`, the component's own struct, or `F64`.
+    /// `Datum`, the component's own struct, `F64` or `bool`.
     pub fn fpp_type(self) -> &'static str {
         match self {
             Form::Datum => "Datum",
             Form::Kelvin => "F64",
+            Form::Decision => "bool",
         }
     }
 
@@ -172,6 +184,7 @@ impl Form {
         match self {
             Form::Datum => "its bytes",
             Form::Kelvin => "a value, as a temperature in kelvin",
+            Form::Decision => "a decision, true for on",
         }
     }
 }
@@ -576,8 +589,8 @@ impl Model {
     /// that differ from one configuration to another, which say which
     /// channel a source's datum is written to, as what, and which device id
     /// a node's name is. A datum is made into a channel's type by the
-    /// component's own `asDatum` and `asKelvin`, which are the same in every
-    /// model; the model says only which.
+    /// component's own `asDatum`, `asKelvin` and `asDecision`, which are the
+    /// same in every model; the model says only which.
     ///
     /// # Arguments
     ///
@@ -613,6 +626,13 @@ impl Model {
                     "\t\tF64 kelvin = 0.0;\n\t\t\
                      if (this->asKelvin(datum, kelvin)) {{\n\t\t\t\
                      this->tlmWrite_{}(kelvin);\n\t\t}}",
+                    channel.name
+                ),
+                Form::Decision => writeln!(
+                    out,
+                    "\t\tbool on = false;\n\t\t\
+                     if (this->asDecision(datum, on)) {{\n\t\t\t\
+                     this->tlmWrite_{}(on);\n\t\t}}",
                     channel.name
                 ),
             };
@@ -737,8 +757,9 @@ mod tests {
 
     /// The thermometer, device id 2, is the channel 0x3002, named after it
     /// and holding its bytes; cabin_temp, device id 3, a conversion, is
-    /// 0x3003 and holds a temperature; and the bridge's own follow the last
-    /// device id.
+    /// 0x3003 and holds a temperature; heater_wanted, device id 4, a
+    /// thermostat, is 0x3004 and holds a decision; and the bridge's own
+    /// follow the last device id.
     #[test]
     fn a_source_is_its_device_id_past_the_base() {
         let model = of(&example(), "fsw").expect("a model");
@@ -765,16 +786,33 @@ mod tests {
                     },
                     form: Form::Kelvin,
                 },
+                Source {
+                    channel: Channel {
+                        name: "heater_wanted".to_string(),
+                        local: 4,
+                        id: 0x3004,
+                    },
+                    form: Form::Decision,
+                },
             ]
         );
         assert_eq!(model.own.len(), OWN_CHANNELS.len());
-        assert_eq!(model.own[0].local, 4);
-        assert_eq!(model.own[0].id, 0x3004);
-        assert_eq!(model.last_id(), 0x3003 + OWN_CHANNELS.len() as u32);
+        assert_eq!(model.own[0].local, 5);
+        assert_eq!(model.own[0].id, 0x3005);
+        assert_eq!(model.last_id(), 0x3004 + OWN_CHANNELS.len() as u32);
         let names: Vec<_> =
             model.nodes.iter().map(|n| n.name.as_str()).collect();
-        assert_eq!(names, ["fsw", "heater", "thermometer", "cabin_temp"]);
-        assert_eq!(model.node_name_bytes(), "thermometer".len());
+        assert_eq!(
+            names,
+            [
+                "fsw",
+                "heater",
+                "thermometer",
+                "cabin_temp",
+                "heater_wanted"
+            ]
+        );
+        assert_eq!(model.node_name_bytes(), "heater_wanted".len());
     }
 
     /// The device id is the one the vehicle counts ports by: the channel
@@ -805,12 +843,14 @@ mod tests {
             "constant CONFIGURATION_DIGEST = \"0123\"",
             "constant GATEWAY_NODE = \"fsw\"",
             "constant ID_BASE = 0x3000",
-            "constant NODE_NAME_BYTES = 11",
+            "constant NODE_NAME_BYTES = 13",
             "telemetry $thermometer: Datum id 2",
             "telemetry $cabin_temp: F64 id 3",
-            "telemetry $BeaconStage: Stage id 4",
-            "telemetry $DataCutShort: U32 id 12",
-            "telemetry $DataNotValues: U32 id 13",
+            "telemetry $heater_wanted: bool id 4",
+            "telemetry $BeaconStage: Stage id 5",
+            "telemetry $DataCutShort: U32 id 13",
+            "telemetry $DataNotValues: U32 id 14",
+            "telemetry $DataNotDecisions: U32 id 15",
         ] {
             assert!(fpp.contains(said), "{said} in:\n{fpp}");
         }
@@ -829,6 +869,13 @@ mod tests {
             cpp.contains(
                 "if (this->asKelvin(datum, kelvin)) {\n\t\t\t\
                  this->tlmWrite_cabin_temp(kelvin);"
+            ),
+            "{cpp}"
+        );
+        assert!(
+            cpp.contains(
+                "if (this->asDecision(datum, on)) {\n\t\t\t\
+                 this->tlmWrite_heater_wanted(on);"
             ),
             "{cpp}"
         );
@@ -922,8 +969,9 @@ mod tests {
     }
 
     /// A value is a temperature by what the configuration says of the node
-    /// that sends it -- a conversion, a vote -- and nothing else is: a
-    /// decision, a sensor, a node the configuration lacks.
+    /// that sends it -- a conversion, a vote -- and a decision is on or off
+    /// by the same, a thermostat; nothing else is either: a sensor, a node
+    /// the configuration lacks.
     #[test]
     fn only_a_node_that_sends_values_has_a_temperature() {
         let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("..");
@@ -932,11 +980,12 @@ mod tests {
                 .expect("the example reads");
         assert_eq!(Form::of(&thermostat, "k_1"), Form::Kelvin);
         assert_eq!(Form::of(&thermostat, "cabin_temp"), Form::Kelvin);
-        assert_eq!(Form::of(&thermostat, "thermostat"), Form::Datum);
+        assert_eq!(Form::of(&thermostat, "thermostat"), Form::Decision);
         assert_eq!(Form::of(&thermostat, "temp_1"), Form::Datum);
         assert_eq!(Form::of(&thermostat, "nobody"), Form::Datum);
         assert_eq!(Form::Kelvin.fpp_type(), "F64");
         assert_eq!(Form::Datum.fpp_type(), "Datum");
+        assert_eq!(Form::Decision.fpp_type(), "bool");
     }
 
     /// A C++ literal escapes what would end it or be read as something else.

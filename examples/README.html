@@ -291,6 +291,14 @@ again in Python under <code>python/</code>, and tests that hold them to
 the Rust.</td>
 </tr>
 <tr>
+<td><code>ping-yamcs</code></td>
+<td>The ping example with Yamcs as the ground station: a
+<code>gateway_yamcs</code> gateway puts a CCSDS primary header on every
+packet to and from the ground, the beacon included, and
+<code>ping_yamcs.py</code> runs Yamcs on tcspecial’s own XTCE and pings
+through it. Needs a Yamcs release unpacked somewhere.</td>
+</tr>
+<tr>
 <td><code>tees</code></td>
 <td>The four nodes that do nothing to what passes: a
 <code>tee-gateway</code> sends each command on to a heater and back to
@@ -485,6 +493,80 @@ same panel, kept by <code>tcslib::ping</code>, which
 answers.</li>
 <li>Payload: none. The <code>ping</code> node is the vehicle’s own, and
 nothing is simulated.</li>
+</ul>
+<h3 id="ping-yamcs">ping-yamcs</h3>
+<p>The ping example with <a href="https://yamcs.org">Yamcs</a> at the
+ground end. The vehicle and what is timed are the same; what differs is
+the configuration’s gateway, <code>yamcs</code>, so every packet to and
+from the ground carries a CCSDS primary header, which tcspecial adds as
+each goes and takes off as each arrives:</p>
+<table>
+<colgroup>
+<col style="width: 26%" />
+<col style="width: 47%" />
+<col style="width: 26%" />
+</colgroup>
+<thead>
+<tr>
+<th>What</th>
+<th>Which way</th>
+<th>APID</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>the beacon</td>
+<td>down</td>
+<td><code>beacon.apid</code>, 0x100</td>
+</tr>
+<tr>
+<td>CONNECT and its answer</td>
+<td>up, down</td>
+<td><code>tcs_cmd.apid</code>, 0x101</td>
+</tr>
+<tr>
+<td>a ping</td>
+<td>up</td>
+<td>the gateway node’s <code>apid_base</code>, 0x200</td>
+</tr>
+<tr>
+<td>its answer</td>
+<td>down</td>
+<td><code>apid_base</code> plus the ping node’s device id, 0x201</td>
+</tr>
+</tbody>
+</table>
+<p><code>ping_yamcs.py</code> writes a Yamcs configuration from the
+tcspecial one – the ports and the APIDs, stated once – with a mission
+database of tcspecial’s own XTCE and
+<code>yamcs/tcs-ccsds.xtce.in</code>, which puts the header around it.
+It starts Yamcs and tcspecial, has Yamcs send CONNECT until the vehicle
+answers with the configuration’s checksum, then pings through Yamcs and
+reads the answers back over Yamcs’s REST API:</p>
+<pre><code>make run-ping-yamcs YAMCS_HOME=~/yamcs-5.14.0
+python3 examples/ping-yamcs/ping_yamcs.py --yamcs ~/yamcs-5.14.0 --pings 3
+python3 examples/ping-yamcs/ping_yamcs.py --describe   # what it read</code></pre>
+<p><code>YAMCS_HOME</code> is where a Yamcs release is unpacked, holding
+<code>bin/yamcsd</code>; <a
+href="https://github.com/yamcs/yamcs/releases"
+class="uri">https://github.com/yamcs/yamcs/releases</a> has them, and it
+was written against 5.14.0. Yamcs’s web interface is at <a
+href="http://localhost:16090" class="uri">http://localhost:16090</a>
+meanwhile, showing every packet and parameter.</p>
+<p>Yamcs sends its commands from a port the system chooses and takes the
+answers on the same socket, so the configuration’s
+<code>tcs_cmd.send</code> is <code>127.0.0.1:0</code>: commands from any
+port of this host.</p>
+<p>Its ports are all in the sixteen thousands, which no other example
+uses.</p>
+<p>Languages:</p>
+<ul>
+<li>tcspecial configuration: YAML (<code>ping-yamcs.ytcs</code>) or XML
+(<code>ping-yamcs.xtcs</code>)</li>
+<li>Yamcs configuration: YAML and XTCE templates
+(<code>yamcs/</code>)</li>
+<li>ground program: Python 3 (<code>ping_yamcs.py</code>), with Yamcs
+(Java)</li>
 </ul>
 <h2 id="payloads-the-kernel-stands-in-for">Payloads the kernel stands in
 for</h2>

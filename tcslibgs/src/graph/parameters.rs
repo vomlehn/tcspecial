@@ -196,9 +196,11 @@ pub fn nest(flat: &BTreeMap<String, Scalar>) -> BTreeMap<String, Parameter> {
 /// stated in them.
 ///
 /// The gateway kind decides how the links are written -- UDP sockets for the
-/// radio and F´, software bus message IDs for cFS -- so an attribute of the
-/// one is required of a configuration of that kind and refused, by name, in
-/// one of the other: see "One kind per configuration" in `docs/design.rst`.
+/// radio, Yamcs and F´, software bus message IDs for cFS -- so an attribute of
+/// the one is required of a configuration of that kind and refused, by name,
+/// in one of the other: see "One kind per configuration" in
+/// `docs/design.rst`. Yamcs adds the APIDs its CCSDS headers carry, which
+/// only it states.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Needed {
     /// Required of every configuration.
@@ -215,6 +217,9 @@ pub enum Needed {
     /// required or refused there by a rule of its own:
     /// `cfe_time.leap_seconds`, stated on the TAI scale and not on UTC.
     BusByRule,
+    /// Required where every packet is a CCSDS Space Packet -- the gateway is
+    /// Yamcs -- and refused where it is not: the APIDs.
+    Framed,
 }
 
 impl Needed {
@@ -233,6 +238,7 @@ impl Needed {
             Needed::Always | Needed::Optional => true,
             Needed::Sockets => !kind.on_bus(),
             Needed::Bus | Needed::BusByRule => kind.on_bus(),
+            Needed::Framed => kind.framed(),
         }
     }
 
@@ -253,6 +259,7 @@ impl Needed {
             (Needed::Always, _) => true,
             (Needed::Sockets, Some(kind)) => !kind.on_bus(),
             (Needed::Bus, Some(kind)) => kind.on_bus(),
+            (Needed::Framed, Some(kind)) => kind.framed(),
             _ => false,
         }
     }
@@ -265,9 +272,9 @@ impl Needed {
 /// to know which fields to offer and which to mark when they are empty -- so
 /// an attribute is added here and appears in both.
 ///
-/// What every configuration must state first, then the radio's and F´'s, then
-/// cFS's, so a panel built from this asks for what it must have before what it
-/// may.
+/// What every configuration must state first, then the radio's, Yamcs's and
+/// F´'s, then Yamcs's APIDs, then cFS's, so a panel built from this asks for
+/// what it must have before what it may.
 pub const ATTRIBUTES: &[(&str, Needed)] = &[
     ("gateway", Needed::Always),
     ("interface", Needed::Always),
@@ -282,6 +289,8 @@ pub const ATTRIBUTES: &[(&str, Needed)] = &[
     ("payload_telemetry.dest_base", Needed::Sockets),
     ("beacon.send", Needed::Sockets),
     ("beacon.recv", Needed::Sockets),
+    ("beacon.apid", Needed::Framed),
+    ("tcs_cmd.apid", Needed::Framed),
     ("sbn.release", Needed::Bus),
     ("sbn.ident", Needed::Bus),
     ("sbn.spacecraft_id", Needed::Bus),
@@ -519,6 +528,7 @@ pub fn ci_config_of(
             send: link("tcs_cmd.send")?,
             cmd_msgid: link("tcs_cmd.cmd_msgid")?,
             response_msgid: link("tcs_cmd.response_msgid")?,
+            apid: link("tcs_cmd.apid")?,
         },
         payload_command: PayloadCommandJson {
             source_base: link("payload_command.source_base")?,
@@ -591,6 +601,7 @@ pub fn ci_config_of(
             send: link("beacon.send")?,
             recv: link("beacon.recv")?,
             tlm_msgid: link("beacon.tlm_msgid")?,
+            apid: link("beacon.apid")?,
         },
         // Absent is the twenty minutes an arm has always lasted. Read here
         // all the same, as the beacon's interval is, so that a length of time
@@ -654,6 +665,15 @@ pub fn ci_config_of(
 ///
 /// The complaint.
 fn misplaced(name: &str, kind: GatewayKind) -> String {
+    // An APID, which only a configuration whose packets carry CCSDS headers
+    // has: the links are sockets either way, so nothing else is offered.
+    if needed(name) == Some(Needed::Framed) {
+        return format!(
+            "{name} is said only where the gateway is yamcs, whose packets \
+             carry CCSDS headers, and this configuration's is {kind}: take it \
+             out"
+        );
+    }
     let what = if kind.on_bus() {
         format!(
             "{name} is a UDP socket's, and this configuration's gateway is \
@@ -1011,6 +1031,7 @@ mod tests {
                 Needed::Optional | Needed::Sockets => {
                     outcome.unwrap_or_else(|why| panic!("{name}: {why}"));
                 }
+                Needed::Framed => unreachable!("{name} is not cFS's"),
             }
         }
     }
@@ -1104,6 +1125,130 @@ mod tests {
         assert!(Needed::Bus.required(Some(GatewayKind::Cfs)));
         assert!(!Needed::BusByRule.required(Some(GatewayKind::Cfs)));
         assert!(!Needed::Bus.belongs(GatewayKind::Radio));
+        assert!(Needed::Sockets.required(Some(GatewayKind::Yamcs)));
+        assert!(Needed::Framed.required(Some(GatewayKind::Yamcs)));
+        assert!(!Needed::Framed.required(Some(GatewayKind::Radio)));
+        assert!(!Needed::Framed.required(None));
+        assert!(!Needed::Framed.belongs(GatewayKind::Fprime));
+        assert!(!Needed::Framed.belongs(GatewayKind::Cfs));
+    }
+
+    /// Settles a section that answers to Yamcs, with some attributes
+    /// changed: those given an empty value are taken out.
+    ///
+    /// # Arguments
+    ///
+    /// * `change` - Attributes by flat name, each with the value it is given
+    ///              in place of the radio's whole section with Yamcs's
+    ///              APIDs, or an empty value to take it out.
+    ///
+    /// # Returns
+    ///
+    /// The section, settled as the command interpreter takes it.
+    ///
+    /// # Errors
+    ///
+    /// What reading or settling the section says is wrong with it.
+    fn yamcs_with(
+        change: &[(&'static str, &'static str)],
+    ) -> Result<crate::CIConfig, String> {
+        let mut all: Vec<_> = whole()
+            .into_iter()
+            .filter(|(name, _)| *name != "gateway")
+            .chain([
+                ("gateway", "yamcs"),
+                ("beacon.apid", "0x100"),
+                ("tcs_cmd.apid", "257"),
+            ])
+            .filter(|(name, _)| !change.iter().any(|(n, _)| n == name))
+            .collect();
+        all.extend(change.iter().filter(|(_, value)| !value.is_empty()));
+        ci_config_of(&said(&all)).and_then(|config| config.to_ci_config())
+    }
+
+    /// A section that answers to Yamcs is the radio's sockets and the two
+    /// APIDs.
+    #[test]
+    fn a_section_answering_to_yamcs_carries_its_apids() {
+        let settled = yamcs_with(&[]).expect("the whole section");
+        assert_eq!(settled.gateway, GatewayKind::Yamcs);
+        let sockets = settled.sockets().expect("on sockets");
+        assert_eq!(
+            sockets.framing,
+            Some(crate::CcsdsFraming {
+                beacon_apid: 0x100,
+                cmd_apid: 0x101,
+            })
+        );
+        assert_eq!(sockets.beacon_recv.to_string(), "127.0.0.1:5650");
+        assert_eq!(
+            ci_config_of(&said(&whole()))
+                .and_then(|c| c.to_ci_config())
+                .expect("the radio's")
+                .sockets()
+                .expect("on sockets")
+                .framing,
+            None,
+            "the radio frames nothing"
+        );
+
+        // Where the ground sends commands from may be any port of a host,
+        // as a Yamcs station sends: the vehicle binds neither.
+        let settled = yamcs_with(&[
+            ("tcs_cmd.send", "127.0.0.1:0"),
+            ("payload_command.source_base", "127.0.0.1:0"),
+        ])
+        .expect("senders at port 0");
+        let sockets = settled.sockets().expect("on sockets");
+        assert_eq!(sockets.moc_cmd_send.port, 0);
+        assert_eq!(sockets.payload_command_source_base.port, 0);
+        // But not where the vehicle listens.
+        let why = yamcs_with(&[("tcs_cmd.recv", "127.0.0.1:0")])
+            .expect_err("port 0 bound");
+        assert!(why.contains("port 0"), "{why}");
+    }
+
+    /// Each APID left out, out of range or the same as the other is refused
+    /// by name, saying what to do.
+    #[test]
+    fn what_is_wrong_with_yamcs_apids_is_refused_by_name() {
+        for (change, says) in [
+            (("beacon.apid", ""), &["beacon.apid", "not stated"][..]),
+            (("tcs_cmd.apid", ""), &["tcs_cmd.apid", "not stated"]),
+            (("beacon.apid", "0x800"), &["beacon.apid", "0x800", "0x7ff"]),
+            (("tcs_cmd.apid", "2048"), &["tcs_cmd.apid", "2048", "0x7ff"]),
+            (("tcs_cmd.apid", "many"), &["tcs_cmd.apid"]),
+            (
+                ("tcs_cmd.apid", "0x100"),
+                &["beacon.apid", "tcs_cmd.apid", "0x100", "another APID"],
+            ),
+        ] {
+            let why = yamcs_with(&[change]).expect_err(change.0);
+            for said in says {
+                assert!(why.contains(said), "{change:?}: {why}");
+            }
+        }
+        // The highest and the lowest are APIDs.
+        yamcs_with(&[("beacon.apid", "0x7FF"), ("tcs_cmd.apid", "0")])
+            .expect("the ends of the range");
+    }
+
+    /// An APID in a configuration whose packets carry no CCSDS header is
+    /// refused by name, whichever kind it is.
+    #[test]
+    fn an_apid_is_refused_where_the_gateway_is_not_yamcs() {
+        for name in ["beacon.apid", "tcs_cmd.apid"] {
+            let mut all = whole();
+            all.push((name, "0x100"));
+            let why = ci_config_of(&said(&all)).expect_err(name);
+            assert!(why.contains(name), "{why}");
+            assert!(why.contains("yamcs"), "{why}");
+            assert!(why.contains("take it out"), "{why}");
+
+            let why = bus_with(&[(name, "0x100")]).expect_err(name);
+            assert!(why.contains(name), "{why}");
+            assert!(why.contains("yamcs"), "{why}");
+        }
     }
 
     /// A section with everything in it reads as what the command interpreter

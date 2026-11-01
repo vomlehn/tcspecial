@@ -96,6 +96,7 @@
       <xs:enumeration value="gateway_radio"/>
       <xs:enumeration value="gateway_cfs"/>
       <xs:enumeration value="gateway_fprime"/>
+      <xs:enumeration value="gateway_yamcs"/>
     </xs:restriction>
   </xs:simpleType>
 
@@ -160,6 +161,10 @@
       <xs:element name="bridge_base" type="xs:string"/>
       <!-- Where the F´ IDs of what reaches an F´ gateway begin. -->
       <xs:element name="fprime_id_base" type="xs:string"/>
+      <!-- A Yamcs gateway's APID: what the ground's CCSDS telecommands to
+           it carry, and the first of the APIDs what goes through it to the
+           ground is counted from, by each source node's device id. -->
+      <xs:element name="apid_base" type="xs:string"/>
       <!-- The message ID what a gateway_cfs node sends on is published
            under on the cFS software bus. -->
       <xs:element name="cmd_msgid" type="xs:string"/>
@@ -350,17 +355,19 @@
        before a configuration flies is tcsverify's to say. -->
   <xs:complexType name="tcspecial">
     <xs:all>
-      <!-- What the vehicle answers to: radio, the ground over UDP; fprime,
-           an F´ flight computer's bridge component, over the same; cfs, a
-           cFS flight computer's software bus, as a peer of its SBN. It
-           decides how the links below are written: sockets for radio and
-           fprime, message IDs for cfs. -->
+      <!-- What the vehicle answers to: radio, the ground over UDP; yamcs,
+           a Yamcs ground station over the same, every packet a CCSDS Space
+           Packet; fprime, an F´ flight computer's bridge component, over
+           UDP too; cfs, a cFS flight computer's software bus, as a peer of
+           its SBN. It decides how the links below are written: sockets for
+           radio, yamcs and fprime, message IDs for cfs. -->
       <xs:element name="gateway" minOccurs="0">
         <xs:simpleType>
           <xs:restriction base="xs:string">
             <xs:enumeration value="radio"/>
             <xs:enumeration value="cfs"/>
             <xs:enumeration value="fprime"/>
+            <xs:enumeration value="yamcs"/>
           </xs:restriction>
         </xs:simpleType>
       </xs:element>
@@ -386,6 +393,9 @@
             <xs:element name="cmd_msgid" type="xs:string" minOccurs="0"/>
             <xs:element name="response_msgid" type="xs:string"
                         minOccurs="0"/>
+            <!-- Where the gateway is yamcs: the APID the commands on both
+                 command links and their answers carry. -->
+            <xs:element name="apid" type="xs:string" minOccurs="0"/>
           </xs:all>
         </xs:complexType>
       </xs:element>
@@ -427,6 +437,8 @@
             <!-- On a cFS software bus: the message ID the beacon is
                  published under. -->
             <xs:element name="tlm_msgid" type="xs:string" minOccurs="0"/>
+            <!-- Where the gateway is yamcs: the APID the beacon carries. -->
+            <xs:element name="apid" type="xs:string" minOccurs="0"/>
           </xs:all>
         </xs:complexType>
       </xs:element>

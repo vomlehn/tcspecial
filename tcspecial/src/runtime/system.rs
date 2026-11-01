@@ -39,7 +39,7 @@ use tcslibgs::graph::Graph;
 
 use std::sync::Arc;
 
-use crate::endpoint::bind_oc_pair;
+use crate::endpoint::{bind_oc_pair, CcsdsWriter, EndpointWritable};
 use crate::node::vehicle::log::LogNode;
 use crate::runtime::bus::{Bus, BusDownlink, BusGatewayPort};
 use crate::runtime::fabric::{Arriving, Fabric, Moved, Port, Read, Taken};
@@ -1014,6 +1014,14 @@ pub fn open_ground_link(
                 vehicle.address, vehicle.port, ground.address, ground.port
             )
         })?;
+    // Under Yamcs each datum goes as CCSDS telemetry under the link's APID.
+    let writer: Box<dyn EndpointWritable + Send> = match link.apid {
+        Some(apid) => Box::new(
+            CcsdsWriter::of(writer, apid)
+                .map_err(|e| format!("{what}: {e}"))?,
+        ),
+        None => writer,
+    };
     Ok(Box::new(EndpointPort::of(
         what,
         reader,
@@ -1164,7 +1172,9 @@ pub fn open(
         // a link of its own to the node's ground_base, opened beside it --
         // see `open_ground_link`. So one that binds nothing, or that nothing
         // is read from, is held as a node that is never asked anything.
-        "gateway_radio"
+        // A Yamcs gateway is a radio's, its packets framed: see
+        // `EndpointPort::open`, which checks and takes off each header.
+        "gateway_radio" | "gateway_yamcs"
             if !tcslibgs::graph::reach::binds(node)
                 || Use::of(routes, &node.name).is_err() =>
         {
@@ -2885,6 +2895,95 @@ vehicle:
         assert_eq!(moved.refused.len(), 1, "{:?}", moved.refused);
         assert_eq!(moved.refused[0].0, "pinger");
         assert_eq!(sent.lock().expect("the record").len(), 1);
+    }
+
+    /// Under Yamcs a ping from the ground arrives at the gateway as a CCSDS
+    /// telecommand under its apid_base and its answer goes to the ground as
+    /// CCSDS telemetry under apid_base plus the ping node's device id; an
+    /// unframed datagram at the gateway is passed over, counted, and
+    /// answers nothing.
+    ///
+    /// The real ports, opened as tcspecial opens them, on loopback.
+    #[test]
+    fn under_yamcs_the_uplink_and_a_downlink_are_framed() {
+        use tcslibgs::ccsds::{read_header, PacketType, Sender};
+        let free = || {
+            std::net::UdpSocket::bind("127.0.0.1:0")
+                .and_then(|socket| socket.local_addr())
+                .expect("a free port")
+                .port()
+        };
+        // The ping node is device id 1, so it sends to ground_base plus 1.
+        let ground = std::net::UdpSocket::bind("127.0.0.1:0").expect("bound");
+        ground
+            .set_read_timeout(Some(std::time::Duration::from_millis(500)))
+            .expect("a timeout");
+        let ground_port = ground.local_addr().expect("where").port();
+        let gateway_port = free();
+        let where_ = tempfile::tempdir().expect("a directory");
+        let path = where_.path().join("yamcs.ytcs");
+        std::fs::write(
+            &path,
+            format!(
+                "gateway:\n\
+                 \x20 - {{ name: ground, type: gateway_yamcs, \
+                 address: 127.0.0.1, port: \"{gateway_port}\", \
+                 ground_base: \"127.0.0.1:{}\", apid_base: \"0x200\", \
+                 gateway-out: pinger }}\n\
+                 vehicle:\n\
+                 \x20 - {{ name: pinger, type: ping, payload-out: ground }}\n",
+                ground_port - 1
+            ),
+        )
+        .expect("written");
+        let graph = Graph::load(&path).expect("it reads");
+        let mut system = System::of_opening(
+            &graph,
+            Instant::now(),
+            |node: &Node, routes: &Routes, abandon: &Abandon| {
+                open(node, routes, abandon, &SegSend::none(), None)
+            },
+            |link: &Telemetered| {
+                assert_eq!(link.apid, Some(0x201));
+                open_ground_link(link, None)
+            },
+        )
+        .expect("it opens");
+
+        let gateway = format!("127.0.0.1:{gateway_port}");
+        let mut answer = [0u8; 256];
+        let mut answered = |system: &mut System| {
+            for _ in 0..50 {
+                let moved = system.pass(Instant::now());
+                assert!(moved.all_delivered(), "{:?}", moved.refused);
+                if let Ok((size, _)) = ground.recv_from(&mut answer) {
+                    return Some(answer[..size].to_vec());
+                }
+            }
+            None
+        };
+
+        // Unframed: passed over, and nothing goes to the ground.
+        ground
+            .send_to(b"ping #1 1760900000.000000001", &gateway)
+            .expect("sent");
+        ground
+            .set_read_timeout(Some(std::time::Duration::from_millis(10)))
+            .expect("a timeout");
+        assert_eq!(answered(&mut system), None, "an unframed ping");
+
+        // Framed: answered, framed.
+        let mut sender = Sender::new(PacketType::Telecommand, 0x200).unwrap();
+        let mut room = [0u8; 64];
+        let packet = sender
+            .frame(&mut room, b"ping #2 1760900000.000000001")
+            .expect("framed");
+        ground.send_to(packet, &gateway).expect("sent");
+        let pong = answered(&mut system).expect("an answer");
+        let data = read_header(&pong, PacketType::Telemetry, 0x201)
+            .expect("framed telemetry");
+        assert!(data.starts_with(b"ping #2 1760900000.000000001 "));
+        assert_eq!(&pong[2..4], &[0xC0, 0x00], "the downlink's first");
     }
 
     /// The group is read on its interval and not before.

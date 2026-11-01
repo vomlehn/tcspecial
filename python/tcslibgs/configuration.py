@@ -46,11 +46,13 @@ from . import sbn as _sbn
 NODE_SECTIONS = ("gateway", "vehicle", "payloads")
 
 #: Each gateway node type, and the attribute it says where its data goes
-#: with: a radio's ``ground_base``, an F´ gateway's ``bridge_base``. The Python
-#: spelling of ``tcslibgs::gateway::GatewayKind::base_attribute``, for the
-#: kinds that have a node type.
+#: with: a radio's and a Yamcs gateway's ``ground_base``, an F´ gateway's
+#: ``bridge_base``. The Python spelling of
+#: ``tcslibgs::gateway::GatewayKind::base_attribute``, for the kinds that have
+#: a node type.
 GATEWAY_BASES = {
     "gateway_radio": "ground_base",
+    "gateway_yamcs": "ground_base",
     "gateway_fprime": "bridge_base",
     "gateway_cfs": "tlm_base",
 }
@@ -167,7 +169,7 @@ class HostPort:
         return f"{self.address}:{self.port}"
 
     @staticmethod
-    def of(attribute, stated):
+    def of(attribute, stated, any_port=False):
         """``stated`` as a host and a port.
 
         Split at the last colon, so that whatever a host is called the port is
@@ -176,13 +178,17 @@ class HostPort:
         Args:
             attribute: The attribute it was stated as, for the error message.
             stated:    What the configuration says, as ``address:port``.
+            any_port:  Whether port 0, any port from the host, is allowed: for
+                       where the ground sends from, which the vehicle never
+                       binds. ``tcslibgs::types::sender_of``.
 
         Returns:
             The :class:`HostPort`, its address with surrounding space removed.
 
         Raises:
             ValueError: ``stated`` has no colon, no address, a port that is
-                        not a number, or a port outside 1 to 65535.
+                        not a number, or a port outside 1 to 65535 (0 to
+                        65535 where ``any_port``).
         """
         said = stated.strip()
         if ":" not in said:
@@ -196,6 +202,8 @@ class HostPort:
                 f'{attribute} "{said}" is not an address and a port'
             )
         number = int(port)
+        if number == 0 and any_port:
+            return HostPort(address.strip(), number)
         if not 0 < number < 65536:
             raise ValueError(f'{attribute} "{said}": a port is 1 to 65535')
         return HostPort(address.strip(), number)
@@ -501,7 +509,8 @@ class Configuration:
         """
         self._not_on_a_bus("its command link")
         return CommandLink(
-            send=HostPort.of("tcs_cmd.send", self._said("tcs_cmd.send")),
+            send=HostPort.of("tcs_cmd.send", self._said("tcs_cmd.send"),
+                             any_port=True),
             recv=HostPort.of("tcs_cmd.recv", self._said("tcs_cmd.recv")),
         )
 
@@ -963,10 +972,13 @@ def came_from(stated, sender):
     """Whether a datagram from ``sender`` came from the socket the
     configuration names as ``stated``.
 
-    The port must match. The address must too, unless the configuration names
-    every interface, in which case the address a datagram carries is whichever
-    interface the route chose and there is nothing written down to compare it
-    with.
+    The port must match, unless the configuration names port 0: a ground
+    that cannot send from a port of its own choosing -- Yamcs sends each
+    command from whatever port the system gives it -- is named with port 0,
+    and then any port from that host is it. The address must match too,
+    unless the configuration names every interface, in which case the address
+    a datagram carries is whichever interface the route chose and there is
+    nothing written down to compare it with.
 
     Args:
         stated: The :class:`HostPort` the configuration names.
@@ -976,7 +988,7 @@ def came_from(stated, sender):
         ``True`` if it came from there.
     """
     address, port = sender[0], sender[1]
-    if port != stated.port:
+    if stated.port != 0 and port != stated.port:
         return False
     if binds_every_interface(stated.address):
         return True

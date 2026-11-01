@@ -703,7 +703,8 @@ one, and is still the word for the ground itself, which is one kind of
 commander.</dd>
 <dt>gateway</dt>
 <dd>The node through which tcspecial reaches its commander, and the link it
-holds: <tt class="docutils literal">gateway_radio</tt>, <tt class="docutils literal">gateway_cfs</tt> or <tt class="docutils literal">gateway_fprime</tt>. It was
+holds: <tt class="docutils literal">gateway_radio</tt>, <tt class="docutils literal">gateway_yamcs</tt>, <tt class="docutils literal">gateway_cfs</tt> or
+<tt class="docutils literal">gateway_fprime</tt>. It was
 also the word for the commander itself, which left one word for both ends
 of a link. See <a class="reference internal" href="#gateways-what-the-vehicle-answers-to">Gateways: what the vehicle answers to</a>.</dd>
 <dt>test harness</dt>
@@ -1301,6 +1302,11 @@ node, and there are three kinds of gateway:</p>
 <td>UDP</td>
 <td><tt class="docutils literal">address</tt>, <tt class="docutils literal">port</tt>, <tt class="docutils literal">ground_base</tt></td>
 </tr>
+<tr><td><tt class="docutils literal">gateway_yamcs</tt></td>
+<td>a Yamcs ground station</td>
+<td>UDP, every packet behind a CCSDS primary header</td>
+<td><tt class="docutils literal">address</tt>, <tt class="docutils literal">port</tt>, <tt class="docutils literal">ground_base</tt>, <tt class="docutils literal">apid_base</tt></td>
+</tr>
 <tr><td><tt class="docutils literal">gateway_cfs</tt></td>
 <td>a cFS flight computer's software bus</td>
 <td>as a peer of its Software Bus Network (SBN) application, over SBN's
@@ -1314,7 +1320,7 @@ UDP protocol module</td>
 </tr>
 </tbody>
 </table>
-<p>All three are in the <tt class="docutils literal">gateway</tt> section, and all three have the terminals
+<p>All four are in the <tt class="docutils literal">gateway</tt> section, and all four have the terminals
 the radio's has: <tt class="docutils literal"><span class="pre">payload-in</span></tt>, which takes as many sources as the
 configuration gives it, and <tt class="docutils literal"><span class="pre">gateway-out</span></tt>.</p>
 <div class="section" id="one-kind-per-configuration">
@@ -6522,6 +6528,26 @@ header and its secondary header, around exactly what the UDP link carries
 -- is specified in <a class="reference internal" href="#what-crosses-the-bus">What crosses the bus</a> and built in <tt class="docutils literal"><span class="pre">tcslibgs::cfs</span></tt>,
 which the vehicle frames and strips with, refusing and counting as
 malformed whatever arrives on the bus not framed so.</p>
+<p><tt class="docutils literal">gateway_yamcs</tt> is the radio's UDP links with a CCSDS Space Packet primary
+header on every packet, and no secondary header, so that a ground station
+that speaks CCSDS packets -- Yamcs -- tells them apart by APID. The kind
+frames every link in its section, as cFS's does: the beacon on
+<tt class="docutils literal">beacon.apid</tt>, the commands and their answers on <tt class="docutils literal">tcs_cmd.apid</tt>, each
+gateway node's uplink on its <tt class="docutils literal">apid_base</tt>, and each source through it on
+<tt class="docutils literal">apid_base</tt> plus its device id. The ground's packets are telecommands and
+the vehicle's telemetry, unsegmented, each sender counting its own sequence
+per APID; a packet with another type, another APID, a secondary header, a
+segment or a length field that is not its own is refused and counted, and
+the sequence count is not checked, a lost packet being no reason to refuse
+the next. The header is <tt class="docutils literal"><span class="pre">tcslibgs::ccsds</span></tt>. The APIDs are stated rather
+than fixed, because which a mission's ground expects is the mission's, and
+they are checked distinct where the file is read. Yamcs's mission database
+is tcspecial's own XTCE with a wrapper that puts the header around it, which
+the ping-yamcs example writes.</p>
+<p>A command link's sender written with port nought takes commands from any
+port of its host. Yamcs sends from a port the system chooses and takes the
+answers on the same socket, and an answer goes back to the port its command
+came from, as every answer does.</p>
 <p>There is then nothing about framing for a configuration to get wrong, or
 for two configurations to disagree about: the node type a configuration
 names, which its checksum covers, says it all.</p>

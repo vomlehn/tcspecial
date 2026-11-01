@@ -716,9 +716,263 @@ pub fn hearing_endpoint_pair(
     }
 }
 
+/// A reader whose datagrams are CCSDS telecommands under one APID: each
+/// header is checked and taken off, and what is under it is what is read.
+///
+/// For the uplink of a gateway whose packets are CCSDS Space Packets: see
+/// [`tcslibgs::ccsds`]. A datagram whose header is not one -- not a
+/// telecommand, another APID, a length it does not say -- is passed over and
+/// counted with the strangers, as a datagram from the wrong sender is:
+/// nothing in it is acted on, and a flood of them is a count rather than a
+/// line in the log apiece. A few at a time, as strangers are, so that a
+/// flood costs a read a bounded amount of work.
+pub struct CcsdsReader {
+    /// What the datagrams are read from.
+    inner: Box<dyn EndpointReadable + Send>,
+    /// The APID they must carry.
+    apid: u16,
+    /// Datagrams passed over since [`EndpointReadable::strangers`] last
+    /// asked.
+    refused: u64,
+}
+
+impl CcsdsReader {
+    /// Reads telecommands under `apid` from `inner`.
+    ///
+    /// # Arguments
+    ///
+    /// * `inner` - What the datagrams are read from.
+    /// * `apid`  - The APID they must carry.
+    ///
+    /// # Returns
+    ///
+    /// The reader, with nothing passed over yet.
+    pub fn of(inner: Box<dyn EndpointReadable + Send>, apid: u16) -> Self {
+        CcsdsReader {
+            inner,
+            apid,
+            refused: 0,
+        }
+    }
+}
+
+impl EndpointWaitable for CcsdsReader {
+    fn io_fd(&self) -> RawFd {
+        self.inner.io_fd()
+    }
+
+    fn wait_for_event(
+        &self,
+        cmd_fd: RawFd,
+        timeout_ms: i32,
+    ) -> TcsResult<WaitResult> {
+        self.inner.wait_for_event(cmd_fd, timeout_ms)
+    }
+}
+
+impl EndpointReadable for CcsdsReader {
+    fn read(&mut self, buffer: &mut [u8]) -> TcsResult<usize> {
+        for _ in 0..STRANGERS_PER_READ {
+            let got = self.inner.read(buffer)?;
+            if got == 0 {
+                return Ok(0);
+            }
+            match tcslibgs::ccsds::read_header(
+                &buffer[..got],
+                tcslibgs::ccsds::PacketType::Telecommand,
+                self.apid,
+            ) {
+                Ok(data) => {
+                    // Moved down over the header rather than copied out, so
+                    // that reading allocates nothing.
+                    let size = data.len();
+                    buffer.copy_within(tcslibgs::ccsds::HEADER_BYTES..got, 0);
+                    return Ok(size);
+                }
+                Err(_) => self.refused += 1,
+            }
+        }
+        Ok(0)
+    }
+
+    fn strangers(&mut self) -> u64 {
+        self.inner.strangers() + std::mem::take(&mut self.refused)
+    }
+}
+
+/// A writer whose every datagram is a CCSDS telemetry packet under one
+/// APID: a header goes on each, counted by the writer's own sequence count.
+///
+/// For a source's downlink through a gateway whose packets are CCSDS Space
+/// Packets: see [`tcslibgs::ccsds`]. The packet is made in room the writer
+/// keeps, which grows to the largest datum and no further, so that writing
+/// allocates nothing once that has been seen.
+pub struct CcsdsWriter {
+    /// What the packets are written to.
+    inner: Box<dyn EndpointWritable + Send>,
+    /// The APID, the type and the count.
+    sender: tcslibgs::ccsds::Sender,
+    /// Where each packet is made.
+    room: Vec<u8>,
+}
+
+impl CcsdsWriter {
+    /// Writes telemetry under `apid` to `inner`.
+    ///
+    /// # Arguments
+    ///
+    /// * `inner` - What the packets are written to.
+    /// * `apid`  - The APID they carry.
+    ///
+    /// # Returns
+    ///
+    /// The writer, its count at nought.
+    ///
+    /// # Errors
+    ///
+    /// `TcsError::Config` for an APID past eleven bits.
+    pub fn of(
+        inner: Box<dyn EndpointWritable + Send>,
+        apid: u16,
+    ) -> TcsResult<Self> {
+        let sender = tcslibgs::ccsds::Sender::new(
+            tcslibgs::ccsds::PacketType::Telemetry,
+            apid,
+        )
+        .map_err(|fault| TcsError::Config(fault.to_string()))?;
+        Ok(CcsdsWriter {
+            inner,
+            sender,
+            room: Vec::new(),
+        })
+    }
+}
+
+impl EndpointWaitable for CcsdsWriter {
+    fn io_fd(&self) -> RawFd {
+        self.inner.io_fd()
+    }
+
+    fn wait_for_event(
+        &self,
+        cmd_fd: RawFd,
+        timeout_ms: i32,
+    ) -> TcsResult<WaitResult> {
+        self.inner.wait_for_event(cmd_fd, timeout_ms)
+    }
+}
+
+impl EndpointWritable for CcsdsWriter {
+    /// Writes `data` as one packet, and says how much of `data` went: all of
+    /// it, none, or what went after the header of a packet only partly
+    /// written.
+    fn write(&mut self, data: &[u8]) -> TcsResult<usize> {
+        let total = tcslibgs::ccsds::HEADER_BYTES + data.len();
+        if self.room.len() < total {
+            self.room.resize(total, 0);
+        }
+        let packet = self
+            .sender
+            .frame(&mut self.room, data)
+            .map_err(|fault| TcsError::Endpoint(fault.to_string()))?;
+        let wrote = self.inner.write(packet)?;
+        Ok(match wrote == packet.len() {
+            true => data.len(),
+            false => wrote.saturating_sub(tcslibgs::ccsds::HEADER_BYTES),
+        })
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// A framed writer's packets read back through a framed reader, under
+    /// the one APID, and nothing else is read: an unframed datagram, one
+    /// under another APID and telemetry where a telecommand belongs are
+    /// each passed over and counted.
+    #[test]
+    fn framed_datagrams_round_trip_and_the_rest_are_counted() {
+        use std::net::UdpSocket;
+        let at = NetworkConfig {
+            protocol: NetworkProtocol::Udp,
+            address: "127.0.0.1".to_string(),
+            port: 0,
+        };
+        let inner = UdpEndpoint::new("uplink", &at).expect("bound");
+        // SAFETY: the endpoint's own descriptor, borrowed while it is open
+        // and not kept.
+        let borrowed = unsafe { BorrowedFd::borrow_raw(inner.io_fd()) };
+        let here = socket2::SockRef::from(&borrowed)
+            .local_addr()
+            .ok()
+            .and_then(|at| at.as_socket())
+            .expect("where it is bound");
+        let mut reader = CcsdsReader::of(Box::new(inner), 0x123);
+
+        let ground = UdpSocket::bind("127.0.0.1:0").expect("a ground");
+        let mut sender = tcslibgs::ccsds::Sender::new(
+            tcslibgs::ccsds::PacketType::Telecommand,
+            0x123,
+        )
+        .expect("an APID");
+        let mut room = [0u8; 64];
+        let mut wrong = tcslibgs::ccsds::Sender::new(
+            tcslibgs::ccsds::PacketType::Telecommand,
+            0x124,
+        )
+        .expect("an APID");
+        let mut telemetry = tcslibgs::ccsds::Sender::new(
+            tcslibgs::ccsds::PacketType::Telemetry,
+            0x123,
+        )
+        .expect("an APID");
+        ground.send_to(b"unframed", here).expect("sent");
+        let packet = wrong.frame(&mut room, b"wrong").expect("framed");
+        ground.send_to(packet, here).expect("sent");
+        let packet = telemetry.frame(&mut room, b"tm").expect("framed");
+        ground.send_to(packet, here).expect("sent");
+        let packet = sender.frame(&mut room, b"set 21").expect("framed");
+        ground.send_to(packet, here).expect("sent");
+
+        let mut buffer = [0u8; 64];
+        let mut got = 0;
+        for _ in 0..200 {
+            got = reader.read(&mut buffer).expect("a read");
+            if got > 0 {
+                break;
+            }
+            std::thread::sleep(std::time::Duration::from_millis(5));
+        }
+        assert_eq!(&buffer[..got], b"set 21");
+        assert_eq!(reader.strangers(), 3, "three passed over");
+        assert_eq!(reader.strangers(), 0, "and counted once");
+
+        // The other way: telemetry under the downlink's APID.
+        let to = ground.local_addr().expect("where the ground is");
+        let ground_at = NetworkConfig {
+            protocol: NetworkProtocol::Udp,
+            address: to.ip().to_string(),
+            port: to.port(),
+        };
+        let (_, inner) =
+            bind_oc_pair("downlink", &at, Some(&ground_at)).expect("bound");
+        let mut writer = CcsdsWriter::of(inner, 0x201).expect("an APID");
+        assert_eq!(writer.write(&[1, 2, 3]).expect("written"), 3);
+        assert_eq!(writer.write(&[4]).expect("written"), 1);
+        assert!(writer.write(&[]).is_err(), "an empty packet is refused");
+        ground
+            .set_read_timeout(Some(std::time::Duration::from_secs(5)))
+            .expect("a timeout");
+        let mut arrived = [0u8; 64];
+        let (size, _) = ground.recv_from(&mut arrived).expect("a packet");
+        assert_eq!(
+            &arrived[..size],
+            [0x02, 0x01, 0xC0, 0x00, 0x00, 0x02, 1, 2, 3]
+        );
+        let (size, _) = ground.recv_from(&mut arrived).expect("a packet");
+        assert_eq!(&arrived[..size], [0x02, 0x01, 0xC0, 0x01, 0x00, 0x00, 4]);
+    }
 
     #[test]
     fn test_wait_result() {

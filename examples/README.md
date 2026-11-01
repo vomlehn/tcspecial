@@ -71,6 +71,7 @@ the vehicle saying it is alive, the vehicle answering a ping. Start with
 | `minimal` | The smallest working configuration: one UDP payload whose telemetry goes straight to the ground (MOC). |
 | `beacon` | The one thing a ground station knows without asking: a window showing the spacecraft's beacon, built from the two halves any ground station would use -- `tcslib::beacon` to listen and `tcsui`'s panel to show it. |
 | `ping` | The ground pings a `ping` vehicle node and times the answer: the round trip, and the two halves of it. The ground station is Python 3, with the beacon panel and the halves it is built from written again in Python under `python/`, and tests that hold them to the Rust. |
+| `ping-yamcs` | The ping example with Yamcs as the ground station: a `gateway_yamcs` gateway puts a CCSDS primary header on every packet to and from the ground, the beacon included, and `ping_yamcs.py` runs Yamcs on tcspecial's own XTCE and pings through it. Needs a Yamcs release unpacked somewhere. |
 | `tees` | The four nodes that do nothing to what passes: a `tee-gateway` sends each command on to a heater and back to the ground, a `tee-payload` sends each reading to the ground and on aboard, and a `null-gateway` and a `null-payload` drop what they are sent. `tcspecial/tests/tees.rs` flies it. |
 | `fprime` | A vehicle that answers to an F´ flight computer rather than to the ground: a `gateway_fprime` node sends each reading, the temperature a `to_kelvin` node makes of it and what a `hysteresis` node decides of that, to the deployment's bridge component at its `bridge_base`, and takes the bridge's commands on to a heater. `tcspecial/tests/fprime.rs` flies it, and `make fprime-test` runs the bridge itself, in `fprime/`, against it. |
 | `cfs` | A vehicle that answers to a cFS flight computer: tcspecial joins its software bus as an SBN peer, a `gateway_cfs` node publishes each reading as its `tlm_base` plus the reading's device id, and a command published as its `cmd_msgid` goes on to a heater. Every link is carried over the one peer, as message IDs. `make run-cfs` runs tcsmoc on it, tcssim standing in for the cFS side; `tcspecial/tests/cfs.rs` flies it against a test playing the cFS side, and `tcspecial/tests/cfs_ground.rs` commands it from tcslib. |
@@ -252,6 +253,51 @@ Languages:
 - Vehicle: Rust -- tcspecial, whose `ping` node answers.
 - Payload: none. The `ping` node is the vehicle's own, and nothing is
   simulated.
+
+### ping-yamcs
+
+The ping example with [Yamcs](https://yamcs.org) at the ground end. The
+vehicle and what is timed are the same; what differs is the configuration's
+gateway, `yamcs`, so every packet to and from the ground carries a CCSDS
+primary header, which tcspecial adds as each goes and takes off as each
+arrives:
+
+| What | Which way | APID |
+|------|-----------|------|
+| the beacon | down | `beacon.apid`, 0x100 |
+| CONNECT and its answer | up, down | `tcs_cmd.apid`, 0x101 |
+| a ping | up | the gateway node's `apid_base`, 0x200 |
+| its answer | down | `apid_base` plus the ping node's device id, 0x201 |
+
+`ping_yamcs.py` writes a Yamcs configuration from the tcspecial one -- the
+ports and the APIDs, stated once -- with a mission database of tcspecial's
+own XTCE and `yamcs/tcs-ccsds.xtce.in`, which puts the header around it. It
+starts Yamcs and tcspecial, has Yamcs send CONNECT until the vehicle answers
+with the configuration's checksum, then pings through Yamcs and reads the
+answers back over Yamcs's REST API:
+
+```
+make run-ping-yamcs YAMCS_HOME=~/yamcs-5.14.0
+python3 examples/ping-yamcs/ping_yamcs.py --yamcs ~/yamcs-5.14.0 --pings 3
+python3 examples/ping-yamcs/ping_yamcs.py --describe   # what it read
+```
+
+`YAMCS_HOME` is where a Yamcs release is unpacked, holding `bin/yamcsd`;
+<https://github.com/yamcs/yamcs/releases> has them, and it was written
+against 5.14.0. Yamcs's web interface is at <http://localhost:16090>
+meanwhile, showing every packet and parameter.
+
+Yamcs sends its commands from a port the system chooses and takes the
+answers on the same socket, so the configuration's `tcs_cmd.send` is
+`127.0.0.1:0`: commands from any port of this host.
+
+Its ports are all in the sixteen thousands, which no other example uses.
+
+Languages:
+
+* tcspecial configuration: YAML (`ping-yamcs.ytcs`) or XML (`ping-yamcs.xtcs`)
+* Yamcs configuration: YAML and XTCE templates (`yamcs/`)
+* ground program: Python 3 (`ping_yamcs.py`), with Yamcs (Java)
 
 ## Payloads the kernel stands in for
 

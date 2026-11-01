@@ -1273,6 +1273,20 @@ impl Graph {
                     None => Problem::BadTcspecial { why },
                 });
             }
+
+            // Under Yamcs: every APID used once, so the ground can sort
+            // what arrives into its streams. Asked only where the section
+            // reads, as the message IDs are.
+            if let Err(refused) = crate::graph::telemetry::apids(self) {
+                match refused.node {
+                    Some(node) => problems.push(Problem::BadNode {
+                        node,
+                        why: refused.why,
+                    }),
+                    None => problems
+                        .push(Problem::BadTcspecial { why: refused.why }),
+                }
+            }
         }
 
         // Every F´ bridge's model can be made: each source drawn into a
@@ -2124,6 +2138,12 @@ mod tests {
                 ("fprime_id_base", "0x3000"),
             ],
             "gateway_cfs" => &[("cmd_msgid", "0x4281"), ("tlm_base", "0x4240")],
+            "gateway_yamcs" => &[
+                ("address", "10.0.0.1"),
+                ("port", "5000"),
+                ("ground_base", "10.0.0.2:5100"),
+                ("apid_base", "0x200"),
+            ],
             // An app node is the program it names, and the argument for each
             // stream its kind handles: see `crate::node::app`.
             "app_payload_veh" | "app_pl" => &[
@@ -2249,6 +2269,198 @@ mod tests {
         let g =
             graph(vec![node("a", "i2c"), ground], vec![link("a", &["ground"])]);
         refused(&g, "ground", "only a gateway_fprime node");
+    }
+
+    /// A graph that answers to Yamcs, its section the radio's with the two
+    /// APIDs.
+    ///
+    /// # Arguments
+    ///
+    /// * `nodes` - Its nodes.
+    /// * `links` - Its links.
+    ///
+    /// # Returns
+    ///
+    /// The graph, its `tcspecial.gateway` being `yamcs`, its beacon's APID
+    /// 0x100 and its commands' 0x101.
+    fn answering_yamcs(nodes: Vec<Node>, links: Vec<Link>) -> Graph {
+        let mut said = crate::graph::parameters::flatten(&tcspecial());
+        for (name, value) in [
+            ("gateway", "yamcs"),
+            ("beacon.apid", "0x100"),
+            ("tcs_cmd.apid", "0x101"),
+        ] {
+            said.insert(name.to_string(), Scalar::of(value));
+        }
+        let mut g = graph(nodes, links);
+        g.tcspecial = Some(crate::graph::parameters::nest(&said));
+        g
+    }
+
+    /// A configuration that answers to Yamcs through a `gateway_yamcs`
+    /// node is sound, and each source's APID is the node's apid_base plus
+    /// its device id.
+    #[test]
+    fn a_graph_answering_to_yamcs_is_sound() {
+        let g = answering_yamcs(
+            vec![node("a", "i2c"), node("ground", "gateway_yamcs")],
+            vec![link("a", &["ground"])],
+        );
+        assert_eq!(g.check(), Vec::new());
+        let links = crate::graph::telemetry::of(&g).expect("sound");
+        assert_eq!(links[0].apid, Some(0x200), "apid_base plus nought");
+        let used = crate::graph::telemetry::apids(&g).expect("sound");
+        let apids: Vec<u16> = used.iter().map(|u| u.apid).collect();
+        assert_eq!(apids, [0x100, 0x101, 0x200, 0x200]);
+
+        // And under the radio a source's link carries no APID.
+        let g = graph(
+            vec![node("a", "i2c"), node("ground", "gateway_radio")],
+            vec![link("a", &["ground"])],
+        );
+        assert_eq!(crate::graph::telemetry::of(&g).unwrap()[0].apid, None);
+        assert_eq!(crate::graph::telemetry::apids(&g), Ok(Vec::new()));
+    }
+
+    /// A Yamcs gateway states its apid_base, as an APID, and no other node
+    /// does.
+    #[test]
+    fn a_yamcs_gateway_states_an_apid_base_and_no_other_node_does() {
+        let mut ground = node("ground", "gateway_yamcs");
+        ground.attributes.remove("apid_base");
+        let g = answering_yamcs(
+            vec![node("a", "i2c"), ground],
+            vec![link("a", &["ground"])],
+        );
+        assert!(says(&g, Some("ground"), &["say apid_base"]), "{g:?}");
+
+        let mut ground = node("ground", "gateway_yamcs");
+        ground
+            .attributes
+            .insert("apid_base".to_string(), Scalar::of("0x800"));
+        let g = answering_yamcs(
+            vec![node("a", "i2c"), ground],
+            vec![link("a", &["ground"])],
+        );
+        assert!(says(&g, Some("ground"), &["apid_base", "0x800", "0x7ff"]));
+
+        for (name, node_type) in [("ground", "gateway_radio"), ("a", "i2c")] {
+            let mut said = node(name, node_type);
+            said.attributes
+                .insert("apid_base".to_string(), Scalar::of("0x200"));
+            let (other, other_type) = match node_type {
+                "i2c" => ("ground", "gateway_radio"),
+                _ => ("a", "i2c"),
+            };
+            let nodes = vec![said, node(other, other_type)];
+            let g = graph(nodes, vec![link("a", &["ground"])]);
+            assert!(
+                says(&g, Some(name), &["only a gateway_yamcs node"]),
+                "{name}: {:?}",
+                g.check()
+            );
+        }
+
+        // Nor a radio's configuration a Yamcs node, or the other way about.
+        let g = graph(
+            vec![node("a", "i2c"), node("ground", "gateway_yamcs")],
+            vec![link("a", &["ground"])],
+        );
+        assert!(says(&g, Some("ground"), &["yamcs", "radio"]));
+        let g = answering_yamcs(
+            vec![node("a", "i2c"), node("ground", "gateway_radio")],
+            vec![link("a", &["ground"])],
+        );
+        assert!(says(&g, Some("ground"), &["radio", "yamcs"]));
+    }
+
+    /// Two uses of one APID are refused, naming both, the APID and what to
+    /// change; a downlink past eleven bits is refused; a gateway's own
+    /// apid_base and its device id 0's downlink may share one.
+    #[test]
+    fn apids_that_collide_are_refused() {
+        // Under the beacon's.
+        let mut ground = node("ground", "gateway_yamcs");
+        ground
+            .attributes
+            .insert("apid_base".to_string(), Scalar::of("0x100"));
+        let g = answering_yamcs(
+            vec![node("a", "i2c"), ground],
+            vec![link("a", &["ground"])],
+        );
+        assert!(says(
+            &g,
+            Some("ground"),
+            &["beacon.apid", "apid_base of \"ground\"", "0x100", "change"]
+        ));
+
+        // A downlink under the beacon's: the source at device id 1 counted
+        // from 0xFF is 0x100, the beacon's.
+        let mut ground = node("ground", "gateway_yamcs");
+        ground
+            .attributes
+            .insert("apid_base".to_string(), Scalar::of("0xFF"));
+        let g = answering_yamcs(
+            vec![ground, node("a", "i2c")],
+            vec![link("a", &["ground"])],
+        );
+        assert!(says(
+            &g,
+            Some("ground"),
+            &["beacon.apid", "sends to \"ground\"", "0x100"]
+        ));
+
+        // Two gateways' apid_bases, and one's downlink under the other's.
+        let mut second = node("other", "gateway_yamcs");
+        second.attributes.insert("port".into(), Scalar::of("5001"));
+        second
+            .attributes
+            .insert("ground_base".into(), Scalar::of("10.0.0.2:6100"));
+        let g = answering_yamcs(
+            vec![node("a", "i2c"), node("ground", "gateway_yamcs"), second],
+            vec![link("a", &["ground", "other"])],
+        );
+        assert!(says(
+            &g,
+            Some("other"),
+            &["apid_base of \"ground\"", "apid_base of \"other\"", "0x200"]
+        ));
+        let mut second = node("other", "gateway_yamcs");
+        second.attributes.insert("port".into(), Scalar::of("5001"));
+        second
+            .attributes
+            .insert("ground_base".into(), Scalar::of("10.0.0.2:6100"));
+        second
+            .attributes
+            .insert("apid_base".into(), Scalar::of("0x201"));
+        let g = answering_yamcs(
+            vec![node("ground", "gateway_yamcs"), node("a", "i2c"), second],
+            vec![link("a", &["ground"])],
+        );
+        assert!(says(
+            &g,
+            Some("ground"),
+            &["apid_base of \"other\"", "sends to \"ground\"", "0x201"]
+        ));
+
+        // Past eleven bits.
+        let mut ground = node("ground", "gateway_yamcs");
+        ground
+            .attributes
+            .insert("apid_base".to_string(), Scalar::of("0x7FF"));
+        let g = answering_yamcs(
+            vec![ground, node("a", "i2c")],
+            vec![link("a", &["ground"])],
+        );
+        assert!(says(&g, Some("ground"), &["apid_base", "0x7ff", "lower"]));
+
+        // A gateway's own apid_base and its device id 0's downlink share
+        // one, told apart by the packet type.
+        let g = answering_yamcs(
+            vec![node("a", "i2c"), node("ground", "gateway_yamcs")],
+            vec![link("a", &["ground"])],
+        );
+        assert_eq!(g.check(), Vec::new());
     }
 
     /// A graph that answers to cFS, its section the design's example.

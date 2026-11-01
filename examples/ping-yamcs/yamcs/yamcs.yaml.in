@@ -1,0 +1,11 @@
+# Yamcs's server configuration for the ping-yamcs example: one instance,
+# "ping", and the web interface and REST API on $http_port. Written by
+# ping_yamcs.py from this template; the names after a dollar sign are
+# filled in from the tcspecial configuration and the run directory.
+services:
+  - class: org.yamcs.http.HttpServer
+    args:
+      port: $http_port
+instances:
+  - ping
+dataDir: $data_dir

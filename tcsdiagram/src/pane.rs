@@ -388,6 +388,7 @@ pub fn is_gateway(node_type: &str) -> bool {
             matches!(
                 t,
                 NodeType::GatewayRadio
+                    | NodeType::GatewayYamcs
                     | NodeType::GatewayFprime
                     | NodeType::GatewayCfs
             )

@@ -128,9 +128,10 @@ MOC
 
 gateway
     The node the vehicle reaches what it answers to through -- the ground,
-    over the radio, as a ``gateway_radio`` node, an F´ flight computer, as a
-    ``gateway_fprime``, or a cFS flight computer's software bus, as a
-    ``gateway_cfs`` -- written in the ``gateway`` section: a link carrying
+    over the radio, as a ``gateway_radio`` node, a Yamcs ground station, as a
+    ``gateway_yamcs``, an F´ flight computer, as a ``gateway_fprime``, or a cFS
+    flight computer's software bus, as a ``gateway_cfs`` -- written in the
+    ``gateway`` section: a link carrying
     telemetry down and commands up. It was called ``moc`` while the
     ground was the only thing at the other end, and a configuration that still
     says ``moc``, ``moc-in``, ``moc-out``, ``tee-moc``, ``null-moc``,
@@ -2501,6 +2502,66 @@ button, the ping sent and the answer, and the three times. Both ground stations
 keep them by the same rules, ``tcslib::ping`` in Rust and ``ping_ground.py`` in
 Python.
 
+The ping-yamcs example
+----------------------
+.. figure:: ../examples/ping-yamcs/ping-yamcs.svg
+   :alt: The ping-yamcs example: Yamcs, driven by ping_yamcs.py, sends a ping
+         as a CCSDS telecommand up to the gateway_yamcs node, which takes the
+         header off and hands it to the ping node; the answer goes back down
+         through the gateway node, which puts a header on it, to Yamcs, beside
+         the beacon, also with a header.
+   :width: 100%
+
+   ``examples/ping-yamcs``: the ping example with Yamcs as the ground
+   station, over CCSDS packets.
+
+The ping example with Yamcs (https://yamcs.org) at the ground end. The
+vehicle is the same -- a ``ping`` node that answers each ping with its time
+on the end -- and so are the three times. What differs is the configuration's
+gateway, ``yamcs``, which puts a CCSDS primary header on every packet to and
+from the ground: see `What the vehicle answers to`_. The beacon is
+telemetry of APID ``0x100``; CONNECT and its answer are on ``tcs_cmd.apid``,
+``0x101``; a ping goes up as a telecommand of the gateway node's
+``apid_base``, ``0x200``, and its answer comes down as telemetry of
+``apid_base`` plus the ping node's device id, ``0x201``.
+
+``examples/ping-yamcs/ping_yamcs.py`` runs it, given a Yamcs release unpacked
+somewhere (``bin/yamcsd`` under it):
+
+.. code-block:: sh
+
+   python3 examples/ping-yamcs/ping_yamcs.py --yamcs ~/yamcs-5.14.0 --pings 3
+   make -C examples run-ping-yamcs YAMCS_HOME=~/yamcs-5.14.0
+
+It writes a Yamcs configuration from the tcspecial one into a run directory,
+``/tmp/ping-yamcs`` unless ``--run-dir`` says, so that the ports and APIDs
+are stated once. The mission database is tcspecial's own XTCE,
+``tcslibgs/xtce``, as it is, and ``tcs-ccsds.xtce``, written from
+``examples/ping-yamcs/yamcs/tcs-ccsds.xtce.in``: the CCSDS header, what
+follows it on each APID, and CONNECT and the ping behind a header. It starts
+Yamcs on that, and tcspecial on the configuration, each stopped when it
+exits; has Yamcs send CONNECT until the vehicle answers with the
+configuration's checksum; and then sends pings through Yamcs and reads the
+answers back, over Yamcs's REST API, printing each exchange:
+
+.. code-block:: text
+
+   connected: the vehicle is running this configuration
+   beacon: name tcspecial, version 0.1.0, number 2, flag normal
+   sent: ping #1 1793520566.926236889
+   received: ping #1 1793520566.926236889 1793520566.947812205
+   times: round trip 21.763111 ms, up 21.575316 ms, down 0.187795 ms
+
+Yamcs's web interface, at ``http://localhost:16090``, shows every packet and
+parameter meanwhile. An answer's arrival time is when Yamcs acquired it,
+which Yamcs gives to the millisecond, so the two halves of a short round trip
+can come out a fraction of a millisecond either side of nought.
+
+Yamcs sends its commands from a port the system chooses and takes the
+answers on the same socket, so the configuration's ``tcs_cmd.send`` is
+``127.0.0.1:0``: commands from any port of this host, each answer going back
+to the port its command came from.
+
 The tees example
 ----------------
 .. figure:: ../examples/tees/tees.svg
@@ -4183,7 +4244,9 @@ telemetry, and every configuration states it:
    tcspecial:
      gateway: "radio"
 
-``radio`` is the ground, over UDP through the vehicle's radio. ``fprime`` is an
+``radio`` is the ground, over UDP through the vehicle's radio. ``yamcs`` is a
+Yamcs ground station, over the same UDP links, every packet carrying a CCSDS
+primary header: see below, and `The ping-yamcs example`_. ``fprime`` is an
 F´ flight computer, through a bridge component in its deployment, over the
 same links in the same protocol: see `The fprime example`_. ``cfs`` is a cFS
 flight computer's software bus, which tcspecial joins as a peer of its SBN,
@@ -4197,7 +4260,8 @@ what a vehicle answers to is a fact about the mission, and the kind decides
 how every link below is written.
 
 The gateway nodes are written in the ``gateway`` section: a radio's with
-``type: gateway_radio``, an F´ bridge's with ``type: gateway_fprime``, a cFS
+``type: gateway_radio``, a Yamcs station's with ``type: gateway_yamcs``, an F´
+bridge's with ``type: gateway_fprime``, a cFS
 software bus's with ``type: gateway_cfs``. Every
 node there is of the kind ``tcspecial.gateway`` names, and one of another kind is refused,
 naming both, because a vehicle answers to one: commands, beacons and data all go
@@ -4209,6 +4273,39 @@ tcspecial's packets as they are, one to a datagram, the F´ bridge speaking
 the radio's own protocol; ``gateway_cfs`` wraps each in the cFS packet the
 cFS software bus carries, and strips it from each it takes, refusing and
 counting as malformed what is not framed so.
+
+``gateway_yamcs`` puts a six-octet CCSDS Space Packet primary header, with no
+secondary header, on every packet the vehicle sends the ground, and takes one
+off every packet it takes, refusing and counting what is not framed so --
+with the wrong packet type, the wrong APID, a secondary header, a segment, or
+a length field that is not the packet's. The ground's packets are
+telecommands and the vehicle's telemetry, each unsegmented, each sender
+counting its own sequence per APID. Each link states its APID:
+
+.. code-block:: yaml
+
+   tcspecial:
+     gateway: "yamcs"
+     beacon:
+       apid: "0x100"     # the beacon
+     tcs_cmd:
+       apid: "0x101"     # commands, and their answers
+   gateway:
+     - name: gateway
+       type: gateway_yamcs
+       apid_base: "0x200"
+
+A gateway node's uplink takes telecommands of its ``apid_base``, and each
+source sends through it as telemetry of ``apid_base`` plus its device id.
+``beacon.apid`` and ``tcs_cmd.apid`` are required in a yamcs configuration and
+refused in any other, as ``apid_base`` is on any node but a ``gateway_yamcs``.
+Each APID is 0 to ``0x7FF``, and no two links may share one: the beacon, the
+commands, each gateway node's uplink and each of its sources.
+
+A command link's sender may be written with port ``0`` -- ``tcs_cmd.send:
+"127.0.0.1:0"`` -- to take commands from any port of that host, each answer
+still going back to the port its command came from. Yamcs needs it, sending
+its commands from a port the system chooses.
 
 Configurations kept on board
 ----------------------------

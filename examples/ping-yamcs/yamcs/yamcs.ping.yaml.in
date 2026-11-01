@@ -1,0 +1,92 @@
+# The "ping" instance: its links to tcspecial and its mission database.
+# Written by ping_yamcs.py from this template, the ports and APIDs taken from
+# the tcspecial configuration, so that they are stated in one place.
+services:
+  - class: org.yamcs.archive.XtceTmRecorder
+  - class: org.yamcs.archive.ParameterRecorder
+  - class: org.yamcs.archive.AlarmRecorder
+  - class: org.yamcs.archive.EventRecorder
+  - class: org.yamcs.archive.ReplayServer
+  - class: org.yamcs.archive.CommandHistoryRecorder
+  - class: org.yamcs.ProcessorCreatorService
+    args:
+      name: realtime
+      type: realtime
+
+# Every packet carries a CCSDS primary header and no time stamp, so Yamcs
+# stamps each with the time it arrived, and fills in each command's sequence
+# count and length as it goes.
+dataLinks:
+  # The command link: CONNECT goes to tcs_cmd.recv from a port the system
+  # chooses, and tcspecial answers to that port, which this link reads too.
+  - name: commands
+    class: org.yamcs.tctm.UdpTcTmDataLink
+    host: $cmd_host
+    port: $cmd_port
+    tmStream: tm_realtime
+    tcStream: tc_commands
+    packetPreprocessorClassName: org.yamcs.tctm.GenericPacketPreprocessor
+    packetPreprocessorArgs:
+      timestampOffset: -1
+      seqCountOffset: -1
+    commandPostprocessorClassName: org.yamcs.tctm.IssCommandPostprocessor
+  # The gateway node's uplink: pings go to the address:port it binds.
+  - name: uplink
+    class: org.yamcs.tctm.UdpTcDataLink
+    stream: tc_uplink
+    host: $uplink_host
+    port: $uplink_port
+    commandPostprocessorClassName: org.yamcs.tctm.IssCommandPostprocessor
+  # The ping node's answers, at the gateway's ground_base plus its device
+  # id.
+  - name: downlink
+    class: org.yamcs.tctm.UdpTmDataLink
+    stream: tm_realtime
+    port: $downlink_port
+    packetPreprocessorClassName: org.yamcs.tctm.GenericPacketPreprocessor
+    packetPreprocessorArgs:
+      timestampOffset: -1
+      seqCountOffset: -1
+  # The beacon, at beacon.recv.
+  - name: beacon
+    class: org.yamcs.tctm.UdpTmDataLink
+    stream: tm_realtime
+    port: $beacon_port
+    packetPreprocessorClassName: org.yamcs.tctm.GenericPacketPreprocessor
+    packetPreprocessorArgs:
+      timestampOffset: -1
+      seqCountOffset: -1
+
+# tcspecial's own XTCE, as it is, and the wrapper that puts a CCSDS header
+# around it.
+mdb:
+  - type: xtce
+    args:
+      file: $xtce_dir/link.xtce
+  - type: xtce
+    args:
+      file: $xtce_dir/fixed.xtce
+  - type: xtce
+    args:
+      file: $xtce_dir/beacon.xtce
+  - type: xtce
+    args:
+      file: $run_dir/tcs-ccsds.xtce
+
+# Each command goes out on the link that leads where it is for: CONNECT on
+# the command link, the ping on the uplink.
+streamConfig:
+  tm:
+    - name: tm_realtime
+      rootContainer: /TcsYamcs/CCSDSPacket
+  cmdHist: [cmdhist_realtime]
+  event: [events_realtime]
+  param: [pp_realtime]
+  parameterAlarm: [alarms_realtime]
+  tc:
+    - name: tc_commands
+      processor: realtime
+      tcPatterns: ["/TcsYamcs/Connect"]
+    - name: tc_uplink
+      processor: realtime
+      tcPatterns: ["/TcsYamcs/PingText"]

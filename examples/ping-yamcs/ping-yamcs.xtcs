@@ -1,0 +1,79 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<configuration
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:noNamespaceSchemaLocation="../../tcsgui/share/schema/tcspecial.xsd">
+    <description>A ping, with Yamcs as the ground station, over CCSDS packets</description>
+    <tcspecial>
+        <!-- The ping example with Yamcs at the ground end. The gateway is
+             yamcs, so every packet on every link to the ground carries a
+             CCSDS primary header: the beacon, the commands and their
+             answers, and what the gateway node takes and gives. Each link
+             says its APID; the gateway node's sources count theirs on from
+             its apid_base.
+
+             Every port is in the sixteen thousands, which no other example
+             uses, so this one can be left running while another is looked
+             at. -->
+        <beacon>
+            <apid>0x100</apid>
+            <default_interval>5 s</default_interval>
+            <recv>127.0.0.1:16510</recv>
+            <reset_interval>1 s</reset_interval>
+            <send>0.0.0.0:16500</send>
+        </beacon>
+        <gateway>yamcs</gateway>
+        <interface>ad9aac4dd5a6d88dd5e78824ba8a83ac</interface>
+        <log>
+            <directory>/tmp/telemetry</directory>
+            <segment_size>65536</segment_size>
+        </log>
+        <payload_command>
+            <dest_base>0.0.0.0:16300</dest_base>
+            <source_base>127.0.0.1:16310</source_base>
+        </payload_command>
+        <payload_telemetry>
+            <dest_base>127.0.0.1:16410</dest_base>
+            <source_base>0.0.0.0:16400</source_base>
+        </payload_telemetry>
+        <!-- tcspecial counts its starts in this file, which must be on
+             storage that survives a power cycle on a vehicle. -->
+        <state_file>/tmp/tcspecial-ping-yamcs.state</state_file>
+        <!-- Yamcs sends its commands from a port the system chooses, and
+             takes the answers on the same socket, so the commands are taken
+             from any port of this host - port 0 - and each answer goes back
+             to the port its command came from. -->
+        <tcs_cmd>
+            <apid>0x101</apid>
+            <recv>0.0.0.0:16200</recv>
+            <send>127.0.0.1:0</send>
+        </tcs_cmd>
+    </tcspecial>
+    <!-- Yamcs's end of the link, both ways. A ping goes up to address:port
+         as a telecommand of APID apid_base, which this node binds aboard,
+         and leaves it by gateway-out for the ping node. The answer comes
+         back to Yamcs at ground_base plus the ping node's device id (ping
+         is the second node written, device id 1, so 16701) as telemetry of
+         APID apid_base plus that device id, 0x201. -->
+    <gateway>
+        <name>gateway</name>
+        <type>gateway_yamcs</type>
+        <address>127.0.0.1</address>
+        <port>16600</port>
+        <ground_base>127.0.0.1:16700</ground_base>
+        <apid_base>0x200</apid_base>
+        <payload-in>true</payload-in>
+        <gateway-out><target>ping</target></gateway-out>
+    </gateway>
+    <!-- Answers each ping with the vehicle's time on the end: see
+         tcslibgs::node::vehicle::ping for what a ping and its answer say. -->
+    <vehicle>
+        <name>ping</name>
+        <type>ping</type>
+        <gateway-in>true</gateway-in>
+        <payload-out><target>gateway</target></payload-out>
+    </vehicle>
+    <tcsgui>
+        <nodes><name>gateway</name><x>469</x><y>34</y></nodes>
+        <nodes><name>ping</name><x>34</x><y>34</y></nodes>
+    </tcsgui>
+</configuration>

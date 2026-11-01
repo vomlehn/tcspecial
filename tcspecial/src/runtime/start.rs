@@ -576,13 +576,28 @@ fn beacons(
                 timing,
                 sockets.beacon_send.clone(),
                 sockets.beacon_recv.clone(),
+                // Under Yamcs, as CCSDS telemetry under beacon.apid.
+                sockets.framing.map(|framing| framing.beacon_apid),
                 telemetry_log,
                 ConfigVersion::of_this_build(),
                 digest,
                 matched,
             )
             .map_err(|e| e.to_string())?,
-            format!("{} to {}", sockets.beacon_send, sockets.beacon_recv),
+            match sockets.framing {
+                None => {
+                    format!(
+                        "{} to {}",
+                        sockets.beacon_send, sockets.beacon_recv
+                    )
+                }
+                Some(framing) => format!(
+                    "{} to {}, as CCSDS APID {:#x}",
+                    sockets.beacon_send,
+                    sockets.beacon_recv,
+                    framing.beacon_apid
+                ),
+            },
         ),
         (Links::Bus(settled), Some(bus)) => (
             BeaconSend::on_bus(

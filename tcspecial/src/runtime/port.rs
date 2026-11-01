@@ -71,7 +71,8 @@ use crate::runtime::node_state::Abandon;
 
 use crate::endpoint::{
     bind_endpoint_pair, connect_endpoint_pair, hearing_endpoint_pair,
-    reaching_endpoint_pair, EndpointReadable, EndpointWritable, WaitResult,
+    reaching_endpoint_pair, CcsdsReader, EndpointReadable, EndpointWritable,
+    WaitResult,
 };
 use crate::runtime::fabric::{Arriving, Port, Taken};
 use crate::runtime::route::Routes;
@@ -259,6 +260,40 @@ impl EndpointPort {
         Ok(EndpointPort::of(what, reader, writer, uses))
     }
 
+    /// [`EndpointPort::bind`], for a link whose datagrams are CCSDS
+    /// telecommands under one APID: each is read with its header checked and
+    /// taken off, and one that fails the check is passed over and counted
+    /// with the strangers. See [`CcsdsReader`].
+    ///
+    /// The writer is left as it is: what goes to the ground does not pass
+    /// through a gateway node, but by each source's own link, which frames
+    /// its own packets (see `crate::runtime::system::open_ground_link`).
+    ///
+    /// # Arguments
+    ///
+    /// * `what`   - The node's name, which every complaint names.
+    /// * `config` - Where it waits.
+    /// * `uses`   - Which way the graph uses it.
+    /// * `apid`   - The APID its datagrams must carry.
+    ///
+    /// # Returns
+    ///
+    /// The port.
+    ///
+    /// # Errors
+    ///
+    /// What binding the endpoint failed with.
+    pub fn bind_framed(
+        what: &str,
+        config: &EndpointConfig,
+        uses: Use,
+        apid: u16,
+    ) -> TcsResult<EndpointPort> {
+        let (reader, writer) = bind_endpoint_pair(what, config)?;
+        let reader = Box::new(CcsdsReader::of(reader, apid));
+        Ok(EndpointPort::of(what, reader, writer, uses))
+    }
+
     /// Holds halves that are already open.
     ///
     /// Both halves are kept whichever way the node is used, rather than the
@@ -357,7 +392,14 @@ impl EndpointPort {
         let endpoint = reach.opened(crate::runtime::start::mode());
 
         let opened = if tcslibgs::gateway::is_gateway(&node.node_type) {
-            EndpointPort::bind(&node.name, &endpoint, uses)
+            // Under Yamcs what the ground sends is CCSDS telecommands under
+            // the node's apid_base, each header checked and taken off.
+            match tcslibgs::graph::reach::apid_base_of(node)? {
+                Some(apid) => {
+                    EndpointPort::bind_framed(&node.name, &endpoint, uses, apid)
+                }
+                None => EndpointPort::bind(&node.name, &endpoint, uses),
+            }
         } else if !speaks_first(uses.produces(), reach.trigger.is_some()) {
             // Spoken to first -- driven, or asked -- so there is nobody to
             // learn from before the first write: what the node says is where

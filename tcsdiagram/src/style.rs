@@ -1001,6 +1001,9 @@ pub enum NodeType {
     AppPl,
     AppAllPl,
     GatewayRadio,
+    /// The ground station again, a Yamcs one: every packet a CCSDS Space
+    /// Packet. See `tcslibgs::gateway`.
+    GatewayYamcs,
     /// A link to an F´ flight computer's bridge component, which the vehicle
     /// answers to in place of the ground: see `tcslibgs::gateway`.
     GatewayFprime,
@@ -1013,7 +1016,7 @@ pub enum NodeType {
 
 impl NodeType {
     /// Every type, for the palette and for the tests.
-    pub const ALL: [NodeType; 26] = [
+    pub const ALL: [NodeType; 27] = [
         NodeType::I2c,
         NodeType::Spi,
         NodeType::Serial,
@@ -1037,6 +1040,7 @@ impl NodeType {
         NodeType::AppPl,
         NodeType::AppAllPl,
         NodeType::GatewayRadio,
+        NodeType::GatewayYamcs,
         NodeType::GatewayFprime,
         NodeType::GatewayCfs,
         NodeType::Subdiagram,
@@ -1074,6 +1078,7 @@ impl NodeType {
             NodeType::AppPl => "app_pl",
             NodeType::AppAllPl => "app_all_pl",
             NodeType::GatewayRadio => "gateway_radio",
+            NodeType::GatewayYamcs => "gateway_yamcs",
             NodeType::GatewayFprime => "gateway_fprime",
             NodeType::GatewayCfs => "gateway_cfs",
             NodeType::Subdiagram => "subdiagram",
@@ -1309,6 +1314,12 @@ impl NodeType {
             NodeType::GatewayRadio => {
                 &[("ground_base", true), ("address", false), ("port", false)]
             }
+            NodeType::GatewayYamcs => &[
+                ("ground_base", true),
+                ("apid_base", true),
+                ("address", false),
+                ("port", false),
+            ],
             NodeType::GatewayFprime => &[
                 ("bridge_base", true),
                 ("fprime_id_base", true),
@@ -1463,6 +1474,7 @@ impl NodeType {
             // `tests::a_payload_is_a_device_or_a_driven_line`.
             NodeType::AppPl | NodeType::AppAllPl => "Payloads of their own",
             NodeType::GatewayRadio => "The ground station",
+            NodeType::GatewayYamcs => "A Yamcs ground station",
             NodeType::GatewayFprime => "An F´ flight computer",
             NodeType::GatewayCfs => "A cFS flight computer",
             NodeType::Subdiagram => "Pages",
@@ -1519,6 +1531,7 @@ impl NodeType {
             | NodeType::AppGatewayVeh
             | NodeType::AppAllVeh
             | NodeType::GatewayRadio
+            | NodeType::GatewayYamcs
             | NodeType::GatewayFprime
             | NodeType::GatewayCfs
             | NodeType::Subdiagram => false,
@@ -1842,6 +1855,21 @@ impl NodeType {
                 label_italic: true,
                 outline: Square,
                 edge: Single,
+                weight: Wide,
+                size: (WIDTH, HEIGHT),
+            },
+            // The Yamcs gateway is the ground station too, so it is its
+            // rectangle, wide, set large and italic; told from it by a
+            // broken second line inside the first -- the CCSDS header around
+            // every packet -- and a monospaced label, its APIDs being
+            // written in hexadecimal: two differences that are not colour.
+            NodeType::GatewayYamcs => Appearance {
+                face: Face::Mono,
+                label_size: 16,
+                label_weight: 700,
+                label_italic: true,
+                outline: Square,
+                edge: DashedDouble,
                 weight: Wide,
                 size: (WIDTH, HEIGHT),
             },

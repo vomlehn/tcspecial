@@ -799,6 +799,7 @@ mod tests {
                 "gateway_cfs",
                 "gateway_fprime",
                 "gateway_radio",
+                "gateway_yamcs",
                 // What the vehicle carries: the two that are programs first,
                 // the tree being sorted by path.
                 "app_all_pl",
@@ -1088,6 +1089,7 @@ mod tests {
             if one.path == Path::new("gateway_radio.yaml")
                 || one.path == Path::new("gateway_fprime.yaml")
                 || one.path == Path::new("gateway_cfs.yaml")
+                || one.path == Path::new("gateway_yamcs.yaml")
             {
                 continue;
             }

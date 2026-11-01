@@ -123,6 +123,44 @@ struct Link {
     /// A command is a command to restart a vehicle or stop a node; taking one
     /// from whoever sent it would be taking the ground's word from a stranger.
     from: HostPort,
+    /// Where every packet on the link is a CCSDS Space Packet -- the gateway
+    /// is Yamcs -- the APID commands must carry and what frames the answers;
+    /// `None` where packets carry no header.
+    framing: Option<LinkFraming>,
+}
+
+/// How a command link's packets are framed under Yamcs: see
+/// [`tcslibgs::ccsds`].
+struct LinkFraming {
+    /// The APID every command must carry as a telecommand: `tcs_cmd.apid`.
+    apid: u16,
+    /// What frames the answers, as telemetry under the same APID, with the
+    /// link's own sequence count.
+    answers: tcslibgs::ccsds::Sender,
+}
+
+impl LinkFraming {
+    /// The framing of a link whose commands and answers carry `apid`.
+    ///
+    /// # Arguments
+    ///
+    /// * `apid` - `tcs_cmd.apid`.
+    ///
+    /// # Returns
+    ///
+    /// The framing, its answers counted from nought.
+    ///
+    /// # Errors
+    ///
+    /// `TcsError::Config` for an APID past eleven bits.
+    fn of(apid: u16) -> TcsResult<LinkFraming> {
+        let answers = tcslibgs::ccsds::Sender::new(
+            tcslibgs::ccsds::PacketType::Telemetry,
+            apid,
+        )
+        .map_err(|fault| TcsError::Config(format!("tcs_cmd.apid: {fault}")))?;
+        Ok(LinkFraming { apid, answers })
+    }
 }
 
 /// What this vehicle answers a CONNECT with, and what it may restart onto.
@@ -263,6 +301,13 @@ impl Commands {
             });
         };
 
+        // Under Yamcs, each link with a sequence count of its own for its
+        // answers.
+        let framing = || {
+            ci.framing
+                .map(|framing| LinkFraming::of(framing.cmd_apid))
+                .transpose()
+        };
         let spacecraft = Link {
             socket: bound(
                 "the spacecraft command link",
@@ -276,6 +321,7 @@ impl Commands {
             )?,
             which: CommandLink::Spacecraft,
             from: ci.moc_cmd_send.clone(),
+            framing: framing()?,
         };
         let nodes = Link {
             socket: bound(
@@ -284,6 +330,7 @@ impl Commands {
             )?,
             which: CommandLink::Payload,
             from: ci.payload_command_source_base.clone(),
+            framing: framing()?,
         };
 
         let spacecraft_at = spacecraft.socket.local_addr()?;
@@ -474,7 +521,7 @@ impl Serving {
     /// * `spacecraft` - The spacecraft command link.
     /// * `nodes`      - The link commands about nodes arrive on.
     fn run(mut self, spacecraft: Link, nodes: Link) {
-        let links = [spacecraft, nodes];
+        let mut links = [spacecraft, nodes];
         let mut buffer = vec![0u8; COMMAND_BYTES];
 
         while !self.stopping.load(Ordering::SeqCst) {
@@ -514,11 +561,13 @@ impl Serving {
                 return;
             }
 
-            for (which, link) in links.iter().enumerate() {
+            // By index, because taking a command counts its answer on the
+            // link it arrived on.
+            for which in 0..links.len() {
                 let ready = set[which]
                     .revents()
                     .is_some_and(|events| events.contains(PollFlags::POLLIN));
-                if ready && self.take_one(link, &mut buffer) {
+                if ready && self.take_one(&mut links[which], &mut buffer) {
                     // A CONNECT has just matched this start. Everything
                     // already queued on the node link was sent before the
                     // ground knew it was matched -- it sends nothing but the
@@ -721,19 +770,24 @@ impl Serving {
     /// A datagram from anywhere but the link's one address, or one that is
     /// not a command -- of an opcode no command has, or of a length that is
     /// not exactly its opcode's layout's -- is not answered and not acted
-    /// on, and is logged and counted as malformed. An armed RESTART is
-    /// carried out once its answer has gone.
+    /// on, and is logged and counted as malformed. So, on a link whose
+    /// packets are CCSDS Space Packets, is one whose header is not a
+    /// telecommand under the link's APID; the header is taken off one that
+    /// is, and put on its answer. An armed RESTART is carried out once its
+    /// answer has gone.
     ///
     /// # Arguments
     ///
     /// * `link`   - The link the poll said is readable.
-    /// * `buffer` - Room for the datagram, as long as the longest one.
+    /// * `buffer` - Room for the datagram, as long as the longest one, and
+    ///              where a framed answer is made once the command is
+    ///              read.
     ///
     /// # Returns
     ///
     /// Whether the command was a CONNECT that matched this start, which it
     /// had not been before.
-    fn take_one(&mut self, link: &Link, buffer: &mut [u8]) -> bool {
+    fn take_one(&mut self, link: &mut Link, buffer: &mut [u8]) -> bool {
         let (size, from) = match link.socket.recv_from(buffer) {
             Ok(got) => got,
             // Nothing there after all, which a poll can say: another reader
@@ -770,7 +824,35 @@ impl Serving {
         // included: they are read into room the command holds. A packet that
         // is not one of the link's is refused here, so nothing it says is
         // acted on and it does not count as the MOC being heard.
-        let command = match Command::read(&buffer[..size]) {
+        //
+        // Under Yamcs the command is what is under a header that must be a
+        // telecommand under the link's APID, and one that is not is refused
+        // as a datagram that is not a command is: the header is all that
+        // says it is the ground's.
+        let start = match &link.framing {
+            None => 0,
+            Some(framing) => match tcslibgs::ccsds::read_header(
+                &buffer[..size],
+                tcslibgs::ccsds::PacketType::Telecommand,
+                framing.apid,
+            ) {
+                Ok(_) => tcslibgs::ccsds::HEADER_BYTES,
+                Err(fault) => {
+                    let count =
+                        self.malformed.fetch_add(1, Ordering::Relaxed) + 1;
+                    error!(
+                        "{}: {size} bytes from {from} that are not a CCSDS \
+                         telecommand under APID {:#x} ({fault}) -- not \
+                         answered, not acted on, and counted as malformed \
+                         ({count})",
+                        spelling(link.which),
+                        framing.apid
+                    );
+                    return false;
+                }
+            },
+        };
+        let command = match Command::read(&buffer[start..size]) {
             Ok(command) => command,
             // Not a command. Nothing to answer and nobody to answer it to: the
             // sender is whatever sent this.
@@ -790,8 +872,25 @@ impl Serving {
         // Back to the address it came from, because a datagram's sender is
         // the only statement of where the ground is, and a configuration
         // that stated it as well would be a second answer that can disagree.
-        self.serve(link.which, &command, |data| {
-            let _ = link.socket.send_to(data, from);
+        //
+        // Under Yamcs as telemetry under the link's APID, made in `buffer`,
+        // which the command has been read out of: answering allocates
+        // nothing.
+        let which = link.which;
+        let socket = &link.socket;
+        let framing = &mut link.framing;
+        self.serve(which, &command, |data| match framing {
+            None => {
+                let _ = socket.send_to(data, from);
+            }
+            Some(framing) => match framing.answers.frame(buffer, data) {
+                Ok(packet) => {
+                    let _ = socket.send_to(packet, from);
+                }
+                Err(fault) => {
+                    error!("{}: an answer not sent: {fault}", spelling(which))
+                }
+            },
         })
     }
 
@@ -1405,6 +1504,7 @@ mod tests {
                 payload_dest_base: here(0),
                 beacon_send: here(0),
                 beacon_recv: here(0),
+                framing: None,
             }),
             beacon_interval: Duration::from_secs(5),
             reset_interval: Duration::from_secs(1),
@@ -1615,6 +1715,89 @@ mod tests {
         (ground, commands)
     }
 
+    /// Under Yamcs a command is taken only as a CCSDS telecommand under
+    /// `tcs_cmd.apid`, on either link, and its answer goes back as CCSDS
+    /// telemetry under the same APID, each link counting its own answers;
+    /// an unframed command, one under another APID and one that says it is
+    /// telemetry are not answered and are counted as malformed.
+    #[test]
+    fn under_yamcs_commands_and_answers_are_framed() {
+        use tcslibgs::ccsds::{read_header, PacketType, Sender};
+        let graph = two_nodes();
+        let states = Arc::new(NodeStates::of(&graph).expect("states"));
+        let (bench, _) = a_pass_answering(|_| Ok(()));
+        let matched = Matched::at_a_start();
+        matched.connected();
+        let ground = UdpSocket::bind("127.0.0.1:0").expect("a ground socket");
+        ground
+            .set_read_timeout(Some(Duration::from_millis(500)))
+            .expect("a timeout");
+        let mut ci = links_for(&ground);
+        if let tcslibgs::Links::Sockets(sockets) = &mut ci.links {
+            sockets.framing = Some(tcslibgs::CcsdsFraming {
+                beacon_apid: 0x100,
+                cmd_apid: 0x101,
+            });
+        }
+        let commands = Commands::start(
+            &ci,
+            states,
+            bench,
+            flying(),
+            None,
+            TelemetryLog::disabled(),
+            matched,
+            || {},
+            None,
+        )
+        .expect("both links bind");
+
+        // What came back, if anything did.
+        let send = |sender: &mut Sender, at: SocketAddr, command: &Command| {
+            let mut room = vec![0u8; COMMAND_BYTES];
+            let packet = sender
+                .frame(&mut room, &command.to_bytes())
+                .expect("framed");
+            ground.send_to(packet, at).expect("sent");
+            let mut answer = vec![0u8; COMMAND_BYTES];
+            let (size, _) = ground.recv_from(&mut answer).ok()?;
+            answer.truncate(size);
+            Some(answer)
+        };
+        let ping =
+            |sequence| Command::Ping(tcslibgs::PingCommand::new(sequence));
+        let mut tc = Sender::new(PacketType::Telecommand, 0x101).unwrap();
+        let at = commands.spacecraft_address();
+
+        // Framed: answered, framed, its count the link's own.
+        for count in 0..2u8 {
+            let answer = send(&mut tc, at, &ping(u32::from(count) + 1))
+                .expect("an answer");
+            let data = read_header(&answer, PacketType::Telemetry, 0x101)
+                .expect("a framed answer");
+            assert_eq!(answer[3], count, "the answers' sequence count");
+            let said = Telemetry::read(data).expect("telemetry");
+            assert_eq!(said.status(), CommandStatus::Success);
+        }
+        // The node link counts its answers from nought.
+        let node = Command::StartNode(NodeCommand::start(3, NodeId::of(1)));
+        let answer =
+            send(&mut tc, commands.node_address(), &node).expect("an answer");
+        read_header(&answer, PacketType::Telemetry, 0x101)
+            .expect("a framed answer");
+        assert_eq!(answer[3], 0, "the node link's own count");
+
+        // Unframed, under another APID, and telemetry: none answered.
+        ground.send_to(&ping(4).to_bytes(), at).expect("sent");
+        let mut answer = [0u8; 64];
+        assert!(ground.recv_from(&mut answer).is_err(), "unframed");
+        let mut other = Sender::new(PacketType::Telecommand, 0x102).unwrap();
+        assert_eq!(send(&mut other, at, &ping(5)), None, "another APID");
+        let mut tm = Sender::new(PacketType::Telemetry, 0x101).unwrap();
+        assert_eq!(send(&mut tm, at, &ping(6)), None, "telemetry");
+        assert_eq!(commands.malformed(), 3);
+    }
+
     /// From a start, every command but CONNECT, RESTART_ARM and RESTART --
     /// PING among them -- is answered `Unmatched` and not acted on. A
     /// CONNECT carrying another configuration's checksum is answered with
@@ -1694,6 +1877,7 @@ mod tests {
         let socket = UdpSocket::bind("127.0.0.1:0").expect("a link");
         let at = socket.local_addr().expect("where it is");
         let link = Link {
+            framing: None,
             socket,
             which: CommandLink::Payload,
             from: HostPort {

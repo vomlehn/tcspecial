@@ -114,6 +114,9 @@ impl BeaconSend {
     /// * `timing`    - How often beacons go, normally and across a restart.
     /// * `from_addr` - `beacon.send`, where beacons are sent from.
     /// * `dest_addr` - `beacon.recv`, where they go.
+    /// * `apid`      - `beacon.apid`, the APID every beacon carries as CCSDS
+    ///                 telemetry where the gateway is Yamcs; `None` where
+    ///                 beacons carry no header.
     /// * `log`       - The telemetry log every beacon is recorded in.
     /// * `version`   - What this build is, carried in every beacon.
     /// * `digest`    - The digest of the configuration read, carried in every
@@ -129,11 +132,17 @@ impl BeaconSend {
     /// # Errors
     ///
     /// `TcsError::Config`, naming the setting to change, where `from_addr`
-    /// cannot be bound or `dest_addr` does not resolve to an address.
+    /// cannot be bound, `dest_addr` does not resolve to an address or `apid`
+    /// is not an APID.
+    //
+    // Eight, each a different thing the sender is made of, as `sending`
+    // has: a structure holding them would only be these arguments again.
+    #[allow(clippy::too_many_arguments)]
     pub fn new(
         timing: BeaconTiming,
         from_addr: tcslibgs::HostPort,
         dest_addr: tcslibgs::HostPort,
+        apid: Option<u16>,
         log: TelemetryLog,
         version: ConfigVersion,
         digest: ConfigDigest,
@@ -173,9 +182,35 @@ impl BeaconSend {
             .next()
             .ok_or_else(unresolved)?;
 
+        // The header's sender and the room each framed beacon is made in,
+        // made here so that sending one allocates nothing.
+        let framing = apid
+            .map(|apid| {
+                tcslibgs::ccsds::Sender::new(
+                    tcslibgs::ccsds::PacketType::Telemetry,
+                    apid,
+                )
+                .map(|sender| Framing {
+                    sender,
+                    room: vec![
+                        0u8;
+                        tcslibgs::ccsds::HEADER_BYTES
+                            + tcslibgs::BEACON_BYTES
+                    ],
+                })
+                .map_err(|fault| {
+                    tcslibgs::TcsError::Config(format!("beacon.apid: {fault}"))
+                })
+            })
+            .transpose()?;
+
         Ok(Some(BeaconSend::sending(
             timing,
-            Out::Socket { socket, dest },
+            Out::Socket {
+                socket,
+                dest,
+                framing,
+            },
             from_addr.to_string(),
             dest_addr.to_string(),
             log,
@@ -364,8 +399,23 @@ impl BeaconSend {
         // beacon the send fails on is still known to have been produced.
         self.log.record(data);
         match out {
-            Out::Socket { socket, dest } => {
+            Out::Socket {
+                socket,
+                dest,
+                framing: None,
+            } => {
                 socket.send_to(data, *dest)?;
+            }
+            // Under Yamcs, as CCSDS telemetry under beacon.apid.
+            Out::Socket {
+                socket,
+                dest,
+                framing: Some(Framing { sender, room }),
+            } => {
+                let packet = sender.frame(room, data).map_err(|fault| {
+                    tcslibgs::TcsError::Config(format!("a beacon: {fault}"))
+                })?;
+                socket.send_to(packet, *dest)?;
             }
             // Not sent, and not a failure, where the peer is not connected
             // or has not subscribed: SBN sends a peer only what it asked for.
@@ -423,10 +473,23 @@ impl BeaconSend {
 
 /// What beacons go out of.
 enum Out {
-    /// A UDP socket bound to `beacon.send`, sending to `beacon.recv`.
-    Socket { socket: UdpSocket, dest: SocketAddr },
+    /// A UDP socket bound to `beacon.send`, sending to `beacon.recv`, and
+    /// how each beacon is framed where the gateway is Yamcs.
+    Socket {
+        socket: UdpSocket,
+        dest: SocketAddr,
+        framing: Option<Framing>,
+    },
     /// A cFS software bus, under `beacon.tlm_msgid`.
     Bus { publisher: Publisher, msgid: u16 },
+}
+
+/// How a beacon goes as a CCSDS Space Packet: see [`tcslibgs::ccsds`].
+struct Framing {
+    /// The APID, the type and the beacons' own sequence count.
+    sender: tcslibgs::ccsds::Sender,
+    /// Where each packet is made: a header and the longest beacon.
+    room: Vec<u8>,
 }
 
 type ArcCondPair<T> = Arc<CondPair<T>>;
@@ -550,6 +613,7 @@ mod tests {
                         address: at.ip().to_string(),
                         port: at.port(),
                     },
+                    framing: None,
                 }),
                 beacon_interval: Duration::from_millis(50),
                 reset_interval: Duration::from_millis(50),
@@ -580,6 +644,7 @@ mod tests {
                 address: at.ip().to_string(),
                 port: at.port(),
             },
+            None,
             log,
             ConfigVersion::of_this_build(),
             ConfigDigest([0u8; 16]),
@@ -646,6 +711,7 @@ mod tests {
                 address: at.ip().to_string(),
                 port: at.port(),
             },
+            None,
             TelemetryLog::disabled(),
             ConfigVersion::of_this_build(),
             ConfigDigest([0u8; 16]),
@@ -768,6 +834,7 @@ mod tests {
                 address: "127.0.0.1".to_string(),
                 port: 9,
             },
+            None,
             TelemetryLog::disabled(),
             ConfigVersion::of_this_build(),
             ConfigDigest([0u8; 16]),
@@ -794,6 +861,7 @@ mod tests {
                 address: "no-such-host.invalid".to_string(),
                 port: 5550,
             },
+            None,
             TelemetryLog::disabled(),
             ConfigVersion::of_this_build(),
             ConfigDigest([0u8; 16]),

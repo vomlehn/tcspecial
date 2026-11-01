@@ -167,6 +167,12 @@ struct Identity {
 impl Identity {
     /// Writes the header of a datagram of `what` type before a message of
     /// `length` bytes already in place after it.
+    ///
+    /// # Arguments
+    ///
+    /// * `what`   - The SBN message type.
+    /// * `out`    - Room for the datagram, the message already after the header.
+    /// * `length` - How long the message is.
     fn header(&self, what: u8, out: &mut [u8], length: usize) {
         Header {
             kind: what,
@@ -450,6 +456,10 @@ impl Keeper {
     }
 
     /// Does what the clock says is due.
+    ///
+    /// # Arguments
+    ///
+    /// * `now` - The time.
     fn tick(&mut self, now: Instant) {
         match self.liveness.due(now) {
             Due::Nothing => {}
@@ -471,6 +481,10 @@ impl Keeper {
     }
 
     /// Takes what the far end sent.
+    ///
+    /// # Arguments
+    ///
+    /// * `now` - When it arrived.
     fn take_from_bus(&mut self, now: Instant) {
         let Ok((size, from)) = self.socket.recv_from(&mut self.room) else {
             return;
@@ -540,6 +554,10 @@ impl Keeper {
     }
 
     /// Sends a telemetry packet's data on to whoever it is for.
+    ///
+    /// # Arguments
+    ///
+    /// * `body` - Where the message, after SBN's header, is in the room.
     fn telemetry(&mut self, body: std::ops::Range<usize>) {
         if !self.verified.load(Ordering::SeqCst) {
             return;
@@ -664,6 +682,11 @@ impl Keeper {
 
     /// Sends what is in `out` after its header, a message of `length`
     /// bytes of this type.
+    ///
+    /// # Arguments
+    ///
+    /// * `what`   - The SBN message type, one of [`kind`]'s.
+    /// * `length` - How many bytes of `out`, after the header, the message is.
     fn say(&mut self, what: u8, length: usize) {
         self.us.header(what, &mut self.out, length);
         if self
@@ -689,6 +712,14 @@ struct Kept {
 
 impl Kept {
     /// A peer not yet heard from.
+    ///
+    /// # Arguments
+    ///
+    /// * `now` - The time, which its silence is counted from.
+    ///
+    /// # Returns
+    ///
+    /// The peer, not connected and subscribed to nothing.
     fn new(now: Instant) -> Kept {
         Kept {
             at: None,
@@ -703,6 +734,12 @@ impl Kept {
         self.wanted[at / 64] & (1 << (at % 64)) != 0
     }
 
+    /// Notes the peer's subscribing to `msgid`, or unsubscribing.
+    ///
+    /// # Arguments
+    ///
+    /// * `msgid`  - The message ID.
+    /// * `wanted` - Whether it subscribed (`true`) or unsubscribed.
     fn want(&mut self, msgid: u16, wanted: bool) {
         let at = usize::from(msgid);
         if wanted {
@@ -849,6 +886,10 @@ struct Hub {
 
 impl Hub {
     /// Keeps the bus until told to stop.
+    ///
+    /// # Arguments
+    ///
+    /// * `stop` - Set when the stand-in is to stop.
     fn run(&mut self, stop: &AtomicBool) {
         let mut fds = [libc::pollfd {
             fd: self.socket.as_raw_fd(),
@@ -865,6 +906,14 @@ impl Hub {
     }
 
     /// The peer `who` names.
+    ///
+    /// # Arguments
+    ///
+    /// * `who` - Which peer.
+    ///
+    /// # Returns
+    ///
+    /// The peer, to change.
     fn kept(&mut self, who: Who) -> &mut Kept {
         match who {
             Who::Vehicle => &mut self.vehicle,
@@ -875,6 +924,10 @@ impl Hub {
     /// Sends heartbeats, and disconnects peers silent too long. The
     /// stand-in never announces: SBN on a cFS does not speak first to a
     /// peer on its own spacecraft.
+    ///
+    /// # Arguments
+    ///
+    /// * `now` - The time.
     fn tick(&mut self, now: Instant) {
         let every = std::iter::once(Who::Vehicle)
             .chain((0..STATIONS_AT_ONCE).map(Who::Station));
@@ -901,6 +954,10 @@ impl Hub {
     }
 
     /// Forgets a peer: a station's slot is then free for another.
+    ///
+    /// # Arguments
+    ///
+    /// * `who` - Which peer.
     fn forget(&mut self, who: Who) {
         let kept = self.kept(who);
         kept.forget();
@@ -910,6 +967,14 @@ impl Hub {
     }
 
     /// Names a peer, for a line said about it.
+    ///
+    /// # Arguments
+    ///
+    /// * `who` - Which peer.
+    ///
+    /// # Returns
+    ///
+    /// What it is, in a word or two.
     fn named(who: Who) -> &'static str {
         match who {
             Who::Vehicle => "vehicle",
@@ -918,6 +983,10 @@ impl Hub {
     }
 
     /// Takes one datagram.
+    ///
+    /// # Arguments
+    ///
+    /// * `now` - When it arrived.
     fn take(&mut self, now: Instant) {
         let Ok((size, from)) = self.socket.recv_from(&mut self.room) else {
             return;
@@ -1032,6 +1101,11 @@ impl Hub {
 
     /// Passes a packet on: from the vehicle to each station that subscribed
     /// to it, and from a station to the vehicle where it subscribed to it.
+    ///
+    /// # Arguments
+    ///
+    /// * `who`  - Which peer it came from.
+    /// * `body` - Where the message, after SBN's header, is in the room.
     fn application(&mut self, who: Who, body: std::ops::Range<usize>) {
         if !self.kept(who).verified {
             return;
@@ -1073,6 +1147,12 @@ impl Hub {
 
     /// Sends what is in `out` after its header to a peer, a message of
     /// `length` bytes of this type.
+    ///
+    /// # Arguments
+    ///
+    /// * `who`    - Which peer it goes to.
+    /// * `what`   - The SBN message type, one of [`kind`]'s.
+    /// * `length` - How many bytes of `out`, after the header, the message is.
     fn say(&mut self, who: Who, what: u8, length: usize) {
         let Some(to) = self.kept(who).at else {
             return;
@@ -1121,6 +1201,15 @@ mod tests {
 
     impl Played {
         /// A peer of this processor ID, speaking to the stand-in at `to`.
+        ///
+        /// # Arguments
+        ///
+        /// * `processor_id` - The processor ID it says it is.
+        /// * `to`           - Where the stand-in is.
+        ///
+        /// # Returns
+        ///
+        /// The peer.
         fn new(processor_id: u32, to: SocketAddr) -> Played {
             let socket = loopback("test").unwrap();
             socket
@@ -1134,6 +1223,11 @@ mod tests {
         }
 
         /// Sends a message of `what` type.
+        ///
+        /// # Arguments
+        ///
+        /// * `what`    - The SBN message type.
+        /// * `message` - The message, after SBN's header.
         fn say(&self, what: u8, message: &[u8]) {
             let mut room = vec![0u8; sbn::HEADER_BYTES + message.len()];
             let size = Header {
@@ -1147,6 +1241,11 @@ mod tests {
         }
 
         /// Subscribes to `msgids` with the ident of `hash`.
+        ///
+        /// # Arguments
+        ///
+        /// * `hash`   - The hash its ident is made from.
+        /// * `msgids` - What it subscribes to.
         fn subscribe(&self, hash: &str, msgids: &[u16]) {
             let mut room = [0u8; 256];
             let size = sbn::write_subscriptions(
@@ -1167,6 +1266,14 @@ mod tests {
         }
 
         /// Waits up to two seconds for a message of `what` type.
+        ///
+        /// # Arguments
+        ///
+        /// * `what` - The SBN message type waited for.
+        ///
+        /// # Returns
+        ///
+        /// The message, after SBN's header, or `None` where none came.
         fn until(&self, what: u8) -> Option<Vec<u8>> {
             let deadline = Instant::now() + Duration::from_secs(2);
             let mut room = vec![0u8; ROOM];

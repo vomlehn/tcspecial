@@ -23,7 +23,11 @@ use tcslibgs::graph::Graph;
 
 mod common;
 
-/// A port nothing holds, for something to bind.
+/// Finds a port nothing holds, for something to bind.
+///
+/// # Returns
+///
+/// The port, free when it was looked at.
 fn free() -> u16 {
     UdpSocket::bind("127.0.0.1:0")
         .expect("a port")

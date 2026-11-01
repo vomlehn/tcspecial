@@ -88,6 +88,19 @@ if [ ! -w "$bank/sim_gpio0/pull" ]; then
 	exit 1
 fi
 
+# Give the chip and its lines' pulls to whoever asked for them, where that was
+# someone running this under sudo. The kernel makes both root's, so without
+# this only root could open the chip -- and the tests, tcspecial and tcssim
+# are run as the user, not as root. udev is let finish first, because it sets
+# a new node's owner itself and would otherwise undo this after the fact.
+if [ -n "${SUDO_USER:-}" ] && [ "$SUDO_USER" != root ]; then
+	if command -v udevadm > /dev/null; then
+		udevadm settle
+	fi
+	chown "$SUDO_USER" "/dev/$chip" "$bank"/sim_gpio*/pull
+	echo "mkgpio: /dev/$chip and its lines' pulls are now $SUDO_USER's"
+fi
+
 echo "mkgpio: done"
 echo
 echo "  a GPIO payload:   path: /dev/$chip"

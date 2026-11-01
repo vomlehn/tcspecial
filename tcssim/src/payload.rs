@@ -100,13 +100,14 @@ pub struct PayloadConfig {
     /// changed while the simulator runs -- a panel may retime a payload --
     /// and an atomic holds a number. They become lengths of time in one
     /// place, [`Pacing::read`], which is what the waiting is done with.
-    /// What this payload is to a thermal mass, where it is attached to one.
+    /// What this payload is to the physics model's world, where it is
+    /// joined to it.
     ///
     /// `None` for every payload that is not, which is every payload in every
-    /// simulator file that declares no mass: such a payload sends bytes from
+    /// simulator file that names no model: such a payload sends bytes from
     /// a random number generator, which is what this simulator did for
-    /// everything before there was a mass to read.
-    pub thermal: Option<crate::physics::thermal_mass::thermal_mass::Thermal>,
+    /// everything before there was a world to read.
+    pub attachment: Option<crate::physics::Attachment>,
     /// The thermostat this sensor reports to, where the simulator stands in
     /// for the vehicle's: every reading it sends goes there as it leaves.
     /// `None` for every other payload, and for every payload of a run with
@@ -617,7 +618,7 @@ pub(crate) enum Produce {
 /// # Arguments
 ///
 /// * `config` - The payload's configuration, which gives its faults and
-///              any thermal mass it reads or heats.
+///              what it is joined to in the world.
 /// * `pacing` - What the window has the payload's packet size at.
 /// * `sent`   - How many packets have gone so far, which the faults that
 ///              are counted rather than random need: a payload that goes
@@ -649,7 +650,7 @@ pub(crate) fn a_packet(
 /// # Arguments
 ///
 /// * `config`   - The payload's configuration, which gives its faults and
-///                any thermal mass it reads or heats.
+///                what it is joined to in the world.
 /// * `pacing`   - What the window has the payload's packet size at.
 /// * `sent`     - How many packets have gone so far.
 /// * `rng`      - Where the random faults come from.
@@ -668,13 +669,13 @@ pub(crate) fn a_packet_from<R: Rng>(
     let faults = &config.faults;
 
     // A heater sends nothing. What it is for is being driven: the vehicle
-    // writes a decision to it and the thermal mass it warms is told, so a
+    // writes a decision to it and the heater it is joined to is switched, so a
     // packet of its own would be bytes nothing reads. Its packet interval is
     // how often it looks for that decision, which is the one thing its pacing
     // still means.
     if matches!(
-        config.thermal,
-        Some(crate::physics::thermal_mass::thermal_mass::Thermal::Heats { .. })
+        config.attachment,
+        Some(crate::physics::Attachment::Drives { .. })
     ) {
         return Produce::Nothing;
     }
@@ -689,41 +690,23 @@ pub(crate) fn a_packet_from<R: Rng>(
         return Produce::Nothing;
     }
 
-    // A sensor attached to a thermal mass sends what the mass is, in the
-    // encoding its own conversion reads back: see
-    // `crate::physics::thermal_mass::thermal_mass`. Every other payload sends
-    // bytes from the generator, which is what this simulator did for
-    // everything before there was a mass to read.
+    // A sensor joined to the world sends what its terminal is, in the
+    // encoding its own conversion reads back: see `crate::physics`. Every
+    // other payload sends bytes from the generator, which is what this
+    // simulator did for everything before there was a world to read.
     //
     // The packet size is not consulted. What a reading of this sensor is, is
     // the format's business -- two bytes or three -- and a size that
     // disagreed with it would be a reading the vehicle could not parse. A
     // payload configuration whose read_size does not match its conversion's
     // format is a fault in that file, and the vehicle finds it.
-    let mut packet: Vec<u8> = match &config.thermal {
-        Some(crate::physics::thermal_mass::thermal_mass::Thermal::Reads {
-            mass,
-            output,
-            reading,
-            sensor,
-        }) => match mass.output(output) {
-            Some(kelvin) => crate::physics::thermal_mass::thermal_mass::encode(
-                reading,
-                sensor.read(kelvin, std::time::Instant::now()),
-            ),
-            // The simulator file was checked for this before anything
-            // started, so it is a fault here rather than in the file.
-            None => {
-                eprintln!(
-                    "{} reads output {output} of the thermal mass {}, which \
-                     has no such output",
-                    config.name,
-                    mass.name()
-                );
-                return Produce::Nothing;
-            }
-        },
-        _ => generate(rng, pacing.packet_size),
+    let mut packet: Vec<u8> = match config
+        .attachment
+        .as_ref()
+        .and_then(crate::physics::Attachment::reading)
+    {
+        Some(reading) => reading,
+        None => generate(rng, pacing.packet_size),
     };
 
     // A packet of one byte is left alone: there is no length that is both
@@ -950,7 +933,7 @@ mod tests {
     /// 100 ms, sending.
     fn with(faults: Faults) -> PayloadConfig {
         PayloadConfig {
-            thermal: None,
+            attachment: None,
             thermostat: None,
             name: "DH0".to_string(),
             protocol: PayloadProtocol::Udp,
@@ -1370,7 +1353,7 @@ mod tests {
     #[test]
     fn test_payload_config() {
         let config = PayloadConfig {
-            thermal: None,
+            attachment: None,
             thermostat: None,
             name: "DH0".to_string(),
             protocol: PayloadProtocol::Udp,

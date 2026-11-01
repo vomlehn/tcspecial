@@ -360,12 +360,15 @@ touches no hardware. Aboard they would be on I2C, SPI and GPIO, as
 `tests/manual/thermostat.ytcs` has them; those buses are flown against
 stand-ins by `make stand-ins-test` and `make kernel-stand-ins-test`.
 
-tcssim stands in for the sensors with a thermal mass, `basic`, declared in
-the vehicle's physics model, `thermostat-physics.yaml`, which
-`thermostat-sim.yaml` names. All three sensors read it, each on an output
-of its own, so their readings agree and the vote produces a temperature. The mass cools towards 283.15 K, ten kelvin below the
-setpoint, and the heaters warm it, each through an input of its own while the
-vehicle has it on: the loop closes through tcspecial.
+tcssim joins the stand-ins to the vehicle's physics model,
+`thermostat-physics.yaml`, which `thermostat-sim.yaml` names: a zone and two
+heaters, each a part simulated alone and joined to the zone under
+`connections`. All three sensors are joined to `zone.temperature`, each from
+a place of its own on the zone, so their readings agree and the vote
+produces a temperature. The zone cools towards 283.15 K, ten kelvin below the
+setpoint, and each heater's stand-in is joined to `heater_1.on` or
+`heater_2.on`, so the heaters warm it while the vehicle has them on: the loop
+closes through tcspecial.
 
 ```
 make run-thermostat

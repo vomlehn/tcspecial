@@ -1443,7 +1443,7 @@ connects and is matched, and the beacon says the configuration's checksum;
 beacons are heard; a simulated reading arrives as the thermometer's channel,
 its two bytes, and the temperature made of it as ``zone_temp``'s, a number
 of kelvin, with no datum refused as not a value; a PING is answered; a node is stopped and started again; ``1`` sent up
-drives the heater, whose stand-in warms the thermal mass the thermometer
+drives the heater, whose stand-in switches the heater warming the zone the thermometer
 reads, so that ``zone_temp`` climbs and ``heater_wanted``'s decision channel
 goes false, with no datum refused as not a decision, and ``0`` turns it off; a node the
 configuration lacks is refused unsent; a restart onto a configuration the
@@ -2855,7 +2855,7 @@ actually switched. True, and it was applied to the link as well, where it does
 not hold. A heater's state then lived in one place -- the vehicle's last
 decision -- and was asserted only on a change, with nothing reading back what
 the heater was doing. One lost datagram stood for ever: the vehicle believing
-it had switched the heaters off, the mass climbing past the top of the band,
+it had switched the heaters off, the zone climbing past the top of the band,
 and the thermostat deciding ``Off`` again, finding it had already said so, and
 staying silent. The decision that would correct it is the one it thinks it has
 already sent.
@@ -10598,108 +10598,184 @@ Requirement
     A group may carry the type and the transport, like every other setting a
     payload does not state. A group whose payloads are not all reached the
     same way leaves them with the payloads: the thermostat's sensors share a
-    rate and a thermal mass, and two of the three are on a different kind of
+    rate and a terminal, and two of the three are on a different kind of
     bus from the third.
 
-Thermal Masses
---------------
+The Physics Model
+-----------------
 Every other simulated payload makes its bytes up. A buffer filled from a
 random number generator exercises a link and nothing at all of a control loop:
 three sensors sending noise never agree, so the vote over them produces
 nothing anybody can check, and a thermostat downstream of it cannot be watched
 holding a band.
 
-A thermal mass is what makes them agree. The sensors attached to one report
-its temperature, each in its own encoding, and the heaters attached to it warm
-it -- so what the vehicle reads is a consequence of what the vehicle drove,
-and the whole loop can be watched closing.
+A physics model is what makes them agree. It is the vehicle's physical parts
+-- a zone, the heaters that warm it -- each simulated alone and joined to the
+others, and the stand-ins are joined to it: the sensors report the zone's
+temperature, each in its own encoding, and the heaters' stand-ins switch the
+heaters -- so what the vehicle reads is a consequence of what the vehicle
+drove, and the whole loop can be watched closing.
 
 Requirement
-    Thermal masses are declared in a physics model: a YAML file of its own,
-    which the simulator file names with ``physics``, relative to the
-    simulator file's directory. A vehicle's physics outlives any one
-    configuration of its payloads, so it is stated once and named by every
-    simulator file that uses it; the manual's thermostat fixture and the
-    thermostat example name one model. A simulator file that still declares
-    masses itself is refused, told where they go.
+    The model is a YAML file of its own, which the simulator file names with
+    ``physics``, relative to the simulator file's directory. A vehicle's
+    physics outlives any one configuration of its payloads, so it is stated
+    once and named by every simulator file that uses it; the manual's
+    thermostat fixture and the thermostat example name one model. A
+    simulator file that still declares masses itself is refused, told where
+    they go.
 
 Requirement
     The model is a list of elements, each with a name and a ``type``, as a
-    configuration is a list of nodes: ``thermal_mass`` is the one type so
-    far, and an element of any other is refused. Each type's settings, and
-    its rules, are stated once, in ``tcslibgs::physics``; its arithmetic is
-    the simulator's.
+    configuration is a list of nodes, and a list of connections between
+    them, as a configuration has links. The types are ``heater`` and
+    ``thermal_zone``, and an element of any other is refused; a
+    ``thermal_mass``, the one type there was before a model was made of
+    parts, is told what it is now. Each type's settings, terminals and rules
+    are stated once, in ``tcslibgs::physics``; its arithmetic is the
+    simulator's, in ``tcssim::physics``.
 
 Requirement
-    A thermal mass has a name, the temperature of the environment it sits
-    in, and a time constant: how long it takes to lose a given fraction of
-    the difference between itself and that environment.
+    Each type is one simple part, with its own words for what goes in and
+    what comes out, rather than a whole assembly: a heater is switched
+    ``on`` and gives out ``heat`` and draws ``current``; a zone takes
+    ``heat`` and has a ``temperature``. A vehicle is made by joining parts,
+    so a part is written once and a different vehicle is different
+    connections.
 
 Requirement
-    ``tcsverify`` reads the model a simulator file names, and reports a
-    problem with a mass at its line in the model, and a model that cannot
-    be read at the simulator file's ``physics`` line.
+    Each type's terminals are fixed. A terminal is an input or an output,
+    and carries a value in one unit or a decision: a heater's ``heat`` is in
+    watts and its ``on`` a decision, a zone's ``temperature`` in kelvin. A
+    connection goes from an output to an input of the same kind, written
+    ``from: heater_1.heat`` and ``to: zone.heat``, and one joining two
+    outputs, two inputs or two kinds is refused, naming both.
 
 Requirement
-    A mass may name inputs, where heaters are connected, and outputs, where
-    sensors read it. Any of them may be left unconnected. A list naming one
-    twice is refused.
+    An input takes one output, or the sum of every output joined to it where
+    its type says so: a zone's ``heat`` is the sum of its heaters'. A second
+    output on an input that takes one, or a connection made twice, is
+    refused. An input that must be joined -- a heater's ``on`` -- and is
+    not, is refused: it is a part nothing can switch.
 
 Requirement
-    A simulated payload may be attached to a mass, either as something that
-    reads one of its outputs or as something that heats it through one of
-    its inputs. A heater states what it adds, in kelvin a second.
+    Every figure is written with its unit -- ``"283.15 K"``, ``"60 W"``,
+    ``"20 J/K"`` -- and one without it, or in another unit, is refused,
+    saying what to write. A bare ``60`` could be watts or kelvin a second,
+    which differ by the zone's heat capacity. A fraction, which has no unit,
+    is written bare.
 
 Requirement
-    An input is one heater's. Two heaters on one input would each switch the
-    other's heat, and which was on would depend on which the vehicle drove
-    last.
+    A heater states its power at its nominal voltage and that voltage. A
+    thermal zone states the temperature of the environment it sits in, its
+    time constant -- how long it takes to lose a given fraction of the
+    difference between itself and that environment -- and its heat
+    capacity, which turns a heater's watts into kelvin a second.
 
 Requirement
-    The mass is one lump at one temperature, so every output reads the
-    same. What the names say is which sensor is on which.
+    A simulated payload is joined to one terminal by ``connects``, written
+    as a connection's end is: ``connects: zone.temperature``. Joined to an
+    output, it reports it; joined to an input, it drives it, which a
+    stand-in can do only to an input taking a decision, a decision being
+    what a vehicle sends a stand-in. A terminal the model does not have is
+    refused, naming what it has. The settings that joined a payload to a
+    thermal mass, ``reads``, ``heats``, ``output``, ``input`` and ``rate``,
+    are refused, told what says it now.
 
 Requirement
-    A mass nothing is attached to is refused. It would be a state nothing
-    reads and nothing changes, which is a file saying something it cannot
-    mean.
+    An input is driven by one stand-in, and not by a stand-in and a
+    connection. Two would each switch it over the other, and which was in
+    force would depend on which the vehicle drove last.
 
-The arithmetic is Newton's cooling with a constant heat,
+Requirement
+    An element nothing is joined to -- no connection and no stand-in -- is
+    refused. It would be a state nothing reads and nothing changes, and the
+    likeliest cause is a misspelled ``connects``.
+
+Requirement
+    ``tcsverify`` reads the model a simulator file names, and reports every
+    problem with an element at its line in the model, a problem with the
+    connections at the model's ``connections`` line, and a model that
+    cannot be read at the simulator file's ``physics`` line.
+
+**How the world advances**
+
+The simulator makes one world of the model, which every stand-in joined to
+it shares, and nothing ticks.
+
+Requirement
+    The world is brought up to a moment only when something needs it there:
+    a stand-in reading an output, or driving an input. A world nobody asks
+    about costs nothing.
+
+Requirement
+    Simulated time tracks the wall clock, a second for a second from when
+    the world was made, because the vehicle at the other end of every link
+    runs on the wall clock. The mapping has a rate, so that a world can run
+    faster than the wall clock where nothing at the other end needs it to
+    keep pace; a run with tcspecial keeps it at one.
+
+Requirement
+    Between two moments every element is advanced with its inputs held, by
+    its type's closed form where there is one, which is exact. The world is
+    advanced whenever it is asked, so its intervals are whatever length the
+    traffic makes them, and a method whose error grew with the interval
+    would make the simulated values depend on how often somebody looked.
+
+Requirement
+    Where an element's behaviour changes inside an interval -- a battery
+    reaching full, a body reaching the ground -- it foresees the moment, as
+    its next event. The events wait in a queue, soonest first, one for each
+    element, set again whenever the element's inputs change; the world
+    advances to each in its order, lets it happen and goes on, so nothing is
+    stepped across. The queue's room is the number of elements, fixed when
+    the world is made, and nothing is allocated once it runs.
+
+Requirement
+    What is at each input is worked out from every output as it stands at
+    the start of an interval, and given again until it settles, so that a
+    heater switched on is a zone warmed from that moment and not from the
+    next one.
+
+Requirement
+    An element that foresees its next event at the moment it is already at,
+    time after time, is stopped after ten thousand and the log says so: the
+    world falls behind rather than every stand-in waiting on it for ever.
+
+**A thermal zone and its heaters**
+
+A heater's heat goes as the square of its supply voltage and its current as
+the voltage, ``power * (1 + v)^2`` and ``power / voltage * (1 + v)`` with
+``v`` the supply's departure from nominal, nought while it is off. A zone's
+arithmetic is Newton's cooling with that heat held,
 
 .. code-block:: text
 
-   dT/dt = -(T - environment) / time_constant + heat
+   dT/dt = -(T - environment) / time_constant + heat / capacity
 
-where ``heat`` is the sum of the rates of the heaters that are on. Between two
-changes of that sum it is constant, so the equation has a closed form, and the
-mass is stepped by that rather than integrated:
+which over an interval has a closed form, and the zone is advanced by that
+rather than integrated:
 
 .. code-block:: text
 
    T(t + dt) = rest + (T - rest) * exp(-dt / time_constant)
-   rest      = environment + heat * time_constant
+   rest      = environment + heat / capacity * time_constant
 
-Requirement
-    The mass is stepped exactly, whenever it is read and whenever a heater
-    changes. A method whose error grew with the step would make the simulated
-    temperature depend on how often somebody looked at it.
-
-``rest`` is where the mass would settle with that heat on for ever, and it is
+``rest`` is where the zone would settle with that heat on for ever, and it is
 the figure that says whether the heaters can win at all: with a fifty second
-constant and six kelvin a second of heat, it is three hundred kelvin above the
-environment.
+constant, twenty joules a kelvin and a hundred and twenty watts, it is three
+hundred kelvin above the environment.
 
 Requirement
-    A mass starts at its environment, with its heaters off. A mass that
-    started at the setpoint would hide the one part of the loop worth
-    watching, and a vehicle coming up cold is the case a thermostat exists
-    for.
+    A zone starts at its environment, and a heater off. A zone that started
+    at the setpoint would hide the one part of the loop worth watching, and
+    a vehicle coming up cold is the case a thermostat exists for.
 
 **What the bytes are**
 
-A sensor has to send bytes the vehicle will read back as the temperature, and
+A sensor has to send bytes the vehicle will read back as what it reports, and
 the format, the scale and the offset are not the sensor's own: they are on the
-``to_kelvin`` node its readings go to.
+conversion, ``to_kelvin`` or ``to_value``, its readings go to.
 
 Requirement
     The encoding is taken from that node and not stated here. A scale written
@@ -10708,76 +10784,82 @@ Requirement
     with both files looking right.
 
 Requirement
-    A sensor attached to a mass whose readings reach no conversion is
-    refused, and so is one whose readings reach two. The first has no
-    encoding to borrow and the second has no single answer.
+    A sensor whose readings reach no conversion is refused, and so is one
+    whose readings reach two, and one whose conversion is in another unit
+    than the terminal it reports. The first has no encoding to borrow, the
+    second has no single answer, and the third would have a zone's
+    temperature read back as volts.
 
 Requirement
-    A temperature the format cannot hold is clamped and not wrapped. A
-    wrapped count is a sensor reporting the other end of its range, which is
-    a fault the vehicle has no way to tell from a reading.
+    A value the format cannot hold is clamped and not wrapped. A wrapped
+    count is a sensor reporting the other end of its range, which is a fault
+    the vehicle has no way to tell from a reading.
 
-**What a heater is**
-
-Requirement
-    A heater sends nothing. Being driven is the whole of what it is for, so a
-    packet of its own would be bytes nothing reads.
+**What a heater's stand-in is**
 
 Requirement
-    A heater's packet interval is how often it looks for what the vehicle
-    decided. It is the one thing pacing still means for a payload that sends
-    nothing, and it is part of how promptly the loop responds: the vehicle
-    cannot see a band crossed until its next sample, and the heaters cannot
-    hear about it until they next look, so the overshoot is their rate over
-    the sum of the two.
+    A stand-in that drives sends nothing. Being driven is the whole of what
+    it is for, so a packet of its own would be bytes nothing reads.
 
 Requirement
-    A heater acts on the last thing the vehicle said and not on the next
-    thing in the queue. A decision is not a reading -- it says what the
-    device should be now -- so a vehicle deciding faster than the heater
-    looks must not leave it acting on a decision that is older every pass.
+    Its packet interval is how often it looks for what the vehicle decided.
+    It is the one thing pacing still means for a payload that sends nothing,
+    and it is part of how promptly the loop responds: the vehicle cannot see
+    a band crossed until its next sample, and the heaters cannot hear about
+    it until they next look, so the overshoot is their heat over the sum of
+    the two.
 
 Requirement
-    A heater must be a kind of payload the simulator can be driven through:
-    a socket, or discrete lines on ``gpio-sim``, whose stand-in watches the
+    It acts on the last thing the vehicle said and not on the next thing in
+    the queue. A decision is not a reading -- it says what the device should
+    be now -- so a vehicle deciding faster than the stand-in looks must not
+    leave it acting on a decision that is older every pass.
+
+Requirement
+    It must be a kind of payload the simulator can be driven through: a
+    socket, or discrete lines on ``gpio-sim``, whose stand-in watches the
     lines the vehicle drives.
 
 **Physically Realistic Noise**
 
-A simulated sensor that reports the mass exactly agrees with the others to
+A simulated sensor that reports the zone exactly agrees with the others to
 the count, and a vote over sensors that always agree is never exercised.
 Real readings go wrong in two places, and a loop treats them differently:
 what goes wrong at a sensor is its own, and a vote can outvote it; what goes
-wrong in the mass every sensor sees, and the heaters must work against it.
+wrong in the zone every sensor sees, and the heaters must work against it.
 
 Requirement
     A sensor may state the noise on each reading, the accuracy its fixed
     calibration error is drawn within, a slow drift and its time, and its
-    own lag, each as a datasheet gives it. The calibration error is drawn
-    once a run, normally distributed with a third of the accuracy as its
-    standard deviation and clamped to the accuracy, which is a bound most
-    parts sit well inside.
+    own lag, each as a datasheet gives it and in the unit of the terminal it
+    reports, which is checked. The calibration error is drawn once a run,
+    normally distributed with a third of the accuracy as its standard
+    deviation and clamped to the accuracy, which is a bound most parts sit
+    well inside.
 
 Requirement
-    A heater may state how its supply voltage varies, and how slowly. Its
-    power goes as the square of its voltage, so it warms by
-    ``rate * (1 + v)^2``.
+    A sensor may state how far the place it is on sits from what its
+    terminal says, as its ``offset``: a body warmed in one place is not one
+    temperature throughout.
 
 Requirement
-    A mass may state how its environment swings as a sine wave, and over
-    what period; how it wanders at random, and how slowly; and how far each
-    output sits from the mass's temperature.
+    A heater may state how its supply voltage varies, and how slowly.
+
+Requirement
+    A zone may state how its environment swings as a sine wave, and over
+    what period, and how it wanders at random, and how slowly.
 
 Requirement
     Everything that wanders is an Ornstein-Uhlenbeck process stepped by its
     exact transition, so that its statistics do not depend on how often it
     is stepped, and starts where a settled one would be. The swing is in
-    the mass's equation, whose closed form gains the swing's steady
-    response, so it is stepped as exactly as the rest. A wander is held for
-    a step, which is exact for steps much shorter than its time constant.
+    the zone's equation, whose closed form gains the swing's steady
+    response, so it is advanced as exactly as the rest. A wander is held for
+    an interval, which is exact for intervals much shorter than its time
+    constant.
 
 Requirement
-    Each mass and each sensor draws from a generator of its own, seeded
+    Each element and each sensor draws from a generator of its own, seeded
     from the run's seed and its name, so that a run with the same seed
     varies the same way whatever order the payloads' threads ask in. The
     seed is the ``tcssim`` section's; without one tcssim chooses it and
@@ -10785,13 +10867,13 @@ Requirement
 
 Requirement
     Every one of these is off unless stated, so a file that states none
-    simulates the mass and its sensors as exactly as before.
+    simulates the zone and its sensors exactly.
 
 **A Stood-in Thermostat**
 
-The loop closes through tcspecial when the heaters are attached: the
-sensors report the mass, the vehicle decides, the heaters warm it. To watch
-the mass and the heaters with no tcspecial running, tcssim can stand in for
+The loop closes through tcspecial when the heaters are joined: the sensors
+report the zone, the vehicle decides, the heaters warm it. To watch the zone
+and the heaters with no tcspecial running, tcssim can stand in for
 the vehicle's thermostat too. It is ``tcssim::node::vehicle::thermostat``,
 the one vehicle node the simulator has: everything else a vehicle computes
 runs on a workstation as it runs aboard.
@@ -10802,8 +10884,8 @@ Requirement
     and ``half_band`` from the configuration, which states them once.
 
 Requirement
-    Its sensors are the simulated payloads reading a thermal mass whose data
-    reaches the node, and its heaters the simulated payloads heating one that
+    Its sensors are the simulated payloads reporting the world whose data
+    reaches the node, and its heaters the simulated payloads driving it that
     data from the node reaches. A node that is not a hysteresis node, or
     that no such sensor reaches, or that reaches no such heater, is refused.
 
@@ -10931,26 +11013,39 @@ Requirement
 Example
 -------
 This is the shipped ``examples/thermostat/thermostat-sim.yaml``, which
-simulates the three sensors and two heaters of ``thermostat.ytcs``, attached
-to the thermal mass ``basic`` of the model it names,
-``thermostat-physics.yaml``:
+simulates the three sensors and two heaters of ``thermostat.ytcs``, joined to
+the model it names, ``thermostat-physics.yaml``: two heaters warming one
+zone.
 
 .. code-block:: yaml
 
    physics:
-     - name: basic
-       type: thermal_mass
-       environment: "283.15"
+     - name: heater_1
+       type: heater
+       power: "60 W"
+       voltage: "28 V"
+     - name: heater_2
+       type: heater
+       power: "60 W"
+       voltage: "28 V"
+     - name: zone
+       type: thermal_zone
+       environment: "283.15 K"
        time_constant: "50 s"
-       inputs: "in1,in2"
-       outputs: "out1,out2,out3"
+       capacity: "20 J/K"
+
+   connections:
+     - from: heater_1.heat
+       to: zone.heat
+     - from: heater_2.heat
+       to: zone.heat
 
 The three sensors are read together and so share a group, which carries
-their rate and the thermal mass they report; the mass is what makes three sensors agree about a temperature, each
-on an output of its own. The heaters warm the mass, each through an input of
-its own while the vehicle has it on. Every one of them is the far end of a
-UDP socket, which the simulator stands in for with nothing more than a
-socket.
+their rate and the terminal they report; the zone is what makes three
+sensors agree about a temperature, each from a place of its own on it. Each
+heater's stand-in switches its heater while the vehicle has it on. Every one
+of them is the far end of a UDP socket, which the simulator stands in for
+with nothing more than a socket.
 
 .. code-block:: yaml
 
@@ -10960,43 +11055,39 @@ socket.
 
    simulated_payload_groups:
      - name: zone_temps
+       simulate: true
        packet_interval: 100 ms
-       reads: basic
+       connects: zone.temperature
 
    simulated_payloads:
      - name: temp_1
        type: network
        protocol: udp
        group: zone_temps
-       output: out1
 
      - name: temp_2
        type: network
        protocol: udp
        group: zone_temps
-       output: out2
+       offset: "+0.2 K"
 
      - name: temp_3
        type: network
        protocol: udp
        group: zone_temps
-       output: out3
+       offset: "-0.3 K"
 
      - name: heaters_1
        simulate: true
        type: network
        protocol: udp
-       heats: basic
-       input: in1
-       rate: "3.0"
+       connects: heater_1.on
 
      - name: heaters_2
        simulate: true
        type: network
        protocol: udp
-       heats: basic
-       input: in2
-       rate: "3.0"
+       connects: heater_2.on
 
 Testing
 =======
@@ -11293,14 +11384,14 @@ Requirement
       the samples going from the kernel to the vehicle past it.
 
     A payload's button off is the device switched off: it sends nothing,
-    answers nothing and acts on nothing -- a heater warms no mass -- and what
+    answers nothing and acts on nothing -- a heater warms no zone -- and what
     reaches it is still counted, as what the vehicle did.
 
 Requirement
     A payload that is only driven -- a heater, a valve -- is simulated as any
     other: its stand-in sends nothing and counts what reaches it, and its
     simulator entry gives no packet interval, there being nothing to send.
-    One that heats a thermal mass warms it as well.
+    One joined to a heater switches it as well.
 
 Requirement
     The comparison is tcssim's, and tcspecial does not read the simulator

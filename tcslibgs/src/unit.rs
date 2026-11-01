@@ -128,6 +128,10 @@ impl Unit {
     ];
 
     /// Finds this unit's row of the table.
+    ///
+    /// # Returns
+    ///
+    /// The row.
     fn row(self) -> &'static Row {
         TABLE
             .iter()

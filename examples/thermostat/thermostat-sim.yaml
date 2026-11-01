@@ -5,15 +5,15 @@
 # The two files are joined by name, and nothing here names a payload that
 # file does not have. Only the payloads named here are simulated.
 #
-# The three sensors report a thermal mass rather than noise, which is what
-# makes the vehicle's half of the loop watchable: three readings of one
-# temperature agree, so the vote produces a temperature and the thermostat
-# decides on it.
+# The three sensors report the zone of the physics model rather than noise,
+# which is what makes the vehicle's half of the loop watchable: three
+# readings of one temperature agree, so the vote produces a temperature and
+# the thermostat decides on it.
 #
 # The heaters are UDP sockets, which the vehicle drives and tcssim watches:
-# each decision the vehicle sends them, their panel counts, and the mass is
-# warmed through the input each is on. So the loop closes through tcspecial:
-# the sensors report the mass, the vehicle decides, and the heaters warm it.
+# each decision the vehicle sends them, their panel counts, and the heater
+# each is joined to is switched. So the loop closes through tcspecial: the
+# sensors report the zone, the vehicle decides, and the heaters warm it.
 #
 # To close it in tcssim alone, with no tcspecial running, add
 # "thermostat: thermostat" to the tcssim section below: tcssim then stands in
@@ -27,79 +27,75 @@ description: Simulator settings for the payloads of thermostat.ytcs
 tcssim:
   ready: "127.0.0.1:7907"
 
-# The physics model the payloads below attach to -- the zone they read and
-# warm -- which is the vehicle's, not this file's: see the file it names.
+# The physics model the payloads below are joined to -- the zone they read
+# and the heaters that warm it -- which is the vehicle's, not this file's:
+# see the file it names.
 physics: thermostat-physics.yaml
 
 simulated_payload_groups:
   # The three sensors are read together, every tenth of a second, as their
-  # payload group in thermostat.ytcs says. Each reports the mass, in the
-  # encoding the to_kelvin node its readings go to expects: this file says
-  # nothing about the format, the scale or the offset, because a scale written
-  # in two files is a scale that can disagree with itself.
+  # payload group in thermostat.ytcs says. Each reports the zone's
+  # temperature, in the encoding the to_kelvin node its readings go to
+  # expects: this file says nothing about the format, the scale or the
+  # offset, because a scale written in two files is a scale that can
+  # disagree with itself.
   #
   # Each sensor drifts too, by a twentieth of a kelvin over half an hour,
   # which is what an ageing part's calibration does.
   - name: zone_temps
     simulate: true
     packet_interval: 100 ms
-    reads: basic
-    drift: "0.05"
+    connects: zone.temperature
+    drift: "0.05 K"
     drift_time: "30 min"
 
 simulated_payloads:
-  # Each sensor on an output of its own, with its part's datasheet errors.
-  # temp_1 and temp_2 are one part, a digital sensor of a sixteenth of a
-  # kelvin a count: accurate to half a kelvin, three hundredths of a kelvin
-  # of noise, and four seconds behind the zone in its package.
+  # Each sensor with its part's datasheet errors, and on its own place on
+  # the zone. temp_1 and temp_2 are one part, a digital sensor of a
+  # sixteenth of a kelvin a count: accurate to half a kelvin, three
+  # hundredths of a kelvin of noise, and four seconds behind the zone in its
+  # package.
   - name: temp_1
     type: network
     protocol: udp
     group: zone_temps
-    output: out1
-    noise: "0.03"
-    accuracy: "0.5"
+    noise: "0.03 K"
+    accuracy: "0.5 K"
     lag: 4 s
 
+  # The zone is not one temperature throughout: the place temp_2 is on is a
+  # fifth of a kelvin warmer than the middle.
   - name: temp_2
     type: network
     protocol: udp
     group: zone_temps
-    output: out2
-    noise: "0.03"
-    accuracy: "0.5"
+    offset: "+0.2 K"
+    noise: "0.03 K"
+    accuracy: "0.5 K"
     lag: 4 s
 
-  # A better part, in a heavier package: accurate to a quarter of a kelvin,
-  # two hundredths of noise, and slower to follow.
+  # A better part, in a heavier package, on a place three tenths of a
+  # kelvin cooler: accurate to a quarter of a kelvin, two hundredths of
+  # noise, and slower to follow.
   - name: temp_3
     type: network
     protocol: udp
     group: zone_temps
-    output: out3
-    noise: "0.02"
-    accuracy: "0.25"
+    offset: "-0.3 K"
+    noise: "0.02 K"
+    accuracy: "0.25 K"
     lag: 6 s
 
   # Driven and never read: their stand-ins send nothing, count each decision
-  # the vehicle sends them, and warm the mass while on. Their supply varies
-  # by two percent over twenty seconds or so, and their heat with its square.
+  # the vehicle sends them, and switch the heater each is joined to.
   - name: heaters_1
     simulate: true
     type: network
     protocol: udp
-    heats: basic
-    input: in1
-    rate: "3.0"
-    ripple: "0.02"
-    ripple_time: 20 s
+    connects: heater_1.on
 
   - name: heaters_2
     simulate: true
     type: network
     protocol: udp
-    heats: basic
-    input: in2
-    rate: "3.0"
-    ripple: "0.02"
-    ripple_time: 20 s
+    connects: heater_2.on

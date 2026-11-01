@@ -264,7 +264,7 @@ fn each_section_takes_the_node_types_the_software_knows() {
 /// The kinds are `DHType`'s, which is what the simulator reads a `type`
 /// with. Empty is allowed, as not stated. And the XSD offers every setting
 /// the one list of them has, which the XSD once did not: it was missing
-/// what attaches a payload to a thermal mass.
+/// what attaches a payload to the physics model.
 #[test]
 fn the_simulator_schemas_take_the_kinds_and_words_the_simulator_reads() {
     let mut kinds: Vec<String> = tcslibgs::DHType::ALL
@@ -307,8 +307,10 @@ fn the_simulator_schemas_take_the_kinds_and_words_the_simulator_reads() {
     let file = dir.path().join("every-sim.xml");
     std::fs::write(
         dir.path().join("every-physics.yaml"),
-        "physics:\n  - name: zone\n    type: thermal_mass\n    \
-         environment: \"280\"\n    time_constant: \"60 s\"\n",
+        "physics:\n  - name: heater\n    type: heater\n    \
+         power: \"60 W\"\n    voltage: \"28 V\"\n  - name: zone\n    \
+         type: thermal_zone\n    environment: \"280 K\"\n    \
+         time_constant: \"60 s\"\n    capacity: \"20 J/K\"\n",
     )
     .expect("written");
     std::fs::write(
@@ -327,14 +329,15 @@ fn the_simulator_schemas_take_the_kinds_and_words_the_simulator_reads() {
     <name>temp</name>
     <group>fast</group>
     <type>i2c</type>
-    <reads>zone</reads>
+    <connects>zone.temperature</connects>
+    <offset>+0.2 K</offset>
+    <noise>0.03 K</noise>
     <drop_percent>1</drop_percent>
   </simulated_payloads>
   <simulated_payloads>
     <name>heater</name>
     <type>gpio</type>
-    <heats>zone</heats>
-    <rate>0.5</rate>
+    <connects>heater.on</connects>
   </simulated_payloads>
 </simulator>
 ",
@@ -872,7 +875,7 @@ fn every_node_is_described_once_and_in_one_spelling() {
 }
 
 /// The physics model's schema offers every element type the model reads,
-/// and every setting of a thermal mass the one list of them has: the
+/// and for each type every setting the one list of its settings has: the
 /// schema an editor checks a hand-written model against says what tcssim
 /// reads.
 #[test]
@@ -886,15 +889,23 @@ fn the_physics_schema_takes_the_types_and_settings_the_model_reads() {
         .map(|value| value.as_str().expect("a type is a word"))
         .collect();
     assert_eq!(types, tcslibgs::physics::TYPES);
-    let mut said: Vec<&str> = item["properties"]
-        .as_object()
-        .expect("an element's settings")
-        .keys()
-        .map(String::as_str)
-        .filter(|name| !["name", "type"].contains(name))
-        .collect();
-    said.sort_unstable();
-    let mut wanted = tcslibgs::physics::THERMAL_MASS_SETTINGS.to_vec();
-    wanted.sort_unstable();
-    assert_eq!(said, wanted);
+    let branches = item["allOf"].as_array().expect("one branch a type");
+    assert_eq!(branches.len(), types.len());
+    for branch in branches {
+        let name = branch["if"]["properties"]["type"]["const"]
+            .as_str()
+            .expect("a branch is for one type");
+        let mut said: Vec<&str> = branch["then"]["properties"]
+            .as_object()
+            .expect("its settings")
+            .keys()
+            .map(String::as_str)
+            .collect();
+        said.sort_unstable();
+        let mut wanted = tcslibgs::physics::settings_of(name)
+            .expect("a type the model reads")
+            .to_vec();
+        wanted.sort_unstable();
+        assert_eq!(said, wanted, "{name}");
+    }
 }

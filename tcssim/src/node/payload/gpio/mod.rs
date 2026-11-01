@@ -195,8 +195,8 @@ pub fn run_gpio_node(
 /// The vehicle drives them as outputs, and gpio-sim keeps what each line is
 /// in its `value`, so what the vehicle decided can be read back without being
 /// in its way. A move is the lines' values, one byte each, `1` or `0`; where
-/// they all agree it is a decision, and a heater of a thermal mass is driven
-/// by it, as a heater reached over a socket is.
+/// they all agree it is a decision, and the heater it is joined to in the
+/// world is driven by it, as one reached over a socket is.
 ///
 /// Silent -- its panel's button off -- the device is switched off: a move is
 /// counted, as every stand-in counts what arrives, and heats nothing.
@@ -234,8 +234,8 @@ fn watch_driven_lines(
         }
         if now != was && !first {
             if sending && now.iter().all(|&v| v == now[0]) {
-                crate::physics::thermal_mass::thermal_mass::driven(
-                    &config.thermal,
+                crate::physics::driven(
+                    &config.attachment,
                     &config.name,
                     &now[..1],
                 );
@@ -315,7 +315,7 @@ mod tests {
             })
             .collect();
         let config = PayloadConfig {
-            thermal: None,
+            attachment: None,
             thermostat: None,
             name: "heaters".to_string(),
             protocol: crate::payload::PayloadProtocol::Gpio,

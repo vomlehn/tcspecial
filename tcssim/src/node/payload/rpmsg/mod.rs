@@ -142,7 +142,7 @@ mod tests {
         interval_ms: u32,
     ) -> PayloadConfig {
         PayloadConfig {
-            thermal: None,
+            attachment: None,
             thermostat: None,
             name: "remote".to_string(),
             protocol: PayloadProtocol::Rpmsg,

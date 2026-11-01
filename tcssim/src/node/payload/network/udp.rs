@@ -61,12 +61,10 @@ pub fn run_udp_node(
     // first binds nothing, and for a heater neither end would ever speak if
     // this one waited to be asked.
     if config.driven
-        || matches!(
-            config.thermal,
-            Some(
-                crate::physics::thermal_mass::thermal_mass::Thermal::Heats { .. }
-            )
-        )
+        || config
+            .attachment
+            .as_ref()
+            .is_some_and(crate::physics::Attachment::drives)
     {
         run_driven_udp_node(config, running, stats, &handler);
         return;
@@ -138,11 +136,11 @@ pub fn run_udp_node(
             if n > 0 {
                 asked = n;
                 asker = Some(from);
-                // A heater is driven by what arrives: the mass is told before
-                // the statistics are, so that nothing holds the stats lock
-                // across the mass's own.
-                crate::physics::thermal_mass::thermal_mass::driven(
-                    &config.thermal,
+                // A heater is driven by what arrives: the world is told
+                // before the statistics are, so that nothing holds the stats
+                // lock across the world's own.
+                crate::physics::driven(
+                    &config.attachment,
                     &config.name,
                     &buf[..n],
                 );
@@ -238,8 +236,8 @@ fn run_driven_udp_node(
         // to and stays on through every later word to the contrary.
         //
         // So the queue is drained and the last word wins. Each is applied in
-        // turn because each is a real thing the vehicle said, and the mass is
-        // stepped by each, which over the no time between them changes
+        // turn because each is a real thing the vehicle said, and the world
+        // is advanced by each, which over the no time between them changes
         // nothing but keeps one rule for how a decision is acted on.
         let mut buf = vec![0u8; 4096];
         // From whoever sent it. The vehicle's end of this link is a port it
@@ -249,13 +247,13 @@ fn run_driven_udp_node(
             if n == 0 {
                 break;
             }
-            // The mass is told before the statistics are, so that nothing
-            // holds the stats lock across the mass's own. Not where the
+            // The world is told before the statistics are, so that nothing
+            // holds the stats lock across the world's own. Not where the
             // panel has the device switched off: what arrives is counted, as
             // every stand-in counts it, and acted on by nothing.
             if pacing.sending {
-                crate::physics::thermal_mass::thermal_mass::driven(
-                    &config.thermal,
+                crate::physics::driven(
+                    &config.attachment,
                     &config.name,
                     &buf[..n],
                 );
@@ -301,7 +299,7 @@ mod tests {
             .expect("a read timeout");
 
         let mut device = SimulatedPayload::new(PayloadConfig {
-            thermal: None,
+            attachment: None,
             thermostat: None,
             name: "DH0".to_string(),
             protocol: PayloadProtocol::Udp,
@@ -384,7 +382,7 @@ mod tests {
             .and_then(|taken| taken.local_addr())
             .expect("a free port");
         let mut device = SimulatedPayload::new(PayloadConfig {
-            thermal: None,
+            attachment: None,
             thermostat: None,
             name: "DH0".to_string(),
             protocol: PayloadProtocol::Udp,
@@ -452,7 +450,7 @@ mod tests {
         own_port: Option<u16>,
     ) -> SimulatedPayload {
         SimulatedPayload::new(PayloadConfig {
-            thermal: None,
+            attachment: None,
             thermostat: None,
             name: "DH0".to_string(),
             protocol: PayloadProtocol::Udp,
@@ -516,7 +514,7 @@ mod tests {
         drop(nowhere);
 
         let config = PayloadConfig {
-            thermal: None,
+            attachment: None,
             thermostat: None,
             name: "serial-line".to_string(),
             protocol: PayloadProtocol::Udp,
@@ -816,7 +814,7 @@ mod tests {
             .expect("a read timeout");
 
         let mut device = SimulatedPayload::new(PayloadConfig {
-            thermal: None,
+            attachment: None,
             thermostat: None,
             name: "DH0".to_string(),
             protocol: PayloadProtocol::Udp,

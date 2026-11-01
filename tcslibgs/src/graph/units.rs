@@ -40,6 +40,17 @@ pub fn unit_of(graph: &Graph, node: &str) -> Option<Unit> {
 
 /// [`unit_of`], with the nodes already being asked about, so that a loop of
 /// votes feeding each other ends rather than recursing for ever.
+///
+/// # Arguments
+///
+/// * `graph`  - The configuration.
+/// * `node`   - The node's name.
+/// * `asking` - The nodes whose units are being worked out further up.
+///
+/// # Returns
+///
+/// The unit, or `None` as [`unit_of`] says, and for a node already being
+/// asked about.
 fn unit_seen<'a>(
     graph: &'a Graph,
     node: &'a str,
@@ -97,6 +108,17 @@ pub fn input_unit(graph: &Graph, node: &str) -> Option<Unit> {
 }
 
 /// The unit each node feeding this one sends values in, by name.
+///
+/// # Arguments
+///
+/// * `graph`  - The configuration.
+/// * `node`   - The node fed.
+/// * `asking` - The nodes whose units are being worked out further up.
+///
+/// # Returns
+///
+/// Each node feeding it, once, with the unit it sends values in, or `None`
+/// for one that sends none.
 fn sources_units<'a>(
     graph: &'a Graph,
     node: &str,
@@ -253,6 +275,13 @@ mod tests {
     }
 
     /// Changes one node's attribute in a configuration.
+    ///
+    /// # Arguments
+    ///
+    /// * `graph`     - The configuration.
+    /// * `node`      - The node's name.
+    /// * `attribute` - The attribute.
+    /// * `value`     - What it is set to.
     fn with(graph: &mut Graph, node: &str, attribute: &str, value: &str) {
         graph
             .nodes

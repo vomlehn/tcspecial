@@ -57,22 +57,16 @@
       <xs:element name="silent_after" type="xs:string"/>
       <xs:element name="close_after" type="xs:string"/>
       <xs:element name="ignore_trigger_percent" type="xs:string"/>
-      <!-- What a payload is attached to: the thermal mass it reports and the
-           output it reads, or the one it warms, the input it warms it
-           through, and how fast. -->
-      <xs:element name="reads" type="xs:string"/>
-      <xs:element name="output" type="xs:string"/>
-      <xs:element name="heats" type="xs:string"/>
-      <xs:element name="input" type="xs:string"/>
-      <xs:element name="rate" type="xs:string"/>
-      <!-- What a sensor gets wrong, and how a heater's supply varies. -->
+      <!-- What a payload is joined to: the terminal of the physics model
+           it reports or drives, and where on it a sensor sits. -->
+      <xs:element name="connects" type="xs:string"/>
+      <xs:element name="offset" type="xs:string"/>
+      <!-- What a sensor gets wrong. -->
       <xs:element name="noise" type="xs:string"/>
       <xs:element name="accuracy" type="xs:string"/>
       <xs:element name="drift" type="xs:string"/>
       <xs:element name="drift_time" type="xs:string"/>
       <xs:element name="lag" type="xs:string"/>
-      <xs:element name="ripple" type="xs:string"/>
-      <xs:element name="ripple_time" type="xs:string"/>
     </xs:choice>
   </xs:complexType>
 

@@ -274,12 +274,10 @@ pub fn run_unix_dgram_node(
     // see `tcspecial::node::payload::network::unix::UnixDatagramEndpoint::
     // reaching`.
     if config.driven
-        || matches!(
-            config.thermal,
-            Some(
-                crate::physics::thermal_mass::thermal_mass::Thermal::Heats { .. }
-            )
-        )
+        || config
+            .attachment
+            .as_ref()
+            .is_some_and(crate::physics::Attachment::drives)
     {
         run_driven_unix_dgram_node(config, running, stats, &handler);
         return;
@@ -480,13 +478,13 @@ fn run_driven_unix_dgram_node(
             if n == 0 {
                 break;
             }
-            // The mass is told before the statistics are, so that nothing
-            // holds the stats lock across the mass's own. Not where the
+            // The world is told before the statistics are, so that nothing
+            // holds the stats lock across the world's own. Not where the
             // panel has the device switched off: what arrives is counted, as
             // every stand-in counts it, and acted on by nothing.
             if pacing.sending {
-                crate::physics::thermal_mass::thermal_mass::driven(
-                    &config.thermal,
+                crate::physics::driven(
+                    &config.attachment,
                     &config.name,
                     &buf[..n],
                 );
@@ -538,7 +536,7 @@ mod tests {
     /// The device, not yet started.
     fn device_at(path: &Path, protocol: PayloadProtocol) -> SimulatedPayload {
         SimulatedPayload::new(PayloadConfig {
-            thermal: None,
+            attachment: None,
             thermostat: None,
             name: "DH0".to_string(),
             protocol,
@@ -674,7 +672,7 @@ mod tests {
         let path = a_path("asked");
         std::fs::remove_file(&path).ok();
         let mut device = SimulatedPayload::new(PayloadConfig {
-            thermal: None,
+            attachment: None,
             thermostat: None,
             name: "temp".to_string(),
             protocol: PayloadProtocol::UnixDgram,
@@ -727,47 +725,34 @@ mod tests {
 
     /// A socket file left by a run that was killed is replaced: the path is
     /// the address, and a dead socket at it would stop every run from then on.
-    /// A driven datagram device waits where the vehicle sends, and the mass
-    /// is warmed by what arrives.
+    /// A driven datagram device waits where the vehicle sends, and the
+    /// heater it is joined to warms its zone by what arrives.
     ///
     /// The case the ordinary arrangement cannot serve: a heater sends nothing,
     /// so the vehicle cannot learn where it is and sends to the path the
     /// configuration names -- which means this end has to be waiting there.
     /// Bound the other way round, the vehicle's write would have had nowhere
-    /// to land and the mass would never have warmed.
+    /// to land and the zone would never have warmed.
     #[test]
     fn a_driven_datagram_device_waits_where_the_vehicle_sends() {
-        use crate::physics::thermal_mass::thermal_mass::{
-            Thermal, ThermalMass,
-        };
-        use tcslibgs::sim_config::{ResolvedMass, Wander};
+        use crate::physics::tests::zone_world;
+        use crate::physics::Attachment;
 
         let path = a_path("driven");
         std::fs::remove_file(&path).ok();
 
-        let mass = Arc::new(ThermalMass::new(
-            &ResolvedMass {
-                name: "zone".to_string(),
-                environment: 283.15,
-                time_constant: Duration::from_secs(50),
-                inputs: vec!["in1".to_string()],
-                outputs: Vec::new(),
-                ..Default::default()
-            },
-            Instant::now(),
-            0,
-        ));
-        let cold = mass.temperature();
+        let (world, place) = zone_world();
+        let temperature = place("zone.temperature");
+        let warmth = || world.read(temperature, Instant::now());
+        let cold = warmth();
 
         // A heater at the path the configuration names, looking for what the
         // vehicle decided every 20 ms -- which is all pacing means for a
         // device that sends nothing.
         let mut device = SimulatedPayload::new(PayloadConfig {
-            thermal: Some(Thermal::Heats {
-                mass: mass.clone(),
-                input: "in1".to_string(),
-                rate: 3.0,
-                supply: Wander::default(),
+            attachment: Some(Attachment::Drives {
+                world: world.clone(),
+                place: place("heater_1.on"),
             }),
             thermostat: None,
             name: "heaters_1".to_string(),
@@ -808,13 +793,13 @@ mod tests {
         // Warming, which is the whole of what a heater does: three kelvin a
         // second, so a tenth of a second is plenty to tell from nothing.
         let deadline = Instant::now() + Duration::from_secs(5);
-        while mass.temperature() <= cold && Instant::now() < deadline {
+        while warmth() <= cold && Instant::now() < deadline {
             std::thread::sleep(Duration::from_millis(20));
         }
         assert!(
-            mass.temperature() > cold,
-            "the mass should have warmed, and is at {}",
-            mass.temperature()
+            warmth() > cold,
+            "the zone should have warmed, and is at {}",
+            warmth()
         );
 
         device.stop();

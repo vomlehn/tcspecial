@@ -2,7 +2,7 @@
 //! band, and the heaters switched on or off.
 //!
 //! What a configuration's hysteresis node does aboard, done in the simulator
-//! so that a thermal mass's loop closes with no tcspecial running. It stands
+//! so that a zone's loop closes with no tcspecial running. It stands
 //! in for one hysteresis node of the configuration, whose `setpoint` and
 //! `half_band` it takes, and the simulator file names that node: see
 //! `tcslibgs::sim_config::SimTcssim::thermostat`.
@@ -15,9 +15,9 @@
 //! feeds reads it -- `Format::counts`, then the scale and the offset -- and
 //! one that conversion would refuse is ignored.
 //!
-//! The sensors are the simulated payloads attached to a thermal mass whose
-//! data reaches the hysteresis node in the configuration; the heaters are
-//! the ones attached to a mass that data from the node reaches.
+//! The sensors are the simulated payloads that report the world whose data
+//! reaches the hysteresis node in the configuration; the heaters are the
+//! ones driving it that data from the node reaches.
 //!
 //! # What it decides
 //!
@@ -36,7 +36,7 @@ use std::sync::Mutex;
 
 use tcslibgs::node::vehicle::compute::{HysteresisParams, ToValueParams};
 
-use crate::physics::thermal_mass::thermal_mass::{driven, Thermal};
+use crate::physics::{driven, Attachment};
 
 /// What the heaters should be doing.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -65,14 +65,14 @@ struct State {
 pub struct Thermostat {
     /// The hysteresis node it stands in for.
     name: String,
-    /// The temperature it holds the mass at, in kelvin.
+    /// The temperature it holds the zone at, in kelvin.
     setpoint: f64,
     /// How far from the setpoint the decision changes, each way.
     half_band: f64,
     /// How each sensor's bytes are read, by payload name.
     sensors: BTreeMap<String, ToValueParams>,
     /// The heaters it switches, by payload name.
-    heaters: Vec<(String, Thermal)>,
+    heaters: Vec<(String, Attachment)>,
     state: Mutex<State>,
 }
 
@@ -86,7 +86,7 @@ impl Thermostat {
     /// * `sensors` - Each sensor it reads, by payload name, with how its
     ///               bytes are read.
     /// * `heaters` - Each heater it switches, by payload name, with what it
-    ///               is to its thermal mass.
+    ///               is to the world.
     ///
     /// # Returns
     ///
@@ -95,7 +95,7 @@ impl Thermostat {
         name: &str,
         params: HysteresisParams,
         sensors: BTreeMap<String, ToValueParams>,
-        heaters: Vec<(String, Thermal)>,
+        heaters: Vec<(String, Attachment)>,
     ) -> Thermostat {
         Thermostat {
             name: name.to_string(),
@@ -159,8 +159,8 @@ impl Thermostat {
             Decision::On => b"1",
             Decision::Off => b"0",
         };
-        for (heater, thermal) in &self.heaters {
-            driven(&Some(thermal.clone()), heater, data);
+        for (heater, attachment) in &self.heaters {
+            driven(&Some(attachment.clone()), heater, data);
         }
         Some(decision)
     }
@@ -209,11 +209,12 @@ fn median(temperatures: impl Iterator<Item = f64>) -> f64 {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::physics::thermal_mass::thermal_mass::{encode, ThermalMass};
+    use crate::physics::tests::zone_world;
+    use crate::physics::{encode, world::World};
     use std::sync::Arc;
-    use std::time::{Duration, Instant};
+    use std::time::Instant;
     use tcslibgs::node::vehicle::compute::Format;
-    use tcslibgs::sim_config::{ResolvedMass, Wander};
+    use tcslibgs::physics::Place;
 
     /// The thermostat example's sensor's encoding.
     ///
@@ -231,35 +232,22 @@ mod tests {
     }
 
     /// A thermostat of the example's figures reading three sensors and
-    /// switching one heater on input in1 of a mass.
+    /// switching one heater of the example's world.
     ///
     /// # Returns
     ///
-    /// The thermostat and the mass.
-    fn thermostat() -> (Thermostat, Arc<ThermalMass>) {
-        let mass = Arc::new(ThermalMass::new(
-            &ResolvedMass {
-                name: "basic".to_string(),
-                environment: 283.15,
-                time_constant: Duration::from_secs(50),
-                inputs: vec!["in1".to_string(), "in2".to_string()],
-                outputs: ["out1", "out2", "out3"].map(String::from).to_vec(),
-                ..Default::default()
-            },
-            Instant::now(),
-            0,
-        ));
+    /// The thermostat, the world, and the heater's heat.
+    fn thermostat() -> (Thermostat, Arc<World>, Place) {
+        let (world, place) = zone_world();
         let sensors = ["temp_1", "temp_2", "temp_3"]
             .iter()
             .map(|name| (name.to_string(), sixteenths()))
             .collect();
         let heaters = vec![(
             "heaters_1".to_string(),
-            Thermal::Heats {
-                mass: mass.clone(),
-                input: "in1".to_string(),
-                rate: 3.0,
-                supply: Wander::default(),
+            Attachment::Drives {
+                world: world.clone(),
+                place: place("heater_1.on"),
             },
         )];
         let params = HysteresisParams {
@@ -268,41 +256,47 @@ mod tests {
         };
         (
             Thermostat::new("thermostat", params, sensors, heaters),
-            mass,
+            world,
+            place("heater_1.heat"),
         )
+    }
+
+    /// What a heater gives out now.
+    fn heat(world: &World, heat: Place) -> f64 {
+        world.read(heat, Instant::now())
     }
 
     /// Below the band it switches the heaters on, above it off, and within
     /// it holds what it last decided.
     #[test]
     fn it_holds_the_band() {
-        let (thermostat, mass) = thermostat();
+        let (thermostat, world, warming) = thermostat();
         let send = |sensor: &str, kelvin: f64| {
             thermostat.sample(sensor, &encode(&sixteenths(), kelvin))
         };
 
         assert_eq!(send("temp_1", 283.15), Some(Decision::On));
-        assert!(mass.heat() > 0.0, "the heater should be on");
+        assert!(heat(&world, warming) > 0.0, "the heater should be on");
         // Within the band: still on.
         assert_eq!(send("temp_1", 293.15), Some(Decision::On));
         assert_eq!(send("temp_1", 296.0), Some(Decision::Off));
-        assert_eq!(mass.heat(), 0.0, "the heater should be off");
+        assert_eq!(heat(&world, warming), 0.0, "the heater should be off");
         assert_eq!(send("temp_1", 293.15), Some(Decision::Off));
     }
 
     /// Nothing is decided until a reading leaves the band.
     #[test]
     fn nothing_is_decided_within_the_band() {
-        let (thermostat, mass) = thermostat();
+        let (thermostat, world, warming) = thermostat();
         let reading = encode(&sixteenths(), 293.15);
         assert_eq!(thermostat.sample("temp_1", &reading), None);
-        assert_eq!(mass.heat(), 0.0);
+        assert_eq!(heat(&world, warming), 0.0);
     }
 
     /// One sensor gone wrong is outvoted by the other two.
     #[test]
     fn the_median_outvotes_one_sensor() {
-        let (thermostat, _) = thermostat();
+        let (thermostat, _, _) = thermostat();
         let send = |sensor: &str, kelvin: f64| {
             thermostat.sample(sensor, &encode(&sixteenths(), kelvin))
         };
@@ -316,10 +310,10 @@ mod tests {
     /// not read, changes nothing.
     #[test]
     fn a_reading_it_cannot_read_is_ignored() {
-        let (thermostat, mass) = thermostat();
+        let (thermostat, world, warming) = thermostat();
         assert_eq!(thermostat.sample("temp_1", &[0x00]), None);
         let cold = encode(&sixteenths(), 283.15);
         assert_eq!(thermostat.sample("elsewhere", &cold), None);
-        assert_eq!(mass.heat(), 0.0);
+        assert_eq!(heat(&world, warming), 0.0);
     }
 }

@@ -1,30 +1,56 @@
 # yaml-language-server: $schema=../../tcsgui/share/schema/tcspecial-physics.schema.json
 
 # The physics of the thermostat example's vehicle: the zone its sensors
-# read and its heaters warm. Named by thermostat-sim.yaml, and by the
-# manual's fixture, tests/manual/thermostat-sim.yaml, which is the same
-# vehicle with its payloads on buses: one zone, stated once.
+# read, and the two heaters that warm it. Named by thermostat-sim.yaml, and
+# by the manual's fixture, tests/manual/thermostat-sim.yaml, which is the
+# same vehicle with its payloads on buses: one zone, stated once.
+#
+# Three parts, each simulated alone and joined below: a heater is switched
+# on and gives out heat; the zone takes heat and has a temperature. The
+# stand-ins in the simulator file are joined to their terminals by name --
+# a sensor to zone.temperature, a heater's stand-in to heater_1.on -- and
+# this file says nothing about them.
 description: The physics of the vehicle of thermostat.ytcs
 
 physics:
+  # Two heaters of sixty watts on a 28 volt bus, which on the zone below is
+  # three kelvin a second each. The supply wanders by two percent over
+  # twenty seconds or so, and a heater's power with its square.
+  - name: heater_1
+    type: heater
+    power: "60 W"
+    voltage: "28 V"
+    ripple: "0.02"
+    ripple_time: "20 s"
+
+  - name: heater_2
+    type: heater
+    power: "60 W"
+    voltage: "28 V"
+    ripple: "0.02"
+    ripple_time: "20 s"
+
   # The zone: ten kelvin below the setpoint of thermostat.ytcs, losing the
   # difference with a fifty second constant -- which at the setpoint is a
-  # fifth of a kelvin a second of cooling. A heater is connected to an input
-  # and a sensor to an output, and any of them may be left unconnected.
+  # fifth of a kelvin a second of cooling -- and twenty joules to warm a
+  # kelvin, so that each heater's sixty watts is three kelvin a second.
   #
   # Its surroundings are not still. They swing three kelvin either side of
   # 283.15 once every ninety minutes -- a low orbit's sun and shadow -- and
-  # wander half a kelvin besides, over ten minutes or so. The zone is not
-  # one temperature throughout either: the place out2's sensor is on is a
-  # fifth of a kelvin warmer than the middle, and out3's three tenths
-  # cooler.
-  - name: basic
-    type: thermal_mass
-    environment: "283.15"
+  # wander half a kelvin besides, over ten minutes or so.
+  - name: zone
+    type: thermal_zone
+    environment: "283.15 K"
     time_constant: "50 s"
-    inputs: "in1,in2"
-    outputs: "out1,out2=+0.2,out3=-0.3"
-    swing: "3"
+    capacity: "20 J/K"
+    swing: "3 K"
     period: "90 min"
-    wander: "0.5"
+    wander: "0.5 K"
     wander_time: "10 min"
+
+connections:
+  # Both heaters warm the zone, whose heat is the sum of what reaches it.
+  - from: heater_1.heat
+    to: zone.heat
+  - from: heater_2.heat
+    to: zone.heat

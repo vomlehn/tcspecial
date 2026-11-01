@@ -2,7 +2,7 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://github.com/vomlehn/tcspecial/schema/tcspecial-physics.schema.json",
   "title": "tcspecial physics model",
-  "description": "The vehicle's physical elements, which tcssim's stand-ins measure and act on: a file of its own, named by each simulator file that uses it, because a vehicle's physics outlives any one configuration of its payloads. A simulated payload attaches to an element by its name and one of its terminals -- a sensor to an output, a heater to an input -- in the simulator file. YAML only.",
+  "description": "The vehicle's physical elements, which tcssim's stand-ins measure and act on, and how they are joined: a file of its own, named by each simulator file that uses it, because a vehicle's physics outlives any one configuration of its payloads. Each element is a part simulated alone, with fixed terminals of its type's; a connection joins an output to an input of the same kind. A stand-in joins a terminal in the simulator file, with connects: element.terminal. Every figure is written with its unit. YAML only.",
   "type": "object",
   "properties": {
     "description": {
@@ -16,81 +16,155 @@
         "type": "object",
         "properties": {
           "name": {
-            "type": "string"
+            "type": "string",
+            "description": "What it is called, which a connection or a stand-in names it by: not empty, and with no dot in it."
           },
           "type": {
             "enum": [
-              "thermal_mass"
+              "heater",
+              "thermal_zone"
             ],
-            "description": "What kind of element it is, which decides what else it states. One kind so far: a thermal mass."
-          },
-          "environment": {
-            "type": [
-              "string",
-              "number"
-            ],
-            "description": "The temperature around it, in kelvin. A mass starts here, with its heaters off, because a vehicle coming up cold is the case a thermostat exists for."
-          },
-          "time_constant": {
-            "type": [
-              "string",
-              "number"
-            ],
-            "description": "How fast it loses the difference between itself and its environment, as a length of time: after one of these it has lost all but 1/e of it."
-          },
-          "inputs": {
-            "type": [
-              "string",
-              "null"
-            ],
-            "description": "The names of the places a heater can be connected to it, separated by commas: `in1,in2`. None need be connected."
-          },
-          "outputs": {
-            "type": [
-              "string",
-              "null"
-            ],
-            "description": "The names of the places a sensor can read its temperature from, separated by commas: `out1,out2,out3`. None need be connected. A name may be followed by `=` and how far, in kelvin, that place sits from the mass's temperature: `out2=+0.3`."
-          },
-          "swing": {
-            "type": [
-              "string",
-              "number",
-              "null"
-            ],
-            "description": "How far the environment swings either side of `environment`, in kelvin, as a sine wave: a day and a night, or an orbit's sun and shadow."
-          },
-          "period": {
-            "type": [
-              "string",
-              "null"
-            ],
-            "description": "How long one swing takes, as a length of time. Required with `swing` and refused without it."
-          },
-          "wander": {
-            "type": [
-              "string",
-              "number",
-              "null"
-            ],
-            "description": "How far the environment wanders at random: the standard deviation, in kelvin, of a departure drawn back towards nought with `wander_time` as its time constant."
-          },
-          "wander_time": {
-            "type": [
-              "string",
-              "null"
-            ],
-            "description": "How slowly the environment wanders, as a length of time. Required with `wander` and refused without it."
+            "description": "What kind of element it is, which decides its terminals and what else it states."
           }
         },
         "required": [
           "name",
-          "type",
-          "environment",
-          "time_constant"
+          "type"
         ],
-        "additionalProperties": false,
-        "description": "A thermal mass: one body at one temperature, which cools towards its environment and is warmed by the heaters that are on, so that what the vehicle reads is a consequence of what the vehicle drove. Three sensors reading one mass agree, where three sending random bytes never do. A mass nothing is attached to is refused."
+        "allOf": [
+          {
+            "if": {
+              "properties": {
+                "type": {
+                  "const": "heater"
+                }
+              }
+            },
+            "then": {
+              "description": "A heater: a resistance on a supply, switched on and off. Its terminals are on, an input driven by a decision; heat, in W; and current, in A. Its on must be joined to a stand-in the vehicle drives.",
+              "properties": {
+                "power": {
+                  "type": [
+                    "string"
+                  ],
+                  "description": "What it gives out while on at its nominal voltage, written with its unit: `60 W`."
+                },
+                "voltage": {
+                  "type": [
+                    "string"
+                  ],
+                  "description": "Its supply's nominal voltage, written with its unit: `28 V`. With its power, says what current it draws."
+                },
+                "ripple": {
+                  "type": [
+                    "string",
+                    "null"
+                  ],
+                  "description": "How far its supply's voltage wanders, as a fraction of nominal: the standard deviation, written bare. Its power goes as the square of its voltage and its current as the voltage."
+                },
+                "ripple_time": {
+                  "type": [
+                    "string",
+                    "null"
+                  ],
+                  "description": "How slowly its supply wanders, as a length of time. Required with `ripple` and refused without it."
+                }
+              },
+              "required": [
+                "power",
+                "voltage"
+              ]
+            }
+          },
+          {
+            "if": {
+              "properties": {
+                "type": {
+                  "const": "thermal_zone"
+                }
+              }
+            },
+            "then": {
+              "description": "A thermal zone: one body at one temperature, which cools towards its environment and is warmed by the heat joined to it. Its terminals are heat, in W, the sum of every heater's joined to it; and temperature, in K.",
+              "properties": {
+                "environment": {
+                  "type": [
+                    "string"
+                  ],
+                  "description": "The temperature around it, written with its unit: `283.15 K`. A zone starts here, because a vehicle coming up cold is the case a thermostat exists for."
+                },
+                "time_constant": {
+                  "type": [
+                    "string"
+                  ],
+                  "description": "How fast it loses the difference between itself and its environment, as a length of time: after one of these it has lost all but 1/e of it."
+                },
+                "capacity": {
+                  "type": [
+                    "string"
+                  ],
+                  "description": "How much heat it takes to warm it a kelvin, written with its unit: `20 J/K`. What turns a heater's watts into kelvin a second."
+                },
+                "swing": {
+                  "type": [
+                    "string",
+                    "null"
+                  ],
+                  "description": "How far the environment swings either side of `environment`, written with its unit, as a sine wave: a day and a night, or an orbit's sun and shadow."
+                },
+                "period": {
+                  "type": [
+                    "string",
+                    "null"
+                  ],
+                  "description": "How long one swing takes, as a length of time. Required with `swing` and refused without it."
+                },
+                "wander": {
+                  "type": [
+                    "string",
+                    "null"
+                  ],
+                  "description": "How far the environment wanders at random, written with its unit: the standard deviation of a departure drawn back towards nought with `wander_time` as its time constant."
+                },
+                "wander_time": {
+                  "type": [
+                    "string",
+                    "null"
+                  ],
+                  "description": "How slowly the environment wanders, as a length of time. Required with `wander` and refused without it."
+                }
+              },
+              "required": [
+                "environment",
+                "time_constant",
+                "capacity"
+              ]
+            }
+          }
+        ],
+        "unevaluatedProperties": false
+      }
+    },
+    "connections": {
+      "type": "array",
+      "description": "How the elements are joined, each from an output to an input of the same kind. An input that takes one output may be given one; a zone's heat takes the sum of every heater's.",
+      "items": {
+        "type": "object",
+        "properties": {
+          "from": {
+            "type": "string",
+            "description": "An output, as the element's name and the terminal's joined by a dot: `heater_1.heat`."
+          },
+          "to": {
+            "type": "string",
+            "description": "An input, written as from is: `zone.heat`."
+          }
+        },
+        "required": [
+          "from",
+          "to"
+        ],
+        "additionalProperties": false
       }
     }
   },

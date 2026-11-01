@@ -10,16 +10,16 @@
 # The two files are joined by name, and nothing here names a payload that
 # file does not have. Only the payloads named here are simulated.
 #
-# The three sensors report a thermal mass rather than noise, which is what
-# makes the vehicle's half of the loop watchable: three readings of one
-# temperature agree, so the vote produces a temperature and the thermostat
-# decides on it.
+# The three sensors report the zone of the physics model rather than noise,
+# which is what makes the vehicle's half of the loop watchable: three
+# readings of one temperature agree, so the vote produces a temperature and
+# the thermostat decides on it.
 #
 # The heaters are discrete lines on the kernel's gpio-sim, which the vehicle
 # drives and tcssim watches: each time the vehicle switches them, their panel
-# counts it, and the mass is warmed through the input each is on. So the loop
-# closes through tcspecial: the sensors report the mass, the vehicle decides,
-# and the heaters warm it.
+# counts it, and the heater each is joined to is switched. So the loop closes
+# through tcspecial: the sensors report the zone, the vehicle decides, and
+# the heaters warm it.
 #
 # To close it in tcssim alone, with no tcspecial running, add
 # "thermostat: thermostat" to the tcssim section below: tcssim then stands in
@@ -33,51 +33,44 @@ description: Simulator settings for the payloads of thermostat.ytcs
 tcssim:
   ready: "127.0.0.1:7907"
 
-# The physics model the payloads below attach to: the thermostat example's,
-# this being the same vehicle with its payloads on buses, so that the zone
-# is stated once for both.
+# The physics model the payloads below are joined to: the thermostat
+# example's, this being the same vehicle with its payloads on buses, so that
+# the zone is stated once for both.
 physics: ../../examples/thermostat/thermostat-physics.yaml
 
 simulated_payload_groups:
   # The three sensors are read together, every tenth of a second, as their
-  # payload group in thermostat.ytcs says. Each reports the mass, in the
-  # encoding the to_kelvin node its readings go to expects: this file says
-  # nothing about the format, the scale or the offset, because a scale written
-  # in two files is a scale that can disagree with itself.
+  # payload group in thermostat.ytcs says. Each reports the zone's
+  # temperature, in the encoding the to_kelvin node its readings go to
+  # expects: this file says nothing about the format, the scale or the
+  # offset, because a scale written in two files is a scale that can
+  # disagree with itself.
   - name: zone_temps
     simulate: true
     packet_interval: 100 ms
-    reads: basic
+    connects: zone.temperature
 
 simulated_payloads:
-  # Each sensor on an output of its own.
   - name: temp_1
     type: i2c
     group: zone_temps
-    output: out1
 
   - name: temp_2
     type: i2c
     group: zone_temps
-    output: out2
 
   - name: temp_3
     type: spi
     group: zone_temps
-    output: out3
 
   # Driven and never read: their stand-ins send nothing, count each time the
-  # vehicle moves their lines, and warm the mass while on.
+  # vehicle moves their lines, and switch the heater each is joined to.
   - name: heaters_1
     simulate: true
     type: gpio
-    heats: basic
-    input: in1
-    rate: "3.0"
+    connects: heater_1.on
 
   - name: heaters_2
     simulate: true
     type: gpio
-    heats: basic
-    input: in2
-    rate: "3.0"
+    connects: heater_2.on

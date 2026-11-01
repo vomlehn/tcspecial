@@ -5,11 +5,20 @@
 description: The physics of the vehicle of fprime.ytcs
 
 physics:
+  # A heater of twenty watts, which on the zone below is a kelvin a second.
+  - name: heater
+    type: heater
+    power: "20 W"
+    voltage: "28 V"
+
   # The zone, starting at and settling to ten degrees, losing any
   # difference with a hundred second constant.
   - name: zone
-    type: thermal_mass
-    environment: "283.15"
+    type: thermal_zone
+    environment: "283.15 K"
     time_constant: "100 s"
-    inputs: "in1"
-    outputs: "out1"
+    capacity: "20 J/K"
+
+connections:
+  - from: heater.heat
+    to: zone.heat

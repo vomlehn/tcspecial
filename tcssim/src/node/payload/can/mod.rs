@@ -489,7 +489,7 @@ mod tests {
         triggered: bool,
     ) -> PayloadConfig {
         PayloadConfig {
-            thermal: None,
+            attachment: None,
             thermostat: None,
             name: "can-device".to_string(),
             protocol: PayloadProtocol::Can,

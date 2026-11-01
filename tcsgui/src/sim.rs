@@ -579,10 +579,10 @@ mod tests {
         let model_said = concat!(
             "physics:\n",
             "  - name: zone\n",
-            "    type: thermal_mass\n",
-            "    environment: \"283.15\"\n",
+            "    type: thermal_zone\n",
+            "    environment: \"283.15 K\"\n",
             "    time_constant: \"50 s\"\n",
-            "    outputs: \"out1\"\n",
+            "    capacity: \"20 J/K\"\n",
         );
         std::fs::write(&model, model_said).expect("written");
         let given = concat!(
@@ -593,7 +593,7 @@ mod tests {
             "\n",
             "simulated_payloads:\n",
             "  - name: temp_1\n    simulate: true\n",
-            "    reads: zone\n    output: out1\n",
+            "    connects: zone.temperature\n",
         );
         std::fs::write(&path, given).expect("written");
 
@@ -607,9 +607,9 @@ mod tests {
         let back = read(&path).expect("it reads again");
         assert_eq!(back.physics, read_in.physics, "{written}");
         assert_eq!(
-            back.payloads["temp_1"].get("reads").map(String::as_str),
-            Some("zone"),
-            "what a payload is attached to is a setting like any other"
+            back.payloads["temp_1"].get("connects").map(String::as_str),
+            Some("zone.temperature"),
+            "what a payload is joined to is a setting like any other"
         );
         assert_eq!(
             std::fs::read_to_string(&model).expect("the model"),
@@ -621,7 +621,8 @@ mod tests {
         // the model it names.
         let file = tcslibgs::sim_config::SimConfigFile::load(&path)
             .expect("the simulator reads what the editor wrote");
-        assert_eq!(file.thermal_mass[0].name, "zone");
+        let model = file.model.expect("the model it names");
+        assert_eq!(model.physics[0].name(), "zone");
     }
 
     /// A file that still declares its masses itself is refused, told where

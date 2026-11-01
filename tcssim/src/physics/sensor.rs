@@ -1,11 +1,11 @@
-//! A temperature sensor on a thermal mass, and what it gets wrong.
+//! A sensor on a terminal of the physics model, and what it gets wrong.
 //!
-//! A real sensor does not report the temperature of the body it is on. It
-//! reports its own, which trails the body's; it is off by a calibration
+//! A real sensor does not report what the body it is on is. A temperature
+//! sensor reports its own temperature, which trails the body's; it is off by a calibration
 //! error that stays put; that error drifts, slowly; and its electronics add
 //! noise to every reading. Each is a datasheet figure, stated in the
-//! simulator file and off unless it is (see
-//! `tcslibgs::sim_config::SensorErrors`):
+//! simulator file in the unit of what the sensor reports, and off unless it
+//! is (see `tcslibgs::sim_config::SensorErrors`):
 //!
 //! * **Lag.** The sensor is a small mass of its own, warmed by the body
 //!   through its mounting, so it follows the body's temperature through a
@@ -24,34 +24,34 @@
 //!   bound most parts sit well inside.
 //! * **Drift.** An error that wanders slowly, drawn back towards nought:
 //!   an Ornstein-Uhlenbeck process, stepped by its exact transition (see
-//!   [`super::thermal_mass::wandered`]).
+//!   [`super::random::wandered`]).
 //! * **Noise.** A normal draw on each reading, independent of the last.
 //!
 //! The sensor's random draws come from a generator of its own, seeded from
 //! the run's seed and the sensor's name.
 
 use std::sync::Mutex;
-use std::time::Instant;
 
 use rand::rngs::StdRng;
 use rand::{Rng, SeedableRng};
 use rand_distr::StandardNormal;
 use tcslibgs::sim_config::SensorErrors;
 
-use super::thermal_mass::{seed_for, wandered};
+use super::random::{seed_for, wandered};
 
 /// What a sensor has read so far.
 #[derive(Debug)]
 struct State {
-    /// Where its drift has got to, in kelvin.
+    /// Where its drift has got to.
     drift: f64,
-    /// When it last read, the body's temperature then and its own.
-    last: Option<(Instant, f64, f64)>,
+    /// When it last read, in simulated seconds, what the body was then
+    /// and what it was itself.
+    last: Option<(f64, f64, f64)>,
     /// Where its random draws come from.
     rng: StdRng,
 }
 
-/// One temperature sensor on a thermal mass.
+/// One sensor on a terminal of the physics model.
 ///
 /// Shared by the copies of its payload's configuration, and read from its
 /// payload's thread, so what it has read is behind a lock.
@@ -59,7 +59,7 @@ struct State {
 pub struct Sensor {
     /// What it gets wrong, as the simulator file states it.
     errors: SensorErrors,
-    /// Its calibration error this run, in kelvin.
+    /// Its calibration error this run.
     bias: f64,
     state: Mutex<State>,
 }
@@ -94,7 +94,7 @@ impl Sensor {
         }
     }
 
-    /// Its calibration error this run, in kelvin.
+    /// Its calibration error this run.
     #[cfg(test)]
     pub fn bias(&self) -> f64 {
         self.bias
@@ -104,21 +104,21 @@ impl Sensor {
     ///
     /// # Arguments
     ///
-    /// * `body` - The temperature of the place it is on, in kelvin.
-    /// * `now`  - The time of the reading.
+    /// * `body` - What the place it is on is, in its terminal's unit.
+    /// * `now`  - The time of the reading, in simulated seconds.
     ///
     /// # Returns
     ///
-    /// What it reports, in kelvin: its own lagging temperature, with its
-    /// calibration error, its drift and this reading's noise.
-    pub fn read(&self, body: f64, now: Instant) -> f64 {
+    /// What it reports, in its terminal's unit: its own lagging value, with
+    /// its calibration error, its drift and this reading's noise.
+    pub fn read(&self, body: f64, now: f64) -> f64 {
         let mut state = self.state.lock().unwrap_or_else(|e| e.into_inner());
         let lag = self.errors.lag.as_secs_f64();
         let (own, seconds) = match state.last {
             // The first reading finds the sensor settled on the body.
             None => (body, 0.0),
             Some((then, body_then, own_then)) => {
-                let seconds = now.saturating_duration_since(then).as_secs_f64();
+                let seconds = (now - then).max(0.0);
                 let own = if lag <= 0.0 || seconds <= 0.0 {
                     if lag <= 0.0 {
                         body
@@ -151,15 +151,14 @@ impl Sensor {
 mod tests {
     use super::*;
     use std::time::Duration;
-    use tcslibgs::sim_config::Wander;
+    use tcslibgs::physics::Wander;
 
     /// A sensor with no errors reports the body exactly.
     #[test]
     fn a_perfect_sensor_reads_the_body() {
         let sensor = Sensor::new("t", SensorErrors::default(), 1);
-        let now = Instant::now();
-        assert_eq!(sensor.read(290.0, now), 290.0);
-        assert_eq!(sensor.read(291.5, now + Duration::from_secs(1)), 291.5);
+        assert_eq!(sensor.read(290.0, 0.0), 290.0);
+        assert_eq!(sensor.read(291.5, 1.0), 291.5);
     }
 
     /// Its calibration error stays within the accuracy, stays put, and
@@ -181,9 +180,8 @@ mod tests {
         assert!((0.12..0.21).contains(&spread), "{spread}");
 
         let sensor = Sensor::new("t", errors, 7);
-        let now = Instant::now();
-        let first = sensor.read(290.0, now) - 290.0;
-        let later = sensor.read(290.0, now + Duration::from_secs(60)) - 290.0;
+        let first = sensor.read(290.0, 0.0) - 290.0;
+        let later = sensor.read(290.0, 60.0) - 290.0;
         assert_eq!(first, later, "a calibration error does not move");
         assert_ne!(
             Sensor::new("t", errors, 7).bias(),
@@ -203,13 +201,10 @@ mod tests {
             },
             lag: Duration::from_secs(3),
         };
-        let now = Instant::now();
         let run = |seed| {
             let sensor = Sensor::new("t", errors, seed);
             (0..10)
-                .map(|i| {
-                    sensor.read(290.0 + i as f64, now + Duration::from_secs(i))
-                })
+                .map(|i| sensor.read(290.0 + i as f64, i as f64))
                 .collect::<Vec<f64>>()
         };
         assert_eq!(run(3), run(3));
@@ -224,9 +219,8 @@ mod tests {
             ..SensorErrors::default()
         };
         let sensor = Sensor::new("t", errors, 11);
-        let now = Instant::now();
         let readings: Vec<f64> = (0..20_000)
-            .map(|i| sensor.read(300.0, now + Duration::from_millis(i)) - 300.0)
+            .map(|i| sensor.read(300.0, i as f64 / 1000.0) - 300.0)
             .collect();
         let n = readings.len() as f64;
         let mean = readings.iter().sum::<f64>() / n;
@@ -245,19 +239,17 @@ mod tests {
             lag: Duration::from_secs(5),
             ..SensorErrors::default()
         };
-        let now = Instant::now();
         for reads in [1u64, 10, 1000] {
             let sensor = Sensor::new("t", errors, 1);
-            sensor.read(280.0, now);
+            sensor.read(280.0, 0.0);
             // The body jumps to 290 and stays: read it at evenly spaced
             // times up to one time constant. The jump itself happens over
             // the first interval, so start just after it.
-            sensor.read(290.0, now + Duration::from_nanos(1));
+            sensor.read(290.0, 1e-9);
             let mut seen = 0.0;
             for i in 1..=reads {
-                let at = Duration::from_nanos(1)
-                    + Duration::from_secs(5).mul_f64(i as f64 / reads as f64);
-                seen = sensor.read(290.0, now + at);
+                let at = 1e-9 + 5.0 * i as f64 / reads as f64;
+                seen = sensor.read(290.0, at);
             }
             let left = 290.0 - seen;
             assert!(
@@ -279,9 +271,8 @@ mod tests {
             ..SensorErrors::default()
         };
         let sensor = Sensor::new("t", errors, 5);
-        let now = Instant::now();
         let readings: Vec<f64> = (0..50_000)
-            .map(|i| sensor.read(300.0, now + Duration::from_secs(i)) - 300.0)
+            .map(|i| sensor.read(300.0, i as f64) - 300.0)
             .collect();
         let n = readings.len() as f64;
         let sd = (readings.iter().map(|r| r * r).sum::<f64>() / n).sqrt();

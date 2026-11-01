@@ -2872,9 +2872,17 @@ make<span class="whitespace"> </span>-C<span class="whitespace"> </span>examples
 <p>It writes a Yamcs configuration from the tcspecial one into a run directory,
 <tt class="docutils literal"><span class="pre">/tmp/ping-yamcs</span></tt> unless <tt class="docutils literal"><span class="pre">--run-dir</span></tt> says, so that the ports and APIDs
 are stated once. The mission database is tcspecial's own XTCE,
-<tt class="docutils literal">tcslibgs/xtce</tt>, as it is, and <tt class="docutils literal"><span class="pre">tcs-ccsds.xtce</span></tt>, written from
-<tt class="docutils literal"><span class="pre">examples/ping-yamcs/yamcs/tcs-ccsds.xtce.in</span></tt>: the CCSDS header, what
-follows it on each APID, and CONNECT and the ping behind a header. It starts
+<tt class="docutils literal">tcslibgs/xtce</tt>, as it is, and <tt class="docutils literal"><span class="pre">tcs-ccsds.xtce</span></tt>, generated from the
+configuration by <tt class="docutils literal">python/tcslibgs/yamcs.py</tt> with a container or a command
+for every APID it counts: the CCSDS header, what follows it on each APID,
+and CONNECT and the gateway node's command, which a ping goes as, behind a
+header. Yamcs's links, one on each port, are generated alongside: see
+<a class="reference internal" href="#what-the-vehicle-answers-to">What the vehicle answers to</a>. Nothing in it is written by hand per APID,
+so a node added to the configuration -- a payload nothing touches, or
+another source drawn into the gateway node -- has its container in Yamcs
+the next time the example runs. A ping goes up as the gateway node's
+command, <tt class="docutils literal">/TcsYamcs/gateway</tt>, and its answer comes down as the ping
+node's parameter, <tt class="docutils literal">/TcsYamcs/ping</tt>, each the ping's text as bytes. It starts
 Yamcs on that, and tcspecial on the configuration, each stopped when it
 exits, however it exits -- the kernel is told to kill both if it is killed;
 has Yamcs send CONNECT until the vehicle answers with the configuration's
@@ -4533,6 +4541,35 @@ is refused where it is read, naming the two links and what to change.</p>
 &quot;127.0.0.1:0&quot;</tt> -- to take commands from any port of that host, each answer
 still going back to the port its command came from. Yamcs needs it, sending
 its commands from a port the system chooses.</p>
+<p>A Yamcs ground station needs a container in its mission database for every
+APID the vehicle sends down, a command for every APID it sends up, and a
+link on every port. <tt class="docutils literal">python/tcslibgs/yamcs.py</tt> works all of them out of
+the configuration, as <tt class="docutils literal">tcslibgs</tt> counts the APIDs, so none is written by
+hand and a node added to the configuration is in Yamcs's mission database
+as soon as it is regenerated:</p>
+<ul class="simple">
+<li>the beacon's container, <tt class="docutils literal">BeaconPacket</tt>, and the answers',
+<tt class="docutils literal">AnswerPacket</tt>, restricted to <tt class="docutils literal">beacon.apid</tt> and <tt class="docutils literal">tcs_cmd.apid</tt>, and
+<tt class="docutils literal">Connect</tt> on <tt class="docutils literal">tcs_cmd.apid</tt>;</li>
+<li>a command named after each <tt class="docutils literal">gateway_yamcs</tt> node, on its <tt class="docutils literal">apid_base</tt>,
+which carries its <tt class="docutils literal">Data</tt> argument whole, <tt class="docutils literal">DataBits</tt> saying how many
+bits it is;</li>
+<li>for each source drawn into a <tt class="docutils literal">gateway_yamcs</tt> node, and each payload
+nothing touches, a container <tt class="docutils literal">&lt;node&gt;Packet</tt> on its APID, holding a
+binary parameter named after the node: what follows the header, whole,
+since no XTCE says how a node's data is laid out. (A source drawn into two
+such nodes gets one for each, named <tt class="docutils literal">&lt;node&gt;_to_&lt;gateway&gt;</tt>);</li>
+<li>a link on the command link, on the beacon, to each <tt class="docutils literal">gateway_yamcs</tt>
+node's <tt class="docutils literal">address</tt> and <tt class="docutils literal">port</tt>, and on each port a source's data arrives
+at.</li>
+</ul>
+<p>What does not depend on the configuration -- the header, the beacon's and
+the answers' layouts, which it takes from <tt class="docutils literal">tcslibgs/xtce</tt>, and CONNECT --
+is <tt class="docutils literal">python/tcslibgs/yamcs.xtce</tt>, to which the generated parts are added.
+A node whose name XTCE does not allow, or that is a name the mission
+database already has, is refused, naming the node, as is an APID used twice.
+<tt class="docutils literal"><span class="pre">examples/ping-yamcs/ping_yamcs.py</span></tt> writes a Yamcs instance with it: see
+<a class="reference internal" href="#the-ping-yamcs-example">The ping-yamcs example</a>.</p>
 </div>
 <div class="section" id="configurations-kept-on-board">
 <h2><a class="toc-backref" href="#toc-entry-64">Configurations kept on board</a></h2>

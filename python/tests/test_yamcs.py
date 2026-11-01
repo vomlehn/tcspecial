@@ -4,17 +4,23 @@ APIDs, and the port-0 rule for where the ground sends commands from.
 The Python mirrors of ``tcslibgs::gateway::GatewayKind::Yamcs``'s base
 attribute, of ``tcslibgs::graph::telemetry::apids``, and of
 ``tcslibgs::types::came_from`` and ``sender_of``: the two languages must
-agree about which datagrams are the ground's, and what each carries.
+agree about which datagrams are the ground's, and what each carries. And
+the Yamcs mission database ``tcslibgs.yamcs`` generates from those APIDs.
 """
 
+import os
+import shutil
+import subprocess
 import sys
 import tempfile
 import unittest
 from pathlib import Path
+from xml.etree import ElementTree
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from tcslibgs import configuration, interface  # noqa: E402
+from tcslibgs import yamcs as generated  # noqa: E402
 from tcslibgs.configuration import HostPort, came_from  # noqa: E402
 
 
@@ -106,21 +112,26 @@ commands:
 """
 
 
-def yamcs(directory, base="0x300", gateway="yamcs"):
+def yamcs(directory, base="0x300", gateway="yamcs", renamed=None):
     """Writes :data:`YAMCS` and reads it.
 
     Args:
         directory: Where to write it.
         base:      Its ``payload_telemetry.apid_base``.
         gateway:   Its ``tcspecial.gateway``.
+        renamed:   Each node to rename, and its new name: the names a test
+                   gives must keep the device ids' order.
 
     Returns:
         The :class:`configuration.Configuration`.
     """
     path = Path(directory) / "vehicle.ytcs"
-    path.write_text(YAMCS.format(interface=interface.of_this_tree().hex(),
-                                 base=base)
-                    .replace("gateway: yamcs", f"gateway: {gateway}"))
+    text = (YAMCS.format(interface=interface.of_this_tree().hex(), base=base)
+            .replace("gateway: yamcs", f"gateway: {gateway}"))
+    for old, new in (renamed or {}).items():
+        text = (text.replace(f": {old}\n", f": {new}\n")
+                .replace(f"from: {old},", f"from: {new},"))
+    path.write_text(text)
     return configuration.load(path)
 
 
@@ -168,6 +179,133 @@ class ApidTest(unittest.TestCase):
                 config.payload_telemetry_apid("n")
             with self.assertRaisesRegex(ValueError, "no CCSDS header"):
                 config.beacon_apid()
+
+    def test_every_apid_is_listed_by_what_it_carries(self):
+        with tempfile.TemporaryDirectory() as directory:
+            config = yamcs(directory)
+            self.assertEqual([(use.carries, use.apid, use.node, use.gateway)
+                              for use in config.apids()],
+                             [("beacon", 0x100, None, None),
+                              ("commands", 0x101, None, None),
+                              ("uplink", 0x200, "m", None),
+                              ("downlink", 0x203, "p", "m"),
+                              ("payload_telemetry", 0x301, "n", None)])
+
+    def test_an_apid_used_twice_is_refused_naming_both(self):
+        with tempfile.TemporaryDirectory() as directory:
+            # The payload's telemetry, 0x100 plus 1, lands on tcs_cmd's.
+            config = yamcs(directory, base="0x100")
+            with self.assertRaisesRegex(ValueError,
+                                        "tcs_cmd.apid and the APID of "
+                                        '"n"\'s telemetry.* both APID '
+                                        "0x101"):
+                config.apids()
+
+    def test_a_gateway_nodes_commands_may_share_its_first_downlink(self):
+        with tempfile.TemporaryDirectory() as directory:
+            # "a" sorts first: device id 0, its downlink the apid_base.
+            config = yamcs(directory, renamed={"p": "a"})
+            uses = config.apids()
+            self.assertEqual([(use.carries, use.apid) for use in uses
+                              if use.node in ("m", "a")],
+                             [("uplink", 0x200), ("downlink", 0x200)])
+
+
+class MdbTest(unittest.TestCase):
+    """The Yamcs mission database's wrapper, generated from a
+    configuration."""
+
+    def setUp(self):
+        self.directory = tempfile.TemporaryDirectory()
+        self.addCleanup(self.directory.cleanup)
+        self.namespace = {"x": generated.NAMESPACE}
+
+    def find(self, root, path):
+        """Everything at an ElementTree path, its names in XTCE's
+        namespace."""
+        return root.findall(path, self.namespace)
+
+    def test_every_apid_gets_its_container_or_command(self):
+        root = generated.mdb(yamcs(self.directory.name)).getroot()
+        restricted = {}
+        for container in self.find(root, ".//x:SequenceContainer"):
+            for comparison in self.find(
+                    container, "./x:BaseContainer/x:RestrictionCriteria"
+                               "/x:Comparison[@parameterRef='CcsdsApid']"):
+                restricted[container.get("name")] = int(
+                    comparison.get("value"))
+        self.assertEqual(restricted, {"BeaconPacket": 0x100,
+                                      "AnswerPacket": 0x101,
+                                      "pPacket": 0x203, "nPacket": 0x301})
+        assigned = {}
+        for command in self.find(root, ".//x:MetaCommand"):
+            for assignment in self.find(
+                    command, ".//x:ArgumentAssignment"
+                             "[@argumentName='CcsdsApid']"):
+                assigned[command.get("name")] = int(
+                    assignment.get("argumentValue"))
+        self.assertEqual(assigned, {"Connect": 0x101, "m": 0x200})
+        # Each node's data is its parameter, what follows the header whole.
+        for name in ("p", "n"):
+            parameter, = self.find(root, f".//x:Parameter[@name='{name}']")
+            self.assertEqual(parameter.get("parameterTypeRef"),
+                             generated.BODY_TYPE)
+
+    def test_the_links_follow_the_configuration(self):
+        config = yamcs(self.directory.name)
+        self.assertEqual([(link.name, link.apid, link.ground.port)
+                          for link in generated.telemetry(config)],
+                         [("p", 0x203, 9003), ("n", 0x301, 9201)])
+        # "m" binds nothing aboard, so the ground has nowhere to send to
+        # it: its command is counted, but nothing carries it.
+        self.assertEqual([stream["tcPatterns"] for stream
+                          in generated.command_streams(config)],
+                         [["/TcsYamcs/Connect"]])
+        self.assertEqual([(link["name"], link["port"])
+                          for link in generated.data_links(config)],
+                         [("commands", 4000), ("beacon", 9100),
+                          ("p-downlink", 9003), ("n-downlink", 9201)])
+
+    def test_a_name_the_wrapper_has_is_refused(self):
+        config = yamcs(self.directory.name, renamed={"m": "Connect"})
+        with self.assertRaisesRegex(ValueError, '"Connect" gives the Yamcs '
+                                                "command name"):
+            generated.mdb(config)
+        config = yamcs(self.directory.name, renamed={"n": "BeaconBody"})
+        with self.assertRaisesRegex(ValueError, "already has"):
+            generated.mdb(config)
+
+    def test_an_apid_used_twice_is_refused(self):
+        with self.assertRaisesRegex(ValueError, "both APID"):
+            generated.mdb(yamcs(self.directory.name, base="0x100"))
+
+    def test_the_wrapper_is_well_formed_xtce(self):
+        """Well-formed, and valid against the XTCE schema: the XTCE 1.2
+        schema Yamcs reads, where ``$XTCE_XSD`` names it, or else XTCE
+        1.3's in the tcs-xtce checkout beside this tree, the namespace
+        moved to 1.3's."""
+        path = Path(self.directory.name) / "tcs-ccsds.xtce"
+        generated.write_mdb(yamcs(self.directory.name), path)
+        ElementTree.parse(path)
+        references = (Path(__file__).resolve().parents[3] / "tcs-xtce"
+                      / "references")
+        schema = os.environ.get("XTCE_XSD")
+        if schema is None and (references / "SpaceSystem.xsd").exists():
+            schema = references / "SpaceSystem.xsd"
+            text = path.read_text().replace(generated.NAMESPACE,
+                                            "http://www.omg.org/spec/XTCE/"
+                                            "20250214")
+            path.write_text(text)
+        if schema is None or shutil.which("xmllint") is None:
+            self.skipTest("no XTCE schema or no xmllint to check it with")
+        catalog = references / "catalog.xml"
+        environment = dict(os.environ)
+        if catalog.exists():
+            environment["XML_CATALOG_FILES"] = str(catalog)
+        ran = subprocess.run(["xmllint", "--nonet", "--noout", "--schema",
+                              str(schema), str(path)],
+                             capture_output=True, text=True, env=environment)
+        self.assertEqual(ran.returncode, 0, ran.stderr)
 
 
 if __name__ == "__main__":

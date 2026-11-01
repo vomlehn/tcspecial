@@ -39,6 +39,8 @@ packages = ["tcslibgs", "tcslibgs._xtce", "tcslib", "tcsui"]
 
 [tool.setuptools.package-data]
 # The XTCE documents the interface digest is taken over: see
-# tcslibgs/interface.py. And the configuration schema, whose lists of node
-# types a configuration is read against: see tcslibgs/configuration.py.
-tcslibgs = ["xtce/*.xtce", "schema/tcspecial.schema.json"]
+# tcslibgs/interface.py. The configuration schema, whose lists of node
+# types a configuration is read against: see tcslibgs/configuration.py. And
+# the part of a Yamcs mission database no configuration changes: see
+# tcslibgs/yamcs.py.
+tcslibgs = ["xtce/*.xtce", "schema/tcspecial.schema.json", "yamcs.xtce"]

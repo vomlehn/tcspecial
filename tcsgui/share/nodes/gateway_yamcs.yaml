@@ -1,0 +1,39 @@
+# A Yamcs ground station, which is the other end of the link and not part of
+# the vehicle at all.
+#
+# The radio's ground station again, with every packet to and from it a CCSDS
+# Space Packet: a six-byte primary header and no secondary header, under the
+# APID the configuration gives the link. It is at the root of this tree, as
+# gateway_radio.yaml is, because it has no Rust of its own: a ground link is
+# served by the network payload code, tcspecial/src/node/payload/network/.
+node: gateway_yamcs
+type: gateway_yamcs
+about: >
+  A Yamcs ground station: the other end of the link, and not the vehicle.
+  Every packet to and from it carries a CCSDS primary header.
+payload-sink: true
+payload-source: false
+gateway-sink: false
+gateway-source: true
+attributes:
+  - name: ground_base
+    required: true
+    about: >
+      Where the Yamcs ground station is, as address:port. What each node
+      linked into this one produces is sent to that address, at that port
+      plus the node's device id, from the start.
+  - name: apid_base
+    required: true
+    about: >
+      The APID, 0 to 0x7FF, of the CCSDS telecommands the ground sends this
+      node. What each node linked into it produces goes to the ground as
+      CCSDS telemetry under this APID plus the node's device id. Decimal, or
+      hexadecimal with 0x.
+  - name: address
+    required: false
+    about: >
+      The address tcspecial binds for what the ground sends: needed, with
+      port, when commands or a line come from this node.
+  - name: port
+    required: false
+    about: The port that goes with the address.

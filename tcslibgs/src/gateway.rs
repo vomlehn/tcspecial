@@ -1,15 +1,15 @@
 //! What the vehicle answers to: its gateway.
 //!
 //! Whatever commands tcspecial and takes its telemetry -- the ground over a
-//! radio, a cFS flight computer on its software bus, an F´ flight computer
-//! through a bridge component. A configuration answers to one kind, and says
+//! radio, a Yamcs ground station, a cFS flight computer on its software bus,
+//! an F´ flight computer through a bridge component. A configuration answers to one kind, and says
 //! which as the `tcspecial` section's `gateway`, because the kind decides how
 //! every other link in that section is written: commands, payload commands,
 //! payload telemetry and the beacon all go the one way. See "Gateways: what the
 //! vehicle answers to" in `docs/design.rst`.
 //!
-//! All three are built. The radio and F´ are reached over UDP sockets, and
-//! cFS over its software bus, as a peer of its Software Bus Network: see
+//! All four are built. The radio, Yamcs and F´ are reached over UDP sockets,
+//! and cFS over its software bus, as a peer of its Software Bus Network: see
 //! [`crate::sbn`] for the wire and [`crate::cfs`] for the packets on it.
 //! [`GatewayKind::on_bus`] says which a kind is, and the rest of the section
 //! is written accordingly.
@@ -20,6 +20,14 @@
 //! called in the file -- `bridge_base` where a radio says `ground_base` -- and
 //! that it states where its F´ channel IDs begin, `fprime_id_base`, which
 //! nothing aboard reads.
+//!
+//! Yamcs is the radio's links again with a ground station at the far end that
+//! reads CCSDS Space Packets: a `gateway_yamcs` node is opened as a radio's
+//! is, and says `ground_base` as a radio's does, and every packet on every
+//! link to and from the ground carries a CCSDS primary header, with the APID
+//! the configuration gives that link. See [`crate::ccsds`] for the header,
+//! and the node's `apid_base` and the section's `beacon.apid` and
+//! `tcs_cmd.apid` for the APIDs.
 //!
 //! The gateway nodes are written in the `gateway` section, and the radio's
 //! node type is `gateway_radio`. Both were `moc` once, and a file that still
@@ -40,23 +48,30 @@ pub enum GatewayKind {
     Cfs,
     /// An F´ flight computer, through a bridge component in its deployment.
     Fprime,
+    /// A Yamcs ground station, over UDP, every packet a CCSDS Space Packet.
+    Yamcs,
 }
 
 impl GatewayKind {
     /// Every kind, in the order the design names them.
-    pub const ALL: [GatewayKind; 3] =
-        [GatewayKind::Radio, GatewayKind::Cfs, GatewayKind::Fprime];
+    pub const ALL: [GatewayKind; 4] = [
+        GatewayKind::Radio,
+        GatewayKind::Cfs,
+        GatewayKind::Fprime,
+        GatewayKind::Yamcs,
+    ];
 
     /// Names the kind as a configuration writes it.
     ///
     /// # Returns
     ///
-    /// `radio`, `cfs` or `fprime`.
+    /// `radio`, `cfs`, `fprime` or `yamcs`.
     pub fn name(self) -> &'static str {
         match self {
             GatewayKind::Radio => "radio",
             GatewayKind::Cfs => "cfs",
             GatewayKind::Fprime => "fprime",
+            GatewayKind::Yamcs => "yamcs",
         }
     }
 
@@ -72,7 +87,10 @@ impl GatewayKind {
     pub fn is_built(self) -> bool {
         matches!(
             self,
-            GatewayKind::Radio | GatewayKind::Cfs | GatewayKind::Fprime
+            GatewayKind::Radio
+                | GatewayKind::Cfs
+                | GatewayKind::Fprime
+                | GatewayKind::Yamcs
         )
     }
 
@@ -85,6 +103,16 @@ impl GatewayKind {
         self == GatewayKind::Cfs
     }
 
+    /// Whether every packet on the kind's links to and from the ground is a
+    /// CCSDS Space Packet, its primary header added as it is sent and
+    /// checked and taken off as it arrives: see [`crate::ccsds`].
+    ///
+    /// The one statement of which kinds frame their packets, read wherever
+    /// the APIDs are required, refused or used.
+    pub fn framed(self) -> bool {
+        self == GatewayKind::Yamcs
+    }
+
     /// Names the node type of the kind's gateway nodes.
     ///
     /// # Returns
@@ -95,6 +123,7 @@ impl GatewayKind {
             GatewayKind::Radio => Some("gateway_radio"),
             GatewayKind::Fprime => Some("gateway_fprime"),
             GatewayKind::Cfs => Some("gateway_cfs"),
+            GatewayKind::Yamcs => Some("gateway_yamcs"),
         }
     }
 
@@ -102,16 +131,16 @@ impl GatewayKind {
     /// goes with, counted on by each source's device id: an `address:port`
     /// for a kind on sockets, a message ID for one on a bus.
     ///
-    /// Named for what is there: the ground for a radio, the bridge
-    /// component for F´, the first telemetry message ID for cFS. One rule
-    /// counts on from each.
+    /// Named for what is there: the ground for a radio and for Yamcs, the
+    /// bridge component for F´, the first telemetry message ID for cFS. One
+    /// rule counts on from each.
     ///
     /// # Returns
     ///
     /// The attribute's name.
     pub fn base_attribute(self) -> &'static str {
         match self {
-            GatewayKind::Radio => "ground_base",
+            GatewayKind::Radio | GatewayKind::Yamcs => "ground_base",
             GatewayKind::Fprime => "bridge_base",
             GatewayKind::Cfs => "tlm_base",
         }
@@ -127,6 +156,7 @@ impl GatewayKind {
             GatewayKind::Radio => "the ground station",
             GatewayKind::Fprime => "the F´ bridge component",
             GatewayKind::Cfs => "the cFS software bus",
+            GatewayKind::Yamcs => "the Yamcs ground station",
         }
     }
 
@@ -224,6 +254,7 @@ mod tests {
         }
         assert_eq!(GatewayKind::of(" radio "), Ok(GatewayKind::Radio));
         assert_eq!(GatewayKind::of("cfs"), Ok(GatewayKind::Cfs));
+        assert_eq!(GatewayKind::of("yamcs"), Ok(GatewayKind::Yamcs));
     }
 
     /// Only cFS is on a bus.
@@ -232,6 +263,18 @@ mod tests {
         assert!(GatewayKind::Cfs.on_bus());
         assert!(!GatewayKind::Radio.on_bus());
         assert!(!GatewayKind::Fprime.on_bus());
+        assert!(!GatewayKind::Yamcs.on_bus());
+    }
+
+    /// Only Yamcs frames its packets, and it names its far end as the
+    /// radio does.
+    #[test]
+    fn only_yamcs_is_framed() {
+        for kind in GatewayKind::ALL {
+            assert_eq!(kind.framed(), kind == GatewayKind::Yamcs, "{kind}");
+        }
+        assert_eq!(GatewayKind::Yamcs.base_attribute(), "ground_base");
+        assert_eq!(GatewayKind::Yamcs.far_end(), "the Yamcs ground station");
     }
 
     /// A word that is no kind is refused as one, offering what to say.
@@ -257,6 +300,10 @@ mod tests {
         assert_eq!(
             GatewayKind::of_node_type("gateway_cfs"),
             Some(GatewayKind::Cfs)
+        );
+        assert_eq!(
+            GatewayKind::of_node_type("gateway_yamcs"),
+            Some(GatewayKind::Yamcs)
         );
         for other in ["log", "compute", "i2c", "tee-gateway", "gateway_moc"] {
             assert_eq!(GatewayKind::of_node_type(other), None, "{other}");

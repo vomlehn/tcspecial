@@ -294,11 +294,16 @@ pub fn one_host(address: &str) -> String {
 /// somebody's mistake. Acting on it would be acting on what the configuration
 /// did not describe.
 ///
-/// The port must match. The address must too -- `localhost`, `127.0.0.1` and
-/// `::1` counting as one host, as they do everywhere else in these rules --
-/// unless the configuration names every interface, in which case the address a
-/// datagram carries is whichever interface the route chose and there is
-/// nothing written down to compare it with.
+/// The port must match, unless the configuration names port 0: a ground that
+/// cannot send from a port of its own choosing -- Yamcs sends each command
+/// from whatever port the system gives it -- is named with port 0, and then
+/// any port from that host is it. Off unless a file writes port 0, and only
+/// a sender may be written so: see [`sender_of`]. The address must match too
+/// -- `localhost`, `127.0.0.1` and `::1` counting as one host, as they do
+/// everywhere else in these rules -- unless the configuration names every
+/// interface, in which case the address a datagram carries is whichever
+/// interface the route chose and there is nothing written down to compare it
+/// with.
 ///
 /// Asked of every datagram on those links, so it allocates nothing: the
 /// address a datagram came from is written into a buffer on the stack and
@@ -313,7 +318,7 @@ pub fn one_host(address: &str) -> String {
 ///
 /// Whether `from` is the socket `stated` names.
 pub fn came_from(stated: &HostPort, from: &SocketAddr) -> bool {
-    if from.port() != stated.port {
+    if stated.port != 0 && from.port() != stated.port {
         return false;
     }
     if binds_every_interface(&stated.address) {
@@ -1569,6 +1574,56 @@ impl std::fmt::Display for HostPort {
 /// A message if there is no colon, no address before it, or a port after it
 /// that is not a whole number from 1 to 65535.
 pub fn host_port_of(attribute: &str, stated: &str) -> Result<HostPort, String> {
+    host_port(attribute, stated, false)
+}
+
+/// Where a ground sends from, as `address:port`: [`host_port_of`], with port
+/// 0 allowed to mean any port from that host.
+///
+/// For `tcs_cmd.send` and `payload_command.source_base`, which the vehicle
+/// never binds: it only asks where each command came from, with
+/// [`came_from`]. A ground that sends from whatever port the system gives
+/// it, as Yamcs does, is written with port 0; the vehicle's answer goes back
+/// to wherever the command came from, as it always has.
+///
+/// # Arguments
+///
+/// * `attribute` - The attribute's name, for the message.
+/// * `stated`    - Its value, as written.
+///
+/// # Returns
+///
+/// The host and the port, which may be 0.
+///
+/// # Errors
+///
+/// A message if there is no colon, no address before it, or a port after it
+/// that is not a whole number from 0 to 65535.
+pub fn sender_of(attribute: &str, stated: &str) -> Result<HostPort, String> {
+    host_port(attribute, stated, true)
+}
+
+/// [`host_port_of`] and [`sender_of`], which differ only in whether port 0
+/// is allowed.
+///
+/// # Arguments
+///
+/// * `attribute` - The attribute's name, for the message.
+/// * `stated`    - Its value, as written.
+/// * `any_port`  - Whether port 0, any port, is allowed.
+///
+/// # Returns
+///
+/// The host and the port.
+///
+/// # Errors
+///
+/// What [`host_port_of`] refuses, port 0 only where `any_port` is false.
+fn host_port(
+    attribute: &str,
+    stated: &str,
+    any_port: bool,
+) -> Result<HostPort, String> {
     let said = stated.trim();
     let (address, port) = said.rsplit_once(':').ok_or_else(|| {
         format!(
@@ -1589,7 +1644,7 @@ pub fn host_port_of(attribute: &str, stated: &str) -> Result<HostPort, String> {
              port is a whole number between 1 and 65535"
         )
     })?;
-    if port == 0 {
+    if port == 0 && !any_port {
         return Err(format!(
             "{attribute} \"{said}\" asks for port 0, which is a request for \
              whatever port is free -- and a link nobody can predict the port \
@@ -1644,6 +1699,10 @@ pub struct TcsCmdJson {
     /// And the one their answers are published under.
     #[serde(default)]
     pub response_msgid: Option<String>,
+    /// The APID commands on both command links carry, and their answers,
+    /// where the gateway is Yamcs: see [`crate::ccsds`].
+    #[serde(default)]
+    pub apid: Option<String>,
 }
 
 /// The beacon link and its timing, as a file states it.
@@ -1708,6 +1767,10 @@ pub struct BeaconJson {
     /// The message ID the beacon is published under, on a software bus.
     #[serde(default)]
     pub tlm_msgid: Option<String>,
+    /// The APID the beacon carries, where the gateway is Yamcs: see
+    /// [`crate::ccsds`].
+    #[serde(default)]
+    pub apid: Option<String>,
 }
 
 /// Where a payload's telemetry goes, as a file states it.
@@ -1993,6 +2056,23 @@ pub struct Sockets {
     /// And where they are received: the MOC binds this and tcspecial sends to
     /// it.
     pub beacon_recv: HostPort,
+    /// The APIDs of the beacon and the command links, where every packet is
+    /// a CCSDS Space Packet -- a configuration that answers to Yamcs -- and
+    /// `None` where none is.
+    pub framing: Option<CcsdsFraming>,
+}
+
+/// The APIDs of the links the `tcspecial` section states, for a
+/// configuration whose packets are CCSDS Space Packets: see
+/// [`crate::ccsds`]. What goes through a gateway node is counted from the
+/// node's own `apid_base`: see [`crate::graph::telemetry`].
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct CcsdsFraming {
+    /// What the beacon carries, as telemetry: `beacon.apid`.
+    pub beacon_apid: u16,
+    /// What commands on both command links carry, as telecommands, and
+    /// their answers, as telemetry: `tcs_cmd.apid`.
+    pub cmd_apid: u16,
 }
 
 /// The SBN peer, settled: see [`crate::sbn`].
@@ -2134,6 +2214,36 @@ pub fn msgid_of(name: &str, said: &str) -> Result<u16, String> {
         })
 }
 
+/// Reads an APID: a whole number of eleven bits, decimal or with `0x`.
+///
+/// # Arguments
+///
+/// * `name` - The attribute's name, for the message.
+/// * `said` - Its value, as written.
+///
+/// # Returns
+///
+/// The APID.
+///
+/// # Errors
+///
+/// A message naming the attribute, if it is not a whole number or is past
+/// [`crate::ccsds::MAX_APID`].
+pub fn apid_of(name: &str, said: &str) -> Result<u16, String> {
+    let value = crate::whole::whole_u32(said.trim())
+        .map_err(|why| format!("{name} is {why}"))?;
+    u16::try_from(value)
+        .ok()
+        .and_then(|apid| crate::ccsds::apid(apid).ok())
+        .ok_or_else(|| {
+            format!(
+                "{name} is {}, and an APID is eleven bits, 0 to {:#x}: give                  one in that range",
+                said.trim(),
+                crate::ccsds::MAX_APID
+            )
+        })
+}
+
 /// Reads one of the whole numbers SBN identifies peers by.
 fn sbn_number(name: &str, said: &str) -> Result<u32, String> {
     crate::whole::whole_u32(said.trim())
@@ -2241,9 +2351,21 @@ impl CIConfigJson {
             })?;
             host_port_of(name, said)
         };
+        // Where the ground sends commands from, which the vehicle never
+        // binds: port 0 is any port from that host. See `sender_of`.
+        let sender = |name: &str, said: &Option<String>| {
+            let said = said.as_deref().ok_or_else(|| {
+                format!(
+                    "{name} is not stated, and a configuration whose gateway \
+                     is {} must state it",
+                    self.gateway
+                )
+            })?;
+            sender_of(name, said)
+        };
         let command = socket("tcs_cmd.recv", &self.tcs_cmd.recv)?;
         let (address, port) = (command.address, command.port);
-        let payload_command_source_base = socket(
+        let payload_command_source_base = sender(
             "payload_command.source_base",
             &self.payload_command.source_base,
         )?;
@@ -2251,7 +2373,7 @@ impl CIConfigJson {
             "payload_command.dest_base",
             &self.payload_command.dest_base,
         )?;
-        let moc_cmd_send = socket("tcs_cmd.send", &self.tcs_cmd.send)?;
+        let moc_cmd_send = sender("tcs_cmd.send", &self.tcs_cmd.send)?;
         let payload_source_base = socket(
             "payload_telemetry.source_base",
             &self.payload_telemetry.source_base,
@@ -2262,6 +2384,7 @@ impl CIConfigJson {
         )?;
         let beacon_send = socket("beacon.send", &self.beacon.send)?;
         let beacon_recv = socket("beacon.recv", &self.beacon.recv)?;
+        let framing = self.framing()?;
 
         // One socket cannot be two links. A file that put both at the same
         // place would describe a split it has not made, and the half that
@@ -2291,7 +2414,70 @@ impl CIConfigJson {
             payload_command_dest_base,
             beacon_send,
             beacon_recv,
+            framing,
         })
+    }
+
+    /// Settles the APIDs of a configuration whose packets are CCSDS Space
+    /// Packets, and says there are none for one whose are not.
+    ///
+    /// # Returns
+    ///
+    /// The beacon's and the command links' APIDs, where the gateway frames
+    /// its packets; `None` where it does not.
+    ///
+    /// # Errors
+    ///
+    /// A message naming the attribute, for one not stated where it must be,
+    /// stated where it must not be, or not an APID, and for the two being
+    /// one APID.
+    fn framing(&self) -> Result<Option<CcsdsFraming>, String> {
+        let stated = [
+            ("beacon.apid", &self.beacon.apid),
+            ("tcs_cmd.apid", &self.tcs_cmd.apid),
+        ];
+        if !self.gateway.framed() {
+            // Refused rather than ignored: an APID in a file whose packets
+            // carry none is somebody expecting a header that is not there.
+            if let Some((name, _)) = stated.iter().find(|(_, said)| {
+                said.as_deref().is_some_and(|said| !said.trim().is_empty())
+            }) {
+                return Err(format!(
+                    "{name} is said only where the gateway is yamcs, whose \
+                     packets carry CCSDS headers, and this configuration's \
+                     is {}: take it out",
+                    self.gateway
+                ));
+            }
+            return Ok(None);
+        }
+        let apid = |name: &str, said: &Option<String>| {
+            let said = said.as_deref().ok_or_else(|| {
+                format!(
+                    "{name} is not stated, and a configuration whose gateway \
+                     is {} must state it: the APID, 0 to {:#x}",
+                    self.gateway,
+                    crate::ccsds::MAX_APID
+                )
+            })?;
+            apid_of(name, said)
+        };
+        let beacon_apid = apid("beacon.apid", &self.beacon.apid)?;
+        let cmd_apid = apid("tcs_cmd.apid", &self.tcs_cmd.apid)?;
+        // The beacon is telemetry and so are the answers, so a ground
+        // station reading both under one APID could not tell a beacon from
+        // an answer.
+        if beacon_apid == cmd_apid {
+            return Err(format!(
+                "beacon.apid and tcs_cmd.apid are both {beacon_apid:#x}, and \
+                 the beacon and the commands' answers would be one stream \
+                 to the ground: give one of them another APID"
+            ));
+        }
+        Ok(Some(CcsdsFraming {
+            beacon_apid,
+            cmd_apid,
+        }))
     }
 
     /// Settles the links of a configuration that answers over a software
@@ -2733,6 +2919,32 @@ mod tests {
         assert!(came_from(&stated("0.0.0.0", 5550), &at("127.0.0.1:5550")));
         assert!(came_from(&stated("0.0.0.0", 5550), &at("10.0.0.1:5550")));
         assert!(!came_from(&stated("0.0.0.0", 5550), &at("127.0.0.1:5551")));
+
+        // Port 0: any port from that host, as a ground that sends from
+        // whatever port the system gives it is written. The host is still
+        // asked about.
+        assert!(came_from(&stated("127.0.0.1", 0), &at("127.0.0.1:40000")));
+        assert!(came_from(&stated("localhost", 0), &at("127.0.0.1:1")));
+        assert!(!came_from(&stated("127.0.0.1", 0), &at("10.0.0.1:40000")));
+        assert!(came_from(&stated("0.0.0.0", 0), &at("10.0.0.1:40000")));
+    }
+
+    /// A sender may be written with port 0, any port; a socket the vehicle
+    /// binds or sends to may not.
+    #[test]
+    fn only_a_sender_may_be_any_port() {
+        assert_eq!(
+            sender_of("tcs_cmd.send", "127.0.0.1:0"),
+            Ok(HostPort {
+                address: "127.0.0.1".to_string(),
+                port: 0,
+            })
+        );
+        let why = host_port_of("tcs_cmd.recv", "127.0.0.1:0")
+            .expect_err("port 0 bound");
+        assert!(why.contains("port 0"), "{why}");
+        assert!(sender_of("tcs_cmd.send", "127.0.0.1:65536").is_err());
+        assert!(sender_of("tcs_cmd.send", "127.0.0.1").is_err());
     }
 
     /// Every kind of endpoint makes its own kind of handler.

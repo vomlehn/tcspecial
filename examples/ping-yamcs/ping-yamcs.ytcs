@@ -1,0 +1,72 @@
+# yaml-language-server: $schema=../../tcsgui/share/schema/tcspecial.schema.json
+
+description: "A ping, with Yamcs as the ground station, over CCSDS packets"
+
+tcspecial:
+  # The ping example with Yamcs at the ground end. The gateway is yamcs, so
+  # every packet on every link to the ground carries a CCSDS primary header:
+  # the beacon, the commands and their answers, and what the gateway node
+  # takes and gives. Each link says its APID; the gateway node's sources
+  # count theirs on from its apid_base.
+  #
+  # Every port is in the sixteen thousands, which no other example uses, so
+  # this one can be left running while another is looked at.
+  beacon:
+    apid: "0x100"
+    default_interval: "5 s"
+    recv: "127.0.0.1:16510"
+    reset_interval: "1 s"
+    send: "0.0.0.0:16500"
+  gateway: "yamcs"
+  interface: "ad9aac4dd5a6d88dd5e78824ba8a83ac"
+  log:
+    directory: "/tmp/telemetry"
+    segment_size: "65536"
+  payload_command:
+    dest_base: "0.0.0.0:16300"
+    source_base: "127.0.0.1:16310"
+  payload_telemetry:
+    dest_base: "127.0.0.1:16410"
+    source_base: "0.0.0.0:16400"
+  # tcspecial counts its starts in this file, which must be on storage
+  # that survives a power cycle on a vehicle.
+  state_file: "/tmp/tcspecial-ping-yamcs.state"
+  # Yamcs sends its commands from a port the system chooses, and takes the
+  # answers on the same socket, so the commands are taken from any port of
+  # this host -- port 0 -- and each answer goes back to the port its command
+  # came from.
+  tcs_cmd:
+    apid: "0x101"
+    recv: "0.0.0.0:16200"
+    send: "127.0.0.1:0"
+
+gateway:
+  # Yamcs's end of the link, both ways. A ping goes up to address:port as a
+  # telecommand of APID apid_base, which this node binds aboard, and leaves
+  # it by gateway-out for the ping node. The answer comes back to Yamcs at
+  # ground_base plus the ping node's device id -- ping is the second node
+  # written, device id 1, so 16701 -- as telemetry of APID apid_base plus
+  # that device id, 0x201.
+  - name: gateway
+    type: gateway_yamcs
+    address: "127.0.0.1"
+    port: "16600"
+    ground_base: "127.0.0.1:16700"
+    apid_base: "0x200"
+    payload-in: true
+    gateway-out:
+      - target: ping
+
+vehicle:
+  # Answers each ping with the vehicle's time on the end: see
+  # tcslibgs::node::vehicle::ping for what a ping and its answer say.
+  - name: ping
+    type: ping
+    gateway-in: true
+    payload-out:
+      - target: gateway
+
+tcsgui:
+  nodes:
+    - { name: gateway, x: 469, y: 34 }
+    - { name: ping, x: 34, y: 34 }

@@ -40,6 +40,14 @@
 //! is every message ID such a configuration uses, telemetry and commands
 //! alike, and holds each to the mission's allotment.
 //!
+//! # Under Yamcs
+//!
+//! A configuration that answers to Yamcs has ports as the radio's does, and
+//! every packet on them is a CCSDS Space Packet: what goes through a
+//! `gateway_yamcs` node carries the node's `apid_base` plus the source's
+//! device id as its APID. [`apids`] is every APID such a configuration uses,
+//! and holds each to being one and used once.
+//!
 //! This is the one place that says all of it. The flight software routes by
 //! it, the checking judges a configuration by it, and a ground station or
 //! simulator working from the same file finds the same ports by it.
@@ -90,6 +98,10 @@ pub struct Telemetered {
     pub via: Via,
     /// How it is reached.
     pub reaches: Reaches,
+    /// The APID its packets carry as CCSDS telemetry, for a link through a
+    /// gateway node whose packets are CCSDS Space Packets, or `None` for a
+    /// link whose packets carry no header.
+    pub apid: Option<u16>,
 }
 
 impl Telemetered {
@@ -189,6 +201,35 @@ pub fn counted(base: u16, id: usize) -> Result<u16, String> {
         })
 }
 
+/// An APID base, counted on by a node's device id: [`counted`] for APIDs.
+///
+/// # Arguments
+///
+/// * `base` - The base.
+/// * `id`   - The node's device id.
+///
+/// # Returns
+///
+/// The APID.
+///
+/// # Errors
+///
+/// A message where the sum is past an APID's eleven bits.
+pub fn counted_apid(base: u16, id: usize) -> Result<u16, String> {
+    usize::from(base)
+        .checked_add(id)
+        .and_then(|sum| u16::try_from(sum).ok())
+        .filter(|sum| *sum <= crate::ccsds::MAX_APID)
+        .ok_or_else(|| {
+            format!(
+                "{base:#x} plus the device id {id} is past an APID's eleven \
+                 bits, {:#x}: lower apid_base, or write the node earlier in \
+                 the configuration",
+                crate::ccsds::MAX_APID
+            )
+        })
+}
+
 /// What a source's link into a gateway node is called.
 pub fn gateway_link_name(source: &str, gateway: &str) -> String {
     format!("{source} to {gateway}")
@@ -255,6 +296,20 @@ pub fn of(graph: &Graph) -> Result<Vec<Telemetered>, Refused> {
                 node: Some(to.clone()),
                 why: format!("\"{to}\": {attribute} {why}"),
             };
+            // Under Yamcs, the node's apid_base counted on by the source's
+            // id, as the port is. A node whose apid_base does not read
+            // contributes nothing, as one whose base does not: reach_of
+            // says what is wrong with it.
+            let apid = match crate::graph::reach::apid_base_of(gateway) {
+                Err(_) => continue,
+                Ok(None) => None,
+                Ok(Some(base)) => {
+                    Some(counted_apid(base, id).map_err(|why| Refused {
+                        node: Some(to.clone()),
+                        why: format!("\"{to}\": apid_base {why}"),
+                    })?)
+                }
+            };
             let reaches = if kind.on_bus() {
                 let Ok(base) = msgid_of(attribute, said.as_str()) else {
                     continue;
@@ -279,6 +334,7 @@ pub fn of(graph: &Graph) -> Result<Vec<Telemetered>, Refused> {
                 id,
                 via: Via::Gateway(to.clone()),
                 reaches,
+                apid,
             });
         }
     }
@@ -321,6 +377,7 @@ pub fn of(graph: &Graph) -> Result<Vec<Telemetered>, Refused> {
                 id,
                 via: Via::PayloadTelemetry,
                 reaches,
+                apid: None,
             });
         }
     }
@@ -556,6 +613,181 @@ pub fn msgids(graph: &Graph) -> Result<Vec<MsgIdUse>, Refused> {
                 ),
             });
         }
+    }
+    Ok(used)
+}
+
+/// What an APID a configuration whose packets are CCSDS Space Packets uses
+/// carries.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum ApidCarries {
+    /// The beacon, as telemetry: `beacon.apid`.
+    Beacon,
+    /// The commands on both command links, as telecommands, and their
+    /// answers, as telemetry: `tcs_cmd.apid`.
+    Commands,
+    /// What the ground sends this gateway node, as telecommands: its
+    /// `apid_base`.
+    Uplink(String),
+    /// A source's data through this gateway node, as telemetry: one of
+    /// [`of`]'s links.
+    Downlink {
+        /// The gateway node it goes through.
+        gateway: String,
+        /// The link's name.
+        link: String,
+    },
+}
+
+/// One APID a configuration whose packets are CCSDS Space Packets uses.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ApidUse {
+    /// The APID.
+    pub apid: u16,
+    /// What it is for, as a complaint names it.
+    pub what: String,
+    /// What to change to move it, as a complaint names it.
+    pub change: String,
+    /// Which node it is about, where it is a node's.
+    pub node: Option<String>,
+    /// What it carries.
+    pub carries: ApidCarries,
+}
+
+impl ApidUse {
+    /// Whether two uses may share an APID: only a gateway node's commands
+    /// and what goes to the ground through that same node, which are told
+    /// apart by their packet type.
+    ///
+    /// # Arguments
+    ///
+    /// * `other` - The other use.
+    ///
+    /// # Returns
+    ///
+    /// `true` where the two may be one APID.
+    fn may_share(&self, other: &ApidUse) -> bool {
+        match (&self.carries, &other.carries) {
+            (
+                ApidCarries::Uplink(one),
+                ApidCarries::Downlink { gateway, .. },
+            )
+            | (
+                ApidCarries::Downlink { gateway, .. },
+                ApidCarries::Uplink(one),
+            ) => one == gateway,
+            _ => false,
+        }
+    }
+}
+
+/// Every APID a configuration whose packets are CCSDS Space Packets uses,
+/// each checked: an APID, and used once.
+///
+/// The beacon's and the command links', each `gateway_yamcs` node's
+/// `apid_base`, and every link [`of`] finds through one. A Yamcs ground
+/// station sorts what arrives into streams by APID, so two kinds of packet
+/// under one would each be read as the other. The one exception is a
+/// gateway node's own `apid_base` and the first APID counted from it, the
+/// device id 0's: one carries telecommands and the other telemetry, and the
+/// packet type tells them apart.
+///
+/// # Arguments
+///
+/// * `graph` - The configuration.
+///
+/// # Returns
+///
+/// Every APID used, or nothing for a configuration whose packets carry no
+/// header or that has no section.
+///
+/// # Errors
+///
+/// [`Refused`] naming the two uses an APID is given, the APID and what to
+/// change, or a downlink's APID that is past eleven bits.
+pub fn apids(graph: &Graph) -> Result<Vec<ApidUse>, Refused> {
+    let Some(section) = graph.tcspecial.as_ref() else {
+        return Ok(Vec::new());
+    };
+    let refused = |why: String| Refused { node: None, why };
+    let ci = ci_config_of(&flatten(section))
+        .map_err(refused)?
+        .to_ci_config()
+        .map_err(refused)?;
+    let Some(framing) = ci.sockets().and_then(|sockets| sockets.framing) else {
+        return Ok(Vec::new());
+    };
+
+    let mut used = vec![
+        ApidUse {
+            apid: framing.beacon_apid,
+            what: "beacon.apid".to_string(),
+            change: "beacon.apid".to_string(),
+            node: None,
+            carries: ApidCarries::Beacon,
+        },
+        ApidUse {
+            apid: framing.cmd_apid,
+            what: "tcs_cmd.apid".to_string(),
+            change: "tcs_cmd.apid".to_string(),
+            node: None,
+            carries: ApidCarries::Commands,
+        },
+    ];
+    for node in &graph.nodes {
+        // One whose apid_base does not read is complained about by
+        // reach_of, and once.
+        let Ok(Some(apid)) = crate::graph::reach::apid_base_of(node) else {
+            continue;
+        };
+        used.push(ApidUse {
+            apid,
+            what: format!("the apid_base of \"{}\"", node.name),
+            change: format!("the apid_base of \"{}\"", node.name),
+            node: Some(node.name.clone()),
+            carries: ApidCarries::Uplink(node.name.clone()),
+        });
+    }
+    for link in of(graph)? {
+        let (Some(apid), Via::Gateway(gateway)) = (link.apid, &link.via) else {
+            continue;
+        };
+        used.push(ApidUse {
+            apid,
+            what: format!(
+                "the APID of what \"{}\" sends to \"{gateway}\", its \
+                 apid_base plus the device id {}",
+                link.source, link.id
+            ),
+            change: format!("the apid_base of \"{gateway}\""),
+            node: Some(gateway.clone()),
+            carries: ApidCarries::Downlink {
+                gateway: gateway.clone(),
+                link: link.name.clone(),
+            },
+        });
+    }
+
+    for (at, one) in used.iter().enumerate() {
+        let Some(before) = used[..at]
+            .iter()
+            .find(|before| before.apid == one.apid && !before.may_share(one))
+        else {
+            continue;
+        };
+        let change = match before.change == one.change {
+            true => one.change.clone(),
+            false => format!("{} or {}", before.change, one.change),
+        };
+        return Err(Refused {
+            node: one.node.clone(),
+            why: format!(
+                "{} and {} are both APID {:#x}: Yamcs sorts packets by APID, \
+                 so each would be read as the other -- change {change} so \
+                 they do not overlap",
+                before.what, one.what, one.apid
+            ),
+        });
     }
     Ok(used)
 }

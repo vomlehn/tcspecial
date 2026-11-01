@@ -311,7 +311,12 @@ fn reach_of_node(node: &Node) -> Result<(), String> {
 
     // Only the nodes that are opened. A computation and a log have rules of
     // their own, and this would tell them they are not interfaces.
-    if !theirs.is_payload() && theirs.node_type != "gateway_radio" {
+    if !theirs.is_payload()
+        && !matches!(
+            theirs.node_type.as_str(),
+            "gateway_radio" | "gateway_yamcs"
+        )
+    {
         return Ok(());
     }
     tcslibgs::graph::reach::reach_of(&theirs).map(|_| ())

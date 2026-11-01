@@ -709,6 +709,21 @@ fn take(
                 node.node_type
             ))
         }
+        // The APID of what the ground sends a Yamcs gateway, and the first
+        // of those counted for what goes to it, which only that node has:
+        // read below.
+        "apid_base"
+            if GatewayKind::of_node_type(&node.node_type)
+                == Some(GatewayKind::Yamcs) => {}
+        "apid_base" => {
+            return Err(format!(
+                "\"{what}\" is {} {} node, and apid_base is the APID of the \
+                 CCSDS packets a Yamcs ground station sends and the first of \
+                 those it is sent: only a gateway_yamcs node has one",
+                kind.article(),
+                node.node_type
+            ))
+        }
         "read_size" => {
             let size = number(what, "read_size", value)?;
             if size == 0 {
@@ -1006,8 +1021,9 @@ pub fn binds(node: &Node) -> bool {
 /// # Errors
 ///
 /// A message if a gateway node leaves out its base attribute or states one
-/// that is not an `address:port`, or if an F´ gateway leaves out
-/// `fprime_id_base` or states one that is not a whole number.
+/// that is not an `address:port`, if an F´ gateway leaves out
+/// `fprime_id_base` or states one that is not a whole number, or if a Yamcs
+/// gateway leaves out `apid_base` or states one that is not an APID.
 fn ground_of(what: &str, node: &Node) -> Result<Option<HostPort>, String> {
     let Some(kind) = GatewayKind::of_node_type(&node.node_type) else {
         return Ok(None);
@@ -1050,7 +1066,55 @@ fn ground_of(what: &str, node: &Node) -> Result<Option<HostPort>, String> {
         )?;
         number(what, "fprime_id_base", ids)?;
     }
+    if kind.framed() {
+        apid_base_of(node)?;
+    }
     host_port_of(base, stated.as_str())
+        .map(Some)
+        .map_err(|why| format!("\"{what}\": {why}"))
+}
+
+/// The APID a gateway node whose packets are CCSDS Space Packets takes
+/// commands under, which is also the first of the APIDs what goes through it
+/// to the ground is counted from: its `apid_base`.
+///
+/// Required of a `gateway_yamcs` node: a Yamcs ground station tells one
+/// stream of packets from another by its APID, so a node that said none
+/// would be one whose packets the ground could not sort.
+///
+/// # Arguments
+///
+/// * `node` - The node.
+///
+/// # Returns
+///
+/// The APID, for a gateway node whose kind frames its packets; `None` for
+/// any other node.
+///
+/// # Errors
+///
+/// A message naming the node if it leaves `apid_base` out or states one that
+/// is not an APID.
+pub fn apid_base_of(node: &Node) -> Result<Option<u16>, String> {
+    let framed = GatewayKind::of_node_type(&node.node_type)
+        .is_some_and(GatewayKind::framed);
+    if !framed {
+        return Ok(None);
+    }
+    let what = node.name.as_str();
+    let stated = required(
+        what,
+        node,
+        "apid_base",
+        "a link to a Yamcs ground station",
+        &format!(
+            "the APID of the CCSDS packets the ground sends it, 0 to {:#x} -- \
+             each node linked into it is sent to the ground under that APID \
+             plus its own device id",
+            crate::ccsds::MAX_APID
+        ),
+    )?;
+    crate::types::apid_of("apid_base", stated.as_str())
         .map(Some)
         .map_err(|why| format!("\"{what}\": {why}"))
 }
@@ -1153,8 +1217,8 @@ fn kind_of(node: &Node) -> Result<DHType, String> {
         other => Err(format!(
             "\"{}\": there is no node type called \"{other}\". The interfaces \
              are i2c, spi, serial, hdlc, can, iio, rpmsg, gpio, device-file \
-             and network; a gateway is gateway_radio, gateway_fprime or \
-             gateway_cfs; and compute, log, \
+             and network; a gateway is gateway_radio, gateway_yamcs, \
+             gateway_fprime or gateway_cfs; and compute, log, \
              null-gateway, null-payload, tee-gateway, tee-payload, ping and \
              the app nodes are the rest",
             node.name

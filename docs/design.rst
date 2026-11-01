@@ -127,7 +127,8 @@ commander
 
 gateway
     The node through which tcspecial reaches its commander, and the link it
-    holds: ``gateway_radio``, ``gateway_cfs`` or ``gateway_fprime``. It was
+    holds: ``gateway_radio``, ``gateway_yamcs``, ``gateway_cfs`` or
+    ``gateway_fprime``. It was
     also the word for the commander itself, which left one word for both ends
     of a link. See `Gateways: what the vehicle answers to`_.
 
@@ -783,6 +784,10 @@ node, and there are three kinds of gateway:
      - the ground, through the vehicle's radio
      - UDP
      - ``address``, ``port``, ``ground_base``
+   * - ``gateway_yamcs``
+     - a Yamcs ground station
+     - UDP, every packet behind a CCSDS primary header
+     - ``address``, ``port``, ``ground_base``, ``apid_base``
    * - ``gateway_cfs``
      - a cFS flight computer's software bus
      - as a peer of its Software Bus Network (SBN) application, over SBN's
@@ -793,7 +798,7 @@ node, and there are three kinds of gateway:
      - UDP, in the radio's own protocol, the bridge playing the MOC
      - ``address``, ``port``, ``bridge_base``, ``fprime_id_base``
 
-All three are in the ``gateway`` section, and all three have the terminals
+All four are in the ``gateway`` section, and all four have the terminals
 the radio's has: ``payload-in``, which takes as many sources as the
 configuration gives it, and ``gateway-out``.
 
@@ -6342,6 +6347,28 @@ header and its secondary header, around exactly what the UDP link carries
 -- is specified in `What crosses the bus`_ and built in ``tcslibgs::cfs``,
 which the vehicle frames and strips with, refusing and counting as
 malformed whatever arrives on the bus not framed so.
+
+``gateway_yamcs`` is the radio's UDP links with a CCSDS Space Packet primary
+header on every packet, and no secondary header, so that a ground station
+that speaks CCSDS packets -- Yamcs -- tells them apart by APID. The kind
+frames every link in its section, as cFS's does: the beacon on
+``beacon.apid``, the commands and their answers on ``tcs_cmd.apid``, each
+gateway node's uplink on its ``apid_base``, and each source through it on
+``apid_base`` plus its device id. The ground's packets are telecommands and
+the vehicle's telemetry, unsegmented, each sender counting its own sequence
+per APID; a packet with another type, another APID, a secondary header, a
+segment or a length field that is not its own is refused and counted, and
+the sequence count is not checked, a lost packet being no reason to refuse
+the next. The header is ``tcslibgs::ccsds``. The APIDs are stated rather
+than fixed, because which a mission's ground expects is the mission's, and
+they are checked distinct where the file is read. Yamcs's mission database
+is tcspecial's own XTCE with a wrapper that puts the header around it, which
+the ping-yamcs example writes.
+
+A command link's sender written with port nought takes commands from any
+port of its host. Yamcs sends from a port the system chooses and takes the
+answers on the same socket, and an answer goes back to the port its command
+came from, as every answer does.
 
 There is then nothing about framing for a configuration to get wrong, or
 for two configurations to disagree about: the node type a configuration

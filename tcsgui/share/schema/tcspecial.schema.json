@@ -42,12 +42,13 @@
       "type": "object",
       "properties": {
         "gateway": {
-          "description": "What the vehicle answers to: radio, the ground over UDP; fprime, an F´ flight computer's bridge component, over the same; cfs, a cFS flight computer's software bus, as a peer of its SBN. Required, with no default; it decides how the links below are written, sockets for radio and fprime and message IDs for cfs.",
+          "description": "What the vehicle answers to: radio, the ground over UDP; yamcs, a Yamcs ground station over the same, every packet a CCSDS Space Packet; fprime, an F´ flight computer's bridge component, over UDP too; cfs, a cFS flight computer's software bus, as a peer of its SBN. Required, with no default; it decides how the links below are written, sockets for radio, yamcs and fprime and message IDs for cfs.",
           "type": "string",
           "enum": [
             "radio",
             "cfs",
-            "fprime"
+            "fprime",
+            "yamcs"
           ]
         },
         "interface": {
@@ -77,6 +78,13 @@
             },
             "response_msgid": {
               "description": "And the one their answers are published under: telemetry's. A cFS message ID, decimal or hexadecimal with 0x, inside msgid_range.",
+              "type": [
+                "string",
+                "integer"
+              ]
+            },
+            "apid": {
+              "description": "Where the gateway is yamcs, the APID commands on both command links carry as CCSDS telecommands, and their answers as CCSDS telemetry: 0 to 0x7FF, decimal or hexadecimal with 0x. Required there, and refused for any other gateway.",
               "type": [
                 "string",
                 "integer"
@@ -171,6 +179,13 @@
             },
             "tlm_msgid": {
               "description": "On a cFS software bus, the message ID the beacon is published under. A cFS message ID, decimal or hexadecimal with 0x, inside msgid_range.",
+              "type": [
+                "string",
+                "integer"
+              ]
+            },
+            "apid": {
+              "description": "Where the gateway is yamcs, the APID the beacon carries as CCSDS telemetry: 0 to 0x7FF, decimal or hexadecimal with 0x. Required there, and refused for any other gateway.",
               "type": [
                 "string",
                 "integer"
@@ -369,12 +384,13 @@
             "type": "string"
           },
           "type": {
-            "description": "What it is: the configuration's own word for the type. A link to the ground over the radio is gateway_radio; one to an F´ bridge component is gateway_fprime; one to a cFS software bus is gateway_cfs.",
+            "description": "What it is: the configuration's own word for the type. A link to the ground over the radio is gateway_radio; one to a Yamcs ground station is gateway_yamcs; one to an F´ bridge component is gateway_fprime; one to a cFS software bus is gateway_cfs.",
             "type": "string",
             "enum": [
               "gateway_radio",
               "gateway_cfs",
-              "gateway_fprime"
+              "gateway_fprime",
+              "gateway_yamcs"
             ]
           },
           "group": {
@@ -480,6 +496,15 @@
           },
           "bridge_base": {
             "description": "Where the F´ bridge component is, as address:port: a gateway_fprime node's ground_base. What each node linked into it produces is sent to that address, at that port plus the node's device id.",
+            "type": [
+              "string",
+              "number",
+              "boolean",
+              "null"
+            ]
+          },
+          "apid_base": {
+            "description": "The APID, 0 to 0x7FF, of the CCSDS telecommands the ground sends a gateway_yamcs node: what each node linked into it produces goes to the ground as CCSDS telemetry under this APID plus its own device id. Decimal, or hexadecimal with 0x.",
             "type": [
               "string",
               "number",

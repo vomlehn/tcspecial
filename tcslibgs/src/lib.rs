@@ -16,6 +16,9 @@ pub mod beacon;
 /// The beacon's packing code, which tcs-xtce generated from
 /// `xtce/beacon.xtce`: used through [`beacon`].
 mod beacon_packet;
+/// The CCSDS Space Packet primary header every packet to and from a Yamcs
+/// ground station carries.
+pub mod ccsds;
 /// What crosses a cFS software bus: the cFS packet around a tcspecial one.
 pub mod cfs;
 pub mod commands;

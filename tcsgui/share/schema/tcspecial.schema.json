@@ -2133,6 +2133,13 @@
                 "string",
                 "integer"
               ]
+            },
+            "apid_base": {
+              "description": "Where the gateway is yamcs, the first of the APIDs the telemetry of a payload nothing touches carries as CCSDS telemetry: payload k's is this plus k, at most 0x7FF. Decimal or hexadecimal with 0x. Required there, and refused for any other gateway.",
+              "type": [
+                "string",
+                "integer"
+              ]
             }
           },
           "additionalProperties": false

@@ -1,9 +1,10 @@
-"""A configuration that answers to Yamcs, as a ground station reads it, and
-the port-0 rule for where the ground sends commands from.
+"""A configuration that answers to Yamcs, as a ground station reads it, its
+APIDs, and the port-0 rule for where the ground sends commands from.
 
 The Python mirrors of ``tcslibgs::gateway::GatewayKind::Yamcs``'s base
-attribute and of ``tcslibgs::types::came_from`` and ``sender_of``: the two
-languages must agree about which datagrams are the ground's.
+attribute, of ``tcslibgs::graph::telemetry::apids``, and of
+``tcslibgs::types::came_from`` and ``sender_of``: the two languages must
+agree about which datagrams are the ground's, and what each carries.
 """
 
 import sys
@@ -66,6 +67,107 @@ class YamcsGatewayTest(unittest.TestCase):
                              HostPort("127.0.0.1", 9001))
             link = config.command_link()
             self.assertEqual(link.send, HostPort("127.0.0.1", 0))
+
+
+#: A configuration that answers to Yamcs, in YAML, with a gateway_yamcs node
+#: ("m", device id 0) a ping node sends to ("p", device id 3), and two
+#: payloads: "n", which nothing touches (device id 1), and "o", which a
+#: command binding names (device id 2).
+YAMCS = """\
+tcspecial:
+  gateway: yamcs
+  interface: "{interface}"
+  beacon: {{ apid: "0x100", recv: "127.0.0.1:9100", send: "0.0.0.0:9101" }}
+  payload_telemetry: {{ apid_base: "{base}", dest_base: "127.0.0.1:9200",
+                       source_base: "0.0.0.0:9300" }}
+  tcs_cmd: {{ apid: "0x101", recv: "127.0.0.1:4000", send: "127.0.0.1:0" }}
+gateways:
+  - type gateway_yamcs:
+      - gateway: m
+        apid_base: "0x200"
+        ground_base: "127.0.0.1:9000"
+vehicle:
+  - type ping:
+      - compute: p
+        payload-out:
+          - target: m
+payloads:
+  - type network:
+      - payload: n
+        address: "127.0.0.1"
+        port: "9401"
+        protocol: "udp"
+      - payload: o
+        address: "127.0.0.1"
+        port: "9402"
+        protocol: "udp"
+commands:
+  - {{ from: m, sets: o.setpoint }}
+"""
+
+
+def yamcs(directory, base="0x300", gateway="yamcs"):
+    """Writes :data:`YAMCS` and reads it.
+
+    Args:
+        directory: Where to write it.
+        base:      Its ``payload_telemetry.apid_base``.
+        gateway:   Its ``tcspecial.gateway``.
+
+    Returns:
+        The :class:`configuration.Configuration`.
+    """
+    path = Path(directory) / "vehicle.ytcs"
+    path.write_text(YAMCS.format(interface=interface.of_this_tree().hex(),
+                                 base=base)
+                    .replace("gateway: yamcs", f"gateway: {gateway}"))
+    return configuration.load(path)
+
+
+class ApidTest(unittest.TestCase):
+    """The APIDs, as ``tcslibgs::graph::telemetry::apids`` counts them."""
+
+    def test_each_link_says_or_counts_its_apid(self):
+        with tempfile.TemporaryDirectory() as directory:
+            config = yamcs(directory)
+            self.assertTrue(config.framed())
+            self.assertEqual(config.beacon_apid(), 0x100)
+            self.assertEqual(config.command_apid(), 0x101)
+            self.assertEqual(config.uplink_apid("m"), 0x200)
+            self.assertEqual(config.downlink_apid("m", "p"), 0x203)
+
+    def test_an_untouched_payloads_telemetry_is_counted_as_its_port(self):
+        with tempfile.TemporaryDirectory() as directory:
+            config = yamcs(directory)
+            # "o" is named by a command binding, so the drawing touches it.
+            self.assertEqual(config.untouched_payloads(), ["n"])
+            self.assertEqual(config.payload_telemetry_apid("n"), 0x301)
+            self.assertEqual(config.payload_telemetry_link("n"),
+                             (HostPort("0.0.0.0", 9301),
+                              HostPort("127.0.0.1", 9201)))
+            for touched in ("o", "p"):
+                with self.assertRaisesRegex(ValueError, "nothing in the"):
+                    config.payload_telemetry_apid(touched)
+            with self.assertRaisesRegex(ValueError, "no node called"):
+                config.payload_telemetry_apid("q")
+
+    def test_what_is_wrong_with_an_apid_is_refused(self):
+        with tempfile.TemporaryDirectory() as directory:
+            config = yamcs(directory, base="0x7FF")
+            with self.assertRaisesRegex(ValueError, "eleven bits"):
+                config.payload_telemetry_apid("n")
+            config = yamcs(directory, base="0x800")
+            with self.assertRaisesRegex(ValueError, "apid_base"):
+                config.payload_telemetry_apid("n")
+            config = yamcs(directory, base="")
+            with self.assertRaisesRegex(ValueError, "not stated"):
+                config.payload_telemetry_apid("n")
+            config = yamcs(directory, gateway="radio")
+            self.assertFalse(config.framed())
+            with self.assertRaisesRegex(ValueError, "no CCSDS header"):
+                config.payload_telemetry_apid("n")
+            with self.assertRaisesRegex(ValueError, "no CCSDS header"):
+                config.beacon_apid()
 
 
 if __name__ == "__main__":

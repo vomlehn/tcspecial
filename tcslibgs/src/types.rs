@@ -1797,6 +1797,10 @@ pub struct PayloadTelemetryJson {
     /// bus, counted the same way.
     #[serde(default)]
     pub tlm_base: Option<String>,
+    /// The first of the APIDs its packets carry as CCSDS telemetry, where
+    /// every packet is a CCSDS Space Packet, counted the same way.
+    #[serde(default)]
+    pub apid_base: Option<String>,
 }
 
 /// The telemetry log, as a file states it.
@@ -2066,7 +2070,8 @@ pub struct Sockets {
 /// The APIDs of the links the `tcspecial` section states, for a
 /// configuration whose packets are CCSDS Space Packets: see
 /// [`crate::ccsds`]. What goes through a gateway node is counted from the
-/// node's own `apid_base`: see [`crate::graph::telemetry`].
+/// node's own `apid_base`, and a payload's telemetry from
+/// `payload_telemetry.apid_base`: see [`crate::graph::telemetry`].
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct CcsdsFraming {
     /// What the beacon carries, as telemetry: `beacon.apid`.
@@ -2074,6 +2079,9 @@ pub struct CcsdsFraming {
     /// What commands on both command links carry, as telecommands, and
     /// their answers, as telemetry: `tcs_cmd.apid`.
     pub cmd_apid: u16,
+    /// What the telemetry of a payload nothing touches is counted from by
+    /// the payload's device id, as its port is: `payload_telemetry.apid_base`.
+    pub payload_apid_base: u16,
 }
 
 /// The SBN peer, settled: see [`crate::sbn`].
@@ -2424,8 +2432,9 @@ impl CIConfigJson {
     ///
     /// # Returns
     ///
-    /// The beacon's and the command links' APIDs, where the gateway frames
-    /// its packets; `None` where it does not.
+    /// The beacon's and the command links' APIDs, and the base a payload's
+    /// telemetry's is counted from, where the gateway frames its packets;
+    /// `None` where it does not.
     ///
     /// # Errors
     ///
@@ -2436,6 +2445,10 @@ impl CIConfigJson {
         let stated = [
             ("beacon.apid", &self.beacon.apid),
             ("tcs_cmd.apid", &self.tcs_cmd.apid),
+            (
+                "payload_telemetry.apid_base",
+                &self.payload_telemetry.apid_base,
+            ),
         ];
         if !self.gateway.framed() {
             // Refused rather than ignored: an APID in a file whose packets
@@ -2465,6 +2478,13 @@ impl CIConfigJson {
         };
         let beacon_apid = apid("beacon.apid", &self.beacon.apid)?;
         let cmd_apid = apid("tcs_cmd.apid", &self.tcs_cmd.apid)?;
+        // A base, which each payload's device id counts on from: whether
+        // what is counted is an APID, and used once, is a question for when
+        // the nodes are known -- crate::graph::telemetry::apids.
+        let payload_apid_base = apid(
+            "payload_telemetry.apid_base",
+            &self.payload_telemetry.apid_base,
+        )?;
         // The beacon is telemetry and so are the answers, so a ground
         // station reading both under one APID could not tell a beacon from
         // an answer.
@@ -2478,6 +2498,7 @@ impl CIConfigJson {
         Ok(Some(CcsdsFraming {
             beacon_apid,
             cmd_apid,
+            payload_apid_base,
         }))
     }
 

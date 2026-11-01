@@ -2291,7 +2291,7 @@ mod tests {
         refused(&g, "ground", "only a gateway_fprime node");
     }
 
-    /// A graph that answers to Yamcs, its section the radio's with the two
+    /// A graph that answers to Yamcs, its section the radio's with its
     /// APIDs.
     ///
     /// # Arguments
@@ -2302,13 +2302,15 @@ mod tests {
     /// # Returns
     ///
     /// The graph, its `tcspecial.gateway` being `yamcs`, its beacon's APID
-    /// 0x100 and its commands' 0x101.
+    /// 0x100, its commands' 0x101 and its payload telemetry's counted from
+    /// 0x300.
     fn answering_yamcs(nodes: Vec<Node>, links: Vec<Link>) -> Graph {
         let mut said = crate::graph::parameters::flatten(&tcspecial());
         for (name, value) in [
             ("gateway", "yamcs"),
             ("beacon.apid", "0x100"),
             ("tcs_cmd.apid", "0x101"),
+            ("payload_telemetry.apid_base", "0x300"),
         ] {
             said.insert(name.to_string(), Scalar::of(value));
         }
@@ -2483,6 +2485,89 @@ mod tests {
             vec![link("a", &["ground"])],
         );
         assert_eq!(g.check(), Vec::new());
+    }
+
+    /// Changes one attribute of a graph's `tcspecial` section.
+    ///
+    /// # Arguments
+    ///
+    /// * `g`     - The graph.
+    /// * `name`  - The attribute's flat name.
+    /// * `value` - What it is given.
+    ///
+    /// # Returns
+    ///
+    /// The graph, so changed.
+    fn with_section(mut g: Graph, name: &str, value: &str) -> Graph {
+        let section = g.tcspecial.as_ref().expect("a section");
+        let mut said = crate::graph::parameters::flatten(section);
+        said.insert(name.to_string(), Scalar::of(value));
+        g.tcspecial = Some(crate::graph::parameters::nest(&said));
+        g
+    }
+
+    /// Under Yamcs, the telemetry of a payload nothing touches is framed
+    /// too, under payload_telemetry.apid_base plus its device id, as its
+    /// port is counted; an APID so counted that is another's, or past
+    /// eleven bits, is refused, naming the payload and what to change.
+    #[test]
+    fn payload_telemetry_under_yamcs_carries_a_counted_apid() {
+        // "a" is drawn to the gateway, device id 0; "b" is touched by
+        // nothing, device id 1.
+        let yamcs = || {
+            answering_yamcs(
+                vec![
+                    node("a", "i2c"),
+                    node("b", "device-file"),
+                    node("ground", "gateway_yamcs"),
+                ],
+                vec![link("a", &["ground"])],
+            )
+        };
+        let g = yamcs();
+        assert_eq!(g.check(), Vec::new());
+        let links = crate::graph::telemetry::of(&g).expect("sound");
+        let b = links.iter().find(|l| l.source == "b").expect("b's link");
+        assert_eq!(b.via, crate::graph::telemetry::Via::PayloadTelemetry);
+        assert_eq!(b.apid, Some(0x301), "payload_telemetry.apid_base plus 1");
+        let used = crate::graph::telemetry::apids(&g).expect("sound");
+        assert!(used.iter().any(|u| u.apid == 0x301
+            && u.carries
+                == crate::graph::telemetry::ApidCarries::PayloadTelemetry(
+                    b.name.clone()
+                )));
+
+        // Under the beacon's.
+        let g = with_section(yamcs(), "payload_telemetry.apid_base", "0xFF");
+        assert!(says(
+            &g,
+            Some("b"),
+            &["beacon.apid", "\"b\"'s telemetry", "0x100", "change"]
+        ));
+
+        // Under a gateway node's apid_base.
+        let g = with_section(yamcs(), "payload_telemetry.apid_base", "0x1FF");
+        assert!(says(
+            &g,
+            Some("b"),
+            &["apid_base of \"ground\"", "\"b\"'s telemetry", "0x200"]
+        ));
+
+        // Past eleven bits.
+        let g = with_section(yamcs(), "payload_telemetry.apid_base", "0x7FF");
+        assert!(says(
+            &g,
+            Some("b"),
+            &["payload_telemetry.apid_base", "0x7ff", "lower"]
+        ));
+
+        // Under the radio, the same payload's link carries no APID.
+        let g = graph(
+            vec![node("b", "device-file"), node("ground", "gateway_radio")],
+            vec![],
+        );
+        let links = crate::graph::telemetry::of(&g).expect("sound");
+        assert_eq!(links[0].apid, None);
     }
 
     /// A graph that answers to cFS, its section the design's example.

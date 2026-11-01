@@ -6624,16 +6624,18 @@ Requirement
     began using its configuration, has its restart flag clear and carries
     that configuration's checksum, and while that beacon is recent: its
     beacon watch says the vehicle is heard from
-    (``tcslib::beacon::Stage::Heard``). A beacon gone overdue ends the
+    (``tcslib::beacon::Stage::Heard``). A beacon gone overdue -- four times
+    ``beacon.default_interval`` since it arrived, which is four beacons
+    missed in a row, ``tcslib::beacon::AGING_AFTER_MISSED`` -- ends the
     match as a flagged one does, and the next beacon that qualifies begins
     it again, with the drop of queued data that a match begins with. A
-    station that has missed beacons cannot then go on reading as though
-    the vehicle had not changed in the meantime. A clear flag says that the vehicle has taken a
-    matching CONNECT for the configuration in that beacon, from this
-    station or another, so a station that only listens is matched as
-    surely as one that commands. A station that commands is matched for
-    commanding only once, besides, a CONNECT of its own has been answered
-    with its checksum.
+    station that has missed beacons cannot then go on reading as though the
+    vehicle had not changed in the meantime. A clear flag says that the
+    vehicle has taken a matching CONNECT for the configuration in that
+    beacon, from this station or another, so a station that only listens is
+    matched as surely as one that commands. A station that commands is
+    matched for commanding only once, besides, a CONNECT of its own has been
+    answered with its checksum.
 
 Requirement
     A station that is not matched reads no downlinked data and takes no
@@ -6723,7 +6725,8 @@ Packets on their way across a restart, on either side
 
 A listening station that misses every beacon of a change
     It is matched only while its beacon is recent, so missing the beacons
-    of a change ends its match within twice the beacon interval, before
+    of a change ends its match within four times ``default_interval``,
+    the time its beacon takes to go overdue (see `On the ground`_), before
     the new configuration's data can be read with the old. The interval it
     ages beacons against is its configuration's, which is the vehicle's
     too: nothing changes it while tcspecial runs.
@@ -7371,8 +7374,9 @@ number higher by more than one says how many were missed.
        taken by the new start brings.
    * - Every beacon lost for a while
      - Nothing.
-     - The beacon goes overdue, which ends the match as a flagged one
-       does: see `On the ground`_.
+     - The beacon goes overdue after four times ``default_interval``,
+       which ends the match as a flagged one does: see `On the
+       ground`_.
 
 No case leaves the station unable to command a vehicle it can hear. What it
 cannot do, in any of them, is have a command acted on by a start it has not

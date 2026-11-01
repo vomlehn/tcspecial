@@ -20,6 +20,9 @@ signal-hook = "0.4"
 #log = "0.4"
 #env_logger = "0.10"
 rand = "0.8"
+# The normal distribution the simulated noise is drawn from, for the rand
+# above.
+rand_distr = "0.4"
 
 [dev-dependencies]
 # Lays the window out headlessly, so a test can measure it. Slint's own

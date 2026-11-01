@@ -705,9 +705,11 @@ pub(crate) fn a_packet_from<R: Rng>(
             mass,
             output,
             reading,
+            sensor,
         }) => match mass.output(output) {
             Some(kelvin) => crate::physics::thermal_mass::thermal_mass::encode(
-                reading, kelvin,
+                reading,
+                sensor.read(kelvin, std::time::Instant::now()),
             ),
             // The simulator file was checked for this before anything
             // started, so it is a fault here rather than in the file.

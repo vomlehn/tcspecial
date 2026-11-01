@@ -45,13 +45,116 @@
 //! setpoint would hide the one part of the loop that is interesting to watch
 //! -- the first climb, with everything on -- and a vehicle coming up cold is
 //! the case the thermostat exists for.
+//!
+//! # What varies
+//!
+//! Three things a real mass sees, each optional and each off unless the
+//! simulator file asks for it:
+//!
+//! * The environment swings as a sine wave, `swing` either side of its
+//!   middle over `period`: a day and a night, or an orbit's sun and shadow.
+//!   That is still a linear equation, and its closed form adds the swing's
+//!   steady response,
+//!
+//!   ```text
+//!   swung(t) = swing * (sin(w t) - w tau cos(w t)) / (1 + (w tau)^2)
+//!   T(t + dt) = rest + swung(t + dt)
+//!               + (T - rest - swung(t)) * exp(-dt / tau)
+//!   ```
+//!
+//!   with `w` the swing's angular frequency and `tau` the time constant, so
+//!   the swing is as exact as the rest.
+//! * The environment wanders at random, and each heater's supply voltage
+//!   does: each is an Ornstein-Uhlenbeck process, a departure drawn back
+//!   towards nought, stepped by its exact transition,
+//!
+//!   ```text
+//!   x(t + dt) = x * exp(-dt / theta) + size * sqrt(1 - exp(-2 dt / theta)) * z
+//!   ```
+//!
+//!   with `z` a standard normal draw, so how much it wanders does not depend
+//!   on how often the mass is stepped. Each is held at its value at the
+//!   start of a step for that step, which is exact for any step much shorter
+//!   than its time constant -- and a wander's time constant is minutes where
+//!   a step is a sample interval. A heater's power goes as the square of its
+//!   voltage, so it warms by `rate * (1 + v)^2` with `v` its supply's
+//!   departure as a fraction of nominal.
+//! * Each output may sit a fixed distance from the mass's temperature: a
+//!   body warmed in one place is not one temperature throughout.
+//!
+//! The random draws come from a generator seeded from the run's seed and the
+//! mass's name, so that a run with the same seed varies the same way.
 
 use std::collections::BTreeMap;
+use std::f64::consts::TAU;
 use std::sync::{Arc, Mutex};
 use std::time::Instant;
 
+use rand::rngs::StdRng;
+use rand::{Rng, SeedableRng};
+use rand_distr::StandardNormal;
 use tcslibgs::node::vehicle::compute::{Format, ToKelvinParams};
-use tcslibgs::sim_config::ResolvedMass;
+use tcslibgs::sim_config::{ResolvedMass, Wander};
+
+use super::sensor::Sensor;
+
+/// A seed for one thing in a run, from the run's seed and the thing's name.
+///
+/// So that each mass and each sensor draws from a generator of its own: one
+/// shared generator would hand out its numbers in whatever order the
+/// payloads' threads happened to ask, and a run would not vary the same way
+/// twice.
+///
+/// # Arguments
+///
+/// * `seed` - The run's seed.
+/// * `what` - The thing's name, such as `mass:basic` or `sensor:temp_1`.
+///
+/// # Returns
+///
+/// The thing's seed: FNV-1a of its name, mixed with the run's.
+pub fn seed_for(seed: u64, what: &str) -> u64 {
+    let mut hash: u64 = 0xcbf2_9ce4_8422_2325;
+    for byte in what.bytes() {
+        hash ^= u64::from(byte);
+        hash = hash.wrapping_mul(0x0000_0100_0000_01b3);
+    }
+    hash ^ seed
+}
+
+/// Steps a wander by its exact transition.
+///
+/// # Arguments
+///
+/// * `x`       - Where it is.
+/// * `wander`  - Its size and time constant; one of no size stays at nought.
+/// * `seconds` - How long to step it by.
+/// * `rng`     - Where the normal draw comes from.
+///
+/// # Returns
+///
+/// Where it is `seconds` later.
+pub fn wandered(
+    x: f64,
+    wander: &Wander,
+    seconds: f64,
+    rng: &mut StdRng,
+) -> f64 {
+    if wander.size <= 0.0 || seconds <= 0.0 {
+        return x;
+    }
+    let keep = (-seconds / wander.time.as_secs_f64()).exp();
+    let z: f64 = rng.sample(StandardNormal);
+    x * keep + wander.size * (1.0 - keep * keep).sqrt() * z
+}
+
+/// One heater that is on: how hard it warms the mass at its nominal
+/// voltage; its supply is in `State::supplies`.
+#[derive(Debug, Clone, Copy)]
+struct Heating {
+    /// Kelvin a second, at its nominal voltage.
+    rate: f64,
+}
 
 /// What a mass is at, and when that was worked out.
 #[derive(Debug)]
@@ -67,7 +170,15 @@ struct State {
     /// twice is one heater: a vehicle sends a command whenever its decision
     /// changes, and a simulator that added a rate per command would have the
     /// mass warming faster every time the thermostat changed its mind.
-    heating: BTreeMap<String, f64>,
+    heating: BTreeMap<String, Heating>,
+    /// Each input's supply voltage, as its departure from nominal as a
+    /// fraction of it, and how it wanders: kept, and wandering, while its
+    /// heater is off, as a supply does.
+    supplies: BTreeMap<String, (f64, Wander)>,
+    /// How far the environment has wandered from where it swings, in kelvin.
+    wander: f64,
+    /// Where this mass's random draws come from.
+    rng: StdRng,
 }
 
 /// A thermal mass the payloads are attached to.
@@ -84,6 +195,16 @@ pub struct ThermalMass {
     time_constant: f64,
     /// The names of the places a sensor reads its temperature from.
     outputs: Vec<String>,
+    /// How far each output sits from the mass's temperature, in kelvin.
+    offsets: BTreeMap<String, f64>,
+    /// How far the environment swings either side of `environment`.
+    swing: f64,
+    /// The swing's angular frequency, in radians a second; nought for none.
+    omega: f64,
+    /// How the environment wanders.
+    wander: Wander,
+    /// The time the swing is measured from.
+    start: Instant,
     state: Mutex<State>,
 }
 
@@ -95,20 +216,46 @@ impl ThermalMass {
     ///
     /// * `mass` - The mass the simulator file declares.
     /// * `now`  - The time its temperature is at.
+    /// * `seed` - The run's seed.
     ///
     /// # Returns
     ///
-    /// The mass.
-    pub fn new(mass: &ResolvedMass, now: Instant) -> ThermalMass {
+    /// The mass, at its environment as it is at `now`: wandered as far as a
+    /// first draw says, and at the middle of its swing.
+    pub fn new(mass: &ResolvedMass, now: Instant, seed: u64) -> ThermalMass {
+        let mut rng = StdRng::seed_from_u64(seed_for(
+            seed,
+            &format!("mass:{}", mass.name),
+        ));
+        // Where a settled wander would be: started at nought, it would show
+        // a quiet beginning no real environment has.
+        let wander = if mass.wander.size > 0.0 {
+            mass.wander.size * rng.sample::<f64, _>(StandardNormal)
+        } else {
+            0.0
+        };
+        let omega = if mass.swing > 0.0 {
+            TAU / mass.period.as_secs_f64()
+        } else {
+            0.0
+        };
         ThermalMass {
             name: mass.name.clone(),
             environment: mass.environment,
             time_constant: mass.time_constant.as_secs_f64(),
             outputs: mass.outputs.clone(),
+            offsets: mass.offsets.clone(),
+            swing: mass.swing,
+            omega,
+            wander: mass.wander,
+            start: now,
             state: Mutex::new(State {
-                temperature: mass.environment,
+                temperature: mass.environment + wander,
                 at: now,
                 heating: BTreeMap::new(),
+                supplies: BTreeMap::new(),
+                wander,
+                rng,
             }),
         }
     }
@@ -128,13 +275,14 @@ impl ThermalMass {
     ///
     /// # Returns
     ///
-    /// Its temperature in kelvin, or `None` for a name the mass does not
-    /// list among its outputs.
+    /// Its temperature in kelvin, with how far that output sits from the
+    /// mass, or `None` for a name the mass does not list among its outputs.
     pub fn output(&self, output: &str) -> Option<f64> {
-        self.outputs
-            .iter()
-            .any(|o| o == output)
-            .then(|| self.temperature())
+        if !self.outputs.iter().any(|o| o == output) {
+            return None;
+        }
+        let away = self.offsets.get(output).copied().unwrap_or(0.0);
+        Some(self.temperature() + away)
     }
 
     /// What it is now, in kelvin.
@@ -152,14 +300,22 @@ impl ThermalMass {
     ///
     /// # Arguments
     ///
-    /// * `which` - The input's name; the same input twice is one heater.
-    /// * `rate`  - How hard it warms the mass while on, in kelvin a second.
-    /// * `on`    - Whether it is now on.
-    pub fn heater(&self, which: &str, rate: f64, on: bool) {
+    /// * `which`  - The input's name; the same input twice is one heater.
+    /// * `rate`   - How hard it warms the mass while on, in kelvin a second,
+    ///              at its nominal voltage.
+    /// * `supply` - How its supply voltage wanders.
+    /// * `on`     - Whether it is now on.
+    pub fn heater(&self, which: &str, rate: f64, supply: Wander, on: bool) {
         let mut state = self.held();
         self.step(&mut state, Instant::now());
         if on {
-            state.heating.insert(which.to_string(), rate);
+            if supply.size > 0.0 && !state.supplies.contains_key(which) {
+                // A supply settled where it would be, as the wander is.
+                let v =
+                    supply.size * state.rng.sample::<f64, _>(StandardNormal);
+                state.supplies.insert(which.to_string(), (v, supply));
+            }
+            state.heating.insert(which.to_string(), Heating { rate });
         } else {
             state.heating.remove(which);
         }
@@ -171,7 +327,8 @@ impl ThermalMass {
     /// mass applies the heat itself and what a run shows is the temperature.
     #[cfg(test)]
     pub fn heat(&self) -> f64 {
-        self.held().heating.values().sum()
+        let state = self.held();
+        heat_of(&state)
     }
 
     /// The lock, taken through one place so a poisoned one is dealt with once.
@@ -196,17 +353,69 @@ impl ThermalMass {
     /// * `now`   - The time to bring it to; one no later than its own
     ///             changes nothing.
     fn step(&self, state: &mut State, now: Instant) {
-        let seconds = now.saturating_duration_since(state.at).as_secs_f64();
+        let from = state.at;
+        let seconds = now.saturating_duration_since(from).as_secs_f64();
         state.at = now;
         if seconds <= 0.0 {
             return;
         }
 
-        let heat: f64 = state.heating.values().sum();
-        let rest = self.environment + heat * self.time_constant;
+        let heat = heat_of(state);
+        let rest = self.environment + state.wander + heat * self.time_constant;
         let decay = (-seconds / self.time_constant).exp();
-        state.temperature = rest + (state.temperature - rest) * decay;
+        let then = self.swung(from);
+        state.temperature =
+            rest + self.swung(now) + (state.temperature - rest - then) * decay;
+
+        // Then what was held for the step moves on to where it is now.
+        state.wander =
+            wandered(state.wander, &self.wander, seconds, &mut state.rng);
+        let State { supplies, rng, .. } = state;
+        for (v, supply) in supplies.values_mut() {
+            *v = wandered(*v, supply, seconds, rng);
+        }
     }
+
+    /// The swing's steady response at a time: what the sine wave of the
+    /// environment adds to the mass once its start has died away.
+    ///
+    /// # Arguments
+    ///
+    /// * `at` - The time.
+    ///
+    /// # Returns
+    ///
+    /// Kelvin; nought for a mass whose environment does not swing.
+    fn swung(&self, at: Instant) -> f64 {
+        if self.swing <= 0.0 {
+            return 0.0;
+        }
+        let t = at.saturating_duration_since(self.start).as_secs_f64();
+        let wt = self.omega * self.time_constant;
+        let phase = self.omega * t;
+        self.swing * (phase.sin() - wt * phase.cos()) / (1.0 + wt * wt)
+    }
+}
+
+/// How hard a mass is being warmed now, in kelvin a second: each heater's
+/// rate at its supply's voltage, whose square its power goes as.
+///
+/// # Arguments
+///
+/// * `state` - The mass's state.
+///
+/// # Returns
+///
+/// The sum.
+fn heat_of(state: &State) -> f64 {
+    state
+        .heating
+        .iter()
+        .map(|(input, heating)| {
+            let v = state.supplies.get(input).map_or(0.0, |(v, _)| *v);
+            heating.rate * (1.0 + v) * (1.0 + v)
+        })
+        .sum()
 }
 
 /// What one simulated payload is to a thermal mass.
@@ -225,6 +434,8 @@ pub enum Thermal {
         /// back the temperature the mass is at: see
         /// `tcslibgs::graph::simulated::reading_of`.
         reading: ToKelvinParams,
+        /// What the sensor gets wrong, and what it has got wrong so far.
+        sensor: Arc<Sensor>,
     },
     /// It warms this mass through this input, by this many kelvin a second
     /// while it is on.
@@ -232,6 +443,8 @@ pub enum Thermal {
         mass: Arc<ThermalMass>,
         input: String,
         rate: f64,
+        /// How its supply voltage wanders.
+        supply: Wander,
     },
 }
 
@@ -254,12 +467,18 @@ pub enum Thermal {
 /// * `data`    - What the vehicle sent it: `1` for on, `0` for off,
 ///               surrounding white space ignored.
 pub fn driven(thermal: &Option<Thermal>, which: &str, data: &[u8]) {
-    let Some(Thermal::Heats { mass, input, rate }) = thermal else {
+    let Some(Thermal::Heats {
+        mass,
+        input,
+        rate,
+        supply,
+    }) = thermal
+    else {
         return;
     };
     match data.trim_ascii() {
-        b"1" => mass.heater(input, *rate, true),
-        b"0" => mass.heater(input, *rate, false),
+        b"1" => mass.heater(input, *rate, *supply, true),
+        b"0" => mass.heater(input, *rate, *supply, false),
         _ => eprintln!(
             "{which} warms the thermal mass {} and was sent {} bytes that are \
              not a decision: a heater is driven to 1 or 0",
@@ -324,6 +543,7 @@ mod tests {
     use crate::payload::{PayloadConfig, PayloadProtocol, SimulatedPayload};
     use std::sync::atomic::AtomicU32;
     use std::time::Duration;
+    use tcslibgs::sim_config::SensorErrors;
 
     /// The example's mass: ten kelvin below a setpoint of 293.15, losing the
     /// difference with a fifty second constant.
@@ -338,13 +558,126 @@ mod tests {
             time_constant: Duration::from_secs(50),
             inputs: vec!["in1".to_string(), "in2".to_string()],
             outputs: ["out1", "out2", "out3"].map(String::from).to_vec(),
+            ..Default::default()
         }
+    }
+
+    /// The swing's closed form agrees with integrating the equation
+    /// numerically, in one step or many.
+    #[test]
+    fn a_swinging_environment_is_stepped_exactly() {
+        let swing = ResolvedMass {
+            swing: 5.0,
+            period: Duration::from_secs(100),
+            ..cabin()
+        };
+        let start = Instant::now();
+        let mass = ThermalMass::new(&swing, start, 0);
+        mass.heater("in1", 0.1, Wander::default(), true);
+        let mut state = mass.held();
+        state.at = start;
+        state.temperature = 290.0;
+        let seconds = 300.0;
+        mass.step(&mut state, start + Duration::from_secs_f64(seconds));
+        let exact = state.temperature;
+
+        // Fourth-order Runge-Kutta over the same 300 s, a hundredth of a
+        // second at a time.
+        let tau = 50.0;
+        let w = std::f64::consts::TAU / 100.0;
+        let slope =
+            |t: f64, x: f64| -(x - (283.15 + 5.0 * (w * t).sin())) / tau + 0.1;
+        let (mut t, mut x, h) = (0.0, 290.0, 0.01);
+        while t < seconds - 1e-9 {
+            let k1 = slope(t, x);
+            let k2 = slope(t + h / 2.0, x + h / 2.0 * k1);
+            let k3 = slope(t + h / 2.0, x + h / 2.0 * k2);
+            let k4 = slope(t + h, x + h * k3);
+            x += h / 6.0 * (k1 + 2.0 * k2 + 2.0 * k3 + k4);
+            t += h;
+        }
+        assert!((exact - x).abs() < 1e-6, "{exact} against {x}");
+    }
+
+    /// The environment's wander settles at its size, and the supply's
+    /// ripple warms the mass by its rate times (1 + v)^2 on average.
+    #[test]
+    fn wanders_settle_at_their_sizes() {
+        let wandering = ResolvedMass {
+            wander: Wander {
+                size: 0.5,
+                time: Duration::from_secs(30),
+            },
+            ..cabin()
+        };
+        let start = Instant::now();
+        let mass = ThermalMass::new(&wandering, start, 3);
+        let supply = Wander {
+            size: 0.05,
+            time: Duration::from_secs(30),
+        };
+        mass.heater("in1", 3.0, supply, true);
+        let mut state = mass.held();
+        let (mut wander, mut heat, mut heat2) = (0.0, 0.0, 0.0);
+        let n = 100_000;
+        for i in 1..=n {
+            mass.step(&mut state, start + Duration::from_secs(30 * i));
+            wander += state.wander * state.wander;
+            let h = heat_of(&state);
+            heat += h;
+            heat2 += h * h;
+        }
+        let n = n as f64;
+        let wander = (wander / n).sqrt();
+        assert!((wander - 0.5).abs() < 0.02, "{wander}");
+        let mean = heat / n;
+        let sd = (heat2 / n - mean * mean).sqrt();
+        assert!((mean - 3.0 * (1.0 + 0.05 * 0.05)).abs() < 0.005, "{mean}");
+        assert!((sd - 3.0 * 2.0 * 0.05).abs() < 0.02, "{sd}");
+    }
+
+    /// An output sits its offset from the mass, and the others where it is.
+    #[test]
+    fn an_output_sits_its_offset_away() {
+        let mut offsets = BTreeMap::new();
+        offsets.insert("out2".to_string(), 0.3);
+        let offset = ResolvedMass { offsets, ..cabin() };
+        let mass = ThermalMass::new(&offset, Instant::now(), 0);
+        let out1 = mass.output("out1").expect("out1");
+        let out2 = mass.output("out2").expect("out2");
+        assert!((out2 - out1 - 0.3).abs() < 1e-9, "{out1} {out2}");
+        assert_eq!(mass.output("out9"), None);
+    }
+
+    /// The same seed wanders the same way.
+    #[test]
+    fn a_seed_repeats_a_mass() {
+        let wandering = ResolvedMass {
+            wander: Wander {
+                size: 0.5,
+                time: Duration::from_secs(30),
+            },
+            ..cabin()
+        };
+        let start = Instant::now();
+        let run = |seed| {
+            let mass = ThermalMass::new(&wandering, start, seed);
+            let mut state = mass.held();
+            (1..20)
+                .map(|i| {
+                    mass.step(&mut state, start + Duration::from_secs(i));
+                    state.temperature
+                })
+                .collect::<Vec<f64>>()
+        };
+        assert_eq!(run(1), run(1));
+        assert_ne!(run(1), run(2));
     }
 
     /// A mass with no heat on it settles at its environment, from either side.
     #[test]
     fn a_mass_settles_at_its_environment() {
-        let mass = ThermalMass::new(&cabin(), Instant::now());
+        let mass = ThermalMass::new(&cabin(), Instant::now(), 0);
         let mut state = mass.held();
 
         // It starts there, which is what a vehicle coming up cold is.
@@ -374,7 +707,7 @@ mod tests {
     /// a reader is owed the arithmetic that turns it into the rate.
     #[test]
     fn the_cooling_rate_at_the_setpoint_is_a_fifth_of_a_kelvin() {
-        let mass = ThermalMass::new(&cabin(), Instant::now());
+        let mass = ThermalMass::new(&cabin(), Instant::now(), 0);
         let mut state = mass.held();
         state.temperature = 293.15;
         let start = state.at;
@@ -392,16 +725,16 @@ mod tests {
     /// twice is one heater.
     #[test]
     fn heaters_warm_it_and_are_counted_once_each() {
-        let mass = ThermalMass::new(&cabin(), Instant::now());
+        let mass = ThermalMass::new(&cabin(), Instant::now(), 0);
 
         // One heater of three kelvin a second: at the environment, where
         // there is nothing to lose, the mass gains very nearly that.
-        mass.heater("heaters_1", 3.0, true);
+        mass.heater("heaters_1", 3.0, Wander::default(), true);
         assert!((mass.heat() - 3.0).abs() < 1e-9);
 
         // Driven on again, which a vehicle does whenever its decision
         // changes: still one heater, and still three.
-        mass.heater("heaters_1", 3.0, true);
+        mass.heater("heaters_1", 3.0, Wander::default(), true);
         assert!(
             (mass.heat() - 3.0).abs() < 1e-9,
             "one heater driven twice is one heater: {}",
@@ -409,10 +742,10 @@ mod tests {
         );
 
         // And the second one makes it six.
-        mass.heater("heaters_2", 3.0, true);
+        mass.heater("heaters_2", 3.0, Wander::default(), true);
         assert!((mass.heat() - 6.0).abs() < 1e-9);
 
-        mass.heater("heaters_1", 3.0, false);
+        mass.heater("heaters_1", 3.0, Wander::default(), false);
         assert!(
             (mass.heat() - 3.0).abs() < 1e-9,
             "one of the two off leaves the other on"
@@ -423,9 +756,9 @@ mod tests {
     /// they can win.
     #[test]
     fn the_heaters_decide_where_it_settles() {
-        let mass = ThermalMass::new(&cabin(), Instant::now());
-        mass.heater("heaters_1", 3.0, true);
-        mass.heater("heaters_2", 3.0, true);
+        let mass = ThermalMass::new(&cabin(), Instant::now(), 0);
+        mass.heater("heaters_1", 3.0, Wander::default(), true);
+        mass.heater("heaters_2", 3.0, Wander::default(), true);
 
         let mut state = mass.held();
         let start = state.at;
@@ -503,8 +836,8 @@ mod tests {
     /// one instant must not do.
     #[test]
     fn a_step_of_no_time_changes_nothing() {
-        let mass = ThermalMass::new(&cabin(), Instant::now());
-        mass.heater("heaters_1", 3.0, true);
+        let mass = ThermalMass::new(&cabin(), Instant::now(), 0);
+        mass.heater("heaters_1", 3.0, Wander::default(), true);
         let first = mass.temperature();
         let again = {
             let mut state = mass.held();
@@ -678,7 +1011,7 @@ mod tests {
     /// can overshoot by is what they add in the interval it did not look.
     #[test]
     fn the_heaters_hold_the_mass_in_band_through_a_lost_decision() {
-        let mass = Arc::new(ThermalMass::new(&cabin(), Instant::now()));
+        let mass = Arc::new(ThermalMass::new(&cabin(), Instant::now(), 0));
 
         // The two encodings of the example, so that what is voted over is
         // readings of one temperature in different formats.
@@ -722,6 +1055,11 @@ mod tests {
                     mass: mass.clone(),
                     output: format!("out{}", n + 1),
                     reading,
+                    sensor: Arc::new(Sensor::new(
+                        "sensor",
+                        SensorErrors::default(),
+                        0,
+                    )),
                 },
             ));
             sensor.start().expect("a sensor starts");
@@ -755,6 +1093,7 @@ mod tests {
                         mass: mass.clone(),
                         input: format!("in{}", n + 1),
                         rate: HEATER_RATE,
+                        supply: Wander::default(),
                     },
                 ));
                 heater.start().expect("a heater starts");

@@ -213,10 +213,14 @@ mod tests {
     use std::sync::Arc;
     use std::time::{Duration, Instant};
     use tcslibgs::node::vehicle::compute::Format;
-    use tcslibgs::sim_config::ResolvedMass;
+    use tcslibgs::sim_config::{ResolvedMass, Wander};
 
-    /// The thermostat example's sensor: sixteenths of a kelvin above
-    /// freezing, two bytes, signed, most significant first.
+    /// The thermostat example's sensor's encoding.
+    ///
+    /// # Returns
+    ///
+    /// Sixteenths of a kelvin above freezing, two bytes, signed, most
+    /// significant first.
     fn sixteenths() -> ToKelvinParams {
         ToKelvinParams {
             format: Format::I16Be,
@@ -239,8 +243,10 @@ mod tests {
                 time_constant: Duration::from_secs(50),
                 inputs: vec!["in1".to_string(), "in2".to_string()],
                 outputs: ["out1", "out2", "out3"].map(String::from).to_vec(),
+                ..Default::default()
             },
             Instant::now(),
+            0,
         ));
         let sensors = ["temp_1", "temp_2", "temp_3"]
             .iter()
@@ -252,6 +258,7 @@ mod tests {
                 mass: mass.clone(),
                 input: "in1".to_string(),
                 rate: 3.0,
+                supply: Wander::default(),
             },
         )];
         let params = HysteresisParams {

@@ -3040,7 +3040,17 @@ reads becomes a consequence of what the vehicle drove.
      inputs               the names a heater can be connected to, separated
                           by commas: "in1,in2"
      outputs              the names a sensor can read from, separated by
-                          commas: "out1,out2,out3"
+                          commas: "out1,out2,out3". A name may be followed
+                          by = and how far, in kelvin, that place sits from
+                          the mass's temperature: "out2=+0.3"
+     swing                how far the environment swings either side of
+                          environment, in kelvin, as a sine wave
+     period               how long one swing takes. With swing and refused
+                          without it
+     wander               how far the environment wanders at random: a
+                          standard deviation, in kelvin
+     wander_time          how slowly it wanders, as a length of time. With
+                          wander and refused without it
 
 Each mass cools towards its environment with that time constant and is warmed
 by the heaters that are on. It starts at its environment with the heaters off,
@@ -3120,6 +3130,75 @@ drives.
        input: in2
        rate: "3.0"
        packet_interval: 20 ms
+
+**Physically realistic noise**
+
+A simulated sensor reports the mass exactly, and three of them agree to the
+count, which real ones never do. Real readings go wrong in two places, and
+the difference matters to a loop: what goes wrong at a sensor is that
+sensor's alone, and a vote over three can outvote it; what goes wrong in the
+mass every sensor sees, and no vote removes it. Each of these is a datasheet
+or mission figure, and each is off unless it is stated.
+
+At a sensor, as settings of a payload that reads, or of its group:
+
+.. code-block:: text
+
+   noise                  the random error on each reading: a standard
+                          deviation, in kelvin
+   accuracy               the most its calibration is off by, in kelvin. A
+                          fixed error is drawn once a run, normally
+                          distributed with a third of this as its standard
+                          deviation and never past it
+   drift                  how far its error wanders, slowly: a standard
+                          deviation, in kelvin
+   drift_time             how slowly it wanders, as a length of time. With
+                          drift and refused without it
+   lag                    its own time constant, as a length of time: a
+                          sensor is a small mass of its own and follows the
+                          body it is on that far behind
+
+At a heater, as settings of a payload that heats:
+
+.. code-block:: text
+
+   ripple                 how much its supply voltage varies: a standard
+                          deviation, as a fraction of nominal. Its power goes
+                          as the square of its voltage, so it warms by
+                          rate * (1 + v)^2
+   ripple_time            how slowly it varies, as a length of time. With
+                          ripple and refused without it
+
+In the mass, the ``swing``, ``period``, ``wander`` and ``wander_time`` of
+its entry, and the offsets of its outputs, above. A sensor's errors are
+refused on a heater and a heater's on a sensor.
+
+Everything that wanders -- a sensor's drift, the environment, a supply -- is
+an Ornstein-Uhlenbeck process: a departure drawn back towards nought, whose
+size is its standard deviation once settled and whose time is how long it
+remembers. Each is stepped by its exact transition, so how much it wanders
+does not depend on how often anything reads it, and each starts where a
+settled one would be. The swing is part of the mass's equation, which still
+has a closed form, so it is as exact as the rest. A lag follows the body's
+temperature as if it changed at a steady rate between two readings.
+
+The random draws come from a generator for each mass and each sensor,
+seeded from the run's seed and its name, so a run with the same seed varies
+the same way. The seed is a setting of the ``tcssim`` section; without one,
+tcssim chooses it and says which it chose, so a run worth repeating can be:
+
+.. code-block:: yaml
+
+   tcssim:
+     ready: "127.0.0.1:7907"
+     seed: 12345
+
+The thermostat example states all of these, with figures of the kind a
+datasheet and a low orbit give: two sensors of one part accurate to half a
+kelvin, with three hundredths of noise and four seconds of lag, and a better
+one; an environment swinging three kelvin over ninety minutes and wandering
+half a kelvin; places a fifth and three tenths of a kelvin off the middle;
+and supplies varying by two percent.
 
 **Standing in for the thermostat**
 

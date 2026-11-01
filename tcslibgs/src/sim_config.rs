@@ -1011,6 +1011,42 @@ pub struct SimSettings {
     /// heats and refused of one that does not.
     #[serde(default, deserialize_with = "blank_is_unstated")]
     pub rate: Option<String>,
+    /// A sensor's random error on each reading: the standard deviation, in
+    /// kelvin, of the normally distributed noise its electronics add, as a
+    /// part's datasheet gives it. Unstated is none.
+    #[serde(default, deserialize_with = "blank_is_unstated")]
+    pub noise: Option<String>,
+    /// A sensor's calibration: the most it reads off by, in kelvin, as a
+    /// datasheet's accuracy gives it. A fixed error is drawn once a run, as
+    /// a normal one with a third of this as its standard deviation and never
+    /// past it, so that sensors of one mass disagree steadily as real ones
+    /// do. Unstated is none.
+    #[serde(default, deserialize_with = "blank_is_unstated")]
+    pub accuracy: Option<String>,
+    /// How far a sensor's error wanders, slowly: the standard deviation, in
+    /// kelvin, of an error drawn back towards nought with `drift_time` as
+    /// its time constant. Unstated is none.
+    #[serde(default, deserialize_with = "blank_is_unstated")]
+    pub drift: Option<String>,
+    /// How slowly a sensor's drift wanders, as a length of time. Required
+    /// with `drift` and refused without it.
+    #[serde(default, deserialize_with = "blank_is_unstated")]
+    pub drift_time: Option<String>,
+    /// A sensor's own time constant, as a length of time: a sensor is a
+    /// small mass of its own, and follows the body it is on that much
+    /// behind. Unstated is none.
+    #[serde(default, deserialize_with = "blank_is_unstated")]
+    pub lag: Option<String>,
+    /// How much a heater's supply voltage varies: the standard deviation of
+    /// it, as a fraction of its nominal voltage. A heater's power goes as
+    /// the square of its voltage, so its rate varies with it. Unstated is
+    /// none.
+    #[serde(default, deserialize_with = "blank_is_unstated")]
+    pub ripple: Option<String>,
+    /// How slowly a heater's supply varies, as a length of time. Required
+    /// with `ripple` and refused without it.
+    #[serde(default, deserialize_with = "blank_is_unstated")]
+    pub ripple_time: Option<String>,
     // The socket the simulated payload binds for itself.
     //
     // Not where the payload is -- the tcspecial configuration file says that,
@@ -1113,7 +1149,7 @@ fn listed(said: &Option<String>) -> impl Iterator<Item = &str> {
     said.as_deref()
         .unwrap_or("")
         .split(',')
-        .map(str::trim)
+        .map(|entry| entry.split('=').next().unwrap_or("").trim())
         .filter(|name| !name.is_empty())
 }
 
@@ -1121,30 +1157,152 @@ fn listed(said: &Option<String>) -> impl Iterator<Item = &str> {
 ///
 /// # Arguments
 ///
-/// * `said` - The list as the file states it, if it does.
+/// * `said`    - The list as the file states it, if it does.
+/// * `offsets` - Whether a name may be followed by `=` and an offset in
+///               kelvin, as an output's may.
 ///
 /// # Returns
 ///
-/// Each name, in order; empty for no list.
+/// Each name, in order, and each offset given, by name; both empty for no
+/// list.
 ///
 /// # Errors
 ///
-/// What is wrong, if a name is empty or listed twice.
-fn connections(said: &Option<String>) -> Result<Vec<String>, String> {
-    let Some(said) = said else {
-        return Ok(Vec::new());
-    };
+/// What is wrong, if a name is empty or listed twice, or has an offset
+/// where `offsets` is false or one that is not a number of kelvin.
+fn connections(
+    said: &Option<String>,
+    offsets: bool,
+) -> Result<(Vec<String>, BTreeMap<String, f64>), String> {
     let mut names: Vec<String> = Vec::new();
-    for name in said.split(',').map(str::trim) {
+    let mut away = BTreeMap::new();
+    let Some(said) = said else {
+        return Ok((names, away));
+    };
+    for entry in said.split(',') {
+        let (name, offset) = match entry.split_once('=') {
+            Some((name, offset)) => (name.trim(), Some(offset.trim())),
+            None => (entry.trim(), None),
+        };
         if name.is_empty() {
             return Err(format!("\"{said}\" has an empty name in it"));
         }
         if names.iter().any(|n| n == name) {
             return Err(format!("\"{said}\" names {name} twice"));
         }
+        if let Some(offset) = offset {
+            if !offsets {
+                return Err(format!(
+                    "{name} has an offset, and only an output sits somewhere \
+                     a temperature can differ"
+                ));
+            }
+            let kelvin: f64 = offset
+                .parse()
+                .ok()
+                .filter(|k: &f64| k.is_finite())
+                .ok_or_else(|| {
+                    format!("{name}={offset}: \"{offset}\" is not a number of kelvin")
+                })?;
+            away.insert(name.to_string(), kelvin);
+        }
         names.push(name.to_string());
     }
-    Ok(names)
+    Ok((names, away))
+}
+
+/// Reads a size in kelvin, or a fraction, that may not be negative.
+///
+/// # Arguments
+///
+/// * `what` - The setting's name, for the complaint.
+/// * `said` - The setting as the file states it, if it does.
+///
+/// # Returns
+///
+/// Its value; nought where it is unstated.
+///
+/// # Errors
+///
+/// What is wrong, if it is not a number or is negative.
+fn size_of(what: &str, said: &Option<String>) -> Result<f64, String> {
+    let Some(said) = said else {
+        return Ok(0.0);
+    };
+    let value: f64 = said
+        .trim()
+        .parse()
+        .ok()
+        .filter(|v: &f64| v.is_finite())
+        .ok_or_else(|| {
+        format!("{what}: \"{}\" is not a number", said.trim())
+    })?;
+    if value < 0.0 {
+        return Err(format!(
+            "{what}: {value} is less than nought, and a size is not"
+        ));
+    }
+    Ok(value)
+}
+
+/// Reads a length of time, which `parse_interval` makes more than nought.
+///
+/// # Arguments
+///
+/// * `what` - The setting's name, for the complaint.
+/// * `said` - The setting as the file states it.
+///
+/// # Returns
+///
+/// The length of time.
+///
+/// # Errors
+///
+/// What is wrong, if it is not a length of time or is none.
+fn time_of(what: &str, said: &str) -> Result<Duration, String> {
+    crate::graph::parse_interval(said.trim())
+        .map_err(|why| format!("{what}: {why}"))
+}
+
+/// Reads a wander: its size and the time constant that goes with it.
+///
+/// # Arguments
+///
+/// * `size_name` - The size setting's name, such as `drift`.
+/// * `time_name` - Its time constant's, such as `drift_time`.
+/// * `size`      - The size as the file states it, if it does.
+/// * `time`      - The time constant, if the file states it.
+///
+/// # Returns
+///
+/// The wander; none where neither is stated or the size is nought.
+///
+/// # Errors
+///
+/// What is wrong, if either does not read, or a size of more than nought
+/// has no time constant, or a time constant has no size.
+fn wander_of(
+    size_name: &str,
+    time_name: &str,
+    size: &Option<String>,
+    time: &Option<String>,
+) -> Result<Wander, String> {
+    let amount = size_of(size_name, size)?;
+    match time {
+        None if amount > 0.0 => Err(format!(
+            "{time_name} is not set: {size_name} says how far something \
+             wanders, and {time_name} how slowly"
+        )),
+        None => Ok(Wander::default()),
+        Some(_) if size.is_none() => Err(format!(
+            "{time_name} says how slowly {size_name} wanders, and \
+             {size_name} is not set"
+        )),
+        Some(said) => Ok(Wander {
+            size: amount,
+            time: time_of(time_name, said)?,
+        }),
+    }
 }
 
 /// A setting written empty is a setting not stated.
@@ -1225,6 +1383,13 @@ pub const SETTINGS: &[&str] = &[
     "heats",
     "input",
     "rate",
+    "noise",
+    "accuracy",
+    "drift",
+    "drift_time",
+    "lag",
+    "ripple",
+    "ripple_time",
 ];
 
 /// Everything a thermal mass states, by the name a file writes, `name` apart.
@@ -1233,8 +1398,16 @@ pub const SETTINGS: &[&str] = &[
 /// for the reason [`SETTINGS`] is: the editor keeps a mass a file carried and
 /// writes it back, and a field missing from this list is a field it would
 /// write away.
-pub const MASS_SETTINGS: &[&str] =
-    &["environment", "time_constant", "inputs", "outputs"];
+pub const MASS_SETTINGS: &[&str] = &[
+    "environment",
+    "time_constant",
+    "inputs",
+    "outputs",
+    "swing",
+    "period",
+    "wander",
+    "wander_time",
+];
 
 impl SimSettings {
     /// This settings' values, falling back to `base` for whatever it does not
@@ -1267,6 +1440,19 @@ impl SimSettings {
             heats: self.heats.clone().or_else(|| base.heats.clone()),
             input: self.input.clone().or_else(|| base.input.clone()),
             rate: self.rate.clone().or_else(|| base.rate.clone()),
+            noise: self.noise.clone().or_else(|| base.noise.clone()),
+            accuracy: self.accuracy.clone().or_else(|| base.accuracy.clone()),
+            drift: self.drift.clone().or_else(|| base.drift.clone()),
+            drift_time: self
+                .drift_time
+                .clone()
+                .or_else(|| base.drift_time.clone()),
+            lag: self.lag.clone().or_else(|| base.lag.clone()),
+            ripple: self.ripple.clone().or_else(|| base.ripple.clone()),
+            ripple_time: self
+                .ripple_time
+                .clone()
+                .or_else(|| base.ripple_time.clone()),
             packet_interval: self
                 .packet_interval
                 .clone()
@@ -1365,6 +1551,11 @@ pub struct SimTcssim {
     /// otherwise be switching the same heaters.
     #[serde(default, deserialize_with = "blank_is_unstated")]
     pub thermostat: Option<String>,
+    /// What the simulation's random numbers start from, so that a run's
+    /// noise can be had again. Unstated is a seed of tcssim's choosing,
+    /// which it reports as it starts.
+    #[serde(default, deserialize_with = "blank_is_unstated")]
+    pub seed: Option<u64>,
 }
 
 /// A thermal mass, as a simulator file states it.
@@ -1398,27 +1589,79 @@ pub struct SimThermalMass {
     pub inputs: Option<String>,
     /// The names of the places a sensor can read its temperature from,
     /// separated by commas: `out1,out2,out3`. None need be connected, and
-    /// none is an empty list.
+    /// none is an empty list. A name may be followed by `=` and how far,
+    /// in kelvin, that place sits from the mass's temperature -- `out2=+0.3`
+    /// -- since a body warmed in one place is not one temperature
+    /// throughout.
     #[serde(default, deserialize_with = "blank_is_unstated")]
     pub outputs: Option<String>,
+    /// How far its environment swings either side of `environment`, in
+    /// kelvin, as a sine wave: a day and a night, or an orbit's sun and
+    /// shadow. Unstated is none.
+    #[serde(default, deserialize_with = "blank_is_unstated")]
+    pub swing: Option<String>,
+    /// How long one swing takes, as a length of time. Required with `swing`
+    /// and refused without it.
+    #[serde(default, deserialize_with = "blank_is_unstated")]
+    pub period: Option<String>,
+    /// How far its environment wanders at random: the standard deviation,
+    /// in kelvin, of a departure drawn back towards nought with
+    /// `wander_time` as its time constant. Unstated is none.
+    #[serde(default, deserialize_with = "blank_is_unstated")]
+    pub wander: Option<String>,
+    /// How slowly its environment wanders, as a length of time. Required
+    /// with `wander` and refused without it.
+    #[serde(default, deserialize_with = "blank_is_unstated")]
+    pub wander_time: Option<String>,
 }
 
 /// What a payload is to its thermal mass.
 #[derive(Debug, Clone, PartialEq)]
 pub enum Attached {
-    /// It reports that mass's temperature, from that output.
-    Reads { mass: String, output: String },
+    /// It reports that mass's temperature, from that output, with that
+    /// sensor's errors.
+    Reads {
+        mass: String,
+        output: String,
+        sensor: SensorErrors,
+    },
     /// It warms that mass through that input, by this many kelvin a second
-    /// while it is on.
+    /// while it is on, from that supply.
     Heats {
         mass: String,
         input: String,
         rate: f64,
+        supply: Wander,
     },
 }
 
+/// A quantity that wanders at random and is drawn back towards nought: an
+/// Ornstein-Uhlenbeck process, which is what a slow drift or a fluctuation
+/// with a memory is.
+#[derive(Debug, Clone, Copy, PartialEq, Default)]
+pub struct Wander {
+    /// Its standard deviation, once it has settled; nought is no wander.
+    pub size: f64,
+    /// How long it remembers where it was: its time constant. Zero only
+    /// where `size` is.
+    pub time: Duration,
+}
+
+/// What a temperature sensor gets wrong, as a datasheet would say it.
+#[derive(Debug, Clone, Copy, PartialEq, Default)]
+pub struct SensorErrors {
+    /// The standard deviation of the noise on each reading, in kelvin.
+    pub noise: f64,
+    /// The most its fixed calibration error may be, in kelvin.
+    pub accuracy: f64,
+    /// Its slow drift, in kelvin.
+    pub drift: Wander,
+    /// Its own time constant; zero follows the body at once.
+    pub lag: Duration,
+}
+
 /// A thermal mass with its figures read.
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Default)]
 pub struct ResolvedMass {
     pub name: String,
     /// Kelvin.
@@ -1428,6 +1671,15 @@ pub struct ResolvedMass {
     pub inputs: Vec<String>,
     /// The names of its outputs, in the order the file lists them.
     pub outputs: Vec<String>,
+    /// How far each output sits from the mass's temperature, in kelvin, by
+    /// output name; an output the file gives none for is not here.
+    pub offsets: BTreeMap<String, f64>,
+    /// How far its environment swings either side of its middle, in kelvin.
+    pub swing: f64,
+    /// How long one swing takes; zero only where `swing` is.
+    pub period: Duration,
+    /// How its environment wanders at random.
+    pub wander: Wander,
 }
 
 /// What simulating one data handler takes, with every value settled.
@@ -1568,10 +1820,42 @@ impl SimConfigFile {
                 crate::graph::parse_interval(mass.time_constant.trim())
                     .map_err(|why| named("time_constant", &why))?;
 
-            let inputs = connections(&mass.inputs)
+            let (inputs, _) = connections(&mass.inputs, false)
                 .map_err(|why| named("inputs", &why))?;
-            let outputs = connections(&mass.outputs)
+            let (outputs, offsets) = connections(&mass.outputs, true)
                 .map_err(|why| named("outputs", &why))?;
+            let wrong = |why: String| SimConfigError::BadThermalMass {
+                mass: mass.name.clone(),
+                why,
+            };
+            let swing = size_of("swing", &mass.swing).map_err(wrong)?;
+            let period =
+                match (&mass.period, swing > 0.0) {
+                    (Some(said), _) if mass.swing.is_some() => {
+                        time_of("period", said).map_err(wrong)?
+                    }
+                    (Some(_), _) => return Err(wrong(
+                        "period says how long the environment's swing takes, \
+                         and swing is not set"
+                            .to_string(),
+                    )),
+                    (None, true) => {
+                        return Err(wrong(
+                            "period is not set: swing says how far the \
+                         environment swings, and period how long a swing \
+                         takes"
+                                .to_string(),
+                        ))
+                    }
+                    (None, false) => Duration::ZERO,
+                };
+            let wander = wander_of(
+                "wander",
+                "wander_time",
+                &mass.wander,
+                &mass.wander_time,
+            )
+            .map_err(wrong)?;
 
             // An input is one heater's: two heaters on one input would each
             // switch the other's heat, and which was on would depend on
@@ -1620,6 +1904,10 @@ impl SimConfigFile {
                 time_constant,
                 inputs,
                 outputs,
+                offsets,
+                swing,
+                period,
+                wander,
             });
         }
         Ok(masses)
@@ -1789,9 +2077,33 @@ impl SimConfigFile {
                             .join(", ")
                     )));
                 }
+                if settings.ripple.is_some() || settings.ripple_time.is_some() {
+                    return Err(bad(
+                        "ripple is how a heater's supply varies, and this \
+                         payload reads a mass"
+                            .to_string(),
+                    ));
+                }
+                let sensor = SensorErrors {
+                    noise: size_of("noise", &settings.noise).map_err(bad)?,
+                    accuracy: size_of("accuracy", &settings.accuracy)
+                        .map_err(bad)?,
+                    drift: wander_of(
+                        "drift",
+                        "drift_time",
+                        &settings.drift,
+                        &settings.drift_time,
+                    )
+                    .map_err(bad)?,
+                    lag: match &settings.lag {
+                        None => Duration::ZERO,
+                        Some(said) => time_of("lag", said).map_err(bad)?,
+                    },
+                };
                 Ok(Some(Attached::Reads {
                     mass: mass.to_string(),
                     output: output.to_string(),
+                    sensor,
                 }))
             }
             (None, Some(mass)) => {
@@ -1840,10 +2152,32 @@ impl SimConfigFile {
                          well leave out"
                     )));
                 }
+                for (what, said) in [
+                    ("noise", &settings.noise),
+                    ("accuracy", &settings.accuracy),
+                    ("drift", &settings.drift),
+                    ("drift_time", &settings.drift_time),
+                    ("lag", &settings.lag),
+                ] {
+                    if said.is_some() {
+                        return Err(bad(format!(
+                            "{what} is something a sensor gets wrong, and this \
+                             payload heats a mass"
+                        )));
+                    }
+                }
+                let supply = wander_of(
+                    "ripple",
+                    "ripple_time",
+                    &settings.ripple,
+                    &settings.ripple_time,
+                )
+                .map_err(bad)?;
                 Ok(Some(Attached::Heats {
                     mass: mass.to_string(),
                     input: input.to_string(),
                     rate,
+                    supply,
                 }))
             }
             (None, None) => {
@@ -1851,6 +2185,13 @@ impl SimConfigFile {
                     ("rate", &settings.rate),
                     ("input", &settings.input),
                     ("output", &settings.output),
+                    ("noise", &settings.noise),
+                    ("accuracy", &settings.accuracy),
+                    ("drift", &settings.drift),
+                    ("drift_time", &settings.drift_time),
+                    ("lag", &settings.lag),
+                    ("ripple", &settings.ripple),
+                    ("ripple_time", &settings.ripple_time),
                 ] {
                     if said.is_some() {
                         return Err(bad(format!(
@@ -3949,6 +4290,7 @@ simulated_payloads:
             Some(Attached::Reads {
                 mass: "basic".to_string(),
                 output: "out2".to_string(),
+                sensor: SensorErrors::default(),
             })
         );
         assert_eq!(
@@ -3957,6 +4299,7 @@ simulated_payloads:
                 mass: "basic".to_string(),
                 input: "in1".to_string(),
                 rate: 3.0,
+                supply: Wander::default(),
             })
         );
         let masses = file.masses().unwrap();
@@ -4026,5 +4369,139 @@ simulated_payloads:
             file.tcssim.and_then(|t| t.thermostat).as_deref(),
             Some("thermostat")
         );
+    }
+
+    /// A sensor's and a heater's errors, and a mass's swing, wander and
+    /// offsets, as they resolve.
+    #[test]
+    fn errors_and_variations_resolve() {
+        let file = attached(
+            "reads: basic\noutput: out2\nnoise: \"0.05\"\n\
+             accuracy: \"0.5\"\ndrift: \"0.1\"\ndrift_time: 10 min\n\
+             lag: 3 s",
+            "heats: basic\ninput: in1\nrate: \"3.0\"\nripple: \"0.02\"\n\
+             ripple_time: 30 s",
+        );
+        let resolved = file
+            .resolve(&[handler("DH0", 2), handler("DH1", 1)])
+            .unwrap();
+        assert_eq!(
+            resolved[0].attached,
+            Some(Attached::Reads {
+                mass: "basic".to_string(),
+                output: "out2".to_string(),
+                sensor: SensorErrors {
+                    noise: 0.05,
+                    accuracy: 0.5,
+                    drift: Wander {
+                        size: 0.1,
+                        time: Duration::from_secs(600),
+                    },
+                    lag: Duration::from_secs(3),
+                },
+            })
+        );
+        assert_eq!(
+            resolved[1].attached,
+            Some(Attached::Heats {
+                mass: "basic".to_string(),
+                input: "in1".to_string(),
+                rate: 3.0,
+                supply: Wander {
+                    size: 0.02,
+                    time: Duration::from_secs(30),
+                },
+            })
+        );
+
+        let mut file = attached("reads: basic\noutput: out2", "");
+        let mass = &mut file.thermal_mass[0];
+        mass.outputs = Some("out1, out2=+0.3, out3=-0.2".to_string());
+        mass.swing = Some("2".to_string());
+        mass.period = Some("90 min".to_string());
+        mass.wander = Some("0.3".to_string());
+        mass.wander_time = Some("5 min".to_string());
+        let masses = file.masses().unwrap();
+        let mass = &masses[0];
+        assert_eq!(mass.outputs, ["out1", "out2", "out3"]);
+        assert_eq!(mass.offsets.get("out2"), Some(&0.3));
+        assert_eq!(mass.offsets.get("out3"), Some(&-0.2));
+        assert_eq!(mass.offsets.get("out1"), None);
+        assert_eq!((mass.swing, mass.period), (2.0, Duration::from_secs(5400)));
+        assert_eq!(
+            mass.wander,
+            Wander {
+                size: 0.3,
+                time: Duration::from_secs(300),
+            }
+        );
+    }
+
+    /// A sensor's error on a heater, a supply on a sensor, a size without
+    /// its time constant or the other way round, and a negative size are
+    /// refused.
+    #[test]
+    fn misplaced_errors_are_refused() {
+        let heater = "heats: basic\ninput: in1\nrate: \"3.0\"";
+        let sensor = "reads: basic\noutput: out1";
+        for (sensor, heater, said) in [
+            (
+                sensor,
+                "heats: basic\ninput: in1\nrate: \"3.0\"\nnoise: \"1\"",
+                "noise is something a sensor gets wrong",
+            ),
+            (
+                "reads: basic\noutput: out1\nripple: \"0.1\"",
+                heater,
+                "ripple is how a heater's supply varies",
+            ),
+            (
+                "reads: basic\noutput: out1\ndrift: \"0.1\"",
+                heater,
+                "drift_time is not set",
+            ),
+            (
+                "reads: basic\noutput: out1\ndrift_time: 1 s",
+                heater,
+                "drift is not set",
+            ),
+            (
+                "reads: basic\noutput: out1\nnoise: \"-1\"",
+                heater,
+                "less than nought",
+            ),
+            (
+                "reads: basic\noutput: out1\nlag: 0 s",
+                heater,
+                "no interval at all",
+            ),
+        ] {
+            let err = attached(sensor, heater)
+                .resolve(&[handler("DH0", 2), handler("DH1", 1)])
+                .unwrap_err()
+                .to_string();
+            assert!(err.contains(said), "{said:?} not in: {err}");
+        }
+
+        for (field, value, said) in [
+            ("swing", "2", "period is not set"),
+            ("period", "1 min", "swing is not set"),
+            ("wander", "1", "wander_time is not set"),
+            ("inputs", "in1=+1", "only an output"),
+            ("outputs", "out1=warm", "not a number of kelvin"),
+        ] {
+            let mut file = attached(sensor, "");
+            let mass = &mut file.thermal_mass[0];
+            let value = Some(value.to_string());
+            match field {
+                "swing" => mass.swing = value,
+                "period" => mass.period = value,
+                "wander" => mass.wander = value,
+                "inputs" => mass.inputs = value,
+                _ => mass.outputs = value,
+            }
+            let err = file.masses().unwrap_err().to_string();
+            assert!(err.contains(said), "{field}: {said:?} not in: {err}");
+        }
     }
 }

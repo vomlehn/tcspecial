@@ -10651,6 +10651,51 @@ Requirement
     a socket, or discrete lines on ``gpio-sim``, whose stand-in watches the
     lines the vehicle drives.
 
+**Physically Realistic Noise**
+
+A simulated sensor that reports the mass exactly agrees with the others to
+the count, and a vote over sensors that always agree is never exercised.
+Real readings go wrong in two places, and a loop treats them differently:
+what goes wrong at a sensor is its own, and a vote can outvote it; what goes
+wrong in the mass every sensor sees, and the heaters must work against it.
+
+Requirement
+    A sensor may state the noise on each reading, the accuracy its fixed
+    calibration error is drawn within, a slow drift and its time, and its
+    own lag, each as a datasheet gives it. The calibration error is drawn
+    once a run, normally distributed with a third of the accuracy as its
+    standard deviation and clamped to the accuracy, which is a bound most
+    parts sit well inside.
+
+Requirement
+    A heater may state how its supply voltage varies, and how slowly. Its
+    power goes as the square of its voltage, so it warms by
+    ``rate * (1 + v)^2``.
+
+Requirement
+    A mass may state how its environment swings as a sine wave, and over
+    what period; how it wanders at random, and how slowly; and how far each
+    output sits from the mass's temperature.
+
+Requirement
+    Everything that wanders is an Ornstein-Uhlenbeck process stepped by its
+    exact transition, so that its statistics do not depend on how often it
+    is stepped, and starts where a settled one would be. The swing is in
+    the mass's equation, whose closed form gains the swing's steady
+    response, so it is stepped as exactly as the rest. A wander is held for
+    a step, which is exact for steps much shorter than its time constant.
+
+Requirement
+    Each mass and each sensor draws from a generator of its own, seeded
+    from the run's seed and its name, so that a run with the same seed
+    varies the same way whatever order the payloads' threads ask in. The
+    seed is the ``tcssim`` section's; without one tcssim chooses it and
+    says which.
+
+Requirement
+    Every one of these is off unless stated, so a file that states none
+    simulates the mass and its sensors as exactly as before.
+
 **A Stood-in Thermostat**
 
 The loop closes through tcspecial when the heaters are attached: the

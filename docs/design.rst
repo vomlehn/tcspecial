@@ -5271,7 +5271,7 @@ Requirement
     know.
 
     Which payloads there are is the configuration's to say, so the entries are
-    its payload nodes in its own order -- a computation, a log and the ground
+    its payload nodes, by name -- a computation, a log and the ground
     link are not simulated and get none. An entry the file already held for a
     name that is not a payload is written out after them: it is somebody's
     typing, and ``tcsverify`` is what says a simulated payload names no

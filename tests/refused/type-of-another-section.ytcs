@@ -1,0 +1,4 @@
+# Refused: i2c is a payload type, written under vehicle.
+vehicle:
+  - type i2c:
+      - compute: a

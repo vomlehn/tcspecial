@@ -1,0 +1,6 @@
+<?xml version="1.0"?>
+<!-- Refused: a node with no name. -->
+<configuration>
+    <payloads><type name="i2c"><payload><address>0x48</address></payload>
+    </type></payloads>
+</configuration>

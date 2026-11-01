@@ -1,0 +1,5 @@
+<?xml version="1.0"?>
+<!-- Refused: i2c is a payload type, written under vehicle. -->
+<configuration>
+    <vehicle><type name="i2c"><compute name="a"/></type></vehicle>
+</configuration>

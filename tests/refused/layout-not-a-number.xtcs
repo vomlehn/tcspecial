@@ -1,0 +1,5 @@
+<?xml version="1.0"?>
+<!-- Refused: a position that is not a whole number. -->
+<configuration>
+    <tcsgui><nodes><node name="a" x="1" y="up"/></nodes></tcsgui>
+</configuration>

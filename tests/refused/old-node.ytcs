@@ -1,0 +1,4 @@
+# Refused: a node in the old shape, with name and type keys.
+payloads:
+  - name: temp_1
+    type: i2c

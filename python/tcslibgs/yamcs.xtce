@@ -1,17 +1,21 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<!-- The CCSDS primary header a gateway_yamcs configuration puts on every
-     packet, around tcspecial's own XTCE, for Yamcs.
+<!-- The CCSDS primary header a configuration whose gateway is yamcs puts on
+     every packet, around tcspecial's own XTCE, for Yamcs: what of the
+     mission database does not depend on the configuration.
 
      tcspecial's link has no header: tcslibgs/xtce/link.xtce, fixed.xtce and
      beacon.xtce describe each packet whole, and their digests are pinned.
      With a yamcs gateway every packet to and from the ground gains a
      six-octet CCSDS primary header, with no secondary header, so this file
-     describes the header and, by APID, what follows it, reaching into those
-     files for the rest rather than stating any of it again.
+     describes the header and what follows it, reaching into those files
+     for the rest rather than stating any of it again.
 
-     Written by ping_yamcs.py from this template: the names after a dollar
-     sign are the APIDs the tcspecial configuration states, so that they
-     are stated once. -->
+     No APID is stated here. tcslibgs/yamcs.py reads this and adds, from the
+     configuration, every APID it counts: the restrictions that put the
+     beacon in BeaconPacket and the answers in AnswerPacket, CONNECT's APID,
+     a container and a parameter for each source drawn into a gateway_yamcs
+     node and for each payload nothing touches, and a command for each
+     gateway_yamcs node. -->
 <SpaceSystem xmlns="http://www.omg.org/spec/XTCE/20180204" name="TcsYamcs">
   <TelemetryMetaData>
     <ParameterTypeSet>
@@ -36,23 +40,10 @@
       <IntegerParameterType name="U16Type" signed="false">
         <IntegerDataEncoding sizeInBits="16"/>
       </IntegerParameterType>
-      <!-- The ping node's answer: text, the whole of what follows the
-           header, whose length is the header's length field plus one. -->
-      <StringParameterType name="PingReplyType">
-        <StringDataEncoding encoding="US-ASCII">
-          <Variable maxSizeInBits="8192">
-            <DynamicValue>
-              <ParameterInstanceRef parameterRef="CcsdsLength"/>
-              <LinearAdjustment slope="8" intercept="8"/>
-            </DynamicValue>
-          </Variable>
-        </StringDataEncoding>
-      </StringParameterType>
-      <!-- The beacon as tcspecial sent it: every octet after the header,
-           read again whole so that the ground station can check it as the
-           ping example's does, from the bytes and not from Yamcs's
-           reading of them. -->
-      <BinaryParameterType name="BeaconBodyType">
+      <!-- Every octet after the header, whose count is the header's
+           length field plus one: the beacon read again whole, and the
+           data of a node whose layout no XTCE states. -->
+      <BinaryParameterType name="PacketBodyType">
         <BinaryDataEncoding>
           <SizeInBits>
             <DynamicValue>
@@ -74,8 +65,11 @@
       <!-- The first octet after an answer's header, which says whether it
            is one of the fixed commands' answers or another's. -->
       <Parameter name="AnswerOpcode" parameterTypeRef="U8Type"/>
-      <Parameter name="PingReply" parameterTypeRef="PingReplyType"/>
-      <Parameter name="BeaconBody" parameterTypeRef="BeaconBodyType"/>
+      <!-- The beacon as tcspecial sent it: every octet after the header,
+           read again whole so that the ground station can check it as the
+           ping example's does, from the bytes and not from Yamcs's
+           reading of them. -->
+      <Parameter name="BeaconBody" parameterTypeRef="PacketBodyType"/>
     </ParameterSet>
     <ContainerSet>
       <SequenceContainer name="CCSDSPacket">
@@ -89,7 +83,8 @@
           <ParameterRefEntry parameterRef="CcsdsLength"/>
         </EntryList>
       </SequenceContainer>
-      <!-- The beacon, on beacon.apid. -->
+      <!-- The beacon, on beacon.apid, which tcslibgs/yamcs.py restricts
+           it to. -->
       <SequenceContainer name="BeaconPacket">
         <EntryList>
           <ContainerRefEntry containerRef="/TcsBeacon/Beacon"/>
@@ -99,23 +94,16 @@
             </LocationInContainerInBits>
           </ParameterRefEntry>
         </EntryList>
-        <BaseContainer containerRef="CCSDSPacket">
-          <RestrictionCriteria>
-            <Comparison parameterRef="CcsdsApid" value="$beacon_apid"/>
-          </RestrictionCriteria>
-        </BaseContainer>
+        <BaseContainer containerRef="CCSDSPacket"/>
       </SequenceContainer>
-      <!-- An answer to a command, on tcs_cmd.apid: a fixed command's
+      <!-- An answer to a command, on tcs_cmd.apid, which
+           tcslibgs/yamcs.py restricts it to: a fixed command's
            (RESTART_ARM 2, RESTART 3, CONNECT 4) or another's. -->
       <SequenceContainer name="AnswerPacket">
         <EntryList>
           <ParameterRefEntry parameterRef="AnswerOpcode"/>
         </EntryList>
-        <BaseContainer containerRef="CCSDSPacket">
-          <RestrictionCriteria>
-            <Comparison parameterRef="CcsdsApid" value="$cmd_apid"/>
-          </RestrictionCriteria>
-        </BaseContainer>
+        <BaseContainer containerRef="CCSDSPacket"/>
       </SequenceContainer>
       <SequenceContainer name="FixedAnswerPacket">
         <EntryList>
@@ -163,18 +151,6 @@
           </RestrictionCriteria>
         </BaseContainer>
       </SequenceContainer>
-      <!-- The ping node's answer, on the gateway's apid_base plus the ping
-           node's device id. -->
-      <SequenceContainer name="PingReplyPacket">
-        <EntryList>
-          <ParameterRefEntry parameterRef="PingReply"/>
-        </EntryList>
-        <BaseContainer containerRef="CCSDSPacket">
-          <RestrictionCriteria>
-            <Comparison parameterRef="CcsdsApid" value="$reply_apid"/>
-          </RestrictionCriteria>
-        </BaseContainer>
-      </SequenceContainer>
     </ContainerSet>
   </TelemetryMetaData>
   <CommandMetaData>
@@ -208,18 +184,18 @@
           <SizeInBits><FixedValue>128</FixedValue></SizeInBits>
         </BinaryDataEncoding>
       </BinaryArgumentType>
-      <!-- Text whose length is TextBits, an argument the sender gives and
-           nothing encodes: the ping goes as its characters and nothing
-           else. -->
-      <StringArgumentType name="TextArg">
-        <StringDataEncoding encoding="US-ASCII">
-          <Variable maxSizeInBits="8192">
+      <!-- Data whose length is DataBits, an argument the sender gives
+           and nothing encodes: what the ground sends a gateway_yamcs node
+           goes as its octets and nothing else. -->
+      <BinaryArgumentType name="DataArg">
+        <BinaryDataEncoding>
+          <SizeInBits>
             <DynamicValue>
-              <ArgumentInstanceRef argumentRef="TextBits"/>
+              <ArgumentInstanceRef argumentRef="DataBits"/>
             </DynamicValue>
-          </Variable>
-        </StringDataEncoding>
-      </StringArgumentType>
+          </SizeInBits>
+        </BinaryDataEncoding>
+      </BinaryArgumentType>
     </ArgumentTypeSet>
     <MetaCommandSet>
       <!-- The header of every command. Yamcs fills in the sequence count
@@ -252,18 +228,14 @@
           </EntryList>
         </CommandContainer>
       </MetaCommand>
-      <!-- CONNECT, on tcs_cmd.apid: the fixed command of
-           tcslibgs/xtce/fixed.xtce, opcode 4, behind the header. Stated
-           again here because a command cannot be put behind another's
-           header from outside, and safe to be: the fixed commands' layouts
-           never change, and tcslibgs pins their digest. -->
+      <!-- CONNECT, on tcs_cmd.apid, which tcslibgs/yamcs.py assigns: the
+           fixed command of tcslibgs/xtce/fixed.xtce, opcode 4, behind the
+           header. Stated again here because a command cannot be put
+           behind another's header from outside, and safe to be: the fixed
+           commands' layouts never change, and tcslibgs pins their
+           digest. -->
       <MetaCommand name="Connect">
-        <BaseMetaCommand metaCommandRef="CcsdsTc">
-          <ArgumentAssignmentList>
-            <ArgumentAssignment argumentName="CcsdsApid"
-                                argumentValue="$cmd_apid"/>
-          </ArgumentAssignmentList>
-        </BaseMetaCommand>
+        <BaseMetaCommand metaCommandRef="CcsdsTc"/>
         <ArgumentList>
           <Argument name="Opcode" argumentTypeRef="U8Arg" initialValue="4"/>
           <Argument name="Sequence" argumentTypeRef="U32Arg"/>
@@ -274,27 +246,6 @@
             <ArgumentRefEntry argumentRef="Opcode"/>
             <ArgumentRefEntry argumentRef="Sequence"/>
             <ArgumentRefEntry argumentRef="Checksum"/>
-          </EntryList>
-          <BaseContainer containerRef="CcsdsTcContainer"/>
-        </CommandContainer>
-      </MetaCommand>
-      <!-- A ping, on the gateway's apid_base: the text of
-           tcslibgs::node::vehicle::ping, which the gateway node takes and
-           hands to the ping node. -->
-      <MetaCommand name="PingText">
-        <BaseMetaCommand metaCommandRef="CcsdsTc">
-          <ArgumentAssignmentList>
-            <ArgumentAssignment argumentName="CcsdsApid"
-                                argumentValue="$uplink_apid"/>
-          </ArgumentAssignmentList>
-        </BaseMetaCommand>
-        <ArgumentList>
-          <Argument name="Text" argumentTypeRef="TextArg"/>
-          <Argument name="TextBits" argumentTypeRef="U16Arg"/>
-        </ArgumentList>
-        <CommandContainer name="PingTextPacket">
-          <EntryList>
-            <ArgumentRefEntry argumentRef="Text"/>
           </EntryList>
           <BaseContainer containerRef="CcsdsTcContainer"/>
         </CommandContainer>

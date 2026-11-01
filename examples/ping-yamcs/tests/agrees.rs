@@ -13,12 +13,14 @@
 use std::path::Path;
 use std::process::Command;
 
-use tcslibgs::graph::telemetry::{self, Via};
+use std::collections::BTreeSet;
+
+use tcslibgs::graph::telemetry::{self, ApidCarries, Via};
 use tcslibgs::graph::Graph;
 
 mod common;
 
-use common::{here, worked_out};
+use common::{generated_mdb, here, with_more_nodes, worked_out, Element};
 
 /// What `ping_yamcs.py --describe` says, as `name value` pairs.
 ///
@@ -183,4 +185,120 @@ fn the_python_counts_payload_telemetry_apids_as_the_rust_does() {
         "0x300 plus 2 and 3"
     );
     assert_eq!(python_payload_telemetry(&path), rust);
+}
+
+/// Every APID the generated wrapper restricts a container to or assigns a
+/// command, with the container's or the command's name.
+///
+/// # Arguments
+///
+/// * `xtce` - The wrapper.
+///
+/// # Returns
+///
+/// Each `(name, apid)`.
+fn mdb_apids(xtce: &Element) -> BTreeSet<(String, u16)> {
+    let number = |said: &str| said.parse::<u16>().expect("an APID");
+    let mut found = BTreeSet::new();
+    let mut containers = Vec::new();
+    xtce.within("SequenceContainer", &mut containers);
+    for container in containers {
+        let mut comparisons = Vec::new();
+        if let Some(base) = container.child("BaseContainer") {
+            base.within("Comparison", &mut comparisons);
+        }
+        for comparison in comparisons {
+            if comparison.attribute("parameterRef") == Some("CcsdsApid") {
+                found.insert((
+                    container.attribute("name").expect("a name").to_string(),
+                    number(comparison.attribute("value").expect("a value")),
+                ));
+            }
+        }
+    }
+    let mut commands = Vec::new();
+    xtce.within("MetaCommand", &mut commands);
+    for command in commands {
+        let mut assignments = Vec::new();
+        command.within("ArgumentAssignment", &mut assignments);
+        for assigned in assignments {
+            if assigned.attribute("argumentName") == Some("CcsdsApid") {
+                found.insert((
+                    command.attribute("name").expect("a name").to_string(),
+                    number(
+                        assigned.attribute("argumentValue").expect("a value"),
+                    ),
+                ));
+            }
+        }
+    }
+    found
+}
+
+/// What the Rust says the wrapper for `path` must have: for every APID
+/// `telemetry::apids` counts, the container or the command named for what
+/// it carries -- the beacon's and the answers' containers and CONNECT, a
+/// command named after each gateway node, and a container named after each
+/// node whose data reaches the ground.
+///
+/// # Arguments
+///
+/// * `path` - The configuration.
+///
+/// # Returns
+///
+/// Each `(name, apid)`.
+///
+/// # Panics
+///
+/// The configuration does not read, or its APIDs do not work out.
+fn rust_apids(path: &Path) -> BTreeSet<(String, u16)> {
+    let graph = Graph::load(path).expect("the configuration reads");
+    assert_eq!(graph.check(), Vec::new(), "{} is sound", path.display());
+    let links = telemetry::of(&graph).expect("its links work out");
+    let source = |name: &str| {
+        let link = links
+            .iter()
+            .find(|link| link.name == name)
+            .unwrap_or_else(|| panic!("no link {name}"));
+        format!("{}Packet", link.source)
+    };
+    let mut expected = BTreeSet::new();
+    for used in telemetry::apids(&graph).expect("its APIDs work out") {
+        let names = match &used.carries {
+            ApidCarries::Beacon => vec!["BeaconPacket".to_string()],
+            ApidCarries::Commands => {
+                vec!["AnswerPacket".to_string(), "Connect".to_string()]
+            }
+            ApidCarries::Uplink(gateway) => vec![gateway.clone()],
+            ApidCarries::Downlink { link, .. } => vec![source(link)],
+            ApidCarries::PayloadTelemetry(link) => vec![source(link)],
+        };
+        expected.extend(names.into_iter().map(|name| (name, used.apid)));
+    }
+    expected
+}
+
+/// The wrapper `tcslibgs/yamcs.py` generates holds exactly the APIDs the
+/// Rust counts, each in the container or command named for it: for the
+/// example, and for a copy with a payload more drawn into the gateway node
+/// and two payloads nothing touches, whose containers no hand wrote.
+#[test]
+fn the_generated_wrapper_has_every_apid_the_rust_counts() {
+    let example = here().join("ping-yamcs.xtcs");
+    assert_eq!(
+        mdb_apids(&generated_mdb(&example)),
+        rust_apids(&here().join("ping-yamcs.ytcs"))
+    );
+
+    let dir = tempfile::tempdir().expect("a directory");
+    let more = with_more_nodes(dir.path());
+    let theirs = rust_apids(&more);
+    assert_eq!(mdb_apids(&generated_mdb(&more)), theirs);
+    for added in ["pongPacket", "sensorPacket", "tankPacket"] {
+        assert!(
+            theirs.iter().any(|(name, _)| name == added),
+            "{added} is counted: {theirs:?}"
+        );
+    }
 }

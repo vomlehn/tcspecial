@@ -597,9 +597,14 @@
 
        The sections may be written in any order. The lists among them,
        include, payload_groups and commands, are written as many times as
-       they have entries, which is how XML spells a list; the three node
-       sections and the tcsgui section are written once each, which is
-       refused where the file is read and not here. Nothing is required here,
+       they have entries, which is how XML spells a list; every other
+       section is written once at most. The description is held to that
+       here, by the identity constraint below: a field may find one node at
+       most, so a second description is refused. The tcspecial section, the
+       three node sections and the tcsgui section are held to it where the
+       file is read and not here, because XSD 1.0 cannot say it: xs:all
+       holds no list, and an identity constraint's field must find a value,
+       which a section of child elements is not. Nothing is required here,
        for the reason the tcspecial section's attributes are not: a file
        somebody is partway through writing must still open. That a
        configuration has a tcspecial section is checked where a complaint can
@@ -618,6 +623,10 @@
         <xs:element name="tcsgui" type="tcsgui"/>
       </xs:choice>
     </xs:complexType>
+    <xs:unique name="one-description">
+      <xs:selector xpath="."/>
+      <xs:field xpath="description"/>
+    </xs:unique>
   </xs:element>
 
 </xs:schema>

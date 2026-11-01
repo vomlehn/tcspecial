@@ -5166,6 +5166,13 @@ destinations being several elements, and XSD 1.0 allows neither repeats nor a
 mixture inside ``xs:all``. A node that says a word twice is refused where the
 file is read instead, and so is a type written twice in a section. A node's
 name is an attribute of its element, which the XSD does require exactly once.
+The same holds for a configuration's sections: ``include``, ``payload_groups``
+and ``commands`` are lists, repeated, so the ``tcspecial``, node and
+``tcsgui`` sections written twice are refused where the file is read. The
+``description`` is held to once by the XSD as well, through an identity
+constraint, which can count a section that is a value and not one of child
+elements. A simulator file has no list among its sections, so its XSD is an
+``xs:all`` and holds every one of them to once.
 
 A schema an editor has to be pointed at by hand is a schema nobody points it
 at, so every configuration this project writes names its own. In XML

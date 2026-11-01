@@ -2572,7 +2572,7 @@ to the ground, on ports 5100 to 5102 and 5107, and to the log
 <tt class="docutils literal">housekeeping</tt>, and the ground may set the setpoint through the command
 binding.</p>
 <p>The physics model, <tt class="docutils literal"><span class="pre">battery-physics.yaml</span></tt>, is the power system as its parts:
-a <tt class="docutils literal">sun</tt>, a <tt class="docutils literal">solar_array</tt> of seven amperes, two <tt class="docutils literal">load</tt> elements of two
+a <tt class="docutils literal">sun</tt>, a <tt class="docutils literal">solar_array</tt> of seven amperes, two <tt class="docutils literal">load</tt> components of two
 amperes each -- <tt class="docutils literal">avionics</tt>, never shed, and <tt class="docutils literal">science</tt> -- a <tt class="docutils literal">bus</tt> and a
 <tt class="docutils literal">battery</tt>, joined under <tt class="docutils literal">connections</tt>. The orbit is six minutes, four
 tenths of it in shadow, and the battery a fifth of an ampere-hour, so that a
@@ -3312,23 +3312,36 @@ somebody fills one in -- and have the file load all the same. A value that is
 there and wrong is still refused, naming it.</p>
 <pre class="code text literal-block">
 simulated_payload_groups        optional
-  name                 the name payloads refer to
+  group                the name payloads refer to, naming the entry
   simulate             true or false, for every payload in the group
   ...                  any of the settings below
 
-simulated_payloads
-  name                 the payload this one stands in for
-  simulate             true for tcssim to stand in for it, false for the
+simulated_payloads              a list of types
+  type &lt;type&gt;          the type of payload, as the tcspecial
+                       configuration writes it, holding the list of
+                       the simulated payloads of that type
+    payload            the payload this one stands in for, naming the
+                       entry
+    simulate           true for tcssim to stand in for it, false for the
                        real device: required, here or in its group
-  type                 the type of payload it is, as the tcspecial
-                       configuration says
-  protocol             which transport, for a network payload
-  payload_address      the socket the payload answers from, if this file
+    protocol           which transport, for a network payload
+    payload_address    the socket the payload answers from, if this file
                        cares to say
-  payload_port         which port it answers from, likewise
-  group                the group to take unstated settings from, if any
-  ...                  any of the settings below
+    payload_port       which port it answers from, likewise
+    group              the group to take unstated settings from, if any
+    ...                any of the settings below
 </pre>
+<p>The simulated payloads are grouped by type, as a configuration's nodes are:
+each entry of <tt class="docutils literal">simulated_payloads</tt> is <tt class="docutils literal">type</tt> and a type, holding the
+payloads of that type, each named by <tt class="docutils literal">payload</tt>. A group is named by
+<tt class="docutils literal">group</tt> and says no type, a payload's being the one it is written under. In
+XML, <tt class="docutils literal">&lt;simulated_payloads&gt;</tt> holds <tt class="docutils literal">&lt;type <span class="pre">name=&quot;...&quot;&gt;</span></tt> elements of
+<tt class="docutils literal">&lt;payload <span class="pre">name=&quot;...&quot;&gt;</span></tt> elements, and <tt class="docutils literal">&lt;simulated_payload_groups&gt;</tt> holds
+<tt class="docutils literal">&lt;group <span class="pre">name=&quot;...&quot;&gt;</span></tt> elements. Nothing in the file is in an order that
+means anything: the types, the payloads of one and the groups may be written
+in any order. A file in the shape before this one, each payload with
+<tt class="docutils literal">name:</tt> and <tt class="docutils literal">type:</tt> of its own, is refused at the line of its first
+entry; <tt class="docutils literal"><span class="pre">tools/convert-format.py</span></tt> rewrites it, keeping its comments.</p>
 <p><strong>Simulated or real: simulate</strong></p>
 <p>Every payload the file names says whether it is simulated, with <tt class="docutils literal">simulate</tt>:
 <tt class="docutils literal">true</tt> has tcssim stand in for it, and <tt class="docutils literal">false</tt> leaves it to the real
@@ -3338,15 +3351,16 @@ payload does not override its group's. A payload the file does not name is
 real too.</p>
 <pre class="code yaml literal-block">
 <span class="name tag">simulated_payload_groups</span><span class="punctuation">:</span><span class="whitespace">
-  </span><span class="punctuation indicator">-</span><span class="whitespace"> </span><span class="name tag">name</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">zone_temps</span><span class="whitespace">
-    </span><span class="name tag">simulate</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">true</span><span class="whitespace">          </span><span class="comment single"># temp_1, temp_2 and temp_3 are simulated</span><span class="whitespace">
+  </span><span class="punctuation indicator">-</span><span class="whitespace"> </span><span class="name tag">group</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">zone_temps</span><span class="whitespace">
     </span><span class="name tag">packet_interval</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">100 ms</span><span class="whitespace">
+    </span><span class="name tag">simulate</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">true</span><span class="whitespace">          </span><span class="comment single"># temp_1, temp_2 and temp_3 are simulated</span><span class="whitespace">
 
 </span><span class="name tag">simulated_payloads</span><span class="punctuation">:</span><span class="whitespace">
-  </span><span class="punctuation indicator">-</span><span class="whitespace"> </span><span class="name tag">name</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">temp_1</span><span class="whitespace">
-    </span><span class="name tag">group</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">zone_temps</span><span class="whitespace">
-  </span><span class="punctuation indicator">-</span><span class="whitespace"> </span><span class="name tag">name</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">heaters_1</span><span class="whitespace">
-    </span><span class="name tag">simulate</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">false</span><span class="whitespace">         </span><span class="comment single"># the real heater</span>
+  </span><span class="punctuation indicator">-</span><span class="whitespace"> </span><span class="name tag">type network</span><span class="punctuation">:</span><span class="whitespace">
+      </span><span class="punctuation indicator">-</span><span class="whitespace"> </span><span class="name tag">payload</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">heaters_1</span><span class="whitespace">
+        </span><span class="name tag">simulate</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">false</span><span class="whitespace">     </span><span class="comment single"># the real heater</span><span class="whitespace">
+      </span><span class="punctuation indicator">-</span><span class="whitespace"> </span><span class="name tag">payload</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">temp_1</span><span class="whitespace">
+        </span><span class="name tag">group</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">zone_temps</span>
 </pre>
 <p>Before it stands in for anything, tcssim compares each payload's <tt class="docutils literal">simulate</tt>
 with what is at the payload's endpoint, by the same rules tcspecial judges a
@@ -3370,17 +3384,18 @@ heater, sends nothing, counts what the vehicle sends it, and takes no packet
 interval. Switched off, a payload sends nothing, answers nothing and acts on
 nothing -- a heater warms no mass -- and still counts what reaches it.</p>
 <p><strong>What it stands in for</strong></p>
-<p>Two of the attributes describe the payload rather than the simulation, and are
-required for that reason. The two files are joined by handler name and by
-nothing else -- and a name is what a set copied from another one keeps -- so a
-simulator configuration written for one set parses happily against another
-set's payloads, and the run that follows looks like a payload that never
-sends. Stating the type here makes that pairing an error instead.</p>
+<p>Two things describe the payload rather than the simulation, and are required
+for that reason. The two files are joined by handler name and by nothing else
+-- and a name is what a set copied from another one keeps -- so a simulator
+configuration written for one set parses happily against another set's
+payloads, and the run that follows looks like a payload that never sends.
+Stating the type here makes that pairing an error instead.</p>
 <pre class="code text literal-block">
-type                   the type of payload this stands in for, in the
+type                   the type the payload is written under, in the
                        tcspecial configuration's own word: network,
-                       device, serial, i2c, spi, can, iio, rpmsg or
-                       gpio. Must be what that configuration says
+                       device-file, serial, i2c, spi, can, iio, rpmsg,
+                       gpio or hdlc. Must be the type that configuration
+                       writes it under
 protocol               which transport, for a network payload, and refused
                        for any other type. Must be what that configuration
                        says
@@ -3401,12 +3416,12 @@ across from the other file.</p>
 socket the simulated payload answers from.</p>
 <pre class="code yaml literal-block">
 <span class="name tag">simulated_payloads</span><span class="punctuation">:</span><span class="whitespace">
-  </span><span class="punctuation indicator">-</span><span class="whitespace"> </span><span class="name tag">name</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">auto-send</span><span class="whitespace">
-    </span><span class="name tag">type</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">network</span><span class="whitespace">
-    </span><span class="name tag">protocol</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">udp</span><span class="whitespace">
-    </span><span class="name tag">payload_address</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">127.0.0.1</span><span class="whitespace">   </span><span class="comment single"># the socket this payload answers from,</span><span class="whitespace">
-    </span><span class="name tag">payload_port</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">7000</span><span class="whitespace">           </span><span class="comment single"># not the one the handler waits at</span><span class="whitespace">
-    </span><span class="name tag">packet_interval</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">1 s</span>
+  </span><span class="punctuation indicator">-</span><span class="whitespace"> </span><span class="name tag">type network</span><span class="punctuation">:</span><span class="whitespace">
+      </span><span class="punctuation indicator">-</span><span class="whitespace"> </span><span class="name tag">payload</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">auto-send</span><span class="whitespace">
+        </span><span class="name tag">packet_interval</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">1 s</span><span class="whitespace">
+        </span><span class="name tag">payload_address</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">127.0.0.1</span><span class="whitespace">   </span><span class="comment single"># the socket this payload answers</span><span class="whitespace">
+        </span><span class="name tag">payload_port</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">7000</span><span class="whitespace">           </span><span class="comment single"># from, not the one the handler</span><span class="whitespace">
+        </span><span class="name tag">protocol</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">udp</span><span class="whitespace">                </span><span class="comment single"># waits at</span>
 </pre>
 <p>Nothing in the link needs it -- a handler learns where its payload is from the
 first packet it gets -- but something outside the simulation may: a rule on a
@@ -3462,12 +3477,22 @@ still declares masses itself is refused, told where they go.</p>
 physics                in the simulator file: the physics model's file,
                        relative to this one. Optional
 </pre>
-<p>The model holds a list of elements, under <tt class="docutils literal">physics</tt>, and the connections
-between them, under <tt class="docutils literal">connections</tt>, as a configuration holds nodes and
-links. Each element is one simple part, of one of these types:</p>
+<p>The model holds its elements, the components it is made of, under
+<tt class="docutils literal">physics</tt>, and the connections between them, under <tt class="docutils literal">connections</tt>, as a
+configuration holds nodes and links. The components are grouped by type, as
+a configuration's nodes are: each entry of <tt class="docutils literal">physics</tt> is <tt class="docutils literal">type</tt> and a
+type, holding the components of that type, each named by <tt class="docutils literal">component</tt>.
+Nothing in the model is in an order that means anything -- not the types,
+the components of one, or the connections -- and tcssim runs it the same
+however it is written: two events due at one moment come in the order of
+their components' names, and the outputs an input sums are added in the order
+of theirs. A model in the shape before this one, each element with <tt class="docutils literal">name:</tt>
+and <tt class="docutils literal">type:</tt> of its own, is refused at the line of its first element;
+<tt class="docutils literal"><span class="pre">tools/convert-format.py</span></tt> rewrites it. Each element is one simple part, of
+one of these types:</p>
 <pre class="code text literal-block">
 heater                 a resistance on a supply, switched on and off
-  name                 the name connections and stand-ins use
+  component            the name connections and stand-ins use
   power                what it gives out while on, at its nominal
                        voltage: &quot;60 W&quot;
   voltage              its supply's nominal voltage: &quot;28 V&quot;
@@ -3477,7 +3502,7 @@ heater                 a resistance on a supply, switched on and off
                        ripple and refused without it
 
 thermal_zone           one body at one temperature
-  name                 the name connections and stand-ins use
+  component            the name connections and stand-ins use
   environment          the temperature around it: &quot;283.15 K&quot;
   time_constant        how fast it loses the difference, as a length
                        of time
@@ -3493,7 +3518,7 @@ thermal_zone           one body at one temperature
                        wander and refused without it
 
 sun                    sunlight and shadow, through an orbit
-  name                 the name connections and stand-ins use
+  component            the name connections and stand-ins use
   period               how long one orbit takes: &quot;90 min&quot;
   eclipse              how much of it is in shadow, as a fraction,
                        written bare: &quot;0.35&quot;
@@ -3501,18 +3526,18 @@ sun                    sunlight and shadow, through an orbit
                        of its sunlight, as a fraction. Optional
 
 solar_array            panels turning light into current
-  name                 the name connections and stand-ins use
+  component            the name connections and stand-ins use
   current              what it gives in full sunlight: &quot;7 A&quot;
 
 load                   something on the bus that draws a current
-  name                 the name connections and stand-ins use
+  component            the name connections and stand-ins use
   current              what it draws while it is on: &quot;2 A&quot;
 
 bus                    where the sources' currents and the loads' meet
-  name                 the name connections and stand-ins use
+  component            the name connections and stand-ins use
 
 battery                a store of charge on the bus
-  name                 the name connections and stand-ins use
+  component            the name connections and stand-ins use
   capacity             how much it holds full: &quot;10 Ah&quot;
   empty                its open-circuit voltage empty: &quot;24 V&quot;
   full                 its open-circuit voltage full, more than empty:
@@ -3521,14 +3546,14 @@ battery                a store of charge on the bus
   charge               how full it starts, as a fraction: &quot;0.6&quot;
 
 engine                 a throttled engine and its fuel
-  name                 the name connections and stand-ins use
+  component            the name connections and stand-ins use
   thrust               its thrust at full throttle: &quot;4500 N&quot;
   isp                  its specific impulse, as a length of time:
                        &quot;311 s&quot;
   fuel                 the fuel it starts with: &quot;100 kg&quot;
 
 body                   a mass falling under gravity, pushed and burning
-  name                 the name connections and stand-ins use
+  component            the name connections and stand-ins use
   mass                 its mass at the start, fuel and all: &quot;1500 kg&quot;
   gravity              the gravity it falls in: &quot;1.62 m/s2&quot;
   altitude             how high it starts: &quot;500 m&quot;
@@ -3635,19 +3660,18 @@ vehicle drives.</p>
 <p>The model, <tt class="docutils literal"><span class="pre">zone-physics.yaml</span></tt>:</p>
 <pre class="code yaml literal-block">
 <span class="name tag">physics</span><span class="punctuation">:</span><span class="whitespace">
-  </span><span class="punctuation indicator">-</span><span class="whitespace"> </span><span class="name tag">name</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">heater_1</span><span class="whitespace">
-    </span><span class="name tag">type</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">heater</span><span class="whitespace">
-    </span><span class="name tag">power</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal string">&quot;60</span><span class="name variable"> </span><span class="literal string">W&quot;</span><span class="whitespace">              </span><span class="comment single"># three kelvin a second on the zone</span><span class="whitespace">
-    </span><span class="name tag">voltage</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal string">&quot;28</span><span class="name variable"> </span><span class="literal string">V&quot;</span><span class="whitespace">
-  </span><span class="punctuation indicator">-</span><span class="whitespace"> </span><span class="name tag">name</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">heater_2</span><span class="whitespace">
-    </span><span class="name tag">type</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">heater</span><span class="whitespace">
-    </span><span class="name tag">power</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal string">&quot;60</span><span class="name variable"> </span><span class="literal string">W&quot;</span><span class="whitespace">
-    </span><span class="name tag">voltage</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal string">&quot;28</span><span class="name variable"> </span><span class="literal string">V&quot;</span><span class="whitespace">
-  </span><span class="punctuation indicator">-</span><span class="whitespace"> </span><span class="name tag">name</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">zone</span><span class="whitespace">
-    </span><span class="name tag">type</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">thermal_zone</span><span class="whitespace">
-    </span><span class="name tag">environment</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal string">&quot;283.15</span><span class="name variable"> </span><span class="literal string">K&quot;</span><span class="whitespace">    </span><span class="comment single"># ten kelvin below the setpoint</span><span class="whitespace">
-    </span><span class="name tag">time_constant</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal string">&quot;50</span><span class="name variable"> </span><span class="literal string">s&quot;</span><span class="whitespace">      </span><span class="comment single"># a fifth of a kelvin a second at it</span><span class="whitespace">
-    </span><span class="name tag">capacity</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal string">&quot;20</span><span class="name variable"> </span><span class="literal string">J/K&quot;</span><span class="whitespace">
+  </span><span class="punctuation indicator">-</span><span class="whitespace"> </span><span class="name tag">type heater</span><span class="punctuation">:</span><span class="whitespace">
+      </span><span class="punctuation indicator">-</span><span class="whitespace"> </span><span class="name tag">component</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">heater_1</span><span class="whitespace">
+        </span><span class="name tag">power</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal string">&quot;60</span><span class="name variable"> </span><span class="literal string">W&quot;</span><span class="whitespace">            </span><span class="comment single"># three kelvin a second on the zone</span><span class="whitespace">
+        </span><span class="name tag">voltage</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal string">&quot;28</span><span class="name variable"> </span><span class="literal string">V&quot;</span><span class="whitespace">
+      </span><span class="punctuation indicator">-</span><span class="whitespace"> </span><span class="name tag">component</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">heater_2</span><span class="whitespace">
+        </span><span class="name tag">power</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal string">&quot;60</span><span class="name variable"> </span><span class="literal string">W&quot;</span><span class="whitespace">
+        </span><span class="name tag">voltage</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal string">&quot;28</span><span class="name variable"> </span><span class="literal string">V&quot;</span><span class="whitespace">
+  </span><span class="punctuation indicator">-</span><span class="whitespace"> </span><span class="name tag">type thermal_zone</span><span class="punctuation">:</span><span class="whitespace">
+      </span><span class="punctuation indicator">-</span><span class="whitespace"> </span><span class="name tag">component</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">zone</span><span class="whitespace">
+        </span><span class="name tag">capacity</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal string">&quot;20</span><span class="name variable"> </span><span class="literal string">J/K&quot;</span><span class="whitespace">
+        </span><span class="name tag">environment</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal string">&quot;283.15</span><span class="name variable"> </span><span class="literal string">K&quot;</span><span class="whitespace">  </span><span class="comment single"># ten kelvin below the setpoint</span><span class="whitespace">
+        </span><span class="name tag">time_constant</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal string">&quot;50</span><span class="name variable"> </span><span class="literal string">s&quot;</span><span class="whitespace">    </span><span class="comment single"># a fifth of a kelvin a second at it</span><span class="whitespace">
 
 </span><span class="name tag">connections</span><span class="punctuation">:</span><span class="whitespace">
   </span><span class="punctuation indicator">-</span><span class="whitespace"> </span><span class="punctuation indicator">{</span><span class="name tag"> from</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="name variable">heater_1.heat</span><span class="punctuation indicator">,</span><span class="name tag"> to</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="name variable">zone.heat</span><span class="whitespace"> </span><span class="punctuation indicator">}</span><span class="whitespace">
@@ -3659,26 +3683,25 @@ it:</p>
 <span class="name tag">physics</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">zone-physics.yaml</span><span class="whitespace">
 
 </span><span class="name tag">simulated_payload_groups</span><span class="punctuation">:</span><span class="whitespace">
-  </span><span class="punctuation indicator">-</span><span class="whitespace"> </span><span class="name tag">name</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">zone_temps</span><span class="whitespace">
-    </span><span class="name tag">packet_interval</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">100 ms</span><span class="whitespace">
+  </span><span class="punctuation indicator">-</span><span class="whitespace"> </span><span class="name tag">group</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">zone_temps</span><span class="whitespace">
     </span><span class="name tag">connects</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">zone.temperature</span><span class="whitespace">
+    </span><span class="name tag">packet_interval</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">100 ms</span><span class="whitespace">
 
 </span><span class="name tag">simulated_payloads</span><span class="punctuation">:</span><span class="whitespace">
-  </span><span class="punctuation indicator">-</span><span class="whitespace"> </span><span class="punctuation indicator">{</span><span class="name tag"> name</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="name variable">temp_1</span><span class="punctuation indicator">,</span><span class="name tag"> type</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="name variable">network</span><span class="punctuation indicator">,</span><span class="name tag"> protocol</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="name variable">udp</span><span class="punctuation indicator">,</span><span class="name tag"> group</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="name variable">zone_temps</span><span class="whitespace"> </span><span class="punctuation indicator">}</span><span class="whitespace">
-  </span><span class="punctuation indicator">-</span><span class="whitespace"> </span><span class="punctuation indicator">{</span><span class="name tag"> name</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="name variable">temp_2</span><span class="punctuation indicator">,</span><span class="name tag"> type</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="name variable">network</span><span class="punctuation indicator">,</span><span class="name tag"> protocol</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="name variable">udp</span><span class="punctuation indicator">,</span><span class="name tag"> group</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="name variable">zone_temps</span><span class="punctuation indicator">,</span><span class="whitespace">
-</span><span class="name tag">      offset</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal string">&quot;+0.2</span><span class="name variable"> </span><span class="literal string">K&quot;</span><span class="whitespace"> </span><span class="punctuation indicator">}</span><span class="whitespace">
-  </span><span class="punctuation indicator">-</span><span class="whitespace"> </span><span class="punctuation indicator">{</span><span class="name tag"> name</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="name variable">temp_3</span><span class="punctuation indicator">,</span><span class="name tag"> type</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="name variable">network</span><span class="punctuation indicator">,</span><span class="name tag"> protocol</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="name variable">udp</span><span class="punctuation indicator">,</span><span class="name tag"> group</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="name variable">zone_temps</span><span class="punctuation indicator">,</span><span class="whitespace">
-</span><span class="name tag">      offset</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal string">&quot;-0.3</span><span class="name variable"> </span><span class="literal string">K&quot;</span><span class="whitespace"> </span><span class="punctuation indicator">}</span><span class="whitespace">
-  </span><span class="punctuation indicator">-</span><span class="whitespace"> </span><span class="name tag">name</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">heaters_1</span><span class="whitespace">
-    </span><span class="name tag">type</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">network</span><span class="whitespace">
-    </span><span class="name tag">protocol</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">udp</span><span class="whitespace">
-    </span><span class="name tag">connects</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">heater_1.on</span><span class="whitespace">
-    </span><span class="name tag">packet_interval</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">20 ms</span><span class="whitespace">     </span><span class="comment single"># how often it looks for a decision</span><span class="whitespace">
-  </span><span class="punctuation indicator">-</span><span class="whitespace"> </span><span class="name tag">name</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">heaters_2</span><span class="whitespace">
-    </span><span class="name tag">type</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">network</span><span class="whitespace">
-    </span><span class="name tag">protocol</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">udp</span><span class="whitespace">
-    </span><span class="name tag">connects</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">heater_2.on</span><span class="whitespace">
-    </span><span class="name tag">packet_interval</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">20 ms</span>
+  </span><span class="punctuation indicator">-</span><span class="whitespace"> </span><span class="name tag">type network</span><span class="punctuation">:</span><span class="whitespace">
+      </span><span class="punctuation indicator">-</span><span class="whitespace"> </span><span class="name tag">payload</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">heaters_1</span><span class="whitespace">
+        </span><span class="name tag">connects</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">heater_1.on</span><span class="whitespace">
+        </span><span class="name tag">packet_interval</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">20 ms</span><span class="whitespace">   </span><span class="comment single"># how often it looks for a decision</span><span class="whitespace">
+        </span><span class="name tag">protocol</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">udp</span><span class="whitespace">
+      </span><span class="punctuation indicator">-</span><span class="whitespace"> </span><span class="name tag">payload</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">heaters_2</span><span class="whitespace">
+        </span><span class="name tag">connects</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">heater_2.on</span><span class="whitespace">
+        </span><span class="name tag">packet_interval</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">20 ms</span><span class="whitespace">
+        </span><span class="name tag">protocol</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">udp</span><span class="whitespace">
+      </span><span class="punctuation indicator">-</span><span class="whitespace"> </span><span class="punctuation indicator">{</span><span class="name tag"> payload</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="name variable">temp_1</span><span class="punctuation indicator">,</span><span class="name tag"> group</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="name variable">zone_temps</span><span class="punctuation indicator">,</span><span class="name tag"> protocol</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="name variable">udp</span><span class="whitespace"> </span><span class="punctuation indicator">}</span><span class="whitespace">
+      </span><span class="punctuation indicator">-</span><span class="whitespace"> </span><span class="punctuation indicator">{</span><span class="name tag"> payload</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="name variable">temp_2</span><span class="punctuation indicator">,</span><span class="name tag"> group</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="name variable">zone_temps</span><span class="punctuation indicator">,</span><span class="name tag"> offset</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal string">&quot;+0.2</span><span class="name variable"> </span><span class="literal string">K&quot;</span><span class="punctuation indicator">,</span><span class="whitespace">
+</span><span class="name tag">          protocol</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="name variable">udp</span><span class="whitespace"> </span><span class="punctuation indicator">}</span><span class="whitespace">
+      </span><span class="punctuation indicator">-</span><span class="whitespace"> </span><span class="punctuation indicator">{</span><span class="name tag"> payload</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="name variable">temp_3</span><span class="punctuation indicator">,</span><span class="name tag"> group</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="name variable">zone_temps</span><span class="punctuation indicator">,</span><span class="name tag"> offset</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal string">&quot;-0.3</span><span class="name variable"> </span><span class="literal string">K&quot;</span><span class="punctuation indicator">,</span><span class="whitespace">
+</span><span class="name tag">          protocol</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="name variable">udp</span><span class="whitespace"> </span><span class="punctuation indicator">}</span>
 </pre>
 <p><strong>How the world moves</strong></p>
 <p>tcssim makes one world of the model, which every stand-in joined to it
@@ -3807,12 +3830,12 @@ reads it. A payload that starts with any fault set says so in one line of log,
 so a run is not left to be guessed at afterwards.</p>
 <pre class="code yaml literal-block">
 <span class="name tag">simulated_payloads</span><span class="punctuation">:</span><span class="whitespace">
-  </span><span class="punctuation indicator">-</span><span class="whitespace"> </span><span class="name tag">name</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">auto-send</span><span class="whitespace">
-    </span><span class="name tag">type</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">network</span><span class="whitespace">
-    </span><span class="name tag">protocol</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">udp</span><span class="whitespace">
-    </span><span class="name tag">packet_interval</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">500 ms</span><span class="whitespace">
-    </span><span class="name tag">drop_percent</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">10</span><span class="whitespace">        </span><span class="comment single"># one packet in ten never arrives</span><span class="whitespace">
-    </span><span class="name tag">jitter</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">50 ms</span><span class="whitespace">            </span><span class="comment single"># and the rest are up to 50 ms late</span>
+  </span><span class="punctuation indicator">-</span><span class="whitespace"> </span><span class="name tag">type network</span><span class="punctuation">:</span><span class="whitespace">
+      </span><span class="punctuation indicator">-</span><span class="whitespace"> </span><span class="name tag">payload</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">auto-send</span><span class="whitespace">
+        </span><span class="name tag">drop_percent</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">10</span><span class="whitespace">        </span><span class="comment single"># one packet in ten never arrives</span><span class="whitespace">
+        </span><span class="name tag">jitter</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">50 ms</span><span class="whitespace">           </span><span class="comment single"># and the rest are up to 50 ms late</span><span class="whitespace">
+        </span><span class="name tag">packet_interval</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">500 ms</span><span class="whitespace">
+        </span><span class="name tag">protocol</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">udp</span>
 </pre>
 <p>The two files are joined by name. Every data handler needs a simulated payload
 naming it, and a name here that no handler has is an error rather than a line
@@ -3833,37 +3856,47 @@ the model the zone is declared in, <tt class="docutils literal"><span class="pre
 </span><span class="name tag">physics</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">thermostat-physics.yaml</span><span class="whitespace">
 
 </span><span class="name tag">simulated_payload_groups</span><span class="punctuation">:</span><span class="whitespace">
-  </span><span class="punctuation indicator">-</span><span class="whitespace"> </span><span class="name tag">name</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">zone_temps</span><span class="whitespace">
-    </span><span class="name tag">packet_interval</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">100 ms</span><span class="whitespace">
+  </span><span class="punctuation indicator">-</span><span class="whitespace"> </span><span class="name tag">group</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">zone_temps</span><span class="whitespace">
     </span><span class="name tag">connects</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">zone.temperature</span><span class="whitespace">
+    </span><span class="name tag">drift</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal string">&quot;0.05</span><span class="name variable"> </span><span class="literal string">K&quot;</span><span class="whitespace">
+    </span><span class="name tag">drift_time</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal string">&quot;30</span><span class="name variable"> </span><span class="literal string">min&quot;</span><span class="whitespace">
+    </span><span class="name tag">packet_interval</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">100 ms</span><span class="whitespace">
+    </span><span class="name tag">simulate</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">true</span><span class="whitespace">
 
 </span><span class="name tag">simulated_payloads</span><span class="punctuation">:</span><span class="whitespace">
-  </span><span class="punctuation indicator">-</span><span class="whitespace"> </span><span class="name tag">name</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">temp_1</span><span class="whitespace">
-    </span><span class="name tag">type</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">network</span><span class="whitespace">
-    </span><span class="name tag">protocol</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">udp</span><span class="whitespace">
-    </span><span class="name tag">group</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">zone_temps</span><span class="whitespace">
+  </span><span class="punctuation indicator">-</span><span class="whitespace"> </span><span class="name tag">type network</span><span class="punctuation">:</span><span class="whitespace">
+      </span><span class="punctuation indicator">-</span><span class="whitespace"> </span><span class="name tag">payload</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">heaters_1</span><span class="whitespace">
+        </span><span class="name tag">connects</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">heater_1.on</span><span class="whitespace">
+        </span><span class="name tag">protocol</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">udp</span><span class="whitespace">
+        </span><span class="name tag">simulate</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">true</span><span class="whitespace">
 
-  </span><span class="punctuation indicator">-</span><span class="whitespace"> </span><span class="name tag">name</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">temp_2</span><span class="whitespace">
-    </span><span class="name tag">type</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">network</span><span class="whitespace">
-    </span><span class="name tag">protocol</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">udp</span><span class="whitespace">
-    </span><span class="name tag">group</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">zone_temps</span><span class="whitespace">
-    </span><span class="name tag">offset</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal string">&quot;+0.2</span><span class="name variable"> </span><span class="literal string">K&quot;</span><span class="whitespace">
+      </span><span class="punctuation indicator">-</span><span class="whitespace"> </span><span class="name tag">payload</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">heaters_2</span><span class="whitespace">
+        </span><span class="name tag">connects</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">heater_2.on</span><span class="whitespace">
+        </span><span class="name tag">protocol</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">udp</span><span class="whitespace">
+        </span><span class="name tag">simulate</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">true</span><span class="whitespace">
 
-  </span><span class="punctuation indicator">-</span><span class="whitespace"> </span><span class="name tag">name</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">temp_3</span><span class="whitespace">
-    </span><span class="name tag">type</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">network</span><span class="whitespace">
-    </span><span class="name tag">protocol</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">udp</span><span class="whitespace">
-    </span><span class="name tag">group</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">zone_temps</span><span class="whitespace">
-    </span><span class="name tag">offset</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal string">&quot;-0.3</span><span class="name variable"> </span><span class="literal string">K&quot;</span><span class="whitespace">
+      </span><span class="punctuation indicator">-</span><span class="whitespace"> </span><span class="name tag">payload</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">temp_1</span><span class="whitespace">
+        </span><span class="name tag">accuracy</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal string">&quot;0.5</span><span class="name variable"> </span><span class="literal string">K&quot;</span><span class="whitespace">
+        </span><span class="name tag">group</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">zone_temps</span><span class="whitespace">
+        </span><span class="name tag">lag</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">4 s</span><span class="whitespace">
+        </span><span class="name tag">noise</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal string">&quot;0.03</span><span class="name variable"> </span><span class="literal string">K&quot;</span><span class="whitespace">
+        </span><span class="name tag">protocol</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">udp</span><span class="whitespace">
 
-  </span><span class="punctuation indicator">-</span><span class="whitespace"> </span><span class="name tag">name</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">heaters_1</span><span class="whitespace">
-    </span><span class="name tag">type</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">network</span><span class="whitespace">
-    </span><span class="name tag">protocol</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">udp</span><span class="whitespace">
-    </span><span class="name tag">connects</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">heater_1.on</span><span class="whitespace">
+      </span><span class="punctuation indicator">-</span><span class="whitespace"> </span><span class="name tag">payload</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">temp_2</span><span class="whitespace">
+        </span><span class="name tag">accuracy</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal string">&quot;0.5</span><span class="name variable"> </span><span class="literal string">K&quot;</span><span class="whitespace">
+        </span><span class="name tag">group</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">zone_temps</span><span class="whitespace">
+        </span><span class="name tag">lag</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">4 s</span><span class="whitespace">
+        </span><span class="name tag">noise</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal string">&quot;0.03</span><span class="name variable"> </span><span class="literal string">K&quot;</span><span class="whitespace">
+        </span><span class="name tag">offset</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal string">&quot;+0.2</span><span class="name variable"> </span><span class="literal string">K&quot;</span><span class="whitespace">
+        </span><span class="name tag">protocol</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">udp</span><span class="whitespace">
 
-  </span><span class="punctuation indicator">-</span><span class="whitespace"> </span><span class="name tag">name</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">udp-fast</span><span class="whitespace">
-    </span><span class="name tag">type</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">network</span><span class="whitespace">
-    </span><span class="name tag">protocol</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">udp</span><span class="whitespace">
-    </span><span class="name tag">packet_interval</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">500 ms</span>
+      </span><span class="punctuation indicator">-</span><span class="whitespace"> </span><span class="name tag">payload</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">temp_3</span><span class="whitespace">
+        </span><span class="name tag">accuracy</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal string">&quot;0.25</span><span class="name variable"> </span><span class="literal string">K&quot;</span><span class="whitespace">
+        </span><span class="name tag">group</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">zone_temps</span><span class="whitespace">
+        </span><span class="name tag">lag</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">6 s</span><span class="whitespace">
+        </span><span class="name tag">noise</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal string">&quot;0.02</span><span class="name variable"> </span><span class="literal string">K&quot;</span><span class="whitespace">
+        </span><span class="name tag">offset</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal string">&quot;-0.3</span><span class="name variable"> </span><span class="literal string">K&quot;</span><span class="whitespace">
+        </span><span class="name tag">protocol</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">udp</span>
 </pre>
 </div>
 <div class="section" id="installing">
@@ -4819,8 +4852,12 @@ under <tt class="docutils literal"><span class="pre">--simulate=none</span></tt>
 address first; a simulator already running on the same configuration,
 simulator file and mode is used and left running, one set up for anything
 else is refused, saying what differs, and otherwise tcsmoc starts tcssim and
-waits for it. Under <tt class="docutils literal">none</tt> it starts tcspecial alone. For a run started by
-hand, <tt class="docutils literal">tcssim <span class="pre">--wait</span></tt> is the waiting:</p>
+waits for it. The simulator file is compared as the configuration is, by a
+digest of what it says rather than of its bytes: of its settings and of the
+physics model it names, in one order, so that a comment or another order is
+the same file and a figure changed in the model is not. Under <tt class="docutils literal">none</tt> it
+starts tcspecial alone. For a run started by hand, <tt class="docutils literal">tcssim <span class="pre">--wait</span></tt> is the
+waiting:</p>
 <pre class="code console literal-block">
 <span class="generic prompt">$ </span>tcssim<span class="whitespace"> </span>--simulate<span class="operator">=</span>all<span class="whitespace"> </span>x.ytcs<span class="whitespace"> </span><span class="punctuation">&amp;</span><span class="whitespace">
 </span><span class="generic prompt">$ </span>tcssim<span class="whitespace"> </span>--wait<span class="whitespace"> </span>--simulate<span class="operator">=</span>all<span class="whitespace"> </span>x.ytcs<span class="whitespace"> </span><span class="operator">&amp;&amp;</span><span class="whitespace"> </span>tcspecial<span class="whitespace"> </span>--simulate<span class="operator">=</span>all<span class="whitespace"> </span>x.ytcs

@@ -1960,15 +1960,22 @@ impl Document {
         // -- see `sim::must_be_yaml` -- so there is one spelling of it and
         // nothing here to choose between.
         if let Some(simulator) = &self.simulator {
-            // The configuration's own payloads, in its order, because it is
-            // what decides which payloads there are to simulate: a file
-            // written from the simulator's entries alone would say nothing
-            // about a payload nobody had typed a setting for yet.
-            let payloads: Vec<String> = self
+            // The configuration's own payloads and their types, because it
+            // is what decides which payloads there are to simulate and what
+            // each is: a file written from the simulator's entries alone
+            // would say nothing about a payload nobody had typed a setting
+            // for yet. The writer puts them in order. Only the payloads a
+            // stand-in can be made for, of a kind of payload: one that is a
+            // program is the program itself, and has no type a simulated
+            // payload can be written under.
+            let payloads: Vec<(String, String)> = self
                 .nodes
                 .iter()
                 .filter(|node| crate::pane::is_payload(&node.node_type))
-                .map(|node| node.name.clone())
+                .filter(|node| {
+                    tcslibgs::DHType::from_spelling(&node.node_type).is_some()
+                })
+                .map(|node| (node.name.clone(), node.node_type.clone()))
                 .collect();
             written.push((
                 simulator.path.clone(),

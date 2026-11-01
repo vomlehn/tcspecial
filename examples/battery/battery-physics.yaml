@@ -14,42 +14,41 @@
 description: The physics of the vehicle of battery.ytcs
 
 physics:
-  # Four tenths of the orbit in the planet's shadow: two minutes and
-  # twenty-four seconds dark, three minutes and thirty-six lit.
-  - name: sun
-    type: sun
-    period: "6 min"
-    eclipse: "0.4"
+  - type battery:
+      # Eight lithium-ion cells in series, 24 V empty and 33.2 V full, of a
+      # fifth of an ampere-hour, starting six tenths full. With both loads on
+      # in shadow it would lose four fifths of its charge in an eclipse; shed
+      # at three tenths, it comes through.
+      - component: battery
+        capacity: "0.2 Ah"
+        charge: "0.6"
+        empty: "24 V"
+        full: "33.2 V"
+        resistance: "0.05 ohm"
 
-  # Seven amperes in full sunlight.
-  - name: array
-    type: solar_array
-    current: "7 A"
+  - type bus:
+      - component: bus
 
-  # The avionics, which are never shed, and the science instrument, which
-  # is: two amperes each.
-  - name: avionics
-    type: load
-    current: "2 A"
+  - type load:
+      # The avionics, which are never shed, and the science instrument, which
+      # is: two amperes each.
+      - component: avionics
+        current: "2 A"
 
-  - name: science
-    type: load
-    current: "2 A"
+      - component: science
+        current: "2 A"
 
-  - name: bus
-    type: bus
+  - type solar_array:
+      # Seven amperes in full sunlight.
+      - component: array
+        current: "7 A"
 
-  # Eight lithium-ion cells in series, 24 V empty and 33.2 V full, of a
-  # fifth of an ampere-hour, starting six tenths full. With both loads on
-  # in shadow it would lose four fifths of its charge in an eclipse; shed
-  # at three tenths, it comes through.
-  - name: battery
-    type: battery
-    capacity: "0.2 Ah"
-    empty: "24 V"
-    full: "33.2 V"
-    resistance: "0.05 ohm"
-    charge: "0.6"
+  - type sun:
+      # Four tenths of the orbit in the planet's shadow: two minutes and
+      # twenty-four seconds dark, three minutes and thirty-six lit.
+      - component: sun
+        eclipse: "0.4"
+        period: "6 min"
 
 connections:
   - from: sun.light

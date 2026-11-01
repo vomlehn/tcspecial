@@ -10,16 +10,15 @@ tcssim:
   ready: "127.0.0.1:7908"
 
 simulated_payloads:
-  # Driven and never read: its stand-in sends nothing and counts what the
-  # vehicle sends it, so that its panel shows each command reaching it.
-  - name: heater
-    simulate: true
-    type: network
-    protocol: udp
+  - type network:
+      # Driven and never read: its stand-in sends nothing and counts what the
+      # vehicle sends it, so that its panel shows each command reaching it.
+      - payload: heater
+        protocol: udp
+        simulate: true
 
-  # One reading a second, sent whole.
-  - name: thermometer
-    simulate: true
-    type: network
-    protocol: udp
-    packet_interval: 1 s
+      # One reading a second, sent whole.
+      - payload: thermometer
+        packet_interval: 1 s
+        protocol: udp
+        simulate: true

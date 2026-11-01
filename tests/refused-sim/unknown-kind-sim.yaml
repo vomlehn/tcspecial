@@ -1,0 +1,4 @@
+simulated_payloads:
+  - type netwrok:
+      - payload: sensor
+        simulate: true

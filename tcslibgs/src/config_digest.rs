@@ -176,18 +176,119 @@ pub fn digest_of_graph(graph: &crate::graph::Graph) -> TcsResult<ConfigDigest> {
     digest_of_value(&interpretation_of_graph(graph))
 }
 
-/// The digest of the simulator file at `path`: of its bytes.
+/// The digest of the simulator file at `path`: of what it says, as a
+/// configuration's is.
 ///
-/// Of the text rather than of what it parses into, as a configuration's is:
-/// a simulator file is read by tcssim alone and in one format, so the two
-/// spellings that make the configuration's digest an interpretation's do not
-/// arise. What it is for is a harness telling whether a simulator already
-/// running read the file the harness did.
+/// What it is for is a harness telling whether a simulator already running
+/// read the file the harness did, and the file and the physics model it
+/// names are what that simulator acts on. So the digest is of the two as
+/// read, in one order, rather than of the simulator file's bytes: a comment
+/// added, or the payloads written in another order, is the same simulator
+/// file, and a physics model changed beside it is not. See
+/// [`interpretation_of_simulator`].
+///
+/// # Arguments
+///
+/// * `path` - The simulator file.
+///
+/// # Returns
+///
+/// Its digest.
+///
+/// # Errors
+///
+/// [`TcsError::Config`] where the file, or the model it names, cannot be
+/// read.
 pub fn digest_of_simulator_file<P: AsRef<Path>>(
     path: P,
 ) -> TcsResult<ConfigDigest> {
-    let text = std::fs::read(path.as_ref())?;
-    Ok(ConfigDigest(md5::compute(text).0))
+    let file = crate::sim_config::SimConfigFile::load(path.as_ref())?;
+    digest_of_value(&interpretation_of_simulator(&file))
+}
+
+/// Writes out what a simulator file is read as: the thing its digest is
+/// taken over.
+///
+/// The `tcssim` section; the groups of settings, by name, each with every
+/// setting it states; the simulated payloads, by name, each with its type,
+/// the group it names and every setting it states; and the physics model
+/// the file names, as read: its components by name, each with its type and
+/// figures, and its connections in the order of what they join. Not in it:
+/// the description, and the name the model is given by, which change
+/// nothing tcssim does. Every list is in one order whatever order the file
+/// wrote it in, nothing in a simulator file or a model being in an order
+/// that means anything, and the keys of a map are put in order as the
+/// digest is taken.
+///
+/// # Arguments
+///
+/// * `file` - The simulator file, with the model it names read.
+///
+/// # Returns
+///
+/// It as a value tree.
+pub fn interpretation_of_simulator(
+    file: &crate::sim_config::SimConfigFile,
+) -> serde_json::Value {
+    use serde_json::{json, Value};
+
+    let settings = |settings: &crate::sim_config::SimSettings| -> Value {
+        serde_json::to_value(settings).unwrap_or(Value::Null)
+    };
+    let tcssim = file.tcssim.as_ref().map(|section| {
+        json!({
+            "ready": section.ready,
+            "thermostat": section.thermostat,
+            "seed": section.seed,
+        })
+    });
+    let mut groups: Vec<&crate::sim_config::SimGroup> =
+        file.simulated_payload_groups.iter().collect();
+    groups.sort_by(|a, b| a.name.cmp(&b.name));
+    let groups: Vec<Value> = groups
+        .into_iter()
+        .map(|group| {
+            json!({ "name": group.name, "settings": settings(&group.settings) })
+        })
+        .collect();
+    let mut payloads: Vec<&crate::sim_config::SimPayload> =
+        file.simulated_payloads.iter().collect();
+    payloads.sort_by(|a, b| a.name.cmp(&b.name));
+    let payloads: Vec<Value> = payloads
+        .into_iter()
+        .map(|payload| {
+            json!({
+                "name": payload.name,
+                "type": payload.settings.dh_type,
+                "group": payload.group,
+                "settings": settings(&payload.settings),
+            })
+        })
+        .collect();
+    let physics = file.model.as_ref().map(|model| {
+        let mut components: Vec<&crate::physics::Element> =
+            model.physics.iter().collect();
+        components.sort_by(|a, b| a.name().cmp(b.name()));
+        let mut connections: Vec<(&str, &str)> = model
+            .connections
+            .iter()
+            .map(|c| (c.from.as_str(), c.to.as_str()))
+            .collect();
+        connections.sort_unstable();
+        json!({
+            "components": components,
+            "connections": connections
+                .into_iter()
+                .map(|(from, to)| json!({ "from": from, "to": to }))
+                .collect::<Vec<Value>>(),
+        })
+    });
+    json!({
+        "tcssim": tcssim,
+        "simulated_payload_groups": groups,
+        "simulated_payloads": payloads,
+        "physics": physics,
+    })
 }
 
 /// What a configuration file is read as, as a value tree: the thing its
@@ -694,6 +795,77 @@ mod tests {
         );
         assert_eq!(unordered("serial", "trigger", "[01 02]"), None);
         assert_eq!(unordered("serial", "init", "[01 02]"), None);
+    }
+
+    /// A simulator file's digest is of what it and its model say: two
+    /// written in other orders, with other comments and descriptions, digest
+    /// alike, and a setting or a figure of the model changed does not.
+    #[test]
+    fn a_simulator_file_in_another_order_digests_alike() {
+        let dir = tempfile::tempdir().expect("a directory");
+        written(
+            dir.path(),
+            "one-physics.yaml",
+            "physics:\n  - type heater:\n      - component: h1\n        \
+             power: \"1 W\"\n        voltage: \"1 V\"\n      \
+             - component: h2\n        voltage: \"1 V\"\n        \
+             power: \"1 W\"\n  - type thermal_zone:\n      \
+             - component: z\n        environment: \"1 K\"\n        \
+             time_constant: 1 s\n        capacity: \"1 J/K\"\n\
+             connections:\n  - { from: h1.heat, to: z.heat }\n  \
+             - { from: h2.heat, to: z.heat }\n",
+        );
+        let model =
+            std::fs::read_to_string(dir.path().join("one-physics.yaml"))
+                .expect("read");
+        let reordered = model.replace(
+            "  - { from: h1.heat, to: z.heat }\n  \
+             - { from: h2.heat, to: z.heat }\n",
+            "  - { from: h2.heat, to: z.heat }\n  \
+             - { from: h1.heat, to: z.heat }\n",
+        );
+        written(dir.path(), "two-physics.yaml", &reordered);
+        let one = written(
+            dir.path(),
+            "one-sim.yaml",
+            "description: one\ntcssim:\n  ready: 127.0.0.1:7999\n\
+             physics: one-physics.yaml\n\
+             simulated_payload_groups:\n  - group: g\n    simulate: true\n  \
+             - group: f\n    packet_interval: 1 s\n    simulate: true\n\
+             simulated_payloads:\n  - type network:\n      \
+             - payload: a\n        protocol: udp\n        group: f\n  \
+             - type spi:\n      - payload: b\n        group: g\n        \
+             packet_interval: 2 s\n",
+        );
+        let two = written(
+            dir.path(),
+            "two-sim.yaml",
+            "# The same, written otherwise.\n\
+             simulated_payloads:\n  - type spi:\n      \
+             - payload: b\n        packet_interval: 2 s\n        \
+             group: g\n  - type network:\n      - payload: a\n        \
+             group: f\n        protocol: udp\n\
+             simulated_payload_groups:\n  - group: f\n    simulate: true\n    \
+             packet_interval: 1 s\n  - group: g\n    simulate: true\n\
+             physics: two-physics.yaml\n\
+             tcssim:\n  ready: 127.0.0.1:7999\ndescription: two\n",
+        );
+        let first = digest_of_simulator_file(&one).expect("one digests");
+        assert_eq!(digest_of_simulator_file(&two).expect("digests"), first);
+
+        // A setting changed is another file.
+        let text = std::fs::read_to_string(&two).expect("read");
+        std::fs::write(&two, text.replace("2 s", "3 s")).expect("written");
+        assert_ne!(digest_of_simulator_file(&two).expect("digests"), first);
+
+        // And so is a figure of its model, its file left as it was.
+        std::fs::write(&two, text).expect("written");
+        written(
+            dir.path(),
+            "two-physics.yaml",
+            &reordered.replace("\"1 K\"", "\"2 K\""),
+        );
+        assert_ne!(digest_of_simulator_file(&two).expect("digests"), first);
     }
 
     /// The version is three bytes, and says what this build is.

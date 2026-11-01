@@ -42,60 +42,56 @@ simulated_payload_groups:
   #
   # Each sensor drifts too, by a twentieth of a kelvin over half an hour,
   # which is what an ageing part's calibration does.
-  - name: zone_temps
-    simulate: true
-    packet_interval: 100 ms
+  - group: zone_temps
     connects: zone.temperature
     drift: "0.05 K"
     drift_time: "30 min"
+    packet_interval: 100 ms
+    simulate: true
 
 simulated_payloads:
-  # Each sensor with its part's datasheet errors, and on its own place on
-  # the zone. temp_1 and temp_2 are one part, a digital sensor of a
-  # sixteenth of a kelvin a count: accurate to half a kelvin, three
-  # hundredths of a kelvin of noise, and four seconds behind the zone in its
-  # package.
-  - name: temp_1
-    type: network
-    protocol: udp
-    group: zone_temps
-    noise: "0.03 K"
-    accuracy: "0.5 K"
-    lag: 4 s
+  - type network:
+      # Driven and never read: their stand-ins send nothing, count each decision
+      # the vehicle sends them, and switch the heater each is joined to.
+      - payload: heaters_1
+        connects: heater_1.on
+        protocol: udp
+        simulate: true
 
-  # The zone is not one temperature throughout: the place temp_2 is on is a
-  # fifth of a kelvin warmer than the middle.
-  - name: temp_2
-    type: network
-    protocol: udp
-    group: zone_temps
-    offset: "+0.2 K"
-    noise: "0.03 K"
-    accuracy: "0.5 K"
-    lag: 4 s
+      - payload: heaters_2
+        connects: heater_2.on
+        protocol: udp
+        simulate: true
 
-  # A better part, in a heavier package, on a place three tenths of a
-  # kelvin cooler: accurate to a quarter of a kelvin, two hundredths of
-  # noise, and slower to follow.
-  - name: temp_3
-    type: network
-    protocol: udp
-    group: zone_temps
-    offset: "-0.3 K"
-    noise: "0.02 K"
-    accuracy: "0.25 K"
-    lag: 6 s
+      # Each sensor with its part's datasheet errors, and on its own place on
+      # the zone. temp_1 and temp_2 are one part, a digital sensor of a
+      # sixteenth of a kelvin a count: accurate to half a kelvin, three
+      # hundredths of a kelvin of noise, and four seconds behind the zone in its
+      # package.
+      - payload: temp_1
+        accuracy: "0.5 K"
+        group: zone_temps
+        lag: 4 s
+        noise: "0.03 K"
+        protocol: udp
 
-  # Driven and never read: their stand-ins send nothing, count each decision
-  # the vehicle sends them, and switch the heater each is joined to.
-  - name: heaters_1
-    simulate: true
-    type: network
-    protocol: udp
-    connects: heater_1.on
+      # The zone is not one temperature throughout: the place temp_2 is on is a
+      # fifth of a kelvin warmer than the middle.
+      - payload: temp_2
+        accuracy: "0.5 K"
+        group: zone_temps
+        lag: 4 s
+        noise: "0.03 K"
+        offset: "+0.2 K"
+        protocol: udp
 
-  - name: heaters_2
-    simulate: true
-    type: network
-    protocol: udp
-    connects: heater_2.on
+      # A better part, in a heavier package, on a place three tenths of a
+      # kelvin cooler: accurate to a quarter of a kelvin, two hundredths of
+      # noise, and slower to follow.
+      - payload: temp_3
+        accuracy: "0.25 K"
+        group: zone_temps
+        lag: 6 s
+        noise: "0.02 K"
+        offset: "-0.3 K"
+        protocol: udp

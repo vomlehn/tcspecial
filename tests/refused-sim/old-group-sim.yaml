@@ -1,0 +1,12 @@
+tcssim:
+  ready: "127.0.0.1:7999"
+simulated_payload_groups:
+  - name: steady
+    simulate: true
+    type: network
+    packet_interval: 1 s
+simulated_payloads:
+  - type network:
+      - payload: sensor
+        protocol: udp
+        group: steady

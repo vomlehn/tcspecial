@@ -11,25 +11,25 @@
 description: The physics of the vehicle of descent.ytcs
 
 physics:
-  # A throttleable engine of four and a half kilonewtons, the size of a
-  # small lander's descent engine, with a hundred kilograms of fuel: a half
-  # again what the descent burns, which is a margin and not much of one.
-  - name: engine
-    type: engine
-    thrust: "4500 N"
-    isp: "311 s"
-    fuel: "100 kg"
+  - type body:
+      # A tonne and a half, five hundred metres up and falling at twenty metres
+      # a second, in the Moon's gravity: the start of a terminal descent. At
+      # full throttle the engine brakes it at not quite one and a half metres a
+      # second a second, and holds it at a little over half.
+      - component: lander
+        altitude: "500 m"
+        gravity: "1.62 m/s2"
+        mass: "1500 kg"
+        velocity: "-20 m/s"
 
-  # A tonne and a half, five hundred metres up and falling at twenty metres
-  # a second, in the Moon's gravity: the start of a terminal descent. At
-  # full throttle the engine brakes it at not quite one and a half metres a
-  # second a second, and holds it at a little over half.
-  - name: lander
-    type: body
-    mass: "1500 kg"
-    gravity: "1.62 m/s2"
-    altitude: "500 m"
-    velocity: "-20 m/s"
+  - type engine:
+      # A throttleable engine of four and a half kilonewtons, the size of a
+      # small lander's descent engine, with a hundred kilograms of fuel: a half
+      # again what the descent burns, which is a margin and not much of one.
+      - component: engine
+        fuel: "100 kg"
+        isp: "311 s"
+        thrust: "4500 N"
 
 connections:
   - from: engine.force

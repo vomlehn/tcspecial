@@ -1502,8 +1502,8 @@ mod tests {
         let sim = |simulate: bool| -> SimConfigFile {
             tcslibgs::format::ConfigFormat::Yaml
                 .parse(&format!(
-                    "simulated_payloads:\n  - name: sensor\n    simulate: \
-                     {simulate}\n"
+                    "simulated_payloads:\n  - type network:\n      \
+                     - payload: sensor\n        simulate: {simulate}\n"
                 ))
                 .unwrap()
         };

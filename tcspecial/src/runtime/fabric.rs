@@ -2180,8 +2180,9 @@ vehicle:
         moved.add(fabric.deliver("temp_3", &[0x00, 0x10, 0x00]));
         assert!(moved.all_delivered(), "{:?}", moved.refused);
 
-        // What the ground saw: three temperatures, the one voted out of them,
-        // and the decision.
+        // What the ground saw: three temperatures, the two voted out of them
+        // -- once two had arrived and again at the third -- and the
+        // decision.
         //
         // A temperature is four bytes of micro-kelvin and a decision is text,
         // so they are read back differently -- which is what the two are: a
@@ -2193,16 +2194,20 @@ vehicle:
             .iter()
             .map(|(_, _, datum)| datum.clone())
             .collect();
+        // In the order they were delivered: temp_1, temp_2 and the vote
+        // over those two, then temp_3 and the vote over all three.
         let temperatures: Vec<f64> = given
             .iter()
-            .take(4)
+            .filter(|datum| datum.len() == 4)
             .map(|datum| {
                 crate::node::vehicle::compute::from_value(datum, "the ground")
                     .expect("a value")
             })
             .collect();
-        for (shown, wanted) in
-            temperatures.iter().zip([289.15, 289.15, 287.3188, 289.15])
+        assert_eq!(temperatures.len(), 5, "{temperatures:?}");
+        for (shown, wanted) in temperatures
+            .iter()
+            .zip([289.15, 289.15, 289.15, 287.3188, 289.15])
         {
             assert!(
                 (shown - wanted).abs() < 1e-9,
@@ -2211,10 +2216,15 @@ vehicle:
                 "the ground should have had {wanted} and had {shown}"
             );
         }
+        let decisions: Vec<&[u8]> = given
+            .iter()
+            .filter(|datum| datum.len() != 4)
+            .map(Vec::as_slice)
+            .collect();
         assert_eq!(
-            given.last().map(|datum| datum.as_slice()),
-            Some(&b"1"[..]),
-            "the decision reaches the ground as well as the heaters"
+            decisions,
+            [&b"1"[..]],
+            "the decision reaches the ground as well as the heaters, once"
         );
 
         // The log saw the same three and the decision, which is the other

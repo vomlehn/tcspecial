@@ -2181,6 +2181,34 @@ Requirement
     two command loops used to return on it -- which would have stopped the link
     a spacecraft is commanded over because a program on it had finished.
 
+A **vote** turns several readings of one quantity -- a trio of sensors of one
+place -- into the one value the rest of the configuration acts on, so that
+the reading survives one sensor going wrong. ``median`` takes the middle
+reading and ``closest_mean`` the mean of the two that agree best; either
+leaves an outlier out, where a mean would carry it into the answer.
+
+Requirement
+    A vote is over at least three named inputs, each named once, and the
+    links must bind exactly those: a vote whose third link was deleted is a
+    configuration fault, not a vote over two.
+
+Requirement
+    It keeps the latest reading from each input and votes on every arrival,
+    over the readings it has, once a majority of its inputs -- two of three
+    -- have reported. Not before: one reading is that sensor's word taken on
+    trust. And not after every input has: a sensor dead from power-up would
+    then hold the vote, and every decision taken from it, at nothing for the
+    whole flight, which is the single failure the trio exists to survive.
+
+Requirement
+    A vote may state an ``age``, a length of time: a reading older than that
+    is not voted on. Once voting has begun, an arrival that leaves fewer than
+    a majority of current readings produces nothing and is reported as a
+    failure, saying how many are current, so that a decision downstream is
+    not left acting on a quantity nobody is measuring without the ground
+    hearing of it. Without ``age``, a reading stands until its input sends
+    another.
+
 App nodes
 ---------
 

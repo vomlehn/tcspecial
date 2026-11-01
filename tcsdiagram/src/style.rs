@@ -1269,6 +1269,7 @@ impl NodeType {
                 // vote
                 ("inputs", false),
                 ("algorithm", false),
+                ("age", false),
                 // hysteresis
                 ("setpoint", false),
                 ("half_band", false),

@@ -350,6 +350,7 @@ mod tests {
                 "in2".to_string(),
             ],
             algorithm: Algorithm::Median,
+            age: None,
         });
 
         let mut thermostat = hysteresis::Hysteresis::of(
@@ -476,6 +477,7 @@ mod tests {
                 "in2".to_string(),
             ],
             algorithm: Algorithm::Median,
+            age: None,
         });
 
         // All three sitting at 20 above freezing, in their own units.
@@ -483,8 +485,9 @@ mod tests {
         let b = aft.give(None, &320i16.to_be_bytes()).unwrap().unwrap();
         let c = bay.give(None, &[0x00, 0x4e, 0x20]).unwrap().unwrap();
 
+        // One reading is no majority; two are, and three are again.
         assert_eq!(voted.give(Some("in0"), &a).unwrap(), None);
-        assert_eq!(voted.give(Some("in1"), &b).unwrap(), None);
+        assert!(voted.give(Some("in1"), &b).unwrap().is_some());
         let out = voted.give(Some("in2"), &c).unwrap().expect("a vote");
 
         let averaged = from_value(&out, "the mean").unwrap();

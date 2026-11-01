@@ -2700,17 +2700,21 @@ vehicle:
                 }
             })
             .collect();
-        // The three readings, the one temperature voted out of them, and the
-        // decision. The vote is 289.15 and not the mean's 288.5396: sorted,
-        // the readings are 287.3188, 289.15 and 289.15, so the median is
-        // 289.15 and the low one is left out -- which is what a trio is for.
+        // The three readings, the temperatures voted out of them, and the
+        // decision. The vote is taken once two readings have arrived and
+        // again at the third, so there are two: the first over whichever two
+        // came first -- 289.15, or the middle of 289.15 and 287.3188 --
+        // and the second over all three, 289.15 and not the mean's
+        // 288.5396: sorted, the readings are 287.3188, 289.15 and 289.15, so
+        // the median is 289.15 and the low one is left out -- which is what
+        // a trio is for.
         //
         // The readings in any order among themselves: each goes to the ground
         // on a link of its own, and the three are sent at once, in one wave,
         // where the order three sockets are written in is nobody's. What is
         // ordered is the waves: every reading is on its way before the vote
         // over them, and the vote before the decision taken from it.
-        assert_eq!(to_ground.len(), 5, "{to_ground:?}");
+        assert_eq!(to_ground.len(), 6, "{to_ground:?}");
         let mut readings = to_ground[..3].to_vec();
         readings.sort();
         assert_eq!(
@@ -2718,10 +2722,14 @@ vehicle:
             ["287.3188", "289.15", "289.15"],
             "the ground should have the three readings first: {to_ground:?}"
         );
+        assert!(
+            ["289.15", "288.2344"].contains(&to_ground[3].as_str()),
+            "then the vote over the first two: {to_ground:?}"
+        );
         assert_eq!(
-            to_ground[3..],
+            to_ground[4..],
             ["289.15", "1"],
-            "and then the vote over them, and the decision"
+            "and then the vote over all three, and the decision"
         );
         assert_eq!(
             vehicle.heaters.lock().expect("the record").clone(),

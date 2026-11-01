@@ -2610,6 +2610,32 @@ exiting is enough to interrupt a receive elsewhere in the process, and the
 two command loops used to return on it -- which would have stopped the link
 a spacecraft is commanded over because a program on it had finished.</dd>
 </dl>
+<p>A <strong>vote</strong> turns several readings of one quantity -- a trio of sensors of one
+place -- into the one value the rest of the configuration acts on, so that
+the reading survives one sensor going wrong. <tt class="docutils literal">median</tt> takes the middle
+reading and <tt class="docutils literal">closest_mean</tt> the mean of the two that agree best; either
+leaves an outlier out, where a mean would carry it into the answer.</p>
+<dl class="docutils">
+<dt>Requirement</dt>
+<dd>A vote is over at least three named inputs, each named once, and the
+links must bind exactly those: a vote whose third link was deleted is a
+configuration fault, not a vote over two.</dd>
+<dt>Requirement</dt>
+<dd>It keeps the latest reading from each input and votes on every arrival,
+over the readings it has, once a majority of its inputs -- two of three
+-- have reported. Not before: one reading is that sensor's word taken on
+trust. And not after every input has: a sensor dead from power-up would
+then hold the vote, and every decision taken from it, at nothing for the
+whole flight, which is the single failure the trio exists to survive.</dd>
+<dt>Requirement</dt>
+<dd>A vote may state an <tt class="docutils literal">age</tt>, a length of time: a reading older than that
+is not voted on. Once voting has begun, an arrival that leaves fewer than
+a majority of current readings produces nothing and is reported as a
+failure, saying how many are current, so that a decision downstream is
+not left acting on a quantity nobody is measuring without the ground
+hearing of it. Without <tt class="docutils literal">age</tt>, a reading stands until its input sends
+another.</dd>
+</dl>
 </div>
 <div class="section" id="app-nodes">
 <h2><a class="toc-backref" href="#toc-entry-23">App nodes</a></h2>

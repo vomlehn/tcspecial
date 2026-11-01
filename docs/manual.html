@@ -2462,8 +2462,12 @@ it names, <tt class="docutils literal">median</tt>, which takes the middle readi
 arithmetic twice over -- it carries a bad reading into the answer in proportion
 to how wrong it is, and waiting for all three turns one dead sensor into no
 answer at all. The vote keeps the last reading from each input and produces a
-value on every arrival, so a sensor that stops reporting is outvoted by the two
-that are working. Fed 296.0, 296.1 and 270.0 -- two sensors warm and one stuck
+value on every arrival once two of the three have reported, so a sensor that
+stops reporting -- or never starts -- is outvoted by the two that are working.
+A vote may also say how old a reading may be, <tt class="docutils literal">age: &quot;2 s&quot;</tt>: one older is
+left out, and a vote left with fewer than two current readings produces
+nothing and reports it on each arrival rather than acting on one sensor's
+word. Fed 296.0, 296.1 and 270.0 -- two sensors warm and one stuck
 cold -- it says 296 and the heaters stay off, where a mean would have said
 287.4 and switched them on because one sensor had failed.</p>
 <p>The voted temperature goes to the ground, on port 5104, and to <tt class="docutils literal">thermostat</tt>:

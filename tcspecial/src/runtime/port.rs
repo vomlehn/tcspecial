@@ -2570,6 +2570,7 @@ mod tests {
             "zone_temp",
             Box::new(Vote::of(VoteParams {
                 algorithm: Algorithm::Median,
+                age: None,
                 inputs: vec!["in0".to_string(), "in1".to_string()],
             })),
         );
@@ -2691,6 +2692,7 @@ mod tests {
             "zone_temp",
             Box::new(Vote::of(VoteParams {
                 algorithm: Algorithm::Median,
+                age: None,
                 inputs: vec!["in0".to_string(), "in1".to_string()],
             })),
         );
@@ -2725,6 +2727,7 @@ mod tests {
             "zone_temp",
             Box::new(Vote::of(VoteParams {
                 algorithm: Algorithm::Median,
+                age: None,
                 inputs: vec!["in0".to_string(), "in1".to_string()],
             })),
         );

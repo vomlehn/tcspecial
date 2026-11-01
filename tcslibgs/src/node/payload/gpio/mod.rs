@@ -132,7 +132,7 @@ impl Direction {
 /// What a GPIO node's lines are set to.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct GpioParams {
-    /// The offsets of the lines, in the order the file gave them.
+    /// The offsets of the lines, lowest first: see [`lines_of`].
     pub lines: Vec<u32>,
     /// Whether they are read or driven.
     pub direction: Direction,

@@ -422,7 +422,7 @@ fn here(nodes: &[OnSheet], name: &str) -> bool {
 /// # Arguments
 ///
 /// * `nodes` - Every node the lines may reach, on this page or another.
-/// * `lines` - The page's lines, in the file's order.
+/// * `lines` - The page's lines, in the order the configuration holds them.
 ///
 /// # Returns
 ///

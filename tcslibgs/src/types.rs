@@ -568,8 +568,8 @@ impl DHName {
 
 /// Which node of a configuration a command is about.
 ///
-/// A node's position among the configuration's nodes, counting from nought in
-/// the order the files declare them: the device id
+/// A node's position among the configuration's nodes sorted by name, counting
+/// from nought: the device id
 /// [`crate::graph::telemetry::ids`] gives, and not a number invented for
 /// commands. The id in a command and the port that node's telemetry arrives
 /// on are therefore the same number, worked out in one place.
@@ -1114,7 +1114,8 @@ pub struct SpiConfig {
 pub struct GpioConfig {
     /// The chip's character device: `/dev/gpiochip0`.
     pub path: String,
-    /// The offsets of the lines, in the order the file gave them.
+    /// The offsets of the lines, lowest first: see
+    /// [`crate::node::payload::gpio::lines_of`].
     pub lines: Vec<u32>,
     /// Whether they are watched or driven.
     pub direction: crate::node::payload::gpio::Direction,
@@ -1506,8 +1507,8 @@ impl HostPort {
     ///
     /// The one place the sum is taken, so that both ends of a link compute the
     /// same port from the same file: a payload's data link is the base port
-    /// plus the payload's id, and the id is the position the payload has in the
-    /// configuration -- see [`crate::graph::order`].
+    /// plus the payload's id, and the id is the position the payload's name
+    /// has among the configuration's -- see [`crate::graph::telemetry::ids`].
     ///
     /// Refused rather than wrapped where the sum leaves the range a port has:
     /// a configuration of three hundred payloads based at 65400 describes

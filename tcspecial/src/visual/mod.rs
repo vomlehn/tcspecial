@@ -139,8 +139,9 @@ struct Line {
     comment: Option<String>,
 }
 
-/// Lists every line of the configuration, one per destination, in the
-/// file's order: the order the route table numbers them in. See
+/// Lists every line of the configuration, one per destination, in the order
+/// the configuration holds them: the order the route table numbers them in.
+/// See
 /// `crate::runtime::route::Delivery::line`.
 ///
 /// # Arguments

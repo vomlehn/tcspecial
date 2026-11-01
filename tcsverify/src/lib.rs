@@ -1069,9 +1069,10 @@ mod tests {
     /// words tcspecial uses to refuse it -- and nothing else.
     #[test]
     fn a_node_of_a_type_not_built_is_reported_where_it_is_written() {
-        let root = Path::new(env!("CARGO_MANIFEST_DIR"))
-            .join("../examples/thermostat");
-        let yaml = root.join("thermostat.ytcs");
+        // The manual's fixture, whose payloads are on I2C, SPI and GPIO,
+        // where the example's are sockets, which every build has.
+        let yaml = Path::new(env!("CARGO_MANIFEST_DIR"))
+            .join("../tests/manual/thermostat.ytcs");
         let report =
             verify_built(&yaml, None, Limits::EVERYTHING, &["i2c", "spi"]);
         let found: Vec<(usize, &str)> = report

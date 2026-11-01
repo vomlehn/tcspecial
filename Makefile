@@ -108,17 +108,11 @@ TCSPECIAL_CONFIG_FILE=tests/manual/thermostat
 
 # The simulator settings for that configuration.
 #
-# The file beside it, `<stem>-sim.yaml`, as every example names its own --
-# except for the thermostat fixture, which has none: it is simulated by the
-# example's, which stands in for the same payloads, as SPELLINGS below says.
+# The file beside it, `<stem>-sim.yaml`, as every example names its own.
 # Named rather than worked out by the programs, because tcssim reads it from
 # the environment and a name nothing has is a run with nothing simulated.
 #   make runsim TCSPECIAL_CONFIG_FILE=mine TCSPECIAL_SIM_FILE=mine-bench.yaml
-ifeq ($(TCSPECIAL_CONFIG_FILE),tests/manual/thermostat)
-TCSPECIAL_SIM_FILE ?= examples/thermostat/thermostat-sim.yaml
-else
 TCSPECIAL_SIM_FILE ?= $(TCSPECIAL_CONFIG_FILE)-sim.yaml
-endif
 
 # What the programs log, which every run target passes on. A variable rather
 # than a word in each recipe, so that it can be overridden the way the payload
@@ -420,12 +414,11 @@ runcomparexy:
 
 # Every configuration shipped in both spellings, with the simulator file each
 # is checked beside: the thermostat fixture and the examples. A list of stems
-# and simulator files rather than a pattern, because the thermostat fixture
-# has no simulator file of its own: it is checked beside the example's, which
-# simulates the same payloads.
+# and simulator files rather than a pattern, so that a configuration may be
+# checked beside a simulator file not named for it.
 #
 SPELLINGS = \
-	tests/manual/thermostat:examples/thermostat/thermostat-sim.yaml \
+	tests/manual/thermostat:tests/manual/thermostat-sim.yaml \
 	examples/minimal/minimal:examples/minimal/minimal-sim.yaml \
 	examples/thermostat/thermostat:examples/thermostat/thermostat-sim.yaml \
 	examples/simple-app/simple-app:examples/simple-app/simple-app-sim.yaml \

@@ -353,10 +353,17 @@ mod tests {
         assert_eq!(handlers(&graph, &sim), Ok(Vec::new()));
     }
 
-    /// The thermostat's sensors are simulated with the sizes their nodes say.
+    /// The thermostat's sensors are simulated with the sizes their nodes
+    /// say: the manual's fixture, whose sensors are on buses with a read
+    /// size, where the example's are sockets.
     #[test]
     fn the_thermostat_sensors_are_simulated_at_their_read_sizes() {
-        let (graph, sim) = example("thermostat");
+        let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("..");
+        let graph = Graph::load(root.join("tests/manual/thermostat.ytcs"))
+            .expect("the fixture reads");
+        let sim =
+            SimConfigFile::load(root.join("tests/manual/thermostat-sim.yaml"))
+                .expect("its simulator file reads");
         let handlers = handlers(&graph, &sim).expect("it simulates");
         let sized: Vec<(&str, usize)> = handlers
             .iter()

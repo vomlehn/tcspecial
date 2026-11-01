@@ -229,8 +229,13 @@ def test_the_vehicle_restarts_and_is_matched_again(fprime_test_api):
     # the bridge says of the start that comes back may be said before the
     # first of these asks, so it is looked for from then, not from now.
     restarted = answered.get_time()
-    fprime_test_api.assert_telemetry(
-        of_bridge("RestartFlag"), value=True, start=restarted,
+    # Said as an event, not looked for in the RestartFlag channel: the flag
+    # is set only until the bridge's next CONNECT, which may be less than
+    # one of the deployment's telemetry periods, and a channel is sampled.
+    fprime_test_api.assert_event(
+        of_bridge("BeaconSaid"),
+        [Contains("RESTARTED")],
+        start=restarted,
         timeout=ARRIVING,
     )
     fprime_test_api.assert_event(

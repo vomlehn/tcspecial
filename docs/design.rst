@@ -3871,14 +3871,35 @@ them, groups and command bindings held and written back -- and the comments
 come with it: a comment is written as a comment rather than as a field, so the
 editor reads the run of comment lines above an entry as that entry's.
 
-An *entry* is a node, a link, a group or a command binding, and that is the
-limit of it. Four kinds of comment in a hand-written file are not kept, and all
-four are lost the first time the editor writes the file -- which the Save
-button does on demand, whether or not anything was edited:
+An *entry* is a node, a link, a group or a command binding. The file's
+structure carries comments too, and those are kept the same way, written back
+where they were read:
+
+* a comment above a node section's line, ``payloads:`` or ``<payloads>``,
+  with no blank line between, is that section's;
+* a comment under it, above the section's first ``- type`` line, is the
+  section's as well -- the paragraph about the section as a whole that the
+  examples have there. It is also where the first type group's own comment
+  would be, and a file cannot tell the two apart, so the section has it;
+* a comment above any later ``- type X:`` or ``<type name="X">`` line is that
+  type group's;
+* a comment above a line of the ``tcspecial`` section -- a setting, a
+  subsection such as ``beacon:``, or a subsection's setting -- is that line's.
+
+Each lives as long as what it is about. A section or type group the editor
+empties is no longer written, and its comment goes with it; one made again
+later starts without, and so does a ``tcspecial`` setting cleared and set
+again. Undo does not bring such a comment back, as it does not bring back a
+removed node's.
+
+Four kinds of comment in a hand-written file are not kept, and all four are
+lost the first time the editor writes the file -- which the Save button does
+on demand, whether or not anything was edited:
 
 * prose attached to nothing: a heading at the top of a file, or a paragraph
   after the last entry, belongs to no entry.
-* a comment above the ``tcspecial`` section, which is not an entry either.
+* a comment above the ``tcspecial`` section's own line, or above any other
+  top-level key that is not a node section, which is not an entry either.
 * a comment above one *attribute* of an entry rather than above the entry
   itself -- the line explaining why a sensor is at ``0x49`` is kept, and the
   same line written directly above the ``address`` attribute is not.

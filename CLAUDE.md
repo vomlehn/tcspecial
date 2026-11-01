@@ -22,7 +22,9 @@ argue from this order and say so.
   A rule about what a configuration may say belongs here, and nowhere else.
 - `tcslib` -- what a ground station is built on: `TcsClient` for commands,
   `gateway::GatewayReceiver` for the vehicle's data, `beacon` for its
-  beacons, `simulator` for waiting until tcssim has made its stand-ins.
+  beacons, `simulator` for waiting until tcssim has made its stand-ins,
+  `bus` for a vehicle on a cFS software bus (the station's SBN peer, and
+  the stand-in for the cFS end that tcssim runs).
 - `tcslib-c` -- tcslib for C and C++: beacons, data and commands behind one
   hand-written header, `include/tcs.h`, which `tests/c_and_cpp.rs` holds to
   the library by compiling a ground station against it with gcc and g++.

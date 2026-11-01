@@ -11088,9 +11088,9 @@ thermostat fixture and the thermostat example name one model. A
 simulator file that still declares masses itself is refused, told where
 they go.</dd>
 <dt>Requirement</dt>
-<dd>The model is its elements, the components it is made of, grouped by type
-as a configuration's nodes are, and a list of connections between them,
-as a configuration has links. Each entry of <tt class="docutils literal">physics</tt> is <tt class="docutils literal">type</tt> and a
+<dd>The model is the components it is made of, grouped by type as a
+configuration's nodes are, and a list of connections between them, as a
+configuration has links. Each entry of <tt class="docutils literal">physics</tt> is <tt class="docutils literal">type</tt> and a
 type, <tt class="docutils literal">- type heater:</tt>, holding the components of that type, each
 named by <tt class="docutils literal">component</tt>. The types are <tt class="docutils literal">heater</tt>, <tt class="docutils literal">thermal_zone</tt>,
 <tt class="docutils literal">sun</tt>, <tt class="docutils literal">solar_array</tt>, <tt class="docutils literal">load</tt>, <tt class="docutils literal">bus</tt>, <tt class="docutils literal">battery</tt>, <tt class="docutils literal">engine</tt> and
@@ -11108,10 +11108,10 @@ however it is written: an input that sums is given its outputs in that
 order, and of two events due at one moment, the one whose component's
 name sorts first happens first.</dd>
 <dt>Requirement</dt>
-<dd>A model in the shape before this one, each element with a <tt class="docutils literal">name</tt> and a
-<tt class="docutils literal">type</tt> of its own, is refused at the line of its first element, shown
-it in the shape it has now and told that <tt class="docutils literal"><span class="pre">tools/convert-format.py</span></tt>
-rewrites the file.</dd>
+<dd>A model in the shape before this one, each component with a <tt class="docutils literal">name</tt> and
+a <tt class="docutils literal">type</tt> of its own, is refused at the line of its first component,
+shown it in the shape it has now and told that
+<tt class="docutils literal"><span class="pre">tools/convert-format.py</span></tt> rewrites the file.</dd>
 <dt>Requirement</dt>
 <dd>Each type is one simple part, with its own words for what goes in and
 what comes out, rather than a whole assembly: a heater is switched
@@ -11169,12 +11169,12 @@ are refused, told what says it now.</dd>
 connection. Two would each switch it over the other, and which was in
 force would depend on which the vehicle drove last.</dd>
 <dt>Requirement</dt>
-<dd>An element nothing is joined to -- no connection and no stand-in -- is
+<dd>A component nothing is joined to -- no connection and no stand-in -- is
 refused. It would be a state nothing reads and nothing changes, and the
 likeliest cause is a misspelled <tt class="docutils literal">connects</tt>.</dd>
 <dt>Requirement</dt>
 <dd><tt class="docutils literal">tcsverify</tt> reads the model a simulator file names, and reports every
-problem with an element at its line in the model, a problem with the
+problem with a component at its line in the model, a problem with the
 connections at the model's <tt class="docutils literal">connections</tt> line, and a model that
 cannot be read at the simulator file's <tt class="docutils literal">physics</tt> line.</dd>
 </dl>
@@ -11196,26 +11196,26 @@ the ground before its radar was enabled. The mapping has a rate, so that a world
 faster than the wall clock where nothing at the other end needs it to
 keep pace; a run with tcspecial keeps it at one.</dd>
 <dt>Requirement</dt>
-<dd>Between two moments every element is advanced with its inputs held, by
+<dd>Between two moments every component is advanced with its inputs held, by
 its type's closed form where there is one, which is exact. The world is
 advanced whenever it is asked, so its intervals are whatever length the
 traffic makes them, and a method whose error grew with the interval
 would make the simulated values depend on how often somebody looked.</dd>
 <dt>Requirement</dt>
-<dd>Where an element's behaviour changes inside an interval -- a battery
+<dd>Where a component's behaviour changes inside an interval -- a battery
 reaching full, a body reaching the ground -- it foresees the moment, as
 its next event. The events wait in a queue, soonest first, one for each
-element, set again whenever the element's inputs change; the world
+component, set again whenever the component's inputs change; the world
 advances to each in its order, lets it happen and goes on, so nothing is
-stepped across. The queue's room is the number of elements, fixed when
-the world is made, and nothing is allocated once it runs.</dd>
+stepped across. The queue's room is the number of components, fixed
+when the world is made, and nothing is allocated once it runs.</dd>
 <dt>Requirement</dt>
 <dd>What is at each input is worked out from every output as it stands at
 the start of an interval, and given again until it settles, so that a
 heater switched on is a zone warmed from that moment and not from the
 next one.</dd>
 <dt>Requirement</dt>
-<dd>An element that foresees its next event at the moment it is already at,
+<dd>A component that foresees its next event at the moment it is already at,
 time after time, is stopped after ten thousand and the log says so: the
 world falls behind rather than every stand-in waiting on it for ever.</dd>
 </dl>
@@ -11388,7 +11388,7 @@ response, so it is advanced as exactly as the rest. A wander is held for
 an interval, which is exact for intervals much shorter than its time
 constant.</dd>
 <dt>Requirement</dt>
-<dd>Each element and each sensor draws from a generator of its own, seeded
+<dd>Each component and each sensor draws from a generator of its own, seeded
 from the run's seed and its name, so that a run with the same seed
 varies the same way whatever order the payloads' threads ask in. The
 seed is the <tt class="docutils literal">tcssim</tt> section's; without one tcssim chooses it and

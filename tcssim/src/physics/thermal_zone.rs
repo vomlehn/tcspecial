@@ -68,7 +68,7 @@ use rand::rngs::StdRng;
 use rand::SeedableRng;
 use tcslibgs::physics::thermal_zone::Resolved;
 
-use super::element::Element;
+use super::component::Component;
 use super::random::{seed_for, settled, wandered};
 
 /// Its terminals' places, in `tcslibgs::physics::thermal_zone::TERMINALS`'s
@@ -110,7 +110,7 @@ impl ThermalZone {
     /// swing.
     pub fn new(name: &str, figures: Resolved, seed: u64) -> ThermalZone {
         let mut rng =
-            StdRng::seed_from_u64(seed_for(seed, &format!("element:{name}")));
+            StdRng::seed_from_u64(seed_for(seed, &format!("component:{name}")));
         let wander = settled(&figures.wander, &mut rng);
         let omega = if figures.swing > 0.0 {
             TAU / figures.period.as_secs_f64()
@@ -148,7 +148,7 @@ impl ThermalZone {
     }
 }
 
-impl Element for ThermalZone {
+impl Component for ThermalZone {
     fn hold(&mut self, inputs: &[f64]) {
         self.heat = inputs[HEAT];
     }

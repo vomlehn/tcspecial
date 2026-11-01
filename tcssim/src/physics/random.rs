@@ -7,7 +7,7 @@ use tcslibgs::physics::Wander;
 
 /// A seed for one thing in a run, from the run's seed and the thing's name.
 ///
-/// So that each element and each sensor draws from a generator of its own:
+/// So that each component and each sensor draws from a generator of its own:
 /// one shared generator would hand out its numbers in whatever order the
 /// payloads' threads happened to ask, and a run would not vary the same way
 /// twice.
@@ -15,7 +15,7 @@ use tcslibgs::physics::Wander;
 /// # Arguments
 ///
 /// * `seed` - The run's seed.
-/// * `what` - The thing's name, such as `element:zone` or `sensor:temp_1`.
+/// * `what` - The thing's name, such as `component:zone` or `sensor:temp_1`.
 ///
 /// # Returns
 ///

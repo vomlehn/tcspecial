@@ -86,7 +86,7 @@ impl Where {
             About::SimGroup(name) => (&["simulated_payload_groups"], name),
             About::Node(name) => (&["gateways", "vehicle", "payloads"], name),
             About::NodeGroup(name) => (&["payload_groups"], name),
-            About::PhysicsElement(name) => (&["physics"], name),
+            About::PhysicsComponent(name) => (&["physics"], name),
         };
 
         sections
@@ -495,7 +495,7 @@ simulated_payloads:
 
         let model = "physics:\n  - type heater:\n      - component: h\n";
         let found = Where::of(model, ConfigFormat::Yaml);
-        assert_eq!(found.line_of(&About::PhysicsElement("h".to_string())), 3);
+        assert_eq!(found.line_of(&About::PhysicsComponent("h".to_string())), 3);
     }
 
     #[test]

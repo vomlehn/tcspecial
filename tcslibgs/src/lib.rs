@@ -49,7 +49,7 @@ pub mod link;
 mod link_packet;
 pub mod node;
 pub mod parameters;
-/// The physics model: the vehicle's physical elements, which the
+/// The physics model: the vehicle's physical components, which the
 /// simulator's stand-ins measure and act on, in a file of its own.
 pub mod physics;
 pub mod protocol;

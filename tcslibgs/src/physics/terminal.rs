@@ -1,13 +1,13 @@
-//! An element's terminals: the places it is joined to other elements and to
+//! A component's terminals: the places it is joined to other components and to
 //! the simulator's stand-ins.
 //!
-//! Each element type has a fixed list of them, stated in its module and
+//! Each component type has a fixed list of them, stated in its module and
 //! nowhere else. A terminal has a direction, an input or an output, and a
 //! kind: a value in one unit, or a decision, on or off. A connection joins an
 //! output to an input of the same kind, so a heater's heat, in watts, can
 //! warm a zone, and cannot be read as its temperature.
 //!
-//! A terminal is written in a file as the element's name and its own,
+//! A terminal is written in a file as the component's name and its own,
 //! joined by a dot: `zone.temperature`, `heater_1.on`.
 
 use crate::unit::Unit;
@@ -15,10 +15,10 @@ use crate::unit::Unit;
 /// Which way a terminal faces.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Direction {
-    /// The element is told something here: what it is driven to, or what
-    /// another element gives it.
+    /// The component is told something here: what it is driven to, or what
+    /// another component gives it.
     In,
-    /// The element says something here: what it is, or what it gives.
+    /// The component says something here: what it is, or what it gives.
     Out,
 }
 
@@ -47,10 +47,10 @@ impl Kind {
     }
 }
 
-/// One terminal of an element type.
+/// One terminal of a component type.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct Terminal {
-    /// Its name, which a file writes after the element's and a dot.
+    /// Its name, which a file writes after the component's and a dot.
     pub name: &'static str,
     pub direction: Direction,
     pub kind: Kind,
@@ -127,10 +127,10 @@ impl Terminal {
     }
 }
 
-/// A terminal as a file names it: an element and one of its terminals.
+/// A terminal as a file names it: a component and one of its terminals.
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct At {
-    pub element: String,
+    pub component: String,
     pub terminal: String,
 }
 
@@ -144,7 +144,7 @@ impl At {
     ///
     /// # Returns
     ///
-    /// The element's name and the terminal's.
+    /// The component's name and the terminal's.
     ///
     /// # Errors
     ///
@@ -152,18 +152,18 @@ impl At {
     pub fn parse(what: &str, said: &str) -> Result<At, String> {
         let said = said.trim();
         match said.split_once('.') {
-            Some((element, terminal))
-                if !element.trim().is_empty()
+            Some((component, terminal))
+                if !component.trim().is_empty()
                     && !terminal.trim().is_empty()
                     && !terminal.contains('.') =>
             {
                 Ok(At {
-                    element: element.trim().to_string(),
+                    component: component.trim().to_string(),
                     terminal: terminal.trim().to_string(),
                 })
             }
             _ => Err(format!(
-                "{what}: \"{said}\" is not a terminal: write the element's \
+                "{what}: \"{said}\" is not a terminal: write the component's \
                  name and the terminal's, joined by a dot, such as \
                  zone.temperature"
             )),
@@ -173,7 +173,7 @@ impl At {
 
 impl std::fmt::Display for At {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}.{}", self.element, self.terminal)
+        write!(f, "{}.{}", self.component, self.terminal)
     }
 }
 
@@ -185,7 +185,7 @@ mod tests {
     #[test]
     fn a_terminal_is_two_names_and_a_dot() {
         let at = At::parse("connects", " zone.temperature ").expect("reads");
-        assert_eq!(at.element, "zone");
+        assert_eq!(at.component, "zone");
         assert_eq!(at.terminal, "temperature");
         assert_eq!(at.to_string(), "zone.temperature");
         for said in ["zone", ".on", "heater.", "a.b.c", ""] {

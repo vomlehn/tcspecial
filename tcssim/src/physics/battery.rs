@@ -26,7 +26,7 @@
 
 use tcslibgs::physics::battery::Resolved;
 
-use super::element::Element;
+use super::component::Component;
 
 /// Its terminals' places, in `tcslibgs::physics::battery::TERMINALS`'s
 /// order, which a test holds this to.
@@ -81,7 +81,7 @@ impl Battery {
     }
 }
 
-impl Element for Battery {
+impl Component for Battery {
     fn hold(&mut self, inputs: &[f64]) {
         self.offered = inputs[OFFERED];
     }

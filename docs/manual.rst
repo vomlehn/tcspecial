@@ -3265,19 +3265,19 @@ still declares masses itself is refused, told where they go.
    physics                in the simulator file: the physics model's file,
                           relative to this one. Optional
 
-The model holds its elements, the components it is made of, under
-``physics``, and the connections between them, under ``connections``, as a
-configuration holds nodes and links. The components are grouped by type, as
+The model holds the components it is made of, under ``physics``, and the
+connections between them, under ``connections``, as a configuration holds
+nodes and links. The components are grouped by type, as
 a configuration's nodes are: each entry of ``physics`` is ``type`` and a
 type, holding the components of that type, each named by ``component``.
 Nothing in the model is in an order that means anything -- not the types,
 the components of one, or the connections -- and tcssim runs it the same
 however it is written: two events due at one moment come in the order of
 their components' names, and the outputs an input sums are added in the order
-of theirs. A model in the shape before this one, each element with ``name:``
-and ``type:`` of its own, is refused at the line of its first element;
-``tools/convert-format.py`` rewrites it. Each element is one simple part, of
-one of these types:
+of theirs. A model in the shape before this one, each component with ``name:``
+and ``type:`` of its own, is refused at the line of its first component;
+``tools/convert-format.py`` rewrites it. Each component is one simple part,
+of one of these types:
 
 .. code-block:: text
 
@@ -3389,7 +3389,7 @@ output, carrying a value in one unit or a decision:
                   velocity      out   m/s, up more than nought
                   contact       out   a decision: asserted on the ground
 
-A terminal is written as the element's name and its own, joined by a dot:
+A terminal is written as the component's name and its own, joined by a dot:
 ``zone.temperature``. A connection goes from an output to an input of the
 same kind, and one joining two outputs, two inputs, or a value in one unit to
 an input in another, is refused, naming both. An input takes one output, or
@@ -3434,8 +3434,9 @@ a decision, ``1`` or ``0``, or a value, four bytes of its unit's steps, which
 has to come from a node sending that unit -- an engine's throttle from a
 ``process`` answering a ``ratio``. An input is driven by one stand-in, and not by one and
 a connection too: two would each switch it over the other. A heater's ``on``
-that nothing drives is refused, being a part nothing can switch, and so is an
-element nothing is joined to, which is most likely a misspelled ``connects``.
+that nothing drives is refused, being a part nothing can switch, and so is a
+component nothing is joined to, which is most likely a misspelled
+``connects``.
 The settings that joined a payload to a thermal mass -- ``reads``, ``heats``,
 ``output``, ``input``, ``rate`` -- are refused, told what says it now.
 
@@ -3513,8 +3514,8 @@ it:
 tcssim makes one world of the model, which every stand-in joined to it
 shares, and nothing ticks: the world is brought up to a moment only when a
 stand-in reads or drives it, and a world nobody asks about costs nothing.
-Between two moments each element is advanced by its closed form, so what a
-sensor reads does not depend on how often it is read. Where an element's
+Between two moments each component is advanced by its closed form, so what
+a sensor reads does not depend on how often it is read. Where a component's
 behaviour would change inside an interval -- a battery reaching full, the
 sun going into shadow, a lander reaching the ground -- it foresees the moment
 as an event, and the world stops there, lets it happen, and goes on, the events waiting in order of when they fall. Simulated time
@@ -3565,7 +3566,7 @@ settled one would be. The swing is part of the zone's equation, which still
 has a closed form, so it is as exact as the rest. A lag follows the body's
 temperature as if it changed at a steady rate between two readings.
 
-The random draws come from a generator for each element and each sensor,
+The random draws come from a generator for each component and each sensor,
 seeded from the run's seed and its name, so a run with the same seed varies
 the same way. The seed is a setting of the ``tcssim`` section; without one,
 tcssim chooses it and says which it chose, so a run worth repeating can be:

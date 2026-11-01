@@ -38,7 +38,7 @@
 
 use tcslibgs::physics::body::Resolved;
 
-use super::element::Element;
+use super::component::Component;
 
 /// Its terminals' places, in `tcslibgs::physics::body::TERMINALS`'s order,
 /// which a test holds this to.
@@ -216,7 +216,7 @@ fn soonest(x: f64, v: f64, a: f64) -> Option<f64> {
     roots.into_iter().find(|t| *t > 0.0 && t.is_finite())
 }
 
-impl Element for Body {
+impl Component for Body {
     fn hold(&mut self, inputs: &[f64]) {
         self.force = inputs[FORCE];
         self.flow = inputs[FLOW].max(0.0);

@@ -77,7 +77,7 @@ pub enum SimConfigError {
     /// states it too.
     SimulateTwice { payload: String, group: String },
     /// Something wrong with the physics model, or with how the stand-ins
-    /// are joined to it: an element whose figures cannot be read, that
+    /// are joined to it: a component whose figures cannot be read, that
     /// nothing is joined to, or whose input is driven twice.
     BadPhysics(PhysicsProblem),
     /// A payload whose connection to the physics model is not one.
@@ -478,7 +478,7 @@ impl SimConfigError {
             | SimConfigError::BadAttachment { payload, .. } => {
                 About::SimPayload(payload.clone())
             }
-            // An element is not a payload and not a group: it is in the
+            // A component is not a payload and not a group: it is in the
             // physics model, which is where a reader should be sent.
             SimConfigError::BadPhysics(problem) => problem.about(),
         }
@@ -766,7 +766,7 @@ const MOVED_SETTINGS: &[&str] = &[
 pub const MOVED_ATTACHMENT: &str = "a stand-in is joined to the physics \
     model by the terminal it is connected to, connects: zone.temperature for \
     a sensor or connects: heater_1.on for a heater, and a heater's power and \
-    ripple are the heater element's, in the physics model";
+    ripple are the heater component's, in the physics model";
 
 /// Check this entry against the payload it names.
 ///
@@ -1026,14 +1026,14 @@ pub struct SimSettings {
     #[serde(default, deserialize_with = "blank_is_unstated")]
     pub protocol: Option<String>,
     /// The terminal of the physics model this stand-in is joined to, as
-    /// the element's name and the terminal's: `zone.temperature`.
+    /// the component's name and the terminal's: `zone.temperature`.
     ///
     /// What makes a simulated payload a part of the vehicle rather than a
     /// source of noise. Joined to an output, it reports it -- a sensor
     /// sends what the zone's temperature is, in the encoding the payload
     /// configuration says its readings are in -- and joined to an input, it
     /// drives it: what the vehicle writes to a heater switches the heater.
-    /// Which it is, is the terminal's direction, which the model's element
+    /// Which it is, is the terminal's direction, which the model's component
     /// type fixes: see [`crate::physics::terminal`].
     ///
     /// Three sensors joined to one zone report one temperature, each in its
@@ -1647,7 +1647,7 @@ impl SimConfigFile {
     /// this file can say is how the stand-ins join it, and these are refused
     /// here:
     ///
-    /// * an element nothing is joined to -- no connection and no stand-in --
+    /// * a component nothing is joined to -- no connection and no stand-in --
     ///   which is arithmetic running for no reason, and likeliest a
     ///   misspelled `connects`, which is the fault it would hide;
     /// * an input driven by two stand-ins, or by one and a connection too:
@@ -1668,9 +1668,9 @@ impl SimConfigFile {
             return Ok(None);
         };
         let model = file.resolve().map_err(SimConfigError::BadPhysics)?;
-        let bad = |element: &str, why: String| {
+        let bad = |component: &str, why: String| {
             SimConfigError::BadPhysics(PhysicsProblem {
-                element: Some(element.to_string()),
+                component: Some(component.to_string()),
                 why,
             })
         };
@@ -1692,13 +1692,13 @@ impl SimConfigFile {
             let Ok((place, terminal)) = model.find(&at) else {
                 continue;
             };
-            joined.insert(place.element);
+            joined.insert(place.component);
             if terminal.direction != Direction::In {
                 continue;
             }
             if let Some(other) = driven.insert(place, payload.name.clone()) {
                 return Err(bad(
-                    &at.element,
+                    &at.component,
                     format!(
                         "{other} and {} both drive {at}, and an input is \
                          driven by one",
@@ -1708,7 +1708,7 @@ impl SimConfigFile {
             }
             if model.connections.iter().any(|c| c.to == place) {
                 return Err(bad(
-                    &at.element,
+                    &at.component,
                     format!(
                         "{} drives {at}, which a connection joins too, and an \
                          input is driven by one",
@@ -1718,44 +1718,44 @@ impl SimConfigFile {
             }
         }
         for connection in &model.connections {
-            joined.insert(connection.from.element);
-            joined.insert(connection.to.element);
+            joined.insert(connection.from.component);
+            joined.insert(connection.to.component);
         }
 
-        for (n, element) in model.elements.iter().enumerate() {
+        for (n, component) in model.components.iter().enumerate() {
             if !joined.contains(&n) {
                 return Err(bad(
-                    &element.name,
-                    "nothing is joined to it: an element no connection and no \
+                    &component.name,
+                    "nothing is joined to it: a component no connection and no \
                      stand-in names is a model nobody looks at, and the \
                      likeliest cause is a connects that names something else"
                         .to_string(),
                 ));
             }
-            for (t, terminal) in element.what.terminals().iter().enumerate() {
+            for (t, terminal) in component.what.terminals().iter().enumerate() {
                 let place = crate::physics::Place {
-                    element: n,
+                    component: n,
                     terminal: t,
                 };
                 let joined = driven.contains_key(&place)
                     || model.connections.iter().any(|c| c.to == place);
                 if terminal.required && !joined {
-                    let at = format!("{}.{}", element.name, terminal.name);
+                    let at = format!("{}.{}", component.name, terminal.name);
                     let how = match terminal.kind {
                         Kind::Decision => format!(
                             "a {} is switched there, so connect a stand-in \
                              the vehicle drives to it with connects: {at}",
-                            element.what.type_name()
+                            component.what.type_name()
                         ),
                         Kind::Value(unit) => format!(
                             "a {} has nothing to go on without it, so join \
                              an output in {} to it under connections",
-                            element.what.type_name(),
+                            component.what.type_name(),
                             unit.name()
                         ),
                     };
                     return Err(bad(
-                        &element.name,
+                        &component.name,
                         format!("{at} is joined to nothing: {how}"),
                     ));
                 }
@@ -4432,20 +4432,20 @@ connections:
     }
 
     /// An input driven twice, or driven and connected too, or a heater's
-    /// on joined to nothing, or an element nothing is joined to, is
-    /// refused at its element.
+    /// on joined to nothing, or a component nothing is joined to, is
+    /// refused at its component.
     #[test]
-    fn inputs_are_driven_once_and_elements_are_joined() {
+    fn inputs_are_driven_once_and_components_are_joined() {
         let err = joined(SENSOR, HEATER_1, HEATER_1).physics().unwrap_err();
         assert!(err.to_string().contains("both drive heater_1.on"), "{err}");
-        assert_eq!(err.about(), About::PhysicsElement("heater_1".into()));
+        assert_eq!(err.about(), About::PhysicsComponent("heater_1".into()));
 
         let err = joined(SENSOR, HEATER_1, "").physics().unwrap_err();
         assert!(err.to_string().contains("heater_2.on is joined"), "{err}");
 
         let mut file = joined(SENSOR, HEATER_1, HEATER_2);
         let model = file.model.as_mut().expect("a model");
-        model.physics.push(crate::physics::Element::ThermalZone(
+        model.physics.push(crate::physics::Component::ThermalZone(
             crate::physics::thermal_zone::ThermalZone {
                 name: "spare".to_string(),
                 environment: "283.15 K".to_string(),

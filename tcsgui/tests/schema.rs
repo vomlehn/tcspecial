@@ -1093,7 +1093,7 @@ fn every_node_is_described_once_and_in_one_spelling() {
     }
 }
 
-/// The physics model's schema offers every element type the model reads,
+/// The physics model's schema offers every component type the model reads,
 /// each an entry `type <type>` holding that type's components, and for each
 /// type every setting the one list of its settings has, beside the
 /// `component` naming it: the schema an editor checks a hand-written model

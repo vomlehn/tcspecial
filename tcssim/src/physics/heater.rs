@@ -25,7 +25,7 @@ use rand::rngs::StdRng;
 use rand::SeedableRng;
 use tcslibgs::physics::heater::Resolved;
 
-use super::element::Element;
+use super::component::Component;
 use super::random::{seed_for, settled, wandered};
 
 /// Its terminals' places, in `tcslibgs::physics::heater::TERMINALS`'s
@@ -59,7 +59,7 @@ impl Heater {
     /// The heater.
     pub fn new(name: &str, figures: Resolved, seed: u64) -> Heater {
         let mut rng =
-            StdRng::seed_from_u64(seed_for(seed, &format!("element:{name}")));
+            StdRng::seed_from_u64(seed_for(seed, &format!("component:{name}")));
         let supply = settled(&figures.supply, &mut rng);
         Heater {
             figures,
@@ -70,7 +70,7 @@ impl Heater {
     }
 }
 
-impl Element for Heater {
+impl Component for Heater {
     fn hold(&mut self, inputs: &[f64]) {
         self.on = inputs[ON] > 0.5;
     }

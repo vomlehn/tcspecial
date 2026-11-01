@@ -1,7 +1,7 @@
 //! The physical world the simulated payloads measure and act on.
 //!
 //! Where `node` holds the stand-ins for the hardware at the far end of each
-//! node, this holds what that hardware would sense and change: the elements
+//! node, this holds what that hardware would sense and change: the components
 //! of the vehicle's physics model -- see `tcslibgs::physics` -- each a part
 //! simulated alone, joined into one [`world::World`] that is advanced from
 //! event to event as the stand-ins ask about it. So what a sensor reports
@@ -15,7 +15,7 @@ pub mod battery;
 pub mod body;
 pub mod bus;
 pub mod clock;
-pub mod element;
+pub mod component;
 pub mod engine;
 pub mod heater;
 pub mod load;

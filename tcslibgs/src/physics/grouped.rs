@@ -32,7 +32,7 @@ use serde::{Deserialize, Deserializer};
 
 use super::{
     battery, body, bus, engine, heater, load, solar_array, sun, thermal_zone,
-    Element, Moved, TYPES,
+    Component, Moved, TYPES,
 };
 
 /// Reads the `physics` section.
@@ -52,7 +52,7 @@ use super::{
 /// component's own reader refuses.
 pub fn components<'de, D: Deserializer<'de>>(
     d: D,
-) -> Result<Vec<Element>, D::Error> {
+) -> Result<Vec<Component>, D::Error> {
     let mut components = d.deserialize_any(SectionVisitor)?;
     components.sort_by(|a, b| a.name().cmp(b.name()));
     Ok(components)
@@ -100,7 +100,7 @@ fn type_in_key(key: &str) -> Result<String, String> {
 struct SectionVisitor;
 
 impl<'de> Visitor<'de> for SectionVisitor {
-    type Value = Vec<Element>;
+    type Value = Vec<Component>;
 
     fn expecting(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(
@@ -110,18 +110,18 @@ impl<'de> Visitor<'de> for SectionVisitor {
     }
 
     /// A section written with nothing in it.
-    fn visit_unit<E: de::Error>(self) -> Result<Vec<Element>, E> {
+    fn visit_unit<E: de::Error>(self) -> Result<Vec<Component>, E> {
         Ok(Vec::new())
     }
 
-    fn visit_none<E: de::Error>(self) -> Result<Vec<Element>, E> {
+    fn visit_none<E: de::Error>(self) -> Result<Vec<Component>, E> {
         Ok(Vec::new())
     }
 
     fn visit_seq<A: SeqAccess<'de>>(
         self,
         mut seq: A,
-    ) -> Result<Vec<Element>, A::Error> {
+    ) -> Result<Vec<Component>, A::Error> {
         let mut types: Vec<String> = Vec::new();
         let mut components = Vec::new();
         while let Some((named, theirs)) = seq.next_element_seed(TypeEntry)? {
@@ -142,7 +142,7 @@ impl<'de> Visitor<'de> for SectionVisitor {
 struct TypeEntry;
 
 impl<'de> DeserializeSeed<'de> for TypeEntry {
-    type Value = (String, Vec<Element>);
+    type Value = (String, Vec<Component>);
 
     fn deserialize<D: Deserializer<'de>>(
         self,
@@ -153,7 +153,7 @@ impl<'de> DeserializeSeed<'de> for TypeEntry {
 }
 
 impl<'de> Visitor<'de> for TypeEntry {
-    type Value = (String, Vec<Element>);
+    type Value = (String, Vec<Component>);
 
     fn expecting(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(
@@ -174,7 +174,7 @@ impl<'de> Visitor<'de> for TypeEntry {
             ));
         };
         let named = type_in_key(&key).map_err(de::Error::custom)?;
-        let components = map.next_value_seed(Components(named.clone()))?;
+        let components = map.next_value_seed(ComponentList(named.clone()))?;
         if let Some(more) = map.next_key::<String>()? {
             return Err(de::Error::custom(format!(
                 "the entry for type {named} says {more} as well: an entry of \
@@ -193,21 +193,21 @@ impl<'de> Visitor<'de> for TypeEntry {
 }
 
 /// The list of components under a type.
-struct Components(String);
+struct ComponentList(String);
 
-impl<'de> DeserializeSeed<'de> for Components {
-    type Value = Vec<Element>;
+impl<'de> DeserializeSeed<'de> for ComponentList {
+    type Value = Vec<Component>;
 
     fn deserialize<D: Deserializer<'de>>(
         self,
         d: D,
-    ) -> Result<Vec<Element>, D::Error> {
+    ) -> Result<Vec<Component>, D::Error> {
         d.deserialize_any(self)
     }
 }
 
-impl<'de> Visitor<'de> for Components {
-    type Value = Vec<Element>;
+impl<'de> Visitor<'de> for ComponentList {
+    type Value = Vec<Component>;
 
     fn expecting(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(
@@ -218,20 +218,20 @@ impl<'de> Visitor<'de> for Components {
     }
 
     /// No components, which the type refuses with a message of its own.
-    fn visit_unit<E: de::Error>(self) -> Result<Vec<Element>, E> {
+    fn visit_unit<E: de::Error>(self) -> Result<Vec<Component>, E> {
         Ok(Vec::new())
     }
 
-    fn visit_none<E: de::Error>(self) -> Result<Vec<Element>, E> {
+    fn visit_none<E: de::Error>(self) -> Result<Vec<Component>, E> {
         Ok(Vec::new())
     }
 
     fn visit_seq<A: SeqAccess<'de>>(
         self,
         mut seq: A,
-    ) -> Result<Vec<Element>, A::Error> {
+    ) -> Result<Vec<Component>, A::Error> {
         let mut components = Vec::new();
-        while let Some(one) = seq.next_element_seed(Component(&self.0))? {
+        while let Some(one) = seq.next_element_seed(OneComponent(&self.0))? {
             components.push(one);
         }
         Ok(components)
@@ -239,32 +239,32 @@ impl<'de> Visitor<'de> for Components {
 }
 
 /// One component, of the type its entry has said.
-struct Component<'a>(&'a str);
+struct OneComponent<'a>(&'a str);
 
-impl<'de> DeserializeSeed<'de> for Component<'_> {
-    type Value = Element;
+impl<'de> DeserializeSeed<'de> for OneComponent<'_> {
+    type Value = Component;
 
     /// Reads it with its type's own reader, which refuses a word the type
     /// does not take, at its line.
     fn deserialize<D: Deserializer<'de>>(
         self,
         d: D,
-    ) -> Result<Element, D::Error> {
+    ) -> Result<Component, D::Error> {
         Ok(match self.0 {
-            "heater" => Element::Heater(heater::Heater::deserialize(d)?),
-            "thermal_zone" => {
-                Element::ThermalZone(thermal_zone::ThermalZone::deserialize(d)?)
-            }
-            "sun" => Element::Sun(sun::Sun::deserialize(d)?),
+            "heater" => Component::Heater(heater::Heater::deserialize(d)?),
+            "thermal_zone" => Component::ThermalZone(
+                thermal_zone::ThermalZone::deserialize(d)?,
+            ),
+            "sun" => Component::Sun(sun::Sun::deserialize(d)?),
             "solar_array" => {
-                Element::SolarArray(solar_array::SolarArray::deserialize(d)?)
+                Component::SolarArray(solar_array::SolarArray::deserialize(d)?)
             }
-            "load" => Element::Load(load::Load::deserialize(d)?),
-            "bus" => Element::Bus(bus::Bus::deserialize(d)?),
-            "battery" => Element::Battery(battery::Battery::deserialize(d)?),
-            "engine" => Element::Engine(engine::Engine::deserialize(d)?),
-            "body" => Element::Body(body::Body::deserialize(d)?),
-            "thermal_mass" => Element::ThermalMass(Moved::deserialize(d)?),
+            "load" => Component::Load(load::Load::deserialize(d)?),
+            "bus" => Component::Bus(bus::Bus::deserialize(d)?),
+            "battery" => Component::Battery(battery::Battery::deserialize(d)?),
+            "engine" => Component::Engine(engine::Engine::deserialize(d)?),
+            "body" => Component::Body(body::Body::deserialize(d)?),
+            "thermal_mass" => Component::ThermalMass(Moved::deserialize(d)?),
             other => {
                 return Err(de::Error::custom(format!(
                     "{other} is not a type of physics component"

@@ -92,8 +92,8 @@ void tcs_configuration_close(tcs_configuration *configuration);
  *                       error. */
 const char *tcs_configuration_digest(const tcs_configuration *configuration);
 
-/** Finds the id of a node: its place among the configuration's nodes, which
- * is what a node command names.
+/** Finds the id of a node: its place among the configuration's nodes sorted
+ * by name, which is what a node command names.
  *
  * @param configuration  The configuration.
  * @param name           The node's name.
@@ -658,8 +658,8 @@ typedef struct tcs_exchange {
 	int64_t down;          /* vehicle had to ground received */
 } tcs_exchange;
 
-/** Opens a way to ping the first ping node the configuration lets the
- * ground reach both ways, through its gateway node.
+/** Opens a way to ping the ping node the configuration lets the ground
+ * reach both ways whose name sorts first, through its gateway node.
  *
  * @param configuration  The configuration.
  * @return               The pinger, or NULL where there is no such ping

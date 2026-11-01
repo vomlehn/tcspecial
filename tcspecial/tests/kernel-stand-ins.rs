@@ -34,6 +34,7 @@ use std::time::{Duration, Instant};
 
 use tcslibgs::graph::telemetry;
 use tcslibgs::graph::Graph;
+use tcslibgs::node::payload::gpio;
 use tcslibgs::simulate::Host;
 
 mod common;
@@ -536,37 +537,19 @@ impl Chip {
 /// The chip, or why there is none, with what makes one.
 fn gpio_sim() -> Result<Chip, String> {
     let host = Host::this();
-    let mut banks: Vec<PathBuf> = std::fs::read_dir("/sys/devices/platform")
-        .map(|entries| {
-            entries
-                .filter_map(|entry| entry.ok())
-                .filter(|entry| {
-                    entry.file_name().to_string_lossy().starts_with("gpio-sim.")
-                })
-                .filter_map(|entry| std::fs::read_dir(entry.path()).ok())
-                .flatten()
-                .filter_map(|bank| bank.ok().map(|bank| bank.path()))
-                .filter(|bank| bank.join("chip_name").is_file())
-                .collect()
-        })
-        .unwrap_or_default();
-    banks.sort();
-    if banks.is_empty() {
+    let chips = gpio::simulated_chips(Path::new(gpio::SIM_DEVICES));
+    if chips.is_empty() {
         return Err(format!(
             "no gpio-sim chip is on this host: make one with `{MAKE} gpio`"
         ));
     }
 
-    for bank in banks {
-        let Ok(name) = std::fs::read_to_string(bank.join("chip_name")) else {
-            continue;
-        };
-        let device = format!("/dev/{}", name.trim());
-        if !tcslibgs::node::payload::gpio::judged(&host, &device).is_stand_in()
-        {
+    for (name, dir) in chips {
+        let device = format!("/dev/{name}");
+        if !gpio::judged(&host, &device).is_stand_in() {
             continue;
         }
-        let lines = [bank.join("sim_gpio0"), bank.join("sim_gpio1")];
+        let lines = [dir.join("sim_gpio0"), dir.join("sim_gpio1")];
         if !lines.iter().all(|line| line.is_dir()) {
             continue;
         }

@@ -857,6 +857,52 @@ mod tests {
         }
     }
 
+    /// Every simulator file and physics model the manual and the design
+    /// show in YAML is in the shape they are read in.
+    #[test]
+    fn the_documents_simulator_files_and_models_read() {
+        let docs = Path::new(env!("CARGO_MANIFEST_DIR")).join("../docs");
+        let mut shown = 0;
+        for name in ["manual.rst", "design.rst"] {
+            let text =
+                std::fs::read_to_string(docs.join(name)).expect("a document");
+            let lines: Vec<&str> = text.lines().collect();
+            for (at, line) in lines.iter().enumerate() {
+                if line.trim() != ".. code-block:: yaml" {
+                    continue;
+                }
+                let indent = line.len() - line.trim_start().len() + 3;
+                let block: Vec<&str> = lines[at + 1..]
+                    .iter()
+                    .take_while(|l| {
+                        l.trim().is_empty()
+                            || l.len() - l.trim_start().len() >= indent
+                    })
+                    .map(|l| l.get(indent..).unwrap_or(""))
+                    .collect();
+                let block = block.join("\n");
+                let keys = |key: &str| {
+                    block.lines().any(|l| l.trim_end() == format!("{key}:"))
+                };
+                let said = if keys("physics") {
+                    PhysicsFile::parse(&block).map(|_| ())
+                } else if keys("simulated_payloads")
+                    || keys("simulated_payload_groups")
+                {
+                    SimConfigFile::parse(&block, crate::ConfigFormat::Yaml)
+                        .map(|_| ())
+                } else {
+                    continue;
+                };
+                shown += 1;
+                if let Err(e) = said {
+                    panic!("{name}:{}: {e}\n{block}", at + 1);
+                }
+            }
+        }
+        assert!(shown >= 8, "{shown}");
+    }
+
     /// A file of the old shape is told to run the converter, and the
     /// converter rewrites it into a file that reads, which it then leaves
     /// as it is.

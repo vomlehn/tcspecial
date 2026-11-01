@@ -1,32 +1,32 @@
-//! What every element of the world does, whatever its type.
+//! What every component of the world does, whatever its type.
 //!
-//! An element is a part simulated alone: it knows its own state and its
+//! A component is a part simulated alone: it knows its own state and its
 //! own arithmetic, and nothing of what it is joined to. The world joins
-//! them: it gives each element what is at its inputs, advances them all
+//! them: it gives each component what is at its inputs, advances them all
 //! together, and reads their outputs for whatever they are joined to. So a
 //! heater is written once, knowing only that it is switched and gives out
 //! heat, and warms a zone, a tank or a battery by being joined to it.
 //!
-//! # How an element is advanced
+//! # How a component is advanced
 //!
-//! The world holds each element's inputs steady from one moment to the
+//! The world holds each component's inputs steady from one moment to the
 //! next -- from one event, or one question a stand-in asks, to the next --
-//! and an element advances across the interval as exactly as its arithmetic
+//! and a component advances across the interval as exactly as its arithmetic
 //! allows: by a closed form where there is one, which is what makes the
-//! answer independent of how often the world is looked at. Where an
-//! element's behaviour changes within an interval -- a threshold crossed --
+//! answer independent of how often the world is looked at. Where a
+//! component's behaviour changes within an interval -- a threshold crossed --
 //! it says when, as its next event, and the world stops there.
 
-/// The most terminals an element type has: the room each element's inputs
+/// The most terminals a component type has: the room each component's inputs
 /// are given, which is fixed so that holding them allocates nothing.
 pub const MOST_TERMINALS: usize = 8;
 
-/// An element of the world.
+/// A component of the world.
 ///
 /// Its terminals are its type's, in the order its type in
 /// `tcslibgs::physics` lists them; every slice of values here is indexed
-/// by them, an output's place holding nothing an element reads.
-pub trait Element: Send + std::fmt::Debug {
+/// by them, an output's place holding nothing a component reads.
+pub trait Component: Send + std::fmt::Debug {
     /// Takes what is at its inputs, which holds until it is given them
     /// again.
     ///
@@ -68,7 +68,7 @@ pub trait Element: Send + std::fmt::Debug {
     /// # Returns
     ///
     /// When, in simulated seconds, or `None` for nothing it can foresee.
-    /// Most elements have none: their arithmetic is one closed form
+    /// Most components have none: their arithmetic is one closed form
     /// whatever their state.
     fn next_event(&self, now: f64) -> Option<f64> {
         let _ = now;

@@ -124,17 +124,22 @@
     </xs:all>
   </xs:complexType>
 
+  <!-- The file: each section once at most, in any order, as tcssim reads
+       it. None is required as the file is read: tcssim refuses to start
+       without a tcssim section, which is its rule and not the shape's. -->
   <xs:element name="simulator">
     <xs:complexType>
-      <xs:choice minOccurs="0" maxOccurs="unbounded">
-        <xs:element name="description" type="xs:string"/>
-        <xs:element name="tcssim" type="tcssim"/>
-        <xs:element name="simulated_payload_groups" type="groups"/>
+      <xs:all>
+        <xs:element name="description" type="xs:string" minOccurs="0"/>
+        <xs:element name="tcssim" type="tcssim" minOccurs="0"/>
+        <xs:element name="simulated_payload_groups" type="groups"
+                    minOccurs="0"/>
         <!-- The physics model the payloads are attached to: a YAML file of
              its own, named relative to this file's directory. -->
-        <xs:element name="physics" type="xs:string"/>
-        <xs:element name="simulated_payloads" type="payloads"/>
-      </xs:choice>
+        <xs:element name="physics" type="xs:string" minOccurs="0"/>
+        <xs:element name="simulated_payloads" type="payloads"
+                    minOccurs="0"/>
+      </xs:all>
     </xs:complexType>
   </xs:element>
 

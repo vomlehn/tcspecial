@@ -5166,6 +5166,13 @@ destinations being several elements, and XSD 1.0 allows neither repeats nor a
 mixture inside ``xs:all``. A node that says a word twice is refused where the
 file is read instead, and so is a type written twice in a section. A node's
 name is an attribute of its element, which the XSD does require exactly once.
+The same holds for a configuration's sections: ``include``, ``payload_groups``
+and ``commands`` are lists, repeated, so the ``tcspecial``, node and
+``tcsgui`` sections written twice are refused where the file is read. The
+``description`` is held to once by the XSD as well, through an identity
+constraint, which can count a section that is a value and not one of child
+elements. A simulator file has no list among its sections, so its XSD is an
+``xs:all`` and holds every one of them to once.
 
 A schema an editor has to be pointed at by hand is a schema nobody points it
 at, so every configuration this project writes names its own. In XML
@@ -10845,9 +10852,9 @@ Requirement
     they go.
 
 Requirement
-    The model is its elements, the components it is made of, grouped by type
-    as a configuration's nodes are, and a list of connections between them,
-    as a configuration has links. Each entry of ``physics`` is ``type`` and a
+    The model is the components it is made of, grouped by type as a
+    configuration's nodes are, and a list of connections between them, as a
+    configuration has links. Each entry of ``physics`` is ``type`` and a
     type, ``- type heater:``, holding the components of that type, each
     named by ``component``. The types are ``heater``, ``thermal_zone``,
     ``sun``, ``solar_array``, ``load``, ``bus``, ``battery``, ``engine`` and
@@ -10867,10 +10874,10 @@ Requirement
     name sorts first happens first.
 
 Requirement
-    A model in the shape before this one, each element with a ``name`` and a
-    ``type`` of its own, is refused at the line of its first element, shown
-    it in the shape it has now and told that ``tools/convert-format.py``
-    rewrites the file.
+    A model in the shape before this one, each component with a ``name`` and
+    a ``type`` of its own, is refused at the line of its first component,
+    shown it in the shape it has now and told that
+    ``tools/convert-format.py`` rewrites the file.
 
 Requirement
     Each type is one simple part, with its own words for what goes in and
@@ -10938,13 +10945,13 @@ Requirement
     force would depend on which the vehicle drove last.
 
 Requirement
-    An element nothing is joined to -- no connection and no stand-in -- is
+    A component nothing is joined to -- no connection and no stand-in -- is
     refused. It would be a state nothing reads and nothing changes, and the
     likeliest cause is a misspelled ``connects``.
 
 Requirement
     ``tcsverify`` reads the model a simulator file names, and reports every
-    problem with an element at its line in the model, a problem with the
+    problem with a component at its line in the model, a problem with the
     connections at the model's ``connections`` line, and a model that
     cannot be read at the simulator file's ``physics`` line.
 
@@ -10969,20 +10976,20 @@ Requirement
     keep pace; a run with tcspecial keeps it at one.
 
 Requirement
-    Between two moments every element is advanced with its inputs held, by
+    Between two moments every component is advanced with its inputs held, by
     its type's closed form where there is one, which is exact. The world is
     advanced whenever it is asked, so its intervals are whatever length the
     traffic makes them, and a method whose error grew with the interval
     would make the simulated values depend on how often somebody looked.
 
 Requirement
-    Where an element's behaviour changes inside an interval -- a battery
+    Where a component's behaviour changes inside an interval -- a battery
     reaching full, a body reaching the ground -- it foresees the moment, as
     its next event. The events wait in a queue, soonest first, one for each
-    element, set again whenever the element's inputs change; the world
+    component, set again whenever the component's inputs change; the world
     advances to each in its order, lets it happen and goes on, so nothing is
-    stepped across. The queue's room is the number of elements, fixed when
-    the world is made, and nothing is allocated once it runs.
+    stepped across. The queue's room is the number of components, fixed
+    when the world is made, and nothing is allocated once it runs.
 
 Requirement
     What is at each input is worked out from every output as it stands at
@@ -10991,7 +10998,7 @@ Requirement
     next one.
 
 Requirement
-    An element that foresees its next event at the moment it is already at,
+    A component that foresees its next event at the moment it is already at,
     time after time, is stopped after ten thousand and the log says so: the
     world falls behind rather than every stand-in waiting on it for ever.
 
@@ -11190,7 +11197,7 @@ Requirement
     constant.
 
 Requirement
-    Each element and each sensor draws from a generator of its own, seeded
+    Each component and each sensor draws from a generator of its own, seeded
     from the run's seed and its name, so that a run with the same seed
     varies the same way whatever order the payloads' threads ask in. The
     seed is the ``tcssim`` section's; without one tcssim chooses it and

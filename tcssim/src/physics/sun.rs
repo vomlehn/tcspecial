@@ -3,14 +3,14 @@
 //! Its terminal is `tcslibgs::physics::sun`'s: `light`, a ratio.
 //!
 //! The light changes all at once, twice an orbit, and between the two it
-//! does not change at all. So the sun is an element of events: it knows when
+//! does not change at all. So the sun is a component of events: it knows when
 //! it next goes into shadow or comes out, says so as its next event, and
 //! changes when the world reaches it. Nothing is stepped across, and the
 //! moment of each change is exact however seldom the world is asked about.
 
 use tcslibgs::physics::sun::Resolved;
 
-use super::element::Element;
+use super::component::Component;
 
 /// Its terminal's place, in `tcslibgs::physics::sun::TERMINALS`'s order,
 /// which a test holds this to.
@@ -54,7 +54,7 @@ impl Sun {
     }
 }
 
-impl Element for Sun {
+impl Component for Sun {
     fn hold(&mut self, _inputs: &[f64]) {}
 
     fn advance(&mut self, _from: f64, _to: f64) {}

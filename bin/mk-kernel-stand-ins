@@ -1,0 +1,172 @@
+#!/bin/bash
+#
+# Make the kernel stand-ins the CAN, GPIO and IIO tests fly tcspecial against,
+# and give them to the user who ran this:
+#
+#   sudo bin/mk-kernel-stand-ins            # all three
+#   sudo bin/mk-kernel-stand-ins can gpio   # only those named
+#
+# The three types are supported because tcspecial's own node code is run
+# against the kernel's stand-in for each -- vcan for a CAN bus, gpio-sim for
+# a GPIO chip, iio_dummy for an IIO sensor -- by tcspecial/tests/
+# kernel-stand-ins.rs. Making any of them needs root, so the tests do not:
+# each finds its device and, where it is not there, skips and names this
+# script. This is run once, with sudo, and the tests then run as the user.
+#
+# One script per type does the making -- bin/mkvcan, bin/mkgpio and
+# bin/mkiio, which `make mkstubs` also runs -- and this calls them rather
+# than carrying a copy. What this adds is the check, before anything is
+# changed, that this kernel has every module the types asked for need: a
+# type it cannot make is refused, by name and with what is missing, and
+# nothing at all is made, so that a run is never left half done. Those
+# scripts give what they make to $SUDO_USER, which is who runs the tests.
+#
+# Nothing here survives a reboot, so it is run again after one;
+# bin/rm-kernel-stand-ins takes it all away.
+
+set -euo pipefail
+
+me="mk-kernel-stand-ins"
+
+if [ "$(id -u)" -ne 0 ]; then
+	echo "$me: making a kernel device needs root: run it as" \
+		"sudo $0${*:+ $*}" >&2
+	exit 1
+fi
+
+# Whom the devices are given to. Under sudo that is the user who ran sudo,
+# who is who runs the tests; a root shell has nobody to give them to, and
+# devices left root's would make tests that skip as if nothing were made.
+user="${SUDO_USER:-}"
+if [ -z "$user" ] || [ "$user" = root ]; then
+	echo "$me: run this with sudo from the account that runs the tests," \
+		"so that it knows whom to give the devices to" >&2
+	exit 1
+fi
+
+wanted=("$@")
+if [ "${#wanted[@]}" -eq 0 ]; then
+	wanted=(can gpio iio)
+fi
+for kind in "${wanted[@]}"; do
+	case "$kind" in
+	can | gpio | iio) ;;
+	*)
+		echo "$me: \"$kind\" is not one of can, gpio and iio, the" \
+			"types this makes stand-ins for" >&2
+		exit 2
+		;;
+	esac
+done
+
+# Whether this kernel has a module, loadable or built in. modinfo answers for
+# a loadable one; a built-in one has no file to find, but is listed under
+# /sys/module once the kernel is up.
+has_module() {
+	modinfo -F filename "$1" > /dev/null 2>&1 ||
+		[ -d "/sys/module/${1//-/_}" ]
+}
+
+# Whether this kernel was built with an option, where its configuration can
+# be read: "yes", "no", or "unknown" where it cannot.
+kernel_option() {
+	local config="/boot/config-$(uname -r)"
+	if [ -r "$config" ]; then
+		if grep -q "^$1=[ym]" "$config"; then
+			echo yes
+		else
+			echo no
+		fi
+	elif [ -r /proc/config.gz ]; then
+		if zcat /proc/config.gz | grep -q "^$1=[ym]"; then
+			echo yes
+		else
+			echo no
+		fi
+	else
+		echo unknown
+	fi
+}
+
+# What each type needs that this kernel lacks, as a sentence, or nothing.
+missing_for() {
+	local kind="$1" lacking=()
+	case "$kind" in
+	can) set -- vcan can-raw ;;
+	gpio) set -- gpio-sim ;;
+	iio) set -- industrialio-configfs iio-trig-hrtimer iio_dummy ;;
+	esac
+	for module in "$@"; do
+		has_module "$module" || lacking+=("$module")
+	done
+	if [ "${#lacking[@]}" -gt 0 ]; then
+		echo "this kernel has no ${lacking[*]} module"
+		return
+	fi
+	# The chip's character device is what tcspecial opens, and a kernel
+	# can have gpio-sim and still not offer one.
+	if [ "$kind" = gpio ] &&
+		[ "$(kernel_option CONFIG_GPIO_CDEV)" = no ]; then
+		echo "this kernel was built without CONFIG_GPIO_CDEV, the" \
+			"GPIO character device tcspecial opens a chip through"
+		return
+	fi
+	# iio_dummy has a buffer only where the kernel was built with one, and
+	# without it there is no /dev/iio:deviceN for tcspecial to read. Asked
+	# here, where nothing has been made, rather than found out by mkiio
+	# after the sensor exists.
+	if [ "$kind" = iio ] &&
+		[ "$(kernel_option CONFIG_IIO_SIMPLE_DUMMY_BUFFER)" = no ]; then
+		echo "this kernel's iio_dummy was built without" \
+			"CONFIG_IIO_SIMPLE_DUMMY_BUFFER, so its sensor has no" \
+			"buffer for tcspecial to read"
+	fi
+}
+
+refused=()
+for kind in "${wanted[@]}"; do
+	why="$(missing_for "$kind")"
+	if [ -n "$why" ]; then
+		echo "$me: cannot make the $kind stand-in: $why" >&2
+		refused+=("$kind")
+	fi
+done
+if [ "${#refused[@]}" -gt 0 ]; then
+	rest=()
+	for kind in "${wanted[@]}"; do
+		case " ${refused[*]} " in
+		*" $kind "*) ;;
+		*) rest+=("$kind") ;;
+		esac
+	done
+	if [ "${#rest[@]}" -gt 0 ]; then
+		echo "$me: nothing was made; for the others alone, run" \
+			"sudo $0 ${rest[*]}" >&2
+	else
+		echo "$me: nothing was made" >&2
+	fi
+	exit 1
+fi
+
+# By the directory this script is in, so that a tree moved or run from
+# elsewhere still finds its siblings; already root here, so their own checks
+# pass through, and SUDO_USER passes on to them.
+here="$(cd -- "$(dirname -- "$0")" && pwd)"
+for kind in "${wanted[@]}"; do
+	echo
+	case "$kind" in
+	can)
+		# A raw CAN socket is anyone's to open, so the bus has
+		# nothing to be given: its protocol is loaded here because
+		# loading a module is root's, not the socket's.
+		modprobe can-raw
+		"$here/mkvcan"
+		;;
+	gpio) "$here/mkgpio" ;;
+	iio) "$here/mkiio" ;;
+	esac
+done
+
+echo
+echo "$me: made ${wanted[*]} for $user; now, as $user:"
+echo "  cargo test -p tcspecial --test kernel-stand-ins"

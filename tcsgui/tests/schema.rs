@@ -569,6 +569,144 @@ fn every_shipped_xml_file_is_valid_against_its_schema() {
     }
 }
 
+/// Whether a file is valid against one of the XSDs, by `xmllint`.
+///
+/// # Arguments
+///
+/// * `schema_name` - The XSD, by its name in `share/schema`.
+/// * `file`        - The file to check.
+///
+/// # Returns
+///
+/// `Ok` if it is valid, and else what `xmllint` said.
+///
+/// # Panics
+///
+/// If `xmllint` cannot be run.
+fn xsd_check(schema_name: &str, file: &Path) -> Result<(), String> {
+    let output = Command::new("xmllint")
+        .arg("--noout")
+        .arg("--schema")
+        .arg(schema().join(schema_name))
+        .arg(file)
+        .output()
+        .expect("xmllint runs");
+    if output.status.success() {
+        Ok(())
+    } else {
+        Err(String::from_utf8_lossy(&output.stderr).into_owned())
+    }
+}
+
+/// Copies one section of an XML file to the end of it, just inside the
+/// root's closing tag, so that the file states it twice.
+///
+/// # Arguments
+///
+/// * `text`    - The file's text.
+/// * `section` - The section's tag, which `text` holds once.
+/// * `root`    - The root element's tag.
+///
+/// # Returns
+///
+/// The text with the section written twice.
+///
+/// # Panics
+///
+/// If `text` does not hold the section or the root's closing tag.
+fn twice(text: &str, section: &str, root: &str) -> String {
+    let start = text
+        .find(&format!("<{section}>"))
+        .unwrap_or_else(|| panic!("no <{section}>"));
+    let close = format!("</{section}>");
+    let end = start + text[start..].find(&close).expect("closed") + close.len();
+    let at = text
+        .rfind(&format!("</{root}>"))
+        .expect("a closing root tag");
+    format!("{}{}\n{}", &text[..at], &text[start..end], &text[at..])
+}
+
+/// A section written twice is refused by the XSD as it is by the reader.
+///
+/// A simulator file has no list among its sections, so each is held to
+/// once by its XSD. A configuration's lists are repeated, which XSD 1.0
+/// cannot mix with sections held to once, except for its description: a
+/// value and not a section of child elements, which an identity constraint
+/// can count. The other sections of a configuration are refused twice
+/// where the file is read and nowhere else.
+///
+/// Skipped, loudly, where xmllint is not installed.
+#[test]
+fn a_section_written_twice_is_refused_by_the_xsd_and_the_reader() {
+    if Command::new("xmllint").arg("--version").output().is_err() {
+        eprintln!("xmllint is not installed: the XML schemas were not checked");
+        return;
+    }
+    let dir = tempfile::tempdir().expect("a directory");
+
+    let simulator = "<?xml version=\"1.0\" encoding=\"UTF-8\"?>
+<simulator>
+  <description>once</description>
+  <tcssim>
+    <ready>127.0.0.1:7999</ready>
+  </tcssim>
+  <physics>once-physics.yaml</physics>
+  <simulated_payload_groups>
+    <group name=\"fast\">
+      <packet_interval>100 ms</packet_interval>
+    </group>
+  </simulated_payload_groups>
+  <simulated_payloads>
+    <type name=\"spi\">
+      <payload name=\"spi-1\">
+        <group>fast</group>
+      </payload>
+    </type>
+  </simulated_payloads>
+</simulator>
+";
+    let file = dir.path().join("once-sim.xml");
+    let check = |text: &str| {
+        std::fs::write(&file, text).expect("written");
+        let read = tcslibgs::sim_config::SimConfigFile::parse(
+            text,
+            tcslibgs::ConfigFormat::Xml,
+        );
+        (xsd_check("tcspecial-sim.xsd", &file), read.map(|_| ()))
+    };
+    let (valid, read) = check(simulator);
+    assert_eq!(valid, Ok(()), "the simulator file is valid");
+    assert!(read.is_ok(), "the simulator reads it: {read:?}");
+    for section in [
+        "description",
+        "tcssim",
+        "physics",
+        "simulated_payload_groups",
+        "simulated_payloads",
+    ] {
+        let (valid, read) = check(&twice(simulator, section, "simulator"));
+        assert!(valid.is_err(), "the XSD takes <{section}> twice");
+        assert!(read.is_err(), "the simulator reads <{section}> twice");
+    }
+
+    let configuration = std::fs::read_to_string(root().join("example.xtcs"))
+        .expect("example.xtcs");
+    let file = dir.path().join("twice.xtcs");
+    std::fs::write(
+        &file,
+        twice(&configuration, "description", "configuration"),
+    )
+    .expect("written");
+    assert!(
+        xsd_check("tcspecial.xsd", &file).is_err(),
+        "the XSD takes <description> twice"
+    );
+    assert!(
+        tcslibgs::graph::Graph::load(&file).is_err(),
+        "the reader takes <description> twice"
+    );
+}
+
 /// Every XML file this repository ships is well formed XML.
 ///
 /// Weaker than the validation above and over a wider set: a file with no

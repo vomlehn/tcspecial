@@ -31,10 +31,27 @@
 //!
 //! # Before the first vote
 //!
-//! Nothing is produced until every input has reported once. There is nothing
-//! to vote on before then: a vote over two of three is a vote with no
-//! majority, and a vote over one is that sensor's word taken on trust, which
-//! is what the trio was built to avoid.
+//! Nothing is produced until a majority of the inputs -- two of three --
+//! have reported. A vote over one is that sensor's word taken on trust,
+//! which is what a trio is built to avoid; but waiting for every input was
+//! worse, because a sensor dead from power-up then held the vote, and every
+//! decision downstream of it, at nothing for the whole flight -- the single
+//! failure the trio exists to survive. Two of three is the least that is
+//! still a vote, and the most that one dead sensor cannot withhold.
+//!
+//! # Readings that have stopped arriving
+//!
+//! A reading is kept until a newer one from the same input replaces it, so
+//! a sensor that stops is voted on at its last word. With `age` stated, a
+//! reading older than that is no longer counted: the vote is over the
+//! readings still current. If, once voting has begun, fewer than a majority
+//! are current, nothing is produced, and each arrival says so as a failure
+//! -- a vote that has lost its majority cannot do what it is for, and
+//! silence would leave a decision downstream acting on a temperature that
+//! is no longer being measured without anyone hearing of it. Without `age`,
+//! readings never expire, as before it existed.
+
+use std::time::{Duration, Instant};
 
 use tcslibgs::node::vehicle::compute::{Algorithm, VoteParams};
 
@@ -43,20 +60,26 @@ use super::{from_value, Function, Out};
 /// The one value from a set of named inputs, by the algorithm the node names.
 #[derive(Debug)]
 pub struct Vote {
-    /// The last reading from each input, by its place in `expected`. An
-    /// input with none has not reported yet.
+    /// The last reading from each input, and when it arrived, by its place
+    /// in `expected`. An input with none has not reported yet.
     ///
     /// Kept rather than cleared after a vote: the readings are of one
     /// quantity, so the last from each is the best that is known about it
-    /// until a newer one arrives. By place rather than by name, so that a
-    /// reading is kept without its name being made again.
-    latest: Vec<Option<f64>>,
-    /// How many of `latest` have reported.
-    reported: usize,
+    /// until a newer one arrives -- or until it is older than `age`. By
+    /// place rather than by name, so that a reading is kept without its name
+    /// being made again.
+    latest: Vec<Option<(Instant, f64)>>,
     /// The inputs this votes over, which the routing found bound.
     expected: Vec<String>,
     /// How the one value is picked out of them.
     algorithm: Algorithm,
+    /// How old a reading may be and still be counted, or `None` for no
+    /// limit.
+    age: Option<Duration>,
+    /// Whether a majority has been current at some arrival: before then, too
+    /// few is a vote starting, and after, it is a vote that has lost its
+    /// majority.
+    voted: bool,
     /// Where the readings are sorted for a verdict: made with room for every
     /// input when the vote is, so that a verdict allocates nothing.
     sorted: Vec<f64>,
@@ -75,7 +98,8 @@ impl Vote {
     ///
     /// # Arguments
     ///
-    /// * `params` - The inputs' names and the algorithm to vote by.
+    /// * `params` - The inputs' names, the algorithm to vote by, and how old
+    ///              a reading may be.
     ///
     /// # Returns
     ///
@@ -84,39 +108,121 @@ impl Vote {
         let inputs = params.inputs.len();
         Vote {
             latest: vec![None; inputs],
-            reported: 0,
             expected: params.inputs,
             algorithm: params.algorithm,
+            age: params.age,
+            voted: false,
             sorted: Vec::with_capacity(inputs),
         }
     }
 
-    /// How many inputs have yet to report for the first time.
+    /// How many current readings a vote needs: more than half its inputs.
     ///
-    /// Nought once every one of them has, and nought for ever after: an input
-    /// that has reported once has a reading, whether or not it is still
-    /// arriving.
-    pub fn waiting_for(&self) -> usize {
-        self.expected.len() - self.reported
+    /// # Returns
+    ///
+    /// Two for three inputs, three for four or five.
+    pub fn majority(&self) -> usize {
+        self.expected.len() / 2 + 1
     }
 
-    /// Works out the value this set of readings comes to.
+    /// Takes one reading, arriving now as far as the vote can tell.
+    ///
+    /// What `Function::give` does, with the time it arrived given rather than
+    /// read from the clock, so that what `age` does can be tested.
+    ///
+    /// # Arguments
+    ///
+    /// * `input` - The input it arrived at.
+    /// * `data`  - The reading.
+    /// * `now`   - When it arrived.
+    ///
+    /// # Returns
+    ///
+    /// The vote's value, or `None` while fewer than a majority have reported
+    /// for the first time.
+    ///
+    /// # Errors
+    ///
+    /// A message for a reading at no input or one the vote is not over, a
+    /// reading that is not a value, and -- once voting has begun -- fewer
+    /// than a majority of current readings.
+    pub fn give_at(
+        &mut self,
+        input: Option<&str>,
+        data: &[u8],
+        now: Instant,
+    ) -> Result<Option<Out>, String> {
+        let input = input.ok_or_else(|| {
+            "a vote takes named inputs, and this arrived without a name: a \
+             link into it is written to.in0 and not to"
+                .to_string()
+        })?;
+
+        let Some(at) = self.expected.iter().position(|e| e == input) else {
+            return Err(format!(
+                "\"{input}\" is not one of this vote's inputs ({})",
+                self.expected.join(", ")
+            ));
+        };
+
+        // The newest reading from that input, replacing whatever it said
+        // before: this votes over the latest from each, so a sensor
+        // reporting twice simply has its later reading used.
+        let reading = from_value(data, input)?;
+        self.latest[at] = Some((now, reading));
+
+        // The readings that still count, sorted for a verdict.
+        let age = self.age;
+        self.sorted.clear();
+        self.sorted.extend(self.latest.iter().flatten().filter_map(
+            |&(when, reading)| {
+                let current = age.is_none_or(|age| {
+                    now.saturating_duration_since(when) <= age
+                });
+                current.then_some(reading)
+            },
+        ));
+
+        let majority = self.majority();
+        if self.sorted.len() < majority {
+            if !self.voted {
+                // Still starting: see the module comment.
+                return Ok(None);
+            }
+            // The one place this allocates as it runs, and only while the
+            // vote has lost its majority, which is a fault to be heard of
+            // and not a reading to be voted on.
+            return Err(format!(
+                "only {} of {} inputs have reported within {}: a vote needs \
+                 {majority}, and nothing is voted until they have",
+                self.sorted.len(),
+                self.expected.len(),
+                age.map_or_else(String::new, |age| format!("{age:?}")),
+            ));
+        }
+        self.voted = true;
+
+        // The verdict is one of the readings, or the mean of two of them,
+        // so it is inside the range every reading came in by -- but it is
+        // made into a value the one way everything else is.
+        Ok(Some(Out::value(self.verdict())?))
+    }
+
+    /// Works out the value the current readings come to.
     ///
     /// Taken in sorted order, which is what both algorithms are about: the
     /// middle of them, or the closest pair.
     ///
     /// # Returns
     ///
-    /// The value the vote's algorithm picks from the latest readings.
+    /// The value the vote's algorithm picks from `sorted`.
     ///
     /// # Panics
     ///
-    /// If fewer readings have arrived than the algorithm needs: one for a
-    /// median, two for a closest mean. `give` asks only once every input
-    /// has reported, and a vote is over at least three.
+    /// If `sorted` holds fewer readings than the algorithm needs: one for a
+    /// median, two for a closest mean. `give_at` asks only with a majority,
+    /// and a vote is over at least three inputs, so a majority is two.
     fn verdict(&mut self) -> f64 {
-        self.sorted.clear();
-        self.sorted.extend(self.latest.iter().flatten().copied());
         let readings = &mut self.sorted;
         // By partial order, there being no total order on a float. Nothing
         // here is NaN -- `from_value` refuses what will not parse as a number
@@ -198,39 +304,7 @@ impl Function for Vote {
         input: Option<&str>,
         data: &[u8],
     ) -> Result<Option<Out>, String> {
-        let input = input.ok_or_else(|| {
-            "a vote takes named inputs, and this arrived without a name: a \
-             link into it is written to.in0 and not to"
-                .to_string()
-        })?;
-
-        let Some(at) = self.expected.iter().position(|e| e == input) else {
-            return Err(format!(
-                "\"{input}\" is not one of this vote's inputs ({})",
-                self.expected.join(", ")
-            ));
-        };
-
-        // The newest reading from that input, replacing whatever it said
-        // before. A second arrival from one input before the others have
-        // reported is not a fault here, as it was for a mean: this votes over
-        // the latest from each, so a sensor reporting twice simply has its
-        // later reading used.
-        let reading = from_value(data, input)?;
-        if self.latest[at].replace(reading).is_none() {
-            self.reported += 1;
-        }
-
-        // Nothing to vote on until every input has reported once: see the
-        // module comment.
-        if self.reported < self.expected.len() {
-            return Ok(None);
-        }
-
-        // The verdict is one of the readings, or the mean of two of them,
-        // so it is inside the range every reading came in by -- but it is
-        // made into a value the one way everything else is.
-        Ok(Some(Out::value(self.verdict())?))
+        self.give_at(input, data, Instant::now())
     }
 
     fn name(&self) -> &'static str {
@@ -261,6 +335,21 @@ mod tests {
     ///
     /// The vote.
     fn vote(algorithm: Algorithm) -> Vote {
+        aged(algorithm, None)
+    }
+
+    /// Makes a vote over three inputs, `in0` to `in2`, whose readings count
+    /// for so long.
+    ///
+    /// # Arguments
+    ///
+    /// * `algorithm` - The algorithm to vote by.
+    /// * `age`       - How old a reading may be, or `None` for no limit.
+    ///
+    /// # Returns
+    ///
+    /// The vote.
+    fn aged(algorithm: Algorithm, age: Option<Duration>) -> Vote {
         Vote::of(VoteParams {
             inputs: vec![
                 "in0".to_string(),
@@ -268,6 +357,7 @@ mod tests {
                 "in2".to_string(),
             ],
             algorithm,
+            age,
         })
     }
 
@@ -276,22 +366,76 @@ mod tests {
         from_value(&out.expect("a value"), "a vote").expect("a value")
     }
 
-    /// Nothing is produced until every input has reported once.
+    /// Nothing is produced until a majority has reported, and from then
+    /// on the vote is over whatever has.
     ///
-    /// There is nothing to vote on before then: two of three readings have no
-    /// majority between them, and one is that sensor's word taken on trust.
+    /// One reading is that sensor's word taken on trust; two of three is a
+    /// vote, and is what one dead sensor cannot withhold.
     #[test]
-    fn nothing_is_produced_until_every_input_has_reported() {
+    fn nothing_is_produced_until_a_majority_has_reported() {
         let mut vote = vote(Algorithm::Median);
+        assert_eq!(vote.majority(), 2);
 
         assert_eq!(vote.give(Some("in0"), &kelvin(290_f64)).unwrap(), None);
-        assert_eq!(vote.waiting_for(), 2);
-        assert_eq!(vote.give(Some("in1"), &kelvin(293_f64)).unwrap(), None);
-        assert_eq!(vote.waiting_for(), 1);
+        let out = vote.give(Some("in1"), &kelvin(294_f64)).unwrap();
+        assert_eq!(said(out), 292.0, "the middle of 290 and 294");
 
         let out = vote.give(Some("in2"), &kelvin(296_f64)).unwrap();
-        assert_eq!(said(out), 293.0, "the middle of 290, 293 and 296");
-        assert_eq!(vote.waiting_for(), 0);
+        assert_eq!(said(out), 294.0, "the middle of 290, 294 and 296");
+    }
+
+    /// A sensor dead from the start does not hold the vote at nothing.
+    ///
+    /// The fault this rule exists for: waiting for every input turned one
+    /// sensor that never reported into no temperature, and no decision, for
+    /// the whole flight.
+    #[test]
+    fn a_sensor_dead_from_the_start_does_not_stop_the_vote() {
+        let mut vote = vote(Algorithm::Median);
+        for reading in [290_f64, 291_f64, 292_f64] {
+            vote.give(Some("in0"), &kelvin(reading)).unwrap();
+            let out = vote.give(Some("in1"), &kelvin(reading + 1.0)).unwrap();
+            assert!(out.is_some(), "in2 never reports, and two still vote");
+        }
+    }
+
+    /// With `age`, a reading older than that is not counted, and a vote that
+    /// has lost its majority says so on every arrival rather than voting on
+    /// one sensor's word; it votes again once a majority is current.
+    #[test]
+    fn a_reading_older_than_age_is_not_counted() {
+        let mut vote = aged(Algorithm::Median, Some(Duration::from_secs(2)));
+        let t0 = Instant::now();
+        let at = |s: u64| t0 + Duration::from_secs(s);
+
+        vote.give_at(Some("in0"), &kelvin(290_f64), at(0)).unwrap();
+        vote.give_at(Some("in1"), &kelvin(292_f64), at(0)).unwrap();
+        let out = vote.give_at(Some("in2"), &kelvin(320_f64), at(1)).unwrap();
+        assert_eq!(said(out), 292.0, "all three are current");
+
+        // At three seconds in0 and in1 are older than two: in2 alone is not
+        // a majority, and that is a failure to be heard, not a vote.
+        let why = vote
+            .give_at(Some("in2"), &kelvin(320_f64), at(3))
+            .expect_err("one current reading is no majority");
+        assert!(why.contains("only 1 of 3"), "{why}");
+
+        // in0 reports again: two current, and the vote is over those two.
+        let out = vote.give_at(Some("in0"), &kelvin(291_f64), at(3)).unwrap();
+        assert_eq!(said(out), 305.5, "the middle of 291 and 320");
+    }
+
+    /// Without `age`, a reading stands until its input sends another, however
+    /// long that is.
+    #[test]
+    fn without_age_a_reading_never_expires() {
+        let mut vote = vote(Algorithm::Median);
+        let t0 = Instant::now();
+        vote.give_at(Some("in0"), &kelvin(290_f64), t0).unwrap();
+        vote.give_at(Some("in1"), &kelvin(292_f64), t0).unwrap();
+        let late = t0 + Duration::from_secs(3600);
+        let out = vote.give_at(Some("in2"), &kelvin(294_f64), late).unwrap();
+        assert_eq!(said(out), 292.0, "an hour-old reading still counts");
     }
 
     /// And after that, every arrival produces a value.
@@ -395,10 +539,10 @@ mod tests {
         // rather than a word that is not a number. See `super::from_value`.
         assert!(vote.give(Some("in0"), b"warmish").is_err());
         assert_eq!(
-            vote.waiting_for(),
-            3,
-            "a refused reading is not a reading: the input has still not \
-             reported"
+            vote.give(Some("in1"), &kelvin(290_f64)).unwrap(),
+            None,
+            "a refused reading is not a reading: in0 has still not reported, \
+             so in1 alone is no majority"
         );
     }
 

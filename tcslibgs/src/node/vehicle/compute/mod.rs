@@ -539,6 +539,11 @@ pub struct VoteParams {
     pub inputs: Vec<String>,
     /// How the one value is picked out of them.
     pub algorithm: Algorithm,
+    /// How old a reading may be and still be voted on: one older is left
+    /// out, and a vote left with fewer than a majority says so rather than
+    /// voting. `None`, unstated, is no limit -- a reading stands until the
+    /// same input sends another.
+    pub age: Option<Duration>,
 }
 
 /// How a vote turns several readings of one thing into the value to use.
@@ -677,7 +682,7 @@ pub fn functions() -> &'static str {
 pub fn attributes_of(function: &str) -> Option<&'static [&'static str]> {
     match function {
         "to_kelvin" => Some(&["function", "format", "scale", "offset"]),
-        "vote" => Some(&["function", "inputs", "algorithm"]),
+        "vote" => Some(&["function", "inputs", "algorithm", "age"]),
         "hysteresis" => Some(&["function", "setpoint", "half_band"]),
         "process" => Some(&["function", "executable", "timeout", "restart"]),
         _ => None,
@@ -833,7 +838,22 @@ pub fn params_of(
                 })
                 .and_then(|said| Algorithm::of(said.as_str()).map_err(named))?;
 
-            Ok(Computation::Vote(VoteParams { inputs, algorithm }))
+            // How old a reading may be. A length of time, as a timeout is,
+            // and optional: unstated is no limit, which is what a vote was
+            // before there was one.
+            let age = attributes
+                .get("age")
+                .map(|said| {
+                    crate::graph::parse_interval(said.as_str())
+                        .map_err(|why| named(format!("age: {why}")))
+                })
+                .transpose()?;
+
+            Ok(Computation::Vote(VoteParams {
+                inputs,
+                algorithm,
+                age,
+            }))
         }
         "hysteresis" => {
             // Both are temperatures -- a goal and the width of a band around
@@ -1299,6 +1319,7 @@ mod tests {
                     "in2".to_string()
                 ],
                 algorithm: Algorithm::Median,
+                age: None,
             })
         );
 

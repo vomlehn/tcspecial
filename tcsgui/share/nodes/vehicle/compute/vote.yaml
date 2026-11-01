@@ -23,3 +23,10 @@ attributes:
       How the one value is picked: median takes the middle reading, and
       closest_mean takes the mean of the two that agree best. Both leave an
       outlier out, which is what makes a trio worth having.
+  - name: age
+    required: false
+    about: >
+      How old a reading may be and still be voted on, as a length of time:
+      2 s. One older is left out, and a vote left with fewer than a majority
+      of current readings produces nothing and says so on each arrival.
+      Unstated is no limit: a reading stands until its input sends another.

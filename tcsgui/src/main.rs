@@ -10751,7 +10751,8 @@ mod tests {
             vec![
                 "function".to_string(),
                 "inputs".to_string(),
-                "algorithm".to_string()
+                "algorithm".to_string(),
+                "age".to_string()
             ]
         );
 

@@ -70,17 +70,17 @@ vehicle:
           - target: zone_temp
             input: in2
         payload-in: true
-      # setpoint is set from the ground; half_band is how far either side
-      # of it the heaters are switched at, the setpoint being in the middle
-      # of the band.
+      # setpoint is set from the ground; half_band is how far
+      # either side of it the heaters are switched at, the setpoint
+      # being in the middle of the band.
       - compute: thermostat
         function: "hysteresis"
         half_band: "2.0"
         setpoint: "293.15"
-        # asserted below the setpoint, unasserted above it. Two heaters,
-        # because one failing must not leave the mass with no way to be
-        # warmed: either alone holds the band, and both together hold it
-        # twice as fast.
+        # asserted below the setpoint, unasserted above it. Two
+        # heaters, because one failing must not leave the mass
+        # with no way to be warmed: either alone holds the band,
+        # and both together hold it twice as fast.
         gateway-out:
           - target: heaters_1
           - target: heaters_2
@@ -88,12 +88,13 @@ vehicle:
           - target: gateway
           - target: housekeeping
         payload-in: true
-      # One temperature out of the three, by the algorithm named: median
-      # takes the middle reading, closest_mean the mean of the two that
-      # agree best. Either leaves a sensor that has gone wrong out of the
-      # answer, which a mean over all three would not, and it produces a
-      # value on every arrival, so one sensor that stops reporting is
-      # outvoted rather than stopping the vehicle from deciding anything.
+      # One temperature out of the three, by the algorithm named:
+      # median takes the middle reading, closest_mean the mean of
+      # the two that agree best. Either leaves a sensor that has
+      # gone wrong out of the answer, which a mean over all three
+      # would not, and it produces a value on every arrival, so one
+      # sensor that stops reporting is outvoted rather than
+      # stopping the vehicle from deciding anything.
       - compute: zone_temp
         algorithm: "median"
         function: "vote"
@@ -110,10 +111,10 @@ vehicle:
 
 payloads:
   - type gpio:
-      # Two heaters, each three circuits driven together, both near the
-      # sensors on the same thermal mass. Separate nodes rather than six
-      # lines on one, so that one can be stopped from the ground while the
-      # other goes on holding the temperature.
+      # Two heaters, each three circuits driven together, both near
+      # the sensors on the same thermal mass. Separate nodes rather
+      # than six lines on one, so that one can be stopped from the
+      # ground while the other goes on holding the temperature.
       - payload: heaters_1
         direction: "output"
         lines: "3,4,5"
@@ -126,8 +127,8 @@ payloads:
         gateway-in: true
   - type i2c:
       # One of three sensors of the same place, a trio, so that the
-      # temperature survives one of them going wrong. Two bytes, signed,
-      # big endian.
+      # temperature survives one of them going wrong. Two bytes,
+      # signed, big endian.
       - payload: temp_1
         address: "0x48"
         group: "zone_temps"
@@ -135,7 +136,8 @@ payloads:
         read_size: "2"
         payload-out:
           - target: k_1
-      # The second of the trio; the same part as temp_1, on the same bus.
+      # The second of the trio; the same part as temp_1, on the
+      # same bus.
       - payload: temp_2
         address: "0x49"
         group: "zone_temps"
@@ -144,9 +146,10 @@ payloads:
         payload-out:
           - target: k_2
   - type spi:
-      # The third. A different part on a different bus: three bytes,
-      # unsigned, its own scale and so its own conversion, so that no one
-      # bus and no one part number can take the whole trio out.
+      # The third. A different part on a different bus: three
+      # bytes, unsigned, its own scale and so its own conversion,
+      # so that no one bus and no one part number can take the
+      # whole trio out.
       - payload: temp_3
         group: "zone_temps"
         max_speed: "1000000"

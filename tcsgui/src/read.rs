@@ -27,7 +27,7 @@
 use std::collections::BTreeMap;
 use std::path::Path;
 
-use tcslibgs::graph::{Destination, Graph};
+use tcslibgs::graph::{Destination, Graph, Section};
 
 use crate::document::{Command, Document, Node};
 use crate::journal::Link;
@@ -253,14 +253,6 @@ fn comments_of(path: &Path) -> Said {
             continue;
         }
 
-        // An XML entry opens with a tag and names itself on the next line, so
-        // the opening tag passes a comment through to the line that says what
-        // the entry is. Nothing else does: a comment that reached a line it
-        // is not about would be a comment moved to another node.
-        if xml && line_opens_an_entry(trimmed) {
-            continue;
-        }
-
         let comment = waiting.join("\n");
         waiting.clear();
 
@@ -280,16 +272,6 @@ fn comments_of(path: &Path) -> Said {
     }
 
     said
-}
-
-/// Whether this XML line opens an entry whose name is on the next line.
-///
-/// The three node sections are the ones: a node's comment sits above its
-/// opening tag and the name is inside it. `<commands>` is matched by its
-/// opening tag instead, since what identifies one of those is its children
-/// rather than a name of its own.
-fn line_opens_an_entry(line: &str) -> bool {
-    matches!(line, "<gateway>" | "<vehicle>" | "<payloads>")
 }
 
 /// Which data source this line writes, if it writes one.
@@ -345,28 +327,31 @@ fn comment_in(line: &str, xml: bool) -> Option<String> {
 
 /// The name of the node this line starts, if it starts one.
 ///
+/// A node names itself on the line it starts on, by the word for its
+/// section: `- payload: temp_1` in YAML and `<payload name="temp_1">` in XML,
+/// as the writers write it. A `type` line above the nodes of a type starts
+/// none, so a comment above it is about no node.
+///
 /// # Arguments
 ///
 /// * `line` - The line, trimmed.
-/// * `xml`  - Whether the file is XML, where the name is a `<name>` element,
-///            rather than YAML, where it is a `- name:` entry.
+/// * `xml`  - Whether the file is XML rather than YAML.
 ///
 /// # Returns
 ///
 /// The node's name, unquoted, or `None` if the line does not start a node.
 fn node_named(line: &str, xml: bool) -> Option<String> {
-    if xml {
-        // `<nodes>` opens an entry and `<name>` is its first child, so the
-        // name is on the next line -- but the comment is attached to the
-        // entry, so the opening tag is what is matched and the name is found
-        // by the caller's next line. Handled by matching the name element
-        // itself, which the writers put first.
-        let name = line.strip_prefix("<name>")?.strip_suffix("</name>")?;
-        Some(name.to_string())
-    } else {
-        let name = line.strip_prefix("- name: ")?;
-        Some(unquoted(name))
-    }
+    Section::ALL.into_iter().find_map(|section| {
+        let word = section.node_word();
+        if xml {
+            let rest = line.strip_prefix(&format!("<{word} name=\""))?;
+            let (name, _) = rest.split_once('"')?;
+            Some(unescape(name))
+        } else {
+            let name = line.strip_prefix(&format!("- {word}: "))?;
+            Some(unquoted(name))
+        }
+    })
 }
 
 /// What the command binding this line starts sets, if it starts one.
@@ -707,7 +692,7 @@ mod tests {
                 Some(
                     "One of three sensors of the same place, a trio, so \
                      that the\ntemperature survives one of them going \
-                     wrong. Two bytes, signed,\nbig endian."
+                     wrong. Two bytes,\nsigned, big endian."
                 ),
                 "{extension}"
             );

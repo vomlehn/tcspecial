@@ -624,7 +624,7 @@ mod tests {
     fn a_read_only_session_changes_nothing() {
         let where_ = tempfile::tempdir().expect("a directory");
         let path = where_.path().join("vehicle.ytcs");
-        let by_hand = "\npayloads:\n  - name: temp_1\n    type: i2c\n";
+        let by_hand = "\npayloads:\n  - type i2c:\n      - payload: temp_1\n";
         std::fs::write(&path, by_hand).expect("a file");
         let journal = crate::history::journal_for(&path);
         let journal_before = journal.as_ref().map(|j| std::fs::read(j).ok());
@@ -684,25 +684,25 @@ mod tests {
         // Written by hand, with the payload where a file from before the
         // canvas was divided would have put it.
         let by_hand = "\
-gateway:
-  - name: gateway
-    type: gateway_radio
-    address: \"10.0.0.1\"
-    port: \"5000\"
-    gateway-out: temp_1
+gateways:
+  - type gateway_radio:
+      - gateway: gateway
+        address: \"10.0.0.1\"
+        port: \"5000\"
+        gateway-out: temp_1
 
 payloads:
-  - name: temp_1
-    type: i2c
-    path: \"/dev/i2c-1\"
-    address: \"0x48\"
-    trigger: \"01\"
-    payload-out: gateway
+  - type i2c:
+      - payload: temp_1
+        path: \"/dev/i2c-1\"
+        address: \"0x48\"
+        trigger: \"01\"
+        payload-out: gateway
 
 tcsgui:
   nodes:
-    - { name: gateway, x: 240, y: 40 }
-    - { name: temp_1, x: 400, y: 240 }
+    - { node: gateway, x: 240, y: 40 }
+    - { node: temp_1, x: 400, y: 240 }
 ";
         std::fs::write(&path, by_hand).expect("a file");
 
@@ -917,7 +917,7 @@ tcsgui:
         let path = where_.path().join("vehicle.ytcs");
         std::fs::write(
             &path,
-            "payloads:\n  - name: payload\n    type: network\n",
+            "payloads:\n  - type network:\n      - payload: payload\n",
         )
         .expect("a configuration");
 
@@ -985,36 +985,24 @@ tcsgui:
         assert!(again.trouble().is_none(), "{:?}", again.trouble());
     }
 
-    /// Two nodes of one name are told apart by position, written at once, and
-    /// not put back by an undo.
+    /// A file that names a node twice is not opened: a node's name is what
+    /// every other part of a configuration knows it by, and the reader
+    /// refuses two nodes of one name, saying where the second is.
     #[test]
-    fn a_duplicate_name_is_settled_outside_the_history() {
+    fn a_file_that_names_a_node_twice_is_refused() {
         let where_ = tempfile::tempdir().expect("a directory");
         let path = where_.path().join("vehicle.ytcs");
         std::fs::write(
             &path,
-            "payloads:\n  - name: i2c\n    type: i2c\n  \
-             - name: i2c\n    type: i2c\n",
+            "payloads:\n  - type i2c:\n      - payload: i2c\n      \
+             - payload: i2c\n",
         )
         .expect("a configuration naming a node twice");
 
-        let mut editor = Editor::open(&path, crate::pane::default_dividers());
-        assert_eq!(editor.document().sharing_a_name(), vec![0, 1]);
-        let depth = editor.undo_depth();
-
-        let spare = editor.document().spare_name(1);
-        editor.settle_name(1, &spare);
-        assert!(editor.document().sharing_a_name().is_empty());
-
-        // On the disk at once, because the document and the file must not
-        // disagree about a name while the session carries on.
-        let written =
-            std::fs::read_to_string(&path).expect("the configuration");
-        assert!(written.contains(&spare), "{written}");
-
-        // And not in the history: an undo would put back a configuration that
-        // nothing can fly, and every edit is written as it is made.
-        assert_eq!(editor.undo_depth(), depth, "a repair is not an edit");
+        let editor = Editor::open(&path, crate::pane::default_dividers());
+        let trouble = editor.trouble().expect("it is refused");
+        assert!(trouble.contains("\"i2c\" twice"), "{trouble}");
+        assert!(trouble.contains("at line 4"), "{trouble}");
     }
 
     /// A setting typed into a simulated payload reaches the simulator's file.
@@ -1030,7 +1018,7 @@ tcsgui:
         let sim = where_.path().join("vehiclesim.yaml");
         std::fs::write(
             &path,
-            "payloads:\n  - name: payload\n    type: network\n",
+            "payloads:\n  - type network:\n      - payload: payload\n",
         )
         .expect("a configuration");
 
@@ -1069,9 +1057,9 @@ tcsgui:
         // nothing standing in for it, so it has no settings to offer.
         std::fs::write(
             &path,
-            "payloads:\n  - name: sensor\n    type: i2c\n  \
-             - name: payload\n    type: network\nvehicle:\n  - name: mean\n    \
-             type: compute\n",
+            "payloads:\n  - type i2c:\n      - payload: sensor\n  \
+             - type network:\n      - payload: payload\nvehicle:\n  \
+             - type compute:\n      - compute: mean\n",
         )
         .expect("a configuration");
 
@@ -1282,15 +1270,18 @@ tcsgui:
         editor.undo();
 
         let saved = std::fs::read_to_string(&path).unwrap();
-        assert!(saved.contains("name: a"), "{saved}");
+        assert!(saved.contains("payload: a"), "{saved}");
         assert!(
-            !saved.contains("name: b"),
+            !saved.contains("payload: b"),
             "the undone node is still in the file: {saved}"
         );
 
         editor.redo();
         let saved = std::fs::read_to_string(&path).unwrap();
-        assert!(saved.contains("name: b"), "the redo was not saved: {saved}");
+        assert!(
+            saved.contains("payload: b"),
+            "the redo was not saved: {saved}"
+        );
     }
 
     /// A write that fails is said so, and the session carries on.
@@ -1340,8 +1331,8 @@ tcsgui:
         editor.edit(add("c", "compute"));
         assert!(editor.trouble().is_none(), "{:?}", editor.trouble());
         let saved = std::fs::read_to_string(&path).unwrap();
-        for name in ["a", "b", "c"] {
-            assert!(saved.contains(&format!("name: {name}")), "{saved}");
+        for name in ["payload: a", "payload: b", "compute: c"] {
+            assert!(saved.contains(name), "{saved}");
         }
     }
 
@@ -1418,21 +1409,21 @@ tcsgui:
 
         // The top file names what it includes and holds its own nodes.
         assert!(top.contains("include:\n  - zone"), "{top}");
-        assert!(top.contains("name: gateway"), "{top}");
+        assert!(top.contains("gateway: gateway"), "{top}");
         assert!(
-            !top.contains("name: temp_1"),
+            !top.contains("payload: temp_1"),
             "the subdiagram's node is in the top file too: {top}"
         );
 
         // The subdiagram holds its node, and the crossing link is written
         // where its source lives -- qualified at the far end only.
-        assert!(inner.contains("name: temp_1"), "{inner}");
+        assert!(inner.contains("payload: temp_1"), "{inner}");
         // A link is an attribute of the node it leaves, so a link that
         // crosses the boundary is written in the file its *source* is in --
         // once, and with the far end plain, gateway having no subdiagram to
         // qualify it with.
         assert!(
-            inner.contains("payload-out:\n      - target: gateway\n"),
+            inner.contains("payload-out:\n          - target: gateway\n"),
             "the crossing link should be written on the node it leaves: {inner}"
         );
         assert!(
@@ -1464,7 +1455,7 @@ tcsgui:
             .expect("the subdiagram, in XML as its parent is");
         assert!(top.contains("<include>zone</include>"), "{top}");
         assert!(inner.starts_with("<?xml"), "{inner}");
-        assert!(inner.contains("<name>temp_1</name>"), "{inner}");
+        assert!(inner.contains("<payload name=\"temp_1\""), "{inner}");
     }
 
     /// An XML name gets an XML file, and the history still works.
@@ -1477,7 +1468,7 @@ tcsgui:
         editor.edit(add("temp_1", "i2c"));
         let written = std::fs::read_to_string(&path).expect("the file exists");
         assert!(written.starts_with("<?xml"), "{written}");
-        assert!(written.contains("<type>i2c</type>"), "{written}");
+        assert!(written.contains("<type name=\"i2c\">"), "{written}");
         assert!(editor.trouble().is_none(), "{:?}", editor.trouble());
 
         // And the history is beside it as it is for YAML, so undo reaches past

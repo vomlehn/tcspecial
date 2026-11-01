@@ -631,14 +631,17 @@ desk and touches no hardware. Aboard they would be on I2C, SPI and GPIO,
 as <code>tests/manual/thermostat.ytcs</code> has them; those buses are
 flown against stand-ins by <code>make stand-ins-test</code> and
 <code>make kernel-stand-ins-test</code>.</p>
-<p>tcssim stands in for the sensors with a thermal mass,
-<code>basic</code>, declared in the vehicle’s physics model,
+<p>tcssim joins the stand-ins to the vehicle’s physics model,
 <code>thermostat-physics.yaml</code>, which
-<code>thermostat-sim.yaml</code> names. All three sensors read it, each
-on an output of its own, so their readings agree and the vote produces a
-temperature. The mass cools towards 283.15 K, ten kelvin below the
-setpoint, and the heaters warm it, each through an input of its own
-while the vehicle has it on: the loop closes through tcspecial.</p>
+<code>thermostat-sim.yaml</code> names: a zone and two heaters, each a
+part simulated alone and joined to the zone under
+<code>connections</code>. All three sensors are joined to
+<code>zone.temperature</code>, each from a place of its own on the zone,
+so their readings agree and the vote produces a temperature. The zone
+cools towards 283.15 K, ten kelvin below the setpoint, and each heater’s
+stand-in is joined to <code>heater_1.on</code> or
+<code>heater_2.on</code>, so the heaters warm it while the vehicle has
+them on: the loop closes through tcspecial.</p>
 <pre><code>make run-thermostat</code></pre>
 <p>That runs tcsmoc on the example, as <code>run-simple</code> does, and
 tcsmoc opens its temperatures window beside its own: each sensor’s

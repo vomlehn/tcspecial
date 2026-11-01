@@ -15,7 +15,7 @@
 //! tcsmoc is at the other end of.
 //!
 //! The exception is `vehicle::thermostat`, which stands in for a hysteresis
-//! node so that a thermal mass's loop -- sensors, a decision, heaters -- can
+//! node so that a zone's loop -- sensors, a decision, heaters -- can
 //! be closed in the simulator alone, with no tcspecial running.
 //!
 //! Not every payload kind has one either. A sensor's buffer is filled by the

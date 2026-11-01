@@ -2,7 +2,7 @@
 
 # How tcssim stands in for the payloads of fprime.ytcs.
 #
-# The thermometer reads a thermal mass and the heater warms it, so what the
+# The thermometer reads the zone and the heater warms it, so what the
 # flight computer sends the heater shows in the temperature it reads back:
 # the bridge's test drives the heater on from F´ and watches zone_temp's
 # channel climb.
@@ -14,21 +14,20 @@ description: Simulator settings for the payloads of fprime.ytcs
 tcssim:
   ready: "127.0.0.1:7902"
 
-# The physics model the payloads below attach to -- the zone they read and
-# warm -- which is the vehicle's, not this file's: see the file it names.
+# The physics model the payloads below are joined to -- the zone they read
+# and the heater that warms it -- which is the vehicle's, not this file's:
+# see the file it names.
 physics: fprime-physics.yaml
 
 simulated_payloads:
   # Driven and never read: its stand-in sends nothing, counts what the
-  # vehicle sends it, and while it is on warms the zone by a kelvin a
-  # second.
+  # vehicle sends it, and switches the heater, which while it is on warms
+  # the zone by a kelvin a second.
   - name: heater
     simulate: true
     type: network
     protocol: udp
-    heats: zone
-    input: in1
-    rate: "1.0"
+    connects: heater.on
 
   # One reading a second of the zone, in the encoding zone_temp reads:
   # this file says nothing of the format, which is the conversion's.
@@ -37,5 +36,4 @@ simulated_payloads:
     type: network
     protocol: udp
     packet_interval: 1 s
-    reads: zone
-    output: out1
+    connects: zone.temperature

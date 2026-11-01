@@ -31,11 +31,12 @@ pub const DEFAULT_PACKET_BYTES: usize = 16;
 /// Finds how a reading of this payload is encoded, from the conversion it
 /// feeds.
 ///
-/// A simulated sensor attached to a thermal mass has to send bytes the vehicle
-/// will read back as the mass's temperature, and what those bytes are is not
-/// the sensor's own business: the payload says `read_size` and nothing else,
-/// and the format, the scale and the offset are on the `to_kelvin` node its
-/// readings go to. So the encoding is taken from there.
+/// A simulated sensor joined to a terminal of the physics model has to send
+/// bytes the vehicle will read back as what the terminal says, and what
+/// those bytes are is not the sensor's own business: the payload says
+/// `read_size` and nothing else, and the format, the scale and the offset
+/// are on the conversion -- `to_kelvin` or `to_value` -- its readings go to.
+/// So the encoding is taken from there.
 ///
 /// Taken rather than stated again in the simulator file. The two files are
 /// joined by name and nothing else, and a scale written in both is a scale
@@ -44,25 +45,29 @@ pub const DEFAULT_PACKET_BYTES: usize = 16;
 /// looking right.
 ///
 /// Refused where there is not exactly one conversion to take it from: a
-/// sensor feeding none has no encoding to borrow, and one feeding two that
-/// disagree has no single answer.
+/// sensor feeding none has no encoding to borrow, and one feeding two has no
+/// single answer. And refused where the conversion is in another unit than
+/// the terminal: a zone's temperature read back as volts is a number the
+/// vehicle would act on, and wrong.
 ///
 /// # Arguments
 ///
 /// * `graph`   - The configuration.
 /// * `payload` - The name of the payload node whose readings are encoded.
+/// * `unit`    - The unit of the terminal it reports.
 ///
 /// # Returns
 ///
-/// The parameters of the one conversion to kelvin its readings go to.
+/// The parameters of the one conversion its readings go to.
 ///
 /// # Errors
 ///
-/// A message saying so when its readings go to no `to_kelvin` node, or to
-/// more than one.
+/// A message saying so when its readings go to no conversion, or to more
+/// than one, or to one in another unit.
 pub fn reading_of(
     graph: &Graph,
     payload: &str,
+    unit: crate::unit::Unit,
 ) -> Result<crate::node::vehicle::compute::ToValueParams, String> {
     use crate::node::vehicle::compute::{params_of, Computation};
 
@@ -77,16 +82,10 @@ pub fn reading_of(
             if node.node_type != "compute" {
                 continue;
             }
-            // A conversion to kelvin, by either name: a thermal mass is a
-            // temperature, and a conversion to anything else would read the
-            // mass's temperature back as volts.
             if let Ok(
                 Computation::ToKelvin(params) | Computation::ToValue(params),
             ) = params_of(&node.name, &node.attributes)
             {
-                if params.unit != crate::unit::Unit::Kelvin {
-                    continue;
-                }
                 if !found.iter().any(|(name, _)| name == &to) {
                     found.push((to, params));
                 }
@@ -94,20 +93,29 @@ pub fn reading_of(
         }
     }
 
-    match found.len() {
-        1 => Ok(found.remove(0).1),
-        0 => Err(format!(
-            "\"{payload}\" reads a thermal mass, and nothing converts its \
-             readings: a simulated sensor sends the bytes a to_kelvin node \
-             would read back as the temperature, so there has to be one to \
-             take the format, the scale and the offset from"
+    match found.as_slice() {
+        [(name, params)] if params.unit != unit => Err(format!(
+            "\"{payload}\" reports {}, and its readings go to {name}, which \
+             reads them as {}: the conversion is in the unit of what the \
+             sensor is joined to",
+            unit.name(),
+            params.unit.name()
+        )),
+        [(_, params)] => Ok(*params),
+        [] => Err(format!(
+            "\"{payload}\" reports {}, and nothing converts its readings: a \
+             simulated sensor sends the bytes a to_kelvin or to_value node \
+             would read back as what it reports, so there has to be one to \
+             take the format, the scale and the offset from",
+            unit.name()
         )),
         _ => {
             let named: Vec<&str> =
                 found.iter().map(|(name, _)| name.as_str()).collect();
             Err(format!(
-                "\"{payload}\" reads a thermal mass and its readings go to {} \
+                "\"{payload}\" reports {} and its readings go to {} \
                  conversions ({}): there is no one encoding to send them in",
+                unit.name(),
                 found.len(),
                 named.join(", ")
             ))
@@ -244,8 +252,8 @@ pub fn handlers(
         // A payload that is only driven -- a heater, a valve -- is written to
         // and never read. Its stand-in sends nothing and watches what
         // arrives, counting it, so that it is shown and switched as every
-        // other simulated payload is; one that warms a thermal mass warms it
-        // as well. See `crate::types::DHConfig::driven`.
+        // other simulated payload is; one joined to a heater switches it as
+        // well. See `crate::types::DHConfig::driven`.
         let leaves = graph.links.iter().any(|l| l.origin().node == node.name);
         let arrives = graph.links.iter().any(|l| {
             l.to.each()
@@ -388,6 +396,23 @@ mod tests {
         assert!(reaches(&graph, "thermostat", "heaters_2"));
         assert!(!reaches(&graph, "thermostat", "temp_1"));
         assert!(!reaches(&graph, "heaters_1", "thermostat"));
+    }
+
+    /// A sensor's encoding is its conversion's, in the unit of what it
+    /// reports, and one reporting another unit than its conversion reads is
+    /// refused naming both.
+    #[test]
+    fn a_reading_is_encoded_as_its_conversion_in_its_unit() {
+        let (graph, _) = example("thermostat");
+        let reading = reading_of(&graph, "temp_1", crate::unit::Unit::Kelvin)
+            .expect("temp_1 feeds k_1");
+        assert_eq!(reading.unit, crate::unit::Unit::Kelvin);
+        let why = reading_of(&graph, "temp_1", crate::unit::Unit::Volt)
+            .expect_err("k_1 reads kelvin");
+        assert!(why.contains("volts") && why.contains("kelvin"), "{why}");
+        let why = reading_of(&graph, "heaters_1", crate::unit::Unit::Kelvin)
+            .expect_err("a heater feeds nothing");
+        assert!(why.contains("nothing converts"), "{why}");
     }
 
     /// A hysteresis node gives its setpoint and band; any other is refused.

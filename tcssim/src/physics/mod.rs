@@ -1,8 +1,744 @@
 //! The physical world the simulated payloads measure and act on.
 //!
 //! Where `node` holds the stand-ins for the hardware at the far end of each
-//! node, this holds what that hardware would sense and change -- the state
-//! of the world around the vehicle and how it evolves with time -- so that
-//! what a sensor reports follows from what the vehicle did.
+//! node, this holds what that hardware would sense and change: the elements
+//! of the vehicle's physics model -- see `tcslibgs::physics` -- each a part
+//! simulated alone, joined into one [`world::World`] that is advanced from
+//! event to event as the stand-ins ask about it. So what a sensor reports
+//! follows from what the vehicle did.
+//!
+//! A stand-in is joined to one terminal of the world, which is what its
+//! entry's `connects` names: it reports an output, or drives an input. That
+//! is its [`Attachment`].
 
-pub mod thermal_mass;
+pub mod clock;
+pub mod element;
+pub mod heater;
+pub mod queue;
+pub mod random;
+pub mod sensor;
+pub mod thermal_zone;
+pub mod world;
+
+use std::sync::Arc;
+use std::time::Instant;
+
+use tcslibgs::node::vehicle::compute::{Format, ToValueParams};
+use tcslibgs::physics::Place;
+
+use sensor::Sensor;
+use world::World;
+
+/// What one simulated payload is to the world.
+///
+/// Held by the payload rather than by the world, because it is the
+/// payload's business: a sensor's thread asks the world what its terminal
+/// is when a packet is due, and a heater's thread tells it when the vehicle
+/// drives it.
+#[derive(Debug, Clone)]
+pub enum Attachment {
+    /// It reports this output, from a place this far from what the output
+    /// says, in this encoding.
+    Reports {
+        world: Arc<World>,
+        place: Place,
+        /// In the output's unit.
+        offset: f64,
+        /// Taken from the conversion the readings go to, so the vehicle
+        /// reads back what the output is: see
+        /// `tcslibgs::graph::simulated::reading_of`.
+        reading: ToValueParams,
+        /// What the sensor gets wrong, and what it has got wrong so far.
+        sensor: Arc<Sensor>,
+    },
+    /// It drives this input, a decision, to what the vehicle sends it.
+    Drives { world: Arc<World>, place: Place },
+}
+
+impl Attachment {
+    /// Says whether it drives an input, which a stand-in that sends nothing
+    /// asks.
+    pub fn drives(&self) -> bool {
+        matches!(self, Attachment::Drives { .. })
+    }
+
+    /// Says what it is, for the log.
+    ///
+    /// # Arguments
+    ///
+    /// * `payload` - Its payload's name.
+    ///
+    /// # Returns
+    ///
+    /// A sentence.
+    pub fn describe(&self, payload: &str) -> String {
+        match self {
+            Attachment::Reports { world, place, .. } => format!(
+                "{payload} reports {}, which starts at {:.2}",
+                world.name_of(*place),
+                world.read(*place, Instant::now())
+            ),
+            Attachment::Drives { world, place } => {
+                format!("{payload} drives {}", world.name_of(*place))
+            }
+        }
+    }
+
+    /// What a reporting stand-in sends now: its terminal, read by its
+    /// sensor, in its encoding.
+    ///
+    /// # Returns
+    ///
+    /// The bytes, or `None` for one that drives.
+    pub fn reading(&self) -> Option<Vec<u8>> {
+        let Attachment::Reports {
+            world,
+            place,
+            offset,
+            reading,
+            sensor,
+        } = self
+        else {
+            return None;
+        };
+        let now = Instant::now();
+        let value = world.read(*place, now) + offset;
+        Some(encode(reading, sensor.read(value, world.seconds(now))))
+    }
+}
+
+/// Tells the world what the vehicle just drove this stand-in to, if it
+/// drives an input.
+///
+/// What arrives at a heater is the thermostat's decision, which a
+/// hysteresis node sends as the text `1` or `0`: the value to drive a set
+/// of discrete lines to. Anything else is left alone rather than guessed at
+/// -- a stand-in joined to a heater and sent something that is not a
+/// decision is a configuration pointing the wrong link at it, and a
+/// simulator that read it as "off" would hide that by behaving plausibly.
+///
+/// Nothing at all for a payload that drives nothing, which is every payload
+/// but a heater: the caller does not have to ask first.
+///
+/// # Arguments
+///
+/// * `attachment` - What the payload is to the world, if anything.
+/// * `which`      - The payload's name, for a complaint.
+/// * `data`       - What the vehicle sent it: `1` for on, `0` for off,
+///                  surrounding white space ignored.
+pub fn driven(attachment: &Option<Attachment>, which: &str, data: &[u8]) {
+    let Some(Attachment::Drives { world, place }) = attachment else {
+        return;
+    };
+    let now = Instant::now();
+    match data.trim_ascii() {
+        b"1" => world.drive(*place, 1.0, now),
+        b"0" => world.drive(*place, 0.0, now),
+        _ => eprintln!(
+            "{which} drives {} and was sent {} bytes that are not a \
+             decision: a heater is driven to 1 or 0",
+            world.name_of(*place),
+            data.len()
+        ),
+    }
+}
+
+/// Encodes a value as the bytes a sensor of this encoding would send.
+///
+/// The inverse of what a conversion does: it reads counts and answers
+/// `counts * scale + offset`, so this takes the value back to counts and
+/// lays them out in the format the conversion expects.
+///
+/// Rounded to the nearest count, which is a real sensor's quantisation and
+/// worth having in a simulation: the example's parts are a sixteenth of a
+/// kelvin and eight thousandths, so a loop that only worked on exact
+/// temperatures would be a loop that does not work.
+///
+/// A value outside what the format can hold is clamped to its ends rather
+/// than wrapped. A wrapped count is a sensor reporting the other end of its
+/// range, which is a reading an operator would act on; a clamped one is a
+/// sensor at the end of its range, which is what a real part does.
+///
+/// # Arguments
+///
+/// * `reading` - The conversion the readings go to, which gives the
+///               format, scale and offset.
+/// * `value`   - The value, in the conversion's unit.
+///
+/// # Returns
+///
+/// The sensor's bytes, two or three of them as the format says.
+pub fn encode(reading: &ToValueParams, value: f64) -> Vec<u8> {
+    let counts = ((value - reading.offset) / reading.scale).round();
+    match reading.format {
+        Format::I16Be => {
+            let held = counts.clamp(i16::MIN as f64, i16::MAX as f64) as i16;
+            held.to_be_bytes().to_vec()
+        }
+        Format::I16Le => {
+            let held = counts.clamp(i16::MIN as f64, i16::MAX as f64) as i16;
+            held.to_le_bytes().to_vec()
+        }
+        Format::U16Be => {
+            let held = counts.clamp(0.0, u16::MAX as f64) as u16;
+            held.to_be_bytes().to_vec()
+        }
+        Format::U24Be => {
+            let held = counts.clamp(0.0, 0xFF_FFFF as f64) as u32;
+            held.to_be_bytes()[1..].to_vec()
+        }
+    }
+}
+
+#[cfg(test)]
+pub(crate) mod tests {
+    use super::*;
+    use crate::payload::{PayloadConfig, PayloadProtocol, SimulatedPayload};
+    use std::sync::atomic::AtomicU32;
+    use std::time::Duration;
+    use tcslibgs::physics::terminal::At;
+    use tcslibgs::physics::PhysicsFile;
+    use tcslibgs::sim_config::SensorErrors;
+    use tcslibgs::unit::Unit;
+
+    /// The thermostat example's model: two heaters of three kelvin a second
+    /// each on the zone, which is ten kelvin below a setpoint of 293.15 and
+    /// loses the difference with a fifty second constant.
+    pub(crate) const ZONE: &str = "physics:
+  - name: heater_1
+    type: heater
+    power: \"60 W\"
+    voltage: \"28 V\"
+  - name: heater_2
+    type: heater
+    power: \"60 W\"
+    voltage: \"28 V\"
+  - name: zone
+    type: thermal_zone
+    environment: \"283.15 K\"
+    time_constant: 50 s
+    capacity: \"20 J/K\"
+connections:
+  - from: heater_1.heat
+    to: zone.heat
+  - from: heater_2.heat
+    to: zone.heat
+";
+
+    /// The world of [`ZONE`], keeping pace with the wall clock from now,
+    /// and a terminal of it by name.
+    ///
+    /// # Returns
+    ///
+    /// The world, and what finds a terminal of it from its name, such as
+    /// `zone.temperature`.
+    pub(crate) fn zone_world() -> (Arc<World>, impl Fn(&str) -> Place) {
+        let model = PhysicsFile::parse(ZONE)
+            .expect("the model parses")
+            .resolve()
+            .expect("it resolves");
+        let world = Arc::new(World::new(
+            &model,
+            clock::Clock::keeping_pace(Instant::now()),
+            0,
+        ));
+        let place = move |name: &str| {
+            model
+                .find(&At::parse("test", name).expect("a terminal"))
+                .expect("the model has it")
+                .0
+        };
+        (world, place)
+    }
+
+    /// Heaters joined to a zone warm it, two twice as fast, and the same
+    /// heater driven on twice is one heater.
+    #[test]
+    fn heaters_warm_their_zone_and_count_once_each() {
+        let (world, place) = zone_world();
+        let (on_1, on_2) = (place("heater_1.on"), place("heater_2.on"));
+        let temperature = place("zone.temperature");
+        let warmed = |from: f64| {
+            let before = world.read_at(temperature, from);
+            world.read_at(temperature, from + 0.01) - before
+        };
+
+        // At the environment, where there is nothing to lose, one heater
+        // gains very nearly its three kelvin a second.
+        world.drive_at(on_1, 1.0, 0.0);
+        assert!((warmed(0.0) / 0.01 - 3.0).abs() < 0.01);
+        // Driven on again, which a vehicle does on every sample: still one.
+        world.drive_at(on_1, 1.0, 0.01);
+        assert!((warmed(0.01) / 0.01 - 3.0).abs() < 0.01);
+        world.drive_at(on_2, 1.0, 0.02);
+        assert!((warmed(0.02) / 0.01 - 6.0).abs() < 0.02);
+        world.drive_at(on_1, 0.0, 0.03);
+        world.drive_at(on_2, 0.0, 0.03);
+        assert!(warmed(0.03) < 0.0, "off, it cools");
+    }
+
+    /// A heater switched on halfway through an interval warms its zone for
+    /// half of it, however the interval is asked about.
+    #[test]
+    fn a_heater_warms_from_the_moment_it_is_switched() {
+        let at = |reads: u32| {
+            let (world, place) = zone_world();
+            let temperature = place("zone.temperature");
+            world.drive_at(place("heater_1.on"), 1.0, 5.0);
+            for i in 1..=reads {
+                world.read_at(
+                    temperature,
+                    10.0 * f64::from(i) / f64::from(reads),
+                );
+            }
+            world.read_at(temperature, 10.0)
+        };
+        // Five seconds at three a second against a fifty second constant.
+        let rest = 283.15 + 3.0 * 50.0;
+        let exact = rest + (283.15 - rest) * (-5.0f64 / 50.0).exp();
+        for reads in [1, 7, 1000] {
+            assert!((at(reads) - exact).abs() < 1e-9, "{reads} reads");
+        }
+    }
+
+    /// A temperature encodes as the bytes the vehicle reads it back from.
+    ///
+    /// Against the example's two parts, in their own formats and scales:
+    /// this is the one piece of arithmetic in the simulator whose answer
+    /// another program checks, so what it is held to is the round trip.
+    #[test]
+    fn a_value_encodes_as_the_bytes_the_vehicle_reads_back() {
+        let parts = [
+            // temp_1 and temp_2: two bytes, a sixteenth of a kelvin a
+            // count, above freezing.
+            ToValueParams {
+                format: Format::I16Be,
+                scale: 0.0625,
+                offset: 273.15,
+                unit: Unit::Kelvin,
+            },
+            // temp_3: three bytes, eight thousandths of a kelvin, its own
+            // offset.
+            ToValueParams {
+                format: Format::U24Be,
+                scale: 0.0078,
+                offset: 255.37,
+                unit: Unit::Kelvin,
+            },
+        ];
+
+        for reading in parts {
+            for kelvin in [283.15, 291.15, 293.15, 295.15, 300.0] {
+                let bytes = encode(&reading, kelvin);
+                let back = reading.format.counts(&bytes).expect("counts")
+                    * reading.scale
+                    + reading.offset;
+                // Within half a count, which is the sensor's quantisation
+                // and not an error in the arithmetic.
+                assert!(
+                    (back - kelvin).abs() <= reading.scale / 2.0 + 1e-9,
+                    "{kelvin} K encoded as {bytes:?} reads back as {back}"
+                );
+            }
+        }
+
+        // And a value the format cannot hold is clamped, not wrapped: a
+        // wrapped count is a sensor reporting the other end of its range.
+        let part = ToValueParams {
+            format: Format::U16Be,
+            scale: 1.0,
+            offset: 0.0,
+            unit: Unit::Kelvin,
+        };
+        assert_eq!(encode(&part, -50.0), vec![0x00, 0x00]);
+        assert_eq!(encode(&part, 1e9), vec![0xFF, 0xFF]);
+    }
+
+    /// A free port, for a payload that is the end which waits.
+    ///
+    /// A heater binds the address the configuration gives, because a device
+    /// the vehicle drives is the end that has to be findable, so the test
+    /// has to name one that is free rather than take whatever a socket of
+    /// its own was given.
+    ///
+    /// # Returns
+    ///
+    /// A loopback UDP port that was free a moment ago.
+    ///
+    /// # Panics
+    ///
+    /// If no socket can be bound.
+    fn a_free_port() -> u16 {
+        let socket =
+            std::net::UdpSocket::bind("127.0.0.1:0").expect("a socket");
+        let port = socket.local_addr().expect("its address").port();
+        drop(socket);
+        port
+    }
+
+    /// Configures a simulated payload of the thermostat example, joined to
+    /// the world.
+    ///
+    /// # Arguments
+    ///
+    /// * `name`       - The payload's name.
+    /// * `at`         - The loopback UDP port it uses.
+    /// * `bytes`      - Its packet size, and its segment size too.
+    /// * `every`      - The packet interval in ms: for a sensor how often it
+    ///                  reports, and for a heater -- which sends nothing --
+    ///                  how often it looks for what the vehicle decided.
+    /// * `attachment` - What it is to the world.
+    ///
+    /// # Returns
+    ///
+    /// Its configuration, sending from the start.
+    fn attached(
+        name: &str,
+        at: u16,
+        bytes: u32,
+        every: u32,
+        attachment: Attachment,
+    ) -> PayloadConfig {
+        PayloadConfig {
+            attachment: Some(attachment),
+            thermostat: None,
+            name: name.to_string(),
+            protocol: PayloadProtocol::Udp,
+            address: "127.0.0.1".to_string(),
+            port: at,
+            bus_address: 0,
+            can_id: 0,
+            can_fd: false,
+            gpio_lines: Vec::new(),
+            triggered: false,
+            faults: Default::default(),
+            own_address: None,
+            own_port: None,
+            packet_size: Arc::new(AtomicU32::new(bytes)),
+            segment_size: Arc::new(AtomicU32::new(bytes)),
+            packet_interval_ms: Arc::new(AtomicU32::new(every)),
+            segment_interval_ms: Arc::new(AtomicU32::new(0)),
+            sending: Arc::new(std::sync::atomic::AtomicBool::new(true)),
+            standing: Default::default(),
+            driven: false,
+        }
+    }
+
+    /// The example's thermostat, as the vehicle's own nodes would decide it.
+    ///
+    /// The median of the three readings, and a heat decision that turns on
+    /// below the band and off above it -- `vote` and `hysteresis`, whose own
+    /// arithmetic is tested where it lives. Here they stand in for the
+    /// vehicle, so that what is tested is the loop: the world, the encoding,
+    /// the two links and the heaters.
+    ///
+    /// # Arguments
+    ///
+    /// * `readings` - The sensors' latest temperatures, in kelvin.
+    /// * `heating`  - Whether the heaters are on now, which is kept inside
+    ///                the band.
+    ///
+    /// # Returns
+    ///
+    /// Whether the heaters are to be on.
+    ///
+    /// # Panics
+    ///
+    /// If a reading is NaN, or there are none.
+    fn decide(readings: &[f64], heating: bool) -> bool {
+        let mut sorted = readings.to_vec();
+        sorted.sort_by(|a, b| a.partial_cmp(b).expect("no NaN temperatures"));
+        let voted = sorted[sorted.len() / 2];
+        match voted {
+            t if t < SETPOINT - HALF_BAND => true,
+            t if t > SETPOINT + HALF_BAND => false,
+            _ => heating,
+        }
+    }
+
+    const SETPOINT: f64 = 293.15;
+    const HALF_BAND: f64 = 2.0;
+    /// The example's sample rate: how often each sensor reports.
+    const SAMPLE_MS: u32 = 100;
+    /// How often a heater looks for a decision.
+    ///
+    /// Faster than the sensors sample, and for a reason the overshoot
+    /// shows: a decision is only as prompt as the slower of the two, so a
+    /// heater that looked every sample would double the time the vehicle
+    /// spends heating a zone that has already arrived.
+    const LOOK_MS: u32 = 20;
+    /// What each heater adds, in kelvin a second: sixty watts on twenty
+    /// joules a kelvin.
+    const HEATER_RATE: f64 = 3.0;
+
+    /// The loop closes: the zone the sensors report is warmed by what the
+    /// vehicle decided, the band is held, and a lost decision is corrected.
+    ///
+    /// Everything here is the real thing but the vehicle: three simulated
+    /// sensors and two simulated heaters, each a payload thread of its own
+    /// sending and receiving over real sockets, joined to one world. The
+    /// vehicle's part is [`decide`], which is what its `vote` and
+    /// `hysteresis` nodes come to.
+    ///
+    /// It is the one test that can fail for a reason outside this file -- a
+    /// loaded machine delays a packet, and a late sample is a late decision
+    /// -- so what it holds is the shape of the answer and not a trajectory:
+    /// the zone starts cold, reaches the band, and from then on stays inside
+    /// it within one sample of heating. A bound of one sample is the
+    /// physics: the vehicle cannot switch heaters off between two readings,
+    /// so the most it can overshoot by is what they add in the interval it
+    /// did not look.
+    #[test]
+    fn the_heaters_hold_the_zone_in_band_through_a_lost_decision() {
+        let (world, place) = zone_world();
+        let temperature = place("zone.temperature");
+
+        // The two encodings of the example, so that what is voted over is
+        // readings of one temperature in different formats.
+        let two_byte = ToValueParams {
+            format: Format::I16Be,
+            scale: 0.0625,
+            offset: 273.15,
+            unit: Unit::Kelvin,
+        };
+        let three_byte = ToValueParams {
+            format: Format::U24Be,
+            scale: 0.0078,
+            offset: 255.37,
+            unit: Unit::Kelvin,
+        };
+
+        // The vehicle's end of each sensor link, which is the end that
+        // waits: a sensor speaks first and this is where it speaks to.
+        let readings = [two_byte, two_byte, three_byte];
+        let waiting: Vec<std::net::UdpSocket> = (0..3)
+            .map(|_| {
+                let socket = std::net::UdpSocket::bind("127.0.0.1:0")
+                    .expect("a socket for the vehicle");
+                socket.set_nonblocking(true).expect("non-blocking");
+                socket
+            })
+            .collect();
+
+        let mut payloads: Vec<SimulatedPayload> = Vec::new();
+        for (n, (socket, reading)) in waiting.iter().zip(readings).enumerate() {
+            let at = socket.local_addr().expect("its address").port();
+            let bytes = if reading.format == Format::U24Be {
+                3
+            } else {
+                2
+            };
+            let mut sensor = SimulatedPayload::new(attached(
+                &format!("temp_{}", n + 1),
+                at,
+                bytes,
+                SAMPLE_MS,
+                Attachment::Reports {
+                    world: world.clone(),
+                    place: temperature,
+                    offset: 0.0,
+                    reading,
+                    sensor: Arc::new(Sensor::new(
+                        "sensor",
+                        SensorErrors::default(),
+                        0,
+                    )),
+                },
+            ));
+            sensor.start().expect("a sensor starts");
+            payloads.push(sensor);
+        }
+
+        // And the heaters, which wait to be driven.
+        //
+        // Their ports are asked for by binding and letting go, so a port
+        // that was free when it was chosen may be taken by the time the
+        // heater binds it -- which would leave the loop open at one end. So
+        // the pair is asked for again: a port that was free a moment ago is
+        // not a port that is free, and a heater that lost one says so in its
+        // own words on the way past.
+        //
+        // Waiting for each to be listening is what tells a lost port from a
+        // slow start. Without it a heater that never bound would show up at
+        // the end of this test as a zone that would not warm, which says
+        // nothing about why.
+        let mut heaters = Vec::new();
+        for attempt in 1..=10 {
+            let ports: Vec<u16> = (0..2).map(|_| a_free_port()).collect();
+            let mut started: Vec<SimulatedPayload> = Vec::new();
+            for (n, at) in ports.iter().enumerate() {
+                let mut heater = SimulatedPayload::new(attached(
+                    &format!("heaters_{}", n + 1),
+                    *at,
+                    1,
+                    LOOK_MS,
+                    Attachment::Drives {
+                        world: world.clone(),
+                        place: place(&format!("heater_{}.on", n + 1)),
+                    },
+                ));
+                heater.start().expect("a heater starts");
+                started.push(heater);
+            }
+
+            let listening = ports.iter().all(|at| {
+                (0..100).any(|_| {
+                    if std::net::UdpSocket::bind(("127.0.0.1", *at)).is_err() {
+                        return true;
+                    }
+                    std::thread::sleep(Duration::from_millis(10));
+                    false
+                })
+            });
+            if listening {
+                payloads.extend(started);
+                heaters = ports;
+                break;
+            }
+
+            for mut heater in started {
+                heater.stop();
+            }
+            assert!(
+                attempt < 10,
+                "ten pairs of ports were taken between being chosen and \
+                 being bound"
+            );
+        }
+
+        // The vehicle's end of the heater links: it sends where the file
+        // says the heater is, which is what `reaching_endpoint_pair` does
+        // aboard.
+        let driving = std::net::UdpSocket::bind("127.0.0.1:0")
+            .expect("a socket for the vehicle");
+        let drive = |on: bool| {
+            for at in &heaters {
+                let _ = driving
+                    .send_to(if on { b"1" } else { b"0" }, ("127.0.0.1", *at));
+            }
+        };
+
+        // What the vehicle has heard from each sensor, and what it decided.
+        let mut latest: Vec<Option<f64>> = vec![None; 3];
+        let mut heating = false;
+        // Whether the one decision this test throws away has been thrown
+        // away yet.
+        let mut lost = false;
+        let mut reached: Option<Duration> = None;
+        let mut lowest = f64::MAX;
+        let mut highest = f64::MIN;
+
+        let start = Instant::now();
+        // Long enough to climb eight kelvin at six a second and then to be
+        // watched holding the band for a while after it has.
+        let watch = Duration::from_secs(4);
+        while start.elapsed() < watch {
+            let mut arrived = false;
+            for (n, (socket, reading)) in
+                waiting.iter().zip(&readings).enumerate()
+            {
+                let mut buffer = [0u8; 64];
+                while let Ok(got) = socket.recv(&mut buffer) {
+                    if let Ok(counts) = reading.format.counts(&buffer[..got]) {
+                        latest[n] =
+                            Some(counts * reading.scale + reading.offset);
+                        arrived = true;
+                    }
+                }
+            }
+
+            // Decided on every arrival and not on every pass, which is what
+            // the vote node does -- and what decides how often the heaters
+            // are told anything.
+            if !arrived {
+                std::thread::sleep(Duration::from_millis(5));
+                continue;
+            }
+            if let Some(reported) =
+                latest.iter().copied().collect::<Option<Vec<f64>>>()
+            {
+                // Driven on every sample, which is what the vehicle does:
+                // the hysteresis node asserts its decision each time a
+                // temperature arrives and the devices are held at it.
+                //
+                // The first word to switch them off is thrown away, as a
+                // lost datagram throws one away. That is the failure this
+                // arrangement exists for: a decision sent once and left to
+                // stand would leave the heaters on with the vehicle
+                // believing otherwise, and the zone with no bound on where
+                // it goes.
+                let want = decide(&reported, heating);
+                let switching_off = heating && !want;
+                heating = want;
+                if switching_off && !lost {
+                    lost = true;
+                } else {
+                    drive(heating);
+                }
+
+                let voted = {
+                    let mut sorted = reported.clone();
+                    sorted.sort_by(|a, b| a.partial_cmp(b).expect("no NaN"));
+                    sorted[1]
+                };
+                if reached.is_none() && voted >= SETPOINT - HALF_BAND {
+                    reached = Some(start.elapsed());
+                }
+                if reached.is_some() {
+                    lowest = lowest.min(voted);
+                    highest = highest.max(voted);
+                }
+            }
+
+            std::thread::sleep(Duration::from_millis(5));
+        }
+
+        for payload in &mut payloads {
+            payload.stop();
+        }
+
+        // It started cold and the heaters brought it to the band. Six
+        // kelvin a second over eight kelvin is under two seconds, and the
+        // bound here is loose enough for a loaded machine to be slow at it.
+        let reached = reached.unwrap_or_else(|| {
+            panic!(
+                "the zone never reached the band: it is at {} K, and the \
+                 vehicle {} driving the heaters",
+                world.read(temperature, Instant::now()),
+                if heating { "is" } else { "is not" }
+            )
+        });
+        assert!(
+            reached < Duration::from_secs(3),
+            "eight kelvin at six a second took {reached:?}"
+        );
+
+        // The loss has to have happened, or this test is only the band test
+        // under a longer name.
+        assert!(
+            lost,
+            "the heaters were never switched off, so no decision was lost"
+        );
+
+        // And from then on it is held, within what the loop cannot help.
+        // Three delays make the overshoot here: the vehicle does not see the
+        // band crossed until the next sample, the heaters do not hear about
+        // it until they next look, and the first word to switch them off was
+        // thrown away -- so one more sample of heating before the next
+        // assertion corrects it. A tenth of a kelvin on top of that is the
+        // scheduler, which is a thirtieth of the interval and not a
+        // trajectory this test is holding anybody to.
+        let delay = (2 * SAMPLE_MS + LOOK_MS) as f64 / 1000.0;
+        let slack = 2.0 * HEATER_RATE * delay + 0.1;
+        assert!(
+            highest <= SETPOINT + HALF_BAND + slack,
+            "it went {highest} K, over a band ending at {} K",
+            SETPOINT + HALF_BAND
+        );
+        assert!(
+            lowest >= SETPOINT - HALF_BAND - slack,
+            "it fell to {lowest} K, under a band starting at {} K",
+            SETPOINT - HALF_BAND
+        );
+    }
+}

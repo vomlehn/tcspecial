@@ -179,7 +179,7 @@ mod tests {
         faults: Faults,
     ) -> SimulatedPayload {
         SimulatedPayload::new(PayloadConfig {
-            thermal: None,
+            attachment: None,
             thermostat: None,
             name: "DH0".to_string(),
             protocol: PayloadProtocol::Tcp,

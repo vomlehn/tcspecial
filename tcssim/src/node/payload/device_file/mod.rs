@@ -199,7 +199,7 @@ mod tests {
     /// The device, not yet started.
     fn device_at(path: &Path, packet: u32) -> SimulatedPayload {
         SimulatedPayload::new(PayloadConfig {
-            thermal: None,
+            attachment: None,
             thermostat: None,
             name: "DH0".to_string(),
             protocol: PayloadProtocol::Device,

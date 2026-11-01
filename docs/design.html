@@ -536,7 +536,7 @@ ul.auto-toc {
 <li><a class="reference internal" href="#simulator-configuration-files" id="toc-entry-125">Simulator Configuration Files</a><ul>
 <li><a class="reference internal" href="#file-structure" id="toc-entry-126">File Structure</a></li>
 <li><a class="reference internal" href="#what-a-simulated-payload-stands-in-for" id="toc-entry-127">What a Simulated Payload Stands In For</a></li>
-<li><a class="reference internal" href="#thermal-masses" id="toc-entry-128">Thermal Masses</a></li>
+<li><a class="reference internal" href="#the-physics-model" id="toc-entry-128">The Physics Model</a></li>
 <li><a class="reference internal" href="#fault-injection" id="toc-entry-129">Fault Injection</a></li>
 <li><a class="reference internal" href="#matching" id="toc-entry-130">Matching</a></li>
 <li><a class="reference internal" href="#example" id="toc-entry-131">Example</a></li>
@@ -1925,7 +1925,7 @@ connects and is matched, and the beacon says the configuration's checksum;
 beacons are heard; a simulated reading arrives as the thermometer's channel,
 its two bytes, and the temperature made of it as <tt class="docutils literal">zone_temp</tt>'s, a number
 of kelvin, with no datum refused as not a value; a PING is answered; a node is stopped and started again; <tt class="docutils literal">1</tt> sent up
-drives the heater, whose stand-in warms the thermal mass the thermometer
+drives the heater, whose stand-in switches the heater warming the zone the thermometer
 reads, so that <tt class="docutils literal">zone_temp</tt> climbs and <tt class="docutils literal">heater_wanted</tt>'s decision channel
 goes false, with no datum refused as not a decision, and <tt class="docutils literal">0</tt> turns it off; a node the
 configuration lacks is refused unsent; a restart onto a configuration the
@@ -3272,7 +3272,7 @@ actually switched. True, and it was applied to the link as well, where it does
 not hold. A heater's state then lived in one place -- the vehicle's last
 decision -- and was asserted only on a change, with nothing reading back what
 the heater was doing. One lost datagram stood for ever: the vehicle believing
-it had switched the heaters off, the mass climbing past the top of the band,
+it had switched the heaters off, the zone climbing past the top of the band,
 and the thermostat deciding <tt class="docutils literal">Off</tt> again, finding it had already said so, and
 staying silent. The decision that would correct it is the one it thinks it has
 already sent.</p>
@@ -10854,96 +10854,162 @@ datagram payload a path beside the handler's.</dd>
 <dd>A group may carry the type and the transport, like every other setting a
 payload does not state. A group whose payloads are not all reached the
 same way leaves them with the payloads: the thermostat's sensors share a
-rate and a thermal mass, and two of the three are on a different kind of
+rate and a terminal, and two of the three are on a different kind of
 bus from the third.</dd>
 </dl>
 </div>
-<div class="section" id="thermal-masses">
-<h2><a class="toc-backref" href="#toc-entry-128">Thermal Masses</a></h2>
+<div class="section" id="the-physics-model">
+<h2><a class="toc-backref" href="#toc-entry-128">The Physics Model</a></h2>
 <p>Every other simulated payload makes its bytes up. A buffer filled from a
 random number generator exercises a link and nothing at all of a control loop:
 three sensors sending noise never agree, so the vote over them produces
 nothing anybody can check, and a thermostat downstream of it cannot be watched
 holding a band.</p>
-<p>A thermal mass is what makes them agree. The sensors attached to one report
-its temperature, each in its own encoding, and the heaters attached to it warm
-it -- so what the vehicle reads is a consequence of what the vehicle drove,
-and the whole loop can be watched closing.</p>
+<p>A physics model is what makes them agree. It is the vehicle's physical parts
+-- a zone, the heaters that warm it -- each simulated alone and joined to the
+others, and the stand-ins are joined to it: the sensors report the zone's
+temperature, each in its own encoding, and the heaters' stand-ins switch the
+heaters -- so what the vehicle reads is a consequence of what the vehicle
+drove, and the whole loop can be watched closing.</p>
 <dl class="docutils">
 <dt>Requirement</dt>
-<dd>Thermal masses are declared in a physics model: a YAML file of its own,
-which the simulator file names with <tt class="docutils literal">physics</tt>, relative to the
-simulator file's directory. A vehicle's physics outlives any one
-configuration of its payloads, so it is stated once and named by every
-simulator file that uses it; the manual's thermostat fixture and the
-thermostat example name one model. A simulator file that still declares
-masses itself is refused, told where they go.</dd>
+<dd>The model is a YAML file of its own, which the simulator file names with
+<tt class="docutils literal">physics</tt>, relative to the simulator file's directory. A vehicle's
+physics outlives any one configuration of its payloads, so it is stated
+once and named by every simulator file that uses it; the manual's
+thermostat fixture and the thermostat example name one model. A
+simulator file that still declares masses itself is refused, told where
+they go.</dd>
 <dt>Requirement</dt>
 <dd>The model is a list of elements, each with a name and a <tt class="docutils literal">type</tt>, as a
-configuration is a list of nodes: <tt class="docutils literal">thermal_mass</tt> is the one type so
-far, and an element of any other is refused. Each type's settings, and
-its rules, are stated once, in <tt class="docutils literal"><span class="pre">tcslibgs::physics</span></tt>; its arithmetic is
-the simulator's.</dd>
+configuration is a list of nodes, and a list of connections between
+them, as a configuration has links. The types are <tt class="docutils literal">heater</tt> and
+<tt class="docutils literal">thermal_zone</tt>, and an element of any other is refused; a
+<tt class="docutils literal">thermal_mass</tt>, the one type there was before a model was made of
+parts, is told what it is now. Each type's settings, terminals and rules
+are stated once, in <tt class="docutils literal"><span class="pre">tcslibgs::physics</span></tt>; its arithmetic is the
+simulator's, in <tt class="docutils literal"><span class="pre">tcssim::physics</span></tt>.</dd>
 <dt>Requirement</dt>
-<dd>A thermal mass has a name, the temperature of the environment it sits
-in, and a time constant: how long it takes to lose a given fraction of
-the difference between itself and that environment.</dd>
+<dd>Each type is one simple part, with its own words for what goes in and
+what comes out, rather than a whole assembly: a heater is switched
+<tt class="docutils literal">on</tt> and gives out <tt class="docutils literal">heat</tt> and draws <tt class="docutils literal">current</tt>; a zone takes
+<tt class="docutils literal">heat</tt> and has a <tt class="docutils literal">temperature</tt>. A vehicle is made by joining parts,
+so a part is written once and a different vehicle is different
+connections.</dd>
 <dt>Requirement</dt>
-<dd><tt class="docutils literal">tcsverify</tt> reads the model a simulator file names, and reports a
-problem with a mass at its line in the model, and a model that cannot
-be read at the simulator file's <tt class="docutils literal">physics</tt> line.</dd>
+<dd>Each type's terminals are fixed. A terminal is an input or an output,
+and carries a value in one unit or a decision: a heater's <tt class="docutils literal">heat</tt> is in
+watts and its <tt class="docutils literal">on</tt> a decision, a zone's <tt class="docutils literal">temperature</tt> in kelvin. A
+connection goes from an output to an input of the same kind, written
+<tt class="docutils literal">from: heater_1.heat</tt> and <tt class="docutils literal">to: zone.heat</tt>, and one joining two
+outputs, two inputs or two kinds is refused, naming both.</dd>
 <dt>Requirement</dt>
-<dd>A mass may name inputs, where heaters are connected, and outputs, where
-sensors read it. Any of them may be left unconnected. A list naming one
-twice is refused.</dd>
+<dd>An input takes one output, or the sum of every output joined to it where
+its type says so: a zone's <tt class="docutils literal">heat</tt> is the sum of its heaters'. A second
+output on an input that takes one, or a connection made twice, is
+refused. An input that must be joined -- a heater's <tt class="docutils literal">on</tt> -- and is
+not, is refused: it is a part nothing can switch.</dd>
 <dt>Requirement</dt>
-<dd>A simulated payload may be attached to a mass, either as something that
-reads one of its outputs or as something that heats it through one of
-its inputs. A heater states what it adds, in kelvin a second.</dd>
+<dd>Every figure is written with its unit -- <tt class="docutils literal">&quot;283.15 K&quot;</tt>, <tt class="docutils literal">&quot;60 W&quot;</tt>,
+<tt class="docutils literal">&quot;20 J/K&quot;</tt> -- and one without it, or in another unit, is refused,
+saying what to write. A bare <tt class="docutils literal">60</tt> could be watts or kelvin a second,
+which differ by the zone's heat capacity. A fraction, which has no unit,
+is written bare.</dd>
 <dt>Requirement</dt>
-<dd>An input is one heater's. Two heaters on one input would each switch the
-other's heat, and which was on would depend on which the vehicle drove
-last.</dd>
+<dd>A heater states its power at its nominal voltage and that voltage. A
+thermal zone states the temperature of the environment it sits in, its
+time constant -- how long it takes to lose a given fraction of the
+difference between itself and that environment -- and its heat
+capacity, which turns a heater's watts into kelvin a second.</dd>
 <dt>Requirement</dt>
-<dd>The mass is one lump at one temperature, so every output reads the
-same. What the names say is which sensor is on which.</dd>
+<dd>A simulated payload is joined to one terminal by <tt class="docutils literal">connects</tt>, written
+as a connection's end is: <tt class="docutils literal">connects: zone.temperature</tt>. Joined to an
+output, it reports it; joined to an input, it drives it, which a
+stand-in can do only to an input taking a decision, a decision being
+what a vehicle sends a stand-in. A terminal the model does not have is
+refused, naming what it has. The settings that joined a payload to a
+thermal mass, <tt class="docutils literal">reads</tt>, <tt class="docutils literal">heats</tt>, <tt class="docutils literal">output</tt>, <tt class="docutils literal">input</tt> and <tt class="docutils literal">rate</tt>,
+are refused, told what says it now.</dd>
 <dt>Requirement</dt>
-<dd>A mass nothing is attached to is refused. It would be a state nothing
-reads and nothing changes, which is a file saying something it cannot
-mean.</dd>
+<dd>An input is driven by one stand-in, and not by a stand-in and a
+connection. Two would each switch it over the other, and which was in
+force would depend on which the vehicle drove last.</dd>
+<dt>Requirement</dt>
+<dd>An element nothing is joined to -- no connection and no stand-in -- is
+refused. It would be a state nothing reads and nothing changes, and the
+likeliest cause is a misspelled <tt class="docutils literal">connects</tt>.</dd>
+<dt>Requirement</dt>
+<dd><tt class="docutils literal">tcsverify</tt> reads the model a simulator file names, and reports every
+problem with an element at its line in the model, a problem with the
+connections at the model's <tt class="docutils literal">connections</tt> line, and a model that
+cannot be read at the simulator file's <tt class="docutils literal">physics</tt> line.</dd>
 </dl>
-<p>The arithmetic is Newton's cooling with a constant heat,</p>
+<p><strong>How the world advances</strong></p>
+<p>The simulator makes one world of the model, which every stand-in joined to
+it shares, and nothing ticks.</p>
+<dl class="docutils">
+<dt>Requirement</dt>
+<dd>The world is brought up to a moment only when something needs it there:
+a stand-in reading an output, or driving an input. A world nobody asks
+about costs nothing.</dd>
+<dt>Requirement</dt>
+<dd>Simulated time tracks the wall clock, a second for a second from when
+the world was made, because the vehicle at the other end of every link
+runs on the wall clock. The mapping has a rate, so that a world can run
+faster than the wall clock where nothing at the other end needs it to
+keep pace; a run with tcspecial keeps it at one.</dd>
+<dt>Requirement</dt>
+<dd>Between two moments every element is advanced with its inputs held, by
+its type's closed form where there is one, which is exact. The world is
+advanced whenever it is asked, so its intervals are whatever length the
+traffic makes them, and a method whose error grew with the interval
+would make the simulated values depend on how often somebody looked.</dd>
+<dt>Requirement</dt>
+<dd>Where an element's behaviour changes inside an interval -- a battery
+reaching full, a body reaching the ground -- it foresees the moment, as
+its next event. The events wait in a queue, soonest first, one for each
+element, set again whenever the element's inputs change; the world
+advances to each in its order, lets it happen and goes on, so nothing is
+stepped across. The queue's room is the number of elements, fixed when
+the world is made, and nothing is allocated once it runs.</dd>
+<dt>Requirement</dt>
+<dd>What is at each input is worked out from every output as it stands at
+the start of an interval, and given again until it settles, so that a
+heater switched on is a zone warmed from that moment and not from the
+next one.</dd>
+<dt>Requirement</dt>
+<dd>An element that foresees its next event at the moment it is already at,
+time after time, is stopped after ten thousand and the log says so: the
+world falls behind rather than every stand-in waiting on it for ever.</dd>
+</dl>
+<p><strong>A thermal zone and its heaters</strong></p>
+<p>A heater's heat goes as the square of its supply voltage and its current as
+the voltage, <tt class="docutils literal">power * (1 + <span class="pre">v)^2</span></tt> and <tt class="docutils literal">power / voltage * (1 + v)</tt> with
+<tt class="docutils literal">v</tt> the supply's departure from nominal, nought while it is off. A zone's
+arithmetic is Newton's cooling with that heat held,</p>
 <pre class="code text literal-block">
-dT/dt = -(T - environment) / time_constant + heat
+dT/dt = -(T - environment) / time_constant + heat / capacity
 </pre>
-<p>where <tt class="docutils literal">heat</tt> is the sum of the rates of the heaters that are on. Between two
-changes of that sum it is constant, so the equation has a closed form, and the
-mass is stepped by that rather than integrated:</p>
+<p>which over an interval has a closed form, and the zone is advanced by that
+rather than integrated:</p>
 <pre class="code text literal-block">
 T(t + dt) = rest + (T - rest) * exp(-dt / time_constant)
-rest      = environment + heat * time_constant
+rest      = environment + heat / capacity * time_constant
 </pre>
-<dl class="docutils">
-<dt>Requirement</dt>
-<dd>The mass is stepped exactly, whenever it is read and whenever a heater
-changes. A method whose error grew with the step would make the simulated
-temperature depend on how often somebody looked at it.</dd>
-</dl>
-<p><tt class="docutils literal">rest</tt> is where the mass would settle with that heat on for ever, and it is
+<p><tt class="docutils literal">rest</tt> is where the zone would settle with that heat on for ever, and it is
 the figure that says whether the heaters can win at all: with a fifty second
-constant and six kelvin a second of heat, it is three hundred kelvin above the
-environment.</p>
+constant, twenty joules a kelvin and a hundred and twenty watts, it is three
+hundred kelvin above the environment.</p>
 <dl class="docutils">
 <dt>Requirement</dt>
-<dd>A mass starts at its environment, with its heaters off. A mass that
-started at the setpoint would hide the one part of the loop worth
-watching, and a vehicle coming up cold is the case a thermostat exists
-for.</dd>
+<dd>A zone starts at its environment, and a heater off. A zone that started
+at the setpoint would hide the one part of the loop worth watching, and
+a vehicle coming up cold is the case a thermostat exists for.</dd>
 </dl>
 <p><strong>What the bytes are</strong></p>
-<p>A sensor has to send bytes the vehicle will read back as the temperature, and
+<p>A sensor has to send bytes the vehicle will read back as what it reports, and
 the format, the scale and the offset are not the sensor's own: they are on the
-<tt class="docutils literal">to_kelvin</tt> node its readings go to.</p>
+conversion, <tt class="docutils literal">to_kelvin</tt> or <tt class="docutils literal">to_value</tt>, its readings go to.</p>
 <dl class="docutils">
 <dt>Requirement</dt>
 <dd>The encoding is taken from that node and not stated here. A scale written
@@ -10951,79 +11017,84 @@ in both files is a scale that can disagree with itself, which would show
 up as a simulated temperature the vehicle reads back as a different one,
 with both files looking right.</dd>
 <dt>Requirement</dt>
-<dd>A sensor attached to a mass whose readings reach no conversion is
-refused, and so is one whose readings reach two. The first has no
-encoding to borrow and the second has no single answer.</dd>
+<dd>A sensor whose readings reach no conversion is refused, and so is one
+whose readings reach two, and one whose conversion is in another unit
+than the terminal it reports. The first has no encoding to borrow, the
+second has no single answer, and the third would have a zone's
+temperature read back as volts.</dd>
 <dt>Requirement</dt>
-<dd>A temperature the format cannot hold is clamped and not wrapped. A
-wrapped count is a sensor reporting the other end of its range, which is
-a fault the vehicle has no way to tell from a reading.</dd>
+<dd>A value the format cannot hold is clamped and not wrapped. A wrapped
+count is a sensor reporting the other end of its range, which is a fault
+the vehicle has no way to tell from a reading.</dd>
 </dl>
-<p><strong>What a heater is</strong></p>
+<p><strong>What a heater's stand-in is</strong></p>
 <dl class="docutils">
 <dt>Requirement</dt>
-<dd>A heater sends nothing. Being driven is the whole of what it is for, so a
-packet of its own would be bytes nothing reads.</dd>
+<dd>A stand-in that drives sends nothing. Being driven is the whole of what
+it is for, so a packet of its own would be bytes nothing reads.</dd>
 <dt>Requirement</dt>
-<dd>A heater's packet interval is how often it looks for what the vehicle
-decided. It is the one thing pacing still means for a payload that sends
-nothing, and it is part of how promptly the loop responds: the vehicle
-cannot see a band crossed until its next sample, and the heaters cannot
-hear about it until they next look, so the overshoot is their rate over
-the sum of the two.</dd>
+<dd>Its packet interval is how often it looks for what the vehicle decided.
+It is the one thing pacing still means for a payload that sends nothing,
+and it is part of how promptly the loop responds: the vehicle cannot see
+a band crossed until its next sample, and the heaters cannot hear about
+it until they next look, so the overshoot is their heat over the sum of
+the two.</dd>
 <dt>Requirement</dt>
-<dd>A heater acts on the last thing the vehicle said and not on the next
-thing in the queue. A decision is not a reading -- it says what the
-device should be now -- so a vehicle deciding faster than the heater
-looks must not leave it acting on a decision that is older every pass.</dd>
+<dd>It acts on the last thing the vehicle said and not on the next thing in
+the queue. A decision is not a reading -- it says what the device should
+be now -- so a vehicle deciding faster than the stand-in looks must not
+leave it acting on a decision that is older every pass.</dd>
 <dt>Requirement</dt>
-<dd>A heater must be a kind of payload the simulator can be driven through:
-a socket, or discrete lines on <tt class="docutils literal"><span class="pre">gpio-sim</span></tt>, whose stand-in watches the
+<dd>It must be a kind of payload the simulator can be driven through: a
+socket, or discrete lines on <tt class="docutils literal"><span class="pre">gpio-sim</span></tt>, whose stand-in watches the
 lines the vehicle drives.</dd>
 </dl>
 <p><strong>Physically Realistic Noise</strong></p>
-<p>A simulated sensor that reports the mass exactly agrees with the others to
+<p>A simulated sensor that reports the zone exactly agrees with the others to
 the count, and a vote over sensors that always agree is never exercised.
 Real readings go wrong in two places, and a loop treats them differently:
 what goes wrong at a sensor is its own, and a vote can outvote it; what goes
-wrong in the mass every sensor sees, and the heaters must work against it.</p>
+wrong in the zone every sensor sees, and the heaters must work against it.</p>
 <dl class="docutils">
 <dt>Requirement</dt>
 <dd>A sensor may state the noise on each reading, the accuracy its fixed
 calibration error is drawn within, a slow drift and its time, and its
-own lag, each as a datasheet gives it. The calibration error is drawn
-once a run, normally distributed with a third of the accuracy as its
-standard deviation and clamped to the accuracy, which is a bound most
-parts sit well inside.</dd>
+own lag, each as a datasheet gives it and in the unit of the terminal it
+reports, which is checked. The calibration error is drawn once a run,
+normally distributed with a third of the accuracy as its standard
+deviation and clamped to the accuracy, which is a bound most parts sit
+well inside.</dd>
 <dt>Requirement</dt>
-<dd>A heater may state how its supply voltage varies, and how slowly. Its
-power goes as the square of its voltage, so it warms by
-<tt class="docutils literal">rate * (1 + <span class="pre">v)^2</span></tt>.</dd>
+<dd>A sensor may state how far the place it is on sits from what its
+terminal says, as its <tt class="docutils literal">offset</tt>: a body warmed in one place is not one
+temperature throughout.</dd>
 <dt>Requirement</dt>
-<dd>A mass may state how its environment swings as a sine wave, and over
-what period; how it wanders at random, and how slowly; and how far each
-output sits from the mass's temperature.</dd>
+<dd>A heater may state how its supply voltage varies, and how slowly.</dd>
+<dt>Requirement</dt>
+<dd>A zone may state how its environment swings as a sine wave, and over
+what period, and how it wanders at random, and how slowly.</dd>
 <dt>Requirement</dt>
 <dd>Everything that wanders is an Ornstein-Uhlenbeck process stepped by its
 exact transition, so that its statistics do not depend on how often it
 is stepped, and starts where a settled one would be. The swing is in
-the mass's equation, whose closed form gains the swing's steady
-response, so it is stepped as exactly as the rest. A wander is held for
-a step, which is exact for steps much shorter than its time constant.</dd>
+the zone's equation, whose closed form gains the swing's steady
+response, so it is advanced as exactly as the rest. A wander is held for
+an interval, which is exact for intervals much shorter than its time
+constant.</dd>
 <dt>Requirement</dt>
-<dd>Each mass and each sensor draws from a generator of its own, seeded
+<dd>Each element and each sensor draws from a generator of its own, seeded
 from the run's seed and its name, so that a run with the same seed
 varies the same way whatever order the payloads' threads ask in. The
 seed is the <tt class="docutils literal">tcssim</tt> section's; without one tcssim chooses it and
 says which.</dd>
 <dt>Requirement</dt>
 <dd>Every one of these is off unless stated, so a file that states none
-simulates the mass and its sensors as exactly as before.</dd>
+simulates the zone and its sensors exactly.</dd>
 </dl>
 <p><strong>A Stood-in Thermostat</strong></p>
-<p>The loop closes through tcspecial when the heaters are attached: the
-sensors report the mass, the vehicle decides, the heaters warm it. To watch
-the mass and the heaters with no tcspecial running, tcssim can stand in for
+<p>The loop closes through tcspecial when the heaters are joined: the sensors
+report the zone, the vehicle decides, the heaters warm it. To watch the zone
+and the heaters with no tcspecial running, tcssim can stand in for
 the vehicle's thermostat too. It is <tt class="docutils literal"><span class="pre">tcssim::node::vehicle::thermostat</span></tt>,
 the one vehicle node the simulator has: everything else a vehicle computes
 runs on a workstation as it runs aboard.</p>
@@ -11033,8 +11104,8 @@ runs on a workstation as it runs aboard.</p>
 the configuration. tcssim then stands in for it, taking its <tt class="docutils literal">setpoint</tt>
 and <tt class="docutils literal">half_band</tt> from the configuration, which states them once.</dd>
 <dt>Requirement</dt>
-<dd>Its sensors are the simulated payloads reading a thermal mass whose data
-reaches the node, and its heaters the simulated payloads heating one that
+<dd>Its sensors are the simulated payloads reporting the world whose data
+reaches the node, and its heaters the simulated payloads driving it that
 data from the node reaches. A node that is not a hysteresis node, or
 that no such sensor reaches, or that reaches no such heater, is refused.</dd>
 <dt>Requirement</dt>
@@ -11149,24 +11220,37 @@ looks like. As there, the error is reported from the payload's end.</dd>
 <div class="section" id="example">
 <h2><a class="toc-backref" href="#toc-entry-131">Example</a></h2>
 <p>This is the shipped <tt class="docutils literal"><span class="pre">examples/thermostat/thermostat-sim.yaml</span></tt>, which
-simulates the three sensors and two heaters of <tt class="docutils literal">thermostat.ytcs</tt>, attached
-to the thermal mass <tt class="docutils literal">basic</tt> of the model it names,
-<tt class="docutils literal"><span class="pre">thermostat-physics.yaml</span></tt>:</p>
+simulates the three sensors and two heaters of <tt class="docutils literal">thermostat.ytcs</tt>, joined to
+the model it names, <tt class="docutils literal"><span class="pre">thermostat-physics.yaml</span></tt>: two heaters warming one
+zone.</p>
 <pre class="code yaml literal-block">
 <span class="name tag">physics</span><span class="punctuation">:</span><span class="whitespace">
-  </span><span class="punctuation indicator">-</span><span class="whitespace"> </span><span class="name tag">name</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">basic</span><span class="whitespace">
-    </span><span class="name tag">type</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">thermal_mass</span><span class="whitespace">
-    </span><span class="name tag">environment</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal string">&quot;283.15&quot;</span><span class="whitespace">
+  </span><span class="punctuation indicator">-</span><span class="whitespace"> </span><span class="name tag">name</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">heater_1</span><span class="whitespace">
+    </span><span class="name tag">type</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">heater</span><span class="whitespace">
+    </span><span class="name tag">power</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal string">&quot;60</span><span class="name variable"> </span><span class="literal string">W&quot;</span><span class="whitespace">
+    </span><span class="name tag">voltage</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal string">&quot;28</span><span class="name variable"> </span><span class="literal string">V&quot;</span><span class="whitespace">
+  </span><span class="punctuation indicator">-</span><span class="whitespace"> </span><span class="name tag">name</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">heater_2</span><span class="whitespace">
+    </span><span class="name tag">type</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">heater</span><span class="whitespace">
+    </span><span class="name tag">power</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal string">&quot;60</span><span class="name variable"> </span><span class="literal string">W&quot;</span><span class="whitespace">
+    </span><span class="name tag">voltage</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal string">&quot;28</span><span class="name variable"> </span><span class="literal string">V&quot;</span><span class="whitespace">
+  </span><span class="punctuation indicator">-</span><span class="whitespace"> </span><span class="name tag">name</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">zone</span><span class="whitespace">
+    </span><span class="name tag">type</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">thermal_zone</span><span class="whitespace">
+    </span><span class="name tag">environment</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal string">&quot;283.15</span><span class="name variable"> </span><span class="literal string">K&quot;</span><span class="whitespace">
     </span><span class="name tag">time_constant</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal string">&quot;50</span><span class="name variable"> </span><span class="literal string">s&quot;</span><span class="whitespace">
-    </span><span class="name tag">inputs</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal string">&quot;in1,in2&quot;</span><span class="whitespace">
-    </span><span class="name tag">outputs</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal string">&quot;out1,out2,out3&quot;</span>
+    </span><span class="name tag">capacity</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal string">&quot;20</span><span class="name variable"> </span><span class="literal string">J/K&quot;</span><span class="whitespace">
+
+</span><span class="name tag">connections</span><span class="punctuation">:</span><span class="whitespace">
+  </span><span class="punctuation indicator">-</span><span class="whitespace"> </span><span class="name tag">from</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">heater_1.heat</span><span class="whitespace">
+    </span><span class="name tag">to</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">zone.heat</span><span class="whitespace">
+  </span><span class="punctuation indicator">-</span><span class="whitespace"> </span><span class="name tag">from</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">heater_2.heat</span><span class="whitespace">
+    </span><span class="name tag">to</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">zone.heat</span>
 </pre>
 <p>The three sensors are read together and so share a group, which carries
-their rate and the thermal mass they report; the mass is what makes three sensors agree about a temperature, each
-on an output of its own. The heaters warm the mass, each through an input of
-its own while the vehicle has it on. Every one of them is the far end of a
-UDP socket, which the simulator stands in for with nothing more than a
-socket.</p>
+their rate and the terminal they report; the zone is what makes three
+sensors agree about a temperature, each from a place of its own on it. Each
+heater's stand-in switches its heater while the vehicle has it on. Every one
+of them is the far end of a UDP socket, which the simulator stands in for
+with nothing more than a socket.</p>
 <pre class="code yaml literal-block">
 <span class="name tag">description</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">Simulator settings for the payloads of thermostat.ytcs</span><span class="whitespace">
 
@@ -11174,43 +11258,39 @@ socket.</p>
 
 </span><span class="name tag">simulated_payload_groups</span><span class="punctuation">:</span><span class="whitespace">
   </span><span class="punctuation indicator">-</span><span class="whitespace"> </span><span class="name tag">name</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">zone_temps</span><span class="whitespace">
+    </span><span class="name tag">simulate</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">true</span><span class="whitespace">
     </span><span class="name tag">packet_interval</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">100 ms</span><span class="whitespace">
-    </span><span class="name tag">reads</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">basic</span><span class="whitespace">
+    </span><span class="name tag">connects</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">zone.temperature</span><span class="whitespace">
 
 </span><span class="name tag">simulated_payloads</span><span class="punctuation">:</span><span class="whitespace">
   </span><span class="punctuation indicator">-</span><span class="whitespace"> </span><span class="name tag">name</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">temp_1</span><span class="whitespace">
     </span><span class="name tag">type</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">network</span><span class="whitespace">
     </span><span class="name tag">protocol</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">udp</span><span class="whitespace">
     </span><span class="name tag">group</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">zone_temps</span><span class="whitespace">
-    </span><span class="name tag">output</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">out1</span><span class="whitespace">
 
   </span><span class="punctuation indicator">-</span><span class="whitespace"> </span><span class="name tag">name</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">temp_2</span><span class="whitespace">
     </span><span class="name tag">type</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">network</span><span class="whitespace">
     </span><span class="name tag">protocol</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">udp</span><span class="whitespace">
     </span><span class="name tag">group</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">zone_temps</span><span class="whitespace">
-    </span><span class="name tag">output</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">out2</span><span class="whitespace">
+    </span><span class="name tag">offset</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal string">&quot;+0.2</span><span class="name variable"> </span><span class="literal string">K&quot;</span><span class="whitespace">
 
   </span><span class="punctuation indicator">-</span><span class="whitespace"> </span><span class="name tag">name</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">temp_3</span><span class="whitespace">
     </span><span class="name tag">type</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">network</span><span class="whitespace">
     </span><span class="name tag">protocol</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">udp</span><span class="whitespace">
     </span><span class="name tag">group</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">zone_temps</span><span class="whitespace">
-    </span><span class="name tag">output</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">out3</span><span class="whitespace">
+    </span><span class="name tag">offset</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal string">&quot;-0.3</span><span class="name variable"> </span><span class="literal string">K&quot;</span><span class="whitespace">
 
   </span><span class="punctuation indicator">-</span><span class="whitespace"> </span><span class="name tag">name</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">heaters_1</span><span class="whitespace">
     </span><span class="name tag">simulate</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">true</span><span class="whitespace">
     </span><span class="name tag">type</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">network</span><span class="whitespace">
     </span><span class="name tag">protocol</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">udp</span><span class="whitespace">
-    </span><span class="name tag">heats</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">basic</span><span class="whitespace">
-    </span><span class="name tag">input</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">in1</span><span class="whitespace">
-    </span><span class="name tag">rate</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal string">&quot;3.0&quot;</span><span class="whitespace">
+    </span><span class="name tag">connects</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">heater_1.on</span><span class="whitespace">
 
   </span><span class="punctuation indicator">-</span><span class="whitespace"> </span><span class="name tag">name</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">heaters_2</span><span class="whitespace">
     </span><span class="name tag">simulate</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">true</span><span class="whitespace">
     </span><span class="name tag">type</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">network</span><span class="whitespace">
     </span><span class="name tag">protocol</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">udp</span><span class="whitespace">
-    </span><span class="name tag">heats</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">basic</span><span class="whitespace">
-    </span><span class="name tag">input</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">in2</span><span class="whitespace">
-    </span><span class="name tag">rate</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal string">&quot;3.0&quot;</span>
+    </span><span class="name tag">connects</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">heater_2.on</span>
 </pre>
 </div>
 </div>
@@ -11493,14 +11573,14 @@ tcssim finds it rather than making it, and its panel counts nothing,
 the samples going from the kernel to the vehicle past it.</li>
 </ul>
 <p class="last">A payload's button off is the device switched off: it sends nothing,
-answers nothing and acts on nothing -- a heater warms no mass -- and what
+answers nothing and acts on nothing -- a heater warms no zone -- and what
 reaches it is still counted, as what the vehicle did.</p>
 </dd>
 <dt>Requirement</dt>
 <dd>A payload that is only driven -- a heater, a valve -- is simulated as any
 other: its stand-in sends nothing and counts what reaches it, and its
 simulator entry gives no packet interval, there being nothing to send.
-One that heats a thermal mass warms it as well.</dd>
+One joined to a heater switches it as well.</dd>
 <dt>Requirement</dt>
 <dd>The comparison is tcssim's, and tcspecial does not read the simulator
 file. The flight software's inputs are its configuration and its flags,

@@ -943,27 +943,92 @@ fn check_graph_simulator(
         }
     }
 
-    // The masses themselves, in the model's words and at its lines, where
-    // the payloads attached to them are all right: a mass nothing attaches
-    // to is refused there, and a misspelled attachment would read as one.
-    if let (true, Some((model, model_text))) = (named_well, model) {
-        if let Err(problem) = sim.masses() {
-            let line = Where::of(&model_text, ConfigFormat::Yaml)
-                .line_of(&problem.about());
-            report.add(&model, line, problem.to_string());
+    // The model itself, in its words and at its lines: everything wrong
+    // with it alone, and where it stands alone, how the stand-ins join it --
+    // an element nothing is joined to is refused there, and a misspelled
+    // connects would read as one, so only where the payloads are named
+    // well.
+    if let Some((model, model_text)) = model {
+        let lines = Where::of(&model_text, ConfigFormat::Yaml);
+        let alone =
+            sim.model.as_ref().map(|m| m.problems()).unwrap_or_default();
+        for problem in &alone {
+            if !report.room() {
+                break;
+            }
+            report.add(
+                &model,
+                lines.line_of(&problem.about()),
+                problem.to_string(),
+            );
+        }
+        if alone.is_empty() && named_well {
+            if let Err(problem) = sim.physics() {
+                report.add(
+                    &model,
+                    lines.line_of(&problem.about()),
+                    problem.to_string(),
+                );
+            }
+            sensors_read_as_they_report(path, graph, &sim, &found, report);
         }
     }
 }
 
-/// Reads the physics model a simulator file names, and gives the file the
-/// thermal masses it holds, as `SimConfigFile::read_physics` does for every
+/// Checks that each sensor joined to the world feeds one conversion, in the
+/// unit of what it reports, which is what tcssim asks of it as it starts:
+/// see `tcslibgs::graph::simulated::reading_of`.
+///
+/// # Arguments
+///
+/// * `path`   - The simulator file.
+/// * `graph`  - The configuration.
+/// * `sim`    - The simulator file, with its model read.
+/// * `found`  - Where its entries are.
+/// * `report` - Where each problem is added.
+fn sensors_read_as_they_report(
+    path: &Path,
+    graph: &tcslibgs::graph::Graph,
+    sim: &SimConfigFile,
+    found: &Where,
+    report: &mut Report,
+) {
+    let Ok(handlers) = tcslibgs::graph::simulated::handlers(graph, sim) else {
+        return;
+    };
+    // Whether or not the model's joins are right, which is reported at the
+    // model's lines: a stand-in joined to an output it cannot report is a
+    // fault of its own.
+    let Some(resolved) = sim.settled(&handlers) else {
+        return;
+    };
+    for (dh, settled) in handlers.iter().zip(&resolved) {
+        let Some(tcslibgs::sim_config::Attached::Reports { unit, .. }) =
+            &settled.attached
+        else {
+            continue;
+        };
+        if let Err(why) =
+            tcslibgs::graph::simulated::reading_of(graph, &dh.name.0, *unit)
+        {
+            if !report.room() {
+                return;
+            }
+            let about = tcslibgs::About::SimPayload(dh.name.0.clone());
+            report.add(path, found.line_of(&about), why);
+        }
+    }
+}
+
+/// Reads the physics model a simulator file names, and gives it to the file,
+/// as `SimConfigFile::read_physics` does for every
 /// program that loads one -- but reporting each problem at its own file and
 /// line, which a program that only starts or stops has no use for.
 ///
 /// # Arguments
 ///
 /// * `path`   - The simulator file.
-/// * `sim`    - What it parsed as, which takes the model's masses.
+/// * `sim`    - What it parsed as, which takes the model.
 /// * `found`  - Where its sections and entries are.
 /// * `report` - Where each problem is added.
 ///
@@ -1021,7 +1086,7 @@ fn read_model(
     };
     match tcslibgs::physics::PhysicsFile::parse(&text) {
         Ok(file) => {
-            sim.thermal_mass = file.thermal_masses();
+            sim.model = Some(file);
             Ok(Some((model, text)))
         }
         Err(e) => {
@@ -1205,6 +1270,64 @@ mod tests {
         assert!(report.found_errors(), "a build that cannot fly it fails");
         // Every type built is what verify asks for, and finds nothing.
         assert!(verify(&yaml, None, Limits::EVERYTHING).findings.is_empty());
+    }
+
+    /// What is wrong with the physics model is reported at its lines, every
+    /// element's, and a stand-in joined to an output its readings are not
+    /// converted from is reported at its entry, whatever else is wrong with
+    /// the model's joins.
+    #[test]
+    fn the_physics_model_is_reported_at_its_own_lines() {
+        let (dir, _, yaml, sim) = thermostat_pair(|xml| xml);
+        let model = dir.path().join("thermostat-physics.yaml");
+        let edit = |path: &Path, from: &str, to: &str| {
+            let text = std::fs::read_to_string(path).expect("read");
+            assert!(text.contains(from), "{from}");
+            std::fs::write(path, text.replace(from, to)).expect("written");
+        };
+        let line_in = |path: &Path, said: &str| {
+            1 + std::fs::read_to_string(path)
+                .expect("read")
+                .lines()
+                .position(|line| line.trim() == said)
+                .expect("the line is there")
+        };
+
+        // Both heaters' power with no unit: one finding at each heater.
+        edit(&model, "power: \"60 W\"", "power: \"60\"");
+        let report = verify(&yaml, Some(&sim), Limits::EVERYTHING);
+        let found: Vec<(PathBuf, usize)> = report
+            .findings
+            .iter()
+            .map(|f| (f.file.clone(), f.line))
+            .collect();
+        assert_eq!(
+            found,
+            [
+                (model.clone(), line_in(&model, "- name: heater_1")),
+                (model.clone(), line_in(&model, "- name: heater_2")),
+            ],
+            "{:?}",
+            report.said()
+        );
+        edit(&model, "power: \"60\"", "power: \"60 W\"");
+
+        // A heater's stand-in joined to its heat, an output: the heater's
+        // on is then joined to nothing, at the heater, and the stand-in
+        // reports watts nothing converts, at the stand-in.
+        edit(&sim, "connects: heater_2.on", "connects: heater_2.heat");
+        let report = verify(&yaml, Some(&sim), Limits::EVERYTHING);
+        let said = report.said();
+        assert_eq!(report.findings.len(), 2, "{said:?}");
+        assert_eq!(report.findings[0].file, model);
+        assert_eq!(
+            report.findings[0].line,
+            line_in(&model, "- name: heater_2")
+        );
+        assert!(report.findings[0].message.contains("heater_2.on is joined"));
+        assert_eq!(report.findings[1].file, sim);
+        assert_eq!(report.findings[1].line, line_in(&sim, "- name: heaters_2"));
+        assert!(report.findings[1].message.contains("nothing converts"));
     }
 
     /// Two spellings of one configuration: each checked, nothing different.

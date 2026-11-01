@@ -157,7 +157,7 @@ mod tests {
     fn a_spi_device_is_a_node_the_configured_path_leads_to() {
         let path = a_path();
         let mut simulated = SimulatedPayload::new(PayloadConfig {
-            thermal: None,
+            attachment: None,
             thermostat: None,
             name: "DH0".to_string(),
             protocol: PayloadProtocol::Spi,

@@ -43,21 +43,21 @@ pub fn payload_config_from(
     payload_config_attached(dh, sim, None)
 }
 
-/// And the same, with the thermal mass this payload is attached to.
+/// And the same, with what this payload is joined to in the world.
 ///
-/// `thermal` is what [`crate::physics::thermal_mass::thermal_mass`] made of
-/// the attachment the simulator file states: `None` for a payload attached
-/// to nothing, which is every payload of a file that declares no mass.
+/// `attachment` is what `main` made of the `connects` the simulator file
+/// states: `None` for a payload joined to nothing, which is every payload of
+/// a file that names no physics model.
 ///
 /// Apart from the function above so that every test of the pacing, the
-/// faults and the addresses goes on saying nothing about thermal masses:
-/// what they are about has not changed.
+/// faults and the addresses goes on saying nothing about the world: what
+/// they are about has not changed.
 ///
 /// # Arguments
 ///
-/// * `dh`      - The data handler, from the tcspecial configuration.
-/// * `sim`     - Its settings as the simulator file settled them.
-/// * `thermal` - The thermal mass it is attached to, if any.
+/// * `dh`         - The data handler, from the tcspecial configuration.
+/// * `sim`        - Its settings as the simulator file settled them.
+/// * `attachment` - What it is joined to in the world, if anything.
 ///
 /// # Returns
 ///
@@ -71,7 +71,7 @@ pub fn payload_config_from(
 pub fn payload_config_attached(
     dh: &DHConfig,
     sim: &ResolvedSim,
-    thermal: Option<crate::physics::thermal_mass::thermal_mass::Thermal>,
+    attachment: Option<crate::physics::Attachment>,
 ) -> Result<PayloadConfig, String> {
     // What the simulator cannot be, which is tcslibgs's rule so that tcsverify
     // asks it too: see `tcslibgs::simulable`.
@@ -214,7 +214,7 @@ pub fn payload_config_attached(
     };
 
     Ok(PayloadConfig {
-        thermal,
+        attachment,
         thermostat: None,
         bus_address,
         can_id,

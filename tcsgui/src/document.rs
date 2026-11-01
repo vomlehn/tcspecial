@@ -81,6 +81,49 @@ pub struct Command {
     pub comment: Option<String>,
 }
 
+/// Which line of a file's structure a comment is written above.
+///
+/// A comment about a section as a whole, or about every node of one type, is
+/// not about any node, so a node cannot carry it -- and an editor that kept
+/// only what nodes carry would delete the paragraph under `payloads:` that
+/// says why every payload is the far end of a socket. These are the places
+/// such a comment is found and written back.
+///
+/// The section is named as the file names it, `payloads`; the type as it is
+/// written on its group's line, `network`. A type belongs to one section --
+/// see `tcslibgs::graph::section_of` -- so the type alone says which group.
+#[derive(
+    Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize,
+)]
+pub enum Heading {
+    /// Above the line that opens the section: `payloads:` or `<payloads>`.
+    Section(String),
+    /// Under that line, above the section's first type group.
+    ///
+    /// Which is also where the first group's own comment would go, so a file
+    /// cannot tell the two apart and the reader takes it as the section's:
+    /// it is the paragraph the converter put there, and the one a person
+    /// writes. A group comment that comes to be first, its group's
+    /// predecessors gone, is written there too and read back as the
+    /// section's -- the words kept, their owner changed.
+    Opening(String),
+    /// Above the line that opens a type group: `- type network:` or
+    /// `<type name="network">`.
+    Type(String),
+}
+
+/// A comment about part of a file's structure rather than about a node in it.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct Remark {
+    /// Which file: the subdiagram, or `None` for the top diagram.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub home: Home,
+    /// Which line it is written above.
+    pub heading: Heading,
+    /// What it says, a line of text for each of its lines.
+    pub text: String,
+}
+
 /// Something that might be wrong with the drawing, and might not be.
 ///
 /// Apart from [`Fault`], which is what *is* wrong: a fault is a document the
@@ -238,6 +281,20 @@ pub struct Document {
     /// see [`Command`].
     #[serde(default)]
     pub commands: Vec<Command>,
+    /// What somebody wrote about a section or a type group: see [`Heading`].
+    ///
+    /// Each lives as long as what it is about. A section or group the editor
+    /// empties is not written, so its comment would have nowhere to go, and
+    /// one that came back later would be a new group with somebody else's
+    /// words over it: see [`Document::forget_lost_comments`].
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub remarks: Vec<Remark>,
+    /// What somebody wrote above a line of the `tcspecial` section, by the
+    /// attribute that line states: `state_file`, a subsection such as
+    /// `beacon`, or a subsection's attribute such as `beacon.recv`, flat as
+    /// [`Document::tcspecial`] is.
+    #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
+    pub tcspecial_comments: BTreeMap<String, String>,
 }
 
 /// One attribute a group may set on all of its payloads.
@@ -561,6 +618,86 @@ impl Document {
                 (node_type, nodes)
             })
             .collect()
+    }
+
+    /// What one file says above one line of its structure, if anything.
+    ///
+    /// # Arguments
+    ///
+    /// * `home`    - The subdiagram, or `None` for the top diagram.
+    /// * `heading` - The line.
+    ///
+    /// # Returns
+    ///
+    /// The comment's text, or `None` where nothing is written there.
+    fn remark(&self, home: &Home, heading: &Heading) -> Option<&str> {
+        self.remarks
+            .iter()
+            .find(|remark| &remark.home == home && &remark.heading == heading)
+            .map(|remark| remark.text.as_str())
+    }
+
+    /// What is written above one line of the `tcspecial` section.
+    ///
+    /// # Arguments
+    ///
+    /// * `parent`    - The subsection the line is in, empty for the top of
+    ///                 the section.
+    /// * `attribute` - What the line states: an attribute, or a subsection
+    ///                 where `parent` is empty.
+    ///
+    /// # Returns
+    ///
+    /// The comment's text, or `None` where nothing is written there.
+    fn tcspecial_comment(&self, parent: &str, attribute: &str) -> Option<&str> {
+        let key = if parent.is_empty() {
+            attribute.to_string()
+        } else {
+            format!("{parent}.{attribute}")
+        };
+        self.tcspecial_comments.get(&key).map(String::as_str)
+    }
+
+    /// Drops the comments whose section, type group or `tcspecial` line is
+    /// no longer in the document.
+    ///
+    /// What a comment is about is written only while it has something in
+    /// it -- see the writers, which leave out an empty section and an empty
+    /// group -- so a comment on one the editor has emptied would wait unseen
+    /// and come back over whatever was put there next: a `- type serial:`
+    /// made again for a different line under a paragraph about the old one.
+    /// Gone with what it described is what a person deleting the last node
+    /// of a type would expect, and undo does not bring it back, as it does
+    /// not bring back a removed node's comment.
+    pub fn forget_lost_comments(&mut self) {
+        let nodes = &self.nodes;
+        self.remarks.retain(|remark| {
+            nodes.iter().any(|node| {
+                node.home == remark.home
+                    && match &remark.heading {
+                        Heading::Section(name) | Heading::Opening(name) => {
+                            section_of(&node.node_type).name() == name
+                        }
+                        Heading::Type(node_type) => {
+                            &node.node_type == node_type
+                        }
+                    }
+            })
+        });
+        let stated: Vec<&String> = self
+            .tcspecial
+            .iter()
+            .filter(|(_, value)| !value.trim().is_empty())
+            .map(|(attribute, _)| attribute)
+            .collect();
+        self.tcspecial_comments.retain(|key, _| {
+            stated.iter().any(|attribute| {
+                *attribute == key
+                    || attribute
+                        .strip_prefix(key.as_str())
+                        .is_some_and(|rest| rest.starts_with('.'))
+            })
+        });
     }
 
     /// One home's nodes, by name: the order the editor's section writes
@@ -1547,6 +1684,9 @@ impl Document {
                 }
             }
         }
+
+        // Whatever the edit emptied takes its comment with it.
+        self.forget_lost_comments();
     }
 
     /// Everything wrong with the document as it stands.
@@ -1933,6 +2073,11 @@ impl Document {
                 for (parent, under) in said {
                     if parent.is_empty() {
                         for (attribute, value) in under {
+                            xml_comment(
+                                &mut out,
+                                self.tcspecial_comment(&parent, &attribute),
+                                8,
+                            );
                             out.push_str(&format!(
                                 "        <{attribute}>{}</{attribute}>\n",
                                 escape(&value)
@@ -1940,8 +2085,18 @@ impl Document {
                         }
                         continue;
                     }
+                    xml_comment(
+                        &mut out,
+                        self.tcspecial_comment("", &parent),
+                        8,
+                    );
                     out.push_str(&format!("        <{parent}>\n"));
                     for (attribute, value) in under {
+                        xml_comment(
+                            &mut out,
+                            self.tcspecial_comment(&parent, &attribute),
+                            12,
+                        );
                         out.push_str(&format!(
                             "            <{attribute}>{}</{attribute}>\n",
                             escape(&value)
@@ -1986,8 +2141,21 @@ impl Document {
                 continue;
             }
             let word = section.node_word();
-            out.push_str(&format!("    <{}>\n", section.name()));
+            let name = section.name().to_string();
+            xml_comment(
+                &mut out,
+                self.remark(home, &Heading::Section(name.clone())),
+                4,
+            );
+            out.push_str(&format!("    <{name}>\n"));
+            xml_comment(
+                &mut out,
+                self.remark(home, &Heading::Opening(name)),
+                8,
+            );
             for (node_type, nodes) in grouped {
+                let heading = Heading::Type(node_type.to_string());
+                xml_comment(&mut out, self.remark(home, &heading), 8);
                 out.push_str(&format!(
                     "        <type name=\"{}\">\n",
                     escape(node_type)
@@ -2213,6 +2381,12 @@ impl Document {
                 for (parent, under) in said {
                     if parent.is_empty() {
                         for (attribute, value) in under {
+                            yaml_comment(
+                                &mut out,
+                                self.tcspecial_comment(&parent, &attribute),
+                                2,
+                                8,
+                            );
                             out.push_str(&format!(
                                 "  {attribute}: {}\n",
                                 quoted(&value)
@@ -2220,8 +2394,20 @@ impl Document {
                         }
                         continue;
                     }
+                    yaml_comment(
+                        &mut out,
+                        self.tcspecial_comment("", &parent),
+                        2,
+                        8,
+                    );
                     out.push_str(&format!("  {parent}:\n"));
                     for (attribute, value) in under {
+                        yaml_comment(
+                            &mut out,
+                            self.tcspecial_comment(&parent, &attribute),
+                            4,
+                            12,
+                        );
                         out.push_str(&format!(
                             "    {attribute}: {}\n",
                             quoted(&value)
@@ -2281,8 +2467,24 @@ impl Document {
                 continue;
             }
             let word = section.node_word();
-            out.push_str(&format!("\n{}:\n", section.name()));
+            let name = section.name().to_string();
+            out.push('\n');
+            yaml_comment(
+                &mut out,
+                self.remark(home, &Heading::Section(name.clone())),
+                0,
+                4,
+            );
+            out.push_str(&format!("{name}:\n"));
+            yaml_comment(
+                &mut out,
+                self.remark(home, &Heading::Opening(name)),
+                2,
+                8,
+            );
             for (node_type, nodes) in grouped {
+                let heading = Heading::Type(node_type.to_string());
+                yaml_comment(&mut out, self.remark(home, &heading), 2, 8);
                 out.push_str(&format!("  - type {node_type}:\n"));
                 for node in nodes {
                     // Above the entry it belongs to, as a comment and not as a
@@ -2795,6 +2997,52 @@ pub(crate) fn comment_lines(comment: &str, indent: usize) -> Vec<String> {
         out.push(now);
     }
     out
+}
+
+/// Writes a comment as YAML, a `#` line for each of its lines.
+///
+/// Broken where the XML writer breaks the same comment, so the two spellings
+/// carry the same lines: see [`comment_lines`].
+///
+/// # Arguments
+///
+/// * `out`     - The text being written.
+/// * `comment` - The comment, if there is one; nothing is written if not.
+/// * `indent`  - How many columns the `#` is indented.
+/// * `xml`     - How many columns the XML spelling indents the same comment,
+///               which is what its lines are measured at.
+fn yaml_comment(
+    out: &mut String,
+    comment: Option<&str>,
+    indent: usize,
+    xml: usize,
+) {
+    for line in comment.map(|c| comment_lines(c, xml)).unwrap_or_default() {
+        out.push_str(&format!("{:indent$}# {line}\n", ""));
+    }
+}
+
+/// Writes a comment as XML, a `<!-- -->` line for each of its lines.
+///
+/// Made safe on the way: see [`comment_safe`], since XML has no way to say
+/// two hyphens in a row inside a comment.
+///
+/// # Arguments
+///
+/// * `out`     - The text being written.
+/// * `comment` - The comment, if there is one; nothing is written if not.
+/// * `indent`  - How many columns the `<!--` is indented.
+fn xml_comment(out: &mut String, comment: Option<&str>, indent: usize) {
+    for line in comment
+        .map(|c| comment_lines(c, indent))
+        .unwrap_or_default()
+    {
+        out.push_str(&format!(
+            "{:indent$}<!-- {} -->\n",
+            "",
+            escape(&comment_safe(&line))
+        ));
+    }
 }
 
 /// The worked example from `design.rst`: a zone thermostat.

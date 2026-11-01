@@ -492,7 +492,9 @@ impl<'de> Visitor<'de> for XmlType {
                         "a <type> names its type twice",
                     ));
                 }
-                let named = map.next_value::<Scalar>()?.as_str().to_string();
+                // As written, and not trimmed as a value is: a type is one
+                // word, and a space beside it is refused as it is in YAML.
+                let named = map.next_value::<String>()?;
                 type_of_section(self.0, &named).map_err(de::Error::custom)?;
                 node_type = Some(named);
             } else if key == word {
@@ -1071,6 +1073,58 @@ impl<'de> Visitor<'de> for Entry {
     }
 }
 
+/// Finds the line a node of a name is written on, for a complaint about it.
+///
+/// A scan and not a parse, as [`super::renamed`]'s is: the file has been
+/// read, and this only points at a node in it. A node is named in YAML by its
+/// first key, the word for its section, and in XML by the name attribute of
+/// the element that word is.
+///
+/// # Arguments
+///
+/// * `path` - The file.
+/// * `name` - The node's name.
+/// * `nth`  - Which of the nodes of that name, from nought.
+///
+/// # Returns
+///
+/// The line, from 1, or `None` where the file cannot be read or the node is
+/// not found.
+pub fn line_of_node(
+    path: &std::path::Path,
+    name: &str,
+    nth: usize,
+) -> Option<usize> {
+    let text = std::fs::read_to_string(path).ok()?;
+    let words = [Section::Gateway, Section::Vehicle, Section::Payloads]
+        .map(Section::node_word);
+    let unquoted =
+        |said: &str| said.trim().trim_matches(['"', '\'']).to_string();
+    let names = |line: &str| -> bool {
+        let line = super::renamed::uncommented(line);
+        words.iter().any(|word| {
+            // YAML: `- payload: temp_1`, or in a flow mapping.
+            let yaml = line
+                .split(['{', ',', '}'])
+                .filter_map(|part| {
+                    let part = part.trim_start().trim_start_matches("- ");
+                    part.split_once(':')
+                })
+                .any(|(key, value)| {
+                    unquoted(key) == *word && unquoted(value) == name
+                });
+            // XML: `<payload name="temp_1"`.
+            let xml = line.contains(&format!("<{word} name=\"{name}\""));
+            yaml || xml
+        })
+    };
+    text.lines()
+        .enumerate()
+        .filter(|(_, line)| names(line))
+        .nth(nth)
+        .map(|(at, _)| at + 1)
+}
+
 #[cfg(test)]
 mod tests {
     use super::super::{Graph, GraphFile};
@@ -1392,6 +1446,31 @@ mod tests {
              </tcsgui></configuration>",
             &["names no node"],
         );
+    }
+
+    /// Every file of `tests/refused` is refused. The Python reader is held
+    /// to the same files by `python/tests/test_configuration.py`, so the
+    /// two refuse the same things.
+    #[test]
+    fn every_file_the_two_readers_refuse_is_refused() {
+        let dir = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+            .join("../tests/refused");
+        let mut files: Vec<std::path::PathBuf> = std::fs::read_dir(&dir)
+            .expect("tests/refused")
+            .map(|entry| entry.expect("an entry").path())
+            .collect();
+        files.sort();
+        assert!(files.len() > 20, "{files:?}");
+        for file in files {
+            let why = Graph::load(&file)
+                .map(|_| ())
+                .expect_err(&format!("{} is read", file.display()));
+            assert!(
+                why.to_string().contains("line"),
+                "{}: {why}",
+                file.display()
+            );
+        }
     }
 
     /// A node's name is one across the whole configuration: two nodes of

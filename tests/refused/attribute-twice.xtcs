@@ -1,0 +1,7 @@
+<?xml version="1.0"?>
+<!-- Refused: a node that says one attribute twice. -->
+<configuration>
+    <payloads><type name="i2c"><payload name="a">
+        <address>0x48</address><address>0x49</address>
+    </payload></type></payloads>
+</configuration>

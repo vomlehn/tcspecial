@@ -1,0 +1,5 @@
+<?xml version="1.0"?>
+<!-- Refused: a node in the old shape, with name and type elements. -->
+<configuration>
+    <payloads><name>temp_1</name><type>i2c</type></payloads>
+</configuration>

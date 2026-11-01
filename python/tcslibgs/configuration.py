@@ -3,7 +3,7 @@
 The Python spelling of what the Rust ground programs ask ``tcslibgs`` for:
 where the beacons are (``graph::parameters::beacon_of``), where a ``gateway``
 node is bound aboard, which port a source's data reaches the ground at
-(``graph::order`` and ``graph::telemetry``), whether a datagram came from where
+(``graph::telemetry``), whether a datagram came from where
 the configuration says (``types::came_from``), and the configuration's digest.
 For a configuration that answers to cFS, whose links are message IDs on a
 software bus rather than sockets, it reads the bus instead: its SBN peer and
@@ -29,21 +29,37 @@ whether a configuration is sound, and a ground station should run on one it
 has passed.
 """
 
+import json
 import os
 import re
 import shutil
 import subprocess
-import xml.etree.ElementTree as ElementTree
+import xml.parsers.expat
 from dataclasses import dataclass, field
 from pathlib import Path
 
 from . import interface as _interface
 from . import sbn as _sbn
 
-#: The sections whose entries are nodes, in which a node's device id is
-#: counted: a node's id is its position among every node the file writes, in
-#: the order it writes them, whatever section each is in.
-NODE_SECTIONS = ("gateway", "vehicle", "payloads")
+#: The sections whose entries are nodes, and the word a node of each is
+#: written as: the key that names it in YAML, its element in XML. See
+#: ``tcslibgs::graph::grouped``.
+NODE_SECTIONS = {"gateways": "gateway", "vehicle": "compute",
+                 "payloads": "payload"}
+
+#: A node's links, each by the data source it leaves.
+LINKS = ("payload-out", "gateway-out")
+
+#: A node's data sinks, which say whether a line arrives there.
+SINKS = ("payload-in", "gateway-in")
+
+#: The attributes a node writes as a list: ``tcslibgs::graph::LISTED``.
+LISTED = ("terminators",)
+
+#: Where the schemas are: a link to tcsgui's ``share/schema``, the one copy,
+#: beside this module so that an installed package has them too, as the
+#: XTCE documents are (see :mod:`tcslibgs.interface`).
+SCHEMAS = Path(__file__).resolve().parent / "schema"
 
 #: Each gateway node type, and the attribute it says where its data goes
 #: with: a radio's and a Yamcs gateway's ``ground_base``, an F´ gateway's
@@ -232,8 +248,8 @@ class Node:
 
     name: str
     node_type: str
-    #: The section it is written in: ``payloads``, ``gateway`` or
-    #: ``vehicle``.
+    #: The section it is written in: ``gateways``, ``vehicle`` or
+    #: ``payloads``.
     section: str = ""
     #: Its attributes, by name: every child but its name, its type and its
     #: links.
@@ -250,7 +266,8 @@ class Configuration:
     path: Path
     #: The ``tcspecial`` section, flat: ``beacon.recv`` and the rest.
     tcspecial: dict
-    #: Every node, in the order the file writes them.
+    #: Every node, by name: the order a file writes them in means nothing,
+    #: and a node's device id is its place among the names.
     nodes: list
 
     def node(self, name):
@@ -277,15 +294,16 @@ class Configuration:
             name: The node's name.
 
         Returns:
-            Its position among the configuration's nodes, counting from
-            nought, in the order the file writes them.
+            Its position among the configuration's nodes sorted by name,
+            counting from nought: ``graph::telemetry::ids``. The order the
+            file writes them in changes no id.
 
         Raises:
             ValueError: There is no node called ``name``.
         """
-        for at, node in enumerate(self.nodes):
-            if node.name == name:
-                return at
+        names = sorted(node.name for node in self.nodes)
+        if name in names:
+            return names.index(name)
         raise ValueError(f'{self.path}: there is no node called "{name}"')
 
     def answers_over_bus(self):
@@ -426,10 +444,10 @@ class Configuration:
                 kind = self._kind(target)
                 if kind in ON_BUS:
                     msgids.add(self.downlink_msgid(target, node.name))
-        for at, node in enumerate(self.nodes):
+        for node in self.nodes:
             if node.section == "payloads" and node.name not in touched:
-                msgids.add(counted("payload_telemetry.tlm_base",
-                                   bus.tlm_base, at))
+                msgids.add(counted("payload_telemetry.tlm_base", bus.tlm_base,
+                                   self.device_id(node.name)))
         return sorted(msgids)
 
     def _kind(self, name):
@@ -830,8 +848,393 @@ def _includes(path):
     )
 
 
+def node_types(section):
+    """The node types a section may hold, as a file spells them: the
+    schema's list, which tcsgui's schema tests hold to
+    ``tcslibgs::graph::types_in``.
+
+    Args:
+        section: The section, as a file names it: ``gateways``, ``vehicle``
+                 or ``payloads``.
+
+    Returns:
+        The types.
+    """
+    with open(SCHEMAS / "tcspecial.schema.json", encoding="utf-8") as text:
+        schema = json.load(text)
+    return [key[len("type "):]
+            for key in schema["$defs"][f"{section}Type"]["enum"]]
+
+
+def _section_of(node_type):
+    """The section a node type belongs in, if any.
+
+    Args:
+        node_type: The type.
+
+    Returns:
+        The section's name, or ``None`` for a type of none.
+    """
+    for section in NODE_SECTIONS:
+        if node_type in node_types(section):
+            return section
+    return None
+
+
+def _type_refused(section, named):
+    """What is wrong with a type a section groups its nodes by, if anything:
+    ``graph::grouped::type_of_section``.
+
+    Args:
+        section: The section.
+        named:   The type, as the file wrote it.
+
+    Returns:
+        The complaint, or ``None`` for one of the section's types.
+    """
+    if not named:
+        return f"a type in {section} names no type: write the type after " \
+               "the word"
+    if any(c.isspace() for c in named):
+        return f'"{named}" is not a type: a type is one word, with no space ' \
+               "in it"
+    if named in node_types(section):
+        return None
+    belongs = _section_of(named)
+    if belongs is not None:
+        return f"{named} is a type of the {belongs} section, and is written " \
+               f"under {belongs} rather than {section}"
+    return f"{named} is not a type of node the {section} section holds, " \
+           f"which are {', '.join(node_types(section))}"
+
+
+#: How a configuration in the old shape is rewritten in the new.
+CONVERTER = "tools/convert-format.py rewrites a file in the old shape into " \
+            "this one"
+
+
+class _Reader:
+    """What one file is read into, with the complaints it may raise."""
+
+    def __init__(self, path):
+        """Begin reading.
+
+        Args:
+            path: The file, for the complaints.
+        """
+        self.path = path
+        self.nodes = []
+
+    def refuse(self, line, why):
+        """The error for something refused.
+
+        Args:
+            line: The line it is on.
+            why:  What is wrong.
+
+        Returns:
+            The ``ValueError`` to raise.
+        """
+        return ValueError(f"{self.path}: at line {line}, {why}")
+
+    def add(self, node, line):
+        """Take a node in, refusing a name already taken.
+
+        Args:
+            node: The node.
+            line: The line it is on.
+
+        Raises:
+            ValueError: A node of that name has been read already.
+        """
+        if any(other.name == node.name for other in self.nodes):
+            raise self.refuse(line,
+                              f'there is a node called "{node.name}" '
+                              "twice in this file: a node's name is the one "
+                              "thing every other part of a configuration knows "
+                              "it by, so no two nodes share one")
+        self.nodes.append(node)
+
+    def done(self, tcspecial):
+        """The configuration read.
+
+        Args:
+            tcspecial: The ``tcspecial`` section, flat.
+
+        Returns:
+            The :class:`Configuration`, its nodes by name.
+        """
+        return Configuration(path=self.path, tcspecial=tcspecial,
+                             nodes=sorted(self.nodes, key=lambda n: n.name))
+
+
+class _Element:
+    """One XML element, and the line it begins on."""
+
+    def __init__(self, tag, attributes, line):
+        """Begin one.
+
+        Args:
+            tag:        Its name.
+            attributes: Its attributes.
+            line:       The line its start tag is on.
+        """
+        self.tag = tag
+        self.attributes = attributes
+        self.line = line
+        self.children = []
+        self.text = ""
+
+    def find(self, tag):
+        """Its first child of a name.
+
+        Args:
+            tag: The name.
+
+        Returns:
+            The child, or ``None``.
+        """
+        return next((c for c in self.children if c.tag == tag), None)
+
+
+def _xml_tree(path):
+    """Read an XML file into elements that know their lines.
+
+    Args:
+        path: The file.
+
+    Returns:
+        The root element.
+
+    Raises:
+        xml.parsers.expat.ExpatError: The file is not well-formed XML.
+    """
+    parser = xml.parsers.expat.ParserCreate()
+    stack = []
+    root = []
+
+    def start(tag, attributes):
+        """Open an element.
+
+        Args:
+            tag:        Its name.
+            attributes: Its attributes.
+        """
+        element = _Element(tag, attributes, parser.CurrentLineNumber)
+        if stack:
+            stack[-1].children.append(element)
+        else:
+            root.append(element)
+        stack.append(element)
+
+    def end(tag):
+        """Close an element.
+
+        Args:
+            tag: Its name, which is not needed.
+        """
+        stack.pop()
+
+    def text(said):
+        """Add text to the element it is in.
+
+        Args:
+            said: The text.
+        """
+        if stack:
+            stack[-1].text += said
+
+    parser.StartElementHandler = start
+    parser.EndElementHandler = end
+    parser.CharacterDataHandler = text
+    with open(path, "rb") as data:
+        parser.ParseFile(data)
+    return root[0]
+
+
+def _xml_old(reader, root):
+    """Refuse an XML file in the old shape, at the line of its first node:
+    ``graph::reshaped``.
+
+    Args:
+        reader: The reader, for the complaint.
+        root:   The root element.
+
+    Raises:
+        ValueError: The file is in the old shape.
+    """
+    old = {"gateway": ("gateways", "gateway"),
+           "vehicle": ("vehicle", "compute"),
+           "payloads": ("payloads", "payload")}
+    for element in root.children:
+        if element.tag == "tcsgui":
+            for child in element.children:
+                if child.tag == "nodes":
+                    stale = child.find("name") is not None
+                elif child.tag == "set-aside":
+                    stale = (child.find("concern") is not None
+                             or any("name" not in n.attributes
+                                    for n in child.children))
+                else:
+                    stale = False
+                if stale:
+                    raise reader.refuse(child.line,
+                                        f"<{child.tag}> in the tcsgui section "
+                                        "is written as it was before the "
+                                        "editor's section named nodes as the "
+                                        "sections do; " + CONVERTER)
+            continue
+        if element.tag not in old:
+            continue
+        stale = (element.tag == "gateway"
+                 or any(c.tag == "name" or c.tag == "type"
+                        and "name" not in c.attributes
+                        for c in element.children))
+        if not stale:
+            continue
+        section, word = old[element.tag]
+        name = element.find("name")
+        name = name.text.strip() if name is not None else "..."
+        kind = element.find("type")
+        kind = kind.text.strip() if kind is not None else "..."
+        raise reader.refuse(
+            element.line,
+            f'the node "{name}" is written as a node was before nodes were '
+            f'grouped by type, as a <{element.tag}> element with <name> and '
+            f'<type> in it. Write it under its type now: <{section}><type '
+            f'name="{kind}"><{word} name="{name}">...</{word}></type>'
+            f'</{section}>; ' + CONVERTER)
+
+
+def _xml_node(reader, section, node_type, element):
+    """Read one XML node element.
+
+    Args:
+        reader:    The reader, for the complaints.
+        section:   The section it is in.
+        node_type: The type it is written under.
+        element:   The element.
+
+    Returns:
+        The :class:`Node`.
+
+    Raises:
+        ValueError: The node is refused: see :func:`_load_xml`.
+    """
+    word = NODE_SECTIONS[section]
+    for attribute in element.attributes:
+        if attribute == "type":
+            raise reader.refuse(element.line,
+                                "a node says a type of its own: a node's type "
+                                "is the type it is written under")
+        if attribute != "name":
+            raise reader.refuse(element.line,
+                                f"<{word}> has a name attribute and no other, "
+                                f"and this one has {attribute}")
+    if "name" not in element.attributes:
+        raise reader.refuse(element.line,
+                            f'a {node_type} node has no name: write it as '
+                            f'<{word} name="...">')
+    name = element.attributes["name"].strip()
+    if not name:
+        raise reader.refuse(element.line,
+                            f"a {node_type} node has an empty name")
+    node = Node(name=name, node_type=node_type, section=section)
+    seen = set()
+    for child in element.children:
+        if child.tag in ("name", "type", "editor"):
+            raise reader.refuse(child.line,
+                                f'"{name}" says <{child.tag}>, which a node '
+                                'does not: its name is its name attribute, '
+                                'its type the type it is written under')
+        if child.tag in seen and child.tag not in LINKS + LISTED:
+            raise reader.refuse(child.line,
+                                f'"{name}" states <{child.tag}> twice')
+        seen.add(child.tag)
+        if child.tag in LINKS:
+            target = child.find("target")
+            said = (target.text if target is not None else child.text).strip()
+            node.links.setdefault(child.tag, []).append(said)
+        elif child.tag in SINKS:
+            _sink(reader, child.line, child.tag, child.text.strip())
+            node.attributes[child.tag] = child.text.strip()
+        elif child.tag in LISTED:
+            had = node.attributes.get(child.tag)
+            one = child.text.strip()
+            node.attributes[child.tag] = one if had is None else f"{had}, {one}"
+        else:
+            node.attributes[child.tag] = child.text.strip()
+    return node
+
+
+def _layout_entry(reader, line, what, said, seen):
+    """Refuse an entry of the editor's section that does not name a node and
+    say the words its list takes: ``graph::grouped::layout`` and
+    ``set_aside``.
+
+    Args:
+        reader: The reader, for the complaint.
+        line:   The line it is on.
+        what:   The list: ``nodes`` or ``set-aside``.
+        said:   What the entry says, by word, its node as ``node``.
+        seen:   The entries read so far, which this one is added to.
+
+    Raises:
+        ValueError: It names no node, leaves out or adds a word, gives a
+                    position that is not a whole number, or says again what
+                    one before it said.
+    """
+    words = ("x", "y") if what == "nodes" else ("concern",)
+    if not str(said.get("node", "")).strip():
+        raise reader.refuse(line, f"an entry of {what} names no node")
+    for word in said:
+        if word != "node" and word not in words:
+            raise reader.refuse(
+                line, f"an entry of {what} says {word}, which it does not")
+    for word in words:
+        if word not in said:
+            raise reader.refuse(line,
+                                f"the entry of {what} for \"{said['node']}\" "
+                                f"says no {word}")
+    if what == "nodes":
+        for axis in words:
+            try:
+                int(str(said[axis]).strip())
+            except ValueError:
+                raise reader.refuse(line,
+                                    f"\"{said['node']}\" is placed at {axis} "
+                                    f"\"{said[axis]}\", which is not a whole "
+                                    "number") from None
+    key = said["node"] if what == "nodes" else tuple(sorted(said.items()))
+    if key in seen:
+        raise reader.refuse(line, f"{what} names \"{said['node']}\" twice")
+    seen.add(key)
+
+
+def _sink(reader, line, sink, said):
+    """Refuse a data sink that says anything but true or false.
+
+    Args:
+        reader: The reader, for the complaint.
+        line:   The line it is on.
+        sink:   The sink.
+        said:   What it says.
+
+    Raises:
+        ValueError: It is neither.
+    """
+    if said not in ("true", "false"):
+        raise reader.refuse(line, f'{sink}: "{said}" is not true or false')
+
+
 def _load_xml(path):
     """Read a configuration written in XML.
+
+    Refused, as ``tcslibgs::graph::grouped`` refuses them: a file in the
+    old shape, a type that is not one of its section's, a type written twice
+    in a section or with no nodes in it, a node with a type of its own, with
+    no name or an empty one, or that says a word twice, and two nodes of one
+    name.
 
     Args:
         path: The configuration file.
@@ -840,47 +1243,87 @@ def _load_xml(path):
         The :class:`Configuration` it says.
 
     Raises:
-        ValueError: The file includes others.
-        xml.etree.ElementTree.ParseError: The file is not well-formed XML.
+        ValueError: The file includes others, or is refused.
+        xml.parsers.expat.ExpatError: The file is not well-formed XML.
     """
-    root = ElementTree.parse(path).getroot()
+    root = _xml_tree(path)
+    reader = _Reader(path)
     if root.find("include") is not None:
         raise _includes(path)
+    _xml_old(reader, root)
 
     tcspecial = {}
     section = root.find("tcspecial")
     if section is not None:
-        for part in section:
-            if len(part):
-                for leaf in part:
-                    tcspecial[f"{part.tag}.{leaf.tag}"] = (
-                        leaf.text or ""
-                    ).strip()
+        for part in section.children:
+            if part.children:
+                for leaf in part.children:
+                    tcspecial[f"{part.tag}.{leaf.tag}"] = leaf.text.strip()
             else:
-                tcspecial[part.tag] = (part.text or "").strip()
+                tcspecial[part.tag] = part.text.strip()
 
-    nodes = []
-    for element in root:
+    seen = set()
+    for element in root.children:
         if element.tag not in NODE_SECTIONS:
             continue
-        node = Node(
-            name=(element.findtext("name") or "").strip(),
-            node_type=(element.findtext("type") or "").strip(),
-            section=element.tag,
-        )
-        for child in element:
-            if child.tag in ("name", "type"):
-                continue
-            targets = child.findall("target")
-            if targets:
-                node.links.setdefault(child.tag, []).extend(
-                    (target.text or "").strip() for target in targets
-                )
-            else:
-                node.attributes[child.tag] = (child.text or "").strip()
-        nodes.append(node)
+        section = element.tag
+        if section in seen:
+            raise reader.refuse(element.line, f"<{section}> is written twice")
+        seen.add(section)
+        word = NODE_SECTIONS[section]
+        typed = set()
+        if element.attributes or element.text.strip():
+            raise reader.refuse(element.line,
+                                f'<{section}> holds <type name="..."> elements '
+                                'and nothing else')
+        for group in element.children:
+            if group.tag != "type" or set(group.attributes) - {"name"}:
+                raise reader.refuse(group.line,
+                                    f'<{section}> holds <type name="..."> '
+                                    'elements, each with a name and no other '
+                                    'attribute')
+            if "name" not in group.attributes:
+                raise reader.refuse(group.line,
+                                    f"a <type> in <{section}> has no name")
+            node_type = group.attributes["name"]
+            why = _type_refused(section, node_type)
+            if why is not None:
+                raise reader.refuse(group.line, why)
+            if node_type in typed:
+                raise reader.refuse(group.line,
+                                    f"type {node_type} is written twice in "
+                                    f"{section}: put its nodes under one")
+            typed.add(node_type)
+            if not group.children:
+                raise reader.refuse(group.line,
+                                    f"type {node_type} in <{section}> has no "
+                                    "nodes in it")
+            for child in group.children:
+                if child.tag != word:
+                    raise reader.refuse(child.line,
+                                        f"a <type> in <{section}> holds "
+                                        f"<{word}> elements, and this one has "
+                                        f"<{child.tag}>")
+                reader.add(_xml_node(reader, section, node_type, child),
+                           child.line)
 
-    return Configuration(path=path, tcspecial=tcspecial, nodes=nodes)
+    layout = root.find("tcsgui")
+    for part in layout.children if layout is not None else []:
+        if part.tag not in ("nodes", "set-aside"):
+            raise reader.refuse(part.line,
+                                f"the tcsgui section has no <{part.tag}>")
+        seen = set()
+        for entry in part.children:
+            if entry.tag != "node":
+                raise reader.refuse(entry.line,
+                                    f'<{part.tag}> holds <node name="..."> '
+                                    'elements')
+            said = dict(entry.attributes)
+            if "name" in said:
+                said["node"] = said.pop("name")
+            _layout_entry(reader, entry.line, part.tag, said, seen)
+
+    return reader.done(tcspecial)
 
 
 def _scalar(value):
@@ -891,8 +1334,183 @@ def _scalar(value):
     return str(value).strip()
 
 
+def _yaml_mapping(reader, node, what):
+    """The entries of a YAML mapping, refusing a key said twice.
+
+    Args:
+        reader: The reader, for the complaints.
+        node:   The mapping, as composed.
+        what:   What it is, for the complaint.
+
+    Returns:
+        Each key, as text, with its value node and the line of the key.
+
+    Raises:
+        ValueError: It is not a mapping, or says a key twice.
+    """
+    import yaml
+
+    if not isinstance(node, yaml.MappingNode):
+        raise reader.refuse(node.start_mark.line + 1,
+                            f"{what} is not a mapping")
+    entries = []
+    seen = set()
+    for key, value in node.value:
+        said = str(key.value)
+        line = key.start_mark.line + 1
+        if said in seen:
+            raise reader.refuse(line, f"{what} states {said} twice")
+        seen.add(said)
+        entries.append((said, value, line))
+    return entries
+
+
+def _yaml_list(reader, node, what):
+    """The items of a YAML list; none for a value left empty.
+
+    Args:
+        reader: The reader, for the complaints.
+        node:   The list, as composed.
+        what:   What it is, for the complaint.
+
+    Returns:
+        The items, as composed.
+
+    Raises:
+        ValueError: It is neither a list nor empty.
+    """
+    import yaml
+
+    if isinstance(node, yaml.ScalarNode) and node.tag.endswith(":null"):
+        return []
+    if not isinstance(node, yaml.SequenceNode):
+        raise reader.refuse(node.start_mark.line + 1, f"{what} is not a list")
+    return node.value
+
+
+def _yaml_old(reader, root):
+    """Refuse a YAML file in the old shape, at the line of its first node:
+    ``graph::reshaped``.
+
+    Args:
+        reader: The reader, for the complaint.
+        root:   The file's mapping, as composed.
+
+    Raises:
+        ValueError: The file is in the old shape.
+    """
+    import yaml
+
+    old = {"gateway": ("gateways", "gateway"),
+           "vehicle": ("vehicle", "compute"),
+           "payloads": ("payloads", "payload")}
+    for key_node, value in root.value:
+        key = str(key_node.value)
+        items = value.value if isinstance(value, yaml.SequenceNode) else []
+        if key == "tcsgui" and isinstance(value, yaml.MappingNode):
+            for part, placed in value.value:
+                if (part.value != "nodes"
+                        or not isinstance(placed, yaml.SequenceNode)):
+                    continue
+                for entry in placed.value:
+                    if (isinstance(entry, yaml.MappingNode)
+                            and any(k.value == "name" for k, _ in entry.value)):
+                        raise reader.refuse(entry.start_mark.line + 1,
+                                            "a position is written as it was "
+                                            "before the editor's section named "
+                                            "nodes as the sections do: write "
+                                            "it `- { node: <name>, x: ..., y: "
+                                            "... }`; " + CONVERTER)
+            continue
+        if key not in old:
+            continue
+        for entry in items:
+            if not isinstance(entry, yaml.MappingNode):
+                continue
+            said = {str(k.value): v for k, v in entry.value}
+            if "name" in said or "type" in said:
+                section, word = old[key]
+                name = getattr(said.get("name"), "value", "...")
+                kind = getattr(said.get("type"), "value", "...")
+                raise reader.refuse(entry.start_mark.line + 1,
+                                    f'the node "{name}" is written as a node '
+                                    'was before nodes were grouped by type, '
+                                    'with name: and type: of its own. Write '
+                                    f'it under its type now: {section}: - type '
+                                    f'{kind}: - {word}: {name}; ' + CONVERTER)
+        if key == "gateway":
+            raise reader.refuse(key_node.start_mark.line + 1,
+                                "the gateway section is gateways now, its "
+                                "nodes grouped by type; " + CONVERTER)
+
+
+def _yaml_node(reader, section, node_type, item, construct):
+    """Read one YAML node.
+
+    Args:
+        reader:    The reader, for the complaints.
+        section:   The section it is in.
+        node_type: The type it is written under.
+        item:      The node's mapping, as composed.
+        construct: Turns a composed value into a Python one.
+
+    Returns:
+        The :class:`Node`.
+
+    Raises:
+        ValueError: The node is refused: see :func:`_load_yaml`.
+    """
+    word = NODE_SECTIONS[section]
+    line = item.start_mark.line + 1
+    name = None
+    attributes = {}
+    links = {}
+    for key, value, at in _yaml_mapping(reader, item, f"a {node_type} node"):
+        if key == word:
+            name = _scalar(construct(value))
+            if not name:
+                raise reader.refuse(at, f"a {node_type} node has an empty name")
+        elif key in NODE_SECTIONS.values():
+            raise reader.refuse(at,
+                                f"a node of the {section} section is written "
+                                f"`- {word}: <name>`, and this one is written "
+                                f"`{key}:`")
+        elif key in ("name", "type", "editor"):
+            raise reader.refuse(at,
+                                f"a node says {key}:, which a node does not: "
+                                f"it is named as `- {word}: <name>`, and its "
+                                "type is the type it is written under")
+        elif key in LINKS:
+            said = construct(value)
+            for one in said if isinstance(said, list) else [said]:
+                target = one.get("target", "") if isinstance(one, dict) else one
+                links.setdefault(key, []).append(_scalar(target))
+        elif key in SINKS:
+            said = _scalar(construct(value))
+            _sink(reader, at, key, said)
+            attributes[key] = said
+        elif key in LISTED:
+            said = construct(value)
+            said = said if isinstance(said, list) else [said]
+            attributes[key] = ", ".join(_scalar(one) for one in said)
+        else:
+            attributes[key] = _scalar(construct(value))
+    if name is None:
+        raise reader.refuse(line,
+                            f"a {node_type} node has no name: write it as `- "
+                            f"{word}: <name>`")
+    return Node(name=name, node_type=node_type, section=section,
+                attributes=attributes, links=links)
+
+
 def _load_yaml(path):
     """Read a configuration written in YAML, with PyYAML.
+
+    Refused, as ``tcslibgs::graph::grouped`` refuses them: a file in the
+    old shape, a type key that is not the word ``type``, one space and one of
+    its section's types, a type written twice in a section or with no nodes,
+    a node with a type of its own, with no name or an empty one, or that
+    says a key twice, and two nodes of one name.
 
     Args:
         path: The configuration file.
@@ -902,7 +1520,7 @@ def _load_yaml(path):
 
     Raises:
         ValueError: PyYAML is not installed, the file is not a map of
-                    sections, or it includes others.
+                    sections, it includes others, or it is refused.
         yaml.YAMLError: The file is not well-formed YAML.
     """
     try:
@@ -915,44 +1533,94 @@ def _load_yaml(path):
         ) from why
 
     with open(path, encoding="utf-8") as text:
-        document = yaml.safe_load(text) or {}
-    if not isinstance(document, dict):
-        raise ValueError(
-            f"{path} is not a configuration: it is not a map of sections"
-        )
-    if "include" in document:
+        root = yaml.compose(text)
+    reader = _Reader(path)
+    if root is None:
+        return reader.done({})
+    if not isinstance(root, yaml.MappingNode):
+        raise ValueError(f"{path} is not a configuration: it is not a map of "
+                         "sections")
+    constructor = yaml.constructor.SafeConstructor()
+
+    def construct(value):
+        """A composed value, as a Python one.
+
+        Args:
+            value: The value.
+
+        Returns:
+            What it says.
+        """
+        return constructor.construct_object(value, deep=True)
+
+    sections = _yaml_mapping(reader, root, "the file")
+    if any(key == "include" for key, _, _ in sections):
         raise _includes(path)
+    _yaml_old(reader, root)
 
     tcspecial = {}
-    for part, value in (document.get("tcspecial") or {}).items():
-        if isinstance(value, dict):
-            for leaf, scalar in value.items():
-                tcspecial[f"{part}.{leaf}"] = _scalar(scalar)
-        else:
-            tcspecial[part] = _scalar(value)
+    for key, value, _ in sections:
+        if key != "tcspecial":
+            continue
+        for part, said in (construct(value) or {}).items():
+            if isinstance(said, dict):
+                for leaf, scalar in said.items():
+                    tcspecial[f"{part}.{leaf}"] = _scalar(scalar)
+            else:
+                tcspecial[part] = _scalar(said)
 
-    # The node sections in the order the file writes them, and each one's
-    # nodes in order: a node's device id is its place among them all.
-    nodes = []
-    for section, entries in document.items():
+    for section, value, _ in sections:
         if section not in NODE_SECTIONS:
             continue
-        for entry in entries or []:
-            node = Node(name=_scalar(entry.get("name", "")),
-                        node_type=_scalar(entry.get("type", "")),
-                        section=section)
-            for key, value in entry.items():
-                if key in ("name", "type"):
-                    continue
-                if isinstance(value, list):
-                    node.links.setdefault(key, []).extend(
-                        _scalar(link.get("target", "")) for link in value
-                    )
-                else:
-                    node.attributes[key] = _scalar(value)
-            nodes.append(node)
+        typed = set()
+        for entry in _yaml_list(reader, value, section):
+            groups = _yaml_mapping(reader, entry, f"an entry of {section}")
+            if len(groups) != 1:
+                raise reader.refuse(entry.start_mark.line + 1,
+                                    f"an entry of {section} names one type, "
+                                    "and its nodes are the list under it")
+            key, nodes, at = groups[0]
+            if not key.startswith("type "):
+                raise reader.refuse(at,
+                                    f'"{key}" is not a type: each entry of '
+                                    f'{section} is the word type, a space and '
+                                    'the type its nodes are')
+            node_type = key[len("type "):]
+            if node_type[:1].isspace():
+                raise reader.refuse(
+                    at, f'"{key}" has more than one space after type')
+            why = _type_refused(section, node_type)
+            if why is not None:
+                raise reader.refuse(at, why)
+            if node_type in typed:
+                raise reader.refuse(at,
+                                    f"type {node_type} is written twice in "
+                                    f"{section}: put its nodes under one")
+            typed.add(node_type)
+            items = _yaml_list(reader, nodes, f"type {node_type}")
+            if not items:
+                raise reader.refuse(
+                    at, f"type {node_type} in {section} has no nodes under it")
+            for item in items:
+                reader.add(_yaml_node(reader, section, node_type, item,
+                                      construct), item.start_mark.line + 1)
 
-    return Configuration(path=path, tcspecial=tcspecial, nodes=nodes)
+    for key, value, at in sections:
+        if key != "tcsgui":
+            continue
+        for part, entries, line in _yaml_mapping(reader, value, "tcsgui"):
+            if part not in ("nodes", "set-aside"):
+                raise reader.refuse(line, f"the tcsgui section has no {part}")
+            seen = set()
+            for entry in _yaml_list(reader, entries, part):
+                said = {
+                    key: construct(value)
+                    for key, value, _ in _yaml_mapping(reader, entry,
+                                                       f"an entry of {part}")}
+                _layout_entry(reader, entry.start_mark.line + 1, part, said,
+                              seen)
+
+    return reader.done(tcspecial)
 
 
 def one_host(address):

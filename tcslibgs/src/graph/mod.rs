@@ -1267,15 +1267,19 @@ impl Graph {
             for said in &typed.nodes {
                 let name = &said.node.name;
                 if let Some(home) = self.homes.get(name) {
-                    let where_ = if home == from {
-                        "twice in this file".to_string()
+                    let (where_, nth) = if home == from {
+                        ("twice in this file".to_string(), 1)
                     } else {
-                        format!("here and in {}", home.display())
+                        (format!("here and in {}", home.display()), 0)
                     };
+                    let at = grouped::line_of_node(from, name, nth)
+                        .map(|line| format!("at line {line}, "))
+                        .unwrap_or_default();
                     return Err(TcsError::Config(format!(
-                        "{}: there is a node called \"{name}\" {where_}: a \
-                         node's name is the one thing every other part of a \
-                         configuration knows it by, so no two nodes share one",
+                        "{}: {at}there is a node called \"{name}\" \
+                         {where_}: a node's name is the one thing every other \
+                         part of a configuration knows it by, so no two nodes \
+                         share one",
                         from.display(),
                     )));
                 }

@@ -1,0 +1,5 @@
+<?xml version="1.0"?>
+<!-- Refused: a type with no nodes in it. -->
+<configuration>
+    <payloads><type name="i2c"/></payloads>
+</configuration>

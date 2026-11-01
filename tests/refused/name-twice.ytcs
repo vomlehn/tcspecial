@@ -1,0 +1,6 @@
+# Refused: two nodes of one name, under different types.
+payloads:
+  - type i2c:
+      - payload: a
+  - type spi:
+      - payload: a

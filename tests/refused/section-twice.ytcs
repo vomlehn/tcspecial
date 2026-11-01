@@ -1,0 +1,7 @@
+# Refused: a section written twice.
+payloads:
+  - type i2c:
+      - payload: a
+payloads:
+  - type spi:
+      - payload: b

@@ -1,0 +1,6 @@
+# Refused: one type grouped twice in a section.
+payloads:
+  - type i2c:
+      - payload: a
+  - type i2c:
+      - payload: b

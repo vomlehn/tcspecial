@@ -1,0 +1,4 @@
+# Refused: two spaces after the word type.
+payloads:
+  - type  i2c:
+      - payload: a

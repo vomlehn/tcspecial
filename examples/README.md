@@ -303,8 +303,11 @@ a fraction of a millisecond negative.
 
 The Rust crate beside it is its tests, which `cargo test` runs: `agrees.rs`
 holds the ports, APIDs and checksum `ping_yamcs.py --describe` reads from
-`ping-yamcs.xtcs` to what `tcslibgs` reads from `ping-yamcs.ytcs`, and
-`python.rs` runs `test_ping_yamcs.py`. Neither needs Yamcs or opens a window.
+`ping-yamcs.xtcs` to what `tcslibgs` reads from `ping-yamcs.ytcs`;
+`wrapper.rs` works `yamcs/tcs-ccsds.xtce.in` as Yamcs would, decoding the
+beacon and the answers as the vehicle frames them and encoding CONNECT and a
+ping for the vehicle to unframe and read; and `python.rs` runs
+`test_ping_yamcs.py`. None needs Yamcs or opens a window.
 
 `YAMCS_HOME` is where a Yamcs release is unpacked, holding `bin/yamcsd`;
 <https://github.com/yamcs/yamcs/releases> has them, and it was written

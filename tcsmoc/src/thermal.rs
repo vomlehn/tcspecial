@@ -234,6 +234,10 @@ impl Plot {
     /// # Arguments
     ///
     /// * `now` - The time at the right edge, once the plot is full.
+    ///
+    /// # Returns
+    ///
+    /// The time, or `None` before the first reading.
     pub fn left(&self, now: Instant) -> Option<Instant> {
         let started = self.started?;
         Some(match now.checked_sub(SPAN) {
@@ -391,6 +395,16 @@ pub struct SwitchDrawn {
 }
 
 impl SwitchDrawn {
+    /// A switch as it is drawn before anything is known of it: labelled,
+    /// with no state and nothing drawn.
+    ///
+    /// # Arguments
+    ///
+    /// * `switch` - The switch.
+    ///
+    /// # Returns
+    ///
+    /// The switch, drawn as unheard; [`Plot::draw`] adds what was heard.
     fn unheard(switch: &Switch) -> SwitchDrawn {
         let mut label = switch.name.clone();
         if !switch.drives.is_empty() {
@@ -417,6 +431,11 @@ pub struct Drawn {
 impl Drawn {
     /// Empties it for the next drawing, keeping what its strings hold room
     /// for.
+    ///
+    /// # Arguments
+    ///
+    /// * `sensors` - How many sensors there are: a path and a latest
+    ///               reading for each.
     fn clear(&mut self, sensors: usize) {
         self.paths.resize_with(sensors, String::new);
         self.latest.resize_with(sensors, String::new);

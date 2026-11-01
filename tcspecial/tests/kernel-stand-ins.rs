@@ -302,7 +302,11 @@ const COMMAND_ID: u32 = 0x124;
 ///
 /// # Returns
 ///
-/// Its name, or why there is none, with what makes one.
+/// Its name.
+///
+/// # Errors
+///
+/// Why there is none, with what makes one.
 fn virtual_can() -> Result<String, String> {
     let host = Host::this();
     let mut names: Vec<String> = std::fs::read_dir("/sys/class/net")
@@ -346,6 +350,15 @@ struct Bus(OwnedFd);
 
 impl Bus {
     /// Opens a socket on `interface`, filtered to `can_id`.
+    ///
+    /// # Arguments
+    ///
+    /// * `interface` - The CAN interface's name.
+    /// * `can_id`    - The one identifier the socket receives.
+    ///
+    /// # Returns
+    ///
+    /// The socket.
     ///
     /// # Panics
     ///
@@ -511,6 +524,10 @@ struct Chip {
 
 impl Chip {
     /// Pulls the switch's line, line 0, high or low.
+    ///
+    /// # Arguments
+    ///
+    /// * `high` - Up, where true; down, where false.
     fn pull(&self, high: bool) {
         std::fs::write(
             self.lines[0].join("pull"),
@@ -520,6 +537,10 @@ impl Chip {
     }
 
     /// What the lamp's line, line 1, is: what the vehicle drove it to.
+    ///
+    /// # Returns
+    ///
+    /// Its value as gpio-sim says it, `0` or `1`.
     fn lamp(&self) -> String {
         std::fs::read_to_string(self.lines[1].join("value"))
             .expect("the lamp's line reads")
@@ -534,7 +555,11 @@ impl Chip {
 ///
 /// # Returns
 ///
-/// The chip, or why there is none, with what makes one.
+/// The chip.
+///
+/// # Errors
+///
+/// Why there is none, with what makes one.
 fn gpio_sim() -> Result<Chip, String> {
     let host = Host::this();
     let chips = gpio::simulated_chips(Path::new(gpio::SIM_DEVICES));
@@ -700,7 +725,11 @@ fn scan_bytes(scan: &Path) -> usize {
 ///
 /// # Returns
 ///
-/// The sensor, or why there is none, with what makes one.
+/// The sensor.
+///
+/// # Errors
+///
+/// Why there is none, with what makes one.
 fn iio_dummy() -> Result<Sensor, String> {
     let host = Host::this();
     let mut devices: Vec<PathBuf> = std::fs::read_dir("/sys/bus/iio/devices")

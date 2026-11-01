@@ -13,6 +13,12 @@ two cannot come to disagree.
 C and C++ alike: the header is C, includable from C++ as it stands, with C
 linkage throughout, and nothing in it that C++ will not compile.
 
+A configuration that answers to cFS is used through the same calls: tcslib
+joins the stand-in for the cFS end that tcssim runs as an SBN peer, on a
+thread of its own, and the beacons, the data and the commands go over that
+peer (see "A vehicle on a cFS software bus" in
+[tcslib's README](../tcslib/README.md)). Nothing in the header changes.
+
 ## What is in it
 
 - **The configuration.** `tcs_configuration_open` reads and checks a

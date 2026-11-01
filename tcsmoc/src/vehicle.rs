@@ -2416,16 +2416,22 @@ pub fn run(
             tcslib::beacon::STANDARD_INTERVAL
         }
     };
-    let _beacon_receive = match tcslibgs::graph::parameters::beacon_of(&graph) {
-        Ok(Some(beacon)) => {
+    // At the socket the beacon link states, or from the station's peer of a
+    // software bus: see `tcslib::beacon::open`.
+    let _beacon_receive = match tcslib::beacon::open(
+        &graph,
+        crate::config::constants::beacon_schedule(interval),
+        digest,
+    ) {
+        Ok(Some(beacons)) => {
             eprintln!(
                 "Listening for beacons at {}, which {} sends from",
-                beacon.recv, beacon.send
+                beacons.link().recv,
+                beacons.link().send
             );
-            BeaconReceive::new(
+            Some(BeaconReceive::new(
                 ui.as_weak(),
-                beacon,
-                crate::config::constants::beacon_schedule(interval),
+                beacons,
                 crate::beacon_receive::Decided {
                     contact: contact.clone(),
                     heard: link.clone().map(|link| {
@@ -2438,7 +2444,6 @@ pub fn run(
                     }),
                     matched: matched.clone(),
                 },
-                digest,
                 Some(crate::ask_whether_to_continue(
                     pm_tcssim.clone(),
                     Some(pm_tcspecial.clone()),
@@ -2484,7 +2489,7 @@ pub fn run(
                             as crate::beacon_receive::OnContact
                     }),
                 },
-            )
+            ))
         }
         Ok(None) => None,
         Err(e) => {

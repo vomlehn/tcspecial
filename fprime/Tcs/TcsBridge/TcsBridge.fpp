@@ -82,6 +82,21 @@ module Tcs {
       node: string size NODE_NAME_BYTES @< The node's name
     ) opcode 3
 
+    @ Arm a restart of the vehicle onto a configuration it holds, which
+    @ the RESTART that follows must name with the same key
+    async command RESTART_ARM(
+      key: U64 @< The key, which the RESTART must carry
+      $target: string size 32 @< The configuration's checksum, as tcsverify prints it, or empty for this one's
+    ) opcode 5
+
+    @ Restart the vehicle onto the configuration the last RESTART_ARM
+    @ named. Its beacons say whether it was taken; the bridge connects to
+    @ the start that comes back by itself
+    async command RESTART(
+      key: U64 @< The key the last RESTART_ARM carried
+      $target: string size 32 @< The checksum it carried, or empty for this configuration's
+    ) opcode 6
+
     @ Send a datum up to the gateway node, which leaves it by its
     @ gateway-out links for the nodes they reach: 1 or 0 to a heater, say.
     @ Sent only while the bridge is matched for commanding
@@ -207,6 +222,13 @@ module Tcs {
     ) severity warning low id 16 \
       format "{} sent a datum that is not a value: {}" \
       throttle 10
+
+    @ tcspecial answered RESTART_ARM or RESTART
+    event RestartAnswered(
+      cmd: string size 16 @< The command
+      status: string size 32 @< What tcspecial answered
+    ) severity activity high id 18 \
+      format "{}: {}"
 
     @ A datum went up to the gateway node
     event DataSent(

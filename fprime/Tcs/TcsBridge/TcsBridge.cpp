@@ -290,7 +290,10 @@ void TcsBridge::connectIfDue(const Heard &heard)
 	if (tcs_client_connect(m_client, &agrees) == 0) {
 		now = agrees ? Connected::AGREED : Connected::DIFFERED;
 	}
-	if (now == m_connected && now != Connected::FAILED) {
+	// Another configuration, again, is no news. A match is, every time:
+	// after a restart the CONNECT that agrees is a new match, though the
+	// last CONNECT before the restart agreed too.
+	if (now == m_connected && now == Connected::DIFFERED) {
 		return;
 	}
 	switch (now) {
@@ -446,6 +449,54 @@ void TcsBridge::QUERY_NODE_cmdHandler(FwOpcodeType opCode, U32 cmdSeq,
 	}
 	this->log_ACTIVITY_HI_NodeQueried(node, enabled != 0);
 	this->cmdResponse_out(opCode, cmdSeq, Fw::CmdResponse::OK);
+}
+
+void TcsBridge::restartCommand(const char *command,
+			       int (*send)(tcs_client *, uint64_t,
+					   const char *, tcs_status *),
+			       FwOpcodeType opCode, U32 cmdSeq, U64 key,
+			       const Fw::CmdStringArg &target)
+{
+	if (!this->open(command, opCode, cmdSeq)) {
+		return;
+	}
+	// Empty is this configuration's checksum, which tcslib-c is told by
+	// NULL: a plain restart. Anything else it holds to being a checksum,
+	// and refuses unsent where it is not one.
+	const char *onto = target.length() == 0 ? nullptr : target.toChar();
+	tcs_status status = TCS_STATUS_FAILURE;
+	if (send(m_client, key, onto, &status) != 0) {
+		this->log_WARNING_LO_CommandFailed(
+			Fw::String(command), Fw::String(tcs_last_error()));
+		this->cmdResponse_out(opCode, cmdSeq,
+				      Fw::CmdResponse::EXECUTION_ERROR);
+		return;
+	}
+	// Nothing is held back after a RESTART taken: the vehicle answers
+	// every command but CONNECT and these two Unmatched until the start
+	// that comes back is matched, and that start's beacons, carrying the
+	// restart flag, end this bridge's match, so that the CONNECT a beacon
+	// is due is what matches it again.
+	this->log_ACTIVITY_HI_RestartAnswered(
+		Fw::String(command), Fw::String(tcs_status_name(status)));
+	this->cmdResponse_out(opCode, cmdSeq,
+			      status == TCS_STATUS_SUCCESS ?
+			      Fw::CmdResponse::OK :
+			      Fw::CmdResponse::EXECUTION_ERROR);
+}
+
+void TcsBridge::RESTART_ARM_cmdHandler(FwOpcodeType opCode, U32 cmdSeq,
+				       U64 key, const Fw::CmdStringArg &target)
+{
+	this->restartCommand("RESTART_ARM", tcs_client_restart_arm, opCode,
+			     cmdSeq, key, target);
+}
+
+void TcsBridge::RESTART_cmdHandler(FwOpcodeType opCode, U32 cmdSeq, U64 key,
+				   const Fw::CmdStringArg &target)
+{
+	this->restartCommand("RESTART", tcs_client_restart, opCode, cmdSeq,
+			     key, target);
 }
 
 void TcsBridge::SEND_DATA_cmdHandler(FwOpcodeType opCode, U32 cmdSeq,

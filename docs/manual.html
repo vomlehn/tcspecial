@@ -2737,7 +2737,11 @@ CONNECT itself, once for each beacon heard while it is unmatched, and says
 <tt class="docutils literal">ConfigurationDiffers</tt> when it does not. Its commands are <tt class="docutils literal">PING</tt>, and
 <tt class="docutils literal">START_NODE</tt>, <tt class="docutils literal">STOP_NODE</tt> and <tt class="docutils literal">QUERY_NODE</tt>, each given a node's name;
 each is answered as tcspecial answers it, with an event saying what tcspecial
-said. <tt class="docutils literal">SEND_DATA</tt> sends its text up to the gateway node, which leaves it
+said. <tt class="docutils literal">RESTART_ARM</tt> and <tt class="docutils literal">RESTART</tt> take a key and a target, the checksum
+of the configuration to restart onto as tcsverify prints it, or nothing for
+this one's; the vehicle's answer is a <tt class="docutils literal">RestartAnswered</tt> event, and after a
+restart the bridge connects to the start that comes back by itself, saying
+<tt class="docutils literal">Matched</tt> again. <tt class="docutils literal">SEND_DATA</tt> sends its text up to the gateway node, which leaves it
 by its <tt class="docutils literal"><span class="pre">gateway-out</span></tt> links -- <tt class="docutils literal">SEND_DATA 1</tt> turns the example's heater on,
 and <tt class="docutils literal">SEND_DATA 0</tt> off -- and is said in a <tt class="docutils literal">DataSent</tt> event; it goes only
 while the bridge is matched for commanding, and is refused before, as every
@@ -2759,11 +2763,12 @@ and hold it to connecting and matching, hearing beacons, a simulated reading
 arriving as the thermometer's channel and as <tt class="docutils literal">cabin_temp</tt>'s temperature, a
 <tt class="docutils literal">PING</tt> answered, a node stopped and
 started again, <tt class="docutils literal">SEND_DATA 1</tt> warming the cabin until <tt class="docutils literal">cabin_temp</tt> climbs,
-an unknown node refused unsent, and stopping cleanly. tcssim's
+an unknown node refused unsent, a restart onto a configuration the vehicle
+does not hold refused, a plain restart taken and the start that comes back
+matched again, and stopping cleanly. tcssim's
 window is open while it runs. What a run leaves -- each program's log, and
 F´'s ground system's -- is in <tt class="docutils literal"><span class="pre">fprime/build-test</span></tt>. F´'s ground system
 listens on TCP port 50000.</p>
-<p>The bridge does not yet offer the restart commands.</p>
 </div>
 </div>
 <div class="section" id="the-cfs-example">

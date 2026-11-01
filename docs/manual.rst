@@ -2457,7 +2457,11 @@ CONNECT itself, once for each beacon heard while it is unmatched, and says
 ``ConfigurationDiffers`` when it does not. Its commands are ``PING``, and
 ``START_NODE``, ``STOP_NODE`` and ``QUERY_NODE``, each given a node's name;
 each is answered as tcspecial answers it, with an event saying what tcspecial
-said. ``SEND_DATA`` sends its text up to the gateway node, which leaves it
+said. ``RESTART_ARM`` and ``RESTART`` take a key and a target, the checksum
+of the configuration to restart onto as tcsverify prints it, or nothing for
+this one's; the vehicle's answer is a ``RestartAnswered`` event, and after a
+restart the bridge connects to the start that comes back by itself, saying
+``Matched`` again. ``SEND_DATA`` sends its text up to the gateway node, which leaves it
 by its ``gateway-out`` links -- ``SEND_DATA 1`` turns the example's heater on,
 and ``SEND_DATA 0`` off -- and is said in a ``DataSent`` event; it goes only
 while the bridge is matched for commanding, and is refused before, as every
@@ -2483,12 +2487,12 @@ and hold it to connecting and matching, hearing beacons, a simulated reading
 arriving as the thermometer's channel and as ``cabin_temp``'s temperature, a
 ``PING`` answered, a node stopped and
 started again, ``SEND_DATA 1`` warming the cabin until ``cabin_temp`` climbs,
-an unknown node refused unsent, and stopping cleanly. tcssim's
+an unknown node refused unsent, a restart onto a configuration the vehicle
+does not hold refused, a plain restart taken and the start that comes back
+matched again, and stopping cleanly. tcssim's
 window is open while it runs. What a run leaves -- each program's log, and
 F´'s ground system's -- is in ``fprime/build-test``. F´'s ground system
 listens on TCP port 50000.
-
-The bridge does not yet offer the restart commands.
 
 The cfs example
 ---------------

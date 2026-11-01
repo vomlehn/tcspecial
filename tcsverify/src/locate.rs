@@ -86,6 +86,7 @@ impl Where {
             About::SimGroup(name) => (&["simulated_payload_groups"], name),
             About::Node(name) => (&["gateway", "vehicle", "payloads"], name),
             About::NodeGroup(name) => (&["payload_groups"], name),
+            About::PhysicsElement(name) => (&["physics"], name),
         };
 
         sections

@@ -2172,7 +2172,8 @@ point of writing the bindings down, and the refusal says why: tcsmoc shows
 the reason the vehicle sends -- ``no command binding says the ground may set
 "thermostat.half-band": it is spelled half_band`` -- beside the status.
 
-The simulator file beside it declares a thermal mass, ``basic``, with
+The simulator file beside it names the vehicle's physics model,
+``thermostat-physics.yaml``, which declares a thermal mass, ``basic``, with
 inputs ``in1`` and ``in2`` and outputs ``out1``, ``out2`` and ``out3``. Each
 sensor reads an output of its own, so that what the three report is one
 temperature rather than three streams of noise, which is what a thermal mass
@@ -3030,10 +3031,27 @@ A thermal mass gives them something to agree about. Declare one, attach the
 sensors that report it and the heaters that warm it, and what the vehicle
 reads becomes a consequence of what the vehicle drove.
 
+A mass is the vehicle's physics and not any one configuration's -- the cabin
+is the same body whichever payloads fly -- so it is declared in a physics
+model: a YAML file of its own, which the simulator file names, relative to
+its own directory. Several simulator files may name one model, which is how
+the manual's thermostat fixture and the thermostat example share their
+cabin. A simulator file that still declares masses itself is refused, told
+where they go.
+
 .. code-block:: text
 
-   thermal_mass            optional
+   physics                in the simulator file: the physics model's file,
+                          relative to this one. Optional
+
+In the model, each element of its ``physics`` list is a thermal mass, the one
+type so far:
+
+.. code-block:: text
+
+   physics
      name                 the name payloads attach to
+     type                 thermal_mass
      environment          the temperature around it, in kelvin
      time_constant        how fast it loses the difference, as a length
                           of time
@@ -3095,14 +3113,23 @@ A heater has to be a payload the simulator can be driven through: a socket,
 or a set of discrete lines, whose stand-in watches the lines the vehicle
 drives.
 
+The model, ``cabin-physics.yaml``:
+
 .. code-block:: yaml
 
-   thermal_mass:
+   physics:
      - name: basic
+       type: thermal_mass
        environment: "283.15"      # ten kelvin below the setpoint
        time_constant: "50 s"      # a fifth of a kelvin a second at it
        inputs: "in1,in2"
        outputs: "out1,out2,out3"
+
+And the simulator file beside it, which names it and attaches the payloads:
+
+.. code-block:: yaml
+
+   physics: cabin-physics.yaml
 
    simulated_payload_groups:
      - name: cabin_temps
@@ -3170,7 +3197,9 @@ At a heater, as settings of a payload that heats:
                           ripple and refused without it
 
 In the mass, the ``swing``, ``period``, ``wander`` and ``wander_time`` of
-its entry, and the offsets of its outputs, above. A sensor's errors are
+its entry in the physics model, and the offsets of its outputs, above: what
+the world does is the model's, and what a stand-in gets wrong is the
+simulator file's. A sensor's errors are
 refused on a heater and a heater's on a sensor.
 
 Everything that wanders -- a sensor's drift, the environment, a supply -- is
@@ -3293,18 +3322,14 @@ refused outright: a device, which tcspecial opens and reads directly, and a
 device on a bus, where the master's own read is the request and a second master
 cannot see it.
 
-This is the shipped ``examples/thermostat/thermostat-sim.yaml``.
+This is the shipped ``examples/thermostat/thermostat-sim.yaml``, which names
+the model the cabin is declared in, ``thermostat-physics.yaml``, beside it.
 
 .. code-block:: yaml
 
    description: Simulator settings for the payloads of thermostat.ytcs
 
-   thermal_mass:
-     - name: basic
-       environment: "283.15"
-       time_constant: "50 s"
-       inputs: "in1,in2"
-       outputs: "out1,out2,out3"
+   physics: thermostat-physics.yaml
 
    simulated_payload_groups:
      - name: cabin_temps

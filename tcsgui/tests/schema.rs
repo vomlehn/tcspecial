@@ -263,8 +263,8 @@ fn each_section_takes_the_node_types_the_software_knows() {
 ///
 /// The kinds are `DHType`'s, which is what the simulator reads a `type`
 /// with. Empty is allowed, as not stated. And the XSD offers every setting
-/// the one list of them has, which the XSD once did not: it was missing the
-/// thermal masses and what attaches a payload to one.
+/// the one list of them has, which the XSD once did not: it was missing
+/// what attaches a payload to a thermal mass.
 #[test]
 fn the_simulator_schemas_take_the_kinds_and_words_the_simulator_reads() {
     let mut kinds: Vec<String> = tcslibgs::DHType::ALL
@@ -293,7 +293,7 @@ fn the_simulator_schemas_take_the_kinds_and_words_the_simulator_reads() {
     assert_eq!(enumerated(&xsd, "kind"), kinds, "in the XSD");
     for word in tcslibgs::sim_config::SETTINGS
         .iter()
-        .chain(&["thermal_mass", "group"])
+        .chain(&["physics", "group"])
     {
         assert!(
             xsd.contains(&format!("<xs:element name=\"{word}\"")),
@@ -306,15 +306,17 @@ fn the_simulator_schemas_take_the_kinds_and_words_the_simulator_reads() {
     let dir = tempfile::tempdir().expect("a directory");
     let file = dir.path().join("every-sim.xml");
     std::fs::write(
+        dir.path().join("every-physics.yaml"),
+        "physics:\n  - name: cabin\n    type: thermal_mass\n    \
+         environment: \"280\"\n    time_constant: \"60 s\"\n",
+    )
+    .expect("written");
+    std::fs::write(
         &file,
         "<?xml version=\"1.0\" encoding=\"UTF-8\"?>
 <simulator>
   <description>every word</description>
-  <thermal_mass>
-    <name>cabin</name>
-    <environment>280</environment>
-    <time_constant>60 s</time_constant>
-  </thermal_mass>
+  <physics>every-physics.yaml</physics>
   <simulated_payload_groups>
     <name>fast</name>
     <type>network</type>
@@ -867,4 +869,32 @@ fn every_node_is_described_once_and_in_one_spelling() {
             name.display()
         );
     }
+}
+
+/// The physics model's schema offers every element type the model reads,
+/// and every setting of a thermal mass the one list of them has: the
+/// schema an editor checks a hand-written model against says what tcssim
+/// reads.
+#[test]
+fn the_physics_schema_takes_the_types_and_settings_the_model_reads() {
+    let json = read("tcspecial-physics.schema.json");
+    let item = &json["properties"]["physics"]["items"];
+    let types: Vec<&str> = item["properties"]["type"]["enum"]
+        .as_array()
+        .expect("the schema lists the types")
+        .iter()
+        .map(|value| value.as_str().expect("a type is a word"))
+        .collect();
+    assert_eq!(types, tcslibgs::physics::TYPES);
+    let mut said: Vec<&str> = item["properties"]
+        .as_object()
+        .expect("an element's settings")
+        .keys()
+        .map(String::as_str)
+        .filter(|name| !["name", "type"].contains(name))
+        .collect();
+    said.sort_unstable();
+    let mut wanted = tcslibgs::physics::THERMAL_MASS_SETTINGS.to_vec();
+    wanted.sort_unstable();
+    assert_eq!(said, wanted);
 }

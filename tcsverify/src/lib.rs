@@ -882,12 +882,16 @@ fn check_graph_simulator(
         return;
     };
 
-    let sim: SimConfigFile = match format.parse(&text) {
+    let mut sim: SimConfigFile = match format.parse(&text) {
         Ok(sim) => sim,
         Err(parse_error) => {
             report.add(path, line_of(&parse_error), parse_error.to_string());
             return;
         }
+    };
+    let found = Where::of(&text, format);
+    let Ok(model) = read_model(path, &mut sim, &found, report) else {
+        return;
     };
 
     let Some(graph) = graph else { return };
@@ -898,7 +902,6 @@ fn check_graph_simulator(
         .map(|node| node.name.as_str())
         .collect();
 
-    let found = Where::of(&text, format);
     let by_name = sim.problems_by_name(&names);
     let named_well = by_name.is_empty();
     for problem in by_name {
@@ -937,6 +940,93 @@ fn check_graph_simulator(
                     );
                 }
             }
+        }
+    }
+
+    // The masses themselves, in the model's words and at its lines, where
+    // the payloads attached to them are all right: a mass nothing attaches
+    // to is refused there, and a misspelled attachment would read as one.
+    if let (true, Some((model, model_text))) = (named_well, model) {
+        if let Err(problem) = sim.masses() {
+            let line = Where::of(&model_text, ConfigFormat::Yaml)
+                .line_of(&problem.about());
+            report.add(&model, line, problem.to_string());
+        }
+    }
+}
+
+/// Reads the physics model a simulator file names, and gives the file the
+/// thermal masses it holds, as `SimConfigFile::read_physics` does for every
+/// program that loads one -- but reporting each problem at its own file and
+/// line, which a program that only starts or stops has no use for.
+///
+/// # Arguments
+///
+/// * `path`   - The simulator file.
+/// * `sim`    - What it parsed as, which takes the model's masses.
+/// * `found`  - Where its sections and entries are.
+/// * `report` - Where each problem is added.
+///
+/// # Returns
+///
+/// The model's path and text, or `None` where the file names none.
+///
+/// # Errors
+///
+/// `()` where the file still declares masses itself, or its model cannot be
+/// read or parsed: said in `report`, and nothing more can be checked.
+fn read_model(
+    path: &Path,
+    sim: &mut SimConfigFile,
+    found: &Where,
+    report: &mut Report,
+) -> Result<Option<(PathBuf, String)>, ()> {
+    if sim.moved_thermal_mass.is_some() {
+        report.add(
+            path,
+            found.line_of(&tcslibgs::About::Section("thermal_mass")),
+            tcslibgs::sim_config::MOVED_THERMAL_MASS,
+        );
+        return Err(());
+    }
+    let Some(model) = sim.physics_path(path) else {
+        return Ok(None);
+    };
+    let at = found.line_of(&tcslibgs::About::Section("physics"));
+    if !tcslibgs::physics::is_yaml_name(&model) {
+        report.add(
+            path,
+            at,
+            format!(
+                "physics names {}: a physics model is YAML, named .yaml or \
+                 .yml",
+                model.display()
+            ),
+        );
+        return Err(());
+    }
+    let text = match std::fs::read_to_string(&model) {
+        Ok(text) => text,
+        Err(e) => {
+            report.add(
+                path,
+                at,
+                format!(
+                    "physics names {}, which cannot be read: {e}",
+                    model.display()
+                ),
+            );
+            return Err(());
+        }
+    };
+    match tcslibgs::physics::PhysicsFile::parse(&text) {
+        Ok(file) => {
+            sim.thermal_mass = file.thermal_masses();
+            Ok(Some((model, text)))
+        }
+        Err(e) => {
+            report.add(&model, line_of(&e), e.to_string());
+            Err(())
         }
     }
 }
@@ -1050,7 +1140,11 @@ mod tests {
             .join("../examples/thermostat");
         let dir = tempfile::tempdir().expect("a directory");
         let at = |name: &str| dir.path().join(name);
-        for name in ["thermostat.ytcs", "thermostat-sim.yaml"] {
+        for name in [
+            "thermostat.ytcs",
+            "thermostat-sim.yaml",
+            "thermostat-physics.yaml",
+        ] {
             std::fs::copy(root.join(name), at(name)).expect("copied");
         }
         let xml = std::fs::read_to_string(root.join("thermostat.xtcs"))

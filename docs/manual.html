@@ -2491,7 +2491,8 @@ decides by it. An attribute no binding mentions is refused, which is the
 point of writing the bindings down, and the refusal says why: tcsmoc shows
 the reason the vehicle sends -- <tt class="docutils literal">no command binding says the ground may set
 <span class="pre">&quot;thermostat.half-band&quot;:</span> it is spelled half_band</tt> -- beside the status.</p>
-<p>The simulator file beside it declares a thermal mass, <tt class="docutils literal">basic</tt>, with
+<p>The simulator file beside it names the vehicle's physics model,
+<tt class="docutils literal"><span class="pre">thermostat-physics.yaml</span></tt>, which declares a thermal mass, <tt class="docutils literal">basic</tt>, with
 inputs <tt class="docutils literal">in1</tt> and <tt class="docutils literal">in2</tt> and outputs <tt class="docutils literal">out1</tt>, <tt class="docutils literal">out2</tt> and <tt class="docutils literal">out3</tt>. Each
 sensor reads an output of its own, so that what the three report is one
 temperature rather than three streams of noise, which is what a thermal mass
@@ -3263,9 +3264,23 @@ it cannot be seen working.</p>
 <p>A thermal mass gives them something to agree about. Declare one, attach the
 sensors that report it and the heaters that warm it, and what the vehicle
 reads becomes a consequence of what the vehicle drove.</p>
+<p>A mass is the vehicle's physics and not any one configuration's -- the cabin
+is the same body whichever payloads fly -- so it is declared in a physics
+model: a YAML file of its own, which the simulator file names, relative to
+its own directory. Several simulator files may name one model, which is how
+the manual's thermostat fixture and the thermostat example share their
+cabin. A simulator file that still declares masses itself is refused, told
+where they go.</p>
 <pre class="code text literal-block">
-thermal_mass            optional
+physics                in the simulator file: the physics model's file,
+                       relative to this one. Optional
+</pre>
+<p>In the model, each element of its <tt class="docutils literal">physics</tt> list is a thermal mass, the one
+type so far:</p>
+<pre class="code text literal-block">
+physics
   name                 the name payloads attach to
+  type                 thermal_mass
   environment          the temperature around it, in kelvin
   time_constant        how fast it loses the difference, as a length
                        of time
@@ -3320,13 +3335,19 @@ next look, so the mass overshoots by their rate over the sum of the two.</p>
 <p>A heater has to be a payload the simulator can be driven through: a socket,
 or a set of discrete lines, whose stand-in watches the lines the vehicle
 drives.</p>
+<p>The model, <tt class="docutils literal"><span class="pre">cabin-physics.yaml</span></tt>:</p>
 <pre class="code yaml literal-block">
-<span class="name tag">thermal_mass</span><span class="punctuation">:</span><span class="whitespace">
+<span class="name tag">physics</span><span class="punctuation">:</span><span class="whitespace">
   </span><span class="punctuation indicator">-</span><span class="whitespace"> </span><span class="name tag">name</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">basic</span><span class="whitespace">
+    </span><span class="name tag">type</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">thermal_mass</span><span class="whitespace">
     </span><span class="name tag">environment</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal string">&quot;283.15&quot;</span><span class="whitespace">      </span><span class="comment single"># ten kelvin below the setpoint</span><span class="whitespace">
     </span><span class="name tag">time_constant</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal string">&quot;50</span><span class="name variable"> </span><span class="literal string">s&quot;</span><span class="whitespace">      </span><span class="comment single"># a fifth of a kelvin a second at it</span><span class="whitespace">
     </span><span class="name tag">inputs</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal string">&quot;in1,in2&quot;</span><span class="whitespace">
-    </span><span class="name tag">outputs</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal string">&quot;out1,out2,out3&quot;</span><span class="whitespace">
+    </span><span class="name tag">outputs</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal string">&quot;out1,out2,out3&quot;</span>
+</pre>
+<p>And the simulator file beside it, which names it and attaches the payloads:</p>
+<pre class="code yaml literal-block">
+<span class="name tag">physics</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">cabin-physics.yaml</span><span class="whitespace">
 
 </span><span class="name tag">simulated_payload_groups</span><span class="punctuation">:</span><span class="whitespace">
   </span><span class="punctuation indicator">-</span><span class="whitespace"> </span><span class="name tag">name</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">cabin_temps</span><span class="whitespace">
@@ -3388,7 +3409,9 @@ ripple_time            how slowly it varies, as a length of time. With
                        ripple and refused without it
 </pre>
 <p>In the mass, the <tt class="docutils literal">swing</tt>, <tt class="docutils literal">period</tt>, <tt class="docutils literal">wander</tt> and <tt class="docutils literal">wander_time</tt> of
-its entry, and the offsets of its outputs, above. A sensor's errors are
+its entry in the physics model, and the offsets of its outputs, above: what
+the world does is the model's, and what a stand-in gets wrong is the
+simulator file's. A sensor's errors are
 refused on a heater and a heater's on a sensor.</p>
 <p>Everything that wanders -- a sensor's drift, the environment, a supply -- is
 an Ornstein-Uhlenbeck process: a departure drawn back towards nought, whose
@@ -3494,16 +3517,12 @@ interval does not, and is refused. Two types cannot be asked at all and are
 refused outright: a device, which tcspecial opens and reads directly, and a
 device on a bus, where the master's own read is the request and a second master
 cannot see it.</p>
-<p>This is the shipped <tt class="docutils literal"><span class="pre">examples/thermostat/thermostat-sim.yaml</span></tt>.</p>
+<p>This is the shipped <tt class="docutils literal"><span class="pre">examples/thermostat/thermostat-sim.yaml</span></tt>, which names
+the model the cabin is declared in, <tt class="docutils literal"><span class="pre">thermostat-physics.yaml</span></tt>, beside it.</p>
 <pre class="code yaml literal-block">
 <span class="name tag">description</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">Simulator settings for the payloads of thermostat.ytcs</span><span class="whitespace">
 
-</span><span class="name tag">thermal_mass</span><span class="punctuation">:</span><span class="whitespace">
-  </span><span class="punctuation indicator">-</span><span class="whitespace"> </span><span class="name tag">name</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">basic</span><span class="whitespace">
-    </span><span class="name tag">environment</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal string">&quot;283.15&quot;</span><span class="whitespace">
-    </span><span class="name tag">time_constant</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal string">&quot;50</span><span class="name variable"> </span><span class="literal string">s&quot;</span><span class="whitespace">
-    </span><span class="name tag">inputs</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal string">&quot;in1,in2&quot;</span><span class="whitespace">
-    </span><span class="name tag">outputs</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal string">&quot;out1,out2,out3&quot;</span><span class="whitespace">
+</span><span class="name tag">physics</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">thermostat-physics.yaml</span><span class="whitespace">
 
 </span><span class="name tag">simulated_payload_groups</span><span class="punctuation">:</span><span class="whitespace">
   </span><span class="punctuation indicator">-</span><span class="whitespace"> </span><span class="name tag">name</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">cabin_temps</span><span class="whitespace">

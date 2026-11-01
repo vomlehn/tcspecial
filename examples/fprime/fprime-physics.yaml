@@ -1,0 +1,15 @@
+# yaml-language-server: $schema=../../tcsgui/share/schema/tcspecial-physics.schema.json
+
+# The physics of the fprime example's vehicle: the cabin its thermometer
+# reads and its heater warms. Named by fprime-sim.yaml.
+description: The physics of the vehicle of fprime.ytcs
+
+physics:
+  # The cabin, starting at and settling to ten degrees, losing any
+  # difference with a hundred second constant.
+  - name: cabin
+    type: thermal_mass
+    environment: "283.15"
+    time_constant: "100 s"
+    inputs: "in1"
+    outputs: "out1"

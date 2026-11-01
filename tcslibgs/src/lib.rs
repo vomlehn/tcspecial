@@ -46,6 +46,9 @@ pub mod link;
 mod link_packet;
 pub mod node;
 pub mod parameters;
+/// The physics model: the vehicle's physical elements, which the
+/// simulator's stand-ins measure and act on, in a file of its own.
+pub mod physics;
 pub mod protocol;
 /// Whether the simulator is ready: what a harness and tcssim say on tcssim's
 /// readiness socket.

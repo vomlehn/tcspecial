@@ -10544,10 +10544,30 @@ it -- so what the vehicle reads is a consequence of what the vehicle drove,
 and the whole loop can be watched closing.
 
 Requirement
-    The simulator file may declare thermal masses. Each has a name, the
-    temperature of the environment it sits in, and a time constant: how long
-    it takes to lose a given fraction of the difference between itself and
-    that environment.
+    Thermal masses are declared in a physics model: a YAML file of its own,
+    which the simulator file names with ``physics``, relative to the
+    simulator file's directory. A vehicle's physics outlives any one
+    configuration of its payloads, so it is stated once and named by every
+    simulator file that uses it; the manual's thermostat fixture and the
+    thermostat example name one model. A simulator file that still declares
+    masses itself is refused, told where they go.
+
+Requirement
+    The model is a list of elements, each with a name and a ``type``, as a
+    configuration is a list of nodes: ``thermal_mass`` is the one type so
+    far, and an element of any other is refused. Each type's settings, and
+    its rules, are stated once, in ``tcslibgs::physics``; its arithmetic is
+    the simulator's.
+
+Requirement
+    A thermal mass has a name, the temperature of the environment it sits
+    in, and a time constant: how long it takes to lose a given fraction of
+    the difference between itself and that environment.
+
+Requirement
+    ``tcsverify`` reads the model a simulator file names, and reports a
+    problem with a mass at its line in the model, and a model that cannot
+    be read at the simulator file's ``physics`` line.
 
 Requirement
     A mass may name inputs, where heaters are connected, and outputs, where
@@ -10840,10 +10860,22 @@ Requirement
 Example
 -------
 This is the shipped ``examples/thermostat/thermostat-sim.yaml``, which
-simulates the three sensors and two heaters of ``thermostat.ytcs``. The three
-sensors are read together and so share a group, which carries their rate and
-the thermal mass they
-report; the mass is what makes three sensors agree about a temperature, each
+simulates the three sensors and two heaters of ``thermostat.ytcs``, attached
+to the thermal mass ``basic`` of the model it names,
+``thermostat-physics.yaml``:
+
+.. code-block:: yaml
+
+   physics:
+     - name: basic
+       type: thermal_mass
+       environment: "283.15"
+       time_constant: "50 s"
+       inputs: "in1,in2"
+       outputs: "out1,out2,out3"
+
+The three sensors are read together and so share a group, which carries
+their rate and the thermal mass they report; the mass is what makes three sensors agree about a temperature, each
 on an output of its own. The heaters warm the mass, each through an input of
 its own while the vehicle has it on. Every one of them is the far end of a
 UDP socket, which the simulator stands in for with nothing more than a
@@ -10853,12 +10885,7 @@ socket.
 
    description: Simulator settings for the payloads of thermostat.ytcs
 
-   thermal_mass:
-     - name: basic
-       environment: "283.15"
-       time_constant: "50 s"
-       inputs: "in1,in2"
-       outputs: "out1,out2,out3"
+   physics: thermostat-physics.yaml
 
    simulated_payload_groups:
      - name: cabin_temps

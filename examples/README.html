@@ -633,11 +633,13 @@ as <code>tests/manual/thermostat.ytcs</code> has them; those buses are
 flown against stand-ins by <code>make stand-ins-test</code> and
 <code>make kernel-stand-ins-test</code>.</p>
 <p>tcssim stands in for the sensors with a thermal mass,
-<code>basic</code>, that all three read, each on an output of its own,
-so their readings agree and the vote produces a temperature. The mass
-cools towards 283.15 K, ten kelvin below the setpoint, and the heaters
-warm it, each through an input of its own while the vehicle has it on:
-the loop closes through tcspecial.</p>
+<code>basic</code>, declared in the vehicle’s physics model,
+<code>thermostat-physics.yaml</code>, which
+<code>thermostat-sim.yaml</code> names. All three sensors read it, each
+on an output of its own, so their readings agree and the vote produces a
+temperature. The mass cools towards 283.15 K, ten kelvin below the
+setpoint, and the heaters warm it, each through an input of its own
+while the vehicle has it on: the loop closes through tcspecial.</p>
 <pre><code>make run-thermostat</code></pre>
 <p>That runs tcsmoc on the example, as <code>run-simple</code> does, and
 tcsmoc opens its temperatures window beside its own: each sensor’s

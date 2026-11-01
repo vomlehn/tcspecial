@@ -76,26 +76,6 @@
     </xs:choice>
   </xs:complexType>
 
-  <!-- A thermal mass: what the simulated sensors read and the simulated
-       heaters warm. The first three are required, as they are where the
-       file is read; inputs and outputs are lists of names separated by
-       commas, an output's name perhaps followed by =offset in kelvin, and
-       either may be left out; so may the environment's swing and period and
-       its wander and wander_time. The order is free. -->
-  <xs:complexType name="thermal_mass">
-    <xs:all>
-      <xs:element name="name" type="xs:string"/>
-      <xs:element name="environment" type="xs:string"/>
-      <xs:element name="time_constant" type="xs:string"/>
-      <xs:element name="inputs" type="xs:string" minOccurs="0"/>
-      <xs:element name="outputs" type="xs:string" minOccurs="0"/>
-      <xs:element name="swing" type="xs:string" minOccurs="0"/>
-      <xs:element name="period" type="xs:string" minOccurs="0"/>
-      <xs:element name="wander" type="xs:string" minOccurs="0"/>
-      <xs:element name="wander_time" type="xs:string" minOccurs="0"/>
-    </xs:all>
-  </xs:complexType>
-
   <!-- What tcssim itself is told: the UDP address, as address:port, at
        which it answers whether it has made its stand-ins, required by tcssim
        to start and by a harness to wait for it; the hysteresis node it
@@ -115,7 +95,9 @@
         <xs:element name="description" type="xs:string"/>
         <xs:element name="tcssim" type="tcssim"/>
         <xs:element name="simulated_payload_groups" type="entry"/>
-        <xs:element name="thermal_mass" type="thermal_mass"/>
+        <!-- The physics model the payloads are attached to: a YAML file of
+             its own, named relative to this file's directory. -->
+        <xs:element name="physics" type="xs:string"/>
         <xs:element name="simulated_payloads" type="entry"/>
       </xs:choice>
     </xs:complexType>

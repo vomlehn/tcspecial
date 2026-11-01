@@ -560,6 +560,13 @@ killed or crashes, so neither is left holding the example’s ports.</p>
 <p>An answer’s arrival time is when Yamcs received it, to the
 millisecond, as finely as Yamcs says; so a half of a sub-millisecond
 round trip can come out a fraction of a millisecond negative.</p>
+<p>The Rust crate beside it is its tests, which <code>cargo test</code>
+runs: <code>agrees.rs</code> holds the ports, APIDs and checksum
+<code>ping_yamcs.py --describe</code> reads from
+<code>ping-yamcs.xtcs</code> to what <code>tcslibgs</code> reads from
+<code>ping-yamcs.ytcs</code>, and <code>python.rs</code> runs
+<code>test_ping_yamcs.py</code>. Neither needs Yamcs or opens a
+window.</p>
 <p><code>YAMCS_HOME</code> is where a Yamcs release is unpacked, holding
 <code>bin/yamcsd</code>; <a
 href="https://github.com/yamcs/yamcs/releases"

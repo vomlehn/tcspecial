@@ -50,11 +50,14 @@ DESTDIR ?=
 SYSCONFDIR ?= /etc/opt/tcs
 LOCALSTATEDIR ?= /var/opt/tcs
 HOOKS ?= 0
+# Where what sits beside this tree is, BESIDE, and the ports' lock,
+# TCS_PORTS_LOCK: see beside.mk.
+include $(CURDIR)/beside.mk
 # tcs-helpers, the packaging scripts and make rules the TCS projects share:
 # a checkout of https://github.com/vomlehn/tcs-helpers, beside this one
 # unless TCS_HELPERS names another, used where it is rather than installed.
 # Installing and packaging check it first: see the tcs-helpers target.
-TCS_HELPERS ?= $(abspath $(CURDIR)/../tcs-helpers)
+TCS_HELPERS ?= $(BESIDE)/tcs-helpers
 TCS_HELPERS_REQUIRED := 0.5.0
 # tcs-xtce, whose Python package generates the link's codecs and holds the
 # runtime python/tcslibgs/_xtce links to: a checkout of
@@ -1159,18 +1162,10 @@ fprime-build:
 # lock while it runs. tcssim's window opens for the length of the test.
 .PHONY: fprime-test
 fprime-test:
-	$(MAKE) -C fprime test TCS_PORTS_LOCK=$(PORTS_LOCK)
+	$(MAKE) -C fprime test
 
 # Where stand-ins-test keeps what a run leaves, emptied at the start of each.
 STAND_INS_RUN = $(CURDIR)/tests/stand-ins/run
-
-# Held for as long as a test binds the ports tcspecial, tcssim and tcsmoc
-# listen on, so that two such tests -- this one, the F´ bridge's, a cFS
-# run -- never run at once from checkouts beside each other. Beside the
-# main checkout, found through git, so that a worktree of it takes the same
-# lock.
-PORTS_LOCK ?= $(abspath $(shell git -C $(CURDIR) rev-parse \
-	--path-format=absolute --git-common-dir)/../../tcs-ports.lock)
 
 # Run tcspecial against tcssim with a payload of each type tcssim stands in
 # for, and check that each one's data reaches the ground: see
@@ -1180,7 +1175,7 @@ PORTS_LOCK ?= $(abspath $(shell git -C $(CURDIR) rev-parse \
 .PHONY: stand-ins-test
 stand-ins-test:
 	cd $(RUST) && cargo build --bin tcspecial --bin tcssim --bin tcsverify
-	flock $(PORTS_LOCK) $(CURDIR)/tests/stand-ins/stand-ins-test \
+	flock $(TCS_PORTS_LOCK) $(CURDIR)/tests/stand-ins/stand-ins-test \
 		$(CURDIR) $(STAND_INS_RUN)
 
 # cFS itself, with SBN v7.0.1 and its UDP module, built with cFS's own tools
@@ -1198,7 +1193,7 @@ cfs-build:
 # through TO_LAB, holding the ports' lock while it runs.
 .PHONY: cfs-test
 cfs-test:
-	$(MAKE) -C cfs test TCS_PORTS_LOCK=$(PORTS_LOCK)
+	$(MAKE) -C cfs test
 
 # Fly tcspecial against the kernel's own stand-ins for a CAN bus, a GPIO chip
 # and an IIO sensor, playing each device's far end through the kernel: see
@@ -1229,3 +1224,4 @@ release: test
 .PHONY: docs
 docs:
 	make -C $(DOCS_DIR)
+

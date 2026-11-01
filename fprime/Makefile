@@ -12,12 +12,14 @@
 # from FPRIME_CONFIG by tcsverify, and the component is built for that
 # configuration and no other: see "F´: gateway_fprime" in docs/design.rst.
 
-# The tcspecial tree this directory is in.
+# The tcspecial tree this directory is in, and what sits beside it: see
+# beside.mk, which also names TCS_PORTS_LOCK.
 TOP := $(abspath $(CURDIR)/..)
+include $(TOP)/beside.mk
 
 # An F´ checkout, v4.4.1 or later, and the virtual environment its tools
 # are in: by default, a directory beside this tree holding both.
-FPRIME_SCRATCH ?= $(abspath $(TOP)/../fprime-scratch)
+FPRIME_SCRATCH ?= $(BESIDE)/fprime-scratch
 FPRIME_FRAMEWORK ?= $(FPRIME_SCRATCH)/fprime
 FPRIME_VENV ?= $(FPRIME_SCRATCH)/venv
 FPRIME_BIN = $(FPRIME_VENV)/bin
@@ -46,10 +48,6 @@ RUN = $(CURDIR)/build-test
 # targets empty theirs.
 TELEMETRY ?= /tmp/telemetry
 
-# The lock every run that binds the fixed ports holds, so that two never
-# run at once: the same file the other tests that bind them use. The top
-# Makefile hands its own PORTS_LOCK in.
-TCS_PORTS_LOCK ?= $(HOME)/working/tcs-ports.lock
 
 .PHONY: all
 all: build

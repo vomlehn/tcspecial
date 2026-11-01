@@ -2784,8 +2784,10 @@ environment holding F´'s tools, <tt class="docutils literal"><span class="pre">
 <span class="generic prompt">$ </span>make<span class="whitespace"> </span>fprime-build<span class="whitespace"> </span><span class="name variable">FPRIME_FRAMEWORK</span><span class="operator">=</span><span class="name variable">$HOME</span>/fprime<span class="whitespace"> </span><span class="name variable">FPRIME_VENV</span><span class="operator">=</span><span class="name variable">$HOME</span>/fprime-venv<span class="whitespace">
 </span><span class="generic prompt">$ </span>make<span class="whitespace"> </span>fprime-test<span class="whitespace"> </span><span class="name variable">FPRIME_FRAMEWORK</span><span class="operator">=</span><span class="name variable">$HOME</span>/fprime<span class="whitespace"> </span><span class="name variable">FPRIME_VENV</span><span class="operator">=</span><span class="name variable">$HOME</span>/fprime-venv
 </pre>
-<p>Left out, the two are looked for in <tt class="docutils literal"><span class="pre">../fprime-scratch</span></tt>, beside this tree, as
-<tt class="docutils literal">fprime</tt> and <tt class="docutils literal">venv</tt>; <tt class="docutils literal">FPRIME_SCRATCH</tt> names another such directory.
+<p>Left out, the two are looked for in <tt class="docutils literal"><span class="pre">fprime-scratch</span></tt>, beside the checkout,
+as <tt class="docutils literal">fprime</tt> and <tt class="docutils literal">venv</tt>; <tt class="docutils literal">FPRIME_SCRATCH</tt> names another such directory.
+Beside the checkout means beside the main checkout, which git finds, so a
+worktree of the tree looks in the same place (<tt class="docutils literal">beside.mk</tt>).
 <tt class="docutils literal">make help</tt> in <tt class="docutils literal">fprime/</tt> says the rest.</p>
 <p>Which channels the bridge has is the configuration's, and is never written by
 hand. <tt class="docutils literal"><span class="pre">fprime-build</span></tt> writes the bridge's model from <tt class="docutils literal">FPRIME_CONFIG</tt>, the
@@ -2988,7 +2990,8 @@ through the stand-in. The payloads' ports are in the eighty-six hundreds,
 which no other example uses.</p>
 <p><tt class="docutils literal">make <span class="pre">cfs-test</span></tt> flies the example against a real cFS. It builds cFS with
 SBN v7.0.1 and its UDP module in <tt class="docutils literal">CFS_SCRATCH</tt> (by default
-<tt class="docutils literal"><span class="pre">../cfs-scratch</span></tt>) from a cFS checkout, <tt class="docutils literal">CFS_PRISTINE</tt>, and a git
+<tt class="docutils literal"><span class="pre">cfs-scratch</span></tt>, beside the checkout, as <tt class="docutils literal"><span class="pre">fprime-scratch</span></tt> is) from a cFS
+checkout, <tt class="docutils literal">CFS_PRISTINE</tt>, and a git
 checkout of SBN, <tt class="docutils literal">SBN_SRC</tt>, and installs nothing; the first build fetches
 the cFS checkout's submodules at the commits it pins. It then starts that
 cFS and tcspecial, and <tt class="docutils literal">tcspecial/tests/cfs_flight.rs</tt> commands the vehicle
@@ -4339,7 +4342,7 @@ does, and listens for ten seconds. Then it stops tcssim with a signal, as a
 harness does, and checks that every stand-in is gone. tcssim's window opens
 for the length of the test, so a display is needed.</p>
 <p>Its ports are 47000 to 47999, and it holds <tt class="docutils literal"><span class="pre">tcs-ports.lock</span></tt>, beside the
-checkout, while it runs, so that it never runs at the same time as another
+main checkout (<tt class="docutils literal">TCS_PORTS_LOCK</tt>, from <tt class="docutils literal">beside.mk</tt>), while it runs, so that it never runs at the same time as another
 test that starts tcspecial and tcssim and holds the same lock.</p>
 </div>
 </div>

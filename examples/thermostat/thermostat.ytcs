@@ -115,53 +115,58 @@ vehicle:
     payload-in: true
 
 payloads:
+  # Every payload is the far end of a UDP socket, which tcssim stands in for
+  # with nothing more than a socket, so that the example runs on any desk
+  # and touches no hardware. The buses these parts would be on aboard --
+  # I2C, SPI, GPIO -- are flown against stand-ins by make stand-ins-test
+  # and make kernel-stand-ins-test.
+  #
   # One of three sensors of the same place, a trio, so that the
   # temperature survives one of them going wrong. Two bytes, signed,
   # big endian.
   - name: temp_1
-    type: i2c
-    address: "0x48"
+    type: network
+    protocol: "udp"
+    address: "127.0.0.1"
+    port: "5201"
     group: "cabin_temps"
-    path: "/dev/i2c-1"
-    read_size: "2"
     payload-out:
       - target: k_1
-  # The second of the trio; the same part as temp_1, on the same bus.
+  # The second of the trio; the same part as temp_1.
   - name: temp_2
-    type: i2c
-    address: "0x49"
+    type: network
+    protocol: "udp"
+    address: "127.0.0.1"
+    port: "5202"
     group: "cabin_temps"
-    path: "/dev/i2c-1"
-    read_size: "2"
     payload-out:
       - target: k_2
-  # The third. A different part on a different bus: three bytes,
-  # unsigned, its own scale and so its own conversion, so that no one
-  # bus and no one part number can take the whole trio out.
+  # The third. A different part: three bytes, unsigned, its own scale and
+  # so its own conversion, so that no one part number can take the whole
+  # trio out.
   - name: temp_3
-    type: spi
+    type: network
+    protocol: "udp"
+    address: "127.0.0.1"
+    port: "5203"
     group: "cabin_temps"
-    max_speed: "1000000"
-    path: "/dev/spidev0.0"
-    read_size: "3"
-    spi_mode: "0"
     payload-out:
       - target: k_3
-  # Two heaters, each three circuits driven together, both near the
-  # sensors on the same thermal mass. Separate nodes rather than six
-  # lines on one, so that one can be stopped from the ground while the
-  # other goes on holding the temperature.
+  # Two heaters, both near the sensors on the same thermal mass, each
+  # driven by what the thermostat decides -- 1 for on, 0 for off. Separate
+  # nodes, so that one can be stopped from the ground while the other goes
+  # on holding the temperature.
   - name: heaters_1
-    type: gpio
-    direction: "output"
-    lines: "3,4,5"
-    path: "/dev/gpiochip0"
+    type: network
+    protocol: "udp"
+    address: "127.0.0.1"
+    port: "5204"
     gateway-in: true
   - name: heaters_2
-    type: gpio
-    direction: "output"
-    lines: "6,7,8"
-    path: "/dev/gpiochip0"
+    type: network
+    protocol: "udp"
+    address: "127.0.0.1"
+    port: "5205"
     gateway-in: true
 
 commands:

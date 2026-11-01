@@ -121,59 +121,64 @@
         <format>variable_ts_rc</format>
         <payload-in>true</payload-in>
     </vehicle>
+    <!-- Every payload is the far end of a UDP socket, which tcssim stands -->
+    <!-- in for with nothing more than a socket, so that the example runs -->
+    <!-- on any desk and touches no hardware. The buses these parts would -->
+    <!-- be on aboard - I2C, SPI, GPIO - are flown against stand-ins by -->
+    <!-- make stand-ins-test and make kernel-stand-ins-test. -->
+    <!-- -->
     <!-- One of three sensors of the same place, a trio, so that the -->
     <!-- temperature survives one of them going wrong. Two bytes, signed, -->
     <!-- big endian. -->
     <payloads>
         <name>temp_1</name>
-        <type>i2c</type>
-        <address>0x48</address>
+        <type>network</type>
+        <protocol>udp</protocol>
+        <address>127.0.0.1</address>
+        <port>5201</port>
         <group>cabin_temps</group>
-        <path>/dev/i2c-1</path>
-        <read_size>2</read_size>
         <payload-out><target>k_1</target></payload-out>
     </payloads>
-    <!-- The second of the trio; the same part as temp_1, on the same bus. -->
+    <!-- The second of the trio; the same part as temp_1. -->
     <payloads>
         <name>temp_2</name>
-        <type>i2c</type>
-        <address>0x49</address>
+        <type>network</type>
+        <protocol>udp</protocol>
+        <address>127.0.0.1</address>
+        <port>5202</port>
         <group>cabin_temps</group>
-        <path>/dev/i2c-1</path>
-        <read_size>2</read_size>
         <payload-out><target>k_2</target></payload-out>
     </payloads>
-    <!-- The third. A different part on a different bus: three bytes, -->
-    <!-- unsigned, its own scale and so its own conversion, so that no one -->
-    <!-- bus and no one part number can take the whole trio out. -->
+    <!-- The third. A different part: three bytes, unsigned, its own scale -->
+    <!-- and so its own conversion, so that no one part number can take the -->
+    <!-- whole trio out. -->
     <payloads>
         <name>temp_3</name>
-        <type>spi</type>
+        <type>network</type>
+        <protocol>udp</protocol>
+        <address>127.0.0.1</address>
+        <port>5203</port>
         <group>cabin_temps</group>
-        <max_speed>1000000</max_speed>
-        <path>/dev/spidev0.0</path>
-        <read_size>3</read_size>
-        <spi_mode>0</spi_mode>
         <payload-out><target>k_3</target></payload-out>
     </payloads>
-    <!-- Two heaters, each three circuits driven together, both near the -->
-    <!-- sensors on the same thermal mass. Separate nodes rather than six -->
-    <!-- lines on one, so that one can be stopped from the ground while the -->
-    <!-- other goes on holding the temperature. -->
+    <!-- Two heaters, both near the sensors on the same thermal mass, each -->
+    <!-- driven by what the thermostat decides - 1 for on, 0 for off. -->
+    <!-- Separate nodes, so that one can be stopped from the ground while -->
+    <!-- the other goes on holding the temperature. -->
     <payloads>
         <name>heaters_1</name>
-        <type>gpio</type>
-        <direction>output</direction>
-        <lines>3,4,5</lines>
-        <path>/dev/gpiochip0</path>
+        <type>network</type>
+        <protocol>udp</protocol>
+        <address>127.0.0.1</address>
+        <port>5204</port>
         <gateway-in>true</gateway-in>
     </payloads>
     <payloads>
         <name>heaters_2</name>
-        <type>gpio</type>
-        <direction>output</direction>
-        <lines>6,7,8</lines>
-        <path>/dev/gpiochip0</path>
+        <type>network</type>
+        <protocol>udp</protocol>
+        <address>127.0.0.1</address>
+        <port>5205</port>
         <gateway-in>true</gateway-in>
     </payloads>
     <!-- the cabin temperature the heaters are held at, in kelvin -->

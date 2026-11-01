@@ -10,11 +10,10 @@
 # temperature agree, so the vote produces a temperature and the thermostat
 # decides on it.
 #
-# The heaters are discrete lines on the kernel's gpio-sim, which the vehicle
-# drives and tcssim watches: each time the vehicle switches them, their panel
-# counts it, and the mass is warmed through the input each is on. So the loop
-# closes through tcspecial: the sensors report the mass, the vehicle decides,
-# and the heaters warm it.
+# The heaters are UDP sockets, which the vehicle drives and tcssim watches:
+# each decision the vehicle sends them, their panel counts, and the mass is
+# warmed through the input each is on. So the loop closes through tcspecial:
+# the sensors report the mass, the vehicle decides, and the heaters warm it.
 #
 # To close it in tcssim alone, with no tcspecial running, add
 # "thermostat: thermostat" to the tcssim section below: tcssim then stands in
@@ -53,32 +52,37 @@ simulated_payload_groups:
 simulated_payloads:
   # Each sensor on an output of its own.
   - name: temp_1
-    type: i2c
+    type: network
+    protocol: udp
     group: cabin_temps
     output: out1
 
   - name: temp_2
-    type: i2c
+    type: network
+    protocol: udp
     group: cabin_temps
     output: out2
 
   - name: temp_3
-    type: spi
+    type: network
+    protocol: udp
     group: cabin_temps
     output: out3
 
-  # Driven and never read: their stand-ins send nothing, count each time the
-  # vehicle moves their lines, and warm the mass while on.
+  # Driven and never read: their stand-ins send nothing, count each decision
+  # the vehicle sends them, and warm the mass while on.
   - name: heaters_1
     simulate: true
-    type: gpio
+    type: network
+    protocol: udp
     heats: basic
     input: in1
     rate: "3.0"
 
   - name: heaters_2
     simulate: true
-    type: gpio
+    type: network
+    protocol: udp
     heats: basic
     input: in2
     rate: "3.0"

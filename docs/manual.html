@@ -2205,10 +2205,13 @@ produced them, so it applies to every type of payload alike.</p>
 </div>
 <div class="section" id="an-example">
 <h2><a class="toc-backref" href="#toc-entry-28">An Example</a></h2>
-<p>This is the shipped <tt class="docutils literal">examples/thermostat/thermostat.ytcs</tt>, without its
+<p>This is the thermostat example as it would be aboard, without its
 <tt class="docutils literal">tcspecial</tt> section: three sensors of one place, two on an I<sup>2</sup>C
 bus and one on SPI, read together as a group, and two sets of heater lines
-driven by what the vehicle decides. Each payload is named for what it is,
+driven by what the vehicle decides. It is <tt class="docutils literal">tests/manual/thermostat.ytcs</tt>;
+the shipped <tt class="docutils literal">examples/thermostat</tt> puts each of these payloads on a UDP
+socket instead, so that it runs on any desk and touches no hardware (see <a class="reference internal" href="#the-thermostat-example">The
+thermostat example</a>). Each payload is named for what it is,
 which is what a panel in the MOC shows.</p>
 <pre class="code yaml literal-block">
 <span class="name tag">payload_groups</span><span class="punctuation">:</span><span class="whitespace">
@@ -2259,7 +2262,7 @@ which is what a panel in the MOC shows.</p>
     </span><span class="name tag">gateway-in</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">true</span>
 </pre>
 <p>The same configuration in the other spelling is
-<tt class="docutils literal">examples/thermostat/thermostat.xtcs</tt>, which a test holds to saying the same
+<tt class="docutils literal">tests/manual/thermostat.xtcs</tt>, which a test holds to saying the same
 thing. What the nodes above feed -- the conversions, the vote and the
 thermostat -- is in the <tt class="docutils literal">vehicle</tt> section; see <a class="reference internal" href="#the-thermostat-example">The thermostat example</a>.</p>
 </div>
@@ -2427,20 +2430,26 @@ tcspecial is running.</p>
 <div class="figure">
 <object data="../examples/thermostat/thermostat.svg" style="width: 100%;" type="image/svg+xml">The thermostat example: three temperature sensors of one place,
 converted to kelvin, voted on, logged and sent to the ground, with a
-hysteresis thermostat driving two sets of GPIO heaters.</object>
+hysteresis thermostat driving two heaters. Each sensor and heater is
+the far end of a UDP socket, which tcssim stands in for.</object>
 <p class="caption"><tt class="docutils literal">examples/thermostat</tt>: a trio of sensors, a vote, a thermostat and its
 two heaters.</p>
 </div>
 <p>The worked example of computing aboard, and of surviving a part that fails.
-Three temperature sensors -- <tt class="docutils literal">temp_1</tt> and <tt class="docutils literal">temp_2</tt> on
-I<sup>2</sup>C, <tt class="docutils literal">temp_3</tt> on SPI -- are read together ten times a
-second as the group <tt class="docutils literal">cabin_temps</tt>, which is what a group is for: readings
-that will be compared are taken as close together as the hardware allows.</p>
+Three temperature sensors -- <tt class="docutils literal">temp_1</tt>, <tt class="docutils literal">temp_2</tt> and <tt class="docutils literal">temp_3</tt> -- are read
+together ten times a second as the group <tt class="docutils literal">cabin_temps</tt>, which is what a
+group is for: readings that will be compared are taken as close together as
+the hardware allows.</p>
+<p>Every sensor and heater is the far end of a UDP socket on this host, ports
+5201 to 5205, which tcssim stands in for with nothing more than a socket: the
+example runs on any desk and touches no hardware. Aboard, the sensors would be
+on I<sup>2</sup>C and SPI and the heaters on GPIO lines, as <a class="reference internal" href="#an-example">An
+Example</a> shows; those buses are flown against stand-ins by <tt class="docutils literal">make
+<span class="pre">stand-ins-test</span></tt> and <tt class="docutils literal">make <span class="pre">kernel-stand-ins-test</span></tt>.</p>
 <p>The three are sensors of <em>one place</em>, separated only because two parts cannot
-occupy one point. <tt class="docutils literal">temp_3</tt> is a different part on a different bus, reporting
-three unsigned bytes on a scale of its own where the first two report two
-signed bytes on theirs, so that no one bus and no one part number can take the
-whole trio out.</p>
+occupy one point. <tt class="docutils literal">temp_3</tt> is a different part, reporting three unsigned
+bytes on a scale of its own where the first two report two signed bytes on
+theirs, so that no one part number can take the whole trio out.</p>
 <p>Each reading is converted to kelvin by its own <tt class="docutils literal">to_kelvin</tt> node, <tt class="docutils literal">k_1</tt>,
 <tt class="docutils literal">k_2</tt> or <tt class="docutils literal">k_3</tt>, and each converted reading goes three ways: to the ground
 through the gateway node -- at its <tt class="docutils literal">ground_base</tt>, <tt class="docutils literal">127.0.0.1:5100</tt>, plus
@@ -2460,12 +2469,11 @@ cold -- it says 296 and the heaters stay off, where a mean would have said
 a hysteresis holding the cabin at its <tt class="docutils literal">setpoint</tt>, 293.15 K, with a
 <tt class="docutils literal">half_band</tt> of 2.0, so the heaters switch two degrees either side of it and
 the setpoint is in the middle of its own band. Its decision is logged, sent to
-the ground on port 5105, and drives two heaters -- <tt class="docutils literal">heaters_1</tt> on GPIO lines
-3, 4 and 5, <tt class="docutils literal">heaters_2</tt> on lines 6, 7 and 8. Two of them, each three circuits
-driven together, because one failing must not leave the cabin with no way to be
-warmed: either alone holds the band, and both together hold it twice as fast.
-They are separate nodes rather than six lines on one so that the ground can
-stop one and leave the other holding the temperature.</p>
+the ground on port 5105, and drives two heaters, <tt class="docutils literal">heaters_1</tt> and
+<tt class="docutils literal">heaters_2</tt>. Two of them, because one failing must not leave the cabin with
+no way to be warmed: either alone holds the band, and both together hold it
+twice as fast. They are separate nodes so that the ground can stop one and
+leave the other holding the temperature.</p>
 <p>The decision is asserted on every sample rather than only when it changes, so
 the heaters are held at what the vehicle last decided and a decision that went
 missing is corrected on the next sample. What is logged and sent to the ground
@@ -3435,22 +3443,26 @@ cannot see it.</p>
 
 </span><span class="name tag">simulated_payloads</span><span class="punctuation">:</span><span class="whitespace">
   </span><span class="punctuation indicator">-</span><span class="whitespace"> </span><span class="name tag">name</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">temp_1</span><span class="whitespace">
-    </span><span class="name tag">type</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">i2c</span><span class="whitespace">
+    </span><span class="name tag">type</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">network</span><span class="whitespace">
+    </span><span class="name tag">protocol</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">udp</span><span class="whitespace">
     </span><span class="name tag">group</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">cabin_temps</span><span class="whitespace">
     </span><span class="name tag">output</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">out1</span><span class="whitespace">
 
   </span><span class="punctuation indicator">-</span><span class="whitespace"> </span><span class="name tag">name</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">temp_2</span><span class="whitespace">
-    </span><span class="name tag">type</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">i2c</span><span class="whitespace">
+    </span><span class="name tag">type</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">network</span><span class="whitespace">
+    </span><span class="name tag">protocol</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">udp</span><span class="whitespace">
     </span><span class="name tag">group</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">cabin_temps</span><span class="whitespace">
     </span><span class="name tag">output</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">out2</span><span class="whitespace">
 
   </span><span class="punctuation indicator">-</span><span class="whitespace"> </span><span class="name tag">name</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">temp_3</span><span class="whitespace">
-    </span><span class="name tag">type</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">spi</span><span class="whitespace">
+    </span><span class="name tag">type</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">network</span><span class="whitespace">
+    </span><span class="name tag">protocol</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">udp</span><span class="whitespace">
     </span><span class="name tag">group</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">cabin_temps</span><span class="whitespace">
     </span><span class="name tag">output</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">out3</span><span class="whitespace">
 
   </span><span class="punctuation indicator">-</span><span class="whitespace"> </span><span class="name tag">name</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">heaters_1</span><span class="whitespace">
-    </span><span class="name tag">type</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">gpio</span><span class="whitespace">
+    </span><span class="name tag">type</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">network</span><span class="whitespace">
+    </span><span class="name tag">protocol</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">udp</span><span class="whitespace">
     </span><span class="name tag">heats</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">basic</span><span class="whitespace">
     </span><span class="name tag">input</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">in1</span><span class="whitespace">
     </span><span class="name tag">rate</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal string">&quot;3.0&quot;</span><span class="whitespace">
@@ -3710,9 +3722,7 @@ configuration, which reaches tcssim through the environment -- and tcsmoc
 too, which it inherits the same way: tcsmoc acts on none of it, and reads it
 only so a panel can show what the tcssim it started is simulating. It
 defaults to the file beside the configuration, <tt class="docutils literal"><span class="pre">$(TCSPECIAL_CONFIG_FILE)-sim.yaml</span></tt>,
-as the examples name theirs; the thermostat fixture has none of its own and
-is simulated by <tt class="docutils literal"><span class="pre">examples/thermostat/thermostat-sim.yaml</span></tt>, which stands in
-for the same payloads.</p>
+as the examples and the thermostat fixture name theirs.</p>
 <p>The fixture lives under <tt class="docutils literal">tests/manual</tt> because running it is something a
 person does at a terminal: it opens sockets and device nodes, so it does not
 belong in a test that runs on every build.</p>

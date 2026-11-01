@@ -5405,7 +5405,10 @@ bus with a format and a scale of its own, so no one bus and no one part number
 can take the whole trio out, and the vote leaves the odd reading out of the
 answer rather than averaging it in.
 
-This is the shape of the shipped ``examples/thermostat``. Left out for room
+This is the shape of the shipped ``examples/thermostat`` as it would be
+aboard, on I\ :superscript:`2`\ C, SPI and GPIO, which is
+``tests/manual/thermostat``; the example itself puts each payload on a UDP
+socket, so that it runs on any desk and touches no hardware. Left out for room
 are its ``tcspecial`` section, which every configuration must have and without
 which this would be refused, its log node, and the editor's layout; its
 addresses are its own. What is here is checked as it stands, with a
@@ -10796,8 +10799,10 @@ simulates the three sensors and two heaters of ``thermostat.ytcs``. The three
 sensors are read together and so share a group, which carries their rate and
 the thermal mass they
 report; the mass is what makes three sensors agree about a temperature, each
-on an output of its own. The heaters are discrete lines, each warming the
-mass through an input of its own while the vehicle has it on.
+on an output of its own. The heaters warm the mass, each through an input of
+its own while the vehicle has it on. Every one of them is the far end of a
+UDP socket, which the simulator stands in for with nothing more than a
+socket.
 
 .. code-block:: yaml
 
@@ -10817,30 +10822,35 @@ mass through an input of its own while the vehicle has it on.
 
    simulated_payloads:
      - name: temp_1
-       type: i2c
+       type: network
+       protocol: udp
        group: cabin_temps
        output: out1
 
      - name: temp_2
-       type: i2c
+       type: network
+       protocol: udp
        group: cabin_temps
        output: out2
 
      - name: temp_3
-       type: spi
+       type: network
+       protocol: udp
        group: cabin_temps
        output: out3
 
      - name: heaters_1
        simulate: true
-       type: gpio
+       type: network
+       protocol: udp
        heats: basic
        input: in1
        rate: "3.0"
 
      - name: heaters_2
        simulate: true
-       type: gpio
+       type: network
+       protocol: udp
        heats: basic
        input: in2
        rate: "3.0"

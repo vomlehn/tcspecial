@@ -596,9 +596,10 @@ what is done with it aboard and on the ground.</p>
 <tbody>
 <tr>
 <td><code>thermostat</code></td>
-<td>Three temperature sensors (I2C and SPI), converted to kelvin, voted
-on, and fed to a hysteresis thermostat that drives GPIO heaters. The
-setpoint is commanded from the ground.</td>
+<td>Three temperature sensors, converted to kelvin, voted on, and fed to
+a hysteresis thermostat that drives two heaters, every one a UDP socket
+tcssim stands in for, so that it runs on any desk. The setpoint is
+commanded from the ground.</td>
 </tr>
 <tr>
 <td><code>simple-app</code></td>
@@ -612,43 +613,42 @@ Rust.</td>
 </table>
 <h3 id="thermostat">thermostat</h3>
 <p>A control loop, aboard. Three temperature sensors are read together,
-every 100 ms, as the group <code>cabin_temps</code>: <code>temp_1</code>
-and <code>temp_2</code> on the I2C bus <code>/dev/i2c-1</code> at
-<code>0x48</code> and <code>0x49</code>, and <code>temp_3</code> on the
-SPI peripheral <code>/dev/spidev0.0</code>. Each reading goes through a
-conversion of its own to kelvin – <code>k_1</code>, <code>k_2</code>,
-<code>k_3</code>, the parts differing in format and scale – and the
-three meet at <code>cabin_temp</code>, which takes their median, so that
-one sensor failing cannot take the cabin’s temperature with it.
+every 100 ms, as the group <code>cabin_temps</code>:
+<code>temp_1</code>, <code>temp_2</code> and <code>temp_3</code>. Each
+reading goes through a conversion of its own to kelvin –
+<code>k_1</code>, <code>k_2</code>, <code>k_3</code>, the parts
+differing in format and scale – and the three meet at
+<code>cabin_temp</code>, which takes their median, so that one sensor
+failing cannot take the cabin’s temperature with it.
 <code>thermostat</code> holds that to a setpoint, 293.15 K with a half
-band of 2 K, and drives the two sets of heater lines,
-<code>heaters_1</code> and <code>heaters_2</code>, GPIO lines 3-5 and
-6-8 of <code>/dev/gpiochip0</code>. The ground commands the setpoint,
-and <code>housekeeping</code> logs the readings and decisions in
+band of 2 K, and drives two heaters, <code>heaters_1</code> and
+<code>heaters_2</code>. The ground commands the setpoint, and
+<code>housekeeping</code> logs the readings and decisions in
 <code>/tmp/telemetry</code>.</p>
+<p>Every sensor and heater is the far end of a UDP socket on this host,
+ports 5201 to 5205, which tcssim stands in for: the example runs on any
+desk and touches no hardware. Aboard they would be on I2C, SPI and GPIO,
+as <code>tests/manual/thermostat.ytcs</code> has them; those buses are
+flown against stand-ins by <code>make stand-ins-test</code> and
+<code>make kernel-stand-ins-test</code>.</p>
 <p>tcssim stands in for the sensors with a thermal mass,
 <code>cabin</code>, that all three read, so their readings agree and the
 vote produces a temperature. The mass cools towards 283.15 K, ten kelvin
 below the setpoint, and what the example shows is the vehicle deciding
-to heat it. The heaters are not attached to the mass: they are GPIO
-lines, and tcssim cannot yet be driven through one, so the loop is not
-closed here. tcssim’s own tests close it, with heaters that are
-sockets.</p>
+to heat it. The heaters are not attached to the mass, so the loop is not
+closed here: tcssim counts what the vehicle decides and warms nothing.
+tcssim’s own tests close it.</p>
 <pre><code>make run-thermostat</code></pre>
 <p>That runs tcsmoc on the example, as <code>run-simple</code> does.
-tcspecial opens the devices, so they have to be there:
-<code>make mkstubs</code>, in the repository’s root, makes stand-ins for
-the I2C bus and the GPIO lines where there is no hardware. There is no
-stand-in for a SPI peripheral – nothing in the kernel can be one – so
-<code>temp_3</code> needs a real one at <code>/dev/spidev0.0</code>.</p>
+Press Connect in tcsmoc, and Enable on each sensor in tcssim, to start
+the data.</p>
 <p>Languages:</p>
 <ul>
 <li>MOC: Rust – tcsmoc.</li>
 <li>Vehicle: Rust – tcspecial, whose conversions, vote, thermostat and
 log are its own nodes.</li>
 <li>Payload: Rust – tcssim stands in for the three sensors, with the
-thermal mass they read. The heater lines are the kernel’s GPIO stand-in,
-or real ones.</li>
+thermal mass they read, and for the two heaters.</li>
 </ul>
 <h3 id="simple-app">simple-app</h3>
 <p>The one example that runs end to end on one host, and the one to look

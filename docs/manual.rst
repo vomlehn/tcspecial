@@ -1854,10 +1854,13 @@ produced them, so it applies to every type of payload alike.
 
 An Example
 ----------
-This is the shipped ``examples/thermostat/thermostat.ytcs``, without its
+This is the thermostat example as it would be aboard, without its
 ``tcspecial`` section: three sensors of one place, two on an I\ :superscript:`2`\ C
 bus and one on SPI, read together as a group, and two sets of heater lines
-driven by what the vehicle decides. Each payload is named for what it is,
+driven by what the vehicle decides. It is ``tests/manual/thermostat.ytcs``;
+the shipped ``examples/thermostat`` puts each of these payloads on a UDP
+socket instead, so that it runs on any desk and touches no hardware (see `The
+thermostat example`_). Each payload is named for what it is,
 which is what a panel in the MOC shows.
 
 .. code-block:: yaml
@@ -1910,7 +1913,7 @@ which is what a panel in the MOC shows.
        gateway-in: true
 
 The same configuration in the other spelling is
-``examples/thermostat/thermostat.xtcs``, which a test holds to saying the same
+``tests/manual/thermostat.xtcs``, which a test holds to saying the same
 thing. What the nodes above feed -- the conversions, the vote and the
 thermostat -- is in the ``vehicle`` section; see `The thermostat example`_.
 
@@ -2098,23 +2101,30 @@ The thermostat example
 .. figure:: ../examples/thermostat/thermostat.svg
    :alt: The thermostat example: three temperature sensors of one place,
          converted to kelvin, voted on, logged and sent to the ground, with a
-         hysteresis thermostat driving two sets of GPIO heaters.
+         hysteresis thermostat driving two heaters. Each sensor and heater is
+         the far end of a UDP socket, which tcssim stands in for.
    :width: 100%
 
    ``examples/thermostat``: a trio of sensors, a vote, a thermostat and its
    two heaters.
 
 The worked example of computing aboard, and of surviving a part that fails.
-Three temperature sensors -- ``temp_1`` and ``temp_2`` on
-I\ :superscript:`2`\ C, ``temp_3`` on SPI -- are read together ten times a
-second as the group ``cabin_temps``, which is what a group is for: readings
-that will be compared are taken as close together as the hardware allows.
+Three temperature sensors -- ``temp_1``, ``temp_2`` and ``temp_3`` -- are read
+together ten times a second as the group ``cabin_temps``, which is what a
+group is for: readings that will be compared are taken as close together as
+the hardware allows.
+
+Every sensor and heater is the far end of a UDP socket on this host, ports
+5201 to 5205, which tcssim stands in for with nothing more than a socket: the
+example runs on any desk and touches no hardware. Aboard, the sensors would be
+on I\ :superscript:`2`\ C and SPI and the heaters on GPIO lines, as `An
+Example`_ shows; those buses are flown against stand-ins by ``make
+stand-ins-test`` and ``make kernel-stand-ins-test``.
 
 The three are sensors of *one place*, separated only because two parts cannot
-occupy one point. ``temp_3`` is a different part on a different bus, reporting
-three unsigned bytes on a scale of its own where the first two report two
-signed bytes on theirs, so that no one bus and no one part number can take the
-whole trio out.
+occupy one point. ``temp_3`` is a different part, reporting three unsigned
+bytes on a scale of its own where the first two report two signed bytes on
+theirs, so that no one part number can take the whole trio out.
 
 Each reading is converted to kelvin by its own ``to_kelvin`` node, ``k_1``,
 ``k_2`` or ``k_3``, and each converted reading goes three ways: to the ground
@@ -2137,12 +2147,11 @@ The voted temperature goes to the ground, on port 5104, and to ``thermostat``:
 a hysteresis holding the cabin at its ``setpoint``, 293.15 K, with a
 ``half_band`` of 2.0, so the heaters switch two degrees either side of it and
 the setpoint is in the middle of its own band. Its decision is logged, sent to
-the ground on port 5105, and drives two heaters -- ``heaters_1`` on GPIO lines
-3, 4 and 5, ``heaters_2`` on lines 6, 7 and 8. Two of them, each three circuits
-driven together, because one failing must not leave the cabin with no way to be
-warmed: either alone holds the band, and both together hold it twice as fast.
-They are separate nodes rather than six lines on one so that the ground can
-stop one and leave the other holding the temperature.
+the ground on port 5105, and drives two heaters, ``heaters_1`` and
+``heaters_2``. Two of them, because one failing must not leave the cabin with
+no way to be warmed: either alone holds the band, and both together hold it
+twice as fast. They are separate nodes so that the ground can stop one and
+leave the other holding the temperature.
 
 The decision is asserted on every sample rather than only when it changes, so
 the heaters are held at what the vehicle last decided and a decision that went
@@ -3225,22 +3234,26 @@ This is the shipped ``examples/thermostat/thermostat-sim.yaml``.
 
    simulated_payloads:
      - name: temp_1
-       type: i2c
+       type: network
+       protocol: udp
        group: cabin_temps
        output: out1
 
      - name: temp_2
-       type: i2c
+       type: network
+       protocol: udp
        group: cabin_temps
        output: out2
 
      - name: temp_3
-       type: spi
+       type: network
+       protocol: udp
        group: cabin_temps
        output: out3
 
      - name: heaters_1
-       type: gpio
+       type: network
+       protocol: udp
        heats: basic
        input: in1
        rate: "3.0"
@@ -3531,9 +3544,7 @@ configuration, which reaches tcssim through the environment -- and tcsmoc
 too, which it inherits the same way: tcsmoc acts on none of it, and reads it
 only so a panel can show what the tcssim it started is simulating. It
 defaults to the file beside the configuration, ``$(TCSPECIAL_CONFIG_FILE)-sim.yaml``,
-as the examples name theirs; the thermostat fixture has none of its own and
-is simulated by ``examples/thermostat/thermostat-sim.yaml``, which stands in
-for the same payloads.
+as the examples and the thermostat fixture name theirs.
 
 The fixture lives under ``tests/manual`` because running it is something a
 person does at a terminal: it opens sockets and device nodes, so it does not

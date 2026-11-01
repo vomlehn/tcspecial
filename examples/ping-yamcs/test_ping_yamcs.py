@@ -136,6 +136,63 @@ class WriteYamcsTest(unittest.TestCase):
                           ("tank-downlink", 16414)])
 
 
+class WrittenMdbTest(unittest.TestCase):
+    """The wrapper as ping_yamcs.py writes it: no line wider than 80
+    columns, and the same XTCE as :func:`tcslibgs.yamcs.mdb` makes, for the
+    example and for a copy of it with more nodes."""
+
+    def written(self, path, directory):
+        """Writes the wrapper for a configuration, and makes it again.
+
+        Args:
+            path:      The configuration.
+            directory: Where to write it.
+
+        Returns:
+            The text written, and the tree made.
+        """
+        config = configuration.load(path)
+        written = Path(directory) / "tcs-ccsds.xtce"
+        generated.write_mdb(config, written)
+        return written.read_text(), generated.mdb(config)
+
+    def test_no_line_is_wider_than_80_columns(self):
+        with tempfile.TemporaryDirectory() as directory:
+            for path in (HERE / "ping-yamcs.xtcs",
+                         with_more_nodes(Path(directory))):
+                text, _ = self.written(path, directory)
+                for number, line in enumerate(text.splitlines(), 1):
+                    self.assertLessEqual(len(line), 80,
+                                         f"{path.name}, line {number}: "
+                                         f"{line}")
+
+    def test_it_reads_as_the_xtce_it_was_made_from(self):
+        with tempfile.TemporaryDirectory() as directory:
+            for path in (HERE / "ping-yamcs.xtcs",
+                         with_more_nodes(Path(directory))):
+                text, tree = self.written(path, directory)
+                parser = ElementTree.XMLParser(
+                    target=ElementTree.TreeBuilder(insert_comments=True))
+                parser.feed(text)
+                self.assertEqual(shape(parser.close()),
+                                 shape(tree.getroot()), path.name)
+
+
+def shape(element):
+    """What an element says, apart from the whitespace around it.
+
+    Args:
+        element: The element, or a comment.
+
+    Returns:
+        Its tag, its attributes, its text without the whitespace around
+        it, and the same of each element in it, in order.
+    """
+    return (element.tag, dict(element.attrib),
+            (element.text or "").strip(),
+            [shape(inside) for inside in element])
+
+
 def with_more_nodes(directory):
     """A copy of the example's configuration with a node more drawn into
     the gateway node -- "pong", a payload -- and two payloads nothing

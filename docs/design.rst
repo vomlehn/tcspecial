@@ -6493,7 +6493,8 @@ node's command is named after it and carries its data whole. So nothing per
 APID is stated twice, and a node added is decoded once the mission database
 is regenerated; the ping-yamcs example's tests hold the generated APIDs to
 the Rust's and work the containers and commands as Yamcs would on packets
-the vehicle frames, the ping's field by field.
+the vehicle frames, the ping's field by field. The mission database is
+written as its fixed part is, no line wider than 80 columns.
 
 A command link's sender written with port nought takes commands from any
 port of its host. Yamcs sends from a port the system chooses and takes the

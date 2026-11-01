@@ -18,6 +18,8 @@ stated a second time by hand:
   the answers' restrictions, CONNECT's APID, a container for each source
   drawn into a ``gateway_yamcs`` node and for each payload nothing touches,
   and a command for each ``gateway_yamcs`` node;
+* :func:`write_mdb` -- the wrapper as Yamcs reads it, no line of it wider
+  than :data:`WIDTH`;
 * :func:`data_links` and :func:`command_streams` -- the Yamcs instance's
   links and the streams that route commands to them.
 
@@ -57,6 +59,11 @@ DOCUMENT_NAMESPACES = (NAMESPACE, "http://www.omg.org/spec/XTCE/20250214")
 
 #: The template's space system, which every name below is qualified by.
 SPACE_SYSTEM = "TcsYamcs"
+
+#: The widest line :func:`write_mdb` writes, and the indent of each level,
+#: which are the template's.
+WIDTH = 80
+INDENT = "  "
 
 #: What of a node's interface document is copied into the wrapper, by
 #: element: the types of its parameters and arguments, which are given to
@@ -956,12 +963,13 @@ def mdb(config, template=TEMPLATE):
         _downlink(root, names, copier, link)
     for uplink in uplinks(config):
         _uplink_command(root, names, copier, uplink)
-    ET.indent(tree, space="  ")
     return tree
 
 
 def write_mdb(config, path, template=TEMPLATE):
-    """Writes the mission database's wrapper for a configuration.
+    """Writes the mission database's wrapper for a configuration, no line
+    of it wider than :data:`WIDTH`, but a comment's that the template or a
+    file's name makes so.
 
     Args:
         config:   The :class:`tcslibgs.configuration.Configuration`.
@@ -974,13 +982,126 @@ def write_mdb(config, path, template=TEMPLATE):
                  wrapper written.
     """
     tree = mdb(config, template)
-    said = ("<!-- Written by tcslibgs/yamcs.py from\n"
-            f"     {Path(template).resolve()}\n"
-            f"     and {Path(config.path).resolve()}:\n"
-            "     edit those, not this. -->\n")
-    Path(path).write_text('<?xml version="1.0" encoding="UTF-8"?>\n' + said
-                          + ET.tostring(tree.getroot(), encoding="unicode")
+    documents = sorted({link.document.name for link in telemetry(config)
+                        if link.document}
+                       | {uplink.document.name for uplink in uplinks(config)
+                          if uplink.document})
+    sources = [Path(template).name] + documents + [Path(config.path).name]
+    said = ("<!-- Written by tcslibgs/yamcs.py from "
+            + ", ".join(sources[:-1]) + f" and {sources[-1]}: edit those, "
+            "not this. -->")
+    Path(path).write_text('<?xml version="1.0" encoding="UTF-8"?>\n'
+                          + "\n".join(_wrapped(said, "     ")
+                                      + serialized(tree.getroot()))
                           + "\n", encoding="UTF-8")
+
+
+def _wrapped(text, indent):
+    """A comment, its words wrapped to :data:`WIDTH`.
+
+    Args:
+        text:   The comment, on one line.
+        indent: What each line after the first begins with.
+
+    Returns:
+        Its lines.
+    """
+    lines, line = [], ""
+    for word in text.split(" "):
+        if line and len(line) + 1 + len(word) > WIDTH:
+            lines.append(line)
+            line = indent + word
+        else:
+            line = f"{line} {word}" if line else word
+    return lines + [line]
+
+
+def _attribute(name, value):
+    """An attribute as XML writes it.
+
+    Args:
+        name:  Its name.
+        value: Its value.
+
+    Returns:
+        ``name="value"``, the value escaped.
+    """
+    for said, written in (("&", "&amp;"), ("<", "&lt;"), (">", "&gt;"),
+                          ('"', "&quot;"), ("\n", "&#10;"), ("\r", "&#13;"),
+                          ("\t", "&#9;")):
+        value = value.replace(said, written)
+    return f'{name}="{value}"'
+
+
+def serialized(root):
+    """An XTCE element as text, as the template is written: each element on
+    a line of its own, indented by its depth, and an element whose start tag
+    would be wider than :data:`WIDTH` with one attribute on each line, each
+    under the first.
+
+    Args:
+        root: The element, in the wrapper's namespace, which is written as
+              its default namespace.
+
+    Returns:
+        Its lines.
+
+    Raises:
+        ValueError: An element is in another namespace, has a namespaced
+                    attribute, or holds both text and elements.
+    """
+    lines = []
+
+    def write(element, depth):
+        """Writes an element and what is in it.
+
+        Args:
+            element: The element.
+            depth:   How deep it is.
+        """
+        pad = INDENT * depth
+        if element.tag is ET.Comment:
+            lines.append(f"{pad}<!--{element.text}-->")
+            return
+        prefix = f"{{{NAMESPACE}}}"
+        if not isinstance(element.tag, str) or not (
+                element.tag.startswith(prefix)):
+            raise ValueError(f"{element.tag} is not in the wrapper's XTCE "
+                             "namespace")
+        name = element.tag[len(prefix):]
+        if any(key.startswith("{") for key in element.attrib):
+            raise ValueError(f"{name} has an attribute in a namespace, which "
+                             "the wrapper does not write")
+        attributes = [_attribute(key, value)
+                      for key, value in element.attrib.items()]
+        if depth == 0:
+            attributes.insert(0, _attribute("xmlns", NAMESPACE))
+        text = (element.text or "").strip()
+        inside = list(element)
+        if text and inside:
+            raise ValueError(f"{name} holds both text and elements")
+        for said, written in (("&", "&amp;"), ("<", "&lt;"), (">", "&gt;")):
+            text = text.replace(said, written)
+        if text:
+            end = f">{text}</{name}>"
+        else:
+            end = ">" if inside else "/>"
+        start = f"{pad}<{name}"
+        line = " ".join([start] + attributes) + end
+        if len(line) <= WIDTH or len(attributes) < 2:
+            lines.append(line)
+        else:
+            under = " " * (len(start) + 1)
+            lines.append(f"{start} {attributes[0]}")
+            lines.extend(under + attribute for attribute in attributes[1:-1])
+            lines.append(under + attributes[-1] + end)
+        if inside:
+            for part in inside:
+                write(part, depth + 1)
+            lines.append(f"{pad}</{name}>")
+
+    write(root, 0)
+    return lines
 
 
 def data_links(config):

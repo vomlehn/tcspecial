@@ -39,7 +39,7 @@ import time
 from dataclasses import dataclass, field
 
 from tcslibgs.beacon import Beacon, BeaconError
-from tcslibgs.configuration import came_from
+from tcslibgs.configuration import BeaconLink, HostPort, came_from
 
 #: A step that never ends, which is how the standard schedule's last one holds
 #: for ever: Rust's ``Duration::MAX``.
@@ -614,9 +614,32 @@ class Beacons:
         Raises:
             OSError: The socket could not be made or bound.
         """
+        held = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        try:
+            held.bind((link.recv.address, link.recv.port))
+        except OSError:
+            held.close()
+            raise
+        return Beacons.on(held, link, schedule, expected)
+
+    @staticmethod
+    def on(held, link, schedule, expected):
+        """Listen on a socket already bound where ``link.recv`` is: for a
+        configuration that answers over a software bus, whose beacons the
+        bus's peer sends to a socket it made. See :func:`open`.
+
+        Args:
+            held:     The socket, bound where ``link.recv`` says.
+            link:     Where beacons are received and where they come from.
+            schedule: The :class:`Schedule` the last beacon ages through.
+            expected: This station's configuration digest, as hex, to compare
+                      each beacon's with; ``None`` to compare nothing.
+
+        Returns:
+            The :class:`Beacons`, listening on ``held``.
+        """
         beacons = Beacons(link, schedule, expected)
-        beacons._socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-        beacons._socket.bind((link.recv.address, link.recv.port))
+        beacons._socket = held
         return beacons
 
     def link(self):
@@ -751,3 +774,33 @@ class Beacons:
         """Stop listening."""
         if self._socket is not None:
             self._socket.close()
+
+
+def open(config, schedule, expected):
+    """Listen for a configuration's beacons, wherever they arrive: at the
+    socket its beacon link states, or, for one that answers over a software
+    bus, from this process's peer of the bus under ``beacon.tlm_msgid`` --
+    ``tcslib::beacon::open``.
+
+    Args:
+        config:   The :class:`tcslibgs.configuration.Configuration`.
+        schedule: The :class:`Schedule` the last beacon ages through.
+        expected: This station's configuration digest, as hex, to compare
+                  each beacon's with; ``None`` to compare nothing.
+
+    Returns:
+        The :class:`Beacons`.
+
+    Raises:
+        ValueError: The configuration does not say where beacons are.
+        OSError:    A socket cannot be bound.
+    """
+    if not config.answers_over_bus():
+        return Beacons.listening(config.beacon_link(), schedule, expected)
+    from tcslib import bus
+
+    ground = bus.ground_of(config)
+    held = ground.receiving(config.bus().beacon_msgid)
+    link = BeaconLink(send=HostPort(*ground.delivering()),
+                      recv=HostPort(*held.getsockname()))
+    return Beacons.on(held, link, schedule, expected)

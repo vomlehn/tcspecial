@@ -186,7 +186,18 @@ pub fn run_udp_node(
             }
         }
 
-        wait_out_packet(&pacing, started, &running);
+        // A stand-in signalling a decision is woken by the decision
+        // changing, so that the vehicle hears of a touchdown when it
+        // happens; every other waits out its interval.
+        let until = started + pacing.packet_interval;
+        let changed = pacing.sending
+            && config
+                .attachment
+                .as_ref()
+                .is_some_and(|a| a.await_change(until, &running));
+        if !changed {
+            wait_out_packet(&pacing, started, &running);
+        }
     }
 }
 

@@ -1,0 +1,126 @@
+# yaml-language-server: $schema=../../tcsgui/share/schema/tcspecial.schema.json
+
+description: "A lander's terminal descent: a radar altimeter's altitude
+  flown down by a guidance program throttling the engine, a Doppler
+  velocimeter for the ground, and a switch that says when it is down"
+
+tcspecial:
+  beacon:
+    default_interval: "5 s"
+    recv: "127.0.0.1:5650"
+    reset_interval: "1 s"
+    send: "0.0.0.0:5550"
+  gateway: "radio"
+  interface: "ad9aac4dd5a6d88dd5e78824ba8a83ac"
+  log:
+    directory: "/tmp/telemetry"
+    segment_size: "65536"
+  payload_command:
+    dest_base: "0.0.0.0:4200"
+    source_base: "127.0.0.1:4300"
+  payload_telemetry:
+    dest_base: "127.0.0.1:6100"
+    source_base: "0.0.0.0:6000"
+  # tcspecial counts its starts in this file, which must be on storage
+  # that survives a power cycle on a vehicle.
+  state_file: "/tmp/tcspecial-descent.state"
+  tcs_cmd:
+    recv: "0.0.0.0:4000"
+    send: "127.0.0.1:4100"
+
+gateway:
+  - name: gateway
+    type: gateway_radio
+    address: "127.0.0.1"
+    ground_base: "127.0.0.1:5100"
+    port: "5000"
+    payload-in: true
+
+vehicle:
+  # The radar's two bytes are centimetres, unsigned, most significant
+  # first: up to 655 metres, which is above where the descent starts.
+  - name: altitude
+    type: compute
+    function: "to_value"
+    format: "u16_be"
+    offset: "0"
+    scale: "0.01"
+    unit: "m"
+    payload-out:
+      - target: gateway
+      - target: guidance
+      - target: housekeeping
+    payload-in: true
+  # The velocimeter's two bytes are centimetres a second, signed: up is
+  # more than nought, so a descent is less.
+  - name: descent_rate
+    type: compute
+    function: "to_value"
+    format: "i16_be"
+    offset: "0"
+    scale: "0.01"
+    unit: "m/s"
+    payload-out:
+      - target: gateway
+      - target: housekeeping
+    payload-in: true
+  # The throttle, from the altitude: a program, flying a descent that
+  # slows as the ground nears and cutting the engine half a metre up. A
+  # Python 3 script beside this file, named relative to the repository's
+  # root because that is where tcspecial is run from. Its answers are a
+  # ratio, which is what the engine's throttle takes.
+  - name: guidance
+    type: compute
+    function: "process"
+    executable: "examples/descent/guidance.py"
+    timeout: "1 s"
+    unit: "ratio"
+    payload-out:
+      - target: gateway
+      - target: housekeeping
+    gateway-out:
+      - target: engine
+    payload-in: true
+  - name: housekeeping
+    type: log
+    directory: "/tmp/telemetry"
+    format: "variable_ts_rc"
+    payload-in: true
+
+payloads:
+  # Every payload is the far end of a UDP socket, which tcssim stands in
+  # for, so that the example runs on any desk and touches no hardware.
+  #
+  # The radar altimeter, which sends ten readings a second.
+  - name: radar
+    type: network
+    protocol: "udp"
+    address: "127.0.0.1"
+    port: "5401"
+    payload-out:
+      - target: altitude
+  # The Doppler velocimeter, five a second.
+  - name: doppler
+    type: network
+    protocol: "udp"
+    address: "127.0.0.1"
+    port: "5402"
+    payload-out:
+      - target: descent_rate
+  # The switch on a landing leg, whose 1 is the ground's word that the
+  # lander is down: straight to the ground and to the log.
+  - name: touchdown
+    type: network
+    protocol: "udp"
+    address: "127.0.0.1"
+    port: "5403"
+    payload-out:
+      - target: gateway
+      - target: housekeeping
+  # The engine's throttle, driven by what guidance answers.
+  - name: engine
+    type: network
+    protocol: "udp"
+    address: "127.0.0.1"
+    port: "5404"
+    gateway-in: true

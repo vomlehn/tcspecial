@@ -1402,8 +1402,12 @@ pub enum Attached {
         offset: f64,
         sensor: SensorErrors,
     },
-    /// It drives this input, a decision, to what the vehicle sends it.
-    Drives { at: At },
+    /// It reports this output, a decision, as the text `1` or `0`: at
+    /// once when it changes, and again every packet interval.
+    Signals { at: At },
+    /// It drives this input to what the vehicle sends it: a decision, or a
+    /// value in the input's unit.
+    Drives { at: At, kind: Kind },
 }
 
 /// What a sensor gets wrong, as a datasheet would say it, in the unit of
@@ -1812,16 +1816,15 @@ impl SimConfigFile {
     ///
     /// # Returns
     ///
-    /// Whether it reports an output or drives an input, and which, or `None`
-    /// if it is joined to neither.
+    /// Whether it reports a value, signals a decision or drives an input,
+    /// and which, or `None` if it is joined to nothing.
     ///
     /// # Errors
     ///
     /// [`SimConfigError::BadAttachment`] if it connects to a terminal with
-    /// no model named, or to one the model has not; reports an output that
-    /// is not a value, or drives an input that is not a decision; states a
-    /// sensor's errors in another unit than its terminal's, or where it
-    /// drives or connects to nothing.
+    /// no model named, or to one the model has not; or states a sensor's
+    /// errors in another unit than its terminal's, or where it drives, reports
+    /// a decision, or connects to nothing.
     fn attachment(
         &self,
         payload: &str,
@@ -1893,7 +1896,7 @@ impl SimConfigFile {
                     sensor,
                 }))
             }
-            (Direction::In, Kind::Decision) => {
+            (Direction::In, kind) => {
                 if let Some((what, _)) =
                     errors.iter().find(|(_, s)| s.is_some())
                 {
@@ -1902,20 +1905,19 @@ impl SimConfigFile {
                          terminal it reports, and this one drives {at}"
                     )));
                 }
-                Ok(Some(Attached::Drives { at }))
+                Ok(Some(Attached::Drives { at, kind }))
             }
-            (Direction::Out, kind) => Err(bad(format!(
-                "connects: {at}, which gives {}, and a stand-in reports a \
-                 value: a sensor is joined to what it measures",
-                kind.describe()
-            ))),
-            (Direction::In, kind) => Err(bad(format!(
-                "connects: {at}, an input taking {}, which no stand-in can \
-                 drive: what the vehicle sends a stand-in is a decision, so \
-                 one drives an input such as a heater's on; {at} is joined \
-                 under connections in the physics model",
-                kind.describe()
-            ))),
+            (Direction::Out, Kind::Decision) => {
+                if let Some((what, _)) =
+                    errors.iter().find(|(_, s)| s.is_some())
+                {
+                    return Err(bad(format!(
+                        "{what} says what a sensor gets wrong about a value, \
+                         and {at} is a decision, which is on or off"
+                    )));
+                }
+                Ok(Some(Attached::Signals { at }))
+            }
         }
     }
 
@@ -4098,6 +4100,7 @@ connections:
             resolved[1].attached,
             Some(Attached::Drives {
                 at: At::parse("t", "heater_1.on").unwrap(),
+                kind: Kind::Decision,
             })
         );
         assert!(file.physics().unwrap().is_some());
@@ -4111,7 +4114,7 @@ connections:
             ("connects: zone", "joined by a dot"),
             ("connects: zone.colour", "no terminal \"colour\""),
             ("connects: room.temperature", "no element \"room\""),
-            ("connects: zone.heat", "which no stand-in can drive"),
+            ("connects: zone.heat", "which a connection joins too"),
             ("noise: \"0.1 K\"", "connects to none"),
         ] {
             let err = joined(sensor, HEATER_1, HEATER_2)
@@ -4126,6 +4129,50 @@ connections:
         file.model = None;
         let err = file.resolve(&handlers()).unwrap_err().to_string();
         assert!(err.contains("names no physics model"), "{err}");
+    }
+
+    /// A stand-in drives an engine's throttle, a value, and another reports
+    /// a body's contact, a decision, which takes no sensor's errors.
+    #[test]
+    fn a_stand_in_drives_a_value_and_signals_a_decision() {
+        let mut file = joined(
+            "connects: lander.contact",
+            "connects: engine.throttle",
+            "connects: lander.altitude",
+        );
+        file.model = Some(
+            PhysicsFile::parse(
+                "physics:
+  - { name: engine, type: engine, thrust: \"16000 N\", isp: 311 s,
+      fuel: \"800 kg\" }
+  - { name: lander, type: body, mass: \"1500 kg\",
+      gravity: \"1.62 m/s2\", altitude: \"500 m\",
+      velocity: \"-20 m/s\" }
+connections:
+  - { from: engine.force, to: lander.force }
+  - { from: engine.flow, to: lander.flow }
+",
+            )
+            .expect("the model parses"),
+        );
+        let resolved = file.resolve(&handlers()).expect("it resolves");
+        assert_eq!(
+            resolved[0].attached,
+            Some(Attached::Signals {
+                at: At::parse("t", "lander.contact").unwrap(),
+            })
+        );
+        assert_eq!(
+            resolved[1].attached,
+            Some(Attached::Drives {
+                at: At::parse("t", "engine.throttle").unwrap(),
+                kind: Kind::Value(crate::unit::Unit::Ratio),
+            })
+        );
+
+        file.simulated_payloads[0].settings.noise = Some("0.1 m".to_string());
+        let err = file.resolve(&handlers()).unwrap_err().to_string();
+        assert!(err.contains("is a decision"), "{err}");
     }
 
     /// What the old settings said is refused, told what says it now.

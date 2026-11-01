@@ -248,6 +248,7 @@ mod tests {
             Attachment::Drives {
                 world: world.clone(),
                 place: place("heater_1.on"),
+                unit: None,
             },
         )];
         let params = HysteresisParams {

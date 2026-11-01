@@ -53,7 +53,9 @@
 //! a second spelling would be a second thing to keep the same as the first.
 
 pub mod battery;
+pub mod body;
 pub mod bus;
+pub mod engine;
 pub mod heater;
 pub mod load;
 pub mod setting;
@@ -83,6 +85,8 @@ pub const TYPES: &[&str] = &[
     "load",
     "bus",
     "battery",
+    "engine",
+    "body",
 ];
 
 /// A physics model, as it parses.
@@ -118,6 +122,10 @@ pub enum Element {
     Bus(bus::Bus),
     #[serde(rename = "battery")]
     Battery(battery::Battery),
+    #[serde(rename = "engine")]
+    Engine(engine::Engine),
+    #[serde(rename = "body")]
+    Body(body::Body),
     /// The one type there was before a model was made of parts. Read only
     /// to be refused, saying what it is now: see [`MASS_MADE_OF_PARTS`].
     #[serde(rename = "thermal_mass")]
@@ -167,6 +175,8 @@ impl Element {
             Element::Load(e) => &e.name,
             Element::Bus(e) => &e.name,
             Element::Battery(e) => &e.name,
+            Element::Engine(e) => &e.name,
+            Element::Body(e) => &e.name,
             Element::ThermalMass(e) => &e.name,
         }
     }
@@ -185,6 +195,8 @@ impl Element {
             Element::Load(_) => "load",
             Element::Bus(_) => "bus",
             Element::Battery(_) => "battery",
+            Element::Engine(_) => "engine",
+            Element::Body(_) => "body",
             Element::ThermalMass(_) => "thermal_mass",
         }
     }
@@ -209,6 +221,8 @@ pub fn settings_of(type_name: &str) -> Option<&'static [&'static str]> {
         "load" => Some(load::SETTINGS),
         "bus" => Some(bus::SETTINGS),
         "battery" => Some(battery::SETTINGS),
+        "engine" => Some(engine::SETTINGS),
+        "body" => Some(body::SETTINGS),
         _ => None,
     }
 }
@@ -231,6 +245,8 @@ pub fn terminals_of(type_name: &str) -> Option<&'static [Terminal]> {
         "load" => Some(load::TERMINALS),
         "bus" => Some(bus::TERMINALS),
         "battery" => Some(battery::TERMINALS),
+        "engine" => Some(engine::TERMINALS),
+        "body" => Some(body::TERMINALS),
         _ => None,
     }
 }
@@ -343,6 +359,8 @@ pub enum Resolution {
     /// A bus has no figures: it is its connections.
     Bus,
     Battery(battery::Resolved),
+    Engine(engine::Resolved),
+    Body(body::Resolved),
 }
 
 impl Resolution {
@@ -360,6 +378,8 @@ impl Resolution {
             Resolution::Load(_) => "load",
             Resolution::Bus => "bus",
             Resolution::Battery(_) => "battery",
+            Resolution::Engine(_) => "engine",
+            Resolution::Body(_) => "body",
         }
     }
 
@@ -377,6 +397,8 @@ impl Resolution {
             Resolution::Load(_) => load::TERMINALS,
             Resolution::Bus => bus::TERMINALS,
             Resolution::Battery(_) => battery::TERMINALS,
+            Resolution::Engine(_) => engine::TERMINALS,
+            Resolution::Body(_) => body::TERMINALS,
         }
     }
 }
@@ -582,6 +604,8 @@ impl PhysicsFile {
                 Element::Load(e) => e.resolve().map(Resolution::Load),
                 Element::Bus(_) => Ok(Resolution::Bus),
                 Element::Battery(e) => e.resolve().map(Resolution::Battery),
+                Element::Engine(e) => e.resolve().map(Resolution::Engine),
+                Element::Body(e) => e.resolve().map(Resolution::Body),
                 Element::ThermalMass(_) => Err(MASS_MADE_OF_PARTS.to_string()),
             };
             match what {

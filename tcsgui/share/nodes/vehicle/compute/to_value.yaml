@@ -26,5 +26,5 @@ attributes:
   - name: unit
     required: true
     about: >
-      What the value is a number of: K, V, A, W, m, m/s, N, or ratio for a
-      fraction of a whole.
+      What the value is a number of: K, V, A, W, m, m/s, N, kg/s, or ratio
+      for a fraction of a whole.

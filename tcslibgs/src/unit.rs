@@ -35,6 +35,8 @@ pub enum Unit {
     MetrePerSecond,
     /// Force: a thrust.
     Newton,
+    /// A flow of mass: what an engine burns.
+    KilogramPerSecond,
     /// A number with no unit: a state of charge, a throttle setting, as a
     /// fraction of the whole.
     Ratio,
@@ -55,7 +57,7 @@ struct Row {
 /// rounded by being carried; of a thousandth where a millionth would leave
 /// too little range -- an altitude in micro-metres reaches only 2 km, a
 /// thrust in micro-newtons only 2 kN.
-const TABLE: [Row; 8] = [
+const TABLE: [Row; 9] = [
     Row {
         unit: Unit::Kelvin,
         symbol: "K",
@@ -106,6 +108,13 @@ const TABLE: [Row; 8] = [
         step: "millinewtons",
     },
     Row {
+        unit: Unit::KilogramPerSecond,
+        symbol: "kg/s",
+        name: "kilograms a second",
+        per_unit: 1e6,
+        step: "milligrams a second",
+    },
+    Row {
         unit: Unit::Ratio,
         symbol: "ratio",
         name: "a ratio",
@@ -116,7 +125,7 @@ const TABLE: [Row; 8] = [
 
 impl Unit {
     /// Every unit, in the table's order.
-    pub const ALL: [Unit; 8] = [
+    pub const ALL: [Unit; 9] = [
         Unit::Kelvin,
         Unit::Volt,
         Unit::Ampere,
@@ -124,6 +133,7 @@ impl Unit {
         Unit::Metre,
         Unit::MetrePerSecond,
         Unit::Newton,
+        Unit::KilogramPerSecond,
         Unit::Ratio,
     ];
 

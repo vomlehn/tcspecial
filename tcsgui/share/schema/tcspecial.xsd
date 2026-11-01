@@ -254,7 +254,7 @@
       <!-- A vote's: how old a reading may be and still be voted on. -->
       <xs:element name="age" type="xs:string"/>
       <!-- The unit a to_value conversion's or a process computation's values
-           are in: K, V, A, W, m, m/s, N or ratio. -->
+           are in: K, V, A, W, m, m/s, N, kg/s or ratio. -->
       <xs:element name="unit" type="xs:string"/>
       <!-- The program this node runs: an app node's application, or the
            program a `process` computation runs on what arrives. Executed with

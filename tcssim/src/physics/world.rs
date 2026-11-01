@@ -33,16 +33,18 @@
 //! Nothing is allocated once it is made: the inputs, the driven values and
 //! the queue have their room from the start.
 
-use std::sync::{Mutex, MutexGuard};
+use std::sync::{Condvar, Mutex, MutexGuard};
 use std::time::Instant;
 
 use tcslibgs::physics::terminal::{Direction, Terminal};
 use tcslibgs::physics::{Joined, Model, Place, Resolution};
 
 use super::battery::Battery;
+use super::body::Body;
 use super::bus::Bus;
 use super::clock::Clock;
 use super::element::{Element, MOST_TERMINALS};
+use super::engine::Engine;
 use super::heater::Heater;
 use super::load::Load;
 use super::queue::Queue;
@@ -71,6 +73,10 @@ pub struct World {
     /// The model's connections.
     connections: Vec<Joined>,
     state: Mutex<State>,
+    /// Told whenever a stand-in drives an input, which can bring an event
+    /// sooner than a waiting stand-in was waiting for: see
+    /// [`World::await_change`].
+    driven: Condvar,
 }
 
 /// What changes as the world runs.
@@ -124,6 +130,10 @@ impl World {
                     Resolution::Battery(figures) => {
                         Box::new(Battery::new(*figures))
                     }
+                    Resolution::Engine(figures) => {
+                        Box::new(Engine::new(*figures))
+                    }
+                    Resolution::Body(figures) => Box::new(Body::new(*figures)),
                 };
                 (element.name.clone(), element.what.terminals(), made)
             })
@@ -168,6 +178,7 @@ impl World {
             names,
             terminals,
             connections,
+            driven: Condvar::new(),
             state: Mutex::new(State {
                 now: 0.0,
                 elements,
@@ -269,6 +280,56 @@ impl World {
         self.advance_to(&mut state, seconds);
         state.driven[place.element][place.terminal] = value;
         self.hold(&mut state);
+        drop(state);
+        self.driven.notify_all();
+    }
+
+    /// Waits for an output to change from what it was, and says what it
+    /// changed to.
+    ///
+    /// What a stand-in that signals a decision waits in, so that the vehicle
+    /// hears of the change -- a lander's contact with the ground -- at the
+    /// moment it happens, and not at the stand-in's next turn to send. The
+    /// world is advanced to each event it foresees at that event's moment on
+    /// the wall clock, unasked by anything else: a change comes at an event,
+    /// or at a stand-in's drive, which wakes the wait too.
+    ///
+    /// # Arguments
+    ///
+    /// * `place` - The output.
+    /// * `from`  - What it was, as the stand-in last said it.
+    /// * `until` - When to stop waiting, on the wall clock.
+    ///
+    /// # Returns
+    ///
+    /// What it changed to, or `None` where it had not by `until`.
+    pub fn await_change(
+        &self,
+        place: Place,
+        from: f64,
+        until: Instant,
+    ) -> Option<f64> {
+        let mut state = self.held();
+        loop {
+            let now = Instant::now();
+            self.advance_to(&mut state, self.clock.at(now));
+            let is = state.elements[place.element].output(place.terminal);
+            if is != from {
+                return Some(is);
+            }
+            if now >= until {
+                return None;
+            }
+            let wake = state
+                .queue
+                .first()
+                .map_or(until, |(at, _)| self.clock.instant_of(at).min(until));
+            let (held, _) = self
+                .driven
+                .wait_timeout(state, wake.saturating_duration_since(now))
+                .unwrap_or_else(|e| e.into_inner());
+            state = held;
+        }
     }
 
     /// The lock, taken through one place so a poisoned one is dealt with

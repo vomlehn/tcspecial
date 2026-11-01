@@ -1,0 +1,159 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1300" height="900" viewBox="0 0 1300 900" role="img" aria-labelledby="title desc">
+  <title id="title">The descent example</title>
+  <desc id="desc">A lander's terminal descent. radar, a radar altimeter at the far end of a UDP socket at 127.0.0.1:5401, sends the altitude ten times a second, which altitude makes a value in metres. doppler, a Doppler velocimeter at 127.0.0.1:5402, sends the velocity five times a second, which descent_rate makes a value in metres a second. guidance, a program, flies a descent from the altitude alone and answers a throttle, a ratio, which goes by its gateway-out link to engine, at 127.0.0.1:5404, the engine's throttle. touchdown, a switch on a landing leg at 127.0.0.1:5403, says 1 when the lander is on the ground. Every value, and the switch, goes to the gateway node on the ground and to the log housekeeping. tcssim stands in for the four payloads, joined to a physics model of an engine and the body it brakes. tcspecial sends what altitude, descent_rate, guidance and touchdown produce as UDP datagrams to the gateway node's ground_base, 127.0.0.1:5100, plus each source's device id.</desc>
+  <defs>
+    <style>
+      text { font-family: "DejaVu Sans", Helvetica, Arial, sans-serif; fill: #111827; }
+      .name { font-family: "DejaVu Sans Mono", Menlo, Consolas, monospace; font-size: 15px; font-weight: bold; }
+      .kind { font-size: 12.5px; fill: #374151; }
+      .detail { font-family: "DejaVu Sans Mono", Menlo, Consolas, monospace; font-size: 11.5px; fill: #4b5563; }
+      .port { font-family: "DejaVu Sans Mono", Menlo, Consolas, monospace; font-size: 10.5px; fill: #6b21a8; }
+      .heading { font-size: 13px; font-weight: bold; fill: #475569; letter-spacing: 0.06em; }
+      .label { font-size: 12px; fill: #1f2937; }
+      .note { font-size: 12px; fill: #4b5563; }
+      .payload { fill: #eaf2fb; stroke: #2f6db5; stroke-width: 1.6; }
+      .vehicle { fill: #f5f0fc; stroke: #7e57c2; stroke-width: 1.6; }
+      .gateway { fill: #e9f6ee; stroke: #2e7d4f; stroke-width: 1.6; }
+      .ground { fill: #f3f4f6; stroke: #4b5563; stroke-width: 1.6; }
+      .groundside { fill: #f8faf8; stroke: #94a3b8; stroke-width: 1.4; stroke-dasharray: 7 5; }
+      .call { fill: none; stroke: #374151; stroke-width: 2.4; }
+      .code { font-family: "DejaVu Sans Mono", Menlo, Consolas, monospace; font-size: 12px; fill: #111827; }
+      .portno { font-family: "DejaVu Sans Mono", Menlo, Consolas, monospace; font-size: 10px; fill: #1e40af; }
+      .boundary { fill: #fbfbfd; stroke: #94a3b8; stroke-width: 1.4; stroke-dasharray: 7 5; }
+      .group { fill: none; stroke: #64748b; stroke-width: 1.2; stroke-dasharray: 3 3; }
+      .groundward { fill: none; stroke: #2563eb; stroke-width: 1.8; }
+      .vehicleward { fill: none; stroke: #d97706; stroke-width: 2; }
+      .command { fill: none; stroke: #d97706; stroke-width: 2; stroke-dasharray: 2 4; stroke-linecap: round; }
+    </style>
+    <marker id="arrow-blue" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#2563eb"/>
+    </marker>
+    <marker id="arrow-orange" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#d97706"/>
+    </marker>
+    <marker id="arrow-call" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#374151"/>
+    </marker>
+  </defs>
+
+  <rect width="1300" height="790" fill="#ffffff"/>
+
+  <!-- Column headings -->
+  <text class="heading" x="60" y="40">PAYLOADS</text>
+
+  <!-- tcspecial, the vehicle -->
+  <rect class="boundary" x="270" y="52" width="710" height="580" rx="16"/>
+  <text class="heading" x="290" y="78">TCSPECIAL (VEHICLE)</text>
+
+  <!-- Payloads -->
+  <rect class="payload" x="60" y="100" width="170" height="74" rx="10"/>
+  <text class="name" x="74" y="124">radar</text>
+  <text class="kind" x="74" y="144">network, udp</text>
+  <text class="detail" x="74" y="162">127.0.0.1:5401</text>
+
+  <rect class="payload" x="60" y="220" width="170" height="74" rx="10"/>
+  <text class="name" x="74" y="244">doppler</text>
+  <text class="kind" x="74" y="264">network, udp</text>
+  <text class="detail" x="74" y="282">127.0.0.1:5402</text>
+
+  <rect class="payload" x="60" y="340" width="170" height="74" rx="10"/>
+  <text class="name" x="74" y="364">touchdown</text>
+  <text class="kind" x="74" y="384">network, udp</text>
+  <text class="detail" x="74" y="402">127.0.0.1:5403</text>
+
+  <rect class="payload" x="60" y="500" width="170" height="74" rx="10"/>
+  <text class="name" x="74" y="524">engine</text>
+  <text class="kind" x="74" y="544">network, udp</text>
+  <text class="detail" x="74" y="562">127.0.0.1:5404</text>
+
+  <!-- Conversions -->
+  <rect class="vehicle" x="300" y="100" width="170" height="74" rx="10"/>
+  <text class="name" x="314" y="124">altitude</text>
+  <text class="kind" x="314" y="144">compute, to_value</text>
+  <text class="detail" x="314" y="162">u16_be, m</text>
+
+  <rect class="vehicle" x="300" y="220" width="170" height="74" rx="10"/>
+  <text class="name" x="314" y="244">descent_rate</text>
+  <text class="kind" x="314" y="264">compute, to_value</text>
+  <text class="detail" x="314" y="282">i16_be, m/s</text>
+
+  <!-- Guidance -->
+  <rect class="vehicle" x="780" y="300" width="170" height="74" rx="10"/>
+  <text class="name" x="794" y="324">guidance</text>
+  <text class="kind" x="794" y="344">compute, process</text>
+  <text class="detail" x="794" y="362">guidance.py, ratio</text>
+
+  <!-- The log -->
+  <rect class="vehicle" x="540" y="470" width="170" height="74" rx="10"/>
+  <text class="name" x="554" y="494">housekeeping</text>
+  <text class="kind" x="554" y="514">log</text>
+  <text class="detail" x="554" y="532">/tmp/telemetry</text>
+
+  <!-- The ground -->
+  <rect class="groundside" x="1010" y="52" width="270" height="580" rx="16"/>
+  <text class="heading" x="1028" y="78">GROUND</text>
+
+  <!-- The gateway node, on the ground -->
+  <rect class="gateway" x="1030" y="96" width="230" height="96" rx="10"/>
+  <text class="name" x="1044" y="120">gateway</text>
+  <text class="kind" x="1044" y="140">receives what tcspecial sends</text>
+  <text class="detail" x="1044" y="158">ground_base 127.0.0.1:5100</text>
+  <text class="detail" x="1044" y="176">commands to 127.0.0.1:5000</text>
+
+  <!-- The ground software -->
+  <rect class="ground" x="1030" y="430" width="230" height="80" rx="10"/>
+  <text class="name" x="1044" y="456">ground software</text>
+  <text class="kind" x="1044" y="477">processing and display</text>
+  <text class="detail" x="1044" y="496">from altitude ... touchdown</text>
+
+  <!-- The payloads to their conversions -->
+  <path class="groundward" d="M230,137 L296,137" marker-end="url(#arrow-blue)"/>
+  <path class="groundward" d="M230,257 L296,257" marker-end="url(#arrow-blue)"/>
+
+  <!-- Each source to the ground link -->
+  <path class="groundward" d="M470,116 L1026,116" marker-end="url(#arrow-blue)"/>
+  <path class="groundward" d="M470,238 C505,238 505,131 540,131 L1026,131" marker-end="url(#arrow-blue)"/>
+  <path class="groundward" d="M950,316 C985,316 985,146 1026,146" marker-end="url(#arrow-blue)"/>
+  <path class="groundward" d="M230,356 C250,356 250,420 282,420 L700,420 C760,420 760,161 790,161 L1026,161" marker-end="url(#arrow-blue)"/>
+
+  <!-- The altitude into guidance -->
+  <path class="groundward" d="M470,158 C620,158 620,337 776,337" marker-end="url(#arrow-blue)"/>
+
+  <!-- Each into the log -->
+  <path class="groundward" d="M470,166 C510,166 510,484 536,484" marker-end="url(#arrow-blue)"/>
+  <path class="groundward" d="M470,278 C494,278 494,500 536,500" marker-end="url(#arrow-blue)"/>
+  <path class="groundward" d="M780,360 C745,360 745,527 714,527" marker-end="url(#arrow-blue)"/>
+  <path class="groundward" d="M230,400 C258,400 258,516 536,516" marker-end="url(#arrow-blue)"/>
+
+  <!-- Guidance throttles the engine -->
+  <path class="vehicleward" d="M865,374 L865,606 L145,606 L145,578" marker-end="url(#arrow-orange)"/>
+  <text class="label" x="560" y="598">gateway-out: the throttle, a ratio</text>
+
+  <!-- Each source's port on the ground: ground_base plus its device id -->
+  <text class="portno" x="985" y="113">5101</text>
+  <text class="portno" x="985" y="128">5102</text>
+  <text class="portno" x="985" y="143">5103</text>
+  <text class="portno" x="985" y="158">5107</text>
+
+  <!-- The ground software gets the data with a function call -->
+  <path class="call" d="M1145,192 L1145,426" marker-end="url(#arrow-call)"/>
+  <text class="code" x="1155" y="304">GatewayReceiver::</text>
+  <text class="code" x="1155" y="320">receive()</text>
+
+  <!-- Legend -->
+  <line x1="50" y1="678" x2="1260" y2="678" stroke="#e5e7eb" stroke-width="1"/>
+  <path class="groundward" d="M50,710 L100,710" marker-end="url(#arrow-blue)"/>
+  <text class="label" x="110" y="714">data link, toward the ground</text>
+  <path class="vehicleward" d="M330,710 L380,710" marker-end="url(#arrow-orange)"/>
+  <text class="label" x="390" y="714">data link, toward the vehicle</text>
+  <path class="call" d="M610,710 L660,710" marker-end="url(#arrow-call)"/>
+  <text class="label" x="670" y="714">function call, from tcslib::gateway</text>
+  <rect class="payload" x="50" y="740" width="22" height="16" rx="4"/>
+  <text class="label" x="80" y="753">payload</text>
+  <rect class="vehicle" x="170" y="740" width="22" height="16" rx="4"/>
+  <text class="label" x="200" y="753">vehicle node</text>
+  <rect class="gateway" x="320" y="740" width="22" height="16" rx="4"/>
+  <text class="label" x="350" y="753">gateway node</text>
+  <rect class="ground" x="450" y="740" width="22" height="16" rx="4"/>
+  <text class="label" x="480" y="753">ground program</text>
+</svg>

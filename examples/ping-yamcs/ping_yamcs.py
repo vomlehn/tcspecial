@@ -65,7 +65,6 @@ sys.path.insert(0, str(HERE.parent / "ping"))
 
 from tcslib.beacon import Arrived, Beacons, Schedule  # noqa: E402
 from tcslibgs import configuration, ping  # noqa: E402
-from tcslibgs.configuration import whole  # noqa: E402
 from ping_gateway import (  # noqa: E402
     Vehicle, die_with_this_program, run_the_window, the_one)
 from ping_ground import Exchange, Pinger, interval  # noqa: E402
@@ -75,9 +74,6 @@ HTTP_PORT = 16090
 
 #: The Yamcs instance this example runs.
 INSTANCE = "ping"
-
-#: The largest APID, eleven bits.
-MAX_APID = 0x7FF
 
 #: The wrapper's qualified names, as Yamcs knows them.
 CONNECT = "/TcsYamcs/Connect"
@@ -141,25 +137,6 @@ def status(text):
         print(text, file=sys.stderr, flush=True)
 
 
-def apid(attribute, said):
-    """Reads an APID the configuration states.
-
-    Args:
-        attribute: Its name, for the complaint.
-        said:      The value as the file writes it, decimal or 0x hex.
-
-    Returns:
-        The APID.
-
-    Raises:
-        ValueError: It is missing, not a number, or past eleven bits.
-    """
-    if said is None:
-        raise ValueError(f"{attribute} is not stated, and a yamcs "
-                         "configuration needs it")
-    return whole(attribute, said, MAX_APID)
-
-
 class Setup:
     """What the program read out of the configuration, and the Yamcs
     settings that follow from it.
@@ -188,16 +165,10 @@ class Setup:
         self.beacon_interval = self.config.beacon_interval()
         self.command = configuration.HostPort.of("tcs_cmd.recv",
                                                  said.get("tcs_cmd.recv"))
-        self.beacon_apid = apid("beacon.apid", said.get("beacon.apid"))
-        self.cmd_apid = apid("tcs_cmd.apid", said.get("tcs_cmd.apid"))
-        gateway = self.config.node(self.gateway)
-        self.uplink_apid = apid(f'"{self.gateway}" apid_base',
-                                gateway.attributes.get("apid_base"))
-        self.reply_apid = self.uplink_apid + self.config.device_id(self.node)
-        if self.reply_apid > MAX_APID:
-            raise ValueError(f"{self.path}: the ping node's APID, apid_base "
-                             f"plus its device id, is {self.reply_apid:#x}, "
-                             f"past {MAX_APID:#x}")
+        self.beacon_apid = self.config.beacon_apid()
+        self.cmd_apid = self.config.command_apid()
+        self.uplink_apid = self.config.uplink_apid(self.gateway)
+        self.reply_apid = self.config.downlink_apid(self.gateway, self.node)
         self.digest, self.why_no_digest = configuration.digest(
             self.path, options.tcsverify)
 

@@ -3453,6 +3453,7 @@ name = "ping-yamcs-example"
 version = "0.1.0"
 dependencies = [
  "tcslibgs",
+ "tempfile",
 ]
 
 [[package]]

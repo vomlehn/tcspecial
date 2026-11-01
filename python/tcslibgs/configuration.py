@@ -9,6 +9,9 @@ For a configuration that answers to cFS, whose links are message IDs on a
 software bus rather than sockets, it reads the bus instead: its SBN peer and
 every message ID, counted as ``graph::telemetry::msgids`` counts them -- see
 :meth:`Configuration.bus`.
+For a configuration that answers to Yamcs, whose packets carry CCSDS
+headers, it reads the APIDs, counted as ``graph::telemetry::apids`` counts
+them -- see :meth:`Configuration.framed`.
 
 It reads either spelling, chosen by the file's extension as the Rust's
 ``format::ConfigFormat`` chooses it. The XML with the standard library alone;
@@ -174,6 +177,56 @@ def counted(attribute, base, device_id):
     return msgid
 
 
+#: The largest APID, eleven bits: ``tcslibgs::ccsds::MAX_APID``.
+MAX_APID = 0x7FF
+
+
+def apid(attribute, said):
+    """Reads an APID a configuration states: ``tcslibgs::types::apid_of``.
+
+    Args:
+        attribute: Its name, for the complaint.
+        said:      The value as the file writes it, decimal or 0x hex, or
+                   ``None`` where the file does not state it.
+
+    Returns:
+        The APID.
+
+    Raises:
+        ValueError: It is missing, not a number, or past eleven bits.
+    """
+    if said is None or not said.strip():
+        raise ValueError(f"{attribute} is not stated, and a configuration "
+                         "whose gateway is yamcs must state it: the APID, 0 "
+                         f"to {MAX_APID:#x}")
+    return whole(attribute, said, MAX_APID)
+
+
+def counted_apid(attribute, base, device_id):
+    """An APID counted on from a base by a node's device id:
+    ``graph::telemetry::counted_apid``.
+
+    Args:
+        attribute: The base's attribute, for the error message.
+        base:      The base.
+        device_id: The node's device id.
+
+    Returns:
+        The APID.
+
+    Raises:
+        ValueError: The sum is past an APID's eleven bits.
+    """
+    counted = base + device_id
+    if counted > MAX_APID:
+        raise ValueError(
+            f"{attribute} {base:#x} plus the device id {device_id} is past an "
+            f"APID's eleven bits, {MAX_APID:#x}: lower the base, or give the "
+            "node a name that sorts earlier"
+        )
+    return counted
+
+
 @dataclass(frozen=True)
 class HostPort:
     """A host and a port, as ``address:port``."""
@@ -269,6 +322,9 @@ class Configuration:
     #: Every node, by name: the order a file writes them in means nothing,
     #: and a node's device id is its place among the names.
     nodes: list
+    #: The command bindings, each the gateway node a command arrives on
+    #: and the ``node.attribute`` it sets: ``(from, sets)``.
+    commands: list = field(default_factory=list)
 
     def node(self, name):
         """The node called ``name``.
@@ -434,21 +490,214 @@ class Configuration:
         msgids = {bus.response_msgid, bus.beacon_msgid}
         for name in (node.name for node in self.nodes):
             msgids.add(self.node_answer_msgid(name))
+        for node in self.nodes:
+            for target in node.links.get("payload-out", []):
+                kind = self._kind(target)
+                if kind in ON_BUS:
+                    msgids.add(self.downlink_msgid(target, node.name))
+        for name in self.untouched_payloads():
+            msgids.add(counted("payload_telemetry.tlm_base", bus.tlm_base,
+                               self.device_id(name)))
+        return sorted(msgids)
+
+    def framed(self):
+        """Whether every packet to and from the ground carries a CCSDS
+        primary header, as one that answers to Yamcs does:
+        ``tcspecial.gateway`` is ``yamcs``. ``GatewayKind::framed``."""
+        return self.tcspecial.get("gateway", "").strip() == "yamcs"
+
+    def beacon_apid(self):
+        """The APID the beacon carries as CCSDS telemetry: ``beacon.apid``.
+
+        Returns:
+            The APID.
+
+        Raises:
+            ValueError: The configuration does not answer to Yamcs, or the
+                        APID is missing or not one.
+        """
+        self._framed()
+        return apid("beacon.apid", self.tcspecial.get("beacon.apid"))
+
+    def command_apid(self):
+        """The APID commands on both command links carry as telecommands,
+        and their answers as telemetry: ``tcs_cmd.apid``.
+
+        Returns:
+            The APID.
+
+        Raises:
+            ValueError: As :meth:`beacon_apid`.
+        """
+        self._framed()
+        return apid("tcs_cmd.apid", self.tcspecial.get("tcs_cmd.apid"))
+
+    def uplink_apid(self, gateway):
+        """The APID what the ground sends the ``gateway_yamcs`` node called
+        ``gateway`` carries as telecommands: its ``apid_base``.
+        ``graph::reach::apid_base_of``.
+
+        Args:
+            gateway: The gateway node's name.
+
+        Returns:
+            The APID.
+
+        Raises:
+            ValueError: The configuration does not answer to Yamcs, there is
+                        no such node, it is not a ``gateway_yamcs`` node, or
+                        its ``apid_base`` is missing or not an APID.
+        """
+        self._framed()
+        node = self._gateway(gateway)
+        if node.node_type != "gateway_yamcs":
+            raise ValueError(
+                f'{self.path}: "{gateway}" is a {node.node_type} node, and '
+                "only a gateway_yamcs node states an apid_base"
+            )
+        return apid(f'"{gateway}" apid_base',
+                    node.attributes.get("apid_base"))
+
+    def downlink_apid(self, gateway, source):
+        """The APID what ``source`` sends to the ``gateway_yamcs`` node
+        called ``gateway`` carries as telemetry: its ``apid_base`` plus the
+        source's device id, as :meth:`downlink`'s port is counted.
+
+        Args:
+            gateway: The gateway node's name.
+            source:  The name of the node whose data is received.
+
+        Returns:
+            The APID.
+
+        Raises:
+            ValueError: As :meth:`uplink_apid`, ``source`` has no
+                        ``payload-out`` link to ``gateway``, or the sum is
+                        past eleven bits.
+        """
+        base = self.uplink_apid(gateway)
+        self._sends_to(gateway, source)
+        return counted_apid(f'"{gateway}" apid_base', base,
+                            self.device_id(source))
+
+    def untouched_payloads(self):
+        """The payloads nothing in the drawing touches -- no link to or from
+        them, no command binding naming them -- each of which reports over
+        the section's ``payload_telemetry``: ``graph::telemetry::of``.
+
+        Returns:
+            Their names, in order.
+        """
+        touched = self._touched()
+        return [node.name for node in self.nodes
+                if node.section == "payloads" and node.name not in touched]
+
+    def payload_telemetry_link(self, payload):
+        """Where the telemetry of ``payload``, which nothing touches, leaves
+        the vehicle and arrives at the ground: ``payload_telemetry``'s
+        ``source_base`` and ``dest_base``, each counted on by its device id.
+
+        Args:
+            payload: The payload's name.
+
+        Returns:
+            The vehicle's :class:`HostPort` and the ground's.
+
+        Raises:
+            ValueError: The payload is not one nothing touches, the
+                        configuration answers over a bus, or a base does not
+                        read or its port counted on is past 65535.
+        """
+        self._not_on_a_bus("a payload's telemetry")
+        device_id = self._untouched(payload)
+        ends = []
+        for attribute in ("payload_telemetry.source_base",
+                          "payload_telemetry.dest_base"):
+            base = HostPort.of(attribute, self._said(attribute))
+            port = base.port + device_id
+            if port > 65535:
+                raise ValueError(
+                    f"{self.path}: {attribute} {base} plus {payload}'s "
+                    f"device id is port {port}, and a port is at most 65535"
+                )
+            ends.append(HostPort(base.address, port))
+        return tuple(ends)
+
+    def payload_telemetry_apid(self, payload):
+        """The APID the telemetry of ``payload``, which nothing touches,
+        carries as CCSDS telemetry: ``payload_telemetry.apid_base`` plus its
+        device id, as its port is counted.
+
+        Args:
+            payload: The payload's name.
+
+        Returns:
+            The APID.
+
+        Raises:
+            ValueError: The configuration does not answer to Yamcs, the
+                        payload is not one nothing touches, or the base is
+                        missing, not an APID, or the sum past eleven bits.
+        """
+        self._framed()
+        device_id = self._untouched(payload)
+        base = apid("payload_telemetry.apid_base",
+                    self.tcspecial.get("payload_telemetry.apid_base"))
+        return counted_apid("payload_telemetry.apid_base", base, device_id)
+
+    def _framed(self):
+        """Refuses a question about APIDs of a configuration whose packets
+        carry none.
+
+        Raises:
+            ValueError: The configuration does not answer to Yamcs.
+        """
+        if not self.framed():
+            raise ValueError(
+                f"{self.path}: this configuration's gateway is "
+                f"{self.tcspecial.get('gateway')!r}, not yamcs, so its "
+                "packets carry no CCSDS header and it states no APIDs"
+            )
+
+    def _untouched(self, payload):
+        """The device id of a payload nothing touches.
+
+        Args:
+            payload: The payload's name.
+
+        Returns:
+            Its device id.
+
+        Raises:
+            ValueError: There is no such node, or it is not a payload
+                        nothing touches.
+        """
+        if payload not in self.untouched_payloads():
+            self.node(payload)
+            raise ValueError(
+                f'{self.path}: "{payload}" is not a payload nothing in the '
+                "drawing touches, so it does not report over "
+                "payload_telemetry: it goes where the drawing says"
+            )
+        return self.device_id(payload)
+
+    def _touched(self):
+        """Every node the drawing touches: an end of a link, or of a command
+        binding. ``graph::telemetry``'s ``touched``.
+
+        Returns:
+            Their names.
+        """
         touched = set()
         for node in self.nodes:
             for targets in node.links.values():
                 if targets:
                     touched.add(node.name)
                     touched.update(targets)
-            for target in node.links.get("payload-out", []):
-                kind = self._kind(target)
-                if kind in ON_BUS:
-                    msgids.add(self.downlink_msgid(target, node.name))
-        for node in self.nodes:
-            if node.section == "payloads" and node.name not in touched:
-                msgids.add(counted("payload_telemetry.tlm_base", bus.tlm_base,
-                                   self.device_id(node.name)))
-        return sorted(msgids)
+        for came, sets in self.commands:
+            touched.add(came)
+            touched.add(sets.split(".", 1)[0])
+        return touched
 
     def _kind(self, name):
         """The node type of the node called ``name``.
@@ -924,6 +1173,7 @@ class _Reader:
         """
         self.path = path
         self.nodes = []
+        self.commands = []
 
     def refuse(self, line, why):
         """The error for something refused.
@@ -965,7 +1215,8 @@ class _Reader:
             The :class:`Configuration`, its nodes by name.
         """
         return Configuration(path=self.path, tcspecial=tcspecial,
-                             nodes=sorted(self.nodes, key=lambda n: n.name))
+                             nodes=sorted(self.nodes, key=lambda n: n.name),
+                             commands=list(self.commands))
 
 
 class _Element:
@@ -1307,6 +1558,17 @@ def _load_xml(path):
                 reader.add(_xml_node(reader, section, node_type, child),
                            child.line)
 
+    for element in root.children:
+        if element.tag != "commands":
+            continue
+        came = element.find("from")
+        sets = element.find("sets")
+        if came is None or sets is None:
+            raise reader.refuse(element.line,
+                                "a command binding says the gateway node it "
+                                "arrives on, <from>, and what it sets, <sets>")
+        reader.commands.append((came.text.strip(), sets.text.strip()))
+
     layout = root.find("tcsgui")
     for part in layout.children if layout is not None else []:
         if part.tag not in ("nodes", "set-aside"):
@@ -1604,6 +1866,19 @@ def _load_yaml(path):
             for item in items:
                 reader.add(_yaml_node(reader, section, node_type, item,
                                       construct), item.start_mark.line + 1)
+
+    for key, value, at in sections:
+        if key != "commands":
+            continue
+        for binding in construct(value) or []:
+            if (not isinstance(binding, dict) or "from" not in binding
+                    or "sets" not in binding):
+                raise reader.refuse(at,
+                                    "a command binding says the gateway node "
+                                    "it arrives on, from, and what it sets, "
+                                    "sets")
+            reader.commands.append((_scalar(binding["from"]).strip(),
+                                    _scalar(binding["sets"]).strip()))
 
     for key, value, at in sections:
         if key != "tcsgui":

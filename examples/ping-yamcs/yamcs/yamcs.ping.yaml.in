@@ -20,7 +20,10 @@ services:
 
 # tcspecial's own XTCE, as it is, and the wrapper that puts a CCSDS header
 # around it, written by tcslibgs/yamcs.py with every APID the configuration
-# counts.
+# counts. The ping node's interface document, tcslibgs/xtce/ping.xtce, is
+# not among them: its command must go behind the header, which a command
+# cannot be put behind from outside, so the wrapper holds a copy of what it
+# states, and Yamcs is not given a ping that goes without one.
 mdb:
   - type: xtce
     args:

@@ -21,10 +21,19 @@ stated a second time by hand:
 * :func:`data_links` and :func:`command_streams` -- the Yamcs instance's
   links and the streams that route commands to them.
 
-A node's data is laid out by no XTCE tcspecial has, so each source's
-container holds what follows the header whole, as a binary parameter named
-after the node, and each gateway node's command takes its data whole, as a
-binary argument. Only the standard library is used.
+A node whose type has an interface document of its own
+(:data:`tcslibgs.interface.NODE_DOCUMENTS`: the ``ping`` node's
+``ping.xtce``) is given what that document states. Its source's container
+holds the fields of the document's container, and a gateway node whose
+data goes only to nodes with that document takes the document's command,
+each named as the document names it, its types and parameters copied in
+from it. A command cannot be put behind another's header from outside, so
+the document is copied rather than referred to, and the copy is held to
+what the document says by refusing anything of it the copy would not say
+the same (:data:`COPIED`). The data of every other node is laid out by no
+XTCE, so its container holds what follows the header whole, as a binary
+parameter named after the node, and a gateway node's command takes its
+data whole, as a binary argument. Only the standard library is used.
 """
 
 import re
@@ -32,6 +41,7 @@ import xml.etree.ElementTree as ET
 from dataclasses import dataclass
 from pathlib import Path
 
+from . import interface
 from .configuration import HostPort
 
 #: The XTCE namespace Yamcs 5 reads: XTCE 1.2.
@@ -40,8 +50,25 @@ NAMESPACE = "http://www.omg.org/spec/XTCE/20180204"
 #: What of the mission database does not depend on the configuration.
 TEMPLATE = Path(__file__).resolve().parent / "yamcs.xtce"
 
+#: The namespaces a node's interface document may be in: XTCE 1.2's, which
+#: the wrapper is in, and XTCE 1.3's. What the wrapper copies of one is the
+#: same in both.
+DOCUMENT_NAMESPACES = (NAMESPACE, "http://www.omg.org/spec/XTCE/20250214")
+
 #: The template's space system, which every name below is qualified by.
 SPACE_SYSTEM = "TcsYamcs"
+
+#: What of a node's interface document is copied into the wrapper, by
+#: element: the types of its parameters and arguments, which are given to
+#: Yamcs as the document gives them. Anything else in a type -- a reference
+#: to another value, a calibrator, an alarm -- is refused, as something the
+#: copy would not say the same behind a header.
+COPIED = frozenset({
+    "StringParameterType", "IntegerParameterType", "BinaryParameterType",
+    "StringArgumentType", "IntegerArgumentType", "BinaryArgumentType",
+    "StringDataEncoding", "IntegerDataEncoding", "BinaryDataEncoding",
+    "SizeInBits", "Fixed", "FixedValue", "Variable", "TerminationChar",
+    "LeadingSize"})
 
 #: A name XTCE allows: its ``NameType``, no space, period, slash, colon or
 #: square bracket.
@@ -108,6 +135,9 @@ class Telemetry:
     carries: str
     #: The gateway node a downlink goes through, or ``None``.
     gateway: str = None
+    #: The source's interface document, which its data is laid out by, or
+    #: ``None`` where it has none.
+    document: Path = None
 
     @property
     def container(self):
@@ -128,6 +158,11 @@ class Uplink:
     #: mission database, as its APID is counted, but no link or stream
     #: carries it.
     vehicle: HostPort
+    #: The interface document of every node its data goes to, whose command
+    #: it takes, or ``None`` where they have none, or not the same one.
+    document: Path = None
+    #: Its command's name: the document's command, or the node's own name.
+    command: str = ""
 
     @property
     def stream(self):
@@ -188,8 +223,9 @@ def telemetry(config):
         else:
             ground = config.payload_telemetry_link(use.node)[1]
             name = use.node
+        document = interface.node_document(config.node(use.node).node_type)
         links.append(Telemetry(name, use.node, use.apid, ground,
-                               use.carries, use.gateway))
+                               use.carries, use.gateway, document))
     return links
 
 
@@ -204,17 +240,48 @@ def uplinks(config):
 
     Raises:
         ValueError: As :func:`telemetry`, or a node's address or port does
-                    not read, or it states one and not the other.
+                    not read, or it states one and not the other, or the
+                    document its data's nodes share does not read.
+        OSError: That document cannot be read.
     """
     links = []
     for use in config.apids():
         if use.carries != "uplink":
             continue
-        said = config.node(use.node).attributes
-        binds = "address" in said or "port" in said
+        node = config.node(use.node)
+        binds = "address" in node.attributes or "port" in node.attributes
+        document = _shared_document(config, node)
+        command = (Document(document).command()[0] if document
+                   else use.node)
         links.append(Uplink(use.node, use.apid,
-                            config.uplink(use.node) if binds else None))
+                            config.uplink(use.node) if binds else None,
+                            document, command))
     return links
+
+
+def _shared_document(config, gateway):
+    """The interface document every node a gateway node's data goes to has.
+
+    Args:
+        config:  The :class:`tcslibgs.configuration.Configuration`.
+        gateway: The gateway node's :class:`~tcslibgs.configuration.Node`.
+
+    Returns:
+        The document's path, or ``None`` where the node's data goes nowhere,
+        or to a node with no document, or to nodes with different ones:
+        data that is not laid out by one document is sent whole.
+
+    Raises:
+        ValueError: A node it names does not exist.
+    """
+    documents = set()
+    for target in gateway.links.get("gateway-out", []):
+        # A destination may name the node's input after a point.
+        name = target.split(".", 1)[0]
+        documents.add(interface.node_document(config.node(name).node_type))
+    if len(documents) != 1:
+        return None
+    return documents.pop()
 
 
 def _tag(name):
@@ -295,27 +362,41 @@ class _Names:
         root: The template's root.
     """
 
-    #: The element kinds whose names share one space, by the space.
-    KINDS = {"parameter": ("Parameter",),
-             "container": ("SequenceContainer", "CommandContainer"),
-             "command": ("MetaCommand",)}
+    #: The element kinds whose names share one space, by the space: each
+    #: an element and, where only those in one set count, the set.
+    KINDS = {"parameter": (("Parameter", None),),
+             "container": (("SequenceContainer", None),
+                           ("CommandContainer", None)),
+             "command": (("MetaCommand", None),),
+             "parameter type": ((None, "ParameterTypeSet"),),
+             "argument type": ((None, "ArgumentTypeSet"),)}
 
     def __init__(self, root):
         self._taken = {}
         for space, kinds in self.KINDS.items():
             taken = set()
-            for kind in kinds:
-                for element in root.iter(_tag(kind)):
-                    taken.add(element.get("name"))
+            for kind, within in kinds:
+                if kind is not None:
+                    found = root.iter(_tag(kind))
+                else:
+                    found = (child for owner in root.iter(_tag(within))
+                             for child in owner)
+                for element in found:
+                    if element.get("name") is not None:
+                        taken.add(element.get("name"))
             self._taken[space] = taken
 
-    def take(self, space, name, node):
+    def take(self, space, name, node, fix="rename the node"):
         """Takes a name for what the configuration adds.
 
         Args:
-            space: ``parameter``, ``container`` or ``command``.
+            space: ``parameter``, ``container``, ``command``,
+                   ``parameter type`` or ``argument type``.
             name:  The name.
-            node:  The node it is named after, for the complaint.
+            node:  The node, or the document, it is named after, for the
+                   complaint.
+            fix:   What to do about a name that is taken, for the
+                   complaint.
 
         Raises:
             ValueError: XTCE does not allow it, or it is taken.
@@ -328,8 +409,502 @@ class _Names:
         if name in self._taken[space]:
             raise ValueError(f'"{node}" gives the Yamcs {space} name '
                              f'"{name}", which the mission database already '
-                             "has: rename the node")
+                             f"has: {fix}")
         self._taken[space].add(name)
+
+
+class Document:
+    """A node type's interface document, as the wrapper takes from it: its
+    one container and its one command, and the types and parameters they
+    use.
+
+    Args:
+        path: The document.
+
+    Raises:
+        ValueError: It is not an XTCE ``SpaceSystem`` of one level, or two
+                    of its elements of a kind have one name.
+        OSError: It cannot be read.
+    """
+
+    #: The sets read, by the element each holds and the set's name.
+    SETS = {"parameter type": "TelemetryMetaData/x:ParameterTypeSet",
+            "parameter": "TelemetryMetaData/x:ParameterSet",
+            "container": "TelemetryMetaData/x:ContainerSet",
+            "argument type": "CommandMetaData/x:ArgumentTypeSet",
+            "command": "CommandMetaData/x:MetaCommandSet"}
+
+    def __init__(self, path):
+        self.path = Path(path)
+        root = ET.parse(self.path).getroot()
+        namespace = root.tag[1:].split("}", 1)[0] if "}" in root.tag else ""
+        if (namespace not in DOCUMENT_NAMESPACES
+                or root.tag != f"{{{namespace}}}SpaceSystem"):
+            raise ValueError(f"{self.path}: not an XTCE 1.2 or 1.3 "
+                             "SpaceSystem, which a node's interface document "
+                             "is")
+        if root.find(f"{{{namespace}}}SpaceSystem") is not None:
+            raise ValueError(f"{self.path}: a SpaceSystem within another, "
+                             "which a node's interface document does not "
+                             "have")
+        self.namespace = namespace
+        self.name = root.get("name")
+        self.sets = {}
+        for what, path_in in self.SETS.items():
+            named = {}
+            for owner in root.findall(f"./x:{path_in}",
+                                      {"x": namespace}):
+                for element in owner:
+                    if not isinstance(element.tag, str):
+                        continue
+                    name = element.get("name")
+                    if name in named:
+                        raise ValueError(f'{self.path}: two of its {what}s '
+                                         f'are called "{name}"')
+                    named[name] = element
+            self.sets[what] = named
+
+    def local(self, element):
+        """An element's name, without the document's namespace.
+
+        Args:
+            element: The element.
+
+        Returns:
+            Its local name.
+
+        Raises:
+            ValueError: It is in another namespace.
+        """
+        prefix = f"{{{self.namespace}}}"
+        if not isinstance(element.tag, str) or not (
+                element.tag.startswith(prefix)):
+            raise ValueError(f"{self.path}: {element.tag} is not of the "
+                             "document's own XTCE")
+        return element.tag[len(prefix):]
+
+    def find(self, what, name, by):
+        """One of the document's elements, by a reference to it.
+
+        Args:
+            what: Its set: ``parameter type``, ``parameter``, ``container``
+                  or ``argument type``.
+            name: The reference, which must be to the document's own.
+            by:   What refers to it, for the complaint.
+
+        Returns:
+            The element.
+
+        Raises:
+            ValueError: It refers outside the document, or to nothing.
+        """
+        if name is None or name not in self.sets[what]:
+            raise ValueError(f"{self.path}: {by} refers to the {what} "
+                             f'"{name}", which the document does not have: '
+                             "a node's interface document refers only to "
+                             "its own")
+        return self.sets[what][name]
+
+    def _the_one(self, what):
+        """The document's one concrete element of a set.
+
+        Args:
+            what: The set: ``container`` or ``command``.
+
+        Returns:
+            Its name and the element.
+
+        Raises:
+            ValueError: It has none, or more than one.
+        """
+        concrete = [(name, element)
+                    for name, element in self.sets[what].items()
+                    if element.get("abstract") != "true"]
+        if len(concrete) != 1:
+            raise ValueError(f"{self.path}: {len(concrete)} {what}s that are "
+                             "not abstract, and a node's interface document "
+                             "has one, for what the node gives back and for "
+                             "what it takes")
+        return concrete[0]
+
+    def container(self):
+        """The container of what a node with this document gives back.
+
+        Returns:
+            Its name, and the parameters it holds in order, its base
+            containers' first.
+
+        Raises:
+            ValueError: The document has no one such container, or it is
+                        laid out by what the wrapper does not copy: an
+                        entry other than a parameter's, one placed where it
+                        is not next, or a restriction other than a value
+                        its own parameters are always equal to.
+        """
+        name, element = self._the_one("container")
+        chain = []
+        seen = set()
+        while element is not None:
+            where = f'container "{element.get("name")}"'
+            if element.get("name") in seen:
+                raise ValueError(f"{self.path}: {where} is its own base")
+            seen.add(element.get("name"))
+            chain.append(element)
+            base = None
+            for part in element:
+                kind = self.local(part)
+                if kind == "BaseContainer":
+                    base = part
+                elif kind != "EntryList":
+                    raise ValueError(f"{self.path}: {where} has {kind}, "
+                                     "which the Yamcs wrapper does not copy")
+            if base is None:
+                break
+            self._constants(base, where)
+            element = self.find("container", base.get("containerRef"), where)
+        parameters = []
+        for element in reversed(chain):
+            where = f'container "{element.get("name")}"'
+            for entries in element:
+                if self.local(entries) != "EntryList":
+                    continue
+                for entry in entries:
+                    kind = self.local(entry)
+                    if kind != "ParameterRefEntry" or len(entry):
+                        raise ValueError(f"{self.path}: {where} has a "
+                                         f"{kind} the Yamcs wrapper does not "
+                                         "copy: it copies parameters, one "
+                                         "after another")
+                    reference = entry.get("parameterRef")
+                    self.find("parameter", reference, where)
+                    parameters.append(reference)
+        return name, parameters
+
+    def _constants(self, base, where):
+        """Refuses a restriction the wrapper does not copy. The wrapper
+        leaves out the values a document's container holds its own
+        parameters to, which say nothing of where anything is: Yamcs shows
+        what arrives, and the ground station checks it.
+
+        Args:
+            base:  A ``BaseContainer``.
+            where: The container it is in, for the complaint.
+
+        Raises:
+            ValueError: It is restricted by anything but parameters being
+                        equal to values.
+        """
+        for criteria in base:
+            if self.local(criteria) != "RestrictionCriteria":
+                raise ValueError(f"{self.path}: {where}'s base has "
+                                 f"{self.local(criteria)}, which the Yamcs "
+                                 "wrapper does not copy")
+            comparisons = []
+            for kind in criteria:
+                if self.local(kind) == "Comparison":
+                    comparisons.append(kind)
+                elif self.local(kind) == "ComparisonList":
+                    comparisons.extend(kind)
+                else:
+                    raise ValueError(f"{self.path}: {where} is restricted "
+                                     f"by {self.local(kind)}, which the "
+                                     "Yamcs wrapper does not copy")
+            for comparison in comparisons:
+                if (self.local(comparison) != "Comparison"
+                        or comparison.get("comparisonOperator",
+                                          "==") != "=="):
+                    raise ValueError(f"{self.path}: {where} is restricted "
+                                     "by other than a parameter being equal "
+                                     "to a value, which the Yamcs wrapper "
+                                     "does not copy")
+                self.find("parameter", comparison.get("parameterRef"),
+                          where)
+
+    def command(self):
+        """The command a node with this document takes.
+
+        Returns:
+            Its name, its arguments' elements, and the entries of its
+            container: its name and the entries, in order.
+
+        Raises:
+            ValueError: The document has no one such command, or it is
+                        laid out by what the wrapper does not copy: a base
+                        command, an argument with more than its name, type
+                        and initial value, or an entry other than an
+                        argument's or a fixed value, one after another.
+        """
+        name, element = self._the_one("command")
+        where = f'command "{name}"'
+        arguments, container = [], None
+        for part in element:
+            kind = self.local(part)
+            if kind == "ArgumentList":
+                arguments = list(part)
+            elif kind == "CommandContainer":
+                container = part
+            else:
+                raise ValueError(f"{self.path}: {where} has {kind}, which "
+                                 "the Yamcs wrapper does not copy")
+        for argument in arguments:
+            if (self.local(argument) != "Argument" or len(argument)
+                    or set(argument.attrib) - {"name", "argumentTypeRef",
+                                               "initialValue"}):
+                raise ValueError(f"{self.path}: {where} has an argument "
+                                 "the Yamcs wrapper does not copy: it "
+                                 "copies a name, a type and an initial "
+                                 "value")
+            self.find("argument type", argument.get("argumentTypeRef"),
+                      where)
+        if container is None:
+            raise ValueError(f"{self.path}: {where} has no container")
+        entries = []
+        for part in container:
+            if self.local(part) != "EntryList":
+                raise ValueError(f"{self.path}: {where}'s container has "
+                                 f"{self.local(part)}, which the Yamcs "
+                                 "wrapper does not copy")
+            entries.extend(part)
+        names = {argument.get("name") for argument in arguments}
+        for entry in entries:
+            kind = self.local(entry)
+            if (kind not in ("ArgumentRefEntry", "FixedValueEntry")
+                    or len(entry)):
+                raise ValueError(f"{self.path}: {where}'s container has a "
+                                 f"{kind} the Yamcs wrapper does not copy: "
+                                 "it copies arguments and fixed values, one "
+                                 "after another")
+            if (kind == "ArgumentRefEntry"
+                    and entry.get("argumentRef") not in names):
+                raise ValueError(f"{self.path}: {where}'s container refers "
+                                 "to an argument it does not have, "
+                                 f'"{entry.get("argumentRef")}"')
+        return name, arguments, container.get("name"), entries
+
+    def copy(self, element):
+        """An element of the document, and everything in it, in the
+        wrapper's namespace.
+
+        Args:
+            element: The element: a parameter's or an argument's type, or
+                     an entry or an argument of the document's command.
+
+        Returns:
+            The copy.
+
+        Raises:
+            ValueError: It or what is in it is not what the wrapper copies:
+                        see :data:`COPIED`.
+        """
+        kind = self.local(element)
+        copied = ET.Element(_tag(kind), dict(element.attrib))
+        copied.text = (element.text or "").strip() or None
+        for part in element:
+            if self.local(part) not in COPIED:
+                raise ValueError(f"{self.path}: {kind} "
+                                 f'"{element.get("name", "")}" has '
+                                 f"{self.local(part)}, which the Yamcs "
+                                 "wrapper does not copy")
+            copied.append(self.copy(part))
+        return copied
+
+
+class _Copier:
+    """What of each node's interface document is in the wrapper, so that
+    each type and parameter is copied once however many nodes use it.
+
+    Args:
+        root:  The wrapper's root.
+        names: The :class:`_Names` it holds.
+    """
+
+    def __init__(self, root, names):
+        self._names = names
+        self._sets = {
+            "parameter type": _one(root, "./x:TelemetryMetaData"
+                                         "/x:ParameterTypeSet",
+                                   "parameter type sets"),
+            "parameter": _one(root, "./x:TelemetryMetaData/x:ParameterSet",
+                              "parameter sets"),
+            "argument type": _one(root, "./x:CommandMetaData"
+                                        "/x:ArgumentTypeSet",
+                                  "argument type sets")}
+        self._copied = set()
+
+    def parameter(self, document, name):
+        """Copies a parameter of a document, and its type, unless they are
+        copied already.
+
+        Args:
+            document: The :class:`Document`.
+            name:     The parameter's name.
+
+        Raises:
+            ValueError: As :meth:`Document.copy`, or its name or its type's
+                        is one the wrapper has of its own.
+        """
+        if (document.path, "parameter", name) in self._copied:
+            return
+        parameter = document.find("parameter", name, document.path.name)
+        if len(parameter) or set(parameter.attrib) != {"name",
+                                                       "parameterTypeRef"}:
+            raise ValueError(f'{document.path}: parameter "{name}" has more '
+                             "than a name and a type, which the Yamcs "
+                             "wrapper does not copy")
+        kind = parameter.get("parameterTypeRef")
+        self._type(document, "parameter type", kind)
+        self._names.take("parameter", name, document.path.name,
+                         "rename it in the document")
+        _child(self._sets["parameter"], "Parameter", name=name,
+               parameterTypeRef=kind)
+        self._copied.add((document.path, "parameter", name))
+
+    def argument_type(self, document, name):
+        """Copies a type of a document's arguments, unless it is copied
+        already.
+
+        Args:
+            document: The :class:`Document`.
+            name:     The type's name.
+
+        Raises:
+            ValueError: As :meth:`Document.copy`, or its name is one the
+                        wrapper has of its own.
+        """
+        self._type(document, "argument type", name)
+
+    def _type(self, document, what, name):
+        """Copies a type of a document, unless it is copied already.
+
+        Args:
+            document: The :class:`Document`.
+            what:     ``parameter type`` or ``argument type``.
+            name:     The type's name.
+
+        Raises:
+            ValueError: As :meth:`Document.copy`, or its name is one the
+                        wrapper has of its own.
+        """
+        if (document.path, what, name) in self._copied:
+            return
+        kind = document.find(what, name, document.path.name)
+        if document.local(kind) not in COPIED or kind.get("baseType"):
+            based = " with a base type" if kind.get("baseType") else ""
+            raise ValueError(f'{document.path}: {what} "{name}" is a '
+                             f"{document.local(kind)}{based}, which the "
+                             "Yamcs wrapper does not copy")
+        self._names.take(what, name, document.path.name,
+                         "rename it in the document")
+        self._sets[what].append(document.copy(kind))
+        self._copied.add((document.path, what, name))
+
+
+def _comment(parent, text):
+    """Adds a comment, which says why what follows it is there.
+
+    Args:
+        parent: The element it goes in.
+        text:   What it says, which fits a line.
+    """
+    parent.append(ET.Comment(f" {text} "))
+
+
+def _downlink(root, names, copier, link):
+    """Adds the container a source's data reaches the ground in.
+
+    Args:
+        root:   The wrapper's root.
+        names:  The :class:`_Names` it holds.
+        copier: The :class:`_Copier` that copies a document's parameters.
+        link:   The :class:`Telemetry`.
+
+    Raises:
+        ValueError: As :meth:`_Names.take`, :meth:`Document.container` and
+                    :meth:`_Copier.parameter`.
+        OSError: The source's document cannot be read.
+    """
+    containers = _one(root, "./x:TelemetryMetaData/x:ContainerSet",
+                      "container sets")
+    names.take("container", link.container, link.source)
+    if link.document is None:
+        names.take("parameter", link.name, link.source)
+        _child(_one(root, "./x:TelemetryMetaData/x:ParameterSet",
+                    "parameter sets"),
+               "Parameter", name=link.name, parameterTypeRef=BODY_TYPE)
+        held = [link.name]
+    else:
+        document = Document(link.document)
+        name, held = document.container()
+        for parameter in held:
+            copier.parameter(document, parameter)
+        _comment(containers, f"{link.source}: {name}, from "
+                             f"{document.path.name}")
+    container = _child(containers, "SequenceContainer", name=link.container)
+    entries = _child(container, "EntryList")
+    for parameter in held:
+        _child(entries, "ParameterRefEntry", parameterRef=parameter)
+    _restrict(_child(container, "BaseContainer", containerRef="CCSDSPacket"),
+              link.apid)
+
+
+def _uplink_command(root, names, copier, uplink):
+    """Adds the command the ground sends a ``gateway_yamcs`` node.
+
+    Args:
+        root:   The wrapper's root.
+        names:  The :class:`_Names` it holds.
+        copier: The :class:`_Copier` that copies a document's types.
+        uplink: The :class:`Uplink`.
+
+    Raises:
+        ValueError: As :meth:`_Names.take`, :meth:`Document.command` and
+                    :meth:`_Copier.argument_type`, or the document's command
+                    has an argument the header's command has.
+        OSError: The node's document cannot be read.
+    """
+    commands = _one(root, "./x:CommandMetaData/x:MetaCommandSet",
+                    "command sets")
+    if uplink.document is None:
+        name, container_name = uplink.name, f"{uplink.name}Packet"
+        arguments = [ET.Element(_tag("Argument"),
+                                {"name": DATA, "argumentTypeRef": DATA_TYPE}),
+                     ET.Element(_tag("Argument"),
+                                {"name": DATA_BITS,
+                                 "argumentTypeRef": DATA_BITS_TYPE})]
+        entries = [ET.Element(_tag("ArgumentRefEntry"),
+                              {"argumentRef": DATA})]
+        fix = "rename the node"
+    else:
+        document = Document(uplink.document)
+        name, said, container_name, from_document = document.command()
+        header = {argument.get("name") for argument in root.iterfind(
+            f".//x:MetaCommand[@name='{BASE_COMMAND}']/x:ArgumentList"
+            "/x:Argument", {"x": NAMESPACE})}
+        arguments = []
+        for argument in said:
+            if argument.get("name") in header:
+                raise ValueError(f'{document.path}: command "{name}" has an '
+                                 f'argument "{argument.get("name")}", as the '
+                                 "header's command does: rename it in the "
+                                 "document")
+            copier.argument_type(document, argument.get("argumentTypeRef"))
+            arguments.append(document.copy(argument))
+        entries = [document.copy(entry) for entry in from_document]
+        fix = (f'"{uplink.name}" takes {document.path.name}\'s command, '
+               "which another gateway_yamcs node takes too: the mission "
+               "database can have it once")
+        _comment(commands, f"{uplink.name}: {name}, from "
+                           f"{document.path.name}")
+    names.take("command", name, uplink.name, fix)
+    names.take("container", container_name, uplink.name, fix)
+    command = _child(commands, "MetaCommand", name=name)
+    _assign(_child(command, "BaseMetaCommand", metaCommandRef=BASE_COMMAND),
+            uplink.apid)
+    _child(command, "ArgumentList").extend(arguments)
+    container = _child(command, "CommandContainer", name=container_name)
+    _child(container, "EntryList").extend(entries)
+    _child(container, "BaseContainer",
+           containerRef=f"{BASE_COMMAND}Container")
 
 
 def mdb(config, template=TEMPLATE):
@@ -347,8 +922,9 @@ def mdb(config, template=TEMPLATE):
         ValueError: The configuration does not answer to Yamcs; an APID is
                     missing, not one, past eleven bits or used twice; a node
                     gives a name XTCE does not allow or the wrapper already
-                    has; or the template lacks what is added to.
-        OSError: The template cannot be read.
+                    has; a node's interface document says what the wrapper
+                    does not copy; or the template lacks what is added to.
+        OSError: The template, or a node's document, cannot be read.
     """
     ET.register_namespace("", NAMESPACE)
     # The template's comments say why it is as it is, and are kept.
@@ -359,6 +935,7 @@ def mdb(config, template=TEMPLATE):
         raise ValueError(f"{template}: not the XTCE 1.2 SpaceSystem "
                          f"{SPACE_SYSTEM}")
     names = _Names(root)
+    copier = _Copier(root, names)
     uses = config.apids()
 
     # The beacon, the answers and CONNECT, laid out by the template.
@@ -373,42 +950,12 @@ def mdb(config, template=TEMPLATE):
                               "/x:BaseMetaCommand", f"{CONNECT} bases")
             _assign(base, use.apid)
 
-    # Each source's data, whole, under its APID.
-    parameters = _one(root, "./x:TelemetryMetaData/x:ParameterSet",
-                      "parameter sets")
-    containers = _one(root, "./x:TelemetryMetaData/x:ContainerSet",
-                      "container sets")
+    # Each source's data under its APID, as its document lays it out or
+    # whole; and a command for each gateway node, likewise.
     for link in telemetry(config):
-        names.take("parameter", link.name, link.source)
-        names.take("container", link.container, link.source)
-        _child(parameters, "Parameter", name=link.name,
-               parameterTypeRef=BODY_TYPE)
-        container = _child(containers, "SequenceContainer",
-                           name=link.container)
-        entries = _child(container, "EntryList")
-        _child(entries, "ParameterRefEntry", parameterRef=link.name)
-        _restrict(_child(container, "BaseContainer",
-                         containerRef="CCSDSPacket"), link.apid)
-
-    # A command for each gateway node, carrying its data whole.
-    commands = _one(root, "./x:CommandMetaData/x:MetaCommandSet",
-                    "command sets")
+        _downlink(root, names, copier, link)
     for uplink in uplinks(config):
-        names.take("command", uplink.name, uplink.name)
-        names.take("container", f"{uplink.name}Packet", uplink.name)
-        command = _child(commands, "MetaCommand", name=uplink.name)
-        _assign(_child(command, "BaseMetaCommand",
-                       metaCommandRef=BASE_COMMAND), uplink.apid)
-        arguments = _child(command, "ArgumentList")
-        _child(arguments, "Argument", name=DATA, argumentTypeRef=DATA_TYPE)
-        _child(arguments, "Argument", name=DATA_BITS,
-               argumentTypeRef=DATA_BITS_TYPE)
-        container = _child(command, "CommandContainer",
-                           name=f"{uplink.name}Packet")
-        entries = _child(container, "EntryList")
-        _child(entries, "ArgumentRefEntry", argumentRef=DATA)
-        _child(container, "BaseContainer",
-               containerRef=f"{BASE_COMMAND}Container")
+        _uplink_command(root, names, copier, uplink)
     ET.indent(tree, space="  ")
     return tree
 
@@ -423,7 +970,8 @@ def write_mdb(config, path, template=TEMPLATE):
 
     Raises:
         ValueError: As :func:`mdb`.
-        OSError: The template cannot be read, or the wrapper written.
+        OSError: The template or a node's document cannot be read, or the
+                 wrapper written.
     """
     tree = mdb(config, template)
     said = ("<!-- Written by tcslibgs/yamcs.py from\n"
@@ -495,5 +1043,5 @@ def command_streams(config):
         if uplink.vehicle is None:
             continue
         streams.append({"name": uplink.stream, "processor": "realtime",
-                        "tcPatterns": [qualified(uplink.name)]})
+                        "tcPatterns": [qualified(uplink.command)]})
     return streams

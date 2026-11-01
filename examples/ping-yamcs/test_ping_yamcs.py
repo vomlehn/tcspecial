@@ -7,6 +7,7 @@ Run from the repository's root::
     python3 -m pytest examples/ping-yamcs/test_ping_yamcs.py
 """
 
+import dataclasses
 import os
 import re
 import signal
@@ -26,7 +27,7 @@ sys.path.insert(0, str(HERE))
 
 import ping_yamcs  # noqa: E402
 from tcslib.beacon import Schedule  # noqa: E402
-from tcslibgs import configuration, ping  # noqa: E402
+from tcslibgs import configuration, ping, ping_packet  # noqa: E402
 from tcslibgs import yamcs as generated  # noqa: E402
 from tcslibgs.beacon import Beacon  # noqa: E402
 
@@ -91,10 +92,10 @@ class WriteYamcsTest(unittest.TestCase):
         ping_yamcs.write_yamcs(setup, self.run, 16090, self.home)
         self.assertEqual(wrapper_apids(self.run / "tcs-ccsds.xtce"),
                          {("BeaconPacket", 0x100), ("AnswerPacket", 0x101),
-                          ("Connect", 0x101), ("gateway", 0x200),
+                          ("Connect", 0x101), ("Ping", 0x200),
                           ("pingPacket", 0x201)})
-        self.assertEqual(setup.ping_command, "/TcsYamcs/gateway")
-        self.assertEqual(setup.ping_reply, "/TcsYamcs/ping")
+        self.assertEqual(setup.ping_command, PING_COMMAND)
+        self.assertEqual(setup.ping_reply, PING_REPLY)
 
     def test_the_instance_has_a_link_on_every_port(self):
         import yaml
@@ -110,7 +111,7 @@ class WriteYamcsTest(unittest.TestCase):
         self.assertEqual([(stream["name"], stream["tcPatterns"])
                           for stream in instance["streamConfig"]["tc"]],
                          [("tc_commands", ["/TcsYamcs/Connect"]),
-                          ("tc_gateway", ["/TcsYamcs/gateway"])])
+                          ("tc_gateway", ["/TcsYamcs/Ping"])])
         self.assertIn('streams: ["tc_commands", "tc_gateway"]',
                       (self.run / "etc" / "processor.yaml").read_text())
 
@@ -123,7 +124,7 @@ class WriteYamcsTest(unittest.TestCase):
         # gateway 0, ping 1, pong 2, sensor 3, tank 4.
         self.assertEqual(wrapper_apids(self.run / "tcs-ccsds.xtce"),
                          {("BeaconPacket", 0x100), ("AnswerPacket", 0x101),
-                          ("Connect", 0x101), ("gateway", 0x200),
+                          ("Connect", 0x101), ("Ping", 0x200),
                           ("pingPacket", 0x201), ("pongPacket", 0x202),
                           ("sensorPacket", 0x303), ("tankPacket", 0x304)})
         instance = yaml.safe_load(
@@ -225,10 +226,13 @@ class YamcsValueTest(unittest.TestCase):
                                                "uint32Value": 4}), 4)
 
 
-#: The ping's command and its answer's parameter, as the example's names
-#: them.
-PING_COMMAND = "/TcsYamcs/gateway"
-PING_REPLY = "/TcsYamcs/ping"
+#: The ping's command and its answer's parameters, as the ping node's
+#: interface document names them.
+PING_COMMAND = "/TcsYamcs/Ping"
+PING_REPLY = ["/TcsYamcs/ReplyCount", "/TcsYamcs/ReplySentSeconds",
+              "/TcsYamcs/ReplySentNanoseconds",
+              "/TcsYamcs/ReplyAnsweredSeconds",
+              "/TcsYamcs/ReplyAnsweredNanoseconds"]
 
 
 class FakeYamcs:
@@ -245,7 +249,8 @@ class FakeYamcs:
         self.reply = None
 
     def issue(self, command, args):
-        """Takes a command; a ping is answered with the vehicle's time.
+        """Takes a command; a ping is answered with the vehicle's time, each
+        field of the answer a parameter.
 
         Args:
             command: The command's qualified name.
@@ -253,34 +258,69 @@ class FakeYamcs:
         """
         self.issued.append((command, args))
         if command == PING_COMMAND and self.answer:
-            data = bytes.fromhex(args["Data"])
-            assert args["DataBits"] == 8 * len(data)
+            data = ping_packet.Ping(
+                count=args["Count"], sent_seconds=args["SentSeconds"],
+                sent_nanoseconds=args["SentNanoseconds"]).to_bytes()
             sent = ping.read_message(data).sent
-            self.reply = (ping.reply(data, sent + 500_000),
+            answer = ping_packet.PingReply.decode(
+                ping.reply(data, sent + 500_000))
+            self.reply = ({name: getattr(answer, field) for field, name
+                           in zip(ping_yamcs.REPLY_PARAMETERS, PING_REPLY)},
                           sent + 1_000_000)
 
-    def parameter(self, name):
-        """The latest answer, or ``None``."""
-        return self.reply if name == PING_REPLY else None
+    def parameters(self, names):
+        """The latest answer's fields, or ``None``."""
+        return self.reply if names == PING_REPLY else None
 
 
 class YamcsPingerTest(unittest.TestCase):
     """The ping link through Yamcs."""
 
-    def test_a_ping_goes_as_data_with_its_length_and_is_timed(self):
+    def test_a_ping_goes_as_its_fields_and_is_timed(self):
         yamcs = FakeYamcs()
         pinger = ping_yamcs.YamcsPinger(yamcs, PING_COMMAND, PING_REPLY,
-                                        clock=lambda: 10**18)
+                                        clock=lambda: 10**18 + 7)
         sent = pinger.ping()
+        self.assertEqual(sent, "ping #1 1000000000.000000007")
         command, args = yamcs.issued[-1]
         self.assertEqual(command, PING_COMMAND)
-        self.assertEqual(args, {"Data": sent.encode().hex(),
-                                "DataBits": 8 * len(sent)})
+        self.assertEqual(args, {"Count": "1", "SentSeconds": "1000000000",
+                                "SentNanoseconds": "000000007"})
         self.assertTrue(pinger.receive(0.1))
         exchange = pinger.exchange()
+        self.assertEqual(exchange.received,
+                         "ping #1 1000000000.000000007 1000000000.000500007")
         self.assertEqual(exchange.round_trip(), 1_000_000)
         self.assertEqual(exchange.up(), 500_000)
         self.assertEqual(exchange.down(), 500_000)
+
+    def test_fields_that_are_not_an_answer_are_shown_as_not_one(self):
+        fields = dict(zip(PING_REPLY, ["1", "1", "x" * 30, "2", "000000000"]))
+        data = ping_yamcs.answer_of(fields, PING_REPLY)
+        with self.assertRaises(ValueError):
+            ping.read_reply(data)
+
+    def test_the_names_are_the_wrappers(self):
+        root = generated.mdb(configuration.load(
+            HERE / "ping-yamcs.xtcs")).getroot()
+        namespace = {"x": generated.NAMESPACE}
+        command, = root.iterfind(".//x:MetaCommand[@name='Ping']", namespace)
+        self.assertEqual([argument.get("name") for argument in
+                          command.iterfind("./x:ArgumentList/x:Argument",
+                                           namespace)],
+                         list(ping_yamcs.PING_ARGUMENTS.values()))
+        held = [entry.get("parameterRef") for entry in root.iterfind(
+            ".//x:SequenceContainer[@name='pingPacket']/x:EntryList/*",
+            namespace)]
+        self.assertEqual([name for name in held
+                          if name not in ("ReplyPrefix", "ReplySpace")],
+                         list(ping_yamcs.REPLY_PARAMETERS.values()))
+        self.assertEqual(list(ping_yamcs.REPLY_PARAMETERS),
+                         [field.name for field in dataclasses.fields(
+                             ping_packet.PingReply)])
+        self.assertEqual(list(ping_yamcs.PING_ARGUMENTS),
+                         [field.name for field in dataclasses.fields(
+                             ping_packet.Ping)])
 
     def test_no_answer_is_no_answer(self):
         pinger = ping_yamcs.YamcsPinger(FakeYamcs(answer=False),

@@ -54,3 +54,4 @@ claude-resume
 /fprime/build-fprime-automatic-*/
 /fprime/build-artifacts/
 /fprime/build-test/
+/tests/stand-ins/run/

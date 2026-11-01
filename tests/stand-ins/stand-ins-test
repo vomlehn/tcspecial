@@ -1,0 +1,441 @@
+#!/usr/bin/env python3
+"""stand-ins-test -- runs tcspecial against tcssim for each type of payload
+tcssim stands in for, and checks that each one's data reaches the ground.
+
+    stand-ins-test <tree> <run directory>
+
+<tree> is the tcspecial tree, whose target/debug holds tcssim, tcspecial and
+tcsverify, and whose python/ holds tcslibgs; <run directory> is where what
+the run leaves is kept, emptied first. `make stand-ins-test` runs this with
+the right arguments.
+
+One configuration with a payload of each type, written into the run
+directory, since a stand-in's path is there: a device file, a serial line,
+a serial line that is an RS-485 bus, a SPI peripheral, an rpmsg channel and
+an IIO buffer, each a file or pseudo-terminal tcssim makes, and an HDLC line
+reached at its stand_in over UDP. A CAN payload is added where a virtual CAN
+bus is up, and a GPIO payload where a gpio-sim chip is there for this user
+to use; neither is made here, since both need root (see bin/mkvcan and
+bin/mkgpio), and the run says which it left out and why.
+
+Started in the order a test harness starts a run (see "Waiting for the
+Simulator" in docs/design.rst): tcssim with every payload sending, waited
+for until it has made its stand-ins; then tcspecial, --simulate=all. The
+ground sends CONNECT until it is answered, and then listens at each
+payload's telemetry port. A payload passes if its data arrives, and the
+device file's must be the start of tcssim's text. When tcssim is stopped,
+by a signal as a harness stops it, every stand-in it made must be gone.
+Whatever was started is stopped however the run ends, so that nothing is
+left holding the ports.
+
+The ports are 47000 to 47999, which nothing else in the tree uses, so that
+this can run beside the other tests. tcssim opens its window for the length
+of the run, so a display is needed.
+"""
+
+import glob
+import os
+import signal
+import socket
+import subprocess
+import sys
+import time
+
+# How long each program has to come up, and how long the ground listens
+# once it is connected.
+PATIENCE = 30
+LISTEN = 10
+
+# The ports, all on the loopback interface.
+TELEMETRY_SOURCE = 47000
+TELEMETRY_DEST = 47100
+COMMAND_DEST = 47200
+COMMAND_SOURCE = 47300
+TCS_CMD_RECV = 47400
+TCS_CMD_SEND = 47450
+BEACON_SEND = 47550
+BEACON_RECV = 47650
+HDLC_STAND_IN = 47950
+READY = 47900
+
+# The interface every configuration in the tree speaks: see example.ytcs.
+INTERFACE = "ad9aac4dd5a6d88dd5e78824ba8a83ac"
+
+# How often a stand-in sends.
+PACKET_INTERVAL = "200 ms"
+
+
+def payloads(run):
+    """The payloads this host can stand in for, in the order they are
+    declared, which is the order of their telemetry ports.
+
+    Args:
+        run: The run directory, where each stand-in's path is.
+
+    Returns:
+        A list of (name, type, configuration lines) and a list of what was
+        left out, each a sentence saying why.
+    """
+    made = [
+        ("text", "device-file", [f'path: "{run}/text"']),
+        ("line", "serial",
+         [f'path: "{run}/line"', 'datarate: "9600"', 'byte_length: "8"',
+          'stop_bits: "1"', 'max_length: "16"', 'read_timeout: "50 ms"']),
+        ("bus", "serial",
+         [f'path: "{run}/bus"', 'datarate: "9600"', 'byte_length: "8"',
+          'stop_bits: "1"', 'max_length: "16"', 'read_timeout: "50 ms"',
+          'rs485: "true"', 'rs485_rts_on_send: "true"',
+          'rs485_delay_before_send: "1 ms"']),
+        ("spi", "spi",
+         [f'path: "{run}/spi"', 'max_speed: "1000000"', 'spi_mode: "0"']),
+        ("rpmsg", "rpmsg",
+         [f'path: "{run}/rpmsg"', 'service: "payload-telemetry"']),
+        ("iio", "iio", [f'path: "{run}/iio"']),
+        ("hdlc", "hdlc",
+         ['interface: "hdlc0"', 'standard: "v35"', 'clock_type: "external"',
+          f'stand_in: "127.0.0.1:{HDLC_STAND_IN}"']),
+    ]
+    left_out = []
+
+    bus, why = virtual_can()
+    if bus:
+        made.append(("can", "can",
+                     [f'interface: "{bus}"', 'can_id: "0x123"',
+                      'read_size: "8"']))
+    else:
+        left_out.append(f"can: {why}")
+
+    chip, why = gpio_sim()
+    if chip:
+        made.append(("gpio", "gpio", [f'path: "{chip}"', 'lines: "0"']))
+    else:
+        left_out.append(f"gpio: {why}")
+
+    return made, left_out
+
+
+def virtual_can():
+    """Finds a virtual CAN bus that is up, as tcspecial judges one.
+
+    Returns:
+        The interface's name and None, or None and why there is none.
+    """
+    for net in sorted(glob.glob("/sys/class/net/*")):
+        try:
+            with open(f"{net}/type") as kind:
+                if kind.read().strip() != "280":
+                    continue
+            with open(f"{net}/flags") as flags:
+                up = int(flags.read().strip(), 16) & 0x1
+        except OSError:
+            continue
+        if "/devices/virtual/net/" not in os.path.realpath(net):
+            continue
+        if up:
+            return os.path.basename(net), None
+    return None, ("no virtual CAN bus is up; make mkvcan makes one, "
+                  "as root")
+
+
+def gpio_sim():
+    """Finds a gpio-sim chip whose device and first line this user may use.
+
+    Returns:
+        The chip's device path and None, or None and why there is none.
+    """
+    names = sorted(glob.glob(
+        "/sys/devices/platform/gpio-sim.*/bank*/chip_name"))
+    if not names:
+        return None, ("no gpio-sim chip is there; make mkstubs makes one, "
+                      "as root")
+    for name in names:
+        with open(name) as chip:
+            device = "/dev/" + chip.read().strip()
+        pull = os.path.join(os.path.dirname(name), "sim_gpio0", "pull")
+        if (os.access(device, os.R_OK | os.W_OK)
+                and os.access(pull, os.W_OK)):
+            return device, None
+    return None, ("a gpio-sim chip is there, but its device or its line's "
+                  "pull is not this user's to use")
+
+
+def write_configuration(run, made):
+    """Writes the configuration and its simulator file into the run
+    directory.
+
+    Args:
+        run:  The run directory.
+        made: The payloads, as payloads() gives them.
+
+    Returns:
+        The configuration's path.
+    """
+    lines = [
+        'description: "A payload of each type tcssim stands in for"',
+        "",
+        "tcspecial:",
+        "  beacon:",
+        '    default_interval: "5 s"',
+        f'    recv: "127.0.0.1:{BEACON_RECV}"',
+        '    reset_interval: "1 s"',
+        f'    send: "0.0.0.0:{BEACON_SEND}"',
+        '  gateway: "radio"',
+        f'  interface: "{INTERFACE}"',
+        "  log:",
+        f'    directory: "{run}/log"',
+        '    segment_size: "65536"',
+        "  payload_command:",
+        f'    dest_base: "0.0.0.0:{COMMAND_DEST}"',
+        f'    source_base: "127.0.0.1:{COMMAND_SOURCE}"',
+        "  payload_telemetry:",
+        f'    dest_base: "127.0.0.1:{TELEMETRY_DEST}"',
+        f'    source_base: "0.0.0.0:{TELEMETRY_SOURCE}"',
+        f'  state_file: "{run}/tcspecial.state"',
+        "  tcs_cmd:",
+        f'    recv: "0.0.0.0:{TCS_CMD_RECV}"',
+        f'    send: "127.0.0.1:{TCS_CMD_SEND}"',
+        "",
+        "payloads:",
+    ]
+    for name, kind, terms in made:
+        lines.append(f"  - name: {name}")
+        lines.append(f"    type: {kind}")
+        lines.extend(f"    {term}" for term in terms)
+    configuration = os.path.join(run, "stand-ins.ytcs")
+    with open(configuration, "w") as out:
+        out.write("\n".join(lines) + "\n")
+
+    sim = [
+        "description: Simulator settings for stand-ins.ytcs",
+        "tcssim:",
+        f'  ready: "127.0.0.1:{READY}"',
+        "simulated_payloads:",
+    ]
+    for name, kind, _ in made:
+        sim.extend([f"  - name: {name}", "    simulate: true",
+                    f"    type: {kind}",
+                    f"    packet_interval: {PACKET_INTERVAL}"])
+    with open(os.path.join(run, "stand-ins-sim.yaml"), "w") as out:
+        out.write("\n".join(sim) + "\n")
+    return configuration
+
+
+def start(started, run, log, *command):
+    """Starts a program in a process group of its own, its output to a log
+    in the run directory.
+
+    Args:
+        started: The processes started so far, which this one is added to.
+        run:     The run directory, which the program runs in.
+        log:     The log's name in the run directory.
+        command: The program and its arguments.
+
+    Returns:
+        The process.
+    """
+    with open(os.path.join(run, log), "w") as out:
+        process = subprocess.Popen(command, cwd=run, stdout=out,
+                                   stderr=subprocess.STDOUT,
+                                   start_new_session=True)
+    started.append(process)
+    return process
+
+
+def stop(process):
+    """Stops a process started by start(), and whatever it started, with
+    SIGTERM, and kills the group should it not stop in time.
+
+    Args:
+        process: The process.
+
+    Returns:
+        Its exit status, or None where it had to be killed.
+    """
+    if process.poll() is None:
+        try:
+            os.killpg(process.pid, signal.SIGTERM)
+        except ProcessLookupError:
+            pass
+    try:
+        return process.wait(PATIENCE)
+    except subprocess.TimeoutExpired:
+        os.killpg(process.pid, signal.SIGKILL)
+        process.wait()
+        return None
+
+
+def connect(tcslibgs, digest):
+    """Sends CONNECT until tcspecial answers it, as a ground station does.
+
+    Args:
+        tcslibgs: The ground's library, for the command's layout.
+        digest:   The configuration's checksum, as tcsverify prints it.
+
+    Returns:
+        True if it was answered within PATIENCE seconds.
+    """
+    with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as link:
+        link.bind(("127.0.0.1", TCS_CMD_SEND))
+        link.settimeout(1)
+        deadline = time.monotonic() + PATIENCE
+        sequence = 1
+        while time.monotonic() < deadline:
+            link.sendto(tcslibgs.fixed.connect(sequence,
+                                               bytes.fromhex(digest)),
+                        ("127.0.0.1", TCS_CMD_RECV))
+            try:
+                link.recvfrom(65536)
+                return True
+            except socket.timeout:
+                sequence += 1
+    return False
+
+
+def listen(made):
+    """Listens at every payload's telemetry port for LISTEN seconds.
+
+    Args:
+        made: The payloads, as payloads() gives them.
+
+    Returns:
+        For each payload's name, the datagrams that arrived for it.
+    """
+    sockets = {}
+    for index, (name, _, _) in enumerate(made):
+        listener = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        listener.bind(("127.0.0.1", TELEMETRY_DEST + index))
+        listener.setblocking(False)
+        sockets[name] = listener
+    got = {name: [] for name in sockets}
+    deadline = time.monotonic() + LISTEN
+    while time.monotonic() < deadline:
+        quiet = True
+        for name, listener in sockets.items():
+            try:
+                got[name].append(listener.recv(65536))
+                quiet = False
+            except BlockingIOError:
+                pass
+        if quiet:
+            time.sleep(0.01)
+    for listener in sockets.values():
+        listener.close()
+    return got
+
+
+def judged(made, got, lorem):
+    """Says, for each payload, whether what arrived is what it should be.
+
+    Args:
+        made:  The payloads, as payloads() gives them.
+        got:   What arrived for each, as listen() gives it.
+        lorem: tcssim's text, which the device file's data must start.
+
+    Returns:
+        A list of (name, passed, what was seen).
+    """
+    verdicts = []
+    for name, kind, _ in made:
+        data = got[name]
+        size = sum(len(datum) for datum in data)
+        seen = f"{len(data)} datagrams, {size} bytes"
+        passed = bool(data)
+        if passed and kind == "device-file":
+            text = b"".join(data)
+            # What arrived before CONNECT was taken is not sent, so the data
+            # is a run of the text, from wherever the ground came in.
+            passed = text in lorem
+            seen += ", part of tcssim's text" if passed else \
+                ", not tcssim's text"
+        if passed and kind == "gpio":
+            passed = all(len(datum) % 16 == 0 for datum in data)
+            seen += ", in 16-byte records" if passed else \
+                ", not in 16-byte records"
+        verdicts.append((name, passed, seen))
+    return verdicts
+
+
+def main():
+    """Runs the test.
+
+    Returns:
+        0 if every payload passed and tcssim cleared its stand-ins, else 1;
+        2 for wrong arguments.
+    """
+    if len(sys.argv) != 3:
+        print(f"usage: {sys.argv[0]} <tree> <run directory>",
+              file=sys.stderr)
+        return 2
+    top = os.path.abspath(sys.argv[1])
+    run = os.path.abspath(sys.argv[2])
+    debug = os.path.join(top, "target", "debug")
+    sys.path.insert(0, os.path.join(top, "python"))
+    import tcslibgs.fixed  # the tree's own, found above
+
+    subprocess.run(["rm", "-rf", run], check=True)
+    os.makedirs(os.path.join(run, "log"))
+    made, left_out = payloads(run)
+    configuration = write_configuration(run, made)
+    with open(os.path.join(top, "tcssim", "src", "node", "payload",
+                           "device_file", "lorem.txt"), "rb") as text:
+        lorem = text.read()
+
+    started = []
+    failed = []
+    try:
+        print(f"tcssim, on {configuration}...")
+        sim = start(started, run, "tcssim.log", f"{debug}/tcssim",
+                    "--simulate=all", "--sending", configuration)
+        waited = subprocess.run([f"{debug}/tcssim", "--simulate=all",
+                                 f"--wait={PATIENCE}", configuration])
+        if waited.returncode != 0:
+            print(f"tcssim did not get ready: see {run}/tcssim.log")
+            return 1
+
+        print(f"tcspecial, on {configuration}...")
+        flight = start(started, run, "tcspecial.log", f"{debug}/tcspecial",
+                       "--simulate=all", configuration)
+
+        said = subprocess.run([f"{debug}/tcsverify", "--digest",
+                               configuration], capture_output=True,
+                              text=True, check=True).stdout
+        digest = said.rsplit("md5 ", 1)[1].split()[0]
+        if not connect(tcslibgs, digest):
+            print(f"tcspecial did not answer CONNECT: see "
+                  f"{run}/tcspecial.log")
+            return 1
+
+        print(f"listening for {LISTEN} s...")
+        verdicts = judged(made, listen(made), lorem)
+        for name, passed, seen in verdicts:
+            print(f"  {'ok  ' if passed else 'FAIL'} {name}: {seen}")
+            if not passed:
+                failed.append(name)
+        for why in left_out:
+            print(f"  left out {why}")
+
+        stop(flight)
+        status = stop(sim)
+        if status != 128 + signal.SIGTERM:
+            print(f"  FAIL tcssim stopped with status {status}, not "
+                  f"{128 + signal.SIGTERM}")
+            failed.append("tcssim's stop")
+        for name, kind, terms in made:
+            path = next((term.split('"')[1] for term in terms
+                         if term.startswith("path:")), None)
+            if path and path.startswith(run) and os.path.lexists(path):
+                print(f"  FAIL {name}: tcssim left {path}")
+                failed.append(f"{name}'s stand-in")
+    finally:
+        for process in reversed(started):
+            stop(process)
+
+    if failed:
+        print(f"failed: {', '.join(failed)}; the logs are in {run}")
+        return 1
+    print("every stand-in's data reached the ground")
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())

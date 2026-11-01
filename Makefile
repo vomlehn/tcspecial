@@ -182,6 +182,8 @@ help:
 		"tcspecial and tcssim"
 	@echo "                     (FPRIME_SCRATCH, or FPRIME_FRAMEWORK and" \
 		"FPRIME_VENV: see fprime/Makefile)"
+	@echo "  make stand-ins-test - Run tcspecial against tcssim with a" \
+		"payload of each type"
 	@echo "  make check       - cargo check, clippy, and a format check"
 	@echo "  make format      - Reformat the source"
 	@echo "  make release     - Build with optimizations"
@@ -678,6 +680,7 @@ clean:
 	@echo "Cleaning build artifacts..."
 	-cargo clean
 	rm -f build.out
+	rm -rf $(STAND_INS_RUN)
 	@echo "✓ Clean complete"
 
 
@@ -1147,6 +1150,28 @@ fprime-build:
 .PHONY: fprime-test
 fprime-test:
 	$(MAKE) -C fprime test
+
+# Where stand-ins-test keeps what a run leaves, emptied at the start of each.
+STAND_INS_RUN = $(CURDIR)/tests/stand-ins/run
+
+# Held for as long as a test binds the ports tcspecial, tcssim and tcsmoc
+# listen on, so that two such tests -- this one, the F´ bridge's, a cFS
+# run -- never run at once from checkouts beside each other. Beside the
+# main checkout, found through git, so that a worktree of it takes the same
+# lock.
+PORTS_LOCK ?= $(abspath $(shell git -C $(CURDIR) rev-parse \
+	--path-format=absolute --git-common-dir)/../../tcs-ports.lock)
+
+# Run tcspecial against tcssim with a payload of each type tcssim stands in
+# for, and check that each one's data reaches the ground: see
+# tests/stand-ins/stand-ins-test. CAN and GPIO are tested only where a
+# virtual CAN bus or a gpio-sim chip is already there. tcssim's window opens
+# for the length of the test.
+.PHONY: stand-ins-test
+stand-ins-test:
+	cd $(RUST) && cargo build --bin tcspecial --bin tcssim --bin tcsverify
+	flock $(PORTS_LOCK) $(CURDIR)/tests/stand-ins/stand-ins-test \
+		$(CURDIR) $(STAND_INS_RUN)
 
 # Format code
 .PHONY: format

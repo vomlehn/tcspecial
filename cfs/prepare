@@ -1,0 +1,122 @@
+#!/bin/bash
+#
+# prepare -- makes the cFS tree the cfs test builds: a copy of a pristine
+# cFS checkout, its submodules at the commits it pins, and SBN with its UDP
+# module, set up for one cFS on spacecraft 0x42 peered with tcspecial.
+#
+#   prepare <pristine cFS> <SBN source> <scratch directory> <defs>
+#
+# <pristine cFS> is a checkout of nasa/cFS, read and never changed. Its
+# submodules need not be checked out: each is fetched from GitHub at the
+# commit the checkout pins, as an archive, once, into
+# <scratch directory>/downloads. <SBN source> is a git checkout of SBN
+# v7.0.1, read and never changed; <defs> is cfs/defs in this tree, the
+# files that differ from cFE's sample mission. What is made is
+# <scratch directory>/cFS, replaced each time, so that a build is always of
+# the pristine tree and these changes and nothing left from before.
+#
+# SBN is copied rather than fetched, because its SBN_IDENT is the one thing
+# the far end is checked by: git writes it as it checks sbn_types.h out
+# (SBN's .gitattributes asks it to), and an archive holds "$Id$" as it
+# stands, which no sbn.ident can match. So the copy is checked to hold the
+# expanded ident, and the hash in it is checked to be git's own hash of the
+# file with the ident collapsed again, which is what git expands it from:
+# a copy that says a hash it was not checked out at is refused.
+
+set -eu
+
+if [ $# -ne 4 ]; then
+	echo "usage: $0 <pristine cFS> <SBN source> <scratch directory>" \
+		"<defs>" >&2
+	exit 2
+fi
+pristine=$(cd "$1" && pwd)
+sbn=$(cd "$2" && pwd)
+scratch=$3
+defs=$(cd "$4" && pwd)
+
+mkdir -p "$scratch/downloads"
+scratch=$(cd "$scratch" && pwd)
+tree=$scratch/cFS
+
+# The ident tcspecial's examples/cfs states, which the build must carry.
+ident=3b339a5e0f686cef822a5d6ea95004222ab7af33
+
+types=$sbn/fsw/platform_inc/sbn_types.h
+said=$(sed -n 's/^#define SBN_IDENT "\$Id: \([0-9a-f]\{40\}\) \$"$/\1/p' \
+	"$types")
+if [ "$said" != "$ident" ]; then
+	echo "$types says SBN_IDENT is \"${said:-unexpanded}\", not $ident:" \
+		"give SBN_SRC a git checkout of SBN v7.0.1, in which git has" \
+		"expanded it" >&2
+	exit 1
+fi
+hashed=$(python3 -I -c '
+import hashlib, re, sys
+text = open(sys.argv[1], "rb").read()
+clean = re.sub(rb"\$Id: [0-9a-f]{40} \$", b"$Id$", text)
+print(hashlib.sha1(b"blob %d\0" % len(clean) + clean).hexdigest())
+' "$types")
+if [ "$hashed" != "$ident" ]; then
+	echo "$types says SBN_IDENT is $ident, but git's hash of the file is" \
+		"$hashed: it has been changed since it was checked out" >&2
+	exit 1
+fi
+
+echo "Copying $pristine to $tree..."
+rm -rf "$tree"
+cp -a "$pristine" "$tree"
+
+# Each submodule's path, commit and URL, from the pristine checkout.
+git -C "$pristine" ls-tree -r HEAD | awk '$1 == "160000" { print $4, $3 }' |
+while read -r path commit; do
+	url=$(git -C "$pristine" config -f .gitmodules --get-regexp \
+		'^submodule\..*\.path$' | awk -v p="$path" '$2 == p { print $1 }' |
+		sed 's/\.path$/.url/' | xargs -I{} git -C "$pristine" config \
+		-f .gitmodules --get {})
+	repo=${url%.git}
+	repo=${repo#https://github.com/}
+	archive=$scratch/downloads/${repo//\//-}-$commit.tar.gz
+	if [ ! -s "$archive" ]; then
+		echo "Fetching $repo at $commit..."
+		curl -sSfL --max-time 300 -o "$archive.part" \
+			"https://codeload.github.com/$repo/tar.gz/$commit"
+		mv "$archive.part" "$archive"
+	fi
+	rm -rf "${tree:?}/$path"
+	mkdir -p "$tree/$path"
+	tar -xzf "$archive" -C "$tree/$path" --strip-components=1
+done
+
+echo "Copying SBN from $sbn..."
+rm -rf "$tree/apps/sbn" "$tree/apps/sbn_udp"
+mkdir -p "$tree/apps/sbn"
+(cd "$sbn" && tar --exclude=.git -cf - .) | tar -xf - -C "$tree/apps/sbn"
+cp -a "$sbn/modules/protocol/udp" "$tree/apps/sbn_udp"
+
+# The mission: cFE's sample, as its own Makefile.sample and sample_defs say
+# to start one, with the files cfs/defs changes put over it.
+cp "$tree/cfe/cmake/Makefile.sample" "$tree/Makefile"
+rm -rf "$tree/sample_defs"
+cp -a "$tree/cfe/cmake/sample_defs" "$tree/sample_defs"
+cp -a "$defs/." "$tree/"
+echo 'include(${CMAKE_CURRENT_LIST_DIR}/sbn_compat.cmake)' \
+	>>"$tree/sample_defs/arch_build_custom.cmake"
+
+# TO_LAB sends the ground what its table subscribes to, and the test reads
+# tcspecial's answers, its beacon, the thermometer's reading and node 1's
+# answers: examples/cfs's 0x4200, 0x4201, 0x4242 and 0x4211. Written into
+# TO_LAB's own table, before the entry that ends it, rather than kept as a
+# copy of the table here.
+python3 -I - "$tree/apps/to_lab/fsw/tables/to_lab_sub.c" <<-'EOF'
+	import sys
+	path = sys.argv[1]
+	text = open(path).read()
+	end = "{CFE_SB_MSGID_RESERVED, {0, 0}, 0}"
+	if text.count(end) != 1:
+	    sys.exit(path + ": no single entry ends the table")
+	ours = "".join("{CFE_SB_MSGID_WRAP_VALUE(%s), {0, 0}, 8},\n" % msgid
+	               for msgid in ("0x4200", "0x4201", "0x4242", "0x4211"))
+	open(path, "w").write(text.replace(end, ours + end))
+EOF
+echo "Prepared $tree"

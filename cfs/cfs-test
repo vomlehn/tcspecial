@@ -1,0 +1,119 @@
+#!/bin/bash
+#
+# cfs-test -- flies the cfs example against cFS's own Linux build with SBN,
+# and tests it from the cFS's ground.
+#
+#   cfs-test <tree> <configuration> <cFS executables> <run directory>
+#
+# <tree> is the tcspecial tree, whose target/debug holds tcspecial;
+# <configuration> is examples/cfs/cfs.ytcs or one like it; <cFS
+# executables> is the build's exe/cpu1, holding core-cpu1 and its cf/;
+# <run directory> is where what the run leaves is kept, emptied first.
+# `make test` in cfs/ runs this with the right arguments.
+#
+# Started in the order the link comes up in flight: cFS, whose SBN binds
+# the address its table gives processor 1 and waits, since SBN on cFS
+# speaks first only to a peer on another spacecraft; then tcspecial, which
+# announces itself to it. tcssim is not needed: the test plays the
+# example's two payloads over UDP itself, as tests/cfs.rs does. Then the
+# test, tcspecial/tests/cfs_flight.rs, commands through CI_LAB and reads
+# through TO_LAB. Whatever was started is stopped however the run ends, so
+# that nothing is left holding the ports.
+#
+# Every port is fixed -- SBN's 2234 and tcspecial's 8634, the payloads'
+# 8601 and 8602, CI_LAB's 1234 and TO_LAB's 1235 -- so a run is one at a
+# time: `make test` holds a lock while it runs this.
+
+set -eu
+
+if [ $# -ne 4 ]; then
+	echo "usage: $0 <tree> <configuration> <cFS executables>" \
+		"<run directory>" >&2
+	exit 2
+fi
+top=$(cd "$1" && pwd)
+example=$2
+exe=$(cd "$3" && pwd)
+run=$4
+
+rm -rf "$run"
+mkdir -p "$run/telemetry"
+run=$(cd "$run" && pwd)
+
+# The example with its log and its state file moved into the run directory,
+# so that a run leaves nothing outside it. Nothing else is changed: the
+# peer, the ports and the message IDs are the example's, which cfs/defs
+# gives cFS too.
+configuration=$run/cfs.ytcs
+sed -e "s|/tmp/telemetry|$run/telemetry|" \
+	-e "s|/tmp/tcspecial-cfs.state|$run/tcspecial.state|" \
+	"$example" >"$configuration"
+
+started=()
+
+# Removes the System V shared memory cFS's PSP keeps its reset area, its
+# critical data store and its reserved memory in. Each is keyed by ftok of a
+# file the PSP makes in its directory -- the file's inode and device and
+# 'R' -- and outlives cFS when it is stopped from outside. One left by an
+# earlier build, whose files had other inodes, can come to have the key a
+# new file gives and the wrong size, and then cFS cannot start ("Cannot
+# shmget"); so this cFS's are removed before it starts and after it stops.
+# The key is worked out here as glibc's ftok works it out.
+remove_shared_memory() {
+	local file inode device
+	for file in .cdskeyfile .resetkeyfile .reservedkeyfile; do
+		[ -e "$exe/$file" ] || continue
+		read -r inode device < <(stat -c '%i %d' "$exe/$file")
+		ipcrm -M "$(printf '0x%08x' $(( (0x52 << 24) |
+			((device & 0xff) << 16) | (inode & 0xffff) )))" \
+			2>/dev/null || true
+	done
+}
+
+# Starts a program in the background in a process group of its own, in a
+# directory, its output to a log, so that it and whatever it starts are
+# stopped together.
+#
+#   start <directory> <log> <program> [argument...]
+start() {
+	local dir=$1 log=$2
+	shift 2
+	(cd "$dir" && exec setsid "$@" >"$log" 2>&1) &
+	started+=($!)
+}
+
+# Stops everything this run started, the last first, and waits for it:
+# each group is told to stop, and killed once its first process has gone.
+# cFS stops on SIGINT, as at its console, and is killed if it has not.
+stop_all() {
+	local i pid
+	for ((i = ${#started[@]} - 1; i >= 0; i--)); do
+		kill -INT -- "-${started[$i]}" 2>/dev/null || true
+	done
+	sleep 1
+	for pid in "${started[@]}"; do
+		kill -TERM -- "-$pid" 2>/dev/null || true
+		wait "$pid" 2>/dev/null || true
+		kill -KILL -- "-$pid" 2>/dev/null || true
+	done
+	remove_shared_memory
+}
+trap stop_all EXIT
+remove_shared_memory
+
+# Power-on reset, so that cFS starts from nothing whatever a run before
+# left in its exe directory.
+echo "cFS, in $exe..."
+start "$exe" "$run/cfs.log" ./core-cpu1 -R PO
+
+echo "tcspecial, on $configuration..."
+start "$run" "$run/tcspecial.log" "$top/target/debug/tcspecial" \
+	--simulate=all "$configuration"
+
+echo "The test, as the cFS's ground..."
+(cd "$top" && TCS_CFS_CONFIGURATION=$configuration \
+	TCS_CFS_LOG=$run/cfs.log TCS_TCSPECIAL_LOG=$run/tcspecial.log \
+	cargo test -q -p tcspecial --test cfs_flight -- --ignored --nocapture)
+
+echo "What SBN on cFS said of its peer:"
+grep -E "SBN_IDENT|[Pp]eer 66:2|protocol|ident" "$run/cfs.log" || true

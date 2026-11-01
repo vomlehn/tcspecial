@@ -182,6 +182,12 @@ help:
 		"tcspecial and tcssim"
 	@echo "                     (FPRIME_SCRATCH, or FPRIME_FRAMEWORK and" \
 		"FPRIME_VENV: see fprime/Makefile)"
+	@echo "  make cfs-build   - Build cFS with SBN for this machine, in" \
+		"a scratch directory"
+	@echo "  make cfs-test    - Build it and fly the cfs example against" \
+		"it, tested from the cFS's ground"
+	@echo "                     (CFS_PRISTINE, SBN_SRC and CFS_SCRATCH:" \
+		"see cfs/Makefile)"
 	@echo "  make check       - cargo check, clippy, and a format check"
 	@echo "  make format      - Reformat the source"
 	@echo "  make release     - Build with optimizations"
@@ -1147,6 +1153,23 @@ fprime-build:
 .PHONY: fprime-test
 fprime-test:
 	$(MAKE) -C fprime test
+
+# cFS itself, with SBN v7.0.1 and its UDP module, built with cFS's own tools
+# from a cFS checkout and an SBN checkout into a scratch directory: see
+# cfs/Makefile, which says where it looks for each and how to say
+# otherwise. Whatever is given here -- CFS_PRISTINE, SBN_SRC, CFS_SCRATCH,
+# CFS_CONFIG -- is passed on.
+.PHONY: cfs-build
+cfs-build:
+	$(MAKE) -C cfs build
+
+# Build cFS and fly the cfs example against it: the test that the wire
+# format tcspecial speaks is SBN's and not only ours. tcspecial is peered
+# with cFS's SBN, and the test commands it through CI_LAB and reads it
+# through TO_LAB, holding the ports' lock while it runs.
+.PHONY: cfs-test
+cfs-test:
+	$(MAKE) -C cfs test
 
 # Format code
 .PHONY: format

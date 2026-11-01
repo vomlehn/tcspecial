@@ -246,7 +246,7 @@ run-beacon:
 # and stops the vehicle.
 .PHONY: run-ping
 run-ping: check-tkinter
-	cd $(ROOT) && cargo build -q --bin tcspecial --bin tcsverify
+	cd $(ROOT) && cargo build -q --bin tcspecial --bin tcsverify --bin segsend
 	( \
 		set -eu; \
 		echo "Running $(PROJECT_NAME) on examples/ping/ping.xtcs..."; \
@@ -270,7 +270,7 @@ run-ping-yamcs: check-tkinter
 			"YAMCS_HOME=<the directory holding bin/yamcsd>" >&2; \
 		exit 1; \
 	}
-	cd $(ROOT) && cargo build -q --bin tcspecial --bin tcsverify
+	cd $(ROOT) && cargo build -q --bin tcspecial --bin tcsverify --bin segsend
 	cd $(ROOT) && RUST_LOG=$(RUST_LOG) python3 \
 		examples/ping-yamcs/ping_yamcs.py --yamcs "$(YAMCS_HOME)"
 

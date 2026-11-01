@@ -5190,12 +5190,12 @@ The verdict is reached on the software version and the digest. They are the
 same payload
 set if the digests match: the digest is of what a file says rather than of its
 bytes, so the YAML and the XML of one set digest alike, and so do two files
-differing only in comments, spacing, the order of their sections or the order
-of one payload's attributes. The order of the payloads does count -- ids follow
-it -- so each payload is given a sequence number as the file is read, the
-digest takes them in that order, and a file may not state a number of its own.
-Both formats number them alike, which is what lets the YAML and the XML of
-one set digest the same. In a set written as several files, the names its
+differing only in comments, spacing or order -- of their sections, types,
+nodes, attributes, links, groups or bindings. Nothing in a configuration is in
+an order that means anything: the digest takes everything in one canonical
+order, by name, and device ids are counted in that same order, so a node's id
+is its position among the names of all the nodes. In a set written as several
+files, the names its
 include list gives them count too; the top file's own name does not.
 
 A difference means the two ends are not serving the same set. The usual cause

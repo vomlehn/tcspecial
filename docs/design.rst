@@ -1549,9 +1549,9 @@ Requirement
     A gateway node is the ground's end of the vehicle's data, and states where
     the ground is as ``ground_base``, ``address:port``. What each node drawn
     into it produces is sent by tcspecial as UDP datagrams to that address, at
-    that port plus the source node's device id -- its position among all the
-    configuration's nodes, in the order the files write them
-    (``tcslibgs::graph::order``). So each source arrives
+    that port plus the source node's device id -- its position among the
+    names of all the configuration's nodes, in the canonical order (see
+    `What Each End Read`_). So each source arrives
     on a port of its own and the ground tells them apart by the port, and the
     vehicle sends from the first reading without being spoken to.
     ``tcslibgs::graph::telemetry`` is the one place that counts the ports, for
@@ -1562,10 +1562,10 @@ Requirement
     configuration files they read with one function,
     ``tcslibgs::config_digest::digest_of_graph``: an MD5 over everything the
     vehicle and the ground act on -- the ``tcspecial`` section, the payload
-    groups, the nodes in the order the files write them with their
-    attributes, the links and the command bindings -- across every included
-    file, the same for either spelling, and not the editor's layout or the
-    description. tcspecial says its digest as it starts and sends it in a
+    groups, the nodes with their attributes, the links and the command
+    bindings -- across every included file, in the canonical order, the same
+    for either spelling and whatever order the files wrote, and not the
+    editor's layout or the description. tcspecial says its digest as it starts and sends it in a
     beacon every ``beacon.default_interval``, from ``beacon.send`` to
     ``beacon.recv``. tcsmoc compares the digest in each beacon with the one it
     computed itself; when they differ it says so on the beacon line and the
@@ -3122,8 +3122,9 @@ Requirement
 How a command names a node
 ~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-By its node id: the number the node has from the order the configuration
-declares it, counted across every node whatever its kind. It is not a number
+By its node id: the node's position among the names of all the
+configuration's nodes, counted across every node whatever its kind (see `What
+Each End Read`_). It is not a number
 invented for commands -- it is the one a node's link to the ground is already
 counted by, a gateway node's ``ground_base`` plus that node's id -- so the id
 in a command and the port its telemetry arrives on are the same number, worked
@@ -3136,17 +3137,16 @@ Requirement
     right; a number is a field like the sequence and the type beside it.
 
 Requirement
-    Node ids are given by one algorithm, in one place, from the order the
-    configuration is read in. Two components that compute them separately
+    Node ids are given by one algorithm, in one place, from the canonical
+    order. Two components that compute them separately
     would be two tables that can drift apart, and the drift would show as
     commands about the wrong node rather than as an error.
 
 Requirement
     What makes the two ends' ids the same is the digest. It is computed over
-    the configuration *including the order the nodes appear in* -- see
+    the configuration in the canonical order the ids are counted in -- see
     `What Each End Read`_ -- so two ends whose digests agree have read the
-    same nodes in the same order and cannot disagree about which node an id
-    names. Agreeing about the digest is what ``CONNECT`` establishes, and it
+    same names and cannot disagree about which node an id names. Agreeing about the digest is what ``CONNECT`` establishes, and it
     is asked on the spacecraft's link before any node command is sent.
 
 Requirement
@@ -8726,59 +8726,83 @@ Requirement
     sections or the order of one payload's attributes.
 
 Requirement
-    The order of the payloads does change the digest. Ids will be assigned in
-    the order the payloads appear, so that order is configuration rather than
-    spelling.
+    Nothing in a configuration is in an order that means anything. The order
+    of the sections, of the types in a section, of the nodes of a type, of a
+    node's attributes, of its links and their destinations, of the payload
+    groups, of the command bindings, of the included files and of the entries
+    of an attribute that is a set are all spelling, and two files that differ
+    only in them are one configuration.
 
 Requirement
-    Each payload is given a sequence number as the file is read: the first is
-    0. A file may not state it -- the number is what this program read, not
-    something a file gets to assert.
+    There is one canonical order, and everything that needs an order takes
+    it: nodes by name; a node's attributes by name; links by the node they
+    leave, each one's destinations by name; payload groups by name; command
+    bindings by where they come from and then what they set; included files
+    by name; and the entries of a set-valued attribute -- a vote's
+    ``inputs``, gpio ``lines``, ``terminators`` -- in one spelling, sorted.
+    ``tcslibgs::config_digest::interpretation_of_graph`` is the one place it
+    is written down.
 
 Requirement
-    The digest takes the payloads in order of their sequence numbers. Two ends
-    that read the same file then agree about which came first whatever either
-    has since done with its own list.
+    The digest is taken over the configuration in the canonical order. So
+    two files that differ only in order digest alike, as two that differ only
+    in format or comments do.
 
-The numbering rests on one assumption: that a parser hands entries to the code
-above it in the order the file gave them. Both formats here do, and a format
-that did not would be unusable for a language whose payload order means
-something.
+Requirement
+    Device ids are counted in the canonical order: a node's id is its
+    position among the names of all the configuration's nodes, across every
+    included file and whatever its kind, the first being 0. The ids are
+    therefore a function of the names alone. Two ends whose digests agree
+    have read the same names, so they agree about every id, and about every
+    port and identifier counted from one -- ``ground_base`` plus an id, a
+    ``payload_command`` ``dest_base`` plus an id, an F´ id.
 
-The payloads are numbered as the list is deserialized, which is the one place
-every format arrives through, so nothing can hold a configuration whose
-payloads do not know which ones they are. A file stating a number of its own
-is refused by name.
+Requirement
+    Anywhere else an order would decide something -- which of two equally
+    overdue reads goes first, which stream several destinations share, which
+    route a ping takes, the order offered settings are listed in -- the tie
+    is broken by name, so that what tcspecial does cannot depend on how a
+    file was written.
 
-Carried by the data rather than left to the order a list happens to keep. The
-order used to live only in that, so anything sorting the payloads -- for a
-lookup, for a display -- would have changed what the configuration said about
-which payload came first, and the only thing in the way was that nothing did
-it yet. The two halves of the check are then independent: walking by sequence
-number is what makes a list in some other order digest the same, and hashing
-the numbers themselves is what makes a *file* in some other order digest
-differently.
+Requirement
+    A file has no way to state an id or a position: the language has no
+    attribute for either, and an attribute it does not have is refused. A
+    node's number is what the canonical order gives it, not something a file
+    gets to assert.
 
-A sequence number and not a line number. A line is not something these parsers
-hand to the code that builds a document, and it would be a different number in
-each of the two formats one set is written in, where the sequence number is
-the same in both -- which is what lets them digest alike.
+Requirement
+    Each node's name is a value, never a key: ``payload: temp_1`` in YAML and
+    ``<payload name="temp_1">`` in XML. A name as a YAML key would make the
+    nodes a map, whose order the YAML parser may not keep, and the name is
+    what the node is sorted by, so it is the one thing that must be read
+    exactly.
+
+Why by name and not as the file has them: ids used to be file position, and
+the digest took the nodes in that order so that two ends would agree about
+them. That made order configuration. Moving one node above another, which an
+editor does whenever it rewrites a file, renumbered the nodes after it and
+moved their ports, and a tool that sorted a list for display was one step from
+changing what the configuration said. Counting by name makes reordering
+harmless: what a file says is its names and what each node is, and the ids
+and ports follow from that. The cost is that adding a node renumbers the nodes
+whose names sort after it, as adding one used to renumber the nodes written
+after it; the digest changes in both cases, so neither end can miss it.
+
+Names are unique across a configuration, so the order is total: no two nodes
+tie, and sorting by name never leaves a choice to the sort.
 
 How it is reached: a file is parsed into the document it describes and that
 document is written back out as a tree of values, which is where the format
 stops showing through -- a number is a number rather than the text that spelled
 it, a list is a list rather than XML's repeated sibling elements, and an
-attribute nobody stated is absent rather than missing. The tree is then written
-to bytes with every map's keys in order and every list in the order it was
-given, and those bytes are what the MD5 is of.
+attribute nobody stated is absent rather than missing. Each list is put in the
+canonical order, the tree is written to bytes with every map's keys in order,
+and those bytes are what the MD5 is of.
 
 A map's keys are put in order twice over, deliberately. The document is a set
 of Rust structs, and a struct writes its fields in the order it declares them
 however the file gave them, so the order a file used is already gone; sorting
 is what keeps the rule true of anything that is a map rather than a struct.
-What a file's own order does reach the digest through is the sequence number
-each payload was given as it was read, which is the one ordering that means
-something.
 
 Payloads
 ========

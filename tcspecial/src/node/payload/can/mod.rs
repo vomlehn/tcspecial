@@ -1,8 +1,8 @@
 //! The CAN endpoint: one raw socket on one interface, filtered to one
 //! identifier.
 //!
-//! **Experimental, and not yet supported.** Run against the kernel's virtual
-//! bus and against no CAN controller.
+//! **Supported.** Run against the kernel's virtual bus, by
+//! `tests/kernel-stand-ins.rs`, and against no CAN controller.
 //!
 //! A CAN controller is a network interface, so this is a socket rather than an
 //! open device file: `PF_CAN`, `SOCK_RAW`, `CAN_RAW`, bound to the interface

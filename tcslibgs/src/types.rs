@@ -229,7 +229,7 @@ pub enum DHType {
     Spi,
     /// A handler whose payload is on a CAN bus.
     ///
-    /// Experimental; see [`crate::node::payload::can`].
+    /// See [`crate::node::payload::can`].
     Can,
     /// A handler whose payload is a sensor's buffered samples.
     ///
@@ -242,7 +242,7 @@ pub enum DHType {
     Rpmsg,
     /// A handler whose payload is a set of discrete lines.
     ///
-    /// Experimental; see [`crate::node::payload::gpio`].
+    /// See [`crate::node::payload::gpio`].
     Gpio,
     /// A handler whose payload is on a synchronous serial line, which Linux
     /// drives as a network interface.
@@ -1099,7 +1099,7 @@ pub struct SpiConfig {
 
 /// Configuration for an endpoint that is a set of discrete lines
 ///
-/// Experimental; see [`crate::node::payload::gpio`].
+/// See [`crate::node::payload::gpio`].
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct GpioConfig {
     /// The chip's character device: `/dev/gpiochip0`.
@@ -1160,7 +1160,7 @@ pub struct IioConfig {
 
 /// Configuration for an endpoint on a CAN bus
 ///
-/// Experimental; see [`crate::node::payload::can`] for what each term means
+/// See [`crate::node::payload::can`] for what each term means
 /// and which of them are applied.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct CanConfig {
@@ -1222,13 +1222,13 @@ pub enum EndpointConfig {
     Serial(SerialConfig),
     I2c(I2cConfig),
     Spi(SpiConfig),
-    /// Experimental; see [`CanConfig`].
+    /// See [`CanConfig`].
     Can(CanConfig),
     /// Experimental; see [`IioConfig`].
     Iio(IioConfig),
     /// Experimental; see [`RpmsgConfig`].
     Rpmsg(RpmsgConfig),
-    /// Experimental; see [`GpioConfig`].
+    /// See [`GpioConfig`].
     Gpio(GpioConfig),
     /// Experimental; see [`HdlcConfig`].
     Hdlc(HdlcConfig),

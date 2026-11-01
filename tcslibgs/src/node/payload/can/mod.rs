@@ -1,8 +1,9 @@
 //! CAN payloads: the interface, the identifier, and the frame.
 //!
-//! **Experimental, and not yet supported.** The terms parse and reach a
-//! handler, and both ends of the link are written; nothing has been run
-//! against a real CAN controller, only against the kernel's virtual bus.
+//! **Supported**, as flown against the kernel's virtual bus by
+//! `tcspecial/tests/kernel-stand-ins.rs`; nothing has been run against a real
+//! CAN controller. See "What Is Supported and What Is Experimental" in
+//! `docs/design.rst`.
 //!
 //! A CAN payload is not located by a device file. It is on a bus, reached
 //! through a network interface -- `can0`, or `vcan0` for the kernel's virtual

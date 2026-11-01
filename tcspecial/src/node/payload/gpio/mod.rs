@@ -1,7 +1,7 @@
 //! The GPIO endpoint: discrete lines, as events a conduit can carry.
 //!
-//! **Experimental, and not yet supported.** Run against the kernel's
-//! simulated chip and against no hardware.
+//! **Supported.** Run against the kernel's simulated chip, by
+//! `tests/kernel-stand-ins.rs`, and against no hardware.
 //!
 //! This is the one endpoint whose device data does not exist until it is
 //! made. Every other kind carries bytes somebody sent; a discrete line has no

@@ -482,24 +482,43 @@ states its type in ``type`` and is then held to that type's attributes and no
 others: a device file stating a ``port``, or a network payload stating a
 ``path``, is refused.
 
-About the experimental interfaces
----------------------------------
-Some of what follows is marked **experimental, not yet supported**. Each of
-those is written, parses, reaches a handler and has tests; none has been run
-against the hardware it describes, and none is shipped in an example. What
-is marked that way is: RS-485 on a serial line, and the ``can``, ``iio``,
-``rpmsg``, ``gpio`` and ``hdlc`` types of payload.
+Supported and experimental interfaces
+-------------------------------------
+Seven types of payload are supported: ``network``, ``device-file``,
+``serial``, ``i2c``, ``spi``, ``can`` and ``gpio``.
 
-One of those is further out than the others. Every experimental type but
-``hdlc`` has something in the kernel to be run against -- a virtual CAN bus, an
-I\ :superscript:`2`\ C stub, a simulated GPIO chip, a dummy sensor -- so each
-has been exercised against something. A synchronous line has none, and needs a
-card; what is written for it is held to the kernel's structures by tests and to
-nothing else.
+The last two were experimental until each was flown against the kernel's own
+stand-in for its device, which is what supported means for them: tcspecial's
+node code is run against a CAN bus of the kernel's ``vcan`` and a chip of its
+``gpio-sim``, the far end of each played through the kernel and not by
+tcssim, by ``tcspecial/tests/kernel-stand-ins.rs``. Each test checks that the
+device's data reaches the ground and that the ground's commands reach the
+device. Each type has an example that the test flies, in ``examples/can`` and
+``examples/gpio``.
+The devices need root to make, so the tests do not make them: see `Making the
+Kernel's Stand-ins`_. A test whose device is not there skips, saying which
+device and the command that makes it, so ``cargo test`` passes on a host that
+has not been set up and proves nothing about these types there. What a
+stand-in cannot show is a real controller, chip or sensor: a bus's bitrate
+and errors, a line's electrical behaviour, a driver's own channels.
+
+Some of what follows is still marked **experimental, not yet supported**:
+RS-485 on a serial line, and the ``iio``, ``rpmsg`` and ``hdlc`` types of
+payload. Each is written, parses, reaches a handler and has tests of its
+rules; none has been run against the hardware it describes or a stand-in the
+kernel makes. ``iio`` has such a stand-in, ``iio_dummy``, and an example and
+a test written to fly it, but a stock distribution kernel such as Ubuntu's
+builds the module without the buffer tcspecial reads, so the test has not
+run: the type is promoted once it has passed against a kernel that has the
+buffer (see `An IIO Payload`_). The others stay experimental because nothing
+in the kernel stands in for them, so there is nothing to fly them against
+short of the hardware: an rpmsg channel needs a remote processor and its
+firmware, a synchronous HDLC line needs a card, and RS-485's direction
+control is the driver of a real UART, which a pseudo-terminal refuses.
 
 Read them as a statement of what the configuration will be rather than as a
-feature to rely on. They may change in ways the five supported types --
-``network``, ``device-file``, ``serial``, ``i2c`` and ``spi`` -- will not.
+feature to rely on. They may change in ways the seven supported types will
+not.
 
 Attributes Every Payload Has
 ----------------------------
@@ -510,8 +529,8 @@ Attributes Every Payload Has
    group          the group it is read with, if any. Optional: a payload in
                   no group states its own rate, or is read on every pass --
                   see `How a Payload's Data Is Read`_
-   type           network | device-file | serial | i2c | spi, or one of the
-                  experimental can | iio | rpmsg | gpio | hdlc
+   type           network | device-file | serial | i2c | spi | can | gpio,
+                  or one of the experimental iio | rpmsg | hdlc
 
 How a payload is driven
 ^^^^^^^^^^^^^^^^^^^^^^^
@@ -1124,9 +1143,10 @@ own, which is why each has a type of its own below.
 
 A CAN Payload
 -------------
-Keyword ``type: can``. **Experimental, not yet supported.** A payload on a CAN
-bus, which is not a device file at all: a CAN controller is a network
-interface, and a payload on it is addressed by the identifier its frames carry.
+Keyword ``type: can``. **Supported**, as flown against the kernel's virtual
+bus: see `Supported and experimental interfaces`_. A payload on a CAN bus,
+which is not a device file at all: a CAN controller is a network interface,
+and a payload on it is addressed by the identifier its frames carry.
 
 .. code-block:: text
 
@@ -1157,7 +1177,7 @@ identifier, and the socket does not receive its own frames, so a handler never
 reads back the trigger it just sent.
 
 The simulator joins the same bus as another member of it, so both ends are
-real -- the only experimental type whose stand-in is as faithful as a socket.
+real -- the one type whose stand-in is as faithful as a socket.
 What it cannot do is make the bus: a virtual one needs
 
 .. code-block:: console
@@ -1193,11 +1213,18 @@ prints in the angle brackets:
    $ ip -brief link show type vcan
    vcan0            UNKNOWN        <NOARP,UP,LOWER_UP>
 
+``tcspecial/tests/kernel-stand-ins.rs`` flies `The can example`_ on such a
+bus, playing the motor itself with a socket of its own rather than with
+tcssim: a frame it puts on the bus reaches the ground, and a command the
+ground sends reaches it as a frame. ``sudo bin/mk-kernel-stand-ins can``
+makes the bus; see `Making the Kernel's Stand-ins`_.
+
 A GPIO Payload
 --------------
-Keyword ``type: gpio``. **Experimental, not yet supported.** A set of discrete
-lines -- a deployment switch, an arming line, a payload's own "alive" line --
-watched for changes, or a set of circuits driven: a heater, a valve, a latch.
+Keyword ``type: gpio``. **Supported**, as flown against the kernel's simulated
+chip: see `Supported and experimental interfaces`_. A set of discrete lines --
+a deployment switch, an arming line, a payload's own "alive" line -- watched
+for changes, or a set of circuits driven: a heater, a valve, a latch.
 
 .. code-block:: text
 
@@ -1305,6 +1332,13 @@ simulated set of discretes, and neither do the faults -- there are no bytes to
 drop or corrupt; what it does is pull each of its lines the other way every
 packet interval.
 
+``tcspecial/tests/kernel-stand-ins.rs`` flies `The gpio example`_ on such a
+chip, pulling and reading its lines itself rather than through tcssim: each
+pull of the switch's line reaches the ground as a record, and a ``1`` or
+``0`` from the ground is what the lamp's line becomes. ``sudo
+bin/mk-kernel-stand-ins gpio`` makes the chip and gives it, and its lines'
+pulls, to the user who ran it; see `Making the Kernel's Stand-ins`_.
+
 An HDLC Payload
 ---------------
 Keyword ``type: hdlc``. **Experimental, not yet supported.** A synchronous
@@ -1403,9 +1437,10 @@ payload writes faster than the handler reads.
 
 An IIO Payload
 --------------
-Keyword ``type: iio``. **Experimental, not yet supported.** A sensor's buffered
-samples, read from a character device: what a thermistor, an accelerometer or
-an ADC looks like on Linux.
+Keyword ``type: iio``. **Experimental, not yet supported**, until its test has
+run against a kernel whose dummy sensor has a buffer: see `Supported and
+experimental interfaces`_. A sensor's buffered samples, read from a character
+device: what a thermistor, an accelerometer or an ADC looks like on Linux.
 
 .. code-block:: text
 
@@ -1435,10 +1470,19 @@ that is: ``iio_dummy``, a sensor with no sensor in it, whose buffer a software
 trigger fills on a timer. There is no simulator side to that one -- a buffer
 is a stream out of the device and an IIO payload cannot be triggered, so the
 dummy *is* the payload and tcspecial reads it, which makes it the more
-faithful of the two stand-ins. ``bin/mkiio`` makes one, prints the node and
-the channel count to name in a configuration, and ``bin/rmiio`` takes it away;
-a host's own sensors sit in the same numbering and are left alone, which is
-why the scripts go by name and not by number.
+faithful of the two stand-ins. ``bin/mkiio`` makes one and prints the node to
+name in a configuration, and ``bin/rmiio`` takes it away; a host's own sensors
+sit in the same numbering and are left alone, which is why the scripts go by
+name and not by number.
+
+``tcspecial/tests/kernel-stand-ins.rs`` is written to fly `The iio example`_
+on the dummy, checking that what reaches the ground is the kernel's samples,
+in whole sample sets. The dummy has a buffer only where the kernel was built
+with ``CONFIG_IIO_SIMPLE_DUMMY_BUFFER``, which a stock distribution kernel's
+is not -- Ubuntu's is not -- and without one there is no
+``/dev/iio:deviceN`` to read; ``sudo bin/mk-kernel-stand-ins iio`` says so
+before making anything, and the test says so where it skips. That test is
+what promotes the type, once it has passed.
 
 A Serial Payload
 ----------------
@@ -1698,6 +1742,46 @@ fails on a serial line.
 
 There is no parity and there are no stop bits. SPI is clocked and full duplex,
 and a transfer is delimited by the chip select rather than by framing bits.
+
+Making the Kernel's Stand-ins
+-----------------------------
+The CAN and GPIO types are supported because each is flown against the
+kernel's own stand-in for its device: a virtual CAN bus, ``vcan0``, and a
+chip of ``gpio-sim`` with eight lines. The experimental IIO type has a test
+written the same way, against a sensor of ``iio_dummy`` whose buffer an
+``hrtimer`` trigger fills a hundred times a second, where the kernel's
+``iio_dummy`` has a buffer. Making any of them needs root, so neither the
+tests nor tcssim do; one command does, run once with sudo from the account
+that runs the tests:
+
+.. code-block:: console
+
+   $ sudo bin/mk-kernel-stand-ins
+   $ make kernel-stand-ins-test
+
+With no arguments the first makes the CAN bus and the GPIO chip; named
+types are made alone, and ``sudo bin/mk-kernel-stand-ins iio`` makes the
+IIO sensor, or ``can gpio iio`` all three. It checks that the kernel has
+every module the types asked for need -- ``vcan`` and ``can-raw``;
+``gpio-sim``; ``industrialio-configfs``, ``iio-trig-hrtimer`` and an
+``iio_dummy`` with its buffer -- and refuses, making nothing, where it lacks
+one, naming the type and what is missing. It runs ``bin/mkvcan``,
+``bin/mkgpio`` and ``bin/mkiio``, which give what they make -- the chip and
+its lines' pulls, the sensor's buffer -- to the user who ran sudo, since the
+kernel makes them root's and the tests are run as the user; a raw CAN socket
+is anyone's to open, so the bus needs nothing. The GPIO chip and the sensor
+are numbered as devices appear, and the scripts print the numbers they got.
+
+The second runs ``tcspecial/tests/kernel-stand-ins.rs`` alone, saying which
+tests flew and which skipped. ``cargo test`` runs the same tests; one whose
+device is not there, or not this user's to use, passes having tested nothing,
+and says so -- which device, and the command that makes it -- where
+``--nocapture`` shows it. The tests bind no fixed port, so they run beside
+anything else; they do use the devices, and ``make stand-ins-test`` uses the
+same bus and chip, so the two are not run at once.
+
+``sudo bin/rm-kernel-stand-ins`` takes away whichever were made. Nothing either
+does survives a reboot, so the first is run again after one.
 
 What the Configuration Will Not Let Pass
 ----------------------------------------
@@ -2652,6 +2736,95 @@ on them. ``cfs/defs`` is what that cFS is configured with, and shows what a
 mission's own needs: tcspecial in its SBN peer table, the extended header,
 the version 2 mapping with cFE's own topics mapped onto it, and a highest
 message ID above the block allotted tcspecial.
+
+The can example
+---------------
+.. figure:: ../examples/can/can.svg
+   :alt: The can example: frames carrying 0x123 on the kernel's virtual CAN
+         bus vcan0 are read by motor_status and go to ground, a gateway_radio
+         node, and down to the MOC; a command the MOC sends up to ground
+         leaves it for motor_command, which puts it on the bus as a frame
+         carrying 0x124.
+   :width: 100%
+
+   ``examples/can``: a motor controller on a CAN bus.
+
+A motor controller on the CAN bus ``vcan0``, which sends its status in frames
+carrying the identifier ``0x123`` and takes commands in frames carrying
+``0x124``. Two identifiers make two payloads: each opens a socket of its own
+on the bus, filtered to its identifier, so ``motor_status`` hears the status
+frames and nothing else, and ``motor_command`` hears nothing it has not sent.
+Each status frame's data goes by ``motor_status``'s ``payload-out`` to the
+gateway node ``ground`` and down to the MOC at ``ground_base`` plus its
+device id, ``127.0.0.1:3701``. What the ground sends up to ``ground``, which
+binds ``127.0.0.1:3600``, leaves it by its ``gateway-out`` for
+``motor_command`` and goes out as one frame, so a command is at most eight
+bytes.
+
+``vcan0`` is the kernel's virtual bus, which ``sudo bin/mk-kernel-stand-ins``
+makes; on a vehicle the interface is the controller's, such as ``can0``, and
+nothing else changes. ``make -C examples run-can`` runs tcsmoc on the example,
+with tcssim on the bus as the motor. ``tcspecial/tests/kernel-stand-ins.rs``
+flies it with the test as the motor. Every port the example uses is in the
+thirty-two to thirty-seven hundreds, ending in 00 or 10, which no other
+example uses.
+
+The gpio example
+----------------
+.. figure:: ../examples/gpio/gpio.svg
+   :alt: The gpio example: each edge on line 0 of a gpio-sim chip is read by
+         switch as a record and goes to ground, a gateway_radio node, and down
+         to the MOC; a 1 or 0 the MOC sends up to ground leaves it for lamp,
+         which drives line 1 to it.
+   :width: 100%
+
+   ``examples/gpio``: a switch read, and a lamp driven.
+
+Two lines of one chip, each a payload of its own because one is read and the
+other driven, and a payload's lines all go one way. ``switch`` watches line 0
+for both edges: each becomes a sixteen-byte record -- when, which line, and
+what it became -- that goes by its ``payload-out`` to ``ground`` and down to
+the MOC at ``127.0.0.1:3721``. ``lamp`` drives line 1: what the ground sends
+up to ``127.0.0.1:3620`` leaves ``ground`` by its ``gateway-out`` for it, the
+text ``1`` lighting the lamp and ``0`` putting it out.
+
+The chip is one of the kernel's ``gpio-sim``, which ``sudo
+bin/mk-kernel-stand-ins`` makes. The configuration names ``/dev/gpiochip1``,
+which is what that chip is on a host with one chip of its own; the number is
+given as chips appear, so a host with another number writes the one the
+script printed. ``make -C examples run-gpio`` runs tcsmoc on the example,
+with tcssim pulling the switch's line every second and counting the lamp's
+changes. ``tcspecial/tests/kernel-stand-ins.rs`` flies it, pulling and
+reading the lines itself. Every port is in the thirty-two to thirty-seven
+hundreds, ending in 20 or 30.
+
+The iio example
+---------------
+.. figure:: ../examples/iio/iio.svg
+   :alt: The iio example: the buffer of an iio_dummy sensor, filled by a
+         software trigger, is read by sensor, and its sample sets go to
+         ground, a gateway_radio node, and down to the MOC.
+   :width: 100%
+
+   ``examples/iio``: a sensor's sample buffer.
+
+A sensor's buffer, which hands over whole sample sets as they are taken.
+``sensor`` reads it and each read's sets go by its ``payload-out`` to
+``ground`` and down to the MOC at ``127.0.0.1:3741``. Nothing goes up: a
+buffer is read and never written, so ``ground`` has no ``gateway-out``. Which
+channels are in a set and how often one is taken are the sensor's settings,
+made in ``sysfs`` by whoever brings it up, and nothing in the configuration.
+
+The ``iio`` type is experimental, and this example is what its test flies:
+see `An IIO Payload`_. The sensor is one of the kernel's ``iio_dummy``, which
+``sudo bin/mk-kernel-stand-ins iio`` makes where the kernel's has a buffer,
+its buffer filled by a timer, so the kernel
+stands in for it entirely and tcssim makes nothing. The configuration names
+``/dev/iio:device1``, which is what the dummy is on a host with one sensor of
+its own; write the number the script printed. ``make -C examples run-iio``
+runs tcsmoc on the example, and ``tcspecial/tests/kernel-stand-ins.rs`` is
+written to fly it, checking that what arrives is whole sample sets. Every port
+is in the thirty-two to thirty-seven hundreds, ending in 40 or 50.
 
 The Simulator Configuration
 ===========================

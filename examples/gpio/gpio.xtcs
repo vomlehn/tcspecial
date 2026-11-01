@@ -1,0 +1,85 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<configuration
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:noNamespaceSchemaLocation="../../tcsgui/share/schema/tcspecial.xsd">
+    <description>Discrete lines of a GPIO chip: a switch's edges to the ground, and the ground's 1 or 0 driving a lamp</description>
+    <tcspecial>
+        <!-- Every port is in the thirty-two hundreds to thirty-seven
+             hundreds, ending in 20 or 30, which no other example uses, so
+             this one can be left running while another is looked at. -->
+        <beacon>
+            <default_interval>5 s</default_interval>
+            <recv>127.0.0.1:3530</recv>
+            <reset_interval>1 s</reset_interval>
+            <send>0.0.0.0:3520</send>
+        </beacon>
+        <gateway>radio</gateway>
+        <interface>ad9aac4dd5a6d88dd5e78824ba8a83ac</interface>
+        <log>
+            <directory>/tmp/telemetry</directory>
+            <segment_size>65536</segment_size>
+        </log>
+        <payload_command>
+            <dest_base>0.0.0.0:3320</dest_base>
+            <source_base>127.0.0.1:3330</source_base>
+        </payload_command>
+        <payload_telemetry>
+            <dest_base>127.0.0.1:3430</dest_base>
+            <source_base>0.0.0.0:3420</source_base>
+        </payload_telemetry>
+        <!-- tcspecial counts its starts in this file, which must be on
+             storage that survives a power cycle on a vehicle. -->
+        <state_file>/tmp/tcspecial-gpio.state</state_file>
+        <tcs_cmd>
+            <recv>0.0.0.0:3220</recv>
+            <send>127.0.0.1:3230</send>
+        </tcs_cmd>
+    </tcspecial>
+    <!-- The ground's end of the link, both ways. What the ground sends goes
+         up to address:port, which this node binds aboard, and leaves it by
+         gateway-out for the lamp. What comes down arrives at ground_base
+         plus the device id of the node that sent it: the switch, device id
+         1, at 127.0.0.1:3721. -->
+    <gateway>
+        <name>ground</name>
+        <type>gateway_radio</type>
+        <address>127.0.0.1</address>
+        <port>3620</port>
+        <ground_base>127.0.0.1:3720</ground_base>
+        <payload-in>true</payload-in>
+        <gateway-out><target>lamp</target></gateway-out>
+    </gateway>
+    <!-- Two lines of one chip, each a payload of its own because one is read
+         and the other driven, and a payload's lines go one way. The chip
+         here is /dev/gpiochip1, which is what the kernel's gpio-sim chip is
+         numbered on a host with one chip of its own; bin/mk-kernel-stand-ins
+         makes that chip and prints the number it was given, which is the
+         path to write here.
+
+         A switch on line 0. Each time it changes, the kernel's edge becomes
+         a sixteen-byte record - when, which line, and what it became - and
+         the record goes to the ground. -->
+    <payloads>
+        <name>switch</name>
+        <type>gpio</type>
+        <path>/dev/gpiochip1</path>
+        <lines>0</lines>
+        <edge>both</edge>
+        <payload-out><target>ground</target></payload-out>
+    </payloads>
+    <!-- A lamp on line 1, driven by what the ground sends: the text 1 to
+         light it, 0 to put it out, and anything else refused. -->
+    <payloads>
+        <name>lamp</name>
+        <type>gpio</type>
+        <path>/dev/gpiochip1</path>
+        <lines>1</lines>
+        <direction>output</direction>
+        <gateway-in>true</gateway-in>
+    </payloads>
+    <tcsgui>
+        <nodes><name>ground</name><x>469</x><y>34</y></nodes>
+        <nodes><name>switch</name><x>34</x><y>34</y></nodes>
+        <nodes><name>lamp</name><x>34</x><y>134</y></nodes>
+    </tcsgui>
+</configuration>

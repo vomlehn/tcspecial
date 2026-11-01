@@ -189,11 +189,22 @@ if [ ! -r "/dev/$node" ]; then
 	exit 1
 fi
 
+# Give the buffer to whoever asked for it, where that was someone running
+# this under sudo, for the reason bin/mkgpio gives its chip: the kernel makes
+# the node root's, and tcspecial and the tests are run as the user. udev is
+# let finish first, so that it does not set the owner back afterwards.
+if [ -n "${SUDO_USER:-}" ] && [ "$SUDO_USER" != root ]; then
+	if command -v udevadm > /dev/null; then
+		udevadm settle
+	fi
+	chown "$SUDO_USER" "/dev/$node"
+	echo "mkiio: /dev/$node is now $SUDO_USER's to read"
+fi
+
 echo "mkiio: done"
 echo
 echo "  an IIO payload:   path: /dev/$node"
-echo "                    channels: $channels"
-echo "                    sample_rate: $iio_rate"
+echo "                    ($channels channels, sampled at $iio_rate Hz)"
 echo
 echo "The device number is assigned as devices appear, so it can differ from"
 echo "one run of this to the next; a payload set that names it has to name" \

@@ -29,7 +29,7 @@ use std::path::Path;
 
 use tcslibgs::graph::{Destination, Graph, Section};
 
-use crate::document::{Command, Document, Node};
+use crate::document::{Command, Document, Heading, Node, Remark};
 use crate::journal::Link;
 use crate::subdiagram::Qualified;
 
@@ -172,6 +172,22 @@ pub fn read(path: &Path) -> Result<Document, String> {
         });
     }
 
+    // What is said about the file's structure rather than its entries: a
+    // section, a type group, a line of the tcspecial section. The top file's
+    // only, as every comment here is; and only those whose subject was read,
+    // which is what the editor holds them to from now on.
+    document.remarks = said
+        .remarks
+        .into_iter()
+        .map(|(heading, text)| Remark {
+            home: None,
+            heading,
+            text,
+        })
+        .collect();
+    document.tcspecial_comments = said.tcspecial;
+    document.forget_lost_comments();
+
     Ok(document)
 }
 
@@ -189,6 +205,31 @@ struct Said {
     links: BTreeMap<(String, String), String>,
     /// By what the binding sets.
     commands: BTreeMap<String, String>,
+    /// By the line of the file's structure each is above: see [`Heading`].
+    remarks: Vec<(Heading, String)>,
+    /// By the line of the `tcspecial` section each is above, named as
+    /// `Document::tcspecial_comments` names it.
+    tcspecial: BTreeMap<String, String>,
+}
+
+/// Where in a file's structure the scan in [`comments_of`] is.
+///
+/// What a line means depends on what it is inside: `recv: ...` is a line of
+/// the `tcspecial` section in one place and nothing to do with it in another,
+/// and the first `- type` of a section is where the section's own comment is.
+#[derive(Debug, Default)]
+struct Within {
+    /// The node section the scan is in, as the file names it.
+    section: Option<String>,
+    /// Whether no type group of that section has been passed yet.
+    first_type: bool,
+    /// Whether the scan is in the `tcspecial` section.
+    tcspecial: bool,
+    /// How far the `tcspecial` section's own lines are indented, in YAML,
+    /// once one has been seen: a line indented further is in a subsection.
+    top: Option<usize>,
+    /// The `tcspecial` subsection the scan is in.
+    parent: Option<String>,
 }
 
 /// Every comment in the file, attached to the entry below it.
@@ -224,6 +265,7 @@ fn comments_of(path: &Path) -> Said {
     let mut waiting: Vec<String> = Vec::new();
     // Which node's entry the scan is inside, for the links written on it.
     let mut inside: Option<String> = None;
+    let mut within = Within::default();
     let mut lines = text.lines().peekable();
 
     while let Some(line) = lines.next() {
@@ -232,6 +274,12 @@ fn comments_of(path: &Path) -> Said {
         // A comment, which is held until the thing it is about turns up.
         if let Some(comment) = comment_in(trimmed, xml) {
             waiting.push(comment);
+            continue;
+        }
+        // An XML comment over several lines, which is how one written by
+        // hand is usually laid out: each of its lines a line of the comment.
+        if xml && trimmed.starts_with("<!--") {
+            waiting.extend(comment_over_lines(trimmed, &mut lines));
             continue;
         }
 
@@ -249,6 +297,11 @@ fn comments_of(path: &Path) -> Said {
             inside = Some(name);
         }
 
+        // And where in the file's structure this line is, likewise whether or
+        // not anything is waiting: what a later comment is about depends on
+        // it.
+        let structural = structure_of(line, xml, &mut within);
+
         if waiting.is_empty() {
             continue;
         }
@@ -259,7 +312,16 @@ fn comments_of(path: &Path) -> Said {
         // What the comment was about. A node and a command are named by the
         // entry itself; a link is named by its two ends, which in YAML are on
         // the one line and in XML are the two lines after it.
-        if let Some(name) = node_named(trimmed, xml) {
+        if let Some(about) = structural {
+            match about {
+                Structure::Heading(heading) => {
+                    said.remarks.push((heading, comment));
+                }
+                Structure::Tcspecial(key) => {
+                    said.tcspecial.insert(key, comment);
+                }
+            }
+        } else if let Some(name) = node_named(trimmed, xml) {
             said.nodes.insert(name, comment);
         } else if let Some(terminal) = source_named(trimmed, xml) {
             // A link, which is an attribute of the node this entry is about.
@@ -272,6 +334,192 @@ fn comments_of(path: &Path) -> Said {
     }
 
     said
+}
+
+/// What a line of a file's structure is, for the comment above it.
+#[derive(Debug)]
+enum Structure {
+    /// A section's line or a type group's: see [`Heading`].
+    Heading(Heading),
+    /// A line of the `tcspecial` section, by the attribute it states.
+    Tcspecial(String),
+}
+
+/// Follows a file's structure past one line, and says which structural line
+/// it is.
+///
+/// The three node sections and the `tcspecial` section are what is tracked:
+/// a section's own line and its type groups' lines are where comments about
+/// a section or a type are written, and the `tcspecial` section's lines carry
+/// comments about tcspecial's settings. In YAML a section begins with its key
+/// at the left margin and ends at the next; in XML it is the element.
+///
+/// # Arguments
+///
+/// * `line`   - The line, untrimmed: in YAML its indent says what it is in.
+/// * `xml`    - Whether the file is XML rather than YAML.
+/// * `within` - Where the scan was before this line, brought up to date.
+///
+/// # Returns
+///
+/// What the line is, if it is one a structural comment is written above;
+/// `None` for anything else, a node's own line among them.
+fn structure_of(
+    line: &str,
+    xml: bool,
+    within: &mut Within,
+) -> Option<Structure> {
+    let trimmed = line.trim();
+    let section = Section::ALL.into_iter().map(Section::name).find(|name| {
+        if xml {
+            trimmed == format!("<{name}>")
+        } else {
+            trimmed == format!("{name}:") && !line.starts_with(' ')
+        }
+    });
+    if let Some(name) = section {
+        *within = Within {
+            section: Some(name.to_string()),
+            first_type: true,
+            ..Within::default()
+        };
+        return Some(Structure::Heading(Heading::Section(name.to_string())));
+    }
+
+    // The end of a section: the closing element, or in YAML any other key
+    // at the margin.
+    let ends = if xml {
+        trimmed.starts_with("</")
+            && (within.tcspecial && trimmed == "</tcspecial>"
+                || within
+                    .section
+                    .as_deref()
+                    .is_some_and(|name| trimmed == format!("</{name}>")))
+    } else {
+        !line.starts_with(' ') && !trimmed.starts_with('-')
+    };
+    if ends {
+        *within = Within::default();
+    }
+    let opens = if xml {
+        trimmed == "<tcspecial>"
+    } else {
+        trimmed == "tcspecial:" && !line.starts_with(' ')
+    };
+    if opens {
+        within.tcspecial = true;
+        return None;
+    }
+
+    if let Some(section) = within.section.clone() {
+        let node_type = if xml {
+            trimmed
+                .strip_prefix("<type name=\"")
+                .and_then(|rest| rest.split_once('"'))
+                .map(|(name, _)| unescape(name))
+        } else {
+            trimmed
+                .strip_prefix("- type ")
+                .and_then(|rest| rest.strip_suffix(':'))
+                .map(unquoted)
+        }?;
+        let heading = if within.first_type {
+            Heading::Opening(section)
+        } else {
+            Heading::Type(node_type)
+        };
+        within.first_type = false;
+        return Some(Structure::Heading(heading));
+    }
+
+    if within.tcspecial {
+        return tcspecial_line(line, xml, within).map(Structure::Tcspecial);
+    }
+    None
+}
+
+/// Which attribute of the `tcspecial` section a line states, keeping track
+/// of the subsection it is in.
+///
+/// # Arguments
+///
+/// * `line`   - The line, untrimmed, inside the `tcspecial` section.
+/// * `xml`    - Whether the file is XML rather than YAML.
+/// * `within` - Where the scan is in the section, brought up to date.
+///
+/// # Returns
+///
+/// The attribute as `Document::tcspecial_comments` names it -- `state_file`,
+/// `beacon`, `beacon.recv` -- or `None` for a line that states none, such as
+/// the end of a subsection.
+fn tcspecial_line(
+    line: &str,
+    xml: bool,
+    within: &mut Within,
+) -> Option<String> {
+    let trimmed = line.trim();
+    let under = |within: &Within, name: &str| match &within.parent {
+        Some(parent) => format!("{parent}.{name}"),
+        None => name.to_string(),
+    };
+    if xml {
+        if trimmed.starts_with("</") {
+            within.parent = None;
+            return None;
+        }
+        let rest = trimmed.strip_prefix('<')?;
+        let (name, after) = rest.split_once('>')?;
+        if after.is_empty() {
+            // A subsection's opening, with its attributes on the lines below.
+            within.parent = Some(name.to_string());
+            return Some(name.to_string());
+        }
+        return Some(under(within, name));
+    }
+
+    let indent = line.len() - line.trim_start().len();
+    let (name, value) = trimmed.split_once(':')?;
+    let top = *within.top.get_or_insert(indent);
+    if indent <= top {
+        within.parent = value.trim().is_empty().then(|| name.to_string());
+        return Some(name.to_string());
+    }
+    Some(under(within, name))
+}
+
+/// The lines of an XML comment that does not end on the line it begins on.
+///
+/// # Arguments
+///
+/// * `first` - The line the comment begins on, trimmed.
+/// * `lines` - The lines after it, from which the rest of the comment is
+///             taken, up to and including the line it ends on.
+///
+/// # Returns
+///
+/// Each line of the comment's text, trimmed and unescaped, leaving out any
+/// with nothing on them.
+fn comment_over_lines<'a, I: Iterator<Item = &'a str>>(
+    first: &str,
+    lines: &mut I,
+) -> Vec<String> {
+    let mut said = Vec::new();
+    let mut now = first.trim_start_matches("<!--").to_string();
+    loop {
+        if let Some((body, _)) = now.split_once("-->") {
+            said.push(body.trim().to_string());
+            break;
+        }
+        said.push(now.trim().to_string());
+        match lines.next() {
+            Some(next) => now = next.to_string(),
+            None => break,
+        }
+    }
+    said.into_iter()
+        .filter(|line| !line.is_empty())
+        .map(|line| unescape(&line))
+        .collect()
 }
 
 /// Which data source this line writes, if it writes one.
@@ -314,11 +562,13 @@ fn source_named(line: &str, xml: bool) -> Option<String> {
 ///
 /// # Returns
 ///
-/// The comment's text, trimmed, or `None` if the line is not a comment.
+/// The comment's text, trimmed and, in XML, unescaped; or `None` if the line
+/// is not a comment.
 fn comment_in(line: &str, xml: bool) -> Option<String> {
     if xml {
         let body = line.strip_prefix("<!--")?.strip_suffix("-->")?;
-        Some(body.trim().to_string())
+        // Unescaped, because the writer escapes it: see `document::escape`.
+        Some(unescape(body.trim()))
     } else {
         let body = line.strip_prefix('#')?;
         Some(body.trim().to_string())
@@ -751,6 +1001,375 @@ mod tests {
                 .expect("the ground link");
             assert_eq!(gateway.comment, None, "{extension}");
         }
+    }
+
+    /// The comments a configuration holds, each with the line it is above.
+    ///
+    /// For comparing what a file said with what the editor wrote back, so it
+    /// is about the words and where they are and not their layout: a run of
+    /// comment lines is one comment, an XML comment over several lines the
+    /// same as several one-line ones, its words joined by single spaces. The
+    /// line under each is the entry it is about, trimmed. The schema line at
+    /// the top of a YAML file is the writer's own and is left out.
+    ///
+    /// # Arguments
+    ///
+    /// * `text` - The file's text.
+    /// * `xml`  - Whether it is XML rather than YAML.
+    ///
+    /// # Returns
+    ///
+    /// Each comment's words, and the line after it, in the file's order.
+    fn comments_in(text: &str, xml: bool) -> Vec<(String, String)> {
+        let mut found = Vec::new();
+        let mut waiting: Vec<String> = Vec::new();
+        let mut lines = text.lines();
+        while let Some(line) = lines.next() {
+            let trimmed = line.trim();
+            if let Some(comment) = comment_in(trimmed, xml) {
+                waiting.push(comment);
+                continue;
+            }
+            if xml && trimmed.starts_with("<!--") {
+                waiting.extend(comment_over_lines(trimmed, &mut lines));
+                continue;
+            }
+            if !waiting.is_empty() {
+                let words = waiting.join(" ");
+                let words: Vec<&str> = words.split_whitespace().collect();
+                if !words.join(" ").starts_with("yaml-language-server") {
+                    found.push((words.join(" "), trimmed.to_string()));
+                }
+                waiting.clear();
+            }
+        }
+        found
+    }
+
+    /// Every shipped configuration keeps its comments through the editor.
+    ///
+    /// Read the way the editor opens a file and written the way it saves
+    /// one, each example in its own language: every comment it held is in
+    /// what is written, saying the same words above the same line. The
+    /// examples are where a section's paragraph, a group's note and a
+    /// tcspecial setting's reason are all found, and an editor that lost any
+    /// of them would be one nobody could open an example in.
+    #[test]
+    fn every_example_keeps_its_comments() {
+        let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("..");
+        let mut paths: Vec<std::path::PathBuf> = Vec::new();
+        let mut directories = vec![root.join("tests/manual"), root.clone()];
+        for entry in std::fs::read_dir(root.join("examples")).expect("there") {
+            directories.push(entry.expect("an entry").path());
+        }
+        for directory in directories {
+            let Ok(entries) = std::fs::read_dir(&directory) else {
+                continue;
+            };
+            for entry in entries {
+                let path = entry.expect("an entry").path();
+                let extension = path.extension().and_then(|e| e.to_str());
+                if matches!(extension, Some("ytcs" | "xtcs")) {
+                    paths.push(path);
+                }
+            }
+        }
+        paths.sort();
+        assert!(paths.len() > 20, "the examples were not found: {paths:?}");
+
+        let mut commented = 0;
+        for path in &paths {
+            let xml = path.extension().is_some_and(|e| e == "xtcs");
+            let document = read(path)
+                .unwrap_or_else(|e| panic!("{}: {e}", path.display()));
+            let written = document.to_text(path).expect("a known format");
+            let shipped = std::fs::read_to_string(path).expect("readable");
+
+            // In any order: a file written by hand may have its sections in
+            // another, and the editor writes the one order a configuration
+            // has. Which line each comment is above is what is compared.
+            let mut before = comments_in(&shipped, xml);
+            let mut after = comments_in(&written, xml);
+            before.sort();
+            after.sort();
+            assert_eq!(
+                before,
+                after,
+                "{}: the comments changed in\n{written}",
+                path.display()
+            );
+            commented += usize::from(!before.is_empty());
+        }
+        assert!(commented > 20, "only {commented} files had comments");
+    }
+
+    /// A document with a payload of two types, for the comments about its
+    /// structure to be about.
+    ///
+    /// # Returns
+    ///
+    /// The document: a ground link, and payloads of type `i2c` and
+    /// `network`.
+    fn two_types() -> Document {
+        use crate::journal::Edit;
+
+        let mut document = Document::new();
+        for (name, node_type) in [
+            ("ground", "gateway_radio"),
+            ("sensor", "i2c"),
+            ("socket", "network"),
+        ] {
+            document.apply(&Edit::AddNode {
+                name: name.into(),
+                node_type: node_type.into(),
+                home: None,
+            });
+        }
+        document
+    }
+
+    /// The comment for one line of the structure, in a document.
+    ///
+    /// # Arguments
+    ///
+    /// * `document` - The document.
+    /// * `heading`  - The line.
+    ///
+    /// # Returns
+    ///
+    /// The comment's text, if it has one.
+    fn remark_of<'a>(
+        document: &'a Document,
+        heading: &Heading,
+    ) -> Option<&'a str> {
+        document
+            .remarks
+            .iter()
+            .find(|remark| &remark.heading == heading)
+            .map(|remark| remark.text.as_str())
+    }
+
+    /// A comment about a section or a type group is read, kept, and written
+    /// back where it was, in both languages.
+    ///
+    /// Three places: above the section's line, under it above its first
+    /// group, and above a later group's line. Written by the editor, read,
+    /// and written again, the second text is the first -- and the comments
+    /// are where a person would look for them.
+    #[test]
+    fn a_comment_about_a_section_or_a_type_is_kept() {
+        let where_ = tempfile::tempdir().expect("a directory");
+        let mut document = two_types();
+        let said = [
+            (Heading::Section("payloads".into()), "what is carried"),
+            (Heading::Opening("payloads".into()), "all of it\non a desk"),
+            (Heading::Type("network".into()), "sockets -- for now"),
+        ];
+        for (heading, text) in &said {
+            document.remarks.push(Remark {
+                home: None,
+                heading: heading.clone(),
+                text: text.to_string(),
+            });
+        }
+
+        for name in ["two.ytcs", "two.xtcs"] {
+            let path = where_.path().join(name);
+            let text = document.to_text(&path).expect("a known format");
+            std::fs::write(&path, &text).expect("written");
+
+            let read = read(&path).unwrap_or_else(|e| panic!("{name}: {e}"));
+            let xml = name.ends_with(".xtcs");
+            for (heading, text) in &said {
+                // The one change XML makes: see `document::comment_safe`.
+                let text = if xml {
+                    text.replace("--", "-")
+                } else {
+                    text.to_string()
+                };
+                assert_eq!(
+                    remark_of(&read, heading),
+                    Some(text.as_str()),
+                    "{name}: {heading:?}"
+                );
+            }
+            assert_eq!(
+                read.to_text(&path).expect("a known format"),
+                text,
+                "{name}: written back differently"
+            );
+
+            let expected = if xml {
+                "    <!-- what is carried -->\n    <payloads>\n        \
+                 <!-- all of it -->\n        <!-- on a desk -->\n        \
+                 <type name=\"i2c\">"
+            } else {
+                "# what is carried\npayloads:\n  # all of it\n  \
+                 # on a desk\n  - type i2c:"
+            };
+            assert!(text.contains(expected), "{name}:\n{text}");
+            let expected = if xml {
+                "        <!-- sockets - for now -->\n        \
+                 <type name=\"network\">"
+            } else {
+                "  # sockets -- for now\n  - type network:"
+            };
+            assert!(text.contains(expected), "{name}:\n{text}");
+            if xml {
+                for line in text.lines().filter(|l| l.contains("<!--")) {
+                    let body = line
+                        .trim()
+                        .trim_start_matches("<!--")
+                        .trim_end_matches("-->");
+                    assert!(!body.contains("--"), "{name}: {line}");
+                }
+            }
+        }
+    }
+
+    /// A long comment about a section is broken to fit eighty columns, as a
+    /// node's is, in both languages.
+    #[test]
+    fn a_long_comment_about_a_section_fits_eighty_columns() {
+        let mut document = two_types();
+        let long = "word ".repeat(40);
+        for heading in [
+            Heading::Section("payloads".into()),
+            Heading::Opening("payloads".into()),
+            Heading::Type("network".into()),
+        ] {
+            document.remarks.push(Remark {
+                home: None,
+                heading,
+                text: long.trim().to_string(),
+            });
+        }
+        document
+            .tcspecial
+            .insert("beacon.recv".into(), "127.0.0.1:5650".into());
+        document
+            .tcspecial_comments
+            .insert("beacon.recv".into(), long.trim().to_string());
+
+        for text in [document.to_yaml(), document.to_xml()] {
+            let comments = text
+                .lines()
+                .filter(|l| l.contains("word word"))
+                .collect::<Vec<&str>>();
+            assert!(comments.len() >= 8, "{text}");
+            for line in comments {
+                assert!(line.chars().count() <= 80, "too long: {line}");
+            }
+        }
+    }
+
+    /// A comment above a line of the tcspecial section is kept with it.
+    #[test]
+    fn a_comment_in_the_tcspecial_section_is_kept() {
+        let where_ = tempfile::tempdir().expect("a directory");
+        let mut document = two_types();
+        for (attribute, value) in [
+            ("beacon.recv", "127.0.0.1:5650"),
+            ("beacon.send", "0.0.0.0:5550"),
+            ("state_file", "/tmp/state"),
+        ] {
+            document.tcspecial.insert(attribute.into(), value.into());
+        }
+        for (key, text) in [
+            ("beacon", "how the vehicle says it is alive"),
+            ("beacon.send", "where it says so"),
+            ("state_file", "on storage that survives a power cycle"),
+        ] {
+            document.tcspecial_comments.insert(key.into(), text.into());
+        }
+
+        for name in ["said.ytcs", "said.xtcs"] {
+            let path = where_.path().join(name);
+            let text = document.to_text(&path).expect("a known format");
+            std::fs::write(&path, &text).expect("written");
+            let read = read(&path).unwrap_or_else(|e| panic!("{name}: {e}"));
+            assert_eq!(
+                read.tcspecial_comments, document.tcspecial_comments,
+                "{name}:\n{text}"
+            );
+            assert_eq!(read.to_text(&path).expect("known"), text, "{name}");
+        }
+    }
+
+    /// A section or a group the editor empties takes its comment with it,
+    /// and one made again starts without.
+    #[test]
+    fn an_emptied_section_or_group_forgets_its_comment() {
+        use crate::journal::Edit;
+
+        let remove = |name: &str, node_type: &str| Edit::RemoveNode {
+            name: name.into(),
+            node_type: node_type.into(),
+            attributes: Vec::new(),
+            links: Vec::new(),
+            home: None,
+        };
+        let mut document = two_types();
+        for heading in [
+            Heading::Section("payloads".into()),
+            Heading::Opening("payloads".into()),
+            Heading::Type("network".into()),
+            Heading::Type("i2c".into()),
+            Heading::Section("gateways".into()),
+        ] {
+            document.remarks.push(Remark {
+                home: None,
+                heading,
+                text: "said".into(),
+            });
+        }
+
+        // The group goes with its last node, and nothing else does.
+        document.apply(&remove("socket", "network"));
+        assert_eq!(
+            remark_of(&document, &Heading::Type("network".into())),
+            None
+        );
+        assert!(remark_of(&document, &Heading::Type("i2c".into())).is_some());
+        assert!(remark_of(&document, &Heading::Opening("payloads".into()))
+            .is_some());
+
+        // Made again, the group has nothing said about it.
+        document.apply(&Edit::AddNode {
+            name: "socket".into(),
+            node_type: "network".into(),
+            home: None,
+        });
+        assert_eq!(
+            remark_of(&document, &Heading::Type("network".into())),
+            None
+        );
+        assert!(
+            !document.to_yaml().contains("# said\n  - type network:"),
+            "{}",
+            document.to_yaml()
+        );
+
+        // And the section goes with its last node.
+        document.apply(&remove("socket", "network"));
+        document.apply(&remove("sensor", "i2c"));
+        for heading in [
+            Heading::Section("payloads".into()),
+            Heading::Opening("payloads".into()),
+            Heading::Type("i2c".into()),
+        ] {
+            assert_eq!(remark_of(&document, &heading), None, "{heading:?}");
+        }
+        assert!(remark_of(&document, &Heading::Section("gateways".into()))
+            .is_some());
+        document.apply(&Edit::AddNode {
+            name: "sensor".into(),
+            node_type: "i2c".into(),
+            home: None,
+        });
+        let yaml = document.to_yaml();
+        assert!(yaml.contains("\npayloads:\n  - type i2c:"), "{yaml}");
+        assert!(yaml.contains("# said\ngateways:"), "{yaml}");
     }
 
     /// A file that is not there opens as a new configuration.

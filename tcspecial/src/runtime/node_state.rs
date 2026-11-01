@@ -838,12 +838,20 @@ mod tests {
         let path = where_.path().join("two.ytcs");
         std::fs::write(
             &path,
-            "payloads:\n\
-             \x20 - { name: inside, type: i2c, path: /dev/i2c-1, address: \
-             \"0x48\", poll_interval: \"1 s\", payload-out: average }\n\
-             vehicle:\n\
-             \x20 - { name: average, type: compute, function: mean, inputs: 1 \
-             }\n",
+            "payloads:
+  - type i2c:
+      - payload: inside
+        address: \"0x48\"
+        path: /dev/i2c-1
+        poll_interval: \"1 s\"
+        payload-out:
+          - target: average
+vehicle:
+  - type compute:
+      - compute: average
+        function: mean
+        inputs: 1
+",
         )
         .expect("written");
         let graph = Graph::load(&path).expect("it reads");

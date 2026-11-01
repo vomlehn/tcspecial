@@ -1487,9 +1487,13 @@ mod tests {
             std::fs::write(
                 &path,
                 format!(
-                    "payloads:\n  \
-                     - {{ name: sensor, type: network, protocol: udp, \
-                     address: \"{address}\", port: \"9\" }}\n"
+                    "payloads:
+  - type network:
+      - payload: sensor
+        address: \"{address}\"
+        port: \"9\"
+        protocol: udp
+"
                 ),
             )
             .unwrap();

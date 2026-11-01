@@ -5091,33 +5091,51 @@ what has arrived without a command going out. What only the spacecraft can say
 -- a node's own counters, and whether it is running -- is what ``Query all``
 is for.
 
-The temperatures window
-^^^^^^^^^^^^^^^^^^^^^^^
-Where a sensor's temperature reaches the ground -- a ``to_kelvin`` node, the
-conversion of one sensor's counts, drawn into a gateway node -- tcsmoc opens a
-second window beside its own, ``tcsmoc: temperatures``, and its
-``Temperatures`` button opens it again once closed. It plots each sensor's
-temperature over the last ten seconds, sixty kelvin tall, centred on the
-thermostat's setpoint where the configuration has a ``hysteresis`` node and
-on the first reading where it has none. It fills from the left, and once ten
-seconds have been drawn it scrolls, the newest at the right edge. A sensor
-silent for more than two and a half seconds has its line broken there rather
-than drawn across the silence.
+The plot window
+^^^^^^^^^^^^^^^
+Where a value or a switch reaches the ground -- a node drawn into a gateway
+node that sends values, which is anything with a unit: a ``to_kelvin`` or
+``to_value`` conversion, a ``vote``, a ``process``'s answers; or a
+``hysteresis``, which sends decisions -- tcsmoc opens a second window beside
+its own, ``tcsmoc: plot``, and its ``Plot`` button opens it again once
+closed.
 
-Under the plot, as wide as it so that a change lines up with the temperatures
-above it, is a strip for each heater switch -- a ``hysteresis`` node drawn
-into a gateway node, named with what it drives -- coloured by what it last
-decided, and while it is on the plot behind the lines is shaded the same
-colour. A thermostat tells the ground only when its decision changes, so a
-switch is drawn from each change to the next, and before the first is heard
-it is not drawn at all, its state said as ``not heard`` rather than guessed as
-off.
+Values in one unit share a panel, so that two temperatures are read off one
+axis and a voltage is never read off a current's: the descent example has
+three, metres, metres a second and a ratio, and the thermostat example one,
+kelvin, with its three sensors and their vote. Each panel is scaled to what
+it shows -- its lowest and highest reading in the span, and the setpoint of
+any thermostat reading values in its unit, drawn as a dark rule labelled
+``setpoint`` -- rounded out to ticks one, two or five of a power of ten
+apart. Over each panel its legend names the unit and each value, with its
+latest reading, beside its colour.
+
+The buttons at the top choose the span: the last ``10 s``, ``1 min`` or
+``10 min``, which fill from the left and then scroll, the newest at the right
+edge; or the ``Whole run``, from the first reading at the left edge to now
+at the right. tcsmoc keeps each value's last six thousand readings, ten
+minutes of one every tenth of a second, and for the whole run four thousand
+more, which it thins as the run grows by letting every other one go, so that
+it holds the whole run, more coarsely the longer it is, in the same room. A
+value silent for more than two and a half seconds has its line broken there
+rather than drawn across the silence, however coarsely it is held. Where
+many readings fall in one column of the screen, their lowest and highest are
+drawn, so that a spike is never thinned away.
+
+Under the panels, as wide as them so that a change lines up with the values
+above it, is a strip for each switch -- a ``hysteresis`` node drawn into a
+gateway node, named with what it drives -- coloured by what it last decided,
+and while it is on the panels behind the lines are shaded the same colour. A
+thermostat tells the ground only when its decision changes, so a switch is
+drawn from each change to the next, and before the first is heard it is not
+drawn at all, its state said as ``not heard`` rather than guessed as off.
 
 The colours are Okabe and Ito's, which readers with each common kind of colour
-blindness tell apart: blue, bluish green, reddish purple and sky blue for the
-sensors, and vermillion, which nothing else uses, for a heater on. None is
-alone: the legend names each sensor beside its colour with its latest
-reading, and each switch's state is in words beside its strip.
+blindness tell apart: blue, bluish green, reddish purple, sky blue and black
+for the values, and vermillion, which nothing else uses, for a switch on.
+None is alone: the legend names each value beside its colour with its latest
+reading, the setpoint's rule is labelled, and each switch's state is in words
+beside its strip.
 
 A triggered payload on the console
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^

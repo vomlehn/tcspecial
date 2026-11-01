@@ -62,13 +62,13 @@ use tcsverify::startup::Startup;
 use crate::beacon_receive::BeaconReceive;
 use crate::ci_link::{CiLink, Commanded};
 use crate::oc_link::{Arrival, Arrivals};
-use crate::thermal::{self, Plot, Plotted};
+use crate::plot::{self, Plot, Plotted};
 use crate::{
     ask_for_the_edge, child_program, grid_shape, handle_close, handle_quit,
     installed_directory, present, show_arrivals, stop, window_size, DHInfo,
-    Edge, MainWindow, MenuAction, PingWindow, ProcessManager, Sizes,
-    ThermalWindow, CHILDREN, CONNECTED_STATUS, DISCONNECTED_STATUS,
-    ERROR_STATUS, NO_TRANSFER_TIME, PANEL_REFRESH_INTERVAL,
+    Edge, MainWindow, MenuAction, PingWindow, PlotWindow, ProcessManager,
+    Sizes, CHILDREN, CONNECTED_STATUS, DISCONNECTED_STATUS, ERROR_STATUS,
+    NO_TRANSFER_TIME, PANEL_REFRESH_INTERVAL,
 };
 
 /// What the window says of ARM Restart and Initiate restart pressed where
@@ -2035,9 +2035,8 @@ fn show_ping(window: &PingWindow, shown: &PingShown) {
 /// * `arrivals`     - Where the last arrival for each panel is left, by row.
 /// * `pings`        - The pinger to hand the ping node's answers to, where
 ///                    they come down through this gateway node.
-/// * `plot`         - The temperatures window's plot, where there is one, to
-///                    hand each sensor's temperature and each switch's
-///                    decision to.
+/// * `plot`         - The plot window's plot, where there is one, to hand
+///                    each value and each switch's decision to.
 fn serve(
     mut gateway: GatewayReceiver,
     rows: Arc<BTreeMap<String, usize>>,
@@ -2055,7 +2054,7 @@ fn serve(
         unit: Option<Unit>,
         /// Whether it is the ping node whose answers the pinger times.
         pings: bool,
-        /// What it is to the temperatures window's plot, if anything.
+        /// What it is to the plot window's plot, if anything.
         plotted: Option<Plotted>,
         /// How many have arrived from it since the MOC started.
         packets: u64,
@@ -2094,7 +2093,7 @@ fn serve(
             }
         }
         if let (Some(plotted), Some(plot)) = (source.plotted, plot.as_ref()) {
-            thermal::take(plot, plotted, data, std::time::Instant::now());
+            plot::take(plot, plotted, data, std::time::Instant::now());
         }
         let Some(row) = source.row else {
             continue;
@@ -2524,15 +2523,15 @@ pub fn run(
     // stopped.
     let _answers = pings.as_ref().map(|(_, feed)| show_answers(feed.clone()));
 
-    // The temperatures window, where a sensor's temperature reaches the
-    // ground: opened by Temperatures, and redrawn by a timer of its own,
-    // kept for as long as the window runs. See thermal.rs.
-    let thermal_window = ThermalWindow::new().unwrap();
+    // The plot window, where a value or a switch reaches the ground: opened
+    // by Plot, and redrawn by a timer of its own, kept for as long as the
+    // window runs. See plot.rs.
+    let plot_window = PlotWindow::new().unwrap();
     let plot = Plot::of(&graph, |name| links.iter().any(|l| l.source == name))
         .map(|plot| Arc::new(Mutex::new(plot)));
     let _plotting = plot
         .as_ref()
-        .map(|plot| thermal::show(&ui, &thermal_window, plot.clone()));
+        .map(|plot| plot::show(&ui, &plot_window, plot.clone()));
 
     let arrivals: Arrivals = Arc::new(Mutex::new(vec![None; count]));
     let gateways: Vec<&str> = graph

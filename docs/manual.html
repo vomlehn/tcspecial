@@ -461,7 +461,7 @@ ul.auto-toc {
 <li><a class="reference internal" href="#tcsmoc" id="toc-entry-74">tcsmoc</a><ul>
 <li><a class="reference internal" href="#the-tcsmoc-window" id="toc-entry-75">The tcsmoc window</a></li>
 <li><a class="reference internal" href="#when-data-last-arrived" id="toc-entry-76">When data last arrived</a></li>
-<li><a class="reference internal" href="#the-temperatures-window" id="toc-entry-77">The temperatures window</a></li>
+<li><a class="reference internal" href="#the-plot-window" id="toc-entry-77">The plot window</a></li>
 <li><a class="reference internal" href="#a-triggered-payload-on-the-console" id="toc-entry-78">A triggered payload on the console</a></li>
 <li><a class="reference internal" href="#what-each-end-read" id="toc-entry-79">What each end read</a></li>
 <li><a class="reference internal" href="#matching-the-configurations" id="toc-entry-80">Matching the configurations</a></li>
@@ -5070,31 +5070,47 @@ what has arrived without a command going out. What only the spacecraft can say
 -- a node's own counters, and whether it is running -- is what <tt class="docutils literal">Query all</tt>
 is for.</p>
 </div>
-<div class="section" id="the-temperatures-window">
-<h3><a class="toc-backref" href="#toc-entry-77">The temperatures window</a></h3>
-<p>Where a sensor's temperature reaches the ground -- a <tt class="docutils literal">to_kelvin</tt> node, the
-conversion of one sensor's counts, drawn into a gateway node -- tcsmoc opens a
-second window beside its own, <tt class="docutils literal">tcsmoc: temperatures</tt>, and its
-<tt class="docutils literal">Temperatures</tt> button opens it again once closed. It plots each sensor's
-temperature over the last ten seconds, sixty kelvin tall, centred on the
-thermostat's setpoint where the configuration has a <tt class="docutils literal">hysteresis</tt> node and
-on the first reading where it has none. It fills from the left, and once ten
-seconds have been drawn it scrolls, the newest at the right edge. A sensor
-silent for more than two and a half seconds has its line broken there rather
-than drawn across the silence.</p>
-<p>Under the plot, as wide as it so that a change lines up with the temperatures
-above it, is a strip for each heater switch -- a <tt class="docutils literal">hysteresis</tt> node drawn
-into a gateway node, named with what it drives -- coloured by what it last
-decided, and while it is on the plot behind the lines is shaded the same
-colour. A thermostat tells the ground only when its decision changes, so a
-switch is drawn from each change to the next, and before the first is heard
-it is not drawn at all, its state said as <tt class="docutils literal">not heard</tt> rather than guessed as
-off.</p>
+<div class="section" id="the-plot-window">
+<h3><a class="toc-backref" href="#toc-entry-77">The plot window</a></h3>
+<p>Where a value or a switch reaches the ground -- a node drawn into a gateway
+node that sends values, which is anything with a unit: a <tt class="docutils literal">to_kelvin</tt> or
+<tt class="docutils literal">to_value</tt> conversion, a <tt class="docutils literal">vote</tt>, a <tt class="docutils literal">process</tt>'s answers; or a
+<tt class="docutils literal">hysteresis</tt>, which sends decisions -- tcsmoc opens a second window beside
+its own, <tt class="docutils literal">tcsmoc: plot</tt>, and its <tt class="docutils literal">Plot</tt> button opens it again once
+closed.</p>
+<p>Values in one unit share a panel, so that two temperatures are read off one
+axis and a voltage is never read off a current's: the descent example has
+three, metres, metres a second and a ratio, and the thermostat example one,
+kelvin, with its three sensors and their vote. Each panel is scaled to what
+it shows -- its lowest and highest reading in the span, and the setpoint of
+any thermostat reading values in its unit, drawn as a dark rule labelled
+<tt class="docutils literal">setpoint</tt> -- rounded out to ticks one, two or five of a power of ten
+apart. Over each panel its legend names the unit and each value, with its
+latest reading, beside its colour.</p>
+<p>The buttons at the top choose the span: the last <tt class="docutils literal">10 s</tt>, <tt class="docutils literal">1 min</tt> or
+<tt class="docutils literal">10 min</tt>, which fill from the left and then scroll, the newest at the right
+edge; or the <tt class="docutils literal">Whole run</tt>, from the first reading at the left edge to now
+at the right. tcsmoc keeps each value's last six thousand readings, ten
+minutes of one every tenth of a second, and for the whole run four thousand
+more, which it thins as the run grows by letting every other one go, so that
+it holds the whole run, more coarsely the longer it is, in the same room. A
+value silent for more than two and a half seconds has its line broken there
+rather than drawn across the silence, however coarsely it is held. Where
+many readings fall in one column of the screen, their lowest and highest are
+drawn, so that a spike is never thinned away.</p>
+<p>Under the panels, as wide as them so that a change lines up with the values
+above it, is a strip for each switch -- a <tt class="docutils literal">hysteresis</tt> node drawn into a
+gateway node, named with what it drives -- coloured by what it last decided,
+and while it is on the panels behind the lines are shaded the same colour. A
+thermostat tells the ground only when its decision changes, so a switch is
+drawn from each change to the next, and before the first is heard it is not
+drawn at all, its state said as <tt class="docutils literal">not heard</tt> rather than guessed as off.</p>
 <p>The colours are Okabe and Ito's, which readers with each common kind of colour
-blindness tell apart: blue, bluish green, reddish purple and sky blue for the
-sensors, and vermillion, which nothing else uses, for a heater on. None is
-alone: the legend names each sensor beside its colour with its latest
-reading, and each switch's state is in words beside its strip.</p>
+blindness tell apart: blue, bluish green, reddish purple, sky blue and black
+for the values, and vermillion, which nothing else uses, for a switch on.
+None is alone: the legend names each value beside its colour with its latest
+reading, the setpoint's rule is labelled, and each switch's state is in words
+beside its strip.</p>
 </div>
 <div class="section" id="a-triggered-payload-on-the-console">
 <h3><a class="toc-backref" href="#toc-entry-78">A triggered payload on the console</a></h3>

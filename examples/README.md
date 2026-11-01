@@ -443,10 +443,10 @@ make run-thermostat
 ```
 
 That runs tcsmoc on the example, as `run-simple` does, and tcsmoc opens its
-temperatures window beside its own: each sensor's temperature over the last
-ten seconds, centred on the setpoint, with the heaters' state under it. Press
-Connect in tcsmoc, and Enable on each payload in tcssim, to start the data
-and the heating.
+plot window beside its own: each sensor's temperature and their vote over
+the last ten seconds, with the setpoint's rule, and the heaters' state under
+them. Press Connect in tcsmoc, and Enable on each payload in tcssim, to start
+the data and the heating.
 
 Languages:
 

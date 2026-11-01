@@ -2154,7 +2154,7 @@ mod tests {
             ),
             data,
             packets: 5,
-            sends_values: false,
+            unit: None,
         };
         let arrivals: Arrivals =
             Arc::new(Mutex::new(vec![None, Some(arrival)]));

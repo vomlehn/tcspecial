@@ -31,4 +31,9 @@
         <kind>boolean</kind>
         <about>Whether it is started again when it stops: true or false.</about>
     </attributes>
+    <attributes>
+        <name>unit</name>
+        <required>true</required>
+        <about>What its answers are numbers of: K, V, A, W, m, m/s, N, or ratio.</about>
+    </attributes>
 </node>

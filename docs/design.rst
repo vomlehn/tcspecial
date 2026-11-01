@@ -1383,11 +1383,13 @@ A source's channel is of the type the configuration says its data are, and
 the configuration says one thing of a datum's type: what a compute node
 sends, by its function, as
 ``tcslibgs::node::vehicle::compute::node_produces`` says. A node whose
-function makes a value -- ``to_kelvin``, ``vote``, ``process`` -- sends
-values, four bytes of a signed count of micro-kelvin (see `Compute
-elements`_), which tcsmoc asks too. Such a source's channel is an ``F64`` of
-kelvin, read by tcslib-c's ``tcs_value_kelvin`` -- ``from_value``, the one
-statement of what a value is -- and a datum from it that is not a value is
+function makes a value -- ``to_kelvin``, ``to_value``, ``vote``,
+``process`` -- sends values, four bytes of a signed count of its unit's steps
+(see `Compute elements`_), in the unit ``tcslibgs::graph::units`` gives it,
+which tcsmoc asks too. Such a source's channel is an ``F64`` in that unit,
+formatted with its symbol so that F´'s ground system shows ``293.15 K``, read
+by tcslib-c's ``tcs_value_in`` -- ``from_value``, the one statement of what a
+value is -- and a datum from it that is not a value is
 written to no channel, counted in ``DataNotValues`` and said in an event:
 four bytes made a number whatever they held would be a temperature nobody
 measured. A ``hysteresis`` node sends decisions, the text ``1`` or ``0``, and
@@ -1992,11 +1994,47 @@ Compute elements
 Two of them, and the difference is where the code lives.
 
 What a computation reads and writes is a **value**: four bytes of a signed
-count of micro-kelvin, most significant byte first. A reading is a value from
-the conversion that made it to the computation that uses it, to the log that
-records it and to the link that carries it to the ground, and it is a value in
-kelvins -- one unit everywhere, so that a comparison between two readings is a
-comparison and not a conversion.
+count of its unit's steps, most significant byte first. A reading is a value
+from the conversion that made it to the computation that uses it, to the log
+that records it and to the link that carries it to the ground, in one unit
+all the way, so that a comparison between two readings is a comparison and
+not a conversion.
+
+A value has a unit -- a temperature in kelvin, a bus in volts, an altitude in
+metres -- and the unit is never on the link. The configuration says it, as it
+says which nodes send values at all: a conversion states it (``to_kelvin`` is
+in kelvin, ``to_value`` names its own), a ``process`` states it, its program's
+answers being its own business, and a ``vote`` is in its inputs' unit, which
+must be one. ``tcslibgs::graph::units`` works it out, once, for every node,
+and everything that reads a value back asks it: the vehicle, decoding what
+arrives at a vote or a thermostat, and the ground, showing a reading with its
+unit. Not a byte is spent on it, and a link, a log or a configuration from
+before there were units reads the same, a kelvin being counted as it always
+was.
+
+Requirement
+    Every node feeding a vote, a thermostat or a program sends values, and in
+    one unit: a vote between a temperature and a voltage, or a thermostat
+    reading a sensor's own bytes, is refused when the configuration is
+    loaded, naming the nodes and the units.
+
+Requirement
+    Each unit has a step, chosen to be finer than anything a part measures
+    while leaving the range a vehicle needs, and the table of them is
+    ``tcslibgs::unit``, the one place it is stated:
+
+    ============ ======= ============= ==================
+    unit         symbol  step          range, either way
+    ============ ======= ============= ==================
+    kelvin       K       micro-kelvin  2147 K
+    volt         V       micro-volt    2147 V
+    ampere       A       micro-ampere  2147 A
+    watt         W       milliwatt     2.1 MW
+    metre        m       millimetre    2147 km
+    metre/second m/s     micro-m/s     2147 m/s
+    newton       N       millinewton   2.1 MN
+    ratio        ratio   millionth     2147
+    ============ ======= ============= ==================
 
 Decimal text was tried first and gave the number up a digit at a time: a
 temperature written to four places is not the number the sensor's counts
@@ -2020,21 +2058,24 @@ what it is rather than as a temperature near 4295 K. And a difference of two
 temperatures is a width, which a band is, and that is signed by nature.
 
 The range is what it costs, and it is stated rather than worked around: a
-signed count of micro-kelvin reaches 2147.483647 K either way. That is above
-anything these nodes are pointed at and below a great deal that exists -- a
-thruster's throat is hotter -- so a temperature outside it is refused, and
-refused where the value is made, which is where the number is still in hand to
-name in the complaint. Not wrapped, which would turn 2200 K into a zone 42 K
-below zero, and not pinned to the end of the range, which would turn a runaway
-into a part that looks hot but surviving: either is a thermostat acting
-confidently on a number nobody produced. A node that must carry more than this
-wants a unit of its own, and that is a change to make deliberately.
+signed count of micro-kelvin reaches 2147.483647 K either way, and each unit
+reaches what its step allows. That is above anything these nodes are pointed
+at and below a great deal that exists -- a thruster's throat is hotter -- so a
+number outside it is refused, and refused where the value is made, which is
+where the number is still in hand to name in the complaint. Not wrapped, which
+would turn 2200 K into a zone 42 K below zero, and not pinned to the end of
+the range, which would turn a runaway into a part that looks hot but
+surviving: either is a thermostat acting confidently on a number nobody
+produced. A quantity that must carry more wants a unit with a coarser step,
+and that is a change to make deliberately.
 
-The same range holds a temperature a *file* states, and that is checked where
-a file is read: a setpoint of 3000 K is a thermostat whose readings can never
+The same range holds a number a *file* states, and that is checked where a
+file is read: a setpoint of 3000 K is a thermostat whose readings can never
 reach it, so the heaters would be driven on and held there for the whole
 flight, and an offset of -2500 K is every reading of that part outside the
-range. On a desk each is one line to change, which is the argument for the
+range. A conversion's offset is checked against its own unit; a thermostat's
+setpoint and band against the unit of what it reads, which only the graph
+knows, so that is where it is checked. On a desk each is one line to change, which is the argument for the
 rule living with the other rules. The form of a value lives there too, in
 ``tcslibgs``: the range and the representation are the same fact, and half of
 a fact in each crate is two places for it to drift. It is also one thing the
@@ -2044,8 +2085,8 @@ showing four bytes of hexadecimal has it to hand.
 
 Four bytes carry one other consequence worth saying plainly. Every four bytes
 are a value, there being no bit pattern of a 32-bit integer that is not a
-count of micro-kelvin, so a four-character word delivered where a reading was
-meant would be read as a temperature -- where eight bytes of a double at least
+count of steps, so a four-character word delivered where a reading was meant
+would be read as a number -- where eight bytes of a double at least
 refused a NaN. What catches a datum that is not a reading is its width, and
 almost nothing a link can deliver here is four bytes long: a sensor's raw
 bytes are two or three, a decision is one, a line of text is longer. The one
@@ -2117,13 +2158,15 @@ per answer on its standard output:
    out:                 an empty line: nothing to send yet
 
 Requirement
-    The program is handed lines and answers in lines, in decimal. A value on a
-    link is four bytes of micro-kelvin, and tcspecial converts at the pipe in
+    The program is handed lines and answers in lines, in decimal, in the
+    units the graph says: what it is handed in the unit of what feeds it, and
+    its answers in the ``unit`` the node states. A value on a link is four
+    bytes of a count of steps, and tcspecial converts at the pipe in
     both directions: a line is what every language reads without a library,
     which is the point of this type of node existing at all, and a program that
     had to unpack a binary integer and scale it would not be writable in
     a shell. Nothing is lost by the trip -- a value is a whole number of
-    micro-kelvin, so six decimal places say all of it -- and a program's answer
+    its unit's steps, so the decimal places say all of it -- and a program's answer
     is held to the range a reading is held to, with the complaint naming the
     program.
 

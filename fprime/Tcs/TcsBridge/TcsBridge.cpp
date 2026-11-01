@@ -249,21 +249,22 @@ const Datum &TcsBridge::asDatum(const tcs_datum &datum)
 	return m_datum;
 }
 
-bool TcsBridge::asKelvin(const tcs_datum &datum, F64 &kelvin)
+bool TcsBridge::asValue(const tcs_datum &datum, const char *unit,
+			F64 &value)
 {
 	// Read by tcslib-c, which reads it as the vehicle wrote it, so that
-	// what a value is -- its width, its unit, its byte order -- is said
-	// once. One that is not a value is written to no channel: a number
-	// made of whatever four bytes were there would be a temperature
-	// nobody measured.
+	// what a value is -- its width, its unit's step, its byte order -- is
+	// said once. One that is not a value is written to no channel: a
+	// number made of whatever four bytes were there would be a reading
+	// nobody took.
 	double read = 0.0;
-	if (tcs_value_kelvin(datum.data, datum.length, &read) != 0) {
+	if (tcs_value_in(unit, datum.data, datum.length, &read) != 0) {
 		m_notValues++;
 		this->log_WARNING_LO_NotAValue(Fw::String(datum.source),
 					       Fw::String(tcs_last_error()));
 		return false;
 	}
-	kelvin = read;
+	value = read;
 	return true;
 }
 

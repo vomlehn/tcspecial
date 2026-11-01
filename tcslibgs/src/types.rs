@@ -839,49 +839,54 @@ impl DHSample {
     /// shown as the number it is: see [`DHSample::panel_lines_of`], which is
     /// what a panel with the configuration in hand calls.
     pub fn panel_lines(&self) -> (String, String) {
-        self.panel_lines_of(false)
+        self.panel_lines_of(None)
     }
 
-    /// The same two strings, with the data read as a temperature where the
-    /// node that sent it sends values.
+    /// The same two strings, with the data read as a number in its unit
+    /// where the node that sent it sends values.
     ///
-    /// `as_value` is the configuration's answer about that node -- see
-    /// `crate::node::vehicle::compute::node_sends_a_value` -- and not a guess
-    /// from the data: every four bytes are a value, so a datum of four
-    /// characters would otherwise be shown as a temperature.
+    /// `unit` is the configuration's answer about that node -- see
+    /// `crate::graph::units::unit_of` -- and not a guess from the data:
+    /// every four bytes are a value, so a datum of four characters would
+    /// otherwise be shown as a number.
     ///
     /// A reading shows as the shortest decimal that is the number, with the
     /// unit after it, because what a reader of a panel wants from this line
-    /// is the temperature. Hexadecimal was what every line showed, and for a
+    /// is the reading. Hexadecimal was what every line showed, and for a
     /// reading it was eight characters of nothing anybody could act on.
     ///
     /// Anything that cannot be read as a value falls back to the bytes --
     /// including a sample of a value that was truncated, which cannot happen
     /// today, a value being shorter than a sample. A node that sends values
     /// and sent something else has something wrong with it, and the bytes are
-    /// what says so; a temperature made out of the wrong four bytes would
-    /// hide it.
+    /// what says so; a number made out of the wrong four bytes would hide it.
     ///
     /// # Arguments
     ///
-    /// * `as_value` - Whether the node that sent the data sends values.
+    /// * `unit` - What the node that sent the data sends values in, or
+    ///            `None` where it does not send values.
     ///
     /// # Returns
     ///
-    /// The time of day of the transfer, and its data as a temperature in kelvin
-    /// or as hex; [`NO_TRANSFER_TIME`] and nothing for a sample with no time.
-    pub fn panel_lines_of(&self, as_value: bool) -> (String, String) {
+    /// The time of day of the transfer, and its data as a number with its
+    /// unit or as hex; [`NO_TRANSFER_TIME`] and nothing for a sample with no
+    /// time.
+    pub fn panel_lines_of(
+        &self,
+        unit: Option<crate::unit::Unit>,
+    ) -> (String, String) {
         let Some(time) = self.time else {
             return (NO_TRANSFER_TIME.to_string(), String::new());
         };
 
-        if as_value && !self.was_truncated() {
+        if let (Some(unit), false) = (unit, self.was_truncated()) {
             if let Ok(number) = crate::node::vehicle::compute::from_value(
                 self.data(),
+                unit,
                 "what arrived",
             ) {
                 let shown = crate::node::vehicle::compute::as_text(number);
-                return (time.time_of_day(), format!("{shown} K"));
+                return (time.time_of_day(), format!("{shown} {unit}"));
             }
         }
 
@@ -2944,36 +2949,47 @@ mod tests {
         };
 
         let mut sample = DHSample::new();
-        sample.record(&as_value(293.15).expect("a temperature"));
+        sample.record(
+            &as_value(293.15, crate::unit::Unit::Kelvin)
+                .expect("a temperature"),
+        );
         at(&mut sample);
         assert_eq!(
-            sample.panel_lines_of(true),
+            sample.panel_lines_of(Some(crate::unit::Unit::Kelvin)),
             ("01:01:01".to_string(), "293.15 K".to_string())
         );
         // The same sample from a node that sends something else: the bytes.
         assert_eq!(
-            sample.panel_lines_of(false),
+            sample.panel_lines_of(None),
             ("01:01:01".to_string(), "11 79 1D 30".to_string())
         );
 
         // Below zero, which is what the sign on a value is for: a conversion
         // with the wrong offset reads as what it is and not as 4295 K.
         let mut sample = DHSample::new();
-        sample.record(&as_value(-40.0).expect("below zero"));
+        sample.record(
+            &as_value(-40.0, crate::unit::Unit::Kelvin).expect("below zero"),
+        );
         at(&mut sample);
-        assert_eq!(sample.panel_lines_of(true).1, "-40 K");
+        assert_eq!(
+            sample.panel_lines_of(Some(crate::unit::Unit::Kelvin)).1,
+            "-40 K"
+        );
 
         // A node that sends values and sent something that is not one: the
         // bytes, because that is what says something is wrong with it.
         let mut sample = DHSample::new();
         sample.record(b"293.15");
         at(&mut sample);
-        assert_eq!(sample.panel_lines_of(true).1, "32 39 33 2E 31 35");
+        assert_eq!(
+            sample.panel_lines_of(Some(crate::unit::Unit::Kelvin)).1,
+            "32 39 33 2E 31 35"
+        );
 
         // And a direction that has carried nothing is still the placeholder,
         // whichever kind of node it is.
         assert_eq!(
-            DHSample::new().panel_lines_of(true),
+            DHSample::new().panel_lines_of(Some(crate::unit::Unit::Kelvin)),
             (NO_TRANSFER_TIME.to_string(), String::new())
         );
     }

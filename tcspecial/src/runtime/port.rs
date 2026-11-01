@@ -53,6 +53,7 @@ use tcslibgs::graph::reach::reach_of;
 use tcslibgs::graph::terminals::Stream;
 use tcslibgs::graph::Node;
 use tcslibgs::node::app;
+use tcslibgs::unit::Unit;
 use tcslibgs::{EndpointConfig, TcsError, TcsResult};
 
 use crate::node::payload::app_all_pl::AppAllPl;
@@ -957,6 +958,8 @@ impl ComputePort {
     ///               computation over several of them needs: a mean cannot
     ///               know it is waiting for three until something tells it
     ///               how many links arrive.
+    /// * `unit`    - What the values arriving at it are in, where it reads
+    ///               values: see `Routes::input_unit_of`.
     /// * `abandon` - What a wait inside the computation, such as a
     ///               `process` computation's, is abandoned for.
     ///
@@ -970,11 +973,12 @@ impl ComputePort {
     pub fn make(
         node: &Node,
         inputs: &[&str],
+        unit: Option<Unit>,
         abandon: &Abandon,
     ) -> Result<ComputePort, String> {
         Ok(ComputePort::of(
             &node.name,
-            compute::make(node, inputs, abandon)?,
+            compute::make(node, inputs, unit, abandon)?,
         ))
     }
 
@@ -1572,7 +1576,8 @@ mod tests {
     /// A temperature on a link: four bytes of micro-kelvin, which is what a
     /// conversion produces and what a computation reads.
     fn kelvin(number: f64) -> Vec<u8> {
-        compute::as_value(number).expect("a temperature a value carries")
+        compute::as_value(number, tcslibgs::unit::Unit::Kelvin)
+            .expect("a temperature a value carries")
     }
 
     /// What a stand-in endpoint was asked to do, and what it will answer.
@@ -2568,11 +2573,14 @@ mod tests {
 
         let mut port = ComputePort::of(
             "zone_temp",
-            Box::new(Vote::of(VoteParams {
-                algorithm: Algorithm::Median,
-                age: None,
-                inputs: vec!["in0".to_string(), "in1".to_string()],
-            })),
+            Box::new(Vote::of(
+                VoteParams {
+                    algorithm: Algorithm::Median,
+                    age: None,
+                    inputs: vec!["in0".to_string(), "in1".to_string()],
+                },
+                tcslibgs::unit::Unit::Kelvin,
+            )),
         );
         assert_eq!(port.function(), "vote");
 
@@ -2592,7 +2600,11 @@ mod tests {
             .map(|taken| taken.bytes)
             .expect("the average");
         assert_eq!(
-            compute::from_value(&buffer[..got], "the average"),
+            compute::from_value(
+                &buffer[..got],
+                tcslibgs::unit::Unit::Kelvin,
+                "the average"
+            ),
             Ok(291.0)
         );
 
@@ -2690,11 +2702,14 @@ mod tests {
 
         let mut port = ComputePort::of(
             "zone_temp",
-            Box::new(Vote::of(VoteParams {
-                algorithm: Algorithm::Median,
-                age: None,
-                inputs: vec!["in0".to_string(), "in1".to_string()],
-            })),
+            Box::new(Vote::of(
+                VoteParams {
+                    algorithm: Algorithm::Median,
+                    age: None,
+                    inputs: vec!["in0".to_string(), "in1".to_string()],
+                },
+                tcslibgs::unit::Unit::Kelvin,
+            )),
         );
 
         // Two ways a datum is not a value, and both are refused here rather
@@ -2725,11 +2740,14 @@ mod tests {
 
         let mut port = ComputePort::of(
             "zone_temp",
-            Box::new(Vote::of(VoteParams {
-                algorithm: Algorithm::Median,
-                age: None,
-                inputs: vec!["in0".to_string(), "in1".to_string()],
-            })),
+            Box::new(Vote::of(
+                VoteParams {
+                    algorithm: Algorithm::Median,
+                    age: None,
+                    inputs: vec!["in0".to_string(), "in1".to_string()],
+                },
+                tcslibgs::unit::Unit::Kelvin,
+            )),
         );
         port.give(Arriving::named("in0"), &kelvin(293.15))
             .expect("a reading");
@@ -2751,7 +2769,11 @@ mod tests {
             .map(|taken| taken.bytes)
             .expect("the result");
         assert_eq!(
-            compute::from_value(&buffer[..got], "the result"),
+            compute::from_value(
+                &buffer[..got],
+                tcslibgs::unit::Unit::Kelvin,
+                "the result"
+            ),
             Ok(293.15)
         );
     }

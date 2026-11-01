@@ -58,6 +58,7 @@ pub mod renamed;
 pub mod simulated;
 pub mod telemetry;
 pub mod terminals;
+pub mod units;
 
 use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};

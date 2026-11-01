@@ -34,7 +34,7 @@
 use std::collections::BTreeMap;
 use std::sync::Mutex;
 
-use tcslibgs::node::vehicle::compute::{HysteresisParams, ToKelvinParams};
+use tcslibgs::node::vehicle::compute::{HysteresisParams, ToValueParams};
 
 use crate::physics::thermal_mass::thermal_mass::{driven, Thermal};
 
@@ -70,7 +70,7 @@ pub struct Thermostat {
     /// How far from the setpoint the decision changes, each way.
     half_band: f64,
     /// How each sensor's bytes are read, by payload name.
-    sensors: BTreeMap<String, ToKelvinParams>,
+    sensors: BTreeMap<String, ToValueParams>,
     /// The heaters it switches, by payload name.
     heaters: Vec<(String, Thermal)>,
     state: Mutex<State>,
@@ -94,7 +94,7 @@ impl Thermostat {
     pub fn new(
         name: &str,
         params: HysteresisParams,
-        sensors: BTreeMap<String, ToKelvinParams>,
+        sensors: BTreeMap<String, ToValueParams>,
         heaters: Vec<(String, Thermal)>,
     ) -> Thermostat {
         Thermostat {
@@ -221,11 +221,12 @@ mod tests {
     ///
     /// Sixteenths of a kelvin above freezing, two bytes, signed, most
     /// significant first.
-    fn sixteenths() -> ToKelvinParams {
-        ToKelvinParams {
+    fn sixteenths() -> ToValueParams {
+        ToValueParams {
             format: Format::I16Be,
             scale: 0.0625,
             offset: 273.15,
+            unit: tcslibgs::unit::Unit::Kelvin,
         }
     }
 

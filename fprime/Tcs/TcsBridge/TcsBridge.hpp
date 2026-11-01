@@ -96,7 +96,7 @@ private:
 
 	/** Writes a datum to the channel of the node that produced it, as
 	 * what the configuration says its data are: through asDatum(),
-	 * asKelvin() or asDecision(). In model/TcsBridgeModel.cpp, which
+	 * asValue() or asDecision(). In model/TcsBridgeModel.cpp, which
 	 * tcsverify --fprime-model writes.
 	 *
 	 * @param datum  The datum, and the node that produced it.
@@ -124,13 +124,14 @@ private:
 	 *               datum. */
 	const Datum &asDatum(const tcs_datum &datum);
 
-	/** Reads a datum as a value, a temperature, as tcslib-c reads one,
+	/** Reads a datum as a value in its unit, as tcslib-c reads one,
 	 * counting and saying it where it is not one.
 	 *
-	 * @param datum   The datum.
-	 * @param kelvin  Where the temperature is written.
-	 * @return        true where it was a value. */
-	bool asKelvin(const tcs_datum &datum, F64 &kelvin);
+	 * @param datum  The datum.
+	 * @param unit   The unit the configuration says it is in: "K", "V".
+	 * @param value  Where the number is written.
+	 * @return       true where it was a value. */
+	bool asValue(const tcs_datum &datum, const char *unit, F64 &value);
 
 	/** Reads a datum as a decision, on or off, as tcslib-c reads one,
 	 * counting and saying it where it is not one.

@@ -317,10 +317,11 @@ int tcs_gateway_receive(tcs_gateway *gateway, int64_t wait_ms,
 void tcs_gateway_close(tcs_gateway *gateway);
 
 /* A value is what a computation that makes one sends: four bytes of a signed
- * count of micro-kelvin, most significant first, which is a temperature. Only
- * the configuration says which nodes send values -- every four bytes read as
- * one, so a datum's width cannot -- and these two are how a station asks it
- * and reads one. */
+ * count of its unit's steps, most significant first -- micro-kelvin for a
+ * temperature, micro-volts for a voltage, millimetres for a length. Only the
+ * configuration says which nodes send values, and in what unit -- every four
+ * bytes read as one, so a datum's width cannot -- and these are how a station
+ * asks it and reads one. */
 
 /** Says whether a node sends values, as the configuration says: a compute
  * node whose function is to_kelvin, vote or process.
@@ -340,6 +341,28 @@ int tcs_configuration_sends_values(const tcs_configuration *configuration,
  * @param kelvin  Where the temperature is written, in kelvin.
  * @return        0, or -1 where the datum is not a value's width. */
 int tcs_value_kelvin(const uint8_t *data, size_t length, double *kelvin);
+
+/** Says what unit a node's values are in, as the configuration says.
+ *
+ * @param configuration  The configuration.
+ * @param node           The node's name, as a datum's source gives it.
+ * @param symbol         Where the unit's symbol is written -- "K", "V",
+ *                       "m/s" -- good for as long as the program runs, or
+ *                       NULL where the node does not send values.
+ * @return               0, or -1 where there is no such node. */
+int tcs_configuration_value_unit(const tcs_configuration *configuration,
+				 const char *node, const char **symbol);
+
+/** Reads a value as a number in its unit.
+ *
+ * @param symbol  The unit, as tcs_configuration_value_unit gives it.
+ * @param data    The datum's bytes; may be NULL where length is 0.
+ * @param length  How many bytes data holds, which for a value is 4.
+ * @param value   Where the number is written, in that unit.
+ * @return        0, or -1 where the unit is not one or the datum is not a
+ *                value's width. */
+int tcs_value_in(const char *symbol, const uint8_t *data, size_t length,
+		 double *value);
 
 /* A decision is what a thermostat -- a compute node whose function is
  * hysteresis -- sends: the text 1 to assert, 0 to unassert, which is what the

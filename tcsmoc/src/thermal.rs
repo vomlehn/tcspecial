@@ -469,9 +469,10 @@ pub fn take(plot: &Mutex<Plot>, plotted: Plotted, data: &[u8], at: Instant) {
     // allocate nothing.
     match plotted {
         Plotted::Sensor(i) => {
-            if let (Ok(kelvin), Ok(mut plot)) =
-                (from_value(data, ""), plot.lock())
-            {
+            if let (Ok(kelvin), Ok(mut plot)) = (
+                from_value(data, tcslibgs::unit::Unit::Kelvin, ""),
+                plot.lock(),
+            ) {
                 plot.reading(i, at, kelvin);
             }
         }

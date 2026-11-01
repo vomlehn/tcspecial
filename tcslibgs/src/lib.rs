@@ -69,6 +69,8 @@ pub mod store;
 pub mod telemetry;
 pub mod trigger;
 pub mod types;
+/// The units a value may be in, and how finely each is carried.
+pub mod unit;
 pub mod verify;
 pub mod whole;
 

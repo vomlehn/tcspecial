@@ -237,6 +237,7 @@ fn a_vehicle_answering_to_fprime_reports_to_the_bridge_and_takes_its_commands()
     assert_eq!(until_heard(&sensor, to, &reading, &bridge), reading);
     let kelvin = tcslibgs::node::vehicle::compute::from_value(
         &until_heard(&sensor, to, &reading, &temperatures),
+        tcslibgs::unit::Unit::Kelvin,
         "zone_temp",
     )
     .expect("a value");

@@ -49,9 +49,11 @@ peer (see "A vehicle on a cFS software bus" in
   what arrives before is dropped and counted, as is whatever is waiting when
   the match begins. So a station that reads data passes its beacons too.
   `tcs_configuration_sends_values` says whether a node's data are *values*
-  -- four bytes of micro-kelvin, which a conversion, a vote or a program's
-  answer makes -- as the configuration says, a datum's width being no
-  guide, and `tcs_value_kelvin` reads one as a temperature.
+  -- four bytes of a count of a unit's steps, which a conversion, a vote or
+  a program's answer makes -- as the configuration says, a datum's width
+  being no guide. `tcs_configuration_value_unit` says what unit a node's
+  values are in, `tcs_value_in` reads one as a number in it, and
+  `tcs_value_kelvin` reads a temperature.
   `tcs_configuration_sends_decisions` says whether they are *decisions* --
   the text `1` or `0`, which a thermostat makes -- and `tcs_decision_on`
   reads one as on or off.

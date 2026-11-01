@@ -41,11 +41,13 @@
 pub mod hysteresis;
 pub mod process;
 pub mod to_kelvin;
+pub mod to_value;
 pub mod vote;
 
 use crate::runtime::node_state::Abandon;
 use tcslibgs::graph::Node;
 use tcslibgs::node::vehicle::compute::{self, Computation};
+use tcslibgs::unit::Unit;
 
 /// The most a computation hands on at once.
 ///
@@ -66,12 +68,13 @@ pub struct Out {
 }
 
 impl Out {
-    /// Makes a value, as every computation's result over temperatures is:
-    /// see `tcslibgs::node::vehicle::compute::as_value`.
+    /// Makes a value, as every computation's result over values is: see
+    /// `tcslibgs::node::vehicle::compute::as_value`.
     ///
     /// # Arguments
     ///
-    /// * `number` - The number to carry, in kelvin for a temperature.
+    /// * `number` - The number to carry.
+    /// * `unit`   - What it is a number of.
     ///
     /// # Returns
     ///
@@ -79,10 +82,10 @@ impl Out {
     ///
     /// # Errors
     ///
-    /// A message saying so if `number` is outside the range a value can
-    /// carry.
-    pub fn value(number: f64) -> Result<Out, String> {
-        let value = value_bytes(number)?;
+    /// A message saying so if `number` is outside the range a value in
+    /// `unit` can carry.
+    pub fn value(number: f64, unit: Unit) -> Result<Out, String> {
+        let value = value_bytes(number, unit)?;
         let mut bytes = [0u8; OUT_BYTES];
         bytes[..value.len()].copy_from_slice(&value);
         Ok(Out {
@@ -227,6 +230,8 @@ pub trait Function: Send {
 ///               over several of them needs: a vote cannot know it is
 ///               waiting for three until something tells it how many links
 ///               arrive.
+/// * `unit`    - What the values arriving at it are in, for a computation
+///               that reads values: see `tcslibgs::graph::units`.
 /// * `abandon` - The node's own wakeup, which a `process` gives up its wait
 ///               for an answer on when the node is disabled.
 ///
@@ -237,11 +242,13 @@ pub trait Function: Send {
 /// # Errors
 ///
 /// A message naming the node if its attributes are wrong, a vote's
-/// declared inputs are not the ones bound to it, or a `process`'s program
-/// cannot be started.
+/// declared inputs are not the ones bound to it, a computation that reads
+/// values has none arriving in one unit, or a `process`'s program cannot be
+/// started.
 pub fn make(
     node: &Node,
     inputs: &[&str],
+    unit: Option<Unit>,
     abandon: &Abandon,
 ) -> Result<Box<dyn Function>, String> {
     // What the node says, by the rules the ground tool checks it against: see
@@ -249,9 +256,23 @@ pub fn make(
     // names the node and the computation.
     let what = compute::params_of(&node.name, &node.attributes)?;
 
-    match what {
-        Computation::ToKelvin(params) => {
-            Ok(Box::new(to_kelvin::ToKelvin::of(params)))
+    // What a vote, a thermostat or a program reads is values in one unit,
+    // which `Graph::check` has held the configuration to. Asked again here
+    // because what is built decodes every arrival by it.
+    let reads = || {
+        unit.ok_or_else(|| {
+            format!(
+                "\"{}\" ({}) reads values, and nothing sends it values in \
+                 one unit",
+                node.name,
+                what.function()
+            )
+        })
+    };
+
+    match &what {
+        Computation::ToKelvin(params) | Computation::ToValue(params) => {
+            Ok(Box::new(to_value::ToValue::of(*params, what.function())))
         }
         Computation::Vote(params) => {
             // The declared inputs and the bound ones are checked against each
@@ -274,10 +295,10 @@ pub fn make(
                 ));
             }
 
-            Ok(Box::new(vote::Vote::of(params)))
+            Ok(Box::new(vote::Vote::of(params.clone(), reads()?)))
         }
         Computation::Hysteresis(params) => {
-            Ok(Box::new(hysteresis::Hysteresis::of(params)))
+            Ok(Box::new(hysteresis::Hysteresis::of(*params, reads()?)))
         }
         // Started here, as the configuration is loaded: a program that
         // cannot be executed is a fault found on the ground rather than three
@@ -286,8 +307,8 @@ pub fn make(
             // The node's own wakeup, so that disabling the node gives up the
             // wait for an answer rather than waiting out a deadline that may
             // be seconds long.
-            let mut program =
-                process::Process::of(params).abandoned_for(abandon.clone());
+            let mut program = process::Process::of(params.clone(), reads()?)
+                .abandoned_for(abandon.clone());
             program
                 .start()
                 .map_err(|why| format!("\"{}\" (process): {why}", node.name))?;
@@ -325,12 +346,14 @@ mod tests {
     #[test]
     fn the_thermostat_runs_from_counts_to_a_decision() {
         let sensor = |scale: f64, offset: f64| {
-            to_kelvin::ToKelvin::of(
-                tcslibgs::node::vehicle::compute::ToKelvinParams {
+            to_value::ToValue::of(
+                tcslibgs::node::vehicle::compute::ToValueParams {
                     format: tcslibgs::node::vehicle::compute::Format::I16Be,
                     scale,
                     offset,
+                    unit: tcslibgs::unit::Unit::Kelvin,
                 },
+                "to_kelvin",
             )
         };
 
@@ -343,21 +366,25 @@ mod tests {
             sensor(0.0625, 273.15),
             sensor(0.0625, 273.15),
         ];
-        let mut voted = vote::Vote::of(VoteParams {
-            inputs: vec![
-                "in0".to_string(),
-                "in1".to_string(),
-                "in2".to_string(),
-            ],
-            algorithm: Algorithm::Median,
-            age: None,
-        });
+        let mut voted = vote::Vote::of(
+            VoteParams {
+                inputs: vec![
+                    "in0".to_string(),
+                    "in1".to_string(),
+                    "in2".to_string(),
+                ],
+                algorithm: Algorithm::Median,
+                age: None,
+            },
+            tcslibgs::unit::Unit::Kelvin,
+        );
 
         let mut thermostat = hysteresis::Hysteresis::of(
             tcslibgs::node::vehicle::compute::HysteresisParams {
                 setpoint: 293.15,
                 half_band: 2.0,
             },
+            tcslibgs::unit::Unit::Kelvin,
         );
 
         /// Runs one pass: three readings in, a decision out if there is one.
@@ -373,7 +400,7 @@ mod tests {
         ///
         /// The thermostat's decision, or `None` if it made none.
         fn pass(
-            converters: &mut [to_kelvin::ToKelvin; 3],
+            converters: &mut [to_value::ToValue; 3],
             voted: &mut vote::Vote,
             thermostat: &mut hysteresis::Hysteresis,
             counts: [i16; 3],
@@ -455,30 +482,37 @@ mod tests {
     #[test]
     fn three_unlike_sensors_average_to_one_temperature() {
         use tcslibgs::node::vehicle::compute::{
-            Algorithm, Format, ToKelvinParams, VoteParams,
+            Algorithm, Format, ToValueParams, VoteParams,
         };
 
         let part = |format: Format, scale: f64| {
-            to_kelvin::ToKelvin::of(ToKelvinParams {
-                format,
-                scale,
-                offset: 273.15,
-            })
+            to_value::ToValue::of(
+                ToValueParams {
+                    format,
+                    scale,
+                    offset: 273.15,
+                    unit: tcslibgs::unit::Unit::Kelvin,
+                },
+                "to_kelvin",
+            )
         };
         let mut fore = part(Format::I16Be, 0.0625);
         let mut aft = part(Format::I16Be, 0.0625);
         // A different part: three bytes, and a different scale.
         let mut bay = part(Format::U24Be, 0.001);
 
-        let mut voted = vote::Vote::of(VoteParams {
-            inputs: vec![
-                "in0".to_string(),
-                "in1".to_string(),
-                "in2".to_string(),
-            ],
-            algorithm: Algorithm::Median,
-            age: None,
-        });
+        let mut voted = vote::Vote::of(
+            VoteParams {
+                inputs: vec![
+                    "in0".to_string(),
+                    "in1".to_string(),
+                    "in2".to_string(),
+                ],
+                algorithm: Algorithm::Median,
+                age: None,
+            },
+            tcslibgs::unit::Unit::Kelvin,
+        );
 
         // All three sitting at 20 above freezing, in their own units.
         let a = fore.give(None, &320i16.to_be_bytes()).unwrap().unwrap();
@@ -490,7 +524,8 @@ mod tests {
         assert!(voted.give(Some("in1"), &b).unwrap().is_some());
         let out = voted.give(Some("in2"), &c).unwrap().expect("a vote");
 
-        let averaged = from_value(&out, "the mean").unwrap();
+        let averaged =
+            from_value(&out, tcslibgs::unit::Unit::Kelvin, "the mean").unwrap();
         assert!(
             (averaged - 293.15).abs() < 0.01,
             "three sensors at one temperature averaged to {averaged}"
@@ -506,7 +541,7 @@ mod tests {
             group: None,
             attributes: BTreeMap::new(),
         };
-        let said = match make(&node, &[], &Abandon::nothing()) {
+        let said = match make(&node, &[], None, &Abandon::nothing()) {
             Err(said) => said,
             Ok(f) => panic!("a node with no function became {}", f.name()),
         };
@@ -529,7 +564,7 @@ mod tests {
             group: None,
             attributes,
         };
-        let said = match make(&node, &[], &Abandon::nothing()) {
+        let said = match make(&node, &[], None, &Abandon::nothing()) {
             Err(said) => said,
             Ok(f) => panic!("sorcery became {}", f.name()),
         };
@@ -556,7 +591,7 @@ mod tests {
             attributes,
         };
 
-        let said = match make(&node, &[], &Abandon::nothing()) {
+        let said = match make(&node, &[], None, &Abandon::nothing()) {
             Err(said) => said,
             Ok(f) => panic!("a conversion with no scale became {}", f.name()),
         };

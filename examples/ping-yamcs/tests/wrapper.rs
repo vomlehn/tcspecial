@@ -1,16 +1,19 @@
 //! The Yamcs wrapper reads what the vehicle frames, and frames what the
 //! vehicle reads.
 //!
-//! `yamcs/tcs-ccsds.xtce.in` tells Yamcs how a packet on the link is laid
-//! out: a CCSDS primary header, and after it, by APID, what follows. The
-//! vehicle frames and unframes with `tcslibgs::ccsds`. Nothing but a run
-//! against Yamcs itself would show the two disagreeing -- a header width, a
-//! length off by one, a restriction on the wrong APID -- so this reads the
-//! wrapper, as `ping_yamcs.py` fills it in from the configuration, and works
-//! it as Yamcs would on the vehicle's own packets:
+//! The mission database's wrapper, which `tcslibgs/yamcs.py` generates from
+//! the configuration and `python/tcslibgs/yamcs.xtce`, tells Yamcs how a
+//! packet on the link is laid out: a CCSDS primary header, and after it, by
+//! APID, what follows. The vehicle frames and unframes with
+//! `tcslibgs::ccsds`. Nothing but a run against Yamcs itself would show the
+//! two disagreeing -- a header width, a length off by one, a restriction on
+//! the wrong APID -- so this generates the wrapper, as `ping_yamcs.py` does,
+//! and works it as Yamcs would on the vehicle's own packets:
 //!
 //! * each packet the vehicle sends down -- a beacon, a ping's answer,
-//!   CONNECT's answer and another command's -- framed by `tcslibgs` and
+//!   CONNECT's answer and another command's, and in a copy of the example
+//!   with more nodes, a payload's data through the gateway node and a
+//!   payload's telemetry -- framed by `tcslibgs` and
 //!   decoded by the wrapper, must land in the container meant for it, with
 //!   the header's fields and the body where the wrapper says;
 //! * each command Yamcs sends up -- CONNECT and a ping -- encoded by the
@@ -24,10 +27,9 @@
 use std::collections::BTreeMap;
 use std::time::Duration;
 
-use quick_xml::escape::unescape;
-use quick_xml::events::{BytesStart, Event};
-use quick_xml::Reader;
 use tcslibgs::ccsds::{read_header, PacketType, Sender, HEADER_BYTES};
+use tcslibgs::graph::telemetry;
+use tcslibgs::graph::Graph;
 use tcslibgs::node::vehicle::ping;
 use tcslibgs::telemetry::{ConnectTelemetry, PingTelemetry, Telemetry};
 use tcslibgs::types::CommandStatus;
@@ -35,105 +37,10 @@ use tcslibgs::{Beacon, Command, ConfigDigest, ConfigVersion};
 
 mod common;
 
-use common::{here, worked_out_of};
+use common::{generated_mdb, here, with_more_nodes, worked_out_of, Element};
 
-/// One element of the wrapper, with what is in it.
-#[derive(Debug, Default)]
-struct Element {
-    name: String,
-    attributes: Vec<(String, String)>,
-    children: Vec<Element>,
-    text: String,
-}
-
-impl Element {
-    /// One of its attributes.
-    ///
-    /// # Arguments
-    ///
-    /// * `name` - The attribute's name.
-    ///
-    /// # Returns
-    ///
-    /// Its value, or `None` where it has none of that name.
-    fn attribute(&self, name: &str) -> Option<&str> {
-        self.attributes
-            .iter()
-            .find(|(said, _)| said == name)
-            .map(|(_, value)| value.as_str())
-    }
-
-    /// Its first child of a kind.
-    ///
-    /// # Arguments
-    ///
-    /// * `name` - The child's element name.
-    ///
-    /// # Returns
-    ///
-    /// The child, or `None`.
-    fn child(&self, name: &str) -> Option<&Element> {
-        self.children.iter().find(|child| child.name == name)
-    }
-
-    /// Everything of a kind within it, at any depth, in document order.
-    ///
-    /// # Arguments
-    ///
-    /// * `name` - The element name.
-    /// * `found` - Where they are put.
-    fn within<'a>(&'a self, name: &str, found: &mut Vec<&'a Element>) {
-        for child in &self.children {
-            if child.name == name {
-                found.push(child);
-            }
-            child.within(name, found);
-        }
-    }
-
-    /// The one element of a kind within it with a `name` attribute.
-    ///
-    /// # Arguments
-    ///
-    /// * `kind` - The element name.
-    /// * `name` - Its `name` attribute.
-    ///
-    /// # Returns
-    ///
-    /// The element.
-    ///
-    /// # Panics
-    ///
-    /// There is none.
-    fn named(&self, kind: &str, name: &str) -> &Element {
-        let mut found = Vec::new();
-        self.within(kind, &mut found);
-        found
-            .into_iter()
-            .find(|element| element.attribute("name") == Some(name))
-            .unwrap_or_else(|| panic!("the wrapper has no {kind} {name}"))
-    }
-}
-
-/// An element's name and attributes, as an [`Element`] with nothing in it.
-fn opened(start: &BytesStart<'_>) -> Element {
-    let text = |said: &str| unescape(said).expect("well escaped").into_owned();
-    Element {
-        name: text(start.name().as_ref()),
-        attributes: start
-            .attributes()
-            .map(|attribute| {
-                let attribute = attribute.expect("an attribute");
-                (text(attribute.key.as_ref()), text(&attribute.value))
-            })
-            .collect(),
-        ..Element::default()
-    }
-}
-
-/// The wrapper, filled in as `ping_yamcs.py` fills it in, from the APIDs the
-/// Rust works out of the example's configuration -- which `agrees.rs` holds
-/// the Python's to.
+/// The wrapper `tcslibgs/yamcs.py` generates for the example's
+/// configuration, as `ping_yamcs.py` writes it for Yamcs.
 ///
 /// # Returns
 ///
@@ -141,50 +48,9 @@ fn opened(start: &BytesStart<'_>) -> Element {
 ///
 /// # Panics
 ///
-/// It does not read, or a name in it is left unfilled.
+/// It is not generated, or does not read.
 fn wrapper() -> Element {
-    let mut text =
-        std::fs::read_to_string(here().join("yamcs/tcs-ccsds.xtce.in"))
-            .expect("the wrapper");
-    for name in ["beacon_apid", "cmd_apid", "uplink_apid", "reply_apid"] {
-        text = text.replace(&format!("${name}"), &worked_out_of(name));
-    }
-    assert!(!text.contains('$'), "a name left unfilled in the wrapper");
-
-    let mut reader = Reader::from_str(&text);
-    reader.config_mut().trim_text(true);
-    let mut open = vec![Element::default()];
-    loop {
-        match reader.read_event().expect("the wrapper is XML") {
-            Event::Start(start) => open.push(opened(&start)),
-            Event::Empty(start) => {
-                let element = opened(&start);
-                open.last_mut().expect("a parent").children.push(element);
-            }
-            Event::End(_) => {
-                let element = open.pop().expect("an element");
-                open.last_mut().expect("a parent").children.push(element);
-            }
-            Event::Text(said) => {
-                let said: &str = said.as_ref();
-                open.last_mut().expect("an element").text.push_str(said);
-            }
-            // An entity in text, `&lt;` in a comparison, comes apart from
-            // the text around it.
-            Event::GeneralRef(entity) => {
-                let entity: &str = entity.as_ref();
-                let said = unescape(&format!("&{entity};"))
-                    .expect("an entity XML defines")
-                    .into_owned();
-                open.last_mut().expect("an element").text.push_str(&said);
-            }
-            Event::Eof => break,
-            _ => {}
-        }
-    }
-    let mut document = open.pop().expect("the document");
-    assert!(open.is_empty(), "every element closed");
-    document.children.pop().expect("a root element")
+    generated_mdb(&here().join("ping-yamcs.xtcs"))
 }
 
 /// The APID the Rust works out for a name `ping_yamcs.py --describe` uses.
@@ -193,6 +59,16 @@ fn apid(name: &str) -> u16 {
 }
 
 /// `bits` bits of `packet` from bit `at`, most significant first.
+///
+/// # Arguments
+///
+/// * `packet` - The packet.
+/// * `at`     - The first bit, counting from nought.
+/// * `bits`   - How many.
+///
+/// # Returns
+///
+/// Their value.
 fn bits(packet: &[u8], at: usize, bits: usize) -> u64 {
     assert!(at + bits <= packet.len() * 8, "{bits} bits at {at} overrun");
     (at..at + bits).fold(0, |value, bit| {
@@ -262,6 +138,16 @@ fn width(kind: &Element, values: &BTreeMap<String, u64>) -> usize {
 
 /// Where an entry starts: where it says, from the start of the packet, or
 /// where the entry before it ended.
+///
+/// # Arguments
+///
+/// * `entry` - The entry.
+/// * `after` - Where the entry before it ended, or `None` where that is
+///             not known.
+///
+/// # Returns
+///
+/// The bit it starts at.
 fn start_of(entry: &Element, after: Option<usize>) -> usize {
     match entry.child("LocationInContainerInBits") {
         Some(location) => {
@@ -297,6 +183,16 @@ struct Decoded {
 }
 
 /// Whether a comparison holds.
+///
+/// # Arguments
+///
+/// * `left`     - The value compared.
+/// * `operator` - The comparison, as XTCE writes it.
+/// * `right`    - What it is compared with.
+///
+/// # Returns
+///
+/// Whether it holds.
 fn holds(left: u64, operator: &str, right: u64) -> bool {
     match operator {
         "==" => left == right,
@@ -574,6 +470,15 @@ fn encode(xtce: &Element, command: &str, given: &[(&str, Given)]) -> Vec<u8> {
 }
 
 /// Frames a packet's data as the vehicle does, under an APID.
+///
+/// # Arguments
+///
+/// * `apid` - The APID.
+/// * `data` - What follows the header.
+///
+/// # Returns
+///
+/// The packet.
 fn framed(apid: u16, data: &[u8]) -> Vec<u8> {
     let mut sender =
         Sender::new(PacketType::Telemetry, apid).expect("a sender");
@@ -611,7 +516,7 @@ fn a_beacon_decodes_as_the_vehicle_framed_it() {
 }
 
 /// A ping's answer, framed under `apid_base` plus the ping node's device
-/// id, is a PingReplyPacket whose text is the answer whole.
+/// id, is the ping node's container, its parameter the answer whole.
 #[test]
 fn a_pings_answer_decodes_as_its_text() {
     let xtce = wrapper();
@@ -622,8 +527,8 @@ fn a_pings_answer_decodes_as_its_text() {
             .expect("an answer");
     let packet = framed(apid("reply_apid"), answer.as_bytes());
     let decoded = decode(&xtce, &packet);
-    assert_eq!(decoded.container, "PingReplyPacket");
-    assert_eq!(decoded.bytes["PingReply"], answer.as_bytes());
+    assert_eq!(decoded.container, "pingPacket");
+    assert_eq!(decoded.bytes["ping"], answer.as_bytes());
 }
 
 /// CONNECT's answer, on `tcs_cmd.apid`, is a FixedAnswerPacket, the fixed
@@ -685,8 +590,9 @@ fn connect_encodes_as_the_vehicle_reads_it() {
     }
 }
 
-/// A ping, as Yamcs sends it by the wrapper, is unframed by the vehicle
-/// under the gateway node's `apid_base`, its text whole.
+/// A ping, as Yamcs sends it by the wrapper as the gateway node's command,
+/// is unframed by the vehicle under the gateway node's `apid_base`, its
+/// text whole.
 #[test]
 fn a_ping_encodes_as_its_text() {
     let xtce = wrapper();
@@ -694,10 +600,10 @@ fn a_ping_encodes_as_its_text() {
         .expect("a ping");
     let packet = encode(
         &xtce,
-        "PingText",
+        "gateway",
         &[
-            ("Text", Given::Bytes(message.as_bytes())),
-            ("TextBits", Given::Integer(8 * message.len() as u64)),
+            ("Data", Given::Bytes(message.as_bytes())),
+            ("DataBits", Given::Integer(8 * message.len() as u64)),
         ],
     );
     let body =
@@ -705,4 +611,42 @@ fn a_ping_encodes_as_its_text() {
             .expect("the vehicle takes its header");
     assert_eq!(body, message.as_bytes());
     ping::read_message(body).expect("the vehicle reads the ping");
+}
+
+/// In a copy of the example with more nodes, the data of each, framed under
+/// the APID `tcslibgs` counts for it -- "pong"'s through the gateway node,
+/// "sensor"'s and "tank"'s over `payload_telemetry` -- is that node's
+/// container, its parameter the data whole; and the ping node's answers
+/// and the gateway node's command are as they were.
+#[test]
+fn added_nodes_decode_into_their_own_containers() {
+    let dir = tempfile::tempdir().expect("a directory");
+    let path = with_more_nodes(dir.path());
+    let xtce = generated_mdb(&path);
+    let graph = Graph::load(&path).expect("the copy reads");
+    let links = telemetry::of(&graph).expect("its links work out");
+    let mut sources: Vec<&str> =
+        links.iter().map(|link| link.source.as_str()).collect();
+    sources.sort_unstable();
+    assert_eq!(sources, ["ping", "pong", "sensor", "tank"]);
+    for link in &links {
+        let data = format!("{} says hello", link.source).into_bytes();
+        let apid = link.apid.expect("framed");
+        let decoded = decode(&xtce, &framed(apid, &data));
+        assert_eq!(decoded.container, format!("{}Packet", link.source));
+        assert_eq!(decoded.integers["CcsdsApid"], u64::from(apid));
+        assert_eq!(decoded.bytes[link.source.as_str()], data);
+    }
+    let packet = encode(
+        &xtce,
+        "gateway",
+        &[
+            ("Data", Given::Bytes(b"up")),
+            ("DataBits", Given::Integer(16)),
+        ],
+    );
+    let body =
+        read_header(&packet, PacketType::Telecommand, apid("uplink_apid"))
+            .expect("the vehicle takes its header");
+    assert_eq!(body, b"up");
 }

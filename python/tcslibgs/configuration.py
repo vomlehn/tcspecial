@@ -287,6 +287,44 @@ class BeaconLink:
 
 
 @dataclass(frozen=True)
+class ApidUse:
+    """One APID a configuration that answers to Yamcs uses, and what it
+    carries: ``graph::telemetry::ApidUse``."""
+
+    apid: int
+    #: What it carries: ``beacon``, ``commands`` (both command links and
+    #: their answers), ``uplink`` (what the ground sends a gateway_yamcs
+    #: node), ``downlink`` (a source's data through one) or
+    #: ``payload_telemetry`` (a payload nothing touches).
+    carries: str
+    #: What it is for, as a complaint names it.
+    what: str
+    #: The node whose data it carries -- the gateway node for an uplink, the
+    #: source for a downlink or a payload's telemetry -- or ``None``.
+    node: str = None
+    #: The gateway node a downlink goes through, or ``None``.
+    gateway: str = None
+
+    def may_share(self, other):
+        """Whether two uses may be one APID: only a gateway node's commands
+        and what reaches the ground through that same node, which their
+        packet type tells apart. ``ApidUse::may_share``.
+
+        Args:
+            other: The other use.
+
+        Returns:
+            Whether the two may share an APID.
+        """
+        pair = {self.carries, other.carries}
+        if pair != {"uplink", "downlink"}:
+            return False
+        uplink, downlink = ((self, other) if self.carries == "uplink"
+                            else (other, self))
+        return uplink.node == downlink.gateway
+
+
+@dataclass(frozen=True)
 class CommandLink:
     """The spacecraft command link: where the ground sends from, ``send``,
     and where the vehicle takes commands, ``recv``."""
@@ -644,6 +682,59 @@ class Configuration:
         base = apid("payload_telemetry.apid_base",
                     self.tcspecial.get("payload_telemetry.apid_base"))
         return counted_apid("payload_telemetry.apid_base", base, device_id)
+
+    def apids(self):
+        """Every APID the configuration uses, each checked: an APID, and
+        used once. ``graph::telemetry::apids``.
+
+        The beacon's and the command links', each ``gateway_yamcs`` node's
+        ``apid_base``, every source drawn into one at that base plus its
+        device id, and every payload nothing touches at
+        ``payload_telemetry.apid_base`` plus its device id. Two uses may
+        share an APID only as :meth:`ApidUse.may_share` allows.
+
+        Returns:
+            The :class:`ApidUse` of each, in that order: the gateway nodes
+            and their sources, and the payloads, by name.
+
+        Raises:
+            ValueError: The configuration does not answer to Yamcs, an APID
+                        is missing or not one, a sum is past eleven bits, or
+                        two uses share an APID, naming both.
+        """
+        used = [ApidUse(self.beacon_apid(), "beacon", "beacon.apid"),
+                ApidUse(self.command_apid(), "commands", "tcs_cmd.apid")]
+        gateways = [node for node in self.nodes
+                    if node.node_type == "gateway_yamcs"]
+        for gateway in gateways:
+            used.append(ApidUse(self.uplink_apid(gateway.name), "uplink",
+                                f'the apid_base of "{gateway.name}"',
+                                node=gateway.name))
+        for gateway in gateways:
+            for node in self.nodes:
+                if gateway.name not in node.links.get("payload-out", []):
+                    continue
+                used.append(ApidUse(
+                    self.downlink_apid(gateway.name, node.name), "downlink",
+                    f'the APID of what "{node.name}" sends to '
+                    f'"{gateway.name}", its apid_base plus the device id '
+                    f"{self.device_id(node.name)}",
+                    node=node.name, gateway=gateway.name))
+        for name in self.untouched_payloads():
+            used.append(ApidUse(
+                self.payload_telemetry_apid(name), "payload_telemetry",
+                f'the APID of "{name}"\'s telemetry, '
+                "payload_telemetry.apid_base plus its device id "
+                f"{self.device_id(name)}",
+                node=name))
+        for at, one in enumerate(used):
+            for before in used[:at]:
+                if before.apid == one.apid and not before.may_share(one):
+                    raise ValueError(
+                        f"{self.path}: {before.what} and {one.what} are both "
+                        f"APID {one.apid:#x}: Yamcs sorts packets by APID, so "
+                        "each would be read as the other")
+        return used
 
     def _framed(self):
         """Refuses a question about APIDs of a configuration whose packets

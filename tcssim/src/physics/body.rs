@@ -298,6 +298,10 @@ mod tests {
 
     /// A body on the Moon at a hundred metres, falling at ten metres a
     /// second.
+    ///
+    /// # Returns
+    ///
+    /// The body, of fifteen hundred kilograms, with nothing pushing it.
     fn falling() -> Body {
         Body::new(Resolved {
             mass: 1500.0,

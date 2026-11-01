@@ -16,11 +16,13 @@ This program puts the two together:
   mission database of tcspecial's own XTCE (``tcslibgs/xtce``) and a wrapper,
   ``yamcs/tcs-ccsds.xtce.in``, that puts the header around it;
 * it starts Yamcs on it, and tcspecial on the configuration, each killed when
-  this program exits;
+  this program exits, however it exits;
 * it has Yamcs send a CONNECT carrying the configuration's checksum until the
   vehicle answers with it -- the vehicle sends nothing down, ping answers
   included, until it has -- and then sends pings through Yamcs and reads the
-  answers back from it, over Yamcs's REST API.
+  answers back from it, over Yamcs's REST API;
+* it shows them in the ping example's window, the beacon panel and the ping
+  panel, or with ``--pings`` prints them with no window.
 
 Yamcs's web interface, at http://localhost:16090 by default, shows every
 packet and parameter meanwhile: the beacon, the answers, and the pings.
@@ -28,14 +30,14 @@ packet and parameter meanwhile: the beacon, the answers, and the pings.
 Usage, from the repository's root, with Yamcs unpacked somewhere::
 
     python3 examples/ping-yamcs/ping_yamcs.py --yamcs ~/yamcs-5.14.0
-    python3 examples/ping-yamcs/ping_yamcs.py --pings 3   # and stop
+    python3 examples/ping-yamcs/ping_yamcs.py --pings 3   # no window
     python3 examples/ping-yamcs/ping_yamcs.py --describe  # what it read
 
 ``--yamcs`` is the directory a Yamcs release unpacks to, holding
 ``bin/yamcsd``; ``$YAMCS_HOME`` says it when ``--yamcs`` does not. With
-neither ``--pings`` nor ``--describe`` it pings once a second until it is
-stopped. ``--no-vehicle`` leaves tcspecial to somebody else, and
-``--no-yamcs`` uses a Yamcs already running on the run directory's
+neither ``--pings`` nor ``--describe`` it opens the window, and pings each
+time ``Send ping`` is pressed. ``--no-vehicle`` leaves tcspecial to somebody
+else, and ``--no-yamcs`` uses a Yamcs already running on the run directory's
 configuration.
 """
 
@@ -61,9 +63,11 @@ sys.path.insert(0, str(ROOT / "python"))
 # ping link's bookkeeping.
 sys.path.insert(0, str(HERE.parent / "ping"))
 
+from tcslib.beacon import Arrived, Beacons, Schedule  # noqa: E402
 from tcslibgs import configuration, ping  # noqa: E402
 from tcslibgs.configuration import whole  # noqa: E402
-from ping_gateway import Vehicle, the_one  # noqa: E402
+from ping_gateway import (  # noqa: E402
+    Vehicle, die_with_this_program, run_the_window, the_one)
 from ping_ground import Exchange, Pinger, interval  # noqa: E402
 
 #: Where Yamcs's web interface and REST API are, unless --http-port says.
@@ -80,7 +84,11 @@ CONNECT = "/TcsYamcs/Connect"
 PING_TEXT = "/TcsYamcs/PingText"
 PING_REPLY = "/TcsYamcs/PingReply"
 RUNNING = "/TcsFixed/Running"
-BEACON_FIELDS = ("Name", "Version", "Number", "Flag")
+BEACON_BODY = "/TcsYamcs/BeaconBody"
+
+#: How long a pass of the beacon loop waits for a beacon, in seconds: often
+#: enough that the indicator changes stage when it should, to the eye.
+BEACON_POLL = 0.25
 
 
 def arguments(argv):
@@ -105,7 +113,8 @@ def arguments(argv):
     parser.add_argument("--http-port", type=int, default=HTTP_PORT,
                         help=f"Yamcs's web port (default: {HTTP_PORT})")
     parser.add_argument("--pings", type=int, metavar="N",
-                        help="send N pings, print each exchange, and stop")
+                        help="send N pings, print each exchange, and stop, "
+                             "with no window")
     parser.add_argument("--describe", action="store_true",
                         help="print what was read and the Yamcs settings, and "
                              "stop")
@@ -176,6 +185,7 @@ class Setup:
         self.uplink = self.config.uplink(self.gateway)
         self.downlink = self.config.downlink(self.gateway, self.node)
         self.beacon = self.config.beacon_link()
+        self.beacon_interval = self.config.beacon_interval()
         self.command = configuration.HostPort.of("tcs_cmd.recv",
                                                  said.get("tcs_cmd.recv"))
         self.beacon_apid = apid("beacon.apid", said.get("beacon.apid"))
@@ -300,17 +310,26 @@ class Yamcs:
         """Start Yamcs, told to die with this program, and wait until its
         instance runs.
 
+        In a session of its own, so that a Ctrl-C at the terminal is this
+        program's to stop it by and not Java's, which would leave it no
+        Yamcs to stop. Told to die with this program all the same, as the
+        vehicle is: a program that is killed runs no ``finally``, and Yamcs
+        would go on holding the example's ports. ``yamcsd`` ends by
+        becoming Java, so what the kernel is told holds for Java.
+
         Raises:
             RuntimeError: It stops, or its instance does not run within a
                           minute.
         """
         program = self.home / "bin" / "yamcsd"
         log = open(self.run_dir / "yamcs.log", "w")
+        parent = os.getpid()
         self.process = subprocess.Popen(
             [str(program), "--etc-dir", str(self.run_dir / "etc"), "--data-dir",
              str(self.run_dir / "data"), "--cache-dir",
              str(self.run_dir / "cache")], stdout=log, stderr=subprocess.STDOUT,
-            start_new_session=True)
+            start_new_session=True,
+            preexec_fn=lambda: die_with_this_program(parent))
         deadline = time.monotonic() + 60
         while time.monotonic() < deadline:
             if self.process.poll() is not None:
@@ -518,39 +537,96 @@ def connect(setup, yamcs, attempts=30):
     return False
 
 
-def beacon_said(yamcs):
-    """Says what the latest beacon says.
+class YamcsBeacons:
+    """The beacon link through Yamcs: each beacon as Yamcs received it, read
+    by the ping example's :class:`tcslib.beacon.Beacons`.
+
+    Yamcs holds the beacon socket, so what arrives is read back from it as
+    the BeaconBody parameter, the beacon's bytes whole, and handed to a
+    ``Beacons`` with no socket of its own. That one checks it as it checks
+    a beacon from its socket -- its checksum against the configuration's,
+    its number against the one before -- and ages it through the same
+    stages, so the beacon panel says here what it says in the ping example.
+    A pass that finds nothing new is one :data:`BEACON_POLL` long.
 
     Args:
-        yamcs: The Yamcs it arrived at.
-
-    Returns:
-        Its name, version, number and flag, as text; ``None`` before one has
-        arrived.
+        yamcs:    The Yamcs the beacons arrive at.
+        link:     The beacon link from the configuration.
+        schedule: The :class:`tcslib.beacon.Schedule` a beacon ages through.
+        expected: The configuration's checksum, as hex; ``None`` to compare
+                  nothing.
+        interval: How often the vehicle beacons, in nanoseconds.
+        clock:    What gives the time now, in nanoseconds since the epoch.
     """
-    fields = []
-    for field in BEACON_FIELDS:
-        value = yamcs.parameter(f"/TcsBeacon/Beacon{field}")
-        if value is None:
-            return None
-        fields.append(f"{field.lower()} {value[0]}")
-    return ", ".join(fields)
+
+    def __init__(self, yamcs, link, schedule, expected, interval,
+                 clock=time.time_ns):
+        self._yamcs = yamcs
+        self._beacons = Beacons(link, schedule, expected)
+        # Yamcs says nothing of where a beacon came from, and the beacon
+        # link to it is its own, so each is taken as from where the
+        # configuration says beacons are sent from.
+        self._sender = (link.send.address, link.send.port)
+        # The beacon Yamcs has already is shown at once if it is this
+        # vehicle's latest, as it is when it came while the CONNECT was
+        # being answered; one older than a beacon's interval is from before
+        # this program, a Yamcs left running, and is not news.
+        latest = yamcs.parameter(BEACON_BODY)
+        stale = latest is not None and clock() - latest[1] > interval
+        self._seen = latest[1] if stale else 0
+
+    def next_pass(self):
+        """Wait for Yamcs to receive a beacon, or for :data:`BEACON_POLL`.
+
+        Returns:
+            The :class:`tcslib.beacon.Pass`: what arrived, if anything, and
+            what to show.
+        """
+        deadline = time.monotonic() + BEACON_POLL
+        while True:
+            latest = self._yamcs.parameter(BEACON_BODY)
+            if latest is not None and latest[1] > self._seen:
+                body, self._seen = latest
+                return self._beacons.heard(body, self._sender)
+            if time.monotonic() >= deadline:
+                return self._beacons.after(Arrived.NOTHING, [])
+            time.sleep(0.05)
+
+
+def first_beacon(beacons, timeout=12):
+    """Print what the beacon link says until the first beacon arrives, as
+    the ping example does with no window.
+
+    Args:
+        beacons: The beacon link.
+        timeout: How long to wait for it, in seconds: two beacons and more
+                 at the example's interval.
+    """
+    deadline = time.monotonic() + timeout
+    while time.monotonic() < deadline:
+        beacon_pass = beacons.next_pass()
+        for remark in beacon_pass.remarks:
+            print(f"beacon: {remark}", flush=True)
+        for warning in beacon_pass.warnings:
+            print(f"beacon: {warning}", file=sys.stderr, flush=True)
+        if beacon_pass.at is not None:
+            print(f"beacon: {beacon_pass.said}", flush=True)
+            return
+    print("beacon: none arrived", file=sys.stderr, flush=True)
 
 
 def ping_and_print(pinger, count):
-    """Send ``count`` pings, one a second, and print each exchange.
+    """Send ``count`` pings, one after another, and print each exchange.
 
     Args:
         pinger: The ping link.
-        count:  How many, or ``None`` for until stopped.
+        count:  How many.
 
     Returns:
         The exit status: nought if every ping was answered, one if not.
     """
     answered_all = True
-    sent = 0
-    while count is None or sent < count:
-        sent += 1
+    for _ in range(count):
         print(f"sent: {pinger.ping()}", flush=True)
         deadline = time.monotonic() + 2
         while time.monotonic() < deadline:
@@ -566,8 +642,6 @@ def ping_and_print(pinger, count):
             print(f"times: round trip {interval(exchange.round_trip())}, up "
                   f"{interval(exchange.up())}, down "
                   f"{interval(exchange.down())}", flush=True)
-        if count is None:
-            time.sleep(1)
     return 0 if answered_all else 1
 
 
@@ -620,10 +694,15 @@ def main(argv):
             return 1
         print("connected: the vehicle is running this configuration",
               flush=True)
-        heard = beacon_said(yamcs)
-        if heard is not None:
-            print(f"beacon: {heard}", flush=True)
-        return ping_and_print(YamcsPinger(yamcs), options.pings)
+        beacons = YamcsBeacons(yamcs, setup.beacon,
+                               Schedule.for_interval(setup.beacon_interval),
+                               setup.digest, setup.beacon_interval)
+        pinger = YamcsPinger(yamcs)
+        if options.pings is None:
+            return run_the_window(setup, beacons, pinger,
+                                  title="tcspecial ping through Yamcs")
+        first_beacon(beacons)
+        return ping_and_print(pinger, options.pings)
     except (RuntimeError, ValueError, OSError) as why:
         print(f"ping_yamcs: {why}", file=sys.stderr)
         return 1

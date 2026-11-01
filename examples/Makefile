@@ -43,8 +43,9 @@ help:
 		"tcspecial"
 	@echo "  make run-ping        - Run the ping example: a Python window" \
 		"that pings the vehicle"
-	@echo "  make run-ping-yamcs  - Run the ping-yamcs example: Yamcs" \
-		"pings the vehicle over CCSDS packets (YAMCS_HOME=<yamcs>)"
+	@echo "  make run-ping-yamcs  - Run the ping-yamcs example: a Python" \
+		"window that pings the vehicle through Yamcs, over CCSDS" \
+		"packets (YAMCS_HOME=<yamcs>)"
 	@echo "  make run-tees        - Run tcsmoc on the tees example: tees" \
 		"and null nodes"
 	@echo "  make run-fprime      - Run tcsmoc on the fprime example," \
@@ -256,11 +257,14 @@ run-ping: check-tkinter
 			examples/ping/ping.xtcs \
 	)
 
-# The ping example with Yamcs as the ground station. YAMCS_HOME is where a
-# Yamcs release is unpacked; ping_yamcs.py starts Yamcs and tcspecial, pings
-# three times through Yamcs, and stops them.
+# The ping example with Yamcs between the ground station and the vehicle.
+# YAMCS_HOME is where a Yamcs release is unpacked; ping_yamcs.py starts Yamcs
+# and tcspecial, and opens the ping example's window, which pings through
+# Yamcs. Closing the window stops them both. With no window,
+#   python3 examples/ping-yamcs/ping_yamcs.py --yamcs <yamcs> --pings 3
+# pings three times, prints each answer and its times, and stops them.
 .PHONY: run-ping-yamcs
-run-ping-yamcs: check-python3
+run-ping-yamcs: check-tkinter
 	@test -x "$(YAMCS_HOME)/bin/yamcsd" || { \
 		echo "say where Yamcs is unpacked: make run-ping-yamcs" \
 			"YAMCS_HOME=<the directory holding bin/yamcsd>" >&2; \
@@ -268,8 +272,7 @@ run-ping-yamcs: check-python3
 	}
 	cd $(ROOT) && cargo build -q --bin tcspecial --bin tcsverify
 	cd $(ROOT) && RUST_LOG=$(RUST_LOG) python3 \
-		examples/ping-yamcs/ping_yamcs.py --yamcs "$(YAMCS_HOME)" \
-		--pings 3
+		examples/ping-yamcs/ping_yamcs.py --yamcs "$(YAMCS_HOME)"
 
 # Whether there is a tkinter for the ping example's window to be drawn with.
 #

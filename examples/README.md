@@ -71,7 +71,7 @@ the vehicle saying it is alive, the vehicle answering a ping. Start with
 | `minimal` | The smallest working configuration: one UDP payload whose telemetry goes straight to the ground (MOC). |
 | `beacon` | The one thing a ground station knows without asking: a window showing the spacecraft's beacon, built from the two halves any ground station would use -- `tcslib::beacon` to listen and `tcsui`'s panel to show it. |
 | `ping` | The ground pings a `ping` vehicle node and times the answer: the round trip, and the two halves of it. The ground station is Python 3, with the beacon panel and the halves it is built from written again in Python under `python/`, and tests that hold them to the Rust. |
-| `ping-yamcs` | The ping example with Yamcs as the ground station: a `gateway_yamcs` gateway puts a CCSDS primary header on every packet to and from the ground, the beacon included, and `ping_yamcs.py` runs Yamcs on tcspecial's own XTCE and pings through it. Needs a Yamcs release unpacked somewhere. |
+| `ping-yamcs` | The ping example with Yamcs between the ground station and the vehicle: a `gateway_yamcs` gateway puts a CCSDS primary header on every packet to and from the ground, the beacon included, and `ping_yamcs.py` runs Yamcs on tcspecial's own XTCE and pings through it from the ping example's window. Needs a Yamcs release unpacked somewhere. |
 | `tees` | The four nodes that do nothing to what passes: a `tee-gateway` sends each command on to a heater and back to the ground, a `tee-payload` sends each reading to the ground and on aboard, and a `null-gateway` and a `null-payload` drop what they are sent. `tcspecial/tests/tees.rs` flies it. |
 | `fprime` | A vehicle that answers to an F´ flight computer rather than to the ground: a `gateway_fprime` node sends each reading, the temperature a `to_kelvin` node makes of it and what a `hysteresis` node decides of that, to the deployment's bridge component at its `bridge_base`, and takes the bridge's commands on to a heater. `tcspecial/tests/fprime.rs` flies it, and `make fprime-test` runs the bridge itself, in `fprime/`, against it. |
 | `cfs` | A vehicle that answers to a cFS flight computer: tcspecial joins its software bus as an SBN peer, a `gateway_cfs` node publishes each reading as its `tlm_base` plus the reading's device id, and a command published as its `cmd_msgid` goes on to a heater. Every link is carried over the one peer, as message IDs. `make run-cfs` runs tcsmoc on it, tcssim standing in for the cFS side; `tcspecial/tests/cfs.rs` flies it against a test playing the cFS side, and `tcspecial/tests/cfs_ground.rs` commands it from tcslib. |
@@ -274,13 +274,28 @@ ports and the APIDs, stated once -- with a mission database of tcspecial's
 own XTCE and `yamcs/tcs-ccsds.xtce.in`, which puts the header around it. It
 starts Yamcs and tcspecial, has Yamcs send CONNECT until the vehicle answers
 with the configuration's checksum, then pings through Yamcs and reads the
-answers back over Yamcs's REST API:
+answers back over Yamcs's REST API.
+
+Its window is the ping example's: the beacon panel, and the ping panel with
+its `Send ping` button. The beacon panel is fed the beacon's own bytes, which
+the Yamcs wrapper keeps whole as the `BeaconBody` parameter, so it checks the
+configuration's checksum and the beacon's number and ages the indicator just
+as the ping example's does. With `--pings` there is no window: it prints the
+first beacon and each exchange, and stops.
 
 ```
-make run-ping-yamcs YAMCS_HOME=~/yamcs-5.14.0
+make run-ping-yamcs YAMCS_HOME=~/yamcs-5.14.0     # the window
 python3 examples/ping-yamcs/ping_yamcs.py --yamcs ~/yamcs-5.14.0 --pings 3
 python3 examples/ping-yamcs/ping_yamcs.py --describe   # what it read
 ```
+
+Yamcs and tcspecial are stopped when the window is closed or the pings are
+done, and are killed with `ping_yamcs.py` if it is killed or crashes, so
+neither is left holding the example's ports.
+
+An answer's arrival time is when Yamcs received it, to the millisecond, as
+finely as Yamcs says; so a half of a sub-millisecond round trip can come out
+a fraction of a millisecond negative.
 
 `YAMCS_HOME` is where a Yamcs release is unpacked, holding `bin/yamcsd`;
 <https://github.com/yamcs/yamcs/releases> has them, and it was written

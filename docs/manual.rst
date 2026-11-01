@@ -8,6 +8,13 @@ TCSpecial Manual
 Introduction
 ============
 
+.. warning::
+   TCSpecial is very early software and is subject to rapid change. Until
+   1.0, any change to its API changes the minor version number (0.1 to
+   0.2), so a release that changes only the patch number never breaks code
+   built against it. Feedback is welcome, even at this stage: open an issue
+   at https://github.com/vomlehn/tcspecial/issues.
+
 .. note::
    TCSpecial has been designed for spacecraft and ground communication with high
    latency communication links. It is just as applicable for other environments,

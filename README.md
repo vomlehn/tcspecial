@@ -8,6 +8,12 @@ which has influenced the design to work with non-reliable communication links.
 However, it will work find over any distance and is extensible to use reliable links
 and.
 
+> **Warning:** TCSpecial is very early software and is subject to rapid
+> change. Until 1.0, any change to its API changes the minor version
+> number (0.1 to 0.2), so a release that changes only the patch number
+> never breaks code built against it. Feedback is welcome, even at this
+> stage: open an issue at https://github.com/vomlehn/tcspecial/issues.
+
 Work is under way on integrating TCSpecial, with its telemetry log
 [tcslog](https://github.com/vomlehn/tcslog) and its packet compiler
 [tcs-xtce](https://github.com/vomlehn/tcs-xtce), with NASA's core Flight System

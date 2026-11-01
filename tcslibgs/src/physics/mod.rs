@@ -297,7 +297,7 @@ impl PhysicsProblem {
     /// # Arguments
     ///
     /// * `component` - The component's name.
-    /// * `why`     - What is wrong.
+    /// * `why`       - What is wrong.
     ///
     /// # Returns
     ///

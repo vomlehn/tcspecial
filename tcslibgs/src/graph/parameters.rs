@@ -291,6 +291,7 @@ pub const ATTRIBUTES: &[(&str, Needed)] = &[
     ("beacon.recv", Needed::Sockets),
     ("beacon.apid", Needed::Framed),
     ("tcs_cmd.apid", Needed::Framed),
+    ("payload_telemetry.apid_base", Needed::Framed),
     ("sbn.release", Needed::Bus),
     ("sbn.ident", Needed::Bus),
     ("sbn.spacecraft_id", Needed::Bus),
@@ -540,6 +541,7 @@ pub fn ci_config_of(
             source_base: link("payload_telemetry.source_base")?,
             dest_base: link("payload_telemetry.dest_base")?,
             tlm_base: link("payload_telemetry.tlm_base")?,
+            apid_base: link("payload_telemetry.apid_base")?,
         },
         // The peer, the allotment and the clock, which only a configuration
         // that answers to cFS has, and which it must state whole.
@@ -1159,6 +1161,7 @@ mod tests {
                 ("gateway", "yamcs"),
                 ("beacon.apid", "0x100"),
                 ("tcs_cmd.apid", "257"),
+                ("payload_telemetry.apid_base", "0x300"),
             ])
             .filter(|(name, _)| !change.iter().any(|(n, _)| n == name))
             .collect();
@@ -1166,8 +1169,8 @@ mod tests {
         ci_config_of(&said(&all)).and_then(|config| config.to_ci_config())
     }
 
-    /// A section that answers to Yamcs is the radio's sockets and the two
-    /// APIDs.
+    /// A section that answers to Yamcs is the radio's sockets, the two
+    /// APIDs, and the base payload telemetry's are counted from.
     #[test]
     fn a_section_answering_to_yamcs_carries_its_apids() {
         let settled = yamcs_with(&[]).expect("the whole section");
@@ -1178,6 +1181,7 @@ mod tests {
             Some(crate::CcsdsFraming {
                 beacon_apid: 0x100,
                 cmd_apid: 0x101,
+                payload_apid_base: 0x300,
             })
         );
         assert_eq!(sockets.beacon_recv.to_string(), "127.0.0.1:5650");
@@ -1219,6 +1223,14 @@ mod tests {
             (("tcs_cmd.apid", "2048"), &["tcs_cmd.apid", "2048", "0x7ff"]),
             (("tcs_cmd.apid", "many"), &["tcs_cmd.apid"]),
             (
+                ("payload_telemetry.apid_base", ""),
+                &["payload_telemetry.apid_base", "not stated"],
+            ),
+            (
+                ("payload_telemetry.apid_base", "0x800"),
+                &["payload_telemetry.apid_base", "0x800", "0x7ff"],
+            ),
+            (
                 ("tcs_cmd.apid", "0x100"),
                 &["beacon.apid", "tcs_cmd.apid", "0x100", "another APID"],
             ),
@@ -1237,7 +1249,9 @@ mod tests {
     /// refused by name, whichever kind it is.
     #[test]
     fn an_apid_is_refused_where_the_gateway_is_not_yamcs() {
-        for name in ["beacon.apid", "tcs_cmd.apid"] {
+        for name in
+            ["beacon.apid", "tcs_cmd.apid", "payload_telemetry.apid_base"]
+        {
             let mut all = whole();
             all.push((name, "0x100"));
             let why = ci_config_of(&said(&all)).expect_err(name);

@@ -31,7 +31,13 @@
             <dest_base>0.0.0.0:16300</dest_base>
             <source_base>127.0.0.1:16310</source_base>
         </payload_command>
+        <!-- A payload nothing in the drawing touches would report to
+             dest_base plus its device id, as telemetry of APID apid_base
+             plus that device id. This vehicle has none, but a
+             configuration that answers to Yamcs says where their APIDs
+             would begin all the same. -->
         <payload_telemetry>
+            <apid_base>0x300</apid_base>
             <dest_base>127.0.0.1:16410</dest_base>
             <source_base>0.0.0.0:16400</source_base>
         </payload_telemetry>

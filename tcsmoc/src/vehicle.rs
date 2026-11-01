@@ -489,7 +489,9 @@ type SendRestart = Rc<dyn Fn(&MainWindow, MenuAction)>;
 ///
 /// # Returns
 ///
-/// Each node's settable attributes by the node's name, each attribute once.
+/// Each node's settable attributes by the node's name, each attribute once,
+/// in the order of their names: the order the bindings are written in means
+/// nothing, so the attribute a panel starts with is the one that sorts first.
 pub fn settable_of(graph: &Graph) -> BTreeMap<String, Vec<String>> {
     let mut settable: BTreeMap<String, Vec<String>> = BTreeMap::new();
     for binding in &graph.commands {
@@ -502,6 +504,9 @@ pub fn settable_of(graph: &Graph) -> BTreeMap<String, Vec<String>> {
                 theirs.push(attribute);
             }
         }
+    }
+    for theirs in settable.values_mut() {
+        theirs.sort();
     }
     settable
 }
@@ -557,8 +562,8 @@ pub fn panels(
                     link.source, link.id
                 )),
                 // What the ground may set on this node: all of them for the
-                // line that says so, and the first for the field to start
-                // with.
+                // line that says so, and the first by name for the field to
+                // start with.
                 settable: SharedString::from(
                     settable
                         .get(&link.source)
@@ -2704,7 +2709,11 @@ pub(crate) mod tests {
         let wrong = dir.path().join("wrong.ytcs");
         std::fs::write(
             &wrong,
-            "vehicle:\n  - { name: a, type: compute, function: mean }\n",
+            "vehicle:
+  - type compute:
+      - compute: a
+        function: mean
+",
         )
         .unwrap();
         let why = restart_target_of(wrong.to_str().unwrap(), Some(ours))
@@ -3045,15 +3054,20 @@ pub(crate) mod tests {
             .port();
         let dir = tempfile::tempdir().expect("a directory");
         let path = dir.path().join("vehicle.ytcs");
-        // The ping node is the second node written, device id 1, so its
-        // answers arrive at ground_base plus one: `port`.
+        // The ping node's name sorts after the gateway node's, so it is
+        // device id 1 and its answers arrive at ground_base plus one: `port`.
         std::fs::write(
             &path,
             format!(
-                "gateway:
-  - {{ name: ground, type: gateway_radio, ground_base: \"127.0.0.1:{}\" }}
+                "gateways:
+  - type gateway_radio:
+      - gateway: ground
+        ground_base: \"127.0.0.1:{}\"
 vehicle:
-  - {{ name: pinger, type: ping, payload-out: ground }}
+  - type ping:
+      - compute: pinger
+        payload-out:
+          - target: ground
 ",
                 port - 1
             ),
@@ -3131,15 +3145,27 @@ vehicle:
         std::fs::write(
             &path,
             format!(
-                "gateway:
-  - {{ name: ground, type: gateway_radio, ground_base: \"127.0.0.1:{}\" }}
+                "gateways:
+  - type gateway_radio:
+      - gateway: ground
+        ground_base: \"127.0.0.1:{}\"
 payloads:
-  - {{ name: a, type: network, protocol: udp, address: \"127.0.0.1\", \
-    port: \"7001\", payload-out: ground }}
-  - {{ name: b, type: network, protocol: udp, address: \"127.0.0.1\", \
-    port: \"7002\", payload-out: ground }}
+  - type network:
+      - payload: a
+        address: \"127.0.0.1\"
+        port: \"7001\"
+        protocol: udp
+        payload-out:
+          - target: ground
+      - payload: b
+        address: \"127.0.0.1\"
+        port: \"7002\"
+        protocol: udp
+        payload-out:
+          - target: ground
 ",
-                port - 1
+                // a and b sort before ground: device ids 0 and 1.
+                port
             ),
         )
         .expect("written");
@@ -3239,21 +3265,22 @@ payloads:
         assert_eq!(
             named,
             vec![
-                ("k_1".to_string(), 1),
-                ("k_2".to_string(), 2),
-                ("k_3".to_string(), 3),
-                ("zone_temp".to_string(), 4),
+                ("k_1".to_string(), 4),
+                ("k_2".to_string(), 5),
+                ("k_3".to_string(), 6),
                 // The decision too, which the ground sees as well as the
                 // heaters.
-                ("thermostat".to_string(), 5),
+                ("thermostat".to_string(), 10),
+                ("zone_temp".to_string(), 11),
             ]
         );
+        // zone_temp, device id 11, at ground_base plus that.
         assert!(
-            panels[3].config.contains("to gateway"),
+            panels[4].config.contains("to gateway"),
             "{}",
-            panels[3].config
+            panels[4].config
         );
-        assert!(panels[3].config.contains("5104"), "{}", panels[3].config);
+        assert!(panels[4].config.contains("5111"), "{}", panels[4].config);
     }
 
     /// The minimal example's sensor reports over payload_telemetry.
@@ -3443,12 +3470,22 @@ payloads:
         std::fs::write(
             &path,
             format!(
-                "gateway:\n  - name: gateway\n    type: gateway_radio\n    \
-                 address: \"127.0.0.1\"\n    port: \"{port}\"\n    \
-                 ground_base: \"127.0.0.1:9100\"\n    payload-in: true\n    \
-                 gateway-out:\n      - target: ping\nvehicle:\n  \
-                 - name: ping\n    type: ping\n    gateway-in: true\n    \
-                 payload-out:\n      - target: gateway\n"
+                "gateways:
+  - type gateway_radio:
+      - gateway: gateway
+        address: \"127.0.0.1\"
+        ground_base: \"127.0.0.1:9100\"
+        port: \"{port}\"
+        gateway-out:
+          - target: ping
+        payload-in: true
+vehicle:
+  - type ping:
+      - compute: ping
+        payload-out:
+          - target: gateway
+        gateway-in: true
+"
             ),
         )
         .expect("written");

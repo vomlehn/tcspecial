@@ -125,7 +125,13 @@ impl Plot {
         let mut sensors = Vec::new();
         let mut switches = Vec::new();
         let mut setpoint = None;
-        for node in &graph.nodes {
+        // By name, the one order a configuration has: the traces and strips
+        // are drawn in it, and the setpoint the plot is centred on is that
+        // of the switch whose name sorts first.
+        let mut nodes: Vec<&tcslibgs::graph::Node> =
+            graph.nodes.iter().collect();
+        nodes.sort_by(|a, b| a.name.cmp(&b.name));
+        for node in nodes {
             if node.node_type != "compute" || !reaches(&node.name) {
                 continue;
             }
@@ -354,7 +360,7 @@ impl Plot {
 ///
 /// # Returns
 ///
-/// The names of the nodes its data goes to, but the ground.
+/// The names of the nodes its data goes to, but the ground, sorted.
 fn drives(graph: &Graph, switch: &str) -> Vec<String> {
     let mut driven = Vec::new();
     for link in &graph.links {
@@ -373,6 +379,7 @@ fn drives(graph: &Graph, switch: &str) -> Vec<String> {
             }
         }
     }
+    driven.sort();
     driven
 }
 

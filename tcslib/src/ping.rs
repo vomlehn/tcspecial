@@ -63,12 +63,16 @@ pub struct Route {
     pub gateway: String,
 }
 
-/// Finds the first `ping` node in the configuration the ground can reach
-/// both ways, in the order the file writes them.
+/// Finds the `ping` node the ground can reach both ways whose name sorts
+/// first, and the gateway node it is reached through.
 ///
 /// Both ways: a gateway node that binds an address and port aboard -- somewhere
 /// for a ping to go up to -- with a link to the `ping` node, and a link from
 /// the `ping` node back down to that same gateway node.
+///
+/// By name where there is more than one: of the ping nodes, the one whose
+/// name sorts first, and of its gateway nodes, likewise. The order a file
+/// writes its nodes and links in means nothing, so it decides nothing here.
 ///
 /// # Arguments
 ///
@@ -81,26 +85,30 @@ pub struct Route {
 /// reachable one way only is one a ping would vanish into.
 pub fn route_of(graph: &Graph) -> Option<Route> {
     let down = telemetry::of(graph).ok()?;
-    graph
+    let mut pings: Vec<&str> = graph
         .nodes
         .iter()
         .filter(|node| node.node_type == "ping")
-        .find_map(|node| {
-            down.iter()
-                .filter(|link| link.source == node.name)
-                .find_map(|link| match &link.via {
-                    Via::Gateway(gateway)
-                        if feeds(graph, gateway, &node.name)
-                            && binds(graph, gateway) =>
-                    {
-                        Some(Route {
-                            node: node.name.clone(),
-                            gateway: gateway.clone(),
-                        })
-                    }
-                    _ => None,
-                })
-        })
+        .map(|node| node.name.as_str())
+        .collect();
+    pings.sort_unstable();
+    pings.into_iter().find_map(|node| {
+        down.iter()
+            .filter(|link| link.source == node)
+            .filter_map(|link| match &link.via {
+                Via::Gateway(gateway)
+                    if feeds(graph, gateway, node) && binds(graph, gateway) =>
+                {
+                    Some(gateway.as_str())
+                }
+                _ => None,
+            })
+            .min()
+            .map(|gateway| Route {
+                node: node.to_string(),
+                gateway: gateway.to_string(),
+            })
+    })
 }
 
 /// Tells whether a link leaves one node for another.
@@ -643,9 +651,13 @@ mod tests {
         std::fs::write(
             &path,
             format!(
-                "gateway:\n  - {{ name: gateway, type: gateway_radio, \
-                 address: \"127.0.0.1\", port: \"{port}\", \
-                 ground_base: \"127.0.0.1:9000\" }}\n"
+                "gateways:
+  - type gateway_radio:
+      - gateway: gateway
+        address: \"127.0.0.1\"
+        ground_base: \"127.0.0.1:9000\"
+        port: \"{port}\"
+"
             ),
         )
         .expect("written");
@@ -676,9 +688,13 @@ mod tests {
         std::fs::write(
             &path,
             format!(
-                "gateway:\n  - {{ name: gateway, type: gateway_radio, \
-                 address: \"127.0.0.1\", port: \"{port}\", \
-                 ground_base: \"127.0.0.1:9000\" }}\n"
+                "gateways:
+  - type gateway_radio:
+      - gateway: gateway
+        address: \"127.0.0.1\"
+        ground_base: \"127.0.0.1:9000\"
+        port: \"{port}\"
+"
             ),
         )
         .expect("written");

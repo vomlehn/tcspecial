@@ -66,9 +66,10 @@ pub struct Delivery {
     pub stream: Option<Stream>,
 
     /// Which line of the drawing this is: the configuration's links counted
-    /// one per destination, in the order the file holds them, which is the
-    /// order tcsgui draws them in and tcspecial's visual window lights them
-    /// by. `None` for a delivery that is not a line anyone drew -- a payload
+    /// one per destination, in the order the configuration holds them -- by
+    /// the node each leaves, and then by where it goes -- which is the order
+    /// tcsgui draws them in and tcspecial's visual window lights them by.
+    /// `None` for a delivery that is not a line anyone drew -- a payload
     /// nothing touches, to its link over `payload_telemetry`.
     pub line: Option<usize>,
 }
@@ -86,10 +87,15 @@ pub struct Delivery {
 ///   not the word was written -- which is why most links in most files need
 ///   none of this.
 ///
+/// At the arriving end every destination is asked, and what they agree on is
+/// the answer, so that it does not depend on which destination is written
+/// first: the order of a link's destinations means nothing.
+///
 /// `None` where nothing settles it, which is a link whose two ends both have a
-/// choice and whose file named neither: `Graph::check` refuses that as a
-/// `BadTerminal`, so nothing downstream depends on it -- a `None` is carried
-/// as "wherever its links go", which is what every delivery was before.
+/// choice and whose file named neither, or whose destinations disagree:
+/// `Graph::check` refuses that as a `BadTerminal`, so nothing downstream
+/// depends on it -- a `None` is carried as "wherever its links go", which is
+/// what every delivery was before.
 ///
 /// # Arguments
 ///
@@ -120,16 +126,21 @@ fn stream_of(graph: &Graph, link: &Link) -> Option<Stream> {
     };
 
     let origin = link.origin();
-    let first = link
-        .to
-        .each()
-        .first()
-        .map(|destination| Destination::parse(destination));
+    let destinations: Vec<Destination> =
+        link.to.each().into_iter().map(Destination::parse).collect();
+    // What the destinations say, where every one that says anything says the
+    // same: the answer does not depend on which destination is asked, the
+    // order of a link's destinations meaning nothing.
+    let agreed = |say: &dyn Fn(&Destination) -> Option<Stream>| {
+        let mut said = destinations.iter().filter_map(say);
+        let one = said.next()?;
+        said.all(|other| other == one).then_some(one)
+    };
 
     named(origin.input.as_deref())
-        .or_else(|| first.as_ref().and_then(|to| named(to.input.as_deref())))
+        .or_else(|| agreed(&|to| named(to.input.as_deref())))
         .or_else(|| only(&origin.node, false))
-        .or_else(|| first.as_ref().and_then(|to| only(&to.node, true)))
+        .or_else(|| agreed(&|to| only(&to.node, true)))
 }
 
 /// The table: what goes where.
@@ -689,9 +700,9 @@ mod tests {
             .find(|l| l.name == "zone_temp to gateway")
             .expect("zone_temp's link to the ground");
         assert_eq!(link.via, Via::Gateway("gateway".to_string()));
-        // The thermostat's mean is its fifth node, id 4, and its gateway node's
-        // ground_base is 10.0.0.2:5100.
+        // The thermostat's mean is the last of its names, id 11, and its
+        // gateway node's ground_base is 10.0.0.2:5100.
         let ground = link.ground().expect("a link over UDP");
-        assert_eq!((ground.address.as_str(), ground.port), ("10.0.0.2", 5104));
+        assert_eq!((ground.address.as_str(), ground.port), ("10.0.0.2", 5111));
     }
 }

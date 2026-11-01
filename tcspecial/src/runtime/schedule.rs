@@ -72,8 +72,7 @@ impl Schedule {
     ///
     /// # Returns
     ///
-    /// The schedule, with each group's members in the order the
-    /// configuration names them.
+    /// The schedule, with each group's members in the order of their names.
     pub fn of(graph: &Graph, now: Instant) -> Schedule {
         let mut groups: Vec<Group> = Vec::new();
         let mut index: BTreeMap<String, usize> = BTreeMap::new();
@@ -105,7 +104,8 @@ impl Schedule {
     ///
     /// Several may be due at once -- two groups on the same interval, or a
     /// run that fell behind -- and the one that has waited longest is read
-    /// first; a tie goes to the one written first. A group once read is not
+    /// first; a tie goes to the one whose name sorts first, the order the
+    /// groups are written in meaning nothing. A group once read is not
     /// due again until its interval has passed (see [`Schedule::read_at`]),
     /// so asking again after each read goes through all that are due, each
     /// once. Allocates nothing.
@@ -122,11 +122,14 @@ impl Schedule {
             .iter()
             .enumerate()
             .filter(|(_, group)| group.next <= now)
-            .min_by_key(|(at, group)| (group.next, *at))
+            .min_by(|(_, one), (_, two)| {
+                (one.next, &one.name).cmp(&(two.next, &two.name))
+            })
             .map(|(at, _)| at)
     }
 
-    /// Lists the groups due at `now`, soonest first.
+    /// Lists the groups due at `now`, soonest first, and of those due at one
+    /// moment the one whose name sorts first.
     ///
     /// The same answer as asking [`Schedule::most_overdue`] after each read,
     /// all at once and as a list -- which allocates, so the pass does not ask
@@ -149,7 +152,7 @@ impl Schedule {
                 at: group.next,
             })
             .collect();
-        due.sort_by_key(|d| d.at);
+        due.sort_by(|one, two| (one.at, &one.group).cmp(&(two.at, &two.group)));
         due
     }
 

@@ -115,7 +115,12 @@ class FakeYamcs:
         self.reply = None
 
     def issue(self, command, args):
-        """Takes a command; a ping is answered with the vehicle's time."""
+        """Takes a command; a ping is answered with the vehicle's time.
+
+        Args:
+            command: The command's qualified name.
+            args:    Its arguments, by name.
+        """
         self.issued.append((command, args))
         if command == ping_yamcs.PING_TEXT and self.answer:
             sent = ping.read_message(args["Text"].encode()).sent

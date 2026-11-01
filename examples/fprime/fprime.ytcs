@@ -1,8 +1,8 @@
 # yaml-language-server: $schema=../../tcsgui/share/schema/tcspecial.schema.json
 
-description: "Answering to an F´ flight computer: a reading, and the
-  temperature made of it, to its bridge component, and a command from it to
-  a heater"
+description: "Answering to an F´ flight computer: a reading, the
+  temperature made of it and what a thermostat would decide of that, to its
+  bridge component, and a command from it to a heater"
 
 tcspecial:
   # Every port is in the nine thousands, which no other example uses, so this
@@ -41,8 +41,9 @@ gateway:
   # for the heater. What comes down arrives at bridge_base plus the device id
   # of the node that sent it, and the bridge gives it the F´ ID
   # fprime_id_base plus that same id: the thermometer, device id 2, arrives
-  # at 127.0.0.1:9702 as 0x3002, and cabin_temp, device id 3, at
-  # 127.0.0.1:9703 as 0x3003.
+  # at 127.0.0.1:9702 as 0x3002, cabin_temp, device id 3, at
+  # 127.0.0.1:9703 as 0x3003, and heater_wanted, device id 4, at
+  # 127.0.0.1:9704 as 0x3004.
   - name: fsw
     type: gateway_fprime
     address: "127.0.0.1"
@@ -88,6 +89,19 @@ vehicle:
     payload-in: true
     payload-out:
       - target: fsw
+      - target: heater_wanted
+  # What a thermostat would decide of cabin_temp -- on below 283.65 K, off
+  # above 284.65 K -- which the bridge's channel for it holds as a decision,
+  # true for on. Advice and no more: the heater is the flight computer's to
+  # drive, and this drives nothing.
+  - name: heater_wanted
+    type: compute
+    function: "hysteresis"
+    half_band: "0.5"
+    setpoint: "284.15"
+    payload-in: true
+    payload-out:
+      - target: fsw
 
 tcsgui:
   nodes:
@@ -95,3 +109,4 @@ tcsgui:
     - { name: heater, x: 34, y: 34 }
     - { name: thermometer, x: 34, y: 134 }
     - { name: cabin_temp, x: 242, y: 134 }
+    - { name: heater_wanted, x: 242, y: 234 }

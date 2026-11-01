@@ -133,6 +133,12 @@ fn a_vehicle_answering_to_fprime_reports_to_the_bridge_and_takes_its_commands()
         .find(|link| link.source == "thermometer")
         .expect("the thermometer reports");
     assert_eq!(reading.ground().expect("over UDP").port, 9702);
+    // And heater_wanted, the thermostat, device id 4, as the comments say.
+    let advice = shipped
+        .iter()
+        .find(|link| link.source == "heater_wanted")
+        .expect("heater_wanted reports");
+    assert_eq!(advice.ground().expect("over UDP").port, 9704);
 
     let dir = tempfile::tempdir().expect("a directory");
     // tcspecial writes its log into a directory that is there, and does not

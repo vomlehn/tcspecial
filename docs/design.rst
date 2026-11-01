@@ -1380,28 +1380,39 @@ match, saying ``ConfigurationDiffers``: its model is this configuration's,
 and a bridge for the other is built from that one's.
 
 A source's channel is of the type the configuration says its data are, and
-the configuration says one thing of a datum's type: that a compute node whose
+the configuration says one thing of a datum's type: what a compute node
+sends, by its function, as
+``tcslibgs::node::vehicle::compute::node_produces`` says. A node whose
 function makes a value -- ``to_kelvin``, ``vote``, ``process`` -- sends
 values, four bytes of a signed count of micro-kelvin (see `Compute
-elements`_), by ``tcslibgs::node::vehicle::compute::node_sends_a_value``,
-which tcsmoc asks too. Such a source's channel is an ``F64`` of kelvin, read
-by tcslib-c's ``tcs_value_kelvin`` -- ``from_value``, the one statement of
-what a value is -- and a datum from it that is not a value is written to no
-channel, counted in ``DataNotValues`` and said in an event: four bytes made a
-number whatever they held would be a temperature nobody measured. Every other
-source's channel is ``Tcs.Datum``: its length, and its first 64 bytes. A
-longer one goes as its first 64 bytes with its whole length, is counted, and
-is said in an event, so that nothing is cut short quietly.
+elements`_), which tcsmoc asks too. Such a source's channel is an ``F64`` of
+kelvin, read by tcslib-c's ``tcs_value_kelvin`` -- ``from_value``, the one
+statement of what a value is -- and a datum from it that is not a value is
+written to no channel, counted in ``DataNotValues`` and said in an event:
+four bytes made a number whatever they held would be a temperature nobody
+measured. A ``hysteresis`` node sends decisions, the text ``1`` or ``0``, and
+its channel is a ``bool``, true for on, read by ``tcs_decision_on`` --
+``from_decision``, the one statement of what a decision is, by which a
+``gpio`` node aboard reads the state its lines are driven to -- and a datum
+from it that is not one is written to no channel, counted in
+``DataNotDecisions`` and said in an event. Every other source's channel is
+``Tcs.Datum``: its length, and its first 64 bytes. A longer one goes as its
+first 64 bytes with its whole length, is counted, and is said in an event,
+so that nothing is cut short quietly.
 
-Two types and no more, because those are what the configuration describes.
+A thermostat sends only a change of decision to anything but the lines it
+drives (see `Compute elements`_), so a decision's channel says what was last
+decided while the bridge was matched: one made before, the first of a start
+among them, is not on it until the next change.
+
+Three types and no more, because those are what the configuration
+describes.
 A sensor's ``format`` -- ``i16_be`` and the rest -- is written on the
 ``to_kelvin`` node that reads it, and says how that one reader takes the
 bytes, not what the sensor sends: a sensor read by two conversions, or by
 none, has two answers or none, and its counts are a number in nobody's unit
 until the conversion has made them a temperature, which is the conversion's
-own channel. A decision is the text ``1`` or ``0``, which the flight
-software writes and the configuration says nothing of, and which the bytes
-show as they are. A type for either would be the model stating what the
+own channel. A type for a sensor's bytes would be the model stating what the
 configuration does not, and a second statement of what it does.
 
 What a beacon says is longer than a channel's text may be in F´, so it is an
@@ -1431,7 +1442,8 @@ beacons are heard; a simulated reading arrives as the thermometer's channel,
 its two bytes, and the temperature made of it as ``cabin_temp``'s, a number
 of kelvin, with no datum refused as not a value; a PING is answered; a node is stopped and started again; ``1`` sent up
 drives the heater, whose stand-in warms the thermal mass the thermometer
-reads, so that ``cabin_temp`` climbs, and ``0`` turns it off; a node the
+reads, so that ``cabin_temp`` climbs and ``heater_wanted``'s decision channel
+goes false, with no datum refused as not a decision, and ``0`` turns it off; a node the
 configuration lacks is refused unsent; a restart onto a configuration the
 vehicle does not hold is answered ``NotFound``; a plain restart is armed and
 taken, the beacons carry the restart flag, and the bridge is matched with the

@@ -223,6 +223,15 @@ module Tcs {
       format "{} sent a datum that is not a value: {}" \
       throttle 10
 
+    @ A node the configuration says sends decisions sent a datum that is
+    @ not one: it went to no channel, and is counted in DataNotDecisions
+    event NotADecision(
+      source: string size NODE_NAME_BYTES @< The node that sent it
+      why: string size 256 @< What tcslib-c said
+    ) severity warning low id 19 \
+      format "{} sent a datum that is not a decision: {}" \
+      throttle 10
+
     @ tcspecial answered RESTART_ARM or RESTART
     event RestartAnswered(
       cmd: string size 16 @< The command

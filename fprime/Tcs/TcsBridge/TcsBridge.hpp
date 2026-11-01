@@ -95,9 +95,9 @@ private:
 	// ---- The model, written from the configuration --------------------
 
 	/** Writes a datum to the channel of the node that produced it, as
-	 * what the configuration says its data are: through asDatum() or
-	 * asKelvin(). In model/TcsBridgeModel.cpp, which tcsverify
-	 * --fprime-model writes.
+	 * what the configuration says its data are: through asDatum(),
+	 * asKelvin() or asDecision(). In model/TcsBridgeModel.cpp, which
+	 * tcsverify --fprime-model writes.
 	 *
 	 * @param datum  The datum, and the node that produced it.
 	 * @return       true, or false where the model has no channel for the
@@ -131,6 +131,14 @@ private:
 	 * @param kelvin  Where the temperature is written.
 	 * @return        true where it was a value. */
 	bool asKelvin(const tcs_datum &datum, F64 &kelvin);
+
+	/** Reads a datum as a decision, on or off, as tcslib-c reads one,
+	 * counting and saying it where it is not one.
+	 *
+	 * @param datum  The datum.
+	 * @param on     Where the decision is written, true for on.
+	 * @return       true where it was a decision. */
+	bool asDecision(const tcs_datum &datum, bool &on);
 
 	// ---- The rest ----------------------------------------------------
 
@@ -232,6 +240,7 @@ private:
 	Datum m_datum;           // what each datum is taken into
 	U32 m_cutShort;          // data longer than a channel holds
 	U32 m_notValues;         // data from a node of values, not one
+	U32 m_notDecisions;      // data from a node of decisions, not one
 	char m_said[TCS_TEXT_BYTES]; // what the beacon last said, as an event
 };
 

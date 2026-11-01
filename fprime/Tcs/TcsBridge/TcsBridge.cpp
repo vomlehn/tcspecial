@@ -71,7 +71,8 @@ TcsBridge::TcsBridge(const char *name)
 	  m_uplink(nullptr), m_client(nullptr), m_noUplink(),
 	  m_open(false), m_heard(), m_stopping(false), m_tick(),
 	  m_connectedAt(0), m_connectedNs(0), m_connected(Connected::NEVER),
-	  m_datum(), m_cutShort(0), m_notValues(0), m_said()
+	  m_datum(), m_cutShort(0), m_notValues(0),
+	  m_notDecisions(0), m_said()
 {
 }
 
@@ -266,6 +267,22 @@ bool TcsBridge::asKelvin(const tcs_datum &datum, F64 &kelvin)
 	return true;
 }
 
+bool TcsBridge::asDecision(const tcs_datum &datum, bool &on)
+{
+	// Read by tcslib-c, so that what a decision is is said once. One that
+	// is not a decision is written to no channel: what a channel said was
+	// decided would be a guess.
+	int read = 0;
+	if (tcs_decision_on(datum.data, datum.length, &read) != 0) {
+		m_notDecisions++;
+		this->log_WARNING_LO_NotADecision(Fw::String(datum.source),
+						  Fw::String(tcs_last_error()));
+		return false;
+	}
+	on = read != 0;
+	return true;
+}
+
 void TcsBridge::connectIfDue(const Heard &heard)
 {
 	int listening = 0, commanding = 0;
@@ -341,6 +358,7 @@ void TcsBridge::writeChannels(const Heard &heard)
 	}
 	this->tlmWrite_DataCutShort(m_cutShort);
 	this->tlmWrite_DataNotValues(m_notValues);
+	this->tlmWrite_DataNotDecisions(m_notDecisions);
 }
 
 bool TcsBridge::open(const char *command, FwOpcodeType opCode, U32 cmdSeq)

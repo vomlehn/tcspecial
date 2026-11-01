@@ -173,7 +173,8 @@ def test_a_node_is_stopped_and_started_again(fprime_test_api):
 def test_data_sent_up_drives_the_heater(fprime_test_api):
     # 1 up to fsw, and on to the heater, whose stand-in warms the cabin a
     # kelvin a second while it is on: cabin_temp, read back, climbs past
-    # anything the cabin left to itself reaches. Then 0, to turn it off.
+    # anything the cabin left to itself reaches, and heater_wanted says the
+    # heater is no longer wanted. Then 0, to turn it off.
     fprime_test_api.send_and_assert_command(
         of_bridge("SEND_DATA"), ["1"], timeout=ANSWERING, commander=COMMANDER
     )
@@ -184,6 +185,17 @@ def test_data_sent_up_drives_the_heater(fprime_test_api):
         of_bridge("cabin_temp"),
         value=predicates.greater_than(286.0),
         timeout=ARRIVING,
+    )
+    # heater_wanted's decisions are a channel of on and off: on its way up
+    # the cabin passed the top of its band, 284.65 K, and the thermostat
+    # said off. Only a change of decision comes down, and this one came
+    # while the bridge was matched, as the first, made before it was, may
+    # not have.
+    fprime_test_api.assert_telemetry(
+        of_bridge("heater_wanted"), value=False, timeout=ARRIVING
+    )
+    fprime_test_api.assert_telemetry(
+        of_bridge("DataNotDecisions"), value=0, timeout=ARRIVING
     )
     fprime_test_api.send_and_assert_command(
         of_bridge("SEND_DATA"), ["0"], timeout=ANSWERING, commander=COMMANDER

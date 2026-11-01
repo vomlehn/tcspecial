@@ -439,6 +439,7 @@ vehicle:
         the ground may set \"ping.count\""
             .to_string(),
         "ping sends values: no".to_string(),
+        "ping sends decisions: no".to_string(),
         "sample ping: took \"ping\" of 6 bytes, gave nothing".to_string(),
         "restart: armed done, restarted done".to_string(),
         "ping ping through gateway: sent".to_string(),

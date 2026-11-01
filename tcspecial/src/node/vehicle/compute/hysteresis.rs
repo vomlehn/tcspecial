@@ -35,7 +35,9 @@
 //! state it keeps is still the last decision; what changed is that silence is
 //! no longer how it is held.
 
-use tcslibgs::node::vehicle::compute::HysteresisParams;
+use tcslibgs::node::vehicle::compute::{
+    HysteresisParams, DECISION_OFF, DECISION_ON,
+};
 
 use super::{from_text, from_value, Function, Out};
 
@@ -52,16 +54,16 @@ impl Decision {
     /// Gives what goes along the link for this decision.
     ///
     /// `1` and `0`, which is what a set of discrete lines takes: the value to
-    /// drive them to. Text, like every other value on a link, so a telemetry
-    /// log shows the decision rather than a byte.
+    /// drive them to. The form is `tcslibgs`'s, which the ground reads a
+    /// decision back by.
     ///
     /// # Returns
     ///
     /// The one byte `1` for `On` and `0` for `Off`.
     fn as_value(self) -> Out {
         // Constants, so that a decision made or held allocates nothing.
-        const ON: Out = Out::byte(b'1');
-        const OFF: Out = Out::byte(b'0');
+        const ON: Out = Out::byte(DECISION_ON);
+        const OFF: Out = Out::byte(DECISION_OFF);
         match self {
             Decision::On => ON,
             Decision::Off => OFF,

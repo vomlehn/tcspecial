@@ -2451,9 +2451,11 @@ The fprime example
 .. figure:: ../examples/fprime/fprime.svg
    :alt: The fprime example: the thermometer's readings go to fsw, a
          gateway_fprime node, and to cabin_temp, a to_kelvin compute node
-         whose temperatures go to fsw too, and both on to the F´ deployment's
-         TcsBridge component at bridge_base plus the sender's device id; a
-         command from the bridge goes up to fsw and on to the heater.
+         whose temperatures go to fsw too and to heater_wanted, a hysteresis
+         compute node whose decisions go to fsw, and all three on to the F´
+         deployment's TcsBridge component at bridge_base plus the sender's
+         device id; a command from the bridge goes up to fsw and on to the
+         heater.
    :width: 100%
 
    ``examples/fprime``: a vehicle that answers to an F´ flight computer.
@@ -2483,6 +2485,12 @@ node's device id being its place in the file. In the simulator file the
 thermometer reads a thermal mass, ``cabin``, in the encoding ``cabin_temp``
 reads back, and the heater warms it while it is driven on, so that what the
 flight computer sends the heater shows in the temperature it reads.
+
+``cabin_temp``'s temperatures go on to ``heater_wanted``, a ``hysteresis``
+compute node -- on below 283.65 K, off above 284.65 K -- whose decisions go
+to ``fsw``: device id 4, ``127.0.0.1:9704``, channel ``0x3004``. It is
+advice and drives nothing, the heater being the flight computer's to drive,
+and it shows the bridge a node that sends decisions.
 
 ``make -C examples run-fprime`` runs tcsmoc on the example, which starts
 tcspecial and tcssim; tcsmoc plays the bridge's part, the two speaking the one
@@ -2525,7 +2533,13 @@ of the type the configuration says its data are. A node that sends values, a
 compute node whose function is ``to_kelvin``, ``vote`` or ``process``, has an
 ``F64`` channel, its temperature in kelvin -- ``cabin_temp``, ``0x3003`` --
 and a datum from it that is not a value goes to no channel, is counted in
-``DataNotValues`` and is said in a ``NotAValue`` event. Every other node's
+``DataNotValues`` and is said in a ``NotAValue`` event. A node that sends
+decisions, a compute node whose function is ``hysteresis``, has a ``bool``
+channel, true for on -- ``heater_wanted``, ``0x3004`` -- and a datum from it
+that is not ``1`` or ``0`` goes to no channel, is counted in
+``DataNotDecisions`` and is said in a ``NotADecision`` event. A thermostat
+sends the ground only a change of decision, so its channel shows what was
+last decided while the bridge was matched. Every other node's
 channel holds a datum's length and its first 64 bytes. A node drawn into it
 must be
 named as F´ names things, with letters, digits and underscores, and every
@@ -2534,7 +2548,7 @@ two ``gateway_fprime`` nodes whose F´ IDs overlap. The bridge's own channels
 follow every device id: ``BeaconStage``, ``RestartFlag``,
 ``ListeningMatched``, ``CommandingMatched``, ``PacketsReceived``,
 ``PacketsProcessed``, ``PacketsMalformed``, ``PacketsMismatched``,
-``DataCutShort`` and ``DataNotValues``.
+``DataCutShort``, ``DataNotValues`` and ``DataNotDecisions``.
 
 The bridge is built for that configuration and runs on no other: given
 another, it says so in a ``ModelDiffers`` event and does nothing. It sends
@@ -2572,7 +2586,8 @@ and runs the tests in ``fprime/BridgeTest/test``, which start ``BridgeTest``
 and hold it to connecting and matching, hearing beacons, a simulated reading
 arriving as the thermometer's channel and as ``cabin_temp``'s temperature, a
 ``PING`` answered, a node stopped and
-started again, ``SEND_DATA 1`` warming the cabin until ``cabin_temp`` climbs,
+started again, ``SEND_DATA 1`` warming the cabin until ``cabin_temp`` climbs
+and ``heater_wanted`` says off,
 an unknown node refused unsent, a restart onto a configuration the vehicle
 does not hold refused, a plain restart taken and the start that comes back
 matched again, and stopping cleanly. tcssim's

@@ -264,15 +264,23 @@ int main(int argc, char **argv)
 						 &taken, &given) != 0) {
 			return fail("sample");
 		}
-		/* Whether its data is a value, a temperature, which the
-		 * configuration says and its width cannot. */
-		int values = 0;
+		/* Whether its data is a value, a temperature, or a decision,
+		 * on or off, which the configuration says and its width
+		 * cannot. */
+		int values = 0, decisions = 0;
 		if (tcs_configuration_sends_values(configuration, node_name,
 						   &values) != 0) {
 			return fail("values");
 		}
+		if (tcs_configuration_sends_decisions(configuration,
+						      node_name,
+						      &decisions) != 0) {
+			return fail("decisions");
+		}
 		printf("%s sends values: %s\n", node_name,
 		       values ? "yes" : "no");
+		printf("%s sends decisions: %s\n", node_name,
+		       decisions ? "yes" : "no");
 
 		printf("sample %s: took \"%.*s\" of %u bytes, %s\n",
 		       node_name, (int)taken.length,
@@ -334,7 +342,7 @@ int main(int argc, char **argv)
 			       exchange.up + exchange.down ==
 			       exchange.round_trip ? "yes" : "no");
 		} else {
-			int values = 0;
+			int values = 0, decisions = 0, on = 0;
 			double kelvin = 0.0;
 			data_seen = 1;
 			if (tcs_configuration_sends_values(configuration,
@@ -345,6 +353,14 @@ int main(int argc, char **argv)
 						       &kelvin) == 0) {
 				printf("data from %s: %.6f K\n", datum.source,
 				       kelvin);
+			} else if (tcs_configuration_sends_decisions(
+					   configuration, datum.source,
+					   &decisions) == 0 &&
+				   decisions &&
+				   tcs_decision_on(datum.data, datum.length,
+						   &on) == 0) {
+				printf("data from %s: %s\n", datum.source,
+				       on ? "on" : "off");
 			} else {
 				printf("data from %s: %.*s\n", datum.source,
 				       (int)datum.length,

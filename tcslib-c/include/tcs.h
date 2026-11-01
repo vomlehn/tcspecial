@@ -341,6 +341,31 @@ int tcs_configuration_sends_values(const tcs_configuration *configuration,
  * @return        0, or -1 where the datum is not a value's width. */
 int tcs_value_kelvin(const uint8_t *data, size_t length, double *kelvin);
 
+/* A decision is what a thermostat -- a compute node whose function is
+ * hysteresis -- sends: the text 1 to assert, 0 to unassert, which is what the
+ * lines it drives take. As with values, only the configuration says which
+ * nodes send decisions, and these two are how a station asks it and reads
+ * one. */
+
+/** Says whether a node sends decisions, as the configuration says: a
+ * compute node whose function is hysteresis.
+ *
+ * @param configuration  The configuration.
+ * @param node           The node's name, as a datum's source gives it.
+ * @param decisions      Where 1 is written when it sends decisions, 0 when
+ *                       not.
+ * @return               0, or -1 where there is no such node. */
+int tcs_configuration_sends_decisions(const tcs_configuration *configuration,
+				      const char *node, int *decisions);
+
+/** Reads a decision as on or off.
+ *
+ * @param data    The datum's bytes; may be NULL where length is 0.
+ * @param length  How many bytes data holds.
+ * @param on      Where 1 is written for on, 0 for off.
+ * @return        0, or -1 where the datum is not 1 or 0. */
+int tcs_decision_on(const uint8_t *data, size_t length, int *on);
+
 /* ---- Data up to the vehicle --------------------------------------------- */
 
 /* The way up to a gateway node: the address and port it binds aboard, from

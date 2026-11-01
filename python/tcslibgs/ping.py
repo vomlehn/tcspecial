@@ -18,6 +18,11 @@ ping it sends. Each time is the number of seconds since the UNIX epoch,
 written with exactly nine digits after the point, so that it says the time to
 the nanosecond: ``1760900000.000000001``.
 
+The same layout is stated field by field in the ping node's interface
+document, ``tcslibgs/xtce/ping.xtce``, for the ground stations that read
+XTCE; ``tcslibgs/ping_packet.py`` is generated from it, and the tests hold
+it to this.
+
 Times are whole nanoseconds since the epoch, as ``time.time_ns()`` gives them,
 and never floats: a float of seconds holds about a microsecond at today's
 epoch, and the format promises nanoseconds.

@@ -52,6 +52,12 @@ pub mod parameters;
 /// The physics model: the vehicle's physical components, which the
 /// simulator's stand-ins measure and act on, in a file of its own.
 pub mod physics;
+/// The ping's and its answer's packing code, which tcs-xtce generated from
+/// `xtce/ping.xtce`, the ping node's interface document: what the tests of
+/// [`node::vehicle::ping`] hold the document to that module with. Not
+/// compiled into anything else, the ping node answering by that module.
+#[cfg(test)]
+mod ping_packet;
 pub mod protocol;
 /// Whether the simulator is ready: what a harness and tcssim say on tcssim's
 /// readiness socket.

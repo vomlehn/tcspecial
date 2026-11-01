@@ -10883,8 +10883,9 @@ they go.</dd>
 <dt>Requirement</dt>
 <dd>The model is a list of elements, each with a name and a <tt class="docutils literal">type</tt>, as a
 configuration is a list of nodes, and a list of connections between
-them, as a configuration has links. The types are <tt class="docutils literal">heater</tt> and
-<tt class="docutils literal">thermal_zone</tt>, and an element of any other is refused; a
+them, as a configuration has links. The types are <tt class="docutils literal">heater</tt>,
+<tt class="docutils literal">thermal_zone</tt>, <tt class="docutils literal">sun</tt>, <tt class="docutils literal">solar_array</tt>, <tt class="docutils literal">load</tt>, <tt class="docutils literal">bus</tt> and
+<tt class="docutils literal">battery</tt>, and an element of any other is refused; a
 <tt class="docutils literal">thermal_mass</tt>, the one type there was before a model was made of
 parts, is told what it is now. Each type's settings, terminals and rules
 are stated once, in <tt class="docutils literal"><span class="pre">tcslibgs::physics</span></tt>; its arithmetic is the
@@ -11005,6 +11006,42 @@ hundred kelvin above the environment.</p>
 <dd>A zone starts at its environment, and a heater off. A zone that started
 at the setpoint would hide the one part of the loop worth watching, and
 a vehicle coming up cold is the case a thermostat exists for.</dd>
+</dl>
+<p><strong>A power bus</strong></p>
+<p>A sun lights a solar array, the array supplies a bus, loads draw on it, and
+what is left over charges a battery, or, in shadow, what the array cannot give
+the battery makes up.</p>
+<dl class="docutils">
+<dt>Requirement</dt>
+<dd>A sun gives out <tt class="docutils literal">light</tt>, a ratio: one in sunlight and nought in
+shadow. Its orbit's <tt class="docutils literal">period</tt> and the fraction of it in shadow,
+<tt class="docutils literal">eclipse</tt>, are stated, and where round it it starts. The light changes
+all at once, so each change is an event, foreseen from the orbit.</dd>
+<dt>Requirement</dt>
+<dd>A solar array takes <tt class="docutils literal">light</tt> and gives out its full-sun <tt class="docutils literal">current</tt>
+times it, in amperes. The bus of a spacecraft without a regulator sits
+where its battery holds it, on the flat of the array's curve, where its
+current is very nearly its short-circuit figure.</dd>
+<dt>Requirement</dt>
+<dd>A load gives out the <tt class="docutils literal">current</tt> it draws, nought while its decision
+<tt class="docutils literal">shed</tt> is asserted. A load nothing sheds is never shed.</dd>
+<dt>Requirement</dt>
+<dd>A bus takes the sum of the sources joined to its <tt class="docutils literal">supply</tt> and of the
+loads joined to its <tt class="docutils literal">demand</tt>, and gives out what is left over as its
+<tt class="docutils literal">current</tt>. It has no settings: a bus is its connections.</dd>
+<dt>Requirement</dt>
+<dd>A battery takes what the bus has left over, <tt class="docutils literal">offered</tt>, and gives out
+its <tt class="docutils literal">voltage</tt>, the <tt class="docutils literal">current</tt> that actually flows into it, and its
+<tt class="docutils literal">charge</tt>, the fraction of its <tt class="docutils literal">capacity</tt> it holds. Its charge moves
+in a straight line with the current, and its voltage runs straight from
+<tt class="docutils literal">empty</tt> to <tt class="docutils literal">full</tt> with its charge, plus what its <tt class="docutils literal">resistance</tt>
+drops. A straight line reaches full or empty at a moment it can foresee,
+which is its next event, so it is never stepped past either.</dd>
+<dt>Requirement</dt>
+<dd>A full battery takes no current: what would charge it is shunted, as a
+spacecraft's regulator does. An empty one is held at empty, and what is
+drawn is still drawn, its voltage below <tt class="docutils literal">empty</tt> showing it: a cell past
+what it is rated for is outside what the model says.</dd>
 </dl>
 <p><strong>What the bytes are</strong></p>
 <p>A sensor has to send bytes the vehicle will read back as what it reports, and

@@ -34,7 +34,11 @@ pub enum Kind {
 }
 
 impl Kind {
-    /// Says what it is, as a sentence names it: `kelvin`, `a decision`.
+    /// Says what it is, as a sentence names it.
+    ///
+    /// # Returns
+    ///
+    /// Its unit's name, `kelvin`, or `a decision`.
     pub fn describe(self) -> &'static str {
         match self {
             Kind::Value(unit) => unit.name(),
@@ -62,6 +66,15 @@ pub struct Terminal {
 
 impl Terminal {
     /// An input of this kind, taking one output at most, connected or not.
+    ///
+    /// # Arguments
+    ///
+    /// * `name` - Its name.
+    /// * `kind` - What it carries.
+    ///
+    /// # Returns
+    ///
+    /// The terminal.
     pub const fn input(name: &'static str, kind: Kind) -> Terminal {
         Terminal {
             name,
@@ -73,6 +86,15 @@ impl Terminal {
     }
 
     /// An output of this kind.
+    ///
+    /// # Arguments
+    ///
+    /// * `name` - Its name.
+    /// * `kind` - What it carries.
+    ///
+    /// # Returns
+    ///
+    /// The terminal.
     pub const fn output(name: &'static str, kind: Kind) -> Terminal {
         Terminal {
             name,
@@ -84,11 +106,19 @@ impl Terminal {
     }
 
     /// This input, taking the sum of every output connected to it.
+    ///
+    /// # Returns
+    ///
+    /// The terminal, summing.
     pub const fn summing(self) -> Terminal {
         Terminal { sums: true, ..self }
     }
 
     /// This input, which must be connected or driven.
+    ///
+    /// # Returns
+    ///
+    /// The terminal, required.
     pub const fn must_be_joined(self) -> Terminal {
         Terminal {
             required: true,

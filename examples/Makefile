@@ -32,6 +32,8 @@ help:
 	@echo "  make README.html     - Build README.html from README.md"
 	@echo "  make run-simple      - Run tcsmoc on the minimal example"
 	@echo "  make run-thermostat  - Run tcsmoc on the thermostat example"
+	@echo "  make run-battery     - Run tcsmoc on the battery example:" \
+		"a power bus through an orbit, a load shed in eclipse"
 	@echo "  make run-simple-app  - Run the simple-app example, printing" \
 		"its line"
 	@echo "  make run-beacon      - Run the beacon example: a window" \
@@ -103,6 +105,12 @@ README.html: README.md style.html
 .PHONY: run-thermostat
 run-thermostat:
 	$(call runexample_on,thermostat)
+
+# Run tcsmoc on the battery example: a power bus through a six minute orbit,
+# its charge counted by a program and its science load shed in eclipse.
+.PHONY: run-battery
+run-battery:
+	$(call runexample_on,battery)
 
 # Run tcsmoc on the tees example: a command copied back to the ground, a
 # reading copied aboard, and data dropped.

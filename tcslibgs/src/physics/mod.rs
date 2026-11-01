@@ -52,8 +52,13 @@
 //! YAML only. A model is written by hand or by a tool that writes YAML, and
 //! a second spelling would be a second thing to keep the same as the first.
 
+pub mod battery;
+pub mod bus;
 pub mod heater;
+pub mod load;
 pub mod setting;
+pub mod solar_array;
+pub mod sun;
 pub mod terminal;
 pub mod thermal_zone;
 
@@ -70,7 +75,15 @@ use terminal::{At, Direction, Terminal};
 
 /// Every element type a physics model may hold, by the name a file writes as
 /// its `type`. The one list of them.
-pub const TYPES: &[&str] = &["heater", "thermal_zone"];
+pub const TYPES: &[&str] = &[
+    "heater",
+    "thermal_zone",
+    "sun",
+    "solar_array",
+    "load",
+    "bus",
+    "battery",
+];
 
 /// A physics model, as it parses.
 #[derive(Debug, Clone, Default, Deserialize, PartialEq)]
@@ -95,6 +108,16 @@ pub enum Element {
     Heater(heater::Heater),
     #[serde(rename = "thermal_zone")]
     ThermalZone(thermal_zone::ThermalZone),
+    #[serde(rename = "sun")]
+    Sun(sun::Sun),
+    #[serde(rename = "solar_array")]
+    SolarArray(solar_array::SolarArray),
+    #[serde(rename = "load")]
+    Load(load::Load),
+    #[serde(rename = "bus")]
+    Bus(bus::Bus),
+    #[serde(rename = "battery")]
+    Battery(battery::Battery),
     /// The one type there was before a model was made of parts. Read only
     /// to be refused, saying what it is now: see [`MASS_MADE_OF_PARTS`].
     #[serde(rename = "thermal_mass")]
@@ -139,6 +162,11 @@ impl Element {
         match self {
             Element::Heater(e) => &e.name,
             Element::ThermalZone(e) => &e.name,
+            Element::Sun(e) => &e.name,
+            Element::SolarArray(e) => &e.name,
+            Element::Load(e) => &e.name,
+            Element::Bus(e) => &e.name,
+            Element::Battery(e) => &e.name,
             Element::ThermalMass(e) => &e.name,
         }
     }
@@ -152,6 +180,11 @@ impl Element {
         match self {
             Element::Heater(_) => "heater",
             Element::ThermalZone(_) => "thermal_zone",
+            Element::Sun(_) => "sun",
+            Element::SolarArray(_) => "solar_array",
+            Element::Load(_) => "load",
+            Element::Bus(_) => "bus",
+            Element::Battery(_) => "battery",
             Element::ThermalMass(_) => "thermal_mass",
         }
     }
@@ -171,6 +204,11 @@ pub fn settings_of(type_name: &str) -> Option<&'static [&'static str]> {
     match type_name {
         "heater" => Some(heater::SETTINGS),
         "thermal_zone" => Some(thermal_zone::SETTINGS),
+        "sun" => Some(sun::SETTINGS),
+        "solar_array" => Some(solar_array::SETTINGS),
+        "load" => Some(load::SETTINGS),
+        "bus" => Some(bus::SETTINGS),
+        "battery" => Some(battery::SETTINGS),
         _ => None,
     }
 }
@@ -188,6 +226,11 @@ pub fn terminals_of(type_name: &str) -> Option<&'static [Terminal]> {
     match type_name {
         "heater" => Some(heater::TERMINALS),
         "thermal_zone" => Some(thermal_zone::TERMINALS),
+        "sun" => Some(sun::TERMINALS),
+        "solar_array" => Some(solar_array::TERMINALS),
+        "load" => Some(load::TERMINALS),
+        "bus" => Some(bus::TERMINALS),
+        "battery" => Some(battery::TERMINALS),
         _ => None,
     }
 }
@@ -294,6 +337,12 @@ pub struct Resolved {
 pub enum Resolution {
     Heater(heater::Resolved),
     ThermalZone(thermal_zone::Resolved),
+    Sun(sun::Resolved),
+    SolarArray(solar_array::Resolved),
+    Load(load::Resolved),
+    /// A bus has no figures: it is its connections.
+    Bus,
+    Battery(battery::Resolved),
 }
 
 impl Resolution {
@@ -306,6 +355,11 @@ impl Resolution {
         match self {
             Resolution::Heater(_) => "heater",
             Resolution::ThermalZone(_) => "thermal_zone",
+            Resolution::Sun(_) => "sun",
+            Resolution::SolarArray(_) => "solar_array",
+            Resolution::Load(_) => "load",
+            Resolution::Bus => "bus",
+            Resolution::Battery(_) => "battery",
         }
     }
 
@@ -318,6 +372,11 @@ impl Resolution {
         match self {
             Resolution::Heater(_) => heater::TERMINALS,
             Resolution::ThermalZone(_) => thermal_zone::TERMINALS,
+            Resolution::Sun(_) => sun::TERMINALS,
+            Resolution::SolarArray(_) => solar_array::TERMINALS,
+            Resolution::Load(_) => load::TERMINALS,
+            Resolution::Bus => bus::TERMINALS,
+            Resolution::Battery(_) => battery::TERMINALS,
         }
     }
 }
@@ -516,6 +575,13 @@ impl PhysicsFile {
                 Element::ThermalZone(e) => {
                     e.resolve().map(Resolution::ThermalZone)
                 }
+                Element::Sun(e) => e.resolve().map(Resolution::Sun),
+                Element::SolarArray(e) => {
+                    e.resolve().map(Resolution::SolarArray)
+                }
+                Element::Load(e) => e.resolve().map(Resolution::Load),
+                Element::Bus(_) => Ok(Resolution::Bus),
+                Element::Battery(e) => e.resolve().map(Resolution::Battery),
                 Element::ThermalMass(_) => Err(MASS_MADE_OF_PARTS.to_string()),
             };
             match what {
@@ -695,7 +761,7 @@ connections:
     fn an_element_of_no_known_type_is_refused() {
         for (text, said) in [
             ("physics:\n  - name: zone\n    environment: \"1\"\n", "type"),
-            ("physics:\n  - name: zone\n    type: battery\n", "battery"),
+            ("physics:\n  - name: zone\n    type: boiler\n", "boiler"),
             (
                 "physics:\n  - name: h\n    type: heater\n    \
                  power: \"1 W\"\n    voltage: \"1 V\"\n    colour: red\n",

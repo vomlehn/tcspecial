@@ -10628,8 +10628,9 @@ Requirement
 Requirement
     The model is a list of elements, each with a name and a ``type``, as a
     configuration is a list of nodes, and a list of connections between
-    them, as a configuration has links. The types are ``heater`` and
-    ``thermal_zone``, and an element of any other is refused; a
+    them, as a configuration has links. The types are ``heater``,
+    ``thermal_zone``, ``sun``, ``solar_array``, ``load``, ``bus`` and
+    ``battery``, and an element of any other is refused; a
     ``thermal_mass``, the one type there was before a model was made of
     parts, is told what it is now. Each type's settings, terminals and rules
     are stated once, in ``tcslibgs::physics``; its arithmetic is the
@@ -10770,6 +10771,48 @@ Requirement
     A zone starts at its environment, and a heater off. A zone that started
     at the setpoint would hide the one part of the loop worth watching, and
     a vehicle coming up cold is the case a thermostat exists for.
+
+**A power bus**
+
+A sun lights a solar array, the array supplies a bus, loads draw on it, and
+what is left over charges a battery, or, in shadow, what the array cannot give
+the battery makes up.
+
+Requirement
+    A sun gives out ``light``, a ratio: one in sunlight and nought in
+    shadow. Its orbit's ``period`` and the fraction of it in shadow,
+    ``eclipse``, are stated, and where round it it starts. The light changes
+    all at once, so each change is an event, foreseen from the orbit.
+
+Requirement
+    A solar array takes ``light`` and gives out its full-sun ``current``
+    times it, in amperes. The bus of a spacecraft without a regulator sits
+    where its battery holds it, on the flat of the array's curve, where its
+    current is very nearly its short-circuit figure.
+
+Requirement
+    A load gives out the ``current`` it draws, nought while its decision
+    ``shed`` is asserted. A load nothing sheds is never shed.
+
+Requirement
+    A bus takes the sum of the sources joined to its ``supply`` and of the
+    loads joined to its ``demand``, and gives out what is left over as its
+    ``current``. It has no settings: a bus is its connections.
+
+Requirement
+    A battery takes what the bus has left over, ``offered``, and gives out
+    its ``voltage``, the ``current`` that actually flows into it, and its
+    ``charge``, the fraction of its ``capacity`` it holds. Its charge moves
+    in a straight line with the current, and its voltage runs straight from
+    ``empty`` to ``full`` with its charge, plus what its ``resistance``
+    drops. A straight line reaches full or empty at a moment it can foresee,
+    which is its next event, so it is never stepped past either.
+
+Requirement
+    A full battery takes no current: what would charge it is shunted, as a
+    spacecraft's regulator does. An empty one is held at empty, and what is
+    drawn is still drawn, its voltage below ``empty`` showing it: a cell past
+    what it is rated for is outside what the model says.
 
 **What the bytes are**
 

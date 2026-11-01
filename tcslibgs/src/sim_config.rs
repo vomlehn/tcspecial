@@ -1690,18 +1690,23 @@ impl SimConfigFile {
                 let joined = driven.contains_key(&place)
                     || model.connections.iter().any(|c| c.to == place);
                 if terminal.required && !joined {
+                    let at = format!("{}.{}", element.name, terminal.name);
+                    let how = match terminal.kind {
+                        Kind::Decision => format!(
+                            "a {} is switched there, so connect a stand-in \
+                             the vehicle drives to it with connects: {at}",
+                            element.what.type_name()
+                        ),
+                        Kind::Value(unit) => format!(
+                            "a {} has nothing to go on without it, so join \
+                             an output in {} to it under connections",
+                            element.what.type_name(),
+                            unit.name()
+                        ),
+                    };
                     return Err(bad(
                         &element.name,
-                        format!(
-                            "{}.{} is joined to nothing: a {} is switched \
-                             there, so connect a stand-in the vehicle drives \
-                             to it with connects: {}.{}",
-                            element.name,
-                            terminal.name,
-                            element.what.type_name(),
-                            element.name,
-                            terminal.name
-                        ),
+                        format!("{at} is joined to nothing: {how}"),
                     ));
                 }
             }

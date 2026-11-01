@@ -2181,10 +2181,10 @@ the heaters are held at what the vehicle last decided and a decision that went
 missing is corrected on the next sample. What is logged and sent to the ground
 is the transitions alone.
 
-Every payload here has lines, so none has a telemetry link of its own: the
-sensors' readings reach the ground through their conversions, and the heaters
-are driven and never read. Tcssim watches the heaters' lines on the
-``gpio-sim`` chip and counts each time the vehicle switches them.
+No payload here has a telemetry link of its own: the sensors' readings reach
+the ground through their conversions, and the heaters are driven and never
+read. Tcssim's stand-ins for the heaters count each decision the vehicle sends
+them.
 
 The command binding on the gateway node says the ground may set the
 thermostat's setpoint, and the running vehicle applies it: a ``SET_NODE``
@@ -2200,14 +2200,70 @@ The simulator file beside it names the vehicle's physics model,
 Each sensor reports the zone's temperature, from a place of its own on it, so
 that what the three report is one temperature rather than three streams of
 noise, which is what the model is for; each heater's stand-in switches its
-heater while the vehicle has it on. So the loop closes through tcspecial: see **The Simulator
-Configuration** below. Naming the ``thermostat`` node in the file's
+heater while the vehicle has it on. So the loop closes through tcspecial: see
+**The Simulator Configuration** below. Naming the ``thermostat`` node in the file's
 ``tcssim`` section closes it in tcssim alone instead, with no tcspecial
 running.
 
-The sensors and heaters are hardware, so ``make -C examples run-thermostat``
-needs ``/dev/i2c-1``, ``/dev/spidev0.0`` and ``/dev/gpiochip0``; ``make
-mkstubs`` provides stand-ins for some of them where there is no hardware.
+``make -C examples run-thermostat`` runs it, on any desk.
+
+The battery example
+-------------------
+.. figure:: ../examples/battery/battery.svg
+   :alt: The battery example: a power monitor on a serial line and a shunt
+         on a UDP socket, their readings made volts and amperes, the
+         amperes counted into a state of charge by a program, and a
+         hysteresis shedding the science load when the charge runs low.
+         Everything goes to the ground and to a log.
+   :width: 100%
+
+   ``examples/battery``: a power bus through an orbit, its charge counted
+   aboard and its science load shed in eclipse.
+
+A spacecraft's power system, and the example of a payload that is asked, of
+a computation that is a program, and of physics with events in it.
+
+``monitor`` is a power monitor on a serial line, ``/tmp/tcs-battery-monitor``.
+It answers only when asked: its ``trigger``, ``"V?\r"``, goes out every
+``trigger_interval``, 500 ms, and it answers two bytes, millivolts, which
+``bus_volts`` -- a ``to_value`` node in volts -- makes the bus's voltage.
+``shunt``, the shunt in the battery's lead, is the far end of a UDP socket
+and sends the battery's current twice a second of its own accord, in
+milliamperes, which ``battery_amps`` makes a value in amperes: more than
+nought charging, less discharging.
+
+Nothing aboard measures how full the battery is, so ``charge`` works it out:
+a ``process`` node running ``examples/battery/charge.py``, which counts the
+current coulomb by coulomb and answers the fraction of its capacity the
+battery holds, as a ``ratio``. A program and not a built-in, because how a
+battery's charge is estimated is a mission's business. A count drifts and
+starts from a guess, so the program sets itself to full whenever the current
+falls to nought, which on this bus happens only when the battery is full and
+what would charge it is shunted.
+
+``shedding`` is a hysteresis on the charge, around 0.4 with a half band of
+0.1: below three tenths it is asserted, and its decision, driven to
+``science``, sheds the science instrument; above half it is unasserted and
+the instrument comes back. The band is wide so that an eclipse sheds the load
+once rather than at every reading near the edge. Every value and decision goes
+to the ground, on ports 5101 to 5104, and to the log ``housekeeping``, and the
+ground may set the setpoint through the command binding.
+
+The physics model, ``battery-physics.yaml``, is the power system as its parts:
+a ``sun``, a ``solar_array`` of seven amperes, two ``load`` elements of two
+amperes each -- ``avionics``, never shed, and ``science`` -- a ``bus`` and a
+``battery``, joined under ``connections``. The orbit is six minutes, four
+tenths of it in shadow, and the battery a fifth of an ampere-hour, so that a
+run on a desk sees a whole orbit in the time it takes to watch: the battery
+charges at three amperes and fills, its current falling to nought; the eclipse
+comes and it discharges at four; the charge falls below three tenths and the
+science load is shed, halving the drain; and the sun returns, the battery
+recovers, and the load comes back above half. Each change -- into shadow and
+out, full, empty -- is an event of the model's, foreseen and met at its
+moment: see **How the world moves** below.
+
+``make -C examples run-battery`` runs it, on any desk: tcssim makes a
+pseudo-terminal for the power monitor at its path, and sockets for the rest.
 
 The simple-app example
 ----------------------
@@ -3070,7 +3126,7 @@ still declares masses itself is refused, told where they go.
 
 The model holds a list of elements, under ``physics``, and the connections
 between them, under ``connections``, as a configuration holds nodes and
-links. Each element is one simple part, of one of two types:
+links. Each element is one simple part, of one of these types:
 
 .. code-block:: text
 
@@ -3100,6 +3156,34 @@ links. Each element is one simple part, of one of two types:
      wander_time          how slowly it wanders, as a length of time. With
                           wander and refused without it
 
+   sun                    sunlight and shadow, through an orbit
+     name                 the name connections and stand-ins use
+     period               how long one orbit takes: "90 min"
+     eclipse              how much of it is in shadow, as a fraction,
+                          written bare: "0.35"
+     start                how far round the orbit it starts, from the start
+                          of its sunlight, as a fraction. Optional
+
+   solar_array            panels turning light into current
+     name                 the name connections and stand-ins use
+     current              what it gives in full sunlight: "7 A"
+
+   load                   something on the bus that draws a current
+     name                 the name connections and stand-ins use
+     current              what it draws while it is on: "2 A"
+
+   bus                    where the sources' currents and the loads' meet
+     name                 the name connections and stand-ins use
+
+   battery                a store of charge on the bus
+     name                 the name connections and stand-ins use
+     capacity             how much it holds full: "10 Ah"
+     empty                its open-circuit voltage empty: "24 V"
+     full                 its open-circuit voltage full, more than empty:
+                          "33.2 V"
+     resistance           its internal resistance: "0.05 ohm"
+     charge               how full it starts, as a fraction: "0.6"
+
 Every figure is written with its unit, and one without it, or in another
 unit, is refused, saying what to write: a bare ``60`` could be watts or
 kelvin a second. A fraction, which has no unit, is written bare. A
@@ -3116,6 +3200,20 @@ output, carrying a value in one unit or a decision:
                   current       out   A, nought while off
    thermal_zone   heat          in    W, the sum of everything joined to it
                   temperature   out   K
+   sun            light         out   a ratio: one lit, nought in shadow
+   solar_array    light         in    a ratio
+                  current       out   A, its full-sun current times light
+   load           shed          in    a decision: shed while asserted, and
+                                      never shed where nothing is joined
+                  current       out   A, nought while shed
+   bus            supply        in    A, the sum of the sources joined to it
+                  demand        in    A, the sum of the loads joined to it
+                  current       out   A, supply less demand
+   battery        offered       in    A, what the bus has left over
+                  voltage       out   V
+                  current       out   A, what flows in: nought into a full
+                                      battery, whose charge is shunted
+                  charge        out   a ratio, the fraction it holds
 
 A terminal is written as the element's name and its own, joined by a dot:
 ``zone.temperature``. A connection goes from an output to an input of the
@@ -3125,7 +3223,11 @@ the sum of every output joined to it where its type says so, as a zone's
 ``heat`` does.
 
 A heater's heat goes as the square of its supply voltage, and its current as
-the voltage. A zone cools towards its environment with its time constant and
+the voltage. A battery's charge moves in a straight line with its current,
+and its voltage runs straight from ``empty`` to ``full`` with its charge, plus
+what its resistance drops; full, a charging current is shunted, and empty, it
+is held there with its voltage below ``empty`` showing it. The sun is lit or
+dark, changing all at once twice an orbit. A zone cools towards its environment with its time constant and
 is warmed by the heat joined to it, its capacity turning watts into kelvin a
 second; with a fifty second constant, twenty joules a kelvin and a hundred
 and twenty watts, it would settle three hundred kelvin above its
@@ -3230,8 +3332,8 @@ shares, and nothing ticks: the world is brought up to a moment only when a
 stand-in reads or drives it, and a world nobody asks about costs nothing.
 Between two moments each element is advanced by its closed form, so what a
 sensor reads does not depend on how often it is read. Where an element's
-behaviour would change inside an interval -- a battery reaching full -- it
-foresees the moment as an event, and the world stops there, lets it happen,
+behaviour would change inside an interval -- a battery reaching full, the
+sun going into shadow -- it foresees the moment as an event, and the world stops there, lets it happen,
 and goes on, the events waiting in order of when they fall. Simulated time
 keeps pace with the wall clock, which the vehicle runs on.
 

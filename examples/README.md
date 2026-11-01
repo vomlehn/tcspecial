@@ -340,6 +340,7 @@ with it aboard and on the ground.
 | Directory | Description |
 |---|---|
 | `thermostat` | Three temperature sensors, converted to kelvin, voted on, and fed to a hysteresis thermostat that drives two heaters, every one a UDP socket tcssim stands in for, so that it runs on any desk. The setpoint is commanded from the ground, and tcsmoc plots the temperatures and the heaters. |
+| `battery` | A power bus through an orbit: a power monitor asked over a serial line, a shunt, the battery's charge counted by a Python 3 program, and the science load shed in eclipse by a hysteresis. tcssim stands in for every payload, joined to a physics model of a sun, a solar array, loads, a bus and a battery. |
 | `simple-app` | A payload that is a program rather than a device: an `app_pl` node sending a line of text one word per packet, and a ground station that prints the line. Two programs of its own beside the configuration: the payload in Python 3, the ground station in Rust. |
 
 ### thermostat
@@ -385,8 +386,48 @@ Languages:
 - MOC: Rust -- tcsmoc.
 - Vehicle: Rust -- tcspecial, whose conversions, vote, thermostat and log are
   its own nodes.
-- Payload: Rust -- tcssim stands in for the three sensors, with the thermal
-  mass they read, and for the two heaters.
+- Payload: Rust -- tcssim stands in for the three sensors, with the zone
+  they read, and for the two heaters.
+
+### battery
+
+A spacecraft's power bus through an orbit: the example of a payload that is
+asked, of a computation that is a program, and of physics with events in it.
+
+`monitor`, a power monitor on a serial line at `/tmp/tcs-battery-monitor`, is
+asked for the bus voltage twice a second -- its `trigger` is `"V?\r"` -- and
+`bus_volts` makes its two bytes volts. `shunt`, the shunt in the battery's
+lead, sends the battery's current twice a second over UDP, port 5301, and
+`battery_amps` makes it amperes. `charge` is a `process` node running
+`charge.py`, a Python 3 program beside the configuration that counts the
+current coulomb by coulomb into the battery's state of charge, a ratio, and
+sets itself full whenever the current falls to nought. `shedding`, a
+hysteresis around 0.4, sheds the science instrument below three tenths by
+driving `science`, port 5302, and restores it above half.
+
+tcssim stands in for all three, joined to the vehicle's physics model,
+`battery-physics.yaml`: a sun, a solar array, two loads, a bus and a battery,
+each a part simulated alone and joined under `connections`. The orbit is six
+minutes and the battery small, so that a run sees, in one orbit, the battery
+charge and fill, the eclipse drain it, the science load shed and the sun bring
+it back. Going into shadow and out, and the battery reaching full, are events
+of the model's, met at their moments.
+
+```
+make run-battery
+```
+
+Press Connect in tcsmoc, and Enable on each payload in tcssim, to start the
+data.
+
+Languages:
+
+- MOC: Rust -- tcsmoc.
+- Vehicle: Rust -- tcspecial, whose conversions, hysteresis and log are its
+  own nodes -- and Python 3, the charge count, which is a program of the
+  example's.
+- Payload: Rust -- tcssim stands in for the power monitor, with a
+  pseudo-terminal at its path, the shunt and the science switch.
 
 ### simple-app
 

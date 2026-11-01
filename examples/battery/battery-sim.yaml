@@ -1,0 +1,50 @@
+# yaml-language-server: $schema=../../tcsgui/share/schema/tcspecial-sim.schema.json
+
+# How tcssim stands in for the payloads of battery.ytcs.
+#
+# The two files are joined by name, and nothing here names a payload that
+# file does not have. Only the payloads named here are simulated.
+#
+# Each stand-in is joined to the physics model: the power monitor reports
+# the battery's voltage, which on a bus with no regulator is the bus's; the
+# shunt reports the current into the battery; and the science switch sheds
+# the science load. So the loop closes through tcspecial: the shunt's
+# current is counted into a charge, the charge decides the shedding, and
+# the shedding changes the current.
+description: Simulator settings for the payloads of battery.ytcs
+
+# Where tcssim answers whether it has made its stand-ins, which whatever
+# starts the run asks before it starts tcspecial. A port no other example
+# uses, so that two can be run at once.
+tcssim:
+  ready: "127.0.0.1:7910"
+
+physics: battery-physics.yaml
+
+simulated_payloads:
+  # Asked, and answering: a triggered payload has no rate of its own here.
+  # Accurate to twenty millivolts, with five of noise on each reading.
+  - name: monitor
+    simulate: true
+    type: serial
+    connects: battery.voltage
+    accuracy: "0.02 V"
+    noise: "0.005 V"
+
+  # Twice a second, with ten milliamperes of noise: the charge program
+  # counts it, noise and all, which is what a real count does.
+  - name: shunt
+    simulate: true
+    type: network
+    protocol: udp
+    packet_interval: 500 ms
+    connects: battery.current
+    noise: "0.01 A"
+
+  # Driven and never read: its stand-in sends nothing, counts each decision
+  # the vehicle sends it, and sheds the science load while it is told to.
+  - name: science
+    simulate: true
+    type: network
+    protocol: udp
+    connects: science.shed

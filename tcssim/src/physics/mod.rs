@@ -11,12 +11,17 @@
 //! entry's `connects` names: it reports an output, or drives an input. That
 //! is its [`Attachment`].
 
+pub mod battery;
+pub mod bus;
 pub mod clock;
 pub mod element;
 pub mod heater;
+pub mod load;
 pub mod queue;
 pub mod random;
 pub mod sensor;
+pub mod solar_array;
+pub mod sun;
 pub mod thermal_zone;
 pub mod world;
 
@@ -249,6 +254,126 @@ connections:
                 .0
         };
         (world, place)
+    }
+
+    /// The battery example's power model, with its orbit shortened to a
+    /// hundred seconds, forty of them in shadow, and a battery of a
+    /// hundredth of an ampere-hour, so that a test sees it fill and drain.
+    const POWER: &str = "physics:
+  - name: sun
+    type: sun
+    period: 100 s
+    eclipse: \"0.4\"
+  - name: array
+    type: solar_array
+    current: \"7 A\"
+  - name: avionics
+    type: load
+    current: \"2 A\"
+  - name: science
+    type: load
+    current: \"2 A\"
+  - name: bus
+    type: bus
+  - name: battery
+    type: battery
+    capacity: \"0.01 Ah\"
+    empty: \"24 V\"
+    full: \"32 V\"
+    resistance: \"0.1 ohm\"
+    charge: \"0.5\"
+connections:
+  - { from: sun.light, to: array.light }
+  - { from: array.current, to: bus.supply }
+  - { from: avionics.current, to: bus.demand }
+  - { from: science.current, to: bus.demand }
+  - { from: bus.current, to: battery.offered }
+";
+
+    /// The world of a model, keeping pace with the wall clock from now,
+    /// and a terminal of it by name.
+    ///
+    /// # Arguments
+    ///
+    /// * `text` - The model.
+    ///
+    /// # Returns
+    ///
+    /// The world, and what finds a terminal of it from its name.
+    fn world_of(text: &str) -> (Arc<World>, impl Fn(&str) -> Place) {
+        let model = PhysicsFile::parse(text)
+            .expect("the model parses")
+            .resolve()
+            .expect("it resolves");
+        let world = Arc::new(World::new(
+            &model,
+            clock::Clock::keeping_pace(Instant::now()),
+            0,
+        ));
+        let place = move |name: &str| {
+            model
+                .find(&At::parse("test", name).expect("a terminal"))
+                .expect("the model has it")
+                .0
+        };
+        (world, place)
+    }
+
+    /// Through an orbit the battery charges in sunlight, is full before the
+    /// eclipse and charges no more, discharges in shadow, and has a load
+    /// shed from the moment it is driven to be: each change at the moment it
+    /// falls, however seldom the world is asked.
+    #[test]
+    fn a_battery_follows_its_orbit_and_its_loads() {
+        let (world, place) = world_of(POWER);
+        let (charge, current, volts) = (
+            place("battery.charge"),
+            place("battery.current"),
+            place("battery.voltage"),
+        );
+
+        // In sunlight: seven amperes in, four out, three into the battery,
+        // whose half of 36 coulombs of room fills in six seconds.
+        assert!((world.read_at(current, 1.0) - 3.0).abs() < 1e-12);
+        assert!((world.read_at(charge, 3.0) - 0.75).abs() < 1e-12);
+        // Asked about once, long after: full at six seconds, and nothing
+        // has flowed in since, the charging current being shunted.
+        assert_eq!(world.read_at(charge, 59.0), 1.0);
+        assert_eq!(world.read_at(current, 59.0), 0.0);
+        assert_eq!(world.read_at(volts, 59.0), 32.0);
+
+        // Into shadow at sixty seconds: four amperes out of it.
+        assert!((world.read_at(current, 61.0) + 4.0).abs() < 1e-12);
+        let after = world.read_at(charge, 64.0);
+        assert!((after - (1.0 - 4.0 * 4.0 / 36.0)).abs() < 1e-9, "{after}");
+
+        // Science shed: half the drain, from that moment.
+        world.drive_at(place("science.shed"), 1.0, 64.0);
+        assert!((world.read_at(current, 65.0) + 2.0).abs() < 1e-12);
+        let shed = world.read_at(charge, 68.0);
+        assert!((shed - (after - 2.0 * 4.0 / 36.0)).abs() < 1e-9, "{shed}");
+
+        // Out of shadow at a hundred, and charging again.
+        assert!((world.read_at(current, 101.0) - 5.0).abs() < 1e-12);
+    }
+
+    /// Two suns on one array is an array given two lights, which it takes
+    /// one of: refused, naming both.
+    #[test]
+    fn an_input_that_takes_one_output_is_given_one() {
+        let text = POWER.replace(
+            "connections:\n",
+            "  - name: moon\n    type: sun\n    period: 100 s\n    \
+             eclipse: \"0.5\"\nconnections:\n  - { from: moon.light, to: \
+             array.light }\n",
+        );
+        let problems = PhysicsFile::parse(&text).expect("parses").problems();
+        assert!(
+            problems.iter().any(|p| p
+                .why
+                .contains("array.light takes one output, and is given")),
+            "{problems:?}"
+        );
     }
 
     /// Heaters joined to a zone warm it, two twice as fast, and the same

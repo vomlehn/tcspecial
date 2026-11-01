@@ -2038,8 +2038,8 @@ fn now() -> Result<Duration, Failed> {
         .map_err(|_| fail("this machine's clock reads before 1970"))
 }
 
-/// Opens a way to ping the configuration's first ping node the ground can
-/// reach both ways.
+/// Opens a way to ping the configuration's ping node the ground can reach
+/// both ways whose name sorts first: see [`route_of`].
 ///
 /// # Arguments
 ///

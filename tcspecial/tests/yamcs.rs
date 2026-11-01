@@ -70,7 +70,7 @@ fn a_vehicle_answering_to_yamcs_frames_every_packet() {
     let dir = tempfile::tempdir().expect("a directory");
     let beacons = bound();
     let commands = bound();
-    // The ping node is the second node written, device id 1, so what it
+    // The ping node's name sorts second of the two, device id 1, so what it
     // sends goes to ground_base plus one: the ground socket's port.
     let downlink = bound();
     let take_at = free();
@@ -85,19 +85,27 @@ fn a_vehicle_answering_to_yamcs_frames_every_packet() {
             "tcspecial:
   gateway: yamcs
   interface: \"{}\"
-  beacon: {{ default_interval: \"100 ms\", reset_interval: \"100 ms\", \
-  recv: \"127.0.0.1:{}\", send: \"{}\", apid: \"0x100\" }}
+  beacon: {{ default_interval: \"100 ms\", reset_interval: \"100 ms\", recv: \
+            \"127.0.0.1:{}\", send: \"{}\", apid: \"0x100\" }}
   payload_command: {{ dest_base: \"{}\", source_base: \"{}\" }}
   payload_telemetry: {{ dest_base: \"{}\", source_base: \"{}\" }}
   state_file: \"{state}\"
-  tcs_cmd: {{ recv: \"127.0.0.1:{take_at}\", \
-  send: \"127.0.0.1:0\", apid: \"0x101\" }}
-gateway:
-  - {{ name: ground, type: gateway_yamcs, address: 127.0.0.1, \
-  port: \"{gateway_at}\", ground_base: \"127.0.0.1:{}\", \
-  apid_base: \"0x200\", gateway-out: pinger }}
+  tcs_cmd: {{ recv: \"127.0.0.1:{take_at}\", send: \"127.0.0.1:0\", apid: \
+            \"0x101\" }}
+gateways:
+  - type gateway_yamcs:
+      - gateway: ground
+        address: 127.0.0.1
+        apid_base: \"0x200\"
+        ground_base: \"127.0.0.1:{}\"
+        port: \"{gateway_at}\"
+        gateway-out:
+          - target: pinger
 vehicle:
-  - {{ name: pinger, type: ping, payload-out: ground }}
+  - type ping:
+      - compute: pinger
+        payload-out:
+          - target: ground
 ",
             tcslibgs::InterfaceDigest::of_this_build(),
             port(&beacons),

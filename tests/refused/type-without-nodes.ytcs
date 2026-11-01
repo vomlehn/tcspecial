@@ -1,0 +1,3 @@
+# Refused: a type with no nodes under it.
+payloads:
+  - type i2c:

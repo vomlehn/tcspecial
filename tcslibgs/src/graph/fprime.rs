@@ -783,11 +783,11 @@ mod tests {
         graph
     }
 
-    /// The thermometer, device id 2, is the channel 0x3002, named after it
-    /// and holding its bytes; zone_temp, device id 3, a conversion, is
-    /// 0x3003 and holds a temperature; heater_wanted, device id 4, a
-    /// thermostat, is 0x3004 and holds a decision; and the bridge's own
-    /// follow the last device id.
+    /// heater_wanted, device id 2, a thermostat, is the channel 0x3002,
+    /// named after it and holding a decision; the thermometer, device id 3,
+    /// is 0x3003 and holds its bytes; zone_temp, device id 4, a conversion,
+    /// is 0x3004 and holds a temperature; and the bridge's own follow the
+    /// last device id.
     #[test]
     fn a_source_is_its_device_id_past_the_base() {
         let model = of(&example(), "fsw").expect("a model");
@@ -800,27 +800,27 @@ mod tests {
             vec![
                 Source {
                     channel: Channel {
-                        name: "thermometer".to_string(),
+                        name: "heater_wanted".to_string(),
                         local: 2,
                         id: 0x3002,
+                    },
+                    form: Form::Decision,
+                },
+                Source {
+                    channel: Channel {
+                        name: "thermometer".to_string(),
+                        local: 3,
+                        id: 0x3003,
                     },
                     form: Form::Datum,
                 },
                 Source {
                     channel: Channel {
                         name: "zone_temp".to_string(),
-                        local: 3,
-                        id: 0x3003,
-                    },
-                    form: Form::Value(Unit::Kelvin),
-                },
-                Source {
-                    channel: Channel {
-                        name: "heater_wanted".to_string(),
                         local: 4,
                         id: 0x3004,
                     },
-                    form: Form::Decision,
+                    form: Form::Value(Unit::Kelvin),
                 },
             ]
         );
@@ -832,7 +832,7 @@ mod tests {
             model.nodes.iter().map(|n| n.name.as_str()).collect();
         assert_eq!(
             names,
-            ["fsw", "heater", "thermometer", "zone_temp", "heater_wanted"]
+            ["fsw", "heater", "heater_wanted", "thermometer", "zone_temp"]
         );
         assert_eq!(model.node_name_bytes(), "heater_wanted".len());
     }
@@ -866,9 +866,9 @@ mod tests {
             "constant GATEWAY_NODE = \"fsw\"",
             "constant ID_BASE = 0x3000",
             "constant NODE_NAME_BYTES = 13",
-            "telemetry $thermometer: Datum id 2",
-            "telemetry $zone_temp: F64 id 3 format \"{} K\"",
-            "telemetry $heater_wanted: bool id 4",
+            "telemetry $heater_wanted: bool id 2",
+            "telemetry $thermometer: Datum id 3",
+            "telemetry $zone_temp: F64 id 4 format \"{} K\"",
             "telemetry $BeaconStage: Stage id 5",
             "telemetry $DataCutShort: U32 id 13",
             "telemetry $DataNotValues: U32 id 14",
@@ -902,7 +902,7 @@ mod tests {
             "{cpp}"
         );
         assert!(cpp.contains("{ \"heater\", 1 },"), "{cpp}");
-        assert!(cpp.contains("{ \"thermometer\", 2 },"), "{cpp}");
+        assert!(cpp.contains("{ \"thermometer\", 3 },"), "{cpp}");
     }
 
     /// A name that is no F´ name is refused, naming the node; a keyword of

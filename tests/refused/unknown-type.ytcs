@@ -1,0 +1,4 @@
+# Refused: no section has a type called bogus.
+payloads:
+  - type bogus:
+      - payload: a

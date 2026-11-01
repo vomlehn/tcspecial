@@ -1,0 +1,5 @@
+<?xml version="1.0"?>
+<!-- Refused: a node of the old gateway section. -->
+<configuration>
+    <gateway><name>g</name><type>gateway_radio</type></gateway>
+</configuration>

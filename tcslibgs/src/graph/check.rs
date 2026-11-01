@@ -172,6 +172,13 @@ pub enum Problem {
     AttributeTooLong { sets: String },
     /// A command binding arriving on something that is not a gateway link.
     NotAGatewayLink { from: String },
+    /// One command binding written twice: the same gateway node setting the
+    /// same attribute.
+    ///
+    /// Refused rather than read as one, so that nothing about a binding
+    /// depends on which of two copies of it is taken: the order bindings are
+    /// written in means nothing.
+    BindingTwice { from: String, sets: String },
     /// A log node whose attributes are not a log's.
     BadLog { node: String, why: String },
     /// A compute node whose attributes are not its computation's.
@@ -339,6 +346,7 @@ impl Problem {
             | Problem::NoAttributeNamed { .. }
             | Problem::AttributeTooLong { .. } => About::Section("commands"),
             Problem::NotAGatewayLink { from } => About::Node(from.clone()),
+            Problem::BindingTwice { .. } => About::Section("commands"),
             Problem::Unconnected { node } => About::Node(node.clone()),
             // On the payload and not on the source: the source is right
             // about where it sends, and the payload is where the trigger
@@ -531,6 +539,10 @@ impl Problem {
             Problem::NotAGatewayLink { from } => format!(
                 "a command arrives on \"{from}\", which is not a gateway node \
                  -- commands come from what the vehicle answers to"
+            ),
+            Problem::BindingTwice { from, sets } => format!(
+                "the binding of {sets} to commands from \"{from}\" is written \
+                 twice: one binding is one entry"
             ),
             Problem::Unconnected { node } => format!(
                 "\"{node}\" has no link to or from it, so nothing reaches it \
@@ -1353,8 +1365,16 @@ impl Graph {
             }
         }
 
-        // Command bindings: from the ground, to an attribute of a real node.
+        // Command bindings: from the ground, to an attribute of a real node,
+        // and each once.
+        let mut bound: BTreeSet<(&str, &str)> = BTreeSet::new();
         for binding in &self.commands {
+            if !bound.insert((&binding.from, &binding.sets)) {
+                problems.push(Problem::BindingTwice {
+                    from: binding.from.clone(),
+                    sets: binding.sets.clone(),
+                });
+            }
             match self.node(&binding.from) {
                 Some(node) if crate::gateway::is_gateway(&node.node_type) => {}
                 _ => problems.push(Problem::NotAGatewayLink {
@@ -2394,15 +2414,16 @@ mod tests {
             &["beacon.apid", "apid_base of \"ground\"", "0x100", "change"]
         ));
 
-        // A downlink under the beacon's: the source at device id 1 counted
-        // from 0xFF is 0x100, the beacon's.
+        // A downlink under the beacon's: the source at device id 1 -- its
+        // name sorts after the gateway's -- counted from 0xFF is 0x100, the
+        // beacon's.
         let mut ground = node("ground", "gateway_yamcs");
         ground
             .attributes
             .insert("apid_base".to_string(), Scalar::of("0xFF"));
         let g = answering_yamcs(
-            vec![ground, node("a", "i2c")],
-            vec![link("a", &["ground"])],
+            vec![ground, node("s", "i2c")],
+            vec![link("s", &["ground"])],
         );
         assert!(says(
             &g,
@@ -2432,15 +2453,16 @@ mod tests {
             .insert("ground_base".into(), Scalar::of("10.0.0.2:6100"));
         second
             .attributes
-            .insert("apid_base".into(), Scalar::of("0x201"));
+            .insert("apid_base".into(), Scalar::of("0x202"));
+        // The source is device id 2, its name sorting after both gateways'.
         let g = answering_yamcs(
-            vec![node("ground", "gateway_yamcs"), node("a", "i2c"), second],
-            vec![link("a", &["ground"])],
+            vec![node("ground", "gateway_yamcs"), node("s", "i2c"), second],
+            vec![link("s", &["ground"])],
         );
         assert!(says(
             &g,
             Some("ground"),
-            &["apid_base of \"other\"", "sends to \"ground\"", "0x201"]
+            &["apid_base of \"other\"", "sends to \"ground\"", "0x202"]
         ));
 
         // Past eleven bits.
@@ -2449,8 +2471,8 @@ mod tests {
             .attributes
             .insert("apid_base".to_string(), Scalar::of("0x7FF"));
         let g = answering_yamcs(
-            vec![ground, node("a", "i2c")],
-            vec![link("a", &["ground"])],
+            vec![ground, node("s", "i2c")],
+            vec![link("s", &["ground"])],
         );
         assert!(says(&g, Some("ground"), &["apid_base", "0x7ff", "lower"]));
 
@@ -3913,6 +3935,43 @@ mod tests {
         );
     }
 
+    /// A binding written twice is refused, so that nothing depends on which
+    /// copy is taken; one gateway node and another may bind one attribute.
+    #[test]
+    fn a_binding_written_twice_is_refused() {
+        let mut g = graph(
+            vec![
+                node("gateway", "gateway_radio"),
+                node("spare", "gateway_radio"),
+                node("t", "compute"),
+            ],
+            vec![link("t", &["gateway"])],
+        );
+        let binding = |from: &str| CommandBinding {
+            from: from.to_string(),
+            sets: "t.setpoint".to_string(),
+        };
+        g.commands = vec![binding("gateway"), binding("spare")];
+        assert!(!g
+            .check()
+            .iter()
+            .any(|p| matches!(p, Problem::BindingTwice { .. })));
+        g.commands.push(binding("gateway"));
+        let twice: Vec<Problem> = g
+            .check()
+            .into_iter()
+            .filter(|p| matches!(p, Problem::BindingTwice { .. }))
+            .collect();
+        assert_eq!(
+            twice,
+            vec![Problem::BindingTwice {
+                from: "gateway".into(),
+                sets: "t.setpoint".into(),
+            }]
+        );
+        assert!(twice[0].describe().contains("written twice"));
+    }
+
     /// A link from a node to itself is refused.
     #[test]
     fn a_node_may_not_link_to_itself() {
@@ -4760,6 +4819,10 @@ mod tests {
             Problem::NoSuchTarget { sets: "x.y".into() },
             Problem::NoAttributeNamed { sets: "x".into() },
             Problem::NotAGatewayLink { from: "a".into() },
+            Problem::BindingTwice {
+                from: "a".into(),
+                sets: "b.c".into(),
+            },
             Problem::Unconnected { node: "a".into() },
             Problem::BadCompute {
                 node: "c".into(),

@@ -48,32 +48,40 @@
             <send>127.0.0.1:0</send>
         </tcs_cmd>
     </tcspecial>
-    <!-- Yamcs's end of the link, both ways. A ping goes up to address:port
-         as a telecommand of APID apid_base, which this node binds aboard,
-         and leaves it by gateway-out for the ping node. The answer comes
-         back to Yamcs at ground_base plus the ping node's device id (ping
-         is the second node written, device id 1, so 16701) as telemetry of
-         APID apid_base plus that device id, 0x201. -->
-    <gateway>
-        <name>gateway</name>
-        <type>gateway_yamcs</type>
-        <address>127.0.0.1</address>
-        <port>16600</port>
-        <ground_base>127.0.0.1:16700</ground_base>
-        <apid_base>0x200</apid_base>
-        <payload-in>true</payload-in>
-        <gateway-out><target>ping</target></gateway-out>
-    </gateway>
-    <!-- Answers each ping with the vehicle's time on the end: see
-         tcslibgs::node::vehicle::ping for what a ping and its answer say. -->
+    <gateways>
+        <type name="gateway_yamcs">
+            <!-- Yamcs's end of the link, both ways. A ping goes up to
+                 address:port as a telecommand of APID apid_base, which this
+                 node binds aboard, and leaves it by gateway-out for the
+                 ping node. The answer comes back to Yamcs at ground_base
+                 plus the ping node's device id (ping is the second name
+                 of the two, device id 1, so 16701) as telemetry of APID
+                 apid_base plus that device id, 0x201. -->
+            <gateway name="gateway">
+                <address>127.0.0.1</address>
+                <apid_base>0x200</apid_base>
+                <ground_base>127.0.0.1:16700</ground_base>
+                <port>16600</port>
+                <gateway-out><target>ping</target></gateway-out>
+                <payload-in>true</payload-in>
+            </gateway>
+        </type>
+    </gateways>
     <vehicle>
-        <name>ping</name>
-        <type>ping</type>
-        <gateway-in>true</gateway-in>
-        <payload-out><target>gateway</target></payload-out>
+        <type name="ping">
+            <!-- Answers each ping with the vehicle's time on the end: see
+                 tcslibgs::node::vehicle::ping for what a ping and its
+                 answer say. -->
+            <compute name="ping">
+                <payload-out><target>gateway</target></payload-out>
+                <gateway-in>true</gateway-in>
+            </compute>
+        </type>
     </vehicle>
     <tcsgui>
-        <nodes><name>gateway</name><x>469</x><y>34</y></nodes>
-        <nodes><name>ping</name><x>34</x><y>34</y></nodes>
+        <nodes>
+            <node name="gateway" x="469" y="34"/>
+            <node name="ping" x="34" y="34"/>
+        </nodes>
     </tcsgui>
 </configuration>

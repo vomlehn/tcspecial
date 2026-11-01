@@ -32,115 +32,115 @@
             <send>127.0.0.1:4100</send>
         </tcs_cmd>
     </tcspecial>
-    <gateway>
-        <name>gateway</name>
-        <type>gateway_radio</type>
-        <address>127.0.0.1</address>
-        <ground_base>127.0.0.1:5100</ground_base>
-        <port>5000</port>
-        <payload-in>true</payload-in>
-    </gateway>
-    <!-- The power monitor's two bytes are millivolts, unsigned, most
-         significant first: up to 65 volts, which is twice the bus. -->
+    <gateways>
+        <type name="gateway_radio">
+            <gateway name="gateway">
+                <address>127.0.0.1</address>
+                <ground_base>127.0.0.1:5100</ground_base>
+                <port>5000</port>
+                <payload-in>true</payload-in>
+            </gateway>
+        </type>
+    </gateways>
     <vehicle>
-        <name>bus_volts</name>
-        <type>compute</type>
-        <function>to_value</function>
-        <format>u16_be</format>
-        <offset>0</offset>
-        <scale>0.001</scale>
-        <unit>V</unit>
-        <payload-out><target>gateway</target></payload-out>
-        <payload-out><target>housekeeping</target></payload-out>
-        <payload-in>true</payload-in>
+        <type name="compute">
+            <!-- The shunt's two bytes are milliamperes, signed, most
+                 significant first: charging is more than nought,
+                 discharging less. -->
+            <compute name="battery_amps">
+                <format>i16_be</format>
+                <function>to_value</function>
+                <offset>0</offset>
+                <scale>0.001</scale>
+                <unit>A</unit>
+                <payload-out><target>charge</target></payload-out>
+                <payload-out><target>gateway</target></payload-out>
+                <payload-out><target>housekeeping</target></payload-out>
+                <payload-in>true</payload-in>
+            </compute>
+            <!-- The power monitor's two bytes are millivolts, unsigned, most
+                 significant first: up to 65 volts, which is twice the bus. -->
+            <compute name="bus_volts">
+                <format>u16_be</format>
+                <function>to_value</function>
+                <offset>0</offset>
+                <scale>0.001</scale>
+                <unit>V</unit>
+                <payload-out><target>gateway</target></payload-out>
+                <payload-out><target>housekeeping</target></payload-out>
+                <payload-in>true</payload-in>
+            </compute>
+            <!-- The battery's state of charge, which nothing aboard
+                 measures: a program counts the charge in and out from the
+                 shunt's readings, coulomb by coulomb, and answers the
+                 fraction of its capacity the battery holds. A Python 3
+                 script beside this file, named relative to the repository's
+                 root because that is where tcspecial is run from. -->
+            <compute name="charge">
+                <executable>examples/battery/charge.py</executable>
+                <function>process</function>
+                <timeout>1 s</timeout>
+                <unit>ratio</unit>
+                <payload-out><target>gateway</target></payload-out>
+                <payload-out><target>housekeeping</target></payload-out>
+                <payload-out><target>shedding</target></payload-out>
+                <payload-in>true</payload-in>
+            </compute>
+            <!-- Sheds the science load when the charge runs low: asserted
+                 below the band, shedding it, and unasserted above it,
+                 restoring it. -->
+            <compute name="shedding">
+                <function>hysteresis</function>
+                <half_band>0.1</half_band>
+                <setpoint>0.4</setpoint>
+                <gateway-out><target>science</target></gateway-out>
+                <payload-out><target>gateway</target></payload-out>
+                <payload-out><target>housekeeping</target></payload-out>
+                <payload-in>true</payload-in>
+            </compute>
+        </type>
+        <type name="log">
+            <compute name="housekeeping">
+                <directory>/tmp/telemetry</directory>
+                <format>variable_ts_rc</format>
+                <payload-in>true</payload-in>
+            </compute>
+        </type>
     </vehicle>
-    <!-- The shunt's two bytes are milliamperes, signed, most significant
-         first: charging is more than nought, discharging less. -->
-    <vehicle>
-        <name>battery_amps</name>
-        <type>compute</type>
-        <function>to_value</function>
-        <format>i16_be</format>
-        <offset>0</offset>
-        <scale>0.001</scale>
-        <unit>A</unit>
-        <payload-out><target>gateway</target></payload-out>
-        <payload-out><target>charge</target></payload-out>
-        <payload-out><target>housekeeping</target></payload-out>
-        <payload-in>true</payload-in>
-    </vehicle>
-    <!-- The battery's state of charge, which nothing aboard measures: a
-         program counts the charge in and out from the shunt's readings,
-         coulomb by coulomb, and answers the fraction of its capacity the
-         battery holds. A Python 3 script beside this file, named relative
-         to the repository's root because that is where tcspecial is run
-         from. -->
-    <vehicle>
-        <name>charge</name>
-        <type>compute</type>
-        <function>process</function>
-        <executable>examples/battery/charge.py</executable>
-        <timeout>1 s</timeout>
-        <unit>ratio</unit>
-        <payload-out><target>gateway</target></payload-out>
-        <payload-out><target>shedding</target></payload-out>
-        <payload-out><target>housekeeping</target></payload-out>
-        <payload-in>true</payload-in>
-    </vehicle>
-    <!-- Sheds the science load when the charge runs low: asserted below
-         the band, shedding it, and unasserted above it, restoring it. -->
-    <vehicle>
-        <name>shedding</name>
-        <type>compute</type>
-        <function>hysteresis</function>
-        <half_band>0.1</half_band>
-        <setpoint>0.4</setpoint>
-        <payload-out><target>housekeeping</target></payload-out>
-        <payload-out><target>gateway</target></payload-out>
-        <gateway-out><target>science</target></gateway-out>
-        <payload-in>true</payload-in>
-    </vehicle>
-    <vehicle>
-        <name>housekeeping</name>
-        <type>log</type>
-        <directory>/tmp/telemetry</directory>
-        <format>variable_ts_rc</format>
-        <payload-in>true</payload-in>
-    </vehicle>
-    <!-- The power monitor, on a serial line: asked for the bus voltage
-         twice a second, it answers two bytes. -->
     <payloads>
-        <name>monitor</name>
-        <type>serial</type>
-        <path>/tmp/tcs-battery-monitor</path>
-        <datarate>9600</datarate>
-        <byte_length>8</byte_length>
-        <stop_bits>1</stop_bits>
-        <max_length>2</max_length>
-        <read_timeout>none</read_timeout>
-        <trigger>"V?\r"</trigger>
-        <trigger_interval>500 ms</trigger_interval>
-        <payload-out><target>bus_volts</target></payload-out>
-    </payloads>
-    <!-- The shunt in the battery's lead, which sends its current twice a
-         second of its own accord. -->
-    <payloads>
-        <name>shunt</name>
-        <type>network</type>
-        <protocol>udp</protocol>
-        <address>127.0.0.1</address>
-        <port>5301</port>
-        <payload-out><target>battery_amps</target></payload-out>
-    </payloads>
-    <!-- The science instrument's power switch, driven by what shedding
-         decides: 1 to shed it, 0 to restore it. -->
-    <payloads>
-        <name>science</name>
-        <type>network</type>
-        <protocol>udp</protocol>
-        <address>127.0.0.1</address>
-        <port>5302</port>
-        <gateway-in>true</gateway-in>
+        <type name="network">
+            <!-- The science instrument's power switch, driven by what shedding
+                 decides: 1 to shed it, 0 to restore it. -->
+            <payload name="science">
+                <address>127.0.0.1</address>
+                <port>5302</port>
+                <protocol>udp</protocol>
+                <gateway-in>true</gateway-in>
+            </payload>
+            <!-- The shunt in the battery's lead, which sends its current
+                 twice a second of its own accord. -->
+            <payload name="shunt">
+                <address>127.0.0.1</address>
+                <port>5301</port>
+                <protocol>udp</protocol>
+                <payload-out><target>battery_amps</target></payload-out>
+            </payload>
+        </type>
+        <type name="serial">
+            <!-- The power monitor, on a serial line: asked for the bus voltage
+                 twice a second, it answers two bytes. -->
+            <payload name="monitor">
+                <byte_length>8</byte_length>
+                <datarate>9600</datarate>
+                <max_length>2</max_length>
+                <path>/tmp/tcs-battery-monitor</path>
+                <read_timeout>none</read_timeout>
+                <stop_bits>1</stop_bits>
+                <trigger>"V?\r"</trigger>
+                <trigger_interval>500 ms</trigger_interval>
+                <payload-out><target>bus_volts</target></payload-out>
+            </payload>
+        </type>
     </payloads>
     <commands>
         <from>gateway</from>

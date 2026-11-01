@@ -49,12 +49,13 @@
 pub mod built;
 pub mod check;
 pub mod fprime;
+pub mod grouped;
 pub mod interface;
 pub mod mirror;
-pub mod order;
 pub mod parameters;
 pub mod reach;
 pub mod renamed;
+pub mod reshaped;
 pub mod simulated;
 pub mod telemetry;
 pub mod terminals;
@@ -77,7 +78,7 @@ use crate::format::ConfigFormat;
 /// reading the language differently announce different digests, and the
 /// digest is what a beacon and an answer to CONNECT carry. A file states
 /// nothing about it.
-pub const VERSION: &str = "2.0";
+pub const VERSION: &str = "3.0";
 
 /// One file of a configuration, as it is written.
 ///
@@ -143,16 +144,18 @@ pub struct GraphFile {
     /// Sets of payloads read on one interval.
     #[serde(default)]
     pub payload_groups: Vec<Group>,
-    /// The ground links: what the editor's gateway working pane holds.
-    #[serde(default)]
-    pub gateway: Vec<NodeFile>,
-    /// What the vehicle itself runs: computations, logs, pass-throughs, pages.
-    #[serde(default)]
-    pub vehicle: Vec<NodeFile>,
+    /// The ground links: what the editor's gateway working pane holds, by
+    /// type. See [`grouped`] for how a section is written.
+    #[serde(default, deserialize_with = "grouped::gateways")]
+    pub gateways: Vec<grouped::Typed>,
+    /// What the vehicle itself runs: computations, logs, pass-throughs,
+    /// pages.
+    #[serde(default, deserialize_with = "grouped::vehicle")]
+    pub vehicle: Vec<grouped::Typed>,
     /// What the vehicle carries: a device on a bus, a line it drives, a link
     /// to something aboard.
-    #[serde(default)]
-    pub payloads: Vec<NodeFile>,
+    #[serde(default, deserialize_with = "grouped::payloads")]
+    pub payloads: Vec<grouped::Typed>,
     #[serde(default)]
     pub commands: Vec<CommandBinding>,
     /// What the editor arranged: where each node was drawn.
@@ -178,11 +181,24 @@ pub struct GraphFile {
     /// not what to do about it, and a reader with a file full of them would
     /// have to be told three times.
     #[serde(default)]
-    pub nodes: Option<Vec<NodeFile>>,
+    pub nodes: Option<Gone>,
     #[serde(default)]
-    pub links: Option<Vec<Link>>,
+    pub links: Option<Gone>,
     #[serde(default)]
-    pub groups: Option<Vec<Group>>,
+    pub groups: Option<Gone>,
+}
+
+/// A section a file used to have, read only so that it can be refused by
+/// name: whatever it holds is passed over.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct Gone;
+
+impl<'de> Deserialize<'de> for Gone {
+    fn deserialize<D: serde::Deserializer<'de>>(
+        d: D,
+    ) -> Result<Self, D::Error> {
+        serde::de::IgnoredAny::deserialize(d).map(|_| Gone)
+    }
 }
 
 /// What the editor keeps about a configuration that a vehicle does not need.
@@ -191,11 +207,15 @@ pub struct GraphFile {
 /// section of the file. Anything else it comes to keep about a drawing belongs
 /// here too, so that the question "does the flight software read this" has one
 /// answer for the whole section.
+///
+/// Written as the nodes are, each entry naming the node it is about: `- {
+/// node: temp_1, x: 34, y: 34 }` in YAML, `<node name="temp_1" x="34"
+/// y="34"/>` in XML. See [`grouped::layout`].
 #[derive(Debug, Clone, Deserialize, PartialEq, Eq, Default)]
 #[serde(deny_unknown_fields)]
 pub struct Tcsgui {
     /// Where each node was drawn, by name.
-    #[serde(default)]
+    #[serde(default, deserialize_with = "grouped::layout")]
     pub nodes: Vec<Placed>,
     /// What the editor was told not to go on raising: a node, and the kind of
     /// concern somebody looked at and left.
@@ -209,13 +229,19 @@ pub struct Tcsgui {
     /// Here rather than in a file of somebody's own for the reason the
     /// positions are: it is a statement about this configuration, and a second
     /// file to keep in step is a second file to lose.
-    #[serde(default, rename = "set-aside")]
+    ///
+    /// Written as the positions are: `- { node: sensor, concern: ... }` in
+    /// YAML, `<node name="sensor" concern="..."/>` in XML.
+    #[serde(
+        default,
+        rename = "set-aside",
+        deserialize_with = "grouped::set_aside"
+    )]
     pub set_aside: Vec<Aside>,
 }
 
 /// One concern somebody has set aside.
-#[derive(Debug, Clone, Deserialize, PartialEq, Eq)]
-#[serde(deny_unknown_fields)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Aside {
     /// The node it is about, as the nodes section named it.
     pub node: String,
@@ -225,8 +251,7 @@ pub struct Aside {
 }
 
 /// One node's place on the canvas.
-#[derive(Debug, Clone, Deserialize, PartialEq, Eq)]
-#[serde(deny_unknown_fields)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Placed {
     /// The node this is about, as the nodes section named it.
     pub name: String,
@@ -253,14 +278,33 @@ impl Section {
     ///
     /// # Returns
     ///
-    /// `gateway`, `vehicle` or `payloads`.
+    /// `gateways`, `vehicle` or `payloads`.
     pub fn name(self) -> &'static str {
         match self {
-            Section::Gateway => "gateway",
+            Section::Gateway => "gateways",
             Section::Vehicle => "vehicle",
             Section::Payloads => "payloads",
         }
     }
+
+    /// Names a node of the section as a file writes it: the key that names
+    /// a node in YAML, and the element a node is in XML.
+    ///
+    /// # Returns
+    ///
+    /// `gateway`, `compute` -- every node of the vehicle's, whatever its
+    /// type -- or `payload`.
+    pub fn node_word(self) -> &'static str {
+        match self {
+            Section::Gateway => "gateway",
+            Section::Vehicle => "compute",
+            Section::Payloads => "payload",
+        }
+    }
+
+    /// Every section, in the order a file is written in.
+    pub const ALL: [Section; 3] =
+        [Section::Gateway, Section::Vehicle, Section::Payloads];
 }
 
 /// Says which section a node of this type belongs in.
@@ -495,178 +539,6 @@ impl NodeFile {
             ("payload-in", self.payload_in),
             ("gateway-in", self.gateway_in),
         ]
-    }
-}
-
-impl<'de> Deserialize<'de> for NodeFile {
-    /// Read by hand, for the reason [`Destinations`] is.
-    ///
-    /// A node's attributes are whatever its type takes, so they are collected
-    /// rather than declared -- and `serde(flatten)` cannot be used to collect
-    /// them beside a declared `payload-out`, because an XML file writes several
-    /// destinations as several `<payload-out>` elements and a flattened map
-    /// refuses the second as a duplicate key. Read as a map here, the repeats
-    /// are what they look like: more destinations.
-    fn deserialize<D: serde::Deserializer<'de>>(
-        d: D,
-    ) -> Result<Self, D::Error> {
-        use serde::de::{self, MapAccess, Visitor};
-        use std::fmt;
-
-        struct V;
-
-        impl<'de> Visitor<'de> for V {
-            type Value = NodeFile;
-
-            fn expecting(&self, f: &mut fmt::Formatter) -> fmt::Result {
-                f.write_str("a node")
-            }
-
-            fn visit_map<A: MapAccess<'de>>(
-                self,
-                mut map: A,
-            ) -> Result<NodeFile, A::Error> {
-                let mut name: Option<String> = None;
-                let mut node_type: Option<String> = None;
-                let mut group: Option<String> = None;
-
-                let mut attributes: BTreeMap<String, Scalar> = BTreeMap::new();
-                let mut payload_out: Vec<String> = Vec::new();
-                let mut gateway_out: Vec<String> = Vec::new();
-                let mut payload_in: Option<bool> = None;
-                let mut gateway_in: Option<bool> = None;
-                let mut lists: BTreeMap<String, Vec<String>> = BTreeMap::new();
-
-                while let Some(key) = map.next_key::<String>()? {
-                    match key.as_str() {
-                        "name" => {
-                            name = Some(
-                                map.next_value::<Scalar>()?
-                                    .as_str()
-                                    .to_string(),
-                            )
-                        }
-                        "type" => {
-                            node_type = Some(
-                                map.next_value::<Scalar>()?
-                                    .as_str()
-                                    .to_string(),
-                            )
-                        }
-                        "group" => {
-                            group = Some(
-                                map.next_value::<Scalar>()?
-                                    .as_str()
-                                    .to_string(),
-                            )
-                        }
-                        // Where this used to be, and said so rather than
-                        // read as an attribute nothing knows: a position is
-                        // the editor's own and lives in the `tcsgui` section
-                        // at the end of the file now.
-                        "editor" => {
-                            return Err(de::Error::custom(
-                                "a node's position is not written on the node \
-                                 any more: it is in the tcsgui section at the \
-                                 end of the file, as `- { name: <node>, x: \
-                                 <x>, y: <y> }`",
-                            ))
-                        }
-                        // A data source, and the one place a file says what is
-                        // linked to what. Repeats add to it rather than
-                        // replacing it: that is what several XML elements of
-                        // one name mean.
-                        "payload-out" => payload_out.extend(
-                            map.next_value::<Destinations>()?
-                                .each()
-                                .into_iter()
-                                .map(str::to_string),
-                        ),
-                        "gateway-out" => gateway_out.extend(
-                            map.next_value::<Destinations>()?
-                                .each()
-                                .into_iter()
-                                .map(str::to_string),
-                        ),
-                        // A data sink, which says whether a line arrives
-                        // there -- a record of links written on the nodes they
-                        // leave, and not a link. Checked against those links
-                        // as the configuration is read: see `mirror`.
-                        "payload-in" => {
-                            payload_in = Some(said_so("payload-in", &mut map)?)
-                        }
-                        "gateway-in" => {
-                            gateway_in = Some(said_so("gateway-in", &mut map)?)
-                        }
-                        // A list of alternatives, each a run of bytes: a YAML
-                        // list, or a repeated XML element, whose repeats add
-                        // to it as payload-out's do. See `Listed`.
-                        listed if LISTED.contains(&listed) => {
-                            let attribute = listed.to_string();
-                            let listed = map.next_value::<Listed>()?;
-                            for one in &listed.0 {
-                                if entries(one.as_str()).len() > 1 {
-                                    return Err(de::Error::custom(format!(
-                                        "\"{}\" writes the {attribute} {:?} as \
-                                         one value with commas between them: \
-                                         write each as an entry of its own -- \
-                                         a YAML list, or one <{attribute}> \
-                                         element for each",
-                                        name.as_deref().unwrap_or("a node"),
-                                        one.as_str()
-                                    )));
-                                }
-                            }
-                            lists.entry(attribute).or_default().extend(
-                                listed
-                                    .0
-                                    .iter()
-                                    .map(|one| one.as_str().trim().to_string()),
-                            );
-                        }
-                        // Everything else is an attribute of the node, which
-                        // is where a word nothing reads ends up -- and is
-                        // refused by name against what the type takes. See
-                        // `reach::reach_of`.
-                        _ => {
-                            let value = map.next_value::<Scalar>()?;
-                            if attributes.insert(key.clone(), value).is_some() {
-                                return Err(de::Error::custom(format!(
-                                    "\"{}\" states {key} twice",
-                                    name.as_deref().unwrap_or("a node")
-                                )));
-                            }
-                        }
-                    }
-                }
-
-                // Held as one value, the alternatives joined by commas, which
-                // is what a node's attribute is and what the editor shows:
-                // the commas are between parts, where none can be otherwise,
-                // so `crate::trigger::sequences_of` splits them back apart
-                // exactly. The file has the one shape; this is the model's.
-                for (attribute, each) in lists {
-                    attributes.insert(attribute, Scalar::of(each.join(", ")));
-                }
-
-                Ok(NodeFile {
-                    node: Node {
-                        name: name
-                            .ok_or_else(|| de::Error::missing_field("name"))?,
-                        node_type: node_type
-                            .ok_or_else(|| de::Error::missing_field("type"))?,
-                        group,
-                        attributes,
-                    },
-                    payload_out,
-                    gateway_out,
-                    payload_in,
-                    gateway_in,
-                })
-            }
-        }
-
-        d.deserialize_map(V)
     }
 }
 
@@ -1314,6 +1186,19 @@ impl Graph {
             graph.files.push(included);
         }
 
+        // In the one order there is: by name. Nothing a file writes is in an
+        // order that means anything -- not its types, not its nodes, not the
+        // files it includes -- so a node's device id, its place in this
+        // list, is its place among the names (see `telemetry::ids`), and the
+        // links are held by the node they leave and then where they go.
+        graph.nodes.sort_by(|a, b| a.name.cmp(&b.name));
+        for link in &mut graph.links {
+            link.to.0.sort();
+        }
+        graph.links.sort_by(|a, b| {
+            (&a.from, a.to.each()).cmp(&(&b.from, b.to.each()))
+        });
+
         mirror.check(&graph)?;
 
         Ok(graph)
@@ -1348,15 +1233,15 @@ impl Graph {
     /// Takes in one file: its nodes, the links they carry, and the rest.
     ///
     /// The three sections are one list of nodes once they are read, because
-    /// every rule about a node is about nodes and not about sections. What the
-    /// sections are for is that a reader of the file can see at a glance what
-    /// the vehicle carries this flight -- so a node in the wrong one is
-    /// refused here, where the complaint can name the file.
+    /// every rule about a node is about nodes and not about sections; the
+    /// sections are for a reader of the file, who can see at a glance what
+    /// the vehicle carries this flight. A node cannot be in the wrong one:
+    /// its type is the group it is written under, and the reader refuses a
+    /// group of another section's type.
     ///
     /// # Arguments
     ///
-    /// * `from`   - The file's path, for the complaints and for its nodes'
-    ///              order.
+    /// * `from`   - The file's path, for the complaints.
     /// * `file`   - The file as read.
     /// * `mirror` - Where what its data sinks say is recorded, to be checked
     ///              once every file is in.
@@ -1367,52 +1252,43 @@ impl Graph {
     ///
     /// # Errors
     ///
-    /// [`TcsError::Config`] for a node written under the wrong section, or a
-    /// file whose order of declaration cannot be read.
+    /// [`TcsError::Config`] for a node named as a node already taken in is,
+    /// in this file or another.
     fn absorb(
         &mut self,
         from: &Path,
         file: &GraphFile,
         mirror: &mut mirror::Mirror,
     ) -> TcsResult<()> {
-        let first = self.nodes.len();
-        for (section, nodes) in [
-            (Section::Gateway, &file.gateway),
-            (Section::Vehicle, &file.vehicle),
-            (Section::Payloads, &file.payloads),
-        ] {
-            for said in nodes {
-                let belongs = section_of(&said.node.node_type);
-                if belongs != section {
+        for typed in [&file.gateways, &file.vehicle, &file.payloads]
+            .into_iter()
+            .flatten()
+        {
+            for said in &typed.nodes {
+                let name = &said.node.name;
+                if let Some(home) = self.homes.get(name) {
+                    let (where_, nth) = if home == from {
+                        ("twice in this file".to_string(), 1)
+                    } else {
+                        (format!("here and in {}", home.display()), 0)
+                    };
+                    let at = grouped::line_of_node(from, name, nth)
+                        .map(|line| format!("at line {line}, "))
+                        .unwrap_or_default();
                     return Err(TcsError::Config(format!(
-                        "{}: \"{}\" is a {} node and is written under {}: it \
-                         belongs under {}",
+                        "{}: {at}there is a node called \"{name}\" \
+                         {where_}: a node's name is the one thing every other \
+                         part of a configuration knows it by, so no two nodes \
+                         share one",
                         from.display(),
-                        said.node.name,
-                        said.node.node_type,
-                        section.name(),
-                        belongs.name()
                     )));
                 }
-                self.homes
-                    .insert(said.node.name.clone(), from.to_path_buf());
+                self.homes.insert(name.clone(), from.to_path_buf());
                 self.nodes.push(said.node.clone());
                 self.links.extend(said.links());
                 mirror.record(from, said);
             }
         }
-
-        // In the order the file declares them, which the sections above do
-        // not keep: a node's device id is its position, and that is the order
-        // somebody reading the file sees. See `order`.
-        let declared = order::declared(from)?;
-        let at = |name: &str| {
-            declared
-                .iter()
-                .position(|n| n == name)
-                .unwrap_or(usize::MAX)
-        };
-        self.nodes[first..].sort_by_key(|node| at(&node.name));
 
         self.groups.extend(file.payload_groups.iter().cloned());
         self.commands.extend(file.commands.iter().cloned());
@@ -1472,6 +1348,12 @@ fn read_one(path: &Path) -> TcsResult<GraphFile> {
         crate::config::names_what_is_gone(&text, format)
     {
         return Err(TcsError::Config(format!("{}: {gone}", path.display())));
+    }
+
+    // A file whose nodes are written in the shape they had before they were
+    // grouped by type, refused by its line and shown the shape now.
+    if let Some(why) = reshaped::refused(&text, format) {
+        return Err(TcsError::Config(format!("{}: {why}", path.display())));
     }
 
     // A word that was renamed, refused by its line and told the word it is
@@ -1812,6 +1694,82 @@ fn whole_micros(
 mod tests {
     use super::*;
     use std::path::Path;
+
+    /// Reads one node, written in YAML under a type of the section it
+    /// belongs in.
+    ///
+    /// # Arguments
+    ///
+    /// * `node_type` - The type it is written under.
+    /// * `body`      - The node's mapping, its first key naming it, as lines
+    ///                 not yet indented.
+    ///
+    /// # Returns
+    ///
+    /// The node as read.
+    ///
+    /// # Errors
+    ///
+    /// What the reader says is wrong with it.
+    fn yaml_node(node_type: &str, body: &str) -> Result<NodeFile, String> {
+        let section = section_of(node_type);
+        let indented = body.trim_end().replace('\n', "\n        ");
+        let text = format!(
+            "{}:\n  - type {node_type}:\n      - {indented}\n",
+            section.name()
+        );
+        let file: GraphFile =
+            ConfigFormat::Yaml.parse(&text).map_err(|e| e.to_string())?;
+        first_node(file)
+    }
+
+    /// Reads one node, written in XML under a type of the section it belongs
+    /// in.
+    ///
+    /// # Arguments
+    ///
+    /// * `node_type` - The type it is written under.
+    /// * `element`   - The node's element.
+    ///
+    /// # Returns
+    ///
+    /// The node as read.
+    ///
+    /// # Errors
+    ///
+    /// What the reader says is wrong with it.
+    fn xml_node(node_type: &str, element: &str) -> Result<NodeFile, String> {
+        let section = section_of(node_type).name();
+        let text = format!(
+            "<configuration><{section}><type name=\"{node_type}\">\
+             {element}</type></{section}></configuration>"
+        );
+        let file: GraphFile =
+            ConfigFormat::Xml.parse(&text).map_err(|e| e.to_string())?;
+        first_node(file)
+    }
+
+    /// The one node a file read for a test holds.
+    ///
+    /// # Arguments
+    ///
+    /// * `file` - The file.
+    ///
+    /// # Returns
+    ///
+    /// Its first node.
+    ///
+    /// # Errors
+    ///
+    /// A message for a file with no node.
+    fn first_node(file: GraphFile) -> Result<NodeFile, String> {
+        [file.gateways, file.vehicle, file.payloads]
+            .into_iter()
+            .flatten()
+            .flat_map(|typed| typed.nodes)
+            .next()
+            .ok_or_else(|| "no node".to_string())
+    }
 
     /// The hint is the other spelling, either way round, and only when that
     /// spelling is a word where it was written.
@@ -2177,9 +2135,10 @@ tcspecial:
     send: \"0.0.0.0:5550\"
     recv: \"\
              127.0.0.1:5650\"
-gateway:
-  - { name: gateway, type: gateway_radio, address: \"\
-             10.0.0.1\", port: \"5000\", ground_base: \"10.0.0.2:5100\" }
+gateways:
+  - type gateway_radio:
+      - { gateway: gateway, address: \"10.0.0.1\", port: \"5000\", \
+             ground_base: \"10.0.0.2:5100\" }
 ",
         )
         .unwrap();
@@ -2190,7 +2149,8 @@ gateway:
         std::fs::write(
             where_.path().join("zone.ytcs"),
             "payloads:\n  \
-             - { name: zone_sensor, type: i2c, path: \"/dev/i2c-1\", \
+             - type i2c:\n      \
+             - { payload: zone_sensor, path: \"/dev/i2c-1\", \
              address: \"0x48\", payload-out: gateway }\n",
         )
         .unwrap();
@@ -2306,9 +2266,9 @@ gateway:
     /// is what the assertions say: both come out as a destination.
     #[test]
     fn a_link_may_be_written_as_an_entry_naming_its_target() {
-        let said: NodeFile = serde_norway::from_str(
-            "name: k_1
-type: compute
+        let said = yaml_node(
+            "compute",
+            "compute: k_1
 payload-out:
   - target: gateway
   - target: zone_temp
@@ -2320,8 +2280,9 @@ payload-out:
 
         // One entry on its own needs no list, as one destination needs no
         // list.
-        let one: NodeFile = serde_norway::from_str(
-            "name: a\ntype: compute\npayload-out: { target: gateway }\n",
+        let one = yaml_node(
+            "compute",
+            "compute: a\npayload-out: { target: gateway }\n",
         )
         .expect("one entry");
         assert_eq!(one.payload_out, vec!["gateway"]);
@@ -2334,23 +2295,17 @@ payload-out:
     /// make impossible.
     #[test]
     fn a_word_an_entry_does_not_know_is_refused() {
-        let said = format!(
-            "{}",
-            serde_norway::from_str::<NodeFile>(
-                "name: a\ntype: compute\npayload-out:\n  - targte: gateway\n"
-            )
-            .expect_err("a misspelling is refused")
-        );
+        let said = yaml_node(
+            "compute",
+            "compute: a\npayload-out:\n  - targte: gateway\n",
+        )
+        .expect_err("a misspelling is refused");
         assert!(said.contains("target"), "{said}");
 
         // And an input with no node to belong to.
-        let said = format!(
-            "{}",
-            serde_norway::from_str::<NodeFile>(
-                "name: a\ntype: compute\npayload-out:\n  - input: in0\n"
-            )
-            .expect_err("an input names no node")
-        );
+        let said =
+            yaml_node("compute", "compute: a\npayload-out:\n  - input: in0\n")
+                .expect_err("an input names no node");
         assert!(said.contains("which node"), "{said}");
     }
 
@@ -2359,28 +2314,25 @@ payload-out:
     /// one.
     #[test]
     fn terminators_are_read_as_a_list_in_either_format() {
-        let yaml: NodeFile = serde_norway::from_str(
-            "name: a\ntype: serial\nterminators:\n  - '\"\\r\\n\"'\n  - \
-             '[03]'\n",
+        let yaml = yaml_node(
+            "serial",
+            "payload: a\nterminators:\n  - '\"\\r\\n\"'\n  - '[03]'\n",
         )
         .expect("a list");
-        let xml: NodeFile = ConfigFormat::Xml
-            .parse(
-                "<node><name>a</name><type>serial</type>\
-                 <terminators>\"\\r\\n\"\
-                 </terminators><terminators>[03]</terminators></node>",
-            )
-            .expect("repeated elements");
+        let xml = xml_node(
+            "serial",
+            "<payload name=\"a\"><terminators>\"\\r\\n\"\
+             </terminators><terminators>[03]</terminators></payload>",
+        )
+        .expect("repeated elements");
         let joined = |file: &NodeFile| {
             file.node.attributes["terminators"].as_str().to_string()
         };
         assert_eq!(joined(&yaml), "\"\\r\\n\", [03]");
         assert_eq!(joined(&xml), joined(&yaml));
 
-        let one: NodeFile = serde_norway::from_str(
-            "name: a\ntype: serial\nterminators: '[0A]'\n",
-        )
-        .expect("one");
+        let one = yaml_node("serial", "payload: a\nterminators: '[0A]'\n")
+            .expect("one");
         assert_eq!(joined(&one), "[0A]");
     }
 
@@ -2389,19 +2341,13 @@ payload-out:
     /// shape -- and a comma inside a string is a character of it.
     #[test]
     fn terminators_written_as_one_value_are_refused() {
-        let said = format!(
-            "{}",
-            serde_norway::from_str::<NodeFile>(
-                "name: a\ntype: serial\nterminators: '[0D], [0A]'\n"
-            )
-            .expect_err("one value, two terminators")
-        );
+        let said =
+            yaml_node("serial", "payload: a\nterminators: '[0D], [0A]'\n")
+                .expect_err("one value, two terminators");
         assert!(said.contains("entry of its own"), "{said}");
 
-        let comma: NodeFile = serde_norway::from_str(
-            "name: a\ntype: serial\nterminators: '\",\"'\n",
-        )
-        .expect("a comma in a string is a character");
+        let comma = yaml_node("serial", "payload: a\nterminators: '\",\"'\n")
+            .expect("a comma in a string is a character");
         assert_eq!(comma.node.attributes["terminators"].as_str(), "\",\"");
     }
 }

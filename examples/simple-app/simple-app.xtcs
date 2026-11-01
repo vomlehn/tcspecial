@@ -32,37 +32,43 @@
             <send>127.0.0.1:4100</send>
         </tcs_cmd>
     </tcspecial>
-    <!-- The ground&apos;s end of the vehicle&apos;s data. tcspecial sends -->
-    <!-- what each node drawn into it produces as UDP datagrams to -->
-    <!-- ground_base&apos;s address, at its port plus that node&apos;s -->
-    <!-- device id: lorem is id 1, so its words go to 127.0.0.1:5101. Ground -->
-    <!-- software gets them from this node with a function call, -->
-    <!-- tcslib::gateway::GatewayReceiver::receive: run `lorem_gateway` -->
-    <!-- to be that ground. It states no address or port of its own, -->
-    <!-- because nothing comes back up. -->
-    <gateway>
-        <name>gateway-1</name>
-        <type>gateway_radio</type>
-        <ground_base>127.0.0.1:5100</ground_base>
-        <payload-in>true</payload-in>
-    </gateway>
-    <!-- A payload that is a program rather than a device: it is never -->
-    <!-- asked, and reports one word of its line at a time, then a packet -->
-    <!-- holding the line terminator. `app-payload-arg` is which line it -->
-    <!-- sends, counting from one. -->
-    <!--  -->
-    <!-- The program is a Python 3 script beside this file, named relative -->
-    <!-- to the repository&apos;s root because that is where tcspecial is -->
-    <!-- run from: see examples/Makefile. -->
+    <gateways>
+        <type name="gateway_radio">
+            <!-- The ground&apos;s end of the vehicle&apos;s data. tcspecial -->
+            <!-- sends what each node drawn into it produces as UDP -->
+            <!-- datagrams to ground_base&apos;s address, at its port plus -->
+            <!-- that node&apos;s device id: lorem is id 1, so its words go -->
+            <!-- to 127.0.0.1:5101. Ground software gets them from this node -->
+            <!-- with a function call, -->
+            <!-- tcslib::gateway::GatewayReceiver::receive: run -->
+            <!-- `lorem_gateway` to be that ground. It states no address or -->
+            <!-- port of its own, because nothing comes back up. -->
+            <gateway name="gateway-1">
+                <ground_base>127.0.0.1:5100</ground_base>
+                <payload-in>true</payload-in>
+            </gateway>
+        </type>
+    </gateways>
     <payloads>
-        <name>lorem</name>
-        <type>app_pl</type>
-        <app-payload-arg>1</app-payload-arg>
-        <executable>examples/simple-app/lorem_pl.py</executable>
-        <payload-out><target>gateway-1</target></payload-out>
+        <!-- A payload that is a program rather than a device: it is never -->
+        <!-- asked, and reports one word of its line at a time, then a -->
+        <!-- packet holding the line terminator. `app-payload-arg` is which -->
+        <!-- line it sends, counting from one. -->
+        <type name="app_pl">
+            <!-- The program is a Python 3 script beside this file, named -->
+            <!-- relative to the repository&apos;s root because that is -->
+            <!-- where tcspecial is run from: see examples/Makefile. -->
+            <payload name="lorem">
+                <app-payload-arg>1</app-payload-arg>
+                <executable>examples/simple-app/lorem_pl.py</executable>
+                <payload-out><target>gateway-1</target></payload-out>
+            </payload>
+        </type>
     </payloads>
     <tcsgui>
-        <nodes><name>gateway-1</name><x>790</x><y>129</y></nodes>
-        <nodes><name>lorem</name><x>15</x><y>204</y></nodes>
+        <nodes>
+            <node name="gateway-1" x="790" y="129"/>
+            <node name="lorem" x="15" y="204"/>
+        </nodes>
     </tcsgui>
 </configuration>

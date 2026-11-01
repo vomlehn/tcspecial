@@ -248,22 +248,22 @@ mod tests {
     reset_interval: 5 s
     send: \"0.0.0.0:5550\"
     recv: \"127.0.0.1:5650\"
-gateway:
-  - name: gateway
-    type: gateway_radio
-    address: \"10.0.0.1\"
-    port: \"5000\"
-    gateway-out:
-      - target: payload
+gateways:
+  - type gateway_radio:
+      - gateway: gateway
+        address: \"10.0.0.1\"
+        port: \"5000\"
+        gateway-out:
+          - target: payload
 {gateway_says}
 payloads:
-  - name: payload
-    type: i2c
-    path: \"/dev/i2c-1\"
-    address: \"0x48\"
-    read_size: \"2\"
-    payload-out:
-      - target: gateway
+  - type i2c:
+      - payload: payload
+        path: \"/dev/i2c-1\"
+        address: \"0x48\"
+        read_size: \"2\"
+        payload-out:
+          - target: gateway
 {payload_says}
 "
             ),
@@ -276,8 +276,9 @@ payloads:
     /// that reads.
     #[test]
     fn a_flag_that_agrees_with_the_links_is_read() {
-        let graph = pair("    payload-in: true", "    gateway-in: true")
-            .expect("both ends saying the same thing");
+        let graph =
+            pair("        payload-in: true", "        gateway-in: true")
+                .expect("both ends saying the same thing");
         assert_eq!(graph.links.len(), 2, "the flags are not links");
     }
 
@@ -298,8 +299,8 @@ payloads:
         let said = format!(
             "{}",
             pair(
-                "    payload-in: true",
-                "    gateway-in: true\n    payload-in: true"
+                "        payload-in: true",
+                "        gateway-in: true\n        payload-in: true"
             )
             .expect_err("a payload has no payload-in")
         );
@@ -313,9 +314,9 @@ payloads:
         let said = format!(
             "{}",
             pair(
-                "    payload-in: true",
-                "    gateway-in: true\nvehicle:\n  - name: through\n    type: \
-                 null-gateway\n    \
+                "        payload-in: true",
+                "        gateway-in: true\nvehicle:\n  \
+                 - type null-gateway:\n      - compute: through\n        \
                  gateway-in: true",
             )
             .expect_err("nothing sends the null-gateway node anything")
@@ -332,7 +333,7 @@ payloads:
     fn a_sink_that_denies_a_line_it_is_sent_is_refused() {
         let said = format!(
             "{}",
-            pair("    payload-in: false", "    gateway-in: true")
+            pair("        payload-in: false", "        gateway-in: true")
                 .expect_err("the payload sends its readings there")
         );
         assert!(said.contains("\"payload\" sends one there"), "{said}");
@@ -341,9 +342,9 @@ payloads:
     /// `false` where nothing arrives is true, and reads.
     #[test]
     fn a_sink_that_denies_a_line_nobody_sends_is_read() {
-        pair("    payload-in: true", "    gateway-in: false")
+        pair("        payload-in: true", "        gateway-in: false")
             .expect_err("the ground sends the payload what it asks with");
-        pair("    payload-in: true", "    gateway-in: true")
+        pair("        payload-in: true", "        gateway-in: true")
             .expect("and says so when it says so");
     }
 
@@ -357,7 +358,7 @@ payloads:
     fn a_sink_given_a_name_instead_of_a_flag_is_refused() {
         let said = format!(
             "{}",
-            pair("    payload-in: payload", "    gateway-in: true")
+            pair("        payload-in: payload", "        gateway-in: true")
                 .expect_err("a name is not a flag")
         );
         assert!(said.contains("is not true or false"), "{said}");

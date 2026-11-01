@@ -30,19 +30,20 @@ tcspecial:
     recv: "0.0.0.0:3220"
     send: "127.0.0.1:3230"
 
-gateway:
-  # The ground's end of the link, both ways. What the ground sends goes up to
-  # address:port, which this node binds aboard, and leaves it by gateway-out
-  # for the lamp. What comes down arrives at ground_base plus the device id
-  # of the node that sent it: the switch, device id 1, at 127.0.0.1:3721.
-  - name: ground
-    type: gateway_radio
-    address: "127.0.0.1"
-    port: "3620"
-    ground_base: "127.0.0.1:3720"
-    payload-in: true
-    gateway-out:
-      - target: lamp
+gateways:
+  - type gateway_radio:
+      # The ground's end of the link, both ways. What the ground sends goes up
+      # to address:port, which this node binds aboard, and leaves it by
+      # gateway-out for the lamp. What comes down arrives at ground_base plus
+      # the device id of the node that sent it: the switch, device id 2, at
+      # 127.0.0.1:3722.
+      - gateway: ground
+        address: "127.0.0.1"
+        ground_base: "127.0.0.1:3720"
+        port: "3620"
+        gateway-out:
+          - target: lamp
+        payload-in: true
 
 payloads:
   # Two lines of one chip, each a payload of its own because one is read and
@@ -50,28 +51,26 @@ payloads:
   # /dev/gpiochip1, which is what the kernel's gpio-sim chip is numbered on a
   # host with one chip of its own; bin/mk-kernel-stand-ins makes that chip and
   # prints the number it was given, which is the path to write here.
-  #
-  # A switch on line 0. Each time it changes, the kernel's edge becomes a
-  # sixteen-byte record -- when, which line, and what it became -- and the
-  # record goes to the ground.
-  - name: switch
-    type: gpio
-    path: "/dev/gpiochip1"
-    lines: "0"
-    edge: "both"
-    payload-out:
-      - target: ground
-  # A lamp on line 1, driven by what the ground sends: the text 1 to light
-  # it, 0 to put it out, and anything else refused.
-  - name: lamp
-    type: gpio
-    path: "/dev/gpiochip1"
-    lines: "1"
-    direction: "output"
-    gateway-in: true
+  - type gpio:
+      # A lamp on line 1, driven by what the ground sends: the text 1 to light
+      # it, 0 to put it out, and anything else refused.
+      - payload: lamp
+        direction: "output"
+        lines: "1"
+        path: "/dev/gpiochip1"
+        gateway-in: true
+      # A switch on line 0. Each time it changes, the kernel's edge becomes a
+      # sixteen-byte record -- when, which line, and what it became -- and the
+      # record goes to the ground.
+      - payload: switch
+        edge: "both"
+        lines: "0"
+        path: "/dev/gpiochip1"
+        payload-out:
+          - target: ground
 
 tcsgui:
   nodes:
-    - { name: ground, x: 469, y: 34 }
-    - { name: switch, x: 34, y: 34 }
-    - { name: lamp, x: 34, y: 134 }
+    - { node: ground, x: 469, y: 34 }
+    - { node: lamp, x: 34, y: 134 }
+    - { node: switch, x: 34, y: 34 }

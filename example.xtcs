@@ -26,25 +26,31 @@
             <send>127.0.0.1:4100</send>
         </tcs_cmd>
     </tcspecial>
-    <gateway>
-        <name>gateway-1</name>
-        <type>gateway_radio</type>
-        <address>127.0.0.1</address>
-        <ground_base>127.0.0.1:5100</ground_base>
-        <port>5000</port>
-        <payload-in>true</payload-in>
-    </gateway>
+    <gateways>
+        <type name="gateway_radio">
+            <gateway name="gateway-1">
+                <address>127.0.0.1</address>
+                <ground_base>127.0.0.1:5100</ground_base>
+                <port>5000</port>
+                <payload-in>true</payload-in>
+            </gateway>
+        </type>
+    </gateways>
     <payloads>
-        <name>spi-1</name>
-        <type>spi</type>
-        <max_speed>1000000</max_speed>
-        <path>/dev/spidev0.0</path>
-        <spi_mode>0</spi_mode>
-        <stand_in>127.0.0.1:7951</stand_in>
-        <payload-out><target>gateway-1</target></payload-out>
+        <type name="spi">
+            <payload name="spi-1">
+                <max_speed>1000000</max_speed>
+                <path>/dev/spidev0.0</path>
+                <spi_mode>0</spi_mode>
+                <stand_in>127.0.0.1:7951</stand_in>
+                <payload-out><target>gateway-1</target></payload-out>
+            </payload>
+        </type>
     </payloads>
     <tcsgui>
-        <nodes><name>gateway-1</name><x>469</x><y>34</y></nodes>
-        <nodes><name>spi-1</name><x>15</x><y>34</y></nodes>
+        <nodes>
+            <node name="gateway-1" x="469" y="34"/>
+            <node name="spi-1" x="15" y="34"/>
+        </nodes>
     </tcsgui>
 </configuration>

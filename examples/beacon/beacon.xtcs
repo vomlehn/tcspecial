@@ -39,20 +39,24 @@
             <send>127.0.0.1:4700</send>
         </tcs_cmd>
     </tcspecial>
-    <!-- A beacon is sent because tcspecial is running rather than because a
-         payload has anything to say, so this example needs a payload only
-         because a configuration describes a vehicle and a vehicle with
-         nothing aboard is not one. Its readings go to the ground over
-         payload_telemetry, as any payload's do when nothing aboard touches
-         them. -->
     <payloads>
-        <name>sensor</name>
-        <type>network</type>
-        <protocol>udp</protocol>
-        <address>127.0.0.1</address>
-        <port>5101</port>
+        <type name="network">
+            <!-- A beacon is sent because tcspecial is running rather than
+                 because a payload has anything to say, so this example
+                 needs a payload only because a configuration describes a
+                 vehicle and a vehicle with nothing aboard is not one. Its
+                 readings go to the ground over payload_telemetry, as any
+                 payload's do when nothing aboard touches them. -->
+            <payload name="sensor">
+                <address>127.0.0.1</address>
+                <port>5101</port>
+                <protocol>udp</protocol>
+            </payload>
+        </type>
     </payloads>
     <tcsgui>
-        <nodes><name>sensor</name><x>34</x><y>34</y></nodes>
+        <nodes>
+            <node name="sensor" x="34" y="34"/>
+        </nodes>
     </tcsgui>
 </configuration>

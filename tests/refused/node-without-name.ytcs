@@ -1,0 +1,4 @@
+# Refused: a node with no name.
+payloads:
+  - type i2c:
+      - address: "0x48"

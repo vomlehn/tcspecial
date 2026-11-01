@@ -123,8 +123,8 @@ fn a_vehicle_answering_to_fprime_reports_to_the_bridge_and_takes_its_commands()
     let text = std::fs::read_to_string(&example).expect("the example reads");
 
     // Where the example's own bridge hears the thermometer, which its
-    // comments and the manual say: bridge_base, 9700, plus the thermometer's
-    // device id, 2.
+    // comments say: bridge_base, 9700, plus the thermometer's device id, 3,
+    // its place among the names.
     let shipped =
         telemetry::of(&Graph::load(&example).expect("the example reads"))
             .expect("its links to the bridge work out");
@@ -132,13 +132,13 @@ fn a_vehicle_answering_to_fprime_reports_to_the_bridge_and_takes_its_commands()
         .iter()
         .find(|link| link.source == "thermometer")
         .expect("the thermometer reports");
-    assert_eq!(reading.ground().expect("over UDP").port, 9702);
-    // And heater_wanted, the thermostat, device id 4, as the comments say.
+    assert_eq!(reading.ground().expect("over UDP").port, 9703);
+    // And heater_wanted, the thermostat, device id 2, as the comments say.
     let advice = shipped
         .iter()
         .find(|link| link.source == "heater_wanted")
         .expect("heater_wanted reports");
-    assert_eq!(advice.ground().expect("over UDP").port, 9704);
+    assert_eq!(advice.ground().expect("over UDP").port, 9702);
 
     let dir = tempfile::tempdir().expect("a directory");
     // tcspecial writes its log into a directory that is there, and does not
@@ -187,20 +187,20 @@ fn a_vehicle_answering_to_fprime_reports_to_the_bridge_and_takes_its_commands()
         .find(|link| link.source == "thermometer")
         .expect("the thermometer reports");
     let ground = link.ground().expect("over UDP");
-    assert_eq!(ground.port, base + 2);
+    assert_eq!(ground.port, base + 3);
     let bridge = UdpSocket::bind(format!("{}:{}", ground.address, ground.port))
         .expect("the bridge's port");
     bridge
         .set_read_timeout(Some(Duration::from_millis(100)))
         .expect("a timeout");
-    // And where it hears zone_temp, device id 3, the reading made a value.
+    // And where it hears zone_temp, device id 4, the reading made a value.
     let value = links
         .iter()
         .find(|link| link.source == "zone_temp")
         .expect("zone_temp reports")
         .ground()
         .expect("over UDP");
-    assert_eq!(value.port, base + 3);
+    assert_eq!(value.port, base + 4);
     let temperatures =
         UdpSocket::bind(format!("{}:{}", value.address, value.port))
             .expect("the bridge's port for zone_temp");

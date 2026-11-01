@@ -30,20 +30,20 @@ tcspecial:
     recv: "0.0.0.0:3200"
     send: "127.0.0.1:3210"
 
-gateway:
-  # The ground's end of the link, both ways. What the ground sends goes up to
-  # address:port, which this node binds aboard, and leaves it by gateway-out
-  # for the motor's commands. What comes down arrives at ground_base plus the
-  # device id of the node that sent it: the motor's status, device id 1, at
-  # 127.0.0.1:3701.
-  - name: ground
-    type: gateway_radio
-    address: "127.0.0.1"
-    port: "3600"
-    ground_base: "127.0.0.1:3700"
-    payload-in: true
-    gateway-out:
-      - target: motor_command
+gateways:
+  - type gateway_radio:
+      # The ground's end of the link, both ways. What the ground sends goes up
+      # to address:port, which this node binds aboard, and leaves it by
+      # gateway-out for the motor's commands. What comes down arrives at
+      # ground_base plus the device id of the node that sent it: the motor's
+      # status, device id 2, at 127.0.0.1:3702.
+      - gateway: ground
+        address: "127.0.0.1"
+        ground_base: "127.0.0.1:3700"
+        port: "3600"
+        gateway-out:
+          - target: motor_command
+        payload-in: true
 
 payloads:
   # A motor controller on the CAN bus vcan0, which sends its status in frames
@@ -52,24 +52,22 @@ payloads:
   # identifier and nothing else on the bus. vcan0 is the kernel's virtual
   # bus, which bin/mk-kernel-stand-ins makes; on a vehicle it is the
   # controller's interface, such as can0.
-  #
-  # Each status frame goes to the ground as it arrives.
-  - name: motor_status
-    type: can
-    interface: "vcan0"
-    can_id: "0x123"
-    payload-out:
-      - target: ground
-  # Each command the ground sends goes to the motor as one frame, so a
-  # command is at most eight bytes, which is all a classic frame carries.
-  - name: motor_command
-    type: can
-    interface: "vcan0"
-    can_id: "0x124"
-    gateway-in: true
+  - type can:
+      # Each command the ground sends goes to the motor as one frame, so a
+      # command is at most eight bytes, which is all a classic frame carries.
+      - payload: motor_command
+        can_id: "0x124"
+        interface: "vcan0"
+        gateway-in: true
+      # Each status frame goes to the ground as it arrives.
+      - payload: motor_status
+        can_id: "0x123"
+        interface: "vcan0"
+        payload-out:
+          - target: ground
 
 tcsgui:
   nodes:
-    - { name: ground, x: 469, y: 34 }
-    - { name: motor_status, x: 34, y: 34 }
-    - { name: motor_command, x: 34, y: 134 }
+    - { node: ground, x: 469, y: 34 }
+    - { node: motor_command, x: 34, y: 134 }
+    - { node: motor_status, x: 34, y: 34 }

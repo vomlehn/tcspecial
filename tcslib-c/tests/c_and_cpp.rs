@@ -220,21 +220,21 @@ fn against_a_vehicle(program: &Path) -> String {
   tcs_cmd:
     recv: \"127.0.0.1:{}\"
     send: \"127.0.0.1:{cmd_from}\"
-gateway:
-  - name: gateway
-    type: gateway_radio
-    address: \"127.0.0.1\"
-    port: \"{}\"
-    ground_base: \"127.0.0.1:{}\"
-    payload-in: true
-    gateway-out:
-      - target: ping
+gateways:
+  - type gateway_radio:
+      - gateway: gateway
+        address: \"127.0.0.1\"
+        ground_base: \"127.0.0.1:{}\"
+        port: \"{}\"
+        gateway-out:
+          - target: ping
+        payload-in: true
 vehicle:
-  - name: ping
-    type: ping
-    gateway-in: true
-    payload-out:
-      - target: gateway
+  - type ping:
+      - compute: ping
+        payload-out:
+          - target: gateway
+        gateway-in: true
 ",
             port(&beacon),
             dir.path().display(),
@@ -242,10 +242,10 @@ vehicle:
             free(),
             free(),
             port(&interpreter),
-            port(&uplink),
-            // ping is the second node, device id 1, so its data arrives one
-            // above the base.
+            // ping's name sorts after the gateway node's, so it is device
+            // id 1 and its data arrives one above the base.
             ground_data - 1,
+            port(&uplink),
         ),
     )
     .expect("written");

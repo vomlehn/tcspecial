@@ -35,35 +35,42 @@
             <send>127.0.0.1:3250</send>
         </tcs_cmd>
     </tcspecial>
-    <!-- The ground's end of the link. Nothing goes up to an IIO sensor,
-         which is read and never written, so nothing leaves this node by
-         gateway-out; what comes down arrives at ground_base plus the device
-         id of the node that sent it: the sensor, device id 1, at
-         127.0.0.1:3741. -->
-    <gateway>
-        <name>ground</name>
-        <type>gateway_radio</type>
-        <address>127.0.0.1</address>
-        <port>3640</port>
-        <ground_base>127.0.0.1:3740</ground_base>
-        <payload-in>true</payload-in>
-    </gateway>
-    <!-- A sensor's buffer, which hands over whole sample sets as they are
-         taken. Which channels are in a set and how often one is taken are
-         the sensor's settings, made in sysfs by whoever brings it up, and
-         nothing here. The device is /dev/iio:device1, which is what the
-         kernel's iio_dummy sensor is numbered on a host with one sensor of
-         its own; bin/mk-kernel-stand-ins makes that sensor, enables its
-         buffer and prints the number it was given, which is the path to
-         write here. -->
+    <gateways>
+        <type name="gateway_radio">
+            <!-- The ground's end of the link. Nothing goes up to an IIO
+                 sensor, which is read and never written, so nothing leaves
+                 this node by gateway-out; what comes down arrives at
+                 ground_base plus the device id of the node that sent it:
+                 the sensor, device id 1, at 127.0.0.1:3741. -->
+            <gateway name="ground">
+                <address>127.0.0.1</address>
+                <ground_base>127.0.0.1:3740</ground_base>
+                <port>3640</port>
+                <payload-in>true</payload-in>
+            </gateway>
+        </type>
+    </gateways>
     <payloads>
-        <name>sensor</name>
-        <type>iio</type>
-        <path>/dev/iio:device1</path>
-        <payload-out><target>ground</target></payload-out>
+        <type name="iio">
+            <!-- A sensor's buffer, which hands over whole sample sets as
+                 they are taken. Which channels are in a set and how often
+                 one is taken are the sensor's settings, made in sysfs by
+                 whoever brings it up, and nothing here. The device is
+                 /dev/iio:device1, which is what the kernel's iio_dummy
+                 sensor is numbered on a host with one sensor of its own;
+                 bin/mk-kernel-stand-ins makes that sensor, enables its
+                 buffer and prints the number it was given, which is the
+                 path to write here. -->
+            <payload name="sensor">
+                <path>/dev/iio:device1</path>
+                <payload-out><target>ground</target></payload-out>
+            </payload>
+        </type>
     </payloads>
     <tcsgui>
-        <nodes><name>ground</name><x>469</x><y>34</y></nodes>
-        <nodes><name>sensor</name><x>34</x><y>34</y></nodes>
+        <nodes>
+            <node name="ground" x="469" y="34"/>
+            <node name="sensor" x="34" y="34"/>
+        </nodes>
     </tcsgui>
 </configuration>

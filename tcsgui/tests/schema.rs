@@ -161,7 +161,7 @@ fn the_configuration_schema_has_the_sections_the_reader_reads() {
         "include",
         "tcspecial",
         "payload_groups",
-        "gateway",
+        "gateways",
         "vehicle",
         "payloads",
         "commands",
@@ -180,7 +180,7 @@ fn the_configuration_schema_has_the_sections_the_reader_reads() {
     // The sections that are gone are gone from the schema too. A file written
     // to the earlier shape is refused where it is read, and an editor offering
     // to complete `links:` would be an editor arguing with the reader.
-    for retired in ["nodes", "links", "groups"] {
+    for retired in ["nodes", "links", "groups", "gateway"] {
         assert!(
             !sections.contains(retired),
             "{retired} is no longer a section"
@@ -236,24 +236,75 @@ fn each_section_takes_the_node_types_the_software_knows() {
 
     let json = read("tcspecial.schema.json");
     let xsd = text_of("tcspecial.xsd");
-    for (section, key, simple_type) in [
-        (Section::Gateway, "gateway", "gatewayType"),
-        (Section::Vehicle, "vehicle", "vehicleType"),
-        (Section::Payloads, "payloads", "payloadType"),
+    for (section, simple_type, group, node) in [
+        (Section::Gateway, "gatewayType", "gatewayGroup", "gateway"),
+        (Section::Vehicle, "vehicleType", "vehicleGroup", "compute"),
+        (Section::Payloads, "payloadType", "payloadGroup", "payload"),
     ] {
+        let key = section.name();
         let wanted: Vec<String> =
             types_in(section).into_iter().map(str::to_string).collect();
 
-        let said: Vec<String> = json["properties"][key]["items"]["properties"]
-            ["type"]["enum"]
+        // In JSON, an entry of the section is one key, the word type and
+        // the type, whose value is a list of the section's nodes, each named
+        // by its first key: the word for the section's nodes.
+        let items = &json["properties"][key]["items"];
+        let reference = items["propertyNames"]["$ref"]
+            .as_str()
+            .unwrap_or_else(|| panic!("{key}: no list of type keys"));
+        let keys = &json["$defs"]
+            [reference.strip_prefix("#/$defs/").expect("a definition")];
+        let said: Vec<String> = keys["enum"]
             .as_array()
             .unwrap_or_else(|| panic!("{key}: the JSON schema lists no types"))
             .iter()
-            .map(|value| value.as_str().expect("a type is a word").to_string())
+            .map(|value| {
+                value
+                    .as_str()
+                    .and_then(|key| key.strip_prefix("type "))
+                    .expect("a type key is the word type and a type")
+                    .to_string()
+            })
             .collect();
         assert_eq!(said, wanted, "{key}, in the JSON schema");
+        assert_eq!(items["maxProperties"], 1, "{key}: one type an entry");
+        let nodes = items["additionalProperties"]["items"]["$ref"]
+            .as_str()
+            .and_then(|r| r.strip_prefix("#/$defs/"))
+            .unwrap_or_else(|| panic!("{key}: no node definition"));
+        assert_eq!(
+            json["$defs"][nodes]["required"],
+            serde_json::json!([section.node_word()]),
+            "{key}: a node is named by the word for its section"
+        );
+        let words = json["$defs"][nodes]["properties"]
+            .as_object()
+            .expect("a node's words");
+        assert!(!words.contains_key("type"), "{key}: a node says no type");
+        assert!(!words.contains_key("name"), "{key}: a node has no name key");
 
+        // And in the XSD, the type named by the attribute of a <type>, and
+        // the nodes in it elements of the word for the section's nodes.
         assert_eq!(enumerated(&xsd, simple_type), wanted, "{key}, in the XSD");
+        assert_eq!(section.node_word(), node);
+        let opens = format!("<xs:complexType name=\"{group}\">");
+        let start = xsd
+            .find(&opens)
+            .unwrap_or_else(|| panic!("the XSD has no {group}"));
+        let body = &xsd[start
+            ..start + xsd[start..].find("</xs:complexType>").expect("closed")];
+        assert!(
+            body.contains(&format!(
+                "<xs:element name=\"{node}\" type=\"node\""
+            )),
+            "{group}: {body}"
+        );
+        assert!(
+            body.contains(&format!(
+                "<xs:attribute name=\"name\" type=\"{simple_type}\""
+            )),
+            "{group}: {body}"
+        );
     }
 }
 
@@ -620,21 +671,47 @@ fn every_key_of_a_shipped_configuration_is_in_the_schema() {
             );
 
             // The node sections, whose entries are what a schema has most to
-            // say about.
-            if !["gateway", "vehicle", "payloads"].contains(&key.as_str()) {
+            // say about: each an entry of one key, the word type and the
+            // type, holding the nodes of that type.
+            let Some(section) = tcslibgs::graph::Section::ALL
+                .into_iter()
+                .find(|section| section.name() == key)
+            else {
                 continue;
-            }
-            let allowed = properties(&schema, &[&key]);
-            for node in value.as_sequence().expect("a list of nodes") {
-                let node = node.as_mapping().expect("a node is a mapping");
-                for (attribute, _) in node {
-                    let attribute =
-                        attribute.as_str().expect("named").to_string();
-                    assert!(
-                        allowed.contains(&attribute),
-                        "{file}: {key} has a node stating {attribute}, which \
-                         the schema does not allow"
-                    );
+            };
+            let nodes = schema["properties"][key.as_str()]["items"]
+                ["additionalProperties"]["items"]["$ref"]
+                .as_str()
+                .and_then(|r| r.strip_prefix("#/$defs/"))
+                .expect("a node definition");
+            let allowed: BTreeSet<String> = schema["$defs"][nodes]
+                ["properties"]
+                .as_object()
+                .expect("a node's words")
+                .keys()
+                .cloned()
+                .collect();
+            for entry in value.as_sequence().expect("a list of types") {
+                let entry = entry.as_mapping().expect("an entry is a mapping");
+                for (_, typed) in entry {
+                    for node in typed.as_sequence().expect("a list of nodes") {
+                        let node =
+                            node.as_mapping().expect("a node is a mapping");
+                        assert!(
+                            node.contains_key(section.node_word()),
+                            "{file}: a node of {key} is not named by {}",
+                            section.node_word()
+                        );
+                        for (attribute, _) in node {
+                            let attribute =
+                                attribute.as_str().expect("named").to_string();
+                            assert!(
+                                allowed.contains(&attribute),
+                                "{file}: {key} has a node stating \
+                                 {attribute}, which the schema does not allow"
+                            );
+                        }
+                    }
                 }
             }
         }

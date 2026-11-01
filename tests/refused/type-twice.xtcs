@@ -1,0 +1,8 @@
+<?xml version="1.0"?>
+<!-- Refused: one type grouped twice in a section. -->
+<configuration>
+    <payloads>
+        <type name="i2c"><payload name="a"/></type>
+        <type name="i2c"><payload name="b"/></type>
+    </payloads>
+</configuration>

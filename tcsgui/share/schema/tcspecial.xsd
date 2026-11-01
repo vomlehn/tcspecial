@@ -12,12 +12,20 @@
 
   Two consequences worth knowing before reading further.
 
+  The nodes are grouped: each section, <gateways>, <vehicle> and <payloads>,
+  holds a <type name="..."> element for each type of node it has, and that
+  holds the nodes of the type, each a <gateway>, <compute> or <payload>
+  element named by its name attribute. A node says no type of its own. The
+  order of the types, of the nodes in a type and of a node's elements means
+  nothing.
+
   A node's content is a choice of known element names repeated in any order,
   which is as close as XSD 1.0 comes to "these words and no others". It cannot
-  say that `name` appears exactly once, because `payload-out` may appear many
+  say that `group` appears at most once, because `payload-out` may appear many
   times (several destinations are several elements) and XSD 1.0's xs:all
-  allows neither repeats nor a mixture. A node with two names is refused where
-  the file is read instead.
+  allows neither repeats nor a mixture. A node that says a word twice is
+  refused where the file is read instead, and so is a type written twice in a
+  section, or a section written twice.
 
   The attribute names below are the union over every node type: a bus address,
   a baud rate and a setpoint are all here, and which of them a given type may
@@ -65,31 +73,57 @@
     <xs:restriction base="xs:boolean"/>
   </xs:simpleType>
 
+  <!-- What a node is called, unique across the configuration. -->
+  <xs:simpleType name="name">
+    <xs:restriction base="xs:string">
+      <xs:minLength value="1"/>
+    </xs:restriction>
+  </xs:simpleType>
+
   <!-- Where the editor drew one node, which the flight software ignores.
        In the tcsgui section at the end of the file rather than on the node:
        the node sections say what the vehicle carries, and this says where
-       somebody put the boxes on a screen. -->
+       somebody put the boxes on a screen. Named as a node is, by its name
+       attribute. -->
   <xs:complexType name="placed">
-    <xs:all>
-      <xs:element name="name" type="xs:string"/>
-      <xs:element name="x" type="xs:integer"/>
-      <xs:element name="y" type="xs:integer"/>
-    </xs:all>
+    <xs:attribute name="name" type="name" use="required"/>
+    <xs:attribute name="x" type="xs:integer" use="required"/>
+    <xs:attribute name="y" type="xs:integer" use="required"/>
   </xs:complexType>
 
-  <xs:complexType name="tcsgui">
+  <xs:complexType name="layout">
     <xs:sequence>
-      <xs:element name="nodes" type="placed"
+      <xs:element name="node" type="placed"
         minOccurs="0" maxOccurs="unbounded"/>
     </xs:sequence>
   </xs:complexType>
 
-  <!-- The node types each section may hold, as a file spells them. One
-       list per section, so that a type written in the wrong section is
-       refused here as it is where the file is read; held against the
-       software's own lists (tcslibgs::graph::types_in) by tcsgui's schema
-       tests. xs:token, so that the whitespace around a word in an element
-       is not part of it. -->
+  <!-- A concern the editor was told not to go on raising: the node it is
+       about, and the editor's own word for the kind of concern. -->
+  <xs:complexType name="aside">
+    <xs:attribute name="name" type="name" use="required"/>
+    <xs:attribute name="concern" type="name" use="required"/>
+  </xs:complexType>
+
+  <xs:complexType name="setAside">
+    <xs:sequence>
+      <xs:element name="node" type="aside"
+        minOccurs="0" maxOccurs="unbounded"/>
+    </xs:sequence>
+  </xs:complexType>
+
+  <xs:complexType name="tcsgui">
+    <xs:all>
+      <xs:element name="nodes" type="layout" minOccurs="0"/>
+      <xs:element name="set-aside" type="setAside" minOccurs="0"/>
+    </xs:all>
+  </xs:complexType>
+
+  <!-- The node types each section may hold, as a file spells them in the
+       name attribute of a <type>. One list per section, so that a type
+       written in the wrong section is refused here as it is where the file
+       is read; held against the software's own lists
+       (tcslibgs::graph::types_in) by tcsgui's schema tests. -->
   <!-- A ground link. -->
   <xs:simpleType name="gatewayType">
     <xs:restriction base="xs:token">
@@ -134,13 +168,12 @@
     </xs:restriction>
   </xs:simpleType>
 
-  <!-- What a node says, whichever section it is in, but for its type. A
-       group so that the three node types below share one list of words and
-       differ only in which types they take. -->
+  <!-- What a node says, whichever section it is in, but for its name,
+       which is its name attribute, and its type, which is the type it is
+       written under. -->
   <xs:group name="nodeWords">
     <xs:choice>
-      <!-- What every node says about itself. -->
-      <xs:element name="name" type="xs:string"/>
+      <!-- The payload group that reads it, where it is in one. -->
       <xs:element name="group" type="xs:string"/>
       <!-- The two data sources, which are where links are written. -->
       <xs:element name="payload-out" type="destination"/>
@@ -281,27 +314,57 @@
     </xs:choice>
   </xs:group>
 
-  <!-- A node of each section: its type, from the section's list, and the
-       rest of what a node may say. -->
-  <xs:complexType name="gatewayNode">
+  <!-- A node of any section: its name, and what it says. -->
+  <xs:complexType name="node">
     <xs:choice minOccurs="0" maxOccurs="unbounded">
-      <xs:element name="type" type="gatewayType"/>
       <xs:group ref="nodeWords"/>
     </xs:choice>
+    <xs:attribute name="name" type="name" use="required"/>
   </xs:complexType>
 
-  <xs:complexType name="vehicleNode">
-    <xs:choice minOccurs="0" maxOccurs="unbounded">
-      <xs:element name="type" type="vehicleType"/>
-      <xs:group ref="nodeWords"/>
-    </xs:choice>
+  <!-- One type's nodes in each section: the type, from the section's
+       list, and the nodes, each written as the section writes one. -->
+  <xs:complexType name="gatewayGroup">
+    <xs:sequence>
+      <xs:element name="gateway" type="node" maxOccurs="unbounded"/>
+    </xs:sequence>
+    <xs:attribute name="name" type="gatewayType" use="required"/>
   </xs:complexType>
 
-  <xs:complexType name="payloadNode">
-    <xs:choice minOccurs="0" maxOccurs="unbounded">
-      <xs:element name="type" type="payloadType"/>
-      <xs:group ref="nodeWords"/>
-    </xs:choice>
+  <xs:complexType name="vehicleGroup">
+    <xs:sequence>
+      <xs:element name="compute" type="node" maxOccurs="unbounded"/>
+    </xs:sequence>
+    <xs:attribute name="name" type="vehicleType" use="required"/>
+  </xs:complexType>
+
+  <xs:complexType name="payloadGroup">
+    <xs:sequence>
+      <xs:element name="payload" type="node" maxOccurs="unbounded"/>
+    </xs:sequence>
+    <xs:attribute name="name" type="payloadType" use="required"/>
+  </xs:complexType>
+
+  <!-- And each section, its types. -->
+  <xs:complexType name="gateways">
+    <xs:sequence>
+      <xs:element name="type" type="gatewayGroup"
+        minOccurs="0" maxOccurs="unbounded"/>
+    </xs:sequence>
+  </xs:complexType>
+
+  <xs:complexType name="vehicle">
+    <xs:sequence>
+      <xs:element name="type" type="vehicleGroup"
+        minOccurs="0" maxOccurs="unbounded"/>
+    </xs:sequence>
+  </xs:complexType>
+
+  <xs:complexType name="payloads">
+    <xs:sequence>
+      <xs:element name="type" type="payloadGroup"
+        minOccurs="0" maxOccurs="unbounded"/>
+    </xs:sequence>
   </xs:complexType>
 
   <!-- A set of payloads read on one interval.
@@ -529,8 +592,11 @@
 
   <!-- The file itself.
 
-       The sections may be written in any order, and each as many times as it
-       has entries: that is how XML spells a list. Nothing is required here,
+       The sections may be written in any order. The lists among them,
+       include, payload_groups and commands, are written as many times as
+       they have entries, which is how XML spells a list; the three node
+       sections and the tcsgui section are written once each, which is
+       refused where the file is read and not here. Nothing is required here,
        for the reason the tcspecial section's attributes are not: a file
        somebody is partway through writing must still open. That a
        configuration has a tcspecial section is checked where a complaint can
@@ -542,9 +608,9 @@
         <xs:element name="include" type="xs:string"/>
         <xs:element name="tcspecial" type="tcspecial"/>
         <xs:element name="payload_groups" type="payload_group"/>
-        <xs:element name="gateway" type="gatewayNode"/>
-        <xs:element name="vehicle" type="vehicleNode"/>
-        <xs:element name="payloads" type="payloadNode"/>
+        <xs:element name="gateways" type="gateways"/>
+        <xs:element name="vehicle" type="vehicle"/>
+        <xs:element name="payloads" type="payloads"/>
         <xs:element name="commands" type="command"/>
         <xs:element name="tcsgui" type="tcsgui"/>
       </xs:choice>

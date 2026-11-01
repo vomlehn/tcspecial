@@ -1,0 +1,6 @@
+<?xml version="1.0"?>
+<!-- Refused: two nodes of one name, in different sections. -->
+<configuration>
+    <payloads><type name="i2c"><payload name="a"/></type></payloads>
+    <vehicle><type name="ping"><compute name="a"/></type></vehicle>
+</configuration>

@@ -35,88 +35,95 @@
             <send>127.0.0.1:8210</send>
         </tcs_cmd>
     </tcspecial>
-    <!-- The ground's end of the link, both ways. What the ground sends goes
-         up to address:port, which this node binds aboard, and leaves it by
-         gateway-out for the tee. What comes down arrives at ground_base plus
-         the device id of the node that sent it. -->
-    <gateway>
-        <name>ground</name>
-        <type>gateway_radio</type>
-        <address>127.0.0.1</address>
-        <port>8600</port>
-        <ground_base>127.0.0.1:8700</ground_base>
-        <payload-in>true</payload-in>
-        <gateway-out><target>echo</target></gateway-out>
-    </gateway>
-    <!-- A heater, driven by what the ground sends: the far end of a UDP
-         socket. -->
+    <gateways>
+        <type name="gateway_radio">
+            <!-- The ground's end of the link, both ways. What the ground
+                 sends goes up to address:port, which this node binds
+                 aboard, and leaves it by gateway-out for the tee. What
+                 comes down arrives at ground_base plus the device id of the
+                 node that sent it. -->
+            <gateway name="ground">
+                <address>127.0.0.1</address>
+                <ground_base>127.0.0.1:8700</ground_base>
+                <port>8600</port>
+                <gateway-out><target>echo</target></gateway-out>
+                <payload-in>true</payload-in>
+            </gateway>
+        </type>
+    </gateways>
     <payloads>
-        <name>heater</name>
-        <type>network</type>
-        <protocol>udp</protocol>
-        <address>127.0.0.1</address>
-        <port>8001</port>
-        <gateway-in>true</gateway-in>
+        <type name="network">
+            <!-- A heater, driven by what the ground sends: the far end of a UDP
+                 socket. -->
+            <payload name="heater">
+                <address>127.0.0.1</address>
+                <port>8001</port>
+                <protocol>udp</protocol>
+                <gateway-in>true</gateway-in>
+            </payload>
+            <!-- A sensor whose readings go to the ground and are copied -->
+            <!-- aboard. -->
+            <payload name="sensor">
+                <address>127.0.0.1</address>
+                <port>8002</port>
+                <protocol>udp</protocol>
+                <payload-out><target>readings</target></payload-out>
+            </payload>
+            <!-- A payload whose data nobody wants yet. -->
+            <payload name="spare">
+                <address>127.0.0.1</address>
+                <port>8003</port>
+                <protocol>udp</protocol>
+                <payload-out><target>unheard</target></payload-out>
+            </payload>
+        </type>
     </payloads>
-    <!-- A sensor whose readings go to the ground and are copied aboard. -->
-    <payloads>
-        <name>sensor</name>
-        <type>network</type>
-        <protocol>udp</protocol>
-        <address>127.0.0.1</address>
-        <port>8002</port>
-        <payload-out><target>readings</target></payload-out>
-    </payloads>
-    <!-- A payload whose data nobody wants yet. -->
-    <payloads>
-        <name>spare</name>
-        <type>network</type>
-        <protocol>udp</protocol>
-        <address>127.0.0.1</address>
-        <port>8003</port>
-        <payload-out><target>unheard</target></payload-out>
-    </payloads>
-    <!-- Each command the ground sends goes on to the heater, as it was going,
-         and back down to the ground as payload data, so that the ground sees
-         what the vehicle was told. A tee has two data sources, so each link
-         names its own. -->
     <vehicle>
-        <name>echo</name>
-        <type>tee-gateway</type>
-        <gateway-in>true</gateway-in>
-        <gateway-out><target>heater</target></gateway-out>
-        <payload-out><target>ground</target></payload-out>
-    </vehicle>
-    <!-- Each reading goes on to the ground, as it was going, and again
-         vehicleward: here to a node that drops it, standing where something
-         aboard that took readings as commands would be. -->
-    <vehicle>
-        <name>readings</name>
-        <type>tee-payload</type>
-        <payload-in>true</payload-in>
-        <payload-out><target>ground</target></payload-out>
-        <gateway-out><target>dropped</target></gateway-out>
-    </vehicle>
-    <!-- Takes what arrives from the ground's side and drops it. -->
-    <vehicle>
-        <name>dropped</name>
-        <type>null-gateway</type>
-        <gateway-in>true</gateway-in>
-    </vehicle>
-    <!-- Takes the spare payload's data and drops it. -->
-    <vehicle>
-        <name>unheard</name>
-        <type>null-payload</type>
-        <payload-in>true</payload-in>
+        <type name="null-gateway">
+            <!-- Takes what arrives from the ground's side and drops it. -->
+            <compute name="dropped">
+                <gateway-in>true</gateway-in>
+            </compute>
+        </type>
+        <type name="null-payload">
+            <!-- Takes the spare payload's data and drops it. -->
+            <compute name="unheard">
+                <payload-in>true</payload-in>
+            </compute>
+        </type>
+        <type name="tee-gateway">
+            <!-- Each command the ground sends goes on to the heater, as it
+                 was going, and back down to the ground as payload data, so
+                 that the ground sees what the vehicle was told. A tee has
+                 two data sources, so each link names its own. -->
+            <compute name="echo">
+                <gateway-out><target>heater</target></gateway-out>
+                <payload-out><target>ground</target></payload-out>
+                <gateway-in>true</gateway-in>
+            </compute>
+        </type>
+        <type name="tee-payload">
+            <!-- Each reading goes on to the ground, as it was going, and
+                 again vehicleward: here to a node that drops it, standing
+                 where something aboard that took readings as commands would
+                 be. -->
+            <compute name="readings">
+                <gateway-out><target>dropped</target></gateway-out>
+                <payload-out><target>ground</target></payload-out>
+                <payload-in>true</payload-in>
+            </compute>
+        </type>
     </vehicle>
     <tcsgui>
-        <nodes><name>ground</name><x>469</x><y>34</y></nodes>
-        <nodes><name>heater</name><x>34</x><y>34</y></nodes>
-        <nodes><name>sensor</name><x>34</x><y>134</y></nodes>
-        <nodes><name>spare</name><x>34</x><y>234</y></nodes>
-        <nodes><name>echo</name><x>34</x><y>34</y></nodes>
-        <nodes><name>readings</name><x>34</x><y>134</y></nodes>
-        <nodes><name>dropped</name><x>234</x><y>134</y></nodes>
-        <nodes><name>unheard</name><x>34</x><y>234</y></nodes>
+        <nodes>
+            <node name="dropped" x="234" y="134"/>
+            <node name="echo" x="34" y="34"/>
+            <node name="ground" x="469" y="34"/>
+            <node name="heater" x="34" y="34"/>
+            <node name="readings" x="34" y="134"/>
+            <node name="sensor" x="34" y="134"/>
+            <node name="spare" x="34" y="234"/>
+            <node name="unheard" x="34" y="234"/>
+        </nodes>
     </tcsgui>
 </configuration>

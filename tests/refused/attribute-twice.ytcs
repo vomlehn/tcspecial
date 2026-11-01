@@ -1,0 +1,6 @@
+# Refused: a node that says one attribute twice.
+payloads:
+  - type i2c:
+      - payload: a
+        address: "0x48"
+        address: "0x49"

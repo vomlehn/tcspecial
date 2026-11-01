@@ -1,0 +1,4 @@
+# Refused: a position in the old shape, named by name.
+tcsgui:
+  nodes:
+    - { name: a, x: 1, y: 2 }

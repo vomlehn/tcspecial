@@ -521,10 +521,13 @@ impl TcsClient {
     /// Where the answer is a success the sequence count goes on from past
     /// the newest command the vehicle has taken.
     ///
-    /// It goes before the station is matched, which is what it is for: answered with the station's own checksum,
-    /// it makes the station matched for commanding once it is matched for
-    /// listening -- see [`Matched::connect_answered`]. Answered with
-    /// another, it matches nothing, and the vehicle changes nothing.
+    /// It goes before the station is matched, which is what it is for:
+    /// answered with the station's own checksum, it makes the station
+    /// matched for commanding once it is matched for listening -- see
+    /// [`Matched::connect_answered`]. Answered with another, it matches
+    /// nothing, and the vehicle changes nothing. Refused, it matches
+    /// nothing either, whatever checksum it carries: a start that has
+    /// taken a RESTART refuses every CONNECT.
     ///
     /// # Arguments
     ///
@@ -537,7 +540,8 @@ impl TcsClient {
     /// # Errors
     ///
     /// `TcsError::Io` if it cannot be sent or no answer comes in time,
-    /// and `TcsError::Protocol` if the answer is not this command's.
+    /// `TcsError::Command` if the vehicle refused it, saying why, and
+    /// `TcsError::Protocol` if the answer is not this command's.
     pub fn connect(
         &mut self,
         digest: ConfigDigest,
@@ -571,13 +575,30 @@ impl TcsClient {
         match answer {
             // Where it answered at all, the count goes on from past the
             // newest command it has taken.
-            Telemetry::Connect(tm) => {
-                if tm.header.status.is_success() {
-                    self.count_past(tm.newest_taken);
-                    self.matched.connect_answered(tm.digest, mark);
-                }
+            // A refusal is not an answer to hold the checksum against: a
+            // start that has taken a RESTART refuses every CONNECT, with
+            // its checksum all the same, and a caller that compared it
+            // would say it agreed with a start that is going.
+            Telemetry::Connect(tm) if tm.header.status.is_success() => {
+                self.count_past(tm.newest_taken);
+                self.matched.connect_answered(tm.digest, mark);
                 Ok((tm.version, tm.digest))
             }
+            Telemetry::Connect(tm)
+                if tm.header.status == CommandStatus::Unmatched =>
+            {
+                Err(TcsError::Command(
+                    "CONNECT refused: tcspecial has taken a RESTART and is \
+                     ending, so it matches no station. Wait for the beacons \
+                     of the start that comes back, then connect again"
+                        .to_string(),
+                ))
+            }
+            Telemetry::Connect(tm) => Err(TcsError::Command(format!(
+                "CONNECT refused ({:?}): nothing was matched; check that it \
+                 went on the vehicle's own command link, then connect again",
+                tm.header.status
+            ))),
             _ => {
                 Err(TcsError::Protocol("Unexpected telemetry type".to_string()))
             }
@@ -1081,6 +1102,29 @@ mod tests {
         client.connect(OURS).expect("answered");
         assert!(!client.matched().for_commanding());
         assert!(matches!(client.ping(), Err(TcsError::Unmatched(_))));
+    }
+
+    /// A CONNECT refused, though its answer carries the station's own
+    /// checksum, is not a match and is not said to be one: a start that
+    /// has taken a RESTART refuses every CONNECT `Unmatched`, and a station
+    /// that took the answer for a match would be matched with a start that
+    /// is going -- and would stay so where the next start's first beacons
+    /// were lost and another station matched it.
+    #[test]
+    fn a_connect_refused_does_not_match() {
+        let refused = Telemetry::Connect(
+            tcslibgs::ConnectTelemetry::new(1, a_version(1), OURS, 40)
+                .refused(CommandStatus::Unmatched),
+        );
+        let matched = listening();
+        let mut client = TcsClient::spacecraft_only(
+            Canned::answering(refused),
+            matched.clone(),
+        );
+        let said = client.connect(OURS).expect_err("refused").to_string();
+        assert!(said.contains("RESTART"), "says why: {said}");
+        matched.beacon(false, Some(OURS), Stage::Heard, false);
+        assert!(!matched.for_commanding(), "and nothing was matched");
     }
 
     /// Every answer that arrives is counted once: the one waited for as

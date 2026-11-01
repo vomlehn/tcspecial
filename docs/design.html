@@ -6758,9 +6758,12 @@ key as the arm it uses.</dd>
 checksum. A CONNECT whose checksum matches it clears the restart flag,
 sends a beacon at once, sets the beacons to their normal interval, and
 opens the downlink and the other commands. One whose checksum does not
-match changes nothing else. A CONNECT taken after a RESTART is answered
-and changes nothing. The ground takes a CONNECT as matched only when
-its answer's checksum is the station's own.</dd>
+match changes nothing else. A CONNECT taken after a RESTART is refused
+<tt class="docutils literal">Unmatched</tt>, still carrying the checksum, and changes nothing: the
+start is going, and a station that counted the answer would be matched
+with it. The ground takes a CONNECT as matched only when it is answered
+with success and its answer's checksum is the station's own; a refused
+CONNECT is an error to the station, whatever checksum it carries.</dd>
 <dt>Requirement</dt>
 <dd>A RESTART_ARM or RESTART whose checksum names no configuration the
 vehicle holds is refused <tt class="docutils literal">NotFound</tt>, and nothing restarts: the
@@ -7301,8 +7304,8 @@ sends from, answered, and carrying the running configuration's
 checksum -- clears the restart flag, sends a beacon at once, and from
 then on beacons every <tt class="docutils literal">default_interval</tt>. One carrying another
 checksum does neither.
-Once a restart has been initiated a
-CONNECT does neither: the flag stays set and the beacons stay at
+Once a restart has been initiated a CONNECT does neither, and is
+refused <tt class="docutils literal">Unmatched</tt>: the flag stays set and the beacons stay at
 <tt class="docutils literal">reset_interval</tt> until the process ends. No other command slows the
 beacons or clears the flag.</dd>
 </dl>
@@ -7440,8 +7443,9 @@ that falls between setting the flag and answering carries the flag
 too.</li>
 <li>It cleans up -- nodes stopped, threads joined, links closed, the log
 flushed -- beaconing every <tt class="docutils literal">reset_interval</tt>, the number still going
-up. A CONNECT that arrives meanwhile is answered with the old start's
-checksum and changes nothing: the flag stays set and the beacons fast.
+up. A CONNECT that arrives meanwhile is refused <tt class="docutils literal">Unmatched</tt>, with the
+old start's checksum, and changes nothing: the flag stays set and the
+beacons fast.
 Once the command links are closed nothing is answered.</li>
 <li>It <tt class="docutils literal">exec</tt>s. The new start reads and writes the state file and sends
 its first beacon at once: #1, with the flag set and the checksum of the
@@ -7511,10 +7515,10 @@ new start's opening them.</td>
 flagged beacon was heard first.</td>
 </tr>
 <tr><td>A CONNECT sent while the old start is ending</td>
-<td>Its answer, carrying the old start's checksum.</td>
-<td>Nothing changes on the vehicle. The station is not matched for
-commanding until a beacon with the flag clear, which only a CONNECT
-taken by the new start brings.</td>
+<td>A refusal, <tt class="docutils literal">Unmatched</tt>, carrying the old start's checksum.</td>
+<td>Nothing changes on the vehicle, and the station counts nothing
+matched: <tt class="docutils literal"><span class="pre">TcsClient::connect</span></tt> says it was refused. It connects
+again once the new start's beacons arrive.</td>
 </tr>
 <tr><td>Every beacon lost for a while</td>
 <td>Nothing.</td>
@@ -7656,6 +7660,15 @@ configuration for the confirmed or the command line's among them: it
 acts on nothing but the three until a CONNECT carries its checksum, so
 commands already on their way when it began are refused, not read with
 its definitions.</dd>
+<dt>A CONNECT answered by a start that is going</dt>
+<dd>A station whose CONNECT reached a start that had taken a RESTART, and
+that took the answer for a match, would be matched with a start that
+is going. Where the next start's first beacons were then all lost, so
+that no number went back, and another station matched that start, the
+station would be matched for commanding without a CONNECT of its own
+to it. Closed: a start that has taken a RESTART refuses every CONNECT
+<tt class="docutils literal">Unmatched</tt>, and the ground matches only on a CONNECT answered with
+success.</dd>
 <dt>A RESTART that never arrives</dt>
 <dd>No answer comes, and the old start's beacons go on counting up at
 <tt class="docutils literal">default_interval</tt> with the flag clear: the RESTART was not taken.

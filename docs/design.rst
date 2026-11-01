@@ -6647,9 +6647,12 @@ Requirement
     checksum. A CONNECT whose checksum matches it clears the restart flag,
     sends a beacon at once, sets the beacons to their normal interval, and
     opens the downlink and the other commands. One whose checksum does not
-    match changes nothing else. A CONNECT taken after a RESTART is answered
-    and changes nothing. The ground takes a CONNECT as matched only when
-    its answer's checksum is the station's own.
+    match changes nothing else. A CONNECT taken after a RESTART is refused
+    ``Unmatched``, still carrying the checksum, and changes nothing: the
+    start is going, and a station that counted the answer would be matched
+    with it. The ground takes a CONNECT as matched only when it is answered
+    with success and its answer's checksum is the station's own; a refused
+    CONNECT is an error to the station, whatever checksum it carries.
 
 Requirement
     A RESTART_ARM or RESTART whose checksum names no configuration the
@@ -7220,8 +7223,8 @@ Requirement
     checksum -- clears the restart flag, sends a beacon at once, and from
     then on beacons every ``default_interval``. One carrying another
     checksum does neither.
-    Once a restart has been initiated a
-    CONNECT does neither: the flag stays set and the beacons stay at
+    Once a restart has been initiated a CONNECT does neither, and is
+    refused ``Unmatched``: the flag stays set and the beacons stay at
     ``reset_interval`` until the process ends. No other command slows the
     beacons or clears the flag.
 
@@ -7369,8 +7372,9 @@ fixed, and is the same in each:
    too.
 #. It cleans up -- nodes stopped, threads joined, links closed, the log
    flushed -- beaconing every ``reset_interval``, the number still going
-   up. A CONNECT that arrives meanwhile is answered with the old start's
-   checksum and changes nothing: the flag stays set and the beacons fast.
+   up. A CONNECT that arrives meanwhile is refused ``Unmatched``, with the
+   old start's checksum, and changes nothing: the flag stays set and the
+   beacons fast.
    Once the command links are closed nothing is answered.
 #. It ``exec``\ s. The new start reads and writes the state file and sends
    its first beacon at once: #1, with the flag set and the checksum of the
@@ -7428,10 +7432,10 @@ number higher by more than one says how many were missed.
      - Nothing was acted on. The answer is dropped and counted if the
        flagged beacon was heard first.
    * - A CONNECT sent while the old start is ending
-     - Its answer, carrying the old start's checksum.
-     - Nothing changes on the vehicle. The station is not matched for
-       commanding until a beacon with the flag clear, which only a CONNECT
-       taken by the new start brings.
+     - A refusal, ``Unmatched``, carrying the old start's checksum.
+     - Nothing changes on the vehicle, and the station counts nothing
+       matched: ``TcsClient::connect`` says it was refused. It connects
+       again once the new start's beacons arrive.
    * - Every beacon lost for a while
      - Nothing.
      - The beacon goes overdue after four times ``default_interval``,
@@ -7586,6 +7590,16 @@ Commands in flight across the restart
     acts on nothing but the three until a CONNECT carries its checksum, so
     commands already on their way when it began are refused, not read with
     its definitions.
+
+A CONNECT answered by a start that is going
+    A station whose CONNECT reached a start that had taken a RESTART, and
+    that took the answer for a match, would be matched with a start that
+    is going. Where the next start's first beacons were then all lost, so
+    that no number went back, and another station matched that start, the
+    station would be matched for commanding without a CONNECT of its own
+    to it. Closed: a start that has taken a RESTART refuses every CONNECT
+    ``Unmatched``, and the ground matches only on a CONNECT answered with
+    success.
 
 A RESTART that never arrives
     No answer comes, and the old start's beacons go on counting up at

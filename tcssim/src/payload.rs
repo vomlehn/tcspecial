@@ -225,7 +225,7 @@ pub enum PayloadProtocol {
     Can,
     /// A sensor's sample buffer, which the simulator stands in for with a pty
     /// -- the samples but not the sysfs around them: see
-    /// [`crate::node::payload::iio`].
+    /// [`crate::node::payload::iio`]. Experimental.
     Iio,
     /// An rpmsg channel to another core, which the simulator stands in for
     /// with a pty: see [`crate::node::payload::rpmsg`]. Experimental.

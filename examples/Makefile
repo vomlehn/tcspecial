@@ -126,8 +126,9 @@ run-cfs:
 # Run tcsmoc on the examples whose payloads are devices the kernel stands in
 # for: a virtual CAN bus, a gpio-sim chip and an iio_dummy sensor. Each
 # device has to be there first, and making one needs root, so these do not:
-# `sudo bin/mk-kernel-stand-ins`, in the top-level directory, makes all
-# three and gives them to the user who ran it. See "Payloads the kernel
+# `sudo bin/mk-kernel-stand-ins can gpio iio`, in the top-level directory,
+# makes all three, where the kernel allows, and gives them to the user who
+# ran it. See "Payloads the kernel
 # stands in for" in README.md.
 .PHONY: run-can
 run-can:

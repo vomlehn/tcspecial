@@ -909,34 +909,37 @@ others: a device file stating a <tt class="docutils literal">port</tt>, or a net
 <tt class="docutils literal">path</tt>, is refused.</p>
 <div class="section" id="supported-and-experimental-interfaces">
 <h2><a class="toc-backref" href="#toc-entry-9">Supported and experimental interfaces</a></h2>
-<p>Eight types of payload are supported: <tt class="docutils literal">network</tt>, <tt class="docutils literal"><span class="pre">device-file</span></tt>,
-<tt class="docutils literal">serial</tt>, <tt class="docutils literal">i2c</tt>, <tt class="docutils literal">spi</tt>, <tt class="docutils literal">can</tt>, <tt class="docutils literal">gpio</tt> and <tt class="docutils literal">iio</tt>.</p>
-<p>The last three were experimental until each was flown against the kernel's
-own stand-in for its device, which is what supported means for them:
-tcspecial's node code is run against a CAN bus of the kernel's <tt class="docutils literal">vcan</tt>, a
-chip of its <tt class="docutils literal"><span class="pre">gpio-sim</span></tt> and a sensor of its <tt class="docutils literal">iio_dummy</tt>, the far end of
-each played through the kernel and not by tcssim, by
-<tt class="docutils literal"><span class="pre">tcspecial/tests/kernel-stand-ins.rs</span></tt>. Each test checks that the device's
-data reaches the ground and, for CAN and GPIO, that the ground's commands
-reach the device; an IIO sensor takes none. Each type has an example that
-the test flies, in <tt class="docutils literal">examples/can</tt>, <tt class="docutils literal">examples/gpio</tt> and <tt class="docutils literal">examples/iio</tt>.
+<p>Seven types of payload are supported: <tt class="docutils literal">network</tt>, <tt class="docutils literal"><span class="pre">device-file</span></tt>,
+<tt class="docutils literal">serial</tt>, <tt class="docutils literal">i2c</tt>, <tt class="docutils literal">spi</tt>, <tt class="docutils literal">can</tt> and <tt class="docutils literal">gpio</tt>.</p>
+<p>The last two were experimental until each was flown against the kernel's own
+stand-in for its device, which is what supported means for them: tcspecial's
+node code is run against a CAN bus of the kernel's <tt class="docutils literal">vcan</tt> and a chip of its
+<tt class="docutils literal"><span class="pre">gpio-sim</span></tt>, the far end of each played through the kernel and not by
+tcssim, by <tt class="docutils literal"><span class="pre">tcspecial/tests/kernel-stand-ins.rs</span></tt>. Each test checks that the
+device's data reaches the ground and that the ground's commands reach the
+device. Each type has an example that the test flies, in <tt class="docutils literal">examples/can</tt> and
+<tt class="docutils literal">examples/gpio</tt>.
 The devices need root to make, so the tests do not make them: see <a class="reference internal" href="#making-the-kernel-s-stand-ins">Making the
 Kernel's Stand-ins</a>. A test whose device is not there skips, saying which
 device and the command that makes it, so <tt class="docutils literal">cargo test</tt> passes on a host that
-has not been set up and proves nothing about these three there. What a
+has not been set up and proves nothing about these types there. What a
 stand-in cannot show is a real controller, chip or sensor: a bus's bitrate
 and errors, a line's electrical behaviour, a driver's own channels.</p>
 <p>Some of what follows is still marked <strong>experimental, not yet supported</strong>:
-RS-485 on a serial line, and the <tt class="docutils literal">rpmsg</tt> and <tt class="docutils literal">hdlc</tt> types of payload.
-Each is written, parses, reaches a handler and has tests of its rules; none
-has been run against the hardware it describes, and none is shipped in an
-example. They stay experimental because nothing in the kernel stands in for
-them, so there is nothing to fly them against short of the hardware: an
-rpmsg channel needs a remote processor and its firmware, a synchronous HDLC
-line needs a card, and RS-485's direction control is the driver of a real
-UART, which a pseudo-terminal refuses.</p>
+RS-485 on a serial line, and the <tt class="docutils literal">iio</tt>, <tt class="docutils literal">rpmsg</tt> and <tt class="docutils literal">hdlc</tt> types of
+payload. Each is written, parses, reaches a handler and has tests of its
+rules; none has been run against the hardware it describes or a stand-in the
+kernel makes. <tt class="docutils literal">iio</tt> has such a stand-in, <tt class="docutils literal">iio_dummy</tt>, and an example and
+a test written to fly it, but a stock distribution kernel such as Ubuntu's
+builds the module without the buffer tcspecial reads, so the test has not
+run: the type is promoted once it has passed against a kernel that has the
+buffer (see <a class="reference internal" href="#an-iio-payload">An IIO Payload</a>). The others stay experimental because nothing
+in the kernel stands in for them, so there is nothing to fly them against
+short of the hardware: an rpmsg channel needs a remote processor and its
+firmware, a synchronous HDLC line needs a card, and RS-485's direction
+control is the driver of a real UART, which a pseudo-terminal refuses.</p>
 <p>Read them as a statement of what the configuration will be rather than as a
-feature to rely on. They may change in ways the eight supported types will
+feature to rely on. They may change in ways the seven supported types will
 not.</p>
 </div>
 <div class="section" id="attributes-every-payload-has">
@@ -947,8 +950,8 @@ name           the handler's name, which commands address it by and the
 group          the group it is read with, if any. Optional: a payload in
                no group states its own rate, or is read on every pass --
                see `How a Payload's Data Is Read`_
-type           network | device-file | serial | i2c | spi | can | iio
-               | gpio, or one of the experimental rpmsg | hdlc
+type           network | device-file | serial | i2c | spi | can | gpio,
+               or one of the experimental iio | rpmsg | hdlc
 </pre>
 <div class="section" id="how-a-payload-is-driven">
 <h3><a class="toc-backref" href="#toc-entry-11">How a payload is driven</a></h3>
@@ -1834,10 +1837,10 @@ payload writes faster than the handler reads.</p>
 </div>
 <div class="section" id="an-iio-payload">
 <h2><a class="toc-backref" href="#toc-entry-22">An IIO Payload</a></h2>
-<p>Keyword <tt class="docutils literal">type: iio</tt>. <strong>Supported</strong>, as flown against the kernel's dummy
-sensor: see <a class="reference internal" href="#supported-and-experimental-interfaces">Supported and experimental interfaces</a>. A sensor's buffered
-samples, read from a character device: what a thermistor, an accelerometer or
-an ADC looks like on Linux.</p>
+<p>Keyword <tt class="docutils literal">type: iio</tt>. <strong>Experimental, not yet supported</strong>, until its test has
+run against a kernel whose dummy sensor has a buffer: see <a class="reference internal" href="#supported-and-experimental-interfaces">Supported and
+experimental interfaces</a>. A sensor's buffered samples, read from a character
+device: what a thermistor, an accelerometer or an ADC looks like on Linux.</p>
 <pre class="code text literal-block">
 path           the buffer: /dev/iio:device0
 </pre>
@@ -1865,13 +1868,14 @@ faithful of the two stand-ins. <tt class="docutils literal">bin/mkiio</tt> makes
 name in a configuration, and <tt class="docutils literal">bin/rmiio</tt> takes it away; a host's own sensors
 sit in the same numbering and are left alone, which is why the scripts go by
 name and not by number.</p>
-<p><tt class="docutils literal"><span class="pre">tcspecial/tests/kernel-stand-ins.rs</span></tt> flies <a class="reference internal" href="#the-iio-example">The iio example</a> on the
-dummy: what reaches the ground is the kernel's samples, in whole sample sets.
-The dummy has a buffer only where the kernel was built with
-<tt class="docutils literal">CONFIG_IIO_SIMPLE_DUMMY_BUFFER</tt>, which not every distribution's is --
-Ubuntu's is not -- and without one there is no <tt class="docutils literal">/dev/iio:deviceN</tt> to read;
-<tt class="docutils literal"><span class="pre">bin/mk-kernel-stand-ins</span></tt> says so before making anything, and the test
-says so where it skips.</p>
+<p><tt class="docutils literal"><span class="pre">tcspecial/tests/kernel-stand-ins.rs</span></tt> is written to fly <a class="reference internal" href="#the-iio-example">The iio example</a>
+on the dummy, checking that what reaches the ground is the kernel's samples,
+in whole sample sets. The dummy has a buffer only where the kernel was built
+with <tt class="docutils literal">CONFIG_IIO_SIMPLE_DUMMY_BUFFER</tt>, which a stock distribution kernel's
+is not -- Ubuntu's is not -- and without one there is no
+<tt class="docutils literal">/dev/iio:deviceN</tt> to read; <tt class="docutils literal">sudo <span class="pre">bin/mk-kernel-stand-ins</span> iio</tt> says so
+before making anything, and the test says so where it skips. That test is
+what promotes the type, once it has passed.</p>
 </div>
 <div class="section" id="a-serial-payload">
 <h2><a class="toc-backref" href="#toc-entry-23">A Serial Payload</a></h2>
@@ -2096,23 +2100,25 @@ and a transfer is delimited by the chip select rather than by framing bits.</p>
 </div>
 <div class="section" id="making-the-kernel-s-stand-ins">
 <h2><a class="toc-backref" href="#toc-entry-26">Making the Kernel's Stand-ins</a></h2>
-<p>The CAN, GPIO and IIO types are supported because each is flown against the
-kernel's own stand-in for its device: a virtual CAN bus, <tt class="docutils literal">vcan0</tt>; a chip of
-<tt class="docutils literal"><span class="pre">gpio-sim</span></tt> with eight lines; and a sensor of <tt class="docutils literal">iio_dummy</tt> whose buffer an
-<tt class="docutils literal">hrtimer</tt> trigger fills a hundred times a second. Making any of them needs
-root, so neither the tests nor tcssim do; one command does, run once with
-sudo from the account that runs the tests:</p>
+<p>The CAN and GPIO types are supported because each is flown against the
+kernel's own stand-in for its device: a virtual CAN bus, <tt class="docutils literal">vcan0</tt>, and a
+chip of <tt class="docutils literal"><span class="pre">gpio-sim</span></tt> with eight lines. The experimental IIO type has a test
+written the same way, against a sensor of <tt class="docutils literal">iio_dummy</tt> whose buffer an
+<tt class="docutils literal">hrtimer</tt> trigger fills a hundred times a second, where the kernel's
+<tt class="docutils literal">iio_dummy</tt> has a buffer. Making any of them needs root, so neither the
+tests nor tcssim do; one command does, run once with sudo from the account
+that runs the tests:</p>
 <pre class="code console literal-block">
 <span class="generic prompt">$ </span>sudo<span class="whitespace"> </span>bin/mk-kernel-stand-ins<span class="whitespace">
 </span><span class="generic prompt">$ </span>make<span class="whitespace"> </span>kernel-stand-ins-test
 </pre>
-<p>The first checks that the kernel has every module the three need -- <tt class="docutils literal">vcan</tt>
-and <tt class="docutils literal"><span class="pre">can-raw</span></tt>; <tt class="docutils literal"><span class="pre">gpio-sim</span></tt>; <tt class="docutils literal"><span class="pre">industrialio-configfs</span></tt>,
-<tt class="docutils literal"><span class="pre">iio-trig-hrtimer</span></tt> and an <tt class="docutils literal">iio_dummy</tt> with its buffer -- and refuses,
-making nothing, where it lacks one, naming the type and what is missing.
-Named types are made alone: <tt class="docutils literal">sudo <span class="pre">bin/mk-kernel-stand-ins</span> can gpio</tt> makes
-the bus and the chip and leaves the sensor be, which is what a kernel whose
-<tt class="docutils literal">iio_dummy</tt> has no buffer is left with. It runs <tt class="docutils literal">bin/mkvcan</tt>,
+<p>With no arguments the first makes the CAN bus and the GPIO chip; named
+types are made alone, and <tt class="docutils literal">sudo <span class="pre">bin/mk-kernel-stand-ins</span> iio</tt> makes the
+IIO sensor, or <tt class="docutils literal">can gpio iio</tt> all three. It checks that the kernel has
+every module the types asked for need -- <tt class="docutils literal">vcan</tt> and <tt class="docutils literal"><span class="pre">can-raw</span></tt>;
+<tt class="docutils literal"><span class="pre">gpio-sim</span></tt>; <tt class="docutils literal"><span class="pre">industrialio-configfs</span></tt>, <tt class="docutils literal"><span class="pre">iio-trig-hrtimer</span></tt> and an
+<tt class="docutils literal">iio_dummy</tt> with its buffer -- and refuses, making nothing, where it lacks
+one, naming the type and what is missing. It runs <tt class="docutils literal">bin/mkvcan</tt>,
 <tt class="docutils literal">bin/mkgpio</tt> and <tt class="docutils literal">bin/mkiio</tt>, which give what they make -- the chip and
 its lines' pulls, the sensor's buffer -- to the user who ran sudo, since the
 kernel makes them root's and the tests are run as the user; a raw CAN socket
@@ -2125,7 +2131,7 @@ and says so -- which device, and the command that makes it -- where
 <tt class="docutils literal"><span class="pre">--nocapture</span></tt> shows it. The tests bind no fixed port, so they run beside
 anything else; they do use the devices, and <tt class="docutils literal">make <span class="pre">stand-ins-test</span></tt> uses the
 same bus and chip, so the two are not run at once.</p>
-<p><tt class="docutils literal">sudo <span class="pre">bin/rm-kernel-stand-ins</span></tt> takes all three away again. Nothing either
+<p><tt class="docutils literal">sudo <span class="pre">bin/rm-kernel-stand-ins</span></tt> takes away whichever were made. Nothing either
 does survives a reboot, so the first is run again after one.</p>
 </div>
 <div class="section" id="what-the-configuration-will-not-let-pass">
@@ -3039,14 +3045,16 @@ ground, a gateway_radio node, and down to the MOC.</object>
 buffer is read and never written, so <tt class="docutils literal">ground</tt> has no <tt class="docutils literal"><span class="pre">gateway-out</span></tt>. Which
 channels are in a set and how often one is taken are the sensor's settings,
 made in <tt class="docutils literal">sysfs</tt> by whoever brings it up, and nothing in the configuration.</p>
-<p>The sensor is one of the kernel's <tt class="docutils literal">iio_dummy</tt>, which <tt class="docutils literal">sudo
-<span class="pre">bin/mk-kernel-stand-ins</span></tt> makes, its buffer filled by a timer, so the kernel
+<p>The <tt class="docutils literal">iio</tt> type is experimental, and this example is what its test flies:
+see <a class="reference internal" href="#an-iio-payload">An IIO Payload</a>. The sensor is one of the kernel's <tt class="docutils literal">iio_dummy</tt>, which
+<tt class="docutils literal">sudo <span class="pre">bin/mk-kernel-stand-ins</span> iio</tt> makes where the kernel's has a buffer,
+its buffer filled by a timer, so the kernel
 stands in for it entirely and tcssim makes nothing. The configuration names
 <tt class="docutils literal">/dev/iio:device1</tt>, which is what the dummy is on a host with one sensor of
 its own; write the number the script printed. <tt class="docutils literal">make <span class="pre">-C</span> examples <span class="pre">run-iio</span></tt>
-runs tcsmoc on the example, and <tt class="docutils literal"><span class="pre">tcspecial/tests/kernel-stand-ins.rs</span></tt> flies
-it, checking that what arrives is whole sample sets. Every port is in the
-thirty-two to thirty-seven hundreds, ending in 40 or 50.</p>
+runs tcsmoc on the example, and <tt class="docutils literal"><span class="pre">tcspecial/tests/kernel-stand-ins.rs</span></tt> is
+written to fly it, checking that what arrives is whole sample sets. Every port
+is in the thirty-two to thirty-seven hundreds, ending in 40 or 50.</p>
 </div>
 </div>
 <div class="section" id="the-simulator-configuration">

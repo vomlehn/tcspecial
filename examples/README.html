@@ -491,18 +491,22 @@ for</h2>
 makes rather than a file or a socket tcssim can make, and each is flown
 against the kernel’s own stand-in for that device by
 <code>tcspecial/tests/kernel-stand-ins.rs</code>, which plays the
-device’s far end through the kernel: that is what makes the three types
-supported. The devices need root to make, so nothing here makes them.
-Run this once, from the account that runs the examples and the
-tests:</p>
+device’s far end through the kernel: that is what makes CAN and GPIO
+supported. IIO stays experimental until its test has passed, which it
+cannot on a kernel whose <code>iio_dummy</code> has no buffer, such as
+Ubuntu’s: see “What Is Supported and What Is Experimental” in
+<code>docs/design.rst</code>. The devices need root to make, so nothing
+here makes them. Run this once, from the account that runs the examples
+and the tests:</p>
 <pre><code>sudo bin/mk-kernel-stand-ins</code></pre>
-<p>It refuses, and makes nothing, where this kernel lacks a module one
-of the three needs, saying which;
-<code>sudo bin/mk-kernel-stand-ins can gpio</code> makes only those
-named. It gives what it makes to the user who ran it, and prints the
+<p>With no arguments it makes the CAN bus and the GPIO chip;
+<code>sudo bin/mk-kernel-stand-ins iio</code> makes the IIO sensor, and
+<code>can gpio iio</code> all three. It refuses, and makes nothing,
+where this kernel lacks a module one of the types named needs, saying
+which. It gives what it makes to the user who ran it, and prints the
 number the kernel gave the GPIO chip and the IIO sensor.
-<code>sudo bin/rm-kernel-stand-ins</code> takes them all away again.
-Nothing either does survives a reboot.</p>
+<code>sudo bin/rm-kernel-stand-ins</code> takes away whichever were
+made. Nothing either does survives a reboot.</p>
 <table>
 <colgroup>
 <col style="width: 50%" />
@@ -530,9 +534,9 @@ a lamp on line 1.</td>
 </tr>
 <tr>
 <td><code>iio</code></td>
-<td>A sensor’s sample buffer, read through the kernel’s IIO subsystem,
-its whole sample sets going to the ground. Nothing goes up: a buffer is
-read and never written.</td>
+<td>Experimental. A sensor’s sample buffer, read through the kernel’s
+IIO subsystem, its whole sample sets going to the ground. Nothing goes
+up: a buffer is read and never written.</td>
 </tr>
 </tbody>
 </table>
@@ -560,10 +564,11 @@ number is given as chips appear, so write the one
 buffer a software trigger fills a hundred times a second: the kernel
 stands in for it entirely, and tcssim makes nothing. Its buffer is there
 only where the kernel’s <code>iio_dummy</code> was built with
-<code>CONFIG_IIO_SIMPLE_DUMMY_BUFFER</code>, which not every
-distribution’s is; <code>bin/mk-kernel-stand-ins</code> says so where it
-was not. The configuration names <code>/dev/iio:device1</code>, which is
-what the dummy is on a host with one sensor of its own; write the number
+<code>CONFIG_IIO_SIMPLE_DUMMY_BUFFER</code>, which a stock distribution
+kernel’s is not; <code>bin/mk-kernel-stand-ins iio</code> says so where
+it was not, and that is why the type is still experimental. The
+configuration names <code>/dev/iio:device1</code>, which is what the
+dummy is on a host with one sensor of its own; write the number
 <code>bin/mk-kernel-stand-ins</code> printed.</p>
 <pre><code>make run-iio</code></pre>
 <p>Languages, for all three:</p>

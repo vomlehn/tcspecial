@@ -281,7 +281,7 @@ pub enum GroupKind {
     Spi(SpiParams),
     /// See [`crate::node::payload::can`].
     Can(CanParams),
-    /// See [`crate::node::payload::iio`].
+    /// Experimental; see [`crate::node::payload::iio`].
     Iio(IioParams),
     /// Experimental; see [`crate::node::payload::rpmsg`].
     Rpmsg(RpmsgParams),

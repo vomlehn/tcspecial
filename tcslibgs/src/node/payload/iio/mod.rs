@@ -1,9 +1,10 @@
 //! IIO payloads: a sensor's buffered samples.
 //!
-//! **Supported**, as flown against the kernel's dummy sensor, `iio_dummy`,
-//! by `tcspecial/tests/kernel-stand-ins.rs`; nothing has been run against a
-//! real sensor. See "What Is Supported and What Is Experimental" in
-//! `docs/design.rst`.
+//! **Experimental, and not yet supported.** The terms parse and reach a
+//! handler, and the handler reads the device; nothing has been run against a
+//! real sensor, nor yet against the kernel's `iio_dummy`, whose test is
+//! written and skips on a kernel built without its buffer. See "What Is
+//! Supported and What Is Experimental" in `docs/design.rst`.
 //!
 //! The kernel's Industrial I/O subsystem is what a thermistor, an
 //! accelerometer or an ADC looks like on Linux. A driver offers channels, and

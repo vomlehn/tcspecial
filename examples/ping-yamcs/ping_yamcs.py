@@ -274,11 +274,10 @@ def write_yamcs(setup, run_dir, http_port, yamcs_home):
     one_stream = 'stream: "tc_realtime"'
     if sample.count(one_stream) != 1:
         raise OSError(f"{yamcs_home}/etc/processor.yaml.sample does not "
-                      f"release commands with {one_stream}, as this "
-                      "program expects of Yamcs 5.14")
+                      f"release commands with {one_stream}, as this program "
+                      "expects of Yamcs 5.14")
     (run_dir / "etc" / "processor.yaml").write_text(
-        sample.replace(one_stream,
-                       'streams: ["tc_commands", "tc_uplink"]'))
+        sample.replace(one_stream, 'streams: ["tc_commands", "tc_uplink"]'))
 
 
 class Yamcs:
@@ -324,7 +323,11 @@ class Yamcs:
                            f"{self.run_dir / 'yamcs.log'}")
 
     def running(self):
-        """Whether the instance is running."""
+        """Says whether the instance is running.
+
+        Returns:
+            Whether Yamcs answers that it is, false if it does not answer.
+        """
         try:
             said = self._get(f"/instances/{INSTANCE}")
         except (OSError, ValueError):
@@ -392,7 +395,16 @@ class Yamcs:
 
 
 def eng_value(value):
-    """A Yamcs value as Python has it: the field its type names."""
+    """Reads a Yamcs value as Python has it.
+
+    Args:
+        value: The value as the REST API gives it, a dictionary of its type
+               and the field that type names.
+
+    Returns:
+        Bytes for a binary value, else the field's value; ``None`` for a
+        type it does not know.
+    """
     kind = value.get("type", "")
     if kind == "BINARY":
         return base64.b64decode(value.get("binaryValue", ""))
@@ -404,8 +416,15 @@ def eng_value(value):
 
 
 def reception_ns(text):
-    """A Yamcs time, as ``2026-11-01T07:46:06.828Z``, in nanoseconds since
-    the epoch; nought for none."""
+    """Reads a Yamcs time.
+
+    Args:
+        text: The time as Yamcs writes it, ``2026-11-01T07:46:06.828Z``, or
+              ``None``.
+
+    Returns:
+        Nanoseconds since the epoch; nought for none.
+    """
     if not text:
         return 0
     when = datetime.datetime.fromisoformat(text.replace("Z", "+00:00"))
@@ -500,7 +519,15 @@ def connect(setup, yamcs, attempts=30):
 
 
 def beacon_said(yamcs):
-    """What the latest beacon says, as text, or ``None`` before one."""
+    """Says what the latest beacon says.
+
+    Args:
+        yamcs: The Yamcs it arrived at.
+
+    Returns:
+        Its name, version, number and flag, as text; ``None`` before one has
+        arrived.
+    """
     fields = []
     for field in BEACON_FIELDS:
         value = yamcs.parameter(f"/TcsBeacon/Beacon{field}")

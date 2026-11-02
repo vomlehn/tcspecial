@@ -27,6 +27,12 @@ This program puts the two together:
 * it shows them in the ping example's window, the beacon panel and the ping
   panel, or with ``--pings`` prints them with no window.
 
+What it shares with other ground stations it shares rather than copies: the
+Yamcs run, its REST API, CONNECT and the beacon through Yamcs are
+``python/tcslib/yamcs_ground.py``'s, which thermostat-yamcs uses too; the
+ping link's bookkeeping and the window are ``examples/ping-common``'s,
+which the ping example uses too.
+
 Yamcs's web interface, at http://localhost:16090 by default, shows every
 packet and parameter meanwhile: the beacon, the answers, and the pings, a
 ping's command and its answer's parameters as the text they are.
@@ -46,45 +52,33 @@ configuration.
 """
 
 import argparse
-import base64
-import datetime
-import json
 import os
-import shutil
-import signal
-import string
-import subprocess
 import sys
 import time
-import urllib.error
-import urllib.request
 from pathlib import Path
 
 HERE = Path(__file__).resolve().parent
 ROOT = HERE.parents[1]
 sys.path.insert(0, str(ROOT / "python"))
-# The ping example's halves, which this one shares: its vehicle, and the
-# ping link's bookkeeping.
-sys.path.insert(0, str(HERE.parent / "ping"))
+# What this example shares with the ping example: the ping link's
+# bookkeeping and the window.
+sys.path.insert(0, str(HERE.parent / "ping-common"))
 
-from tcslib.beacon import Arrived, Beacons, Schedule  # noqa: E402
+from tcslib.beacon import Schedule  # noqa: E402
+from tcslib.processes import Vehicle  # noqa: E402
+from tcslib.yamcs_ground import (  # noqa: E402
+    Yamcs, YamcsBeacons, command_settings, connect, first_beacon,
+    write_yamcs, yamcs_home)
 from tcslibgs import configuration, ping, ping_packet  # noqa: E402
 from tcslibgs import yamcs as generated  # noqa: E402
-from ping_gateway import (  # noqa: E402
-    Vehicle, die_with_this_program, run_the_window, the_one)
 from ping_ground import Exchange, Pinger, interval  # noqa: E402
+from ping_window import run_the_window, the_one  # noqa: E402
 
 #: Where Yamcs's web interface and REST API are, unless --http-port says.
 HTTP_PORT = 16090
 
 #: The Yamcs instance this example runs.
 INSTANCE = "ping"
-
-#: The wrapper's qualified names, as Yamcs knows them. The ping is named
-#: as the ping node's interface document names it: see :class:`Setup`.
-CONNECT = generated.qualified(generated.CONNECT)
-RUNNING = "/TcsFixed/Running"
-BEACON_BODY = generated.qualified("BeaconBody")
 
 #: The ping command's arguments, as ``tcslibgs/xtce/ping.xtce`` names them,
 #: by the field of :class:`tcslibgs.ping_packet.Ping` that each is: what a
@@ -103,10 +97,6 @@ REPLY_PARAMETERS = {
     "reply_sent_nanoseconds": "ReplySentNanoseconds",
     "reply_answered_seconds": "ReplyAnsweredSeconds",
     "reply_answered_nanoseconds": "ReplyAnsweredNanoseconds"}
-
-#: How long a pass of the beacon loop waits for a beacon, in seconds: often
-#: enough that the indicator changes stage when it should, to the eye.
-BEACON_POLL = 0.25
 
 
 def arguments(argv):
@@ -185,8 +175,7 @@ class Setup:
         self.downlink = self.config.downlink(self.gateway, self.node)
         self.beacon = self.config.beacon_link()
         self.beacon_interval = self.config.beacon_interval()
-        self.command = configuration.HostPort.of("tcs_cmd.recv",
-                                                 said.get("tcs_cmd.recv"))
+        self.command = self.config.command_link().recv
         self.beacon_apid = self.config.beacon_apid()
         self.cmd_apid = self.config.command_apid()
         self.uplink_apid = self.config.uplink_apid(self.gateway)
@@ -219,25 +208,24 @@ class Setup:
         Returns:
             A dictionary of each template name and its value.
         """
+        # What the configuration says, which tcslibgs/yamcs.py writes into
+        # Yamcs's links and its mission database, and which --describe
+        # prints for the tests to hold to the Rust. Yamcs reaches
+        # tcspecial's command link where the vehicle takes commands; a
+        # vehicle that takes them on every interface is reached here.
+        said = command_settings(self.config)
         return {
             "http_port": str(http_port),
             "data_dir": str(run_dir / "data"),
             "run_dir": str(run_dir),
-            "xtce_dir": str(ROOT / "tcslibgs" / "xtce"),
-            # What follows is what the configuration says, which
-            # tcslibgs/yamcs.py writes into Yamcs's links and its mission
-            # database, and which --describe prints for the tests to hold
-            # to the Rust. Yamcs reaches tcspecial's command link where the
-            # vehicle takes commands; a vehicle that takes them on every
-            # interface is reached here.
-            "cmd_host": local(self.command.address),
-            "cmd_port": str(self.command.port),
-            "uplink_host": local(self.uplink.address),
+            "cmd_host": said["cmd_host"],
+            "cmd_port": said["cmd_port"],
+            "uplink_host": generated.local(self.uplink.address),
             "uplink_port": str(self.uplink.port),
             "downlink_port": str(self.downlink.port),
-            "beacon_port": str(self.beacon.recv.port),
-            "beacon_apid": str(self.beacon_apid),
-            "cmd_apid": str(self.cmd_apid),
+            "beacon_port": said["beacon_port"],
+            "beacon_apid": said["beacon_apid"],
+            "cmd_apid": said["cmd_apid"],
             "uplink_apid": str(self.uplink_apid),
             "reply_apid": str(self.reply_apid)}
 
@@ -254,273 +242,6 @@ class Setup:
         settings = self.yamcs_settings(run_dir, http_port)
         lines = [f"{name} {value}" for name, value in settings.items()]
         return "\n".join(lines + [f"digest {self.digest}"])
-
-
-#: The address to reach a socket at from this host: itself, or this host for
-#: one bound on every interface.
-local = generated.local
-
-
-def write_yamcs(setup, run_dir, http_port, yamcs_home):
-    """Writes Yamcs's configuration for this tcspecial configuration.
-
-    The server's and the instance's from the templates in ``yamcs/``, with
-    the instance's links and command streams added, and the mission
-    database's wrapper, each worked out of the configuration by
-    :mod:`tcslibgs.yamcs`.
-
-    Args:
-        setup:      What was read out of the configuration.
-        run_dir:    Where to write it: ``etc/``, the wrapper XTCE, and an
-                    empty ``data/``. Made afresh each run.
-        http_port:  Yamcs's web port.
-        yamcs_home: Where Yamcs is unpacked, whose sample processor
-                    configuration is used as it is.
-
-    Raises:
-        ValueError: The configuration does not give Yamcs what it needs: an
-                    APID that does not read or is used twice, or a node
-                    name XTCE does not allow.
-        OSError: A file cannot be written, Yamcs's sample is missing, or
-                 PyYAML, which writes the instance's configuration, is not
-                 installed.
-    """
-    try:
-        import yaml
-    except ImportError:
-        raise OSError("PyYAML is not installed, and ping_yamcs.py writes "
-                      "Yamcs's configuration with it: pip install PyYAML")
-    if run_dir.exists():
-        shutil.rmtree(run_dir)
-    (run_dir / "etc").mkdir(parents=True)
-    (run_dir / "data").mkdir()
-    settings = setup.yamcs_settings(run_dir, http_port)
-    templates = HERE / "yamcs"
-
-    def filled(template):
-        """A template, its names filled in from ``settings``."""
-        text = (templates / template).read_text()
-        return string.Template(text).substitute(settings)
-
-    (run_dir / "etc" / "yamcs.yaml").write_text(filled("yamcs.yaml.in"))
-    instance = yaml.safe_load(filled("yamcs.ping.yaml.in"))
-    instance["dataLinks"] = generated.data_links(setup.config)
-    streams = generated.command_streams(setup.config)
-    instance["streamConfig"]["tc"] = streams
-    (run_dir / "etc" / "yamcs.ping.yaml").write_text(
-        "# Written by ping_yamcs.py from yamcs/yamcs.ping.yaml.in and\n"
-        f"# {setup.path}, its links and command streams\n"
-        "# by tcslibgs/yamcs.py: edit those, not this.\n"
-        + yaml.safe_dump(instance, sort_keys=False))
-    generated.write_mdb(setup.config, run_dir / "tcs-ccsds.xtce")
-    # Yamcs's own processor configuration, but releasing commands to every
-    # one of this instance's command streams, which route them: its sample
-    # sends every command to one.
-    sample = (Path(yamcs_home) / "etc" / "processor.yaml.sample").read_text()
-    one_stream = 'stream: "tc_realtime"'
-    if sample.count(one_stream) != 1:
-        raise OSError(f"{yamcs_home}/etc/processor.yaml.sample does not "
-                      f"release commands with {one_stream}, as this program "
-                      "expects of Yamcs 5.14")
-    names = ", ".join(f'"{stream["name"]}"' for stream in streams)
-    (run_dir / "etc" / "processor.yaml").write_text(
-        sample.replace(one_stream, f"streams: [{names}]"))
-
-
-class Yamcs:
-    """Yamcs, run by this program on the run directory's configuration and
-    killed when it exits, and its REST API.
-
-    Args:
-        home:      Where Yamcs is unpacked.
-        run_dir:   The run directory, which :func:`write_yamcs` wrote.
-        http_port: Its web port.
-    """
-
-    def __init__(self, home, run_dir, http_port):
-        self.home = Path(home) if home else None
-        self.run_dir = run_dir
-        self.base = f"http://localhost:{http_port}/api"
-        self.process = None
-
-    def start(self):
-        """Start Yamcs, told to die with this program, and wait until its
-        instance runs.
-
-        In a session of its own, so that a Ctrl-C at the terminal is this
-        program's to stop it by and not Java's, which would leave it no
-        Yamcs to stop. Told to die with this program all the same, as the
-        vehicle is: a program that is killed runs no ``finally``, and Yamcs
-        would go on holding the example's ports. ``yamcsd`` ends by
-        becoming Java, so what the kernel is told holds for Java.
-
-        Raises:
-            RuntimeError: It stops, or its instance does not run within a
-                          minute.
-        """
-        program = self.home / "bin" / "yamcsd"
-        log = open(self.run_dir / "yamcs.log", "w")
-        parent = os.getpid()
-        self.process = subprocess.Popen(
-            [str(program), "--etc-dir", str(self.run_dir / "etc"), "--data-dir",
-             str(self.run_dir / "data"), "--cache-dir",
-             str(self.run_dir / "cache")], stdout=log, stderr=subprocess.STDOUT,
-            start_new_session=True,
-            preexec_fn=lambda: die_with_this_program(parent))
-        deadline = time.monotonic() + 60
-        while time.monotonic() < deadline:
-            if self.process.poll() is not None:
-                raise RuntimeError("Yamcs stopped: see "
-                                   f"{self.run_dir / 'yamcs.log'}")
-            if self.running():
-                return
-            time.sleep(0.5)
-        raise RuntimeError(f"Yamcs's instance {INSTANCE} did not start: see "
-                           f"{self.run_dir / 'yamcs.log'}")
-
-    def running(self):
-        """Says whether the instance is running.
-
-        Returns:
-            Whether Yamcs answers that it is, false if it does not answer.
-        """
-        try:
-            said = self._get(f"/instances/{INSTANCE}")
-        except (OSError, ValueError):
-            return False
-        return said.get("state") == "RUNNING"
-
-    def stop(self):
-        """Stop Yamcs, and wait for it to be gone."""
-        if self.process is None or self.process.poll() is not None:
-            return
-        os.killpg(self.process.pid, signal.SIGTERM)
-        try:
-            self.process.wait(timeout=10)
-        except subprocess.TimeoutExpired:
-            os.killpg(self.process.pid, signal.SIGKILL)
-            self.process.wait()
-
-    def issue(self, command, args):
-        """Has Yamcs send a command.
-
-        Args:
-            command: The command's qualified name.
-            args:    Its arguments, by name.
-
-        Raises:
-            RuntimeError: Yamcs refuses it.
-        """
-        body = json.dumps({"args": args}).encode()
-        url = (f"{self.base}/processors/{INSTANCE}/realtime/commands{command}")
-        request = urllib.request.Request(
-            url, data=body, method="POST",
-            headers={"Content-Type": "application/json"})
-        try:
-            urllib.request.urlopen(request, timeout=5).read()
-        except urllib.error.HTTPError as why:
-            raise RuntimeError(f"Yamcs refused {command}: "
-                               f"{why.read().decode(errors='replace')}")
-
-    def parameters(self, names):
-        """Several parameters' latest values, each from one packet, and when
-        Yamcs received them.
-
-        Args:
-            names: The parameters' qualified names.
-
-        Returns:
-            ``(values, received)`` -- each value, by name, as
-            :meth:`parameter` gives it, and when Yamcs acquired them, in
-            nanoseconds since the epoch -- or ``None`` before all of them
-            have arrived, or while what Yamcs has of them is not from one
-            packet.
-        """
-        body = json.dumps({"id": [{"name": name} for name in names],
-                           "fromCache": True}).encode()
-        request = urllib.request.Request(
-            f"{self.base}/processors/{INSTANCE}/realtime/parameters:batchGet",
-            data=body, method="POST",
-            headers={"Content-Type": "application/json"})
-        try:
-            with urllib.request.urlopen(request, timeout=5) as reply:
-                said = json.loads(reply.read())
-        except (OSError, ValueError):
-            return None
-        values, times = {}, set()
-        for value in said.get("value", []):
-            name = value.get("id", {}).get("name")
-            if name in names and value.get("engValue"):
-                values[name] = eng_value(value["engValue"])
-                times.add(value.get("acquisitionTime"))
-        if len(values) != len(names) or len(times) != 1:
-            return None
-        return values, reception_ns(times.pop())
-
-    def parameter(self, name):
-        """A parameter's latest value, and when Yamcs received it.
-
-        Args:
-            name: The parameter's qualified name.
-
-        Returns:
-            ``(value, received)`` -- the engineering value as Python has it
-            (bytes for a binary one), and when Yamcs acquired it, in
-            nanoseconds since the epoch -- or ``None`` before any has
-            arrived.
-        """
-        try:
-            said = self._get(f"/processors/{INSTANCE}/realtime/parameters"
-                             f"{name}")
-        except (OSError, ValueError):
-            return None
-        value = said.get("engValue")
-        if not value:
-            return None
-        return eng_value(value), reception_ns(said.get("acquisitionTime"))
-
-    def _get(self, path):
-        """A REST API reply, read as JSON."""
-        with urllib.request.urlopen(self.base + path, timeout=5) as reply:
-            return json.loads(reply.read())
-
-
-def eng_value(value):
-    """Reads a Yamcs value as Python has it.
-
-    Args:
-        value: The value as the REST API gives it, a dictionary of its type
-               and the field that type names.
-
-    Returns:
-        Bytes for a binary value, else the field's value; ``None`` for a
-        type it does not know.
-    """
-    kind = value.get("type", "")
-    if kind == "BINARY":
-        return base64.b64decode(value.get("binaryValue", ""))
-    for field in ("stringValue", "uint32Value", "uint64Value", "sint32Value",
-                  "sint64Value", "floatValue", "doubleValue", "booleanValue"):
-        if field in value:
-            return value[field]
-    return None
-
-
-def reception_ns(text):
-    """Reads a Yamcs time.
-
-    Args:
-        text: The time as Yamcs writes it, ``2026-11-01T07:46:06.828Z``, or
-              ``None``.
-
-    Returns:
-        Nanoseconds since the epoch; nought for none.
-    """
-    if not text:
-        return 0
-    when = datetime.datetime.fromisoformat(text.replace("Z", "+00:00"))
-    whole_seconds = int(when.replace(microsecond=0).timestamp())
-    return whole_seconds * ping.NANOS + when.microsecond * 1000
 
 
 class YamcsPinger(Pinger):
@@ -614,109 +335,6 @@ def answer_of(values, names):
         return f"{fields}: {why}".encode()
 
 
-def connect(setup, yamcs, attempts=30):
-    """Has Yamcs send CONNECT, carrying the configuration's checksum, once a
-    second until the vehicle answers that it is running it.
-
-    Args:
-        setup:    What was read out of the configuration.
-        yamcs:    The Yamcs to send through.
-        attempts: How many to send before giving up.
-
-    Returns:
-        Whether the vehicle answered with the checksum.
-    """
-    want = bytes.fromhex(setup.digest)
-    for sequence in range(1, attempts + 1):
-        yamcs.issue(CONNECT, {"Sequence": sequence, "Checksum": setup.digest})
-        status(f"CONNECT {sequence} sent")
-        deadline = time.monotonic() + 1
-        while time.monotonic() < deadline:
-            running = yamcs.parameter(RUNNING)
-            if running is not None and running[0] == want:
-                return True
-            time.sleep(0.05)
-    return False
-
-
-class YamcsBeacons:
-    """The beacon link through Yamcs: each beacon as Yamcs received it, read
-    by the ping example's :class:`tcslib.beacon.Beacons`.
-
-    Yamcs holds the beacon socket, so what arrives is read back from it as
-    the BeaconBody parameter, the beacon's bytes whole, and handed to a
-    ``Beacons`` with no socket of its own. That one checks it as it checks
-    a beacon from its socket -- its checksum against the configuration's,
-    its number against the one before -- and ages it through the same
-    stages, so the beacon panel says here what it says in the ping example.
-    A pass that finds nothing new is one :data:`BEACON_POLL` long.
-
-    Args:
-        yamcs:    The Yamcs the beacons arrive at.
-        link:     The beacon link from the configuration.
-        schedule: The :class:`tcslib.beacon.Schedule` a beacon ages through.
-        expected: The configuration's checksum, as hex; ``None`` to compare
-                  nothing.
-        interval: How often the vehicle beacons, in nanoseconds.
-        clock:    What gives the time now, in nanoseconds since the epoch.
-    """
-
-    def __init__(self, yamcs, link, schedule, expected, interval,
-                 clock=time.time_ns):
-        self._yamcs = yamcs
-        self._beacons = Beacons(link, schedule, expected)
-        # Yamcs says nothing of where a beacon came from, and the beacon
-        # link to it is its own, so each is taken as from where the
-        # configuration says beacons are sent from.
-        self._sender = (link.send.address, link.send.port)
-        # The beacon Yamcs has already is shown at once if it is this
-        # vehicle's latest, as it is when it came while the CONNECT was
-        # being answered; one older than a beacon's interval is from before
-        # this program, a Yamcs left running, and is not news.
-        latest = yamcs.parameter(BEACON_BODY)
-        stale = latest is not None and clock() - latest[1] > interval
-        self._seen = latest[1] if stale else 0
-
-    def next_pass(self):
-        """Wait for Yamcs to receive a beacon, or for :data:`BEACON_POLL`.
-
-        Returns:
-            The :class:`tcslib.beacon.Pass`: what arrived, if anything, and
-            what to show.
-        """
-        deadline = time.monotonic() + BEACON_POLL
-        while True:
-            latest = self._yamcs.parameter(BEACON_BODY)
-            if latest is not None and latest[1] > self._seen:
-                body, self._seen = latest
-                return self._beacons.heard(body, self._sender)
-            if time.monotonic() >= deadline:
-                return self._beacons.after(Arrived.NOTHING, [])
-            time.sleep(0.05)
-
-
-def first_beacon(beacons, timeout=12):
-    """Print what the beacon link says until the first beacon arrives, as
-    the ping example does with no window.
-
-    Args:
-        beacons: The beacon link.
-        timeout: How long to wait for it, in seconds: two beacons and more
-                 at the example's interval.
-    """
-    deadline = time.monotonic() + timeout
-    while time.monotonic() < deadline:
-        beacon_pass = beacons.next_pass()
-        for remark in beacon_pass.remarks:
-            print(f"beacon: {remark}", flush=True)
-        for warning in beacon_pass.warnings:
-            print(f"beacon: {warning}", file=sys.stderr, flush=True)
-        if beacon_pass.at is not None:
-            print(f"beacon: {beacon_pass.said}", flush=True)
-            return
-    print("beacon: none arrived", file=sys.stderr, flush=True)
-
-
 def ping_and_print(pinger, count):
     """Send ``count`` pings, one after another, and print each exchange.
 
@@ -772,17 +390,17 @@ def main(argv):
         print(f"ping_yamcs: no checksum for CONNECT: {setup.why_no_digest}",
               file=sys.stderr)
         return 2
-    yamcs = Yamcs(options.yamcs, run_dir, options.http_port)
+    yamcs = Yamcs(options.yamcs, run_dir, options.http_port, INSTANCE)
     vehicle = None
     try:
         if not options.no_yamcs:
-            if (not options.yamcs
-                    or not (Path(options.yamcs) / "bin" / "yamcsd").exists()):
-                print("ping_yamcs: say where Yamcs is, with --yamcs or "
-                      "$YAMCS_HOME: the directory holding bin/yamcsd",
-                      file=sys.stderr)
+            try:
+                home = yamcs_home(options.yamcs)
+            except ValueError as why:
+                print(f"ping_yamcs: {why}", file=sys.stderr)
                 return 2
-            write_yamcs(setup, run_dir, options.http_port, options.yamcs)
+            write_yamcs(setup.config, run_dir, options.http_port, home,
+                        INSTANCE, "ping_yamcs.py")
             status(f"starting Yamcs on {run_dir}")
             yamcs.start()
             status(f"Yamcs is at http://localhost:{options.http_port}")
@@ -790,7 +408,7 @@ def main(argv):
             vehicle = Vehicle.for_configuration(setup.path, options.tcspecial,
                                                 options.verbose)
             vehicle.start()
-        if not connect(setup, yamcs):
+        if not connect(yamcs, setup.digest, say=status):
             print("ping_yamcs: the vehicle never answered CONNECT with this "
                   "configuration's checksum", file=sys.stderr)
             return 1
@@ -802,7 +420,8 @@ def main(argv):
         pinger = YamcsPinger(yamcs, setup.ping_command, setup.ping_reply)
         if options.pings is None:
             return run_the_window(setup, beacons, pinger,
-                                  title="tcspecial ping through Yamcs")
+                                  title="tcspecial ping through Yamcs",
+                                  say=status)
         first_beacon(beacons)
         return ping_and_print(pinger, options.pings)
     except (RuntimeError, ValueError, OSError) as why:

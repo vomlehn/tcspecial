@@ -1,13 +1,9 @@
 //! What the tests read out of the example's configuration through
 //! `tcslibgs`: the Rust's answers, which the Python's and the Yamcs
-//! wrapper's are held to.
+//! wrapper's are held to. How the wrapper is generated and read is
+//! `yamcs_common`'s, which thermostat-yamcs's tests share.
 
 use std::path::{Path, PathBuf};
-use std::process::Command;
-
-use quick_xml::escape::unescape;
-use quick_xml::events::{BytesStart, Event};
-use quick_xml::Reader;
 
 use tcslibgs::config_digest::digest_of_file;
 use tcslibgs::graph::parameters::{beacon_of, ci_config_of, flatten};
@@ -147,227 +143,6 @@ pub fn worked_out_of(name: &str) -> String {
         .unwrap_or_else(|| panic!("no {name} is worked out"))
 }
 
-/// One element of an XTCE document, with what is in it.
-#[derive(Debug, Default)]
-pub struct Element {
-    /// Its name, as written, with any prefix.
-    pub name: String,
-    /// Its attributes, in order.
-    pub attributes: Vec<(String, String)>,
-    /// The elements in it, in order.
-    pub children: Vec<Element>,
-    /// Its text.
-    pub text: String,
-}
-
-#[allow(dead_code)]
-impl Element {
-    /// One of its attributes.
-    ///
-    /// # Arguments
-    ///
-    /// * `name` - The attribute's name.
-    ///
-    /// # Returns
-    ///
-    /// Its value, or `None` where it has none of that name.
-    pub fn attribute(&self, name: &str) -> Option<&str> {
-        self.attributes
-            .iter()
-            .find(|(said, _)| said == name)
-            .map(|(_, value)| value.as_str())
-    }
-
-    /// Its first child of a kind.
-    ///
-    /// # Arguments
-    ///
-    /// * `name` - The child's element name.
-    ///
-    /// # Returns
-    ///
-    /// The child, or `None`.
-    pub fn child(&self, name: &str) -> Option<&Element> {
-        self.children.iter().find(|child| child.name == name)
-    }
-
-    /// Everything of a kind within it, at any depth, in document order.
-    ///
-    /// # Arguments
-    ///
-    /// * `name`  - The element name.
-    /// * `found` - Where they are put.
-    pub fn within<'a>(&'a self, name: &str, found: &mut Vec<&'a Element>) {
-        for child in &self.children {
-            if child.name == name {
-                found.push(child);
-            }
-            child.within(name, found);
-        }
-    }
-
-    /// The one element of a kind within it with a `name` attribute.
-    ///
-    /// # Arguments
-    ///
-    /// * `kind` - The element name.
-    /// * `name` - Its `name` attribute.
-    ///
-    /// # Returns
-    ///
-    /// The element.
-    ///
-    /// # Panics
-    ///
-    /// There is none.
-    pub fn named(&self, kind: &str, name: &str) -> &Element {
-        let mut found = Vec::new();
-        self.within(kind, &mut found);
-        found
-            .into_iter()
-            .find(|element| element.attribute("name") == Some(name))
-            .unwrap_or_else(|| panic!("the document has no {kind} {name}"))
-    }
-}
-
-/// An element's name and attributes, as an [`Element`] with nothing in it.
-///
-/// # Arguments
-///
-/// * `start` - The element's start tag.
-///
-/// # Returns
-///
-/// The element, with no children or text.
-fn opened(start: &BytesStart<'_>) -> Element {
-    let text = |said: &str| unescape(said).expect("well escaped").into_owned();
-    Element {
-        name: text(start.name().as_ref()),
-        attributes: start
-            .attributes()
-            .map(|attribute| {
-                let attribute = attribute.expect("an attribute");
-                (text(attribute.key.as_ref()), text(&attribute.value))
-            })
-            .collect(),
-        ..Element::default()
-    }
-}
-
-/// Reads an XTCE document.
-///
-/// # Arguments
-///
-/// * `text` - The document.
-///
-/// # Returns
-///
-/// Its root element.
-///
-/// # Panics
-///
-/// It is not XML.
-#[allow(dead_code)]
-pub fn read_xml(text: &str) -> Element {
-    let mut reader = Reader::from_str(text);
-    reader.config_mut().trim_text(true);
-    let mut open = vec![Element::default()];
-    loop {
-        match reader.read_event().expect("the document is XML") {
-            Event::Start(start) => open.push(opened(&start)),
-            Event::Empty(start) => {
-                let element = opened(&start);
-                open.last_mut().expect("a parent").children.push(element);
-            }
-            Event::End(_) => {
-                let element = open.pop().expect("an element");
-                open.last_mut().expect("a parent").children.push(element);
-            }
-            Event::Text(said) => {
-                let said: &str = said.as_ref();
-                open.last_mut().expect("an element").text.push_str(said);
-            }
-            // An entity in text, `&lt;` in a comparison, comes apart from
-            // the text around it.
-            Event::GeneralRef(entity) => {
-                let entity: &str = entity.as_ref();
-                let said = unescape(&format!("&{entity};"))
-                    .expect("an entity XML defines")
-                    .into_owned();
-                open.last_mut().expect("an element").text.push_str(&said);
-            }
-            Event::Eof => break,
-            _ => {}
-        }
-    }
-    let mut document = open.pop().expect("the document");
-    assert!(open.is_empty(), "every element closed");
-    document.children.pop().expect("a root element")
-}
-
-/// Runs Python with the tree's `python/` and the example's directory on its
-/// path.
-///
-/// # Arguments
-///
-/// * `script`    - The program, which `sys.argv[1:]` gives `arguments` to.
-/// * `arguments` - Its arguments.
-///
-/// # Returns
-///
-/// What it printed.
-///
-/// # Panics
-///
-/// python3 cannot be run, or the program fails.
-pub fn python(script: &str, arguments: &[&Path]) -> String {
-    let ran = Command::new("python3")
-        .arg("-c")
-        .arg(format!(
-            "import sys\n\
-             sys.path[:0] = [{:?}, {:?}]\n\
-             {script}",
-            here().join("../../python").display().to_string(),
-            here().display().to_string()
-        ))
-        .args(arguments)
-        .output()
-        .expect("python3 runs");
-    assert!(
-        ran.status.success(),
-        "{}",
-        String::from_utf8_lossy(&ran.stderr)
-    );
-    String::from_utf8(ran.stdout).expect("text")
-}
-
-/// The mission database's wrapper `tcslibgs/yamcs.py` generates for a
-/// configuration, as `ping_yamcs.py` writes it for Yamcs.
-///
-/// # Arguments
-///
-/// * `configuration` - The configuration.
-///
-/// # Returns
-///
-/// The wrapper's root element.
-///
-/// # Panics
-///
-/// The Python fails, or what it writes is not XML.
-#[allow(dead_code)]
-pub fn generated_mdb(configuration: &Path) -> Element {
-    let dir = tempfile::tempdir().expect("a directory");
-    let written = dir.path().join("tcs-ccsds.xtce");
-    python(
-        "from pathlib import Path\n\
-         from tcslibgs import configuration, yamcs\n\
-         yamcs.write_mdb(configuration.load(sys.argv[1]), Path(sys.argv[2]))\n",
-        &[configuration, &written],
-    );
-    read_xml(&std::fs::read_to_string(&written).expect("it was written"))
-}
-
 /// A copy of the example's configuration with a payload more drawn into
 /// the gateway node, "pong", and two payloads nothing touches, "sensor" and
 /// "tank": `test_ping_yamcs.with_more_nodes`, the one place it is written.
@@ -385,10 +160,11 @@ pub fn generated_mdb(configuration: &Path) -> Element {
 /// The Python fails.
 #[allow(dead_code)]
 pub fn with_more_nodes(dir: &Path) -> PathBuf {
-    let said = python(
+    let said = yamcs_common::python(
         "from pathlib import Path\n\
          import test_ping_yamcs\n\
          print(test_ping_yamcs.with_more_nodes(Path(sys.argv[1])))\n",
+        &[&here()],
         &[dir],
     );
     PathBuf::from(said.trim())

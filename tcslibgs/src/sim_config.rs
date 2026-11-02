@@ -4545,10 +4545,9 @@ connections:
     /// A blank name between commas, or one named twice, is refused.
     #[test]
     fn a_blank_or_repeated_thermostat_is_refused() {
-        for (names, why) in [
-            ("fore,,aft", "blank name"),
-            ("fore,fore", "named twice"),
-        ] {
+        for (names, why) in
+            [("fore,,aft", "blank name"), ("fore,fore", "named twice")]
+        {
             let text = format!(
                 "tcssim:\n  ready: \"127.0.0.1:7999\"\n  thermostat: \
                  \"{names}\"\n"

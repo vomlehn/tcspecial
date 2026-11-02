@@ -1504,9 +1504,9 @@ pub const MOVED_THERMAL_MASS: &str = "a simulator file no longer declares \
     thermal masses: they are the vehicle's physics, and are written in a \
     physics model of their own, made of parts: a thermal_zone for each mass \
     and a heater for each heater, joined under connections:. Write it in a \
-    file beside this one -- <name>-physics.yaml, as \
-    examples/thermostat/thermostat-physics.yaml is -- and name that file \
-    here with physics: <name>-physics.yaml";
+    file of its own -- <name>-physics.yaml, as \
+    examples/thermostat-common/thermostat-physics.yaml is -- and name that \
+    file here with physics: and its path from this file's directory";
 
 impl SimConfigFile {
     /// Read a simulator configuration file, and the physics model it names.

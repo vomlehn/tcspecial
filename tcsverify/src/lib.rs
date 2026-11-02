@@ -1230,13 +1230,24 @@ mod tests {
             .join("../examples/thermostat");
         let dir = tempfile::tempdir().expect("a directory");
         let at = |name: &str| dir.path().join(name);
-        for name in [
-            "thermostat.ytcs",
-            "thermostat-sim.yaml",
-            "thermostat-physics.yaml",
-        ] {
-            std::fs::copy(root.join(name), at(name)).expect("copied");
-        }
+        std::fs::copy(root.join("thermostat.ytcs"), at("thermostat.ytcs"))
+            .expect("copied");
+        // The physics model is the one thermostat-yamcs shares, in
+        // thermostat-common, and the copy names its own copy beside it.
+        std::fs::copy(
+            root.join("../thermostat-common/thermostat-physics.yaml"),
+            at("thermostat-physics.yaml"),
+        )
+        .expect("copied");
+        let shared = "physics: ../thermostat-common/thermostat-physics.yaml";
+        let sim = std::fs::read_to_string(root.join("thermostat-sim.yaml"))
+            .expect("the simulator file");
+        assert!(sim.contains(shared), "it names the shared model");
+        std::fs::write(
+            at("thermostat-sim.yaml"),
+            sim.replace(shared, "physics: thermostat-physics.yaml"),
+        )
+        .expect("written");
         let xml = std::fs::read_to_string(root.join("thermostat.xtcs"))
             .expect("the XML");
         std::fs::write(at("thermostat.xtcs"), change(xml)).expect("written");

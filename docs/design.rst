@@ -11428,7 +11428,8 @@ Example
 -------
 This is the shipped ``examples/thermostat/thermostat-sim.yaml``, which
 simulates the three sensors and two heaters of ``thermostat.ytcs``, joined to
-the model it names, ``thermostat-physics.yaml``: two heaters warming one
+the model it names, ``examples/thermostat-common/thermostat-physics.yaml``,
+which thermostat-yamcs's simulator file names too: two heaters warming one
 zone.
 
 .. code-block:: yaml
@@ -11464,7 +11465,7 @@ with nothing more than a socket.
 
    description: Simulator settings for the payloads of thermostat.ytcs
 
-   physics: thermostat-physics.yaml
+   physics: ../thermostat-common/thermostat-physics.yaml
 
    simulated_payload_groups:
      - group: zone_temps

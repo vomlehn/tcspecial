@@ -30,7 +30,7 @@ tcssim:
 # The physics model the payloads below are joined to -- the zone they read
 # and the heaters that warm it -- which is the vehicle's, not this file's:
 # see the file it names.
-physics: thermostat-physics.yaml
+physics: ../thermostat-common/thermostat-physics.yaml
 
 simulated_payload_groups:
   # The three sensors are read together, every tenth of a second, as their

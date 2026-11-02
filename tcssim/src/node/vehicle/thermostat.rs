@@ -5,9 +5,9 @@
 //! so that a zone's loop closes with no tcspecial running. It stands
 //! in for one hysteresis node of the configuration, whose `setpoint` and
 //! `half_band` it takes, and the simulator file names that node: see
-//! `tcslibgs::sim_config::SimTcssim::thermostats`. A staged thermostat is
-//! several of these, one a stage, each reading the same sensors and
-//! switching heaters of its own.
+//! `tcslibgs::sim_config::SimTcssim::thermostats`. Several zones, or a
+//! staged thermostat, are several of these, each switching heaters of its
+//! own.
 //!
 //! # What it reads
 //!
@@ -273,6 +273,7 @@ mod tests {
                 world: world.clone(),
                 place: place("heater_1.on"),
                 unit: None,
+                power: Arc::new(crate::physics::Power::new(true, true)),
             },
         )];
         let params = HysteresisParams {
@@ -307,6 +308,25 @@ mod tests {
         assert_eq!(send("temp_1", 296.0), Some(Decision::Off));
         assert_eq!(heat(&world, warming), 0.0, "the heater should be off");
         assert_eq!(send("temp_1", 293.15), Some(Decision::Off));
+    }
+
+    /// A heater disabled in its panel stays off whatever the stood-in
+    /// thermostat decides, and takes its latest decision when enabled.
+    #[test]
+    fn a_disabled_heater_ignores_the_stood_in_thermostat() {
+        let (thermostat, world, warming) = thermostat();
+        let heater = thermostat.heaters[0].1.clone();
+        heater.enable(false);
+        let send = |sensor: &str, kelvin: f64| {
+            thermostat.sample(sensor, &encode(&sixteenths(), kelvin))
+        };
+
+        assert_eq!(send("temp_1", 283.15), Some(Decision::On));
+        assert_eq!(heat(&world, warming), 0.0, "disabled, it stays off");
+        heater.enable(true);
+        assert!(heat(&world, warming) > 0.0, "enabled, it takes the on");
+        heater.enable(false);
+        assert_eq!(heat(&world, warming), 0.0, "disabled again, off");
     }
 
     /// Nothing is decided until a reading leaves the band.

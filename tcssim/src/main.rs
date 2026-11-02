@@ -268,6 +268,8 @@ fn payload_info_from(
         packet_interval: sim.packet_interval.as_millis() as i32,
         segment_interval: sim.segment_interval.as_millis() as i32,
         status: SharedString::from(STOPPED_STATUS),
+        // Said once the payload is made: see `SimulatedPayload::driving_said`.
+        driving: SharedString::new(),
         last_sent_time: SharedString::from(NO_TRANSFER_TIME),
         last_sent_data: SharedString::new(),
         last_recv_time: SharedString::from(NO_TRANSFER_TIME),
@@ -449,10 +451,18 @@ fn joined_to_the_world(
                     }
                     Kind::Decision => None,
                 };
+                let place = place(at)?;
+                // Disabled, as every payload starts: its panel's button, or
+                // --sending, enables it.
+                let heater = matches!(
+                    model.components[place.component].what,
+                    tcslibgs::physics::Resolution::Heater(_)
+                );
                 Attachment::Drives {
                     world: world.clone(),
-                    place: place(at)?,
+                    place,
                     unit,
+                    power: Arc::new(physics::Power::new(false, heater)),
                 }
             }
         };
@@ -1238,13 +1248,16 @@ fn main() {
     for (row, payload) in made.iter_mut().enumerate() {
         // A payload not yet running, so this cannot be refused.
         let _ = payload.start();
-        // As though its button had been pressed, where --sending asks.
+        // As though its button had been pressed, where --sending asks: which
+        // for a heater is to power it.
         if sending {
             payload.send(true);
             update_row(&model, row, |info| {
                 info.status = SharedString::from(RUNNING_STATUS);
             });
         }
+        let driving = SharedString::from(payload.driving_said());
+        update_row(&model, row, |info| info.driving = driving);
     }
     let payloads: Arc<Mutex<Vec<SimulatedPayload>>> =
         Arc::new(Mutex::new(made));
@@ -1283,6 +1296,10 @@ fn main() {
                     });
                 }
             }
+            // Said at once rather than at the next refresh: a heater just
+            // disabled is off now.
+            let driving = SharedString::from(payload.driving_said());
+            update_row(&model, row, |info| info.driving = driving);
         });
     }
 
@@ -1322,7 +1339,11 @@ fn main() {
                 let guard = payloads.lock().unwrap();
                 for (row, payload) in guard.iter().enumerate() {
                     let stats = payload.stats();
-                    update_row(&model, row, |info| show_traffic(info, &stats));
+                    let driving = SharedString::from(payload.driving_said());
+                    update_row(&model, row, |info| {
+                        show_traffic(info, &stats);
+                        info.driving = driving;
+                    });
                 }
             },
         );
@@ -2529,9 +2550,9 @@ mod tests {
         }
     }
 
-    /// Asked to stand in for the thermostat example's two stages, tcssim
-    /// reads the three sensors for each and switches each stage's own heater,
-    /// and only the sensors report to them.
+    /// Asked to stand in for the thermostat example's hysteresis node, tcssim
+    /// reads the three sensors and switches the two heaters, and only the
+    /// sensors report to it.
     #[test]
     fn tcssim_stands_in_for_the_examples_thermostat() {
         let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("..");
@@ -2540,35 +2561,27 @@ mod tests {
             root.join("examples/thermostat/thermostat-sim.yaml"),
         )
         .expect("the simulator file reads");
-        let stand_in_for = |sim_file: &mut SimConfigFile, names: &[&str]| {
-            sim_file
-                .tcssim
-                .as_mut()
-                .expect("a tcssim section")
-                .thermostats = names.iter().map(|n| n.to_string()).collect();
-        };
-        stand_in_for(&mut sim_file, &["thermostat_1", "thermostat_2"]);
+        stand_in_for(&mut sim_file, &["thermostat"]);
         let graph = tcslibgs::graph::Graph::load(&payload_path).expect("reads");
         let dh_configs = simulated_payloads_of(&payload_path, &sim_file);
         let sims = sim_file.resolve(&dh_configs).expect("it fits");
 
         let (attached, thermostats) =
             joined_to_the_world(&sim_file, Some(&graph), &sims, &dh_configs)
-                .expect("the world and the thermostats are made");
+                .expect("the world and the thermostat are made");
         let named: Vec<&str> = thermostats.iter().map(|t| t.name()).collect();
-        assert_eq!(named, ["thermostat_1", "thermostat_2"]);
-        for (thermostat, heater) in thermostats.iter().zip(["1", "2"]) {
-            for sensor in ["temp_1", "temp_2", "temp_3"] {
-                assert!(thermostat.reads(sensor), "{sensor}");
-            }
-            assert!(!thermostat.reads("heaters_1"));
-            let heaters: Vec<&str> = thermostat.heaters().collect();
-            assert_eq!(heaters, [format!("heaters_{heater}")]);
+        assert_eq!(named, ["thermostat"]);
+        let thermostat = &thermostats[0];
+        for sensor in ["temp_1", "temp_2", "temp_3"] {
+            assert!(thermostat.reads(sensor), "{sensor}");
         }
+        assert!(!thermostat.reads("heaters_1"));
+        let heaters: Vec<&str> = thermostat.heaters().collect();
+        assert_eq!(heaters, ["heaters_1", "heaters_2"]);
         assert_eq!(attached.len(), 5);
 
         // Naming a node that is not a hysteresis node is refused.
-        stand_in_for(&mut sim_file, &["thermostat_1", "temp1"]);
+        stand_in_for(&mut sim_file, &["thermostat", "temp1"]);
         assert!(joined_to_the_world(
             &sim_file,
             Some(&graph),
@@ -2576,6 +2589,102 @@ mod tests {
             &dh_configs
         )
         .is_err());
+    }
+
+    /// Has a simulator file's tcssim section name the thermostats tcssim
+    /// stands in for.
+    ///
+    /// # Arguments
+    ///
+    /// * `sim_file` - The simulator file, which has a tcssim section.
+    /// * `names`    - The hysteresis nodes, in order.
+    fn stand_in_for(sim_file: &mut SimConfigFile, names: &[&str]) {
+        sim_file
+            .tcssim
+            .as_mut()
+            .expect("a tcssim section")
+            .thermostats = names.iter().map(|n| n.to_string()).collect();
+    }
+
+    /// Gives the thermostat example's graph a second hysteresis node,
+    /// `backstop`, which reads the vote as `thermostat` does and takes
+    /// `heaters_2` from it: two thermostats, each with a heater of its own.
+    ///
+    /// # Arguments
+    ///
+    /// * `graph` - The thermostat example's graph.
+    fn with_a_backstop(graph: &mut tcslibgs::graph::Graph) {
+        let mut node = graph
+            .nodes
+            .iter()
+            .find(|node| node.name == "thermostat")
+            .cloned()
+            .expect("the example has a thermostat");
+        node.name = "backstop".to_string();
+        graph.nodes.push(node);
+        let mut added = Vec::new();
+        for link in &mut graph.links {
+            if link.to.each().contains(&"thermostat") {
+                let mut also = link.clone();
+                also.to = tcslibgs::graph::Destinations::of(vec![
+                    "backstop".to_string()
+                ]);
+                added.push(also);
+            }
+            if link.origin().node == "thermostat"
+                && link.to.each().contains(&"heaters_2")
+            {
+                let mut taken = link.clone();
+                taken.from = link.from.replacen("thermostat", "backstop", 1);
+                taken.to = tcslibgs::graph::Destinations::of(vec![
+                    "heaters_2".to_string()
+                ]);
+                added.push(taken);
+                link.to = tcslibgs::graph::Destinations::of(
+                    link.to
+                        .each()
+                        .into_iter()
+                        .filter(|to| *to != "heaters_2")
+                        .map(str::to_string)
+                        .collect(),
+                );
+            }
+        }
+        graph.links.retain(|link| !link.to.each().is_empty());
+        graph.links.extend(added);
+    }
+
+    /// Several thermostats are stood in for together, each switching the
+    /// heaters it drives and reading the sensors that feed it.
+    #[test]
+    fn tcssim_stands_in_for_several_thermostats() {
+        let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("..");
+        let payload_path = root.join("examples/thermostat/thermostat.ytcs");
+        let mut sim_file = SimConfigFile::load(
+            root.join("examples/thermostat/thermostat-sim.yaml"),
+        )
+        .expect("the simulator file reads");
+        stand_in_for(&mut sim_file, &["thermostat", "backstop"]);
+        let mut graph =
+            tcslibgs::graph::Graph::load(&payload_path).expect("reads");
+        with_a_backstop(&mut graph);
+        let dh_configs = simulated_payloads_of(&payload_path, &sim_file);
+        let sims = sim_file.resolve(&dh_configs).expect("it fits");
+
+        let (_, thermostats) =
+            joined_to_the_world(&sim_file, Some(&graph), &sims, &dh_configs)
+                .expect("the world and the thermostats are made");
+        let named: Vec<&str> = thermostats.iter().map(|t| t.name()).collect();
+        assert_eq!(named, ["thermostat", "backstop"]);
+        for (thermostat, heater) in
+            thermostats.iter().zip(["heaters_1", "heaters_2"])
+        {
+            for sensor in ["temp_1", "temp_2", "temp_3"] {
+                assert!(thermostat.reads(sensor), "{sensor}");
+            }
+            let heaters: Vec<&str> = thermostat.heaters().collect();
+            assert_eq!(heaters, [heater]);
+        }
     }
 
     /// Two stand-ins switching one heater are refused, naming both.
@@ -2587,23 +2696,20 @@ mod tests {
             root.join("examples/thermostat/thermostat-sim.yaml"),
         )
         .expect("the simulator file reads");
-        sim_file
-            .tcssim
-            .as_mut()
-            .expect("a tcssim section")
-            .thermostats = vec!["thermostat_1".into(), "thermostat_2".into()];
+        stand_in_for(&mut sim_file, &["thermostat", "backstop"]);
         let mut graph =
             tcslibgs::graph::Graph::load(&payload_path).expect("reads");
-        // The second stage driving the first heater too.
+        with_a_backstop(&mut graph);
+        // The backstop driving the first heater too.
         let mut also = graph
             .links
             .iter()
             .find(|link| {
-                link.origin().node == "thermostat_2"
+                link.origin().node == "backstop"
                     && link.to.each().contains(&"heaters_2")
             })
             .cloned()
-            .expect("the second stage drives heaters_2");
+            .expect("the backstop drives heaters_2");
         also.to = tcslibgs::graph::Destinations::of(vec!["heaters_1".into()]);
         graph.links.push(also);
         let dh_configs = simulated_payloads_of(&payload_path, &sim_file);
@@ -2613,8 +2719,8 @@ mod tests {
             joined_to_the_world(&sim_file, Some(&graph), &sims, &dh_configs)
                 .expect_err("refused");
         assert!(
-            refused.contains("thermostat_1")
-                && refused.contains("thermostat_2")
+            refused.contains("thermostat")
+                && refused.contains("backstop")
                 && refused.contains("heaters_1"),
             "{refused}"
         );
@@ -2624,15 +2730,24 @@ mod tests {
     /// [`run_the_thermostat_example`].
     #[derive(Debug, Default)]
     struct ThermostatRun {
-        /// Simulated seconds watched, after the first climb.
+        /// Simulated seconds watched, after the first climb to the band.
         watched: f64,
-        /// Of those, the seconds each stage was on.
-        on: [f64; 2],
-        /// How many times each stage came on.
-        came_on: [usize; 2],
-        /// The seconds the zone was outside the setpoint of the first stage
-        /// plus or minus two of its half bands.
-        outside: f64,
+        /// Of those, the seconds the thermostat had the heaters on.
+        decided_on: f64,
+        /// How many times it switched them on.
+        came_on: usize,
+        /// The seconds each heater gave out heat.
+        heating: [f64; 2],
+        /// The seconds one enabled heater was heating and another enabled
+        /// one was not: never, if they switch together.
+        apart: f64,
+        /// The seconds the zone was inside the band, the setpoint plus or
+        /// minus a half band.
+        inside: f64,
+        /// The seconds it was below the setpoint less two half bands.
+        below: f64,
+        /// The seconds it was above the setpoint plus two half bands.
+        above: f64,
         /// The coldest and the warmest the zone was.
         coldest: f64,
         warmest: f64,
@@ -2640,20 +2755,28 @@ mod tests {
 
     /// Runs the thermostat example's physics with no window and no vehicle:
     /// its world, its three sensors with their errors, the median of their
-    /// readings, and its two stages deciding on it every tenth of a second,
-    /// as the payload group is read, each driving its own heater.
+    /// readings, and its thermostat deciding on it every tenth of a second,
+    /// as the payload group is read, sending each change to both heaters.
+    /// A heater disabled, as its panel would have it, gets the decisions
+    /// and stays off, as it does in tcssim.
     ///
     /// # Arguments
     ///
     /// * `seed`    - What the world's random draws start from.
     /// * `seconds` - How long to run, in simulated seconds.
+    /// * `enabled` - Whether `heaters_1` and `heaters_2` are enabled.
     ///
     /// # Returns
     ///
     /// What happened, counted from the first time the zone reached the
-    /// first stage's band, the climb from cold being no part of holding it.
-    fn run_the_thermostat_example(seed: u64, seconds: f64) -> ThermostatRun {
-        use tcslibgs::graph::simulated::{hysteresis_of, reaches};
+    /// band, where it does; the climb from cold is no part of holding it.
+    /// With no heater enabled it never climbs, and all of it is counted.
+    fn run_the_thermostat_example(
+        seed: u64,
+        seconds: f64,
+        enabled: [bool; 2],
+    ) -> ThermostatRun {
+        use tcslibgs::graph::simulated::hysteresis_of;
 
         let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("..");
         let payload_path = root.join("examples/thermostat/thermostat.ytcs");
@@ -2669,13 +2792,11 @@ mod tests {
             joined_to_the_world(&sim_file, Some(&graph), &sims, &dh_configs)
                 .expect("the world is made");
 
-        let stages = ["thermostat_1", "thermostat_2"]
-            .map(|name| hysteresis_of(&graph, name).expect("a stage"));
-        let (setpoint, half_band) = (stages[0].setpoint, stages[0].half_band);
+        let thermostat = hysteresis_of(&graph, "thermostat").expect("one");
+        let (setpoint, half_band) = (thermostat.setpoint, thermostat.half_band);
         let mut zone = None;
         let mut sensors = Vec::new();
-        let mut heaters: [Vec<(Arc<physics::world::World>, _)>; 2] =
-            Default::default();
+        let mut heaters = Vec::new();
         for (payload, attachment) in &attached {
             match attachment {
                 Attachment::Reports {
@@ -2688,29 +2809,34 @@ mod tests {
                     zone = Some((world.clone(), *place));
                     sensors.push((*place, *offset, sensor.clone()));
                 }
-                Attachment::Drives { world, place, .. } => {
-                    for (n, stage) in
-                        ["thermostat_1", "thermostat_2"].iter().enumerate()
-                    {
-                        if reaches(&graph, stage, payload) {
-                            heaters[n].push((world.clone(), *place));
-                        }
-                    }
+                Attachment::Drives { place, .. } => {
+                    // Its heat, the output after its on.
+                    let heat = tcslibgs::physics::Place {
+                        terminal: place.terminal + 1,
+                        ..*place
+                    };
+                    heaters.push((payload.clone(), attachment.clone(), heat));
                 }
                 Attachment::Signals { .. } => {}
             }
         }
         let (world, zone) = zone.expect("a sensor of the zone");
         assert_eq!(sensors.len(), 3);
+        let named: Vec<&str> = heaters.iter().map(|h| h.0.as_str()).collect();
+        assert_eq!(named, ["heaters_1", "heaters_2"]);
+        for (n, (_, heater, heat)) in heaters.iter().enumerate() {
+            assert_eq!(world.name_of(*heat), format!("heater_{}.heat", n + 1));
+            heater.enable_at(enabled[n], 0.0);
+        }
 
         let step = 0.1;
-        let mut decided = [false; 2];
+        let mut decided = false;
         let mut run = ThermostatRun {
             coldest: f64::INFINITY,
             warmest: f64::NEG_INFINITY,
             ..ThermostatRun::default()
         };
-        let mut holding = false;
+        let mut holding = !enabled.contains(&true);
         let mut now = 0.0;
         while now < seconds {
             now += step;
@@ -2722,21 +2848,16 @@ mod tests {
                 .collect();
             readings.sort_by(f64::total_cmp);
             let voted = readings[1];
-            for (n, stage) in stages.iter().enumerate() {
-                let was = decided[n];
-                if voted > stage.setpoint + stage.half_band {
-                    decided[n] = false;
-                } else if voted < stage.setpoint - stage.half_band {
-                    decided[n] = true;
-                }
-                if decided[n] != was || now <= step {
-                    let value = if decided[n] { 1.0 } else { 0.0 };
-                    for (world, place) in &heaters[n] {
-                        world.drive_at(*place, value, now);
-                    }
-                }
-                if holding && decided[n] && !was {
-                    run.came_on[n] += 1;
+            let was = decided;
+            if voted > setpoint + half_band {
+                decided = false;
+            } else if voted < setpoint - half_band {
+                decided = true;
+            }
+            // Sent to both heaters, enabled or not, as the vehicle does.
+            if decided != was || now <= step {
+                for (_, heater, _) in &heaters {
+                    heater.sent_at(if decided { 1.0 } else { 0.0 }, now);
                 }
             }
 
@@ -2746,13 +2867,39 @@ mod tests {
                 continue;
             }
             run.watched += step;
-            for (n, on) in decided.iter().enumerate() {
+            if decided {
+                run.decided_on += step;
+                run.came_on += usize::from(!was);
+            }
+            let heating: Vec<bool> = heaters
+                .iter()
+                .map(|(_, _, heat)| world.read_at(*heat, now) > 0.0)
+                .collect();
+            for (n, on) in heating.iter().enumerate() {
                 if *on {
-                    run.on[n] += step;
+                    run.heating[n] += step;
                 }
             }
-            if (temperature - setpoint).abs() > 2.0 * half_band {
-                run.outside += step;
+            let enabled_heating: Vec<bool> = heating
+                .iter()
+                .zip(enabled)
+                .filter(|(_, enabled)| *enabled)
+                .map(|(on, _)| *on)
+                .collect();
+            if enabled_heating.iter().any(|on| *on)
+                && !enabled_heating.iter().all(|on| *on)
+            {
+                run.apart += step;
+            }
+            let off = temperature - setpoint;
+            if off.abs() <= half_band {
+                run.inside += step;
+            }
+            if off < -2.0 * half_band {
+                run.below += step;
+            }
+            if off > 2.0 * half_band {
+                run.above += step;
             }
             run.coldest = run.coldest.min(temperature);
             run.warmest = run.warmest.max(temperature);
@@ -2760,26 +2907,50 @@ mod tests {
         run
     }
 
-    /// The thermostat example's zone, over orbits of its environment's cold
-    /// swing: the first heater alone holds it through the warm part, the
-    /// second stage comes on in the cold part, where the first cannot, and
-    /// the two together bring it back; and the zone stays within two half
-    /// bands of the setpoint nearly all the time.
+    /// The thermostat example's zone over three orbits of its surroundings'
+    /// swing, from three seeds, with both heaters enabled: the thermostat
+    /// cycles them, they always switch together, and the zone stays within
+    /// two half bands of the setpoint nearly all the time.
     #[test]
-    fn the_thermostat_examples_second_stage_comes_on_in_the_cold() {
-        // Three orbits of ninety minutes, from three seeds.
+    fn the_thermostat_example_holds_the_zone_with_both_heaters() {
         for seed in [1, 2, 3] {
-            let run = run_the_thermostat_example(seed, 3.0 * 5400.0);
-            eprintln!("seed {seed}: {run:?}");
+            let run = run_the_thermostat_example(seed, 3.0 * 5400.0, [true; 2]);
+            eprintln!("both, seed {seed}: {run:?}");
             let share = |seconds: f64| seconds / run.watched;
-            // The first stage is on often and the second only sometimes.
-            assert!(share(run.on[0]) > 0.3, "{run:?}");
-            assert!(run.came_on[1] >= 3, "{run:?}");
-            assert!(share(run.on[1]) > 0.02, "{run:?}");
-            assert!(share(run.on[1]) < share(run.on[0]) / 2.0, "{run:?}");
-            // And the zone is held.
-            assert!(share(run.outside) < 0.02, "{run:?}");
+            assert_eq!(run.apart, 0.0, "{run:?}");
+            assert!(run.came_on >= 30, "it cycles them: {run:?}");
+            assert!(
+                (run.heating[0] - run.decided_on).abs() < 1.0
+                    && (run.heating[1] - run.decided_on).abs() < 1.0,
+                "{run:?}"
+            );
+            assert!(share(run.below + run.above) < 0.01, "{run:?}");
+            assert!(share(run.inside) > 0.7, "{run:?}");
         }
+    }
+
+    /// With one heater disabled, the other cannot hold the zone through the
+    /// cold part of the orbit, which falls more than two half bands below
+    /// the setpoint; the disabled heater gets every decision and never
+    /// heats. With both disabled, the zone follows its surroundings.
+    #[test]
+    fn the_thermostat_example_falls_behind_with_a_heater_disabled() {
+        for seed in [1, 2, 3] {
+            let run =
+                run_the_thermostat_example(seed, 3.0 * 5400.0, [true, false]);
+            eprintln!("one, seed {seed}: {run:?}");
+            let share = |seconds: f64| seconds / run.watched;
+            assert_eq!(run.heating[1], 0.0, "disabled, it never heats");
+            assert!(run.came_on >= 3, "{run:?}");
+            assert!(share(run.below) > 0.1, "{run:?}");
+            assert!(share(run.below) < 0.4, "{run:?}");
+            assert!(run.coldest < 288.0, "{run:?}");
+        }
+
+        let run = run_the_thermostat_example(1, 5400.0, [false; 2]);
+        eprintln!("neither: {run:?}");
+        assert_eq!(run.heating, [0.0; 2]);
+        assert!(run.warmest < 290.0 && run.coldest < 278.0, "{run:?}");
     }
 
     /// A shipped tcspecial configuration states a packet interval only where a
@@ -2984,6 +3155,24 @@ mod tests {
              received"
         );
         assert_eq!(pkts, vec!["Pkts: 3 sent / 1 recv".to_string()]);
+
+        // A heater sends nothing, and its first row says in words what it
+        // is doing instead.
+        for doing in ["heating", "off", "disabled, so off"] {
+            let mut heater = payload_info_from(0, &handler("DH0"), &asked);
+            heater.driving = SharedString::from(format!("heater_1: {doing}"));
+            let ui = MainWindow::new().unwrap();
+            let _ = grid::settle(&ui);
+            ui.set_payload_model(ModelRc::from(Rc::new(VecModel::from(vec![
+                heater,
+            ]))));
+            ui.show().unwrap();
+            assert_eq!(
+                lines_from(&ui, "heater_1: "),
+                vec![format!("heater_1: {doing}")]
+            );
+            assert!(lines_from(&ui, "Sent: ").is_empty(), "{doing}");
+        }
     }
 
     /// Each panel says which payload of the configuration it is, beside the

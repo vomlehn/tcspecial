@@ -44,6 +44,11 @@ export struct PayloadInfo {
     segment-interval: int,
     // From the running simulation
     status: string,
+    // What a part the vehicle drives is doing, in words -- "heater_1:
+    // heating", "heater_1: off", "heater_1: disabled, so off" -- and empty
+    // for a payload that drives nothing. Such a part sends nothing, so its
+    // panel says this where another's says what it last sent.
+    driving: string,
     last-sent-time: string,
     last-sent-data: string,
     last-recv-time: string,
@@ -70,6 +75,7 @@ component PayloadPanel inherits Rectangle {
     in property <string> parameters: "";
     in property <string> sizes-problem: "";
     in property <bool> triggered: false;
+    in property <string> driving: "";
 
     callback transfer-clicked();
     // One callback per spin box, each carrying the value just set. The panel
@@ -349,11 +355,20 @@ component PayloadPanel inherits Rectangle {
         }
 
         // The three rows of data the panel ends with.
+        //
+        // A part the vehicle drives sends nothing, so its first row says
+        // what it is doing instead, in words: whether a heater is heating,
+        // off, or disabled in this panel and so off whatever it is sent.
         sent-row := HorizontalLayout {
             height: 14px;
-            Text {
+            if driving == "" : Text {
                 text: "Sent: " + last-sent-time + " " + last-sent-data;
                 font-size: Fonts.window;
+            }
+            if driving != "" : Text {
+                text: driving;
+                font-size: Fonts.window;
+                font-weight: 700;
             }
         }
         // The line stays and its contents go, for a payload that is never
@@ -537,6 +552,7 @@ export component MainWindow inherits Window {
                         parameters: p.parameters;
                         sizes-problem: p.sizes-problem;
                         triggered: p.triggered;
+                        driving: p.driving;
 
                         transfer-clicked => { transfer-payload(i); }
 

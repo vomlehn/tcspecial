@@ -5572,14 +5572,10 @@ Three temperature sensors of one place, two on an I\ :superscript:`2`\ C bus
 and one on a SPI link, each producing a different format. All three are read
 together ten times a second. Each reading is converted to kelvin, and each
 converted reading goes to two places: down to the MOC, and into a vote. The
-vote takes the middle of the three and goes to the MOC as well, and into two
-stages of comparison, each against a setpoint the ground sets and each driving
-a set of heater lines of its own. More than two degrees above the first
-stage's setpoint, its lines are unasserted; more than two below, they are
-asserted. The second stage's setpoint is three degrees lower and its band one
-degree each way, so its lines are asserted only when the zone falls two
-degrees further than the first stage's band, where the first set alone has
-not held it, and unasserted where the first stage's band begins.
+vote takes the middle of the three and goes to the MOC as well, and into a
+comparison against a setpoint the ground sets. More than two degrees above it,
+two sets of heater lines are unasserted; more than two below, they are
+asserted.
 
 The trio is the point of the example. Three sensors of one place, separated
 only because two parts cannot occupy one point, so that the temperature
@@ -5624,18 +5620,13 @@ addresses are its own. What is here is checked as it stands, with a
              payload-out: [{ target: gateway },
                            { target: ambient, input: in2 }] }
 
-         - { compute: thermostat_1, function: hysteresis,
+         - { compute: thermostat, function: hysteresis,
              setpoint: "293.15", half_band: "2.0", payload-in: true,
              payload-out: [{ target: gateway }],
-             gateway-out: [{ target: heaters_1 }] }
-         - { compute: thermostat_2, function: hysteresis,
-             setpoint: "290.15", half_band: "1.0", payload-in: true,
-             payload-out: [{ target: gateway }],
-             gateway-out: [{ target: heaters_2 }] }
+             gateway-out: [{ target: heaters_1 }, { target: heaters_2 }] }
          - { compute: ambient, function: vote, algorithm: median,
              inputs: "in0,in1,in2", payload-in: true,
-             payload-out: [{ target: gateway }, { target: thermostat_1 },
-                           { target: thermostat_2 }] }
+             payload-out: [{ target: gateway }, { target: thermostat }] }
 
    payloads:
      - type gpio:
@@ -5654,15 +5645,14 @@ addresses are its own. What is here is checked as it stands, with a
              payload-out: [{ target: temp3 }] }
 
    commands:
-     - { from: gateway, sets: thermostat_1.setpoint }
-     - { from: gateway, sets: thermostat_2.setpoint }
+     - { from: gateway, sets: thermostat.setpoint }
 
 A line is written once, on the node it leaves, under the terminal it leaves
 by: ``payload-out`` on each sensor names the conversion it feeds, and the
-conversions name the vote's input they bind. Each stage's decision leaves by
-two terminals, which is the file saying two different things with it -- its
+conversions name the vote's input they bind. The thermostat's decision leaves
+by two terminals, which is the file saying two different things with it -- its
 ``payload-out`` sends it to the ground as telemetry, and its ``gateway-out``
-drives its heaters.
+drives the two heaters.
 
 Several things in that file are refusals waiting to happen, which is the point.
 Drop ``ambient.in2`` from ``temp3``'s links and the configuration is refused
@@ -12351,6 +12341,25 @@ Requirement
     A payload that failed to start offers ``Enable`` again. It is not
     sending, which is what its status says, and the useful thing to offer is
     the start that failed rather than a stop of something that never began.
+
+Requirement
+    For a part the vehicle drives -- a heater -- the same button is the
+    part's power. Disabled, it is unpowered, or has failed, and stays off
+    whatever the vehicle or a thermostat tcssim stands in for decides: it
+    gives the world nothing. What it is sent meanwhile is kept, the latest
+    replacing the one before, and ``Enable`` applies that at once, because
+    the vehicle sends a decision only when it changes and a heater waiting
+    for the next one would sit cold through a whole band. One button and not
+    a second control: a heater sends nothing, so its button had nothing else
+    to mean. Nothing aboard changes, and the ground sees a disabled heater
+    only through the temperature, which is the point of being able to
+    disable one.
+
+Requirement
+    A heater's panel says what it is doing in words -- ``heating``,
+    ``off``, or ``disabled, so off`` -- on the line where another payload's
+    says what it last sent, a heater sending nothing. Words, so that the
+    state is never told by a colour alone.
 
 Requirement
     Each panel has a button that shows every parameter read from the two

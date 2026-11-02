@@ -1968,6 +1968,15 @@ payload disabled in one window is disabled in the other rather than silent in
 one and disabled in the other; they were the payload's own, ``Send`` and
 ``Silent``, which left the reader of two windows translating.
 
+A heater, or any part the vehicle drives, sends nothing, so in tcssim the
+same button is its power. Disabled -- as every payload starts, unless tcssim
+is given ``--sending`` -- it is unpowered, or failed, and stays off whatever
+the vehicle, or a thermostat tcssim stands in for, decides: it gives the
+simulated world no heat. What it is sent meanwhile is kept, the latest
+replacing the one before, and ``Enable`` applies that latest at once, since
+the vehicle sends a decision only when it changes. Nothing aboard changes:
+the ground sees a disabled heater only through the temperature.
+
 tcsmoc had one button that way too. It said ``Receive`` or ``Discard``
 according to the status, which meant a press could not be made until the
 handler was in the state that offered it -- and when a panel looks wrong,
@@ -2125,13 +2134,12 @@ The thermostat example
 .. figure:: ../examples/thermostat/thermostat.svg
    :alt: The thermostat example: three temperature sensors of one place,
          converted to kelvin, voted on, logged and sent to the ground, with a
-         thermostat of two hysteresis stages, each driving a heater of its
-         own. Each sensor and heater is the far end of a UDP socket, which
-         tcssim stands in for.
+         hysteresis thermostat driving two heaters. Each sensor and heater is
+         the far end of a UDP socket, which tcssim stands in for.
    :width: 100%
 
-   ``examples/thermostat``: a trio of sensors, a vote, a thermostat of two
-   stages and its two heaters.
+   ``examples/thermostat``: a trio of sensors, a vote, a thermostat and its
+   two heaters.
 
 The worked example of computing aboard, and of surviving a part that fails.
 Three temperature sensors -- ``temp_1``, ``temp_2`` and ``temp_3`` -- are read
@@ -2172,24 +2180,18 @@ word. Fed 296.0, 296.1 and 270.0 -- two sensors warm and one stuck
 cold -- it says 296 and the heaters stay off, where a mean would have said
 287.4 and switched them on because one sensor had failed.
 
-The voted temperature goes to the ground, on port 5100, and to the
-thermostat, which is two stages, each a hysteresis of its own driving a
-heater of its own. ``thermostat_1`` holds the zone at its ``setpoint``,
-293.15 K, with a ``half_band`` of 2.0: ``heaters_1`` goes on below 291.15 K
-and off above 295.15 K, the setpoint in the middle of its band.
-``thermostat_2`` is for when the first heater alone cannot hold the zone: its
-setpoint is 290.15 K and its half band 1.0, so ``heaters_2`` goes on below
-289.15 K, two of the first stage's half bands under its setpoint, and off
-above 291.15 K, where the first stage comes on. The second band lies wholly
-under the first, so ``heaters_2`` is on only while ``heaters_1`` is, and how
-many heaters are on says how hard the zone is being pulled down. Each stage's
-decision is logged and sent to the ground, ``thermostat_1``'s on port 5111
-and ``thermostat_2``'s on 5112, so the ground sees which stages are on as
-well as the temperature. Two heaters, because one failing must not leave the
-zone with no way to be warmed, and separate nodes, so that the ground can
-stop one and leave the other warming it.
+The voted temperature goes to the ground, on port 5100, and to ``thermostat``:
+a hysteresis holding the zone at its ``setpoint``, 293.15 K, with a
+``half_band`` of 2.0, so the heaters switch two degrees either side of it and
+the setpoint is in the middle of its own band. Its decision is logged, sent to
+the ground on port 5111, and drives two heaters, ``heaters_1`` and
+``heaters_2``, which go on and off together. Two of them, because one
+failing must not leave the zone with no way to be warmed: either alone holds
+the band while the orbit is warm, and both together hold it in the cold too.
+They are separate nodes so that the ground can stop one and leave the other
+warming the zone.
 
-Each decision is asserted on every sample rather than only when it changes, so
+The decision is asserted on every sample rather than only when it changes, so
 the heaters are held at what the vehicle last decided and a decision that went
 missing is corrected on the next sample. What is logged and sent to the ground
 is the transitions alone.
@@ -2199,14 +2201,14 @@ the ground through their conversions, and the heaters are driven and never
 read. Tcssim's stand-ins for the heaters count each decision the vehicle sends
 them.
 
-The command bindings on the gateway node say the ground may set each stage's
-setpoint, and the running vehicle applies it: a ``SET_NODE`` naming that
-node and that attribute is taken on the node command link, the value reaches
-the stage between stages of a pass, and the next pass decides by it. An
-attribute no binding mentions is refused, which is the point of writing the
-bindings down, and the refusal says why: tcsmoc shows the reason the vehicle
-sends -- ``no command binding says the ground may set
-"thermostat_1.half-band": it is spelled half_band`` -- beside the status.
+The command binding on the gateway node says the ground may set the
+thermostat's setpoint, and the running vehicle applies it: a ``SET_NODE``
+naming that node and that attribute is taken on the node command link, the
+value reaches the thermostat between stages of a pass, and the next pass
+decides by it. An attribute no binding mentions is refused, which is the
+point of writing the bindings down, and the refusal says why: tcsmoc shows
+the reason the vehicle sends -- ``no command binding says the ground may set
+"thermostat.half-band": it is spelled half_band`` -- beside the status.
 
 The simulator file beside it names the vehicle's physics model,
 ``examples/thermostat-common/thermostat-physics.yaml``, which holds a zone
@@ -2216,26 +2218,31 @@ Each sensor reports the zone's temperature, from a place of its own on it, so
 that what the three report is one temperature rather than three streams of
 noise, which is what the model is for; each heater's stand-in switches its
 heater while the vehicle has it on. So the loop closes through tcspecial: see
-**The Simulator Configuration** below. Naming the two stages in the file's
+**The Simulator Configuration** below. Naming the ``thermostat`` node in the file's
 ``tcssim`` section closes it in tcssim alone instead, with no tcspecial
 running.
 
 The heaters are small on purpose, four watts each, and the zone's
 surroundings swing six kelvin either side of 283.15 K over a ninety minute
-orbit. One heater settles the zone ten kelvin above its surroundings: through
-the warm part of the orbit that is above the first stage's band, so
-``heaters_1`` switches on and off and ``heaters_2`` stays off; through the
-cold part, about a quarter of the orbit, it is under 289.15 K, so the zone
-sinks with ``heaters_1`` on until the second stage comes on, and the two
-together, which settle it twenty kelvin above its surroundings, bring it back
-to 291.15 K, where the second stage goes off again. A run of the model with
-its sensors' errors and both stages, three orbits long from each of three
-seeds -- ``the_thermostat_examples_second_stage_comes_on_in_the_cold``, a test
-of tcssim's -- has ``heaters_1`` on about five sixths of the time,
-``heaters_2`` a fifteenth to a twelfth, coming on some twenty times an orbit,
-and the zone within 4 K of 293.15 K all but a fraction of a percent of the
-time.
-The zone starts at its surroundings, so a run begins with both heaters on.
+orbit. Both heaters settle the zone twenty kelvin above its surroundings,
+297.15 K at the coldest, above the band, so together they always bring it
+back and the thermostat cycles them. One settles it ten kelvin above, which
+holds the band in the warm part of the orbit and not in the cold part, about
+a quarter of it, where the zone sinks more than two half bands below the
+setpoint. So a heater disabled in tcssim's window -- an unpowered or failed
+heater, see `Starting and stopping a payload`_ -- shows in the temperature,
+and nowhere else. ``make -C examples run-thermostat`` starts every payload
+disabled, so press ``Enable`` on each, and ``Disable`` on a heater to take
+it away. A run of the model with its sensors' errors, three orbits from each
+of three seeds -- tcssim's tests
+``the_thermostat_example_holds_the_zone_with_both_heaters`` and
+``the_thermostat_example_falls_behind_with_a_heater_disabled`` -- has, with
+both heaters, the zone never more than two half bands from the setpoint and
+within one three quarters of the time, the heaters on half the time and
+switching together some eighty times an orbit; with one disabled, the zone
+more than two half bands below the setpoint 27% to 31% of the time, as cold
+as 285.3 K, and the disabled heater never heating; and with neither, the
+zone following its surroundings, 277.4 to 289.4 K.
 
 ``make -C examples run-thermostat`` runs it, on any desk.
 
@@ -2679,10 +2686,10 @@ The thermostat-yamcs example
 ----------------------------
 .. figure:: ../examples/thermostat-yamcs/thermostat-yamcs.svg
    :alt: The thermostat-yamcs example: the thermostat example's sensors,
-         conversions, vote, two thermostat stages and heaters, with a
-         gateway_yamcs node that sends each conversion's, the vote's and
-         each stage's data down to Yamcs as CCSDS telemetry, one APID each,
-         where each is a temperature in kelvin or on or off.
+         conversions, vote, thermostat and heaters, with a gateway_yamcs
+         node that sends each conversion's, the vote's and the thermostat's
+         data down to Yamcs as CCSDS telemetry, one APID each, where each
+         is a temperature in kelvin or on or off.
    :width: 100%
 
    ``examples/thermostat-yamcs``: the thermostat example with Yamcs
@@ -2699,15 +2706,14 @@ the other. What differs is the gateway, ``yamcs``: the beacon is telemetry
 of APID ``0x110``, CONNECT and its answer are on ``0x111``, and each source
 drawn into the gateway node comes down as telemetry of its ``apid_base``,
 ``0x400``, plus the source's device id -- ``ambient`` on ``0x400``,
-``temp1`` to ``temp3`` on ``0x405`` to ``0x407``, and the stages,
-``thermostat_1`` and ``thermostat_2``, on ``0x40b`` and ``0x40c``.
+``temp1`` to ``temp3`` on ``0x405`` to ``0x407``, and ``thermostat`` on
+``0x40b``.
 
 The mission database gives each of them a parameter of the type the
 configuration says its data are (see `What the vehicle answers to`_): the
-conversions and the vote are temperatures in kelvin, and each stage's
-decision is a boolean, on or off. Nothing is added to the configuration for
-it: the type is what tcsmoc's plot window and the F´ bridge already read
-there.
+conversions and the vote are temperatures in kelvin, and the thermostat's
+decision is on or off. Nothing is added to the configuration for it: the
+type is what tcsmoc's plot window and the F´ bridge already read there.
 Yamcs's web interface, at ``http://localhost:17090``, shows them so.
 
 ``examples/thermostat-yamcs/thermostat_yamcs.py`` runs it, given a Yamcs
@@ -2723,24 +2729,27 @@ It starts Yamcs, tcssim, with every payload sending from the start, and
 tcspecial once tcssim is ready, each killed with it; has Yamcs send CONNECT
 until the vehicle answers with the configuration's checksum; and reads the
 parameters back over Yamcs's REST API. Its window shows the beacon above
-the zone's temperature, each reading, and each stage's decision with the
-heater it drives. With ``--seconds`` there is no window, and it prints
-what arrives, and a line each time a stage switches its heater:
+the zone's temperature, each reading, the thermostat's decision and the
+heaters it drives. With ``--seconds`` there is no window, and it prints
+what arrives, and a line each time the heaters are switched:
 
 .. code-block:: text
 
    connected: the vehicle is running this configuration
    parameter: /TcsYamcs/ambient, Value(Kelvin), units K
-   parameter: /TcsYamcs/thermostat_1, Decision, units none
-   parameter: /TcsYamcs/thermostat_2, Decision, units none
-   read: ambient 293.087 K, temp1 293.087 K, temp2 293.212 K, temp3 292.857 K,
-   thermostat_1 off, heaters_1 off, thermostat_2 off, heaters_2 off
-   switched: thermostat_1 off -> on, driving heaters_1; ambient 291.087 K,
-   temp1 291.087 K, temp2 291.337 K, temp3 290.922 K, thermostat_1 on,
-   heaters_1 on, thermostat_2 off, heaters_2 off
+   parameter: /TcsYamcs/thermostat, Decision, units none
+   read: ambient 292.623 K, temp1 292.587 K, temp2 292.712 K, temp3 292.623 K,
+   thermostat off, heaters_1 off, heaters_2 off
+   switched: thermostat off -> on, driving heaters_1, heaters_2; ambient
+   291.039 K, temp1 291.025 K, temp2 291.150 K, temp3 291.039 K, thermostat on,
+   heaters_1 on, heaters_2 on
 
 tcssim draws a window of its own, so it wants a display. Every port is in
 the seventeen thousands, so it can run beside the thermostat example.
+Because tcssim is given ``--sending``, both heaters start enabled; press
+``Disable`` on a heater's panel in tcssim's window to take it away, and the
+zone falls behind in the cold part of the orbit, which Yamcs sees only in
+the temperatures -- the thermostat's decision goes on switching both.
 
 The tees example
 ----------------
@@ -3701,15 +3710,15 @@ and supplies varying by two percent.
 **Standing in for the thermostat**
 
 tcssim can stand in for hysteresis nodes as well, so that the loop closes
-in the simulator alone, with no tcspecial running. Name the nodes in the
-``tcssim`` section, one, or several separated by commas -- the thermostat
-example's two stages:
+in the simulator alone, with no tcspecial running. Name the node in the
+``tcssim`` section -- or several, separated by commas, for a vehicle with a
+thermostat for each of several zones:
 
 .. code-block:: yaml
 
    tcssim:
      ready: "127.0.0.1:7907"
-     thermostat: thermostat_1,thermostat_2
+     thermostat: thermostat
 
 tcssim then takes each node's ``setpoint`` and ``half_band`` from the
 tcspecial configuration, and stands in for each alone. Its sensors are the
@@ -4254,7 +4263,7 @@ on, saying what each file says:
 
 .. code-block:: console
 
-   examples/thermostat/thermostat.ytcs:101: error: nodes / thermostat_1 / attributes / setpoint: examples/thermostat/thermostat.xtcs says "290" and examples/thermostat/thermostat.ytcs says "293.15"
+   examples/thermostat/thermostat.ytcs:95: error: nodes / thermostat / attributes / setpoint: examples/thermostat/thermostat.xtcs says "290" and examples/thermostat/thermostat.ytcs says "293.15"
 
 The order anything is written in is not compared: nothing in a configuration
 is in an order that means anything, and a node's device id comes from its
@@ -4305,7 +4314,7 @@ that::
 and before the problems::
 
    $ cargo run --bin tcsverify -- --digest examples/thermostat/thermostat.ytcs
-   examples/thermostat/thermostat.ytcs: md5 4dce480907f41e94c2634cb4aa8c9328
+   examples/thermostat/thermostat.ytcs: md5 2e863fd2024ec28240ba599e5e627a10
 
 That is the digest tcspecial prints as it starts and puts in every beacon, and
 the MOC compares with its own: two ends whose digests agree have read one
@@ -5377,15 +5386,19 @@ drawn, so that a spike is never thinned away.
 Under the panels, as wide as them so that a change lines up with the values
 above it, is a strip for each switch -- a ``hysteresis`` node drawn into a
 gateway node, named with what it drives, such as ``thermostat → heaters_1,
-heaters_2`` -- vermillion with ``on`` written in it while it is on, grey
-while it is off, and its last decision said beside it. With two thermostats
-each driving a heater there are two strips, one under the other, so which
-heater is on, or both, is read straight off them. Nothing of a switch is
+heaters_2`` in the thermostat example, whose one thermostat drives both
+heaters -- vermillion with ``on`` written in it while it is on, grey while
+it is off, and its last decision said beside it. With two thermostats each
+driving a heater there are two strips, one under the other, so which heater
+is on, or both, is read straight off them. Nothing of a switch is
 drawn on the panels, which keeps a switch on from being taken for the band's
 pale red. A thermostat tells the ground only when its decision changes, so a
 switch is drawn from each change to the next, and before the first is heard
 it is not drawn at all, its state said as ``not heard`` rather than guessed
 as off.
+A strip is the thermostat's decision and not what a heater does: the plot
+cannot see tcssim's ``Enable``, so a heater disabled there shows only
+through the temperature.
 
 The colours are Okabe and Ito's, which readers with each common kind of colour
 blindness tell apart: blue, bluish green, reddish purple, sky blue and black
@@ -5853,7 +5866,10 @@ under `Starting and stopping a payload`_, and ``Configuration``, described
 under `Seeing what was read`_ -- and then three lines:
 
 ``Sent``
-  When the last packet went, and the first few bytes of it.
+  When the last packet went, and the first few bytes of it. A part the
+  vehicle drives sends nothing, and this line says what it is doing instead,
+  in words: ``heater_1: heating``, ``heater_1: off``, or ``heater_1:
+  disabled, so off`` -- see `Starting and stopping a payload`_.
 
 ``Recv``
   When the last packet arrived, and the first few bytes of it -- for a payload

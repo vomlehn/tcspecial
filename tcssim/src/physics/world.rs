@@ -240,12 +240,6 @@ impl World {
         self.read_at(place, self.clock.at(now))
     }
 
-    /// Drives an input to a value at a moment of the wall clock, bringing
-    /// the world up to it first.
-    pub fn drive(&self, place: Place, value: f64, now: Instant) {
-        self.drive_at(place, value, self.clock.at(now));
-    }
-
     /// Says what an output is at a simulated time, bringing the world up to
     /// it.
     ///

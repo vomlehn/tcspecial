@@ -14,6 +14,18 @@
 //! a thermostat's setpoint where one reads values in that unit, rounded out
 //! to a tick every one, two or five of a power of ten.
 //!
+//! Behind a panel read by a thermostat is that thermostat's [`Band`]: its
+//! setpoint S and half band H mark out where the reading is held, S - H to
+//! S + H, left white; a pale yellow H wide either side of that, where the
+//! reading is off but near; and a pale red beyond, to the panel's edges.
+//! Where several thermostats read one unit -- staged heating, a first stage
+//! and a second with a lower setpoint -- the band drawn is that of the one
+//! with the highest setpoint, the first stage, which is the one that states
+//! the comfort band; the others' setpoints are drawn as rules, as every
+//! setpoint is. The panel's scale takes in S - 2H to S + 2H, so that the
+//! yellow is always seen, and the red wherever the readings or the scale's
+//! rounding reach past it.
+//!
 //! The span is chosen in the window: the last ten seconds, minute or ten
 //! minutes, which fill from the left and then scroll, the newest at the right
 //! edge; or the whole run, the first reading at the left edge and the newest
@@ -32,7 +44,15 @@
 //! The colours are Okabe and Ito's, chosen to be told apart by readers with
 //! each common kind of colour blindness, and never alone: every trace is
 //! named, with its latest reading, in its panel's legend beside its colour,
-//! and every switch is named on its strip, with its state in words.
+//! and every switch is named on its strip, with its state in words. A band's
+//! tints are their yellow and vermillion paled toward white, which pale
+//! yellow and pale red readers with red-green colour blindness can confuse,
+//! so each region is said in words on the panel -- "high", "too high",
+//! "low", "too low" -- each edge is a line, and the legend names the band's
+//! edges and its thermostat. The red is told from a switch on by more than
+//! its shade: a switch is drawn only on its own strip under the panels, in
+//! full vermillion with "on" written in it, and nothing of a switch is drawn
+//! on a panel.
 
 use std::collections::VecDeque;
 use std::fmt::Write as _;
@@ -243,6 +263,60 @@ struct Panel {
     /// The setpoints of the thermostats that read values in this unit, each
     /// drawn as a rule.
     setpoints: Vec<f64>,
+    /// The band drawn behind it: see [`Band::of`].
+    band: Option<Band>,
+}
+
+/// A thermostat's band: the setpoint it holds a reading at, and how far
+/// either side of it it switches.
+#[derive(Debug, Clone, PartialEq)]
+pub struct Band {
+    /// The thermostat's name, for the legend.
+    pub name: String,
+    pub setpoint: f64,
+    /// Its `half_band`, more than nought: the checking refuses any other.
+    pub half: f64,
+}
+
+impl Band {
+    /// The band drawn behind a panel: that of the thermostat with the
+    /// highest setpoint among those that read values in the panel's unit.
+    /// With staged heating that is the first stage, whose band is the
+    /// comfort band; a later stage, set lower, comes on only when the first
+    /// cannot hold it. Of two with one setpoint, the first by name.
+    ///
+    /// # Arguments
+    ///
+    /// * `unit`        - The panel's unit.
+    /// * `thermostats` - Every thermostat plotted, with the unit it reads,
+    ///                   in order of name.
+    ///
+    /// # Returns
+    ///
+    /// The band, or `None` where no thermostat reads values in the unit.
+    fn of(unit: Unit, thermostats: &[(Unit, Band)]) -> Option<Band> {
+        let mut chosen: Option<&Band> = None;
+        for (read, band) in thermostats {
+            if *read == unit
+                && chosen.is_none_or(|was| band.setpoint > was.setpoint)
+            {
+                chosen = Some(band);
+            }
+        }
+        chosen.cloned()
+    }
+
+    /// Its edges, from the top down: S + 2H, where too high begins; S + H,
+    /// where high begins; S - H, where low begins; and S - 2H, where too
+    /// low begins.
+    ///
+    /// # Returns
+    ///
+    /// The four edges, in the panel's unit.
+    pub fn edges(&self) -> [f64; 4] {
+        let (s, h) = (self.setpoint, self.half);
+        [s + 2.0 * h, s + h, s - h, s - 2.0 * h]
+    }
 }
 
 /// One switch's changes of state, oldest first, timed as they arrived.
@@ -295,7 +369,7 @@ impl Plot {
         let mut traces = Vec::new();
         let mut panels: Vec<Panel> = Vec::new();
         let mut switches = Vec::new();
-        let mut setpoints = Vec::new();
+        let mut thermostats: Vec<(Unit, Band)> = Vec::new();
         // By name, the one order a configuration has: the panels, traces
         // and switches are drawn in it.
         let mut nodes: Vec<&tcslibgs::graph::Node> =
@@ -313,6 +387,7 @@ impl Plot {
                             unit,
                             traces: Vec::new(),
                             setpoints: Vec::new(),
+                            band: None,
                         });
                         panels.len() - 1
                     }
@@ -335,7 +410,14 @@ impl Plot {
                 params_of(&node.name, &node.attributes)
             {
                 if let Some(unit) = input_unit(graph, &node.name) {
-                    setpoints.push((unit, params.setpoint));
+                    thermostats.push((
+                        unit,
+                        Band {
+                            name: node.name.clone(),
+                            setpoint: params.setpoint,
+                            half: params.half_band,
+                        },
+                    ));
                 }
                 switches.push(Switch {
                     name: node.name.clone(),
@@ -349,10 +431,13 @@ impl Plot {
         }
         // A setpoint is drawn where values in its unit are; where none
         // reaches the ground there is nothing for it to be read against.
-        for (unit, setpoint) in setpoints {
-            if let Some(panel) = panels.iter_mut().find(|p| p.unit == unit) {
-                panel.setpoints.push(setpoint);
+        for (unit, band) in &thermostats {
+            if let Some(panel) = panels.iter_mut().find(|p| p.unit == *unit) {
+                panel.setpoints.push(band.setpoint);
             }
+        }
+        for panel in &mut panels {
+            panel.band = Band::of(panel.unit, &thermostats);
         }
         Some(Plot {
             traces,
@@ -533,6 +618,11 @@ impl Plot {
                 for (&i, latest) in panel.traces.iter().zip(&mut shown.latest) {
                     latest.push_str(&self.traces[i].name);
                 }
+                // Said before anything is heard, though it cannot be drawn
+                // on a panel with no scale yet.
+                if let Some(band) = &panel.band {
+                    band_said(&mut shown.band_said, band, panel.unit);
+                }
             }
             for switch in &self.switches {
                 drawn.switches.push(SwitchDrawn::unheard(switch));
@@ -557,7 +647,8 @@ impl Plot {
         };
 
         for (panel, shown) in self.panels.iter().zip(&mut drawn.panels) {
-            // The panel's scale: what is on the plot, and the setpoints.
+            // The panel's scale: what is on the plot, the setpoints, and
+            // the band's edges, so that its yellow is always on the panel.
             let mut low = f64::INFINITY;
             let mut high = f64::NEG_INFINITY;
             for &i in &panel.traces {
@@ -571,6 +662,11 @@ impl Plot {
             for &setpoint in &panel.setpoints {
                 low = low.min(setpoint);
                 high = high.max(setpoint);
+            }
+            if let Some(band) = &panel.band {
+                let edges = band.edges();
+                low = low.min(edges[3]);
+                high = high.max(edges[0]);
             }
             // As many steps as fit with room for a tick's value in each, so
             // that a short panel's values are never written over each
@@ -592,6 +688,10 @@ impl Plot {
             }
             for &setpoint in &panel.setpoints {
                 shown.setpoints.push(y_of(setpoint));
+            }
+            if let Some(band) = &panel.band {
+                shown.band = Some(band.edges().map(y_of));
+                band_said(&mut shown.band_said, band, panel.unit);
             }
             for ((&i, path), latest) in panel
                 .traces
@@ -827,6 +927,19 @@ fn nice(x: f64) -> f64 {
 /// * `value` - The value.
 /// * `unit`  - Its unit.
 fn value_said(out: &mut String, value: f64, unit: Unit) {
+    number_said(out, value);
+    if unit != Unit::Ratio {
+        let _ = write!(out, " {}", unit.symbol());
+    }
+}
+
+/// Writes a number to five figures and no more than three places.
+///
+/// # Arguments
+///
+/// * `out`   - Where it is written.
+/// * `value` - The number.
+fn number_said(out: &mut String, value: f64) {
     let figures = if value == 0.0 || !value.is_finite() {
         1
     } else {
@@ -834,9 +947,24 @@ fn value_said(out: &mut String, value: f64, unit: Unit) {
     };
     let places = (5 - figures).clamp(0, 3) as usize;
     let _ = write!(out, "{value:.places$}");
-    if unit != Unit::Ratio {
-        let _ = write!(out, " {}", unit.symbol());
-    }
+}
+
+/// Writes what the legend says of a band: where the reading is held, and
+/// whose band it is, such as `band 291.15–295.15 K (thermostat)`.
+///
+/// # Arguments
+///
+/// * `out`  - Where it is written, emptied first.
+/// * `band` - The band.
+/// * `unit` - The panel's unit.
+fn band_said(out: &mut String, band: &Band, unit: Unit) {
+    let edges = band.edges();
+    out.clear();
+    out.push_str("band ");
+    number_said(out, edges[2]);
+    out.push('\u{2013}');
+    value_said(out, edges[1], unit);
+    let _ = write!(out, " ({})", band.name);
 }
 
 /// Writes how long the run has been: seconds, or minutes and seconds, or
@@ -938,13 +1066,18 @@ pub struct Tick {
 }
 
 /// One panel, drawn: a path for each trace, as SVG path commands in pixels,
-/// what each last read, the ticks and the setpoints' rules.
+/// what each last read, the ticks, the setpoints' rules and the band.
 #[derive(Debug, Default)]
 pub struct PanelDrawn {
     pub paths: Vec<String>,
     pub latest: Vec<String>,
     pub ticks: Vec<Tick>,
     pub setpoints: Vec<f32>,
+    /// How far down the band's edges are, in pixels, from the top down as
+    /// [`Band::edges`] gives them, or `None` for a panel with no band.
+    pub band: Option<[f32; 4]>,
+    /// What the legend says of the band; empty where there is none.
+    pub band_said: String,
 }
 
 /// The plot, drawn: what its span is, each panel, and each switch's spans.
@@ -975,6 +1108,8 @@ impl Drawn {
             }
             drawn.ticks.clear();
             drawn.setpoints.clear();
+            drawn.band = None;
+            drawn.band_said.clear();
         }
         self.switches.clear();
     }
@@ -1090,6 +1225,12 @@ pub fn show(
                 traces: ModelRc::from(models.traces.clone()),
                 ticks: ModelRc::from(models.ticks.clone()),
                 setpoints: ModelRc::from(models.setpoints.clone()),
+                banded: false,
+                band_said: SharedString::new(),
+                too_high: 0.0,
+                high: 0.0,
+                low: 0.0,
+                too_low: 0.0,
             })
             .collect::<Vec<_>>(),
     ));
@@ -1106,7 +1247,7 @@ pub fn show(
             })
             .collect::<Vec<_>>(),
     ));
-    window.set_panels(ModelRc::from(panels));
+    window.set_panels(ModelRc::from(panels.clone()));
     window.set_switches(ModelRc::from(shown.clone()));
     let _ = window.show();
 
@@ -1132,7 +1273,18 @@ pub fn show(
         // worked out to draw -- the paths, ticks and spans -- is in `drawn`,
         // which is reused.
         window.set_said(SharedString::from(drawn.said.as_str()));
-        for (panel, models) in drawn.panels.iter().zip(&models) {
+        for (p, (panel, models)) in drawn.panels.iter().zip(&models).enumerate()
+        {
+            if let Some(mut row) = panels.row_data(p) {
+                row.banded = panel.band.is_some();
+                [row.too_high, row.high, row.low, row.too_low] =
+                    panel.band.unwrap_or_default();
+                if row.band_said.as_str() != panel.band_said {
+                    row.band_said =
+                        SharedString::from(panel.band_said.as_str());
+                }
+                panels.set_row_data(p, row);
+            }
             for (i, (commands, said)) in
                 panel.paths.iter().zip(&panel.latest).enumerate()
             {
@@ -1187,7 +1339,7 @@ fn colour(rgb: u32) -> Color {
 }
 
 #[cfg(test)]
-mod tests {
+pub(crate) mod tests {
     use super::*;
     use std::path::Path;
 
@@ -1456,5 +1608,206 @@ mod tests {
             })
             .collect();
         assert_eq!(spans, vec![(1000, 3000, true), (4000, 2000, false)]);
+    }
+
+    /// A band named for its thermostat, for the tests.
+    ///
+    /// # Arguments
+    ///
+    /// * `name`     - The thermostat's name.
+    /// * `setpoint` - Its setpoint.
+    /// * `half`     - Its half band.
+    ///
+    /// # Returns
+    ///
+    /// The band.
+    fn band(name: &str, setpoint: f64, half: f64) -> Band {
+        Band {
+            name: name.to_string(),
+            setpoint,
+            half,
+        }
+    }
+
+    /// A band's edges are the setpoint plus and minus one and two half
+    /// bands, from the top down.
+    #[test]
+    fn a_band_has_four_edges() {
+        assert_eq!(band("t", 293.0, 2.0).edges(), [297.0, 295.0, 291.0, 289.0]);
+    }
+
+    /// Of the thermostats reading a unit, the band drawn is that with the
+    /// highest setpoint, the first of two with one setpoint; one reading
+    /// another unit is not drawn, and with none there is no band.
+    #[test]
+    fn the_band_drawn_is_the_highest_setpoints() {
+        let thermostats = vec![
+            (Unit::Kelvin, band("stage_2", 290.15, 1.0)),
+            (Unit::Ratio, band("shed", 400.0, 0.1)),
+            (Unit::Kelvin, band("stage_1", 293.15, 2.0)),
+            (Unit::Kelvin, band("stage_1b", 293.15, 3.0)),
+        ];
+        assert_eq!(
+            Band::of(Unit::Kelvin, &thermostats),
+            Some(band("stage_1", 293.15, 2.0))
+        );
+        assert_eq!(
+            Band::of(Unit::Ratio, &thermostats),
+            Some(band("shed", 400.0, 0.1))
+        );
+        assert_eq!(Band::of(Unit::Metre, &thermostats), None);
+        assert_eq!(Band::of(Unit::Kelvin, &[]), None);
+    }
+
+    /// Staged heating: a second thermostat reading the zone temperature, set
+    /// lower and driving one heater, has its setpoint drawn as a rule and its
+    /// own strip, but the band drawn is the first stage's.
+    #[test]
+    fn staged_heating_draws_the_first_stages_band() {
+        use tcslibgs::endpoint_config::Scalar;
+        use tcslibgs::graph::{Destinations, Link};
+
+        let mut graph = example("thermostat");
+        let mut second = graph
+            .node("thermostat")
+            .expect("the example's thermostat")
+            .clone();
+        second.name = "thermostat_2".to_string();
+        second
+            .attributes
+            .insert("setpoint".to_string(), Scalar::of("290.15"));
+        graph.nodes.push(second);
+        graph.links.push(Link {
+            from: "zone_temp".to_string(),
+            to: Destinations::of(vec!["thermostat_2".to_string()]),
+            comment: None,
+        });
+        graph.links.push(Link {
+            from: "thermostat_2".to_string(),
+            to: Destinations::of(vec!["heaters_2".to_string()]),
+            comment: None,
+        });
+        let plot = Plot::of(&graph, |_| true).expect("a plot");
+        assert_eq!(plot.panels[0].setpoints, vec![293.15, 290.15]);
+        assert_eq!(plot.panels[0].band, Some(band("thermostat", 293.15, 2.0)));
+        let mut drawn = Drawn::default();
+        plot.draw(Instant::now(), 100.0, 60.0, &mut drawn);
+        let labels: Vec<&str> =
+            drawn.switches.iter().map(|s| s.label.as_str()).collect();
+        assert_eq!(
+            labels,
+            vec![
+                "thermostat \u{2192} heaters_1, heaters_2",
+                "thermostat_2 \u{2192} heaters_2",
+            ]
+        );
+    }
+
+    /// A thermostat's band is drawn behind its panel, its edges in order
+    /// down the panel and on it, the scale taking in two half bands either
+    /// side of the setpoint however close the readings are to it, and the
+    /// legend naming the band and its thermostat.
+    #[test]
+    fn a_band_is_drawn_and_the_scale_takes_it_in() {
+        let mut plot =
+            Plot::of(&example("thermostat"), |_| true).expect("a plot");
+        assert_eq!(plot.panels[0].band, Some(band("thermostat", 293.15, 2.0)));
+        let mut drawn = Drawn::default();
+        plot.draw(Instant::now(), 100.0, 600.0, &mut drawn);
+        assert_eq!(drawn.panels[0].band, None, "no scale yet");
+        assert_eq!(
+            drawn.panels[0].band_said,
+            "band 291.15\u{2013}295.15 K (thermostat)"
+        );
+
+        let t0 = Instant::now();
+        plot.reading(0, t0, 293.0);
+        plot.draw(t0, 100.0, 600.0, &mut drawn);
+        let edges = drawn.panels[0].band.expect("a band");
+        for pair in edges.windows(2) {
+            assert!(pair[0] < pair[1], "{edges:?}");
+        }
+        assert!(edges[0] >= 0.0 && edges[3] <= 600.0, "{edges:?}");
+        let ticks = &drawn.panels[0].ticks;
+        let top: f64 = ticks[0].said.parse().expect("a number");
+        let bottom: f64 =
+            ticks[ticks.len() - 1].said.parse().expect("a number");
+        assert!(top >= 297.15 && bottom <= 289.15, "{top} {bottom}");
+        assert_eq!(
+            drawn.panels[0].band_said,
+            "band 291.15\u{2013}295.15 K (thermostat)"
+        );
+    }
+
+    /// A panel no thermostat reads has no band, and says none.
+    #[test]
+    fn no_thermostat_is_no_band() {
+        let mut plot = Plot::of(&example("descent"), |_| true).expect("a plot");
+        assert!(plot.panels.iter().all(|panel| panel.band.is_none()));
+        let t0 = Instant::now();
+        plot.reading(0, t0, 10.0);
+        let mut drawn = Drawn::default();
+        plot.draw(t0, 100.0, 600.0, &mut drawn);
+        for panel in &drawn.panels {
+            assert_eq!(panel.band, None);
+            assert!(panel.band_said.is_empty());
+        }
+    }
+
+    /// The thermostat example's plot window, opened as tcsmoc opens it and
+    /// redrawn once by its timer, says each region of the band in words, in
+    /// order down the panel, names the band in the legend, and writes "on"
+    /// on a switch's strip while it is on.
+    ///
+    /// Not a test of its own: one test per binary may start the testing
+    /// backend, and its windows belong to the thread that made them. Called
+    /// from main.rs's `every_panels_data_is_inside_the_window`.
+    pub(crate) fn the_band_is_said_in_words_in_the_window() {
+        use i_slint_backend_testing::ElementHandle;
+
+        let ui = MainWindow::new().expect("a main window");
+        let window = PlotWindow::new().expect("a plot window");
+        window
+            .window()
+            .set_size(slint::LogicalSize::new(820.0, 620.0));
+        let plot = Arc::new(Mutex::new(
+            Plot::of(&example("thermostat"), |_| true).expect("a plot"),
+        ));
+        let _timer = show(&ui, &window, plot.clone());
+        {
+            let mut plot = plot.lock().expect("the plot");
+            // Five seconds back, so that the switch's span is wide enough
+            // to say "on" in.
+            let t0 = Instant::now()
+                .checked_sub(Duration::from_secs(5))
+                .expect("a time five seconds back");
+            plot.reading(0, t0, 292.0);
+            plot.decision(0, t0, true);
+        }
+        std::thread::sleep(REDRAW + Duration::from_millis(50));
+        slint::platform::update_timers_and_animations();
+
+        let said = |text: &str| -> Vec<f32> {
+            ElementHandle::find_by_element_type_name(&window, "Text")
+                .filter(|e| e.accessible_label().as_deref() == Some(text))
+                .map(|e| e.absolute_position().y)
+                .collect()
+        };
+        let mut down = Vec::new();
+        for words in ["too high", "high", "low", "too low"] {
+            let found = said(words);
+            assert_eq!(found.len(), 1, "{words:?} is said once: {found:?}");
+            down.push(found[0]);
+        }
+        for pair in down.windows(2) {
+            assert!(pair[0] < pair[1], "the regions out of order: {down:?}");
+        }
+        assert_eq!(
+            said("band 291.15\u{2013}295.15 K (thermostat)").len(),
+            1,
+            "the legend names the band"
+        );
+        // Once beside the strip, as its state, and once on it.
+        assert_eq!(said("on").len(), 2, "the switch on is said on its strip");
     }
 }

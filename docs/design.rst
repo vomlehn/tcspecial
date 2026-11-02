@@ -12343,6 +12343,25 @@ Requirement
     the start that failed rather than a stop of something that never began.
 
 Requirement
+    For a part the vehicle drives -- a heater -- the same button is the
+    part's power. Disabled, it is unpowered, or has failed, and stays off
+    whatever the vehicle or a thermostat tcssim stands in for decides: it
+    gives the world nothing. What it is sent meanwhile is kept, the latest
+    replacing the one before, and ``Enable`` applies that at once, because
+    the vehicle sends a decision only when it changes and a heater waiting
+    for the next one would sit cold through a whole band. One button and not
+    a second control: a heater sends nothing, so its button had nothing else
+    to mean. Nothing aboard changes, and the ground sees a disabled heater
+    only through the temperature, which is the point of being able to
+    disable one.
+
+Requirement
+    A heater's panel says what it is doing in words -- ``heating``,
+    ``off``, or ``disabled, so off`` -- on the line where another payload's
+    says what it last sent, a heater sending nothing. Words, so that the
+    state is never told by a colour alone.
+
+Requirement
     Each panel has a button that shows every parameter read from the two
     configuration files for that payload, in both programs. What a panel has
     room for is a name, a size and what has moved; a payload set says a good

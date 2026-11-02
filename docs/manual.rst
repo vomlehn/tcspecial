@@ -1968,6 +1968,15 @@ payload disabled in one window is disabled in the other rather than silent in
 one and disabled in the other; they were the payload's own, ``Send`` and
 ``Silent``, which left the reader of two windows translating.
 
+A heater, or any part the vehicle drives, sends nothing, so in tcssim the
+same button is its power. Disabled -- as every payload starts, unless tcssim
+is given ``--sending`` -- it is unpowered, or failed, and stays off whatever
+the vehicle, or a thermostat tcssim stands in for, decides: it gives the
+simulated world no heat. What it is sent meanwhile is kept, the latest
+replacing the one before, and ``Enable`` applies that latest at once, since
+the vehicle sends a decision only when it changes. Nothing aboard changes:
+the ground sees a disabled heater only through the temperature.
+
 tcsmoc had one button that way too. It said ``Receive`` or ``Discard``
 according to the status, which meant a press could not be made until the
 handler was in the state that offered it -- and when a panel looks wrong,
@@ -2212,6 +2221,28 @@ heater while the vehicle has it on. So the loop closes through tcspecial: see
 **The Simulator Configuration** below. Naming the ``thermostat`` node in the file's
 ``tcssim`` section closes it in tcssim alone instead, with no tcspecial
 running.
+
+The heaters are small on purpose, four watts each, and the zone's
+surroundings swing six kelvin either side of 283.15 K over a ninety minute
+orbit. Both heaters settle the zone twenty kelvin above its surroundings,
+297.15 K at the coldest, above the band, so together they always bring it
+back and the thermostat cycles them. One settles it ten kelvin above, which
+holds the band in the warm part of the orbit and not in the cold part, about
+a quarter of it, where the zone sinks more than two half bands below the
+setpoint. So a heater disabled in tcssim's window -- an unpowered or failed
+heater, see `Starting and stopping a payload`_ -- shows in the temperature,
+and nowhere else. ``make -C examples run-thermostat`` starts every payload
+disabled, so press ``Enable`` on each, and ``Disable`` on a heater to take
+it away. A run of the model with its sensors' errors, three orbits from each
+of three seeds -- tcssim's tests
+``the_thermostat_example_holds_the_zone_with_both_heaters`` and
+``the_thermostat_example_falls_behind_with_a_heater_disabled`` -- has, with
+both heaters, the zone never more than two half bands from the setpoint and
+within one three quarters of the time, the heaters on half the time and
+switching together some eighty times an orbit; with one disabled, the zone
+more than two half bands below the setpoint 27% to 31% of the time, as cold
+as 285.3 K, and the disabled heater never heating; and with neither, the
+zone following its surroundings, 277.4 to 289.4 K.
 
 ``make -C examples run-thermostat`` runs it, on any desk.
 
@@ -2715,6 +2746,10 @@ what arrives, and a line each time the heaters are switched:
 
 tcssim draws a window of its own, so it wants a display. Every port is in
 the seventeen thousands, so it can run beside the thermostat example.
+Because tcssim is given ``--sending``, both heaters start enabled; press
+``Disable`` on a heater's panel in tcssim's window to take it away, and the
+zone falls behind in the cold part of the orbit, which Yamcs sees only in
+the temperatures -- the thermostat's decision goes on switching both.
 
 The tees example
 ----------------
@@ -5351,15 +5386,19 @@ drawn, so that a spike is never thinned away.
 Under the panels, as wide as them so that a change lines up with the values
 above it, is a strip for each switch -- a ``hysteresis`` node drawn into a
 gateway node, named with what it drives, such as ``thermostat → heaters_1,
-heaters_2`` -- vermillion with ``on`` written in it while it is on, grey
-while it is off, and its last decision said beside it. With two thermostats
-each driving a heater there are two strips, one under the other, so which
-heater is on, or both, is read straight off them. Nothing of a switch is
+heaters_2`` in the thermostat example, whose one thermostat drives both
+heaters -- vermillion with ``on`` written in it while it is on, grey while
+it is off, and its last decision said beside it. With two thermostats each
+driving a heater there are two strips, one under the other, so which heater
+is on, or both, is read straight off them. Nothing of a switch is
 drawn on the panels, which keeps a switch on from being taken for the band's
 pale red. A thermostat tells the ground only when its decision changes, so a
 switch is drawn from each change to the next, and before the first is heard
 it is not drawn at all, its state said as ``not heard`` rather than guessed
 as off.
+A strip is the thermostat's decision and not what a heater does: the plot
+cannot see tcssim's ``Enable``, so a heater disabled there shows only
+through the temperature.
 
 The colours are Okabe and Ito's, which readers with each common kind of colour
 blindness tell apart: blue, bluish green, reddish purple, sky blue and black
@@ -5827,7 +5866,10 @@ under `Starting and stopping a payload`_, and ``Configuration``, described
 under `Seeing what was read`_ -- and then three lines:
 
 ``Sent``
-  When the last packet went, and the first few bytes of it.
+  When the last packet went, and the first few bytes of it. A part the
+  vehicle drives sends nothing, and this line says what it is doing instead,
+  in words: ``heater_1: heating``, ``heater_1: off``, or ``heater_1:
+  disabled, so off`` -- see `Starting and stopping a payload`_.
 
 ``Recv``
   When the last packet arrived, and the first few bytes of it -- for a payload

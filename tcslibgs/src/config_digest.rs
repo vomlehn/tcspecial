@@ -238,7 +238,7 @@ pub fn interpretation_of_simulator(
     let tcssim = file.tcssim.as_ref().map(|section| {
         json!({
             "ready": section.ready,
-            "thermostat": section.thermostat,
+            "thermostat": section.thermostats,
             "seed": section.seed,
         })
     });
@@ -651,8 +651,8 @@ mod tests {
         let node = retuned
             .nodes
             .iter_mut()
-            .find(|n| n.name == "thermostat")
-            .expect("the thermostat");
+            .find(|n| n.name == "thermostat_1")
+            .expect("the first stage");
         node.attributes
             .insert("setpoint".to_string(), crate::Scalar::of("300.0"));
         assert_ne!(digest_of_graph(&retuned).expect("it digests"), digest);

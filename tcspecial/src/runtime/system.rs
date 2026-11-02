@@ -2537,7 +2537,7 @@ vehicle:
         let bench = system.workbench();
         let thermostat = system
             .states()
-            .named("thermostat")
+            .named("thermostat_1")
             .expect("the thermostat")
             .shared_name();
 
@@ -2820,10 +2820,11 @@ vehicle:
         );
         assert_eq!(
             vehicle.heaters.lock().expect("the record").clone(),
-            // One decision, reaching both heaters: they are driven together,
-            // so that one failing leaves the other warming the mass.
-            vec![b"1".to_vec(), b"1".to_vec()],
-            "a zone below the band should have both its heaters on"
+            // The first stage's decision, reaching its heater. The second
+            // stage comes on only below 289.15, and the zone is at 289.15
+            // exactly: inside its band, so it decides nothing.
+            vec![b"1".to_vec()],
+            "a zone below the first stage's band should have heaters_1 on"
         );
         assert!(
             vehicle.telemetry.lock().expect("the record").is_empty(),
@@ -3122,9 +3123,9 @@ vehicle:
         assert_eq!(vehicle.system.logs(), ["housekeeping"]);
         assert_eq!(
             vehicle.system.holds(),
-            17,
-            "twelve nodes in the example, and a link to the ground for each of \
-             the five nodes drawn into its gateway node"
+            19,
+            "thirteen nodes in the example, and a link to the ground for each \
+             of the six nodes drawn into its gateway node"
         );
     }
 
@@ -3135,12 +3136,12 @@ vehicle:
         let mut vehicle = vehicle(start, &[]);
 
         assert_eq!(
-            vehicle.system.set("thermostat", "setpoint", b"300.0"),
+            vehicle.system.set("thermostat_1", "setpoint", b"300.0"),
             Ok(())
         );
         assert!(vehicle
             .system
-            .set("thermostat", "above", b"5.0")
+            .set("thermostat_1", "above", b"5.0")
             .is_err_and(|why| why.contains("no command binding")));
     }
 
@@ -3224,8 +3225,8 @@ vehicle:
     #[test]
     fn a_setpoint_the_ground_sets_changes_what_the_vehicle_decides() {
         let start = Instant::now();
-        // A zone at 289.15 K, which is below the example's band around
-        // 293.15: the heaters go on.
+        // A zone at 289.15 K, which is below the first stage's band around
+        // 293.15: its heater goes on.
         let readings = [
             ("temp_1", &[0x01, 0x00][..]),
             ("temp_2", &[0x01, 0x00][..]),
@@ -3235,9 +3236,9 @@ vehicle:
         vehicle.system.pass(start);
         assert_eq!(
             vehicle.heaters.lock().expect("the record").clone(),
-            // One decision reaching both heaters.
-            vec![b"1".to_vec(), b"1".to_vec()],
-            "a zone below the band has both its heaters on"
+            // The first stage's decision, reaching its heater.
+            vec![b"1".to_vec()],
+            "a zone below the first stage's band has heaters_1 on"
         );
 
         // The ground lowers the setpoint under the zone, from a thread of
@@ -3247,14 +3248,14 @@ vehicle:
         let finished = done.clone();
         let asking = std::thread::spawn(move || {
             let set = bench.ask(Work::Set {
-                node: "thermostat".into(),
+                node: "thermostat_1".into(),
                 attribute: tcslibgs::Attribute::of("setpoint").expect("a name"),
                 value: tcslibgs::Value::of(b"280.0").expect("a value"),
             });
             // And an attribute the configuration does not bind, which must
             // come back refused rather than applied.
             let unbound = bench.ask(Work::Set {
-                node: "thermostat".into(),
+                node: "thermostat_1".into(),
                 attribute: tcslibgs::Attribute::of("above").expect("a name"),
                 value: tcslibgs::Value::of(b"5.0").expect("a value"),
             });
@@ -3278,7 +3279,8 @@ vehicle:
         assert_eq!(set, Ok(()), "a bound attribute is set");
         let why = unbound.expect_err("an attribute no binding mentions");
         assert!(
-            why.contains("command binding") && why.contains("thermostat.above"),
+            why.contains("command binding")
+                && why.contains("thermostat_1.above"),
             "the reason should reach the ground: {why}"
         );
 
@@ -3291,9 +3293,10 @@ vehicle:
 
         assert_eq!(
             vehicle.heaters.lock().expect("the record").clone(),
-            // On, then off: each decision reaching both heaters.
-            vec![b"1".to_vec(), b"1".to_vec(), b"0".to_vec(), b"0".to_vec()],
-            "the same zone is now above the band, so both heaters go off"
+            // On, then off, each the first stage's.
+            vec![b"1".to_vec(), b"0".to_vec()],
+            "the same zone is now above the first stage's band, so its \
+             heater goes off"
         );
     }
 
@@ -3334,8 +3337,8 @@ vehicle:
         );
         assert_eq!(
             vehicle.heaters.lock().expect("the record").len(),
-            2,
-            "one decision, reaching both heaters"
+            1,
+            "one decision, the first stage's, reaching its heater"
         );
     }
 }

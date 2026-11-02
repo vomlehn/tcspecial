@@ -935,7 +935,8 @@ mod tests {
         assert_eq!(ids["heaters_2"], 3);
         assert_eq!(ids["temp1"], 5);
         assert_eq!(ids["temp_1"], 8);
-        assert_eq!(ids["thermostat"], 11);
+        assert_eq!(ids["thermostat_1"], 11);
+        assert_eq!(ids["thermostat_2"], 12);
     }
 
     /// The order the nodes are in means nothing: shuffled, they have the
@@ -962,10 +963,11 @@ mod tests {
                 ("temp1", 5, "127.0.0.1", 5105),
                 ("temp2", 6, "127.0.0.1", 5106),
                 ("temp3", 7, "127.0.0.1", 5107),
-                // The decision itself, which the ground sees as well as the
-                // heaters: a reader of the telemetry can then say why the
+                // The decisions themselves, which the ground sees as well as
+                // the heaters: a reader of the telemetry can then say why the
                 // heaters are on without inferring it from the temperature.
-                ("thermostat", 11, "127.0.0.1", 5111),
+                ("thermostat_1", 11, "127.0.0.1", 5111),
+                ("thermostat_2", 12, "127.0.0.1", 5112),
             ]
         );
         assert!(links

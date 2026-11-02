@@ -3268,12 +3268,13 @@ payloads:
                 ("temp1".to_string(), 5),
                 ("temp2".to_string(), 6),
                 ("temp3".to_string(), 7),
-                // The decision too, which the ground sees as well as the
+                // The decisions too, which the ground sees as well as the
                 // heaters.
-                ("thermostat".to_string(), 11),
+                ("thermostat_1".to_string(), 11),
+                ("thermostat_2".to_string(), 12),
             ]
         );
-        // thermostat, device id 11, at ground_base plus that.
+        // thermostat_1, device id 11, at ground_base plus that.
         assert!(
             panels[4].config.contains("to gateway"),
             "{}",
@@ -3326,27 +3327,29 @@ payloads:
     ///
     /// From the `commands` section and not from the spacecraft: what the
     /// ground may set is written in the file both ends read. The thermostat
-    /// example binds one attribute of one node, so one of its four panels
-    /// offers a field and the other three say they offer none.
+    /// example binds one attribute of each of its two stages, so two of its
+    /// six panels offer a field and the other four say they offer none.
     #[test]
     fn a_panel_offers_what_its_node_binds() {
         let graph = example("thermostat");
         let settable = settable_of(&graph);
-        assert_eq!(
-            settable.get("thermostat").map(Vec::as_slice),
-            Some(&["setpoint".to_string()][..]),
-            "the example binds the thermostat's setpoint and nothing else"
-        );
+        for stage in ["thermostat_1", "thermostat_2"] {
+            assert_eq!(
+                settable.get(stage).map(Vec::as_slice),
+                Some(&["setpoint".to_string()][..]),
+                "the example binds each stage's setpoint and nothing else"
+            );
+        }
 
         let shown =
             panels(&telemetry::of(&graph).expect("its links"), &settable);
-        // The thermostat is one of the panels, its decision reaching the
-        // ground as well as the heaters, and it is the one that binds
-        // something: its panel offers the setpoint and the others offer
+        // Each stage is one of the panels, its decision reaching the ground
+        // as well as its heater, and the stages are the ones that bind
+        // something: their panels offer the setpoint and the others offer
         // nothing.
         for panel in &shown {
             let offered = match panel.name.as_str() {
-                "thermostat" => ("setpoint", "setpoint"),
+                "thermostat_1" | "thermostat_2" => ("setpoint", "setpoint"),
                 _ => ("", ""),
             };
             assert_eq!(

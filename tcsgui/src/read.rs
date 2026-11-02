@@ -879,8 +879,8 @@ mod tests {
             let path =
                 root.join(format!("tests/manual/thermostat.{extension}"));
             let document = read(&path).expect("the worked example");
-            assert_eq!(document.nodes.len(), 12, "thermostat.{extension}");
-            assert_eq!(document.links.len(), 18, "thermostat.{extension}");
+            assert_eq!(document.nodes.len(), 13, "thermostat.{extension}");
+            assert_eq!(document.links.len(), 21, "thermostat.{extension}");
         }
     }
 
@@ -970,18 +970,19 @@ mod tests {
                 "{extension}: and over more than one line"
             );
 
-            // A link's, and a command binding's. The comment is above the
-            // terminal rather than one of its lines, so both heaters carry
-            // it: it is about what leaves there and not about which heater.
-            for heater in ["heaters_1", "heaters_2"] {
+            // A link's, and a command binding's: each stage's link to its
+            // own heater, the comment above the terminal it leaves by.
+            for (stage, heater) in
+                [("thermostat_1", "heaters_1"), ("thermostat_2", "heaters_2")]
+            {
                 let link = document
                     .links
                     .iter()
-                    .find(|l| l.from == "thermostat" && l.to == heater)
+                    .find(|l| l.from == stage && l.to == heater)
                     .unwrap_or_else(|| panic!("the link to {heater}"));
                 assert!(
                     link.comment.as_deref().is_some_and(
-                        |said| said.contains("asserted below the setpoint")
+                        |said| said.contains("asserted below the band")
                     ),
                     "{extension}: {heater}: {:?}",
                     link.comment
@@ -989,7 +990,7 @@ mod tests {
             }
             assert_eq!(
                 document.commands[0].comment.as_deref(),
-                Some("the zone temperature the heaters are held at, in kelvin"),
+                Some("the middle of the first stage band, in kelvin"),
                 "{extension}"
             );
 

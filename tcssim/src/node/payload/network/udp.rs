@@ -311,7 +311,7 @@ mod tests {
 
         let mut device = SimulatedPayload::new(PayloadConfig {
             attachment: None,
-            thermostat: None,
+            thermostats: Vec::new(),
             name: "DH0".to_string(),
             protocol: PayloadProtocol::Udp,
             address: at.ip().to_string(),
@@ -394,7 +394,7 @@ mod tests {
             .expect("a free port");
         let mut device = SimulatedPayload::new(PayloadConfig {
             attachment: None,
-            thermostat: None,
+            thermostats: Vec::new(),
             name: "DH0".to_string(),
             protocol: PayloadProtocol::Udp,
             address: at.ip().to_string(),
@@ -462,7 +462,7 @@ mod tests {
     ) -> SimulatedPayload {
         SimulatedPayload::new(PayloadConfig {
             attachment: None,
-            thermostat: None,
+            thermostats: Vec::new(),
             name: "DH0".to_string(),
             protocol: PayloadProtocol::Udp,
             address: at.ip().to_string(),
@@ -526,7 +526,7 @@ mod tests {
 
         let config = PayloadConfig {
             attachment: None,
-            thermostat: None,
+            thermostats: Vec::new(),
             name: "serial-line".to_string(),
             protocol: PayloadProtocol::Udp,
             address: at.ip().to_string(),
@@ -826,7 +826,7 @@ mod tests {
 
         let mut device = SimulatedPayload::new(PayloadConfig {
             attachment: None,
-            thermostat: None,
+            thermostats: Vec::new(),
             name: "DH0".to_string(),
             protocol: PayloadProtocol::Udp,
             address: at.ip().to_string(),

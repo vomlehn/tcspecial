@@ -599,7 +599,10 @@ mod tests {
         // into the log, each named once.
         let mut into_log = routes.arriving_at("housekeeping");
         into_log.sort();
-        assert_eq!(into_log, vec!["temp1", "temp2", "temp3", "thermostat"]);
+        assert_eq!(
+            into_log,
+            vec!["temp1", "temp2", "temp3", "thermostat_1", "thermostat_2"]
+        );
 
         // A sensor is the start of a path and nothing arrives at it.
         assert!(routes.arriving_at("temp_1").is_empty());

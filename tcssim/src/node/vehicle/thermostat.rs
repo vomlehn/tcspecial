@@ -5,7 +5,9 @@
 //! so that a zone's loop closes with no tcspecial running. It stands
 //! in for one hysteresis node of the configuration, whose `setpoint` and
 //! `half_band` it takes, and the simulator file names that node: see
-//! `tcslibgs::sim_config::SimTcssim::thermostat`.
+//! `tcslibgs::sim_config::SimTcssim::thermostats`. A staged thermostat is
+//! several of these, one a stage, each reading the same sensors and
+//! switching heaters of its own.
 //!
 //! # What it reads
 //!
@@ -123,6 +125,28 @@ impl Thermostat {
     /// Whether that sensor's readings come here.
     pub fn reads(&self, sensor: &str) -> bool {
         self.sensors.contains_key(sensor)
+    }
+
+    /// The heaters it switches.
+    ///
+    /// # Returns
+    ///
+    /// Each heater's payload name.
+    pub fn heaters(&self) -> impl Iterator<Item = &str> {
+        self.heaters.iter().map(|(heater, _)| heater.as_str())
+    }
+
+    /// Says whether it switches a heater.
+    ///
+    /// # Arguments
+    ///
+    /// * `heater` - The heater's payload name.
+    ///
+    /// # Returns
+    ///
+    /// Whether that heater is one of its own.
+    pub fn switches(&self, heater: &str) -> bool {
+        self.heaters().any(|named| named == heater)
     }
 
     /// Takes a reading a sensor has just sent, and switches the heaters.

@@ -933,6 +933,10 @@ install-tcspecial-ground: install-data tcs-helpers tcs-xtce
 	$(call install_links,tcspecial-ground,$(GROUND_BIN))
 	$(SUBST) packaging/tcs.pc.in > $(DESTDIR)$(LIBDIR)/pkgconfig/tcs.pc
 	chmod 644 $(DESTDIR)$(LIBDIR)/pkgconfig/tcs.pc
+# The schemas the Python reads are tcsgui's, which install-data puts under
+# $(DATADIR)/$(GUI_NAME): the installed package reaches them through a link,
+# as python/tcslibgs/schema does in the source tree, rather than carrying a
+# second copy that could differ from the first.
 	set -e; \
 	tmp=$$(mktemp -d -t tcspecial-py.XXXXXXXXXX); \
 	trap 'rm -rf "$$tmp"' EXIT; \
@@ -945,7 +949,12 @@ install-tcspecial-ground: install-data tcs-helpers tcs-xtce
 	dist=$$(echo $(DESTDIR)$(PYTHONDIR)/tcspecial_ground-*.dist-info); \
 	rm -f "$$dist/direct_url.json"; \
 	sed -i '/^tcspecial_ground-[^/]*\.dist-info\/direct_url\.json,/d' \
-		"$$dist/RECORD"
+		"$$dist/RECORD"; \
+	schema=$(DESTDIR)$(PYTHONDIR)/tcslibgs/schema; \
+	rm -rf "$$schema"; \
+	ln -s $$(realpath -m --relative-to=$(PYTHONDIR)/tcslibgs \
+		$(DATADIR)/$(GUI_NAME)/schema) "$$schema"; \
+	sed -i '/^tcslibgs\/schema\//d' "$$dist/RECORD"
 	install -d -m 755 $(DESTDIR)$(DOCDIR)/tcspecial-ground/tcslib-c \
 		$(DESTDIR)$(DOCDIR)/tcspecial-ground/python
 	install -m 644 README.md LICENSE-APACHE LICENSE-MIT \

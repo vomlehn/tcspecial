@@ -112,7 +112,7 @@ fn readings_and_the_vote_decode_as_temperatures() {
     let xtce = generated_mdb(&path);
     let apids = apids(&path);
     let (least, most) = Unit::Kelvin.range();
-    for source in ["k_1", "k_2", "k_3", "zone_temp"] {
+    for source in ["temp1", "temp2", "temp3", "ambient"] {
         for number in [0.0, 255.37, 293.15, 291.234567, -40.5, least, most] {
             let (read, units) = value_read(
                 &xtce,
@@ -127,23 +127,30 @@ fn readings_and_the_vote_decode_as_temperatures() {
     }
 }
 
-/// The thermostat's decisions, framed under its APID, are on and off; what
-/// is neither is not read as either.
+/// Each stage's decisions, framed under its APID, are on and off; what is
+/// neither is not read as either.
 #[test]
 fn the_thermostats_decisions_decode_as_on_and_off() {
     let path = here().join("thermostat-yamcs.xtcs");
     let xtce = generated_mdb(&path);
-    let apid = apid_of(&apids(&path), "thermostat");
-    for (said, read) in [
-        (vec![DECISION_ON], Ok(true)),
-        (vec![DECISION_OFF], Ok(false)),
-        (b"x".to_vec(), Err(b"x".to_vec())),
-    ] {
-        let packet = framed(apid, &said);
-        let decoded = decode(&xtce, &packet);
-        assert_eq!(decoded.container, "thermostatPacket");
-        assert_eq!(decoded.booleans["thermostat"], read);
-        assert_eq!(decoded.end, Some(packet.len() * 8), "all of it is read");
+    let apids = apids(&path);
+    for stage in ["thermostat_1", "thermostat_2"] {
+        let apid = apid_of(&apids, stage);
+        for (said, read) in [
+            (vec![DECISION_ON], Ok(true)),
+            (vec![DECISION_OFF], Ok(false)),
+            (b"x".to_vec(), Err(b"x".to_vec())),
+        ] {
+            let packet = framed(apid, &said);
+            let decoded = decode(&xtce, &packet);
+            assert_eq!(decoded.container, format!("{stage}Packet"));
+            assert_eq!(decoded.booleans[stage], read);
+            assert_eq!(
+                decoded.end,
+                Some(packet.len() * 8),
+                "all of it is read"
+            );
+        }
     }
 }
 
@@ -212,7 +219,7 @@ fn values_in_every_unit_decode_in_it() {
         let xtce = generated_mdb(&path);
         let apids = apids(&path);
         let (_, most) = unit.range();
-        for source in ["k_1", "zone_temp"] {
+        for source in ["temp1", "ambient"] {
             for number in [1.5, -2.25, most] {
                 let (read, units) = value_read(
                     &xtce,

@@ -2009,10 +2009,10 @@ mod tests {
         let (mean, mean_port) = recorder();
         let (log, log_port) = recorder();
         fabric.hold("gateway", gateway_port);
-        fabric.hold("zone_temp", mean_port);
+        fabric.hold("ambient", mean_port);
         fabric.hold("housekeeping", log_port);
 
-        let moved = fabric.deliver("k_1", &[1, 2, 3, 4]);
+        let moved = fabric.deliver("temp1", &[1, 2, 3, 4]);
 
         assert!(moved.all_delivered(), "{:?}", moved.refused);
         assert_eq!(moved.delivered, 3);
@@ -2126,13 +2126,13 @@ vehicle:
         let (mean, mean_port) = recorder();
         let (gateway, gateway_port) = recorder();
         let (log, log_port) = recorder();
-        fabric.hold("zone_temp", mean_port);
+        fabric.hold("ambient", mean_port);
         fabric.hold("gateway", gateway_port);
         fabric.hold("housekeeping", log_port);
 
-        fabric.deliver("k_1", &[1]);
-        fabric.deliver("k_2", &[2]);
-        fabric.deliver("k_3", &[3]);
+        fabric.deliver("temp1", &[1]);
+        fabric.deliver("temp2", &[2]);
+        fabric.deliver("temp3", &[3]);
 
         let given = mean.lock().expect("the record");
         assert_eq!(
@@ -2170,7 +2170,14 @@ vehicle:
         let routes = Routes::of(&graph);
 
         let mut fabric = Fabric::new(routes.clone(), 64);
-        for name in ["k_1", "k_2", "k_3", "zone_temp", "thermostat"] {
+        for name in [
+            "temp1",
+            "temp2",
+            "temp3",
+            "ambient",
+            "thermostat_1",
+            "thermostat_2",
+        ] {
             let node = graph.node(name).expect("a node of the example");
             let inputs = routes.inputs_of(name);
             let port = ComputePort::make(
@@ -2250,7 +2257,7 @@ vehicle:
         assert_eq!(
             decisions,
             [&b"1"[..]],
-            "the decision reaches the ground as well as the heaters, once"
+            "the decision reaches the ground as well as the heater, once"
         );
 
         // The log saw the same three and the decision, which is the other
@@ -2262,10 +2269,15 @@ vehicle:
             log.lock().expect("the record").given
         );
 
-        // And both heaters were asserted, from the one pass: one decision
-        // reaching each of them, so that one failing leaves the other
-        // warming the mass.
-        for (which, heater) in [("heaters_1", &first), ("heaters_2", &second)] {
+        // And the first stage's heater was asserted, from the one pass. The
+        // second stage comes on only below 289.15, two of the first stage's
+        // half bands under its setpoint, and the vote is 289.15 exactly:
+        // inside the second stage's band, so it decides nothing and its
+        // heater is left alone.
+        for (which, heater, wanted) in [
+            ("heaters_1", &first, vec![b"1".to_vec()]),
+            ("heaters_2", &second, Vec::new()),
+        ] {
             let driven: Vec<Vec<u8>> = heater
                 .lock()
                 .expect("the record")
@@ -2273,11 +2285,7 @@ vehicle:
                 .iter()
                 .map(|(_, _, datum)| datum.clone())
                 .collect();
-            assert_eq!(
-                driven,
-                vec![b"1".to_vec()],
-                "{which}: a zone below the band should have its heaters on"
-            );
+            assert_eq!(driven, wanted, "{which}");
         }
     }
 
@@ -2295,7 +2303,14 @@ vehicle:
         let routes = Routes::of(&graph);
 
         let mut fabric = Fabric::new(routes.clone(), 64);
-        for name in ["k_1", "k_2", "k_3", "zone_temp", "thermostat"] {
+        for name in [
+            "temp1",
+            "temp2",
+            "temp3",
+            "ambient",
+            "thermostat_1",
+            "thermostat_2",
+        ] {
             let node = graph.node(name).expect("a node of the example");
             let inputs = routes.inputs_of(name);
             fabric.hold(
@@ -2348,14 +2363,14 @@ vehicle:
         let routes = Routes::of(&graph);
 
         let mut fabric = Fabric::new(routes.clone(), 64);
-        let node = graph.node("k_1").expect("the converter");
+        let node = graph.node("temp1").expect("the converter");
         fabric.hold(
-            "k_1",
+            "temp1",
             Box::new(
                 ComputePort::make(
                     node,
-                    &routes.inputs_of("k_1"),
-                    routes.input_unit_of("k_1"),
+                    &routes.inputs_of("temp1"),
+                    routes.input_unit_of("temp1"),
                     &Abandon::nothing(),
                 )
                 .expect("it builds"),
@@ -2369,7 +2384,7 @@ vehicle:
         let moved = fabric.deliver("temp_1", &[0x01, 0x00, 0x00]);
 
         assert_eq!(moved.refused.len(), 1, "{:?}", moved.refused);
-        assert_eq!(moved.refused[0].0, "k_1");
+        assert_eq!(moved.refused[0].0, "temp1");
         assert!(
             moved.refused[0].1.contains("to_kelvin"),
             "the complaint should name the computation: {}",
@@ -2383,7 +2398,7 @@ vehicle:
     /// A command from the ground changes what the thermostat decides.
     ///
     /// The last link in the worked example's chain. The example's binding says
-    /// the ground may set `thermostat.setpoint`, and a zone that was within
+    /// the ground may set `thermostat_1.setpoint`, and a zone that was within
     /// the band becomes a zone the heaters are wanted in -- without the
     /// readings changing at all, which is what makes this the command's doing
     /// and not the sensors'.
@@ -2395,19 +2410,24 @@ vehicle:
         let routes = Routes::of(&graph);
 
         let mut fabric = Fabric::new(routes.clone(), 64);
-        let thermostat = graph.node("thermostat").expect("the thermostat");
+        // The first stage, and a stand-in for the second that only takes
+        // what reaches it, so that what the heaters are told is the first
+        // stage's alone.
+        let thermostat = graph.node("thermostat_1").expect("the first stage");
         fabric.hold(
-            "thermostat",
+            "thermostat_1",
             Box::new(
                 ComputePort::make(
                     thermostat,
                     &[],
-                    routes.input_unit_of("thermostat"),
+                    routes.input_unit_of("thermostat_1"),
                     &Abandon::nothing(),
                 )
                 .expect("it builds"),
             ),
         );
+        let (_, second_stage) = recorder();
+        fabric.hold("thermostat_2", second_stage);
         let (heaters, heater_port) = recorder();
         let (_, second_port) = recorder();
         let (_, log_port) = recorder();
@@ -2419,7 +2439,7 @@ vehicle:
 
         // 294 kelvin against a setpoint of 293.15 with two degrees either
         // side: inside the band, so nothing is decided.
-        let moved = fabric.deliver("zone_temp", &kelvin(294.0));
+        let moved = fabric.deliver("ambient", &kelvin(294.0));
         assert!(moved.all_delivered(), "{:?}", moved.refused);
         assert!(
             heaters.lock().expect("the record").given.is_empty(),
@@ -2429,11 +2449,11 @@ vehicle:
         // The ground asks for a warmer zone. The decision is not taken on
         // the strength of the number -- the next reading decides -- so the
         // heaters are still untouched.
-        assert_eq!(fabric.set("thermostat", "setpoint", b"300.0"), Ok(()));
+        assert_eq!(fabric.set("thermostat_1", "setpoint", b"300.0"), Ok(()));
         assert!(heaters.lock().expect("the record").given.is_empty());
 
         // And the same reading now calls for heat.
-        let moved = fabric.deliver("zone_temp", &kelvin(294.0));
+        let moved = fabric.deliver("ambient", &kelvin(294.0));
         assert!(moved.all_delivered(), "{:?}", moved.refused);
         assert_eq!(
             heaters.lock().expect("the record").given,
@@ -2466,19 +2486,24 @@ vehicle:
         let routes = Routes::of(&graph);
 
         let mut fabric = Fabric::new(routes.clone(), 64);
-        let thermostat = graph.node("thermostat").expect("the thermostat");
+        // The first stage, and a stand-in for the second that only takes
+        // what reaches it, so that what the heaters are told is the first
+        // stage's alone.
+        let thermostat = graph.node("thermostat_1").expect("the first stage");
         fabric.hold(
-            "thermostat",
+            "thermostat_1",
             Box::new(
                 ComputePort::make(
                     thermostat,
                     &[],
-                    routes.input_unit_of("thermostat"),
+                    routes.input_unit_of("thermostat_1"),
                     &Abandon::nothing(),
                 )
                 .expect("it builds"),
             ),
         );
+        let (_, second_stage) = recorder();
+        fabric.hold("thermostat_2", second_stage);
         let (heaters, heater_port) = device();
         let (second, second_port) = device();
         let (log, log_port) = recorder();
@@ -2490,7 +2515,7 @@ vehicle:
 
         // Cold: the first decision, which is a change and goes everywhere its
         // links lead.
-        let moved = fabric.deliver("zone_temp", &kelvin(280.0));
+        let moved = fabric.deliver("ambient", &kelvin(280.0));
         assert!(moved.all_delivered(), "{:?}", moved.refused);
         // The decisions a node was handed, and not the temperatures: the
         // example logs the voted temperature and reports it to the ground as
@@ -2510,15 +2535,15 @@ vehicle:
         assert_eq!(said(&log), vec![b"1".to_vec()]);
         assert_eq!(said(&gateway), vec![b"1".to_vec()]);
 
-        // Four more samples, still cold. Each asserts the decision to both
-        // heaters again -- it is what they are to be held at -- and the
-        // record of it stands at the one transition.
+        // Four more samples, still cold. Each asserts the decision to the
+        // heater again -- it is what it is to be held at -- and the record
+        // of it stands at the one transition.
         for _ in 0..4 {
-            let moved = fabric.deliver("zone_temp", &kelvin(280.0));
+            let moved = fabric.deliver("ambient", &kelvin(280.0));
             assert!(moved.all_delivered(), "{:?}", moved.refused);
         }
         assert_eq!(said(&heaters).len(), 5, "{:?}", said(&heaters));
-        assert_eq!(said(&second).len(), 5, "both heaters are held, not one");
+        assert!(said(&second).is_empty(), "heaters_2 is the second stage's");
         assert!(
             said(&heaters).iter().all(|datum| datum == b"1"),
             "every assertion is the same decision: {:?}",
@@ -2537,14 +2562,14 @@ vehicle:
 
         // A reading inside the band decides nothing new, and the heaters are
         // still held at what they were told: that is what the band means.
-        let moved = fabric.deliver("zone_temp", &kelvin(294.0));
+        let moved = fabric.deliver("ambient", &kelvin(294.0));
         assert!(moved.all_delivered(), "{:?}", moved.refused);
         assert_eq!(said(&heaters).len(), 6);
         assert_eq!(said(&log).len(), 1);
 
         // Warm enough to switch them off: a change, so it is recorded with
         // the first one and the heaters are driven to it.
-        let moved = fabric.deliver("zone_temp", &kelvin(300.0));
+        let moved = fabric.deliver("ambient", &kelvin(300.0));
         assert!(moved.all_delivered(), "{:?}", moved.refused);
         assert_eq!(said(&heaters).last(), Some(&b"0".to_vec()));
         assert_eq!(
@@ -2563,28 +2588,30 @@ vehicle:
         let routes = Routes::of(&graph);
 
         let mut fabric = Fabric::new(routes.clone(), 64);
-        let thermostat = graph.node("thermostat").expect("the thermostat");
-        fabric.hold(
-            "thermostat",
-            Box::new(
-                ComputePort::make(
-                    thermostat,
-                    &[],
-                    routes.input_unit_of("thermostat"),
-                    &Abandon::nothing(),
-                )
-                .expect("it builds"),
-            ),
-        );
+        for stage in ["thermostat_1", "thermostat_2"] {
+            let thermostat = graph.node(stage).expect("a stage");
+            fabric.hold(
+                stage,
+                Box::new(
+                    ComputePort::make(
+                        thermostat,
+                        &[],
+                        routes.input_unit_of(stage),
+                        &Abandon::nothing(),
+                    )
+                    .expect("it builds"),
+                ),
+            );
+        }
 
         // The band either side of the setpoint is in the file and no binding
         // names it, so the ground cannot change it however willing the
         // computation is.
         let said = fabric
-            .set("thermostat", "above", b"5.0")
+            .set("thermostat_1", "above", b"5.0")
             .expect_err("an attribute no binding names");
         assert!(
-            said.contains("thermostat.above") && said.contains("checkable"),
+            said.contains("thermostat_1.above") && said.contains("checkable"),
             "the refusal should name what was asked and why not: {said}"
         );
 
@@ -2593,23 +2620,23 @@ vehicle:
         let mut bound = graph.clone();
         bound.commands.push(tcslibgs::graph::CommandBinding {
             from: "gateway".to_string(),
-            sets: "thermostat.half_band".to_string(),
+            sets: "thermostat_1.half_band".to_string(),
         });
         let mut fabric_bound = Fabric::new(Routes::of(&bound), 64);
         fabric_bound.hold(
-            "thermostat",
+            "thermostat_1",
             Box::new(
                 ComputePort::make(
-                    thermostat,
+                    graph.node("thermostat_1").expect("the first stage"),
                     &[],
-                    routes.input_unit_of("thermostat"),
+                    routes.input_unit_of("thermostat_1"),
                     &Abandon::nothing(),
                 )
                 .expect("it builds"),
             ),
         );
         let said = fabric_bound
-            .set("thermostat", "half-band", b"1.0")
+            .set("thermostat_1", "half-band", b"1.0")
             .expect_err("a spelling no binding names");
         assert!(
             said.contains("it is spelled half_band"),
@@ -2619,10 +2646,10 @@ vehicle:
         // A value that is not a number is refused by the computation, which
         // is the other half of what a command has to get past.
         let said = fabric
-            .set("thermostat", "setpoint", b"warm")
+            .set("thermostat_1", "setpoint", b"warm")
             .expect_err("a setpoint that is not a number");
         assert!(
-            said.contains("thermostat") && said.contains("warm"),
+            said.contains("thermostat_1") && said.contains("warm"),
             "the refusal should name the node and the value: {said}"
         );
     }
@@ -2730,10 +2757,10 @@ vehicle:
         log.lock().expect("the record").refuse =
             Some("the device is full".to_string());
         fabric.hold("gateway", gateway_port);
-        fabric.hold("zone_temp", mean_port);
+        fabric.hold("ambient", mean_port);
         fabric.hold("housekeeping", log_port);
 
-        let moved = fabric.deliver("k_1", &[9]);
+        let moved = fabric.deliver("temp1", &[9]);
 
         assert_eq!(
             moved.delivered, 2,
@@ -2758,9 +2785,9 @@ vehicle:
         let mut fabric = Fabric::new(thermostat(), 64);
         let (gateway, gateway_port) = recorder();
         fabric.hold("gateway", gateway_port);
-        // zone_temp and housekeeping are not held.
+        // ambient and housekeeping are not held.
 
-        let moved = fabric.deliver("k_1", &[7]);
+        let moved = fabric.deliver("temp1", &[7]);
 
         assert_eq!(moved.delivered, 1);
         assert_eq!(moved.refused.len(), 2, "{:?}", moved.refused);
@@ -2790,7 +2817,7 @@ vehicle:
         let (_sensor, sensor_port) = recorder();
         let (_k, k_port) = recorder();
         fabric.hold("temp_1", sensor_port);
-        fabric.hold("k_1", k_port);
+        fabric.hold("temp1", k_port);
 
         let moved = fabric.pump("temp_1");
         assert_eq!(moved.delivered, 0);
@@ -2805,7 +2832,7 @@ vehicle:
         let (k, k_port) = recorder();
         sensor.lock().expect("the record").to_say = vec![vec![0x01, 0x90]];
         fabric.hold("temp_1", sensor_port);
-        fabric.hold("k_1", k_port);
+        fabric.hold("temp1", k_port);
 
         let moved = fabric.pump("temp_1");
 
@@ -2823,9 +2850,11 @@ vehicle:
         let mut fabric = Fabric::new(thermostat(), 64);
 
         let mut sensors = Vec::new();
-        for (sensor, converter) in
-            [("temp_1", "k_1"), ("temp_2", "k_2"), ("temp_3", "k_3")]
-        {
+        for (sensor, converter) in [
+            ("temp_1", "temp1"),
+            ("temp_2", "temp2"),
+            ("temp_3", "temp3"),
+        ] {
             let (record, port) = recorder();
             record.lock().expect("the record").to_say =
                 vec![vec![sensors.len() as u8]];

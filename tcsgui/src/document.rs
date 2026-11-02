@@ -3174,9 +3174,9 @@ pub fn thermostat_example() -> Document {
     );
 
     for (name, at, format, scale, offset) in [
-        ("k_1", (242, 34), "i16_be", "0.0625", "273.15"),
-        ("k_2", (242, 166), "i16_be", "0.0625", "273.15"),
-        ("k_3", (242, 280), "u24_be", "0.0078", "255.37"),
+        ("temp1", (242, 34), "i16_be", "0.0625", "273.15"),
+        ("temp2", (242, 166), "i16_be", "0.0625", "273.15"),
+        ("temp3", (242, 280), "u24_be", "0.0078", "255.37"),
     ] {
         place(&mut document, name, "compute", at);
         set(&mut document, name, "function", "to_kelvin");
@@ -3185,13 +3185,13 @@ pub fn thermostat_example() -> Document {
         set(&mut document, name, "offset", offset);
     }
 
-    place(&mut document, "zone_temp", "compute", (469, 166));
-    set(&mut document, "zone_temp", "function", "vote");
-    set(&mut document, "zone_temp", "algorithm", "median");
-    set(&mut document, "zone_temp", "inputs", "in0,in1,in2");
+    place(&mut document, "ambient", "compute", (469, 166));
+    set(&mut document, "ambient", "function", "vote");
+    set(&mut document, "ambient", "algorithm", "median");
+    set(&mut document, "ambient", "inputs", "in0,in1,in2");
     note(
         &mut document,
-        "zone_temp",
+        "ambient",
         "One temperature out of the three, by the algorithm named: \
          median takes the middle reading, closest_mean the mean of the two \
          that agree best. Either leaves a sensor that has gone wrong out of \
@@ -3200,17 +3200,37 @@ pub fn thermostat_example() -> Document {
          is outvoted rather than stopping the vehicle from deciding anything.",
     );
 
-    place(&mut document, "thermostat", "compute", (601, 242));
-    set(&mut document, "thermostat", "function", "hysteresis");
-    set(&mut document, "thermostat", "setpoint", "293.15");
-    set(&mut document, "thermostat", "half_band", "2.0");
-    note(
-        &mut document,
-        "thermostat",
-        "setpoint is set from the ground; half_band is how far either side of \
-         it the heaters are switched at, the setpoint being in the middle of \
-         the band.",
-    );
+    // Two stages, each a hysteresis of its own, so that the second heater
+    // comes on only when the first cannot hold the zone alone.
+    for (name, at, setpoint, half_band, note_text) in [
+        (
+            "thermostat_1",
+            (601, 166),
+            "293.15",
+            "2.0",
+            "The first stage, driving heaters_1: on below 291.15 K, off \
+             above 295.15 K. setpoint is set from the ground; half_band is \
+             how far either side of it the stage switches, the setpoint being \
+             in the middle of the band.",
+        ),
+        (
+            "thermostat_2",
+            (601, 300),
+            "290.15",
+            "1.0",
+            "The second stage, for when heaters_1 alone cannot hold the zone: \
+             heaters_2 on below 289.15 K, two half bands of the first stage \
+             under its setpoint, and off above 291.15 K, where the first \
+             stage comes on. Its band lies under that of the first stage, so \
+             heaters_2 is on only while heaters_1 is.",
+        ),
+    ] {
+        place(&mut document, name, "compute", at);
+        set(&mut document, name, "function", "hysteresis");
+        set(&mut document, name, "setpoint", setpoint);
+        set(&mut document, name, "half_band", half_band);
+        note(&mut document, name, note_text);
+    }
 
     place(&mut document, "gateway", "gateway_radio", (790, 34));
     set(&mut document, "gateway", "address", "10.0.0.1");
@@ -3259,68 +3279,36 @@ pub fn thermostat_example() -> Document {
         });
     };
 
-    link(&mut document, "temp_1", "payload-out", "k_1", None);
-    link(&mut document, "temp_2", "payload-out", "k_2", None);
-    link(&mut document, "temp_3", "payload-out", "k_3", None);
+    link(&mut document, "temp_1", "payload-out", "temp1", None);
+    link(&mut document, "temp_2", "payload-out", "temp2", None);
+    link(&mut document, "temp_3", "payload-out", "temp3", None);
 
     // The "T": each converted reading goes to the ground, into the vote, and
     // into the log.
-    for (from, input) in [("k_1", "in0"), ("k_2", "in1"), ("k_3", "in2")] {
+    for (from, input) in [("temp1", "in0"), ("temp2", "in1"), ("temp3", "in2")]
+    {
         link(&mut document, from, "payload-out", "gateway", None);
-        link(&mut document, from, "payload-out", "zone_temp", Some(input));
+        link(&mut document, from, "payload-out", "ambient", Some(input));
         link(&mut document, from, "payload-out", "housekeeping", None);
     }
 
-    link(&mut document, "zone_temp", "payload-out", "gateway", None);
-    link(
-        &mut document,
-        "zone_temp",
-        "payload-out",
-        "thermostat",
-        None,
-    );
-    // The heaters are a payload, so what drives them leaves the thermostat by
-    // its gateway-out: the vehicleward stream, which is what reaches a payload.
-    link(
-        &mut document,
-        "thermostat",
-        "gateway-out",
-        "heaters_1",
-        None,
-    );
-    link(
-        &mut document,
-        "thermostat",
-        "gateway-out",
-        "heaters_2",
-        None,
-    );
-    link(
-        &mut document,
-        "thermostat",
-        "payload-out",
-        "housekeeping",
-        None,
-    );
-    link(&mut document, "thermostat", "payload-out", "gateway", None);
-    // The comment belongs to the terminal rather than to one link, so both
-    // of the heaters carry it: that is what reading the file back gives, a
-    // comment above `gateway-out` being about the block and not its first line.
-    for heater in ["heaters_1", "heaters_2"] {
+    link(&mut document, "ambient", "payload-out", "gateway", None);
+    // The heaters are payloads, so what drives them leaves a stage by its
+    // gateway-out: the vehicleward stream, which is what reaches a payload.
+    // Each stage drives a heater of its own, so that the two are seen apart.
+    for (stage, heater) in
+        [("thermostat_1", "heaters_1"), ("thermostat_2", "heaters_2")]
+    {
+        link(&mut document, "ambient", "payload-out", stage, None);
+        link(&mut document, stage, "gateway-out", heater, None);
+        link(&mut document, stage, "payload-out", "housekeeping", None);
+        link(&mut document, stage, "payload-out", "gateway", None);
         document.apply(&Edit::SetLinkComment {
-            link: Link::joining(
-                "thermostat",
-                Some("gateway-out"),
-                heater,
-                None,
-            ),
+            link: Link::joining(stage, Some("gateway-out"), heater, None),
             was: None,
             now: Some(
                 comment_lines(
-                    "asserted below the setpoint, unasserted above it. Two \
-                     heaters, because one failing must not leave the mass \
-                     with no way to be warmed: either alone holds the band, \
-                     and both together hold it twice as fast.",
+                    "asserted below the band, unasserted above it.",
                     16,
                 )
                 .join("\n"),
@@ -3329,16 +3317,24 @@ pub fn thermostat_example() -> Document {
     }
 
     // What the ground may change in flight, which the worked example calls for
-    // and the diagram cannot show: the setpoint is commanded, and the rest of
-    // the thermostat is not.
-    document.commands.push(Command {
-        from: "gateway".to_string(),
-        sets: "thermostat.setpoint".to_string(),
-        comment: Some(
-            "the zone temperature the heaters are held at, in kelvin"
-                .to_string(),
+    // and the diagram cannot show: each stage's setpoint is commanded, and the
+    // rest of it is not.
+    for (stage, said) in [
+        (
+            "thermostat_1",
+            "the middle of the first stage band, in kelvin",
         ),
-    });
+        (
+            "thermostat_2",
+            "the middle of the second stage band, in kelvin",
+        ),
+    ] {
+        document.commands.push(Command {
+            from: "gateway".to_string(),
+            sets: format!("{stage}.setpoint"),
+            comment: Some(said.to_string()),
+        });
+    }
 
     document
 }

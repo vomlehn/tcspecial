@@ -215,7 +215,7 @@ pub fn payload_config_attached(
 
     Ok(PayloadConfig {
         attachment,
-        thermostat: None,
+        thermostats: Vec::new(),
         bus_address,
         can_id,
         can_fd,

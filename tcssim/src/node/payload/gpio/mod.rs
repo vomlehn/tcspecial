@@ -316,7 +316,7 @@ mod tests {
             .collect();
         let config = PayloadConfig {
             attachment: None,
-            thermostat: None,
+            thermostats: Vec::new(),
             name: "heaters".to_string(),
             protocol: crate::payload::PayloadProtocol::Gpio,
             address: "/dev/gpiochip3".to_string(),

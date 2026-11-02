@@ -5572,10 +5572,14 @@ Three temperature sensors of one place, two on an I\ :superscript:`2`\ C bus
 and one on a SPI link, each producing a different format. All three are read
 together ten times a second. Each reading is converted to kelvin, and each
 converted reading goes to two places: down to the MOC, and into a vote. The
-vote takes the middle of the three and goes to the MOC as well, and into a
-comparison against a setpoint the ground sets. More than two degrees above it,
-two sets of heater lines are unasserted; more than two below, they are
-asserted.
+vote takes the middle of the three and goes to the MOC as well, and into two
+stages of comparison, each against a setpoint the ground sets and each driving
+a set of heater lines of its own. More than two degrees above the first
+stage's setpoint, its lines are unasserted; more than two below, they are
+asserted. The second stage's setpoint is three degrees lower and its band one
+degree each way, so its lines are asserted only when the zone falls two
+degrees further than the first stage's band, where the first set alone has
+not held it, and unasserted where the first stage's band begins.
 
 The trio is the point of the example. Three sensors of one place, separated
 only because two parts cannot occupy one point, so that the temperature
@@ -5607,26 +5611,31 @@ addresses are its own. What is here is checked as it stands, with a
 
    vehicle:
      - type compute:
-         - { compute: k_1, function: to_kelvin, format: i16_be,
+         - { compute: temp1, function: to_kelvin, format: i16_be,
              scale: "0.0625", offset: "273.15", payload-in: true,
              payload-out: [{ target: gateway },
-                           { target: zone_temp, input: in0 }] }
-         - { compute: k_2, function: to_kelvin, format: i16_be,
+                           { target: ambient, input: in0 }] }
+         - { compute: temp2, function: to_kelvin, format: i16_be,
              scale: "0.0625", offset: "273.15", payload-in: true,
              payload-out: [{ target: gateway },
-                           { target: zone_temp, input: in1 }] }
-         - { compute: k_3, function: to_kelvin, format: u24_be,
+                           { target: ambient, input: in1 }] }
+         - { compute: temp3, function: to_kelvin, format: u24_be,
              scale: "0.0078", offset: "255.37", payload-in: true,
              payload-out: [{ target: gateway },
-                           { target: zone_temp, input: in2 }] }
+                           { target: ambient, input: in2 }] }
 
-         - { compute: thermostat, function: hysteresis,
+         - { compute: thermostat_1, function: hysteresis,
              setpoint: "293.15", half_band: "2.0", payload-in: true,
              payload-out: [{ target: gateway }],
-             gateway-out: [{ target: heaters_1 }, { target: heaters_2 }] }
-         - { compute: zone_temp, function: vote, algorithm: median,
+             gateway-out: [{ target: heaters_1 }] }
+         - { compute: thermostat_2, function: hysteresis,
+             setpoint: "290.15", half_band: "1.0", payload-in: true,
+             payload-out: [{ target: gateway }],
+             gateway-out: [{ target: heaters_2 }] }
+         - { compute: ambient, function: vote, algorithm: median,
              inputs: "in0,in1,in2", payload-in: true,
-             payload-out: [{ target: gateway }, { target: thermostat }] }
+             payload-out: [{ target: gateway }, { target: thermostat_1 },
+                           { target: thermostat_2 }] }
 
    payloads:
      - type gpio:
@@ -5636,26 +5645,27 @@ addresses are its own. What is here is checked as it stands, with a
              lines: "6,7,8", gateway-in: true }
      - type i2c:
          - { payload: temp_1, group: zone_temps, path: "/dev/i2c-1",
-             address: "0x48", read_size: "2", payload-out: [{ target: k_1 }] }
+             address: "0x48", read_size: "2", payload-out: [{ target: temp1 }] }
          - { payload: temp_2, group: zone_temps, path: "/dev/i2c-1",
-             address: "0x49", read_size: "2", payload-out: [{ target: k_2 }] }
+             address: "0x49", read_size: "2", payload-out: [{ target: temp2 }] }
      - type spi:
          - { payload: temp_3, group: zone_temps, path: "/dev/spidev0.0",
              max_speed: "1000000", spi_mode: "0", read_size: "3",
-             payload-out: [{ target: k_3 }] }
+             payload-out: [{ target: temp3 }] }
 
    commands:
-     - { from: gateway, sets: thermostat.setpoint }
+     - { from: gateway, sets: thermostat_1.setpoint }
+     - { from: gateway, sets: thermostat_2.setpoint }
 
 A line is written once, on the node it leaves, under the terminal it leaves
 by: ``payload-out`` on each sensor names the conversion it feeds, and the
-conversions name the vote's input they bind. The thermostat's decision leaves
-by two terminals, which is the file saying two different things with it -- its
+conversions name the vote's input they bind. Each stage's decision leaves by
+two terminals, which is the file saying two different things with it -- its
 ``payload-out`` sends it to the ground as telemetry, and its ``gateway-out``
-drives the two heaters.
+drives its heaters.
 
 Several things in that file are refusals waiting to happen, which is the point.
-Drop ``zone_temp.in2`` from ``k_3``'s links and the configuration is refused
+Drop ``ambient.in2`` from ``temp3``'s links and the configuration is refused
 for a vote whose declared inputs are not the ones that arrive, rather than
 voting over two readings and calling it a trio. Give ``temp_2`` an interval of
 its own and it is refused for disagreeing with the group that says when it is

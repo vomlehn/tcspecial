@@ -2362,18 +2362,16 @@ mod tests {
         // beside it is the node's own device id rather than the row: a
         // command names the id, and a panel that showed the row would name
         // the wrong node the moment a source was left out of the window.
-        let second = links
-            .iter()
-            .min_by_key(|link| link.id)
-            .map(|first| first.id)
-            .expect("at least one link");
-        assert_eq!(model[1].dev_id, i32::try_from(second + 1).unwrap());
+        let mut ids: Vec<usize> = links.iter().map(|link| link.id).collect();
+        ids.sort_unstable();
+        let second = *ids.get(1).expect("at least two links");
+        assert_eq!(model[1].dev_id, i32::try_from(second).unwrap());
         assert_eq!(
             model[1].name,
             SharedString::from(
                 links
                     .iter()
-                    .find(|link| link.id == second + 1)
+                    .find(|link| link.id == second)
                     .expect("the second source")
                     .source
                     .clone()

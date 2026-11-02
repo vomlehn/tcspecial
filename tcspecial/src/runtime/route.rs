@@ -460,31 +460,31 @@ mod tests {
     fn one_output_reaches_every_destination_of_its_link() {
         let routes = Routes::of(&thermostat());
 
-        let from_k_fore = routes.from("k_1");
+        let from_k_fore = routes.from("temp1");
         assert_eq!(
             from_k_fore.len(),
             3,
             "the T should deliver three ways: {from_k_fore:?}"
         );
 
-        // The one to the ground goes to k_1's own link to the gateway node's
+        // The one to the ground goes to temp1's own link to the gateway node's
         // ground_base: see `a_line_into_a_gateway_node_goes_to_its_own_link`.
         let places: Vec<&str> =
             from_k_fore.iter().map(|d| d.to.as_str()).collect();
-        assert!(places.contains(&"k_1 to gateway"), "{places:?}");
-        assert!(places.contains(&"zone_temp"), "{places:?}");
+        assert!(places.contains(&"temp1 to gateway"), "{places:?}");
+        assert!(places.contains(&"ambient"), "{places:?}");
         assert!(places.contains(&"housekeeping"), "{places:?}");
 
         // And the one into the mean knows which input it fills, where the
         // other two do not name one.
         let into_mean = from_k_fore
             .iter()
-            .find(|d| d.to == "zone_temp")
+            .find(|d| d.to == "ambient")
             .expect("a delivery into the mean");
         assert_eq!(into_mean.input.as_deref(), Some("in0"));
         let payload_out = from_k_fore
             .iter()
-            .find(|d| d.to == "k_1 to gateway")
+            .find(|d| d.to == "temp1 to gateway")
             .unwrap();
         assert_eq!(payload_out.input, None);
     }
@@ -565,14 +565,14 @@ mod tests {
     fn a_fan_in_is_filled_by_name_and_not_by_order() {
         let routes = Routes::of(&thermostat());
 
-        assert_eq!(routes.inputs_of("zone_temp"), vec!["in0", "in1", "in2"]);
-        assert_eq!(routes.source_of("zone_temp", "in0"), Some("k_1"));
-        assert_eq!(routes.source_of("zone_temp", "in1"), Some("k_2"));
-        assert_eq!(routes.source_of("zone_temp", "in2"), Some("k_3"));
+        assert_eq!(routes.inputs_of("ambient"), vec!["in0", "in1", "in2"]);
+        assert_eq!(routes.source_of("ambient", "in0"), Some("temp1"));
+        assert_eq!(routes.source_of("ambient", "in1"), Some("temp2"));
+        assert_eq!(routes.source_of("ambient", "in2"), Some("temp3"));
 
         // An input nothing fills has no source, which is what the checking
         // refuses a configuration for -- here it is simply absent.
-        assert_eq!(routes.source_of("zone_temp", "in3"), None);
+        assert_eq!(routes.source_of("ambient", "in3"), None);
     }
 
     /// A node whose output goes one place has one delivery.
@@ -582,7 +582,7 @@ mod tests {
 
         let from_sensor = routes.from("temp_1");
         assert_eq!(from_sensor.len(), 1, "{from_sensor:?}");
-        assert_eq!(from_sensor[0].to, "k_1");
+        assert_eq!(from_sensor[0].to, "temp1");
         assert_eq!(from_sensor[0].input, None);
         assert_eq!(routes.fan_out("temp_1"), 1);
     }
@@ -599,7 +599,10 @@ mod tests {
         // into the log, each named once.
         let mut into_log = routes.arriving_at("housekeeping");
         into_log.sort();
-        assert_eq!(into_log, vec!["k_1", "k_2", "k_3", "thermostat"]);
+        assert_eq!(
+            into_log,
+            vec!["temp1", "temp2", "temp3", "thermostat_1", "thermostat_2"]
+        );
 
         // A sensor is the start of a path and nothing arrives at it.
         assert!(routes.arriving_at("temp_1").is_empty());
@@ -607,8 +610,8 @@ mod tests {
         assert!(routes.arriving_at("nobody").is_empty());
 
         // Three links into three named inputs are three sources.
-        let into_vote = routes.arriving_at("zone_temp");
-        assert_eq!(into_vote, vec!["k_1", "k_2", "k_3"], "{into_vote:?}");
+        let into_vote = routes.arriving_at("ambient");
+        assert_eq!(into_vote, vec!["temp1", "temp2", "temp3"], "{into_vote:?}");
     }
 
     /// A node nothing leaves has no deliveries, and asking is cheap.
@@ -688,21 +691,21 @@ mod tests {
         assert!(routes.arriving_at("gateway").is_empty());
 
         let mean: Vec<&str> = routes
-            .from("zone_temp")
+            .from("ambient")
             .iter()
             .map(|d| d.to.as_str())
             .collect();
-        assert!(mean.contains(&"zone_temp to gateway"), "{mean:?}");
+        assert!(mean.contains(&"ambient to gateway"), "{mean:?}");
 
         let link = routes
             .ground_links()
             .iter()
-            .find(|l| l.name == "zone_temp to gateway")
-            .expect("zone_temp's link to the ground");
+            .find(|l| l.name == "ambient to gateway")
+            .expect("ambient's link to the ground");
         assert_eq!(link.via, Via::Gateway("gateway".to_string()));
-        // The thermostat's mean is the last of its names, id 11, and its
-        // gateway node's ground_base is 10.0.0.2:5100.
+        // The thermostat's vote, ambient, is the first of its names, id 0,
+        // and its gateway node's ground_base is 10.0.0.2:5100.
         let ground = link.ground().expect("a link over UDP");
-        assert_eq!((ground.address.as_str(), ground.port), ("10.0.0.2", 5111));
+        assert_eq!((ground.address.as_str(), ground.port), ("10.0.0.2", 5100));
     }
 }

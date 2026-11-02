@@ -143,7 +143,7 @@ mod tests {
     ) -> PayloadConfig {
         PayloadConfig {
             attachment: None,
-            thermostat: None,
+            thermostats: Vec::new(),
             name: "remote".to_string(),
             protocol: PayloadProtocol::Rpmsg,
             address: path.to_string(),

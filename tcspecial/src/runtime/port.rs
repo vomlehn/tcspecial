@@ -2498,7 +2498,7 @@ mod tests {
         // A computation is not opened at all, and says so before anything is
         // reached for.
         let said = match EndpointPort::open(
-            graph.node("thermostat").expect("the thermostat"),
+            graph.node("thermostat_1").expect("the thermostat"),
             &routes,
             &Abandon::nothing(),
         ) {

@@ -1067,12 +1067,22 @@ export struct TickShown {
 }
 
 // The values in one unit: the unit's name, their traces, the axis's ticks,
-// and how far down each thermostat setpoint in this unit is, in pixels.
+// and how far down each thermostat setpoint in this unit is, in pixels. Where
+// a thermostat's band is drawn behind it (see plot.rs's `Band`), `banded`,
+// what the legend says of the band, and how far down its edges are, in
+// pixels: setpoint plus twice the half band, plus once, minus once and minus
+// twice.
 export struct PanelShown {
     unit: string,
     traces: [TraceShown],
     ticks: [TickShown],
     setpoints: [float],
+    banded: bool,
+    band-said: string,
+    too-high: float,
+    high: float,
+    low: float,
+    too-low: float,
 }
 
 // A stretch of time a switch was in one state, in pixels across the plot.
@@ -1101,6 +1111,16 @@ export struct SwitchShown {
 // legend with its latest reading, each switch's state is said in words, and
 // a setpoint's rule is labelled. Vermillion is the switches' alone, so that
 // no value is the colour of a switch on.
+//
+// A thermostat's band is drawn behind its panel's traces in their yellow and
+// vermillion paled toward white -- 25% of #F0E442 and 15% of #D55E00 -- so
+// pale that every trace keeps most of the contrast it has on white. A pale
+// yellow and a pale red can look alike to a reader with red-green colour
+// blindness, so each region is said in words at the panel's left, each edge
+// is a line, and the legend names the band. The pale red is never mistaken
+// for a switch on: a switch is drawn on its own strip under the panels, in
+// full vermillion with "on" written in it, and nothing of a switch is drawn
+// on a panel.
 export component PlotWindow inherits Window {
     default-font-size: Fonts.window;
     title: "tcsmoc: plot";
@@ -1128,8 +1148,14 @@ export component PlotWindow inherits Window {
             / max(1, root.panels.length);
 
     property <color> switch-on: #D55E00;
-    property <color> switch-on-shade: #D55E0024;
     property <color> switch-off: #D4D8DD;
+    // Okabe and Ito's yellow and vermillion, paled toward white.
+    property <color> band-near: #FBF8D0;
+    property <color> band-far: #F9E7D9;
+    // A band's edges: darker than the ticks' rules, lighter and thinner
+    // than a setpoint's.
+    property <color> band-edge: #A8A29E;
+    property <color> band-words: #4B5563;
     property <color> rule: #E5E7EB;
     property <color> edge: #9CA3AF;
     property <length> axis-width: 92px;
@@ -1196,6 +1222,12 @@ export component PlotWindow inherits Window {
                             vertical-alignment: center;
                         }
                     }
+                    if panel.band-said != "": Text {
+                        text: panel.band-said;
+                        color: root.band-words;
+                        font-italic: true;
+                        vertical-alignment: center;
+                    }
                 }
 
                 // The axis: each tick's value, centred on its rule. The top
@@ -1221,17 +1253,88 @@ export component PlotWindow inherits Window {
                     border-color: root.edge;
                     clip: true;
 
-                    // While a switch is on, the plot behind the traces is
-                    // shaded its colour, so that what the switches did lines
-                    // up with what the values did.
-                    for switch in root.switches: Rectangle {
-                        for span in switch.spans: Rectangle {
-                            x: span.x * 1px;
+                    // The band, behind everything else: white where the
+                    // reading is held, pale yellow a half band either side,
+                    // pale red beyond, each region said in words at the
+                    // left and each edge a line. A region too thin for its
+                    // words goes without them; the legend still names the
+                    // band.
+                    if panel.banded: Rectangle {
+                        x: 0;
+                        y: 0;
+                        width: parent.width;
+                        height: parent.height;
+                        Rectangle {
+                            x: 0;
                             y: 0;
-                            width: span.width * 1px;
-                            height: parent.height;
-                            background: span.on ? root.switch-on-shade
-                                                : transparent;
+                            width: parent.width;
+                            height: max(0px, panel.too-high * 1px);
+                            background: root.band-far;
+                        }
+                        Rectangle {
+                            x: 0;
+                            y: panel.too-high * 1px;
+                            width: parent.width;
+                            height: (panel.high - panel.too-high) * 1px;
+                            background: root.band-near;
+                        }
+                        Rectangle {
+                            x: 0;
+                            y: panel.low * 1px;
+                            width: parent.width;
+                            height: (panel.too-low - panel.low) * 1px;
+                            background: root.band-near;
+                        }
+                        Rectangle {
+                            x: 0;
+                            y: panel.too-low * 1px;
+                            width: parent.width;
+                            height: max(0px,
+                                        parent.height - panel.too-low * 1px);
+                            background: root.band-far;
+                        }
+                        for edge in [panel.too-high, panel.high, panel.low,
+                                     panel.too-low]: Rectangle {
+                            x: 0;
+                            y: edge * 1px;
+                            width: parent.width;
+                            height: 1px;
+                            background: root.band-edge;
+                        }
+                        Text {
+                            x: 4px;
+                            y: panel.too-high * 1px - self.height;
+                            visible: panel.too-high * 1px >= self.height;
+                            text: "too high";
+                            color: root.band-words;
+                            font-italic: true;
+                        }
+                        Text {
+                            x: 4px;
+                            y: panel.high * 1px - self.height;
+                            visible: (panel.high - panel.too-high) * 1px
+                                     >= self.height;
+                            text: "high";
+                            color: root.band-words;
+                            font-italic: true;
+                        }
+                        Text {
+                            x: 4px;
+                            y: panel.low * 1px + 1px;
+                            visible: (panel.too-low - panel.low) * 1px
+                                     >= self.height;
+                            text: "low";
+                            color: root.band-words;
+                            font-italic: true;
+                        }
+                        Text {
+                            x: 4px;
+                            y: panel.too-low * 1px + 1px;
+                            visible: parent.height - panel.too-low * 1px
+                                     >= self.height;
+                            text: "too low";
+                            color: root.band-words;
+                            font-italic: true;
                         }
                     }
 
@@ -1277,7 +1380,11 @@ export component PlotWindow inherits Window {
         }
 
         // Each switch, under the panels and as wide as them, so that a
-        // change lines up with the values above it.
+        // change lines up with the values above it: one strip a switch,
+        // labelled with what it drives, so that with two heaters on two
+        // thermostats, which is on, or both, is read straight off them. Full
+        // vermillion with "on" written in it while on, which no trace and
+        // neither band tint is.
         for switch in root.switches: HorizontalLayout {
             spacing: root.gap;
             Text {
@@ -1291,7 +1398,7 @@ export component PlotWindow inherits Window {
                 spacing: 2px;
                 Text { text: switch.label; }
                 Rectangle {
-                    height: 16px;
+                    height: 20px;
                     border-width: 1px;
                     border-color: root.edge;
                     clip: true;
@@ -1302,6 +1409,17 @@ export component PlotWindow inherits Window {
                         height: parent.height;
                         background: span.on ? root.switch-on
                                             : root.switch-off;
+                        // Black on vermillion, 5.4 to 1; left out where
+                        // the span is too narrow to hold it.
+                        Text {
+                            x: 4px;
+                            visible: span.on
+                                     && parent.width >= self.width + 8px;
+                            text: "on";
+                            color: #000000;
+                            font-weight: 700;
+                            vertical-alignment: center;
+                        }
                     }
                 }
             }

@@ -1664,6 +1664,7 @@ mod tests {
         panels_fill_left_to_right();
         every_panel_in_a_row_is_the_same_width();
         the_question_is_asked_in_front_of_the_greyed_panels();
+        crate::plot::tests::the_band_is_said_in_words_in_the_window();
         use crate::vehicle::tests as vehicle;
         vehicle::pressing_connect_and_enable_commands_the_vehicle();
         vehicle::pressing_send_ping_pings_the_node_and_times_its_answer();

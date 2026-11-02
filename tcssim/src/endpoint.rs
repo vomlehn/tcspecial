@@ -213,6 +213,13 @@ pub fn payload_config_attached(
         _ => Vec::new(),
     };
 
+    let sending = match &attachment {
+        Some(crate::physics::Attachment::Drives { power, .. }) => {
+            power.enabled_flag()
+        }
+        _ => Arc::new(std::sync::atomic::AtomicBool::new(false)),
+    };
+
     Ok(PayloadConfig {
         attachment,
         thermostats: Vec::new(),
@@ -239,7 +246,9 @@ pub fn payload_config_attached(
         segment_interval_ms: Arc::new(AtomicU32::new(
             sim.segment_interval.as_millis() as u32,
         )),
-        sending: Arc::new(std::sync::atomic::AtomicBool::new(false)),
+        // A driven part's panel button is its power, so the two are one
+        // flag: see `crate::physics::Power`.
+        sending,
         standing: Default::default(),
         driven: dh.driven,
     })

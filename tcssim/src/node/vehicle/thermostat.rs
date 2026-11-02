@@ -273,6 +273,7 @@ mod tests {
                 world: world.clone(),
                 place: place("heater_1.on"),
                 unit: None,
+                power: Arc::new(crate::physics::Power::new(true, true)),
             },
         )];
         let params = HysteresisParams {
@@ -307,6 +308,25 @@ mod tests {
         assert_eq!(send("temp_1", 296.0), Some(Decision::Off));
         assert_eq!(heat(&world, warming), 0.0, "the heater should be off");
         assert_eq!(send("temp_1", 293.15), Some(Decision::Off));
+    }
+
+    /// A heater disabled in its panel stays off whatever the stood-in
+    /// thermostat decides, and takes its latest decision when enabled.
+    #[test]
+    fn a_disabled_heater_ignores_the_stood_in_thermostat() {
+        let (thermostat, world, warming) = thermostat();
+        let heater = thermostat.heaters[0].1.clone();
+        heater.enable(false);
+        let send = |sensor: &str, kelvin: f64| {
+            thermostat.sample(sensor, &encode(&sixteenths(), kelvin))
+        };
+
+        assert_eq!(send("temp_1", 283.15), Some(Decision::On));
+        assert_eq!(heat(&world, warming), 0.0, "disabled, it stays off");
+        heater.enable(true);
+        assert!(heat(&world, warming) > 0.0, "enabled, it takes the on");
+        heater.enable(false);
+        assert_eq!(heat(&world, warming), 0.0, "disabled again, off");
     }
 
     /// Nothing is decided until a reading leaves the band.

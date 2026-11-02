@@ -7093,6 +7093,20 @@ Requirement
     Initiate restart pressed before a CONNECT has been answered give an
     advisory pop-up instead, which lets the operator go on or cancel.
 
+Requirement
+    tcsmoc's plot window draws a thermostat's band behind the panel of the
+    unit it reads: white within one ``half_band`` of the setpoint, pale
+    yellow within two, pale red beyond, each region said in words and the
+    band named in the legend, so that colour is never the only cue. The
+    panel's scale takes in two half bands either side of the setpoint. Of
+    several thermostats reading one unit, the band drawn is that of the one
+    with the highest setpoint: with staged heating that is the first stage,
+    whose band is the comfort band, a later stage being set lower to come on
+    only when the first cannot hold it. Every thermostat's setpoint is drawn
+    as a rule. A switch is drawn only on its own strip, labelled with what it
+    drives, never on a panel, so that a switch on is not taken for the band's
+    red. See ``tcsmoc/src/plot.rs``.
+
 Holes in the checksum scheme, and what closes them
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 

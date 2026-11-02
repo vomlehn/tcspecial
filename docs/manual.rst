@@ -5315,6 +5315,21 @@ any thermostat reading values in its unit, drawn as a dark rule labelled
 apart. Over each panel its legend names the unit and each value, with its
 latest reading, beside its colour.
 
+Behind a panel a thermostat reads, its band is drawn. With setpoint S and
+``half_band`` H, the panel is left white from S - H to S + H, where the
+thermostat holds the reading; it is pale yellow, and said ``high`` and
+``low``, for a further H either side; and pale red, said ``too high`` and
+``too low``, beyond that to the panel's edges. Each edge is a thin line, and
+the legend names the band and its thermostat, as ``band 291.15–295.15 K
+(thermostat)`` in the thermostat example. The panel's scale always takes in
+S - 2H to S + 2H, so the yellow is always there to be seen, and the red is
+too wherever the readings, or the rounding out to a tick, reach past it.
+Where more than one thermostat reads the unit -- staged heating, with a first
+stage and a second set lower that comes on only when the first cannot hold
+the zone -- the band drawn is that of the thermostat with the highest
+setpoint, the first stage, which is the one that states the comfort band;
+every thermostat's setpoint is still drawn as its rule.
+
 The buttons at the top choose the span: the last ``10 s``, ``1 min`` or
 ``10 min``, which fill from the left and then scroll, the newest at the right
 edge; or the ``Whole run``, from the first reading at the left edge to now
@@ -5329,18 +5344,26 @@ drawn, so that a spike is never thinned away.
 
 Under the panels, as wide as them so that a change lines up with the values
 above it, is a strip for each switch -- a ``hysteresis`` node drawn into a
-gateway node, named with what it drives -- coloured by what it last decided,
-and while it is on the panels behind the lines are shaded the same colour. A
-thermostat tells the ground only when its decision changes, so a switch is
-drawn from each change to the next, and before the first is heard it is not
-drawn at all, its state said as ``not heard`` rather than guessed as off.
+gateway node, named with what it drives, such as ``thermostat → heaters_1,
+heaters_2`` -- vermillion with ``on`` written in it while it is on, grey
+while it is off, and its last decision said beside it. With two thermostats
+each driving a heater there are two strips, one under the other, so which
+heater is on, or both, is read straight off them. Nothing of a switch is
+drawn on the panels, which keeps a switch on from being taken for the band's
+pale red. A thermostat tells the ground only when its decision changes, so a
+switch is drawn from each change to the next, and before the first is heard
+it is not drawn at all, its state said as ``not heard`` rather than guessed
+as off.
 
 The colours are Okabe and Ito's, which readers with each common kind of colour
 blindness tell apart: blue, bluish green, reddish purple, sky blue and black
-for the values, and vermillion, which nothing else uses, for a switch on.
-None is alone: the legend names each value beside its colour with its latest
-reading, the setpoint's rule is labelled, and each switch's state is in words
-beside its strip.
+for the values, and vermillion, which no value uses, for a switch on. The
+band's yellow and red are their yellow and vermillion paled toward white,
+light enough that every line keeps its contrast against them. None is alone:
+the legend names each value beside its colour with its latest reading, the
+setpoint's rule is labelled, each region of the band is said in words and the
+legend names the band, and each switch's state is in words beside its strip
+and on it.
 
 A triggered payload on the console
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^

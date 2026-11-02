@@ -21,6 +21,10 @@
 # each is joined to is switched. So the loop closes through tcspecial: the
 # sensors report the zone, the vehicle decides, and the heaters warm it.
 #
+# A heater's panel button is its power: disabled, it is an unpowered or
+# failed heater, and stays off whatever is decided; enabled again, it takes
+# the latest decision at once.
+#
 # To close it in tcssim alone, with no tcspecial running, add
 # "thermostat: thermostat" to the tcssim section below: tcssim then stands in
 # for the hysteresis node of that name, with its setpoint and band. Never

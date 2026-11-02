@@ -468,8 +468,8 @@ reading goes through a conversion of its own to kelvin -- `temp1`, `temp2`,
 `ambient`, which takes their median, so that one sensor failing cannot take
 the zone's temperature with it. `thermostat` holds that to a setpoint,
 293.15 K with a half band of 2 K, and drives two heaters, `heaters_1` and
-`heaters_2`. The ground commands the setpoint, and `housekeeping` logs the
-readings and decisions in `/tmp/telemetry`.
+`heaters_2`, which go on and off together. The ground commands the setpoint,
+and `housekeeping` logs the readings and decisions in `/tmp/telemetry`.
 
 Every sensor and heater is the far end of a UDP socket on this host, ports
 5201 to 5205, which tcssim stands in for: the example runs on any desk and
@@ -483,10 +483,19 @@ names, as thermostat-yamcs's simulator file does: a zone and two
 heaters, each a part simulated alone and joined to the zone under
 `connections`. All three sensors are joined to `zone.temperature`, each from
 a place of its own on the zone, so their readings agree and the vote
-produces a temperature. The zone cools towards 283.15 K, ten kelvin below the
-setpoint, and each heater's stand-in is joined to `heater_1.on` or
-`heater_2.on`, so the heaters warm it while the vehicle has them on: the loop
-closes through tcspecial.
+produces a temperature. The zone cools towards its surroundings, which swing
+six kelvin either side of 283.15 K over a ninety minute orbit, and each
+heater's stand-in is joined to `heater_1.on` or `heater_2.on`, so the heaters
+warm it while the vehicle has them on: the loop closes through tcspecial.
+The heaters are four watts each. Together they hold the band all round the
+orbit, the thermostat cycling them; one alone holds it only in the warm part,
+and for about a quarter of the orbit the zone falls more than two half bands
+below the setpoint, into the plot's pale red.
+
+A heater whose panel in tcssim is not enabled is unpowered, or failed: it
+stays off whatever the thermostat decides, and enabled again it takes the
+latest decision at once. Nothing aboard changes, so the ground sees a
+disabled heater only through the temperature.
 
 ```
 make run-thermostat
@@ -494,9 +503,13 @@ make run-thermostat
 
 That runs tcsmoc on the example, as `run-simple` does, and tcsmoc opens its
 plot window beside its own: each sensor's temperature and their vote over
-the last ten seconds, with the setpoint's rule, and the heaters' state under
-them. Press Connect in tcsmoc, and Enable on each payload in tcssim, to start
-the data and the heating.
+the last ten seconds, with the setpoint's rule and the thermostat's band, and
+its decision under them, one strip, `thermostat → heaters_1, heaters_2`.
+Press Connect in tcsmoc, and Enable on each payload in tcssim, to start the
+data and the heating; press Disable on a heater's panel in tcssim to take it
+away, and watch the zone fall behind in the cold part of the orbit. The
+strip goes on showing the thermostat's decision: the plot cannot see
+tcssim's Enable.
 
 Languages:
 
@@ -548,7 +561,10 @@ above the thermostat's: the zone's temperature, each reading, the
 thermostat's decision and the two heaters it drives. With `--seconds` there
 is no window: it prints every value each `--every` seconds, and a line each
 time the heaters are switched, and stops. tcssim draws a window of its own,
-so either wants a display.
+so either wants a display. Every payload sending from the start includes the
+heaters, so both start enabled; press Disable on a heater's panel in tcssim's
+window to take it away, and the zone falls behind in the cold part of the
+orbit, which Yamcs sees only in the temperatures.
 
 ```
 make run-thermostat-yamcs YAMCS_HOME=~/yamcs-5.14.0   # the window

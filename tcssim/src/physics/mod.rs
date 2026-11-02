@@ -667,7 +667,7 @@ connections:
     ) -> PayloadConfig {
         PayloadConfig {
             attachment: Some(attachment),
-            thermostat: None,
+            thermostats: Vec::new(),
             name: name.to_string(),
             protocol: PayloadProtocol::Udp,
             address: "127.0.0.1".to_string(),

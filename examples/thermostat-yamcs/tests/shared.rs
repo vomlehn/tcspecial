@@ -66,7 +66,7 @@ fn the_vehicles_are_the_same() {
         vehicle_of(&examples().join("thermostat-yamcs/thermostat-yamcs.ytcs"));
     assert_eq!(thermostat, yamcs);
     assert!(
-        thermostat["nodes"].as_array().expect("nodes").len() == 11,
+        thermostat["nodes"].as_array().expect("nodes").len() == 12,
         "{thermostat}"
     );
 }

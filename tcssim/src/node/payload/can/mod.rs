@@ -490,7 +490,7 @@ mod tests {
     ) -> PayloadConfig {
         PayloadConfig {
             attachment: None,
-            thermostat: None,
+            thermostats: Vec::new(),
             name: "can-device".to_string(),
             protocol: PayloadProtocol::Can,
             address: interface.to_string(),

@@ -1207,6 +1207,51 @@ where
     })
 }
 
+/// Reads a list of node names written as one text, separated by commas:
+/// `thermostat_1,thermostat_2`.
+///
+/// # Arguments
+///
+/// * `d` - The deserializer, at the text.
+///
+/// # Returns
+///
+/// The names, in the order written; none for a value left out or blank.
+///
+/// # Errors
+///
+/// An error naming the text if a name between its commas is blank, or a
+/// name is written twice: neither is a list of nodes anybody meant.
+fn node_names<'de, D>(d: D) -> Result<Vec<String>, D::Error>
+where
+    D: serde::Deserializer<'de>,
+{
+    let said = Option::<crate::Scalar>::deserialize(d)?;
+    let Some(said) = said else {
+        return Ok(Vec::new());
+    };
+    let text = said.as_str().trim();
+    if text.is_empty() {
+        return Ok(Vec::new());
+    }
+    let mut names: Vec<String> = Vec::new();
+    for name in text.split(',').map(str::trim) {
+        if name.is_empty() {
+            return Err(serde::de::Error::custom(format!(
+                "\"{text}\": a blank name between its commas, and each is \
+                 the name of a node"
+            )));
+        }
+        if names.iter().any(|named| named == name) {
+            return Err(serde::de::Error::custom(format!(
+                "\"{text}\": {name} is named twice"
+            )));
+        }
+        names.push(name.to_string());
+    }
+    Ok(names)
+}
+
 /// Every setting a group or a simulated payload may state, by the name a file
 /// writes.
 ///
@@ -1390,15 +1435,18 @@ pub struct SimTcssim {
     /// The UDP address, as `address:port`, at which tcssim answers whether it
     /// has made its stand-ins: see `crate::ready`.
     pub ready: String,
-    /// The hysteresis node of the configuration tcssim stands in for, if
-    /// any: tcssim then reads the sensors that feed it and switches the
-    /// heaters it drives itself, with the node's setpoint and band, so that
-    /// a zone's loop closes with no tcspecial running.
+    /// The hysteresis nodes of the configuration tcssim stands in for, in
+    /// the order written, none if the file states none: tcssim then reads
+    /// the sensors that feed each and switches the heaters each drives
+    /// itself, with each node's setpoint and band, so that a zone's loop
+    /// closes with no tcspecial running. A file writes them under
+    /// `thermostat`, one name or several separated by commas, as a staged
+    /// thermostat has one hysteresis node a stage.
     ///
-    /// Unstated for a run with tcspecial, whose own thermostat would
+    /// Unstated for a run with tcspecial, whose own thermostats would
     /// otherwise be switching the same heaters.
-    #[serde(default, deserialize_with = "blank_is_unstated")]
-    pub thermostat: Option<String>,
+    #[serde(default, rename = "thermostat", deserialize_with = "node_names")]
+    pub thermostats: Vec<String>,
     /// What the simulation's random numbers start from, so that a run's
     /// noise can be had again. Unstated is a seed of tcssim's choosing,
     /// which it reports as it starts.
@@ -4471,9 +4519,46 @@ connections:
 ",
         );
         assert_eq!(
-            file.tcssim.and_then(|t| t.thermostat).as_deref(),
-            Some("thermostat")
+            file.tcssim.map(|t| t.thermostats),
+            Some(vec!["thermostat".to_string()])
         );
+    }
+
+    /// It may name several, one a stage, separated by commas; and none is
+    /// none.
+    #[test]
+    fn the_tcssim_section_names_several_thermostats() {
+        let file = parse(
+            "tcssim:
+  ready: \"127.0.0.1:7999\"
+  thermostat: \"thermostat_1, thermostat_2\"
+",
+        );
+        assert_eq!(
+            file.tcssim.map(|t| t.thermostats),
+            Some(vec!["thermostat_1".to_string(), "thermostat_2".to_string()])
+        );
+        let file = parse("tcssim:\n  ready: \"127.0.0.1:7999\"\n");
+        assert_eq!(file.tcssim.map(|t| t.thermostats), Some(Vec::new()));
+    }
+
+    /// A blank name between commas, or one named twice, is refused.
+    #[test]
+    fn a_blank_or_repeated_thermostat_is_refused() {
+        for (names, why) in [
+            ("thermostat_1,,thermostat_2", "blank name"),
+            ("thermostat_1,thermostat_1", "named twice"),
+        ] {
+            let text = format!(
+                "tcssim:\n  ready: \"127.0.0.1:7999\"\n  thermostat: \
+                 \"{names}\"\n"
+            );
+            let err = crate::ConfigFormat::Yaml
+                .parse::<SimConfigFile>(&text)
+                .expect_err("refused")
+                .to_string();
+            assert!(err.contains(why), "{err}");
+        }
     }
 
     /// A sensor's errors and offset resolve in its terminal's unit.

@@ -127,23 +127,30 @@ fn readings_and_the_vote_decode_as_temperatures() {
     }
 }
 
-/// The thermostat's decisions, framed under its APID, are on and off; what
-/// is neither is not read as either.
+/// Each stage's decisions, framed under its APID, are on and off; what is
+/// neither is not read as either.
 #[test]
 fn the_thermostats_decisions_decode_as_on_and_off() {
     let path = here().join("thermostat-yamcs.xtcs");
     let xtce = generated_mdb(&path);
-    let apid = apid_of(&apids(&path), "thermostat");
-    for (said, read) in [
-        (vec![DECISION_ON], Ok(true)),
-        (vec![DECISION_OFF], Ok(false)),
-        (b"x".to_vec(), Err(b"x".to_vec())),
-    ] {
-        let packet = framed(apid, &said);
-        let decoded = decode(&xtce, &packet);
-        assert_eq!(decoded.container, "thermostatPacket");
-        assert_eq!(decoded.booleans["thermostat"], read);
-        assert_eq!(decoded.end, Some(packet.len() * 8), "all of it is read");
+    let apids = apids(&path);
+    for stage in ["thermostat_1", "thermostat_2"] {
+        let apid = apid_of(&apids, stage);
+        for (said, read) in [
+            (vec![DECISION_ON], Ok(true)),
+            (vec![DECISION_OFF], Ok(false)),
+            (b"x".to_vec(), Err(b"x".to_vec())),
+        ] {
+            let packet = framed(apid, &said);
+            let decoded = decode(&xtce, &packet);
+            assert_eq!(decoded.container, format!("{stage}Packet"));
+            assert_eq!(decoded.booleans[stage], read);
+            assert_eq!(
+                decoded.end,
+                Some(packet.len() * 8),
+                "all of it is read"
+            );
+        }
     }
 }
 

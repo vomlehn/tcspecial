@@ -267,10 +267,10 @@ mod tests {
         let graph = thermostat();
         assert_eq!(unit_of(&graph, "temp1"), Some(Unit::Kelvin));
         assert_eq!(unit_of(&graph, "ambient"), Some(Unit::Kelvin));
-        assert_eq!(unit_of(&graph, "thermostat"), None);
+        assert_eq!(unit_of(&graph, "thermostat_1"), None);
         assert_eq!(unit_of(&graph, "temp_1"), None);
         assert_eq!(unit_of(&graph, "nobody"), None);
-        assert_eq!(input_unit(&graph, "thermostat"), Some(Unit::Kelvin));
+        assert_eq!(input_unit(&graph, "thermostat_1"), Some(Unit::Kelvin));
         assert!(problems(&graph).is_empty(), "{:?}", problems(&graph));
     }
 
@@ -322,7 +322,7 @@ mod tests {
         }
         let found = problems(&graph);
         assert!(
-            found.iter().any(|(node, why)| node == "thermostat"
+            found.iter().any(|(node, why)| node == "thermostat_1"
                 && why.contains("temp_1")
                 && why.contains("not a value")),
             "{found:?}"
@@ -333,13 +333,11 @@ mod tests {
     #[test]
     fn a_setpoint_no_reading_could_reach_is_refused() {
         let mut graph = thermostat();
-        with(&mut graph, "thermostat", "setpoint", "3000");
+        with(&mut graph, "thermostat_1", "setpoint", "3000");
         let found = problems(&graph);
         assert!(
-            found
-                .iter()
-                .any(|(node, why)| node == "thermostat"
-                    && why.contains("setpoint")),
+            found.iter().any(|(node, why)| node == "thermostat_1"
+                && why.contains("setpoint")),
             "{found:?}"
         );
     }

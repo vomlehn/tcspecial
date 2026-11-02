@@ -2546,7 +2546,7 @@ mod tests {
             .tcssim
             .as_mut()
             .expect("a tcssim section")
-            .thermostat = Some("k_1".to_string());
+            .thermostat = Some("temp1".to_string());
         assert!(joined_to_the_world(
             &sim_file,
             Some(&graph),

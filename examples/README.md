@@ -463,9 +463,9 @@ with it aboard and on the ground.
 
 A control loop, aboard. Three temperature sensors are read together, every
 100 ms, as the group `zone_temps`: `temp_1`, `temp_2` and `temp_3`. Each
-reading goes through a conversion of its own to kelvin -- `k_1`, `k_2`, `k_3`,
-the parts differing in format and scale -- and the three meet at
-`zone_temp`, which takes their median, so that one sensor failing cannot take
+reading goes through a conversion of its own to kelvin -- `temp1`, `temp2`,
+`temp3`, the parts differing in format and scale -- and the three meet at
+`ambient`, which takes their median, so that one sensor failing cannot take
 the zone's temperature with it. `thermostat` holds that to a setpoint,
 293.15 K with a half band of 2 K, and drives two heaters, `heaters_1` and
 `heaters_2`. The ground commands the setpoint, and `housekeeping` logs the
@@ -521,9 +521,9 @@ ground carries a CCSDS primary header:
 | the beacon | down | `beacon.apid`, 0x110 |
 | CONNECT and its answer | up, down | `tcs_cmd.apid`, 0x111 |
 | what Yamcs sends the gateway node | up | its `apid_base`, 0x400 |
-| `k_1`, `k_2`, `k_3` | down | `apid_base` plus each one's device id, 0x404 to 0x406 |
-| `thermostat` | down | 0x40a |
-| `zone_temp` | down | 0x40b |
+| `ambient` | down | `apid_base` plus its device id, 0x400 |
+| `temp1`, `temp2`, `temp3` | down | 0x405 to 0x407 |
+| `thermostat` | down | 0x40b |
 
 `thermostat_yamcs.py` writes Yamcs's configuration with
 `python/tcslib/yamcs_ground.py`, as `ping_yamcs.py` does, its mission
@@ -536,7 +536,7 @@ conversion's or a vote's value is a float in its unit, with the unit in a
 `UnitSet`, read from its four bytes of a signed count of the unit's steps
 through a calibrator, and a thermostat's decision is a boolean read from
 its `1` or `0`. So Yamcs's web interface, at <http://localhost:17090>,
-shows `zone_temp` and `k_1` to `k_3` as temperatures in K and `thermostat`
+shows `ambient` and `temp1` to `temp3` as temperatures in K and `thermostat`
 as true or false.
 
 It starts Yamcs, then tcssim -- every payload sending from the start, as

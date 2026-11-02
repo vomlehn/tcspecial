@@ -62,7 +62,7 @@
         <type name="gateway_yamcs">
             <!-- Yamcs's end of the link. Each reading and decision drawn
                  into this node comes down to Yamcs at ground_base plus its
-                 source's device id (zone_temp is the last of the twelve
+                 source's device id (thermostat is the last of the twelve
                  names, device id 11, so 17711) as telemetry of APID
                  apid_base plus that device id, 0x40b. What Yamcs sends up
                  to address:port goes as a telecommand of APID apid_base. -->
@@ -77,34 +77,49 @@
     </gateways>
     <vehicle>
         <type name="compute">
-            <compute name="k_1">
+            <!-- One temperature out of the three, by the algorithm named: -->
+            <!-- median takes the middle reading, closest_mean the mean of -->
+            <!-- the two that agree best. Either leaves a sensor that has -->
+            <!-- gone wrong out of the answer, which a mean over all three -->
+            <!-- would not, and it produces a value on every arrival, so one -->
+            <!-- sensor that stops reporting is outvoted rather than -->
+            <!-- stopping the vehicle from deciding anything. -->
+            <compute name="ambient">
+                <algorithm>median</algorithm>
+                <function>vote</function>
+                <inputs>in0,in1,in2</inputs>
+                <payload-out><target>gateway</target></payload-out>
+                <payload-out><target>thermostat</target></payload-out>
+                <payload-in>true</payload-in>
+            </compute>
+            <compute name="temp1">
                 <format>i16_be</format>
                 <function>to_kelvin</function>
                 <offset>273.15</offset>
                 <scale>0.0625</scale>
+                <payload-out><target>ambient</target><input>in0</input></payload-out>
                 <payload-out><target>gateway</target></payload-out>
                 <payload-out><target>housekeeping</target></payload-out>
-                <payload-out><target>zone_temp</target><input>in0</input></payload-out>
                 <payload-in>true</payload-in>
             </compute>
-            <compute name="k_2">
+            <compute name="temp2">
                 <format>i16_be</format>
                 <function>to_kelvin</function>
                 <offset>273.15</offset>
                 <scale>0.0625</scale>
+                <payload-out><target>ambient</target><input>in1</input></payload-out>
                 <payload-out><target>gateway</target></payload-out>
                 <payload-out><target>housekeeping</target></payload-out>
-                <payload-out><target>zone_temp</target><input>in1</input></payload-out>
                 <payload-in>true</payload-in>
             </compute>
-            <compute name="k_3">
+            <compute name="temp3">
                 <format>u24_be</format>
                 <function>to_kelvin</function>
                 <offset>255.37</offset>
                 <scale>0.0078</scale>
+                <payload-out><target>ambient</target><input>in2</input></payload-out>
                 <payload-out><target>gateway</target></payload-out>
                 <payload-out><target>housekeeping</target></payload-out>
-                <payload-out><target>zone_temp</target><input>in2</input></payload-out>
                 <payload-in>true</payload-in>
             </compute>
             <!-- setpoint is set from the ground; half_band is how far -->
@@ -122,21 +137,6 @@
                 <gateway-out><target>heaters_2</target></gateway-out>
                 <payload-out><target>gateway</target></payload-out>
                 <payload-out><target>housekeeping</target></payload-out>
-                <payload-in>true</payload-in>
-            </compute>
-            <!-- One temperature out of the three, by the algorithm named: -->
-            <!-- median takes the middle reading, closest_mean the mean of -->
-            <!-- the two that agree best. Either leaves a sensor that has -->
-            <!-- gone wrong out of the answer, which a mean over all three -->
-            <!-- would not, and it produces a value on every arrival, so one -->
-            <!-- sensor that stops reporting is outvoted rather than -->
-            <!-- stopping the vehicle from deciding anything. -->
-            <compute name="zone_temp">
-                <algorithm>median</algorithm>
-                <function>vote</function>
-                <inputs>in0,in1,in2</inputs>
-                <payload-out><target>gateway</target></payload-out>
-                <payload-out><target>thermostat</target></payload-out>
                 <payload-in>true</payload-in>
             </compute>
         </type>
@@ -181,7 +181,7 @@
                 <group>zone_temps</group>
                 <port>17801</port>
                 <protocol>udp</protocol>
-                <payload-out><target>k_1</target></payload-out>
+                <payload-out><target>temp1</target></payload-out>
             </payload>
             <!-- The second of the trio; the same part as temp_1. -->
             <payload name="temp_2">
@@ -189,7 +189,7 @@
                 <group>zone_temps</group>
                 <port>17802</port>
                 <protocol>udp</protocol>
-                <payload-out><target>k_2</target></payload-out>
+                <payload-out><target>temp2</target></payload-out>
             </payload>
             <!-- The third. A different part: three bytes, unsigned, its own -->
             <!-- scale and so its own conversion, so that no one part number -->
@@ -199,7 +199,7 @@
                 <group>zone_temps</group>
                 <port>17803</port>
                 <protocol>udp</protocol>
-                <payload-out><target>k_3</target></payload-out>
+                <payload-out><target>temp3</target></payload-out>
             </payload>
         </type>
     </payloads>
@@ -210,18 +210,18 @@
     </commands>
     <tcsgui>
         <nodes>
+            <node name="ambient" x="469" y="166"/>
             <node name="gateway" x="790" y="34"/>
             <node name="heaters_1" x="34" y="393"/>
             <node name="heaters_2" x="34" y="470"/>
             <node name="housekeeping" x="469" y="374"/>
-            <node name="k_1" x="242" y="34"/>
-            <node name="k_2" x="242" y="166"/>
-            <node name="k_3" x="242" y="280"/>
+            <node name="temp1" x="242" y="34"/>
+            <node name="temp2" x="242" y="166"/>
+            <node name="temp3" x="242" y="280"/>
             <node name="temp_1" x="34" y="34"/>
             <node name="temp_2" x="34" y="166"/>
             <node name="temp_3" x="34" y="280"/>
             <node name="thermostat" x="601" y="242"/>
-            <node name="zone_temp" x="469" y="166"/>
         </nodes>
     </tcsgui>
 </configuration>

@@ -929,12 +929,13 @@ mod tests {
     #[test]
     fn every_node_has_a_device_id() {
         let ids = ids(&example("thermostat"));
-        assert_eq!(ids["gateway"], 0);
-        assert_eq!(ids["heaters_1"], 1);
-        assert_eq!(ids["heaters_2"], 2);
-        assert_eq!(ids["k_1"], 4);
-        assert_eq!(ids["temp_1"], 7);
-        assert_eq!(ids["zone_temp"], 11);
+        assert_eq!(ids["ambient"], 0);
+        assert_eq!(ids["gateway"], 1);
+        assert_eq!(ids["heaters_1"], 2);
+        assert_eq!(ids["heaters_2"], 3);
+        assert_eq!(ids["temp1"], 5);
+        assert_eq!(ids["temp_1"], 8);
+        assert_eq!(ids["thermostat"], 11);
     }
 
     /// The order the nodes are in means nothing: shuffled, they have the
@@ -957,14 +958,14 @@ mod tests {
         assert_eq!(
             summary(&links),
             vec![
-                ("k_1", 4, "127.0.0.1", 5104),
-                ("k_2", 5, "127.0.0.1", 5105),
-                ("k_3", 6, "127.0.0.1", 5106),
+                ("ambient", 0, "127.0.0.1", 5100),
+                ("temp1", 5, "127.0.0.1", 5105),
+                ("temp2", 6, "127.0.0.1", 5106),
+                ("temp3", 7, "127.0.0.1", 5107),
                 // The decision itself, which the ground sees as well as the
                 // heaters: a reader of the telemetry can then say why the
                 // heaters are on without inferring it from the temperature.
-                ("thermostat", 10, "127.0.0.1", 5110),
-                ("zone_temp", 11, "127.0.0.1", 5111),
+                ("thermostat", 11, "127.0.0.1", 5111),
             ]
         );
         assert!(links
@@ -996,8 +997,8 @@ mod tests {
     #[test]
     fn two_sources_on_one_port_are_refused() {
         let mut graph = example("thermostat");
-        // temp_2, id 8, unlinked: 6100 + 8 = 6108; a gateway base of 6104
-        // puts k_1, id 4, on the same port.
+        // temp_2, id 9, unlinked: 6100 + 9 = 6109; a gateway base of 6104
+        // puts temp1, id 5, on the same port.
         graph.links.retain(|link| link.origin().node != "temp_2");
         let gateway = graph
             .nodes
@@ -1008,10 +1009,10 @@ mod tests {
             "ground_base".to_string(),
             crate::Scalar::of("127.0.0.1:6104"),
         );
-        let refused = of(&graph).expect_err("two sources on 6108");
-        assert!(refused.why.contains("k_1"), "{}", refused.why);
+        let refused = of(&graph).expect_err("two sources on 6109");
+        assert!(refused.why.contains("temp1"), "{}", refused.why);
         assert!(refused.why.contains("temp_2"), "{}", refused.why);
-        assert!(refused.why.contains("6108"), "{}", refused.why);
+        assert!(refused.why.contains("6109"), "{}", refused.why);
     }
 
     /// A base with no room for the ids counted from it is refused.

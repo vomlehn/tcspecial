@@ -112,7 +112,7 @@ fn readings_and_the_vote_decode_as_temperatures() {
     let xtce = generated_mdb(&path);
     let apids = apids(&path);
     let (least, most) = Unit::Kelvin.range();
-    for source in ["k_1", "k_2", "k_3", "zone_temp"] {
+    for source in ["temp1", "temp2", "temp3", "ambient"] {
         for number in [0.0, 255.37, 293.15, 291.234567, -40.5, least, most] {
             let (read, units) = value_read(
                 &xtce,
@@ -212,7 +212,7 @@ fn values_in_every_unit_decode_in_it() {
         let xtce = generated_mdb(&path);
         let apids = apids(&path);
         let (_, most) = unit.range();
-        for source in ["k_1", "zone_temp"] {
+        for source in ["temp1", "ambient"] {
             for number in [1.5, -2.25, most] {
                 let (read, units) = value_read(
                     &xtce,

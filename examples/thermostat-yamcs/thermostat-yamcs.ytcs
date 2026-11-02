@@ -53,7 +53,7 @@ gateways:
   - type gateway_yamcs:
       # Yamcs's end of the link. Each reading and decision drawn into this
       # node comes down to Yamcs at ground_base plus its source's device id
-      # -- zone_temp is the last of the twelve names, device id 11, so 17711
+      # -- thermostat is the last of the twelve names, device id 11, so 17711
       # -- as telemetry of APID apid_base plus that device id, 0x40b. What
       # Yamcs sends up to address:port goes as a telecommand of APID
       # apid_base.
@@ -66,38 +66,52 @@ gateways:
 
 vehicle:
   - type compute:
-      - compute: k_1
+      # One temperature out of the three, by the algorithm named: median
+      # takes the middle reading, closest_mean the mean of the two that
+      # agree best. Either leaves a sensor that has gone wrong out of the
+      # answer, which a mean over all three would not, and it produces a
+      # value on every arrival, so one sensor that stops reporting is
+      # outvoted rather than stopping the vehicle from deciding anything.
+      - compute: ambient
+        algorithm: "median"
+        function: "vote"
+        inputs: "in0,in1,in2"
+        payload-out:
+          - target: gateway
+          - target: thermostat
+        payload-in: true
+      - compute: temp1
         format: "i16_be"
         function: "to_kelvin"
         offset: "273.15"
         scale: "0.0625"
         payload-out:
-          - target: gateway
-          - target: housekeeping
-          - target: zone_temp
+          - target: ambient
             input: in0
+          - target: gateway
+          - target: housekeeping
         payload-in: true
-      - compute: k_2
+      - compute: temp2
         format: "i16_be"
         function: "to_kelvin"
         offset: "273.15"
         scale: "0.0625"
         payload-out:
+          - target: ambient
+            input: in1
           - target: gateway
           - target: housekeeping
-          - target: zone_temp
-            input: in1
         payload-in: true
-      - compute: k_3
+      - compute: temp3
         format: "u24_be"
         function: "to_kelvin"
         offset: "255.37"
         scale: "0.0078"
         payload-out:
+          - target: ambient
+            input: in2
           - target: gateway
           - target: housekeeping
-          - target: zone_temp
-            input: in2
         payload-in: true
       # setpoint is set from the ground; half_band is how far either side
       # of it the heaters are switched at, the setpoint being in the middle
@@ -116,20 +130,6 @@ vehicle:
         payload-out:
           - target: gateway
           - target: housekeeping
-        payload-in: true
-      # One temperature out of the three, by the algorithm named: median
-      # takes the middle reading, closest_mean the mean of the two that
-      # agree best. Either leaves a sensor that has gone wrong out of the
-      # answer, which a mean over all three would not, and it produces a
-      # value on every arrival, so one sensor that stops reporting is
-      # outvoted rather than stopping the vehicle from deciding anything.
-      - compute: zone_temp
-        algorithm: "median"
-        function: "vote"
-        inputs: "in0,in1,in2"
-        payload-out:
-          - target: gateway
-          - target: thermostat
         payload-in: true
   - type log:
       - compute: housekeeping
@@ -167,7 +167,7 @@ payloads:
         port: "17801"
         protocol: "udp"
         payload-out:
-          - target: k_1
+          - target: temp1
       # The second of the trio; the same part as temp_1.
       - payload: temp_2
         address: "127.0.0.1"
@@ -175,7 +175,7 @@ payloads:
         port: "17802"
         protocol: "udp"
         payload-out:
-          - target: k_2
+          - target: temp2
       # The third. A different part: three bytes, unsigned, its own scale and
       # so its own conversion, so that no one part number can take the whole
       # trio out.
@@ -185,7 +185,7 @@ payloads:
         port: "17803"
         protocol: "udp"
         payload-out:
-          - target: k_3
+          - target: temp3
 
 commands:
   # the zone temperature the heaters are held at, in kelvin
@@ -193,15 +193,15 @@ commands:
 
 tcsgui:
   nodes:
+    - { node: ambient, x: 469, y: 166 }
     - { node: gateway, x: 790, y: 34 }
     - { node: heaters_1, x: 34, y: 393 }
     - { node: heaters_2, x: 34, y: 470 }
     - { node: housekeeping, x: 469, y: 374 }
-    - { node: k_1, x: 242, y: 34 }
-    - { node: k_2, x: 242, y: 166 }
-    - { node: k_3, x: 242, y: 280 }
+    - { node: temp1, x: 242, y: 34 }
+    - { node: temp2, x: 242, y: 166 }
+    - { node: temp3, x: 242, y: 280 }
     - { node: temp_1, x: 34, y: 34 }
     - { node: temp_2, x: 34, y: 166 }
     - { node: temp_3, x: 34, y: 280 }
     - { node: thermostat, x: 601, y: 242 }
-    - { node: zone_temp, x: 469, y: 166 }

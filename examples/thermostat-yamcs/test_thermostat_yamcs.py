@@ -58,22 +58,22 @@ class SetupTest(unittest.TestCase):
         self.assertEqual(
             [(source.node, source.parameter, source.form, source.drives)
              for source in setup.sources],
-            [("k_1", "/TcsYamcs/k_1", KELVIN, ()),
-             ("k_2", "/TcsYamcs/k_2", KELVIN, ()),
-             ("k_3", "/TcsYamcs/k_3", KELVIN, ()),
+            [("ambient", "/TcsYamcs/ambient", KELVIN, ()),
+             ("temp1", "/TcsYamcs/temp1", KELVIN, ()),
+             ("temp2", "/TcsYamcs/temp2", KELVIN, ()),
+             ("temp3", "/TcsYamcs/temp3", KELVIN, ()),
              ("thermostat", "/TcsYamcs/thermostat", DECISION,
-              ("heaters_1", "heaters_2")),
-             ("zone_temp", "/TcsYamcs/zone_temp", KELVIN, ())])
+              ("heaters_1", "heaters_2"))])
 
     def test_the_example_says_its_apids_and_ports(self):
         setup = thermostat_yamcs.Setup(options())
-        # gateway 0, heaters 1 and 2, housekeeping 3, k 4 to 6, temp 7 to
-        # 9, thermostat 10, zone_temp 11.
+        # ambient 0, gateway 1, heaters 2 and 3, housekeeping 4, temp1 to
+        # temp3 5 to 7, temp_1 to temp_3 8 to 10, thermostat 11.
         self.assertEqual([(link.source, link.apid, link.ground.port)
                           for link in setup.links],
-                         [("k_1", 0x404, 17704), ("k_2", 0x405, 17705),
-                          ("k_3", 0x406, 17706), ("thermostat", 0x40a, 17710),
-                          ("zone_temp", 0x40b, 17711)])
+                         [("ambient", 0x400, 17700), ("temp1", 0x405, 17705),
+                          ("temp2", 0x406, 17706), ("temp3", 0x407, 17707),
+                          ("thermostat", 0x40b, 17711)])
         self.assertEqual(setup.config.beacon_apid(), 0x110)
         self.assertEqual(setup.config.command_apid(), 0x111)
         self.assertEqual(setup.beacon.recv.port, 17510)
@@ -122,7 +122,7 @@ class MdbTest(unittest.TestCase):
         return kind
 
     def test_the_readings_and_the_vote_are_temperatures(self):
-        for parameter in ("k_1", "k_2", "k_3", "zone_temp"):
+        for parameter in ("temp1", "temp2", "temp3", "ambient"):
             kind = self.kind_of(parameter)
             self.assertEqual(kind.tag, f"{{{generated.NAMESPACE}}}"
                                        "FloatParameterType")
@@ -167,10 +167,10 @@ class MdbTest(unittest.TestCase):
         self.assertEqual({name: apid for name, apid in found.items()
                           if name.endswith("Packet")
                           and name[:-len("Packet")] in
-                          ("k_1", "k_2", "k_3", "thermostat", "zone_temp")},
-                         {"k_1Packet": 0x404, "k_2Packet": 0x405,
-                          "k_3Packet": 0x406, "thermostatPacket": 0x40a,
-                          "zone_tempPacket": 0x40b})
+                          ("ambient", "temp1", "temp2", "temp3", "thermostat")},
+                         {"ambientPacket": 0x400, "temp1Packet": 0x405,
+                          "temp2Packet": 0x406, "temp3Packet": 0x407,
+                          "thermostatPacket": 0x40b})
 
     def test_no_line_is_wider_than_80_columns(self):
         config = configuration.load(HERE / "thermostat-yamcs.xtcs")
@@ -187,10 +187,10 @@ class MdbTest(unittest.TestCase):
                           for link in generated.data_links(config)],
                          [("commands", 17200), ("beacon", 17510),
                           ("gateway-uplink", 17600),
-                          ("k_1-downlink", 17704), ("k_2-downlink", 17705),
-                          ("k_3-downlink", 17706),
-                          ("thermostat-downlink", 17710),
-                          ("zone_temp-downlink", 17711)])
+                          ("ambient-downlink", 17700),
+                          ("temp1-downlink", 17705), ("temp2-downlink", 17706),
+                          ("temp3-downlink", 17707),
+                          ("thermostat-downlink", 17711)])
 
 
 class FakeYamcs:
@@ -234,7 +234,7 @@ def a_yamcs():
     """A Yamcs whose mission database is the example's: kelvin for each
     temperature, nothing for the decision."""
     return FakeYamcs({f"/TcsYamcs/{name}": ["K"]
-                      for name in ("k_1", "k_2", "k_3", "zone_temp")})
+                      for name in ("temp1", "temp2", "temp3", "ambient")})
 
 
 class ReadingsTest(unittest.TestCase):
@@ -245,15 +245,15 @@ class ReadingsTest(unittest.TestCase):
         yamcs = a_yamcs()
         readings = readings_of(yamcs)
         self.assertEqual(readings.line(),
-                         "zone_temp --, k_1 --, k_2 --, k_3 --, "
+                         "ambient --, temp1 --, temp2 --, temp3 --, "
                          "thermostat --, heaters_1 --, heaters_2 --")
-        yamcs.values.update({"/TcsYamcs/zone_temp": 291.2341,
-                             "/TcsYamcs/k_1": 291.0,
+        yamcs.values.update({"/TcsYamcs/ambient": 291.2341,
+                             "/TcsYamcs/temp1": 291.0,
                              "/TcsYamcs/thermostat": True})
         readings.read()
         self.assertEqual(readings.line(),
-                         "zone_temp 291.234 K, k_1 291.000 K, k_2 --, "
-                         "k_3 --, thermostat on, heaters_1 on, heaters_2 on")
+                         "ambient 291.234 K, temp1 291.000 K, temp2 --, "
+                         "temp3 --, thermostat on, heaters_1 on, heaters_2 on")
         self.assertFalse(readings.arrived())
 
     def test_a_decision_that_changes_is_said(self):
@@ -266,7 +266,7 @@ class ReadingsTest(unittest.TestCase):
                          [("thermostat", None, True)])
         self.assertEqual(readings.read(), [], "the same is no change")
         yamcs.values["/TcsYamcs/thermostat"] = False
-        yamcs.values["/TcsYamcs/zone_temp"] = 295.2
+        yamcs.values["/TcsYamcs/ambient"] = 295.2
         changed = readings.read()
         said = io.StringIO()
         with contextlib.redirect_stdout(said):
@@ -274,8 +274,8 @@ class ReadingsTest(unittest.TestCase):
             thermostat_yamcs.say_changes(changed, readings)
         self.assertEqual(said.getvalue().splitlines(),
                          ["switched: thermostat on -> off, driving "
-                          "heaters_1, heaters_2; zone_temp 295.200 K, "
-                          "k_1 --, k_2 --, k_3 --, thermostat off, "
+                          "heaters_1, heaters_2; ambient 295.200 K, "
+                          "temp1 --, temp2 --, temp3 --, thermostat off, "
                           "heaters_1 off, heaters_2 off"])
 
     def test_bytes_are_shown_as_hex(self):
@@ -307,7 +307,7 @@ class WatchTest(unittest.TestCase):
             status = thermostat_yamcs.watch_and_print(readings, NoBeacons(),
                                                       0.05, 1)
         self.assertEqual(status, 0)
-        self.assertIn("read: zone_temp 290.000 K", said.getvalue())
+        self.assertIn("read: ambient 290.000 K", said.getvalue())
 
     def test_it_fails_where_a_source_never_says_anything(self):
         readings = readings_of(a_yamcs())
@@ -317,7 +317,7 @@ class WatchTest(unittest.TestCase):
             status = thermostat_yamcs.watch_and_print(readings, NoBeacons(),
                                                       0.05, 1)
         self.assertEqual(status, 1)
-        self.assertIn("nothing arrived from k_1", said.getvalue())
+        self.assertIn("nothing arrived from ambient", said.getvalue())
 
 
 if __name__ == "__main__":

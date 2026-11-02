@@ -11117,7 +11117,7 @@ mod tests {
 
             assert_eq!(
                 ui.get_links().row_count(),
-                21,
+                18,
                 "thermostat.{extension} should draw every line"
             );
             for row in 0..ui.get_links().row_count() {

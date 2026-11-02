@@ -5,9 +5,9 @@
 //! so that a zone's loop closes with no tcspecial running. It stands
 //! in for one hysteresis node of the configuration, whose `setpoint` and
 //! `half_band` it takes, and the simulator file names that node: see
-//! `tcslibgs::sim_config::SimTcssim::thermostats`. A staged thermostat is
-//! several of these, one a stage, each reading the same sensors and
-//! switching heaters of its own.
+//! `tcslibgs::sim_config::SimTcssim::thermostats`. Several zones, or a
+//! staged thermostat, are several of these, each switching heaters of its
+//! own.
 //!
 //! # What it reads
 //!

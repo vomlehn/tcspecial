@@ -1358,9 +1358,9 @@ pub(crate) mod tests {
             .expect("the example reads")
     }
 
-    /// The thermostat example's three sensors and their vote are traced, in
-    /// one panel in kelvin with the thermostat's setpoint; the thermostat is
-    /// a switch driving both heaters; and a sensor's own counts are not
+    /// The thermostat example's three conversions and their vote are traced,
+    /// in one panel in kelvin with both stages' setpoints; each stage is a
+    /// switch driving its own heater; and a sensor's own counts are not
     /// plotted.
     #[test]
     fn the_thermostat_example_plots_its_temperatures_and_a_switch() {
@@ -1369,24 +1369,27 @@ pub(crate) mod tests {
         assert_eq!(panels.len(), 1);
         assert_eq!(panels[0].0, Unit::Kelvin);
         assert_eq!(panels[0].1.len(), 4);
-        assert_eq!(switches, 1);
-        assert_eq!(plot.panels[0].setpoints, vec![293.15]);
-        assert_eq!(plot.plotted("k_2"), Some(Plotted::Trace(1, Unit::Kelvin)));
-        assert!(matches!(
-            plot.plotted("zone_temp"),
-            Some(Plotted::Trace(_, Unit::Kelvin))
-        ));
-        assert_eq!(plot.plotted("thermostat"), Some(Plotted::Switch(0)));
+        assert_eq!(switches, 2);
+        assert_eq!(plot.panels[0].setpoints, vec![293.15, 290.15]);
+        assert_eq!(
+            plot.plotted("ambient"),
+            Some(Plotted::Trace(0, Unit::Kelvin))
+        );
+        assert_eq!(
+            plot.plotted("temp2"),
+            Some(Plotted::Trace(2, Unit::Kelvin))
+        );
+        assert_eq!(plot.plotted("thermostat_1"), Some(Plotted::Switch(0)));
+        assert_eq!(plot.plotted("thermostat_2"), Some(Plotted::Switch(1)));
         assert_eq!(plot.plotted("temp_1"), None);
 
         let mut drawn = Drawn::default();
         plot.draw(Instant::now(), 100.0, 60.0, &mut drawn);
         assert_eq!(drawn.said, "Nothing heard yet");
-        assert_eq!(
-            drawn.switches[0].label,
-            "thermostat \u{2192} heaters_1, heaters_2"
-        );
+        assert_eq!(drawn.switches[0].label, "thermostat_1 \u{2192} heaters_1");
+        assert_eq!(drawn.switches[1].label, "thermostat_2 \u{2192} heaters_2");
         assert_eq!(drawn.switches[0].on, None, "nothing heard yet");
+        assert_eq!(drawn.switches[1].on, None, "nothing heard yet");
         assert!(drawn.panels[0].paths.iter().all(String::is_empty));
     }
 
@@ -1659,37 +1662,17 @@ pub(crate) mod tests {
         assert_eq!(Band::of(Unit::Kelvin, &[]), None);
     }
 
-    /// Staged heating: a second thermostat reading the zone temperature, set
-    /// lower and driving one heater, has its setpoint drawn as a rule and its
-    /// own strip, but the band drawn is the first stage's.
+    /// Staged heating, as the thermostat example has it: the second stage,
+    /// set lower and driving one heater, has its setpoint drawn as a rule and
+    /// its own strip, but the band drawn is the first stage's.
     #[test]
     fn staged_heating_draws_the_first_stages_band() {
-        use tcslibgs::endpoint_config::Scalar;
-        use tcslibgs::graph::{Destinations, Link};
-
-        let mut graph = example("thermostat");
-        let mut second = graph
-            .node("thermostat")
-            .expect("the example's thermostat")
-            .clone();
-        second.name = "thermostat_2".to_string();
-        second
-            .attributes
-            .insert("setpoint".to_string(), Scalar::of("290.15"));
-        graph.nodes.push(second);
-        graph.links.push(Link {
-            from: "zone_temp".to_string(),
-            to: Destinations::of(vec!["thermostat_2".to_string()]),
-            comment: None,
-        });
-        graph.links.push(Link {
-            from: "thermostat_2".to_string(),
-            to: Destinations::of(vec!["heaters_2".to_string()]),
-            comment: None,
-        });
-        let plot = Plot::of(&graph, |_| true).expect("a plot");
+        let plot = Plot::of(&example("thermostat"), |_| true).expect("a plot");
         assert_eq!(plot.panels[0].setpoints, vec![293.15, 290.15]);
-        assert_eq!(plot.panels[0].band, Some(band("thermostat", 293.15, 2.0)));
+        assert_eq!(
+            plot.panels[0].band,
+            Some(band("thermostat_1", 293.15, 2.0))
+        );
         let mut drawn = Drawn::default();
         plot.draw(Instant::now(), 100.0, 60.0, &mut drawn);
         let labels: Vec<&str> =
@@ -1697,7 +1680,7 @@ pub(crate) mod tests {
         assert_eq!(
             labels,
             vec![
-                "thermostat \u{2192} heaters_1, heaters_2",
+                "thermostat_1 \u{2192} heaters_1",
                 "thermostat_2 \u{2192} heaters_2",
             ]
         );
@@ -1711,13 +1694,16 @@ pub(crate) mod tests {
     fn a_band_is_drawn_and_the_scale_takes_it_in() {
         let mut plot =
             Plot::of(&example("thermostat"), |_| true).expect("a plot");
-        assert_eq!(plot.panels[0].band, Some(band("thermostat", 293.15, 2.0)));
+        assert_eq!(
+            plot.panels[0].band,
+            Some(band("thermostat_1", 293.15, 2.0))
+        );
         let mut drawn = Drawn::default();
         plot.draw(Instant::now(), 100.0, 600.0, &mut drawn);
         assert_eq!(drawn.panels[0].band, None, "no scale yet");
         assert_eq!(
             drawn.panels[0].band_said,
-            "band 291.15\u{2013}295.15 K (thermostat)"
+            "band 291.15\u{2013}295.15 K (thermostat_1)"
         );
 
         let t0 = Instant::now();
@@ -1735,7 +1721,7 @@ pub(crate) mod tests {
         assert!(top >= 297.15 && bottom <= 289.15, "{top} {bottom}");
         assert_eq!(
             drawn.panels[0].band_said,
-            "band 291.15\u{2013}295.15 K (thermostat)"
+            "band 291.15\u{2013}295.15 K (thermostat_1)"
         );
     }
 
@@ -1803,7 +1789,7 @@ pub(crate) mod tests {
             assert!(pair[0] < pair[1], "the regions out of order: {down:?}");
         }
         assert_eq!(
-            said("band 291.15\u{2013}295.15 K (thermostat)").len(),
+            said("band 291.15\u{2013}295.15 K (thermostat_1)").len(),
             1,
             "the legend names the band"
         );

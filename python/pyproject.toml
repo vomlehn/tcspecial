@@ -42,5 +42,7 @@ packages = ["tcslibgs", "tcslibgs._xtce", "tcslib", "tcsui"]
 # tcslibgs/interface.py. The configuration schema, whose lists of node
 # types a configuration is read against: see tcslibgs/configuration.py. And
 # the part of a Yamcs mission database no configuration changes: see
-# tcslibgs/yamcs.py.
+# tcslibgs/yamcs.py; and the Yamcs server's and instance's configurations a
+# ground station fills in: see tcslib/yamcs_ground.py.
 tcslibgs = ["xtce/*.xtce", "schema/tcspecial.schema.json", "yamcs.xtce"]
+tcslib = ["yamcs-templates/*.in"]

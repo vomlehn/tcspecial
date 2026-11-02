@@ -1,9 +1,10 @@
-"""The ping example's own code: what is kept as pings go and answers come,
-and the window that shows it.
+"""What the ping example's two ground stations share: what is kept as pings
+go and answers come, and the window that shows it.
 
-Run by ``tests/python.rs`` under ``cargo test``, or directly::
+Run by ``examples/ping/tests/python.rs`` under ``cargo test``, or
+directly::
 
-    python3 -m unittest discover -s examples/ping -p 'test_*.py'
+    python3 -m unittest discover -s examples/ping-common -p 'test_*.py'
 """
 
 import os
@@ -161,7 +162,7 @@ class WindowTest(unittest.TestCase):
         import tkinter as tk
         from tkinter import ttk
 
-        import ping_gateway
+        import ping_window
 
         vehicle = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
         vehicle.bind(("127.0.0.1", 0))
@@ -230,7 +231,7 @@ class WindowTest(unittest.TestCase):
 
         tk.Tk.mainloop = mainloop
         try:
-            ping_gateway.run_the_window(None, NoBeacons(), pinger)
+            ping_window.run_the_window(None, NoBeacons(), pinger)
         finally:
             tk.Tk.mainloop = original
             pinger.close()

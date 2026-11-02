@@ -1,7 +1,9 @@
-# The "ping" instance: its services, its mission database and its streams,
-# which are the same whatever the tcspecial configuration says. Written by
-# ping_yamcs.py from this template, which adds what the configuration says,
-# worked out by tcslibgs/yamcs.py so that it is stated in one place: the
+# A tcspecial example's Yamcs instance: its services, its mission database
+# and its streams, which are the same whatever the tcspecial configuration
+# says. Written by $writer from this template,
+# python/tcslib/yamcs-templates/instance.yaml.in, which adds what the
+# configuration says, worked out by tcslibgs/yamcs.py so that it is stated
+# in one place: the
 # dataLinks -- the command links, the beacon, an uplink to each
 # gateway_yamcs node and a link on each port a source's data arrives at --
 # and the command streams, streamConfig's tc, that route each command to
@@ -20,10 +22,11 @@ services:
 
 # tcspecial's own XTCE, as it is, and the wrapper that puts a CCSDS header
 # around it, written by tcslibgs/yamcs.py with every APID the configuration
-# counts. The ping node's interface document, tcslibgs/xtce/ping.xtce, is
-# not among them: its command must go behind the header, which a command
-# cannot be put behind from outside, so the wrapper holds a copy of what it
-# states, and Yamcs is not given a ping that goes without one.
+# counts. A node's interface document, as the ping node's
+# tcslibgs/xtce/ping.xtce, is not among them: its command must go behind the
+# header, which a command cannot be put behind from outside, so the wrapper
+# holds a copy of what it states, and Yamcs is not given a ping that goes
+# without one.
 mdb:
   - type: xtce
     args:

@@ -38,7 +38,7 @@
 //! the round trip whatever the offset, which is how to tell a clock that is
 //! out from a link that is slow.
 //!
-//! `examples/ping/ping_ground.py` is this in Python, for the example's
+//! `examples/ping-common/ping_ground.py` is this in Python, for the example's
 //! Python ground station.
 
 use std::net::{SocketAddr, ToSocketAddrs, UdpSocket};

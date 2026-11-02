@@ -1,10 +1,11 @@
 //! The Python's own tests, run where the Rust's are.
 //!
-//! Two suites: the libraries' in `python/tests`, which say each Rust test of
+//! Three suites: the libraries' in `python/tests`, which say each Rust test of
 //! `tcslib::beacon`, `tcsui` and the ping format again, with the same figures;
-//! and this example's, beside `ping_gateway.py`. Run under `cargo test` so that
-//! a change to the Rust that the Python has not followed fails where the Rust
-//! change is being tested.
+//! this example's, beside `ping_gateway.py`; and what it shares with
+//! ping-yamcs, the ping link and the window, in `examples/ping-common`. Run
+//! under `cargo test` so that a change to the Rust that the Python has not
+//! followed fails where the Rust change is being tested.
 
 use std::path::Path;
 use std::process::Command;
@@ -47,4 +48,9 @@ fn the_python_libraries_pass_their_tests() {
 #[test]
 fn the_ping_examples_python_passes_its_tests() {
     suite("examples/ping", "test_*.py", "examples/ping");
+}
+
+#[test]
+fn what_the_ping_examples_share_passes_its_tests() {
+    suite("examples/ping-common", "test_*.py", "examples/ping-common");
 }

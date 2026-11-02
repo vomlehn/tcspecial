@@ -1,16 +1,20 @@
 # yaml-language-server: $schema=../../tcsgui/share/schema/tcspecial-physics.schema.json
 
 # The physics of the thermostat example's vehicle: the zone its sensors
-# read, and the two heaters that warm it. Named by thermostat-sim.yaml, and
-# by the manual's fixture, tests/manual/thermostat-sim.yaml, which is the
-# same vehicle with its payloads on buses: one zone, stated once.
+# read, and the two heaters that warm it. Named by the simulator files of
+# the thermostat example and of thermostat-yamcs, the same vehicle with
+# Yamcs as its ground station, and by the manual's fixture,
+# tests/manual/thermostat-sim.yaml, which is the same vehicle with its
+# payloads on buses: one zone, stated once, here in thermostat-common, which
+# the two examples share and which is not an example itself.
 #
 # Three parts, each simulated alone and joined below: a heater is switched
 # on and gives out heat; the zone takes heat and has a temperature. The
 # stand-ins in the simulator file are joined to their terminals by name --
 # a sensor to zone.temperature, a heater's stand-in to heater_1.on -- and
 # this file says nothing about them.
-description: The physics of the vehicle of thermostat.ytcs
+description: The physics of the vehicle of thermostat.ytcs and
+  thermostat-yamcs.ytcs
 
 physics:
   - type heater:

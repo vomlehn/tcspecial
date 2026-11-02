@@ -1,10 +1,11 @@
 //! The ping example's tests, and nothing else.
 //!
 //! The example's ground station is a Python 3 program, `ping_gateway.py`,
-//! beside this crate, and the libraries it is built on are Python spellings of
-//! Rust ones: `python/tcslib/beacon.py` of `tcslib::beacon`, `python/tcsui` of
-//! `tcsui`, and `python/tcslibgs` of the parts of `tcslibgs` a ground station
-//! reads. A rule written twice is two rules on the day one of them changes, so
+//! beside this crate, its ping link and window in `examples/ping-common`,
+//! which it shares with ping-yamcs. The libraries it is built on are Python
+//! spellings of Rust ones: `python/tcslib/beacon.py` of `tcslib::beacon`,
+//! `python/tcsui` of `tcsui`, and `python/tcslibgs` of the parts of
+//! `tcslibgs` a ground station reads. A rule written twice is two rules on the day one of them changes, so
 //! the tests here hold each Python spelling to its Rust one:
 //!
 //! * `tests/python.rs` runs the Python's own tests, which use the Rust tests'

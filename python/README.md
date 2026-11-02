@@ -21,7 +21,7 @@ written after, and each module after the Rust it says again:
 | `tcslib/bus.py` | `tcslib/src/bus.rs` (`Ground`) | A station's one SBN peer of the stand-in for the cFS end that tcssim runs, on a thread of its own, turning the bus back into loopback UDP links, so that `beacon.open` and `listening.command_link_of` work for a configuration that answers to cFS as for one that answers to the radio. Only the fixed commands go over it. |
 
 And beside the ping example, because it is the example's own part of the
-ground station: `examples/ping/ping_ground.py`, written after
+ground station: `examples/ping-common/ping_ground.py`, written after
 `tcslib/src/ping.rs` -- the ground's half of a ping, which tcsmoc pings with.
 
 They use nothing outside the standard library, but for one thing. That has

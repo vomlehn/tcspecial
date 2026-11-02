@@ -415,12 +415,15 @@ runcomparexy:
 # Every configuration shipped in both spellings, with the simulator file each
 # is checked beside: the thermostat fixture and the examples. A list of stems
 # and simulator files rather than a pattern, so that a configuration may be
-# checked beside a simulator file not named for it.
+# checked beside a simulator file not named for it. THERMOSTAT_YAMCS is a
+# stem too long to write twice on one line.
 #
+THERMOSTAT_YAMCS = examples/thermostat-yamcs/thermostat-yamcs
 SPELLINGS = \
 	tests/manual/thermostat:tests/manual/thermostat-sim.yaml \
 	examples/minimal/minimal:examples/minimal/minimal-sim.yaml \
 	examples/thermostat/thermostat:examples/thermostat/thermostat-sim.yaml \
+	$(THERMOSTAT_YAMCS):$(THERMOSTAT_YAMCS)-sim.yaml \
 	examples/simple-app/simple-app:examples/simple-app/simple-app-sim.yaml \
 	examples/beacon/beacon:examples/beacon/beacon-sim.yaml \
 	examples/fprime/fprime:examples/fprime/fprime-sim.yaml \

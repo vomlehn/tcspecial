@@ -35,6 +35,11 @@ members = [
     "examples/ping",
     # The same for the ping example through Yamcs.
     "examples/ping-yamcs",
+    # And for the thermostat example through Yamcs.
+    "examples/thermostat-yamcs",
+    # What the tests of the examples through Yamcs share: an interpreter of
+    # the mission database tcslibgs/yamcs.py generates. Not an example.
+    "examples/yamcs-common",
 ]
 
 # Each argument's description in a doc comment, continuation lines and all,

@@ -36,7 +36,7 @@ tcssim:
 # The physics model the payloads below are joined to: the thermostat
 # example's, this being the same vehicle with its payloads on buses, so that
 # the zone is stated once for both.
-physics: ../../examples/thermostat/thermostat-physics.yaml
+physics: ../../examples/thermostat-common/thermostat-physics.yaml
 
 simulated_payload_groups:
   # The three sensors are read together, every tenth of a second, as their

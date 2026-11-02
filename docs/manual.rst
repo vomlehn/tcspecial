@@ -2201,7 +2201,9 @@ the reason the vehicle sends -- ``no command binding says the ground may set
 "thermostat.half-band": it is spelled half_band`` -- beside the status.
 
 The simulator file beside it names the vehicle's physics model,
-``thermostat-physics.yaml``, which holds a zone and two heaters joined to it.
+``examples/thermostat-common/thermostat-physics.yaml``, which holds a zone
+and two heaters joined to it, and which thermostat-yamcs, the same vehicle
+with Yamcs as its ground station, names too.
 Each sensor reports the zone's temperature, from a place of its own on it, so
 that what the three report is one temperature rather than three streams of
 noise, which is what the model is for; each heater's stand-in switches its
@@ -2555,8 +2557,10 @@ ground can reach both ways -- a gateway node binding an address and port with a
 link to it, and its link back down -- gives the MOC a ``Ping node`` button
 beside ``Command``. It opens the same panel, in a window of its own: the
 button, the ping sent and the answer, and the three times. Both ground stations
-keep them by the same rules, ``tcslib::ping`` in Rust and ``ping_ground.py`` in
-Python.
+keep them by the same rules, ``tcslib::ping`` in Rust and
+``examples/ping-common/ping_ground.py`` in Python. ``examples/ping-common``
+holds what the ping example shares with ping-yamcs, the ping link and the
+window, and is not an example itself.
 
 The ping-yamcs example
 ----------------------
@@ -2641,6 +2645,74 @@ Yamcs sends its commands from a port the system chooses and takes the
 answers on the same socket, so the configuration's ``tcs_cmd.send`` is
 ``127.0.0.1:0``: commands from any port of this host, each answer going back
 to the port its command came from.
+
+Starting Yamcs, its REST API, CONNECT and the beacon through Yamcs are
+``python/tcslib/yamcs_ground.py``'s, which `The thermostat-yamcs example`_
+shares, as it shares the Yamcs templates beside it.
+
+The thermostat-yamcs example
+----------------------------
+.. figure:: ../examples/thermostat-yamcs/thermostat-yamcs.svg
+   :alt: The thermostat-yamcs example: the thermostat example's sensors,
+         conversions, vote, thermostat and heaters, with a gateway_yamcs
+         node that sends each conversion's, the vote's and the thermostat's
+         data down to Yamcs as CCSDS telemetry, one APID each, where each
+         is a temperature in kelvin or on or off.
+   :width: 100%
+
+   ``examples/thermostat-yamcs``: the thermostat example with Yamcs
+   between the ground station and the vehicle, over CCSDS packets.
+
+The thermostat example with Yamcs at the ground end, as ping-yamcs is the
+ping example with it. The vehicle is the thermostat's, and so is the
+physics model tcssim joins its stand-ins to,
+``examples/thermostat-common/thermostat-physics.yaml``, which the two
+simulator files name; the two configurations and the two simulator files
+are written in both examples, as neither format can include the other, and
+a test, ``examples/thermostat-yamcs/tests/shared.rs``, holds each copy to
+the other. What differs is the gateway, ``yamcs``: the beacon is telemetry
+of APID ``0x110``, CONNECT and its answer are on ``0x111``, and each source
+drawn into the gateway node comes down as telemetry of its ``apid_base``,
+``0x400``, plus the source's device id -- ``k_1`` to ``k_3`` on ``0x404``
+to ``0x406``, ``thermostat`` on ``0x40a`` and ``zone_temp`` on ``0x40b``.
+
+The mission database gives each of them a parameter of the type the
+configuration says its data are (see `What the vehicle answers to`_): the
+conversions and the vote are temperatures in kelvin, and the thermostat's
+decision is on or off. Nothing is added to the configuration for it: the
+type is what tcsmoc's plot window and the F´ bridge already read there.
+Yamcs's web interface, at ``http://localhost:17090``, shows them so.
+
+``examples/thermostat-yamcs/thermostat_yamcs.py`` runs it, given a Yamcs
+release unpacked somewhere:
+
+.. code-block:: sh
+
+   make -C examples run-thermostat-yamcs YAMCS_HOME=~/yamcs-5.14.0
+   python3 examples/thermostat-yamcs/thermostat_yamcs.py \
+       --yamcs ~/yamcs-5.14.0 --seconds 120
+
+It starts Yamcs, tcssim, with every payload sending from the start, and
+tcspecial once tcssim is ready, each killed with it; has Yamcs send CONNECT
+until the vehicle answers with the configuration's checksum; and reads the
+parameters back over Yamcs's REST API. Its window shows the beacon above
+the zone's temperature, each reading, the thermostat's decision and the
+heaters it drives. With ``--seconds`` there is no window, and it prints
+what arrives, and a line each time the heaters are switched:
+
+.. code-block:: text
+
+   connected: the vehicle is running this configuration
+   parameter: /TcsYamcs/zone_temp, Value(Kelvin), units K
+   parameter: /TcsYamcs/thermostat, Decision, units none
+   read: zone_temp 292.623 K, k_1 292.587 K, k_2 292.712 K, k_3 292.623 K,
+   thermostat off, heaters_1 off, heaters_2 off
+   switched: thermostat off -> on, driving heaters_1, heaters_2; zone_temp
+   291.039 K, k_1 291.025 K, k_2 291.150 K, k_3 291.039 K, thermostat on,
+   heaters_1 on, heaters_2 on
+
+tcssim draws a window of its own, so it wants a display. Every port is in
+the seventeen thousands, so it can run beside the thermostat example.
 
 The tees example
 ----------------
@@ -3692,13 +3764,15 @@ device on a bus, where the master's own read is the request and a second master
 cannot see it.
 
 This is the shipped ``examples/thermostat/thermostat-sim.yaml``, which names
-the model the zone is declared in, ``thermostat-physics.yaml``, beside it.
+the model the zone is declared in, ``thermostat-physics.yaml``, by its path
+from the simulator file's directory: it is in ``examples/thermostat-common``,
+which the thermostat example shares with thermostat-yamcs.
 
 .. code-block:: yaml
 
    description: Simulator settings for the payloads of thermostat.ytcs
 
-   physics: thermostat-physics.yaml
+   physics: ../thermostat-common/thermostat-physics.yaml
 
    simulated_payload_groups:
      - group: zone_temps
@@ -4488,9 +4562,14 @@ as soon as it is regenerated:
 * for each source drawn into a ``gateway_yamcs`` node, and each payload
   nothing touches, a container ``<node>Packet`` on its APID, holding the
   fields of its interface document's container, where its type has one,
-  and otherwise a binary parameter named after the node: what follows the
-  header, whole. (A source drawn into two such nodes gets one for each,
-  named ``<node>_to_<gateway>``);
+  and otherwise a parameter named after the node of the type the
+  configuration says its data are, as tcsmoc's plot window and the F´
+  bridge read it: a compute node's value a float in its unit (``K``,
+  ``V``, ...), read from its four bytes through a calibrator, with the unit
+  in a ``UnitSet``; a thermostat's decision a boolean, read from its ``1``
+  or ``0``; and any other node's data binary, what follows the header,
+  whole. (A source drawn into two such nodes gets one for each, named
+  ``<node>_to_<gateway>``);
 * a link on the command link, on the beacon, to each ``gateway_yamcs``
   node's ``address`` and ``port``, and on each port a source's data arrives
   at.

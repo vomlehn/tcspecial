@@ -1,0 +1,25 @@
+[package]
+name = "thermostat-yamcs-example"
+version = "0.1.0"
+edition = "2021"
+license.workspace = true
+description = """\
+The tests of the thermostat-yamcs example, whose ground station is Python 3: \
+they hold the Python, and the Yamcs mission database it generates, to the \
+Rust it is written after"""
+
+# Nothing is built for the example itself: its ground station is
+# thermostat_yamcs.py beside this. What is here is the tests, which need the
+# Rust to hold the Python to -- the ports, the APIDs and what each node's
+# data are -- and the thermostat example to hold this one to.
+[dev-dependencies]
+tcslibgs = { path = "../../tcslibgs" }
+tempfile = "3.27.0"
+# The two examples' configurations as value trees, compared.
+serde_json = "1.0"
+# Generates the Yamcs wrapper's XTCE and works it as Yamcs would, which the
+# tests hold to the vehicle's framing: shared with ping-yamcs.
+yamcs-common = { path = "../yamcs-common" }
+
+[lints]
+workspace = true

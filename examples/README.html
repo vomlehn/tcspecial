@@ -201,6 +201,19 @@ payload and a Rust ground station. An example may hold a ground program
 without holding a payload: <code>beacon</code> does, its ground station
 watching something tcspecial sends on its own account, and so does
 <code>ping</code>, whose ground station is Python 3.</p>
+<p>Two examples that are one example with another ground station share
+what they have in common from a directory of its own, which is not an
+example and holds no configuration: <code>ping-common</code> holds the
+ping link and the window that <code>ping</code> and
+<code>ping-yamcs</code> both show, and <code>thermostat-common</code>
+the physics model the simulator files of <code>thermostat</code> and
+<code>thermostat-yamcs</code> both name. What a file cannot refer to – a
+simulator file includes no other, and a ground station in Python reads
+no configuration includes – is written in both, and a test holds the two
+copies to each other:
+<code>examples/thermostat-yamcs/tests/shared.rs</code>.
+<code>yamcs-common</code> is not an example either: it is the Rust the
+tests of the examples through Yamcs share.</p>
 <p>A configuration and its simulator file are matched by payload name.
 The simulator file can’t name a payload the configuration doesn’t have,
 nor one the simulator would not stand in for: a payload that is a
@@ -455,9 +468,11 @@ after <code>tcslib::beacon</code>,
 <code>python/tcslibgs</code> for the ping format, the beacon and the
 configuration. The interface digest beacons are checked against is
 worked out with tcs-xtce’s Python runtime, from the tcs-xtce checkout
-beside this tree. <code>ping_ground.py</code> here is the ping’s own
-part, with no window. The Rust crate beside them is the tests that hold
-the Python to the Rust; <code>cargo test</code> runs them.</p>
+beside this tree. <code>ping-common/ping_ground.py</code> is the ping’s
+own part, with no window, and <code>ping-common/ping_window.py</code>
+the window, both shared with <code>ping-yamcs</code>. The Rust crate
+beside them is the tests that hold the Python to the Rust;
+<code>cargo test</code> runs them.</p>
 <pre><code>make run-ping                                   # the vehicle and the window
 python3 examples/ping/ping_gateway.py --pings 3 # no window: three pings
 python3 examples/ping/ping_gateway.py --yaml    # ping.ytcs, not ping.xtcs</code></pre>
@@ -563,19 +578,25 @@ a binary parameter named after it, and a gateway node whose data goes
 anywhere else a command named after it that carries its data whole.
 Nothing in the wrapper is written by hand per APID, so a node added to
 the configuration is decoded by Yamcs the next time the example runs,
-and no line of it is wider than 80 columns. It starts Yamcs and
-tcspecial, has Yamcs send CONNECT until the vehicle answers with the
-configuration’s checksum, then pings through Yamcs – the ping split into
-the document’s fields by the code tcs-xtce generates from it,
-<code>python/tcslibgs/ping_packet.py</code> – and reads the answers back
-over Yamcs’s REST API, putting each together again from its fields.</p>
-<p>Its window is the ping example’s: the beacon panel, and the ping
-panel with its <code>Send ping</code> button. The beacon panel is fed
-the beacon’s own bytes, which the Yamcs wrapper keeps whole as the
-<code>BeaconBody</code> parameter, so it checks the configuration’s
-checksum and the beacon’s number and ages the indicator just as the ping
-example’s does. With <code>--pings</code> there is no window: it prints
-the first beacon and each exchange, and stops.</p>
+and no line of it is wider than 80 columns. A node whose data the
+configuration types – a conversion’s or a vote’s value in its unit, a
+thermostat’s decision – is given a parameter of that type instead: see
+thermostat-yamcs. It starts Yamcs and tcspecial, has Yamcs send CONNECT
+until the vehicle answers with the configuration’s checksum, then pings
+through Yamcs – the ping split into the document’s fields by the code
+tcs-xtce generates from it, <code>python/tcslibgs/ping_packet.py</code>
+– and reads the answers back over Yamcs’s REST API, putting each
+together again from its fields.</p>
+<p>Its window is the ping example’s, from <code>ping-common</code>: the
+beacon panel, and the ping panel with its <code>Send ping</code> button.
+Starting Yamcs, its REST API, CONNECT and the beacon through Yamcs are
+<code>python/tcslib/yamcs_ground.py</code>’s, which thermostat-yamcs
+shares. The beacon panel is fed the beacon’s own bytes, which the Yamcs
+wrapper keeps whole as the <code>BeaconBody</code> parameter, so it
+checks the configuration’s checksum and the beacon’s number and ages the
+indicator just as the ping example’s does. With <code>--pings</code>
+there is no window: it prints the first beacon and each exchange, and
+stops.</p>
 <pre><code>make run-ping-yamcs YAMCS_HOME=~/yamcs-5.14.0     # the window
 python3 examples/ping-yamcs/ping_yamcs.py --yamcs ~/yamcs-5.14.0 --pings 3
 python3 examples/ping-yamcs/ping_yamcs.py --describe   # what it read</code></pre>
@@ -596,7 +617,8 @@ generated wrapper as Yamcs would, decoding the beacon, the answers – a
 ping’s field by field, every byte of it read – and each added node’s
 data as the vehicle frames them, and encoding CONNECT and a ping, its
 fields as text, for the vehicle to unframe and read as the ping
-<code>tcslibgs</code> writes; and <code>python.rs</code> runs
+<code>tcslibgs</code> writes, with the interpreter of
+<code>examples/yamcs-common</code>; and <code>python.rs</code> runs
 <code>test_ping_yamcs.py</code>, which also holds every line of the
 written wrapper to 80 columns. None needs Yamcs or opens a window.</p>
 <p><code>YAMCS_HOME</code> is where a Yamcs release is unpacked, holding
@@ -616,8 +638,9 @@ uses.</p>
 <ul>
 <li>tcspecial configuration: YAML (<code>ping-yamcs.ytcs</code>) or XML
 (<code>ping-yamcs.xtcs</code>)</li>
-<li>Yamcs configuration: YAML and XTCE templates
-(<code>yamcs/</code>)</li>
+<li>Yamcs configuration: YAML templates
+(<code>python/tcslib/yamcs-templates</code>) and an XTCE template
+(<code>python/tcslibgs/yamcs.xtce</code>)</li>
 <li>ground program: Python 3 (<code>ping_yamcs.py</code>), with Yamcs
 (Java)</li>
 </ul>
@@ -738,6 +761,14 @@ commanded from the ground, and tcsmoc plots the temperatures and the
 heaters.</td>
 </tr>
 <tr>
+<td><code>thermostat-yamcs</code></td>
+<td>The thermostat, with Yamcs as its ground station, over CCSDS
+packets: the zone’s temperature and the three readings arrive in Yamcs
+as temperatures in kelvin, and the thermostat’s decision as on or off,
+each a parameter the configuration types, and a Python 3 program shows
+them.</td>
+</tr>
+<tr>
 <td><code>battery</code></td>
 <td>A power bus through an orbit: a power monitor asked over a serial
 line, a shunt, the battery’s charge counted by a Python 3 program, and
@@ -783,14 +814,14 @@ as <code>tests/manual/thermostat.ytcs</code> has them; those buses are
 flown against stand-ins by <code>make stand-ins-test</code> and
 <code>make kernel-stand-ins-test</code>.</p>
 <p>tcssim joins the stand-ins to the vehicle’s physics model,
-<code>thermostat-physics.yaml</code>, which
-<code>thermostat-sim.yaml</code> names: a zone and two heaters, each a
-part simulated alone and joined to the zone under
-<code>connections</code>. All three sensors are joined to
-<code>zone.temperature</code>, each from a place of its own on the zone,
-so their readings agree and the vote produces a temperature. The zone
-cools towards 283.15 K, ten kelvin below the setpoint, and each heater’s
-stand-in is joined to <code>heater_1.on</code> or
+<code>thermostat-common/thermostat-physics.yaml</code>, which
+<code>thermostat-sim.yaml</code> names, as thermostat-yamcs’s simulator
+file does: a zone and two heaters, each a part simulated alone and
+joined to the zone under <code>connections</code>. All three sensors are
+joined to <code>zone.temperature</code>, each from a place of its own on
+the zone, so their readings agree and the vote produces a temperature.
+The zone cools towards 283.15 K, ten kelvin below the setpoint, and each
+heater’s stand-in is joined to <code>heater_1.on</code> or
 <code>heater_2.on</code>, so the heaters warm it while the vehicle has
 them on: the loop closes through tcspecial.</p>
 <pre><code>make run-thermostat</code></pre>
@@ -806,6 +837,119 @@ each payload in tcssim, to start the data and the heating.</p>
 log are its own nodes.</li>
 <li>Payload: Rust – tcssim stands in for the three sensors, with the
 zone they read, and for the two heaters.</li>
+</ul>
+<h3 id="thermostat-yamcs">thermostat-yamcs</h3>
+<p>The thermostat example with <a href="https://yamcs.org">Yamcs</a> at
+the ground end, as ping-yamcs is the ping example with it. The vehicle
+is the thermostat’s – the same sensors, conversions, vote, thermostat,
+heaters and log, which <code>tests/shared.rs</code> holds to the
+thermostat example’s, and the same physics model,
+<code>thermostat-common/thermostat-physics.yaml</code> – and what
+differs is the configuration’s gateway, <code>yamcs</code>, so every
+packet to and from the ground carries a CCSDS primary header:</p>
+<table>
+<colgroup>
+<col style="width: 26%" />
+<col style="width: 47%" />
+<col style="width: 26%" />
+</colgroup>
+<thead>
+<tr>
+<th>What</th>
+<th>Which way</th>
+<th>APID</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>the beacon</td>
+<td>down</td>
+<td><code>beacon.apid</code>, 0x110</td>
+</tr>
+<tr>
+<td>CONNECT and its answer</td>
+<td>up, down</td>
+<td><code>tcs_cmd.apid</code>, 0x111</td>
+</tr>
+<tr>
+<td>what Yamcs sends the gateway node</td>
+<td>up</td>
+<td>its <code>apid_base</code>, 0x400</td>
+</tr>
+<tr>
+<td><code>k_1</code>, <code>k_2</code>, <code>k_3</code></td>
+<td>down</td>
+<td><code>apid_base</code> plus each one’s device id, 0x404 to
+0x406</td>
+</tr>
+<tr>
+<td><code>thermostat</code></td>
+<td>down</td>
+<td>0x40a</td>
+</tr>
+<tr>
+<td><code>zone_temp</code></td>
+<td>down</td>
+<td>0x40b</td>
+</tr>
+</tbody>
+</table>
+<p><code>thermostat_yamcs.py</code> writes Yamcs’s configuration with
+<code>python/tcslib/yamcs_ground.py</code>, as
+<code>ping_yamcs.py</code> does, its mission database generated by
+<code>python/tcslibgs/yamcs.py</code>. That gives each node drawn into
+the gateway node a parameter of the type the configuration says its data
+are, by <code>python/tcslibgs/form.py</code> – the Python spelling of
+<code>tcslibgs::graph::fprime::Form::of</code>, which tcsmoc’s plot
+window and the F´ bridge go by, and nothing a configuration does not
+already state: a conversion’s or a vote’s value is a float in its unit,
+with the unit in a <code>UnitSet</code>, read from its four bytes of a
+signed count of the unit’s steps through a calibrator, and a
+thermostat’s decision is a boolean read from its <code>1</code> or
+<code>0</code>. So Yamcs’s web interface, at <a
+href="http://localhost:17090" class="uri">http://localhost:17090</a>,
+shows <code>zone_temp</code> and <code>k_1</code> to <code>k_3</code> as
+temperatures in K and <code>thermostat</code> as true or false.</p>
+<p>It starts Yamcs, then tcssim – every payload sending from the start,
+as though its panel’s button had been pressed – and, once tcssim says it
+is ready, tcspecial, each with <code>--simulate=all</code>; has Yamcs
+send CONNECT until the vehicle answers with the configuration’s
+checksum; and reads the parameters back over Yamcs’s REST API. Its
+window shows the beacon panel above the thermostat’s: the zone’s
+temperature, each reading, the thermostat’s decision and the two heaters
+it drives. With <code>--seconds</code> there is no window: it prints
+every value each <code>--every</code> seconds, and a line each time the
+heaters are switched, and stops. tcssim draws a window of its own, so
+either wants a display.</p>
+<pre><code>make run-thermostat-yamcs YAMCS_HOME=~/yamcs-5.14.0   # the window
+python3 examples/thermostat-yamcs/thermostat_yamcs.py --yamcs ~/yamcs-5.14.0 \
+    --seconds 120
+python3 examples/thermostat-yamcs/thermostat_yamcs.py --describe</code></pre>
+<p>Yamcs, tcssim and tcspecial are stopped when it ends and killed with
+it if it is killed or crashes.</p>
+<p>The Rust crate beside it is its tests: <code>agrees.rs</code> holds
+the ports, APIDs, forms and checksum
+<code>thermostat_yamcs.py --describe</code> reads from
+<code>thermostat-yamcs.xtcs</code> to what <code>tcslibgs</code> reads
+from <code>thermostat-yamcs.ytcs</code>, the Python’s form of every node
+of every example to <code>Form::of</code>, and its table of units to
+<code>tcslibgs::unit</code>; <code>wrapper.rs</code> works the generated
+mission database as Yamcs would, with
+<code>examples/yamcs-common</code>’s interpreter, on what the vehicle
+sends – each value as <code>value_bytes</code> makes it, in every unit
+there is, and each decision; <code>shared.rs</code> holds its vehicle
+and simulator file to the thermostat example’s; and
+<code>python.rs</code> runs <code>test_thermostat_yamcs.py</code>. None
+needs Yamcs or opens a window.</p>
+<p>Its ports are all in the seventeen thousands, which no other example
+uses, so it can run beside the thermostat example.</p>
+<p>Languages:</p>
+<ul>
+<li>tcspecial configuration: YAML (<code>thermostat-yamcs.ytcs</code>)
+or XML (<code>thermostat-yamcs.xtcs</code>)</li>
+<li>ground program: Python 3 (<code>thermostat_yamcs.py</code>), with
+Yamcs (Java)</li>
+<li>payloads: Rust – tcssim, as in the thermostat example</li>
 </ul>
 <h3 id="battery">battery</h3>
 <p>A spacecraft’s power bus through an orbit: the example of a payload

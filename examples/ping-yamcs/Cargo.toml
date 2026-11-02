@@ -13,9 +13,9 @@ hold the Python to the Rust it is written after"""
 [dev-dependencies]
 tcslibgs = { path = "../../tcslibgs" }
 tempfile = "3.27.0"
-# Reads the Yamcs wrapper's XTCE, which the tests hold to the vehicle's
-# framing.
-quick-xml = "0.42"
+# Generates the Yamcs wrapper's XTCE and works it as Yamcs would, which the
+# tests hold to the vehicle's framing: shared with thermostat-yamcs.
+yamcs-common = { path = "../yamcs-common" }
 
 [lints]
 workspace = true

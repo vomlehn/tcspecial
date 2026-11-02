@@ -33,8 +33,12 @@ from it. A command cannot be put behind another's header from outside, so
 the document is copied rather than referred to, and the copy is held to
 what the document says by refusing anything of it the copy would not say
 the same (:data:`COPIED`). The data of every other node is laid out by no
-XTCE, so its container holds what follows the header whole, as a binary
-parameter named after the node, and a gateway node's command takes its
+XTCE, so its container holds what follows the header whole, as a
+parameter named after the node: of the type the configuration says the
+node's data are (:func:`tcslibgs.form.form_of`, the same that tcsmoc's plot
+window and the F´ bridge go by), a value as a number in its unit, read from
+its four bytes, and a decision as a boolean, read from its ``1`` or ``0``;
+and binary, whole, for every other node. A gateway node's command takes its
 data whole, as a binary argument. Only the standard library is used.
 """
 
@@ -45,6 +49,7 @@ from pathlib import Path
 
 from . import interface
 from .configuration import HostPort
+from .form import DATUM, DECISION_OFF, DECISION_ON, VALUE_BYTES, form_of
 
 #: The XTCE namespace Yamcs 5 reads: XTCE 1.2.
 NAMESPACE = "http://www.omg.org/spec/XTCE/20180204"
@@ -91,6 +96,10 @@ CONNECT = "Connect"
 #: The binary parameter type a node's data is read as: what follows the
 #: header, whole.
 BODY_TYPE = "PacketBodyType"
+
+#: The parameter type a decision is read as: a boolean, from the one
+#: character ``1`` or ``0``.
+DECISION_TYPE = "DecisionType"
 
 #: The binary argument type a gateway node's command carries its data as,
 #: and the argument that says its length in bits.
@@ -145,6 +154,9 @@ class Telemetry:
     #: The source's interface document, which its data is laid out by, or
     #: ``None`` where it has none.
     document: Path = None
+    #: What the configuration says its data are, where no document lays
+    #: them out: a :class:`tcslibgs.form.Form`.
+    form: object = DATUM
 
     @property
     def container(self):
@@ -213,8 +225,10 @@ def telemetry(config):
         :meth:`~tcslibgs.configuration.Configuration.apids`.
 
     Raises:
-        ValueError: The configuration does not answer to Yamcs, or an APID
-                    or a port does not read, fit, or is used twice.
+        ValueError: The configuration does not answer to Yamcs, an APID or
+                    a port does not read, fit, or is used twice, or a node
+                    of values says no unit it has (see
+                    :func:`tcslibgs.form.form_of`).
     """
     uses = [use for use in config.apids()
             if use.carries in ("downlink", "payload_telemetry")]
@@ -231,8 +245,9 @@ def telemetry(config):
             ground = config.payload_telemetry_link(use.node)[1]
             name = use.node
         document = interface.node_document(config.node(use.node).node_type)
+        form = DATUM if document else form_of(config, use.node)
         links.append(Telemetry(name, use.node, use.apid, ground,
-                               use.carries, use.gateway, document))
+                               use.carries, use.gateway, document, form))
     return links
 
 
@@ -816,6 +831,80 @@ def _comment(parent, text):
     parent.append(ET.Comment(f" {text} "))
 
 
+def value_type(unit):
+    """The name of the parameter type a value in a unit is read as.
+
+    Args:
+        unit: The :class:`tcslibgs.form.Unit`.
+
+    Returns:
+        ``<Unit>ValueType``, by the Rust's name for the unit, which an XTCE
+        name allows where a symbol, ``m/s``, may not be.
+    """
+    return f"{unit.variant}ValueType"
+
+
+def _form_type(root, names, link):
+    """The parameter type a source's data is read as, where no document
+    lays it out, added to the wrapper the first time it is needed.
+
+    A value is a float in its unit, read from four bytes of a signed count
+    of the unit's steps, most significant first, which a calibrator turns
+    into the unit: what ``compute::from_value`` reads. Its unit is said in
+    a ``UnitSet``, but a ratio's, which has no symbol. A decision is a
+    boolean read from the one character ``compute::from_decision`` reads,
+    ``1`` for on and ``0`` for off; anything else is not one, and Yamcs
+    says it cannot read it. Any other node's data is :data:`BODY_TYPE`.
+
+    Args:
+        root:  The wrapper's root.
+        names: The :class:`_Names` it holds.
+        link:  The :class:`Telemetry`.
+
+    Returns:
+        The type's name.
+
+    Raises:
+        ValueError: As :meth:`_Names.take`.
+    """
+    form = link.form
+    if form.kind == "Datum":
+        return BODY_TYPE
+    name = value_type(form.unit) if form.kind == "Value" else DECISION_TYPE
+    types = _one(root, "./x:TelemetryMetaData/x:ParameterTypeSet",
+                 "parameter type sets")
+    if any(kind.get("name") == name for kind in types):
+        return name
+    names.take("parameter type", name, link.source)
+    if form.kind == "Decision":
+        _comment(types, "A decision: the one character 1 for on, 0 for "
+                        "off.")
+        kind = _child(types, "BooleanParameterType", name=name,
+                      oneStringValue=DECISION_ON,
+                      zeroStringValue=DECISION_OFF)
+        encoding = _child(kind, "StringDataEncoding")
+        fixed = _child(_child(encoding, "SizeInBits"), "Fixed")
+        _child(fixed, "FixedValue").text = "8"
+        return name
+    unit = form.unit
+    steps = {1e6: "millionths", 1e3: "thousandths"}[unit.per_unit]
+    _comment(types, f"A value in {unit.name}: a signed count of "
+                    f"{steps} of one.")
+    kind = _child(types, "FloatParameterType", name=name, sizeInBits="64")
+    if unit.variant != "Ratio":
+        _child(_child(kind, "UnitSet"), "Unit",
+               description=unit.name).text = unit.symbol
+    encoding = _child(kind, "IntegerDataEncoding",
+                      sizeInBits=str(8 * VALUE_BYTES),
+                      encoding="twosComplement",
+                      byteOrder="mostSignificantByteFirst")
+    polynomial = _child(_child(encoding, "DefaultCalibrator"),
+                        "PolynomialCalibrator")
+    _child(polynomial, "Term", coefficient=repr(1 / unit.per_unit),
+           exponent="1")
+    return name
+
+
 def _downlink(root, names, copier, link):
     """Adds the container a source's data reaches the ground in.
 
@@ -834,10 +923,11 @@ def _downlink(root, names, copier, link):
                       "container sets")
     names.take("container", link.container, link.source)
     if link.document is None:
+        kind = _form_type(root, names, link)
         names.take("parameter", link.name, link.source)
         _child(_one(root, "./x:TelemetryMetaData/x:ParameterSet",
                     "parameter sets"),
-               "Parameter", name=link.name, parameterTypeRef=BODY_TYPE)
+               "Parameter", name=link.name, parameterTypeRef=kind)
         held = [link.name]
     else:
         document = Document(link.document)

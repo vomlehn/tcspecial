@@ -46,6 +46,9 @@ help:
 	@echo "  make run-ping-yamcs  - Run the ping-yamcs example: a Python" \
 		"window that pings the vehicle through Yamcs, over CCSDS" \
 		"packets (YAMCS_HOME=<yamcs>)"
+	@echo "  make run-thermostat-yamcs - Run the thermostat-yamcs" \
+		"example: the thermostat, watched through Yamcs, over CCSDS" \
+		"packets (YAMCS_HOME=<yamcs>)"
 	@echo "  make run-tees        - Run tcsmoc on the tees example: tees" \
 		"and null nodes"
 	@echo "  make run-fprime      - Run tcsmoc on the fprime example," \
@@ -273,6 +276,32 @@ run-ping-yamcs: check-tkinter
 	cd $(ROOT) && cargo build -q --bin tcspecial --bin tcsverify --bin segsend
 	cd $(ROOT) && RUST_LOG=$(RUST_LOG) python3 \
 		examples/ping-yamcs/ping_yamcs.py --yamcs "$(YAMCS_HOME)"
+
+# The thermostat example with Yamcs between the ground station and the
+# vehicle. YAMCS_HOME is where a Yamcs release is unpacked;
+# thermostat_yamcs.py starts Yamcs, tcssim and tcspecial, and opens a window
+# of the zone's temperature, the three readings, the thermostat's decision
+# and the heaters it drives, each read from Yamcs. Closing the window stops
+# them all. tcssim draws a window of its own, so this wants a display. With
+# no window of the program's own,
+#   python3 examples/thermostat-yamcs/thermostat_yamcs.py --yamcs <yamcs> \
+#       --seconds 120
+# prints what arrives for two minutes, and a line each time the heaters are
+# switched, and stops them.
+.PHONY: run-thermostat-yamcs
+run-thermostat-yamcs: check-tkinter
+	@test -x "$(YAMCS_HOME)/bin/yamcsd" || { \
+		echo "say where Yamcs is unpacked: make run-thermostat-yamcs" \
+			"YAMCS_HOME=<the directory holding bin/yamcsd>" >&2; \
+		exit 1; \
+	}
+	cd $(ROOT) && cargo build -q --bin tcspecial --bin tcssim \
+		--bin tcsverify --bin segsend
+	rm -rf $(TELEMETRY)
+	mkdir $(TELEMETRY)
+	cd $(ROOT) && RUST_LOG=$(RUST_LOG) python3 \
+		examples/thermostat-yamcs/thermostat_yamcs.py \
+		--yamcs "$(YAMCS_HOME)"
 
 # Whether there is a tkinter for the ping example's window to be drawn with.
 #

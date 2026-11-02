@@ -40,7 +40,8 @@ class WriteYamcsTest(unittest.TestCase):
         self.run = Path(tempfile.mkdtemp()) / "run"
 
     def test_every_template_name_is_filled_in(self):
-        for example, instance in (("ping-yamcs", "ping"),):
+        for example, instance in (("ping-yamcs", "ping"),
+                                  ("thermostat-yamcs", "thermostat")):
             config = configuration.load(
                 ROOT / "examples" / example / f"{example}.xtcs")
             yamcs_ground.write_yamcs(config, self.run, 1, self.home,

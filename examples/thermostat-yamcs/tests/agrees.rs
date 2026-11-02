@@ -182,8 +182,8 @@ fn the_python_reads_the_configuration_as_the_rust_does() {
             "Value(Kelvin)",
             "Value(Kelvin)",
             "Value(Kelvin)",
-            "Decision",
-            "Value(Kelvin)"
+            "Value(Kelvin)",
+            "Decision"
         ]
     );
 }

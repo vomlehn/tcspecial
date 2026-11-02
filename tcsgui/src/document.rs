@@ -3174,9 +3174,9 @@ pub fn thermostat_example() -> Document {
     );
 
     for (name, at, format, scale, offset) in [
-        ("k_1", (242, 34), "i16_be", "0.0625", "273.15"),
-        ("k_2", (242, 166), "i16_be", "0.0625", "273.15"),
-        ("k_3", (242, 280), "u24_be", "0.0078", "255.37"),
+        ("temp1", (242, 34), "i16_be", "0.0625", "273.15"),
+        ("temp2", (242, 166), "i16_be", "0.0625", "273.15"),
+        ("temp3", (242, 280), "u24_be", "0.0078", "255.37"),
     ] {
         place(&mut document, name, "compute", at);
         set(&mut document, name, "function", "to_kelvin");
@@ -3185,13 +3185,13 @@ pub fn thermostat_example() -> Document {
         set(&mut document, name, "offset", offset);
     }
 
-    place(&mut document, "zone_temp", "compute", (469, 166));
-    set(&mut document, "zone_temp", "function", "vote");
-    set(&mut document, "zone_temp", "algorithm", "median");
-    set(&mut document, "zone_temp", "inputs", "in0,in1,in2");
+    place(&mut document, "ambient", "compute", (469, 166));
+    set(&mut document, "ambient", "function", "vote");
+    set(&mut document, "ambient", "algorithm", "median");
+    set(&mut document, "ambient", "inputs", "in0,in1,in2");
     note(
         &mut document,
-        "zone_temp",
+        "ambient",
         "One temperature out of the three, by the algorithm named: \
          median takes the middle reading, closest_mean the mean of the two \
          that agree best. Either leaves a sensor that has gone wrong out of \
@@ -3259,26 +3259,21 @@ pub fn thermostat_example() -> Document {
         });
     };
 
-    link(&mut document, "temp_1", "payload-out", "k_1", None);
-    link(&mut document, "temp_2", "payload-out", "k_2", None);
-    link(&mut document, "temp_3", "payload-out", "k_3", None);
+    link(&mut document, "temp_1", "payload-out", "temp1", None);
+    link(&mut document, "temp_2", "payload-out", "temp2", None);
+    link(&mut document, "temp_3", "payload-out", "temp3", None);
 
     // The "T": each converted reading goes to the ground, into the vote, and
     // into the log.
-    for (from, input) in [("k_1", "in0"), ("k_2", "in1"), ("k_3", "in2")] {
+    for (from, input) in [("temp1", "in0"), ("temp2", "in1"), ("temp3", "in2")]
+    {
         link(&mut document, from, "payload-out", "gateway", None);
-        link(&mut document, from, "payload-out", "zone_temp", Some(input));
+        link(&mut document, from, "payload-out", "ambient", Some(input));
         link(&mut document, from, "payload-out", "housekeeping", None);
     }
 
-    link(&mut document, "zone_temp", "payload-out", "gateway", None);
-    link(
-        &mut document,
-        "zone_temp",
-        "payload-out",
-        "thermostat",
-        None,
-    );
+    link(&mut document, "ambient", "payload-out", "gateway", None);
+    link(&mut document, "ambient", "payload-out", "thermostat", None);
     // The heaters are a payload, so what drives them leaves the thermostat by
     // its gateway-out: the vehicleward stream, which is what reaches a payload.
     link(

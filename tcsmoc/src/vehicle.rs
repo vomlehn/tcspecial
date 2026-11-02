@@ -3264,16 +3264,16 @@ payloads:
         assert_eq!(
             named,
             vec![
-                ("k_1".to_string(), 4),
-                ("k_2".to_string(), 5),
-                ("k_3".to_string(), 6),
+                ("ambient".to_string(), 0),
+                ("temp1".to_string(), 5),
+                ("temp2".to_string(), 6),
+                ("temp3".to_string(), 7),
                 // The decision too, which the ground sees as well as the
                 // heaters.
-                ("thermostat".to_string(), 10),
-                ("zone_temp".to_string(), 11),
+                ("thermostat".to_string(), 11),
             ]
         );
-        // zone_temp, device id 11, at ground_base plus that.
+        // thermostat, device id 11, at ground_base plus that.
         assert!(
             panels[4].config.contains("to gateway"),
             "{}",

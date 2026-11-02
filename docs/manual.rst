@@ -1916,7 +1916,7 @@ which is what a panel in the MOC shows.
            path: "/dev/i2c-1"
            read_size: "2"
            payload-out:
-             - target: k_1
+             - target: temp1
 
          - payload: temp_2
            address: "0x49"
@@ -1924,7 +1924,7 @@ which is what a panel in the MOC shows.
            path: "/dev/i2c-1"
            read_size: "2"
            payload-out:
-             - target: k_2
+             - target: temp2
 
      - type spi:
          - payload: temp_3
@@ -1934,7 +1934,7 @@ which is what a panel in the MOC shows.
            read_size: "3"
            spi_mode: "0"
            payload-out:
-             - target: k_3
+             - target: temp3
 
 The same configuration in the other spelling is
 ``tests/manual/thermostat.xtcs``, which a test holds to saying the same
@@ -2150,14 +2150,14 @@ occupy one point. ``temp_3`` is a different part, reporting three unsigned
 bytes on a scale of its own where the first two report two signed bytes on
 theirs, so that no one part number can take the whole trio out.
 
-Each reading is converted to kelvin by its own ``to_kelvin`` node, ``k_1``,
-``k_2`` or ``k_3``, and each converted reading goes three ways: to the ground
-through the gateway node -- at its ``ground_base``, ``127.0.0.1:5100``, plus
-each source's device id, so ``k_1``, ``k_2`` and ``k_3``, ids 4 to 6, arrive on
-ports 5104 to 5106 -- into ``zone_temp`` as the input ``in0``, ``in1`` or
-``in2``, and into the log ``housekeeping``.
+Each reading is converted to kelvin by its own ``to_kelvin`` node,
+``temp1``, ``temp2`` or ``temp3``, and each converted reading goes three ways:
+to the ground through the gateway node -- at its ``ground_base``,
+``127.0.0.1:5100``, plus each source's device id, so ``temp1``, ``temp2`` and
+``temp3``, ids 5 to 7, arrive on ports 5105 to 5107 -- into ``ambient`` as the
+input ``in0``, ``in1`` or ``in2``, and into the log ``housekeeping``.
 
-``zone_temp`` is a ``vote``: one temperature out of the three by the algorithm
+``ambient`` is a ``vote``: one temperature out of the three by the algorithm
 it names, ``median``, which takes the middle reading. A mean would be the wrong
 arithmetic twice over -- it carries a bad reading into the answer in proportion
 to how wrong it is, and waiting for all three turns one dead sensor into no
@@ -2171,11 +2171,11 @@ word. Fed 296.0, 296.1 and 270.0 -- two sensors warm and one stuck
 cold -- it says 296 and the heaters stay off, where a mean would have said
 287.4 and switched them on because one sensor had failed.
 
-The voted temperature goes to the ground, on port 5111, and to ``thermostat``:
+The voted temperature goes to the ground, on port 5100, and to ``thermostat``:
 a hysteresis holding the zone at its ``setpoint``, 293.15 K, with a
 ``half_band`` of 2.0, so the heaters switch two degrees either side of it and
 the setpoint is in the middle of its own band. Its decision is logged, sent to
-the ground on port 5110, and drives two heaters, ``heaters_1`` and
+the ground on port 5111, and drives two heaters, ``heaters_1`` and
 ``heaters_2``. Two of them, because one failing must not leave the zone with
 no way to be warmed: either alone holds the band, and both together hold it
 twice as fast. They are separate nodes so that the ground can stop one and
@@ -2673,8 +2673,9 @@ a test, ``examples/thermostat-yamcs/tests/shared.rs``, holds each copy to
 the other. What differs is the gateway, ``yamcs``: the beacon is telemetry
 of APID ``0x110``, CONNECT and its answer are on ``0x111``, and each source
 drawn into the gateway node comes down as telemetry of its ``apid_base``,
-``0x400``, plus the source's device id -- ``k_1`` to ``k_3`` on ``0x404``
-to ``0x406``, ``thermostat`` on ``0x40a`` and ``zone_temp`` on ``0x40b``.
+``0x400``, plus the source's device id -- ``ambient`` on ``0x400``,
+``temp1`` to ``temp3`` on ``0x405`` to ``0x407``, and ``thermostat`` on
+``0x40b``.
 
 The mission database gives each of them a parameter of the type the
 configuration says its data are (see `What the vehicle answers to`_): the
@@ -2703,12 +2704,12 @@ what arrives, and a line each time the heaters are switched:
 .. code-block:: text
 
    connected: the vehicle is running this configuration
-   parameter: /TcsYamcs/zone_temp, Value(Kelvin), units K
+   parameter: /TcsYamcs/ambient, Value(Kelvin), units K
    parameter: /TcsYamcs/thermostat, Decision, units none
-   read: zone_temp 292.623 K, k_1 292.587 K, k_2 292.712 K, k_3 292.623 K,
+   read: ambient 292.623 K, temp1 292.587 K, temp2 292.712 K, temp3 292.623 K,
    thermostat off, heaters_1 off, heaters_2 off
-   switched: thermostat off -> on, driving heaters_1, heaters_2; zone_temp
-   291.039 K, k_1 291.025 K, k_2 291.150 K, k_3 291.039 K, thermostat on,
+   switched: thermostat off -> on, driving heaters_1, heaters_2; ambient
+   291.039 K, temp1 291.025 K, temp2 291.150 K, temp3 291.039 K, thermostat on,
    heaters_1 on, heaters_2 on
 
 tcssim draws a window of its own, so it wants a display. Every port is in
@@ -4222,7 +4223,7 @@ on, saying what each file says:
 
 .. code-block:: console
 
-   examples/thermostat/thermostat.ytcs:81: error: nodes / thermostat / attributes / setpoint: examples/thermostat/thermostat.xtcs says "290" and examples/thermostat/thermostat.ytcs says "293.15"
+   examples/thermostat/thermostat.ytcs:95: error: nodes / thermostat / attributes / setpoint: examples/thermostat/thermostat.xtcs says "290" and examples/thermostat/thermostat.ytcs says "293.15"
 
 The order anything is written in is not compared: nothing in a configuration
 is in an order that means anything, and a node's device id comes from its
@@ -4273,7 +4274,7 @@ that::
 and before the problems::
 
    $ cargo run --bin tcsverify -- --digest examples/thermostat/thermostat.ytcs
-   examples/thermostat/thermostat.ytcs: md5 8136194fda73c86685a82efbd5b955a5
+   examples/thermostat/thermostat.ytcs: md5 2e863fd2024ec28240ba599e5e627a10
 
 That is the digest tcspecial prints as it starts and puts in every beacon, and
 the MOC compares with its own: two ends whose digests agree have read one

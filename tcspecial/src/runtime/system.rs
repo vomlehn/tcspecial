@@ -3204,7 +3204,7 @@ vehicle:
         assert_eq!(described["heaters_1"], "gpio, driven");
         assert_eq!(described["heaters_2"], "gpio, driven");
         assert_eq!(described["gateway"], "gateway_radio, read");
-        assert_eq!(described["k_1"], "compute");
+        assert_eq!(described["temp1"], "compute");
         assert_eq!(described["housekeeping"], "log");
     }
 

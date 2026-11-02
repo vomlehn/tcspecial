@@ -2271,7 +2271,7 @@ which is what a panel in the MOC shows.</p>
         </span><span class="name tag">path</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal string">&quot;/dev/i2c-1&quot;</span><span class="whitespace">
         </span><span class="name tag">read_size</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal string">&quot;2&quot;</span><span class="whitespace">
         </span><span class="name tag">payload-out</span><span class="punctuation">:</span><span class="whitespace">
-          </span><span class="punctuation indicator">-</span><span class="whitespace"> </span><span class="name tag">target</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">k_1</span><span class="whitespace">
+          </span><span class="punctuation indicator">-</span><span class="whitespace"> </span><span class="name tag">target</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">temp1</span><span class="whitespace">
 
       </span><span class="punctuation indicator">-</span><span class="whitespace"> </span><span class="name tag">payload</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">temp_2</span><span class="whitespace">
         </span><span class="name tag">address</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal string">&quot;0x49&quot;</span><span class="whitespace">
@@ -2279,7 +2279,7 @@ which is what a panel in the MOC shows.</p>
         </span><span class="name tag">path</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal string">&quot;/dev/i2c-1&quot;</span><span class="whitespace">
         </span><span class="name tag">read_size</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal string">&quot;2&quot;</span><span class="whitespace">
         </span><span class="name tag">payload-out</span><span class="punctuation">:</span><span class="whitespace">
-          </span><span class="punctuation indicator">-</span><span class="whitespace"> </span><span class="name tag">target</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">k_2</span><span class="whitespace">
+          </span><span class="punctuation indicator">-</span><span class="whitespace"> </span><span class="name tag">target</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">temp2</span><span class="whitespace">
 
   </span><span class="punctuation indicator">-</span><span class="whitespace"> </span><span class="name tag">type spi</span><span class="punctuation">:</span><span class="whitespace">
       </span><span class="punctuation indicator">-</span><span class="whitespace"> </span><span class="name tag">payload</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">temp_3</span><span class="whitespace">
@@ -2289,7 +2289,7 @@ which is what a panel in the MOC shows.</p>
         </span><span class="name tag">read_size</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal string">&quot;3&quot;</span><span class="whitespace">
         </span><span class="name tag">spi_mode</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal string">&quot;0&quot;</span><span class="whitespace">
         </span><span class="name tag">payload-out</span><span class="punctuation">:</span><span class="whitespace">
-          </span><span class="punctuation indicator">-</span><span class="whitespace"> </span><span class="name tag">target</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">k_3</span>
+          </span><span class="punctuation indicator">-</span><span class="whitespace"> </span><span class="name tag">target</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">temp3</span>
 </pre>
 <p>The same configuration in the other spelling is
 <tt class="docutils literal">tests/manual/thermostat.xtcs</tt>, which a test holds to saying the same
@@ -2480,13 +2480,13 @@ Example</a> shows; those buses are flown against stand-ins by <tt class="docutil
 occupy one point. <tt class="docutils literal">temp_3</tt> is a different part, reporting three unsigned
 bytes on a scale of its own where the first two report two signed bytes on
 theirs, so that no one part number can take the whole trio out.</p>
-<p>Each reading is converted to kelvin by its own <tt class="docutils literal">to_kelvin</tt> node, <tt class="docutils literal">k_1</tt>,
-<tt class="docutils literal">k_2</tt> or <tt class="docutils literal">k_3</tt>, and each converted reading goes three ways: to the ground
-through the gateway node -- at its <tt class="docutils literal">ground_base</tt>, <tt class="docutils literal">127.0.0.1:5100</tt>, plus
-each source's device id, so <tt class="docutils literal">k_1</tt>, <tt class="docutils literal">k_2</tt> and <tt class="docutils literal">k_3</tt>, ids 4 to 6, arrive on
-ports 5104 to 5106 -- into <tt class="docutils literal">zone_temp</tt> as the input <tt class="docutils literal">in0</tt>, <tt class="docutils literal">in1</tt> or
-<tt class="docutils literal">in2</tt>, and into the log <tt class="docutils literal">housekeeping</tt>.</p>
-<p><tt class="docutils literal">zone_temp</tt> is a <tt class="docutils literal">vote</tt>: one temperature out of the three by the algorithm
+<p>Each reading is converted to kelvin by its own <tt class="docutils literal">to_kelvin</tt> node,
+<tt class="docutils literal">temp1</tt>, <tt class="docutils literal">temp2</tt> or <tt class="docutils literal">temp3</tt>, and each converted reading goes three ways:
+to the ground through the gateway node -- at its <tt class="docutils literal">ground_base</tt>,
+<tt class="docutils literal">127.0.0.1:5100</tt>, plus each source's device id, so <tt class="docutils literal">temp1</tt>, <tt class="docutils literal">temp2</tt> and
+<tt class="docutils literal">temp3</tt>, ids 5 to 7, arrive on ports 5105 to 5107 -- into <tt class="docutils literal">ambient</tt> as the
+input <tt class="docutils literal">in0</tt>, <tt class="docutils literal">in1</tt> or <tt class="docutils literal">in2</tt>, and into the log <tt class="docutils literal">housekeeping</tt>.</p>
+<p><tt class="docutils literal">ambient</tt> is a <tt class="docutils literal">vote</tt>: one temperature out of the three by the algorithm
 it names, <tt class="docutils literal">median</tt>, which takes the middle reading. A mean would be the wrong
 arithmetic twice over -- it carries a bad reading into the answer in proportion
 to how wrong it is, and waiting for all three turns one dead sensor into no
@@ -2499,11 +2499,11 @@ nothing and reports it on each arrival rather than acting on one sensor's
 word. Fed 296.0, 296.1 and 270.0 -- two sensors warm and one stuck
 cold -- it says 296 and the heaters stay off, where a mean would have said
 287.4 and switched them on because one sensor had failed.</p>
-<p>The voted temperature goes to the ground, on port 5111, and to <tt class="docutils literal">thermostat</tt>:
+<p>The voted temperature goes to the ground, on port 5100, and to <tt class="docutils literal">thermostat</tt>:
 a hysteresis holding the zone at its <tt class="docutils literal">setpoint</tt>, 293.15 K, with a
 <tt class="docutils literal">half_band</tt> of 2.0, so the heaters switch two degrees either side of it and
 the setpoint is in the middle of its own band. Its decision is logged, sent to
-the ground on port 5110, and drives two heaters, <tt class="docutils literal">heaters_1</tt> and
+the ground on port 5111, and drives two heaters, <tt class="docutils literal">heaters_1</tt> and
 <tt class="docutils literal">heaters_2</tt>. Two of them, because one failing must not leave the zone with
 no way to be warmed: either alone holds the band, and both together hold it
 twice as fast. They are separate nodes so that the ground can stop one and
@@ -2946,8 +2946,9 @@ a test, <tt class="docutils literal"><span class="pre">examples/thermostat-yamcs
 the other. What differs is the gateway, <tt class="docutils literal">yamcs</tt>: the beacon is telemetry
 of APID <tt class="docutils literal">0x110</tt>, CONNECT and its answer are on <tt class="docutils literal">0x111</tt>, and each source
 drawn into the gateway node comes down as telemetry of its <tt class="docutils literal">apid_base</tt>,
-<tt class="docutils literal">0x400</tt>, plus the source's device id -- <tt class="docutils literal">k_1</tt> to <tt class="docutils literal">k_3</tt> on <tt class="docutils literal">0x404</tt>
-to <tt class="docutils literal">0x406</tt>, <tt class="docutils literal">thermostat</tt> on <tt class="docutils literal">0x40a</tt> and <tt class="docutils literal">zone_temp</tt> on <tt class="docutils literal">0x40b</tt>.</p>
+<tt class="docutils literal">0x400</tt>, plus the source's device id -- <tt class="docutils literal">ambient</tt> on <tt class="docutils literal">0x400</tt>,
+<tt class="docutils literal">temp1</tt> to <tt class="docutils literal">temp3</tt> on <tt class="docutils literal">0x405</tt> to <tt class="docutils literal">0x407</tt>, and <tt class="docutils literal">thermostat</tt> on
+<tt class="docutils literal">0x40b</tt>.</p>
 <p>The mission database gives each of them a parameter of the type the
 configuration says its data are (see <a class="reference internal" href="#what-the-vehicle-answers-to">What the vehicle answers to</a>): the
 conversions and the vote are temperatures in kelvin, and the thermostat's
@@ -2970,12 +2971,12 @@ heaters it drives. With <tt class="docutils literal"><span class="pre">--seconds
 what arrives, and a line each time the heaters are switched:</p>
 <pre class="code text literal-block">
 connected: the vehicle is running this configuration
-parameter: /TcsYamcs/zone_temp, Value(Kelvin), units K
+parameter: /TcsYamcs/ambient, Value(Kelvin), units K
 parameter: /TcsYamcs/thermostat, Decision, units none
-read: zone_temp 292.623 K, k_1 292.587 K, k_2 292.712 K, k_3 292.623 K,
+read: ambient 292.623 K, temp1 292.587 K, temp2 292.712 K, temp3 292.623 K,
 thermostat off, heaters_1 off, heaters_2 off
-switched: thermostat off -&gt; on, driving heaters_1, heaters_2; zone_temp
-291.039 K, k_1 291.025 K, k_2 291.150 K, k_3 291.039 K, thermostat on,
+switched: thermostat off -&gt; on, driving heaters_1, heaters_2; ambient
+291.039 K, temp1 291.025 K, temp2 291.150 K, temp3 291.039 K, thermostat on,
 heaters_1 on, heaters_2 on
 </pre>
 <p>tcssim draws a window of its own, so it wants a display. Every port is in
@@ -4333,7 +4334,7 @@ so two spellings this finds no difference between are two that tcspecial and
 tcsmoc agree on. A difference is reported at the line of the second file it is
 on, saying what each file says:</p>
 <pre class="code console literal-block">
-<span class="generic output">examples/thermostat/thermostat.ytcs:81: error: nodes / thermostat / attributes / setpoint: examples/thermostat/thermostat.xtcs says &quot;290&quot; and examples/thermostat/thermostat.ytcs says &quot;293.15&quot;</span>
+<span class="generic output">examples/thermostat/thermostat.ytcs:95: error: nodes / thermostat / attributes / setpoint: examples/thermostat/thermostat.xtcs says &quot;290&quot; and examples/thermostat/thermostat.ytcs says &quot;293.15&quot;</span>
 </pre>
 <p>The order anything is written in is not compared: nothing in a configuration
 is in an order that means anything, and a node's device id comes from its
@@ -4378,7 +4379,7 @@ $ cargo run --bin tcsverify -- --warnings=off --error-limit=1 example.ytcs
 and before the problems:</p>
 <pre class="literal-block">
 $ cargo run --bin tcsverify -- --digest examples/thermostat/thermostat.ytcs
-examples/thermostat/thermostat.ytcs: md5 8136194fda73c86685a82efbd5b955a5
+examples/thermostat/thermostat.ytcs: md5 2e863fd2024ec28240ba599e5e627a10
 </pre>
 <p>That is the digest tcspecial prints as it starts and puts in every beacon, and
 the MOC compares with its own: two ends whose digests agree have read one

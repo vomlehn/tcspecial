@@ -452,10 +452,10 @@ mod tests {
     fn a_reading_is_encoded_as_its_conversion_in_its_unit() {
         let (graph, _) = example("thermostat");
         let reading = reading_of(&graph, "temp_1", crate::unit::Unit::Kelvin)
-            .expect("temp_1 feeds k_1");
+            .expect("temp_1 feeds temp1");
         assert_eq!(reading.unit, crate::unit::Unit::Kelvin);
         let why = reading_of(&graph, "temp_1", crate::unit::Unit::Volt)
-            .expect_err("k_1 reads kelvin");
+            .expect_err("temp1 reads kelvin");
         assert!(why.contains("volts") && why.contains("kelvin"), "{why}");
         let why = reading_of(&graph, "heaters_1", crate::unit::Unit::Kelvin)
             .expect_err("a heater feeds nothing");
@@ -468,7 +468,7 @@ mod tests {
         let (graph, _) = example("thermostat");
         let params = hysteresis_of(&graph, "thermostat").unwrap();
         assert_eq!((params.setpoint, params.half_band), (293.15, 2.0));
-        for name in ["k_1", "temp_1", "nowhere"] {
+        for name in ["temp1", "temp_1", "nowhere"] {
             assert!(hysteresis_of(&graph, name).is_err(), "{name}");
         }
     }

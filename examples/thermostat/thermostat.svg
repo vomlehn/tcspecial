@@ -1,6 +1,6 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="1300" height="900" viewBox="0 0 1300 900" role="img" aria-labelledby="title desc">
   <title id="title">The thermostat example</title>
-  <desc id="desc">Three temperature sensors of one place, temp_1, temp_2 and temp_3, read together ten times a second as the group zone_temps. Three of them, so that the temperature survives one sensor going wrong. Every sensor and heater is the far end of a UDP socket on this host, ports 5201 to 5205, which tcssim stands in for, so that the example touches no hardware. Each reading is converted to kelvin by k_1, k_2 and k_3, and each converted reading goes to the gateway node on the ground, to zone_temp as input in0, in1 or in2, and to the log housekeeping. zone_temp votes over the three, by the median, and produces one temperature on every arrival: a sensor that has gone wrong is outvoted, and one that stops reporting is outvoted too rather than stopping the vehicle from deciding anything. Its value goes to the gateway node and to thermostat, a hysteresis holding 293.15 K within a half-band of 2.0, whose decision drives two heaters, is logged, and goes to the ground. Two heaters, because one failing must not leave the thermal mass with no way to be warmed. tcspecial sends what each of k_1, k_2, k_3, zone_temp and thermostat produces as UDP datagrams to the gateway node's ground_base, 127.0.0.1:5100, plus the source's device id: ports 5104 to 5106 for the conversions, 5111 for zone_temp and 5110 for thermostat. Ground software gets that data from the gateway node with a function call, tcslib's GatewayReceiver::receive. The ground sets the thermostat's setpoint through a command binding on the gateway node, sent to 127.0.0.1:5000.</desc>
+  <desc id="desc">Three temperature sensors of one place, temp_1, temp_2 and temp_3, read together ten times a second as the group zone_temps. Three of them, so that the temperature survives one sensor going wrong. Every sensor and heater is the far end of a UDP socket on this host, ports 5201 to 5205, which tcssim stands in for, so that the example touches no hardware. Each reading is converted to kelvin by temp1, temp2 and temp3, and each converted reading goes to the gateway node on the ground, to ambient as input in0, in1 or in2, and to the log housekeeping. ambient votes over the three, by the median, and produces one temperature on every arrival: a sensor that has gone wrong is outvoted, and one that stops reporting is outvoted too rather than stopping the vehicle from deciding anything. Its value goes to the gateway node and to thermostat, a hysteresis holding 293.15 K within a half-band of 2.0, whose decision drives two heaters, is logged, and goes to the ground. Two heaters, because one failing must not leave the thermal mass with no way to be warmed. tcspecial sends what each of temp1, temp2, temp3, ambient and thermostat produces as UDP datagrams to the gateway node's ground_base, 127.0.0.1:5100, plus the source's device id: ports 5105 to 5107 for the conversions, 5100 for ambient and 5111 for thermostat. Ground software gets that data from the gateway node with a function call, tcslib's GatewayReceiver::receive. The ground sets the thermostat's setpoint through a command binding on the gateway node, sent to 127.0.0.1:5000.</desc>
   <defs>
     <style>
       text { font-family: "DejaVu Sans", Helvetica, Arial, sans-serif; fill: #111827; }
@@ -78,23 +78,23 @@
 
   <!-- Conversions -->
   <rect class="vehicle" x="300" y="100" width="170" height="74" rx="10"/>
-  <text class="name" x="314" y="124">k_1</text>
+  <text class="name" x="314" y="124">temp1</text>
   <text class="kind" x="314" y="144">compute, to_kelvin</text>
   <text class="detail" x="314" y="162">i16_be</text>
 
   <rect class="vehicle" x="300" y="220" width="170" height="74" rx="10"/>
-  <text class="name" x="314" y="244">k_2</text>
+  <text class="name" x="314" y="244">temp2</text>
   <text class="kind" x="314" y="264">compute, to_kelvin</text>
   <text class="detail" x="314" y="282">i16_be</text>
 
   <rect class="vehicle" x="300" y="340" width="170" height="74" rx="10"/>
-  <text class="name" x="314" y="364">k_3</text>
+  <text class="name" x="314" y="364">temp3</text>
   <text class="kind" x="314" y="384">compute, to_kelvin</text>
   <text class="detail" x="314" y="402">u24_be</text>
 
   <!-- The vote over the three, with its named inputs -->
   <rect class="vehicle" x="540" y="220" width="170" height="80" rx="10"/>
-  <text class="name" x="574" y="244">zone_temp</text>
+  <text class="name" x="574" y="244">ambient</text>
   <text class="kind" x="574" y="264">compute, vote: median</text>
   <text class="port" x="546" y="236">in0</text>
   <text class="port" x="546" y="261">in1</text>
@@ -128,7 +128,7 @@
   <rect class="ground" x="1030" y="430" width="230" height="80" rx="10"/>
   <text class="name" x="1044" y="456">ground software</text>
   <text class="kind" x="1044" y="477">processing and display</text>
-  <text class="detail" x="1044" y="496">from k_1 ... zone_temp</text>
+  <text class="detail" x="1044" y="496">from ambient ... thermostat</text>
 
 
   <!-- Sensors to their conversions -->
@@ -165,11 +165,11 @@
   <text class="label" x="672" y="698">and to the second heater</text>
 
   <!-- Each source's port on the ground: ground_base plus its device id -->
-  <text class="portno" x="985" y="113">5104</text>
-  <text class="portno" x="985" y="128">5105</text>
-  <text class="portno" x="985" y="143">5106</text>
-  <text class="portno" x="985" y="158">5111</text>
-  <text class="portno" x="985" y="173">5110</text>
+  <text class="portno" x="985" y="113">5105</text>
+  <text class="portno" x="985" y="128">5106</text>
+  <text class="portno" x="985" y="143">5107</text>
+  <text class="portno" x="985" y="158">5100</text>
+  <text class="portno" x="985" y="173">5111</text>
 
   <!-- The ground sets the setpoint -->
   <path class="command" d="M1030,180 L900,180 L900,336" marker-end="url(#arrow-orange)"/>

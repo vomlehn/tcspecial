@@ -28,7 +28,7 @@ pub mod thermal_zone;
 pub mod world;
 
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
-use std::sync::Arc;
+use std::sync::{Arc, Mutex, MutexGuard};
 use std::time::{Duration, Instant};
 
 use tcslibgs::node::vehicle::compute::{from_value, Format, ToValueParams};
@@ -70,15 +70,229 @@ pub enum Attachment {
         said: Arc<AtomicU64>,
     },
     /// It drives this input to what the vehicle sends it: a decision where
-    /// `unit` is `None`, and a value in that unit where it is not.
+    /// `unit` is `None`, and a value in that unit where it is not -- while
+    /// its panel has it enabled: see [`Power`].
     Drives {
         world: Arc<World>,
         place: Place,
         unit: Option<Unit>,
+        /// Whether it is enabled, and what the vehicle last sent it.
+        /// Shared by the copies of its payload's configuration and by a
+        /// thermostat tcssim stands in for, so that all of them see the one
+        /// panel.
+        power: Arc<Power>,
     },
 }
 
+/// Whether a driven part is enabled in its payload's panel, and what the
+/// vehicle last sent it.
+///
+/// The panel's button is the one control a payload has, and for a part the
+/// vehicle drives -- a heater -- it is the part's power: one that is not
+/// enabled is unpowered, or has failed, and stays off whatever the vehicle
+/// decides, its input held at nought. Nothing aboard changes, and the
+/// ground sees it only by what the world does without it: a zone that
+/// cools.
+///
+/// What arrives while it is disabled is still kept, the latest replacing
+/// the one before, and enabling it applies that at once: the vehicle sends
+/// a decision whenever it decides, but a heater that waited for the next
+/// change before going on would sit cold through a whole band. A part that
+/// was never sent anything stays at nought.
+#[derive(Debug)]
+pub struct Power {
+    /// Whether it is enabled: the same flag as its payload's
+    /// `PayloadConfig::sending`, which the panel's button sets.
+    enabled: Arc<AtomicBool>,
+    /// Whether what it drives is a heater, which its panel says is heating
+    /// rather than on.
+    heater: bool,
+    /// What it has been sent and what it holds the world's input at.
+    held: Mutex<Powered>,
+}
+
+/// What a driven part has been sent, and what it holds its input at.
+#[derive(Debug, Default, Clone, Copy)]
+struct Powered {
+    /// What the vehicle last sent, as the value to drive to; `None` until
+    /// anything has come.
+    latest: Option<f64>,
+    /// What the world's input is held at by this part: nought while it is
+    /// disabled, and the latest while it is enabled.
+    applied: f64,
+}
+
+/// What a driven part is doing, as its panel says it.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub enum Driving {
+    /// Disabled in its panel, so held at nought.
+    Disabled,
+    /// Enabled, and held at this.
+    At(f64),
+}
+
+impl Power {
+    /// Makes the power of a driven part.
+    ///
+    /// # Arguments
+    ///
+    /// * `enabled` - Whether it starts enabled: false for a payload whose
+    ///               panel has not been pressed.
+    /// * `heater`  - Whether what it drives is a heater.
+    ///
+    /// # Returns
+    ///
+    /// Its power, with nothing yet sent to it.
+    pub fn new(enabled: bool, heater: bool) -> Power {
+        Power {
+            enabled: Arc::new(AtomicBool::new(enabled)),
+            heater,
+            held: Mutex::new(Powered::default()),
+        }
+    }
+
+    /// The flag that says whether it is enabled, for its payload's
+    /// configuration to share as its `sending`.
+    pub fn enabled_flag(&self) -> Arc<AtomicBool> {
+        self.enabled.clone()
+    }
+
+    /// Locks what it holds, even after a panic elsewhere: what it holds is
+    /// two numbers, never half written.
+    fn held(&self) -> MutexGuard<'_, Powered> {
+        self.held.lock().unwrap_or_else(|e| e.into_inner())
+    }
+}
+
 impl Attachment {
+    /// Takes what the vehicle sent a driven part, at a simulated time: it is
+    /// kept as the latest, and the world's input is driven to it if the
+    /// part is enabled. Nothing for any other attachment.
+    ///
+    /// # Arguments
+    ///
+    /// * `value`   - What it was sent, as the value to drive to: one for on
+    ///               and nought for off, for a decision.
+    /// * `seconds` - The simulated time, as [`World::drive_at`] takes it.
+    pub fn sent_at(&self, value: f64, seconds: f64) {
+        let Attachment::Drives {
+            world,
+            place,
+            power,
+            ..
+        } = self
+        else {
+            return;
+        };
+        // Held across the drive, so that a press of the panel's button and a
+        // decision arriving together leave the input where the later says.
+        let mut held = power.held();
+        held.latest = Some(value);
+        if power.enabled.load(Ordering::SeqCst) && held.applied != value {
+            held.applied = value;
+            world.drive_at(*place, value, seconds);
+        }
+    }
+
+    /// Enables or disables a driven part, at a simulated time: disabled, its
+    /// input is held at nought; enabled, at the latest it was sent, or
+    /// nought if it was sent nothing. Nothing for any other attachment.
+    ///
+    /// # Arguments
+    ///
+    /// * `enabled` - Whether it is to be enabled.
+    /// * `seconds` - The simulated time, as [`World::drive_at`] takes it.
+    pub fn enable_at(&self, enabled: bool, seconds: f64) {
+        let Attachment::Drives {
+            world,
+            place,
+            power,
+            ..
+        } = self
+        else {
+            return;
+        };
+        let mut held = power.held();
+        power.enabled.store(enabled, Ordering::SeqCst);
+        let value = if enabled {
+            held.latest.unwrap_or(0.0)
+        } else {
+            0.0
+        };
+        // Only a change: the world is not asked anything, and its clock not
+        // started, by a part that was off and stays off.
+        if held.applied != value {
+            held.applied = value;
+            world.drive_at(*place, value, seconds);
+        }
+    }
+
+    /// Enables or disables a driven part now, as its panel's button does:
+    /// see [`Attachment::enable_at`].
+    ///
+    /// # Arguments
+    ///
+    /// * `enabled` - Whether it is to be enabled.
+    pub fn enable(&self, enabled: bool) {
+        if let Attachment::Drives { world, .. } = self {
+            self.enable_at(enabled, world.seconds(Instant::now()));
+        }
+    }
+
+    /// Says what a driven part is doing.
+    ///
+    /// # Returns
+    ///
+    /// Disabled, or what its input is held at; `None` for any other
+    /// attachment.
+    pub fn driving(&self) -> Option<Driving> {
+        let Attachment::Drives { power, .. } = self else {
+            return None;
+        };
+        let held = power.held();
+        Some(if power.enabled.load(Ordering::SeqCst) {
+            Driving::At(held.applied)
+        } else {
+            Driving::Disabled
+        })
+    }
+
+    /// Says what a driven part is doing in words, for its panel: whether a
+    /// heater is heating, off, or disabled and so off. Words, so that the
+    /// panel says it in more than a colour.
+    ///
+    /// # Returns
+    ///
+    /// The part and what it is doing -- `heater_1: heating` -- or empty for
+    /// any other attachment.
+    pub fn driving_said(&self) -> String {
+        let (
+            Attachment::Drives {
+                world,
+                place,
+                unit,
+                power,
+            },
+            Some(driving),
+        ) = (self, self.driving())
+        else {
+            return String::new();
+        };
+        let name = world.name_of(*place);
+        let part = name.split('.').next().unwrap_or(&name);
+        let doing = match (driving, unit) {
+            (Driving::Disabled, _) => "disabled, so off".to_string(),
+            (Driving::At(value), None) if value > 0.5 => {
+                if power.heater { "heating" } else { "on" }.to_string()
+            }
+            (Driving::At(_), None) => "off".to_string(),
+            (Driving::At(value), Some(unit)) => {
+                format!("at {value} {}", unit.symbol())
+            }
+        };
+        format!("{part}: {doing}")
+    }
+
     /// Says whether it drives an input, which a stand-in that sends nothing
     /// asks.
     pub fn drives(&self) -> bool {
@@ -199,7 +413,12 @@ impl Attachment {
 /// * `which`      - The payload's name, for a complaint.
 /// * `data`       - What the vehicle sent it.
 pub fn driven(attachment: &Option<Attachment>, which: &str, data: &[u8]) {
-    let Some(Attachment::Drives { world, place, unit }) = attachment else {
+    let Some(
+        driving @ Attachment::Drives {
+            world, place, unit, ..
+        },
+    ) = attachment
+    else {
         return;
     };
     let now = Instant::now();
@@ -216,7 +435,7 @@ pub fn driven(attachment: &Option<Attachment>, which: &str, data: &[u8]) {
         },
     };
     match value {
-        Ok(value) => world.drive(*place, value, now),
+        Ok(value) => driving.sent_at(value, world.seconds(now)),
         Err(why) => eprintln!("{why}, and drives {}", world.name_of(*place)),
     }
 }
@@ -279,9 +498,10 @@ pub(crate) mod tests {
     use tcslibgs::sim_config::SensorErrors;
     use tcslibgs::unit::Unit;
 
-    /// The thermostat example's model: two heaters of three kelvin a second
-    /// each on the zone, which is ten kelvin below a setpoint of 293.15 and
-    /// loses the difference with a fifty second constant.
+    /// A model of the thermostat example's shape with bigger heaters: two of
+    /// three kelvin a second each on the zone, which is ten kelvin below a
+    /// setpoint of 293.15 and loses the difference with a fifty second
+    /// constant.
     pub(crate) const ZONE: &str = "physics:
   - type heater:
       - component: heater_1
@@ -484,6 +704,7 @@ connections:
             world: world.clone(),
             place: place("engine.throttle"),
             unit: Some(Unit::Ratio),
+            power: Arc::new(Power::new(true, false)),
         });
         let force = place("engine.force");
         let half =
@@ -541,6 +762,90 @@ connections:
         world.drive_at(on_1, 0.0, 0.03);
         world.drive_at(on_2, 0.0, 0.03);
         assert!(warmed(0.03) < 0.0, "off, it cools");
+    }
+
+    /// A heater disabled in its panel stays off whatever it is sent, and
+    /// keeps the latest it was sent; enabled, it takes that at once, and
+    /// disabled again it goes off at once. Its panel says which, in words.
+    #[test]
+    fn a_disabled_heater_stays_off_and_takes_the_latest_when_enabled() {
+        let (world, place) = zone_world();
+        let heat = place("heater_1.heat");
+        let heater = Attachment::Drives {
+            world: world.clone(),
+            place: place("heater_1.on"),
+            unit: None,
+            power: Arc::new(Power::new(false, true)),
+        };
+        let heating = |at: f64| world.read_at(heat, at) > 0.0;
+        assert_eq!(heater.driving(), Some(Driving::Disabled));
+        assert_eq!(heater.driving_said(), "heater_1: disabled, so off");
+
+        // Sent on, and off, and on again while disabled: nothing heats.
+        for (at, value) in [(1.0, 1.0), (2.0, 0.0), (3.0, 1.0)] {
+            heater.sent_at(value, at);
+            assert!(!heating(at + 0.5), "disabled, at {at}");
+        }
+
+        // Enabled, it takes the last of those at once.
+        heater.enable_at(true, 4.0);
+        assert!(heating(4.1), "the latest, on, at once");
+        assert_eq!(heater.driving(), Some(Driving::At(1.0)));
+        assert_eq!(heater.driving_said(), "heater_1: heating");
+        heater.sent_at(0.0, 5.0);
+        assert!(!heating(5.1));
+        assert_eq!(heater.driving_said(), "heater_1: off");
+        heater.sent_at(1.0, 6.0);
+        assert!(heating(6.1));
+
+        // Disabled while on, it goes off at once.
+        heater.enable_at(false, 7.0);
+        assert!(!heating(7.1), "disabled while heating");
+
+        // One never sent anything stays off when enabled.
+        let other = Attachment::Drives {
+            world: world.clone(),
+            place: place("heater_2.on"),
+            unit: None,
+            power: Arc::new(Power::new(false, true)),
+        };
+        other.enable_at(true, 8.0);
+        assert!(world.read_at(place("heater_2.heat"), 8.1) == 0.0);
+        assert_eq!(other.driving_said(), "heater_2: off");
+    }
+
+    /// The payload's flag and the heater's power are one: the panel's
+    /// button, through `SimulatedPayload::send`, powers the heater, and a
+    /// decision arriving over its socket is held off while it is disabled.
+    #[test]
+    fn a_heaters_panel_button_is_its_power() {
+        let (world, place) = zone_world();
+        let heat = place("heater_1.heat");
+        let power = Arc::new(Power::new(false, true));
+        let attachment = Attachment::Drives {
+            world: world.clone(),
+            place: place("heater_1.on"),
+            unit: None,
+            power: power.clone(),
+        };
+        let mut config =
+            attached("heaters_1", a_free_port(), 1, 20, attachment.clone());
+        config.sending = power.enabled_flag();
+        let payload = SimulatedPayload::new(config);
+        let attachment = Some(attachment);
+
+        driven(&attachment, "heaters_1", b"1");
+        assert_eq!(
+            attachment.as_ref().and_then(Attachment::driving),
+            Some(Driving::Disabled)
+        );
+        assert_eq!(world.read(heat, Instant::now()), 0.0);
+        payload.send(true);
+        assert!(world.read(heat, Instant::now()) > 0.0, "on at once");
+        assert_eq!(payload.driving_said(), "heater_1: heating");
+        payload.send(false);
+        assert_eq!(world.read(heat, Instant::now()), 0.0, "off at once");
+        assert_eq!(payload.driving_said(), "heater_1: disabled, so off");
     }
 
     /// A heater switched on halfway through an interval warms its zone for
@@ -842,6 +1147,7 @@ connections:
                         world: world.clone(),
                         place: place(&format!("heater_{}.on", n + 1)),
                         unit: None,
+                        power: Arc::new(Power::new(true, true)),
                     },
                 ));
                 heater.start().expect("a heater starts");

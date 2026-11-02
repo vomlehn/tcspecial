@@ -1433,7 +1433,7 @@ mod tests {
         assert!(
             finding
                 .message
-                .contains("nodes / thermostat_1 / attributes / setpoint")
+                .contains("nodes / thermostat / attributes / setpoint")
                 && finding.message.contains("says \"293.15\"")
                 && finding.message.contains("says \"290\""),
             "{said:?}"

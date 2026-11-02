@@ -2332,8 +2332,7 @@ mod tests {
         assert!(!configuration.is_null(), "the example opens");
         for (node, wanted) in [
             (c"ambient", Some("K")),
-            (c"thermostat_1", None),
-            (c"thermostat_2", None),
+            (c"thermostat", None),
             (c"temp_1", None),
         ] {
             let mut symbol: *const c_char = c"unset".as_ptr();
@@ -2396,8 +2395,7 @@ mod tests {
         for (node, sends) in [
             (c"temp1", 1),
             (c"ambient", 1),
-            (c"thermostat_1", 0),
-            (c"thermostat_2", 0),
+            (c"thermostat", 0),
             (c"temp_1", 0),
         ] {
             let mut values = -1;
@@ -2441,12 +2439,9 @@ mod tests {
         // SAFETY: a NUL-terminated path that outlives the call.
         let configuration = unsafe { tcs_configuration_open(path.as_ptr()) };
         assert!(!configuration.is_null(), "the example opens");
-        for (node, sends) in [
-            (c"thermostat_1", 1),
-            (c"thermostat_2", 1),
-            (c"ambient", 0),
-            (c"temp_1", 0),
-        ] {
+        for (node, sends) in
+            [(c"thermostat", 1), (c"ambient", 0), (c"temp_1", 0)]
+        {
             let mut decisions = -1;
             // SAFETY: a live configuration, a NUL-terminated name and a
             // writable int.

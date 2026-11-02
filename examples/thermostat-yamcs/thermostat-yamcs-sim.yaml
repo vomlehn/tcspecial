@@ -14,17 +14,20 @@
 # The three sensors report the zone of the physics model rather than noise,
 # which is what makes the vehicle's half of the loop watchable: three
 # readings of one temperature agree, so the vote produces a temperature and
-# the thermostat's two stages decide on it.
+# the thermostat decides on it.
 #
 # The heaters are UDP sockets, which the vehicle drives and tcssim watches:
 # each decision the vehicle sends them, their panel counts, and the heater
 # each is joined to is switched. So the loop closes through tcspecial: the
 # sensors report the zone, the vehicle decides, and the heaters warm it.
 #
+# A heater's panel button is its power: disabled, it is an unpowered or
+# failed heater, and stays off whatever is decided; enabled again, it takes
+# the latest decision at once.
+#
 # To close it in tcssim alone, with no tcspecial running, add
-# "thermostat: thermostat_1,thermostat_2" to the tcssim section below: tcssim
-# then stands in for the hysteresis nodes of those names, the thermostat's
-# two stages, each with its own setpoint and band and its own heater. Never
+# "thermostat: thermostat" to the tcssim section below: tcssim then stands in
+# for the hysteresis node of that name, with its setpoint and band. Never
 # with tcspecial running, whose own thermostat switches the same heaters.
 description: Simulator settings for the payloads of
   thermostat-yamcs.ytcs

@@ -51,8 +51,7 @@ vehicle:
         inputs: "in0,in1,in2"
         payload-out:
           - target: gateway
-          - target: thermostat_1
-          - target: thermostat_2
+          - target: thermostat
         payload-in: true
       - compute: temp1
         format: "i16_be"
@@ -87,36 +86,19 @@ vehicle:
           - target: gateway
           - target: housekeeping
         payload-in: true
-      # Two stages, each a hysteresis of its own, so that the second heater
-      # comes on only when the first cannot hold the zone alone, and the
-      # ground can see which are on. In each, setpoint is set from the
-      # ground, and half_band is how far either side of it the stage
-      # switches, the setpoint being in the middle of the band.
-      #
-      # The first stage, driving heaters_1: on below 291.15 K, off above
-      # 295.15 K.
-      - compute: thermostat_1
+      # setpoint is set from the ground; half_band is how far either side
+      # of it the heaters are switched at, the setpoint being in the middle
+      # of the band.
+      - compute: thermostat
         function: "hysteresis"
         half_band: "2.0"
         setpoint: "293.15"
-        # asserted below the band, unasserted above it.
+        # asserted below the setpoint, unasserted above it. Two heaters, because
+        # one failing must not leave the mass with no way to be warmed: either
+        # alone holds the band while the orbit is warm, and both together hold
+        # it in the cold too.
         gateway-out:
           - target: heaters_1
-        payload-out:
-          - target: gateway
-          - target: housekeeping
-        payload-in: true
-      # The second stage, for when heaters_1 alone cannot hold the zone:
-      # heaters_2 on below 289.15 K, two half bands of the first stage
-      # under its setpoint, and off above 291.15 K, where the first stage
-      # comes on. Its band lies under that of the first stage, so heaters_2
-      # is on only while heaters_1 is.
-      - compute: thermostat_2
-        function: "hysteresis"
-        half_band: "1.0"
-        setpoint: "290.15"
-        # asserted below the band, unasserted above it.
-        gateway-out:
           - target: heaters_2
         payload-out:
           - target: gateway
@@ -136,10 +118,9 @@ payloads:
   # and make kernel-stand-ins-test.
   - type network:
       # Two heaters, both near the sensors on the same thermal mass, each
-      # driven by what its stage of the thermostat decides -- 1 for on, 0 for
-      # off. Two, because one failing must not leave the mass with no way to
-      # be warmed; separate nodes, so that one can be stopped from the ground
-      # while the other goes on warming the zone.
+      # driven by what the thermostat decides -- 1 for on, 0 for off. Separate
+      # nodes, so that one can be stopped from the ground while the other goes
+      # on warming the mass.
       - payload: heaters_1
         address: "127.0.0.1"
         port: "5204"
@@ -180,10 +161,8 @@ payloads:
           - target: temp3
 
 commands:
-  # the middle of the first stage band, in kelvin
-  - { from: gateway, sets: thermostat_1.setpoint }
-  # the middle of the second stage band, in kelvin
-  - { from: gateway, sets: thermostat_2.setpoint }
+  # the zone temperature the heaters are held at, in kelvin
+  - { from: gateway, sets: thermostat.setpoint }
 
 tcsgui:
   nodes:
@@ -198,5 +177,4 @@ tcsgui:
     - { node: temp_1, x: 34, y: 34 }
     - { node: temp_2, x: 34, y: 166 }
     - { node: temp_3, x: 34, y: 280 }
-    - { node: thermostat_1, x: 601, y: 166 }
-    - { node: thermostat_2, x: 601, y: 300 }
+    - { node: thermostat, x: 601, y: 242 }

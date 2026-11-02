@@ -20,10 +20,11 @@ physics:
   - type heater:
       # Two film heaters of four watts on a 28 volt bus, which on the zone
       # below is a fifth of a kelvin a second each. Small on purpose: the
-      # first alone holds the zone only while its surroundings are warm, so
-      # that the thermostat's second stage, and heaters_2, can be seen to
-      # come on in the cold. The supply wanders by two percent over twenty
-      # seconds or so, and a heater's power with its square.
+      # two together hold the zone wherever the orbit is, and one alone holds
+      # it only while its surroundings are warm, so that a heater disabled in
+      # tcssim's window -- unpowered, or failed -- can be seen in the
+      # temperature. The supply wanders by two percent over twenty seconds or
+      # so, and a heater's power with its square.
       - component: heater_1
         power: "4 W"
         ripple: "0.02"
@@ -46,14 +47,14 @@ physics:
       #
       # Its surroundings are not still. They swing six kelvin either side of
       # 283.15 once every ninety minutes -- a low orbit's sun and shadow -- and
-      # wander half a kelvin besides, over ten minutes or so. Where one heater
-      # settles the zone -- ten kelvin above its surroundings -- is then
-      # between 287.15 and 299.15 K: above the first stage's band in the
-      # warm part of the orbit, so that heaters_1 switches, and for about a
-      # quarter of it under 289.15 K, where the second stage comes on. Both
-      # heaters settle it twenty kelvin above its surroundings, 297.15 K at
-      # the coldest, which is above the whole of the second stage's band, so
-      # the two together always bring it back.
+      # wander half a kelvin besides, over ten minutes or so. Both heaters
+      # settle the zone twenty kelvin above its surroundings, 297.15 K at the
+      # coldest, which is above the thermostat's band, 291.15 to 295.15 K, so
+      # the two together always bring it back and the thermostat cycles them.
+      # One heater settles it ten kelvin above its surroundings, between
+      # 287.15 and 299.15 K: enough in the warm part of the orbit, and for
+      # about a quarter of it under 289.15 K, two half bands below the
+      # setpoint. With neither, the zone follows its surroundings.
       - component: zone
         capacity: "20 J/K"
         environment: "283.15 K"

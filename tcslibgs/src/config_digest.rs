@@ -236,9 +236,14 @@ pub fn interpretation_of_simulator(
         serde_json::to_value(settings).unwrap_or(Value::Null)
     };
     let tcssim = file.tcssim.as_ref().map(|section| {
+        // The names as one text, as a file writes them, and nothing where
+        // there are none: one thermostat interprets as it did before a file
+        // could name several.
+        let thermostat = (!section.thermostats.is_empty())
+            .then(|| section.thermostats.join(","));
         json!({
             "ready": section.ready,
-            "thermostat": section.thermostats,
+            "thermostat": thermostat,
             "seed": section.seed,
         })
     });
@@ -651,8 +656,8 @@ mod tests {
         let node = retuned
             .nodes
             .iter_mut()
-            .find(|n| n.name == "thermostat_1")
-            .expect("the first stage");
+            .find(|n| n.name == "thermostat")
+            .expect("the thermostat");
         node.attributes
             .insert("setpoint".to_string(), crate::Scalar::of("300.0"));
         assert_ne!(digest_of_graph(&retuned).expect("it digests"), digest);

@@ -1208,7 +1208,7 @@ where
 }
 
 /// Reads a list of node names written as one text, separated by commas:
-/// `thermostat_1,thermostat_2`.
+/// `fore,aft`.
 ///
 /// # Arguments
 ///
@@ -1440,8 +1440,9 @@ pub struct SimTcssim {
     /// the sensors that feed each and switches the heaters each drives
     /// itself, with each node's setpoint and band, so that a zone's loop
     /// closes with no tcspecial running. A file writes them under
-    /// `thermostat`, one name or several separated by commas, as a staged
-    /// thermostat has one hysteresis node a stage.
+    /// `thermostat`, one name or several separated by commas, as a vehicle
+    /// of several zones, or a staged thermostat, has several hysteresis
+    /// nodes.
     ///
     /// Unstated for a run with tcspecial, whose own thermostats would
     /// otherwise be switching the same heaters.
@@ -4524,19 +4525,18 @@ connections:
         );
     }
 
-    /// It may name several, one a stage, separated by commas; and none is
-    /// none.
+    /// It may name several, separated by commas; and none is none.
     #[test]
     fn the_tcssim_section_names_several_thermostats() {
         let file = parse(
             "tcssim:
   ready: \"127.0.0.1:7999\"
-  thermostat: \"thermostat_1, thermostat_2\"
+  thermostat: \"fore, aft\"
 ",
         );
         assert_eq!(
             file.tcssim.map(|t| t.thermostats),
-            Some(vec!["thermostat_1".to_string(), "thermostat_2".to_string()])
+            Some(vec!["fore".to_string(), "aft".to_string()])
         );
         let file = parse("tcssim:\n  ready: \"127.0.0.1:7999\"\n");
         assert_eq!(file.tcssim.map(|t| t.thermostats), Some(Vec::new()));
@@ -4545,10 +4545,9 @@ connections:
     /// A blank name between commas, or one named twice, is refused.
     #[test]
     fn a_blank_or_repeated_thermostat_is_refused() {
-        for (names, why) in [
-            ("thermostat_1,,thermostat_2", "blank name"),
-            ("thermostat_1,thermostat_1", "named twice"),
-        ] {
+        for (names, why) in
+            [("fore,,aft", "blank name"), ("fore,fore", "named twice")]
+        {
             let text = format!(
                 "tcssim:\n  ready: \"127.0.0.1:7999\"\n  thermostat: \
                  \"{names}\"\n"

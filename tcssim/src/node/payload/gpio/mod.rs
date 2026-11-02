@@ -198,8 +198,10 @@ pub fn run_gpio_node(
 /// they all agree it is a decision, and the heater it is joined to in the
 /// world is driven by it, as one reached over a socket is.
 ///
-/// Silent -- its panel's button off -- the device is switched off: a move is
-/// counted, as every stand-in counts what arrives, and heats nothing.
+/// Disabled -- its panel's button off -- the part is unpowered: a move is
+/// counted, as every stand-in counts what arrives, and kept as the latest
+/// decision, and the part stays off until it is enabled. See
+/// [`crate::physics::Power`].
 ///
 /// # Arguments
 ///
@@ -223,7 +225,6 @@ fn watch_driven_lines(
     let mut read = [0u8; 4];
     let mut first = true;
     while running.load(Ordering::SeqCst) {
-        let sending = Pacing::read(config).sending;
         for (path, value) in values.iter().zip(now.iter_mut()) {
             // Opened each time, as a sysfs attribute is read: its value is
             // what it is when it is opened.
@@ -233,7 +234,7 @@ fn watch_driven_lines(
             *value = if high { b'1' } else { b'0' };
         }
         if now != was && !first {
-            if sending && now.iter().all(|&v| v == now[0]) {
+            if now.iter().all(|&v| v == now[0]) {
                 crate::physics::driven(
                     &config.attachment,
                     &config.name,

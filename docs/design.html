@@ -11606,7 +11606,8 @@ looks like. As there, the error is reported from the payload's end.</dd>
 <h2><a class="toc-backref" href="#toc-entry-132">Example</a></h2>
 <p>This is the shipped <tt class="docutils literal"><span class="pre">examples/thermostat/thermostat-sim.yaml</span></tt>, which
 simulates the three sensors and two heaters of <tt class="docutils literal">thermostat.ytcs</tt>, joined to
-the model it names, <tt class="docutils literal"><span class="pre">thermostat-physics.yaml</span></tt>: two heaters warming one
+the model it names, <tt class="docutils literal"><span class="pre">examples/thermostat-common/thermostat-physics.yaml</span></tt>,
+which thermostat-yamcs's simulator file names too: two heaters warming one
 zone.</p>
 <pre class="code yaml literal-block">
 <span class="name tag">physics</span><span class="punctuation">:</span><span class="whitespace">
@@ -11638,7 +11639,7 @@ with nothing more than a socket.</p>
 <pre class="code yaml literal-block">
 <span class="name tag">description</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">Simulator settings for the payloads of thermostat.ytcs</span><span class="whitespace">
 
-</span><span class="name tag">physics</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">thermostat-physics.yaml</span><span class="whitespace">
+</span><span class="name tag">physics</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">../thermostat-common/thermostat-physics.yaml</span><span class="whitespace">
 
 </span><span class="name tag">simulated_payload_groups</span><span class="punctuation">:</span><span class="whitespace">
   </span><span class="punctuation indicator">-</span><span class="whitespace"> </span><span class="name tag">group</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">zone_temps</span><span class="whitespace">

@@ -20,9 +20,8 @@ use tcslibgs::graph::{Destination, Graph};
 
 mod common;
 
-use common::{
-    generated_mdb, here, read_xml, with_more_nodes, worked_out, Element,
-};
+use common::{here, with_more_nodes, worked_out};
+use yamcs_common::{generated_mdb, read_xml, Element};
 
 /// What `ping_yamcs.py --describe` says, as `name value` pairs.
 ///

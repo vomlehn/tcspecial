@@ -3452,9 +3452,9 @@ checksum = "b330c9d1b92dfe68442ca20b009c717d5f0b1e3cf4965e62f704c3c6e95a1305"
 name = "ping-yamcs-example"
 version = "0.1.0"
 dependencies = [
- "quick-xml 0.42.0",
  "tcslibgs",
  "tempfile",
+ "yamcs-common",
 ]
 
 [[package]]
@@ -4699,6 +4699,16 @@ name = "text-size"
 version = "1.1.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "f18aa187839b2bdb1ad2fa35ead8c4c2976b64e4363c386d45ac0f7ee85c9233"
+
+[[package]]
+name = "thermostat-yamcs-example"
+version = "0.1.0"
+dependencies = [
+ "serde_json",
+ "tcslibgs",
+ "tempfile",
+ "yamcs-common",
+]
 
 [[package]]
 name = "thiserror"
@@ -6037,6 +6047,15 @@ name = "xmlwriter"
 version = "0.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "ec7a2a501ed189703dba8b08142f057e887dfc4b2cc4db2d343ac6376ba3e0b9"
+
+[[package]]
+name = "yamcs-common"
+version = "0.1.0"
+dependencies = [
+ "quick-xml 0.42.0",
+ "tcslibgs",
+ "tempfile",
+]
 
 [[package]]
 name = "yazi"

@@ -162,8 +162,8 @@ pub const MASS_MADE_OF_PARTS: &str = "a thermal_mass is now made of parts: \
     joined under connections: from each heater's heat to the zone's heat. A \
     stand-in then names the terminal it is joined to, connects: \
     zone.temperature or connects: heater_1.on, in place of reads, heats, \
-    output, input and rate. examples/thermostat/thermostat-physics.yaml is \
-    one written so";
+    output, input and rate. \
+    examples/thermostat-common/thermostat-physics.yaml is one written so";
 
 /// A connection between two components, as a file writes it.
 #[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]

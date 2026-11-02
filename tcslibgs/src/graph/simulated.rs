@@ -433,16 +433,19 @@ mod tests {
         assert!(sized.contains(&("temp_3", 3)), "{sized:?}");
     }
 
-    /// The thermostat example's sensors reach its hysteresis node and the
-    /// node reaches its heaters, and not the other way round.
+    /// The thermostat example's sensors reach both its hysteresis nodes,
+    /// and each node reaches its own heater, and not the other way round.
     #[test]
     fn data_reaches_along_the_links() {
         let (graph, _) = example("thermostat");
-        assert!(reaches(&graph, "temp_1", "thermostat"));
-        assert!(reaches(&graph, "temp_3", "thermostat"));
-        assert!(reaches(&graph, "thermostat", "heaters_2"));
-        assert!(!reaches(&graph, "thermostat", "temp_1"));
-        assert!(!reaches(&graph, "heaters_1", "thermostat"));
+        assert!(reaches(&graph, "temp_1", "thermostat_1"));
+        assert!(reaches(&graph, "temp_3", "thermostat_2"));
+        assert!(reaches(&graph, "thermostat_1", "heaters_1"));
+        assert!(reaches(&graph, "thermostat_2", "heaters_2"));
+        assert!(!reaches(&graph, "thermostat_1", "heaters_2"));
+        assert!(!reaches(&graph, "thermostat_2", "heaters_1"));
+        assert!(!reaches(&graph, "thermostat_1", "temp_1"));
+        assert!(!reaches(&graph, "heaters_1", "thermostat_1"));
     }
 
     /// A sensor's encoding is its conversion's, in the unit of what it
@@ -452,10 +455,10 @@ mod tests {
     fn a_reading_is_encoded_as_its_conversion_in_its_unit() {
         let (graph, _) = example("thermostat");
         let reading = reading_of(&graph, "temp_1", crate::unit::Unit::Kelvin)
-            .expect("temp_1 feeds k_1");
+            .expect("temp_1 feeds temp1");
         assert_eq!(reading.unit, crate::unit::Unit::Kelvin);
         let why = reading_of(&graph, "temp_1", crate::unit::Unit::Volt)
-            .expect_err("k_1 reads kelvin");
+            .expect_err("temp1 reads kelvin");
         assert!(why.contains("volts") && why.contains("kelvin"), "{why}");
         let why = reading_of(&graph, "heaters_1", crate::unit::Unit::Kelvin)
             .expect_err("a heater feeds nothing");
@@ -466,9 +469,11 @@ mod tests {
     #[test]
     fn a_thermostat_is_a_hysteresis_node() {
         let (graph, _) = example("thermostat");
-        let params = hysteresis_of(&graph, "thermostat").unwrap();
+        let params = hysteresis_of(&graph, "thermostat_1").unwrap();
         assert_eq!((params.setpoint, params.half_band), (293.15, 2.0));
-        for name in ["k_1", "temp_1", "nowhere"] {
+        let params = hysteresis_of(&graph, "thermostat_2").unwrap();
+        assert_eq!((params.setpoint, params.half_band), (290.15, 1.0));
+        for name in ["temp1", "temp_1", "nowhere"] {
             assert!(hysteresis_of(&graph, name).is_err(), "{name}");
         }
     }

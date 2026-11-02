@@ -45,53 +45,6 @@
     </gateways>
     <vehicle>
         <type name="compute">
-            <compute name="k_1">
-                <format>i16_be</format>
-                <function>to_kelvin</function>
-                <offset>273.15</offset>
-                <scale>0.0625</scale>
-                <payload-out><target>gateway</target></payload-out>
-                <payload-out><target>housekeeping</target></payload-out>
-                <payload-out><target>zone_temp</target><input>in0</input></payload-out>
-                <payload-in>true</payload-in>
-            </compute>
-            <compute name="k_2">
-                <format>i16_be</format>
-                <function>to_kelvin</function>
-                <offset>273.15</offset>
-                <scale>0.0625</scale>
-                <payload-out><target>gateway</target></payload-out>
-                <payload-out><target>housekeeping</target></payload-out>
-                <payload-out><target>zone_temp</target><input>in1</input></payload-out>
-                <payload-in>true</payload-in>
-            </compute>
-            <compute name="k_3">
-                <format>u24_be</format>
-                <function>to_kelvin</function>
-                <offset>255.37</offset>
-                <scale>0.0078</scale>
-                <payload-out><target>gateway</target></payload-out>
-                <payload-out><target>housekeeping</target></payload-out>
-                <payload-out><target>zone_temp</target><input>in2</input></payload-out>
-                <payload-in>true</payload-in>
-            </compute>
-            <!-- setpoint is set from the ground; half_band is how far -->
-            <!-- either side of it the heaters are switched at, the setpoint -->
-            <!-- being in the middle of the band. -->
-            <compute name="thermostat">
-                <function>hysteresis</function>
-                <half_band>2.0</half_band>
-                <setpoint>293.15</setpoint>
-                <!-- asserted below the setpoint, unasserted above it. Two -->
-                <!-- heaters, because one failing must not leave the mass -->
-                <!-- with no way to be warmed: either alone holds the band, -->
-                <!-- and both together hold it twice as fast. -->
-                <gateway-out><target>heaters_1</target></gateway-out>
-                <gateway-out><target>heaters_2</target></gateway-out>
-                <payload-out><target>gateway</target></payload-out>
-                <payload-out><target>housekeeping</target></payload-out>
-                <payload-in>true</payload-in>
-            </compute>
             <!-- One temperature out of the three, by the algorithm named: -->
             <!-- median takes the middle reading, closest_mean the mean of -->
             <!-- the two that agree best. Either leaves a sensor that has -->
@@ -99,12 +52,73 @@
             <!-- would not, and it produces a value on every arrival, so one -->
             <!-- sensor that stops reporting is outvoted rather than -->
             <!-- stopping the vehicle from deciding anything. -->
-            <compute name="zone_temp">
+            <compute name="ambient">
                 <algorithm>median</algorithm>
                 <function>vote</function>
                 <inputs>in0,in1,in2</inputs>
                 <payload-out><target>gateway</target></payload-out>
-                <payload-out><target>thermostat</target></payload-out>
+                <payload-out><target>thermostat_1</target></payload-out>
+                <payload-out><target>thermostat_2</target></payload-out>
+                <payload-in>true</payload-in>
+            </compute>
+            <compute name="temp1">
+                <format>i16_be</format>
+                <function>to_kelvin</function>
+                <offset>273.15</offset>
+                <scale>0.0625</scale>
+                <payload-out><target>ambient</target><input>in0</input></payload-out>
+                <payload-out><target>gateway</target></payload-out>
+                <payload-out><target>housekeeping</target></payload-out>
+                <payload-in>true</payload-in>
+            </compute>
+            <compute name="temp2">
+                <format>i16_be</format>
+                <function>to_kelvin</function>
+                <offset>273.15</offset>
+                <scale>0.0625</scale>
+                <payload-out><target>ambient</target><input>in1</input></payload-out>
+                <payload-out><target>gateway</target></payload-out>
+                <payload-out><target>housekeeping</target></payload-out>
+                <payload-in>true</payload-in>
+            </compute>
+            <compute name="temp3">
+                <format>u24_be</format>
+                <function>to_kelvin</function>
+                <offset>255.37</offset>
+                <scale>0.0078</scale>
+                <payload-out><target>ambient</target><input>in2</input></payload-out>
+                <payload-out><target>gateway</target></payload-out>
+                <payload-out><target>housekeeping</target></payload-out>
+                <payload-in>true</payload-in>
+            </compute>
+            <!-- The first stage, driving heaters_1: on below 291.15 K, off -->
+            <!-- above 295.15 K. setpoint is set from the ground; half_band -->
+            <!-- is how far either side of it the stage switches, the -->
+            <!-- setpoint being in the middle of the band. -->
+            <compute name="thermostat_1">
+                <function>hysteresis</function>
+                <half_band>2.0</half_band>
+                <setpoint>293.15</setpoint>
+                <!-- asserted below the band, unasserted above it. -->
+                <gateway-out><target>heaters_1</target></gateway-out>
+                <payload-out><target>gateway</target></payload-out>
+                <payload-out><target>housekeeping</target></payload-out>
+                <payload-in>true</payload-in>
+            </compute>
+            <!-- The second stage, for when heaters_1 alone cannot hold the -->
+            <!-- zone: heaters_2 on below 289.15 K, two half bands of the -->
+            <!-- first stage under its setpoint, and off above 291.15 K, -->
+            <!-- where the first stage comes on. Its band lies under that of -->
+            <!-- the first stage, so heaters_2 is on only while heaters_1 -->
+            <!-- is. -->
+            <compute name="thermostat_2">
+                <function>hysteresis</function>
+                <half_band>1.0</half_band>
+                <setpoint>290.15</setpoint>
+                <!-- asserted below the band, unasserted above it. -->
+                <gateway-out><target>heaters_2</target></gateway-out>
+                <payload-out><target>gateway</target></payload-out>
+                <payload-out><target>housekeeping</target></payload-out>
                 <payload-in>true</payload-in>
             </compute>
         </type>
@@ -144,7 +158,7 @@
                 <group>zone_temps</group>
                 <path>/dev/i2c-1</path>
                 <read_size>2</read_size>
-                <payload-out><target>k_1</target></payload-out>
+                <payload-out><target>temp1</target></payload-out>
             </payload>
             <!-- The second of the trio; the same part as temp_1, on the -->
             <!-- same bus. -->
@@ -153,7 +167,7 @@
                 <group>zone_temps</group>
                 <path>/dev/i2c-1</path>
                 <read_size>2</read_size>
-                <payload-out><target>k_2</target></payload-out>
+                <payload-out><target>temp2</target></payload-out>
             </payload>
         </type>
         <type name="spi">
@@ -167,29 +181,35 @@
                 <path>/dev/spidev0.0</path>
                 <read_size>3</read_size>
                 <spi_mode>0</spi_mode>
-                <payload-out><target>k_3</target></payload-out>
+                <payload-out><target>temp3</target></payload-out>
             </payload>
         </type>
     </payloads>
-    <!-- the zone temperature the heaters are held at, in kelvin -->
+    <!-- the middle of the first stage band, in kelvin -->
     <commands>
         <from>gateway</from>
-        <sets>thermostat.setpoint</sets>
+        <sets>thermostat_1.setpoint</sets>
+    </commands>
+    <!-- the middle of the second stage band, in kelvin -->
+    <commands>
+        <from>gateway</from>
+        <sets>thermostat_2.setpoint</sets>
     </commands>
     <tcsgui>
         <nodes>
+            <node name="ambient" x="469" y="166"/>
             <node name="gateway" x="790" y="34"/>
             <node name="heaters_1" x="34" y="393"/>
             <node name="heaters_2" x="34" y="470"/>
             <node name="housekeeping" x="469" y="374"/>
-            <node name="k_1" x="242" y="34"/>
-            <node name="k_2" x="242" y="166"/>
-            <node name="k_3" x="242" y="280"/>
+            <node name="temp1" x="242" y="34"/>
+            <node name="temp2" x="242" y="166"/>
+            <node name="temp3" x="242" y="280"/>
             <node name="temp_1" x="34" y="34"/>
             <node name="temp_2" x="34" y="166"/>
             <node name="temp_3" x="34" y="280"/>
-            <node name="thermostat" x="601" y="242"/>
-            <node name="zone_temp" x="469" y="166"/>
+            <node name="thermostat_1" x="601" y="166"/>
+            <node name="thermostat_2" x="601" y="300"/>
         </nodes>
     </tcsgui>
 </configuration>

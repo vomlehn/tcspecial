@@ -537,7 +537,7 @@ mod tests {
     fn device_at(path: &Path, protocol: PayloadProtocol) -> SimulatedPayload {
         SimulatedPayload::new(PayloadConfig {
             attachment: None,
-            thermostat: None,
+            thermostats: Vec::new(),
             name: "DH0".to_string(),
             protocol,
             address: path.display().to_string(),
@@ -673,7 +673,7 @@ mod tests {
         std::fs::remove_file(&path).ok();
         let mut device = SimulatedPayload::new(PayloadConfig {
             attachment: None,
-            thermostat: None,
+            thermostats: Vec::new(),
             name: "temp".to_string(),
             protocol: PayloadProtocol::UnixDgram,
             address: path.display().to_string(),
@@ -755,7 +755,7 @@ mod tests {
                 place: place("heater_1.on"),
                 unit: None,
             }),
-            thermostat: None,
+            thermostats: Vec::new(),
             name: "heaters_1".to_string(),
             protocol: PayloadProtocol::UnixDgram,
             address: path.display().to_string(),

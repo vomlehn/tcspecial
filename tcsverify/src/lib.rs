@@ -1330,7 +1330,7 @@ mod tests {
         };
 
         // Both heaters' power with no unit: one finding at each heater.
-        edit(&model, "power: \"60 W\"", "power: \"60\"");
+        edit(&model, "power: \"4 W\"", "power: \"4\"");
         let report = verify(&yaml, Some(&sim), Limits::EVERYTHING);
         let found: Vec<(PathBuf, usize)> = report
             .findings
@@ -1346,7 +1346,7 @@ mod tests {
             "{:?}",
             report.said()
         );
-        edit(&model, "power: \"60\"", "power: \"60 W\"");
+        edit(&model, "power: \"4\"", "power: \"4 W\"");
 
         // A heater's stand-in joined to its heat, an output: the heater's
         // on is then joined to nothing, at the heater, and the stand-in
@@ -1433,7 +1433,7 @@ mod tests {
         assert!(
             finding
                 .message
-                .contains("nodes / thermostat / attributes / setpoint")
+                .contains("nodes / thermostat_1 / attributes / setpoint")
                 && finding.message.contains("says \"293.15\"")
                 && finding.message.contains("says \"290\""),
             "{said:?}"

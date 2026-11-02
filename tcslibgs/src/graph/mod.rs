@@ -2045,11 +2045,11 @@ mod tests {
         assert_eq!(yaml.commands, xml.commands);
         assert_eq!(yaml.groups, xml.groups);
 
-        // And it is the thermostat: three sensors, a vote over them, a
-        // comparison, the ground, two heaters and a log.
+        // And it is the thermostat: three sensors, a vote over them, two
+        // stages of comparison, the ground, two heaters and a log.
         assert_eq!(
             yaml.nodes.len(),
-            12,
+            13,
             "{:?}",
             yaml.nodes.iter().map(|n| &n.name).collect::<Vec<_>>()
         );

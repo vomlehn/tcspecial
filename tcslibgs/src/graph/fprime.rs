@@ -1000,12 +1000,10 @@ mod tests {
         let thermostat =
             Graph::load(root.join("examples/thermostat/thermostat.ytcs"))
                 .expect("the example reads");
-        assert_eq!(Form::of(&thermostat, "k_1"), Form::Value(Unit::Kelvin));
-        assert_eq!(
-            Form::of(&thermostat, "zone_temp"),
-            Form::Value(Unit::Kelvin)
-        );
-        assert_eq!(Form::of(&thermostat, "thermostat"), Form::Decision);
+        assert_eq!(Form::of(&thermostat, "temp1"), Form::Value(Unit::Kelvin));
+        assert_eq!(Form::of(&thermostat, "ambient"), Form::Value(Unit::Kelvin));
+        assert_eq!(Form::of(&thermostat, "thermostat_1"), Form::Decision);
+        assert_eq!(Form::of(&thermostat, "thermostat_2"), Form::Decision);
         assert_eq!(Form::of(&thermostat, "temp_1"), Form::Datum);
         assert_eq!(Form::of(&thermostat, "nobody"), Form::Datum);
         assert_eq!(Form::Value(Unit::Volt).fpp_type(), "F64");

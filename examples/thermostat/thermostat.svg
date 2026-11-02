@@ -1,6 +1,6 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="1300" height="900" viewBox="0 0 1300 900" role="img" aria-labelledby="title desc">
+<svg xmlns="http://www.w3.org/2000/svg" width="1300" height="880" viewBox="0 0 1300 880" role="img" aria-labelledby="title desc">
   <title id="title">The thermostat example</title>
-  <desc id="desc">Three temperature sensors of one place, temp_1, temp_2 and temp_3, read together ten times a second as the group zone_temps. Three of them, so that the temperature survives one sensor going wrong. Every sensor and heater is the far end of a UDP socket on this host, ports 5201 to 5205, which tcssim stands in for, so that the example touches no hardware. Each reading is converted to kelvin by k_1, k_2 and k_3, and each converted reading goes to the gateway node on the ground, to zone_temp as input in0, in1 or in2, and to the log housekeeping. zone_temp votes over the three, by the median, and produces one temperature on every arrival: a sensor that has gone wrong is outvoted, and one that stops reporting is outvoted too rather than stopping the vehicle from deciding anything. Its value goes to the gateway node and to thermostat, a hysteresis holding 293.15 K within a half-band of 2.0, whose decision drives two heaters, is logged, and goes to the ground. Two heaters, because one failing must not leave the thermal mass with no way to be warmed. tcspecial sends what each of k_1, k_2, k_3, zone_temp and thermostat produces as UDP datagrams to the gateway node's ground_base, 127.0.0.1:5100, plus the source's device id: ports 5104 to 5106 for the conversions, 5111 for zone_temp and 5110 for thermostat. Ground software gets that data from the gateway node with a function call, tcslib's GatewayReceiver::receive. The ground sets the thermostat's setpoint through a command binding on the gateway node, sent to 127.0.0.1:5000.</desc>
+  <desc id="desc">Three temperature sensors of one place, temp_1, temp_2 and temp_3, read together ten times a second as the group zone_temps. Three of them, so that the temperature survives one sensor going wrong. Every sensor and heater is the far end of a UDP socket on this host, ports 5201 to 5205, which tcssim stands in for, so that the example touches no hardware. Each reading is converted to kelvin by temp1, temp2 and temp3, and each converted reading goes to the gateway node on the ground, to ambient as input in0, in1 or in2, and to the log housekeeping. ambient votes over the three, by the median, and produces one temperature on every arrival: a sensor that has gone wrong is outvoted, and one that stops reporting is outvoted too rather than stopping the vehicle from deciding anything. Its value goes to the gateway node and to the thermostat's two stages, each a hysteresis whose decision drives a heater of its own, is logged, and goes to the ground: thermostat_1, holding 293.15 K within a half-band of 2.0, drives heaters_1, on below 291.15 K and off above 295.15 K; thermostat_2, holding 290.15 K within a half-band of 1.0, drives heaters_2, on below 289.15 K and off above 291.15 K, so that the second heater comes on only when the first cannot hold the zone. Two heaters, because one failing must not leave the thermal mass with no way to be warmed. tcspecial sends what each of ambient, temp1, temp2, temp3, thermostat_1 and thermostat_2 produces as UDP datagrams to the gateway node's ground_base, 127.0.0.1:5100, plus the source's device id: port 5100 for ambient, 5105 to 5107 for the conversions, and 5111 and 5112 for the two stages. Ground software gets that data from the gateway node with a function call, tcslib's GatewayReceiver::receive. The ground sets each stage's setpoint through a command binding on the gateway node, sent to 127.0.0.1:5000.</desc>
   <defs>
     <style>
       text { font-family: "DejaVu Sans", Helvetica, Arial, sans-serif; fill: #111827; }
@@ -36,13 +36,13 @@
     </marker>
   </defs>
 
-  <rect width="1300" height="790" fill="#ffffff"/>
+  <rect width="1300" height="880" fill="#ffffff"/>
 
   <!-- Column headings -->
   <text class="heading" x="60" y="40">PAYLOADS</text>
 
   <!-- tcspecial, the vehicle -->
-  <rect class="boundary" x="270" y="52" width="710" height="580" rx="16"/>
+  <rect class="boundary" x="270" y="52" width="710" height="700" rx="16"/>
   <text class="heading" x="290" y="78">TCSPECIAL (VEHICLE)</text>
 
   <!-- The group the three sensors are read in -->
@@ -66,35 +66,35 @@
   <text class="kind" x="74" y="384">network, udp</text>
   <text class="detail" x="74" y="402">127.0.0.1:5203</text>
 
-  <rect class="payload" x="60" y="500" width="170" height="74" rx="10"/>
-  <text class="name" x="74" y="524">heaters_1</text>
-  <text class="kind" x="74" y="544">network, udp</text>
-  <text class="detail" x="74" y="562">127.0.0.1:5204</text>
+  <rect class="payload" x="60" y="520" width="170" height="74" rx="10"/>
+  <text class="name" x="74" y="544">heaters_1</text>
+  <text class="kind" x="74" y="564">network, udp</text>
+  <text class="detail" x="74" y="582">127.0.0.1:5204</text>
 
-  <rect class="payload" x="60" y="620" width="170" height="74" rx="10"/>
-  <text class="name" x="74" y="644">heaters_2</text>
-  <text class="kind" x="74" y="664">network, udp</text>
-  <text class="detail" x="74" y="682">127.0.0.1:5205</text>
+  <rect class="payload" x="60" y="650" width="170" height="74" rx="10"/>
+  <text class="name" x="74" y="674">heaters_2</text>
+  <text class="kind" x="74" y="694">network, udp</text>
+  <text class="detail" x="74" y="712">127.0.0.1:5205</text>
 
   <!-- Conversions -->
   <rect class="vehicle" x="300" y="100" width="170" height="74" rx="10"/>
-  <text class="name" x="314" y="124">k_1</text>
+  <text class="name" x="314" y="124">temp1</text>
   <text class="kind" x="314" y="144">compute, to_kelvin</text>
   <text class="detail" x="314" y="162">i16_be</text>
 
   <rect class="vehicle" x="300" y="220" width="170" height="74" rx="10"/>
-  <text class="name" x="314" y="244">k_2</text>
+  <text class="name" x="314" y="244">temp2</text>
   <text class="kind" x="314" y="264">compute, to_kelvin</text>
   <text class="detail" x="314" y="282">i16_be</text>
 
   <rect class="vehicle" x="300" y="340" width="170" height="74" rx="10"/>
-  <text class="name" x="314" y="364">k_3</text>
+  <text class="name" x="314" y="364">temp3</text>
   <text class="kind" x="314" y="384">compute, to_kelvin</text>
   <text class="detail" x="314" y="402">u24_be</text>
 
   <!-- The vote over the three, with its named inputs -->
   <rect class="vehicle" x="540" y="220" width="170" height="80" rx="10"/>
-  <text class="name" x="574" y="244">zone_temp</text>
+  <text class="name" x="574" y="244">ambient</text>
   <text class="kind" x="574" y="264">compute, vote: median</text>
   <text class="port" x="546" y="236">in0</text>
   <text class="port" x="546" y="261">in1</text>
@@ -106,19 +106,24 @@
   <text class="kind" x="554" y="514">log</text>
   <text class="detail" x="554" y="532">/tmp/telemetry</text>
 
-
-  <!-- The thermostat -->
-  <rect class="vehicle" x="780" y="340" width="170" height="74" rx="10"/>
-  <text class="name" x="794" y="364">thermostat</text>
-  <text class="kind" x="794" y="384">compute, hysteresis</text>
-  <text class="detail" x="794" y="402">293.15 K, half_band 2.0</text>
+  <!-- The thermostat's two stages, the second's band under the first's -->
+  <rect class="vehicle" x="780" y="300" width="170" height="90" rx="10"/>
+  <text class="name" x="794" y="324">thermostat_1</text>
+  <text class="kind" x="794" y="344">compute, hysteresis</text>
+  <text class="detail" x="794" y="362">setpoint 293.15 K</text>
+  <text class="detail" x="794" y="380">half_band 2.0</text>
+  <rect class="vehicle" x="780" y="450" width="170" height="90" rx="10"/>
+  <text class="name" x="794" y="474">thermostat_2</text>
+  <text class="kind" x="794" y="494">compute, hysteresis</text>
+  <text class="detail" x="794" y="512">setpoint 290.15 K</text>
+  <text class="detail" x="794" y="530">half_band 1.0</text>
 
   <!-- The ground -->
-  <rect class="groundside" x="1010" y="52" width="270" height="580" rx="16"/>
+  <rect class="groundside" x="1010" y="52" width="270" height="700" rx="16"/>
   <text class="heading" x="1028" y="78">GROUND</text>
 
   <!-- The gateway node, on the ground -->
-  <rect class="gateway" x="1030" y="96" width="230" height="96" rx="10"/>
+  <rect class="gateway" x="1030" y="96" width="230" height="110" rx="10"/>
   <text class="name" x="1044" y="120">gateway</text>
   <text class="kind" x="1044" y="140">receives what tcspecial sends</text>
   <text class="detail" x="1044" y="158">ground_base 127.0.0.1:5100</text>
@@ -128,7 +133,7 @@
   <rect class="ground" x="1030" y="430" width="230" height="80" rx="10"/>
   <text class="name" x="1044" y="456">ground software</text>
   <text class="kind" x="1044" y="477">processing and display</text>
-  <text class="detail" x="1044" y="496">from k_1 ... zone_temp</text>
+  <text class="detail" x="1044" y="496">from ambient ... thermostat_2</text>
 
 
   <!-- Sensors to their conversions -->
@@ -141,7 +146,7 @@
   <path class="groundward" d="M470,238 C505,238 505,131 540,131 L1026,131" marker-end="url(#arrow-blue)"/>
   <path class="groundward" d="M470,358 C512,358 512,146 548,146 L1026,146" marker-end="url(#arrow-blue)"/>
 
-  <!-- Each conversion into the mean, by name -->
+  <!-- Each conversion into the vote, by name -->
   <path class="groundward" d="M470,137 C505,137 505,232 536,232" marker-end="url(#arrow-blue)"/>
   <path class="groundward" d="M470,257 L536,257" marker-end="url(#arrow-blue)"/>
   <path class="groundward" d="M470,377 C505,377 505,282 536,282" marker-end="url(#arrow-blue)"/>
@@ -151,54 +156,60 @@
   <path class="groundward" d="M470,278 C494,278 494,500 536,500" marker-end="url(#arrow-blue)"/>
   <path class="groundward" d="M470,398 C490,398 490,516 536,516" marker-end="url(#arrow-blue)"/>
 
-  <!-- The mean to the ground link and to the thermostat -->
+  <!-- The vote to the ground link and to both stages -->
   <path class="groundward" d="M710,240 C745,240 745,161 780,161 L1026,161" marker-end="url(#arrow-blue)"/>
-  <path class="groundward" d="M710,280 C745,280 745,377 776,377" marker-end="url(#arrow-blue)"/>
+  <path class="groundward" d="M710,270 C745,270 745,337 776,337" marker-end="url(#arrow-blue)"/>
+  <path class="groundward" d="M710,288 C735,288 735,495 776,495" marker-end="url(#arrow-blue)"/>
 
-  <!-- The thermostat's decision, logged -->
-  <path class="groundward" d="M780,400 C745,400 745,527 714,527" marker-end="url(#arrow-blue)"/>
+  <!-- Each stage's decision, to the ground link and logged -->
+  <path class="groundward" d="M792,300 L792,176 L1026,176" marker-end="url(#arrow-blue)"/>
+  <path class="groundward" d="M950,470 L975,470 L975,248 A8,8 0 0 0 975,232 L975,191 L1026,191" marker-end="url(#arrow-blue)"/>
+  <path class="groundward" d="M780,358 C755,358 755,522 714,522" marker-end="url(#arrow-blue)"/>
+  <path class="groundward" d="M780,522 C755,522 755,536 714,536" marker-end="url(#arrow-blue)"/>
 
-  <!-- The thermostat drives both heaters: one decision, two circuits -->
-  <path class="vehicleward" d="M865,414 L865,586 L145,586 L145,578" marker-end="url(#arrow-orange)"/>
-  <path class="vehicleward" d="M865,586 L865,706 L145,706 L145,698" marker-end="url(#arrow-orange)"/>
-  <text class="label" x="672" y="578">gateway-out: on below the band</text>
-  <text class="label" x="672" y="698">and to the second heater</text>
+  <!-- Each stage drives its own heater -->
+  <path class="vehicleward" d="M950,350 L962,350 L962,462 A8,8 0 0 1 962,478 L962,497 A8,8 0 0 1 962,513 L962,610 L145,610 L145,598" marker-end="url(#arrow-orange)"/>
+  <path class="vehicleward" d="M865,540 L865,602 A8,8 0 0 1 865,618 L865,740 L145,740 L145,728" marker-end="url(#arrow-orange)"/>
+  <text class="label" x="560" y="602">gateway-out: heaters_1 on below 291.15 K</text>
+  <text class="label" x="560" y="732">gateway-out: heaters_2 on below 289.15 K</text>
 
   <!-- Each source's port on the ground: ground_base plus its device id -->
-  <text class="portno" x="985" y="113">5104</text>
-  <text class="portno" x="985" y="128">5105</text>
-  <text class="portno" x="985" y="143">5106</text>
-  <text class="portno" x="985" y="158">5111</text>
-  <text class="portno" x="985" y="173">5110</text>
+  <text class="portno" x="985" y="113">5105</text>
+  <text class="portno" x="985" y="128">5106</text>
+  <text class="portno" x="985" y="143">5107</text>
+  <text class="portno" x="985" y="158">5100</text>
+  <text class="portno" x="985" y="173">5111</text>
+  <text class="portno" x="985" y="188">5112</text>
 
-  <!-- The ground sets the setpoint -->
-  <path class="command" d="M1030,180 L900,180 L900,336" marker-end="url(#arrow-orange)"/>
-  <text class="label" x="910" y="252">command:</text>
-  <text class="label" x="910" y="268">sets setpoint</text>
+  <!-- The ground sets each stage's setpoint -->
+  <path class="command" d="M1030,198 L995,198 L995,505 L954,505" marker-end="url(#arrow-orange)"/>
+  <path class="command" d="M995,240 L912,240 L912,296" marker-end="url(#arrow-orange)"/>
+  <text class="label" x="802" y="262">command: sets</text>
+  <text class="label" x="802" y="278">each setpoint</text>
 
   <!-- The ground software gets the data with a function call -->
-  <path class="call" d="M1145,192 L1145,426" marker-end="url(#arrow-call)"/>
+  <path class="call" d="M1145,206 L1145,426" marker-end="url(#arrow-call)"/>
   <text class="code" x="1155" y="304">GatewayReceiver::</text>
   <text class="code" x="1155" y="320">receive()</text>
 
   <!-- Legend -->
-  <line x1="50" y1="678" x2="1260" y2="678" stroke="#e5e7eb" stroke-width="1"/>
-  <path class="groundward" d="M50,710 L100,710" marker-end="url(#arrow-blue)"/>
-  <text class="label" x="110" y="714">data link, toward the ground</text>
-  <path class="vehicleward" d="M330,710 L380,710" marker-end="url(#arrow-orange)"/>
-  <text class="label" x="390" y="714">data link, toward the vehicle</text>
-  <path class="command" d="M610,710 L660,710" marker-end="url(#arrow-orange)"/>
-  <text class="label" x="670" y="714">command binding</text>
-  <path class="call" d="M830,710 L880,710" marker-end="url(#arrow-call)"/>
-  <text class="label" x="890" y="714">function call, from tcslib::gateway</text>
-  <rect class="payload" x="50" y="740" width="22" height="16" rx="4"/>
-  <text class="label" x="80" y="753">payload</text>
-  <rect class="vehicle" x="170" y="740" width="22" height="16" rx="4"/>
-  <text class="label" x="200" y="753">vehicle node</text>
-  <rect class="gateway" x="320" y="740" width="22" height="16" rx="4"/>
-  <text class="label" x="350" y="753">gateway node</text>
-  <rect class="ground" x="450" y="740" width="22" height="16" rx="4"/>
-  <text class="label" x="480" y="753">ground program</text>
-  <rect class="group" x="620" y="740" width="22" height="16" rx="4"/>
-  <text class="label" x="650" y="753">payload group</text>
+  <line x1="50" y1="782" x2="1260" y2="782" stroke="#e5e7eb" stroke-width="1"/>
+  <path class="groundward" d="M50,810 L100,810" marker-end="url(#arrow-blue)"/>
+  <text class="label" x="110" y="814">data link, toward the ground</text>
+  <path class="vehicleward" d="M330,810 L380,810" marker-end="url(#arrow-orange)"/>
+  <text class="label" x="390" y="814">data link, toward the vehicle</text>
+  <path class="command" d="M610,810 L660,810" marker-end="url(#arrow-orange)"/>
+  <text class="label" x="670" y="814">command binding</text>
+  <path class="call" d="M830,810 L880,810" marker-end="url(#arrow-call)"/>
+  <text class="label" x="890" y="814">function call, from tcslib::gateway</text>
+  <rect class="payload" x="50" y="840" width="22" height="16" rx="4"/>
+  <text class="label" x="80" y="853">payload</text>
+  <rect class="vehicle" x="170" y="840" width="22" height="16" rx="4"/>
+  <text class="label" x="200" y="853">vehicle node</text>
+  <rect class="gateway" x="320" y="840" width="22" height="16" rx="4"/>
+  <text class="label" x="350" y="853">gateway node</text>
+  <rect class="ground" x="450" y="840" width="22" height="16" rx="4"/>
+  <text class="label" x="480" y="853">ground program</text>
+  <rect class="group" x="620" y="840" width="22" height="16" rx="4"/>
+  <text class="label" x="650" y="853">payload group</text>
 </svg>

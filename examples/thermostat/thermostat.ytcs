@@ -39,70 +39,88 @@ gateways:
 
 vehicle:
   - type compute:
-      - compute: k_1
-        format: "i16_be"
-        function: "to_kelvin"
-        offset: "273.15"
-        scale: "0.0625"
-        payload-out:
-          - target: gateway
-          - target: housekeeping
-          - target: zone_temp
-            input: in0
-        payload-in: true
-      - compute: k_2
-        format: "i16_be"
-        function: "to_kelvin"
-        offset: "273.15"
-        scale: "0.0625"
-        payload-out:
-          - target: gateway
-          - target: housekeeping
-          - target: zone_temp
-            input: in1
-        payload-in: true
-      - compute: k_3
-        format: "u24_be"
-        function: "to_kelvin"
-        offset: "255.37"
-        scale: "0.0078"
-        payload-out:
-          - target: gateway
-          - target: housekeeping
-          - target: zone_temp
-            input: in2
-        payload-in: true
-      # setpoint is set from the ground; half_band is how far either side
-      # of it the heaters are switched at, the setpoint being in the middle
-      # of the band.
-      - compute: thermostat
-        function: "hysteresis"
-        half_band: "2.0"
-        setpoint: "293.15"
-        # asserted below the setpoint, unasserted above it. Two heaters,
-        # because one failing must not leave the mass with no way to be
-        # warmed: either alone holds the band, and both together hold it
-        # twice as fast.
-        gateway-out:
-          - target: heaters_1
-          - target: heaters_2
-        payload-out:
-          - target: gateway
-          - target: housekeeping
-        payload-in: true
       # One temperature out of the three, by the algorithm named: median
       # takes the middle reading, closest_mean the mean of the two that
       # agree best. Either leaves a sensor that has gone wrong out of the
       # answer, which a mean over all three would not, and it produces a
       # value on every arrival, so one sensor that stops reporting is
       # outvoted rather than stopping the vehicle from deciding anything.
-      - compute: zone_temp
+      - compute: ambient
         algorithm: "median"
         function: "vote"
         inputs: "in0,in1,in2"
         payload-out:
           - target: gateway
-          - target: thermostat
+          - target: thermostat_1
+          - target: thermostat_2
+        payload-in: true
+      - compute: temp1
+        format: "i16_be"
+        function: "to_kelvin"
+        offset: "273.15"
+        scale: "0.0625"
+        payload-out:
+          - target: ambient
+            input: in0
+          - target: gateway
+          - target: housekeeping
+        payload-in: true
+      - compute: temp2
+        format: "i16_be"
+        function: "to_kelvin"
+        offset: "273.15"
+        scale: "0.0625"
+        payload-out:
+          - target: ambient
+            input: in1
+          - target: gateway
+          - target: housekeeping
+        payload-in: true
+      - compute: temp3
+        format: "u24_be"
+        function: "to_kelvin"
+        offset: "255.37"
+        scale: "0.0078"
+        payload-out:
+          - target: ambient
+            input: in2
+          - target: gateway
+          - target: housekeeping
+        payload-in: true
+      # Two stages, each a hysteresis of its own, so that the second heater
+      # comes on only when the first cannot hold the zone alone, and the
+      # ground can see which are on. In each, setpoint is set from the
+      # ground, and half_band is how far either side of it the stage
+      # switches, the setpoint being in the middle of the band.
+      #
+      # The first stage, driving heaters_1: on below 291.15 K, off above
+      # 295.15 K.
+      - compute: thermostat_1
+        function: "hysteresis"
+        half_band: "2.0"
+        setpoint: "293.15"
+        # asserted below the band, unasserted above it.
+        gateway-out:
+          - target: heaters_1
+        payload-out:
+          - target: gateway
+          - target: housekeeping
+        payload-in: true
+      # The second stage, for when heaters_1 alone cannot hold the zone:
+      # heaters_2 on below 289.15 K, two half bands of the first stage
+      # under its setpoint, and off above 291.15 K, where the first stage
+      # comes on. Its band lies under that of the first stage, so heaters_2
+      # is on only while heaters_1 is.
+      - compute: thermostat_2
+        function: "hysteresis"
+        half_band: "1.0"
+        setpoint: "290.15"
+        # asserted below the band, unasserted above it.
+        gateway-out:
+          - target: heaters_2
+        payload-out:
+          - target: gateway
+          - target: housekeeping
         payload-in: true
   - type log:
       - compute: housekeeping
@@ -118,9 +136,10 @@ payloads:
   # and make kernel-stand-ins-test.
   - type network:
       # Two heaters, both near the sensors on the same thermal mass, each
-      # driven by what the thermostat decides -- 1 for on, 0 for off. Separate
-      # nodes, so that one can be stopped from the ground while the other goes
-      # on holding the temperature.
+      # driven by what its stage of the thermostat decides -- 1 for on, 0 for
+      # off. Two, because one failing must not leave the mass with no way to
+      # be warmed; separate nodes, so that one can be stopped from the ground
+      # while the other goes on warming the zone.
       - payload: heaters_1
         address: "127.0.0.1"
         port: "5204"
@@ -140,7 +159,7 @@ payloads:
         port: "5201"
         protocol: "udp"
         payload-out:
-          - target: k_1
+          - target: temp1
       # The second of the trio; the same part as temp_1.
       - payload: temp_2
         address: "127.0.0.1"
@@ -148,7 +167,7 @@ payloads:
         port: "5202"
         protocol: "udp"
         payload-out:
-          - target: k_2
+          - target: temp2
       # The third. A different part: three bytes, unsigned, its own scale and
       # so its own conversion, so that no one part number can take the whole
       # trio out.
@@ -158,23 +177,26 @@ payloads:
         port: "5203"
         protocol: "udp"
         payload-out:
-          - target: k_3
+          - target: temp3
 
 commands:
-  # the zone temperature the heaters are held at, in kelvin
-  - { from: gateway, sets: thermostat.setpoint }
+  # the middle of the first stage band, in kelvin
+  - { from: gateway, sets: thermostat_1.setpoint }
+  # the middle of the second stage band, in kelvin
+  - { from: gateway, sets: thermostat_2.setpoint }
 
 tcsgui:
   nodes:
+    - { node: ambient, x: 469, y: 166 }
     - { node: gateway, x: 790, y: 34 }
     - { node: heaters_1, x: 34, y: 393 }
     - { node: heaters_2, x: 34, y: 470 }
     - { node: housekeeping, x: 469, y: 374 }
-    - { node: k_1, x: 242, y: 34 }
-    - { node: k_2, x: 242, y: 166 }
-    - { node: k_3, x: 242, y: 280 }
+    - { node: temp1, x: 242, y: 34 }
+    - { node: temp2, x: 242, y: 166 }
+    - { node: temp3, x: 242, y: 280 }
     - { node: temp_1, x: 34, y: 34 }
     - { node: temp_2, x: 34, y: 166 }
     - { node: temp_3, x: 34, y: 280 }
-    - { node: thermostat, x: 601, y: 242 }
-    - { node: zone_temp, x: 469, y: 166 }
+    - { node: thermostat_1, x: 601, y: 166 }
+    - { node: thermostat_2, x: 601, y: 300 }

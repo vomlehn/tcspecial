@@ -158,7 +158,7 @@ mod tests {
     fn sensor_at(path: &str) -> PayloadConfig {
         PayloadConfig {
             attachment: None,
-            thermostat: None,
+            thermostats: Vec::new(),
             name: "sensor".to_string(),
             protocol: PayloadProtocol::Iio,
             address: path.to_string(),

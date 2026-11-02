@@ -453,8 +453,8 @@ with it aboard and on the ground.
 
 | Directory | Description |
 |---|---|
-| `thermostat` | Three temperature sensors, converted to kelvin, voted on, and fed to a hysteresis thermostat that drives two heaters, every one a UDP socket tcssim stands in for, so that it runs on any desk. The setpoint is commanded from the ground, and tcsmoc plots the temperatures and the heaters. |
-| `thermostat-yamcs` | The thermostat, with Yamcs as its ground station, over CCSDS packets: the zone's temperature and the three readings arrive in Yamcs as temperatures in kelvin, and the thermostat's decision as on or off, each a parameter the configuration types, and a Python 3 program shows them. |
+| `thermostat` | Three temperature sensors, converted to kelvin, voted on, and fed to a thermostat of two hysteresis stages, each driving a heater of its own, the second only when the first cannot hold the zone; every one a UDP socket tcssim stands in for, so that it runs on any desk. The setpoints are commanded from the ground, and tcsmoc plots the temperatures and the heaters. |
+| `thermostat-yamcs` | The thermostat, with Yamcs as its ground station, over CCSDS packets: the zone's temperature and the three readings arrive in Yamcs as temperatures in kelvin, and each stage's decision as on or off, each a parameter the configuration types, and a Python 3 program shows them. |
 | `battery` | A power bus through an orbit: a power monitor asked over a serial line, a shunt, the battery's charge counted by a Python 3 program, and the science load shed in eclipse by a hysteresis. tcssim stands in for every payload, joined to a physics model of a sun, a solar array, loads, a bus and a battery. |
 | `descent` | A lander's terminal descent: a radar altimeter's altitude flown down by a Python 3 guidance program throttling the engine, a Doppler velocimeter, and a touchdown switch that speaks the moment the lander is down. tcssim stands in for every payload, joined to a physics model of an engine and the body it brakes. |
 | `simple-app` | A payload that is a program rather than a device: an `app_pl` node sending a line of text one word per packet, and a ground station that prints the line. Two programs of its own beside the configuration: the payload in Python 3, the ground station in Rust. |
@@ -463,13 +463,19 @@ with it aboard and on the ground.
 
 A control loop, aboard. Three temperature sensors are read together, every
 100 ms, as the group `zone_temps`: `temp_1`, `temp_2` and `temp_3`. Each
-reading goes through a conversion of its own to kelvin -- `k_1`, `k_2`, `k_3`,
-the parts differing in format and scale -- and the three meet at
-`zone_temp`, which takes their median, so that one sensor failing cannot take
-the zone's temperature with it. `thermostat` holds that to a setpoint,
-293.15 K with a half band of 2 K, and drives two heaters, `heaters_1` and
-`heaters_2`. The ground commands the setpoint, and `housekeeping` logs the
-readings and decisions in `/tmp/telemetry`.
+reading goes through a conversion of its own to kelvin -- `temp1`, `temp2`,
+`temp3`, the parts differing in format and scale -- and the three meet at
+`ambient`, which takes their median, so that one sensor failing cannot take
+the zone's temperature with it. The thermostat is two stages, each a
+hysteresis driving a heater of its own, so that the ground can see when one
+heater is on and when both are. `thermostat_1` holds the zone at 293.15 K with
+a half band of 2 K, `heaters_1` on below 291.15 K and off above 295.15 K.
+`thermostat_2`, at 290.15 K with a half band of 1 K, adds `heaters_2` below
+289.15 K -- two of the first stage's half bands under its setpoint -- and
+takes it off again above 291.15 K, where the first stage comes on; so
+`heaters_2` is on only while `heaters_1` is, and only when the first heater
+alone has not held the zone. The ground commands each stage's setpoint, and
+`housekeeping` logs the readings and decisions in `/tmp/telemetry`.
 
 Every sensor and heater is the far end of a UDP socket on this host, ports
 5201 to 5205, which tcssim stands in for: the example runs on any desk and
@@ -483,10 +489,15 @@ names, as thermostat-yamcs's simulator file does: a zone and two
 heaters, each a part simulated alone and joined to the zone under
 `connections`. All three sensors are joined to `zone.temperature`, each from
 a place of its own on the zone, so their readings agree and the vote
-produces a temperature. The zone cools towards 283.15 K, ten kelvin below the
-setpoint, and each heater's stand-in is joined to `heater_1.on` or
-`heater_2.on`, so the heaters warm it while the vehicle has them on: the loop
-closes through tcspecial.
+produces a temperature. The zone cools towards its surroundings, which swing
+six kelvin either side of 283.15 K over a ninety minute orbit, and each
+heater's stand-in is joined to `heater_1.on` or `heater_2.on`, so the heaters
+warm it while the vehicle has them on: the loop closes through tcspecial. The
+heaters are four watts each, and one settles the zone ten kelvin above its
+surroundings: enough to hold the first stage's band in the warm part of the
+orbit, and not in the cold part, about a quarter of it, where the zone sinks
+under 289.15 K and the second stage comes on, the two heaters together
+bringing it back.
 
 ```
 make run-thermostat
@@ -494,9 +505,10 @@ make run-thermostat
 
 That runs tcsmoc on the example, as `run-simple` does, and tcsmoc opens its
 plot window beside its own: each sensor's temperature and their vote over
-the last ten seconds, with the setpoint's rule, and the heaters' state under
-them. Press Connect in tcsmoc, and Enable on each payload in tcssim, to start
-the data and the heating.
+the last ten seconds, with the stages' setpoints, and a strip for each stage
+under them, named with the heater it drives, so that one heater on and two
+are told apart. Press Connect in tcsmoc, and Enable on each payload in
+tcssim, to start the data and the heating.
 
 Languages:
 
@@ -521,9 +533,9 @@ ground carries a CCSDS primary header:
 | the beacon | down | `beacon.apid`, 0x110 |
 | CONNECT and its answer | up, down | `tcs_cmd.apid`, 0x111 |
 | what Yamcs sends the gateway node | up | its `apid_base`, 0x400 |
-| `k_1`, `k_2`, `k_3` | down | `apid_base` plus each one's device id, 0x404 to 0x406 |
-| `thermostat` | down | 0x40a |
-| `zone_temp` | down | 0x40b |
+| `ambient` | down | `apid_base` plus its device id, 0x400 |
+| `temp1`, `temp2`, `temp3` | down | 0x405 to 0x407 |
+| `thermostat_1`, `thermostat_2` | down | 0x40b and 0x40c |
 
 `thermostat_yamcs.py` writes Yamcs's configuration with
 `python/tcslib/yamcs_ground.py`, as `ping_yamcs.py` does, its mission
@@ -536,18 +548,18 @@ conversion's or a vote's value is a float in its unit, with the unit in a
 `UnitSet`, read from its four bytes of a signed count of the unit's steps
 through a calibrator, and a thermostat's decision is a boolean read from
 its `1` or `0`. So Yamcs's web interface, at <http://localhost:17090>,
-shows `zone_temp` and `k_1` to `k_3` as temperatures in K and `thermostat`
-as true or false.
+shows `ambient` and `temp1` to `temp3` as temperatures in K and
+`thermostat_1` and `thermostat_2` as true or false.
 
 It starts Yamcs, then tcssim -- every payload sending from the start, as
 though its panel's button had been pressed -- and, once tcssim says it is
 ready, tcspecial, each with `--simulate=all`; has Yamcs send CONNECT until
 the vehicle answers with the configuration's checksum; and reads the
 parameters back over Yamcs's REST API. Its window shows the beacon panel
-above the thermostat's: the zone's temperature, each reading, the
-thermostat's decision and the two heaters it drives. With `--seconds` there
-is no window: it prints every value each `--every` seconds, and a line each
-time the heaters are switched, and stops. tcssim draws a window of its own,
+above the thermostat's: the zone's temperature, each reading, and each
+stage's decision with the heater it drives. With `--seconds` there is no
+window: it prints every value each `--every` seconds, and a line each time a
+stage switches its heater, and stops. tcssim draws a window of its own,
 so either wants a display.
 
 ```

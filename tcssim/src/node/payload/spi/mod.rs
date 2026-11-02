@@ -158,7 +158,7 @@ mod tests {
         let path = a_path();
         let mut simulated = SimulatedPayload::new(PayloadConfig {
             attachment: None,
-            thermostat: None,
+            thermostats: Vec::new(),
             name: "DH0".to_string(),
             protocol: PayloadProtocol::Spi,
             address: path.display().to_string(),

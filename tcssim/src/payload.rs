@@ -108,11 +108,11 @@ pub struct PayloadConfig {
     /// a random number generator, which is what this simulator did for
     /// everything before there was a world to read.
     pub attachment: Option<crate::physics::Attachment>,
-    /// The thermostat this sensor reports to, where the simulator stands in
-    /// for the vehicle's: every reading it sends goes there as it leaves.
-    /// `None` for every other payload, and for every payload of a run with
-    /// tcspecial's own thermostat.
-    pub thermostat: Option<Arc<crate::node::vehicle::thermostat::Thermostat>>,
+    /// The thermostats this sensor reports to, where the simulator stands
+    /// in for the vehicle's: every reading it sends goes to each as it
+    /// leaves. None for every other payload, and for every payload of a run
+    /// with tcspecial's own thermostats.
+    pub thermostats: Vec<Arc<crate::node::vehicle::thermostat::Thermostat>>,
     pub packet_interval_ms: Arc<AtomicU32>,
     pub segment_interval_ms: Arc<AtomicU32>,
     /// Whether this payload sends: its panel's button.
@@ -727,8 +727,8 @@ pub(crate) fn a_packet_from<R: Rng>(
         packet[which] = corrupt(packet[which], rng);
     }
 
-    // What leaves the sensor is what the thermostat reads, faults and all.
-    if let Some(thermostat) = &config.thermostat {
+    // What leaves the sensor is what the thermostats read, faults and all.
+    for thermostat in &config.thermostats {
         thermostat.sample(&config.name, &packet);
     }
 
@@ -934,7 +934,7 @@ mod tests {
     fn with(faults: Faults) -> PayloadConfig {
         PayloadConfig {
             attachment: None,
-            thermostat: None,
+            thermostats: Vec::new(),
             name: "DH0".to_string(),
             protocol: PayloadProtocol::Udp,
             address: "127.0.0.1".to_string(),
@@ -1354,7 +1354,7 @@ mod tests {
     fn test_payload_config() {
         let config = PayloadConfig {
             attachment: None,
-            thermostat: None,
+            thermostats: Vec::new(),
             name: "DH0".to_string(),
             protocol: PayloadProtocol::Udp,
             address: "127.0.0.1".to_string(),

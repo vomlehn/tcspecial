@@ -1753,10 +1753,10 @@ mod tests {
     fn a_computation_and_a_log_are_not_opened() {
         let graph = thermostat();
 
-        let said = reach_of(graph.node("thermostat").expect("the thermostat"))
+        let said = reach_of(graph.node("thermostat_1").expect("a stage"))
             .expect_err("a computation opened");
         assert!(
-            said.contains("thermostat")
+            said.contains("thermostat_1")
                 && said.contains("not something that is opened"),
             "{said}"
         );

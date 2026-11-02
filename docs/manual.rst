@@ -2232,8 +2232,9 @@ to 291.15 K, where the second stage goes off again. A run of the model with
 its sensors' errors and both stages, three orbits long from each of three
 seeds -- ``the_thermostat_examples_second_stage_comes_on_in_the_cold``, a test
 of tcssim's -- has ``heaters_1`` on about five sixths of the time,
-``heaters_2`` about a fourteenth, coming on some twenty times an orbit, and
-the zone within 4 K of 293.15 K all but a fraction of a percent of the time.
+``heaters_2`` a fifteenth to a twelfth, coming on some twenty times an orbit,
+and the zone within 4 K of 293.15 K all but a fraction of a percent of the
+time.
 The zone starts at its surroundings, so a run begins with both heaters on.
 
 ``make -C examples run-thermostat`` runs it, on any desk.

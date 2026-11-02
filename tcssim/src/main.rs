@@ -268,6 +268,8 @@ fn payload_info_from(
         packet_interval: sim.packet_interval.as_millis() as i32,
         segment_interval: sim.segment_interval.as_millis() as i32,
         status: SharedString::from(STOPPED_STATUS),
+        // Said once the payload is made: see `SimulatedPayload::driving_said`.
+        driving: SharedString::new(),
         last_sent_time: SharedString::from(NO_TRANSFER_TIME),
         last_sent_data: SharedString::new(),
         last_recv_time: SharedString::from(NO_TRANSFER_TIME),
@@ -449,10 +451,18 @@ fn joined_to_the_world(
                     }
                     Kind::Decision => None,
                 };
+                let place = place(at)?;
+                // Disabled, as every payload starts: its panel's button, or
+                // --sending, enables it.
+                let heater = matches!(
+                    model.components[place.component].what,
+                    tcslibgs::physics::Resolution::Heater(_)
+                );
                 Attachment::Drives {
                     world: world.clone(),
-                    place: place(at)?,
+                    place,
                     unit,
+                    power: Arc::new(physics::Power::new(false, heater)),
                 }
             }
         };
@@ -1238,13 +1248,16 @@ fn main() {
     for (row, payload) in made.iter_mut().enumerate() {
         // A payload not yet running, so this cannot be refused.
         let _ = payload.start();
-        // As though its button had been pressed, where --sending asks.
+        // As though its button had been pressed, where --sending asks: which
+        // for a heater is to power it.
         if sending {
             payload.send(true);
             update_row(&model, row, |info| {
                 info.status = SharedString::from(RUNNING_STATUS);
             });
         }
+        let driving = SharedString::from(payload.driving_said());
+        update_row(&model, row, |info| info.driving = driving);
     }
     let payloads: Arc<Mutex<Vec<SimulatedPayload>>> =
         Arc::new(Mutex::new(made));
@@ -1283,6 +1296,10 @@ fn main() {
                     });
                 }
             }
+            // Said at once rather than at the next refresh: a heater just
+            // disabled is off now.
+            let driving = SharedString::from(payload.driving_said());
+            update_row(&model, row, |info| info.driving = driving);
         });
     }
 
@@ -1322,7 +1339,11 @@ fn main() {
                 let guard = payloads.lock().unwrap();
                 for (row, payload) in guard.iter().enumerate() {
                     let stats = payload.stats();
-                    update_row(&model, row, |info| show_traffic(info, &stats));
+                    let driving = SharedString::from(payload.driving_said());
+                    update_row(&model, row, |info| {
+                        show_traffic(info, &stats);
+                        info.driving = driving;
+                    });
                 }
             },
         );
@@ -2606,7 +2627,7 @@ mod tests {
             if link.to.each().contains(&"thermostat") {
                 let mut also = link.clone();
                 also.to = tcslibgs::graph::Destinations::of(vec![
-                    "backstop".to_string(),
+                    "backstop".to_string()
                 ]);
                 added.push(also);
             }
@@ -2616,7 +2637,7 @@ mod tests {
                 let mut taken = link.clone();
                 taken.from = link.from.replacen("thermostat", "backstop", 1);
                 taken.to = tcslibgs::graph::Destinations::of(vec![
-                    "heaters_2".to_string(),
+                    "heaters_2".to_string()
                 ]);
                 added.push(taken);
                 link.to = tcslibgs::graph::Destinations::of(
@@ -2703,6 +2724,233 @@ mod tests {
                 && refused.contains("heaters_1"),
             "{refused}"
         );
+    }
+
+    /// What a run of the thermostat example's physics did: see
+    /// [`run_the_thermostat_example`].
+    #[derive(Debug, Default)]
+    struct ThermostatRun {
+        /// Simulated seconds watched, after the first climb to the band.
+        watched: f64,
+        /// Of those, the seconds the thermostat had the heaters on.
+        decided_on: f64,
+        /// How many times it switched them on.
+        came_on: usize,
+        /// The seconds each heater gave out heat.
+        heating: [f64; 2],
+        /// The seconds one enabled heater was heating and another enabled
+        /// one was not: never, if they switch together.
+        apart: f64,
+        /// The seconds the zone was inside the band, the setpoint plus or
+        /// minus a half band.
+        inside: f64,
+        /// The seconds it was below the setpoint less two half bands.
+        below: f64,
+        /// The seconds it was above the setpoint plus two half bands.
+        above: f64,
+        /// The coldest and the warmest the zone was.
+        coldest: f64,
+        warmest: f64,
+    }
+
+    /// Runs the thermostat example's physics with no window and no vehicle:
+    /// its world, its three sensors with their errors, the median of their
+    /// readings, and its thermostat deciding on it every tenth of a second,
+    /// as the payload group is read, sending each change to both heaters.
+    /// A heater disabled, as its panel would have it, gets the decisions
+    /// and stays off, as it does in tcssim.
+    ///
+    /// # Arguments
+    ///
+    /// * `seed`    - What the world's random draws start from.
+    /// * `seconds` - How long to run, in simulated seconds.
+    /// * `enabled` - Whether `heaters_1` and `heaters_2` are enabled.
+    ///
+    /// # Returns
+    ///
+    /// What happened, counted from the first time the zone reached the
+    /// band, where it does; the climb from cold is no part of holding it.
+    /// With no heater enabled it never climbs, and all of it is counted.
+    fn run_the_thermostat_example(
+        seed: u64,
+        seconds: f64,
+        enabled: [bool; 2],
+    ) -> ThermostatRun {
+        use tcslibgs::graph::simulated::hysteresis_of;
+
+        let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("..");
+        let payload_path = root.join("examples/thermostat/thermostat.ytcs");
+        let mut sim_file = SimConfigFile::load(
+            root.join("examples/thermostat/thermostat-sim.yaml"),
+        )
+        .expect("the simulator file reads");
+        sim_file.tcssim.as_mut().expect("a tcssim section").seed = Some(seed);
+        let graph = tcslibgs::graph::Graph::load(&payload_path).expect("reads");
+        let dh_configs = simulated_payloads_of(&payload_path, &sim_file);
+        let sims = sim_file.resolve(&dh_configs).expect("it fits");
+        let (attached, _) =
+            joined_to_the_world(&sim_file, Some(&graph), &sims, &dh_configs)
+                .expect("the world is made");
+
+        let thermostat = hysteresis_of(&graph, "thermostat").expect("one");
+        let (setpoint, half_band) = (thermostat.setpoint, thermostat.half_band);
+        let mut zone = None;
+        let mut sensors = Vec::new();
+        let mut heaters = Vec::new();
+        for (payload, attachment) in &attached {
+            match attachment {
+                Attachment::Reports {
+                    world,
+                    place,
+                    offset,
+                    sensor,
+                    ..
+                } => {
+                    zone = Some((world.clone(), *place));
+                    sensors.push((*place, *offset, sensor.clone()));
+                }
+                Attachment::Drives { place, .. } => {
+                    // Its heat, the output after its on.
+                    let heat = tcslibgs::physics::Place {
+                        terminal: place.terminal + 1,
+                        ..*place
+                    };
+                    heaters.push((payload.clone(), attachment.clone(), heat));
+                }
+                Attachment::Signals { .. } => {}
+            }
+        }
+        let (world, zone) = zone.expect("a sensor of the zone");
+        assert_eq!(sensors.len(), 3);
+        let named: Vec<&str> = heaters.iter().map(|h| h.0.as_str()).collect();
+        assert_eq!(named, ["heaters_1", "heaters_2"]);
+        for (n, (_, heater, heat)) in heaters.iter().enumerate() {
+            assert_eq!(world.name_of(*heat), format!("heater_{}.heat", n + 1));
+            heater.enable_at(enabled[n], 0.0);
+        }
+
+        let step = 0.1;
+        let mut decided = false;
+        let mut run = ThermostatRun {
+            coldest: f64::INFINITY,
+            warmest: f64::NEG_INFINITY,
+            ..ThermostatRun::default()
+        };
+        let mut holding = !enabled.contains(&true);
+        let mut now = 0.0;
+        while now < seconds {
+            now += step;
+            let mut readings: Vec<f64> = sensors
+                .iter()
+                .map(|(place, offset, sensor)| {
+                    sensor.read(world.read_at(*place, now) + offset, now)
+                })
+                .collect();
+            readings.sort_by(f64::total_cmp);
+            let voted = readings[1];
+            let was = decided;
+            if voted > setpoint + half_band {
+                decided = false;
+            } else if voted < setpoint - half_band {
+                decided = true;
+            }
+            // Sent to both heaters, enabled or not, as the vehicle does.
+            if decided != was || now <= step {
+                for (_, heater, _) in &heaters {
+                    heater.sent_at(if decided { 1.0 } else { 0.0 }, now);
+                }
+            }
+
+            let temperature = world.read_at(zone, now);
+            holding |= temperature > setpoint - half_band;
+            if !holding {
+                continue;
+            }
+            run.watched += step;
+            if decided {
+                run.decided_on += step;
+                run.came_on += usize::from(!was);
+            }
+            let heating: Vec<bool> = heaters
+                .iter()
+                .map(|(_, _, heat)| world.read_at(*heat, now) > 0.0)
+                .collect();
+            for (n, on) in heating.iter().enumerate() {
+                if *on {
+                    run.heating[n] += step;
+                }
+            }
+            let enabled_heating: Vec<bool> = heating
+                .iter()
+                .zip(enabled)
+                .filter(|(_, enabled)| *enabled)
+                .map(|(on, _)| *on)
+                .collect();
+            if enabled_heating.iter().any(|on| *on)
+                && !enabled_heating.iter().all(|on| *on)
+            {
+                run.apart += step;
+            }
+            let off = temperature - setpoint;
+            if off.abs() <= half_band {
+                run.inside += step;
+            }
+            if off < -2.0 * half_band {
+                run.below += step;
+            }
+            if off > 2.0 * half_band {
+                run.above += step;
+            }
+            run.coldest = run.coldest.min(temperature);
+            run.warmest = run.warmest.max(temperature);
+        }
+        run
+    }
+
+    /// The thermostat example's zone over three orbits of its surroundings'
+    /// swing, from three seeds, with both heaters enabled: the thermostat
+    /// cycles them, they always switch together, and the zone stays within
+    /// two half bands of the setpoint nearly all the time.
+    #[test]
+    fn the_thermostat_example_holds_the_zone_with_both_heaters() {
+        for seed in [1, 2, 3] {
+            let run = run_the_thermostat_example(seed, 3.0 * 5400.0, [true; 2]);
+            eprintln!("both, seed {seed}: {run:?}");
+            let share = |seconds: f64| seconds / run.watched;
+            assert_eq!(run.apart, 0.0, "{run:?}");
+            assert!(run.came_on >= 30, "it cycles them: {run:?}");
+            assert!(
+                (run.heating[0] - run.decided_on).abs() < 1.0
+                    && (run.heating[1] - run.decided_on).abs() < 1.0,
+                "{run:?}"
+            );
+            assert!(share(run.below + run.above) < 0.01, "{run:?}");
+            assert!(share(run.inside) > 0.7, "{run:?}");
+        }
+    }
+
+    /// With one heater disabled, the other cannot hold the zone through the
+    /// cold part of the orbit, which falls more than two half bands below
+    /// the setpoint; the disabled heater gets every decision and never
+    /// heats. With both disabled, the zone follows its surroundings.
+    #[test]
+    fn the_thermostat_example_falls_behind_with_a_heater_disabled() {
+        for seed in [1, 2, 3] {
+            let run =
+                run_the_thermostat_example(seed, 3.0 * 5400.0, [true, false]);
+            eprintln!("one, seed {seed}: {run:?}");
+            let share = |seconds: f64| seconds / run.watched;
+            assert_eq!(run.heating[1], 0.0, "disabled, it never heats");
+            assert!(run.came_on >= 3, "{run:?}");
+            assert!(share(run.below) > 0.1, "{run:?}");
+            assert!(share(run.below) < 0.4, "{run:?}");
+            assert!(run.coldest < 288.0, "{run:?}");
+        }
+
+        let run = run_the_thermostat_example(1, 5400.0, [false; 2]);
+        eprintln!("neither: {run:?}");
+        assert_eq!(run.heating, [0.0; 2]);
+        assert!(run.warmest < 290.0 && run.coldest < 278.0, "{run:?}");
     }
 
     /// A shipped tcspecial configuration states a packet interval only where a
@@ -2907,6 +3155,24 @@ mod tests {
              received"
         );
         assert_eq!(pkts, vec!["Pkts: 3 sent / 1 recv".to_string()]);
+
+        // A heater sends nothing, and its first row says in words what it
+        // is doing instead.
+        for doing in ["heating", "off", "disabled, so off"] {
+            let mut heater = payload_info_from(0, &handler("DH0"), &asked);
+            heater.driving = SharedString::from(format!("heater_1: {doing}"));
+            let ui = MainWindow::new().unwrap();
+            let _ = grid::settle(&ui);
+            ui.set_payload_model(ModelRc::from(Rc::new(VecModel::from(vec![
+                heater,
+            ]))));
+            ui.show().unwrap();
+            assert_eq!(
+                lines_from(&ui, "heater_1: "),
+                vec![format!("heater_1: {doing}")]
+            );
+            assert!(lines_from(&ui, "Sent: ").is_empty(), "{doing}");
+        }
     }
 
     /// Each panel says which payload of the configuration it is, beside the

@@ -259,16 +259,11 @@ fn run_driven_udp_node(
                 break;
             }
             // The world is told before the statistics are, so that nothing
-            // holds the stats lock across the world's own. Not where the
-            // panel has the device switched off: what arrives is counted, as
-            // every stand-in counts it, and acted on by nothing.
-            if pacing.sending {
-                crate::physics::driven(
-                    &config.attachment,
-                    &config.name,
-                    &buf[..n],
-                );
-            }
+            // holds the stats lock across the world's own. Where the panel
+            // has the device disabled, what arrives is counted, as every
+            // stand-in counts it, and kept as the latest, and the part stays
+            // off: see `crate::physics::Power`.
+            crate::physics::driven(&config.attachment, &config.name, &buf[..n]);
             let mut guard = stats.lock().unwrap();
             guard.a_packet_has_come(&buf[..n]);
             guard.bytes_recv += n as u64;

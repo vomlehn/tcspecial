@@ -352,9 +352,33 @@ impl SimulatedPayload {
     }
 
     /// Have it send, or be silent: its panel's button. Its stand-in is there
-    /// either way.
+    /// either way. For a part the vehicle drives -- a heater -- the button
+    /// is its power instead: disabled, it stays off whatever it is sent, and
+    /// enabled, it takes the latest it was sent at once. See
+    /// [`crate::physics::Power`].
+    ///
+    /// # Arguments
+    ///
+    /// * `sending` - Whether it is to send, or for a driven part be enabled.
     pub fn send(&self, sending: bool) {
         self.config.sending.store(sending, Ordering::SeqCst);
+        if let Some(attachment) = &self.config.attachment {
+            attachment.enable(sending);
+        }
+    }
+
+    /// Says what a part the vehicle drives is doing, in words for its
+    /// panel: see [`crate::physics::Attachment::driving_said`].
+    ///
+    /// # Returns
+    ///
+    /// What it is doing, or empty for a payload that drives nothing.
+    pub fn driving_said(&self) -> String {
+        self.config
+            .attachment
+            .as_ref()
+            .map(crate::physics::Attachment::driving_said)
+            .unwrap_or_default()
     }
 
     /// Stop the payload simulation

@@ -5200,7 +5200,10 @@ build a tcspecial that flies this way: the feature is for a vehicle on a desk.
        examples/simple-app/simple-app.ytcs
 
 The window draws the configuration as tcsgui does -- the three working panes,
-every node where the editor puts it, every link along its route -- and lights
+every node where the editor puts it, every link along its route, and the
+simulator file's physics in the Physics pane to their left, the simulator file
+being the one tcssim would read for the configuration, ``PAYLOAD_SIM_YAML`` or
+the one beside it, read for the drawing and nothing else -- and lights
 a link each time data is sent over it: a wide line, a shade lighter than the
 link's own colour, appears under it and goes a quarter of a second later. A
 link carrying a reading every second blinks once a second.

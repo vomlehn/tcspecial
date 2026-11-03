@@ -3967,12 +3967,48 @@ by accident and hard to understand afterwards.
 And every list shows a node when the window opens, which a share of a column
 cannot be trusted to do by itself: a twentieth of an 820-pixel window is
 forty-one pixels, enough for the list's own heading and nothing under it. So
-the three default shares -- 20, 35 and 45 -- are checked against what the three
-lists actually have to draw at the height the window opens at, and the test
+the default shares -- 20 for the physics list, then 25, 35 and 20 -- are
+checked against what the lists actually have to draw at the height the window opens at, and the test
 reads both the window's preferred height and the list's own padding out of
 ``main.slint`` rather than restating them: a rule about what fits is a rule
 about numbers in two files, and a test that copied them would pass while the
 window showed nothing.
+
+Left of the three, where a simulator file is open, is a fourth: the *Physics
+pane*, labelled ``Physics``, which holds the simulator file's world -- its
+physics components -- and not anything of the configuration's. It is drawn
+beside the working width rather than in it, at negative positions in the
+coordinates the configuration holds, so that adding it moved nothing a file
+had placed. Its components are laid out down it by name, the one order a model
+has, and are not dragged: a configuration file is where a node's position is
+kept, and a physics component is never in one. A component is the one shape no
+node type has, a square with a dotted edge, narrower than every node, in the
+pane's own reddish purple, with its type written under its name. A physics
+connection is drawn between the two components it joins, and each stand-in's
+``connects`` between its component and the payload node it stands in for,
+the arrow the way the value goes: both dashed and in that purple, where a
+configuration's links are solid. tcspecial's visual window draws the same pane
+from the simulator file tcssim would read for the configuration, and only
+draws it. See ``tcsdiagram::physics``.
+
+The physics list is at the top of the selection column, its pane being the
+leftmost, with a line under it that is dragged as the others are. Its entries
+are the component types, under ``Thermal``, ``Power`` and ``Motion``.
+Pressing one adds a component of that type to the simulator file's world, under
+a name nothing has -- ``heater_3`` -- with nothing stated, and opens the
+physics window on it, which shows its type's settings and, under them, what
+the simulator's own reader says is wrong with it as it is typed: a figure
+without its unit, one required and not given. A component the reader would
+refuse is drawn red on the canvas. Placing, setting and removing a component
+are edits like any other, each taken back by one undo, and removing one
+removes the connections that join it, which come back with it. Without a
+simulator file the list is greyed and says to open one, and the Physics pane
+is not drawn. The world's ``ambient_temp`` and its connections are edited in
+the simulator file for now.
+
+Where the Physics pane's line and the physics list's line are is kept in the
+preferences file beside the others: the pane's width as a percentage of the
+working width, and the list's share of the column.
 
 What that buys is a drawing that can be compared with last mission's. The three
 parts change on different schedules -- the ground is the other end of the link

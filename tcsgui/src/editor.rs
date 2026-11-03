@@ -879,6 +879,86 @@ tcsgui:
             .expect("the simulator should read what the editor wrote");
     }
 
+    /// A physics component placed, given a figure and removed with its
+    /// connections reaches the simulator file each time, and each is taken
+    /// back by one undo.
+    #[test]
+    fn a_physics_component_is_placed_set_and_removed_in_the_world() {
+        let where_ = tempfile::tempdir().expect("a directory");
+        let path = where_.path().join("vehicle.ytcs");
+        let sim = where_.path().join("vehicle-sim.yaml");
+        std::fs::write(
+            &sim,
+            "world:\n  ambient_temp: \"283.15 K\"\n  physics:\n    \
+             components:\n      - type thermal_zone:\n          \
+             - component: zone\n            capacity: \"20 J/K\"\n            \
+             time_constant: \"50 s\"\n",
+        )
+        .expect("written");
+        let mut editor = Editor::open(&path, crate::pane::default_dividers());
+        editor.open_simulator(&sim);
+        assert_eq!(editor.trouble(), None, "{:?}", editor.trouble());
+        let world = |editor: &Editor| {
+            editor
+                .document()
+                .simulator
+                .as_ref()
+                .expect("a simulator file")
+                .world
+                .clone()
+        };
+
+        let name = world(&editor).fresh_name("heater");
+        assert_eq!(name, "heater_1");
+        editor.edit(Edit::AddPhysics {
+            name: name.clone(),
+            kind: "heater".into(),
+        });
+        for (setting, value) in [("power", "4 W"), ("voltage", "28 V")] {
+            editor.edit(Edit::SetPhysics {
+                component: name.clone(),
+                setting: setting.into(),
+                was: None,
+                now: Some(value.into()),
+            });
+        }
+        let written = std::fs::read_to_string(&sim).expect("the file");
+        assert!(written.contains("- type heater:"), "{written}");
+        assert!(written.contains("power: \"4 W\""), "{written}");
+        assert!(world(&editor).problems().is_empty());
+
+        // Joined to the zone, by hand in the file's terms, and removed: the
+        // connection goes with it, and one undo brings both back.
+        let mut joined = world(&editor);
+        joined
+            .connections
+            .insert(("heater_1.heat".into(), "zone.heat".into()));
+        editor.document.simulator.as_mut().expect("one").world = joined;
+        let before = world(&editor);
+        editor.edit(Edit::RemovePhysics {
+            name: name.clone(),
+            kind: "heater".into(),
+            settings: before.components[&name]
+                .settings
+                .iter()
+                .map(|(a, b)| (a.clone(), b.clone()))
+                .collect(),
+            connections: before.connections_of(&name),
+        });
+        assert!(!world(&editor).components.contains_key(&name));
+        assert!(world(&editor).connections.is_empty());
+        editor.undo();
+        assert_eq!(world(&editor), before);
+
+        // And the placing itself, taken back.
+        editor.undo();
+        editor.undo();
+        editor.undo();
+        assert!(!world(&editor).components.contains_key(&name));
+        tcslibgs::sim_config::SimConfigFile::load(&sim)
+            .expect("the simulator reads what the editor wrote");
+    }
+
     /// A simulator file that cannot be read leaves the session usable.
     ///
     /// Said in red, and opened as nothing rather than refused: an editor that

@@ -806,11 +806,10 @@ impl<'de, A: MapAccess<'de>> MapAccess<'de> for Named<A> {
 mod tests {
     use std::path::{Path, PathBuf};
 
-    use crate::physics::PhysicsFile;
     use crate::sim_config::SimConfigFile;
 
-    /// The files of `tests/refused-sim`: simulator files and physics models,
-    /// a model's name ending `-physics.yaml`.
+    /// The files of `tests/refused-sim`: simulator files, some with a
+    /// physics section in a shape it had before, or a wrong one.
     ///
     /// # Returns
     ///
@@ -826,7 +825,7 @@ mod tests {
         files
     }
 
-    /// Reads a simulator file or a physics model, as its name says it is.
+    /// Reads a simulator file.
     ///
     /// # Arguments
     ///
@@ -836,13 +835,7 @@ mod tests {
     ///
     /// What is wrong with it, or `None` where it reads.
     fn read(file: &Path) -> Option<String> {
-        let physics = file.to_string_lossy().ends_with("-physics.yaml");
-        let read = if physics {
-            PhysicsFile::load(file).map(|_| ())
-        } else {
-            SimConfigFile::load(file).map(|_| ())
-        };
-        read.err().map(|e| e.to_string())
+        SimConfigFile::load(file).err().map(|e| e.to_string())
     }
 
     /// Every file of `tests/refused-sim` is refused, at a line.
@@ -884,9 +877,8 @@ mod tests {
                 let keys = |key: &str| {
                     block.lines().any(|l| l.trim_end() == format!("{key}:"))
                 };
-                let said = if keys("physics") {
-                    PhysicsFile::parse(&block).map(|_| ())
-                } else if keys("simulated_payloads")
+                let said = if keys("world")
+                    || keys("simulated_payloads")
                     || keys("simulated_payload_groups")
                 {
                     SimConfigFile::parse(&block, crate::ConfigFormat::Yaml)
@@ -900,7 +892,7 @@ mod tests {
                 }
             }
         }
-        assert!(shown >= 8, "{shown}");
+        assert!(shown >= 7, "{shown}");
     }
 
     /// A file of the old shape is told to run the converter, and the

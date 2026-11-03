@@ -257,6 +257,14 @@ struct Views {
     /// for what one node says about itself.
     sim_groups: Option<SimWindow>,
     showing_sim_group: Rc<RefCell<String>>,
+    /// The physics components' window, if one is open, and which component
+    /// it shows: the simulator groups' window, pointed at the world's
+    /// components instead. See [`show_physics`].
+    physics: Option<SimWindow>,
+    showing_physics: Rc<RefCell<String>>,
+    /// The physics list's share of the selection column, at its top, in per
+    /// cent: kept beside `lists` and saved with it.
+    physics_list: Rc<std::cell::Cell<i32>>,
     /// The tcspecial parameters window, if one is open.
     ///
     /// One, like the group window and for the same reason: it is a form about
@@ -476,6 +484,9 @@ impl Views {
             .borrow()
             .as_ref()
             .and_then(|drawing| drawing.holding.clone());
+        if let Some(window) = &self.physics {
+            put_physics(window, editor, &self.showing_physics.borrow());
+        }
         if let Some(window) = &self.group {
             put_group(window, editor, &self.showing.borrow());
         }
@@ -688,10 +699,10 @@ fn main() -> Result<(), slint::PlatformError> {
     // pane each node belongs in, and a node the file draws in the wrong one is
     // brought into its own as the file is read.
     let settings = settings::load();
-    let divider = Rc::new(std::cell::Cell::new(dividers_for(
-        settings.gateway_percent,
-        settings.vehicle_percent,
-    )));
+    let divider = Rc::new(std::cell::Cell::new(Dividers {
+        physics: pane::physics_width(settings.physics_percent),
+        ..dividers_for(settings.gateway_percent, settings.vehicle_percent)
+    }));
     // And how the selection column was divided, which is the same preference
     // the other way: see `Views::lists`.
     let lists = Rc::new(std::cell::Cell::new((
@@ -730,6 +741,11 @@ fn main() -> Result<(), slint::PlatformError> {
     let ui = MainWindow::new()?;
     session!(&ui);
     furnish!(&ui, descriptions());
+    // The physics list and its pane's tint, which only the main window has:
+    // see `physics_palette`.
+    ui.set_physics_palette(physics_palette());
+    ui.set_physics_ground(colour(&ground_of(style::Ground::Physics)));
+    ui.set_physics_list_percent(settings.list_physics_percent);
 
     let views = Rc::new(RefCell::new(Views {
         top: ui.as_weak(),
@@ -750,6 +766,11 @@ fn main() -> Result<(), slint::PlatformError> {
         faulted: Rc::new(RefCell::new(Default::default())),
         sim_groups: None,
         showing_sim_group: Rc::new(RefCell::new(String::new())),
+        physics: None,
+        showing_physics: Rc::new(RefCell::new(String::new())),
+        physics_list: Rc::new(std::cell::Cell::new(
+            settings.list_physics_percent,
+        )),
         showing: Rc::new(RefCell::new(String::new())),
     }));
     alerting(&views);
@@ -792,6 +813,7 @@ fn main() -> Result<(), slint::PlatformError> {
     // the line being dragged off the drawing: see Views::drawing.
     views.borrow_mut().drawing = drawing.clone();
     wire(&ui, &editor, &views, &drawing, &chosen, &None);
+    wire_physics(&ui, &editor, &views);
 
     {
         // Opening a subdiagram. A window per subdiagram, made once and raised
@@ -1478,6 +1500,19 @@ fn put(
     ui.set_gateway_list_percent(lists.0);
     ui.set_vehicle_list_percent(lists.1);
     ui.set_has_simulator(editor.document().simulator.is_some());
+    let (physics_nodes, physics_links) = physics_views_of(editor, dividers);
+    // The Physics pane only where there is a simulator file for it to be
+    // the world of: without one it would be a column nothing can be put in,
+    // taking room from the panes that can. The list stays, greyed, saying
+    // why.
+    let physics_width = if editor.document().simulator.is_some() {
+        dividers.physics
+    } else {
+        0
+    };
+    ui.set_physics_width(physics_width as f32);
+    ui.set_physics_nodes(ModelRc::from(Rc::new(VecModel::from(physics_nodes))));
+    ui.set_physics_links(ModelRc::from(Rc::new(VecModel::from(physics_links))));
     let (nodes, links) = views_of(editor, home, held);
     ui.set_selected(chosen.unwrap_or_default().into());
     ui.set_nodes(ModelRc::from(Rc::new(VecModel::from(nodes))));
@@ -1803,15 +1838,7 @@ fn drag_divider(
         });
     }
 
-    let (gateway_percent, vehicle_percent) = percents_for(dividers.get());
-    let (list_gateway_percent, list_vehicle_percent) =
-        views.borrow().lists.get();
-    settings::save(settings::Settings {
-        gateway_percent,
-        vehicle_percent,
-        list_gateway_percent,
-        list_vehicle_percent,
-    });
+    remember(&views.borrow());
     views.borrow().refresh(&editor.borrow());
 }
 
@@ -1858,15 +1885,100 @@ fn drag_list_divider(
         return;
     }
     lists.set(now);
+    // The payload list takes what the other three leave, so the physics list
+    // gives way where the two below it have taken its room.
+    let physics = views.borrow().physics_list.clone();
+    physics.set(settings::physics_list_share(physics.get(), now.0, now.1));
 
-    let (gateway_percent, vehicle_percent) =
-        percents_for(views.borrow().divider.get());
+    remember(&views.borrow());
+    views.borrow().refresh(&editor.borrow());
+}
+
+/// Writes down how the panes and the lists are divided now, as the settings
+/// keep them.
+///
+/// # Arguments
+///
+/// * `views` - The windows, which hold where every divider is.
+fn remember(views: &Views) {
+    let dividers = views.divider.get();
+    let (gateway_percent, vehicle_percent) = percents_for(dividers);
+    let (list_gateway_percent, list_vehicle_percent) = views.lists.get();
     settings::save(settings::Settings {
         gateway_percent,
         vehicle_percent,
-        list_gateway_percent: now.0,
-        list_vehicle_percent: now.1,
+        list_gateway_percent,
+        list_vehicle_percent,
+        physics_percent: pane::physics_percent(dividers.physics),
+        list_physics_percent: views.physics_list.get(),
     });
+}
+
+/// Moves the line between the Physics pane and the payloads where a
+/// gesture dragged it: the Physics pane grows as the line goes right, it
+/// being the pane to the line's left.
+///
+/// Its width snapped to the grid and kept inside [`settings::LEAST`] to
+/// [`settings::MOST`] per cent of the working width, saved as a preference
+/// and every window redrawn; a line that did not move writes nothing.
+///
+/// # Arguments
+///
+/// * `editor` - The session, for redrawing.
+/// * `views`  - The windows, which hold the Physics pane's width.
+/// * `dx`     - How far the line moved, in pixels, rightward positive.
+fn drag_physics_divider(
+    editor: &Rc<RefCell<Editor>>,
+    views: &Rc<RefCell<Views>>,
+    dx: f32,
+) {
+    let dividers = views.borrow().divider.clone();
+    let was = dividers.get();
+    let now = pane::physics_width(pane::physics_percent(pane::grid_ceil(
+        was.physics + dx.round() as i32,
+    )));
+    if now == was.physics {
+        return;
+    }
+    dividers.set(Dividers {
+        physics: now,
+        ..was
+    });
+    remember(&views.borrow());
+    views.borrow().refresh(&editor.borrow());
+}
+
+/// Moves the line under the physics list where a gesture dragged it: the
+/// physics list grows by what the payload list below it gives up.
+///
+/// # Arguments
+///
+/// * `editor` - The session, for redrawing.
+/// * `views`  - The windows, which hold the lists' shares.
+/// * `dy`     - How far the line moved, in pixels, downward positive.
+/// * `tall`   - How tall the whole column is, in pixels.
+fn drag_physics_list_divider(
+    editor: &Rc<RefCell<Editor>>,
+    views: &Rc<RefCell<Views>>,
+    dy: f32,
+    tall: f32,
+) {
+    if tall < 1.0 {
+        return;
+    }
+    let (gateway, vehicle) = views.borrow().lists.get();
+    let cell = views.borrow().physics_list.clone();
+    let was = cell.get();
+    let now = settings::physics_list_share(
+        was + (dy / tall * 100.0).round() as i32,
+        gateway,
+        vehicle,
+    );
+    if now == was {
+        return;
+    }
+    cell.set(now);
+    remember(&views.borrow());
     views.borrow().refresh(&editor.borrow());
 }
 
@@ -4441,6 +4553,392 @@ fn views_of(
     (nodes, links)
 }
 
+/// The simulator file's physics, drawn: its components as nodes in the
+/// Physics pane, its connections and each stand-in's `connects` as links,
+/// in the coordinates of the whole canvas, whose nought is the Physics
+/// pane's left edge. Nothing for a session with no simulator file.
+///
+/// A component the reader would refuse is drawn faulty, by what
+/// [`crate::sim::World::problems`] says, which is the reader's own checking:
+/// so a figure without its unit is red on the canvas as well as in the
+/// window it is typed in.
+///
+/// # Arguments
+///
+/// * `editor`   - The session drawn.
+/// * `dividers` - Where the panes are, the Physics pane's width included.
+///
+/// # Returns
+///
+/// The physics nodes, and the physics links.
+fn physics_views_of(
+    editor: &Editor,
+    dividers: Dividers,
+) -> (Vec<NodeView>, Vec<LinkView>) {
+    let document = editor.document();
+    let Some(simulator) = &document.simulator else {
+        return (Vec::new(), Vec::new());
+    };
+    let world = &simulator.world;
+    let problems = world.problems();
+    let faulty = |name: &str| {
+        problems
+            .iter()
+            .any(|(component, _)| component.as_deref() == Some(name))
+    };
+    let components: Vec<tcsdiagram::physics::Component> = world
+        .components
+        .iter()
+        .map(|(name, component)| tcsdiagram::physics::Component {
+            name,
+            kind: &component.kind,
+            faulty: faulty(name),
+        })
+        .collect();
+    let connections: Vec<(&str, &str)> = world
+        .connections
+        .iter()
+        .map(|(from, to)| (from.as_str(), to.as_str()))
+        .collect();
+    // Each simulated payload's own connects, or else its group's.
+    let mut said: Vec<(String, String)> = Vec::new();
+    for (payload, settings) in &simulator.payloads {
+        let connects = settings
+            .get("connects")
+            .filter(|said| !said.trim().is_empty())
+            .or_else(|| {
+                let group = settings.get("group")?;
+                simulator.groups.get(group)?.get("connects")
+            });
+        if let Some(connects) = connects {
+            for terminal in tcslibgs::sim_config::terminals_of(connects) {
+                said.push((payload.clone(), terminal.to_string()));
+            }
+        }
+    }
+    let joins: Vec<tcsdiagram::physics::Join> = said
+        .iter()
+        .map(|(payload, terminal)| tcsdiagram::physics::Join {
+            payload,
+            terminal,
+        })
+        .collect();
+    let sheet = on_sheet(document, &None);
+    let (nodes, links) = tcsdiagram::physics::looks(
+        &components,
+        &connections,
+        &joins,
+        &sheet,
+        dividers,
+        dividers.physics,
+    );
+    (
+        nodes
+            .into_iter()
+            .map(|look| node_view(look, false))
+            .collect(),
+        links.into_iter().map(link_view).collect(),
+    )
+}
+
+/// Wires what the main window does with physics: placing a component from
+/// the physics list, editing and deleting one on the canvas, and moving the
+/// Physics pane's line and the physics list's.
+///
+/// The main window's alone: a subdiagram's window draws no Physics pane.
+///
+/// # Arguments
+///
+/// * `window` - The main window.
+/// * `editor` - The one editor every window edits.
+/// * `views`  - The windows, redrawn after each edit.
+fn wire_physics(
+    window: &MainWindow,
+    editor: &Rc<RefCell<Editor>>,
+    views: &Rc<RefCell<Views>>,
+) {
+    {
+        // A component of this type, under a name nothing has, with nothing
+        // stated: its window opens on it, so that its figures are the next
+        // thing typed. One edit, which one undo takes away.
+        let editor = editor.clone();
+        let views = views.clone();
+        window.on_place_physics(move |kind| {
+            let name = {
+                let mut editor = editor.borrow_mut();
+                let Some(simulator) = &editor.document().simulator else {
+                    return;
+                };
+                let name = simulator.world.fresh_name(&kind);
+                editor.edit(Edit::AddPhysics {
+                    name: name.clone(),
+                    kind: kind.to_string(),
+                });
+                name
+            };
+            *views.borrow().showing_physics.borrow_mut() = name;
+            show_physics(&editor, &views);
+            views.borrow().refresh(&editor.borrow());
+        });
+    }
+    {
+        let editor = editor.clone();
+        let views = views.clone();
+        window.on_physics_edit(move |name| {
+            *views.borrow().showing_physics.borrow_mut() = name.to_string();
+            show_physics(&editor, &views);
+        });
+    }
+    {
+        let editor = editor.clone();
+        let views = views.clone();
+        window.on_physics_delete(move |name| {
+            remove_physics(&editor, &name);
+            views.borrow().refresh(&editor.borrow());
+        });
+    }
+    {
+        let editor = editor.clone();
+        let views = views.clone();
+        window.on_physics_divider_moved(move |dx: f32| {
+            drag_physics_divider(&editor, &views, dx);
+        });
+    }
+    {
+        let editor = editor.clone();
+        let views = views.clone();
+        window.on_physics_list_divider_moved(move |dy: f32, tall: f32| {
+            drag_physics_list_divider(&editor, &views, dy, tall);
+        });
+    }
+}
+
+/// Removes a physics component, with the connections that join it, in one
+/// edit that carries both, so that one undo puts them back.
+///
+/// # Arguments
+///
+/// * `editor` - The session.
+/// * `name`   - The component.
+fn remove_physics(editor: &Rc<RefCell<Editor>>, name: &str) {
+    let mut editor = editor.borrow_mut();
+    let Some(edit) = editor.document().simulator.as_ref().and_then(|s| {
+        let component = s.world.components.get(name)?;
+        Some(Edit::RemovePhysics {
+            name: name.to_string(),
+            kind: component.kind.clone(),
+            settings: component
+                .settings
+                .iter()
+                .map(|(a, b)| (a.clone(), b.clone()))
+                .collect(),
+            connections: s.world.connections_of(name),
+        })
+    }) else {
+        return;
+    };
+    editor.edit(edit);
+}
+
+/// Shows the physics components' window, on the component
+/// `Views::showing_physics` names, making it if there is not one.
+///
+/// The simulator groups' window, pointed at the world's components: a
+/// component is a set of settings with a name, as a group is. Its type's
+/// settings are offered whether stated or not, and what the reader would
+/// refuse about the one shown is said under them, in the reader's words, as
+/// it is typed.
+///
+/// # Arguments
+///
+/// * `editor` - The session whose simulator file's world is shown and
+///              edited.
+/// * `views`  - The windows, which keep the window once it is made.
+fn show_physics(editor: &Rc<RefCell<Editor>>, views: &Rc<RefCell<Views>>) {
+    if views.borrow().physics.is_none() {
+        let window = match SimWindow::new() {
+            Ok(window) => {
+                session!(&window);
+                window
+            }
+            Err(e) => {
+                eprintln!("tcsgui: the physics window cannot be opened: {e}");
+                return;
+            }
+        };
+        let showing = views.borrow().showing_physics.clone();
+        {
+            let editor = editor.clone();
+            let views = views.clone();
+            let showing = showing.clone();
+            window.on_choose(move |chosen| {
+                *showing.borrow_mut() = chosen.to_string();
+                views.borrow().refresh(&editor.borrow());
+            });
+        }
+        {
+            let editor = editor.clone();
+            let views = views.clone();
+            let showing = showing.clone();
+            window.on_remove(move || {
+                let name = showing.borrow().clone();
+                remove_physics(&editor, &name);
+                showing.borrow_mut().clear();
+                views.borrow().refresh(&editor.borrow());
+            });
+        }
+        {
+            let editor = editor.clone();
+            let views = views.clone();
+            window.on_setting_set(move |setting, value| {
+                let component = showing.borrow().clone();
+                {
+                    let mut editor = editor.borrow_mut();
+                    let setting = setting.to_string();
+                    let Some(said) = editor
+                        .document()
+                        .simulator
+                        .as_ref()
+                        .and_then(|s| s.world.components.get(&component))
+                    else {
+                        return;
+                    };
+                    let was = said.settings.get(&setting).cloned();
+                    let now =
+                        (!value.trim().is_empty()).then(|| value.to_string());
+                    if was == now {
+                        return;
+                    }
+                    editor.edit(Edit::SetPhysics {
+                        component,
+                        setting,
+                        was,
+                        now,
+                    });
+                }
+                views.borrow().refresh(&editor.borrow());
+            });
+        }
+        views.borrow_mut().physics = Some(window);
+    }
+    let window = views
+        .borrow()
+        .physics
+        .as_ref()
+        .map(|window| window.as_weak());
+    if let Some(window) = window.and_then(|window| window.upgrade()) {
+        put_physics(
+            &window,
+            &editor.borrow(),
+            &views.borrow().showing_physics.borrow(),
+        );
+        if let Err(e) = window.show() {
+            eprintln!("tcsgui: the physics window cannot be shown: {e}");
+        }
+    }
+}
+
+/// Puts one physics component into the physics window.
+///
+/// # Arguments
+///
+/// * `window`    - The physics window.
+/// * `editor`    - The session whose simulator file's world is shown.
+/// * `component` - The component shown; one the world has not shows
+///                 nothing chosen.
+fn put_physics(window: &SimWindow, editor: &Editor, component: &str) {
+    let world = editor
+        .document()
+        .simulator
+        .as_ref()
+        .map(|simulator| simulator.world.clone())
+        .unwrap_or_default();
+    let choices: Vec<slint::SharedString> =
+        world.components.keys().map(|name| name.into()).collect();
+    let chosen = world.components.get(component);
+    window.set_editing("Physics components".into());
+    window.set_about(
+        "The simulator file's world: each component is a part of the \
+         vehicle simulated alone, and a stand-in is joined to one of its \
+         terminals by its connects. Every figure is written with its unit. \
+         A component is placed from the physics list."
+            .into(),
+    );
+    window.set_can_add(false);
+    window.set_can_remove(true);
+    window.set_choices(ModelRc::from(Rc::new(VecModel::from(choices))));
+    window.set_chosen(chosen.map_or("", |_| component).into());
+    let fields: Vec<&'static str> = chosen
+        .and_then(|c| tcslibgs::physics::settings_of(&c.kind))
+        .map(|settings| settings.to_vec())
+        .unwrap_or_default();
+    let empty = BTreeMap::new();
+    window.set_fields(settings_shown(
+        &fields,
+        chosen.map_or(&empty, |c| &c.settings),
+    ));
+    // What the reader says of this component, or of the world it is in.
+    let said: Vec<String> = world
+        .problems()
+        .into_iter()
+        .filter(|(about, _)| about.as_deref().is_none_or(|a| a == component))
+        .map(|(_, why)| why)
+        .collect();
+    window.set_trouble(
+        editor
+            .trouble()
+            .map(str::to_string)
+            .unwrap_or_else(|| said.join("\n"))
+            .into(),
+    );
+}
+
+/// The physics list: every type of physics component, under its family's
+/// heading, in alphabetical order within it.
+///
+/// # Returns
+///
+/// The entries, each drawn as a component of that type is drawn on the
+/// canvas, named after its type.
+fn physics_palette() -> ModelRc<PaletteEntry> {
+    let mut entries: Vec<PaletteEntry> = Vec::new();
+    for (family, kinds) in PHYSICS_FAMILIES {
+        entries.push(PaletteEntry {
+            heading: (*family).into(),
+            node: view_of("", "", (0, 0), None, false, None),
+            is_heading: true,
+            sets: "".into(),
+        });
+        let mut kinds: Vec<&str> = kinds.to_vec();
+        kinds.sort_unstable();
+        for kind in kinds {
+            let look = tcsdiagram::physics::node_look(
+                &tcsdiagram::physics::Component {
+                    name: kind,
+                    kind,
+                    faulty: false,
+                },
+                (8, 2),
+            );
+            entries.push(PaletteEntry {
+                heading: "".into(),
+                node: node_view(look, false),
+                is_heading: false,
+                sets: "".into(),
+            });
+        }
+    }
+    ModelRc::from(Rc::new(VecModel::from(entries)))
+}
+
+/// The physics component types by family, as the physics list heads them:
+/// every one of `tcslibgs::physics::TYPES` once, which a test holds it to.
+const PHYSICS_FAMILIES: &[(&str, &[&str])] = &[
+    ("Thermal", &["heater", "thermal_zone"]),
+    ("Power", &["battery", "bus", "load", "solar_array", "sun"]),
+    ("Motion", &["body", "engine"]),
+];
+
 /// Where a link's line starts and finishes, and which way it points at each
 /// end.
 ///
@@ -5595,7 +6093,24 @@ fn family_hue(pane: Pane) -> f64 {
         Pane::Gateway => 265.0,
         Pane::Vehicle => 118.0,
         Pane::Payloads => 200.0,
+        // Okabe and Ito's reddish purple.
+        Pane::Physics => 326.0,
     }
+}
+
+/// The physics list offers every type of physics component the reader
+/// knows, once each.
+#[cfg(test)]
+#[test]
+fn the_physics_list_offers_every_type_once() {
+    let mut offered: Vec<&str> = PHYSICS_FAMILIES
+        .iter()
+        .flat_map(|(_, kinds)| kinds.iter().copied())
+        .collect();
+    offered.sort_unstable();
+    let mut known: Vec<&str> = tcslibgs::physics::TYPES.to_vec();
+    known.sort_unstable();
+    assert_eq!(offered, known);
 }
 
 /// A hex string as a Slint colour. See tcsdiagram::look::rgb.
@@ -5888,7 +6403,8 @@ mod tests {
             (
                 Pane::Payloads,
                 100 - settings::DEFAULT_LIST_GATEWAY
-                    - settings::DEFAULT_LIST_VEHICLE,
+                    - settings::DEFAULT_LIST_VEHICLE
+                    - settings::DEFAULT_LIST_PHYSICS,
             ),
         ] {
             let rows = rows_of(pane);
@@ -5912,6 +6428,19 @@ mod tests {
                 pane.label()
             );
         }
+
+        // And the physics list, whose rows are physics components, under a
+        // family's heading, as the others' are.
+        let shrink = 0.75;
+        assert!(markup.contains("property <float> shrink: 0.75;"));
+        let wanted =
+            ABOVE_THE_FIRST + tcsdiagram::physics::SIZE.1 as f32 * shrink;
+        let got = tall * settings::DEFAULT_LIST_PHYSICS as f32 / 100.0;
+        assert!(
+            got >= wanted,
+            "the physics list opens {got:.0} pixels tall and its first node \
+             wants {wanted:.0}"
+        );
     }
 
     /// The read-only flag is taken in all three spellings and anywhere on the
@@ -8659,6 +9188,7 @@ mod tests {
                 Dividers {
                     payloads: least,
                     vehicle: least * 2,
+                    ..dividers()
                 },
             ),
             (
@@ -8666,6 +9196,7 @@ mod tests {
                 Dividers {
                     payloads: least,
                     vehicle: WORKING_WIDTH - least,
+                    ..dividers()
                 },
             ),
         ] {
@@ -9698,6 +10229,11 @@ mod tests {
             faulted: Rc::new(RefCell::new(Default::default())),
             sim_groups: None,
             showing_sim_group: Rc::new(RefCell::new(String::new())),
+            physics: None,
+            showing_physics: Rc::new(RefCell::new(String::new())),
+            physics_list: Rc::new(std::cell::Cell::new(
+                settings::DEFAULT_LIST_PHYSICS,
+            )),
             showing: Rc::new(RefCell::new(String::new())),
         }))
     }
@@ -9953,6 +10489,11 @@ mod tests {
             faulted: Rc::new(RefCell::new(Default::default())),
             sim_groups: None,
             showing_sim_group: Rc::new(RefCell::new(String::new())),
+            physics: None,
+            showing_physics: Rc::new(RefCell::new(String::new())),
+            physics_list: Rc::new(std::cell::Cell::new(
+                settings::DEFAULT_LIST_PHYSICS,
+            )),
             showing: Rc::new(RefCell::new(String::new())),
         }));
         let chosen: Rc<RefCell<BTreeMap<String, String>>> =
@@ -10090,6 +10631,11 @@ mod tests {
             faulted: Rc::new(RefCell::new(Default::default())),
             sim_groups: None,
             showing_sim_group: Rc::new(RefCell::new(String::new())),
+            physics: None,
+            showing_physics: Rc::new(RefCell::new(String::new())),
+            physics_list: Rc::new(std::cell::Cell::new(
+                settings::DEFAULT_LIST_PHYSICS,
+            )),
             showing: Rc::new(RefCell::new(String::new())),
         }));
         let chosen: Rc<RefCell<BTreeMap<String, String>>> =
@@ -10223,6 +10769,11 @@ mod tests {
             faulted: Rc::new(RefCell::new(Default::default())),
             sim_groups: None,
             showing_sim_group: Rc::new(RefCell::new(String::new())),
+            physics: None,
+            showing_physics: Rc::new(RefCell::new(String::new())),
+            physics_list: Rc::new(std::cell::Cell::new(
+                settings::DEFAULT_LIST_PHYSICS,
+            )),
             showing: Rc::new(RefCell::new(String::new())),
         }));
         let chosen: Rc<RefCell<BTreeMap<String, String>>> =
@@ -10304,6 +10855,11 @@ mod tests {
             faulted: Rc::new(RefCell::new(Default::default())),
             sim_groups: None,
             showing_sim_group: Rc::new(RefCell::new(String::new())),
+            physics: None,
+            showing_physics: Rc::new(RefCell::new(String::new())),
+            physics_list: Rc::new(std::cell::Cell::new(
+                settings::DEFAULT_LIST_PHYSICS,
+            )),
             showing: Rc::new(RefCell::new(String::new())),
         }));
         alerting(&views);
@@ -10442,6 +10998,11 @@ mod tests {
             faulted: Rc::new(RefCell::new(Default::default())),
             sim_groups: None,
             showing_sim_group: Rc::new(RefCell::new(String::new())),
+            physics: None,
+            showing_physics: Rc::new(RefCell::new(String::new())),
+            physics_list: Rc::new(std::cell::Cell::new(
+                settings::DEFAULT_LIST_PHYSICS,
+            )),
             showing: Rc::new(RefCell::new(String::new())),
         }));
         alerting(&views);
@@ -10581,6 +11142,11 @@ mod tests {
             faulted: Rc::new(RefCell::new(Default::default())),
             sim_groups: None,
             showing_sim_group: Rc::new(RefCell::new(String::new())),
+            physics: None,
+            showing_physics: Rc::new(RefCell::new(String::new())),
+            physics_list: Rc::new(std::cell::Cell::new(
+                settings::DEFAULT_LIST_PHYSICS,
+            )),
             showing: Rc::new(RefCell::new(String::new())),
         }));
         let chosen: Rc<RefCell<BTreeMap<String, String>>> =
@@ -10700,6 +11266,11 @@ mod tests {
             faulted: Rc::new(RefCell::new(Default::default())),
             sim_groups: None,
             showing_sim_group: Rc::new(RefCell::new(String::new())),
+            physics: None,
+            showing_physics: Rc::new(RefCell::new(String::new())),
+            physics_list: Rc::new(std::cell::Cell::new(
+                settings::DEFAULT_LIST_PHYSICS,
+            )),
             showing: Rc::new(RefCell::new(String::new())),
         }));
         let chosen: Rc<RefCell<BTreeMap<String, String>>> =
@@ -10897,6 +11468,11 @@ mod tests {
             faulted: Rc::new(RefCell::new(Default::default())),
             sim_groups: None,
             showing_sim_group: Rc::new(RefCell::new(String::new())),
+            physics: None,
+            showing_physics: Rc::new(RefCell::new(String::new())),
+            physics_list: Rc::new(std::cell::Cell::new(
+                settings::DEFAULT_LIST_PHYSICS,
+            )),
             showing: Rc::new(RefCell::new(String::new())),
         }));
         let chosen: Rc<RefCell<BTreeMap<String, String>>> =
@@ -11208,6 +11784,11 @@ mod tests {
             faulted: Rc::new(RefCell::new(Default::default())),
             sim_groups: None,
             showing_sim_group: Rc::new(RefCell::new(String::new())),
+            physics: None,
+            showing_physics: Rc::new(RefCell::new(String::new())),
+            physics_list: Rc::new(std::cell::Cell::new(
+                settings::DEFAULT_LIST_PHYSICS,
+            )),
             showing: Rc::new(RefCell::new(String::new())),
         }));
         let chosen: Rc<RefCell<BTreeMap<String, String>>> =
@@ -11351,6 +11932,11 @@ mod tests {
             faulted: Rc::new(RefCell::new(Default::default())),
             sim_groups: None,
             showing_sim_group: Rc::new(RefCell::new(String::new())),
+            physics: None,
+            showing_physics: Rc::new(RefCell::new(String::new())),
+            physics_list: Rc::new(std::cell::Cell::new(
+                settings::DEFAULT_LIST_PHYSICS,
+            )),
             showing: Rc::new(RefCell::new(String::new())),
         }));
         let chosen: Rc<RefCell<BTreeMap<String, String>>> =
@@ -11447,6 +12033,11 @@ mod tests {
             faulted: Rc::new(RefCell::new(Default::default())),
             sim_groups: None,
             showing_sim_group: Rc::new(RefCell::new(String::new())),
+            physics: None,
+            showing_physics: Rc::new(RefCell::new(String::new())),
+            physics_list: Rc::new(std::cell::Cell::new(
+                settings::DEFAULT_LIST_PHYSICS,
+            )),
             showing: Rc::new(RefCell::new(String::new())),
         }));
         let chosen: Rc<RefCell<BTreeMap<String, String>>> =
@@ -11607,6 +12198,11 @@ mod tests {
             faulted: Rc::new(RefCell::new(Default::default())),
             sim_groups: None,
             showing_sim_group: Rc::new(RefCell::new(String::new())),
+            physics: None,
+            showing_physics: Rc::new(RefCell::new(String::new())),
+            physics_list: Rc::new(std::cell::Cell::new(
+                settings::DEFAULT_LIST_PHYSICS,
+            )),
             showing: Rc::new(RefCell::new(String::new())),
         }));
 
@@ -11681,6 +12277,11 @@ mod tests {
             faulted: Rc::new(RefCell::new(Default::default())),
             sim_groups: None,
             showing_sim_group: Rc::new(RefCell::new(String::new())),
+            physics: None,
+            showing_physics: Rc::new(RefCell::new(String::new())),
+            physics_list: Rc::new(std::cell::Cell::new(
+                settings::DEFAULT_LIST_PHYSICS,
+            )),
             showing: Rc::new(RefCell::new(String::new())),
         }));
 
@@ -11833,6 +12434,11 @@ mod tests {
             faulted: Rc::new(RefCell::new(Default::default())),
             sim_groups: None,
             showing_sim_group: Rc::new(RefCell::new(String::new())),
+            physics: None,
+            showing_physics: Rc::new(RefCell::new(String::new())),
+            physics_list: Rc::new(std::cell::Cell::new(
+                settings::DEFAULT_LIST_PHYSICS,
+            )),
             showing: Rc::new(RefCell::new(String::new())),
         }));
         let chosen: Rc<RefCell<BTreeMap<String, String>>> =
@@ -12106,6 +12712,11 @@ mod tests {
             faulted: Rc::new(RefCell::new(Default::default())),
             sim_groups: None,
             showing_sim_group: Rc::new(RefCell::new(String::new())),
+            physics: None,
+            showing_physics: Rc::new(RefCell::new(String::new())),
+            physics_list: Rc::new(std::cell::Cell::new(
+                settings::DEFAULT_LIST_PHYSICS,
+            )),
             showing: Rc::new(RefCell::new(String::new())),
         }));
 
@@ -12190,6 +12801,11 @@ mod tests {
             faulted: Rc::new(RefCell::new(Default::default())),
             sim_groups: None,
             showing_sim_group: Rc::new(RefCell::new(String::new())),
+            physics: None,
+            showing_physics: Rc::new(RefCell::new(String::new())),
+            physics_list: Rc::new(std::cell::Cell::new(
+                settings::DEFAULT_LIST_PHYSICS,
+            )),
             showing: Rc::new(RefCell::new(String::new())),
         }));
         let chosen: Rc<RefCell<BTreeMap<String, String>>> =
@@ -12318,6 +12934,11 @@ mod tests {
             faulted: Rc::new(RefCell::new(Default::default())),
             sim_groups: None,
             showing_sim_group: Rc::new(RefCell::new(String::new())),
+            physics: None,
+            showing_physics: Rc::new(RefCell::new(String::new())),
+            physics_list: Rc::new(std::cell::Cell::new(
+                settings::DEFAULT_LIST_PHYSICS,
+            )),
             showing: Rc::new(RefCell::new(String::new())),
         }));
 

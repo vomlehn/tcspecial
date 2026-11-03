@@ -950,7 +950,7 @@ fn check_graph_simulator(
         return;
     };
 
-    let mut sim = match SimConfigFile::parse(&text, format) {
+    let sim = match SimConfigFile::parse(&text, format) {
         Ok(sim) => sim,
         Err(parse_error) => {
             report.add(path, line_of(&parse_error), parse_error.to_string());
@@ -958,9 +958,14 @@ fn check_graph_simulator(
         }
     };
     let found = Where::of(&text, format);
-    let Ok(model) = read_model(path, &mut sim, &found, report) else {
+    if sim.moved_thermal_mass.is_some() {
+        report.add(
+            path,
+            found.line_of(&tcslibgs::About::Section("thermal_mass")),
+            tcslibgs::sim_config::MOVED_THERMAL_MASS,
+        );
         return;
-    };
+    }
 
     let Some(graph) = graph else { return };
     let names: Vec<&str> = graph
@@ -1016,25 +1021,23 @@ fn check_graph_simulator(
     // a component nothing is joined to is refused there, and a misspelled
     // connects would read as one, so only where the payloads are named
     // well.
-    if let Some((model, model_text)) = model {
-        let lines = Where::of(&model_text, ConfigFormat::Yaml);
-        let alone =
-            sim.model.as_ref().map(|m| m.problems()).unwrap_or_default();
+    if let Some(model) = &sim.world {
+        let alone = model.problems();
         for problem in &alone {
             if !report.room() {
                 break;
             }
             report.add(
-                &model,
-                lines.line_of(&problem.about()),
+                path,
+                found.line_of(&problem.about()),
                 problem.to_string(),
             );
         }
         if alone.is_empty() && named_well {
             if let Err(problem) = sim.physics() {
                 report.add(
-                    &model,
-                    lines.line_of(&problem.about()),
+                    path,
+                    found.line_of(&problem.about()),
                     problem.to_string(),
                 );
             }
@@ -1092,82 +1095,6 @@ fn sensors_read_as_they_report(
             }
             let about = tcslibgs::About::SimPayload(dh.name.0.clone());
             report.add(path, found.line_of(&about), why);
-        }
-    }
-}
-
-/// Reads the physics model a simulator file names, and gives it to the file,
-/// as `SimConfigFile::read_physics` does for every
-/// program that loads one -- but reporting each problem at its own file and
-/// line, which a program that only starts or stops has no use for.
-///
-/// # Arguments
-///
-/// * `path`   - The simulator file.
-/// * `sim`    - What it parsed as, which takes the model.
-/// * `found`  - Where its sections and entries are.
-/// * `report` - Where each problem is added.
-///
-/// # Returns
-///
-/// The model's path and text, or `None` where the file names none.
-///
-/// # Errors
-///
-/// `()` where the file still declares masses itself, or its model cannot be
-/// read or parsed: said in `report`, and nothing more can be checked.
-fn read_model(
-    path: &Path,
-    sim: &mut SimConfigFile,
-    found: &Where,
-    report: &mut Report,
-) -> Result<Option<(PathBuf, String)>, ()> {
-    if sim.moved_thermal_mass.is_some() {
-        report.add(
-            path,
-            found.line_of(&tcslibgs::About::Section("thermal_mass")),
-            tcslibgs::sim_config::MOVED_THERMAL_MASS,
-        );
-        return Err(());
-    }
-    let Some(model) = sim.physics_path(path) else {
-        return Ok(None);
-    };
-    let at = found.line_of(&tcslibgs::About::Section("physics"));
-    if !tcslibgs::physics::is_yaml_name(&model) {
-        report.add(
-            path,
-            at,
-            format!(
-                "physics names {}: a physics model is YAML, named .yaml or \
-                 .yml",
-                model.display()
-            ),
-        );
-        return Err(());
-    }
-    let text = match std::fs::read_to_string(&model) {
-        Ok(text) => text,
-        Err(e) => {
-            report.add(
-                path,
-                at,
-                format!(
-                    "physics names {}, which cannot be read: {e}",
-                    model.display()
-                ),
-            );
-            return Err(());
-        }
-    };
-    match tcslibgs::physics::PhysicsFile::parse(&text) {
-        Ok(file) => {
-            sim.model = Some(file);
-            Ok(Some((model, text)))
-        }
-        Err(e) => {
-            report.add(&model, line_of(&e), e.to_string());
-            Err(())
         }
     }
 }
@@ -1287,28 +1214,23 @@ mod tests {
             Path::new(env!("CARGO_MANIFEST_DIR")).join("../examples");
         let dir = tempfile::tempdir().expect("a directory");
         let at = |name: &str| dir.path().join(name);
-        for (sub, files) in [
-            ("thermostat", ["thermostat", "thermostat-sim.yaml"]),
-            (
-                "thermostat-common",
-                ["thermostat", "thermostat-physics.yaml"],
-            ),
-        ] {
+        for sub in ["thermostat", "thermostat-common"] {
             std::fs::create_dir(at(sub)).expect("a directory");
-            let copy = |name: String| {
-                std::fs::copy(
-                    examples.join(sub).join(&name),
-                    at(sub).join(&name),
-                )
+            let from = examples.join(sub).join("thermostat.ytcs");
+            std::fs::copy(from, at(sub).join("thermostat.ytcs"))
                 .expect("copied");
-            };
-            copy(format!("{}.ytcs", files[0]));
-            copy(files[1].to_string());
-            let xml = format!("{}.xtcs", files[0]);
-            let text = std::fs::read_to_string(examples.join(sub).join(&xml))
-                .expect("the XML");
-            std::fs::write(at(sub).join(&xml), change(text)).expect("written");
+            let xml = examples.join(sub).join("thermostat.xtcs");
+            let text = std::fs::read_to_string(xml).expect("the XML");
+            std::fs::write(at(sub).join("thermostat.xtcs"), change(text))
+                .expect("written");
         }
+        // The example's simulator file is a link; the copy is of the file
+        // it names, which is what a link to it reads.
+        std::fs::copy(
+            examples.join("thermostat/thermostat-sim.yaml"),
+            at("thermostat/thermostat-sim.yaml"),
+        )
+        .expect("copied");
         let (xml, yaml, sim) = (
             at("thermostat/thermostat.xtcs"),
             at("thermostat/thermostat.ytcs"),
@@ -1373,9 +1295,7 @@ mod tests {
     #[test]
     fn the_physics_model_is_reported_at_its_own_lines() {
         let (_dir, _, yaml, sim) = thermostat_pair(|xml| xml);
-        // Named as the simulator file names it, which is how it is reported.
-        let model =
-            sim.with_file_name("../thermostat-common/thermostat-physics.yaml");
+        let model = sim.clone();
         let edit = |path: &Path, from: &str, to: &str| {
             let text = std::fs::read_to_string(path).expect("read");
             assert!(text.contains(from), "{from}");
@@ -1415,7 +1335,7 @@ mod tests {
         let report = verify(&yaml, Some(&sim), Limits::EVERYTHING);
         let said = report.said();
         assert_eq!(report.findings.len(), 2, "{said:?}");
-        assert_eq!(report.findings[0].file, model);
+        assert_eq!(report.findings[0].file, sim);
         assert_eq!(
             report.findings[0].line,
             line_in(&model, "- component: heater_2")
@@ -1437,8 +1357,7 @@ mod tests {
         let root =
             Path::new(env!("CARGO_MANIFEST_DIR")).join("../examples/descent");
         let dir = tempfile::tempdir().expect("a directory");
-        for name in ["descent.ytcs", "descent-sim.yaml", "descent-physics.yaml"]
-        {
+        for name in ["descent.ytcs", "descent-sim.yaml"] {
             std::fs::copy(root.join(name), dir.path().join(name))
                 .expect("copied");
         }

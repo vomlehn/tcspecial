@@ -1,5 +1,0 @@
-physics:
-  - type bus:
-      - component: a
-  - type bus:
-      - component: b

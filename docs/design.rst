@@ -3993,12 +3993,48 @@ by accident and hard to understand afterwards.
 And every list shows a node when the window opens, which a share of a column
 cannot be trusted to do by itself: a twentieth of an 820-pixel window is
 forty-one pixels, enough for the list's own heading and nothing under it. So
-the three default shares -- 20, 35 and 45 -- are checked against what the three
-lists actually have to draw at the height the window opens at, and the test
+the default shares -- 20 for the physics list, then 25, 35 and 20 -- are
+checked against what the lists actually have to draw at the height the window opens at, and the test
 reads both the window's preferred height and the list's own padding out of
 ``main.slint`` rather than restating them: a rule about what fits is a rule
 about numbers in two files, and a test that copied them would pass while the
 window showed nothing.
+
+Left of the three, where a simulator file is open, is a fourth: the *Physics
+pane*, labelled ``Physics``, which holds the simulator file's world -- its
+physics components -- and not anything of the configuration's. It is drawn
+beside the working width rather than in it, at negative positions in the
+coordinates the configuration holds, so that adding it moved nothing a file
+had placed. Its components are laid out down it by name, the one order a model
+has, and are not dragged: a configuration file is where a node's position is
+kept, and a physics component is never in one. A component is the one shape no
+node type has, a square with a dotted edge, narrower than every node, in the
+pane's own reddish purple, with its type written under its name. A physics
+connection is drawn between the two components it joins, and each stand-in's
+``connects`` between its component and the payload node it stands in for,
+the arrow the way the value goes: both dashed and in that purple, where a
+configuration's links are solid. tcspecial's visual window draws the same pane
+from the simulator file tcssim would read for the configuration, and only
+draws it. See ``tcsdiagram::physics``.
+
+The physics list is at the top of the selection column, its pane being the
+leftmost, with a line under it that is dragged as the others are. Its entries
+are the component types, under ``Thermal``, ``Power`` and ``Motion``.
+Pressing one adds a component of that type to the simulator file's world, under
+a name nothing has -- ``heater_3`` -- with nothing stated, and opens the
+physics window on it, which shows its type's settings and, under them, what
+the simulator's own reader says is wrong with it as it is typed: a figure
+without its unit, one required and not given. A component the reader would
+refuse is drawn red on the canvas. Placing, setting and removing a component
+are edits like any other, each taken back by one undo, and removing one
+removes the connections that join it, which come back with it. Without a
+simulator file the list is greyed and says to open one, and the Physics pane
+is not drawn. The world's ``ambient_temp`` and its connections are edited in
+the simulator file for now.
+
+Where the Physics pane's line and the physics list's line are is kept in the
+preferences file beside the others: the pane's width as a percentage of the
+working width, and the list's share of the column.
 
 What that buys is a drawing that can be compared with last mission's. The three
 parts change on different schedules -- the ground is the other end of the link
@@ -8980,10 +9016,10 @@ Requirement
     ``lines`` in sorted order, whatever order the file lists them in.
 
 Requirement
-    The same rule holds for simulator files and physics models. Their type
-    groups, entries, settings and groups are in no meaningful order; the
-    simulator file's digest is taken over what it and its model say, in
-    canonical order; and in a physics model, events due at the same instant
+    The same rule holds for simulator files and their physics models. Their
+    type groups, entries, settings and groups are in no meaningful order;
+    the simulator file's digest is taken over what it says, its world
+    included, in canonical order; and in a physics model, events due at the same instant
     are taken by component name, and a terminal's inputs are summed in the
     order of the names of the terminals they come from.
 
@@ -10963,19 +10999,29 @@ heaters -- so what the vehicle reads is a consequence of what the vehicle
 drove, and the whole loop can be watched closing.
 
 Requirement
-    The model is a YAML file of its own, which the simulator file names with
-    ``physics``, relative to the simulator file's directory. A vehicle's
-    physics outlives any one configuration of its payloads, so it is stated
-    once and named by every simulator file that uses it; the manual's
-    thermostat fixture and the thermostat example name one model. A
-    simulator file that still declares masses itself is refused, told where
-    they go.
+    The model is in the simulator file, under ``world: physics:``, beside
+    the stand-ins joined to it, so that one file says the whole of what the
+    simulator simulates and a stand-in's ``connects`` names a terminal the
+    same file says is there. The world also states ``ambient_temp``, the
+    one temperature every thermal zone's surroundings are about, required
+    where there is a zone. The world is YAML only: a simulator file written
+    in XML has none, and one with a ``world`` or a ``physics`` element is
+    refused.
+
+Requirement
+    The shapes a model had before are refused, each told where it goes: a
+    simulator file naming a model in a file of its own,
+    ``physics: zone-physics.yaml``; such a file given as a simulator file;
+    a ``physics`` section at the top of a simulator file; a zone stating
+    its own ``environment``, which is the world's ``ambient_temp`` now; and
+    a simulator file that still declares masses itself.
 
 Requirement
     The model is the components it is made of, grouped by type as a
     configuration's nodes are, and a list of connections between them, as a
-    configuration has links. Each entry of ``physics`` is ``type`` and a
-    type, ``- type heater:``, holding the components of that type, each
+    configuration has links: ``components`` and ``connections``, under
+    ``physics``. Each entry of ``components`` is ``type`` and a type,
+    ``- type heater:``, holding the components of that type, each
     named by ``component``. The types are ``heater``, ``thermal_zone``,
     ``sun``, ``solar_array``, ``load``, ``bus``, ``battery``, ``engine`` and
     ``body``, and a type of any other is refused; a ``thermal_mass``, the one
@@ -11033,10 +11079,10 @@ Requirement
 
 Requirement
     A heater states its power at its nominal voltage and that voltage. A
-    thermal zone states the temperature of the environment it sits in, its
-    time constant -- how long it takes to lose a given fraction of the
-    difference between itself and that environment -- and its heat
-    capacity, which turns a heater's watts into kelvin a second.
+    thermal zone sits in surroundings about the world's ``ambient_temp``,
+    and states its time constant -- how long it takes to lose a given
+    fraction of the difference between itself and its surroundings -- and
+    its heat capacity, which turns a heater's watts into kelvin a second.
 
 Requirement
     A simulated payload is joined to one terminal by ``connects``, written
@@ -11072,10 +11118,10 @@ Requirement
     likeliest cause is a misspelled ``connects``.
 
 Requirement
-    ``tcsverify`` reads the model a simulator file names, and reports every
-    problem with a component at its line in the model, a problem with the
-    connections at the model's ``connections`` line, and a model that
-    cannot be read at the simulator file's ``physics`` line.
+    ``tcsverify`` reports every problem with a component at its line in
+    the simulator file, a problem with the connections at the world's
+    ``connections`` line, and one with the ambient temperature at its
+    ``ambient_temp`` line.
 
 **How the world advances**
 
@@ -11146,10 +11192,11 @@ rather than integrated:
 ``rest`` is where the zone would settle with that heat on for ever, and it is
 the figure that says whether the heaters can win at all: with a fifty second
 constant, twenty joules a kelvin and a hundred and twenty watts, it is three
-hundred kelvin above the environment.
+hundred kelvin above the environment, which is the zone's surroundings: the
+world's ``ambient_temp``, swinging and wandering as the zone says.
 
 Requirement
-    A zone starts at its environment, and a heater off, unless the model
+    A zone starts at the world's ``ambient_temp``, and a heater off, unless the model
     states ``start``, and then there. Coming up cold is the case a
     thermostat exists for, and its first climb is worth watching; a model
     that would rather show the thermostat holding its band from the first
@@ -11310,8 +11357,9 @@ Requirement
     A heater may state how its supply voltage varies, and how slowly.
 
 Requirement
-    A zone may state how its environment swings as a sine wave, and over
-    what period, and how it wanders at random, and how slowly.
+    A zone may state how its surroundings swing about the world's
+    ``ambient_temp`` as a sine wave, and over what period, and how they
+    wander at random, and how slowly.
 
 Requirement
     Everything that wanders is an Ornstein-Uhlenbeck process stepped by its
@@ -11476,33 +11524,11 @@ Requirement
 
 Example
 -------
-This is the shipped ``examples/thermostat/thermostat-sim.yaml``, which
-simulates the three sensors and two heaters of ``thermostat.ytcs``, joined to
-the model it names, ``examples/thermostat-common/thermostat-physics.yaml``,
-which thermostat-yamcs's simulator file names too: two heaters warming one
+This is the shipped ``examples/thermostat/thermostat-sim.yaml``, a link to
+``examples/thermostat-common/thermostat-sim.yaml``, which thermostat-yamcs's
+simulator file is a link to too. It simulates the three sensors and two
+heaters of ``thermostat.ytcs``, joined to its world: two heaters warming one
 zone.
-
-.. code-block:: yaml
-
-   physics:
-     - type heater:
-         - component: heater_1
-           power: "60 W"
-           voltage: "28 V"
-         - component: heater_2
-           power: "60 W"
-           voltage: "28 V"
-     - type thermal_zone:
-         - component: zone
-           capacity: "20 J/K"
-           environment: "283.15 K"
-           time_constant: "50 s"
-
-   connections:
-     - from: heater_1.heat
-       to: zone.heat
-     - from: heater_2.heat
-       to: zone.heat
 
 The three sensors are read together and so share a group, which carries
 their rate and the terminal they report; the zone is what makes three
@@ -11513,9 +11539,29 @@ with nothing more than a socket.
 
 .. code-block:: yaml
 
-   description: Simulator settings for the payloads of thermostat.ytcs
+   description: Simulator settings for the payloads of thermostat.ytcs and
+     thermostat-yamcs.ytcs
 
-   physics: ../thermostat-common/thermostat-physics.yaml
+   world:
+     ambient_temp: "283.15 K"
+     physics:
+       components:
+         - type heater:
+             - component: heater_1
+               power: "60 W"
+               voltage: "28 V"
+             - component: heater_2
+               power: "60 W"
+               voltage: "28 V"
+         - type thermal_zone:
+             - component: zone
+               capacity: "20 J/K"
+               time_constant: "50 s"
+       connections:
+         - from: heater_1.heat
+           to: zone.heat
+         - from: heater_2.heat
+           to: zone.heat
 
    simulated_payload_groups:
      - group: zone_temps
@@ -11986,11 +12032,10 @@ Requirement
     ``--simulate`` mode. The simulator file's digest is taken as the
     configuration's is, of what it says and not of its bytes: its
     ``tcssim`` section, its groups and its simulated payloads by name, each
-    with its type and settings, and the physics model it names, its
-    components by name and its connections in order -- the description and
-    the model's file name left out. A comment or another order is then the
-    same simulator file, and a figure changed in the model beside it is
-    not. The harness compares the three with its own before
+    with its type and settings, and its world, its ambient temperature,
+    its components by name and its connections in order -- the description
+    left out. A comment or another order is then the same simulator file,
+    and a figure changed in the model is not. The harness compares the three with its own before
     it starts tcspecial, and refuses to go on when any differs, saying which
     and what each side has. A simulator started yesterday on another
     configuration, or under another mode, then stops the run before tcspecial

@@ -14,10 +14,34 @@ description: Simulator settings for the payloads of fprime.ytcs
 tcssim:
   ready: "127.0.0.1:7902"
 
-# The physics model the payloads below are joined to -- the zone they read
-# and the heater that warms it -- which is the vehicle's, not this file's:
-# see the file it names.
-physics: fprime-physics.yaml
+# The physics of the fprime example's vehicle: the zone its thermometer
+# reads and its heater warms. The stand-ins below are joined to its
+# terminals by name, with connects.
+world:
+  # The temperature the zone's surroundings are, ten degrees: one for the
+  # world, and not the zone's, because every zone of a vehicle is in the one
+  # set of surroundings.
+  ambient_temp: "283.15 K"
+
+  physics:
+    components:
+      - type heater:
+          # A heater of twenty watts, which on the zone below is a kelvin a
+          # second.
+          - component: heater
+            power: "20 W"
+            voltage: "28 V"
+
+      - type thermal_zone:
+          # The zone, starting at and settling to ten degrees, losing any
+          # difference with a hundred second constant.
+          - component: zone
+            capacity: "20 J/K"
+            time_constant: "100 s"
+
+    connections:
+      - from: heater.heat
+        to: zone.heat
 
 simulated_payloads:
   - type network:

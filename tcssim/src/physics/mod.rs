@@ -528,15 +528,40 @@ pub(crate) mod tests {
     use std::sync::atomic::AtomicU32;
     use std::time::Duration;
     use tcslibgs::physics::terminal::At;
-    use tcslibgs::physics::PhysicsFile;
+    use tcslibgs::physics::WorldSection;
     use tcslibgs::sim_config::SensorErrors;
     use tcslibgs::unit::Unit;
+
+    /// Reads a model's components and connections, written as they would be
+    /// at the left margin, as the physics of a world whose ambient
+    /// temperature is 283.15 K.
+    ///
+    /// # Arguments
+    ///
+    /// * `text` - The physics section's value.
+    ///
+    /// # Returns
+    ///
+    /// The world.
+    ///
+    /// # Errors
+    ///
+    /// What the reader says of it.
+    pub(crate) fn parsed(
+        text: &str,
+    ) -> tcslibgs::error::TcsResult<WorldSection> {
+        let physics: String =
+            text.lines().map(|line| format!("  {line}\n")).collect();
+        WorldSection::parse(&format!(
+            "ambient_temp: \"283.15 K\"\nphysics:\n{physics}"
+        ))
+    }
 
     /// A model of the thermostat example's shape with bigger heaters: two of
     /// three kelvin a second each on the zone, which is ten kelvin below a
     /// setpoint of 293.15 and loses the difference with a fifty second
     /// constant.
-    pub(crate) const ZONE: &str = "physics:
+    pub(crate) const ZONE: &str = "components:
   - type heater:
       - component: heater_1
         power: \"60 W\"
@@ -547,7 +572,6 @@ pub(crate) mod tests {
   - type thermal_zone:
       - component: zone
         capacity: \"20 J/K\"
-        environment: \"283.15 K\"
         time_constant: 50 s
 connections:
   - from: heater_1.heat
@@ -564,7 +588,7 @@ connections:
     /// The world, and what finds a terminal of it from its name, such as
     /// `zone.temperature`.
     pub(crate) fn zone_world() -> (Arc<World>, impl Fn(&str) -> Place) {
-        let model = PhysicsFile::parse(ZONE)
+        let model = parsed(ZONE)
             .expect("the model parses")
             .resolve()
             .expect("it resolves");
@@ -585,7 +609,7 @@ connections:
     /// The battery example's power model, with its orbit shortened to a
     /// hundred seconds, forty of them in shadow, and a battery of a
     /// hundredth of an ampere-hour, so that a test sees it fill and drain.
-    const POWER: &str = "physics:
+    const POWER: &str = "components:
   - type battery:
       - component: battery
         capacity: \"0.01 Ah\"
@@ -626,7 +650,7 @@ connections:
     ///
     /// The world, and what finds a terminal of it from its name.
     fn world_of(text: &str) -> (Arc<World>, impl Fn(&str) -> Place) {
-        let model = PhysicsFile::parse(text)
+        let model = parsed(text)
             .expect("the model parses")
             .resolve()
             .expect("it resolves");
@@ -684,7 +708,7 @@ connections:
 
     /// A lander two metres up and falling at one metre a second, its engine
     /// joined and shut.
-    const LANDER: &str = "physics:
+    const LANDER: &str = "components:
   - type body:
       - component: lander
         altitude: \"2 m\"
@@ -763,7 +787,7 @@ connections:
              eclipse: \"0.5\"\nconnections:\n  - { from: moon.light, to: \
              array.light }\n",
         );
-        let problems = PhysicsFile::parse(&text).expect("parses").problems();
+        let problems = parsed(&text).expect("parses").problems();
         assert!(
             problems.iter().any(|p| p
                 .why

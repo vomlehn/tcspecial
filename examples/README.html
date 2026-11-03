@@ -208,19 +208,19 @@ that <code>ping</code> and <code>ping-yamcs</code> both show, and
 <code>ping.ytcs</code> and <code>ping.xtcs</code>, the ping node, which
 both configurations include; <code>thermostat-common</code> holds
 <code>thermostat.ytcs</code> and <code>thermostat.xtcs</code>, the
-vehicle both thermostat configurations include, and the physics model
-both simulator files name. Each configuration includes its common file
-by its path from its own directory,
-<code>../thermostat-common/thermostat</code>, and keeps for itself only
-what differs: its <code>tcspecial</code> section, its gateway node –
-called <code>gateway</code> in both, which is the name the common file’s
-links send to – and, for the thermostat, the three sensors, whose ports
-differ so that the two can run at once. A common file is not checked on
-its own, having no <code>tcspecial</code> section; it is checked as part
-of each configuration that includes it. A simulator file includes no
-other, so the two thermostat simulator files are written in both, and a
-test holds the two copies to each other:
-<code>examples/thermostat-yamcs/tests/shared.rs</code>.
+vehicle both thermostat configurations include, and
+<code>thermostat-sim.yaml</code>, the simulator file, physics model and
+all, which each thermostat example’s <code>-sim.yaml</code> is a link
+to, so that each is found beside its configuration by name. Each
+configuration includes its common file by its path from its own
+directory, <code>../thermostat-common/thermostat</code>, and keeps for
+itself only what differs: its <code>tcspecial</code> section, its
+gateway node – called <code>gateway</code> in both, which is the name
+the common file’s links send to – and, for the thermostat, the three
+sensors, whose ports differ. A common file is not checked on its own,
+having no <code>tcspecial</code> section; it is checked as part of each
+configuration that includes it. A test holds the links to the shared
+simulator file: <code>examples/thermostat-yamcs/tests/shared.rs</code>.
 <code>yamcs-common</code> is not an example either: it is the Rust the
 tests of the examples through Yamcs share.</p>
 <p>A configuration and its simulator file are matched by payload name.
@@ -831,23 +831,24 @@ the kernel stands in for”, below). The gpio example has lines 0 and 1 of
 it, so the two run at once. Aboard the sensors would be on I2C and SPI,
 as <code>tests/manual/thermostat.ytcs</code> has them; those buses are
 flown against stand-ins by <code>make stand-ins-test</code>.</p>
-<p>tcssim joins the stand-ins to the vehicle’s physics model,
-<code>thermostat-common/thermostat-physics.yaml</code>, which
-<code>thermostat-sim.yaml</code> names, as thermostat-yamcs’s simulator
-file does: a zone and two heaters, each a part simulated alone and
-joined to the zone under <code>connections</code>. All three sensors are
-joined to <code>zone.temperature</code>, each from a place of its own on
-the zone, so their readings agree and the vote produces a temperature.
-The zone starts at 292.15 K, inside the band, and cools towards its
-surroundings, 288.15 K, just inside the plot’s lower red, which swing
-half a kelvin over a ninety minute orbit; each heater’s switch’s
-stand-in is joined to <code>heater_1.on</code> or
-<code>heater_2.on</code>, so the heaters warm it while the vehicle has
-them on: the loop closes through tcspecial. <code>gpio-in-tmass</code>’s
-stand-in pulls its line 2 to <code>heater_1.heating</code> and its line
-3 to <code>heater_2.heating</code>, which are on only while each heater
-is really heating. The heaters are four watts each, and either alone
-holds the band, the thermostat cycling whichever are working; a heater
+<p>tcssim joins the stand-ins to the vehicle’s physics model, in the
+world section of <code>thermostat-sim.yaml</code>, a link to
+<code>thermostat-common/thermostat-sim.yaml</code>, which
+thermostat-yamcs’s simulator file is a link to too: a zone and two
+heaters, each a part simulated alone and joined to the zone under
+<code>connections</code>. All three sensors are joined to
+<code>zone.temperature</code>, each from a place of its own on the zone,
+so their readings agree and the vote produces a temperature. The zone
+starts at 292.15 K, inside the band, and cools towards its surroundings,
+288.15 K, just inside the plot’s lower red, which swing half a kelvin
+over a ninety minute orbit; each heater’s switch’s stand-in is joined to
+<code>heater_1.on</code> or <code>heater_2.on</code>, so the heaters
+warm it while the vehicle has them on: the loop closes through
+tcspecial. <code>gpio-in-tmass</code>’s stand-in pulls its line 2 to
+<code>heater_1.heating</code> and its line 3 to
+<code>heater_2.heating</code>, which are on only while each heater is
+really heating. The heaters are four watts each, and either alone holds
+the band, the thermostat cycling whichever are working; a heater
 disabled in tcssim shows on its line’s strip, and with both disabled the
 zone falls into the plot’s lower red.</p>
 <p>A heater whose switch’s panel in tcssim is not enabled is unpowered,
@@ -881,10 +882,12 @@ the ground end, as ping-yamcs is the ping example with it. The vehicle
 is the thermostat’s – the same conversions, vote, thermostat, heaters,
 GPIO lines and log, from the file both include,
 <code>thermostat-common/thermostat.ytcs</code>, the same three sensors,
-at ports of its own, and the same physics model,
-<code>thermostat-common/thermostat-physics.yaml</code> – and what
-differs is the configuration’s gateway, <code>yamcs</code>, so every
-packet to and from the ground carries a CCSDS primary header:</p>
+at ports of its own, and the same simulator file,
+<code>thermostat-common/thermostat-sim.yaml</code>, physics model and
+all, each example’s being a link to it; the two cannot run at once,
+their heaters being the same lines of one GPIO chip – and what differs
+is the configuration’s gateway, <code>yamcs</code>, so every packet to
+and from the ground carries a CCSDS primary header:</p>
 <table>
 <thead>
 <tr>
@@ -1006,13 +1009,13 @@ nought. <code>shedding</code>, a hysteresis around 0.4, sheds the
 science instrument below three tenths by driving <code>science</code>,
 port 5302, and restores it above half.</p>
 <p>tcssim stands in for all three, joined to the vehicle’s physics
-model, <code>battery-physics.yaml</code>: a sun, a solar array, two
-loads, a bus and a battery, each a part simulated alone and joined under
-<code>connections</code>. The orbit is six minutes and the battery
-small, so that a run sees, in one orbit, the battery charge and fill,
-the eclipse drain it, the science load shed and the sun bring it back.
-Going into shadow and out, and the battery reaching full, are events of
-the model’s, met at their moments.</p>
+model, in the world section of <code>battery-sim.yaml</code>: a sun, a
+solar array, two loads, a bus and a battery, each a part simulated alone
+and joined under <code>connections</code>. The orbit is six minutes and
+the battery small, so that a run sees, in one orbit, the battery charge
+and fill, the eclipse drain it, the science load shed and the sun bring
+it back. Going into shadow and out, and the battery reaching full, are
+events of the model’s, met at their moments.</p>
 <pre><code>make run-battery</code></pre>
 <p>Press Connect in tcsmoc, and Enable on each payload in tcssim, to
 start the data.</p>
@@ -1041,12 +1044,12 @@ engine’s stand-in reads as the ratio it is. <code>doppler</code>, port
 port 5403, a switch on a landing leg, says <code>1</code> when the
 lander is down.</p>
 <p>tcssim stands in for all four, joined to the vehicle’s physics model,
-<code>descent-physics.yaml</code>: an engine and the body it brakes,
-five hundred metres up and falling at twenty metres a second. The body
-falls by the rocket equation, and the moment it reaches the ground is
-found ahead of time and met exactly; the touchdown switch’s stand-in
-waits on the model for it, and speaks then. A run lands in about
-seventy-five seconds.</p>
+in the world section of <code>descent-sim.yaml</code>: an engine and the
+body it brakes, five hundred metres up and falling at twenty metres a
+second. The body falls by the rocket equation, and the moment it reaches
+the ground is found ahead of time and met exactly; the touchdown
+switch’s stand-in waits on the model for it, and speaks then. A run
+lands in about seventy-five seconds.</p>
 <pre><code>make run-descent</code></pre>
 <p>Press Connect in tcsmoc, and Enable on each payload in tcssim,
 <code>engine</code> and <code>radar</code> first: the lander does not

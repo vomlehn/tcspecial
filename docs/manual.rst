@@ -2253,10 +2253,10 @@ point of writing the bindings down, and the refusal says why: tcsmoc shows
 the reason the vehicle sends -- ``no command binding says the ground may set
 "thermostat.half-band": it is spelled half_band`` -- beside the status.
 
-The simulator file beside it names the vehicle's physics model,
-``examples/thermostat-common/thermostat-physics.yaml``, which holds a zone
-and two heaters joined to it, and which thermostat-yamcs, the same vehicle
-with Yamcs as its ground station, names too.
+The simulator file beside it, ``thermostat-sim.yaml``, is a link to
+``examples/thermostat-common/thermostat-sim.yaml``, which thermostat-yamcs,
+the same vehicle with Yamcs as its ground station, links to too. Its world
+holds the vehicle's physics model: a zone and two heaters joined to it.
 Each sensor reports the zone's temperature, from a place of its own on it, so
 that what the three report is one temperature rather than three streams of
 noise, which is what the model is for; each heater's switch's stand-in
@@ -2336,7 +2336,7 @@ to the ground, on ports 5100 to 5102 and 5107, and to the log
 ``housekeeping``, and the ground may set the setpoint through the command
 binding.
 
-The physics model, ``battery-physics.yaml``, is the power system as its parts:
+The physics model, in the world of ``battery-sim.yaml``, is the power system as its parts:
 a ``sun``, a ``solar_array`` of seven amperes, two ``load`` components of two
 amperes each -- ``avionics``, never shed, and ``science`` -- a ``bus`` and a
 ``battery``, joined under ``connections``. The orbit is six minutes, four
@@ -2387,7 +2387,7 @@ Guidance does not take it: a process takes values in one unit, and guidance
 takes metres. ``touchdown`` is a switch on a landing leg, sending ``1`` on
 the ground and ``0`` off it, straight to the ground and the log.
 
-The physics model, ``descent-physics.yaml``, is an ``engine`` of four and a
+The physics model, in the world of ``descent-sim.yaml``, is an ``engine`` of four and a
 half kilonewtons with a hundred kilograms of fuel, and a ``body`` of a tonne
 and a half, five hundred metres up and falling at twenty metres a second in
 the Moon's gravity, the engine's force and the fuel it burns joined to it. The
@@ -2745,23 +2745,22 @@ The thermostat-yamcs example
 
 The thermostat example with Yamcs at the ground end, as ping-yamcs is the
 ping example with it. The vehicle is the thermostat's, and so is the
-physics model tcssim joins its stand-ins to,
-``examples/thermostat-common/thermostat-physics.yaml``, which the two
-simulator files name. The vehicle is written once, in
-``examples/thermostat-common/thermostat.ytcs`` and its XML, which both
-configurations include: the conversions, the vote, the thermostat and its
-log, the heaters and the lines sensing them, the ``zone_temps`` group and
-the setpoint's binding. Each example's own file has its ``tcspecial``
-section, its gateway node, called ``gateway`` in both, and the three
-sensors, whose ports differ so that the two can run at once. A simulator
-file includes no other, so the two simulator files are written in both
-examples, and a test, ``examples/thermostat-yamcs/tests/shared.rs``, holds
-each copy to the other. What differs is the gateway, ``yamcs``: the beacon
-is telemetry of APID ``0x110``, CONNECT and its answer are on ``0x111``, and
-each source drawn into the gateway node comes down as telemetry of its
-``apid_base``, ``0x400``, plus the source's device id -- ``ambient`` on
-``0x400``, ``gpio-in-tmass`` on ``0x402``, and ``temp1`` to ``temp3`` on
-``0x406`` to ``0x408``.
+simulator file, with the physics model tcssim joins its stand-ins to: each
+example's is a link to ``examples/thermostat-common/thermostat-sim.yaml``,
+so that each is found beside its configuration by name. The vehicle is
+written once, in ``examples/thermostat-common/thermostat.ytcs`` and its
+XML, which both configurations include: the conversions, the vote, the
+thermostat and its log, the heaters and the lines sensing them, the
+``zone_temps`` group and the setpoint's binding. Each example's own file
+has its ``tcspecial`` section, its gateway node, called ``gateway`` in
+both, and the three sensors, whose ports differ. The two cannot run at
+once all the same, their heaters being the same lines of one GPIO chip, so
+they answer whether tcssim is ready at one address. What differs is the
+gateway, ``yamcs``: the beacon is telemetry of APID ``0x110``, CONNECT and
+its answer are on ``0x111``, and each source drawn into the gateway node
+comes down as telemetry of its ``apid_base``, ``0x400``, plus the source's
+device id -- ``ambient`` on ``0x400``, ``gpio-in-tmass`` on ``0x402``, and
+``temp1`` to ``temp3`` on ``0x406`` to ``0x408``.
 
 The mission database gives each of them a parameter of the type the
 configuration says its data are (see `What the vehicle answers to`_): the
@@ -3432,31 +3431,41 @@ joined to the others. Join the sensors to what they measure and the heaters'
 stand-ins to the heaters, and what the vehicle reads becomes a consequence of
 what the vehicle drove.
 
-The model is the vehicle's physics and not any one configuration's -- the
-zone is the same body whichever payloads fly -- so it is a YAML file of its
-own, which the simulator file names, relative to its own directory. Several
-simulator files may name one model, which is how the manual's thermostat
-fixture and the thermostat example share their zone. A simulator file that
-still declares masses itself is refused, told where they go.
+The model is in the simulator file's ``world`` section, beside the stand-ins
+joined to it, so that one file says the whole of what tcssim simulates and a
+stand-in's ``connects`` names a terminal the same file says is there. Two
+examples that fly one vehicle share it by sharing the whole simulator file, a
+link to it beside each configuration. The world is YAML only: a simulator
+file written in XML has none.
 
 .. code-block:: text
 
-   physics                in the simulator file: the physics model's file,
-                          relative to this one. Optional
+   world                  in the simulator file. Optional
+     ambient_temp         the temperature every thermal zone's surroundings
+                          are about: "288.15 K". Required where there is a
+                          thermal_zone
+     physics
+       components         the components, grouped by type
+       connections        how they are joined, each from an output to an
+                          input
 
-The model holds the components it is made of, under ``physics``, and the
+The model holds the components it is made of, under ``components``, and the
 connections between them, under ``connections``, as a configuration holds
 nodes and links. The components are grouped by type, as
-a configuration's nodes are: each entry of ``physics`` is ``type`` and a
+a configuration's nodes are: each entry of ``components`` is ``type`` and a
 type, holding the components of that type, each named by ``component``.
 Nothing in the model is in an order that means anything -- not the types,
 the components of one, or the connections -- and tcssim runs it the same
 however it is written: two events due at one moment come in the order of
 their components' names, and the outputs an input sums are added in the order
-of theirs. A model in the shape before this one, each component with ``name:``
-and ``type:`` of its own, is refused at the line of its first component;
-``tools/convert-format.py`` rewrites it. Each component is one simple part,
-of one of these types:
+of theirs. The shapes a model had before are refused, each told where it goes
+now: a simulator file still naming a model in a file of its own,
+``physics: zone-physics.yaml``; such a file given as a simulator file; a
+``physics`` section at the top of a simulator file, not under ``world``; a
+zone stating its own ``environment``, which is the world's ``ambient_temp``;
+a component with ``name:`` and ``type:`` of its own; and a simulator file
+still declaring masses itself. Each component is one simple part, of one of
+these types:
 
 .. code-block:: text
 
@@ -3470,23 +3479,23 @@ of one of these types:
      ripple_time          how slowly it varies, as a length of time. With
                           ripple and refused without it
 
-   thermal_zone           one body at one temperature
+   thermal_zone           one body at one temperature, in surroundings
+                          about the world's ambient_temp
      component            the name connections and stand-ins use
-     environment          the temperature around it: "283.15 K"
      time_constant        how fast it loses the difference, as a length
                           of time
      capacity             how much heat it takes to warm it a kelvin:
                           "20 J/K"
-     swing                how far the environment swings either side of
-                          environment, as a sine wave: "3 K". Optional
+     swing                how far its surroundings swing either side of
+                          ambient_temp, as a sine wave: "3 K". Optional
      period               how long one swing takes. With swing and refused
                           without it
-     wander               how far the environment wanders at random: a
+     wander               how far its surroundings wander at random: a
                           standard deviation, "0.5 K". Optional
-     wander_time          how slowly it wanders, as a length of time. With
+     wander_time          how slowly they wander, as a length of time. With
                           wander and refused without it
      start                where it starts: "292.15 K". Optional; left out,
-                          it starts at its environment
+                          it starts at ambient_temp
 
    sun                    sunlight and shadow, through an orbit
      component            the name connections and stand-ins use
@@ -3587,11 +3596,11 @@ times its full thrust, and it burns that over its specific impulse in fuel
 until there is none, when it stops. A body falls by the rocket equation with
 gravity, which has a closed form while its force and its flow are held, and is
 set down when it reaches the ground, a moment found ahead of time and met
-exactly; it stays down until a force beating its weight lifts it. A zone cools towards its environment with its time constant and
+exactly; it stays down until a force beating its weight lifts it. A zone cools towards its surroundings with its time constant and
 is warmed by the heat joined to it, its capacity turning watts into kelvin a
 second; with a fifty second constant, twenty joules a kelvin and a hundred
 and twenty watts, it would settle three hundred kelvin above its
-environment. It starts at its environment with the heaters off, because a
+surroundings. It starts at the world's ambient temperature with the heaters off, because a
 vehicle coming up cold is the case a thermostat exists for, unless it states
 ``start``, and then there.
 
@@ -3650,34 +3659,28 @@ A heater's stand-in has to be a payload the simulator can be driven through:
 a socket, or a set of discrete lines, whose stand-in watches the lines the
 vehicle drives.
 
-The model, ``zone-physics.yaml``:
+A simulator file with a model, and its payloads joined to it:
 
 .. code-block:: yaml
 
-   physics:
-     - type heater:
-         - component: heater_1
-           power: "60 W"            # three kelvin a second on the zone
-           voltage: "28 V"
-         - component: heater_2
-           power: "60 W"
-           voltage: "28 V"
-     - type thermal_zone:
-         - component: zone
-           capacity: "20 J/K"
-           environment: "283.15 K"  # ten kelvin below the setpoint
-           time_constant: "50 s"    # a fifth of a kelvin a second at it
-
-   connections:
-     - { from: heater_1.heat, to: zone.heat }
-     - { from: heater_2.heat, to: zone.heat }
-
-And the simulator file beside it, which names it and joins the payloads to
-it:
-
-.. code-block:: yaml
-
-   physics: zone-physics.yaml
+   world:
+     ambient_temp: "283.15 K"         # ten kelvin below the setpoint
+     physics:
+       components:
+         - type heater:
+             - component: heater_1
+               power: "60 W"          # three kelvin a second on the zone
+               voltage: "28 V"
+             - component: heater_2
+               power: "60 W"
+               voltage: "28 V"
+         - type thermal_zone:
+             - component: zone
+               capacity: "20 J/K"
+               time_constant: "50 s"  # a fifth of a kelvin a second at it
+       connections:
+         - { from: heater_1.heat, to: zone.heat }
+         - { from: heater_2.heat, to: zone.heat }
 
    simulated_payload_groups:
      - group: zone_temps
@@ -3872,16 +3875,34 @@ refused outright: a device, which tcspecial opens and reads directly, and a
 device on a bus, where the master's own read is the request and a second master
 cannot see it.
 
-This is the shipped ``examples/thermostat/thermostat-sim.yaml``, which names
-the model the zone is declared in, ``thermostat-physics.yaml``, by its path
-from the simulator file's directory: it is in ``examples/thermostat-common``,
-which the thermostat example shares with thermostat-yamcs.
+This is the shipped ``examples/thermostat/thermostat-sim.yaml``, a link to
+``examples/thermostat-common/thermostat-sim.yaml``, which the thermostat
+example shares with thermostat-yamcs, its world shortened here:
 
 .. code-block:: yaml
 
-   description: Simulator settings for the payloads of thermostat.ytcs
+   description: Simulator settings for the payloads of thermostat.ytcs and
+     thermostat-yamcs.ytcs
 
-   physics: ../thermostat-common/thermostat-physics.yaml
+   world:
+     ambient_temp: "288.15 K"
+     physics:
+       components:
+         - type heater:
+             - component: heater_1
+               power: "4 W"
+               voltage: "28 V"
+             - component: heater_2
+               power: "4 W"
+               voltage: "28 V"
+         - type thermal_zone:
+             - component: zone
+               capacity: "20 J/K"
+               start: "292.15 K"
+               time_constant: "50 s"
+       connections:
+         - { from: heater_1.heat, to: zone.heat }
+         - { from: heater_2.heat, to: zone.heat }
 
    simulated_payload_groups:
      - group: zone_temps
@@ -5100,9 +5121,9 @@ address first; a simulator already running on the same configuration,
 simulator file and mode is used and left running, one set up for anything
 else is refused, saying what differs, and otherwise tcsmoc starts tcssim and
 waits for it. The simulator file is compared as the configuration is, by a
-digest of what it says rather than of its bytes: of its settings and of the
-physics model it names, in one order, so that a comment or another order is
-the same file and a figure changed in the model is not. Under ``none`` it
+digest of what it says rather than of its bytes: of its settings and of its
+world, in one order, so that a comment or another order is the same file and
+a figure changed in the model is not. Under ``none`` it
 starts tcspecial alone. For a run started by hand, ``tcssim --wait`` is the
 waiting:
 
@@ -5211,7 +5232,10 @@ build a tcspecial that flies this way: the feature is for a vehicle on a desk.
        examples/simple-app/simple-app.ytcs
 
 The window draws the configuration as tcsgui does -- the three working panes,
-every node where the editor puts it, every link along its route -- and lights
+every node where the editor puts it, every link along its route, and the
+simulator file's physics in the Physics pane to their left, the simulator file
+being the one tcssim would read for the configuration, ``PAYLOAD_SIM_YAML`` or
+the one beside it, read for the drawing and nothing else -- and lights
 a link each time data is sent over it: a wide line, a shade lighter than the
 link's own colour, appears under it and goes a quarter of a second later. A
 link carrying a reading every second blinks once a second.

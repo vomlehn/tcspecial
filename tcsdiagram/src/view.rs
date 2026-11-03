@@ -62,6 +62,9 @@ pub struct NodeLook {
     pub payload_out: TerminalLook,
     pub terminal_column: f32,
     pub inset: f32,
+    /// Whether the name is set at the top rather than in the middle: for a
+    /// block with others drawn inside it.
+    pub label_top: bool,
 }
 
 /// What a node of this type looks like, at `at`.
@@ -187,6 +190,7 @@ pub fn node_look(
         // The room anything drawn inside the shape has to leave at the sides,
         // which is nothing unless the shape leans: see style::room_of.
         inset: style::room_of(outline, size) as f32,
+        label_top: false,
     }
 }
 

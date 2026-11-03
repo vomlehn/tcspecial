@@ -10,6 +10,13 @@
 //! physics component is never in one. So the drawing is the same every
 //! time a model is opened, in the one order the model has.
 //!
+//! A component whose heat, or whatever else it puts out, all goes into one
+//! other component is drawn inside that one, as a heater is inside the zone
+//! it warms: the two are one body on the vehicle, and what joins the
+//! sensors and the heaters' lines to them is drawn to one block, not
+//! spread over several. The connection between them is the nesting, and is
+//! not drawn again as a line.
+//!
 //! A physics node is the one shape no node of a configuration's has -- a
 //! square outline with a dotted edge -- in the Physics pane's own reddish
 //! purple, and labelled with its type as well as its name. A physics link
@@ -151,32 +158,122 @@ pub fn of_simulator(sim: &tcslibgs::sim_config::SimConfigFile) -> Drawn {
     drawn
 }
 
+/// How far a component drawn inside another is in from that one's sides,
+/// and how far below the one above it, in pixels.
+pub const INSIDE: u32 = 8;
+
+/// Where one component is drawn, in the coordinates the file holds.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct Place {
+    /// Its upper left corner.
+    pub at: (i32, i32),
+    /// Its width and height.
+    pub size: (u32, u32),
+    /// The right edge of the block it is drawn in: its own, or the right
+    /// edge of the component it is inside. Every line to the component
+    /// leaves the block from there.
+    pub right: i32,
+}
+
+/// Which component each is drawn inside, if any.
+///
+/// One whose every connection goes from it into one other component, which
+/// itself goes into nothing, is drawn inside that one: a heater inside the
+/// zone it warms. Only one deep, so that a block is never a nest of blocks
+/// that a narrow pane could not hold; anything else stands alone.
+///
+/// # Arguments
+///
+/// * `names`       - The components' names.
+/// * `connections` - The model's connections, from and to, as the file
+///                   writes them.
+///
+/// # Returns
+///
+/// For each name, the index in `names` of the one it is drawn inside.
+pub fn hosts_of(
+    names: &[&str],
+    connections: &[(&str, &str)],
+) -> Vec<Option<usize>> {
+    let component = |end: &str| {
+        let name = end.split_once('.').map_or(end, |(name, _)| name);
+        names.iter().position(|n| *n == name)
+    };
+    // Where each component's connections go, by index; None for one that
+    // goes nowhere, and a component's own index for one whose connections
+    // go to more than one.
+    let mut into: Vec<Option<usize>> = vec![None; names.len()];
+    for (from, to) in connections {
+        let (Some(a), Some(b)) = (component(from), component(to)) else {
+            continue;
+        };
+        into[a] = match into[a] {
+            None => Some(b),
+            Some(was) if was == b => Some(b),
+            Some(_) => Some(a),
+        };
+    }
+    (0..names.len())
+        .map(|i| match into[i] {
+            Some(host) if host != i && into[host].is_none() => Some(host),
+            _ => None,
+        })
+        .collect()
+}
+
 /// Where each component goes: down the Physics pane, in name order, a step
-/// apart, clear of the pane's heading.
+/// apart, clear of the pane's heading, and each drawn inside another under
+/// that one's name.
 ///
 /// # Arguments
 ///
 /// * `names`    - The components' names, in the order they are drawn.
+/// * `hosts`    - Which each is drawn inside: see [`hosts_of`].
 /// * `dividers` - Where the panes are, which says how wide the Physics pane
 ///                is.
 ///
 /// # Returns
 ///
-/// Each name's upper left corner, in the coordinates the file holds.
-pub fn layout(names: &[&str], dividers: Dividers) -> Vec<(i32, i32)> {
+/// Each name's place.
+pub fn layout(
+    names: &[&str],
+    hosts: &[Option<usize>],
+    dividers: Dividers,
+) -> Vec<Place> {
     let (left, right) = edges_of(Pane::Physics, dividers);
-    let x = node_ceil(left).min(node_floor(right - SIZE.0 as i32));
-    // One step of the node grid between one node and the next.
+    let x = node_ceil(left)
+        .min(node_floor(right - SIZE.0 as i32))
+        .max(left);
+    // One step of the node grid between one block and the next.
     let gap = (NODE_STEP_MM as f64 * PX_PER_MM).round() as i32;
+    let (width, height, inside) = (SIZE.0 as i32, SIZE.1 as i32, INSIDE as i32);
+    let mut places = vec![
+        Place {
+            at: (x, 0),
+            size: SIZE,
+            right: x + width,
+        };
+        names.len()
+    ];
     let mut y = node_ceil(NAMES.0 + NAMES.1);
-    names
-        .iter()
-        .map(|_| {
-            let at = (x.max(left), y);
-            y = node_ceil(y + SIZE.1 as i32 + gap);
-            at
-        })
-        .collect()
+    for host in 0..names.len() {
+        if hosts[host].is_some() {
+            continue;
+        }
+        let guests: Vec<usize> = (0..names.len())
+            .filter(|&g| hosts[g] == Some(host))
+            .collect();
+        for (n, &guest) in guests.iter().enumerate() {
+            places[guest].at =
+                (x + inside, y + height + n as i32 * (height + inside));
+            places[guest].size = (SIZE.0 - 2 * INSIDE, SIZE.1);
+        }
+        let tall = height + guests.len() as i32 * (height + inside);
+        places[host].at = (x, y);
+        places[host].size = (SIZE.0, tall as u32);
+        y = node_ceil(y + tall + gap);
+    }
+    places
 }
 
 /// What a physics node looks like.
@@ -185,11 +282,17 @@ pub fn layout(names: &[&str], dividers: Dividers) -> Vec<(i32, i32)> {
 ///
 /// * `component` - The component.
 /// * `at`        - Where its upper left corner is, in pixels.
+/// * `size`      - Its width and height: [`SIZE`], or what [`layout`]
+///                 makes it.
 ///
 /// # Returns
 ///
 /// Everything the markup needs to draw it.
-pub fn node_look(component: &Component, at: (i32, i32)) -> NodeLook {
+pub fn node_look(
+    component: &Component,
+    at: (i32, i32),
+    size: (u32, u32),
+) -> NodeLook {
     let outline = style::Outline::Square;
     let edge = style::Edge::Dotted;
     let none = TerminalLook {
@@ -203,12 +306,12 @@ pub fn node_look(component: &Component, at: (i32, i32)) -> NodeLook {
         node_type: component.kind.to_string(),
         x: at.0 as f32,
         y: at.1 as f32,
-        width: SIZE.0 as f32,
-        height: SIZE.1 as f32,
+        width: size.0 as f32,
+        height: size.1 as f32,
         outline: "square",
-        shape: style::shape_of(outline, SIZE),
-        edge: style::edge_of(outline, edge, SIZE),
-        inner: style::inner_of(outline, edge, SIZE),
+        shape: style::shape_of(outline, size),
+        edge: style::edge_of(outline, edge, size),
+        inner: style::inner_of(outline, edge, size),
         border: 1.0,
         face: "mono",
         label_size: 13.0,
@@ -233,6 +336,9 @@ pub fn node_look(component: &Component, at: (i32, i32)) -> NodeLook {
         payload_out: none,
         terminal_column: 0.0,
         inset: 0.0,
+        // A block with others drawn inside it is named at its top, above
+        // them, where its name is not covered.
+        label_top: size.1 > SIZE.1,
     }
 }
 
@@ -267,54 +373,74 @@ pub fn looks(
     shift: i32,
 ) -> (Vec<NodeLook>, Vec<LinkLook>) {
     let names: Vec<&str> = components.iter().map(|c| c.name).collect();
-    let places = layout(&names, dividers);
-    let at_of = |name: &str| {
-        names
-            .iter()
-            .position(|n| *n == name)
-            .map(|i| (places[i].0 + shift, places[i].1))
+    let hosts = hosts_of(&names, connections);
+    let places = layout(&names, &hosts, dividers);
+    let place_of =
+        |name: &str| names.iter().position(|n| *n == name).map(|i| places[i]);
+
+    // Each block before what is drawn inside it, so that what is inside is
+    // drawn over it and is what a press on it reaches.
+    let mut drawn: Vec<NodeLook> = Vec::new();
+    for i in 0..components.len() {
+        if hosts[i].is_some() {
+            continue;
+        }
+        for j in std::iter::once(i)
+            .chain((0..components.len()).filter(|&g| hosts[g] == Some(i)))
+        {
+            let place = places[j];
+            drawn.push(node_look(
+                &components[j],
+                (place.at.0 + shift, place.at.1),
+                place.size,
+            ));
+        }
+    }
+
+    let height = SIZE.1 as i32;
+    // Where a line to a component leaves its block: the block's right
+    // edge, level with the component's own name.
+    let side_of = |place: Place, at: i32| {
+        ((place.right + shift) as f32, (place.at.1 + at) as f32)
     };
-
-    let drawn: Vec<NodeLook> = components
-        .iter()
-        .zip(&places)
-        .map(|(component, at)| node_look(component, (at.0 + shift, at.1)))
-        .collect();
-
-    let (width, height) = (SIZE.0 as i32, SIZE.1 as i32);
     let mut links = Vec::new();
-    // Each connection a loop out of the right of its output's node and back
+    // Each connection a loop out of the right of its output's block and back
     // into the right of its input's, a little further out each, so that two
-    // do not run down one line.
+    // do not run down one line. One into the block it is drawn inside is
+    // that nesting, and not drawn again.
     for (n, (from, to)) in connections.iter().enumerate() {
         let (Some((a, _)), Some((b, _))) =
             (from.split_once('.'), to.split_once('.'))
         else {
             continue;
         };
-        let (Some(a_at), Some(b_at)) = (at_of(a), at_of(b)) else {
+        let (Some(a_at), Some(b_at)) = (place_of(a), place_of(b)) else {
             continue;
         };
-        let out = (a_at.0 + width) as f32 + 8.0 + 6.0 * (n % 3) as f32;
-        let y1 = (a_at.1 + height / 3) as f32;
-        let y2 = (b_at.1 + 2 * height / 3) as f32;
-        let points = [
-            ((a_at.0 + width) as f32, y1),
-            (out, y1),
-            (out, y2),
-            ((b_at.0 + width) as f32, y2),
-        ];
+        let (Some(i), Some(j)) = (
+            names.iter().position(|n| *n == a),
+            names.iter().position(|n| *n == b),
+        ) else {
+            continue;
+        };
+        if hosts[i] == Some(j) {
+            continue;
+        }
+        let start = side_of(a_at, height / 3);
+        let end = side_of(b_at, 2 * height / 3);
+        let out = start.0.max(end.0) + 8.0 + 6.0 * (n % 3) as f32;
+        let points = [start, (out, start.1), (out, end.1), end];
         links.push(link(&points));
     }
 
-    // Each join from the right of its component's node to the left of its
+    // Each join from the right of its component's block to the left of its
     // payload's, the arrow the way the data goes: out of an output to the
     // stand-in that reports it, and from a stand-in into an input it drives.
     for (n, join) in joins.iter().enumerate() {
         let Some((component, terminal)) = join.terminal.split_once('.') else {
             continue;
         };
-        let Some(at) = at_of(component) else {
+        let Some(place) = place_of(component) else {
             continue;
         };
         let Some(node) = nodes
@@ -334,7 +460,7 @@ pub fn looks(
                 t.direction == tcslibgs::physics::terminal::Direction::In
             });
         let (_, tall) = crate::pane::size_of(node.node_type);
-        let mine = ((at.0 + width) as f32, (at.1 + height / 2) as f32);
+        let mine = side_of(place, height / 2);
         let theirs = (
             (node.at.0 + shift) as f32,
             (node.at.1 + tall as i32 / 2) as f32,
@@ -448,22 +574,127 @@ mod tests {
     #[test]
     fn the_components_go_down_the_physics_pane() {
         let dividers = default_dividers();
-        let places = layout(&["heater_1", "heater_2", "zone"], dividers);
+        let places = layout(
+            &["heater_1", "heater_2", "zone"],
+            &[None, None, None],
+            dividers,
+        );
         let (left, right) = edges_of(Pane::Physics, dividers);
-        for (i, (x, y)) in places.iter().enumerate() {
-            assert!(*x >= left && x + SIZE.0 as i32 <= right, "{places:?}");
-            assert!(*y >= NAMES.0 + NAMES.1, "{places:?}");
-            assert!(crate::pane::is_on_node_grid(*y), "{places:?}");
+        for (i, place) in places.iter().enumerate() {
+            let (x, y) = place.at;
+            assert_eq!(place.size, SIZE, "{places:?}");
+            assert!(x >= left && x + SIZE.0 as i32 <= right, "{places:?}");
+            assert!(y >= NAMES.0 + NAMES.1, "{places:?}");
+            assert!(crate::pane::is_on_node_grid(y), "{places:?}");
             if i > 0 {
-                assert!(*y >= places[i - 1].1 + SIZE.1 as i32, "{places:?}");
+                assert!(y >= places[i - 1].at.1 + SIZE.1 as i32, "{places:?}");
             }
         }
         assert!(right <= 0, "the Physics pane is left of the payloads");
     }
 
-    /// A connection is drawn between its two components and a join between
-    /// a component and its payload's node, both dashed and in the Physics
-    /// pane's line colour; a join to a node not on the page is not drawn.
+    /// Heaters that warm a zone are drawn inside the zone's block, under its
+    /// name, and every line to them leaves that one block: the sensors and
+    /// the heaters' lines are joined to one thermal mass, not to three
+    /// blocks.
+    #[test]
+    fn the_heaters_are_drawn_inside_the_zone_they_warm() {
+        let names = ["heater_1", "heater_2", "zone"];
+        let connections = [
+            ("heater_1.heat", "zone.heat"),
+            ("heater_2.heat", "zone.heat"),
+        ];
+        let hosts = hosts_of(&names, &connections);
+        assert_eq!(hosts, [Some(2), Some(2), None]);
+
+        let dividers = default_dividers();
+        let places = layout(&names, &hosts, dividers);
+        let zone = places[2];
+        // Right and bottom edges.
+        let end =
+            |p: &Place| (p.at.0 + p.size.0 as i32, p.at.1 + p.size.1 as i32);
+        for heater in &places[..2] {
+            assert!(
+                heater.at.0 > zone.at.0
+                    && end(heater).0 < end(&zone).0
+                    && heater.at.1 >= zone.at.1 + SIZE.1 as i32
+                    && end(heater).1 < end(&zone).1,
+                "inside the zone, under its name: {places:?}"
+            );
+            assert_eq!(heater.right, zone.right);
+        }
+        assert!(places[1].at.1 >= places[0].at.1 + SIZE.1 as i32);
+
+        let component = |name, kind| Component {
+            name,
+            kind,
+            faulty: false,
+        };
+        let components = [
+            component("heater_1", "heater"),
+            component("heater_2", "heater"),
+            component("zone", "thermal_zone"),
+        ];
+        let node = |name: &str, y| OnSheet {
+            name: name.to_string(),
+            node_type: "network",
+            at: (34, y),
+            here: true,
+        };
+        let nodes = [node("temp_1", 34), node("gpio-out-1", 200)];
+        let joins = [
+            Join {
+                payload: "temp_1",
+                terminal: "zone.temperature",
+            },
+            Join {
+                payload: "gpio-out-1",
+                terminal: "heater_1.on",
+            },
+        ];
+        let (drawn, links) = looks(
+            &components,
+            &connections,
+            &joins,
+            &nodes,
+            dividers,
+            dividers.physics,
+        );
+        // The zone first, so that the heaters are drawn over it and a press
+        // on one reaches the heater.
+        let order: Vec<&str> = drawn.iter().map(|n| n.name.as_str()).collect();
+        assert_eq!(order, ["zone", "heater_1", "heater_2"]);
+        assert!(drawn[0].label_top && !drawn[1].label_top);
+        // No line for the heat: the nesting says it.
+        assert_eq!(links.len(), 2, "only the two joins are drawn");
+        let edge = format!("{:.1}", (zone.right + dividers.physics) as f32);
+        for link in &links {
+            assert!(
+                link.route.contains(&edge),
+                "every join leaves the zone's block at {edge}: {}",
+                link.route
+            );
+        }
+    }
+
+    /// A component whose connections go to two others, or into one that
+    /// goes on into another, stands alone: a block is one deep.
+    #[test]
+    fn only_a_component_feeding_one_end_is_drawn_inside_it() {
+        let names = ["a", "b", "c"];
+        assert_eq!(
+            hosts_of(&names, &[("a.out", "b.in"), ("a.out", "c.in")]),
+            [None, None, None]
+        );
+        assert_eq!(
+            hosts_of(&names, &[("a.out", "b.in"), ("b.out", "c.in")]),
+            [None, Some(2), None]
+        );
+    }
+
+    /// A join is drawn between a component and its payload's node, dashed
+    /// and in the Physics pane's line colour; a join to a node not on the
+    /// page is not drawn.
     #[test]
     fn connections_and_joins_are_dashed_links() {
         let components = [
@@ -504,17 +735,23 @@ mod tests {
             dividers.physics,
         );
         assert_eq!(drawn.len(), 2);
-        assert!(drawn[1].faulty && !drawn[0].faulty);
-        assert_eq!(drawn[0].node_type, "heater");
+        // The heater is inside the zone, drawn after it.
+        assert!(drawn[0].faulty && !drawn[1].faulty);
+        assert_eq!(drawn[1].node_type, "heater");
         assert!(drawn.iter().all(|n| n.x >= 0.0), "shifted into view");
-        assert_eq!(links.len(), 2, "the join to elsewhere is not drawn");
+        assert_eq!(
+            links.len(),
+            1,
+            "the join to elsewhere is not drawn, nor the heat into the \
+             zone the heater is drawn inside"
+        );
         for link in &links {
             assert_eq!(link.ink, PHYSICS_LINE);
             assert!(link.route.matches('M').count() > 2, "dashed");
         }
         // The zone's temperature is an output: its join arrives at the
         // payload, going right.
-        assert!(links[1]
+        assert!(links[0]
             .head
             .contains(&format!("{}", 34 + dividers.physics)));
     }

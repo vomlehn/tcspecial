@@ -4752,19 +4752,30 @@ command line, and a restart may name any of them, by its checksum:
      load_trials: "3"
 
 ``configurations`` is the directory they are kept in, each in a directory
-named by its checksum. In it, the top file is named by the checksum too --
-``<checksum>/<checksum>.ytcs`` or ``<checksum>/<checksum>.xtcs`` -- and
-each file it includes sits beside it under the name its include list gives
-it. The checksum takes in those names, so it says the shape of the tree as
-well as what is in it. Left out, the vehicle keeps none, and a restart may
-name only the configuration it runs. An include name must be a file's
-name, not a path, must not begin with a dot, and must not be the checksum,
-so a configuration that includes a file in another directory, as the
-thermostat and ping examples do, is not kept: written for a vehicle, its
-files are put in one directory and include one another by name.
+named by its checksum, its tree. In it, the top file is named by the
+checksum too, ``<checksum>.ytcs`` or ``<checksum>.xtcs``, and each file it
+includes is where its include name, read from the top file's directory,
+puts it. An include may climb out of that directory with ``..``, so the top
+file is kept as far down its tree as its includes climb: one directory
+named ``top`` for each ``..`` the furthest of them goes above it. The
+thermostat example, which includes ``../thermostat-common/thermostat``, is
+kept as
+
+.. code-block:: text
+
+   <checksum>/top/<checksum>.ytcs
+   <checksum>/thermostat-common/thermostat.ytcs
+
+and one whose includes are all beside it as ``<checksum>/<checksum>.ytcs``
+with its includes beside that. The checksum takes in the include names as
+they are written, so it says the shape of the tree as well as what is in
+it. Left out, the vehicle keeps none, and a restart may name only the
+configuration it runs. A part of an include name must not begin with a
+dot, unless it is ``..``, and its last part must not be the checksum.
 A checksum is computed again each time its configuration is loaded, and
 one whose checksum is not its name -- cut short as it was written, or
-damaged -- is not loaded.
+damaged -- is not loaded, nor is one whose top file is not as far down
+its tree as its includes climb, which would read a file from outside it.
 
 To put one there, on the ground or at first provisioning, check and keep it
 with tcsverify:

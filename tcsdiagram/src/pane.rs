@@ -734,6 +734,12 @@ pub struct Placing<'a> {
 /// Every node is checked against every other, whichever pane it is in, because
 /// a node of the other pane overlapping this one is just as unreadable.
 ///
+/// A node already in its pane and on the grid is moved too when it covers one
+/// before it: a file written by hand, or by a program that knew nothing of
+/// node sizes, can put two nodes in one place, and the one drawn underneath
+/// is a node nobody can see is there. The first of them keeps its place and
+/// the later one steps down, so only the nodes that have to move do.
+///
 /// One rule for the editor, which settles what it opens, and for tcspecial's
 /// visual window, which draws what the editor would.
 ///
@@ -756,17 +762,10 @@ pub fn settle(nodes: &mut [Placing], dividers: Dividers) -> usize {
 
     for at in 0..nodes.len() {
         let node = nodes[at];
-        let want = confine(node.node_type, dividers, node.at);
-        if want == node.at {
-            continue;
-        }
-
-        // Clear of the nodes that are already settled, and of the ones that
-        // were in the right place to begin with.
         let (width, height) = size_of(node.node_type);
-        let mut want = want;
-        for _ in 0..200 {
-            let clashes = nodes.iter().enumerate().any(|(other, node)| {
+        // Whether this node, at `want`, covers any of `others`.
+        let covers = |want: (i32, i32), others: &[Placing]| {
+            others.iter().enumerate().any(|(other, node)| {
                 if other == at {
                     return false;
                 }
@@ -775,8 +774,21 @@ pub fn settle(nodes: &mut [Placing], dividers: Dividers) -> usize {
                     && node.at.0 < want.0 + width as i32
                     && want.1 < node.at.1 + tall as i32
                     && node.at.1 < want.1 + height as i32
-            });
-            if !clashes {
+            })
+        };
+        let want = confine(node.node_type, dividers, node.at);
+        // Only the nodes before this one, which are settled: a node that
+        // covers a later one stays, and the later one moves when its turn
+        // comes, so of two in one place the first keeps it.
+        if want == node.at && !covers(want, &nodes[..at]) {
+            continue;
+        }
+
+        // Clear of the nodes that are already settled, and of the ones that
+        // were in the right place to begin with.
+        let mut want = want;
+        for _ in 0..200 {
+            if !covers(want, nodes) {
                 break;
             }
             want.1 = node_ceil(want.1 + 32);
@@ -834,6 +846,55 @@ mod tests {
             assert_eq!(bands[1].0 + bands[1].2 as i32, bands[2].0);
             assert_eq!(bands[2].0 + bands[2].2 as i32, WORKING_WIDTH);
         }
+    }
+
+    /// Two nodes in one place, both in their pane, come apart.
+    ///
+    /// Both are where the rule allows, so moving them home moves neither; it
+    /// is the covering that has to be put right, or the one underneath is a
+    /// node nobody can see. The first keeps its place, and the second ends up
+    /// in its own pane, clear of the first.
+    #[test]
+    fn nodes_in_one_place_are_spread_apart() {
+        let dividers = default_dividers();
+        let at = place_in(&[], "i2c", dividers, (0, 700));
+        let mut nodes = [
+            Placing {
+                node_type: "i2c",
+                at,
+            },
+            Placing {
+                node_type: "i2c",
+                at,
+            },
+            Placing {
+                node_type: "i2c",
+                at: (at.0 + 8, at.1 + 8),
+            },
+        ];
+        assert_eq!(confine("i2c", dividers, at), at, "a place that obeys");
+
+        assert_eq!(settle(&mut nodes, dividers), 2);
+
+        assert_eq!(nodes[0].at, at, "the first keeps its place");
+        let (width, height) = size_of("i2c");
+        for (one, node) in nodes.iter().enumerate() {
+            assert_eq!(confine("i2c", dividers, node.at), node.at);
+            for theirs in &nodes[one + 1..] {
+                assert!(
+                    node.at.0 >= theirs.at.0 + width as i32
+                        || theirs.at.0 >= node.at.0 + width as i32
+                        || node.at.1 >= theirs.at.1 + height as i32
+                        || theirs.at.1 >= node.at.1 + height as i32,
+                    "{:?} covers {:?}",
+                    node.at,
+                    theirs.at
+                );
+            }
+        }
+
+        // Settled is settled: a second time moves nothing.
+        assert_eq!(settle(&mut nodes, dividers), 0);
     }
 
     /// A node the editor places keeps off its own pane's band.

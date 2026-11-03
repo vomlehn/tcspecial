@@ -4056,7 +4056,11 @@ height and takes the near edge of its own pane, which is the smallest move that
 obeys the rule, and steps down the grid from there if that would land it on top
 of another -- a file with its payloads in a row would otherwise come up as one
 payload with the rest hidden behind it. A node off the grid is brought to the
-nearest grid point in the same way.
+nearest grid point in the same way. A node already in its pane and on the grid
+moves too if it covers one before it in the order of their names: the first
+keeps its place and the later one steps down the grid until it is clear, so a
+file that puts two nodes in one place comes up with both in view. tcspecial's
+visual window settles what it draws by the same rule, and writes nothing.
 
 That is a change to the document, so it is worth saying what it is not. It is
 not an edit: nothing goes into the history, because undoing it would put a node

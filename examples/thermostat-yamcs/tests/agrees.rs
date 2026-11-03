@@ -98,6 +98,13 @@ fn local(address: &str) -> String {
 fn worked_out() -> Vec<(String, String)> {
     let path = here().join("thermostat-yamcs.ytcs");
     let graph = Graph::load(&path).expect("the example reads");
+    // Most of it is in the file the two thermostat examples include, so the
+    // ids, the ports and the digest are the two readers' of an included set.
+    assert_eq!(
+        graph.included(),
+        ["../thermostat-common/thermostat"],
+        "what it includes"
+    );
     let section = graph.tcspecial.as_ref().expect("a tcspecial section");
     let ci = ci_config_of(&flatten(section))
         .expect("its section reads")

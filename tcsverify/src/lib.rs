@@ -1267,11 +1267,14 @@ mod tests {
     use tcslibgs::graph::built::OPTIONAL_TYPES as ALL;
 
     /// Copies the thermostat example's two spellings and its simulator file
-    /// to a directory of their own, with `change` made to the XML.
+    /// to a directory of their own, with the common file they include and
+    /// the physics model in a directory beside it, as in `examples`, and
+    /// with `change` made to the XML of both.
     ///
     /// # Arguments
     ///
-    /// * `change` - Takes the XML's text and gives what is written instead.
+    /// * `change` - Takes an XML file's text and gives what is written
+    ///              instead.
     ///
     /// # Returns
     ///
@@ -1280,35 +1283,36 @@ mod tests {
     fn thermostat_pair(
         change: impl Fn(String) -> String,
     ) -> (tempfile::TempDir, PathBuf, PathBuf, PathBuf) {
-        let root = Path::new(env!("CARGO_MANIFEST_DIR"))
-            .join("../examples/thermostat");
+        let examples =
+            Path::new(env!("CARGO_MANIFEST_DIR")).join("../examples");
         let dir = tempfile::tempdir().expect("a directory");
         let at = |name: &str| dir.path().join(name);
-        std::fs::copy(root.join("thermostat.ytcs"), at("thermostat.ytcs"))
-            .expect("copied");
-        // The physics model is the one thermostat-yamcs shares, in
-        // thermostat-common, and the copy names its own copy beside it.
-        std::fs::copy(
-            root.join("../thermostat-common/thermostat-physics.yaml"),
-            at("thermostat-physics.yaml"),
-        )
-        .expect("copied");
-        let shared = "physics: ../thermostat-common/thermostat-physics.yaml";
-        let sim = std::fs::read_to_string(root.join("thermostat-sim.yaml"))
-            .expect("the simulator file");
-        assert!(sim.contains(shared), "it names the shared model");
-        std::fs::write(
-            at("thermostat-sim.yaml"),
-            sim.replace(shared, "physics: thermostat-physics.yaml"),
-        )
-        .expect("written");
-        let xml = std::fs::read_to_string(root.join("thermostat.xtcs"))
-            .expect("the XML");
-        std::fs::write(at("thermostat.xtcs"), change(xml)).expect("written");
+        for (sub, files) in [
+            ("thermostat", ["thermostat", "thermostat-sim.yaml"]),
+            (
+                "thermostat-common",
+                ["thermostat", "thermostat-physics.yaml"],
+            ),
+        ] {
+            std::fs::create_dir(at(sub)).expect("a directory");
+            let copy = |name: String| {
+                std::fs::copy(
+                    examples.join(sub).join(&name),
+                    at(sub).join(&name),
+                )
+                .expect("copied");
+            };
+            copy(format!("{}.ytcs", files[0]));
+            copy(files[1].to_string());
+            let xml = format!("{}.xtcs", files[0]);
+            let text = std::fs::read_to_string(examples.join(sub).join(&xml))
+                .expect("the XML");
+            std::fs::write(at(sub).join(&xml), change(text)).expect("written");
+        }
         let (xml, yaml, sim) = (
-            at("thermostat.xtcs"),
-            at("thermostat.ytcs"),
-            at("thermostat-sim.yaml"),
+            at("thermostat/thermostat.xtcs"),
+            at("thermostat/thermostat.ytcs"),
+            at("thermostat/thermostat-sim.yaml"),
         );
         (dir, xml, yaml, sim)
     }
@@ -1368,8 +1372,10 @@ mod tests {
     /// the model's joins.
     #[test]
     fn the_physics_model_is_reported_at_its_own_lines() {
-        let (dir, _, yaml, sim) = thermostat_pair(|xml| xml);
-        let model = dir.path().join("thermostat-physics.yaml");
+        let (_dir, _, yaml, sim) = thermostat_pair(|xml| xml);
+        // Named as the simulator file names it, which is how it is reported.
+        let model =
+            sim.with_file_name("../thermostat-common/thermostat-physics.yaml");
         let edit = |path: &Path, from: &str, to: &str| {
             let text = std::fs::read_to_string(path).expect("read");
             assert!(text.contains(from), "{from}");
@@ -1483,7 +1489,12 @@ mod tests {
         let said = report.said();
         assert_eq!(report.findings.len(), 1, "{said:?}");
         let finding = &report.findings[0];
-        assert_eq!(finding.file, xml);
+        // In the file the thermostat is written in, which is the one the
+        // example includes.
+        assert_eq!(
+            finding.file,
+            xml.with_file_name("../thermostat-common/thermostat.xtcs")
+        );
         assert!(
             finding
                 .message
@@ -1492,7 +1503,7 @@ mod tests {
                 && finding.message.contains("says \"290\""),
             "{said:?}"
         );
-        let text = std::fs::read_to_string(&xml).expect("the XML");
+        let text = std::fs::read_to_string(&finding.file).expect("the XML");
         let line = text.lines().nth(finding.line - 1).expect("a line");
         assert!(
             line.contains("<setpoint>290"),

@@ -6,6 +6,10 @@
 //! ping goes up and where its answer comes down are worked out on both sides,
 //! so this holds the Python's answers for `ping.xtcs` to the Rust's for
 //! `ping.ytcs` -- which is also the two spellings being held to one another.
+//! The ping node is in the file both ping examples include,
+//! `ping-common/ping`, so the two readers are held to following an include
+//! alike: the ids the ports are counted from, and the digest, which takes
+//! in the include's name.
 
 use std::path::{Path, PathBuf};
 use std::process::Command;
@@ -67,6 +71,11 @@ fn described() -> Vec<(String, String)> {
 fn worked_out() -> Vec<(String, String)> {
     let path = here().join("ping.ytcs");
     let graph = Graph::load(&path).expect("the example reads");
+    assert_eq!(
+        graph.included(),
+        ["../ping-common/ping"],
+        "what it includes"
+    );
 
     let link = beacon_of(&graph)
         .expect("its section reads")

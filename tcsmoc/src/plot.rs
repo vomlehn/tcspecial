@@ -151,11 +151,13 @@ const HISTORY: usize = 4096;
 const CHANGES: usize = 1024;
 
 /// The traces' colours, in the order values are listed: Okabe and Ito's
-/// blue, vermillion, reddish purple, sky blue and black. Their bluish green
-/// is kept for the switches, so a trace is never the colour of a switch on;
-/// their orange and yellow are left out, being too pale to read on white.
+/// blue, bluish green, reddish purple, sky blue and black; their orange and
+/// yellow are left out, being too pale to read on white. A trace may share
+/// its green with a switch on, because the two are never drawn in one place:
+/// a trace is a line on a panel, and a switch a strip under the panels with
+/// "on" written in it.
 pub const TRACE_COLOURS: [u32; 5] =
-    [0x0072B2, 0xD55E00, 0xCC79A7, 0x56B4E9, 0x000000];
+    [0x0072B2, 0x009E73, 0xCC79A7, 0x56B4E9, 0x000000];
 
 /// One reading kept for the whole run.
 #[derive(Debug, Clone, Copy)]

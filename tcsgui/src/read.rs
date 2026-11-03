@@ -913,6 +913,117 @@ mod tests {
         }
     }
 
+    /// An example that includes a file in another directory opens with that
+    /// file as a subdiagram, under its include name, and saving it writes
+    /// every file back to where it was, saying what it said: the include as
+    /// it was written, the common file's nodes, group, binding and layout in
+    /// the common file, and every comment above the line it was above.
+    #[test]
+    fn an_example_with_a_common_file_is_saved_as_it_was() {
+        let examples =
+            Path::new(env!("CARGO_MANIFEST_DIR")).join("../examples");
+        for (example, common) in [
+            ("thermostat", "thermostat-common/thermostat"),
+            ("thermostat-yamcs", "thermostat-common/thermostat"),
+            ("ping", "ping-common/ping"),
+            ("ping-yamcs", "ping-common/ping"),
+        ] {
+            for extension in ["ytcs", "xtcs"] {
+                let xml = extension == "xtcs";
+                let name = format!("{example}/{example}.{extension}");
+                let top = examples.join(&name);
+                let document = read(&top).unwrap_or_else(|e| panic!("{e}"));
+                let include = format!("../{common}");
+                assert_eq!(document.subdiagrams(), vec![include.clone()]);
+                assert!(
+                    document.node(&include).is_some_and(|box_| {
+                        box_.node_type == "subdiagram" && box_.at != (0, 0)
+                    }),
+                    "{name}: the common file's box, where it was drawn"
+                );
+
+                // The top file, its other spelling, and the common file in
+                // this spelling, written where they are.
+                let files = document.files(&top).expect("a known format");
+                let shared = format!("{common}.{extension}");
+                let paths: Vec<&Path> =
+                    files.iter().map(|(path, _)| path.as_path()).collect();
+                assert_eq!(
+                    paths,
+                    vec![
+                        top.as_path(),
+                        top.with_extension(if xml { "ytcs" } else { "xtcs" })
+                            .as_path(),
+                        top.with_file_name(format!("../{shared}")).as_path(),
+                    ],
+                    "{name}"
+                );
+
+                // The group and the binding are the common file's, and stay
+                // there.
+                if example.starts_with("thermostat") {
+                    let (top_text, common_text) = (&files[0].1, &files[2].1);
+                    for said in ["zone_temps", "thermostat.setpoint"] {
+                        assert!(common_text.contains(said), "{name}: {said}");
+                    }
+                    for section in
+                        ["payload_groups", "\ncommands:", "<commands>"]
+                    {
+                        assert!(!top_text.contains(section), "{name}");
+                    }
+                }
+
+                // Written somewhere else in the same shape, they read as the
+                // shipped files do.
+                let dir = tempfile::tempdir().expect("a directory");
+                let common_dir = common.split('/').next().expect("a dir");
+                for sub in [example, common_dir] {
+                    std::fs::create_dir(dir.path().join(sub)).expect("made");
+                }
+                let shipped_files =
+                    [examples.join(&name), examples.join(&shared)];
+                let written_files =
+                    [dir.path().join(&name), dir.path().join(&shared)];
+                for ((_, text), at) in
+                    [&files[0], &files[2]].into_iter().zip(&written_files)
+                {
+                    std::fs::write(at, text).expect("written");
+                }
+                let load = |path: &Path| {
+                    let mut graph = Graph::load(path)
+                        .unwrap_or_else(|e| panic!("{}: {e}", path.display()));
+                    let included = graph.included();
+                    graph.files.clear();
+                    graph.homes.clear();
+                    (graph, included)
+                };
+                assert_eq!(
+                    load(&written_files[0]),
+                    load(&shipped_files[0]),
+                    "{name}"
+                );
+
+                // And each file's comments are where they were.
+                for (shipped, written) in
+                    shipped_files.iter().zip(&written_files)
+                {
+                    let said = |path: &Path| {
+                        let text = std::fs::read_to_string(path).expect("read");
+                        let mut said = comments_in(&text, xml);
+                        said.sort();
+                        said
+                    };
+                    assert_eq!(
+                        said(shipped),
+                        said(written),
+                        "{}",
+                        shipped.display()
+                    );
+                }
+            }
+        }
+    }
+
     /// The shipped examples open as what they say.
     #[test]
     fn the_shipped_examples_open() {
@@ -1151,7 +1262,13 @@ mod tests {
         let mut paths: Vec<std::path::PathBuf> = Vec::new();
         let mut directories = vec![root.join("tests/manual"), root.clone()];
         for entry in std::fs::read_dir(root.join("examples")).expect("there") {
-            directories.push(entry.expect("an entry").path());
+            let path = entry.expect("an entry").path();
+            // What two examples include is not a configuration on its own,
+            // and is kept through the editor as part of each: see
+            // `an_example_with_a_common_file_is_saved_as_it_was`.
+            if !path.to_string_lossy().ends_with("-common") {
+                directories.push(path);
+            }
         }
         for directory in directories {
             let Ok(entries) = std::fs::read_dir(&directory) else {

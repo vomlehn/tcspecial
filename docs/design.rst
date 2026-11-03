@@ -3839,6 +3839,32 @@ what a file names, so the set of files that make up a configuration is itself
 written down. The digest the beacon carries is taken over the whole set, so the
 ground can say which configuration is flying rather than which top file is.
 
+Requirement
+    An include names a file by its path relative to the top file's
+    directory, without an extension, the top file's being given it: ``zone``
+    beside the top file, ``../common/zone`` in another directory. Each part
+    of it is a name or ``..``. Nothing in it is expanded: an include that is
+    empty, absolute, begins with ``~``, has a ``$`` in it, or has a part that
+    is empty or ``.`` is refused, saying that includes are relative to the
+    top file. The digest takes in each include as it is written, so the
+    same set of files digests the same from any working directory, and an
+    expansion would make the digest depend on something that is not in the
+    files.
+
+Requirement
+    One level: an included file has no ``tcspecial`` section and no
+    ``include`` list of its own. A file is included once, the top file not
+    at all, whatever path names it; and a node's name is its own in every
+    file, so no two files have a node of one name and a link or a command
+    binding in one file may name a node in another.
+
+``tcslibgs::graph::Graph::load`` is the reader, and the Python ground
+reader, ``python/tcslibgs/configuration.py``, follows includes by the same
+rules, so that the two count a node's device id among the same names.
+tcsgui opens each included file as a subdiagram named by its include and
+writes each node, group and command binding back to the file it was read
+from.
+
 A small vehicle needs no split and should not have one. Where a split earns its
 place, the useful seam is who owns a file and how often it changes, not what
 type of data is in it:

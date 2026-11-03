@@ -45,18 +45,17 @@ tcspecial:
     recv: "0.0.0.0:17200"
     send: "127.0.0.1:0"
 
-payload_groups:
-  - name: "zone_temps"
-    interval: "1 s"
+include:
+  - ../thermostat-common/thermostat
 
 gateways:
   - type gateway_yamcs:
-      # Yamcs's end of the link. Each reading and decision drawn into this
-      # node comes down to Yamcs at ground_base plus its source's device id
-      # -- thermostat is the last of the twelve names, device id 11, so 17711
-      # -- as telemetry of APID apid_base plus that device id, 0x40b. What
-      # Yamcs sends up to address:port goes as a telecommand of APID
-      # apid_base.
+      # Yamcs's end of the link. Each reading drawn into this node comes
+      # down to Yamcs at ground_base plus its source's device id -- temp3 is
+      # the ninth of the thirteen names, here and in the file this one
+      # includes, device id 8, so 17708 -- as telemetry of APID apid_base
+      # plus that device id, 0x408. What Yamcs sends up to address:port goes
+      # as a telecommand of APID apid_base.
       - gateway: gateway
         address: "127.0.0.1"
         apid_base: "0x400"
@@ -64,113 +63,7 @@ gateways:
         port: "17600"
         payload-in: true
 
-vehicle:
-  - type compute:
-      # One temperature out of the three, by the algorithm named: median
-      # takes the middle reading, closest_mean the mean of the two that
-      # agree best. Either leaves a sensor that has gone wrong out of the
-      # answer, which a mean over all three would not, and it produces a
-      # value on every arrival, so one sensor that stops reporting is
-      # outvoted rather than stopping the vehicle from deciding anything.
-      - compute: ambient
-        algorithm: "median"
-        function: "vote"
-        inputs: "in0,in1,in2"
-        payload-out:
-          - target: gateway
-          - target: thermostat
-        payload-in: true
-      - compute: temp1
-        format: "i16_be"
-        function: "to_kelvin"
-        offset: "273.15"
-        scale: "0.0625"
-        payload-out:
-          - target: ambient
-            input: in0
-          - target: gateway
-          - target: housekeeping
-        payload-in: true
-      - compute: temp2
-        format: "i16_be"
-        function: "to_kelvin"
-        offset: "273.15"
-        scale: "0.0625"
-        payload-out:
-          - target: ambient
-            input: in1
-          - target: gateway
-          - target: housekeeping
-        payload-in: true
-      - compute: temp3
-        format: "u24_be"
-        function: "to_kelvin"
-        offset: "255.37"
-        scale: "0.0078"
-        payload-out:
-          - target: ambient
-            input: in2
-          - target: gateway
-          - target: housekeeping
-        payload-in: true
-      # setpoint is set from the ground; half_band is how far either side
-      # of it the heaters are switched at, the setpoint being in the middle
-      # of the band.
-      - compute: thermostat
-        function: "hysteresis"
-        half_band: "2.0"
-        setpoint: "293.15"
-        # asserted below the setpoint, unasserted above it. Two heaters, because
-        # one failing must not leave the mass with no way to be warmed: either
-        # alone holds the band while the orbit is warm, and both together hold
-        # it in the cold too, each switched through a line of its own. What it
-        # decides goes to the heaters and the log and not to the ground: the
-        # ground is told what the heaters are doing, by gpio-in-tmass, which a
-        # heater that has failed does not hide.
-        gateway-out:
-          - target: gpio-out-tmass1
-          - target: gpio-out-tmass2
-        payload-out:
-          - target: housekeeping
-        payload-in: true
-  - type log:
-      - compute: housekeeping
-        directory: "/tmp/telemetry"
-        format: "variable_ts_rc"
-        payload-in: true
-
 payloads:
-  # The heaters and the lines that sense them, on the thermal mass, through
-  # the kernel's simulated chip, which bin/mk-kernel-stand-ins makes: lines
-  # 2 to 5, which leaves 0 and 1 to the gpio example.
-  - type gpio:
-      # Two lines on the thermal mass, one sensing each heater: high while it
-      # is heating. Read every second for what they are, rather than for
-      # when they change, so the ground hears the heaters' state on a beat
-      # and a lost report is made good by the next; one bit a line, each a
-      # sixteen-byte record -- when, which line, what it is -- to the ground
-      # and the log. Disabled from the ground, it reports nothing at all.
-      - payload: gpio-in-tmass
-        edge: "none"
-        lines: "2,3"
-        path: "/dev/gpiochip1"
-        state_interval: "1 s"
-        payload-out:
-          - target: gateway
-          - target: housekeeping
-      # The two heaters' switches, each a line the thermostat drives -- 1 for
-      # on, 0 for off. One payload each, so that one can be stopped from the
-      # ground while the other goes on warming the mass.
-      - payload: gpio-out-tmass1
-        direction: "output"
-        lines: "4"
-        path: "/dev/gpiochip1"
-        gateway-in: true
-      - payload: gpio-out-tmass2
-        direction: "output"
-        lines: "5"
-        path: "/dev/gpiochip1"
-        gateway-in: true
   # The sensors are each the far end of a UDP socket, which tcssim stands in
   # for with nothing more than a socket, so that they touch no hardware. The
   # buses these parts would be on aboard -- I2C, SPI -- are flown against
@@ -205,22 +98,10 @@ payloads:
         payload-out:
           - target: temp3
 
-commands:
-  # the zone temperature the heaters are held at, in kelvin
-  - { from: gateway, sets: thermostat.setpoint }
-
 tcsgui:
   nodes:
-    - { node: ambient, x: 469, y: 166 }
+    - { node: ../thermostat-common/thermostat, x: 242, y: 166 }
     - { node: gateway, x: 790, y: 34 }
-    - { node: gpio-in-tmass, x: 242, y: 470 }
-    - { node: gpio-out-tmass1, x: 34, y: 393 }
-    - { node: gpio-out-tmass2, x: 34, y: 470 }
-    - { node: housekeeping, x: 469, y: 374 }
-    - { node: temp1, x: 242, y: 34 }
-    - { node: temp2, x: 242, y: 166 }
-    - { node: temp3, x: 242, y: 280 }
     - { node: temp_1, x: 34, y: 34 }
     - { node: temp_2, x: 34, y: 166 }
     - { node: temp_3, x: 34, y: 280 }
-    - { node: thermostat, x: 601, y: 242 }

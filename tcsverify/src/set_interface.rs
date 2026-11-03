@@ -396,8 +396,9 @@ mod tests {
     fn a_file_is_set_in_place() {
         let dir = tempfile::tempdir().unwrap();
         let path = dir.path().join("v.ytcs");
+        // A file that includes none, which reads where it is copied to.
         let example = Path::new(env!("CARGO_MANIFEST_DIR"))
-            .join("../examples/ping/ping.ytcs");
+            .join("../examples/minimal/minimal.ytcs");
         let good = std::fs::read_to_string(example).unwrap();
         let ours = InterfaceDigest::of_this_build().to_string();
         let stale = good.replace(&ours, OURS);

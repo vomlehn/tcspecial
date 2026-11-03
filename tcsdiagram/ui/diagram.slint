@@ -97,7 +97,7 @@ export struct NodeView {
     y: length,
     width: length,
     height: length,
-    // square | rounded | parallelogram
+    // square | rounded | parallelogram | hexagon
     outline: string,
     // The shape to fill, as path data in this node's own coordinates. Empty
     // for the rounded outline, which is a corner radius on a Rectangle, and
@@ -493,10 +493,17 @@ export component NodeShape inherits Rectangle {
         // of the node, and simply stops short of the corner boxes. Reserving
         // a row at the top and the bottom instead would leave sixteen pixels
         // for a name on the shortest node.
+        //
+        // A hexagon's side with no terminals is padded by how far its corners
+        // are in, which a label as wide as the node would otherwise cross. A
+        // physics node's alone: a configuration's nodes are laid out as they
+        // always were.
         VerticalLayout {
             padding: Space.tight;
             padding-left: (node.gateway-in.shown || node.payload-out.shown)
-                ? node.terminal-column : Space.tight;
+                ? node.terminal-column
+                : node.outline == "hexagon"
+                    ? Space.tight + node.inset : Space.tight;
             padding-right: (node.gateway-out.shown || node.payload-in.shown)
                 ? node.terminal-column : Space.tight;
             spacing: 1px;

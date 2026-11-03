@@ -38,7 +38,7 @@ pub struct NodeLook {
     pub y: f32,
     pub width: f32,
     pub height: f32,
-    /// `square`, `rounded` or `parallelogram`.
+    /// `square`, `rounded`, `parallelogram` or `hexagon`.
     pub outline: &'static str,
     pub shape: String,
     pub edge: String,
@@ -148,6 +148,7 @@ pub fn node_look(
             Outline::Square => "square",
             Outline::Rounded => "rounded",
             Outline::Parallelogram => "parallelogram",
+            Outline::Hexagon => "hexagon",
         },
         // The shape to fill, the line to stroke and the second line of a
         // doubled edge, all as paths in the node's own coordinates, for every

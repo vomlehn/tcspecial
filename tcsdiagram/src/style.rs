@@ -60,6 +60,45 @@ pub enum Outline {
     /// radius on a rectangle: a radius cannot be dashed or doubled, and seven
     /// vehicle types of one outline need the edges to be told apart by.
     Rounded,
+    /// A hexagon, pointed at both ends. A component of the simulator's
+    /// physics, every one: a heater, a zone, anything the simulator models
+    /// and the vehicle does not hold.
+    ///
+    /// Not a node type at all, and so a shape no node type has: a physics
+    /// component drawn in an outline a node also had would be read as that
+    /// node's kind of thing. The points are [`POINT`] deep whatever the
+    /// height, so a tall block -- a zone with its heaters drawn inside it --
+    /// leans no further in than a short one and holds what is inside it.
+    Hexagon,
+}
+
+/// How far a hexagon's points stand out from its top and bottom corners, in
+/// pixels: enough to read as a point at a glance, and little enough that a
+/// terminal beside a corner keeps most of its row.
+pub const POINT: f32 = 10.0;
+
+/// How far in a hexagon's side is, anywhere along the rows `top` to
+/// `bottom`.
+///
+/// The side is furthest in at whichever end of the run is further from the
+/// point, which is halfway down: a box in that run has to clear the side
+/// along all of its height, not at its middle.
+///
+/// # Arguments
+///
+/// * `height` - The hexagon's height, in pixels.
+/// * `top`    - The first row, in pixels from its top.
+/// * `bottom` - The last row.
+///
+/// # Returns
+///
+/// How far in the side is, in whole pixels.
+pub fn hexagon_room(height: u32, top: i32, bottom: i32) -> i32 {
+    let half = (height as f32 - 1.0) / 2.0;
+    let point = POINT.min(half);
+    let from_middle =
+        (top as f32 - half).abs().max((bottom as f32 - half).abs());
+    (point * (from_middle / half).min(1.0)).ceil() as i32
 }
 
 /// How round a rounded outline's corners are, in pixels.
@@ -440,6 +479,18 @@ pub fn polygon_of(
             let slant = (h - top) / 2.0;
             vec![(left + slant, top), (w, top), (w - slant, h), (left, h)]
         }
+        Outline::Hexagon => {
+            let point = POINT.min((h - top) / 2.0).min((w - left) / 2.0);
+            let middle = (top + h) / 2.0;
+            vec![
+                (left + point, top),
+                (w - point, top),
+                (w, middle),
+                (w - point, h),
+                (left + point, h),
+                (left, middle),
+            ]
+        }
     }
 }
 
@@ -666,10 +717,12 @@ fn dashes_of(
 /// # Returns
 ///
 /// The most the shape is in from a side, in pixels: half the height,
-/// rounded up, for a parallelogram and 0 for every other outline.
+/// rounded up, for a parallelogram, [`POINT`] for a hexagon, and 0 for every
+/// other outline.
 pub fn room_of(outline: Outline, (_width, height): (u32, u32)) -> i32 {
     match outline {
         Outline::Parallelogram => (height as f32 / 2.0).ceil() as i32,
+        Outline::Hexagon => hexagon_room(height, 0, 0),
         _ => 0,
     }
 }
@@ -718,6 +771,15 @@ pub fn room_at(
                 slant * (y / h)
             };
             room.max(0.0).ceil() as i32
+        }
+        Outline::Hexagon => {
+            let (inset, tall) = (TERMINAL_INSET as i32, TERMINAL.1 as i32);
+            let top = if corner.top {
+                inset
+            } else {
+                height as i32 - inset - tall
+            };
+            hexagon_room(height, top, top + tall)
         }
         _ => {
             let _ = (width, corner);

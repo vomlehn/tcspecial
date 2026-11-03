@@ -1364,7 +1364,7 @@ mod tests {
         assert_eq!(report.findings[1].file, sim);
         assert_eq!(
             report.findings[1].line,
-            line_in(&sim, "- payload: heaters_2")
+            line_in(&sim, "- payload: gpio-out-tmass2")
         );
         assert!(report.findings[1].message.contains("nothing converts"));
     }
@@ -1456,19 +1456,21 @@ mod tests {
         // Compared and not verified, so the simulator file is not wanted.
         let (_dir, xml, yaml, _) = thermostat_pair(|xml| {
             xml.replace(
-                "<payload name=\"heaters_1\">",
+                "<payload name=\"gpio-out-tmass1\">",
                 "<payload name=\"heater\">",
             )
-            .replace("<target>heaters_1</target>", "<target>heater</target>")
+            .replace(
+                "<target>gpio-out-tmass1</target>",
+                "<target>heater</target>",
+            )
         });
         let mut report = Report::default();
         compare(&yaml, &xml, &mut report);
         let said: Vec<&str> =
             report.findings.iter().map(|f| f.message.as_str()).collect();
         assert!(
-            said.iter()
-                .any(|m| m.contains("nodes / heaters_1:")
-                    && m.contains("does not")),
+            said.iter().any(|m| m.contains("nodes / gpio-out-tmass1:")
+                && m.contains("does not")),
             "{said:?}"
         );
         assert!(
@@ -1478,7 +1480,7 @@ mod tests {
         // And the line to it, a destination one has and the other does not,
         // each way: a link's destinations are a set, whatever order they are
         // written in.
-        for name in ["heaters_1", "heater"] {
+        for name in ["gpio-out-tmass1", "heater"] {
             assert!(
                 said.iter().any(|m| m.contains(&format!("/ to / {name}:"))),
                 "{said:?}"

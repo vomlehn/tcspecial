@@ -3,6 +3,7 @@
 //! Its terminals are `tcslibgs::physics::heater`'s: `on`, the decision it
 //! is driven to; `heat`, in watts, what it gives out; `current`, in
 //! amperes, what it draws. Both outputs are nought while it is off.
+//! `heating` is one while it is on and nought while it is off.
 //!
 //! # The arithmetic
 //!
@@ -33,6 +34,7 @@ use super::random::{seed_for, settled, wandered};
 const ON: usize = 0;
 const HEAT: usize = 1;
 const CURRENT: usize = 2;
+const HEATING: usize = 3;
 
 /// A heater of the world.
 #[derive(Debug)]
@@ -90,6 +92,7 @@ impl Component for Heater {
         }
         let v = 1.0 + self.supply;
         match terminal {
+            HEATING => 1.0,
             HEAT => self.figures.power * v * v,
             CURRENT => self.figures.power / self.figures.voltage * v,
             _ => 0.0,
@@ -109,10 +112,11 @@ mod tests {
         assert_eq!(TERMINALS[ON].name, "on");
         assert_eq!(TERMINALS[HEAT].name, "heat");
         assert_eq!(TERMINALS[CURRENT].name, "current");
+        assert_eq!(TERMINALS[HEATING].name, "heating");
     }
 
-    /// Off it gives and draws nothing; on, its power and its power over its
-    /// voltage.
+    /// Off it gives and draws nothing and is not heating; on, it gives its
+    /// power, draws its power over its voltage, and is heating.
     #[test]
     fn a_heater_gives_its_power_while_on() {
         let figures = Resolved {
@@ -122,11 +126,14 @@ mod tests {
         };
         let mut heater = Heater::new("h", figures, 0);
         assert_eq!((heater.output(HEAT), heater.output(CURRENT)), (0.0, 0.0));
+        assert_eq!(heater.output(HEATING), 0.0);
         heater.hold(&[1.0, 0.0, 0.0]);
         assert_eq!(heater.output(HEAT), 60.0);
         assert!((heater.output(CURRENT) - 60.0 / 28.0).abs() < 1e-12);
+        assert_eq!(heater.output(HEATING), 1.0);
         heater.hold(&[0.0, 0.0, 0.0]);
         assert_eq!(heater.output(HEAT), 0.0);
+        assert_eq!(heater.output(HEATING), 0.0);
     }
 
     /// Its supply's ripple warms by its power times (1 + v)^2 on average,

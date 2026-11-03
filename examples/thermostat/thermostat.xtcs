@@ -103,10 +103,13 @@
                 <!-- heaters, because one failing must not leave the mass -->
                 <!-- with no way to be warmed: either alone holds the band -->
                 <!-- while the orbit is warm, and both together hold it in -->
-                <!-- the cold too. -->
-                <gateway-out><target>heaters_1</target></gateway-out>
-                <gateway-out><target>heaters_2</target></gateway-out>
-                <payload-out><target>gateway</target></payload-out>
+                <!-- the cold too, each switched through a line of its own. -->
+                <!-- What it decides goes to the heaters and the log and not -->
+                <!-- to the ground: the ground is told what the heaters are -->
+                <!-- doing, by gpio-in-tmass, which a heater that has failed -->
+                <!-- does not hide. -->
+                <gateway-out><target>gpio-out-tmass1</target></gateway-out>
+                <gateway-out><target>gpio-out-tmass2</target></gateway-out>
                 <payload-out><target>housekeeping</target></payload-out>
                 <payload-in>true</payload-in>
             </compute>
@@ -120,30 +123,50 @@
         </type>
     </vehicle>
     <payloads>
-        <!-- Every payload is the far end of a UDP socket, which tcssim -->
-        <!-- stands in for with nothing more than a socket, so that the -->
-        <!-- example runs on any desk and touches no hardware. The buses -->
-        <!-- these parts would be on aboard - I2C, SPI, GPIO - are flown -->
-        <!-- against stand-ins by make stand-ins-test and make -->
-        <!-- kernel-stand-ins-test. -->
+        <!-- The heaters and the lines that sense them, on the thermal -->
+        <!-- mass, through the simulated chip of the kernel, which -->
+        <!-- bin/mk-kernel-stand-ins makes: lines 2 to 5, which leaves 0 -->
+        <!-- and 1 to the gpio example. -->
+        <type name="gpio">
+            <!-- Two lines on the thermal mass, one sensing each heater: -->
+            <!-- high while it is heating. Read every second for what they -->
+            <!-- are, rather than for when they change, so the ground hears -->
+            <!-- the state of the heaters on a beat and a lost report is -->
+            <!-- made good by the next; one bit a line, each a sixteen-byte -->
+            <!-- record of when, which line and what it is, to the ground -->
+            <!-- and the log. -->
+            <!-- Disabled from the ground, it reports nothing at all. -->
+            <payload name="gpio-in-tmass">
+                <edge>none</edge>
+                <lines>2,3</lines>
+                <path>/dev/gpiochip1</path>
+                <state_interval>1 s</state_interval>
+                <payload-out><target>gateway</target></payload-out>
+                <payload-out><target>housekeeping</target></payload-out>
+            </payload>
+            <!-- The switches of the two heaters, each a line the thermostat -->
+            <!-- drives - 1 for on, 0 for off. One payload each, so that one -->
+            <!-- can be stopped from the ground while the other goes on -->
+            <!-- warming the mass. -->
+            <payload name="gpio-out-tmass1">
+                <direction>output</direction>
+                <lines>4</lines>
+                <path>/dev/gpiochip1</path>
+                <gateway-in>true</gateway-in>
+            </payload>
+            <payload name="gpio-out-tmass2">
+                <direction>output</direction>
+                <lines>5</lines>
+                <path>/dev/gpiochip1</path>
+                <gateway-in>true</gateway-in>
+            </payload>
+        </type>
+        <!-- The sensors are each the far end of a UDP socket, which -->
+        <!-- tcssim stands in for with nothing more than a socket, so that -->
+        <!-- they touch no hardware. The buses these parts would be on -->
+        <!-- aboard - I2C, SPI - are flown against stand-ins by make -->
+        <!-- stand-ins-test and make kernel-stand-ins-test. -->
         <type name="network">
-            <!-- Two heaters, both near the sensors on the same thermal -->
-            <!-- mass, each driven by what the thermostat decides - 1 for -->
-            <!-- on, 0 for off. Separate nodes, so that one can be stopped -->
-            <!-- from the ground while the other goes on warming the -->
-            <!-- mass. -->
-            <payload name="heaters_1">
-                <address>127.0.0.1</address>
-                <port>5204</port>
-                <protocol>udp</protocol>
-                <gateway-in>true</gateway-in>
-            </payload>
-            <payload name="heaters_2">
-                <address>127.0.0.1</address>
-                <port>5205</port>
-                <protocol>udp</protocol>
-                <gateway-in>true</gateway-in>
-            </payload>
             <!-- One of three sensors of the same place, a trio, so that the -->
             <!-- temperature survives one of them going wrong. Two bytes, -->
             <!-- signed, big endian. -->
@@ -183,8 +206,9 @@
         <nodes>
             <node name="ambient" x="469" y="166"/>
             <node name="gateway" x="790" y="34"/>
-            <node name="heaters_1" x="34" y="393"/>
-            <node name="heaters_2" x="34" y="470"/>
+            <node name="gpio-in-tmass" x="242" y="470"/>
+            <node name="gpio-out-tmass1" x="34" y="393"/>
+            <node name="gpio-out-tmass2" x="34" y="470"/>
             <node name="housekeeping" x="469" y="374"/>
             <node name="temp1" x="242" y="34"/>
             <node name="temp2" x="242" y="166"/>

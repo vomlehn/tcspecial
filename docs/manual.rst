@@ -2134,12 +2134,14 @@ The thermostat example
 .. figure:: ../examples/thermostat/thermostat.svg
    :alt: The thermostat example: three temperature sensors of one place,
          converted to kelvin, voted on, logged and sent to the ground, with a
-         hysteresis thermostat driving two heaters. Each sensor and heater is
-         the far end of a UDP socket, which tcssim stands in for.
+         hysteresis thermostat driving two heaters, each through a GPIO line,
+         and two more lines sensing the heaters reported to the ground. Each
+         sensor is the far end of a UDP socket and each line one of the
+         kernel's simulated chip, which tcssim stands in for.
    :width: 100%
 
-   ``examples/thermostat``: a trio of sensors, a vote, a thermostat and its
-   two heaters.
+   ``examples/thermostat``: a trio of sensors, a vote, a thermostat, its two
+   heaters, and the lines that say what the heaters are doing.
 
 The worked example of computing aboard, and of surviving a part that fails.
 Three temperature sensors -- ``temp_1``, ``temp_2`` and ``temp_3`` -- are read
@@ -2147,12 +2149,16 @@ together ten times a second as the group ``zone_temps``, which is what a
 group is for: readings that will be compared are taken as close together as
 the hardware allows.
 
-Every sensor and heater is the far end of a UDP socket on this host, ports
-5201 to 5205, which tcssim stands in for with nothing more than a socket: the
-example runs on any desk and touches no hardware. Aboard, the sensors would be
-on I\ :superscript:`2`\ C and SPI and the heaters on GPIO lines, as `An
-Example`_ shows; those buses are flown against stand-ins by ``make
-stand-ins-test`` and ``make kernel-stand-ins-test``.
+Every sensor is the far end of a UDP socket on this host, ports 5201 to 5203,
+which tcssim stands in for with nothing more than a socket. Aboard, the
+sensors would be on I\ :superscript:`2`\ C and SPI, as `An Example`_ shows;
+those buses are flown against stand-ins by ``make stand-ins-test``. The
+heaters, and the lines that sense them, are GPIO lines 2 to 5 of the kernel's
+simulated chip, ``/dev/gpiochip1``, which tcssim moves and watches: ``sudo
+bin/mk-kernel-stand-ins gpio`` makes it, once, before the example is run --
+see `Making the Kernel's Stand-ins`_. The gpio example has lines 0 and 1, so
+the two run at once; the thermostat-yamcs example has the same lines as this,
+so it and this do not.
 
 The three are sensors of *one place*, separated only because two parts cannot
 occupy one point. ``temp_3`` is a different part, reporting three unsigned
@@ -2163,7 +2169,7 @@ Each reading is converted to kelvin by its own ``to_kelvin`` node,
 ``temp1``, ``temp2`` or ``temp3``, and each converted reading goes three ways:
 to the ground through the gateway node -- at its ``ground_base``,
 ``127.0.0.1:5100``, plus each source's device id, so ``temp1``, ``temp2`` and
-``temp3``, ids 5 to 7, arrive on ports 5105 to 5107 -- into ``ambient`` as the
+``temp3``, ids 6 to 8, arrive on ports 5106 to 5108 -- into ``ambient`` as the
 input ``in0``, ``in1`` or ``in2``, and into the log ``housekeeping``.
 
 ``ambient`` is a ``vote``: one temperature out of the three by the algorithm
@@ -2183,23 +2189,37 @@ cold -- it says 296 and the heaters stay off, where a mean would have said
 The voted temperature goes to the ground, on port 5100, and to ``thermostat``:
 a hysteresis holding the zone at its ``setpoint``, 293.15 K, with a
 ``half_band`` of 2.0, so the heaters switch two degrees either side of it and
-the setpoint is in the middle of its own band. Its decision is logged, sent to
-the ground on port 5111, and drives two heaters, ``heaters_1`` and
-``heaters_2``, which go on and off together. Two of them, because one
-failing must not leave the zone with no way to be warmed: either alone holds
-the band while the orbit is warm, and both together hold it in the cold too.
-They are separate nodes so that the ground can stop one and leave the other
-warming the zone.
+the setpoint is in the middle of its own band. Its decision is logged, and
+drives two heaters, each switched by a GPIO line of its own,
+``gpio-out-tmass1`` on line 4 and ``gpio-out-tmass2`` on line 5, which go on
+and off together. Two of them, because one failing must not leave the zone
+with no way to be warmed: either alone holds the band while the orbit is
+warm, and both together hold it in the cold too. They are separate nodes so
+that the ground can stop one and leave the other warming the zone.
+
+The decision is not sent to the ground: what the thermostat decided is not
+what the heaters did, and a heater that has failed takes what it is told and
+does nothing. What goes down instead is ``gpio-in-tmass``, two lines on the
+thermal mass, line 2 sensing the first heater and line 3 the second, each high
+while its heater is heating. It reads them for their levels every second --
+``edge: "none"`` and ``state_interval: "1 s"`` -- and sends a sixteen-byte
+record of each, the time, the line and its level, to the ground on port 5102
+and to the log. So the ground hears every second what each heater is doing,
+and a report lost on the way is made good by the next. Disabled from the
+ground, like any node, it reports nothing at all.
 
 The decision is asserted on every sample rather than only when it changes, so
 the heaters are held at what the vehicle last decided and a decision that went
-missing is corrected on the next sample. What is logged and sent to the ground
-is the transitions alone.
+missing is corrected on the next sample. What is logged is the transitions
+alone.
 
 No payload here has a telemetry link of its own: the sensors' readings reach
-the ground through their conversions, and the heaters are driven and never
-read. Tcssim's stand-ins for the heaters count each decision the vehicle sends
-them.
+the ground through their conversions, the heaters' switches are driven and
+never read, and the lines sensing the heaters are drawn into the gateway node.
+Tcssim's stand-ins for the switches count each decision the vehicle drives
+them to, and its stand-in for ``gpio-in-tmass`` pulls each of its lines to its
+heater's ``heating`` -- ``connects: heater_1.heating, heater_2.heating``, one
+terminal for each line, in the order of the node's lines.
 
 The command binding on the gateway node says the ground may set the
 thermostat's setpoint, and the running vehicle applies it: a ``SET_NODE``
@@ -2216,8 +2236,8 @@ and two heaters joined to it, and which thermostat-yamcs, the same vehicle
 with Yamcs as its ground station, names too.
 Each sensor reports the zone's temperature, from a place of its own on it, so
 that what the three report is one temperature rather than three streams of
-noise, which is what the model is for; each heater's stand-in switches its
-heater while the vehicle has it on. So the loop closes through tcspecial: see
+noise, which is what the model is for; each heater's switch's stand-in
+switches its heater while the vehicle has it on. So the loop closes through tcspecial: see
 **The Simulator Configuration** below. Naming the ``thermostat`` node in the file's
 ``tcssim`` section closes it in tcssim alone instead, with no tcspecial
 running.
@@ -2231,7 +2251,8 @@ holds the band in the warm part of the orbit and not in the cold part, about
 a quarter of it, where the zone sinks more than two half bands below the
 setpoint. So a heater disabled in tcssim's window -- an unpowered or failed
 heater, see `Starting and stopping a payload`_ -- shows in the temperature,
-and nowhere else. ``make -C examples run-thermostat`` starts every payload
+and on its line of ``gpio-in-tmass``, which stays low however the thermostat
+decides. ``make -C examples run-thermostat`` starts every payload
 disabled, so press ``Enable`` on each, and ``Disable`` on a heater to take
 it away. A run of the model with its sensors' errors, three orbits from each
 of three seeds -- tcssim's tests
@@ -2244,7 +2265,8 @@ more than two half bands below the setpoint 27% to 31% of the time, as cold
 as 285.3 K, and the disabled heater never heating; and with neither, the
 zone following its surroundings, 277.4 to 289.4 K.
 
-``make -C examples run-thermostat`` runs it, on any desk.
+``make -C examples run-thermostat`` runs it, on a host with the kernel's
+simulated chip.
 
 The battery example
 -------------------
@@ -2686,10 +2708,10 @@ The thermostat-yamcs example
 ----------------------------
 .. figure:: ../examples/thermostat-yamcs/thermostat-yamcs.svg
    :alt: The thermostat-yamcs example: the thermostat example's sensors,
-         conversions, vote, thermostat and heaters, with a gateway_yamcs
-         node that sends each conversion's, the vote's and the thermostat's
-         data down to Yamcs as CCSDS telemetry, one APID each, where each
-         is a temperature in kelvin or on or off.
+         conversions, vote, thermostat, heaters and the lines sensing them,
+         with a gateway_yamcs node that sends each conversion's, the vote's
+         and the lines' data down to Yamcs as CCSDS telemetry, one APID
+         each, where each is a temperature in kelvin or a line on or off.
    :width: 100%
 
    ``examples/thermostat-yamcs``: the thermostat example with Yamcs
@@ -2706,14 +2728,17 @@ the other. What differs is the gateway, ``yamcs``: the beacon is telemetry
 of APID ``0x110``, CONNECT and its answer are on ``0x111``, and each source
 drawn into the gateway node comes down as telemetry of its ``apid_base``,
 ``0x400``, plus the source's device id -- ``ambient`` on ``0x400``,
-``temp1`` to ``temp3`` on ``0x405`` to ``0x407``, and ``thermostat`` on
-``0x40b``.
+``gpio-in-tmass`` on ``0x402``, and ``temp1`` to ``temp3`` on ``0x406`` to
+``0x408``.
 
 The mission database gives each of them a parameter of the type the
 configuration says its data are (see `What the vehicle answers to`_): the
-conversions and the vote are temperatures in kelvin, and the thermostat's
-decision is on or off. Nothing is added to the configuration for it: the
-type is what tcsmoc's plot window and the F´ bridge already read there.
+conversions and the vote are temperatures in kelvin, and ``gpio-in-tmass``,
+lines read for their levels with no edges, is a record for each line in the
+order of its offsets -- ``gpio-in-tmass_line2_time``, ``_offset`` and
+``gpio-in-tmass_line2``, its level, on or off, then line 3's. Nothing is
+added to the configuration for it: the type is what tcsmoc's plot window and
+the F´ bridge already read there.
 Yamcs's web interface, at ``http://localhost:17090``, shows them so.
 
 ``examples/thermostat-yamcs/thermostat_yamcs.py`` runs it, given a Yamcs
@@ -2729,27 +2754,24 @@ It starts Yamcs, tcssim, with every payload sending from the start, and
 tcspecial once tcssim is ready, each killed with it; has Yamcs send CONNECT
 until the vehicle answers with the configuration's checksum; and reads the
 parameters back over Yamcs's REST API. Its window shows the beacon above
-the zone's temperature, each reading, the thermostat's decision and the
-heaters it drives. With ``--seconds`` there is no window, and it prints
-what arrives, and a line each time the heaters are switched:
+the zone's temperature, each reading, and each line sensing a heater, on or
+off. With ``--seconds`` there is no window, and it prints what arrives, and a
+line each time a heater's line changes, of these forms:
 
 .. code-block:: text
 
    connected: the vehicle is running this configuration
-   parameter: /TcsYamcs/ambient, Value(Kelvin), units K
-   parameter: /TcsYamcs/thermostat, Decision, units none
-   read: ambient 292.623 K, temp1 292.587 K, temp2 292.712 K, temp3 292.623 K,
-   thermostat off, heaters_1 off, heaters_2 off
-   switched: thermostat off -> on, driving heaters_1, heaters_2; ambient
-   291.039 K, temp1 291.025 K, temp2 291.150 K, temp3 291.039 K, thermostat on,
-   heaters_1 on, heaters_2 on
+   read: ambient <T> K, temp1 <T> K, temp2 <T> K, temp3 <T> K,
+   gpio-in-tmass line 2 off, gpio-in-tmass line 3 off
+   switched: gpio-in-tmass line 2 off -> on; ambient <T> K, ...
 
-tcssim draws a window of its own, so it wants a display. Every port is in
-the seventeen thousands, so it can run beside the thermostat example.
+tcssim draws a window of its own, so it wants a display. Its ports are in
+the seventeen thousands, apart from the thermostat example's, but its GPIO
+lines are the same lines of the same chip, so the two are not run at once.
 Because tcssim is given ``--sending``, both heaters start enabled; press
-``Disable`` on a heater's panel in tcssim's window to take it away, and the
-zone falls behind in the cold part of the orbit, which Yamcs sees only in
-the temperatures -- the thermostat's decision goes on switching both.
+``Disable`` on a heater's switch in tcssim's window to take it away, and its
+line goes low and stays low, which Yamcs shows, while the zone falls behind
+in the cold part of the orbit.
 
 The tees example
 ----------------
@@ -2880,7 +2902,9 @@ that is not ``1`` or ``0`` goes to no channel, is counted in
 ``DataNotDecisions`` and is said in a ``NotADecision`` event. A thermostat
 sends the ground only a change of decision, so its channel shows what was
 last decided while the bridge was matched. Every other node's
-channel holds a datum's length and its first 64 bytes. A node drawn into it
+channel holds a datum's length and its first 64 bytes, a GPIO payload's
+lines read for their levels among them, their records as they came. A node
+drawn into it
 must be
 named as F´ names things, with letters, digits and underscores, and every
 program that checks a configuration refuses one that is not, as it refuses
@@ -3543,7 +3567,10 @@ every other setting may be stated on a group instead:
 
    connects               the terminal it is joined to: zone.temperature,
                           heater_1.on. Joined to an output, it reports it;
-                          joined to an input, it drives it
+                          joined to an input, it drives it. A GPIO payload
+                          that watches lines names a decision for each line,
+                          in the order of its lines: heater_1.heating,
+                          heater_2.heating
    offset                 how far the place a reporting stand-in is on sits
                           from what its terminal says, in the terminal's
                           unit: "+0.2 K". Optional
@@ -3560,6 +3587,12 @@ a connection too: two would each switch it over the other. A heater's ``on``
 that nothing drives is refused, being a part nothing can switch, and so is a
 component nothing is joined to, which is most likely a misspelled
 ``connects``.
+A GPIO payload that watches lines is pulled rather than signalled: each of its
+lines is held high while its terminal's decision is on, and looked at every
+packet interval -- a line sensing a heater, pulled to the heater's
+``heating``, which is on only while the heater is really heating, so a heater
+disabled in tcssim reads low whatever it is told. One terminal for each line
+is required, and a list of terminals anywhere else is refused.
 The settings that joined a payload to a thermal mass -- ``reads``, ``heats``,
 ``output``, ``input``, ``rate`` -- are refused, told what says it now.
 
@@ -4608,8 +4641,11 @@ as soon as it is regenerated:
   bridge read it: a compute node's value a float in its unit (``K``,
   ``V``, ...), read from its four bytes through a calibrator, with the unit
   in a ``UnitSet``; a thermostat's decision a boolean, read from its ``1``
-  or ``0``; and any other node's data binary, what follows the header,
-  whole. (A source drawn into two such nodes gets one for each, named
+  or ``0``; a GPIO payload's lines read for their levels with no edges a
+  record for each line, in the order of its offsets --
+  ``<node>_line<offset>_time``, ``_offset``, and ``<node>_line<offset>``,
+  the level, a boolean from its 32-bit word; and any other node's data
+  binary, what follows the header, whole. (A source drawn into two such nodes gets one for each, named
   ``<node>_to_<gateway>``);
 * a link on the command link, on the beacon, to each ``gateway_yamcs``
   node's ``address`` and ``port``, and on each port a source's data arrives
@@ -5359,7 +5395,9 @@ and when it arrived, so that a reading is told from the line drawn between
 two; where readings crowd into one column of the screen, one dot stands for
 them.
 
-Behind a panel a thermostat reads, its band is drawn. With setpoint S and
+Behind a panel a thermostat reads, its band is drawn, whether or not its
+decision reaches the ground: the band is what the values are held to, said by
+the configuration. With setpoint S and
 ``half_band`` H, the panel is left white from S - H to S + H, where the
 thermostat holds the reading; it is pale yellow, and said ``high`` and
 ``low``, for a further H either side; and pale red, said ``too high`` and
@@ -5388,10 +5426,12 @@ drawn, so that a spike is never thinned away.
 
 Under the panels, as wide as them so that a change lines up with the values
 above it, is a strip for each switch -- a ``hysteresis`` node drawn into a
-gateway node, named with what it drives, such as ``thermostat → heaters_1,
-heaters_2`` in the thermostat example, whose one thermostat drives both
-heaters -- vermillion with ``on`` written in it while it is on, grey while
-it is off, and its last decision said beside it. With two thermostats each
+gateway node, named with what it drives, such as ``thermostat →
+gpio-out-tmass1, gpio-out-tmass2``; and each line of a GPIO payload drawn into
+one that watches lines, named with its line, such as ``gpio-in-tmass line 2``
+in the thermostat example, whose lines sense its heaters -- vermillion with
+``on`` written in it while it is on or high, grey while it is off or low, and
+its last state said beside it. With two thermostats each
 driving a heater there are two strips, one under the other, so which heater
 is on, or both, is read straight off them. Nothing of a switch is
 drawn on the panels, which keeps a switch on from being taken for the band's
@@ -5399,9 +5439,10 @@ pale red. A thermostat tells the ground only when its decision changes, so a
 switch is drawn from each change to the next, and before the first is heard
 it is not drawn at all, its state said as ``not heard`` rather than guessed
 as off.
-A strip is the thermostat's decision and not what a heater does: the plot
-cannot see tcssim's ``Enable``, so a heater disabled there shows only
-through the temperature.
+A thermostat's strip is its decision and not what a heater does: a heater
+disabled in tcssim takes the decision and does nothing. A line sensing the
+heater is what it does, and its strip stays off; which is why the thermostat
+example sends its heaters' lines down rather than its thermostat's decision.
 
 The colours are Okabe and Ito's, which readers with each common kind of colour
 blindness tell apart: blue, bluish green, reddish purple, sky blue and black

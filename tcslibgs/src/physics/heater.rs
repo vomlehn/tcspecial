@@ -3,7 +3,10 @@
 //! Driven at `on` by a decision -- a hysteresis node's, through a stand-in
 //! the vehicle writes to -- and giving out its `heat`, in watts, to whatever
 //! it warms, and drawing its `current`, in amperes, from its supply. Both are
-//! nought while it is off.
+//! nought while it is off. `heating` says whether it is on, as a decision: what
+//! a line sensing the heater reads, which is what it is doing rather than what
+//! it was told -- a heater whose stand-in is disabled is told nothing, and is
+//! off.
 //!
 //! Its supply is not steady. Where `ripple` is stated the voltage wanders by
 //! that fraction of nominal, slowly, as `ripple_time` says; a resistance's
@@ -22,6 +25,7 @@ pub const TERMINALS: &[Terminal] = &[
     Terminal::input("on", Kind::Decision).must_be_joined(),
     Terminal::output("heat", Kind::Value(Unit::Watt)),
     Terminal::output("current", Kind::Value(Unit::Ampere)),
+    Terminal::output("heating", Kind::Decision),
 ];
 
 /// Everything it states, by the name a file writes, the

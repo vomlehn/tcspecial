@@ -10,9 +10,9 @@
 # readings of one temperature agree, so the vote produces a temperature and
 # the thermostat decides on it.
 #
-# The heaters are UDP sockets, which the vehicle drives and tcssim watches:
-# each decision the vehicle sends them, their panel counts, and the heater
-# each is joined to is switched. So the loop closes through tcspecial: the
+# The heaters are lines of a GPIO chip, which the vehicle drives and tcssim
+# watches: each decision the vehicle drives them to, their panel counts, and
+# the heater each is joined to is switched. So the loop closes through tcspecial: the
 # sensors report the zone, the vehicle decides, and the heaters warm it.
 #
 # A heater's panel button is its power: disabled, it is an unpowered or
@@ -54,19 +54,33 @@ simulated_payload_groups:
     simulate: true
 
 simulated_payloads:
-  - type network:
-      # Driven and never read: their stand-ins send nothing, count each decision
-      # the vehicle sends them, and switch the heater each is joined to.
-      - payload: heaters_1
+  # The heaters' switches and the lines that sense them, through the
+  # kernel's simulated chip: sudo bin/mk-kernel-stand-ins gpio makes it.
+  - type gpio:
+      # The lines on the thermal mass, pulled to what each heater is doing --
+      # line 2 to heater_1's, line 3 to heater_2's, in the order the node
+      # names its lines -- so a heater disabled below reads as off however it
+      # was told, and the ground sees that. Looked at ten times a second, so a
+      # line follows its heater within a tenth of a second.
+      - payload: gpio-in-tmass
+        connects: heater_1.heating, heater_2.heating
+        packet_interval: 100 ms
+        simulate: true
+
+      # Driven and never read: each stand-in watches its line, counts each
+      # change the vehicle drives it to, and switches the heater it is joined
+      # to. A heater's panel button is its power: disabled, it is an
+      # unpowered or failed heater, and stays off whatever is decided;
+      # enabled again, it takes the latest decision at once.
+      - payload: gpio-out-tmass1
         connects: heater_1.on
-        protocol: udp
         simulate: true
 
-      - payload: heaters_2
+      - payload: gpio-out-tmass2
         connects: heater_2.on
-        protocol: udp
         simulate: true
 
+  - type network:
       # Each sensor with its part's datasheet errors, and on its own place on
       # the zone. temp_1 and temp_2 are one part, a digital sensor of a
       # sixteenth of a kelvin a count: accurate to half a kelvin, three

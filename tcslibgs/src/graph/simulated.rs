@@ -440,9 +440,9 @@ mod tests {
         let (graph, _) = example("thermostat");
         assert!(reaches(&graph, "temp_1", "thermostat"));
         assert!(reaches(&graph, "temp_3", "thermostat"));
-        assert!(reaches(&graph, "thermostat", "heaters_2"));
+        assert!(reaches(&graph, "thermostat", "gpio-out-tmass2"));
         assert!(!reaches(&graph, "thermostat", "temp_1"));
-        assert!(!reaches(&graph, "heaters_1", "thermostat"));
+        assert!(!reaches(&graph, "gpio-out-tmass1", "thermostat"));
     }
 
     /// A sensor's encoding is its conversion's, in the unit of what it

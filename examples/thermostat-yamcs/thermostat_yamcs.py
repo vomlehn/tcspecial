@@ -69,6 +69,7 @@ from tcslib.yamcs_ground import (  # noqa: E402
     write_yamcs, yamcs_home)
 from tcslibgs import configuration  # noqa: E402
 from tcslibgs import yamcs as generated  # noqa: E402
+from tcslibgs.form import DECISION  # noqa: E402
 
 #: Where Yamcs's web interface and REST API are, unless --http-port says.
 HTTP_PORT = 17090
@@ -201,9 +202,20 @@ class Setup:
         self.beacon_interval = self.config.beacon_interval()
         self.links = [link for link in generated.telemetry(self.config)
                       if link.gateway == self.gateway]
-        self.sources = [Source(link.source, generated.qualified(link.name),
-                               link.form, self._drives(link))
-                        for link in self.links]
+        self.sources = []
+        for link in self.links:
+            if link.form.kind == "Lines":
+                # Each line is a source of its own, on or off as it is high
+                # or low: a line sensing a heater is the heater's state.
+                self.sources += [
+                    Source(f"{link.source} line {offset}",
+                           generated.qualified(f"{link.name}_line{offset}"),
+                           DECISION)
+                    for offset in link.form.lines]
+                continue
+            self.sources.append(Source(link.source,
+                                       generated.qualified(link.name),
+                                       link.form, self._drives(link)))
         if not any(source.form.kind == "Value" for source in self.sources):
             raise ValueError(f'{self.path}: nothing drawn into '
                              f'"{self.gateway}" sends values, and this '
@@ -414,9 +426,12 @@ def say_changes(changed, readings):
     for source, was, now in changed:
         if was is None:
             continue
-        driven = ", ".join(source.drives) or "nothing"
+        # What a decision drives, where it drives anything: a line sensing a
+        # heater drives nothing, being the heater's state.
+        driving = (f", driving {', '.join(source.drives)}" if source.drives
+                   else "")
         print(f"switched: {source.node} {shown(source, was, [])} -> "
-              f"{shown(source, now, [])}, driving {driven}; "
+              f"{shown(source, now, [])}{driving}; "
               f"{readings.line()}", flush=True)
 
 

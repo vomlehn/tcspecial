@@ -123,12 +123,14 @@ vehicle:
         # asserted below the setpoint, unasserted above it. Two heaters, because
         # one failing must not leave the mass with no way to be warmed: either
         # alone holds the band while the orbit is warm, and both together hold
-        # it in the cold too.
+        # it in the cold too, each switched through a line of its own. What it
+        # decides goes to the heaters and the log and not to the ground: the
+        # ground is told what the heaters are doing, by gpio-in-tmass, which a
+        # heater that has failed does not hide.
         gateway-out:
-          - target: heaters_1
-          - target: heaters_2
+          - target: gpio-out-tmass1
+          - target: gpio-out-tmass2
         payload-out:
-          - target: gateway
           - target: housekeeping
         payload-in: true
   - type log:
@@ -138,26 +140,42 @@ vehicle:
         payload-in: true
 
 payloads:
-  # Every payload is the far end of a UDP socket, which tcssim stands in for
-  # with nothing more than a socket, so that the example runs on any desk
-  # and touches no hardware. The buses these parts would be on aboard --
-  # I2C, SPI, GPIO -- are flown against stand-ins by make stand-ins-test
-  # and make kernel-stand-ins-test.
+  # The heaters and the lines that sense them, on the thermal mass, through
+  # the kernel's simulated chip, which bin/mk-kernel-stand-ins makes: lines
+  # 2 to 5, which leaves 0 and 1 to the gpio example.
+  - type gpio:
+      # Two lines on the thermal mass, one sensing each heater: high while it
+      # is heating. Read every second for what they are, rather than for
+      # when they change, so the ground hears the heaters' state on a beat
+      # and a lost report is made good by the next; one bit a line, each a
+      # sixteen-byte record -- when, which line, what it is -- to the ground
+      # and the log. Disabled from the ground, it reports nothing at all.
+      - payload: gpio-in-tmass
+        edge: "none"
+        lines: "2,3"
+        path: "/dev/gpiochip1"
+        state_interval: "1 s"
+        payload-out:
+          - target: gateway
+          - target: housekeeping
+      # The two heaters' switches, each a line the thermostat drives -- 1 for
+      # on, 0 for off. One payload each, so that one can be stopped from the
+      # ground while the other goes on warming the mass.
+      - payload: gpio-out-tmass1
+        direction: "output"
+        lines: "4"
+        path: "/dev/gpiochip1"
+        gateway-in: true
+      - payload: gpio-out-tmass2
+        direction: "output"
+        lines: "5"
+        path: "/dev/gpiochip1"
+        gateway-in: true
+  # The sensors are each the far end of a UDP socket, which tcssim stands in
+  # for with nothing more than a socket, so that they touch no hardware. The
+  # buses these parts would be on aboard -- I2C, SPI -- are flown against
+  # stand-ins by make stand-ins-test and make kernel-stand-ins-test.
   - type network:
-      # Two heaters, both near the sensors on the same thermal mass, each
-      # driven by what the thermostat decides -- 1 for on, 0 for off. Separate
-      # nodes, so that one can be stopped from the ground while the other goes
-      # on warming the mass.
-      - payload: heaters_1
-        address: "127.0.0.1"
-        port: "17804"
-        protocol: "udp"
-        gateway-in: true
-      - payload: heaters_2
-        address: "127.0.0.1"
-        port: "17805"
-        protocol: "udp"
-        gateway-in: true
       # One of three sensors of the same place, a trio, so that the
       # temperature survives one of them going wrong. Two bytes, signed,
       # big endian.
@@ -195,8 +213,9 @@ tcsgui:
   nodes:
     - { node: ambient, x: 469, y: 166 }
     - { node: gateway, x: 790, y: 34 }
-    - { node: heaters_1, x: 34, y: 393 }
-    - { node: heaters_2, x: 34, y: 470 }
+    - { node: gpio-in-tmass, x: 242, y: 470 }
+    - { node: gpio-out-tmass1, x: 34, y: 393 }
+    - { node: gpio-out-tmass2, x: 34, y: 470 }
     - { node: housekeeping, x: 469, y: 374 }
     - { node: temp1, x: 242, y: 34 }
     - { node: temp2, x: 242, y: 166 }

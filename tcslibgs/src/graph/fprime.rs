@@ -128,7 +128,11 @@ pub const OWN_CHANNELS: &[Own] = &[
 /// [`crate::node::vehicle::compute::from_value`] -- is a number in the unit
 /// the graph gives it, see [`crate::graph::units`]; a decision -- the text
 /// `1` or `0`, see [`crate::node::vehicle::compute::from_decision`] -- is on
-/// or off. Of every other node it says nothing. A sensor's `format` is
+/// or off. A set of GPIO lines read for their levels on an interval, with no
+/// edges, sends a record for each of its lines every time, in the order its
+/// node names them -- see [`crate::node::payload::gpio::EVENT_BYTES`] -- so
+/// what it sends is its lines' levels. Of every other node it says nothing.
+/// A sensor's `format` is
 /// written on the conversion that reads it, not on the sensor, and says how
 /// that one reader takes the bytes. So a value's channel is a number with
 /// its unit, a decision's is a `bool`, and every other channel is the bytes
@@ -143,6 +147,11 @@ pub enum Form {
     /// A decision, as a `bool`, true for on, which tcslib-c's
     /// `tcs_decision_on` reads.
     Decision,
+    /// The levels of this many GPIO lines, a record each, in the order the
+    /// node names them, every datum. F´'s channel for it is the bytes, as a
+    /// `Datum`: a ground that reads lines -- Yamcs, tcsmoc's plot -- reads
+    /// them out of the records.
+    Lines(usize),
 }
 
 impl Form {
@@ -157,10 +166,27 @@ impl Form {
     ///
     /// [`Form::Value`] for a node that sends values in a unit, and
     /// [`Form::Decision`] for one that sends decisions, as
-    /// [`node_produces`] and [`units::unit_of`] say; [`Form::Datum`] for
-    /// every other, including a node of values whose unit cannot be settled,
-    /// which `Graph::check` refuses.
+    /// [`node_produces`] and [`units::unit_of`] say; [`Form::Lines`] for a
+    /// GPIO payload's lines read for their levels on an interval and
+    /// watched for no edge; [`Form::Datum`] for every other, including a
+    /// node of values whose unit cannot be settled, which `Graph::check`
+    /// refuses, and lines watched for edges, whose datum may hold the one
+    /// line that changed.
     pub fn of(graph: &Graph, source: &str) -> Form {
+        if let Some(Ok(crate::graph::reach::Reach {
+            endpoint: crate::EndpointConfig::Gpio(gpio),
+            ..
+        })) = graph.node(source).map(crate::graph::reach::reach_of)
+        {
+            let levels = !gpio.direction.is_output()
+                && gpio.edge == crate::LineEdge::None
+                && gpio.state_interval.is_some();
+            return if levels {
+                Form::Lines(gpio.lines.len())
+            } else {
+                Form::Datum
+            };
+        }
         let produces = graph
             .node(source)
             .and_then(|node| node_produces(&node.node_type, &node.attributes));
@@ -178,7 +204,7 @@ impl Form {
     /// `Datum`, the component's own struct, `F64` or `bool`.
     pub fn fpp_type(self) -> &'static str {
         match self {
-            Form::Datum => "Datum",
+            Form::Datum | Form::Lines(_) => "Datum",
             Form::Value(_) => "F64",
             Form::Decision => "bool",
         }
@@ -195,6 +221,9 @@ impl Form {
             Form::Datum => "its bytes".to_string(),
             Form::Value(unit) => format!("a value, in {}", unit.name()),
             Form::Decision => "a decision, true for on".to_string(),
+            Form::Lines(count) => {
+                format!("the levels of {count} lines, a record each, as bytes")
+            }
         }
     }
 
@@ -643,7 +672,7 @@ impl Model {
                 cpp_string(&channel.name)
             );
             let _ = match form {
-                Form::Datum => writeln!(
+                Form::Datum | Form::Lines(_) => writeln!(
                     out,
                     "\t\tthis->tlmWrite_{}(this->asDatum(datum));",
                     channel.name
@@ -1004,6 +1033,10 @@ mod tests {
         assert_eq!(Form::of(&thermostat, "ambient"), Form::Value(Unit::Kelvin));
         assert_eq!(Form::of(&thermostat, "thermostat"), Form::Decision);
         assert_eq!(Form::of(&thermostat, "temp_1"), Form::Datum);
+        // Lines read for their levels, and lines that are driven.
+        assert_eq!(Form::of(&thermostat, "gpio-in-tmass"), Form::Lines(2));
+        assert_eq!(Form::of(&thermostat, "gpio-out-tmass1"), Form::Datum);
+        assert_eq!(Form::Lines(2).fpp_type(), "Datum");
         assert_eq!(Form::of(&thermostat, "nobody"), Form::Datum);
         assert_eq!(Form::Value(Unit::Volt).fpp_type(), "F64");
         assert_eq!(Form::Datum.fpp_type(), "Datum");

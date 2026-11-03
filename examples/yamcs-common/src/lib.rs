@@ -692,6 +692,13 @@ pub fn decode(xtce: &Element, packet: &[u8]) -> Decoded {
                             name.to_string(),
                             calibrated(kind, raw, size),
                         );
+                    } else if kind.name == "BooleanParameterType"
+                        && kind.child("IntegerDataEncoding").is_some()
+                    {
+                        // An integer read as a boolean, as Yamcs reads one:
+                        // nought is false and anything else true.
+                        let raw = bits(packet, at, size);
+                        decoded.booleans.insert(name.to_string(), Ok(raw != 0));
                     } else if kind.name == "BooleanParameterType" {
                         assert!(
                             at.is_multiple_of(8) && size.is_multiple_of(8),

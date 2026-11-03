@@ -82,6 +82,12 @@ pub enum Attachment {
         /// panel.
         power: Arc<Power>,
     },
+    /// It pulls each of a GPIO payload's lines, in the order its node names
+    /// them, to one of these decision outputs: high while the output is on.
+    Pulls {
+        world: Arc<World>,
+        places: Vec<Place>,
+    },
 }
 
 /// Whether a driven part is enabled in its payload's panel, and what the
@@ -323,7 +329,35 @@ impl Attachment {
             Attachment::Drives { world, place, .. } => {
                 format!("{payload} drives {}", world.name_of(*place))
             }
+            Attachment::Pulls { world, places } => {
+                let names: Vec<String> =
+                    places.iter().map(|p| world.name_of(*p)).collect();
+                format!("{payload} pulls its lines to {}", names.join(", "))
+            }
         }
+    }
+
+    /// What a pulling stand-in's lines are to be now: each high where its
+    /// decision is on. Written into `levels`, which its caller made once,
+    /// so that asking allocates nothing.
+    ///
+    /// # Arguments
+    ///
+    /// * `levels` - One for each line, in the node's order.
+    ///
+    /// # Returns
+    ///
+    /// Whether this is a pulling stand-in: for one of any other kind,
+    /// `levels` is left as it was.
+    pub fn levels(&self, levels: &mut [bool]) -> bool {
+        let Attachment::Pulls { world, places } = self else {
+            return false;
+        };
+        let now = Instant::now();
+        for (level, place) in levels.iter_mut().zip(places) {
+            *level = world.read(*place, now) > 0.5;
+        }
+        true
     }
 
     /// What a reporting or signalling stand-in sends now: its terminal,
@@ -351,7 +385,7 @@ impl Attachment {
                 said.store(value.to_bits(), Ordering::Relaxed);
                 Some(if value > 0.5 { b"1" } else { b"0" }.to_vec())
             }
-            Attachment::Drives { .. } => None,
+            Attachment::Drives { .. } | Attachment::Pulls { .. } => None,
         }
     }
 

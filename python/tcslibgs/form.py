@@ -12,6 +12,9 @@ some nodes: a compute node says, by its function, what it sends.
   ``process`` state their own, and a ``vote`` is in its inputs' one unit.
 * A decision -- the text ``1`` or ``0`` (``compute::from_decision``) -- is
   on or off: what a ``hysteresis`` sends.
+* A set of GPIO lines read for their levels on an interval, and watched for
+  no edge, sends a sixteen-byte record for each line every time, in the
+  order of its offsets, lowest first: its lines' levels.
 * Every other node's data is bytes, as they came.
 
 tcsmoc's plot window and the F´ bridge's dictionary know a node's data by
@@ -88,15 +91,21 @@ DECISION_FUNCTIONS = ("hysteresis",)
 
 @dataclass(frozen=True)
 class Form:
-    """What a node sends: ``Datum``, ``Value`` (with its :class:`Unit`) or
-    ``Decision``, as ``fprime::Form`` names them."""
+    """What a node sends: ``Datum``, ``Value`` (with its :class:`Unit`),
+    ``Decision`` or ``Lines`` (with its lines' offsets), as ``fprime::Form``
+    names them."""
 
     kind: str
     unit: Unit = None
+    #: For ``Lines``: the offsets of the lines, lowest first, which is the
+    #: order their records come in.
+    lines: tuple = ()
 
     def __str__(self):
         """The form as the Rust's ``Debug`` writes it: ``Datum``,
-        ``Value(Kelvin)``, ``Decision``."""
+        ``Value(Kelvin)``, ``Decision``, ``Lines(2)``."""
+        if self.kind == "Lines":
+            return f"Lines({len(self.lines)})"
         if self.unit is None:
             return self.kind
         return f"{self.kind}({self.unit.variant})"
@@ -117,8 +126,9 @@ def form_of(config, source):
     Returns:
         A value's :class:`Form`, with its unit, for a compute node whose
         function makes values; :data:`DECISION` for one whose function
-        makes decisions; :data:`DATUM` for every other node, and for one
-        that is not there.
+        makes decisions; a ``Lines`` form for a GPIO payload read for its
+        lines' levels, as :func:`_lines_form` says; :data:`DATUM` for every
+        other node, and for one that is not there.
 
     Raises:
         ValueError: A node of values does not say its unit, says one that
@@ -129,12 +139,45 @@ def form_of(config, source):
     names = {node.name for node in config.nodes}
     if source not in names:
         return DATUM
+    node = config.node(source)
+    if node.node_type == "gpio":
+        return _lines_form(node)
     function = _function(config, source)
     if function in DECISION_FUNCTIONS:
         return DECISION
     if function in VALUE_FUNCTIONS:
         return Form("Value", _unit(config, source, []))
     return DATUM
+
+
+#: The bytes of one line's record: ``gpio::EVENT_BYTES``.
+LINE_RECORD_BYTES = 16
+
+
+def _lines_form(node):
+    """The form of a GPIO payload's data: ``Form::of``'s rule for one.
+
+    Its lines' levels where it reads them on an interval and watches them
+    for no edge, every datum then holding a record of every line; its bytes
+    where it watches for edges, a datum of which may hold the one line that
+    changed, or drives them.
+
+    Args:
+        node: The node.
+
+    Returns:
+        A ``Lines`` :class:`Form`, or :data:`DATUM`.
+    """
+    said = {name: str(value).strip()
+            for name, value in node.attributes.items()}
+    levels = (said.get("direction", "input") != "output"
+              and said.get("edge") == "none"
+              and bool(said.get("state_interval")))
+    if not levels:
+        return DATUM
+    offsets = sorted(int(word, 0) for word in
+                     said.get("lines", "").replace(",", " ").split())
+    return Form("Lines", lines=tuple(offsets))
 
 
 def _function(config, name):

@@ -627,6 +627,14 @@ impl EndpointWaitable for GpioEndpoint {
 }
 
 impl EndpointReadable for GpioEndpoint {
+    /// Whether a report of what the lines are is due. Lines watched for no
+    /// edge have a descriptor nothing ever makes readable, so without this
+    /// a set of lines read only for its levels would never be read at all.
+    fn due(&self) -> bool {
+        !self.direction.is_output()
+            && self.next_report.is_some_and(|due| Instant::now() >= due)
+    }
+
     /// Every event that is waiting, as records.
     ///
     /// As many as the buffer has room for: the kernel hands over whole

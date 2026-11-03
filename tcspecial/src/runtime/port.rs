@@ -695,11 +695,20 @@ impl EndpointPort {
         &mut self,
         buffer: &mut [u8],
     ) -> Result<usize, String> {
+        // Read where the descriptor has something, or where the endpoint
+        // has a report due that no descriptor announces: see
+        // `EndpointReadable::due`.
         match self.ready_to_read() {
-            Ok(true) => self.reader.read(buffer).map_err(|e| {
-                format!("{}: the read failed: {}", self.what, self.plainly(e))
-            }),
-            Ok(false) => Ok(0),
+            Ok(ready) if ready || self.reader.due() => {
+                self.reader.read(buffer).map_err(|e| {
+                    format!(
+                        "{}: the read failed: {}",
+                        self.what,
+                        self.plainly(e)
+                    )
+                })
+            }
+            Ok(_) => Ok(0),
             Err(why) => Err(why),
         }
     }

@@ -1056,6 +1056,8 @@ export component MainWindow inherits Window {
 export struct TraceShown {
     said: string,
     commands: string,
+    // A dot where each reading is, as path commands in the same pixels.
+    dots: string,
     colour: color,
 }
 
@@ -1374,6 +1376,20 @@ export component PlotWindow inherits Window {
                         commands: trace.commands;
                         stroke: trace.colour;
                         stroke-width: 2px;
+                    }
+
+                    // A dot on each trace where each reading arrived, in the
+                    // trace's colour, so that what was read is told from the
+                    // line drawn between readings.
+                    for trace in panel.traces: Path {
+                        x: 0;
+                        y: 0;
+                        width: parent.width;
+                        height: parent.height;
+                        viewbox-width: self.width / 1px;
+                        viewbox-height: self.height / 1px;
+                        commands: trace.dots;
+                        fill: trace.colour;
                     }
                 }
             }

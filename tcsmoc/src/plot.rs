@@ -693,16 +693,27 @@ impl Plot {
                 shown.band = Some(band.edges().map(y_of));
                 band_said(&mut shown.band_said, band, panel.unit);
             }
-            for ((&i, path), latest) in panel
+            for (((&i, path), latest), dots) in panel
                 .traces
                 .iter()
                 .zip(&mut shown.paths)
                 .zip(&mut shown.latest)
+                .zip(&mut shown.dots)
             {
                 let trace = &self.traces[i];
                 let mut pen = Pen { path, column: None };
+                // A dot where each reading is, when it arrived and what it
+                // said, so that the line between readings is not read as
+                // readings; one to a column of pixels, where they crowd.
+                let mut dotted: Option<i64> = None;
                 self.each(trace, left, |at, value, joined| {
-                    pen.point(x_of(at), y_of(value), joined);
+                    let (x, y) = (x_of(at), y_of(value));
+                    pen.point(x, y, joined);
+                    let column = x.floor() as i64;
+                    if at >= left && dotted != Some(column) {
+                        dot(dots, x, y);
+                        dotted = Some(column);
+                    }
                 });
                 pen.flush();
                 latest.push_str(&trace.name);
@@ -797,6 +808,28 @@ impl Pen<'_> {
             }
         }
     }
+}
+
+/// How big a reading's dot is: its radius, in pixels.
+const DOT: f32 = 2.5;
+
+/// Writes a dot, a circle of radius [`DOT`] about a point, as SVG path
+/// commands: two half circles.
+///
+/// # Arguments
+///
+/// * `out` - Where it is written.
+/// * `x`   - The point across, in pixels.
+/// * `y`   - The point down, in pixels.
+fn dot(out: &mut String, x: f32, y: f32) {
+    let _ = write!(
+        out,
+        "M {:.1} {y:.1} A {DOT} {DOT} 0 1 0 {:.1} {y:.1} \
+         A {DOT} {DOT} 0 1 0 {:.1} {y:.1} Z ",
+        x - DOT,
+        x + DOT,
+        x - DOT
+    );
 }
 
 /// A panel's scale: its top and bottom, and the step between its ticks.
@@ -1070,6 +1103,8 @@ pub struct Tick {
 #[derive(Debug, Default)]
 pub struct PanelDrawn {
     pub paths: Vec<String>,
+    /// Each trace's dots, one where each reading is, as SVG path commands.
+    pub dots: Vec<String>,
     pub latest: Vec<String>,
     pub ticks: Vec<Tick>,
     pub setpoints: Vec<f32>,
@@ -1102,8 +1137,14 @@ impl Drawn {
             .resize_with(plot.panels.len(), PanelDrawn::default);
         for (panel, drawn) in plot.panels.iter().zip(&mut self.panels) {
             drawn.paths.resize_with(panel.traces.len(), String::new);
+            drawn.dots.resize_with(panel.traces.len(), String::new);
             drawn.latest.resize_with(panel.traces.len(), String::new);
-            for text in drawn.paths.iter_mut().chain(&mut drawn.latest) {
+            for text in drawn
+                .paths
+                .iter_mut()
+                .chain(&mut drawn.dots)
+                .chain(&mut drawn.latest)
+            {
                 text.clear();
             }
             drawn.ticks.clear();
@@ -1208,6 +1249,7 @@ pub fn show(
                     .map(|&i| TraceShown {
                         said: SharedString::new(),
                         commands: SharedString::new(),
+                        dots: SharedString::new(),
                         colour: colour(TRACE_COLOURS[i % TRACE_COLOURS.len()]),
                     })
                     .collect::<Vec<_>>(),
@@ -1285,11 +1327,16 @@ pub fn show(
                 }
                 panels.set_row_data(p, row);
             }
-            for (i, (commands, said)) in
-                panel.paths.iter().zip(&panel.latest).enumerate()
+            for (i, ((commands, dots), said)) in panel
+                .paths
+                .iter()
+                .zip(&panel.dots)
+                .zip(&panel.latest)
+                .enumerate()
             {
                 if let Some(mut trace) = models.traces.row_data(i) {
                     trace.commands = SharedString::from(commands.as_str());
+                    trace.dots = SharedString::from(dots.as_str());
                     trace.said = SharedString::from(said.as_str());
                     models.traces.set_row_data(i, trace);
                 }
@@ -1508,6 +1555,26 @@ pub(crate) mod tests {
         assert_eq!(
             drawn.panels[0].paths[0],
             "M 0.0 450.0 L 10.0 150.0 M 40.0 150.0 "
+        );
+    }
+
+    /// Each reading on the plot has a dot where it is, and readings crowded
+    /// into one column of pixels share one.
+    #[test]
+    fn each_reading_has_a_dot() {
+        let mut plot = Plot::of(&example("descent"), |_| true).expect("a plot");
+        let t0 = Instant::now();
+        plot.reading(0, t0, 0.0);
+        plot.reading(0, t0 + Duration::from_secs(2), 10.0);
+        // A tenth of a pixel after the last, in the same column.
+        plot.reading(0, t0 + Duration::from_millis(2001), 10.0);
+        let mut drawn = Drawn::default();
+        plot.draw(t0 + Duration::from_secs(2), 1000.0, 600.0, &mut drawn);
+        assert_eq!(
+            drawn.panels[0].dots[0],
+            "M -2.5 450.0 A 2.5 2.5 0 1 0 2.5 450.0 A 2.5 2.5 0 1 0 -2.5 \
+             450.0 Z M 197.5 150.0 A 2.5 2.5 0 1 0 202.5 150.0 A 2.5 2.5 0 1 \
+             0 197.5 150.0 Z "
         );
     }
 

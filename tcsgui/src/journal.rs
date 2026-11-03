@@ -209,6 +209,33 @@ pub enum Edit {
         name: String,
         settings: Vec<(String, String)>,
     },
+    /// A physics component placed in the simulator file's world, of a type,
+    /// with nothing stated yet. Undone by removing it.
+    AddPhysics { name: String, kind: String },
+    /// A physics component removed, with what it stated and the connections
+    /// that joined it, so that undo puts back the component that was there
+    /// and not an empty one of the same name: removing a component removes
+    /// its connections, which would name nothing otherwise.
+    RemovePhysics {
+        name: String,
+        kind: String,
+        settings: Vec<(String, String)>,
+        connections: Vec<(String, String)>,
+    },
+    /// A physics component put back as it was.
+    RestorePhysics {
+        name: String,
+        kind: String,
+        settings: Vec<(String, String)>,
+        connections: Vec<(String, String)>,
+    },
+    /// A setting of one physics component was set.
+    SetPhysics {
+        component: String,
+        setting: String,
+        was: Option<String>,
+        now: Option<String>,
+    },
     /// A node was moved on the canvas. Not a change to the configuration --
     /// the vehicle does not care where the box is -- but it is in the history
     /// because a person who drags a node expects undo to put it back.
@@ -485,6 +512,45 @@ impl Edit {
                 name: name.clone(),
                 settings: settings.clone(),
             },
+            Edit::AddPhysics { name, kind } => Edit::RemovePhysics {
+                name: name.clone(),
+                kind: kind.clone(),
+                settings: Vec::new(),
+                connections: Vec::new(),
+            },
+            Edit::RemovePhysics {
+                name,
+                kind,
+                settings,
+                connections,
+            } => Edit::RestorePhysics {
+                name: name.clone(),
+                kind: kind.clone(),
+                settings: settings.clone(),
+                connections: connections.clone(),
+            },
+            Edit::RestorePhysics {
+                name,
+                kind,
+                settings,
+                connections,
+            } => Edit::RemovePhysics {
+                name: name.clone(),
+                kind: kind.clone(),
+                settings: settings.clone(),
+                connections: connections.clone(),
+            },
+            Edit::SetPhysics {
+                component,
+                setting,
+                was,
+                now,
+            } => Edit::SetPhysics {
+                component: component.clone(),
+                setting: setting.clone(),
+                was: now.clone(),
+                now: was.clone(),
+            },
             Edit::AddGroup { name, interval } => Edit::RemoveGroup {
                 name: name.clone(),
                 interval: interval.clone(),
@@ -627,6 +693,18 @@ impl Edit {
             Edit::RestoreSimGroup { name, .. } => {
                 format!("put back simulator group \"{name}\"")
             }
+            Edit::AddPhysics { name, kind } => {
+                format!("add {kind} \"{name}\"")
+            }
+            Edit::RemovePhysics { name, .. } => {
+                format!("remove physics \"{name}\"")
+            }
+            Edit::RestorePhysics { name, .. } => {
+                format!("put back physics \"{name}\"")
+            }
+            Edit::SetPhysics {
+                component, setting, ..
+            } => format!("set {setting} of \"{component}\""),
             Edit::AddGroup { name, .. } => format!("add group \"{name}\""),
             Edit::RemoveGroup { name, .. } => {
                 format!("remove group \"{name}\"")

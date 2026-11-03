@@ -1018,3 +1018,39 @@ export component SheetGround inherits Rectangle {
         }
     }
 }
+
+// The Physics pane's heading: a band across the top of the pane with its
+// name in it, painted in its own tint, as SheetGround heads the other three.
+// The Physics pane is the simulator file's and is drawn left of the sheet
+// the configuration is on -- see tcsdiagram::pane -- so it is a piece of its
+// own, put in the window's canvas beside the sheet.
+export component PhysicsGround inherits Rectangle {
+    // How wide the pane is, in sheet pixels.
+    in property <length> physics-width;
+    // What its band is painted. See tcsdiagram::look::ground_of.
+    in property <color> physics-ground;
+    // How deep the band is: the other three panes', so that the four line
+    // up. SheetGround works it out from its labels; this one is told.
+    in property <length> heading-tall: 30px;
+
+    width: root.physics-width;
+    height: 100%;
+    background: transparent;
+
+    Rectangle {
+        x: 0;
+        y: 0;
+        width: root.physics-width;
+        height: root.heading-tall;
+        background: root.physics-ground;
+
+        Text {
+            x: Space.step;
+            y: Space.tight;
+            text: "Physics";
+            font-size: Type.small;
+            font-italic: true;
+            color: #9ca3af;
+        }
+    }
+}

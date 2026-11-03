@@ -10,7 +10,7 @@ import { Colors } from "../../tcsui/ui/colors.slint";
 // program's Rust sees them as its own.
 import {
     Session, Space, Type, TerminalView, NodeView, LinkView, NodeShape,
-    LinkLine, SheetGround
+    LinkLine, SheetGround, PhysicsGround
 } from "../../tcsdiagram/ui/diagram.slint";
 export { Session, Space, Type, TerminalView, NodeView, LinkView }
 
@@ -136,6 +136,12 @@ component SelectionPane inherits Rectangle {
     // on a blush ground and putting it on a blush pane has been told where it
     // goes twice, by the colour of the shape and by the colour under it.
     in property <color> ground: #f2f2f0;
+    // Whether anything here may be placed, and if not, why: the physics list
+    // places into the simulator file, and a session given none has nowhere
+    // to put a component. Greyed and said, rather than hidden: a list that
+    // came and went would be a list somebody has to discover is there.
+    in property <bool> enabled: true;
+    in property <string> note: "";
     callback place-node(string, string, string);
 
     background: root.ground;
@@ -151,6 +157,13 @@ component SelectionPane inherits Rectangle {
                 font-size: Type.body;
                 font-weight: Type.bold;
                 height: 18px;
+            }
+            if !root.enabled && root.note != "": Text {
+                text: root.note;
+                font-size: Type.small;
+                font-italic: true;
+                color: #6b7280;
+                wrap: word-wrap;
             }
             // A row as tall as the shape in it. A fixed height clipped the
             // taller shapes into the row below them, which made a list of
@@ -181,13 +194,15 @@ component SelectionPane inherits Rectangle {
                     node: p.node;
                     transform-scale: root.shrink;
                     transform-origin: { x: 0px, y: 0px };
+                    opacity: root.enabled ? 1 : 0.4;
                 }
                 // The whole row, so the hit area is the row and not only the
                 // shape: a rounded end's corners are not part of the shape,
                 // and a press there should still place one.
                 if !p.is-heading: TouchArea {
-                    // Nothing placed in a read-only session.
-                    enabled: !Session.read-only;
+                    // Nothing placed in a read-only session, or where this
+                    // list has nowhere to place.
+                    enabled: !Session.read-only && root.enabled;
                     mouse-cursor: MouseCursor.pointer;
                     clicked => {
                         root.place-node(p.node.name, p.node.node-type, p.sets);
@@ -355,6 +370,22 @@ component Surface inherits Rectangle {
     in property <[PaletteEntry]> gateway-palette: [];
     in property <[PaletteEntry]> vehicle-palette: [];
     in property <[PaletteEntry]> payload-palette: [];
+    // The physics components a simulator file's world may hold, which the
+    // physics list offers; and whether there is a simulator file to put one
+    // in. See tcsdiagram::physics.
+    in property <[PaletteEntry]> physics-palette: [];
+    in property <bool> has-world: false;
+    // The Physics pane, left of the payloads: how wide it is, what its
+    // heading is painted, and its nodes and links, in the coordinates of the
+    // whole canvas, whose nought is the Physics pane's left edge. A window
+    // that shows no Physics pane -- a subdiagram's -- is given a width of
+    // nought and nothing to draw. See tcsdiagram::pane.
+    in property <bool> shows-physics: true;
+    in property <length> physics-width: 0px;
+    in property <color> physics-ground: white;
+    in property <[NodeView]> physics-nodes: [];
+    in property <[LinkView]> physics-links: [];
+    in property <int> physics-list-percent: 20;
     in property <length> payload-divider: 0px;
     in property <length> vehicle-divider: 0px;
     in property <length> working-width: 0px;
@@ -433,6 +464,15 @@ component Surface inherits Rectangle {
     callback vehicle-list-divider-moved(length, length);
     callback payload-divider-moved(length);
     callback vehicle-divider-moved(length);
+    // The line between the Physics pane and the payloads, dragged; and the
+    // line under the physics list.
+    callback physics-divider-moved(length);
+    callback physics-list-divider-moved(length, length);
+    // A physics component placed from the list, by its type; and one on the
+    // canvas, asked to be edited or deleted, by its name.
+    callback place-physics(string);
+    callback physics-edit(string);
+    callback physics-delete(string);
     callback open-subdiagram(string);
     // Write every file of the configuration now.
     callback save-clicked();
@@ -577,16 +617,44 @@ component Surface inherits Rectangle {
                 // What the shares are of. Named so the dividers can report it:
                 // see ListDivider.
                 property <length> whole: self.height;
+                // The physics list at the top, its pane being the leftmost;
+                // none in a window that shows no Physics pane.
+                property <length> physics-tall: root.shows-physics
+                    ? whole * root.physics-list-percent / 100
+                    : 0px;
                 property <length> payload-tall:
-                    whole - gateway-tall - vehicle-tall;
+                    whole - physics-tall - gateway-tall - vehicle-tall;
                 property <length> gateway-tall:
                     whole * root.gateway-list-percent / 100;
                 property <length> vehicle-tall:
                     whole * root.vehicle-list-percent / 100;
 
-                SelectionPane {
+                if root.shows-physics: SelectionPane {
                     x: 0;
                     y: 0;
+                    width: 100%;
+                    height: lists.physics-tall - 4px;
+                    heading: "Physics node types";
+                    ground: root.physics-ground;
+                    palette: root.physics-palette;
+                    enabled: root.has-world;
+                    note: "Open a simulator file to place physics.";
+                    place-node(name, t, sets) => {
+                        root.place-physics(t);
+                    }
+                }
+                if root.shows-physics: ListDivider {
+                    x: 0;
+                    y: lists.physics-tall - 7px;
+                    width: 100%;
+                    parent-height: lists.whole;
+                    moved(dy, tall) => {
+                        root.physics-list-divider-moved(dy, tall);
+                    }
+                }
+                SelectionPane {
+                    x: 0;
+                    y: lists.physics-tall;
                     width: 100%;
                     height: lists.payload-tall - 4px;
                     heading: "Payload node types";
@@ -598,7 +666,7 @@ component Surface inherits Rectangle {
                 }
                 ListDivider {
                     x: 0;
-                    y: lists.payload-tall - 7px;
+                    y: lists.physics-tall + lists.payload-tall - 7px;
                     width: 100%;
                     parent-height: lists.whole;
                     moved(dy, tall) => {
@@ -607,7 +675,7 @@ component Surface inherits Rectangle {
                 }
                 SelectionPane {
                     x: 0;
-                    y: lists.payload-tall;
+                    y: lists.physics-tall + lists.payload-tall;
                     width: 100%;
                     height: lists.vehicle-tall - 4px;
                     heading: "Vehicle node types";
@@ -619,7 +687,8 @@ component Surface inherits Rectangle {
                 }
                 ListDivider {
                     x: 0;
-                    y: lists.payload-tall + lists.vehicle-tall - 7px;
+                    y: lists.physics-tall + lists.payload-tall
+                        + lists.vehicle-tall - 7px;
                     width: 100%;
                     parent-height: lists.whole;
                     moved(dy, tall) => {
@@ -628,7 +697,8 @@ component Surface inherits Rectangle {
                 }
                 SelectionPane {
                     x: 0;
-                    y: lists.payload-tall + lists.vehicle-tall;
+                    y: lists.physics-tall + lists.payload-tall
+                        + lists.vehicle-tall;
                     width: 100%;
                     height: lists.gateway-tall;
                     heading: "Gateway node types";
@@ -655,7 +725,7 @@ component Surface inherits Rectangle {
             // the right of them.
             sheet := ScrollView {
                 horizontal-stretch: 1;
-                content-width: root.working-width;
+                content-width: root.physics-width + root.working-width;
                 content-height: root.working-height;
                 content-y <=> root.canvas-offset;
 
@@ -666,12 +736,34 @@ component Surface inherits Rectangle {
                 // dividers between them, and the tints are kept for the two
                 // places they say something -- those bands, and the selection
                 // panes a node is taken from.
-                canvas := Rectangle {
-                    width: root.working-width;
+                // The Physics pane, left of the configuration's sheet, and
+                // the sheet itself beside it, in the coordinates its file
+                // holds: see tcsdiagram::pane. The physics links under
+                // everything, the sheet being transparent, and the physics
+                // nodes over it, in their own pane.
+                page := Rectangle {
+                    width: root.physics-width + root.working-width;
                     height: root.working-height;
                     background: white;
                     border-width: 1px;
                     border-color: #d8d8d4;
+
+                    if root.shows-physics && root.physics-width > 0:
+                    PhysicsGround {
+                        x: 0;
+                        y: 0;
+                        physics-width: root.physics-width;
+                        physics-ground: root.physics-ground;
+                    }
+                    for l in root.physics-links: LinkLine {
+                        link: l;
+                    }
+
+                canvas := Rectangle {
+                    x: root.physics-width;
+                    width: root.working-width;
+                    height: root.working-height;
+                    background: transparent;
 
                     SheetGround {
                         working-width: root.working-width;
@@ -729,6 +821,16 @@ component Surface inherits Rectangle {
                 }
                 }
 
+                    for n in root.physics-nodes: NodeShape {
+                        node: n;
+                        edit-requested => { root.physics-edit(n.name); }
+                        delete-requested => { root.physics-delete(n.name); }
+                        // Pressing a component opens it, as its menu's Edit
+                        // does: it has nothing else a press could mean.
+                        chosen => { root.physics-edit(n.name); }
+                    }
+                }
+
                 // The two lines between the three working panes, drawn over
                 // the sheet rather than on it.
                 //
@@ -743,16 +845,24 @@ component Surface inherits Rectangle {
                 // Shifted by the sheet's own horizontal offset, so a divider
                 // stays over the column it divides when the sheet is scrolled
                 // sideways.
+                if root.shows-physics && root.physics-width > 0: PaneDivider {
+                    width: 100%;
+                    height: 100%;
+                    at: root.physics-width + sheet.content-x;
+                    moved(dx) => { root.physics-divider-moved(dx); }
+                }
                 PaneDivider {
                     width: 100%;
                     height: 100%;
-                    at: root.payload-divider + sheet.content-x;
+                    at: root.physics-width + root.payload-divider
+                        + sheet.content-x;
                     moved(dx) => { root.payload-divider-moved(dx); }
                 }
                 PaneDivider {
                     width: 100%;
                     height: 100%;
-                    at: root.vehicle-divider + sheet.content-x;
+                    at: root.physics-width + root.vehicle-divider
+                        + sheet.content-x;
                     moved(dx) => { root.vehicle-divider-moved(dx); }
                 }
             }
@@ -1101,6 +1211,18 @@ export component MainWindow inherits Window {
     in property <[PaletteEntry]> gateway-palette: [];
     in property <[PaletteEntry]> vehicle-palette: [];
     in property <[PaletteEntry]> payload-palette: [];
+    // The physics list and the Physics pane: see Surface.
+    in property <[PaletteEntry]> physics-palette: [];
+    in property <length> physics-width: 0px;
+    in property <color> physics-ground: white;
+    in property <[NodeView]> physics-nodes: [];
+    in property <[LinkView]> physics-links: [];
+    in property <int> physics-list-percent: 20;
+    callback physics-divider-moved(length);
+    callback physics-list-divider-moved(length, length);
+    callback place-physics(string);
+    callback physics-edit(string);
+    callback physics-delete(string);
     in property <length> payload-divider: 0px;
     in property <length> vehicle-divider: 0px;
     in property <length> working-width: 0px;
@@ -1253,6 +1375,20 @@ export component MainWindow inherits Window {
         gateway-palette: root.gateway-palette;
         vehicle-palette: root.vehicle-palette;
         payload-palette: root.payload-palette;
+        physics-palette: root.physics-palette;
+        has-world: root.has-simulator;
+        physics-width: root.physics-width;
+        physics-ground: root.physics-ground;
+        physics-nodes: root.physics-nodes;
+        physics-links: root.physics-links;
+        physics-list-percent: root.physics-list-percent;
+        physics-divider-moved(dx) => { root.physics-divider-moved(dx); }
+        physics-list-divider-moved(dy, tall) => {
+            root.physics-list-divider-moved(dy, tall);
+        }
+        place-physics(t) => { root.place-physics(t); }
+        physics-edit(n) => { root.physics-edit(n); }
+        physics-delete(n) => { root.physics-delete(n); }
         payload-divider: root.payload-divider;
         vehicle-divider: root.vehicle-divider;
         gateway-list-percent: root.gateway-list-percent;
@@ -1537,6 +1673,10 @@ export component SubWindow inherits Window {
         gateway-palette: root.gateway-palette;
         vehicle-palette: root.vehicle-palette;
         payload-palette: root.payload-palette;
+        // A subdiagram's window draws a page of the configuration, and the
+        // physics model is the simulator file's and not a page's: its pane
+        // and its list are the main window's.
+        shows-physics: false;
         payload-divider: root.payload-divider;
         vehicle-divider: root.vehicle-divider;
         gateway-list-percent: root.gateway-list-percent;
@@ -1915,6 +2055,10 @@ export component SimWindow inherits Window {
     // payloads cannot: a simulated payload stands in for a payload of the
     // configuration, so its name is the configuration's and not this file's.
     in property <bool> can-add: false;
+    // And whether it can take one away: the groups can, and so can the
+    // physics components, which are placed from the physics list instead
+    // of made here.
+    in property <bool> can-remove: false;
     in property <string> trouble: "";
 
     callback choose(string);
@@ -1951,7 +2095,7 @@ export component SimWindow inherits Window {
                 enabled: !Session.read-only;
                 clicked => { root.add(); }
             }
-            if root.can-add: Button {
+            if root.can-add || root.can-remove: Button {
                 text: "Remove";
                 enabled: root.chosen != "" && !Session.read-only;
                 clicked => { root.remove(); }

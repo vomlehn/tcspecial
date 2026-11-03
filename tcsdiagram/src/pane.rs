@@ -1,4 +1,5 @@
-//! The three working panes, and where a node may be in them.
+//! The three working panes, and where a node may be in them; and the
+//! Physics pane to their left.
 //!
 //! The canvas is divided into three columns, left to right: the payload working
 //! pane, which holds everything the vehicle carries; the vehicle working pane,
@@ -8,6 +9,16 @@
 //! other end of the link and not the vehicle at all, the vehicle's own graph
 //! persists, and what it carries changes between flights -- so a drawing that
 //! puts each in its own column can be compared with last mission's.
+//!
+//! The Physics pane is the simulator file's and not the configuration's: it
+//! holds the components of the world the simulated payloads are joined to.
+//! It is to the left of the payloads, at negative x in the coordinates the
+//! file holds, so that adding it moved nothing a configuration had placed:
+//! the three working panes are where they always were, and a window that
+//! draws the Physics pane draws the sheet that much further right. Its
+//! nodes are laid out by name rather than placed -- see `crate::physics` --
+//! because a configuration file is the only place a node's position is kept,
+//! and a physics component is not in one.
 //!
 //! Its own module because three parts of the program need the same answers and
 //! none of them should be asking another: the window places and confines nodes
@@ -268,6 +279,9 @@ pub const WORKING_HEIGHT: i32 = 2400;
 pub struct Dividers {
     pub payloads: i32,
     pub vehicle: i32,
+    /// How wide the Physics pane is, which is to the left of x nought: see
+    /// the module's comment.
+    pub physics: i32,
 }
 
 /// Where the dividers fall, for panes of these percentages of the whole.
@@ -301,7 +315,44 @@ pub fn dividers_for(gateway_percent: i32, vehicle_percent: i32) -> Dividers {
     Dividers {
         payloads: at_percent(100 - gateway_percent - vehicle_percent),
         vehicle: at_percent(100 - gateway_percent),
+        physics: physics_width(settings::DEFAULT_PHYSICS),
     }
+}
+
+/// How wide the Physics pane is, for this percentage of the working width.
+///
+/// A share of the working width, as the other panes' are, though it is not
+/// a share *of* it: the Physics pane is beside the working width and not in
+/// it. A percentage nonetheless, so that the settings file says every pane's
+/// width the one way.
+///
+/// # Arguments
+///
+/// * `percent` - The Physics pane's width, as a percentage of the working
+///               width; brought inside `settings::LEAST` to
+///               `settings::MOST`.
+///
+/// # Returns
+///
+/// The width, in pixels, on the grid.
+pub fn physics_width(percent: i32) -> i32 {
+    at_percent(percent.clamp(settings::LEAST, settings::MOST))
+}
+
+/// And back: what percentage of the working width the Physics pane's width
+/// is.
+///
+/// # Arguments
+///
+/// * `width` - The Physics pane's width, in pixels.
+///
+/// # Returns
+///
+/// The percentage, whole, brought inside `settings::LEAST` to
+/// `settings::MOST`.
+pub fn physics_percent(width: i32) -> i32 {
+    ((width as f32 * 100.0 / WORKING_WIDTH as f32).round() as i32)
+        .clamp(settings::LEAST, settings::MOST)
 }
 
 /// Where the dividers sit until somebody moves them.
@@ -401,6 +452,9 @@ pub fn is_gateway(node_type: &str) -> bool {
 /// ground link, the vehicle's own graph, and what it carries.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Pane {
+    /// The simulator file's physics components, left of the payloads. No
+    /// node of a configuration belongs in it: see the module's comment.
+    Physics,
     Payloads,
     Vehicle,
     Gateway,
@@ -415,9 +469,10 @@ impl Pane {
     ///
     /// # Returns
     ///
-    /// The pane's name: `Gateway`, `Vehicle` or `Payloads`.
+    /// The pane's name: `Gateway`, `Vehicle`, `Payloads` or `Physics`.
     pub fn label(self) -> &'static str {
         match self {
+            Pane::Physics => "Physics",
             Pane::Gateway => "Gateway",
             Pane::Vehicle => "Vehicle",
             Pane::Payloads => "Payloads",
@@ -536,6 +591,7 @@ pub fn pane_for(node_type: &str, dividers: Dividers) -> (i32, i32) {
 /// The pane's left and right edges, in pixels.
 pub fn edges_of(pane: Pane, dividers: Dividers) -> (i32, i32) {
     match pane {
+        Pane::Physics => (-dividers.physics, 0),
         Pane::Payloads => (0, dividers.payloads),
         Pane::Vehicle => (dividers.payloads, dividers.vehicle),
         Pane::Gateway => (dividers.vehicle, WORKING_WIDTH),

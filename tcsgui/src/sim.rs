@@ -143,6 +143,38 @@ impl World {
             .expect("a free name among the numbers")
     }
 
+    /// Everything the simulator's own reader says is wrong with the world as
+    /// it stands: a figure without its unit or in another, a setting a type
+    /// requires and is not given, an ambient temperature missing where there
+    /// is a zone, a connection that names nothing or joins two outputs. What
+    /// the stand-ins are joined to is not here: the configuration says which
+    /// payloads there are, and `tcsverify` checks the two together.
+    ///
+    /// # Returns
+    ///
+    /// Each problem: the component it is about, or `None` for one about the
+    /// world or its connections, and what is wrong, in the reader's words.
+    pub fn problems(&self) -> Vec<(Option<String>, String)> {
+        if self.is_empty() {
+            return Vec::new();
+        }
+        let mut text = String::new();
+        world_written(&mut text, self, true);
+        match tcslibgs::sim_config::SimConfigFile::parse(
+            &text,
+            ConfigFormat::Yaml,
+        ) {
+            Ok(file) => file
+                .world
+                .map(|world| world.problems())
+                .unwrap_or_default()
+                .into_iter()
+                .map(|problem| (problem.component.clone(), problem.to_string()))
+                .collect(),
+            Err(why) => vec![(None, why.to_string())],
+        }
+    }
+
     /// The connections that join a component, to or from it.
     ///
     /// # Arguments
@@ -669,12 +701,30 @@ pub fn to_yaml(simulator: &Simulator, payloads: &[(String, String)]) -> String {
 /// * `out`   - Where the lines are written.
 /// * `world` - The world.
 fn world_yaml(out: &mut String, world: &World) {
+    world_written(out, world, false);
+}
+
+/// Writes the world section, as [`world_yaml`] does, with a setting nobody
+/// has answered written either with nothing after it or as an empty text.
+///
+/// The file has the first, which is a question not yet answered; the
+/// checking has the second, so that a figure the reader requires and is not
+/// given is refused at its component, as one that does not read is, rather
+/// than as a file that does not parse.
+///
+/// # Arguments
+///
+/// * `out`    - Where the lines are written.
+/// * `world`  - The world.
+/// * `empty`  - Whether an unanswered setting is written as `""`.
+fn world_written(out: &mut String, world: &World, empty: bool) {
+    let blank = if empty { " \"\"" } else { "" };
     if world.is_empty() {
         return;
     }
     out.push_str("\nworld:\n");
     match world.ambient_temp.trim() {
-        "" => out.push_str("  ambient_temp:\n"),
+        "" => out.push_str(&format!("  ambient_temp:{blank}\n")),
         said => {
             out.push_str(&format!("  ambient_temp: \"{}\"\n", escaped(said)))
         }
@@ -716,7 +766,8 @@ fn world_yaml(out: &mut String, world: &World) {
                         "            {setting}: \"{}\"\n",
                         escaped(value)
                     )),
-                    _ => out.push_str(&format!("            {setting}:\n")),
+                    _ => out
+                        .push_str(&format!("            {setting}:{blank}\n")),
                 }
             }
         }
@@ -990,6 +1041,39 @@ mod tests {
         };
         assert!(why.contains("world:"), "{why}");
         assert_eq!(std::fs::read_to_string(&path).expect("read"), old);
+    }
+
+    /// The world's problems are the reader's, each at its component: a
+    /// figure without its unit, and one required and not given.
+    #[test]
+    fn the_worlds_problems_are_the_readers() {
+        let mut world = World {
+            ambient_temp: "283.15 K".to_string(),
+            ..World::default()
+        };
+        assert!(world.problems().is_empty());
+        world.components.insert(
+            "heater_1".to_string(),
+            PhysicsComponent {
+                kind: "heater".to_string(),
+                settings: [("power", "4"), ("voltage", "28 V")]
+                    .into_iter()
+                    .map(|(a, b)| (a.to_string(), b.to_string()))
+                    .collect(),
+            },
+        );
+        world.components.insert(
+            "zone".to_string(),
+            PhysicsComponent {
+                kind: "thermal_zone".to_string(),
+                settings: Settings::new(),
+            },
+        );
+        let problems = world.problems();
+        assert_eq!(problems.len(), 2, "{problems:?}");
+        assert_eq!(problems[0].0.as_deref(), Some("heater_1"));
+        assert!(problems[0].1.contains("has no unit"), "{problems:?}");
+        assert_eq!(problems[1].0.as_deref(), Some("zone"));
     }
 
     /// Two physics components of one name are refused, and a new one is

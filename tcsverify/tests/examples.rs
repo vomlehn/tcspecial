@@ -197,10 +197,28 @@ fn every_xml_example_has_its_yaml() {
 }
 
 /// And every simulator file has a configuration to go with it. A lone one is
-/// usually a configuration renamed without its partner.
+/// usually a configuration renamed without its partner. One in a `-common`
+/// directory is shared by examples, each of whose own is a link to it, and
+/// has to be linked to by one.
 #[test]
 fn every_simulator_file_has_its_configuration() {
-    for sim in sim_files() {
+    let every = sim_files();
+    for sim in &every {
+        let shared = sim
+            .parent()
+            .and_then(Path::file_name)
+            .and_then(|dir| dir.to_str())
+            .is_some_and(|dir| dir.ends_with("-common"));
+        if shared {
+            let real = sim.canonicalize().expect("it resolves");
+            assert!(
+                every.iter().any(|other| other != sim
+                    && other.canonicalize().ok().as_ref() == Some(&real)),
+                "{} is shared, and no example links to it",
+                sim.display()
+            );
+            continue;
+        }
         let name = sim.to_str().expect("a UTF-8 path");
         let config = PathBuf::from(format!(
             "{}.ytcs",

@@ -31,8 +31,8 @@ touchdown switch says when it is down.
 import sys
 import time
 
-# The lander's and the engine's figures, from
-# examples/descent/descent-physics.yaml. The mass is taken as it starts:
+# The lander's and the engine's figures, from the world section of
+# examples/descent/descent-sim.yaml. The mass is taken as it starts:
 # what it burns is a tenth of it, which the closing of the gap makes up.
 MASS_KG = 1500.0
 GRAVITY = 1.62

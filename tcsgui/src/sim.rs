@@ -8,14 +8,16 @@
 //! be describing hardware nobody would fly -- so it lives in its own file,
 //! joined to the configuration by name.
 //!
-//! # Why it is not on the canvas
+//! # What of it is on the canvas
 //!
-//! There is nothing to draw. The simulator file adds settings to payloads that
-//! are already on the canvas and declares groups of settings for them to
-//! share; it introduces no nodes and no connections, so a drawing of it would
-//! be the same drawing with numbers on it. It is edited from the menu instead,
-//! one window for the payloads and one for the groups, which is what was asked
-//! for and is also what the file is: two lists of settings.
+//! Its physics model, and nothing else. The simulator file adds settings to
+//! payloads that are already on the canvas and declares groups of settings
+//! for them to share, and a drawing of those would be the same drawing with
+//! numbers on it: they are edited from the menu, one window for the payloads
+//! and one for the groups. The physics model is different: its components
+//! are things joined to one another and to the payloads, so they are drawn,
+//! as nodes in the Physics pane, with their connections and each stand-in's
+//! `connects` as links. See [`Physics`].
 //!
 //! # Held as text
 //!
@@ -59,14 +61,11 @@ pub struct Simulator {
     /// thing that broke a set that worked.
     #[serde(default)]
     pub tcssim: Settings,
-    /// The physics model the file names, as it names it: a path relative to
-    /// the file's own directory.
-    ///
-    /// Kept so that saving does not drop it, as the `tcssim` section is. The
-    /// model itself -- the masses the payloads attach to -- is a file of its
-    /// own, which saving this one never touches: see `tcslibgs::physics`.
+    /// The world: the file's `world` section, its ambient temperature and
+    /// its physics model's components and their connections. Empty for a
+    /// file without one, and written only where it holds something.
     #[serde(default)]
-    pub physics: Option<String>,
+    pub world: World,
     /// The groups of settings, by name.
     pub groups: BTreeMap<String, Settings>,
     /// The simulated payloads, by the name of the payload each stands in for.
@@ -82,6 +81,85 @@ pub struct Simulator {
     /// no payload of, which is written back under the type it came with.
     #[serde(default)]
     pub kinds: BTreeMap<String, String>,
+}
+
+/// The world, as the editor holds it: every setting as the words a file
+/// holds, as the payloads' are, so that a figure somebody is halfway
+/// through typing can be written.
+#[derive(
+    Debug, Clone, Default, PartialEq, Eq, serde::Serialize, serde::Deserialize,
+)]
+pub struct World {
+    /// The temperature every thermal zone's surroundings are about, as
+    /// written: `288.15 K`. Empty where unstated.
+    #[serde(default)]
+    pub ambient_temp: String,
+    /// The physics model's components, by name.
+    pub components: BTreeMap<String, PhysicsComponent>,
+    /// The connections, each an output and the input it is joined to, as
+    /// `heater_1.heat` and `zone.heat`. A set, in name order: nothing in
+    /// a model is in an order that means anything.
+    pub connections: std::collections::BTreeSet<(String, String)>,
+}
+
+/// One component of the physics model.
+#[derive(
+    Debug, Clone, Default, PartialEq, Eq, serde::Serialize, serde::Deserialize,
+)]
+pub struct PhysicsComponent {
+    /// Its type, one of `tcslibgs::physics::TYPES`.
+    pub kind: String,
+    /// What it states, by setting name.
+    pub settings: Settings,
+}
+
+impl World {
+    /// Whether there is nothing in it.
+    ///
+    /// # Returns
+    ///
+    /// Whether it states no ambient temperature, and has no components and
+    /// no connections.
+    pub fn is_empty(&self) -> bool {
+        self.ambient_temp.trim().is_empty()
+            && self.components.is_empty()
+            && self.connections.is_empty()
+    }
+
+    /// A name for a new component of a type: the type and the first number
+    /// from 1 that no component has, as `heater_3`.
+    ///
+    /// # Arguments
+    ///
+    /// * `kind` - The type.
+    ///
+    /// # Returns
+    ///
+    /// The name.
+    pub fn fresh_name(&self, kind: &str) -> String {
+        (1..)
+            .map(|n| format!("{kind}_{n}"))
+            .find(|name| !self.components.contains_key(name))
+            .expect("a free name among the numbers")
+    }
+
+    /// The connections that join a component, to or from it.
+    ///
+    /// # Arguments
+    ///
+    /// * `name` - The component.
+    ///
+    /// # Returns
+    ///
+    /// Each, as (from, to).
+    pub fn connections_of(&self, name: &str) -> Vec<(String, String)> {
+        let of = |end: &str| end.split_once('.').map(|(c, _)| c) == Some(name);
+        self.connections
+            .iter()
+            .filter(|(from, to)| of(from) || of(to))
+            .cloned()
+            .collect()
+    }
 }
 
 impl Simulator {
@@ -165,15 +243,125 @@ struct File {
     #[serde(default)]
     tcssim: BTreeMap<String, Scalar>,
     #[serde(default)]
-    physics: Option<Scalar>,
-    /// A section a simulator file held before the physics model had a file
-    /// of its own: read only to be refused, as every program refuses it.
+    world: Option<WorldFile>,
+    /// A section a simulator file held before the physics model was made of
+    /// parts: read only to be refused, as every program refuses it.
     #[serde(default)]
     thermal_mass: Option<serde::de::IgnoredAny>,
     #[serde(default, deserialize_with = "tcslibgs::sim_grouped::groups")]
     simulated_payload_groups: Vec<Entry>,
     #[serde(default, deserialize_with = "tcslibgs::sim_grouped::payloads")]
     simulated_payloads: Vec<Entry>,
+}
+
+/// The `world` section, as it parses: permissive, as [`File`] is.
+#[derive(Debug, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct WorldFile {
+    #[serde(default)]
+    ambient_temp: Option<Scalar>,
+    #[serde(default)]
+    physics: Option<PhysicsFile>,
+}
+
+/// The world's `physics`, as it parses.
+#[derive(Debug, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct PhysicsFile {
+    /// Each entry `type <kind>:` and the list of that type's components,
+    /// each a map whose `component` names it.
+    #[serde(default)]
+    components: Vec<BTreeMap<String, Vec<BTreeMap<String, Scalar>>>>,
+    #[serde(default)]
+    connections: Vec<ConnectionFile>,
+}
+
+/// One connection, as it parses.
+#[derive(Debug, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct ConnectionFile {
+    from: String,
+    to: String,
+}
+
+/// Takes in the `world` section as the editor holds it.
+///
+/// # Arguments
+///
+/// * `file` - The section, as it parsed.
+///
+/// # Returns
+///
+/// The world.
+///
+/// # Errors
+///
+/// A message for an entry that is not `type` and a type the model has, a
+/// component with no name, and two components of one name: the editor
+/// cannot draw or write back what it cannot tell apart.
+fn world_of(file: WorldFile) -> Result<World, String> {
+    let mut world = World {
+        ambient_temp: file
+            .ambient_temp
+            .map(|said| said.as_str().to_string())
+            .unwrap_or_default(),
+        ..World::default()
+    };
+    let Some(file) = file.physics else {
+        return Ok(world);
+    };
+    for entry in file.components {
+        for (key, components) in entry {
+            let kind = key
+                .strip_prefix("type ")
+                .filter(|kind| tcslibgs::physics::TYPES.contains(kind))
+                .ok_or_else(|| {
+                    format!(
+                        "physics components: \"{key}\" is not the word type \
+                         and one of {}",
+                        tcslibgs::physics::TYPES.join(", ")
+                    )
+                })?;
+            for mut said in components {
+                let name = said
+                    .remove("component")
+                    .map(|name| name.as_str().to_string())
+                    .filter(|name| !name.is_empty())
+                    .ok_or_else(|| {
+                        format!(
+                            "physics components: a {kind} has no name: name \
+                             it with component: <name>"
+                        )
+                    })?;
+                // A setting written empty is one not stated, and the form
+                // writes it empty again: held as not there.
+                let settings = said
+                    .into_iter()
+                    .map(|(setting, value)| {
+                        (setting, value.as_str().to_string())
+                    })
+                    .filter(|(_, value)| !value.is_empty())
+                    .collect();
+                let component = PhysicsComponent {
+                    kind: kind.to_string(),
+                    settings,
+                };
+                if world.components.insert(name.clone(), component).is_some() {
+                    return Err(format!(
+                        "two physics components are called \"{name}\"; a \
+                         connection or a stand-in names one, so a name has \
+                         to name one component"
+                    ));
+                }
+            }
+        }
+    }
+    world.connections = file
+        .connections
+        .into_iter()
+        .map(|c| (c.from.trim().to_string(), c.to.trim().to_string()))
+        .collect();
+    Ok(world)
 }
 
 /// Whether this is a name a simulator configuration may have.
@@ -295,10 +483,9 @@ pub fn read(path: &Path) -> Result<Simulator, Trouble> {
         ));
     }
     simulator.description = file.description;
-    simulator.physics = file
-        .physics
-        .map(|named| named.as_str().trim().to_string())
-        .filter(|named| !named.is_empty());
+    if let Some(world) = file.world {
+        simulator.world = world_of(world).map_err(Trouble::Unusable)?;
+    }
     simulator.tcssim = file
         .tcssim
         .into_iter()
@@ -423,10 +610,8 @@ pub fn to_yaml(simulator: &Simulator, payloads: &[(String, String)]) -> String {
 
     // The physics model the payloads attach to, before them, because that
     // is the order the file reads in: a model exists and then payloads attach
-    // to it. Only the name: the model is a file of its own.
-    if let Some(physics) = &simulator.physics {
-        out.push_str(&format!("\nphysics: {}\n", quoted(physics)));
-    }
+    // to it.
+    world_yaml(&mut out, &simulator.world);
 
     // Each group, in name order, as the map holds them.
     if !simulator.groups.is_empty() {
@@ -469,6 +654,83 @@ pub fn to_yaml(simulator: &Simulator, payloads: &[(String, String)]) -> String {
         }
     }
     out
+}
+
+/// Writes the world section, where the world holds anything.
+///
+/// In the one order a world has: its ambient temperature, then the types of
+/// its physics by name, a type's components by name, each with every
+/// setting its type states and anything else it was read with, by name,
+/// written empty where nobody has answered it, as a payload's are; and the
+/// connections by what they join.
+///
+/// # Arguments
+///
+/// * `out`   - Where the lines are written.
+/// * `world` - The world.
+fn world_yaml(out: &mut String, world: &World) {
+    if world.is_empty() {
+        return;
+    }
+    out.push_str("\nworld:\n");
+    match world.ambient_temp.trim() {
+        "" => out.push_str("  ambient_temp:\n"),
+        said => {
+            out.push_str(&format!("  ambient_temp: \"{}\"\n", escaped(said)))
+        }
+    }
+    if world.components.is_empty() && world.connections.is_empty() {
+        return;
+    }
+    out.push_str("  physics:\n");
+    let mut typed: BTreeMap<&str, Vec<(&String, &PhysicsComponent)>> =
+        BTreeMap::new();
+    for (name, component) in &world.components {
+        typed
+            .entry(component.kind.as_str())
+            .or_default()
+            .push((name, component));
+    }
+    if !typed.is_empty() {
+        out.push_str("    components:\n");
+    }
+    for (kind, components) in typed {
+        out.push_str(&format!("      - type {kind}:\n"));
+        for (name, component) in components {
+            out.push_str(&format!("          - component: {}\n", quoted(name)));
+            let mut settings: Vec<&str> = tcslibgs::physics::settings_of(kind)
+                .unwrap_or_default()
+                .to_vec();
+            settings.extend(
+                component
+                    .settings
+                    .keys()
+                    .map(String::as_str)
+                    .filter(|setting| !settings.contains(setting))
+                    .collect::<Vec<_>>(),
+            );
+            settings.sort_unstable();
+            for setting in settings {
+                match component.settings.get(setting).map(|v| v.trim()) {
+                    Some(value) if !value.is_empty() => out.push_str(&format!(
+                        "            {setting}: \"{}\"\n",
+                        escaped(value)
+                    )),
+                    _ => out.push_str(&format!("            {setting}:\n")),
+                }
+            }
+        }
+    }
+    if !world.connections.is_empty() {
+        out.push_str("    connections:\n");
+        for (from, to) in &world.connections {
+            out.push_str(&format!(
+                "      - from: {}\n        to: {}\n",
+                quoted(from),
+                quoted(to)
+            ));
+        }
+    }
 }
 
 /// Writes every setting an entry may state, by name, and then anything the
@@ -545,7 +807,25 @@ fn quoted(value: &str) -> String {
     if !value.is_empty() && value.bytes().all(|byte| byte.is_ascii_digit()) {
         return value.to_string();
     }
-    format!("\"{}\"", value.replace('\\', "\\\\").replace('"', "\\\""))
+    format!("\"{}\"", escaped(value))
+}
+
+/// A value with its backslashes and double quotes escaped, to be written
+/// between double quotes.
+///
+/// A physics figure is always written quoted, whole numbers too: every one
+/// is read as text, its unit and all, and a bare fraction such as `0.02`
+/// would otherwise be a number to YAML and a string to nobody.
+///
+/// # Arguments
+///
+/// * `value` - The value.
+///
+/// # Returns
+///
+/// It, escaped.
+fn escaped(value: &str) -> String {
+    value.replace('\\', "\\\\").replace('"', "\\\"")
 }
 
 #[cfg(test)]
@@ -633,62 +913,108 @@ mod tests {
         }
     }
 
-    /// The physics model a file names still goes back out, and the model
-    /// itself is left as it was: saving the simulator file writes that file
-    /// and no other.
+    /// The physics model goes back out as it came in, in name order, and
+    /// the simulator's own reader takes what the editor wrote; a file that
+    /// still names a model of its own is refused and left as it is.
     #[test]
-    fn the_physics_model_named_survives_the_editor() {
+    fn the_physics_model_survives_the_editor() {
         let where_ = tempfile::tempdir().expect("a directory");
         let path = where_.path().join("vehiclesim.yaml");
-        let model = where_.path().join("vehicle-physics.yaml");
-        let model_said = concat!(
-            "physics:\n",
-            "  - type thermal_zone:\n",
-            "      - component: zone\n",
-            "        environment: \"283.15 K\"\n",
-            "        time_constant: \"50 s\"\n",
-            "        capacity: \"20 J/K\"\n",
-        );
-        std::fs::write(&model, model_said).expect("written");
         let given = concat!(
             "tcssim:\n",
             "  ready: \"127.0.0.1:7999\"\n",
             "\n",
-            "physics: vehicle-physics.yaml\n",
+            "world:\n",
+            "  ambient_temp: \"283.15 K\"\n",
+            "  physics:\n",
+            "    components:\n",
+            "      - type thermal_zone:\n",
+            "          - component: zone\n",
+            "            time_constant: \"50 s\"\n",
+            "            capacity: \"20 J/K\"\n",
+            "      - type heater:\n",
+            "          - component: heater_1\n",
+            "            power: \"4 W\"\n",
+            "            voltage: \"28 V\"\n",
+            "            ripple: \"0.02\"\n",
+            "            ripple_time: \"20 s\"\n",
+            "    connections:\n",
+            "      - from: heater_1.heat\n",
+            "        to: zone.heat\n",
             "\n",
             "simulated_payloads:\n",
             "  - type i2c:\n",
             "      - payload: temp_1\n        simulate: true\n",
             "        connects: zone.temperature\n",
+            "  - type gpio:\n",
+            "      - payload: heat_1\n        simulate: true\n",
+            "        connects: heater_1.on\n",
         );
         std::fs::write(&path, given).expect("written");
 
         let read_in = read(&path).expect("it reads");
-        assert_eq!(read_in.physics.as_deref(), Some("vehicle-physics.yaml"));
+        let zone = &read_in.world.components["zone"];
+        assert_eq!(zone.kind, "thermal_zone");
+        assert_eq!(zone.settings["capacity"], "20 J/K");
+        assert!(read_in
+            .world
+            .connections
+            .contains(&("heater_1.heat".to_string(), "zone.heat".to_string())));
 
         // Saved, as every other edit saves the whole file, and read again.
-        let payloads = [("temp_1".to_string(), "i2c".to_string())];
+        let payloads = [
+            ("temp_1".to_string(), "i2c".to_string()),
+            ("heat_1".to_string(), "gpio".to_string()),
+        ];
         let written = to_yaml(&read_in, &payloads);
+        let at = |what: &str| written.find(what).expect(what);
+        assert!(at("type heater:") < at("type thermal_zone:"), "{written}");
+        assert!(at("capacity:") < at("time_constant:"), "{written}");
         std::fs::write(&path, &written).expect("written");
         let back = read(&path).expect("it reads again");
-        assert_eq!(back.physics, read_in.physics, "{written}");
-        assert_eq!(
-            back.payloads["temp_1"].get("connects").map(String::as_str),
-            Some("zone.temperature"),
-            "what a payload is joined to is a setting like any other"
-        );
-        assert_eq!(
-            std::fs::read_to_string(&model).expect("the model"),
-            model_said,
-            "the model is not the editor's to write"
-        );
+        assert_eq!(back.world, read_in.world, "{written}");
+        assert_eq!(back.world.ambient_temp, "283.15 K");
 
-        // And the simulator's own reader takes what the editor wrote, with
-        // the model it names.
+        // And the simulator's own reader takes what the editor wrote.
         let file = tcslibgs::sim_config::SimConfigFile::load(&path)
             .expect("the simulator reads what the editor wrote");
-        let model = file.model.expect("the model it names");
-        assert_eq!(model.physics[0].name(), "zone");
+        let model = file.world.expect("the model");
+        assert_eq!(model.physics.components.len(), 2);
+        model.resolve().expect("its figures read");
+
+        // A file naming a model of its own is refused, and left alone.
+        let old = "physics: vehicle-physics.yaml\n";
+        std::fs::write(&path, old).expect("written");
+        let Err(Trouble::Unusable(why)) = read(&path) else {
+            panic!("a file naming a model was read");
+        };
+        assert!(why.contains("world:"), "{why}");
+        assert_eq!(std::fs::read_to_string(&path).expect("read"), old);
+    }
+
+    /// Two physics components of one name are refused, and a new one is
+    /// given a name nothing has.
+    #[test]
+    fn physics_names_are_one_each() {
+        let where_ = tempfile::tempdir().expect("a directory");
+        let path = where_.path().join("vehiclesim.yaml");
+        std::fs::write(
+            &path,
+            "world:\n  physics:\n    components:\n      - type bus:\n          \
+             - component: b\n      - type load:\n          - component: b\n",
+        )
+        .expect("written");
+        let Err(Trouble::Unusable(why)) = read(&path) else {
+            panic!("two of one name were read");
+        };
+        assert!(why.contains("two physics components"), "{why}");
+
+        let mut world = World::default();
+        world
+            .components
+            .insert("bus_1".to_string(), PhysicsComponent::default());
+        assert_eq!(world.fresh_name("bus"), "bus_2");
+        assert_eq!(world.fresh_name("load"), "load_1");
     }
 
     /// A file that still declares its masses itself is refused, told where
@@ -705,7 +1031,7 @@ mod tests {
         let Err(Trouble::Unusable(why)) = read(&path) else {
             panic!("a file declaring masses was read");
         };
-        assert!(why.contains("physics model of their own"), "{why}");
+        assert!(why.contains("world section"), "{why}");
     }
 
     /// What the simulator's own reader makes of what the editor writes.

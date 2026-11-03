@@ -1,18 +1,20 @@
 //! How a physics model writes its components: grouped by type.
 //!
-//! The `physics` section is a list of entries, one for each type, and a
-//! component says its name and its figures but not its type, which is the
-//! entry's:
+//! The `components` of the world's `physics` are a list of entries, one for
+//! each type, and a component says its name and its figures but not its
+//! type, which is the entry's:
 //!
 //! ```yaml
-//! physics:
-//!   - type heater:
-//!       - component: heater_1
-//!         power: "60 W"
-//!         voltage: "28 V"
-//!   - type thermal_zone:
-//!       - component: zone
-//!         environment: "283.15 K"
+//! world:
+//!   physics:
+//!     components:
+//!       - type heater:
+//!           - component: heater_1
+//!             power: "60 W"
+//!             voltage: "28 V"
+//!       - type thermal_zone:
+//!           - component: zone
+//!             time_constant: "50 s"
 //! ```
 //!
 //! As a configuration groups its nodes -- see [`crate::graph::grouped`] --
@@ -35,7 +37,7 @@ use super::{
     Component, Moved, TYPES,
 };
 
-/// Reads the `physics` section.
+/// Reads the `components` of the world's `physics`.
 ///
 /// # Arguments
 ///
@@ -76,7 +78,7 @@ pub fn components<'de, D: Deserializer<'de>>(
 fn type_in_key(key: &str) -> Result<String, String> {
     let Some(named) = key.strip_prefix("type ") else {
         return Err(format!(
-            "\"{key}\" is not a type: each entry of physics is the word type, \
+            "\"{key}\" is not a type: each entry of physics components is the word type, \
              a space and the type its components are, as `- type heater:`"
         ));
     };
@@ -127,7 +129,7 @@ impl<'de> Visitor<'de> for SectionVisitor {
         while let Some((named, theirs)) = seq.next_element_seed(TypeEntry)? {
             if types.contains(&named) {
                 return Err(de::Error::custom(format!(
-                    "type {named} is written twice in physics: put its \
+                    "type {named} is written twice in physics components: put its \
                      components under one"
                 )));
             }
@@ -158,7 +160,7 @@ impl<'de> Visitor<'de> for TypeEntry {
     fn expecting(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(
             f,
-            "an entry of physics naming a type, as `type heater:`, with its \
+            "an entry of physics components naming a type, as `type heater:`, with its \
              components under it"
         )
     }
@@ -169,7 +171,7 @@ impl<'de> Visitor<'de> for TypeEntry {
     ) -> Result<Self::Value, A::Error> {
         let Some(key) = map.next_key::<String>()? else {
             return Err(de::Error::custom(
-                "an entry of physics is empty: it names a type, as `- type \
+                "an entry of physics components is empty: it names a type, as `- type \
                  heater:`, with its components under it",
             ));
         };
@@ -178,13 +180,13 @@ impl<'de> Visitor<'de> for TypeEntry {
         if let Some(more) = map.next_key::<String>()? {
             return Err(de::Error::custom(format!(
                 "the entry for type {named} says {more} as well: an entry of \
-                 physics names one type, and its components are the list \
+                 physics components names one type, and its components are the list \
                  under it"
             )));
         }
         if components.is_empty() {
             return Err(de::Error::custom(format!(
-                "type {named} in physics has no components under it: write \
+                "type {named} in physics components has no components under it: write \
                  its components, or leave the type out"
             )));
         }

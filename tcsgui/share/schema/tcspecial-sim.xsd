@@ -134,9 +134,9 @@
         <xs:element name="tcssim" type="tcssim" minOccurs="0"/>
         <xs:element name="simulated_payload_groups" type="groups"
                     minOccurs="0"/>
-        <!-- The physics model the payloads are attached to: a YAML file of
-             its own, named relative to this file's directory. -->
-        <xs:element name="physics" type="xs:string" minOccurs="0"/>
+        <!-- No world: the world the payloads are joined to, its ambient
+             temperature and its physics model, is written only in a
+             simulator file in YAML. -->
         <xs:element name="simulated_payloads" type="payloads"
                     minOccurs="0"/>
       </xs:all>

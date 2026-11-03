@@ -771,11 +771,11 @@ LIBTCS_SONAME := libtcs.so.$(LIBTCS_ABI)
 # The example configurations, in both spellings, with their simulator files
 # and diagrams; the manual's figures are the diagrams, so it is given them as
 # well. Taken from git, so that a scratch file left in examples/ is not
-# shipped.
+# shipped. A simulator file two examples share is a link in each to the one
+# in their -common directory, and is installed as the same link.
 EXAMPLE_FILES = examples/README.html $(shell git ls-files \
 		'examples/*/*.ytcs' 'examples/*/*.xtcs' \
-		'examples/*/*-sim.yaml' 'examples/*/*-physics.yaml' \
-		'examples/*/*.svg')
+		'examples/*/*-sim.yaml' 'examples/*/*.svg')
 
 # Whether what is installed is stripped: 1, the default, or 0.
 #
@@ -874,10 +874,15 @@ install-tcspecial: tcs-helpers
 	install -m 644 $(DOCS_DIR)/*.html $(DOCS_DIR)/*.svg \
 		$(DESTDIR)$(DOCDIR)/$(PROJECT_NAME)/docs
 	for file in $(EXAMPLE_FILES); do \
+		to=$(DESTDIR)$(EXAMPLEDIR)/$${file#examples/}; \
+		if [ -L $$file ]; then \
+			install -d -m 755 $$(dirname $$to) && \
+				ln -sfn $$(readlink $$file) $$to || exit 1; \
+			continue; \
+		fi; \
 		mode=644; \
 		[ "$$(head -c 2 $$file)" != '#!' ] || mode=755; \
-		install -D -m $$mode $$file \
-			$(DESTDIR)$(EXAMPLEDIR)/$${file#examples/} || exit 1; \
+		install -D -m $$mode $$file $$to || exit 1; \
 	done
 	ln -sfn ../../examples/$(PROJECT_NAME) \
 		$(DESTDIR)$(DOCDIR)/$(PROJECT_NAME)/examples

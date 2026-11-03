@@ -4935,6 +4935,7 @@ fn physics_palette() -> ModelRc<PaletteEntry> {
                     faulty: false,
                 },
                 (8, 2),
+                tcsdiagram::physics::SIZE,
             );
             entries.push(PaletteEntry {
                 heading: "".into(),
@@ -6046,6 +6047,7 @@ fn node_view(look: tcsdiagram::view::NodeLook, selected: bool) -> NodeView {
         payload_out: terminal(look.payload_out),
         terminal_column: look.terminal_column,
         inset: look.inset,
+        label_top: look.label_top,
     }
 }
 

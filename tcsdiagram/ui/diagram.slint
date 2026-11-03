@@ -117,6 +117,10 @@ export struct NodeView {
     // nothing, unless the outline leans. Rust's arithmetic, as the shape is:
     // see style::room_of.
     inset: length,
+    // Whether the label is at the top rather than in the middle: true for a
+    // physics block with components drawn inside it, which would cover a
+    // label in the middle.
+    label-top: bool,
     // How the label is set: the fifth channel that is not colour. A face, a
     // size, a weight and an italic, chosen per type in style.rs.
     face: string,
@@ -496,7 +500,8 @@ export component NodeShape inherits Rectangle {
             padding-right: (node.gateway-out.shown || node.payload-in.shown)
                 ? node.terminal-column : Space.tight;
             spacing: 1px;
-            alignment: center;
+            alignment: node.label-top ? LayoutAlignment.start
+                : LayoutAlignment.center;
 
             Text {
                 text: node.name;

@@ -4303,9 +4303,15 @@ had placed. Its components are laid out down it by name, the one order a model
 has, and are not dragged: a configuration file is where a node's position is
 kept, and a physics component is never in one. A component is the one shape no
 node type has, a square with a dotted edge, narrower than every node, in the
-pane's own reddish purple, with its type written under its name. A physics
-connection is drawn between the two components it joins, and each stand-in's
-<tt class="docutils literal">connects</tt> between its component and the payload node it stands in for,
+pane's own reddish purple, with its type written under its name. A
+component whose every connection goes into one other, which itself goes into
+nothing, is drawn inside that one, under its name: the heaters inside the
+zone they warm, so that the sensors and the heaters' lines are all joined to
+the one block that is the thermal mass, as they are on the vehicle, and the
+nesting is the connection, not drawn again. Only one deep, which a narrow
+pane can hold. Every other physics connection is drawn between the two
+components it joins, and each stand-in's <tt class="docutils literal">connects</tt> between its component
+and the payload node it stands in for,
 the arrow the way the value goes: both dashed and in that purple, where a
 configuration's links are solid. tcspecial's visual window draws the same pane
 from the simulator file tcssim would read for the configuration, and only

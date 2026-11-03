@@ -170,6 +170,15 @@ pub trait EndpointReadable: EndpointWaitable {
     fn strangers(&mut self) -> u64 {
         0
     }
+
+    /// Whether a read now would find something whatever its descriptor
+    /// says: an endpoint that makes what it reports by the clock rather than
+    /// being sent it -- a set of lines reported for their levels every
+    /// interval -- has a report due that no descriptor announces. False for
+    /// every endpoint whose data arrives, which is what the default is.
+    fn due(&self) -> bool {
+        false
+    }
 }
 
 /// The most datagrams one read turns away before it gives up for the pass.
@@ -797,6 +806,10 @@ impl EndpointReadable for CcsdsReader {
 
     fn strangers(&mut self) -> u64 {
         self.inner.strangers() + std::mem::take(&mut self.refused)
+    }
+
+    fn due(&self) -> bool {
+        self.inner.due()
     }
 }
 

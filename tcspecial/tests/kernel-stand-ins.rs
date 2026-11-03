@@ -89,6 +89,33 @@ impl Flown {
     /// If the example does not say what it is expected to, cannot be
     /// written, or tcspecial does not start and answer a CONNECT.
     fn fly(name: &str, offset: u16, device: (&str, &str, usize)) -> Flown {
+        Flown::fly_with(name, offset, device, &[])
+    }
+
+    /// Flies an example as [`Flown::fly`] does, with some of what it says
+    /// changed first.
+    ///
+    /// # Arguments
+    ///
+    /// * `name`    - The example.
+    /// * `offset`  - Its ports' offset from the CAN example's.
+    /// * `device`  - What it says its device is, what to say instead, and
+    ///               how many of its payloads say it.
+    /// * `changed` - Text it says, each once, and what to say instead.
+    ///
+    /// # Returns
+    ///
+    /// The example, flying and connected to.
+    ///
+    /// # Panics
+    ///
+    /// As [`Flown::fly`] does, and if a change's text is not said once.
+    fn fly_with(
+        name: &str,
+        offset: u16,
+        device: (&str, &str, usize),
+        changed: &[(&str, &str)],
+    ) -> Flown {
         let example = Path::new(env!("CARGO_MANIFEST_DIR"))
             .join(format!("../examples/{name}/{name}.ytcs"));
         let mut text =
@@ -153,6 +180,9 @@ impl Flown {
         }
         let (was, now, times) = device;
         text = common::moved_each(&text, was, now, times);
+        for (was, now) in changed {
+            text = common::moved(&text, was, now);
+        }
 
         let configuration = dir.path().join(format!("{name}.ytcs"));
         std::fs::write(&configuration, &text).expect("written");
@@ -515,6 +545,10 @@ fn a_can_payload_is_flown_over_a_virtual_bus() {
 
 // ---------------------------------------------------------------- GPIO
 
+/// Held by a test while it flies a gpio-sim chip: the tests share the one
+/// chip, and its line 0 can be asked for by one tcspecial at a time.
+static CHIP: std::sync::Mutex<()> = std::sync::Mutex::new(());
+
 /// A gpio-sim chip this user may use: its device, and its first two lines'
 /// directories, where a line's pull is set and its value read.
 struct Chip {
@@ -604,6 +638,7 @@ fn gpio_sim() -> Result<Chip, String> {
 /// drive the lamp, on a chip of the kernel's gpio-sim.
 #[test]
 fn a_gpio_payload_is_flown_on_a_simulated_chip() {
+    let _chip = CHIP.lock().unwrap_or_else(|held| held.into_inner());
     let chip = match gpio_sim() {
         Ok(chip) => chip,
         Err(why) => return skipped(&why),
@@ -653,6 +688,45 @@ fn a_gpio_payload_is_flown_on_a_simulated_chip() {
     // The lamp lit, and put out, by what the ground sends.
     flown.command_until(b"1", || chip.lamp() == "1");
     flown.command_until(b"0", || chip.lamp() == "0");
+}
+
+/// A GPIO payload read for what its lines are, with no edges to wake it,
+/// reports them every `state_interval` all the same: the gpio example's
+/// switch, watched for no edge and reported every fifth of a second, is
+/// heard high and then low with the line held still between.
+#[test]
+fn a_gpio_payload_read_for_its_state_reports_it_on_its_interval() {
+    let _chip = CHIP.lock().unwrap_or_else(|held| held.into_inner());
+    let chip = match gpio_sim() {
+        Ok(chip) => chip,
+        Err(why) => return skipped(&why),
+    };
+    chip.pull(true);
+
+    let flown = Flown::fly_with(
+        "gpio",
+        20,
+        ("\"/dev/gpiochip1\"", &format!("\"{}\"", chip.device), 2),
+        &[(
+            "        edge: \"both\"\n",
+            "        edge: \"none\"\n        state_interval: \"200 ms\"\n",
+        )],
+    );
+    let ground = flown.ground_of("switch");
+
+    for level in [1u32, 0] {
+        chip.pull(level == 1);
+        heard_while(
+            &ground,
+            || {},
+            |datum| {
+                datum.chunks(16).any(|record| {
+                    u32::from_be_bytes(record[12..16].try_into().unwrap())
+                        == level
+                })
+            },
+        );
+    }
 }
 
 // ---------------------------------------------------------------- IIO

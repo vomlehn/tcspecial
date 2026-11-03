@@ -20,7 +20,9 @@ a station reading XML needs nothing outside the standard library. Both are
 read into the same :class:`Configuration`, and the two spellings say the same
 thing, which ``make comparespellings`` and tcsverify hold them to;
 ``examples/ping/tests/agrees.rs`` holds what this reads to what the Rust
-reads.
+reads. A configuration's ``include`` list is followed as the Rust follows it
+(``graph::Graph::load``), so that a node's device id is counted among the
+same names: see :func:`load`.
 
 The digest is not worked out here. It is taken over what a configuration says
 rather than over its bytes -- see ``tcslibgs::config_digest`` -- and a second
@@ -363,6 +365,9 @@ class Configuration:
     #: The command bindings, each the gateway node a command arrives on
     #: and the ``node.attribute`` it sets: ``(from, sets)``.
     commands: list = field(default_factory=list)
+    #: The other files the configuration is made of, by the names its
+    #: ``include`` list gives them: see :func:`include_path`.
+    included: list = field(default_factory=list)
 
     def node(self, name):
         """The node called ``name``.
@@ -1109,12 +1114,16 @@ def choose(named, stem, default, chosen=None):
 
 
 def load(path):
-    """Read the configuration at ``path``, YAML or XML by its extension.
+    """Read the configuration at ``path``, YAML or XML by its extension,
+    with every file its ``include`` list names.
 
-    A file that names others in an ``include`` is refused rather than read in
-    part: its nodes' device ids depend on the files it includes, and a station
-    that counted only the top file's would receive on the wrong ports and say
-    nothing about why.
+    The included files are read as ``Graph::load`` reads them, by the same
+    rules: each in the top file's spelling, at the path :func:`include_path`
+    gives its name, none with a ``tcspecial`` section or an ``include`` list
+    of its own, none named twice, and no node named in two of them. Their
+    nodes are counted with the top file's, because a node's device id is its
+    place among the names of the whole configuration: a station that counted
+    only the top file's would receive on the wrong ports.
 
     Args:
         path: The configuration file, named ``.ytcs``, for YAML, or
@@ -1126,18 +1135,15 @@ def load(path):
     Raises:
         ValueError: The extension is neither of those -- ``.yaml``, ``.yml``
                     and ``.xml``, as configurations were once named,
-                    included, with the name to give the file -- the file
-                    includes
-                    others, it is not a map of sections, or it is YAML and
-                    PyYAML is not installed.
-        OSError: The file cannot be read.
+                    included, with the name to give the file -- an
+                    include is refused, a file is not a map of sections, or
+                    it is YAML and PyYAML is not installed.
+        OSError: A file cannot be read.
     """
     path = Path(path)
     suffix = path.suffix.lower()
-    if suffix == ".xtcs":
-        return _interface_checked(_load_xml(path))
-    if suffix == ".ytcs":
-        return _interface_checked(_load_yaml(path))
+    if suffix in (".xtcs", ".ytcs"):
+        return _interface_checked(_with_includes(path))
     if suffix in OLD_EXTENSIONS:
         new = OLD_EXTENSIONS[suffix]
         spelling = "YAML" if new == ".ytcs" else "XML"
@@ -1173,19 +1179,108 @@ def _interface_checked(config):
     return config
 
 
-def _includes(path):
-    """The error for a configuration that includes other files.
+def include_path(top, name):
+    """Where an included file is: ``graph::include_path``.
+
+    A name is a relative path without an extension, its parts separated by
+    ``/``, each a name or ``..``, read from the directory of the file that
+    names it and given that file's extension: ``zone``, or
+    ``../thermostat-common/thermostat``. An empty name, an absolute one, one
+    with a part that is empty or ``.``, one beginning with ``~`` and one with
+    a ``$`` in it are refused, as the Rust refuses them: nothing is expanded.
 
     Args:
-        path: The configuration file.
+        top:  The file that names it.
+        name: The name it is included by.
 
     Returns:
-        The ``ValueError`` to raise.
+        The included file's path.
+
+    Raises:
+        ValueError: The name is of a shape refused above.
     """
-    return ValueError(
-        f"{path} includes other files, which this does not read: their nodes' "
-        "device ids would be counted wrong"
-    )
+    why = None
+    if name == "":
+        why = "is empty"
+    elif name.startswith("/"):
+        why = "is an absolute path"
+    elif any(part in ("", ".") for part in name.split("/")):
+        why = 'has a part that is empty or "."'
+    elif name.startswith("~"):
+        why = "begins with ~, which is not expanded"
+    elif "$" in name:
+        why = "has a $ in it, and no variable is expanded"
+    if why is not None:
+        raise ValueError(
+            f'{top}: the include "{name}" {why}: an include is relative to '
+            "this file's directory, naming a file by its path from there "
+            "without an extension, such as zone or ../common/zone")
+    return top.parent / f"{name}{top.suffix}"
+
+
+def _load_one(path):
+    """Read one file of a configuration, in the spelling its extension says.
+
+    Args:
+        path: The file.
+
+    Returns:
+        A pair: the :class:`Configuration` it says alone, and whether it has
+        a ``tcspecial`` section.
+    """
+    if path.suffix.lower() == ".xtcs":
+        return _load_xml(path)
+    return _load_yaml(path)
+
+
+def _with_includes(path):
+    """Read a configuration and every file it includes, as one.
+
+    Args:
+        path: The top file.
+
+    Returns:
+        The :class:`Configuration`, every file's nodes and command bindings
+        in it.
+
+    Raises:
+        ValueError: A file is refused, an include name is refused, a file is
+                    included twice or is the top file, an included file has
+                    a ``tcspecial`` section or includes of its own, or two
+                    files have a node of one name.
+        OSError: A file cannot be read.
+    """
+    config, _ = _load_one(path)
+    homes = {node.name: path for node in config.nodes}
+    seen = [path.resolve(strict=True)]
+    for name in config.included:
+        included = include_path(path, name)
+        part, has_section = _load_one(included)
+        real = included.resolve(strict=True)
+        if real in seen:
+            raise ValueError(f"{path}: {included} is included twice, or is "
+                             "this file")
+        seen.append(real)
+        if has_section:
+            raise ValueError(
+                f"{included}: an included file may not have a tcspecial "
+                "section -- a configuration has one command interpreter, and "
+                "the file that was asked for says what it is")
+        if part.included:
+            raise ValueError(
+                f"{included}: an included file may not include others")
+        for node in part.nodes:
+            if node.name in homes:
+                raise ValueError(
+                    f'{included}: there is a node called "{node.name}" here '
+                    f"and in {homes[node.name]}: a node's name is the one "
+                    "thing every other part of a configuration knows it by, "
+                    "so no two nodes share one")
+            homes[node.name] = included
+        config.nodes = sorted(config.nodes + part.nodes,
+                              key=lambda n: n.name)
+        config.commands.extend(part.commands)
+    return config
 
 
 def node_types(section):
@@ -1265,6 +1360,7 @@ class _Reader:
         self.path = path
         self.nodes = []
         self.commands = []
+        self.included = []
 
     def refuse(self, line, why):
         """The error for something refused.
@@ -1296,18 +1392,22 @@ class _Reader:
                               "it by, so no two nodes share one")
         self.nodes.append(node)
 
-    def done(self, tcspecial):
-        """The configuration read.
+    def done(self, tcspecial, has_section):
+        """The file read.
 
         Args:
-            tcspecial: The ``tcspecial`` section, flat.
+            tcspecial:   The ``tcspecial`` section, flat.
+            has_section: Whether the file has a ``tcspecial`` section.
 
         Returns:
-            The :class:`Configuration`, its nodes by name.
+            A pair: the :class:`Configuration` the file says alone, its nodes
+            by name, and ``has_section``.
         """
-        return Configuration(path=self.path, tcspecial=tcspecial,
-                             nodes=sorted(self.nodes, key=lambda n: n.name),
-                             commands=list(self.commands))
+        return (Configuration(path=self.path, tcspecial=tcspecial,
+                              nodes=sorted(self.nodes, key=lambda n: n.name),
+                              commands=list(self.commands),
+                              included=list(self.included)),
+                has_section)
 
 
 class _Element:
@@ -1582,16 +1682,18 @@ def _load_xml(path):
         path: The configuration file.
 
     Returns:
-        The :class:`Configuration` it says.
+        A pair: the :class:`Configuration` the file says alone, its includes
+        named but not read, and whether it has a ``tcspecial`` section.
 
     Raises:
-        ValueError: The file includes others, or is refused.
+        ValueError: The file is refused.
         xml.parsers.expat.ExpatError: The file is not well-formed XML.
     """
     root = _xml_tree(path)
     reader = _Reader(path)
-    if root.find("include") is not None:
-        raise _includes(path)
+    for element in root.children:
+        if element.tag == "include":
+            reader.included.append(element.text.strip())
     _xml_old(reader, root)
 
     tcspecial = {}
@@ -1676,7 +1778,7 @@ def _load_xml(path):
                 said["node"] = said.pop("name")
             _layout_entry(reader, entry.line, part.tag, said, seen)
 
-    return reader.done(tcspecial)
+    return reader.done(tcspecial, root.find("tcspecial") is not None)
 
 
 def _scalar(value):
@@ -1869,11 +1971,12 @@ def _load_yaml(path):
         path: The configuration file.
 
     Returns:
-        The :class:`Configuration` it says.
+        A pair: the :class:`Configuration` the file says alone, its includes
+        named but not read, and whether it has a ``tcspecial`` section.
 
     Raises:
         ValueError: PyYAML is not installed, the file is not a map of
-                    sections, it includes others, or it is refused.
+                    sections, or it is refused.
         yaml.YAMLError: The file is not well-formed YAML.
     """
     try:
@@ -1889,7 +1992,7 @@ def _load_yaml(path):
         root = yaml.compose(text)
     reader = _Reader(path)
     if root is None:
-        return reader.done({})
+        return reader.done({}, False)
     if not isinstance(root, yaml.MappingNode):
         raise ValueError(f"{path} is not a configuration: it is not a map of "
                          "sections")
@@ -1907,8 +2010,15 @@ def _load_yaml(path):
         return constructor.construct_object(value, deep=True)
 
     sections = _yaml_mapping(reader, root, "the file")
-    if any(key == "include" for key, _, _ in sections):
-        raise _includes(path)
+    for key, value, at in sections:
+        if key != "include":
+            continue
+        for name in _yaml_list(reader, value, "include"):
+            said = construct(name)
+            if not isinstance(said, str):
+                raise reader.refuse(name.start_mark.line + 1,
+                                    "an include is a file's name")
+            reader.included.append(said)
     _yaml_old(reader, root)
 
     tcspecial = {}
@@ -1986,7 +2096,8 @@ def _load_yaml(path):
                 _layout_entry(reader, entry.start_mark.line + 1, part, said,
                               seen)
 
-    return reader.done(tcspecial)
+    has_section = any(key == "tcspecial" for key, _, _ in sections)
+    return reader.done(tcspecial, has_section)
 
 
 def one_host(address):

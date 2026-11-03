@@ -9151,10 +9151,10 @@ digest. Where its entries are numbered, they are numbered in the
 canonical order: bit <em>n</em> of a gpio node's report is the <em>n</em>-th of its
 <tt class="docutils literal">lines</tt> in sorted order, whatever order the file lists them in.</dd>
 <dt>Requirement</dt>
-<dd>The same rule holds for simulator files and physics models. Their type
-groups, entries, settings and groups are in no meaningful order; the
-simulator file's digest is taken over what it and its model say, in
-canonical order; and in a physics model, events due at the same instant
+<dd>The same rule holds for simulator files and their physics models. Their
+type groups, entries, settings and groups are in no meaningful order;
+the simulator file's digest is taken over what it says, its world
+included, in canonical order; and in a physics model, events due at the same instant
 are taken by component name, and a terminal's inputs are summed in the
 order of the names of the terminals they come from.</dd>
 <dt>Requirement</dt>
@@ -11176,18 +11176,27 @@ heaters -- so what the vehicle reads is a consequence of what the vehicle
 drove, and the whole loop can be watched closing.</p>
 <dl class="docutils">
 <dt>Requirement</dt>
-<dd>The model is a YAML file of its own, which the simulator file names with
-<tt class="docutils literal">physics</tt>, relative to the simulator file's directory. A vehicle's
-physics outlives any one configuration of its payloads, so it is stated
-once and named by every simulator file that uses it; the manual's
-thermostat fixture and the thermostat example name one model. A
-simulator file that still declares masses itself is refused, told where
-they go.</dd>
+<dd>The model is in the simulator file, under <tt class="docutils literal">world: physics:</tt>, beside
+the stand-ins joined to it, so that one file says the whole of what the
+simulator simulates and a stand-in's <tt class="docutils literal">connects</tt> names a terminal the
+same file says is there. The world also states <tt class="docutils literal">ambient_temp</tt>, the
+one temperature every thermal zone's surroundings are about, required
+where there is a zone. The world is YAML only: a simulator file written
+in XML has none, and one with a <tt class="docutils literal">world</tt> or a <tt class="docutils literal">physics</tt> element is
+refused.</dd>
+<dt>Requirement</dt>
+<dd>The shapes a model had before are refused, each told where it goes: a
+simulator file naming a model in a file of its own,
+<tt class="docutils literal">physics: <span class="pre">zone-physics.yaml</span></tt>; such a file given as a simulator file;
+a <tt class="docutils literal">physics</tt> section at the top of a simulator file; a zone stating
+its own <tt class="docutils literal">environment</tt>, which is the world's <tt class="docutils literal">ambient_temp</tt> now; and
+a simulator file that still declares masses itself.</dd>
 <dt>Requirement</dt>
 <dd>The model is the components it is made of, grouped by type as a
 configuration's nodes are, and a list of connections between them, as a
-configuration has links. Each entry of <tt class="docutils literal">physics</tt> is <tt class="docutils literal">type</tt> and a
-type, <tt class="docutils literal">- type heater:</tt>, holding the components of that type, each
+configuration has links: <tt class="docutils literal">components</tt> and <tt class="docutils literal">connections</tt>, under
+<tt class="docutils literal">physics</tt>. Each entry of <tt class="docutils literal">components</tt> is <tt class="docutils literal">type</tt> and a type,
+<tt class="docutils literal">- type heater:</tt>, holding the components of that type, each
 named by <tt class="docutils literal">component</tt>. The types are <tt class="docutils literal">heater</tt>, <tt class="docutils literal">thermal_zone</tt>,
 <tt class="docutils literal">sun</tt>, <tt class="docutils literal">solar_array</tt>, <tt class="docutils literal">load</tt>, <tt class="docutils literal">bus</tt>, <tt class="docutils literal">battery</tt>, <tt class="docutils literal">engine</tt> and
 <tt class="docutils literal">body</tt>, and a type of any other is refused; a <tt class="docutils literal">thermal_mass</tt>, the one
@@ -11238,10 +11247,10 @@ which differ by the zone's heat capacity. A fraction, which has no unit,
 is written bare.</dd>
 <dt>Requirement</dt>
 <dd>A heater states its power at its nominal voltage and that voltage. A
-thermal zone states the temperature of the environment it sits in, its
-time constant -- how long it takes to lose a given fraction of the
-difference between itself and that environment -- and its heat
-capacity, which turns a heater's watts into kelvin a second.</dd>
+thermal zone sits in surroundings about the world's <tt class="docutils literal">ambient_temp</tt>,
+and states its time constant -- how long it takes to lose a given
+fraction of the difference between itself and its surroundings -- and
+its heat capacity, which turns a heater's watts into kelvin a second.</dd>
 <dt>Requirement</dt>
 <dd>A simulated payload is joined to one terminal by <tt class="docutils literal">connects</tt>, written
 as a connection's end is: <tt class="docutils literal">connects: zone.temperature</tt>. Joined to an
@@ -11271,10 +11280,10 @@ force would depend on which the vehicle drove last.</dd>
 refused. It would be a state nothing reads and nothing changes, and the
 likeliest cause is a misspelled <tt class="docutils literal">connects</tt>.</dd>
 <dt>Requirement</dt>
-<dd><tt class="docutils literal">tcsverify</tt> reads the model a simulator file names, and reports every
-problem with a component at its line in the model, a problem with the
-connections at the model's <tt class="docutils literal">connections</tt> line, and a model that
-cannot be read at the simulator file's <tt class="docutils literal">physics</tt> line.</dd>
+<dd><tt class="docutils literal">tcsverify</tt> reports every problem with a component at its line in
+the simulator file, a problem with the connections at the world's
+<tt class="docutils literal">connections</tt> line, and one with the ambient temperature at its
+<tt class="docutils literal">ambient_temp</tt> line.</dd>
 </dl>
 <p><strong>How the world advances</strong></p>
 <p>The simulator makes one world of the model, which every stand-in joined to
@@ -11334,10 +11343,11 @@ rest      = environment + heat / capacity * time_constant
 <p><tt class="docutils literal">rest</tt> is where the zone would settle with that heat on for ever, and it is
 the figure that says whether the heaters can win at all: with a fifty second
 constant, twenty joules a kelvin and a hundred and twenty watts, it is three
-hundred kelvin above the environment.</p>
+hundred kelvin above the environment, which is the zone's surroundings: the
+world's <tt class="docutils literal">ambient_temp</tt>, swinging and wandering as the zone says.</p>
 <dl class="docutils">
 <dt>Requirement</dt>
-<dd>A zone starts at its environment, and a heater off, unless the model
+<dd>A zone starts at the world's <tt class="docutils literal">ambient_temp</tt>, and a heater off, unless the model
 states <tt class="docutils literal">start</tt>, and then there. Coming up cold is the case a
 thermostat exists for, and its first climb is worth watching; a model
 that would rather show the thermostat holding its band from the first
@@ -11479,8 +11489,9 @@ temperature throughout.</dd>
 <dt>Requirement</dt>
 <dd>A heater may state how its supply voltage varies, and how slowly.</dd>
 <dt>Requirement</dt>
-<dd>A zone may state how its environment swings as a sine wave, and over
-what period, and how it wanders at random, and how slowly.</dd>
+<dd>A zone may state how its surroundings swing about the world's
+<tt class="docutils literal">ambient_temp</tt> as a sine wave, and over what period, and how they
+wander at random, and how slowly.</dd>
 <dt>Requirement</dt>
 <dd>Everything that wanders is an Ornstein-Uhlenbeck process stepped by its
 exact transition, so that its statistics do not depend on how often it
@@ -11627,32 +11638,11 @@ looks like. As there, the error is reported from the payload's end.</dd>
 </div>
 <div class="section" id="example">
 <h2><a class="toc-backref" href="#toc-entry-132">Example</a></h2>
-<p>This is the shipped <tt class="docutils literal"><span class="pre">examples/thermostat/thermostat-sim.yaml</span></tt>, which
-simulates the three sensors and two heaters of <tt class="docutils literal">thermostat.ytcs</tt>, joined to
-the model it names, <tt class="docutils literal"><span class="pre">examples/thermostat-common/thermostat-physics.yaml</span></tt>,
-which thermostat-yamcs's simulator file names too: two heaters warming one
+<p>This is the shipped <tt class="docutils literal"><span class="pre">examples/thermostat/thermostat-sim.yaml</span></tt>, a link to
+<tt class="docutils literal"><span class="pre">examples/thermostat-common/thermostat-sim.yaml</span></tt>, which thermostat-yamcs's
+simulator file is a link to too. It simulates the three sensors and two
+heaters of <tt class="docutils literal">thermostat.ytcs</tt>, joined to its world: two heaters warming one
 zone.</p>
-<pre class="code yaml literal-block">
-<span class="name tag">physics</span><span class="punctuation">:</span><span class="whitespace">
-  </span><span class="punctuation indicator">-</span><span class="whitespace"> </span><span class="name tag">type heater</span><span class="punctuation">:</span><span class="whitespace">
-      </span><span class="punctuation indicator">-</span><span class="whitespace"> </span><span class="name tag">component</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">heater_1</span><span class="whitespace">
-        </span><span class="name tag">power</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal string">&quot;60</span><span class="name variable"> </span><span class="literal string">W&quot;</span><span class="whitespace">
-        </span><span class="name tag">voltage</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal string">&quot;28</span><span class="name variable"> </span><span class="literal string">V&quot;</span><span class="whitespace">
-      </span><span class="punctuation indicator">-</span><span class="whitespace"> </span><span class="name tag">component</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">heater_2</span><span class="whitespace">
-        </span><span class="name tag">power</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal string">&quot;60</span><span class="name variable"> </span><span class="literal string">W&quot;</span><span class="whitespace">
-        </span><span class="name tag">voltage</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal string">&quot;28</span><span class="name variable"> </span><span class="literal string">V&quot;</span><span class="whitespace">
-  </span><span class="punctuation indicator">-</span><span class="whitespace"> </span><span class="name tag">type thermal_zone</span><span class="punctuation">:</span><span class="whitespace">
-      </span><span class="punctuation indicator">-</span><span class="whitespace"> </span><span class="name tag">component</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">zone</span><span class="whitespace">
-        </span><span class="name tag">capacity</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal string">&quot;20</span><span class="name variable"> </span><span class="literal string">J/K&quot;</span><span class="whitespace">
-        </span><span class="name tag">environment</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal string">&quot;283.15</span><span class="name variable"> </span><span class="literal string">K&quot;</span><span class="whitespace">
-        </span><span class="name tag">time_constant</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal string">&quot;50</span><span class="name variable"> </span><span class="literal string">s&quot;</span><span class="whitespace">
-
-</span><span class="name tag">connections</span><span class="punctuation">:</span><span class="whitespace">
-  </span><span class="punctuation indicator">-</span><span class="whitespace"> </span><span class="name tag">from</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">heater_1.heat</span><span class="whitespace">
-    </span><span class="name tag">to</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">zone.heat</span><span class="whitespace">
-  </span><span class="punctuation indicator">-</span><span class="whitespace"> </span><span class="name tag">from</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">heater_2.heat</span><span class="whitespace">
-    </span><span class="name tag">to</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">zone.heat</span>
-</pre>
 <p>The three sensors are read together and so share a group, which carries
 their rate and the terminal they report; the zone is what makes three
 sensors agree about a temperature, each from a place of its own on it. Each
@@ -11660,9 +11650,29 @@ heater's stand-in switches its heater while the vehicle has it on. Every one
 of them is the far end of a UDP socket, which the simulator stands in for
 with nothing more than a socket.</p>
 <pre class="code yaml literal-block">
-<span class="name tag">description</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">Simulator settings for the payloads of thermostat.ytcs</span><span class="whitespace">
+<span class="name tag">description</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">Simulator settings for the payloads of thermostat.ytcs and</span><span class="whitespace">
+  </span><span class="literal scalar plain">thermostat-yamcs.ytcs</span><span class="whitespace">
 
-</span><span class="name tag">physics</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">../thermostat-common/thermostat-physics.yaml</span><span class="whitespace">
+</span><span class="name tag">world</span><span class="punctuation">:</span><span class="whitespace">
+  </span><span class="name tag">ambient_temp</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal string">&quot;283.15</span><span class="name variable"> </span><span class="literal string">K&quot;</span><span class="whitespace">
+  </span><span class="name tag">physics</span><span class="punctuation">:</span><span class="whitespace">
+    </span><span class="name tag">components</span><span class="punctuation">:</span><span class="whitespace">
+      </span><span class="punctuation indicator">-</span><span class="whitespace"> </span><span class="name tag">type heater</span><span class="punctuation">:</span><span class="whitespace">
+          </span><span class="punctuation indicator">-</span><span class="whitespace"> </span><span class="name tag">component</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">heater_1</span><span class="whitespace">
+            </span><span class="name tag">power</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal string">&quot;60</span><span class="name variable"> </span><span class="literal string">W&quot;</span><span class="whitespace">
+            </span><span class="name tag">voltage</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal string">&quot;28</span><span class="name variable"> </span><span class="literal string">V&quot;</span><span class="whitespace">
+          </span><span class="punctuation indicator">-</span><span class="whitespace"> </span><span class="name tag">component</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">heater_2</span><span class="whitespace">
+            </span><span class="name tag">power</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal string">&quot;60</span><span class="name variable"> </span><span class="literal string">W&quot;</span><span class="whitespace">
+            </span><span class="name tag">voltage</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal string">&quot;28</span><span class="name variable"> </span><span class="literal string">V&quot;</span><span class="whitespace">
+      </span><span class="punctuation indicator">-</span><span class="whitespace"> </span><span class="name tag">type thermal_zone</span><span class="punctuation">:</span><span class="whitespace">
+          </span><span class="punctuation indicator">-</span><span class="whitespace"> </span><span class="name tag">component</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">zone</span><span class="whitespace">
+            </span><span class="name tag">capacity</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal string">&quot;20</span><span class="name variable"> </span><span class="literal string">J/K&quot;</span><span class="whitespace">
+            </span><span class="name tag">time_constant</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal string">&quot;50</span><span class="name variable"> </span><span class="literal string">s&quot;</span><span class="whitespace">
+    </span><span class="name tag">connections</span><span class="punctuation">:</span><span class="whitespace">
+      </span><span class="punctuation indicator">-</span><span class="whitespace"> </span><span class="name tag">from</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">heater_1.heat</span><span class="whitespace">
+        </span><span class="name tag">to</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">zone.heat</span><span class="whitespace">
+      </span><span class="punctuation indicator">-</span><span class="whitespace"> </span><span class="name tag">from</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">heater_2.heat</span><span class="whitespace">
+        </span><span class="name tag">to</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">zone.heat</span><span class="whitespace">
 
 </span><span class="name tag">simulated_payload_groups</span><span class="punctuation">:</span><span class="whitespace">
   </span><span class="punctuation indicator">-</span><span class="whitespace"> </span><span class="name tag">group</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">zone_temps</span><span class="whitespace">
@@ -12111,11 +12121,10 @@ tcspecial configuration it read, the digest of its simulator file, and its
 <tt class="docutils literal"><span class="pre">--simulate</span></tt> mode. The simulator file's digest is taken as the
 configuration's is, of what it says and not of its bytes: its
 <tt class="docutils literal">tcssim</tt> section, its groups and its simulated payloads by name, each
-with its type and settings, and the physics model it names, its
-components by name and its connections in order -- the description and
-the model's file name left out. A comment or another order is then the
-same simulator file, and a figure changed in the model beside it is
-not. The harness compares the three with its own before
+with its type and settings, and its world, its ambient temperature,
+its components by name and its connections in order -- the description
+left out. A comment or another order is then the same simulator file,
+and a figure changed in the model is not. The harness compares the three with its own before
 it starts tcspecial, and refuses to go on when any differs, saying which
 and what each side has. A simulator started yesterday on another
 configuration, or under another mode, then stops the run before tcspecial

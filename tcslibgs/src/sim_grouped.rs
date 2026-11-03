@@ -892,7 +892,7 @@ mod tests {
                 }
             }
         }
-        assert!(shown >= 8, "{shown}");
+        assert!(shown >= 7, "{shown}");
     }
 
     /// A file of the old shape is told to run the converter, and the

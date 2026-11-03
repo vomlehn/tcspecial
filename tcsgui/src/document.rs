@@ -946,6 +946,8 @@ impl Document {
                         });
                     }
                 }
+                // No node of a configuration's is a physics component.
+                crate::pane::Pane::Physics => {}
             }
         }
 
@@ -1600,6 +1602,68 @@ impl Document {
                         name.clone(),
                         settings.iter().cloned().collect(),
                     );
+                }
+            }
+            Edit::AddPhysics { name, kind } => {
+                if let Some(simulator) = &mut self.simulator {
+                    simulator.world.components.insert(
+                        name.clone(),
+                        crate::sim::PhysicsComponent {
+                            kind: kind.clone(),
+                            settings: Default::default(),
+                        },
+                    );
+                }
+            }
+            Edit::RemovePhysics { name, .. } => {
+                if let Some(simulator) = &mut self.simulator {
+                    let world = &mut simulator.world;
+                    for joined in world.connections_of(name) {
+                        world.connections.remove(&joined);
+                    }
+                    world.components.remove(name);
+                }
+            }
+            Edit::RestorePhysics {
+                name,
+                kind,
+                settings,
+                connections,
+            } => {
+                if let Some(simulator) = &mut self.simulator {
+                    let world = &mut simulator.world;
+                    world.components.insert(
+                        name.clone(),
+                        crate::sim::PhysicsComponent {
+                            kind: kind.clone(),
+                            settings: settings.iter().cloned().collect(),
+                        },
+                    );
+                    world.connections.extend(connections.iter().cloned());
+                }
+            }
+            Edit::SetPhysics {
+                component,
+                setting,
+                now,
+                ..
+            } => {
+                // Only a component that is there, as for a group: making the
+                // entry here would put a removed component back.
+                if let Some(said) = self
+                    .simulator
+                    .as_mut()
+                    .and_then(|s| s.world.components.get_mut(component))
+                {
+                    match now {
+                        Some(value) => {
+                            said.settings
+                                .insert(setting.clone(), value.clone());
+                        }
+                        None => {
+                            said.settings.remove(setting);
+                        }
+                    }
                 }
             }
             Edit::AddGroup { name, interval } => {
@@ -4323,6 +4387,10 @@ mod tests {
                 Edit::AddSimGroup { .. } => (),
                 Edit::RemoveSimGroup { .. } => (),
                 Edit::RestoreSimGroup { .. } => (),
+                Edit::AddPhysics { .. } => (),
+                Edit::RemovePhysics { .. } => (),
+                Edit::RestorePhysics { .. } => (),
+                Edit::SetPhysics { .. } => (),
                 Edit::AddGroup { .. } => (),
                 Edit::RemoveGroup { .. } => (),
                 Edit::SetGroupInterval { .. } => (),

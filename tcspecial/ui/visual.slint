@@ -12,7 +12,8 @@ import { ScrollView } from "std-widgets.slint";
 import { Colors } from "../../tcsui/ui/colors.slint";
 import { Fonts } from "../../tcsui/ui/fonts.slint";
 import {
-    Session, NodeView, LinkView, NodeShape, LinkLine, SheetGround
+    Session, NodeView, LinkView, NodeShape, LinkLine, SheetGround,
+    PhysicsGround
 } from "../../tcsdiagram/ui/diagram.slint";
 
 // Exported so that the Rust can say this session changes nothing, which is
@@ -37,25 +38,55 @@ export component VisualWindow inherits Window {
     in property <color> vehicle-ground;
     in property <color> gateway-ground;
 
+    // The Physics pane, left of the sheet: the simulator file's components
+    // and the links between them and to the payloads, in the coordinates of
+    // the whole canvas, the Physics pane's left edge at nought. Empty, and
+    // the pane with them, where tcspecial found no simulator file. See
+    // tcsdiagram::physics.
+    in property <length> physics-width;
+    in property <color> physics-ground;
+    in property <[NodeView]> physics-nodes;
+    in property <[LinkView]> physics-links;
+
     // Said in the title as well as in the manual, because a window that looks
     // like the editor and is not one should say what it is where it is seen.
     title: "tcspecial " + configuration + " -- visual, not for flight";
-    preferred-width: root.working-width + 24px;
+    preferred-width: root.physics-width + root.working-width + 24px;
     preferred-height: 720px;
     background: Colors.window;
 
     sheet := ScrollView {
         width: 100%;
         height: 100%;
-        content-width: root.working-width;
+        content-width: root.physics-width + root.working-width;
         content-height: root.working-height;
 
         canvas := Rectangle {
-            width: root.working-width;
+            width: root.physics-width + root.working-width;
             height: root.working-height;
             background: white;
             border-width: 1px;
             border-color: #d8d8d4;
+
+            PhysicsGround {
+                x: 0;
+                y: 0;
+                physics-width: root.physics-width;
+                physics-ground: root.physics-ground;
+            }
+            // The physics links under everything, as a configuration's are
+            // under its nodes: the sheet beside them is transparent.
+            for l in physics-links: LinkLine {
+                link: l;
+            }
+
+            // The configuration's sheet, right of the Physics pane, in the
+            // coordinates its file holds.
+            Rectangle {
+                x: root.physics-width;
+                width: root.working-width;
+                height: root.working-height;
+                background: transparent;
 
             SheetGround {
                 working-width: root.working-width;
@@ -86,6 +117,18 @@ export component VisualWindow inherits Window {
                 link: l;
             }
             for n in nodes: NodeShape {
+                node: n;
+            }
+            }
+
+            // The line between the Physics pane and the payloads.
+            Rectangle {
+                x: root.physics-width;
+                width: 1px;
+                height: 100%;
+                background: #cbcdd1;
+            }
+            for n in physics-nodes: NodeShape {
                 node: n;
             }
         }

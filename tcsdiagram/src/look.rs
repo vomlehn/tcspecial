@@ -102,6 +102,17 @@ pub const PAYLOAD_LINE: &str = "#289aa2";
 /// to change.
 pub const GATEWAY_LINE: &str = "#0292e4";
 
+/// What a physics component's body is painted: Okabe and Ito's reddish
+/// purple, darkened until the white drawn on a body reads on it, as the
+/// other panes' rungs are.
+pub const PHYSICS_TINT: &str = "#8e4a76";
+
+/// And what a physics link is drawn in: the same hue, lighter, as a line is
+/// lighter than the bodies it joins. A physics link is dashed as well, so
+/// that its colour is not the only thing saying it is not a link of the
+/// configuration's.
+pub const PHYSICS_LINE: &str = "#b5679a";
+
 /// What a node of this type is painted.
 ///
 /// A rung of its own panel's ramp. Each panel starts twelve CIE units below
@@ -152,6 +163,9 @@ pub fn tint_of(node_type: &str) -> String {
         Pane::Gateway => GATEWAY_RUNGS,
         Pane::Vehicle => VEHICLE_RUNGS,
         Pane::Payloads => PAYLOAD_RUNGS,
+        // No type of a configuration's is in it; a physics component is
+        // drawn by `crate::physics`, in its own tint.
+        Pane::Physics => &[PHYSICS_TINT],
     };
     let order = ramp_order(pane);
     // Where this type comes in its own panel, alphabetically. A type this
@@ -249,6 +263,9 @@ pub fn ground_of(ground: style::Ground) -> String {
         style::Ground::Gateway => "#dee2fc",
         style::Ground::Vehicle => "#e8e4ca",
         style::Ground::Payloads => "#bad2d0",
+        // The palest of the reddish purple Okabe and Ito give: a hue no other
+        // pane is in, and the Physics pane's heading says "Physics" besides.
+        style::Ground::Physics => "#f2dcea",
     }
     .to_string()
 }

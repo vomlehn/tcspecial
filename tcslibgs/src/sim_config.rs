@@ -1483,7 +1483,7 @@ pub enum Attached {
 /// # Returns
 ///
 /// Each terminal as written, trimmed.
-fn terminals_of(said: &str) -> impl Iterator<Item = &str> {
+pub fn terminals_of(said: &str) -> impl Iterator<Item = &str> {
     said.split(',').map(str::trim)
 }
 
@@ -1930,7 +1930,7 @@ impl SimConfigFile {
     /// # Returns
     ///
     /// Its settings, laid over its group's where it names a declared one.
-    fn settings_of(&self, payload: &SimPayload) -> SimSettings {
+    pub fn settings_of(&self, payload: &SimPayload) -> SimSettings {
         match payload.group.as_ref().and_then(|name| {
             self.simulated_payload_groups
                 .iter()

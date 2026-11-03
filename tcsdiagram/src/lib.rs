@@ -21,6 +21,7 @@
 
 pub mod look;
 pub mod pane;
+pub mod physics;
 pub mod route;
 pub mod settings;
 pub mod style;

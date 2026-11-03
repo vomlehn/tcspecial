@@ -178,7 +178,9 @@ pub enum Edit {
     ///
     /// `payload` is the payload of the configuration this one stands in for:
     /// the two files are joined by name, and the editor never invents a name
-    /// the configuration does not have.
+    /// the configuration does not have. Its own name, as the simulator's file
+    /// writes it, without the subdiagram it is drawn in: see
+    /// `crate::sim::Simulator::key_of`.
     SetSimPayload {
         payload: String,
         setting: String,

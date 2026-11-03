@@ -232,19 +232,20 @@ impl Editor {
                 // like. Refused rather than adopted, because adopting it
                 // means writing the file back on the next edit with the
                 // stray entry still in it and nothing said.
-                let payloads: Vec<String> = self
-                    .document
-                    .nodes
-                    .iter()
-                    .filter(|node| crate::pane::is_payload(&node.node_type))
-                    .map(|node| {
-                        crate::Qualified::of(&node.name, &node.home).absolute()
-                    })
-                    .collect();
+                //
+                // By each payload's own name, wherever it is drawn: the file
+                // names a payload in an included file as it names one in the
+                // top file, the reader allowing no two nodes one name across
+                // all of them. See `crate::sim::Simulator::key_of`.
                 let stray: Vec<&String> = simulator
                     .payloads
                     .keys()
-                    .filter(|name| !payloads.contains(name))
+                    .filter(|name| {
+                        !self.document.nodes.iter().any(|node| {
+                            crate::pane::is_payload(&node.node_type)
+                                && &&node.name == name
+                        })
+                    })
                     .collect();
                 if stray.is_empty() {
                     self.document.simulator = Some(simulator);
@@ -1066,6 +1067,149 @@ tcsgui:
         let mut again = Editor::open(&path, crate::pane::default_dividers());
         again.open_simulator(&good);
         assert!(again.trouble().is_none(), "{:?}", again.trouble());
+    }
+
+    /// Copies the thermostat example and the common directory it includes
+    /// into `into`, as they are shipped: the example's simulator file is a
+    /// symbolic link into the common directory, and stays one.
+    ///
+    /// # Arguments
+    ///
+    /// * `into` - The directory the two example directories are made in.
+    ///
+    /// # Returns
+    ///
+    /// The copied configuration, and its simulator file.
+    fn thermostat_example(into: &Path) -> (PathBuf, PathBuf) {
+        let examples =
+            Path::new(env!("CARGO_MANIFEST_DIR")).join("../examples");
+        for dir in ["thermostat", "thermostat-common"] {
+            std::fs::create_dir(into.join(dir)).expect("a directory");
+            for entry in std::fs::read_dir(examples.join(dir)).expect("listed")
+            {
+                let entry = entry.expect("an entry");
+                let to = into.join(dir).join(entry.file_name());
+                let kind = entry.file_type().expect("a file type");
+                if kind.is_symlink() {
+                    let target =
+                        std::fs::read_link(entry.path()).expect("its target");
+                    std::os::unix::fs::symlink(target, &to).expect("linked");
+                } else {
+                    std::fs::copy(entry.path(), &to).expect("copied");
+                }
+            }
+        }
+        let top = into.join("thermostat");
+        (top.join("thermostat.ytcs"), top.join("thermostat-sim.yaml"))
+    }
+
+    /// The shipped thermostat opens with its simulator file, though every
+    /// payload the file names is in the included common file and drawn in
+    /// its subdiagram.
+    ///
+    /// The file names each payload by its own name, as tcssim does, and the
+    /// editor holds a node in a subdiagram under the subdiagram's name too:
+    /// joining the two by the editor's name refused the shipped example, and
+    /// the Physics pane with it.
+    #[test]
+    fn the_thermostat_example_opens_with_its_simulator_file() {
+        let where_ = tempfile::tempdir().expect("a directory");
+        let (path, sim) = thermostat_example(where_.path());
+
+        let mut editor = Editor::open(&path, crate::pane::default_dividers());
+        assert_eq!(editor.trouble(), None, "{:?}", editor.trouble());
+        editor.open_simulator(&sim);
+        assert_eq!(editor.trouble(), None, "{:?}", editor.trouble());
+
+        let simulator =
+            editor.document().simulator.as_ref().expect("it is adopted");
+        assert!(
+            !simulator.world.components.is_empty(),
+            "the world's components, for the Physics pane"
+        );
+        assert!(simulator.payloads.contains_key("gpio-in-tmass"));
+        let tmass = editor
+            .document()
+            .nodes
+            .iter()
+            .find(|node| node.name == "gpio-in-tmass")
+            .expect("the payload");
+        assert_eq!(
+            tmass.home.as_deref(),
+            Some("../thermostat-common/thermostat"),
+            "the payload this is about is in the included file"
+        );
+    }
+
+    /// A simulated setting of a payload in an included file is written
+    /// under the payload's own name, and a rename of it carries its
+    /// settings, there too.
+    ///
+    /// The window a setting is typed into knows the node by the name the
+    /// editor holds it under, `../thermostat-common/thermostat/gpio-in-tmass`
+    /// here; the file knows it as `gpio-in-tmass`, and an entry written
+    /// under the other name joins nothing the next session can open.
+    #[test]
+    fn an_included_payloads_simulated_settings_keep_its_own_name() {
+        let where_ = tempfile::tempdir().expect("a directory");
+        let (path, sim) = thermostat_example(where_.path());
+        let held = "../thermostat-common/thermostat/gpio-in-tmass";
+
+        let mut editor = Editor::open(&path, crate::pane::default_dividers());
+        editor.open_simulator(&sim);
+        assert_eq!(editor.trouble(), None, "{:?}", editor.trouble());
+        assert!(editor.document().node(held).is_some(), "held so");
+
+        editor.edit(Edit::SetSimPayload {
+            payload: crate::sim::Simulator::key_of(held),
+            setting: "drop_percent".to_string(),
+            was: None,
+            now: Some("7".to_string()),
+        });
+        let written =
+            std::fs::read_to_string(&sim).expect("the simulator file");
+        assert!(
+            !written.contains("thermostat/gpio-in-tmass"),
+            "a qualified name is a payload nobody has: {written}"
+        );
+        let entry = written
+            .split("- payload: ")
+            .find(|entry| entry.starts_with("\"gpio-in-tmass\""))
+            .expect("the payload's entry");
+        assert!(entry.contains("drop_percent: 7\n"), "{entry}");
+
+        let mut again = Editor::open(&path, crate::pane::default_dividers());
+        again.open_simulator(&sim);
+        assert_eq!(again.trouble(), None, "{:?}", again.trouble());
+
+        // Renamed where it is, as the problems panel renames a node: the
+        // settings follow it to its new name.
+        let at = editor
+            .document()
+            .nodes
+            .iter()
+            .position(|node| node.name == "gpio-in-tmass")
+            .expect("the payload");
+        editor.settle_name(at, "gpio-in-mass");
+        let simulator =
+            editor.document().simulator.as_ref().expect("still adopted");
+        assert!(!simulator.payloads.contains_key("gpio-in-tmass"));
+        assert_eq!(
+            simulator.payloads["gpio-in-mass"]
+                .get("drop_percent")
+                .map(String::as_str),
+            Some("7")
+        );
+        let mut again = Editor::open(&path, crate::pane::default_dividers());
+        again.open_simulator(&sim);
+        assert_eq!(again.trouble(), None, "{:?}", again.trouble());
+        assert!(again
+            .document()
+            .simulator
+            .as_ref()
+            .is_some_and(|simulator| simulator
+                .payloads
+                .contains_key("gpio-in-mass")));
     }
 
     /// A file that names a node twice is not opened: a node's name is what

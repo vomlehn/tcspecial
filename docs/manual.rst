@@ -2145,7 +2145,7 @@ The thermostat example
 
 The worked example of computing aboard, and of surviving a part that fails.
 Three temperature sensors -- ``temp_1``, ``temp_2`` and ``temp_3`` -- are read
-together ten times a second as the group ``zone_temps``, which is what a
+together once a second as the group ``zone_temps``, which is what a
 group is for: readings that will be compared are taken as close together as
 the hardware allows.
 
@@ -2260,12 +2260,12 @@ of three seeds -- tcssim's tests
 ``the_thermostat_example_holds_the_zone_with_both_heaters`` and
 ``the_thermostat_example_holds_the_zone_with_a_heater_disabled`` -- has, with
 both heaters, the zone never more than two half bands from the setpoint and
-within one about four fifths of the time, the heaters on a quarter of the
+within one about three quarters of the time, the heaters on a quarter of the
 time and switching together some seventy-five times an orbit; with one
 disabled, the zone never more than two half bands from the setpoint, the
 working heater on about half the time and the disabled one never heating;
 and with neither, the zone falling from the band to its surroundings, as
-cold as 287.4 K in the first orbit.
+cold as 287.1 K in the first orbit.
 
 ``make -C examples run-thermostat`` runs it, on a host with the kernel's
 simulated chip.
@@ -3858,7 +3858,7 @@ which the thermostat example shares with thermostat-yamcs.
        connects: zone.temperature
        drift: "0.05 K"
        drift_time: "30 min"
-       packet_interval: 100 ms
+       packet_interval: 1 s
        simulate: true
 
    simulated_payloads:

@@ -37,7 +37,7 @@ tcssim:
 physics: ../thermostat-common/thermostat-physics.yaml
 
 simulated_payload_groups:
-  # The three sensors are read together, every tenth of a second, as their
+  # The three sensors are read together, once a second, as their
   # payload group in thermostat.ytcs says. Each reports the zone's
   # temperature, in the encoding the to_kelvin node its readings go to
   # expects: this file says nothing about the format, the scale or the
@@ -50,7 +50,7 @@ simulated_payload_groups:
     connects: zone.temperature
     drift: "0.05 K"
     drift_time: "30 min"
-    packet_interval: 100 ms
+    packet_interval: 1 s
     simulate: true
 
 simulated_payloads:
@@ -60,11 +60,12 @@ simulated_payloads:
       # The lines on the thermal mass, pulled to what each heater is doing --
       # line 2 to heater_1's, line 3 to heater_2's, in the order the node
       # names its lines -- so a heater disabled below reads as off however it
-      # was told, and the ground sees that. Looked at ten times a second, so a
-      # line follows its heater within a tenth of a second.
+      # was told, and the ground sees that. Looked at once a second, as often
+      # as gpio-in-tmass reports them, so a line follows its heater within a
+      # second.
       - payload: gpio-in-tmass
         connects: heater_1.heating, heater_2.heating
-        packet_interval: 100 ms
+        packet_interval: 1 s
         simulate: true
 
       # Driven and never read: each stand-in watches its line, counts each

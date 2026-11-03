@@ -27,7 +27,7 @@ tcspecial:
 
 payload_groups:
   - name: "zone_temps"
-    interval: "100 ms"
+    interval: "1 s"
 
 gateways:
   - type gateway_radio:

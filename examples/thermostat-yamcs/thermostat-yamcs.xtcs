@@ -56,7 +56,7 @@
     </tcspecial>
     <payload_groups>
         <name>zone_temps</name>
-        <interval>100 ms</interval>
+        <interval>1 s</interval>
     </payload_groups>
     <gateways>
         <type name="gateway_yamcs">

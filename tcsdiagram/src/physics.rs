@@ -18,15 +18,19 @@
 //! not drawn again as a line.
 //!
 //! A physics node is the one shape no node of a configuration's has -- a
-//! square outline with a dotted edge -- in the Physics pane's own reddish
-//! purple, and labelled with its type as well as its name. A physics link
+//! hexagon, pointed at both ends, with a dotted edge -- in the Physics pane's
+//! own reddish purple, and labelled with its type as well as its name. It
+//! has at most two terminals, both on its right, towards the payloads: one
+//! output, at the top, that every value it gives out leaves by, and one
+//! input, under it, that everything it takes in arrives at. A component's
+//! terminals are many and named, but a line's terminal is in the file, and
+//! a box for each would leave no room for the name. A physics link
 //! is dashed and drawn in that purple, where a configuration's links are
 //! solid: two things, and not the colour alone, say it is the simulator's.
 
 use crate::look::{PHYSICS_LINE, PHYSICS_TINT};
 use crate::pane::{
-    edges_of, node_ceil, node_floor, Dividers, Pane, NAMES, NODE_STEP_MM,
-    PX_PER_MM,
+    edges_of, node_ceil, Dividers, Pane, NAMES, NODE_STEP_MM, PX_PER_MM,
 };
 use crate::view::{LinkLook, NodeLook, OnSheet, TerminalLook};
 use crate::{route, style};
@@ -34,8 +38,8 @@ use crate::{route, style};
 /// How big a physics node is drawn, in pixels: narrower than every node of
 /// a configuration's, so that its size is a second thing that tells it
 /// apart, and so that the links leaving it have room beside it in the
-/// Physics pane.
-pub const SIZE: (u32, u32) = (120, 44);
+/// Physics pane; and wide enough for a name beside its terminals.
+pub const SIZE: (u32, u32) = (150, 44);
 
 /// The type a physics node is drawn as, for the windows' lists: never one of
 /// a configuration's.
@@ -162,6 +166,17 @@ pub fn of_simulator(sim: &tcslibgs::sim_config::SimConfigFile) -> Drawn {
 /// and how far below the one above it, in pixels.
 pub const INSIDE: u32 = 8;
 
+/// How much of the Physics pane right of its blocks is kept for the lanes
+/// the joins run down to the payloads, in pixels.
+pub const LANES: i32 = 24;
+
+/// The narrowest a block is drawn, however narrow the pane: its two
+/// terminals and the hexagon's points, with the name elided to its first
+/// letters. A tenth of the working width, the narrowest the pane is let be
+/// (see `settings::LEAST`), less the lanes: the block and its lanes fit even
+/// then, and the pane is dragged wider to read the names.
+pub const NARROWEST: u32 = 72;
+
 /// Where one component is drawn, in the coordinates the file holds.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct Place {
@@ -241,16 +256,25 @@ pub fn layout(
     dividers: Dividers,
 ) -> Vec<Place> {
     let (left, right) = edges_of(Pane::Physics, dividers);
-    let x = node_ceil(left)
-        .min(node_floor(right - SIZE.0 as i32))
-        .max(left);
+    // As wide as SIZE where the pane has room for that and the lanes the
+    // joins run down beside it, and narrower where it has not, so that a
+    // narrow pane keeps its blocks in it rather than under the payloads.
+    // Never narrower than NARROWEST, which still holds both terminals and
+    // a little of the name.
+    let fits = |x: i32| right - x - LANES;
+    let x = if fits(node_ceil(left)) >= SIZE.0 as i32 {
+        node_ceil(left)
+    } else {
+        left
+    };
+    let width = (SIZE.0 as i32).min(fits(x)).max(NARROWEST as i32);
     // One step of the node grid between one block and the next.
     let gap = (NODE_STEP_MM as f64 * PX_PER_MM).round() as i32;
-    let (width, height, inside) = (SIZE.0 as i32, SIZE.1 as i32, INSIDE as i32);
+    let (height, inside) = (SIZE.1 as i32, INSIDE as i32);
     let mut places = vec![
         Place {
             at: (x, 0),
-            size: SIZE,
+            size: (width as u32, SIZE.1),
             right: x + width,
         };
         names.len()
@@ -266,11 +290,11 @@ pub fn layout(
         for (n, &guest) in guests.iter().enumerate() {
             places[guest].at =
                 (x + inside, y + height + n as i32 * (height + inside));
-            places[guest].size = (SIZE.0 - 2 * INSIDE, SIZE.1);
+            places[guest].size = ((width - 2 * inside) as u32, SIZE.1);
         }
         let tall = height + guests.len() as i32 * (height + inside);
         places[host].at = (x, y);
-        places[host].size = (SIZE.0, tall as u32);
+        places[host].size = (width as u32, tall as u32);
         y = node_ceil(y + tall + gap);
     }
     places
@@ -293,13 +317,24 @@ pub fn node_look(
     at: (i32, i32),
     size: (u32, u32),
 ) -> NodeLook {
-    let outline = style::Outline::Square;
+    let outline = style::Outline::Hexagon;
     let edge = style::Edge::Dotted;
     let none = TerminalLook {
         shown: false,
         x: 0.0,
         y: 0.0,
         rightward: false,
+    };
+    // Each terminal shown where the type has a terminal that way, its arrow
+    // the way the value goes: out of the node rightwards, or into it.
+    let terminal = |output: bool| {
+        let (x, y) = terminal_at(size, output);
+        TerminalLook {
+            shown: has(component.kind, output),
+            x: x as f32,
+            y: y as f32,
+            rightward: output,
+        }
     };
     NodeLook {
         name: component.name.to_string(),
@@ -308,7 +343,7 @@ pub fn node_look(
         y: at.1 as f32,
         width: size.0 as f32,
         height: size.1 as f32,
-        outline: "square",
+        outline: "hexagon",
         shape: style::shape_of(outline, size),
         edge: style::edge_of(outline, edge, size),
         inner: style::inner_of(outline, edge, size),
@@ -330,16 +365,71 @@ pub fn node_look(
         // what tell a heater from a zone.
         summary: String::new(),
         openable: false,
+        // The two on the right, in the two slots the markup draws on the
+        // right, so the name is padded away from them; which slots says
+        // nothing more, a physics node being joined only by its lines.
         gateway_in: none.clone(),
-        gateway_out: none.clone(),
-        payload_in: none.clone(),
+        gateway_out: terminal(true),
+        payload_in: terminal(false),
         payload_out: none,
-        terminal_column: 0.0,
-        inset: 0.0,
+        terminal_column: (style::TERMINAL_COLUMN as i32
+            + style::room_of(outline, size)) as f32,
+        inset: style::room_of(outline, size) as f32,
         // A block with others drawn inside it is named at its top, above
         // them, where its name is not covered.
         label_top: size.1 > SIZE.1,
     }
+}
+
+/// Whether a component of type `kind` has a terminal that way.
+///
+/// # Arguments
+///
+/// * `kind`   - The component's type.
+/// * `output` - Whether the terminal asked about is an output.
+///
+/// # Returns
+///
+/// `true` where one of its type's terminals goes that way; `false` for a
+/// type there is no such component of.
+fn has(kind: &str, output: bool) -> bool {
+    use tcslibgs::physics::terminal::Direction;
+    let wanted = if output {
+        Direction::Out
+    } else {
+        Direction::In
+    };
+    tcslibgs::physics::terminals_of(kind)
+        .is_some_and(|all| all.iter().any(|t| t.direction == wanted))
+}
+
+/// Where a physics node's output or input terminal is drawn, from its upper
+/// left corner.
+///
+/// At the right, the output in the top row and the input in the row under
+/// it, both within the top [`SIZE`] of the node: a block with others inside
+/// it keeps its terminals beside its own name, where nothing inside covers
+/// them. In from the right by however far the hexagon's side is in along
+/// the terminal's rows.
+///
+/// # Arguments
+///
+/// * `size`   - The node's width and height.
+/// * `output` - Whether it is the output.
+///
+/// # Returns
+///
+/// The terminal's upper left corner, in pixels from the node's.
+pub fn terminal_at(size: (u32, u32), output: bool) -> (i32, i32) {
+    let inset = style::TERMINAL_INSET as i32;
+    let tall = style::TERMINAL.1 as i32;
+    let y = if output {
+        inset
+    } else {
+        SIZE.1 as i32 - inset - tall
+    };
+    let room = style::hexagon_room(size.1, y, y + tall);
+    (size.0 as i32 - inset - style::TERMINAL.0 as i32 - room, y)
 }
 
 /// Every physics node and link, as the markup draws them.
@@ -397,17 +487,20 @@ pub fn looks(
         }
     }
 
-    let height = SIZE.1 as i32;
-    // Where a line to a component leaves its block: the block's right
-    // edge, level with the component's own name.
-    let side_of = |place: Place, at: i32| {
-        ((place.right + shift) as f32, (place.at.1 + at) as f32)
+    // Where a line leaves or arrives at a component: the right of its
+    // output or its input terminal, halfway down it.
+    let end_at = |place: Place, output: bool| {
+        let (x, y) = terminal_at(place.size, output);
+        (
+            (place.at.0 + shift + x + style::TERMINAL.0 as i32) as f32,
+            (place.at.1 + y + style::TERMINAL.1 as i32 / 2) as f32,
+        )
     };
     let mut links = Vec::new();
-    // Each connection a loop out of the right of its output's block and back
-    // into the right of its input's, a little further out each, so that two
-    // do not run down one line. One into the block it is drawn inside is
-    // that nesting, and not drawn again.
+    // Each connection a loop out of its output's terminal, past the right of
+    // the blocks, and back into its input's, a little further out each, so
+    // that two do not run down one line. One into the block it is drawn
+    // inside is that nesting, and not drawn again.
     for (n, (from, to)) in connections.iter().enumerate() {
         let (Some((a, _)), Some((b, _))) =
             (from.split_once('.'), to.split_once('.'))
@@ -426,16 +519,18 @@ pub fn looks(
         if hosts[i] == Some(j) {
             continue;
         }
-        let start = side_of(a_at, height / 3);
-        let end = side_of(b_at, 2 * height / 3);
-        let out = start.0.max(end.0) + 8.0 + 6.0 * (n % 3) as f32;
+        let start = end_at(a_at, true);
+        let end = end_at(b_at, false);
+        let right = (a_at.right.max(b_at.right) + shift) as f32;
+        let out = right + 8.0 + 6.0 * (n % 3) as f32;
         let points = [start, (out, start.1), (out, end.1), end];
         links.push(link(&points));
     }
 
-    // Each join from the right of its component's block to the left of its
-    // payload's, the arrow the way the data goes: out of an output to the
-    // stand-in that reports it, and from a stand-in into an input it drives.
+    // Each join between its component's terminal and the left of its
+    // payload's node, the arrow the way the data goes: out of the output to
+    // the stand-in that reports it, and from a stand-in into the input it
+    // drives.
     for (n, join) in joins.iter().enumerate() {
         let Some((component, terminal)) = join.terminal.split_once('.') else {
             continue;
@@ -460,7 +555,7 @@ pub fn looks(
                 t.direction == tcslibgs::physics::terminal::Direction::In
             });
         let (_, tall) = crate::pane::size_of(node.node_type);
-        let mine = side_of(place, height / 2);
+        let mine = end_at(place, !input);
         let theirs = (
             (node.at.0 + shift) as f32,
             (node.at.1 + tall as i32 / 2) as f32,
@@ -667,13 +762,112 @@ mod tests {
         assert!(drawn[0].label_top && !drawn[1].label_top);
         // No line for the heat: the nesting says it.
         assert_eq!(links.len(), 2, "only the two joins are drawn");
-        let edge = format!("{:.1}", (zone.right + dividers.physics) as f32);
-        for link in &links {
-            assert!(
-                link.route.contains(&edge),
-                "every join leaves the zone's block at {edge}: {}",
-                link.route
+        // The zone's temperature leaves by the zone's output terminal, and
+        // heater_1's switching arrives at heater_1's input terminal: each at
+        // the right of its terminal, halfway down it. A dashed line starts
+        // with a dash, but may end in a gap, so the end is looked for within
+        // a gap of the terminal, on its row.
+        let point = |place: Place, output: bool| {
+            let (x, y) = terminal_at(place.size, output);
+            (
+                (place.at.0 + dividers.physics + x) as f32
+                    + style::TERMINAL.0 as f32,
+                (place.at.1 + y) as f32 + style::TERMINAL.1 as f32 / 2.0,
+            )
+        };
+        let parse = |said: &str| {
+            let mut it = said.split(' ').map(|n| n.parse::<f32>().unwrap());
+            (it.next().unwrap(), it.next().unwrap())
+        };
+        let first = parse(links[0].route[2..].split(" L ").next().unwrap());
+        assert_eq!(first, point(zone, true), "{}", links[0].route);
+        let last = parse(links[1].route.rsplit(" L ").next().unwrap());
+        let wanted = point(places[0], false);
+        assert!(
+            last.1 == wanted.1 && (0.0..=5.0).contains(&(last.0 - wanted.0)),
+            "ends at {last:?}, not at {wanted:?}: {}",
+            links[1].route
+        );
+    }
+
+    /// A physics node is a hexagon, the one outline no configuration's node
+    /// has, with one output terminal and one input terminal, both inside it
+    /// and clear of each other, and none of a kind its type has not.
+    #[test]
+    fn a_physics_node_is_a_hexagon_with_one_terminal_each_way() {
+        let component = |kind| Component {
+            name: "it",
+            kind,
+            faulty: false,
+        };
+        let block = (SIZE.0, 3 * SIZE.1);
+        for size in [SIZE, block] {
+            let look = node_look(&component("heater"), (0, 0), size);
+            assert_eq!(look.outline, "hexagon");
+            let shown: Vec<&TerminalLook> = [
+                &look.gateway_in,
+                &look.gateway_out,
+                &look.payload_in,
+                &look.payload_out,
+            ]
+            .into_iter()
+            .filter(|t| t.shown)
+            .collect();
+            assert_eq!(shown.len(), 2, "one each way: {look:?}");
+            let (out, into) = (&look.gateway_out, &look.payload_in);
+            assert!(out.rightward && !into.rightward);
+            assert!(out.y + style::TERMINAL.1 as f32 <= into.y, "apart");
+            // Both in the node's top row of SIZE, and inside the hexagon at
+            // both of their corners on the right.
+            let polygon = style::polygon_of(style::Outline::Hexagon, size);
+            let half = size.1 as f32 / 2.0;
+            for t in [out, into] {
+                assert!(t.y + style::TERMINAL.1 as f32 <= SIZE.1 as f32);
+                let right = t.x + style::TERMINAL.0 as f32;
+                for y in [t.y, t.y + style::TERMINAL.1 as f32] {
+                    let edge =
+                        polygon[2].0 - style::POINT * ((y - half).abs() / half);
+                    assert!(right <= edge, "{t:?} pokes out at row {y}");
+                }
+            }
+        }
+        // A zone gives out its temperature and takes heat; a type there is
+        // no such component of has neither.
+        let zone = node_look(&component("thermal_zone"), (0, 0), SIZE);
+        assert!(zone.gateway_out.shown && zone.payload_in.shown);
+        let unknown = node_look(&component("nonesuch"), (0, 0), SIZE);
+        assert!(!unknown.gateway_out.shown && !unknown.payload_in.shown);
+        // And no node type is drawn as one.
+        for kind in style::NodeType::ALL {
+            assert_ne!(kind.appearance().outline, style::Outline::Hexagon);
+        }
+    }
+
+    /// A narrow Physics pane keeps its blocks in it, with the joins' lanes
+    /// beside them, rather than drawing them under the payloads; a wide one
+    /// draws them at their full width.
+    #[test]
+    fn a_narrow_pane_narrows_its_blocks() {
+        let names = ["heater_1", "zone"];
+        let hosts = [Some(1), None];
+        let least = crate::pane::WORKING_WIDTH * crate::settings::LEAST / 100;
+        for physics in [least, 105, 192, 400] {
+            let dividers = Dividers {
+                physics,
+                ..default_dividers()
+            };
+            let (left, right) = edges_of(Pane::Physics, dividers);
+            let places = layout(&names, &hosts, dividers);
+            let zone = places[1];
+            assert!(zone.at.0 >= left, "{physics}: {places:?}");
+            assert!(zone.right + LANES <= right, "{physics}: {places:?}");
+            assert_eq!(
+                zone.size.0 == SIZE.0,
+                right - left >= SIZE.0 as i32 + LANES + 8,
+                "{physics}: {places:?}"
             );
+            assert!(places[0].right == zone.right);
+            assert!(places[0].at.0 + (places[0].size.0 as i32) < zone.right);
         }
     }
 

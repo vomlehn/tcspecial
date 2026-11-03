@@ -1709,7 +1709,9 @@ fn wire_node(
         // different file and so a different edit.
         let editor = editor.clone();
         let views = views.clone();
-        let node = node.to_string();
+        // By the node's own name, as the simulator's file keys it, which a
+        // node in a subdiagram is not held under here.
+        let node = sim::Simulator::key_of(node);
         window.on_sim_attribute_set(move |setting, value| {
             {
                 let mut editor = editor.borrow_mut();
@@ -4430,7 +4432,9 @@ fn panel_of(
     if let Some(simulator) = &editor.document().simulator {
         if is_payload(&node.node_type) {
             let empty = BTreeMap::new();
-            let said = simulator.payloads.get(&absolute).unwrap_or(&empty);
+            // By its own name, as the simulator's file keys it: see
+            // `sim::Simulator::key_of`.
+            let said = simulator.payloads.get(&node.name).unwrap_or(&empty);
             fields.push(FieldView {
                 about: Default::default(),
                 name: "simulated payload".into(),
@@ -4602,9 +4606,19 @@ fn physics_views_of(
         .iter()
         .map(|(from, to)| (from.as_str(), to.as_str()))
         .collect();
-    // Each simulated payload's own connects, or else its group's.
+    // Each simulated payload's own connects, or else its group's, drawn to
+    // where its node is on the top page: the node itself, or the box of the
+    // subdiagram it is in, which is all of a subdiagram the top page shows.
+    // The file names the payload by its own name wherever it is drawn (see
+    // `sim::Simulator::key_of`), and the page names a box by its subdiagram.
     let mut said: Vec<(String, String)> = Vec::new();
     for (payload, settings) in &simulator.payloads {
+        let drawn = document
+            .nodes
+            .iter()
+            .find(|node| &node.name == payload)
+            .and_then(|node| node.home.clone())
+            .unwrap_or_else(|| payload.clone());
         let connects = settings
             .get("connects")
             .filter(|said| !said.trim().is_empty())
@@ -4614,7 +4628,7 @@ fn physics_views_of(
             });
         if let Some(connects) = connects {
             for terminal in tcslibgs::sim_config::terminals_of(connects) {
-                said.push((payload.clone(), terminal.to_string()));
+                said.push((drawn.clone(), terminal.to_string()));
             }
         }
     }

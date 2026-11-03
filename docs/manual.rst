@@ -5354,7 +5354,10 @@ it shows -- its lowest and highest reading in the span, and the setpoint of
 any thermostat reading values in its unit, drawn as a dark rule labelled
 ``setpoint`` -- rounded out to ticks one, two or five of a power of ten
 apart. Over each panel its legend names the unit and each value, with its
-latest reading, beside its colour.
+latest reading, beside its colour. Each reading is a dot on its line, where
+and when it arrived, so that a reading is told from the line drawn between
+two; where readings crowd into one column of the screen, one dot stands for
+them.
 
 Behind a panel a thermostat reads, its band is drawn. With setpoint S and
 ``half_band`` H, the panel is left white from S - H to S + H, where the

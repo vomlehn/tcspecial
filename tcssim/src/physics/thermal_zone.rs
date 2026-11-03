@@ -34,10 +34,11 @@
 //!
 //! # Starting
 //!
-//! At the environment. A zone that started at its setpoint would hide the
-//! one part of a loop that is interesting to watch -- the first climb, with
-//! everything on -- and a vehicle coming up cold is the case a thermostat
-//! exists for.
+//! At the environment, unless the model states `start`. A vehicle coming up
+//! cold is the case a thermostat exists for, and the first climb, with
+//! everything on, is worth watching. A model that would rather show the
+//! thermostat holding its band from the first reading states where to
+//! start, and every run of it starts there.
 //!
 //! # What varies
 //!
@@ -107,7 +108,7 @@ impl ThermalZone {
     ///
     /// The zone, at its environment as it is at simulated time nought:
     /// wandered as far as a first draw says, and at the middle of its
-    /// swing.
+    /// swing. Or where the model states it starts.
     pub fn new(name: &str, figures: Resolved, seed: u64) -> ThermalZone {
         let mut rng =
             StdRng::seed_from_u64(seed_for(seed, &format!("component:{name}")));
@@ -117,10 +118,11 @@ impl ThermalZone {
         } else {
             0.0
         };
+        let temperature = figures.start.unwrap_or(figures.environment + wander);
         ThermalZone {
             tau: figures.time_constant.as_secs_f64(),
             omega,
-            temperature: figures.environment + wander,
+            temperature,
             heat: 0.0,
             wander,
             rng,
@@ -352,5 +354,24 @@ mod tests {
         let first = zone.output(TEMPERATURE);
         zone.advance(1.0, 1.0);
         assert_eq!(zone.output(TEMPERATURE), first);
+    }
+
+    /// A zone given a start begins exactly there, whatever the seed.
+    #[test]
+    fn a_stated_start_is_where_it_starts() {
+        let started = Resolved {
+            start: Some(292.15),
+            wander: Wander {
+                size: 0.5,
+                time: Duration::from_secs(30),
+            },
+            ..zone()
+        };
+        for seed in 0..10 {
+            assert_eq!(
+                ThermalZone::new("zone", started, seed).output(TEMPERATURE),
+                292.15
+            );
+        }
     }
 }

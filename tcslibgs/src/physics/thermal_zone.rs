@@ -10,7 +10,8 @@
 //!
 //! Its surroundings may swing, as a sine wave of `swing` either side of
 //! `environment` over `period` -- an orbit's sun and shadow -- and wander at
-//! random by `wander`, over `wander_time`. The arithmetic is tcssim's
+//! random by `wander`, over `wander_time`. It starts at its surroundings,
+//! or at `start` where that is stated. The arithmetic is tcssim's
 //! `physics::thermal_zone`.
 
 use std::time::Duration;
@@ -39,6 +40,7 @@ pub const SETTINGS: &[&str] = &[
     "period",
     "wander",
     "wander_time",
+    "start",
 ];
 
 /// A thermal zone, as a physics model states it.
@@ -84,6 +86,15 @@ pub struct ThermalZone {
     /// with `wander` and refused without it.
     #[serde(default, deserialize_with = "blank_is_unstated")]
     pub wander_time: Option<String>,
+    /// Where it starts, in kelvin. Unstated is at its surroundings, which is
+    /// a vehicle coming up cold.
+    ///
+    /// A zone already in its band is how a run looks once the first climb
+    /// is over, and a run that starts there shows the thermostat at work from
+    /// its first reading. One fixed figure rather than one drawn each run, so
+    /// that every run of a model starts the same and two can be compared.
+    #[serde(default, deserialize_with = "blank_is_unstated")]
+    pub start: Option<String>,
 }
 
 /// A thermal zone with its figures read.
@@ -101,6 +112,8 @@ pub struct Resolved {
     pub period: Duration,
     /// How its surroundings wander at random, in kelvin.
     pub wander: Wander,
+    /// Where it starts, in kelvin; `None` is at its surroundings.
+    pub start: Option<f64>,
 }
 
 impl ThermalZone {
@@ -130,6 +143,10 @@ impl ThermalZone {
             }
             (None, false) => Duration::ZERO,
         };
+        let start = match &self.start {
+            Some(said) => Some(quantity("start", said, Some("K"))?),
+            None => None,
+        };
         Ok(Resolved {
             environment: quantity("environment", &self.environment, Some("K"))?,
             time_constant: time_of("time_constant", &self.time_constant)?,
@@ -143,6 +160,63 @@ impl ThermalZone {
                 &self.wander_time,
                 Some("K"),
             )?,
+            start,
         })
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// The example's zone, as a file states it.
+    fn zone() -> ThermalZone {
+        ThermalZone {
+            name: "zone".to_string(),
+            environment: "288.15 K".to_string(),
+            time_constant: "50 s".to_string(),
+            capacity: "20 J/K".to_string(),
+            swing: None,
+            period: None,
+            wander: None,
+            wander_time: None,
+            start: None,
+        }
+    }
+
+    /// A start is read in kelvin; unstated, the zone starts at its
+    /// surroundings.
+    #[test]
+    fn a_start_is_read_in_kelvin() {
+        assert_eq!(zone().resolve().unwrap().start, None);
+
+        let started = ThermalZone {
+            start: Some("292.15 K".to_string()),
+            ..zone()
+        }
+        .resolve()
+        .unwrap();
+        assert_eq!(started.start, Some(292.15));
+    }
+
+    /// A start with no unit, or in another unit, is refused, told what to
+    /// write.
+    #[test]
+    fn a_start_that_cannot_be_used_is_refused() {
+        let err = ThermalZone {
+            start: Some("292.15".to_string()),
+            ..zone()
+        }
+        .resolve()
+        .unwrap_err();
+        assert!(err.contains("start: \"292.15\" has no unit"), "{err}");
+
+        let err = ThermalZone {
+            start: Some("19 C".to_string()),
+            ..zone()
+        }
+        .resolve()
+        .unwrap_err();
+        assert!(err.contains("start is in K"), "{err}");
     }
 }

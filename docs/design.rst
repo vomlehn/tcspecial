@@ -11123,9 +11123,13 @@ constant, twenty joules a kelvin and a hundred and twenty watts, it is three
 hundred kelvin above the environment.
 
 Requirement
-    A zone starts at its environment, and a heater off. A zone that started
-    at the setpoint would hide the one part of the loop worth watching, and
-    a vehicle coming up cold is the case a thermostat exists for.
+    A zone starts at its environment, and a heater off, unless the model
+    states ``start``, and then there. Coming up cold is the case a
+    thermostat exists for, and its first climb is worth watching; a model
+    that would rather show the thermostat holding its band from the first
+    reading states a start in the band, as the thermostat example's does.
+    The start is one fixed figure and never drawn at random, so that every
+    run of a model starts alike and two runs can be compared.
 
 **A power bus**
 

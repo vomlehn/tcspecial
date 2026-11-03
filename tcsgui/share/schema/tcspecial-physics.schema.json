@@ -163,7 +163,7 @@
           "type": [
             "string"
           ],
-          "description": "The temperature around it, written with its unit: `283.15 K`. A zone starts here, because a vehicle coming up cold is the case a thermostat exists for."
+          "description": "The temperature around it, written with its unit: `283.15 K`. A zone starts here unless `start` says otherwise, because a vehicle coming up cold is the case a thermostat exists for."
         },
         "time_constant": {
           "type": [
@@ -204,6 +204,13 @@
             "null"
           ],
           "description": "How slowly the environment wanders, as a length of time. Required with `wander` and refused without it."
+        },
+        "start": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "description": "Where it starts, written with its unit: `292.15 K`. Left out, it starts at its environment."
         }
       },
       "required": [

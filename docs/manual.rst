@@ -2242,28 +2242,30 @@ switches its heater while the vehicle has it on. So the loop closes through tcsp
 ``tcssim`` section closes it in tcssim alone instead, with no tcspecial
 running.
 
-The heaters are small on purpose, four watts each, and the zone's
-surroundings swing six kelvin either side of 283.15 K over a ninety minute
-orbit. Both heaters settle the zone twenty kelvin above its surroundings,
-297.15 K at the coldest, above the band, so together they always bring it
-back and the thermostat cycles them. One settles it ten kelvin above, which
-holds the band in the warm part of the orbit and not in the cold part, about
-a quarter of it, where the zone sinks more than two half bands below the
-setpoint. So a heater disabled in tcssim's window -- an unpowered or failed
-heater, see `Starting and stopping a payload`_ -- shows in the temperature,
-and on its line of ``gpio-in-tmass``, which stays low however the thermostat
-decides. ``make -C examples run-thermostat`` starts every payload
-disabled, so press ``Enable`` on each, and ``Disable`` on a heater to take
+The heaters are four watts each, and the zone's surroundings are 288.15 K,
+just inside the plot's lower red, two half bands and a kelvin below the
+setpoint; they swing half a kelvin either side over a ninety minute orbit
+and wander a quarter of a kelvin. The zone starts at 292.15 K, a kelvin below
+the setpoint and inside the band, every run alike. Either
+heater alone settles the zone ten kelvin above its surroundings, above the
+band, so one heater holds it and the thermostat cycles whichever are
+working. So a heater disabled in tcssim's window -- an unpowered or failed
+heater, see `Starting and stopping a payload`_ -- shows on its line of
+``gpio-in-tmass``, which stays low however the thermostat decides, while the
+other, on twice as long, holds the band; with both disabled, the zone falls
+out of the band to its surroundings. ``make -C examples run-thermostat``
+starts every payload disabled, so press ``Enable`` on each, and ``Disable`` on a heater to take
 it away. A run of the model with its sensors' errors, three orbits from each
 of three seeds -- tcssim's tests
 ``the_thermostat_example_holds_the_zone_with_both_heaters`` and
-``the_thermostat_example_falls_behind_with_a_heater_disabled`` -- has, with
+``the_thermostat_example_holds_the_zone_with_a_heater_disabled`` -- has, with
 both heaters, the zone never more than two half bands from the setpoint and
-within one three quarters of the time, the heaters on half the time and
-switching together some eighty times an orbit; with one disabled, the zone
-more than two half bands below the setpoint 27% to 31% of the time, as cold
-as 285.3 K, and the disabled heater never heating; and with neither, the
-zone following its surroundings, 277.4 to 289.4 K.
+within one about four fifths of the time, the heaters on a quarter of the
+time and switching together some seventy-five times an orbit; with one
+disabled, the zone never more than two half bands from the setpoint, the
+working heater on about half the time and the disabled one never heating;
+and with neither, the zone falling from the band to its surroundings, as
+cold as 287.4 K in the first orbit.
 
 ``make -C examples run-thermostat`` runs it, on a host with the kernel's
 simulated chip.
@@ -3453,6 +3455,8 @@ of one of these types:
                           standard deviation, "0.5 K". Optional
      wander_time          how slowly it wanders, as a length of time. With
                           wander and refused without it
+     start                where it starts: "292.15 K". Optional; left out,
+                          it starts at its environment
 
    sun                    sunlight and shadow, through an orbit
      component            the name connections and stand-ins use
@@ -3558,7 +3562,8 @@ is warmed by the heat joined to it, its capacity turning watts into kelvin a
 second; with a fifty second constant, twenty joules a kelvin and a hundred
 and twenty watts, it would settle three hundred kelvin above its
 environment. It starts at its environment with the heaters off, because a
-vehicle coming up cold is the case a thermostat exists for.
+vehicle coming up cold is the case a thermostat exists for, unless it states
+``start``, and then there.
 
 A stand-in is joined to one terminal by a setting of its payload, which like
 every other setting may be stated on a group instead:
@@ -3736,8 +3741,8 @@ tcssim chooses it and says which it chose, so a run worth repeating can be:
 The thermostat example states all of these, with figures of the kind a
 datasheet and a low orbit give: two sensors of one part accurate to half a
 kelvin, with three hundredths of noise and four seconds of lag, and a better
-one; an environment swinging six kelvin over ninety minutes and wandering
-half a kelvin; places a fifth and three tenths of a kelvin off the middle;
+one; an environment swinging half a kelvin over ninety minutes and
+wandering a quarter of a kelvin; a start inside the band; places a fifth and three tenths of a kelvin off the middle;
 and supplies varying by two percent.
 
 **Standing in for the thermostat**
@@ -5445,8 +5450,9 @@ heater is what it does, and its strip stays off; which is why the thermostat
 example sends its heaters' lines down rather than its thermostat's decision.
 
 The colours are Okabe and Ito's, which readers with each common kind of colour
-blindness tell apart: blue, vermillion, reddish purple, sky blue and black
-for the values, and bluish green, which no value uses, for a switch on. The
+blindness tell apart: blue, bluish green, reddish purple, sky blue and black
+for the values, and bluish green for a switch on, which is never taken for a
+value because a switch is a strip of its own under the panels. The
 band's yellow and red are their yellow and vermillion paled toward white,
 light enough that every line keeps its contrast against them. None is alone:
 the legend names each value beside its colour with its latest reading, the

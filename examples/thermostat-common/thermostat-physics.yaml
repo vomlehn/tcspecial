@@ -19,12 +19,12 @@ description: The physics of the vehicle of thermostat.ytcs and
 physics:
   - type heater:
       # Two film heaters of four watts on a 28 volt bus, which on the zone
-      # below is a fifth of a kelvin a second each. Small on purpose: the
-      # two together hold the zone wherever the orbit is, and one alone holds
-      # it only while its surroundings are warm, so that a heater disabled in
-      # tcssim's window -- unpowered, or failed -- can be seen in the
-      # temperature. The supply wanders by two percent over twenty seconds or
-      # so, and a heater's power with its square.
+      # below is a fifth of a kelvin a second each. Either alone holds the
+      # zone in the band, so a heater disabled in tcssim's window --
+      # unpowered, or failed -- is seen on its line's strip, which stays off
+      # while the other does the work, and both disabled let the zone fall
+      # out of the band. The supply wanders by two percent over twenty
+      # seconds or so, and a heater's power with its square.
       - component: heater_1
         power: "4 W"
         ripple: "0.02"
@@ -38,30 +38,34 @@ physics:
         voltage: "28 V"
 
   - type thermal_zone:
-      # The zone: its surroundings ten kelvin below the setpoint of
-      # thermostat.ytcs on average, losing the difference with a fifty second
-      # constant -- which at the setpoint is a fifth of a kelvin a second of
-      # cooling, four tenths of a watt a kelvin -- and twenty joules to warm a
-      # kelvin, so that each heater's four watts is a fifth of a kelvin a
-      # second.
+      # The zone: its surroundings 288.15 K, three kelvin below the bottom of
+      # the thermostat's band of 291.15 to 295.15 K, and a kelvin below
+      # 289.15 K, two half bands below the setpoint, where the plot's yellow
+      # ends and its lower red begins -- so that with no heat on it the zone
+      # sinks just into the lower red.
+      # It loses the difference with a fifty second constant, which at the
+      # setpoint is a tenth of a kelvin a second of cooling, and takes twenty
+      # joules to warm a kelvin, so that each heater's four watts is a fifth
+      # of a kelvin a second.
       #
-      # Its surroundings are not still. They swing six kelvin either side of
-      # 283.15 once every ninety minutes -- a low orbit's sun and shadow -- and
-      # wander half a kelvin besides, over ten minutes or so. Both heaters
-      # settle the zone twenty kelvin above its surroundings, 297.15 K at the
-      # coldest, which is above the thermostat's band, 291.15 to 295.15 K, so
-      # the two together always bring it back and the thermostat cycles them.
-      # One heater settles it ten kelvin above its surroundings, between
-      # 287.15 and 299.15 K: enough in the warm part of the orbit, and for
-      # about a quarter of it under 289.15 K, two half bands below the
-      # setpoint. With neither, the zone follows its surroundings.
+      # Its surroundings barely move: half a kelvin either side over a ninety
+      # minute orbit, and a quarter of a kelvin of wander over ten minutes or
+      # so, which keeps them in the lower red nearly always. One heater settles the zone
+      # ten kelvin above them and both twenty, either above the band, so one
+      # heater alone holds the band and the thermostat cycles whichever are
+      # working; with neither, the zone falls to its surroundings.
+      #
+      # It starts at 292.15 K, a kelvin below the setpoint and inside the
+      # band, every run alike: the plot shows the thermostat holding the band
+      # from the first reading, and the heaters cut in on the first dip.
       - component: zone
         capacity: "20 J/K"
-        environment: "283.15 K"
+        environment: "288.15 K"
         period: "90 min"
-        swing: "6 K"
+        start: "292.15 K"
+        swing: "0.5 K"
         time_constant: "50 s"
-        wander: "0.5 K"
+        wander: "0.25 K"
         wander_time: "10 min"
 
 connections:

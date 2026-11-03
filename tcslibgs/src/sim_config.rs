@@ -4675,6 +4675,7 @@ connections:
                 period: None,
                 wander: None,
                 wander_time: None,
+                start: None,
             },
         ));
         let err = file.physics().unwrap_err().to_string();

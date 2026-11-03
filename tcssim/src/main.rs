@@ -2937,28 +2937,29 @@ mod tests {
         }
     }
 
-    /// With one heater disabled, the other cannot hold the zone through the
-    /// cold part of the orbit, which falls more than two half bands below
-    /// the setpoint; the disabled heater gets every decision and never
-    /// heats. With both disabled, the zone follows its surroundings.
+    /// With one heater disabled, the other holds the zone in the band alone,
+    /// on for about twice as long, and the disabled heater gets every
+    /// decision and never heats. With both disabled, the zone falls from
+    /// the band to its surroundings, just inside the plot's lower red.
     #[test]
-    fn the_thermostat_example_falls_behind_with_a_heater_disabled() {
+    fn the_thermostat_example_holds_the_zone_with_a_heater_disabled() {
         for seed in [1, 2, 3] {
             let run =
                 run_the_thermostat_example(seed, 3.0 * 5400.0, [true, false]);
             eprintln!("one, seed {seed}: {run:?}");
             let share = |seconds: f64| seconds / run.watched;
             assert_eq!(run.heating[1], 0.0, "disabled, it never heats");
-            assert!(run.came_on >= 3, "{run:?}");
-            assert!(share(run.below) > 0.1, "{run:?}");
-            assert!(share(run.below) < 0.4, "{run:?}");
-            assert!(run.coldest < 288.0, "{run:?}");
+            assert!(run.came_on >= 30, "it cycles the other: {run:?}");
+            assert!(share(run.below + run.above) < 0.01, "{run:?}");
+            assert!(share(run.inside) > 0.7, "{run:?}");
+            assert!(share(run.heating[0]) > 0.4, "{run:?}");
         }
 
         let run = run_the_thermostat_example(1, 5400.0, [false; 2]);
         eprintln!("neither: {run:?}");
         assert_eq!(run.heating, [0.0; 2]);
-        assert!(run.warmest < 290.0 && run.coldest < 278.0, "{run:?}");
+        assert!(run.coldest > 286.0 && run.coldest < 289.15, "{run:?}");
+        assert!(run.warmest < 296.0, "{run:?}");
     }
 
     /// A shipped tcspecial configuration states a packet interval only where a

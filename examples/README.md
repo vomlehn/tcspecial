@@ -491,17 +491,18 @@ names, as thermostat-yamcs's simulator file does: a zone and two
 heaters, each a part simulated alone and joined to the zone under
 `connections`. All three sensors are joined to `zone.temperature`, each from
 a place of its own on the zone, so their readings agree and the vote
-produces a temperature. The zone cools towards its surroundings, which swing
-six kelvin either side of 283.15 K over a ninety minute orbit, and each
+produces a temperature. The zone starts at 292.15 K, inside the band, and
+cools towards its surroundings, 288.15 K, just inside the
+plot's lower red, which swing half a kelvin over a ninety minute orbit; each
 heater's switch's stand-in is joined to `heater_1.on` or `heater_2.on`, so the
 heaters warm it while the vehicle has them on: the loop closes through
 tcspecial. `gpio-in-tmass`'s stand-in pulls its line 2 to `heater_1.heating`
 and its line 3 to `heater_2.heating`, which are on only while each heater is
 really heating.
-The heaters are four watts each. Together they hold the band all round the
-orbit, the thermostat cycling them; one alone holds it only in the warm part,
-and for about a quarter of the orbit the zone falls more than two half bands
-below the setpoint, into the plot's pale red.
+The heaters are four watts each, and either alone holds the band, the
+thermostat cycling whichever are working; a heater disabled in tcssim shows
+on its line's strip, and with both disabled the zone falls into the plot's
+lower red.
 
 A heater whose switch's panel in tcssim is not enabled is unpowered, or
 failed: it stays off whatever the thermostat decides, and enabled again it

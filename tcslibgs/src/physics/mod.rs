@@ -835,6 +835,10 @@ mod tests {
     /// # Returns
     ///
     /// The world.
+    ///
+    /// # Errors
+    ///
+    /// What the reader says of it.
     fn parse(text: &str) -> TcsResult<WorldSection> {
         let physics: String =
             text.lines().map(|line| format!("  {line}\n")).collect();

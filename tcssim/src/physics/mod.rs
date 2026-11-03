@@ -543,6 +543,10 @@ pub(crate) mod tests {
     /// # Returns
     ///
     /// The world.
+    ///
+    /// # Errors
+    ///
+    /// What the reader says of it.
     pub(crate) fn parsed(
         text: &str,
     ) -> tcslibgs::error::TcsResult<WorldSection> {

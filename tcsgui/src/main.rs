@@ -6047,7 +6047,6 @@ fn node_view(look: tcsdiagram::view::NodeLook, selected: bool) -> NodeView {
         payload_out: terminal(look.payload_out),
         terminal_column: look.terminal_column,
         inset: look.inset,
-        label_top: look.label_top,
     }
 }
 

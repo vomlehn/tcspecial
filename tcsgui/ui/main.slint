@@ -754,6 +754,8 @@ component Surface inherits Rectangle {
                         y: 0;
                         physics-width: root.physics-width;
                         physics-ground: root.physics-ground;
+                        note: root.has-world ? ""
+                            : "Open a simulator file to place physics.";
                     }
                     for l in root.physics-links: LinkLine {
                         link: l;
@@ -1140,9 +1142,11 @@ export component MainWindow inherits Window {
     background: Colors.window;
     // Wide enough for both working panes and both selection panes, which is
     // what the preferred width is: 960 of working area, 180 of selection
-    // panes and the gaps between them. There was a 260-pixel panel here as
-    // well, and what a node says about itself is a window of its own now --
-    // so the working panes have those pixels.
+    // panes and the gaps between them, and the Physics pane beside the
+    // working area, so that the window opens with some of every pane in
+    // view. There was a 260-pixel panel here as well, and what a node says
+    // about itself is a window of its own now -- so the working panes have
+    // those pixels.
     //
     // The minimum is smaller because a window that cannot be made to fit a
     // screen is a window that cannot be used on it: squeezed, the right of
@@ -1150,7 +1154,7 @@ export component MainWindow inherits Window {
     // than a failure.
     min-width: 760px;
     min-height: 600px;
-    preferred-width: 1180px;
+    preferred-width: 1180px + root.physics-width;
     preferred-height: 820px;
 
     in property <[NodeView]> nodes: [];

@@ -68,19 +68,19 @@ pub fn save(settings: Settings) {
     };
     let (gateway_percent, vehicle_percent) =
         shares(settings.gateway_percent, settings.vehicle_percent);
-    let (list_gateway_percent, list_vehicle_percent) =
-        shares(settings.list_gateway_percent, settings.list_vehicle_percent);
+    let (list_gateway_percent, list_vehicle_percent, list_physics_percent) =
+        list_shares(
+            settings.list_gateway_percent,
+            settings.list_vehicle_percent,
+            settings.list_physics_percent,
+        );
     let kept = Settings {
         gateway_percent,
         vehicle_percent,
         list_gateway_percent,
         list_vehicle_percent,
         physics_percent: settings.physics_percent.clamp(LEAST, MOST),
-        list_physics_percent: physics_list_share(
-            settings.list_physics_percent,
-            list_gateway_percent,
-            list_vehicle_percent,
-        ),
+        list_physics_percent,
     };
     if let Err(why) =
         crate::save::write_atomically(&path, written(&kept).as_bytes())

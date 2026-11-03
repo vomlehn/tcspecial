@@ -30,7 +30,7 @@ import sys
 import time
 
 # The battery's capacity, in ampere-hours, and how full it is launched: the
-# figures of examples/battery/battery-physics.yaml.
+# figures of the world section of examples/battery/battery-sim.yaml.
 CAPACITY_AH = 0.2
 LAUNCHED = 0.6
 

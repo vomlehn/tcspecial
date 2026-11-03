@@ -47,7 +47,7 @@ pub fn payload_config_from(
 ///
 /// `attachment` is what `main` made of the `connects` the simulator file
 /// states: `None` for a payload joined to nothing, which is every payload of
-/// a file that names no physics model.
+/// a file that has no physics model.
 ///
 /// Apart from the function above so that every test of the pacing, the
 /// faults and the addresses goes on saying nothing about the world: what

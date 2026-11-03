@@ -86,7 +86,7 @@ impl Where {
             About::SimGroup(name) => (&["simulated_payload_groups"], name),
             About::Node(name) => (&["gateways", "vehicle", "payloads"], name),
             About::NodeGroup(name) => (&["payload_groups"], name),
-            About::PhysicsComponent(name) => (&["physics"], name),
+            About::PhysicsComponent(name) => (&["world"], name),
         };
 
         sections
@@ -146,7 +146,7 @@ fn name_key(section: &str) -> String {
     let word = match section {
         "simulated_payloads" => "payload",
         "simulated_payload_groups" => "group",
-        "physics" => "component",
+        "world" => "component",
         _ => tcslibgs::graph::Section::ALL
             .into_iter()
             .find(|s| s.name() == section)
@@ -216,6 +216,20 @@ fn yaml(text: &str) -> Where {
                 found.note_section(&section, number);
             }
             continue;
+        }
+
+        // The world's ambient temperature and its physics' connections,
+        // which a problem with either is reported at: see
+        // `tcslibgs::physics::AMBIENT` and `CONNECTIONS`.
+        if section == "world" {
+            for (key, at) in [
+                ("ambient_temp:", tcslibgs::physics::AMBIENT),
+                ("connections:", tcslibgs::physics::CONNECTIONS),
+            ] {
+                if trimmed.starts_with(key) {
+                    found.note_section(at, number);
+                }
+            }
         }
 
         // An entry's name, whether it is the first key of a list item or a
@@ -480,7 +494,7 @@ simulated_payloads:
         );
     }
 
-    /// A simulator file in XML, and a physics model, say where each entry
+    /// A simulator file in XML, and a physics section, say where each entry
     /// is by the word that names it.
     #[test]
     fn a_simulator_file_in_xml_and_a_model_say_where_each_entry_is() {
@@ -493,9 +507,20 @@ simulated_payloads:
         assert_eq!(found.line_of(&About::SimGroup("steady".to_string())), 3);
         assert_eq!(found.line_of(&About::SimPayload("DH0".to_string())), 7);
 
-        let model = "physics:\n  - type heater:\n      - component: h\n";
+        let model = "world:\n  ambient_temp: \"1 K\"\n  physics:\n    \
+                     components:\n      - type heater:\n          \
+                     - component: h\n    connections:\n      \
+                     - from: h.heat\n";
         let found = Where::of(model, ConfigFormat::Yaml);
-        assert_eq!(found.line_of(&About::PhysicsComponent("h".to_string())), 3);
+        assert_eq!(found.line_of(&About::PhysicsComponent("h".to_string())), 6);
+        assert_eq!(
+            found.line_of(&About::Section(tcslibgs::physics::CONNECTIONS)),
+            7
+        );
+        assert_eq!(
+            found.line_of(&About::Section(tcslibgs::physics::AMBIENT)),
+            2
+        );
     }
 
     #[test]

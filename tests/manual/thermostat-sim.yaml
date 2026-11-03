@@ -33,10 +33,84 @@ description: Simulator settings for the payloads of thermostat.ytcs
 tcssim:
   ready: "127.0.0.1:7907"
 
-# The physics model the payloads below are joined to: the thermostat
-# example's, this being the same vehicle with its payloads on buses, so that
-# the zone is stated once for both.
-physics: ../../examples/thermostat-common/thermostat-physics.yaml
+# The physics of the vehicle: the zone its sensors read, and the two
+# heaters that warm it. The thermostat example's vehicle, this being it with
+# its payloads on buses: this section is a copy of the physics section of
+# examples/thermostat-common/thermostat-sim.yaml, which the thermostat and
+# thermostat-yamcs examples share, held the same by
+# examples/thermostat-yamcs/tests/shared.rs. Change the two together.
+#
+# Three parts, each simulated alone and joined below: a heater is switched
+# on and gives out heat; the zone takes heat and has a temperature. The
+# stand-ins below are joined to their terminals by name -- a sensor to
+# zone.temperature, a heater's stand-in to heater_1.on -- and the physics
+# says nothing about them.
+world:
+  # The temperature the zone's surroundings are about: 288.15 K, three
+  # kelvin below the bottom of the thermostat's band of 291.15 to 295.15 K,
+  # and a kelvin below 289.15 K, two half bands below the setpoint, where
+  # the plot's yellow ends and its lower red begins -- so that with no heat
+  # on it the zone sinks just into the lower red. The world's, and not the
+  # zone's, because every zone of a vehicle is in the one set of
+  # surroundings.
+  ambient_temp: "288.15 K"
+
+  physics:
+    components:
+      - type heater:
+          # Two film heaters of four watts on a 28 volt bus, which on the zone
+          # below is a fifth of a kelvin a second each. Either alone holds the
+          # zone in the band, so a heater disabled in tcssim's window --
+          # unpowered, or failed -- is seen on its line's strip, which stays
+          # off while the other does the work, and both disabled let the zone
+          # fall out of the band. The supply wanders by two percent over
+          # twenty seconds or so, and a heater's power with its square.
+          - component: heater_1
+            power: "4 W"
+            ripple: "0.02"
+            ripple_time: "20 s"
+            voltage: "28 V"
+
+          - component: heater_2
+            power: "4 W"
+            ripple: "0.02"
+            ripple_time: "20 s"
+            voltage: "28 V"
+
+      - type thermal_zone:
+          # The zone loses the difference between itself and its
+          # surroundings with a fifty second constant, which at the setpoint
+          # is a tenth of a kelvin a second of cooling, and takes twenty
+          # joules to warm a kelvin, so that each heater's four watts is a
+          # fifth of a kelvin a second.
+          #
+          # Its surroundings barely move: half a kelvin either side of the
+          # world's ambient_temp over a ninety minute orbit, and a quarter of
+          # a kelvin of wander over ten minutes or so, which keeps them in the
+          # lower red nearly always. One heater settles the zone ten kelvin
+          # above them and both twenty, either above the band, so one heater
+          # alone holds the band and the thermostat cycles whichever are
+          # working; with neither, the zone falls to its surroundings.
+          #
+          # It starts at 292.15 K, a kelvin below the setpoint and inside the
+          # band, every run alike: the plot shows the thermostat holding the
+          # band from the first reading, and the heaters cut in on the first
+          # dip.
+          - component: zone
+            capacity: "20 J/K"
+            period: "90 min"
+            start: "292.15 K"
+            swing: "0.5 K"
+            time_constant: "50 s"
+            wander: "0.25 K"
+            wander_time: "10 min"
+
+    connections:
+      # Both heaters warm the zone, whose heat is the sum of what reaches it.
+      - from: heater_1.heat
+        to: zone.heat
+      - from: heater_2.heat
+        to: zone.heat
 
 simulated_payload_groups:
   # The three sensors are read together, every tenth of a second, as their

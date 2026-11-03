@@ -1,0 +1,201 @@
+# yaml-language-server: $schema=../../tcsgui/share/schema/tcspecial-sim.schema.json
+
+# How tcssim stands in for the payloads of the thermostat example's
+# vehicle: thermostat.ytcs, with a radio for its gateway, and
+# thermostat-yamcs.ytcs, the same vehicle with Yamcs for its ground station.
+# One file for both, here in thermostat-common, which the two examples share
+# and which is not an example itself: each example's simulator file,
+# examples/thermostat/thermostat-sim.yaml and
+# examples/thermostat-yamcs/thermostat-yamcs-sim.yaml, is a link to it, so
+# that each is found beside its configuration by name, as every simulator
+# file is.
+#
+# A configuration and this file are joined by name, and nothing here names
+# a payload either configuration does not have. Only the payloads named here
+# are simulated.
+#
+# The three sensors report the zone of the physics model rather than noise,
+# which is what makes the vehicle's half of the loop watchable: three
+# readings of one temperature agree, so the vote produces a temperature and
+# the thermostat decides on it.
+#
+# The heaters are lines of a GPIO chip, which the vehicle drives and tcssim
+# watches: each decision the vehicle drives them to, their panel counts, and the
+# heater each is joined to is switched. So the loop closes through tcspecial:
+# the sensors report the zone, the vehicle decides, and the heaters warm it.
+#
+# A heater's panel button is its power: disabled, it is an unpowered or
+# failed heater, and stays off whatever is decided; enabled again, it takes
+# the latest decision at once.
+#
+# To close it in tcssim alone, with no tcspecial running, add
+# "thermostat: thermostat" to the tcssim section below: tcssim then stands in
+# for the hysteresis node of that name, with its setpoint and band. Never
+# with tcspecial running, whose own thermostat switches the same heaters.
+description: Simulator settings for the payloads of thermostat.ytcs and
+  thermostat-yamcs.ytcs
+
+# Where tcssim answers whether it has made its stand-ins, which whatever
+# starts the run asks before it starts tcspecial. A port no other example
+# uses, so that two can be run at once -- one for both of the examples this
+# file serves, which cannot run at once anyway: their heaters are the same
+# lines of the same GPIO chip.
+tcssim:
+  ready: "127.0.0.1:7907"
+
+# The physics of the vehicle: the zone its sensors read, and the two
+# heaters that warm it. The manual's fixture, tests/manual/thermostat-sim.yaml,
+# is the same vehicle with its payloads on buses, and its physics section is
+# a copy of this one, held the same by
+# examples/thermostat-yamcs/tests/shared.rs: change the two together.
+#
+# Three parts, each simulated alone and joined below: a heater is switched
+# on and gives out heat; the zone takes heat and has a temperature. The
+# stand-ins below are joined to their terminals by name -- a sensor to
+# zone.temperature, a heater's stand-in to heater_1.on -- and the physics
+# says nothing about them.
+world:
+  # The temperature the zone's surroundings are about: 288.15 K, three
+  # kelvin below the bottom of the thermostat's band of 291.15 to 295.15 K,
+  # and a kelvin below 289.15 K, two half bands below the setpoint, where
+  # the plot's yellow ends and its lower red begins -- so that with no heat
+  # on it the zone sinks just into the lower red. The world's, and not the
+  # zone's, because every zone of a vehicle is in the one set of
+  # surroundings.
+  ambient_temp: "288.15 K"
+
+  physics:
+    components:
+      - type heater:
+          # Two film heaters of four watts on a 28 volt bus, which on the zone
+          # below is a fifth of a kelvin a second each. Either alone holds the
+          # zone in the band, so a heater disabled in tcssim's window --
+          # unpowered, or failed -- is seen on its line's strip, which stays
+          # off while the other does the work, and both disabled let the zone
+          # fall out of the band. The supply wanders by two percent over
+          # twenty seconds or so, and a heater's power with its square.
+          - component: heater_1
+            power: "4 W"
+            ripple: "0.02"
+            ripple_time: "20 s"
+            voltage: "28 V"
+
+          - component: heater_2
+            power: "4 W"
+            ripple: "0.02"
+            ripple_time: "20 s"
+            voltage: "28 V"
+
+      - type thermal_zone:
+          # The zone loses the difference between itself and its
+          # surroundings with a fifty second constant, which at the setpoint
+          # is a tenth of a kelvin a second of cooling, and takes twenty
+          # joules to warm a kelvin, so that each heater's four watts is a
+          # fifth of a kelvin a second.
+          #
+          # Its surroundings barely move: half a kelvin either side of the
+          # world's ambient_temp over a ninety minute orbit, and a quarter of
+          # a kelvin of wander over ten minutes or so, which keeps them in the
+          # lower red nearly always. One heater settles the zone ten kelvin
+          # above them and both twenty, either above the band, so one heater
+          # alone holds the band and the thermostat cycles whichever are
+          # working; with neither, the zone falls to its surroundings.
+          #
+          # It starts at 292.15 K, a kelvin below the setpoint and inside the
+          # band, every run alike: the plot shows the thermostat holding the
+          # band from the first reading, and the heaters cut in on the first
+          # dip.
+          - component: zone
+            capacity: "20 J/K"
+            period: "90 min"
+            start: "292.15 K"
+            swing: "0.5 K"
+            time_constant: "50 s"
+            wander: "0.25 K"
+            wander_time: "10 min"
+
+    connections:
+      # Both heaters warm the zone, whose heat is the sum of what reaches it.
+      - from: heater_1.heat
+        to: zone.heat
+      - from: heater_2.heat
+        to: zone.heat
+
+simulated_payload_groups:
+  # The three sensors are read together, once a second, as their
+  # payload group in each configuration says. Each reports the zone's
+  # temperature, in the encoding the to_kelvin node its readings go to
+  # expects: this file says nothing about the format, the scale or the
+  # offset, because a scale written in two files is a scale that can
+  # disagree with itself.
+  #
+  # Each sensor drifts too, by a twentieth of a kelvin over half an hour,
+  # which is what an ageing part's calibration does.
+  - group: zone_temps
+    connects: zone.temperature
+    drift: "0.05 K"
+    drift_time: "30 min"
+    packet_interval: 1 s
+    simulate: true
+
+simulated_payloads:
+  # The heaters' switches and the lines that sense them, through the
+  # kernel's simulated chip: sudo bin/mk-kernel-stand-ins gpio makes it.
+  - type gpio:
+      # The lines on the thermal mass, pulled to what each heater is doing --
+      # line 2 to heater_1's, line 3 to heater_2's, in the order the node
+      # names its lines -- so a heater disabled below reads as off however it
+      # was told, and the ground sees that. Looked at once a second, as often
+      # as gpio-in-tmass reports them, so a line follows its heater within a
+      # second.
+      - payload: gpio-in-tmass
+        connects: heater_1.heating, heater_2.heating
+        packet_interval: 1 s
+        simulate: true
+
+      # Driven and never read: each stand-in watches its line, counts each
+      # change the vehicle drives it to, and switches the heater it is joined
+      # to. A heater's panel button is its power: disabled, it is an
+      # unpowered or failed heater, and stays off whatever is decided;
+      # enabled again, it takes the latest decision at once.
+      - payload: gpio-out-tmass1
+        connects: heater_1.on
+        simulate: true
+
+      - payload: gpio-out-tmass2
+        connects: heater_2.on
+        simulate: true
+
+  - type network:
+      # Each sensor with its part's datasheet errors, and on its own place on
+      # the zone. temp_1 and temp_2 are one part, a digital sensor of a
+      # sixteenth of a kelvin a count: accurate to half a kelvin, three
+      # hundredths of a kelvin of noise, and four seconds behind the zone in its
+      # package.
+      - payload: temp_1
+        accuracy: "0.5 K"
+        group: zone_temps
+        lag: 4 s
+        noise: "0.03 K"
+        protocol: udp
+
+      # The zone is not one temperature throughout: the place temp_2 is on is a
+      # fifth of a kelvin warmer than the middle.
+      - payload: temp_2
+        accuracy: "0.5 K"
+        group: zone_temps
+        lag: 4 s
+        noise: "0.03 K"
+        offset: "+0.2 K"
+        protocol: udp
+
+      # A better part, in a heavier package, on a place three tenths of a
+      # kelvin cooler: accurate to a quarter of a kelvin, two hundredths of
+      # noise, and slower to follow.
+      - payload: temp_3
+        accuracy: "0.25 K"
+        group: zone_temps
+        lag: 6 s
+        noise: "0.02 K"
+        offset: "-0.3 K"
+        protocol: udp

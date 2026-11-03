@@ -1,0 +1,18 @@
+# A physics model written as a file of its own, given where a simulator
+# file is wanted: the model is the simulator file's physics section now.
+description: A zone and its heater
+
+physics:
+  - type heater:
+      - component: heater_1
+        power: "4 W"
+        voltage: "28 V"
+  - type thermal_zone:
+      - component: zone
+        capacity: "20 J/K"
+        environment: "283.15 K"
+        time_constant: "50 s"
+
+connections:
+  - from: heater_1.heat
+    to: zone.heat

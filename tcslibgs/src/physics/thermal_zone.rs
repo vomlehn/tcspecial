@@ -8,14 +8,17 @@
 //! dT/dt = -(T - environment) / time_constant + heat / capacity
 //! ```
 //!
-//! Its surroundings may swing, as a sine wave of `swing` either side of
-//! `environment` over `period` -- an orbit's sun and shadow -- and wander at
-//! random by `wander`, over `wander_time`. It starts at its surroundings,
-//! or at `start` where that is stated. The arithmetic is tcssim's
+//! Its environment is the world's `ambient_temp`, one temperature for every
+//! zone of the vehicle: see [`super::WorldSection`]. About that, a zone's
+//! surroundings may swing, as a sine wave of `swing` either side of it over
+//! `period` -- an orbit's sun and shadow -- and wander at random by
+//! `wander`, over `wander_time`. It starts at its surroundings, or at
+//! `start` where that is stated. The arithmetic is tcssim's
 //! `physics::thermal_zone`.
 
 use std::time::Duration;
 
+use serde::de::IgnoredAny;
 use serde::{Deserialize, Serialize};
 
 use super::setting::{positive, quantity, size_of, time_of, wander_of, Wander};
@@ -33,7 +36,6 @@ pub const TERMINALS: &[Terminal] = &[
 /// `component` naming it apart: the one list, from which an editor builds
 /// its form.
 pub const SETTINGS: &[&str] = &[
-    "environment",
     "time_constant",
     "capacity",
     "swing",
@@ -44,20 +46,17 @@ pub const SETTINGS: &[&str] = &[
 ];
 
 /// A thermal zone, as a physics model states it.
-#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq)]
 #[serde(deny_unknown_fields)]
 pub struct ThermalZone {
     /// What it is called, which is how a connection or a stand-in names it.
     #[serde(rename = "component")]
     pub name: String,
-    /// The temperature it tends towards with nothing warming it, in kelvin:
-    /// `"283.15 K"`.
-    ///
-    /// Fixed, and not a figure that follows the vehicle's setpoint: a zone
-    /// whose surroundings tracked the setpoint could never be driven away
-    /// from it, and commanding the setpoint from the ground would then show
-    /// nothing at all.
-    pub environment: String,
+    /// The temperature its surroundings were, which is the world's
+    /// `ambient_temp` now. Read only to be refused, saying so: see
+    /// [`MOVED_ENVIRONMENT`].
+    #[serde(default, rename = "environment", skip_serializing)]
+    pub moved_environment: Option<IgnoredAny>,
     /// How quickly it loses the difference, as a length of time.
     ///
     /// The time constant of Newton's cooling: with nothing warming it, the
@@ -69,8 +68,8 @@ pub struct ThermalZone {
     /// How much heat it takes to warm it a kelvin, in joules a kelvin:
     /// `"20 J/K"`. What turns a heater's watts into kelvin a second.
     pub capacity: String,
-    /// How far its surroundings swing either side of `environment`, in
-    /// kelvin, as a sine wave. Unstated is none.
+    /// How far its surroundings swing either side of the world's
+    /// `ambient_temp`, in kelvin, as a sine wave. Unstated is none.
     #[serde(default, deserialize_with = "blank_is_unstated")]
     pub swing: Option<String>,
     /// How long one swing takes, as a length of time. Required with `swing`
@@ -97,10 +96,16 @@ pub struct ThermalZone {
     pub start: Option<String>,
 }
 
+/// What a zone that states its own `environment` is told.
+pub const MOVED_ENVIRONMENT: &str = "environment is the world's now: state \
+    it once, as ambient_temp under world:, beside physics:, and every \
+    thermal_zone takes its surroundings from it";
+
 /// A thermal zone with its figures read.
 #[derive(Debug, Clone, Copy, PartialEq, Default)]
 pub struct Resolved {
-    /// Kelvin.
+    /// The temperature it tends towards with nothing warming it, in kelvin:
+    /// the world's `ambient_temp`.
     pub environment: f64,
     pub time_constant: Duration,
     /// Joules a kelvin.
@@ -119,14 +124,23 @@ pub struct Resolved {
 impl ThermalZone {
     /// Reads its figures.
     ///
+    /// # Arguments
+    ///
+    /// * `ambient` - The world's `ambient_temp`, in kelvin, which its
+    ///               surroundings are about.
+    ///
     /// # Returns
     ///
     /// Them.
     ///
     /// # Errors
     ///
-    /// What is wrong with the first that does not read, naming it.
-    pub fn resolve(&self) -> Result<Resolved, String> {
+    /// What is wrong with the first that does not read, naming it, and
+    /// [`MOVED_ENVIRONMENT`] for a zone stating its own environment.
+    pub fn resolve(&self, ambient: f64) -> Result<Resolved, String> {
+        if self.moved_environment.is_some() {
+            return Err(MOVED_ENVIRONMENT.to_string());
+        }
         let swing = size_of("swing", &self.swing, Some("K"))?;
         let period = match (&self.period, self.swing.is_some()) {
             (Some(said), true) => time_of("period", said)?,
@@ -148,7 +162,7 @@ impl ThermalZone {
             None => None,
         };
         Ok(Resolved {
-            environment: quantity("environment", &self.environment, Some("K"))?,
+            environment: ambient,
             time_constant: time_of("time_constant", &self.time_constant)?,
             capacity: positive("capacity", &self.capacity, Some("J/K"))?,
             swing,
@@ -177,7 +191,7 @@ mod tests {
     fn zone() -> ThermalZone {
         ThermalZone {
             name: "zone".to_string(),
-            environment: "288.15 K".to_string(),
+            moved_environment: None,
             time_constant: "50 s".to_string(),
             capacity: "20 J/K".to_string(),
             swing: None,
@@ -192,13 +206,13 @@ mod tests {
     /// surroundings.
     #[test]
     fn a_start_is_read_in_kelvin() {
-        assert_eq!(zone().resolve().unwrap().start, None);
+        assert_eq!(zone().resolve(288.15).unwrap().start, None);
 
         let started = ThermalZone {
             start: Some("292.15 K".to_string()),
             ..zone()
         }
-        .resolve()
+        .resolve(288.15)
         .unwrap();
         assert_eq!(started.start, Some(292.15));
     }
@@ -211,7 +225,7 @@ mod tests {
             start: Some("292.15".to_string()),
             ..zone()
         }
-        .resolve()
+        .resolve(288.15)
         .unwrap_err();
         assert!(err.contains("start: \"292.15\" has no unit"), "{err}");
 
@@ -219,7 +233,7 @@ mod tests {
             start: Some("19 C".to_string()),
             ..zone()
         }
-        .resolve()
+        .resolve(288.15)
         .unwrap_err();
         assert!(err.contains("start is in K"), "{err}");
     }

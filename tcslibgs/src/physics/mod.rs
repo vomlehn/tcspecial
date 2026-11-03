@@ -1,12 +1,17 @@
 //! The physics model: the vehicle's physical components, which the
 //! simulator's stand-ins measure and act on.
 //!
-//! A file of its own, beside the simulator file and named by it, because a
-//! vehicle's physics outlives any one configuration of its payloads: the
-//! zone is the same body whichever payloads fly. Kept in each simulator
-//! file, the same vehicle would be written once per configuration, and the
-//! copies would drift. One model, named by every simulator file that uses
-//! it, is one statement of it.
+//! The `physics` of the simulator file's `world` section, beside the
+//! stand-ins that are joined to it; the world also states its
+//! `ambient_temp`, the one temperature every thermal zone's surroundings
+//! are about: see [`WorldSection`]. It was once a file of its own, named by the simulator file,
+//! so that one vehicle could be shared by several configurations of its
+//! payloads; but a model in another file is a second file to find, to keep
+//! and to send with the first, and a stand-in's `connects` names a terminal
+//! that only the other file says is there. One file says the whole of what
+//! tcssim simulates. A simulator file that still names a model, and a model
+//! written as a file of its own, are refused, told where it goes now: see
+//! [`crate::sim_reshaped`].
 //!
 //! # What it holds
 //!
@@ -14,20 +19,21 @@
 //! the connections between them, as a configuration holds links:
 //!
 //! ```yaml
-//! physics:
-//!   - type heater:
-//!       - component: heater_1
-//!         power: "60 W"
-//!         voltage: "28 V"
-//!   - type thermal_zone:
-//!       - component: zone
-//!         environment: "283.15 K"
-//!         time_constant: "50 s"
-//!         capacity: "20 J/K"
-//!
-//! connections:
-//!   - from: heater_1.heat
-//!     to: zone.heat
+//! world:
+//!   ambient_temp: "283.15 K"
+//!   physics:
+//!     components:
+//!       - type heater:
+//!           - component: heater_1
+//!             power: "60 W"
+//!             voltage: "28 V"
+//!       - type thermal_zone:
+//!           - component: zone
+//!             time_constant: "50 s"
+//!             capacity: "20 J/K"
+//!     connections:
+//!       - from: heater_1.heat
+//!         to: zone.heat
 //! ```
 //!
 //! Nothing in it is in an order that means anything: not the types, not the
@@ -46,17 +52,18 @@
 //! a connection joins an output to an input of the same kind: see
 //! [`terminal`].
 //!
-//! A stand-in in the simulator file is joined to a terminal by naming it,
-//! `connects: zone.temperature`: a sensor reports an output, and a
-//! stand-in the vehicle drives drives an input. This file says only what the
-//! world is.
+//! A stand-in elsewhere in the simulator file is joined to a terminal by
+//! naming it, `connects: zone.temperature`: a sensor reports an output, and
+//! a stand-in the vehicle drives drives an input. This section says only
+//! what the world is.
 //!
 //! # Its figures
 //!
 //! Each written with its unit, which is checked: see [`setting`].
 //!
 //! YAML only. A model is written by hand or by a tool that writes YAML, and
-//! a second spelling would be a second thing to keep the same as the first.
+//! a second spelling would be a second thing to keep the same as the first:
+//! a simulator file written in XML has no `world`.
 
 pub mod battery;
 pub mod body;
@@ -72,12 +79,12 @@ pub mod terminal;
 pub mod thermal_zone;
 
 use std::collections::BTreeMap;
-use std::path::Path;
 
 use serde::de::IgnoredAny;
 use serde::{Deserialize, Serialize};
 
-use crate::error::{TcsError, TcsResult};
+use crate::error::TcsResult;
+use crate::sim_config::blank_is_unstated;
 use crate::verify::About;
 pub use setting::Wander;
 use terminal::{At, Direction, Terminal};
@@ -97,17 +104,36 @@ pub const TYPES: &[&str] = &[
     "body",
 ];
 
-/// A physics model, as it parses.
+/// The simulator file's `world` section, as it parses: the vehicle's
+/// physics, and the temperature its surroundings are about.
 #[derive(Debug, Clone, Default, Deserialize, PartialEq)]
 #[serde(deny_unknown_fields)]
-pub struct PhysicsFile {
-    /// What the model is of.
+pub struct WorldSection {
+    /// The temperature every thermal zone's surroundings are about, in
+    /// kelvin: `"288.15 K"`. One for the world, because a vehicle's zones
+    /// are in one set of surroundings; each zone says how they vary about
+    /// it, by its `swing` and its `wander`. Required where there is a
+    /// thermal zone.
+    ///
+    /// Fixed, and not a figure that follows the vehicle's setpoint: a zone
+    /// whose surroundings tracked the setpoint could never be driven away
+    /// from it, and commanding the setpoint from the ground would then show
+    /// nothing at all.
+    #[serde(default, deserialize_with = "blank_is_unstated")]
+    pub ambient_temp: Option<String>,
+    /// The components and their connections.
     #[serde(default)]
-    pub description: Option<String>,
+    pub physics: PhysicsSection,
+}
+
+/// A physics model, as the `physics` of the `world` section parses.
+#[derive(Debug, Clone, Default, Deserialize, PartialEq)]
+#[serde(deny_unknown_fields)]
+pub struct PhysicsSection {
     /// Its components, in name order, whatever order the file writes them
     /// in: see [`grouped`].
     #[serde(default, deserialize_with = "grouped::components")]
-    pub physics: Vec<Component>,
+    pub components: Vec<Component>,
     /// How its components are joined, each an output to an input.
     #[serde(default)]
     pub connections: Vec<Connection>,
@@ -155,15 +181,23 @@ pub struct Moved {
     pub rest: BTreeMap<String, IgnoredAny>,
 }
 
+/// Where a problem with the connections is reported: the `connections` of
+/// the simulator file's `world: physics:`.
+pub const CONNECTIONS: &str = "world.physics.connections";
+
+/// Where a problem with the world's `ambient_temp` is reported.
+pub const AMBIENT: &str = "world.ambient_temp";
+
 /// What a model with a `thermal_mass` is told.
 pub const MASS_MADE_OF_PARTS: &str = "a thermal_mass is now made of parts: \
-    a thermal_zone, with environment, time_constant and a capacity in J/K, \
-    and a heater for each heater, with its power in W and its voltage in V, \
-    joined under connections: from each heater's heat to the zone's heat. A \
-    stand-in then names the terminal it is joined to, connects: \
-    zone.temperature or connects: heater_1.on, in place of reads, heats, \
-    output, input and rate. \
-    examples/thermostat-common/thermostat-physics.yaml is one written so";
+    a thermal_zone, with time_constant and a capacity in J/K, its \
+    surroundings the world's ambient_temp, and a heater for each heater, \
+    with its power in W and its voltage in V, joined under connections: \
+    from each heater's heat to the zone's heat. A stand-in then names the \
+    terminal it is joined to, connects: zone.temperature or connects: \
+    heater_1.on, in place of reads, heats, output, input and rate. The \
+    world section of examples/thermostat-common/thermostat-sim.yaml is one \
+    written so";
 
 /// A connection between two components, as a file writes it.
 #[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
@@ -267,26 +301,14 @@ pub fn terminals_of(type_name: &str) -> Option<&'static [Terminal]> {
     }
 }
 
-/// Says whether a file is named as a physics model is: `.yaml` or `.yml`.
-///
-/// # Arguments
-///
-/// * `path` - The file.
-///
-/// # Returns
-///
-/// Whether its name ends in either.
-pub fn is_yaml_name(path: &Path) -> bool {
-    path.extension()
-        .and_then(|e| e.to_str())
-        .is_some_and(|e| e == "yaml" || e == "yml")
-}
-
 /// Something wrong with a physics model.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct PhysicsProblem {
-    /// The component it is about, or `None` for one about the connections.
+    /// The component it is about, or `None` for one about the connections
+    /// or the world's `ambient_temp`.
     pub component: Option<String>,
+    /// Whether it is about the world's `ambient_temp`.
+    pub ambient: bool,
     /// What is wrong.
     pub why: String,
 }
@@ -302,9 +324,27 @@ impl PhysicsProblem {
     /// # Returns
     ///
     /// The problem.
-    fn of(component: &str, why: impl Into<String>) -> PhysicsProblem {
+    pub fn of(component: &str, why: impl Into<String>) -> PhysicsProblem {
         PhysicsProblem {
             component: Some(component.to_string()),
+            ambient: false,
+            why: why.into(),
+        }
+    }
+
+    /// Makes a problem with the world's `ambient_temp`.
+    ///
+    /// # Arguments
+    ///
+    /// * `why` - What is wrong.
+    ///
+    /// # Returns
+    ///
+    /// The problem.
+    fn of_ambient(why: impl Into<String>) -> PhysicsProblem {
+        PhysicsProblem {
+            component: None,
+            ambient: true,
             why: why.into(),
         }
     }
@@ -321,20 +361,22 @@ impl PhysicsProblem {
     fn joining(why: impl Into<String>) -> PhysicsProblem {
         PhysicsProblem {
             component: None,
+            ambient: false,
             why: why.into(),
         }
     }
 
     /// What it is about, which is how the line it belongs to is found in
-    /// the model's file.
+    /// the simulator file.
     ///
     /// # Returns
     ///
-    /// Its component, or the connections.
+    /// Its component, the connections or the world's `ambient_temp`.
     pub fn about(&self) -> About {
         match &self.component {
             Some(name) => About::PhysicsComponent(name.clone()),
-            None => About::Section("connections"),
+            None if self.ambient => About::Section(AMBIENT),
+            None => About::Section(CONNECTIONS),
         }
     }
 }
@@ -345,7 +387,10 @@ impl std::fmt::Display for PhysicsProblem {
             Some(name) => {
                 write!(f, "physics component \"{name}\": {}", self.why)
             }
-            None => write!(f, "connections: {}", self.why),
+            None if self.ambient => {
+                write!(f, "world ambient_temp: {}", self.why)
+            }
+            None => write!(f, "physics connections: {}", self.why),
         }
     }
 }
@@ -516,60 +561,24 @@ impl Model {
     }
 }
 
-impl PhysicsFile {
-    /// Reads a physics model.
+impl WorldSection {
+    /// Reads a world section from its text, as it would stand alone:
+    /// `ambient_temp:` and `physics:` at the left margin. For a test, or a
+    /// document's example; a program reads the section with the rest of its
+    /// simulator file.
     ///
     /// # Arguments
     ///
-    /// * `path` - The file, which is YAML and named `.yaml` or `.yml`.
+    /// * `text` - The section's value, as YAML.
     ///
     /// # Returns
     ///
-    /// The model.
+    /// The world.
     ///
     /// # Errors
     ///
-    /// `TcsError::Config` naming the file where it is not YAML by its name,
-    /// cannot be read, or does not parse as a model.
-    pub fn load<P: AsRef<Path>>(path: P) -> TcsResult<PhysicsFile> {
-        let path = path.as_ref();
-        let named = |why: String| {
-            TcsError::Config(format!("{}: {why}", path.display()))
-        };
-        if !is_yaml_name(path) {
-            return Err(named(
-                "a physics model is YAML, named .yaml or .yml".to_string(),
-            ));
-        }
-        let text = std::fs::read_to_string(path)
-            .map_err(|e| named(format!("cannot be read: {e}")))?;
-        PhysicsFile::parse(&text).map_err(|e| match e {
-            TcsError::Config(why) => named(why),
-            other => named(other.to_string()),
-        })
-    }
-
-    /// Reads a physics model from its text.
-    ///
-    /// # Arguments
-    ///
-    /// * `text` - The model, as YAML.
-    ///
-    /// # Returns
-    ///
-    /// The model.
-    ///
-    /// # Errors
-    ///
-    /// What the YAML reader says, with the line it says it at, and a model
-    /// in the shape it had before its components were grouped by type, at
-    /// its line.
-    pub fn parse(text: &str) -> TcsResult<PhysicsFile> {
-        // A model written before its components were grouped by type,
-        // refused by its line and shown the shape now.
-        if let Some(why) = crate::sim_reshaped::physics_refused(text) {
-            return Err(TcsError::Config(why));
-        }
+    /// What the YAML reader says, with the line it says it at.
+    pub fn parse(text: &str) -> TcsResult<WorldSection> {
         crate::format::ConfigFormat::Yaml.parse(text)
     }
 
@@ -581,7 +590,7 @@ impl PhysicsFile {
     ///
     /// # Errors
     ///
-    /// The first of [`PhysicsFile::problems`].
+    /// The first of [`WorldSection::problems`].
     pub fn resolve(&self) -> Result<Model, PhysicsProblem> {
         let (model, mut problems) = self.built();
         if problems.is_empty() {
@@ -591,18 +600,21 @@ impl PhysicsFile {
         }
     }
 
-    /// Everything wrong with the model as it stands alone: a component whose
-    /// figures do not read, two of one name, a connection that names no
-    /// terminal, joins two outputs or two inputs, joins a value in one unit
-    /// to an input in another, or is a second output on an input that takes
-    /// one.
+    /// Everything wrong with the world as it stands alone: an
+    /// `ambient_temp` that does not read, or is not stated where a thermal
+    /// zone needs it; a component whose figures do not read, two of one
+    /// name; a connection that names no terminal, joins two outputs or two
+    /// inputs, joins a value in one unit to an input in another, or is a
+    /// second output on an input that takes one.
     ///
-    /// What the stand-ins are joined to is the simulator file's, and checked
-    /// there: see `crate::sim_config::SimConfigFile::physics`.
+    /// What the stand-ins are joined to is the rest of the simulator
+    /// file's, and checked there: see
+    /// `crate::sim_config::SimConfigFile::physics`.
     ///
     /// # Returns
     ///
-    /// Each problem, the components' first, in name order.
+    /// Each problem: the ambient temperature's, then the components', in
+    /// name order, then the connections'.
     pub fn problems(&self) -> Vec<PhysicsProblem> {
         self.built().1
     }
@@ -616,9 +628,35 @@ impl PhysicsFile {
     fn built(&self) -> (Model, Vec<PhysicsProblem>) {
         let mut problems = Vec::new();
         let mut model = Model::default();
+        let zones = self
+            .physics
+            .components
+            .iter()
+            .any(|c| matches!(c, Component::ThermalZone(_)));
+        let ambient = match &self.ambient_temp {
+            Some(said) => {
+                match setting::quantity("ambient_temp", said, Some("K")) {
+                    Ok(kelvin) => Some(kelvin),
+                    Err(why) => {
+                        problems.push(PhysicsProblem::of_ambient(why));
+                        None
+                    }
+                }
+            }
+            None if zones => {
+                problems.push(PhysicsProblem::of_ambient(
+                    "it is not stated, and a thermal_zone's surroundings are \
+                     about it: state it under world:, as ambient_temp: \
+                     \"288.15 K\"",
+                ));
+                None
+            }
+            None => None,
+        };
         // By name, as [`grouped`] holds them already: a model made some
         // other way is in one order too.
-        let mut components: Vec<&Component> = self.physics.iter().collect();
+        let mut components: Vec<&Component> =
+            self.physics.components.iter().collect();
         components.sort_by(|a, b| a.name().cmp(b.name()));
         for component in components {
             let name = component.name();
@@ -640,9 +678,14 @@ impl PhysicsFile {
             }
             let what = match component {
                 Component::Heater(e) => e.resolve().map(Resolution::Heater),
-                Component::ThermalZone(e) => {
-                    e.resolve().map(Resolution::ThermalZone)
-                }
+                // A zone with no ambient temperature to be about has been
+                // refused for that already, once, at the world.
+                Component::ThermalZone(e) => match ambient {
+                    Some(ambient) => {
+                        e.resolve(ambient).map(Resolution::ThermalZone)
+                    }
+                    None => continue,
+                },
                 Component::Sun(e) => e.resolve().map(Resolution::Sun),
                 Component::SolarArray(e) => {
                     e.resolve().map(Resolution::SolarArray)
@@ -671,7 +714,7 @@ impl PhysicsFile {
         if !problems.is_empty() {
             return (model, problems);
         }
-        for connection in &self.connections {
+        for connection in &self.physics.connections {
             match joined(&model, connection) {
                 Ok(joined) => model.connections.push(joined),
                 Err(why) => problems.push(PhysicsProblem::joining(why)),
@@ -781,12 +824,30 @@ mod tests {
     use super::*;
     use crate::unit::Unit;
 
+    /// Reads a model's components and connections, written as they would be
+    /// at the left margin, as the physics of a world whose ambient
+    /// temperature is 283.15 K.
+    ///
+    /// # Arguments
+    ///
+    /// * `text` - The physics section's value.
+    ///
+    /// # Returns
+    ///
+    /// The world.
+    fn parse(text: &str) -> TcsResult<WorldSection> {
+        let physics: String =
+            text.lines().map(|line| format!("  {line}\n")).collect();
+        WorldSection::parse(&format!(
+            "ambient_temp: \"283.15 K\"\nphysics:\n{physics}"
+        ))
+    }
+
     /// The thermostat's model: two heaters warming one zone.
     const ZONE: &str = "\
-physics:
+components:
   - type thermal_zone:
       - component: zone
-        environment: \"283.15 K\"
         time_constant: 50 s
         capacity: \"20 J/K\"
   - type heater:
@@ -810,7 +871,7 @@ connections:
     /// the file wrote them.
     #[test]
     fn a_model_holds_typed_components_and_their_connections() {
-        let model = PhysicsFile::parse(ZONE)
+        let model = parse(ZONE)
             .expect("it parses")
             .resolve()
             .expect("it resolves");
@@ -849,7 +910,7 @@ connections:
     to: zone.heat
   - from: heater_2.heat
     to: zone.heat
-physics:
+components:
   - type heater:
       - component: heater_1
         voltage: \"28 V\"
@@ -863,11 +924,10 @@ physics:
       - component: zone
         capacity: \"20 J/K\"
         time_constant: 50 s
-        environment: \"283.15 K\"
 ";
-        let one = PhysicsFile::parse(ZONE).expect("parses");
-        let two = PhysicsFile::parse(other).expect("parses");
-        assert_eq!(one.physics, two.physics);
+        let one = parse(ZONE).expect("parses");
+        let two = parse(other).expect("parses");
+        assert_eq!(one.physics.components, two.physics.components);
         assert_eq!(
             one.resolve().expect("resolves"),
             two.resolve().expect("resolves")
@@ -879,30 +939,30 @@ physics:
     #[test]
     fn an_component_of_no_known_type_is_refused() {
         for (text, said) in [
-            ("physics:\n  - component: zone\n", "is not a type"),
+            ("components:\n  - component: zone\n", "is not a type"),
             (
-                "physics:\n  - type boiler:\n      - component: zone\n",
+                "components:\n  - type boiler:\n      - component: zone\n",
                 "boiler",
             ),
-            ("physics:\n  - type heater:\n", "no components"),
+            ("components:\n  - type heater:\n", "no components"),
             (
-                "physics:\n  - type heater:\n      - component: h\n        \
+                "components:\n  - type heater:\n      - component: h\n        \
                  power: \"1 W\"\n        voltage: \"1 V\"\n        \
                  colour: red\n",
                 "colour",
             ),
             (
-                "physics:\n  - type bus:\n      - component: a\n  \
+                "components:\n  - type bus:\n      - component: a\n  \
                  - type bus:\n      - component: b\n",
                 "written twice",
             ),
             (
-                "physics:\n  - type bus:\n      - component: a\n        \
+                "components:\n  - type bus:\n      - component: a\n        \
                  type: bus\n",
                 "type",
             ),
         ] {
-            let why = PhysicsFile::parse(text).expect_err(text).to_string();
+            let why = parse(text).expect_err(text).to_string();
             assert!(why.contains(said), "{text}: {why}");
         }
     }
@@ -911,8 +971,8 @@ physics:
     /// refused, saying what it is now.
     #[test]
     fn a_thermal_mass_is_told_what_it_is_now() {
-        let file = PhysicsFile::parse(
-            "physics:\n  - type thermal_mass:\n      \
+        let file = parse(
+            "components:\n  - type thermal_mass:\n      \
              - component: basic\n        \
              environment: \"283.15\"\n        inputs: \"in1\"\n",
         )
@@ -930,12 +990,13 @@ physics:
         for name in TYPES {
             let settings = settings_of(name).expect("its settings");
             assert!(terminals_of(name).is_some_and(|t| !t.is_empty()));
-            let mut text =
-                format!("physics:\n  - type {name}:\n      - component: x\n");
+            let mut text = format!(
+                "components:\n  - type {name}:\n      - component: x\n"
+            );
             for setting in settings {
                 text.push_str(&format!("        {setting}: \"1\"\n"));
             }
-            assert!(PhysicsFile::parse(&text).is_ok(), "{text}");
+            assert!(parse(&text).is_ok(), "{text}");
         }
     }
 
@@ -943,7 +1004,7 @@ physics:
     #[test]
     fn a_figure_without_its_unit_is_refused() {
         let text = ZONE.replace("\"60 W\"", "\"60\"");
-        let problems = PhysicsFile::parse(&text).expect("parses").problems();
+        let problems = parse(&text).expect("parses").problems();
         assert_eq!(problems.len(), 2, "{problems:?}");
         assert_eq!(problems[0].component.as_deref(), Some("heater_1"));
         assert!(problems[0].why.contains("\"60 W\""), "{problems:?}");
@@ -970,8 +1031,7 @@ physics:
             ("heater_1", "zone.heat", "joined by a dot"),
         ] {
             let text = format!("{ZONE}  - from: {from}\n    to: {to}\n");
-            let problems =
-                PhysicsFile::parse(&text).expect("parses").problems();
+            let problems = parse(&text).expect("parses").problems();
             assert!(
                 problems
                     .iter()
@@ -985,17 +1045,43 @@ physics:
     #[test]
     fn names_are_one_each_and_dotless() {
         let twice = ZONE.replace("component: heater_2", "component: heater_1");
-        let problems = PhysicsFile::parse(&twice).expect("parses").problems();
+        let problems = parse(&twice).expect("parses").problems();
         assert!(problems[0].why.contains("two components"), "{problems:?}");
         let dotted = ZONE.replace("component: zone", "component: the.zone");
-        let problems = PhysicsFile::parse(&dotted).expect("parses").problems();
+        let problems = parse(&dotted).expect("parses").problems();
         assert!(problems[0].why.contains("no dot"), "{problems:?}");
     }
 
-    /// A model is YAML, and a file named otherwise is refused by its name.
+    /// A zone takes its surroundings from the world's ambient temperature:
+    /// one stating its own environment is told where it is now, and a
+    /// world with a zone and no ambient temperature is refused at it, once.
     #[test]
-    fn a_model_is_yaml() {
-        let why = PhysicsFile::load("zone.xml").expect_err("not YAML");
-        assert!(why.to_string().contains("is YAML"), "{why}");
+    fn a_zone_is_in_the_worlds_ambient_temperature() {
+        let model = parse(ZONE).expect("parses").resolve().expect("resolves");
+        let Resolution::ThermalZone(zone) = &model.components[2].what else {
+            panic!("a zone: {:?}", model.components[2]);
+        };
+        assert_eq!(zone.environment, 283.15);
+
+        let own = ZONE.replace(
+            "capacity: \"20 J/K\"",
+            "capacity: \"20 J/K\"\n        environment: \"283.15 K\"",
+        );
+        let problem = parse(&own).expect("parses").resolve().unwrap_err();
+        assert_eq!(problem.about(), About::PhysicsComponent("zone".into()));
+        assert!(problem.why.contains("ambient_temp"), "{problem}");
+
+        let physics: String =
+            ZONE.lines().map(|line| format!("  {line}\n")).collect();
+        let none = WorldSection::parse(&format!("physics:\n{physics}"))
+            .expect("parses");
+        let problems = none.problems();
+        assert_eq!(problems.len(), 1, "{problems:?}");
+        assert_eq!(problems[0].about(), About::Section(AMBIENT));
+        let wrong = WorldSection::parse(&format!(
+            "ambient_temp: \"20 C\"\nphysics:\n{physics}"
+        ))
+        .expect("parses");
+        assert_eq!(wrong.problems()[0].about(), About::Section(AMBIENT));
     }
 }

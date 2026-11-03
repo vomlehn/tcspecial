@@ -1,6 +1,0 @@
-physics:
-  - name: zone
-    type: thermal_zone
-    environment: "283.15 K"
-    time_constant: "50 s"
-    capacity: "20 J/K"

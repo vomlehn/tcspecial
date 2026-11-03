@@ -1,0 +1,9 @@
+# A physics section at the top of a simulator file, as it was before it
+# was the world's: it goes under world:, beside the world's ambient_temp.
+tcssim:
+  ready: 127.0.0.1:7999
+
+physics:
+  components:
+    - type bus:
+        - component: bus

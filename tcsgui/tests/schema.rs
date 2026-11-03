@@ -356,10 +356,7 @@ fn the_simulator_schemas_take_the_kinds_and_words_the_simulator_reads() {
 
     let xsd = text_of("tcspecial-sim.xsd");
     assert_eq!(enumerated(&xsd, "kind"), kinds, "in the XSD");
-    for word in tcslibgs::sim_config::SETTINGS
-        .iter()
-        .chain(&["physics", "group"])
-    {
+    for word in tcslibgs::sim_config::SETTINGS.iter().chain(&["group"]) {
         assert!(
             xsd.contains(&format!("<xs:element name=\"{word}\"")),
             "the simulator XSD has no {word}"
@@ -371,25 +368,10 @@ fn the_simulator_schemas_take_the_kinds_and_words_the_simulator_reads() {
     let dir = tempfile::tempdir().expect("a directory");
     let file = dir.path().join("every-sim.xml");
     std::fs::write(
-        dir.path().join("every-physics.yaml"),
-        "physics:\n  \
-         - type heater:\n      \
-         - component: heater\n        \
-         power: \"60 W\"\n        \
-         voltage: \"28 V\"\n  \
-         - type thermal_zone:\n      \
-         - component: zone\n        \
-         capacity: \"20 J/K\"\n        \
-         environment: \"280 K\"\n        \
-         time_constant: \"60 s\"\n",
-    )
-    .expect("written");
-    std::fs::write(
         &file,
         "<?xml version=\"1.0\" encoding=\"UTF-8\"?>
 <simulator>
   <description>every word</description>
-  <physics>every-physics.yaml</physics>
   <simulated_payload_groups>
     <group name=\"fast\">
       <packet_interval>100 ms</packet_interval>
@@ -415,6 +397,8 @@ fn the_simulator_schemas_take_the_kinds_and_words_the_simulator_reads() {
 ",
     )
     .expect("written");
+    // Read as far as a file is without its world: the payloads are joined
+    // to terminals only a YAML simulator file's world can have.
     tcslibgs::sim_config::SimConfigFile::load(&file)
         .unwrap_or_else(|e| panic!("the simulator does not read it: {e}"));
 
@@ -654,7 +638,6 @@ fn a_section_written_twice_is_refused_by_the_xsd_and_the_reader() {
   <tcssim>
     <ready>127.0.0.1:7999</ready>
   </tcssim>
-  <physics>once-physics.yaml</physics>
   <simulated_payload_groups>
     <group name=\"fast\">
       <packet_interval>100 ms</packet_interval>
@@ -684,7 +667,6 @@ fn a_section_written_twice_is_refused_by_the_xsd_and_the_reader() {
     for section in [
         "description",
         "tcssim",
-        "physics",
         "simulated_payload_groups",
         "simulated_payloads",
     ] {
@@ -901,15 +883,15 @@ fn every_key_of_a_shipped_configuration_is_in_the_schema() {
     }
 }
 
-/// Every key of every shipped simulator file and physics model is one its
-/// schema allows, in the shape it allows: the simulated payloads and the
-/// components grouped by type, each named by its word, and the groups named
-/// by `group`. The same shallow check as the configurations', for the same
-/// reason.
+/// Every key of every shipped simulator file is one its schema allows, in
+/// the shape it allows: the simulated payloads and the world's components
+/// grouped by type, each named by its word, and the groups named by
+/// `group`. The same shallow check as the configurations', for the same
+/// reason; [`every_shipped_simulator_file_is_valid_against_its_schema`]
+/// is the whole one.
 #[test]
-fn every_key_of_a_shipped_simulator_file_and_model_is_in_its_schema() {
+fn every_key_of_a_shipped_simulator_file_is_in_its_schema() {
     let sim = read("tcspecial-sim.schema.json");
-    let physics = read("tcspecial-physics.schema.json");
     let words = |entry: &serde_json::Value| -> BTreeSet<String> {
         entry["properties"]
             .as_object()
@@ -920,6 +902,7 @@ fn every_key_of_a_shipped_simulator_file_and_model_is_in_its_schema() {
     };
     let payload = words(&sim["$defs"]["simulatedPayload"]);
     let group = words(&sim["properties"]["simulated_payload_groups"]["items"]);
+    let world = &sim["properties"]["world"];
 
     /// Checks one entry: named by its word, saying only what is allowed.
     ///
@@ -943,62 +926,164 @@ fn every_key_of_a_shipped_simulator_file_and_model_is_in_its_schema() {
         }
     }
 
+    /// Checks a list of entries grouped by type: each one key, `type` and
+    /// a type, holding entries each named by `word`.
+    ///
+    /// # Arguments
+    ///
+    /// * `file`    - The file, for a message.
+    /// * `list`    - The list.
+    /// * `word`    - The word that names an entry.
+    /// * `allowed` - What an entry of a type may say, by the type, or
+    ///               `None` for a type that is not allowed.
+    fn grouped(
+        file: &str,
+        list: &serde_norway::Value,
+        word: &str,
+        allowed: &dyn Fn(&str) -> Option<BTreeSet<String>>,
+    ) {
+        for entry in list.as_sequence().expect("a list of types") {
+            let entry = entry.as_mapping().expect("a mapping");
+            assert_eq!(entry.len(), 1, "{file}: one type an entry");
+            for (kind, entries) in entry {
+                let kind = kind.as_str().expect("a type key");
+                let named =
+                    kind.strip_prefix("type ").expect("type and the type");
+                let allowed = allowed(named)
+                    .unwrap_or_else(|| panic!("{file}: {kind} is not allowed"));
+                for one in entries.as_sequence().expect("a list") {
+                    check(file, one, word, &allowed);
+                }
+            }
+        }
+    }
+
+    let kinds = &sim["$defs"]["simulatedType"]["enum"];
+    let is_kind = |named: &str| {
+        kinds
+            .as_array()
+            .expect("kinds")
+            .iter()
+            .any(|k| k.as_str() == Some(&format!("type {named}")))
+    };
     let mut files = examples("-sim.yaml");
     files.push("example-sim.yaml".to_string());
     files.push("tests/manual/thermostat-sim.yaml".to_string());
-    files.extend(examples("-physics.yaml"));
     for file in &files {
         let text = std::fs::read_to_string(root().join(file))
             .unwrap_or_else(|e| panic!("{file}: {e}"));
         let said: serde_norway::Value = serde_norway::from_str(&text)
             .unwrap_or_else(|e| panic!("{file}: {e}"));
-        let model = file.ends_with("-physics.yaml");
-        let schema = if model { &physics } else { &sim };
-        let sections = properties(schema, &[]);
+        let sections = properties(&sim, &[]);
         for (key, value) in said.as_mapping().expect("a mapping") {
             let key = key.as_str().expect("a section is named");
             assert!(sections.contains(key), "{file}: {key} is not allowed");
-            let typed = match key {
+            match key {
                 "simulated_payload_groups" => {
                     for entry in value.as_sequence().expect("a list") {
                         check(file, entry, "group", &group);
                     }
-                    continue;
                 }
-                "simulated_payloads" => None,
-                "physics" if model => Some(&physics),
-                _ => continue,
-            };
-            for entry in value.as_sequence().expect("a list of types") {
-                let entry = entry.as_mapping().expect("a mapping");
-                assert_eq!(entry.len(), 1, "{file}: one type an entry");
-                for (kind, entries) in entry {
-                    let kind = kind.as_str().expect("a type key");
-                    let named =
-                        kind.strip_prefix("type ").expect("type and the type");
-                    let (word, allowed) = match typed {
-                        None => {
-                            let kinds = &sim["$defs"]["simulatedType"]["enum"];
+                "simulated_payloads" => {
+                    grouped(file, value, "payload", &|named| {
+                        is_kind(named).then(|| payload.clone())
+                    });
+                }
+                "world" => {
+                    let value = value.as_mapping().expect("a mapping");
+                    for (key, said) in value {
+                        let key = key.as_str().expect("named");
+                        assert!(
+                            world["properties"].get(key).is_some(),
+                            "{file}: world: {key} is not allowed"
+                        );
+                        if key != "physics" {
+                            continue;
+                        }
+                        let physics = &world["properties"]["physics"];
+                        for (key, said) in said.as_mapping().expect("a mapping")
+                        {
+                            let key = key.as_str().expect("named");
                             assert!(
-                                kinds
-                                    .as_array()
-                                    .expect("kinds")
-                                    .iter()
-                                    .any(|k| k.as_str() == Some(kind)),
-                                "{file}: {kind} is not allowed"
+                                physics["properties"].get(key).is_some(),
+                                "{file}: world: physics: {key} is not allowed"
                             );
-                            ("payload", payload.clone())
+                            if key == "components" {
+                                grouped(file, said, "component", &|named| {
+                                    sim["$defs"]
+                                        .get(named)
+                                        .map(|component| words(component))
+                                });
+                            }
                         }
-                        Some(schema) => {
-                            ("component", words(&schema["$defs"][named]))
-                        }
-                    };
-                    for one in entries.as_sequence().expect("a list") {
-                        check(file, one, word, &allowed);
                     }
                 }
+                _ => {}
             }
         }
+    }
+}
+
+/// Every shipped simulator file is valid against the simulator schema, as
+/// an editor's language server would hold it, by a JSON Schema validator:
+/// every word, every type and every shape. And the shapes the physics model
+/// had before -- a file of its own named by `physics: <path>`, or a
+/// `physics` section at the top of the file -- are not.
+#[test]
+fn every_shipped_simulator_file_is_valid_against_its_schema() {
+    let validator =
+        jsonschema::validator_for(&read("tcspecial-sim.schema.json"))
+            .expect("the simulator schema is a schema");
+    /// A YAML text as the JSON a validator takes.
+    ///
+    /// # Arguments
+    ///
+    /// * `text` - The YAML.
+    ///
+    /// # Returns
+    ///
+    /// It, as JSON.
+    fn json_of(text: &str) -> serde_json::Value {
+        serde_norway::from_str(text).expect("YAML")
+    }
+    let mut files = examples("-sim.yaml");
+    files.push("example-sim.yaml".to_string());
+    files.push("tests/manual/thermostat-sim.yaml".to_string());
+    files.push("examples/thermostat-common/thermostat-sim.yaml".to_string());
+    for file in &files {
+        let text = std::fs::read_to_string(root().join(file))
+            .unwrap_or_else(|e| panic!("{file}: {e}"));
+        let errors: Vec<String> = validator
+            .iter_errors(&json_of(&text))
+            .map(|e| format!("{}: {e}", e.instance_path()))
+            .collect();
+        assert!(errors.is_empty(), "{file}: {errors:#?}");
+    }
+
+    let world = "world:\n  ambient_temp: \"288.15 K\"\n  physics:\n    \
+                 components:\n      - type heater:\n          \
+                 - component: h\n            power: \"4 W\"\n            \
+                 voltage: \"28 V\"\n      - type thermal_zone:\n          \
+                 - component: zone\n            capacity: \"20 J/K\"\n            \
+                 time_constant: \"50 s\"\n    connections:\n      \
+                 - { from: h.heat, to: zone.heat }\n";
+    assert!(validator.is_valid(&json_of(world)), "{world}");
+    for refused in [
+        "physics: ../thermostat-common/thermostat-physics.yaml\n".to_string(),
+        world
+            .replace("world:\n  ambient_temp: \"288.15 K\"\n  ", "")
+            .replace("\n  ", "\n"),
+        world.replace(
+            "time_constant",
+            "environment: \"283.15 K\"\n            time_constant",
+        ),
+        world.replace("type heater", "type boiler"),
+        world.replace("from: h.heat", "via: h.heat"),
+    ] {
+        assert!(
+            !validator.is_valid(&json_of(&refused)),
+            "the schema takes:\n{refused}"
+        );
     }
 }
 
@@ -1235,15 +1320,20 @@ fn every_node_is_described_once_and_in_one_spelling() {
     }
 }
 
-/// The physics model's schema offers every component type the model reads,
-/// each an entry `type <type>` holding that type's components, and for each
-/// type every setting the one list of its settings has, beside the
+/// The simulator schema's world offers every component type the model
+/// reads, each an entry `type <type>` holding that type's components, and
+/// for each type every setting the one list of its settings has, beside the
 /// `component` naming it: the schema an editor checks a hand-written model
 /// against says what tcssim reads.
 #[test]
-fn the_physics_schema_takes_the_types_and_settings_the_model_reads() {
-    let json = read("tcspecial-physics.schema.json");
-    let item = &json["properties"]["physics"]["items"];
+fn the_simulator_schema_takes_the_types_and_settings_the_model_reads() {
+    let json = read("tcspecial-sim.schema.json");
+    let world = &json["properties"]["world"]["properties"];
+    assert!(
+        world["ambient_temp"].is_object(),
+        "the world's ambient_temp"
+    );
+    let item = &world["physics"]["properties"]["components"]["items"];
     assert_eq!(item["maxProperties"], 1, "one type an entry");
     let entries = item["properties"].as_object().expect("one entry a type");
     let types: BTreeSet<&str> = entries

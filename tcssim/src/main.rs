@@ -434,6 +434,10 @@ fn joined_to_the_world(
                 )?,
                 sensor: Arc::new(Sensor::new(&name, *sensor, seed)),
             },
+            Some(Attached::Pulls { at }) => Attachment::Pulls {
+                world: world.clone(),
+                places: at.iter().map(place).collect::<Result<_, _>>()?,
+            },
             Some(Attached::Signals { at }) => Attachment::Signals {
                 world: world.clone(),
                 place: place(at)?,
@@ -2575,10 +2579,12 @@ mod tests {
         for sensor in ["temp_1", "temp_2", "temp_3"] {
             assert!(thermostat.reads(sensor), "{sensor}");
         }
-        assert!(!thermostat.reads("heaters_1"));
+        assert!(!thermostat.reads("gpio-out-tmass1"));
         let heaters: Vec<&str> = thermostat.heaters().collect();
-        assert_eq!(heaters, ["heaters_1", "heaters_2"]);
-        assert_eq!(attached.len(), 5);
+        assert_eq!(heaters, ["gpio-out-tmass1", "gpio-out-tmass2"]);
+        // The three sensors, the two heaters' switches, and the lines that
+        // sense the heaters.
+        assert_eq!(attached.len(), 6);
 
         // Naming a node that is not a hysteresis node is refused.
         stand_in_for(&mut sim_file, &["thermostat", "temp1"]);
@@ -2608,7 +2614,7 @@ mod tests {
 
     /// Gives the thermostat example's graph a second hysteresis node,
     /// `backstop`, which reads the vote as `thermostat` does and takes
-    /// `heaters_2` from it: two thermostats, each with a heater of its own.
+    /// `gpio-out-tmass2` from it: two thermostats, each with a heater of its own.
     ///
     /// # Arguments
     ///
@@ -2632,19 +2638,19 @@ mod tests {
                 added.push(also);
             }
             if link.origin().node == "thermostat"
-                && link.to.each().contains(&"heaters_2")
+                && link.to.each().contains(&"gpio-out-tmass2")
             {
                 let mut taken = link.clone();
                 taken.from = link.from.replacen("thermostat", "backstop", 1);
                 taken.to = tcslibgs::graph::Destinations::of(vec![
-                    "heaters_2".to_string()
+                    "gpio-out-tmass2".to_string(),
                 ]);
                 added.push(taken);
                 link.to = tcslibgs::graph::Destinations::of(
                     link.to
                         .each()
                         .into_iter()
-                        .filter(|to| *to != "heaters_2")
+                        .filter(|to| *to != "gpio-out-tmass2")
                         .map(str::to_string)
                         .collect(),
                 );
@@ -2676,8 +2682,9 @@ mod tests {
                 .expect("the world and the thermostats are made");
         let named: Vec<&str> = thermostats.iter().map(|t| t.name()).collect();
         assert_eq!(named, ["thermostat", "backstop"]);
-        for (thermostat, heater) in
-            thermostats.iter().zip(["heaters_1", "heaters_2"])
+        for (thermostat, heater) in thermostats
+            .iter()
+            .zip(["gpio-out-tmass1", "gpio-out-tmass2"])
         {
             for sensor in ["temp_1", "temp_2", "temp_3"] {
                 assert!(thermostat.reads(sensor), "{sensor}");
@@ -2706,11 +2713,12 @@ mod tests {
             .iter()
             .find(|link| {
                 link.origin().node == "backstop"
-                    && link.to.each().contains(&"heaters_2")
+                    && link.to.each().contains(&"gpio-out-tmass2")
             })
             .cloned()
-            .expect("the backstop drives heaters_2");
-        also.to = tcslibgs::graph::Destinations::of(vec!["heaters_1".into()]);
+            .expect("the backstop drives gpio-out-tmass2");
+        also.to =
+            tcslibgs::graph::Destinations::of(vec!["gpio-out-tmass1".into()]);
         graph.links.push(also);
         let dh_configs = simulated_payloads_of(&payload_path, &sim_file);
         let sims = sim_file.resolve(&dh_configs).expect("it fits");
@@ -2721,7 +2729,7 @@ mod tests {
         assert!(
             refused.contains("thermostat")
                 && refused.contains("backstop")
-                && refused.contains("heaters_1"),
+                && refused.contains("gpio-out-tmass1"),
             "{refused}"
         );
     }
@@ -2764,7 +2772,7 @@ mod tests {
     ///
     /// * `seed`    - What the world's random draws start from.
     /// * `seconds` - How long to run, in simulated seconds.
-    /// * `enabled` - Whether `heaters_1` and `heaters_2` are enabled.
+    /// * `enabled` - Whether `gpio-out-tmass1` and `gpio-out-tmass2` are enabled.
     ///
     /// # Returns
     ///
@@ -2817,13 +2825,13 @@ mod tests {
                     };
                     heaters.push((payload.clone(), attachment.clone(), heat));
                 }
-                Attachment::Signals { .. } => {}
+                Attachment::Signals { .. } | Attachment::Pulls { .. } => {}
             }
         }
         let (world, zone) = zone.expect("a sensor of the zone");
         assert_eq!(sensors.len(), 3);
         let named: Vec<&str> = heaters.iter().map(|h| h.0.as_str()).collect();
-        assert_eq!(named, ["heaters_1", "heaters_2"]);
+        assert_eq!(named, ["gpio-out-tmass1", "gpio-out-tmass2"]);
         for (n, (_, heater, heat)) in heaters.iter().enumerate() {
             assert_eq!(world.name_of(*heat), format!("heater_{}.heat", n + 1));
             heater.enable_at(enabled[n], 0.0);

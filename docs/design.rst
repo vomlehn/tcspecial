@@ -10972,7 +10972,9 @@ Requirement
 Requirement
     Each type is one simple part, with its own words for what goes in and
     what comes out, rather than a whole assembly: a heater is switched
-    ``on`` and gives out ``heat`` and draws ``current``; a zone takes
+    ``on``, gives out ``heat``, draws ``current``, and says whether it is
+    ``heating`` -- what a line sensing it reads, which is what it is doing
+    rather than what it was told; a zone takes
     ``heat`` and has a ``temperature``. A vehicle is made by joining parts,
     so a part is written once and a different vehicle is different
     connections.

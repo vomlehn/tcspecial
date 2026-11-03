@@ -52,28 +52,35 @@ def options(**changed):
 class SetupTest(unittest.TestCase):
     """What is read out of the example's configuration."""
 
-    def test_the_sources_are_the_readings_the_vote_and_the_decision(self):
+    def test_the_sources_are_the_readings_the_vote_and_the_heaters(self):
         setup = thermostat_yamcs.Setup(options())
         self.assertEqual(setup.gateway, "gateway")
         self.assertEqual(
             [(source.node, source.parameter, source.form, source.drives)
              for source in setup.sources],
             [("ambient", "/TcsYamcs/ambient", KELVIN, ()),
+             # The lines sensing the heaters, each on or off: what the
+             # heaters are doing, where the thermostat's decision is not
+             # sent down.
+             ("gpio-in-tmass line 2", "/TcsYamcs/gpio-in-tmass_line2",
+              DECISION, ()),
+             ("gpio-in-tmass line 3", "/TcsYamcs/gpio-in-tmass_line3",
+              DECISION, ()),
              ("temp1", "/TcsYamcs/temp1", KELVIN, ()),
              ("temp2", "/TcsYamcs/temp2", KELVIN, ()),
-             ("temp3", "/TcsYamcs/temp3", KELVIN, ()),
-             ("thermostat", "/TcsYamcs/thermostat", DECISION,
-              ("heaters_1", "heaters_2"))])
+             ("temp3", "/TcsYamcs/temp3", KELVIN, ())])
 
     def test_the_example_says_its_apids_and_ports(self):
         setup = thermostat_yamcs.Setup(options())
-        # ambient 0, gateway 1, heaters 2 and 3, housekeeping 4, temp1 to
-        # temp3 5 to 7, temp_1 to temp_3 8 to 10, thermostat 11.
+        # ambient 0, gateway 1, gpio-in-tmass 2, gpio-out-tmass1 and 2 3
+        # and 4, housekeeping 5, temp1 to temp3 6 to 8, temp_1 to temp_3 9
+        # to 11, thermostat 12.
         self.assertEqual([(link.source, link.apid, link.ground.port)
                           for link in setup.links],
-                         [("ambient", 0x400, 17700), ("temp1", 0x405, 17705),
-                          ("temp2", 0x406, 17706), ("temp3", 0x407, 17707),
-                          ("thermostat", 0x40b, 17711)])
+                         [("ambient", 0x400, 17700),
+                          ("gpio-in-tmass", 0x402, 17702),
+                          ("temp1", 0x406, 17706), ("temp2", 0x407, 17707),
+                          ("temp3", 0x408, 17708)])
         self.assertEqual(setup.config.beacon_apid(), 0x110)
         self.assertEqual(setup.config.command_apid(), 0x111)
         self.assertEqual(setup.beacon.recv.port, 17510)
@@ -140,21 +147,31 @@ class MdbTest(unittest.TestCase):
             self.assertEqual((float(term.get("coefficient")),
                               term.get("exponent")), (1e-6, "1"))
 
-    def test_the_decision_is_a_boolean(self):
-        kind = self.kind_of("thermostat")
-        self.assertEqual(kind.tag, f"{{{generated.NAMESPACE}}}"
-                                   "BooleanParameterType")
-        self.assertEqual((kind.get("oneStringValue"),
-                          kind.get("zeroStringValue")), ("1", "0"))
-        size, = kind.iterfind(
-            "./x:StringDataEncoding/x:SizeInBits/x:Fixed/x:FixedValue", X)
-        self.assertEqual(size.text, "8")
+    def test_each_line_is_a_record_and_its_level_a_boolean(self):
+        container, = self.root.iterfind(
+            ".//x:SequenceContainer[@name='gpio-in-tmassPacket']", X)
+        held = [entry.get("parameterRef") for entry in container.iterfind(
+            "./x:EntryList/x:ParameterRefEntry", X)]
+        self.assertEqual(held, [
+            "gpio-in-tmass_line2_time", "gpio-in-tmass_line2_offset",
+            "gpio-in-tmass_line2", "gpio-in-tmass_line3_time",
+            "gpio-in-tmass_line3_offset", "gpio-in-tmass_line3"])
+        sizes = []
+        for name in held:
+            encoding, = self.kind_of(name).iterfind(
+                "./x:IntegerDataEncoding", X)
+            sizes.append(int(encoding.get("sizeInBits")))
+        # A record: the time, the offset and the level, sixteen bytes.
+        self.assertEqual(sizes, [64, 32, 32] * 2)
+        level = self.kind_of("gpio-in-tmass_line2")
+        self.assertEqual(level.tag, f"{{{generated.NAMESPACE}}}"
+                                    "BooleanParameterType")
 
     def test_each_type_is_written_once(self):
         names = [kind.get("name") for kind in self.root.iterfind(
             ".//x:ParameterTypeSet/*", X)]
         self.assertEqual(names.count("KelvinValueType"), 1)
-        self.assertEqual(names.count("DecisionType"), 1)
+        self.assertEqual(names.count(generated.LINE_LEVEL_TYPE), 1)
 
     def test_each_container_is_its_sources_apid(self):
         found = {}
@@ -167,10 +184,11 @@ class MdbTest(unittest.TestCase):
         self.assertEqual({name: apid for name, apid in found.items()
                           if name.endswith("Packet")
                           and name[:-len("Packet")] in
-                          ("ambient", "temp1", "temp2", "temp3", "thermostat")},
-                         {"ambientPacket": 0x400, "temp1Packet": 0x405,
-                          "temp2Packet": 0x406, "temp3Packet": 0x407,
-                          "thermostatPacket": 0x40b})
+                          ("ambient", "gpio-in-tmass", "temp1", "temp2",
+                           "temp3")},
+                         {"ambientPacket": 0x400, "gpio-in-tmassPacket": 0x402,
+                          "temp1Packet": 0x406, "temp2Packet": 0x407,
+                          "temp3Packet": 0x408})
 
     def test_no_line_is_wider_than_80_columns(self):
         config = configuration.load(HERE / "thermostat-yamcs.xtcs")
@@ -188,9 +206,9 @@ class MdbTest(unittest.TestCase):
                          [("commands", 17200), ("beacon", 17510),
                           ("gateway-uplink", 17600),
                           ("ambient-downlink", 17700),
-                          ("temp1-downlink", 17705), ("temp2-downlink", 17706),
-                          ("temp3-downlink", 17707),
-                          ("thermostat-downlink", 17711)])
+                          ("gpio-in-tmass-downlink", 17702),
+                          ("temp1-downlink", 17706), ("temp2-downlink", 17707),
+                          ("temp3-downlink", 17708)])
 
 
 class FakeYamcs:
@@ -232,7 +250,7 @@ def readings_of(yamcs):
 
 def a_yamcs():
     """A Yamcs whose mission database is the example's: kelvin for each
-    temperature, nothing for the decision."""
+    temperature, nothing for the lines sensing the heaters."""
     return FakeYamcs({f"/TcsYamcs/{name}": ["K"]
                       for name in ("temp1", "temp2", "temp3", "ambient")})
 
@@ -246,26 +264,28 @@ class ReadingsTest(unittest.TestCase):
         readings = readings_of(yamcs)
         self.assertEqual(readings.line(),
                          "ambient --, temp1 --, temp2 --, temp3 --, "
-                         "thermostat --, heaters_1 --, heaters_2 --")
+                         "gpio-in-tmass line 2 --, gpio-in-tmass line 3 --")
         yamcs.values.update({"/TcsYamcs/ambient": 291.2341,
                              "/TcsYamcs/temp1": 291.0,
-                             "/TcsYamcs/thermostat": True})
+                             "/TcsYamcs/gpio-in-tmass_line2": True,
+                             "/TcsYamcs/gpio-in-tmass_line3": False})
         readings.read()
         self.assertEqual(readings.line(),
                          "ambient 291.234 K, temp1 291.000 K, temp2 --, "
-                         "temp3 --, thermostat on, heaters_1 on, heaters_2 on")
+                         "temp3 --, gpio-in-tmass line 2 on, "
+                         "gpio-in-tmass line 3 off")
         self.assertFalse(readings.arrived())
 
     def test_a_decision_that_changes_is_said(self):
         yamcs = a_yamcs()
         readings = readings_of(yamcs)
-        yamcs.values["/TcsYamcs/thermostat"] = True
+        yamcs.values["/TcsYamcs/gpio-in-tmass_line2"] = True
         first = readings.read()
         self.assertEqual([(source.node, was, now)
                           for source, was, now in first],
-                         [("thermostat", None, True)])
+                         [("gpio-in-tmass line 2", None, True)])
         self.assertEqual(readings.read(), [], "the same is no change")
-        yamcs.values["/TcsYamcs/thermostat"] = False
+        yamcs.values["/TcsYamcs/gpio-in-tmass_line2"] = False
         yamcs.values["/TcsYamcs/ambient"] = 295.2
         changed = readings.read()
         said = io.StringIO()
@@ -273,10 +293,10 @@ class ReadingsTest(unittest.TestCase):
             thermostat_yamcs.say_changes(first, readings)
             thermostat_yamcs.say_changes(changed, readings)
         self.assertEqual(said.getvalue().splitlines(),
-                         ["switched: thermostat on -> off, driving "
-                          "heaters_1, heaters_2; ambient 295.200 K, "
-                          "temp1 --, temp2 --, temp3 --, thermostat off, "
-                          "heaters_1 off, heaters_2 off"])
+                         ["switched: gpio-in-tmass line 2 on -> off; "
+                          "ambient 295.200 K, temp1 --, temp2 --, temp3 --, "
+                          "gpio-in-tmass line 2 off, gpio-in-tmass line 3 "
+                          "--"])
 
     def test_bytes_are_shown_as_hex(self):
         self.assertEqual(thermostat_yamcs.shown(

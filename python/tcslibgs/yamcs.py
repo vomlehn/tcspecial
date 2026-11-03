@@ -101,6 +101,13 @@ BODY_TYPE = "PacketBodyType"
 #: character ``1`` or ``0``.
 DECISION_TYPE = "DecisionType"
 
+#: The parameter types a line's record is read as: its time, in
+#: microseconds since the epoch; its offset; and its level, a boolean from
+#: the 32-bit word that is 1 for high and 0 for low.
+LINE_TIME_TYPE = "U64Type"
+LINE_OFFSET_TYPE = "U32Type"
+LINE_LEVEL_TYPE = "LineLevelType"
+
 #: The binary argument type a gateway node's command carries its data as,
 #: and the argument that says its length in bits.
 DATA_TYPE = "DataArg"
@@ -905,6 +912,53 @@ def _form_type(root, names, link):
     return name
 
 
+def _line_parameters(root, names, link):
+    """Adds the parameters a GPIO payload's lines are read as, where it reads
+    them for their levels: for each line, in the order its records come,
+    lowest offset first, the record's time, the line's offset, and its
+    level, named ``<source>_line<offset>`` -- what
+    ``tcspecial::node::payload::gpio``'s ``level_record`` writes.
+
+    Args:
+        root:  The wrapper's root.
+        names: The :class:`_Names` it holds.
+        link:  The :class:`Telemetry`, its form ``Lines``.
+
+    Returns:
+        The parameters' names, in the order the container holds them.
+
+    Raises:
+        ValueError: As :meth:`_Names.take`.
+    """
+    types = _one(root, "./x:TelemetryMetaData/x:ParameterTypeSet",
+                 "parameter type sets")
+    have = {kind.get("name") for kind in types}
+    for name, bits in ((LINE_TIME_TYPE, 64), (LINE_OFFSET_TYPE, 32)):
+        if name not in have:
+            names.take("parameter type", name, link.source)
+            kind = _child(types, "IntegerParameterType", name=name,
+                          signed="false")
+            _child(kind, "IntegerDataEncoding", sizeInBits=str(bits))
+    if LINE_LEVEL_TYPE not in have:
+        names.take("parameter type", LINE_LEVEL_TYPE, link.source)
+        _comment(types, "A GPIO line's level: its record's word, 1 high.")
+        kind = _child(types, "BooleanParameterType", name=LINE_LEVEL_TYPE,
+                      oneStringValue="high", zeroStringValue="low")
+        _child(kind, "IntegerDataEncoding", sizeInBits="32")
+    parameters = _one(root, "./x:TelemetryMetaData/x:ParameterSet",
+                      "parameter sets")
+    held = []
+    for offset in link.form.lines:
+        line = f"{link.name}_line{offset}"
+        for name, kind in ((f"{line}_time", LINE_TIME_TYPE),
+                           (f"{line}_offset", LINE_OFFSET_TYPE),
+                           (line, LINE_LEVEL_TYPE)):
+            names.take("parameter", name, link.source)
+            _child(parameters, "Parameter", name=name, parameterTypeRef=kind)
+            held.append(name)
+    return held
+
+
 def _downlink(root, names, copier, link):
     """Adds the container a source's data reaches the ground in.
 
@@ -922,7 +976,9 @@ def _downlink(root, names, copier, link):
     containers = _one(root, "./x:TelemetryMetaData/x:ContainerSet",
                       "container sets")
     names.take("container", link.container, link.source)
-    if link.document is None:
+    if link.document is None and link.form.kind == "Lines":
+        held = _line_parameters(root, names, link)
+    elif link.document is None:
         kind = _form_type(root, names, link)
         names.take("parameter", link.name, link.source)
         _child(_one(root, "./x:TelemetryMetaData/x:ParameterSet",

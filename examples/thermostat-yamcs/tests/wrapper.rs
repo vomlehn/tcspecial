@@ -5,14 +5,15 @@
 //! the configuration, gives each node drawn into the gateway node a
 //! parameter of the type the configuration says its data are: a value as a
 //! float in its unit, read from four bytes of a signed count of the unit's
-//! steps through a calibrator, and a decision as a boolean, read from the
-//! character `1` or `0`. Nothing but a run against Yamcs itself would show
+//! steps through a calibrator, a decision as a boolean, read from the
+//! character `1` or `0`, and a GPIO payload's lines read for their levels as
+//! each line's record, its level a boolean. Nothing but a run against Yamcs itself would show
 //! the wrapper and the vehicle disagreeing -- a byte order, a scale off by a
 //! thousand, a sign lost -- so this generates the wrapper, as
 //! `thermostat_yamcs.py` does, and works it as Yamcs would, with
 //! `yamcs_common`'s interpreter, on what the vehicle sends: each value made
-//! by `tcslibgs::node::vehicle::compute::value_bytes`, each decision its
-//! `DECISION_ON` or `DECISION_OFF`, framed by `tcslibgs::ccsds` under the
+//! by `tcslibgs::node::vehicle::compute::value_bytes`, each line's record as
+//! tcspecial writes it, framed by `tcslibgs::ccsds` under the
 //! APID `tcslibgs` counts for its source. And so for every unit there is, in
 //! copies of the example whose readings are in that unit.
 
@@ -21,9 +22,7 @@ use std::path::{Path, PathBuf};
 use tcslibgs::ccsds::HEADER_BYTES;
 use tcslibgs::graph::telemetry;
 use tcslibgs::graph::Graph;
-use tcslibgs::node::vehicle::compute::{
-    value_bytes, DECISION_OFF, DECISION_ON,
-};
+use tcslibgs::node::vehicle::compute::value_bytes;
 use tcslibgs::unit::Unit;
 use tcslibgs::{Beacon, ConfigDigest, ConfigVersion};
 
@@ -127,23 +126,50 @@ fn readings_and_the_vote_decode_as_temperatures() {
     }
 }
 
-/// The thermostat's decisions, framed under its APID, are on and off; what
-/// is neither is not read as either.
+/// One line's record, as `tcspecial` reports a line read for its level:
+/// the time, in microseconds since the epoch, then the line's offset and its
+/// level, each a 32-bit word, every number most significant byte first.
+///
+/// # Arguments
+///
+/// * `micros` - The time.
+/// * `offset` - The line's offset on its chip.
+/// * `level`  - 1 for high, 0 for low.
+///
+/// # Returns
+///
+/// The record's sixteen bytes.
+fn record(micros: u64, offset: u32, level: u32) -> Vec<u8> {
+    let mut record = micros.to_be_bytes().to_vec();
+    record.extend(offset.to_be_bytes());
+    record.extend(level.to_be_bytes());
+    assert_eq!(record.len(), tcslibgs::node::payload::gpio::EVENT_BYTES);
+    record
+}
+
+/// The lines sensing the heaters, framed under gpio-in-tmass's APID, a
+/// record for each in the order of their offsets, are each heater's level:
+/// on and off, with each record's time and line.
 #[test]
-fn the_thermostats_decisions_decode_as_on_and_off() {
+fn the_heaters_lines_decode_as_their_levels() {
     let path = here().join("thermostat-yamcs.xtcs");
     let xtce = generated_mdb(&path);
-    let apid = apid_of(&apids(&path), "thermostat");
-    for (said, read) in [
-        (vec![DECISION_ON], Ok(true)),
-        (vec![DECISION_OFF], Ok(false)),
-        (b"x".to_vec(), Err(b"x".to_vec())),
-    ] {
-        let packet = framed(apid, &said);
+    let apid = apid_of(&apids(&path), "gpio-in-tmass");
+    for (two, three) in [(1, 0), (0, 1), (1, 1), (0, 0)] {
+        let mut data = record(1_793_000_000_000_000, 2, two);
+        data.extend(record(1_793_000_000_000_001, 3, three));
+        let packet = framed(apid, &data);
         let decoded = decode(&xtce, &packet);
-        assert_eq!(decoded.container, "thermostatPacket");
-        assert_eq!(decoded.booleans["thermostat"], read);
+        assert_eq!(decoded.container, "gpio-in-tmassPacket");
         assert_eq!(decoded.end, Some(packet.len() * 8), "all of it is read");
+        assert_eq!(decoded.booleans["gpio-in-tmass_line2"], Ok(two == 1));
+        assert_eq!(decoded.booleans["gpio-in-tmass_line3"], Ok(three == 1));
+        assert_eq!(decoded.integers["gpio-in-tmass_line2_offset"], 2);
+        assert_eq!(decoded.integers["gpio-in-tmass_line3_offset"], 3);
+        assert_eq!(
+            decoded.integers["gpio-in-tmass_line3_time"],
+            1_793_000_000_000_001
+        );
     }
 }
 

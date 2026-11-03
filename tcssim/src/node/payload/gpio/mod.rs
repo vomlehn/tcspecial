@@ -146,6 +146,12 @@ pub fn run_gpio_node(
         watch_driven_lines(&config, &running, &stats, &lines);
         return;
     }
+    if let Some(world @ crate::physics::Attachment::Pulls { .. }) =
+        &config.attachment
+    {
+        pull_to_the_world(&config, world, &running, &stats, &lines);
+        return;
+    }
 
     // What each line is being pulled to, which is what moving it means.
     let mut high = false;
@@ -186,6 +192,69 @@ pub fn run_gpio_node(
         }
 
         wait_out_packet(&pacing, started, &running);
+    }
+}
+
+/// Pulls each line of a chip to what the world says it senses -- a line on a
+/// heater, high while the heater is heating -- rather than to a pattern.
+///
+/// Looked at every packet interval, which is how often this stand-in looks
+/// at the world, and a line is moved only when what it senses changes, so
+/// the vehicle, polling or watching for edges, reads what the part is doing
+/// within an interval of its doing it.
+/// While the payload is disabled in its panel its lines are left where they
+/// are, as a disabled stand-in sends nothing.
+///
+/// # Arguments
+///
+/// * `config`  - The payload's configuration.
+/// * `world`   - What its lines are pulled to: an `Attachment::Pulls`.
+/// * `running` - Cleared to stop it.
+/// * `stats`   - Where each move is counted.
+/// * `lines`   - The chip's lines, from [`lines_of`], in the node's order.
+fn pull_to_the_world(
+    config: &PayloadConfig,
+    world: &crate::physics::Attachment,
+    running: &AtomicBool,
+    stats: &std::sync::Mutex<PayloadStats>,
+    lines: &[SimulatedLine],
+) {
+    // Made here, before the loop, and reused: what each line is to be, and
+    // what it was last pulled to -- nothing yet, so the first look pulls
+    // every line.
+    let mut levels = vec![false; lines.len()];
+    let mut pulled: Vec<Option<bool>> = vec![None; lines.len()];
+    while running.load(Ordering::SeqCst) {
+        let started = Instant::now();
+        let pacing = Pacing::read(config);
+        if pacing.sending && world.levels(&mut levels) {
+            let mut moved = 0u64;
+            for ((line, &level), was) in
+                lines.iter().zip(&levels).zip(pulled.iter_mut())
+            {
+                if *was == Some(level) {
+                    continue;
+                }
+                let pull = if level { "pull-up" } else { "pull-down" };
+                match std::fs::write(&line.pull, pull) {
+                    Ok(()) => {
+                        moved += 1;
+                        *was = Some(level);
+                    }
+                    Err(e) => eprintln!(
+                        "{}: cannot move {}: {e}",
+                        config.name,
+                        line.pull.display()
+                    ),
+                }
+            }
+            if moved > 0 {
+                let mut guard = stats.lock().unwrap();
+                guard.bytes_sent += moved * EVENT_BYTES;
+                guard.a_packet_has_gone(b"pulled");
+            }
+        }
+        wait_out_packet(&pacing, started, running);
     }
 }
 

@@ -803,17 +803,24 @@ conversion of its own to kelvin – <code>temp1</code>,
 and scale – and the three meet at <code>ambient</code>, which takes
 their median, so that one sensor failing cannot take the zone’s
 temperature with it. <code>thermostat</code> holds that to a setpoint,
-293.15 K with a half band of 2 K, and drives two heaters,
-<code>heaters_1</code> and <code>heaters_2</code>, which go on and off
-together. The ground commands the setpoint, and
-<code>housekeeping</code> logs the readings and decisions in
-<code>/tmp/telemetry</code>.</p>
-<p>Every sensor and heater is the far end of a UDP socket on this host,
-ports 5201 to 5205, which tcssim stands in for: the example runs on any
-desk and touches no hardware. Aboard they would be on I2C, SPI and GPIO,
+293.15 K with a half band of 2 K, and drives two heaters, each through a
+GPIO line of its own, <code>gpio-out-tmass1</code> and
+<code>gpio-out-tmass2</code>, which go on and off together. Its decision
+is logged and not sent down: what the ground hears is
+<code>gpio-in-tmass</code>, two lines on the thermal mass sensing the
+heaters, read for their levels every second, so the ground sees what the
+heaters are doing rather than what they were told. The ground commands
+the setpoint, and <code>housekeeping</code> logs the readings, the
+decisions and the lines in <code>/tmp/telemetry</code>.</p>
+<p>The sensors are the far end of UDP sockets on this host, ports 5201
+to 5203, which tcssim stands in for. The heaters’ switches and the lines
+sensing them are lines 2 to 5 of the kernel’s simulated GPIO chip,
+<code>/dev/gpiochip1</code>, which tcssim moves and watches: make it
+once with <code>sudo bin/mk-kernel-stand-ins gpio</code> (see “Payloads
+the kernel stands in for”, below). The gpio example has lines 0 and 1 of
+it, so the two run at once. Aboard the sensors would be on I2C and SPI,
 as <code>tests/manual/thermostat.ytcs</code> has them; those buses are
-flown against stand-ins by <code>make stand-ins-test</code> and
-<code>make kernel-stand-ins-test</code>.</p>
+flown against stand-ins by <code>make stand-ins-test</code>.</p>
 <p>tcssim joins the stand-ins to the vehicle’s physics model,
 <code>thermostat-common/thermostat-physics.yaml</code>, which
 <code>thermostat-sim.yaml</code> names, as thermostat-yamcs’s simulator
@@ -822,43 +829,48 @@ joined to the zone under <code>connections</code>. All three sensors are
 joined to <code>zone.temperature</code>, each from a place of its own on
 the zone, so their readings agree and the vote produces a temperature.
 The zone cools towards its surroundings, which swing six kelvin either
-side of 283.15 K over a ninety minute orbit, and each heater’s stand-in
-is joined to <code>heater_1.on</code> or <code>heater_2.on</code>, so
-the heaters warm it while the vehicle has them on: the loop closes
-through tcspecial. The heaters are four watts each. Together they hold
+side of 283.15 K over a ninety minute orbit, and each heater’s switch’s
+stand-in is joined to <code>heater_1.on</code> or
+<code>heater_2.on</code>, so the heaters warm it while the vehicle has
+them on: the loop closes through tcspecial. <code>gpio-in-tmass</code>’s
+stand-in pulls its line 2 to <code>heater_1.heating</code> and its line
+3 to <code>heater_2.heating</code>, which are on only while each heater
+is really heating. The heaters are four watts each. Together they hold
 the band all round the orbit, the thermostat cycling them; one alone
 holds it only in the warm part, and for about a quarter of the orbit the
 zone falls more than two half bands below the setpoint, into the plot’s
 pale red.</p>
-<p>A heater whose panel in tcssim is not enabled is unpowered, or
-failed: it stays off whatever the thermostat decides, and enabled again
-it takes the latest decision at once. Nothing aboard changes, so the
-ground sees a disabled heater only through the temperature.</p>
+<p>A heater whose switch’s panel in tcssim is not enabled is unpowered,
+or failed: it stays off whatever the thermostat decides, and enabled
+again it takes the latest decision at once. The ground sees it on its
+line of <code>gpio-in-tmass</code>, which stays low, and in the
+temperature.</p>
 <pre><code>make run-thermostat</code></pre>
 <p>That runs tcsmoc on the example, as <code>run-simple</code> does, and
 tcsmoc opens its plot window beside its own: each sensor’s temperature
-and their vote over the last ten seconds, with the setpoint’s rule and
-the thermostat’s band, and its decision under them, one strip,
-<code>thermostat → heaters_1, heaters_2</code>. Press Connect in tcsmoc,
-and Enable on each payload in tcssim, to start the data and the heating;
-press Disable on a heater’s panel in tcssim to take it away, and watch
-the zone fall behind in the cold part of the orbit. The strip goes on
-showing the thermostat’s decision: the plot cannot see tcssim’s
-Enable.</p>
+and their vote over the last ten seconds, a dot at each reading, with
+the setpoint’s rule and the thermostat’s band, and under them a strip
+for each line of <code>gpio-in-tmass</code>,
+<code>gpio-in-tmass line 2</code> and <code>line 3</code>, on while its
+heater is heating. Press Connect in tcsmoc, and Enable on each payload
+in tcssim, to start the data and the heating; press Disable on a
+heater’s switch in tcssim to take it away, and its strip stays off while
+the zone falls behind in the cold part of the orbit.</p>
 <p>Languages:</p>
 <ul>
 <li>MOC: Rust – tcsmoc.</li>
 <li>Vehicle: Rust – tcspecial, whose conversions, vote, thermostat and
 log are its own nodes.</li>
 <li>Payload: Rust – tcssim stands in for the three sensors, with the
-zone they read, and for the two heaters.</li>
+zone they read, and for the heaters’ switches and the lines sensing
+them, on the kernel’s simulated GPIO chip.</li>
 </ul>
 <h3 id="thermostat-yamcs">thermostat-yamcs</h3>
 <p>The thermostat example with <a href="https://yamcs.org">Yamcs</a> at
 the ground end, as ping-yamcs is the ping example with it. The vehicle
 is the thermostat’s – the same sensors, conversions, vote, thermostat,
-heaters and log, which <code>tests/shared.rs</code> holds to the
-thermostat example’s, and the same physics model,
+heaters, GPIO lines and log, which <code>tests/shared.rs</code> holds to
+the thermostat example’s, and the same physics model,
 <code>thermostat-common/thermostat-physics.yaml</code> – and what
 differs is the configuration’s gateway, <code>yamcs</code>, so every
 packet to and from the ground carries a CCSDS primary header:</p>
@@ -892,14 +904,14 @@ packet to and from the ground carries a CCSDS primary header:</p>
 <td><code>apid_base</code> plus its device id, 0x400</td>
 </tr>
 <tr>
-<td><code>temp1</code>, <code>temp2</code>, <code>temp3</code></td>
+<td><code>gpio-in-tmass</code></td>
 <td>down</td>
-<td>0x405 to 0x407</td>
+<td>0x402</td>
 </tr>
 <tr>
-<td><code>thermostat</code></td>
+<td><code>temp1</code>, <code>temp2</code>, <code>temp3</code></td>
 <td>down</td>
-<td>0x40b</td>
+<td>0x406 to 0x408</td>
 </tr>
 </tbody>
 </table>
@@ -913,26 +925,28 @@ are, by <code>python/tcslibgs/form.py</code> – the Python spelling of
 window and the F´ bridge go by, and nothing a configuration does not
 already state: a conversion’s or a vote’s value is a float in its unit,
 with the unit in a <code>UnitSet</code>, read from its four bytes of a
-signed count of the unit’s steps through a calibrator, and a
-thermostat’s decision is a boolean read from its <code>1</code> or
-<code>0</code>. So Yamcs’s web interface, at <a
-href="http://localhost:17090" class="uri">http://localhost:17090</a>,
-shows <code>ambient</code> and <code>temp1</code> to <code>temp3</code>
-as temperatures in K and <code>thermostat</code> as true or false.</p>
+signed count of the unit’s steps through a calibrator, and lines read
+for their levels are a record for each line, its level a boolean. So
+Yamcs’s web interface, at <a href="http://localhost:17090"
+class="uri">http://localhost:17090</a>, shows <code>ambient</code> and
+<code>temp1</code> to <code>temp3</code> as temperatures in K and
+<code>gpio-in-tmass_line2</code> and <code>_line3</code> as true or
+false.</p>
 <p>It starts Yamcs, then tcssim – every payload sending from the start,
 as though its panel’s button had been pressed – and, once tcssim says it
 is ready, tcspecial, each with <code>--simulate=all</code>; has Yamcs
 send CONNECT until the vehicle answers with the configuration’s
 checksum; and reads the parameters back over Yamcs’s REST API. Its
 window shows the beacon panel above the thermostat’s: the zone’s
-temperature, each reading, the thermostat’s decision and the two heaters
-it drives. With <code>--seconds</code> there is no window: it prints
-every value each <code>--every</code> seconds, and a line each time the
-heaters are switched, and stops. tcssim draws a window of its own, so
-either wants a display. Every payload sending from the start includes
-the heaters, so both start enabled; press Disable on a heater’s panel in
-tcssim’s window to take it away, and the zone falls behind in the cold
-part of the orbit, which Yamcs sees only in the temperatures.</p>
+temperature, each reading, and each line sensing a heater, on or off.
+With <code>--seconds</code> there is no window: it prints every value
+each <code>--every</code> seconds, and a line each time a heater’s line
+changes, and stops. tcssim draws a window of its own, so either wants a
+display. Every payload sending from the start includes the heaters’
+switches, so both start enabled; press Disable on one in tcssim’s window
+to take its heater away, and its line goes low and stays low while the
+zone falls behind in the cold part of the orbit. Its GPIO lines are the
+thermostat example’s, so the two are not run at once.</p>
 <pre><code>make run-thermostat-yamcs YAMCS_HOME=~/yamcs-5.14.0   # the window
 python3 examples/thermostat-yamcs/thermostat_yamcs.py --yamcs ~/yamcs-5.14.0 \
     --seconds 120

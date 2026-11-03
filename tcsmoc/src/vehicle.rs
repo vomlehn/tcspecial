@@ -3265,21 +3265,21 @@ payloads:
             named,
             vec![
                 ("ambient".to_string(), 0),
-                ("temp1".to_string(), 5),
-                ("temp2".to_string(), 6),
-                ("temp3".to_string(), 7),
-                // The decision too, which the ground sees as well as the
-                // heaters.
-                ("thermostat".to_string(), 11),
+                // The lines sensing the heaters, which the ground sees in
+                // place of the thermostat's decision.
+                ("gpio-in-tmass".to_string(), 2),
+                ("temp1".to_string(), 6),
+                ("temp2".to_string(), 7),
+                ("temp3".to_string(), 8),
             ]
         );
-        // thermostat, device id 11, at ground_base plus that.
+        // temp3, device id 8, at ground_base plus that.
         assert!(
             panels[4].config.contains("to gateway"),
             "{}",
             panels[4].config
         );
-        assert!(panels[4].config.contains("5111"), "{}", panels[4].config);
+        assert!(panels[4].config.contains("5108"), "{}", panels[4].config);
     }
 
     /// The minimal example's sensor reports over payload_telemetry.

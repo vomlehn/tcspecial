@@ -1472,6 +1472,95 @@ pub enum Attached {
     /// It drives this input to what the vehicle sends it: a decision, or a
     /// value in the input's unit.
     Drives { at: At, kind: Kind },
+    /// It pulls each of a GPIO payload's lines, in the order its node names
+    /// them, to one of these decision outputs: a line sensing a heater,
+    /// pulled high while the heater is heating.
+    Pulls { at: Vec<At> },
+}
+
+/// The terminals a stand-in's `connects` names: one, or one for each line
+/// of a GPIO payload, separated by commas.
+///
+/// # Arguments
+///
+/// * `said` - What `connects` says.
+///
+/// # Returns
+///
+/// Each terminal as written, trimmed.
+fn terminals_of(said: &str) -> impl Iterator<Item = &str> {
+    said.split(',').map(str::trim)
+}
+
+/// What a stand-in is to the physics model, now that its node is known.
+///
+/// A GPIO payload that watches lines is the one stand-in with several
+/// places to be: each of its lines is pulled to a decision, in the order its
+/// node names the lines, so a line sensing a heater reads what the heater is
+/// doing. One terminal and one line is that too, so it is pulled rather than
+/// signalled. A list of terminals anywhere else, or a count that is not the
+/// lines', is refused: a line nothing pulls, or a decision no line reads,
+/// is a sensor wired to nothing.
+///
+/// # Arguments
+///
+/// * `payload`  - The payload's name, for the complaint.
+/// * `attached` - What [`SimConfig::attachment`] made of its `connects`.
+/// * `endpoint` - Its node's endpoint.
+///
+/// # Returns
+///
+/// What it is to the model.
+///
+/// # Errors
+///
+/// [`SimConfigError::BadAttachment`] for a list of terminals on a payload
+/// that is not lines being watched, or one whose count is not the lines'.
+fn lined(
+    payload: &str,
+    attached: Option<Attached>,
+    endpoint: &EndpointConfig,
+) -> Result<Option<Attached>, SimConfigError> {
+    let bad = |why: String| SimConfigError::BadAttachment {
+        payload: payload.to_string(),
+        why,
+    };
+    let watched = match endpoint {
+        EndpointConfig::Gpio(gpio) if !gpio.direction.is_output() => {
+            Some(gpio.lines.len())
+        }
+        _ => None,
+    };
+    match (attached, watched) {
+        (Some(Attached::Signals { at }), Some(_)) => {
+            lined(payload, Some(Attached::Pulls { at: vec![at] }), endpoint)
+        }
+        (Some(Attached::Pulls { at }), Some(lines)) => {
+            if at.len() != lines {
+                return Err(bad(format!(
+                    "connects names {} terminals and the node watches {lines} \
+                     lines: name one decision for each line, in the order \
+                     the node's lines are",
+                    at.len()
+                )));
+            }
+            Ok(Some(Attached::Pulls { at }))
+        }
+        (Some(Attached::Pulls { .. }), None) => Err(bad(
+            "connects names several terminals, which only a GPIO payload \
+             watching lines may, one for each line: name one terminal"
+                .to_string(),
+        )),
+        (
+            Some(Attached::Reports { at, .. } | Attached::Drives { at, .. }),
+            Some(_),
+        ) => Err(bad(format!(
+            "a GPIO payload's watched lines are pulled to decisions, and \
+                 {at} is not a decision output: connect each line to one, \
+                 such as heater_1.heating"
+        ))),
+        (attached, _) => Ok(attached),
+    }
 }
 
 /// What a sensor gets wrong, as a datasheet would say it, in the unit of
@@ -1735,35 +1824,38 @@ impl SimConfigFile {
             let Some(said) = settings.connects.as_deref() else {
                 continue;
             };
-            let Ok(at) = At::parse("connects", said) else {
-                continue;
-            };
-            let Ok((place, terminal)) = model.find(&at) else {
-                continue;
-            };
-            joined.insert(place.component);
-            if terminal.direction != Direction::In {
-                continue;
-            }
-            if let Some(other) = driven.insert(place, payload.name.clone()) {
-                return Err(bad(
-                    &at.component,
-                    format!(
-                        "{other} and {} both drive {at}, and an input is \
+            for said in terminals_of(said) {
+                let Ok(at) = At::parse("connects", said) else {
+                    continue;
+                };
+                let Ok((place, terminal)) = model.find(&at) else {
+                    continue;
+                };
+                joined.insert(place.component);
+                if terminal.direction != Direction::In {
+                    continue;
+                }
+                if let Some(other) = driven.insert(place, payload.name.clone())
+                {
+                    return Err(bad(
+                        &at.component,
+                        format!(
+                            "{other} and {} both drive {at}, and an input is \
                          driven by one",
-                        payload.name
-                    ),
-                ));
-            }
-            if model.connections.iter().any(|c| c.to == place) {
-                return Err(bad(
-                    &at.component,
-                    format!(
+                            payload.name
+                        ),
+                    ));
+                }
+                if model.connections.iter().any(|c| c.to == place) {
+                    return Err(bad(
+                        &at.component,
+                        format!(
                         "{} drives {at}, which a connection joins too, and an \
                          input is driven by one",
                         payload.name
                     ),
-                ));
+                    ));
+                }
             }
         }
         for connection in &model.connections {
@@ -1954,6 +2046,35 @@ impl SimConfigFile {
                  it to be in: name one with physics: <name>-physics.yaml"
             )));
         };
+        // Several terminals, one for each of a GPIO payload's lines, each a
+        // decision the line is pulled to: whether the payload has that many
+        // lines is `lined`'s question, which knows its node.
+        let listed: Vec<&str> = terminals_of(said).collect();
+        if listed.len() > 1 {
+            if let Some((what, _)) = errors.iter().find(|(_, s)| s.is_some()) {
+                return Err(bad(format!(
+                    "{what} says what a sensor gets wrong about a value, and \
+                     connects: {said} names lines' decisions, which are on or \
+                     off"
+                )));
+            }
+            let mut at = Vec::with_capacity(listed.len());
+            for said in listed {
+                let one = At::parse("connects", said).map_err(bad)?;
+                let (_, terminal) = model.find(&one).map_err(bad)?;
+                if (terminal.direction, terminal.kind)
+                    != (Direction::Out, Kind::Decision)
+                {
+                    return Err(bad(format!(
+                        "connects names a terminal for each line, and each \
+                         line is pulled to a decision: {one} is not a \
+                         decision output -- name one such as heater_1.heating"
+                    )));
+                }
+                at.push(one);
+            }
+            return Ok(Some(Attached::Pulls { at }));
+        }
         let at = At::parse("connects", said).map_err(bad)?;
         let (_, terminal) = model.find(&at).map_err(bad)?;
 
@@ -2348,6 +2469,7 @@ impl SimConfigFile {
                 }
                 Some(Err(_)) => None,
             };
+            let attached = lined(&payload.name, attached, &dh.endpoint)?;
 
             Ok(ResolvedSim {
                 attached,
@@ -4391,6 +4513,55 @@ connections:
             })
         );
         assert!(file.physics().unwrap().is_some());
+    }
+
+    /// A GPIO payload watching lines is pulled to a decision for each line,
+    /// one terminal a line; a count that is not the lines', or a list of
+    /// terminals on anything else, is refused, and one terminal on one line
+    /// is a pull too.
+    #[test]
+    fn gpio_lines_are_pulled_one_terminal_a_line() {
+        use crate::node::payload::gpio::Direction;
+        let at = |said: &str| At::parse("connects", said).expect("a terminal");
+        let gpio = |lines: Vec<u32>| {
+            EndpointConfig::Gpio(crate::GpioConfig {
+                path: "/dev/gpiochip1".to_string(),
+                lines,
+                direction: Direction::Input,
+                edge: crate::LineEdge::None,
+                bias: crate::Bias::None,
+                debounce: None,
+                state_interval: Some(Duration::from_secs(1)),
+            })
+        };
+        let two = Attached::Pulls {
+            at: vec![at("heater_1.heating"), at("heater_2.heating")],
+        };
+        assert!(matches!(
+            lined("p", Some(two.clone()), &gpio(vec![2, 3])),
+            Ok(Some(Attached::Pulls { at })) if at.len() == 2
+        ));
+        let why = lined("p", Some(two.clone()), &gpio(vec![2]))
+            .expect_err("two terminals and one line");
+        assert!(why.to_string().contains("2 terminals"), "{why}");
+        let why = lined(
+            "p",
+            Some(two),
+            &EndpointConfig::Network(crate::NetworkConfig {
+                protocol: crate::NetworkProtocol::Udp,
+                address: "127.0.0.1".to_string(),
+                port: 5204,
+            }),
+        )
+        .expect_err("a list off a GPIO payload");
+        assert!(why.to_string().contains("only a GPIO payload"), "{why}");
+        let one = Attached::Signals {
+            at: at("heater_1.heating"),
+        };
+        assert!(matches!(
+            lined("p", Some(one), &gpio(vec![2])),
+            Ok(Some(Attached::Pulls { at })) if at.len() == 1
+        ));
     }
 
     /// A connection that names nothing, or a terminal no stand-in can be

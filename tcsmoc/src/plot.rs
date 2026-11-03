@@ -6,7 +6,10 @@
 //! conversion, a vote, a program's answer -- read by the rule the vehicle
 //! writes it by, `tcslibgs::node::vehicle::compute::from_value`, in that
 //! unit. A switch is a node that sends decisions, a `hysteresis`, read by
-//! `from_decision`. Nothing is guessed from a datum's width.
+//! `from_decision`; or one line of a GPIO payload that watches lines, read
+//! from the records its node sends -- a line sensing a heater is the
+//! heater's real state, where a thermostat's decision is what it was told.
+//! Nothing is guessed from a datum's width.
 //!
 //! Values in one unit share a panel, so that two temperatures are read off
 //! one axis and a voltage is never read off a current's. Each panel is
@@ -66,6 +69,7 @@ use slint::{
 };
 use tcslibgs::graph::units::{input_unit, unit_of};
 use tcslibgs::graph::Graph;
+use tcslibgs::node::payload::gpio::EVENT_BYTES;
 use tcslibgs::node::vehicle::compute::{
     from_decision, from_value, params_of, Computation,
 };
@@ -335,6 +339,21 @@ pub enum Plotted {
     Trace(usize, Unit),
     /// A switch's decision: the place in [`Plot::switches`].
     Switch(usize),
+    /// A GPIO payload's lines: the place in [`Plot::line_sets`].
+    Lines(usize),
+}
+
+/// A GPIO payload whose lines reach the ground, each line a switch: a line
+/// sensing a heater is the heater's real state.
+#[derive(Debug)]
+struct LineSet {
+    name: String,
+    /// The place in [`Plot::switches`] of its first line's strip; the rest
+    /// follow it, in its node's order.
+    first: usize,
+    /// Its lines' offsets on the chip, in its node's order, which is how a
+    /// record says which line it is of.
+    offsets: Vec<u32>,
 }
 
 /// Everything the plot shows, kept by the threads that receive it and drawn
@@ -344,6 +363,7 @@ pub struct Plot {
     traces: Vec<Trace>,
     panels: Vec<Panel>,
     switches: Vec<Switch>,
+    line_sets: Vec<LineSet>,
     /// When the first reading arrived: the left edge, until the span has
     /// filled, and always for the whole run.
     started: Option<Instant>,
@@ -369,6 +389,7 @@ impl Plot {
         let mut traces = Vec::new();
         let mut panels: Vec<Panel> = Vec::new();
         let mut switches = Vec::new();
+        let mut line_sets = Vec::new();
         let mut thermostats: Vec<(Unit, Band)> = Vec::new();
         // By name, the one order a configuration has: the panels, traces
         // and switches are drawn in it.
@@ -376,10 +397,18 @@ impl Plot {
             graph.nodes.iter().collect();
         nodes.sort_by(|a, b| a.name.cmp(&b.name));
         for node in nodes {
-            if !reaches(&node.name) {
+            // A thermostat's setpoint and band are drawn behind the values
+            // it reads whether or not its decision reaches the ground, being
+            // what those values are held to; its strip is drawn only where
+            // the decision does.
+            let reaching = reaches(&node.name);
+            if !reaching && node.node_type != "compute" {
                 continue;
             }
             if let Some(unit) = unit_of(graph, &node.name) {
+                if !reaching {
+                    continue;
+                }
                 let panel = match panels.iter().position(|p| p.unit == unit) {
                     Some(panel) => panel,
                     None => {
@@ -401,6 +430,31 @@ impl Plot {
                 });
                 continue;
             }
+            // A GPIO payload's watched lines, each a switch whose state is
+            // the line's: what a line sensing a heater says the heater is
+            // doing. A node whose reach does not settle is refused before the
+            // window opens.
+            if let Ok(tcslibgs::graph::reach::Reach {
+                endpoint: tcslibgs::EndpointConfig::Gpio(gpio),
+                ..
+            }) = tcslibgs::graph::reach::reach_of(node)
+            {
+                if !gpio.direction.is_output() {
+                    line_sets.push(LineSet {
+                        name: node.name.clone(),
+                        first: switches.len(),
+                        offsets: gpio.lines.clone(),
+                    });
+                    for offset in &gpio.lines {
+                        switches.push(Switch {
+                            name: format!("{} line {offset}", node.name),
+                            drives: Vec::new(),
+                            changes: VecDeque::with_capacity(CHANGES),
+                        });
+                    }
+                }
+                continue;
+            }
             if node.node_type != "compute" {
                 continue;
             }
@@ -418,6 +472,9 @@ impl Plot {
                             half: params.half_band,
                         },
                     ));
+                }
+                if !reaching {
+                    continue;
                 }
                 switches.push(Switch {
                     name: node.name.clone(),
@@ -443,6 +500,7 @@ impl Plot {
             traces,
             panels,
             switches,
+            line_sets,
             started: None,
             span: Span::TenSeconds,
         })
@@ -461,10 +519,33 @@ impl Plot {
         if let Some(i) = self.traces.iter().position(|t| t.name == source) {
             return Some(Plotted::Trace(i, self.traces[i].unit));
         }
+        if let Some(k) = self.line_sets.iter().position(|l| l.name == source) {
+            return Some(Plotted::Lines(k));
+        }
         self.switches
             .iter()
             .position(|s| s.name == source)
             .map(Plotted::Switch)
+    }
+
+    /// Keeps what a GPIO payload says one of its lines is, where it is a
+    /// change. Allocates nothing.
+    ///
+    /// # Arguments
+    ///
+    /// * `set`    - Its place in the plot's line sets.
+    /// * `offset` - The line's offset on the chip, as its record says it.
+    /// * `at`     - When it arrived.
+    /// * `on`     - Whether the line is high.
+    pub fn line(&mut self, set: usize, offset: u32, at: Instant, on: bool) {
+        let Some(set) = self.line_sets.get(set) else {
+            return;
+        };
+        // A record of a line the node does not name is the vehicle's
+        // mistake, and is not drawn as one it does.
+        if let Some(n) = set.offsets.iter().position(|&o| o == offset) {
+            self.decision(set.first + n, at, on);
+        }
     }
 
     /// Keeps a value's reading. Allocates nothing: the oldest recent
@@ -1189,6 +1270,29 @@ pub fn take(plot: &Mutex<Plot>, plotted: Plotted, data: &[u8], at: Instant) {
                 plot.decision(i, at, on);
             }
         }
+        // One record for each line reported, each the time, the line's
+        // offset and what it is, as `tcslibgs::node::payload::gpio` lays
+        // them out; a datum that is not whole records is not plotted.
+        Plotted::Lines(k) => {
+            let (records, rest) = data.as_chunks::<EVENT_BYTES>();
+            if records.is_empty() || !rest.is_empty() {
+                return;
+            }
+            let Ok(mut plot) = plot.lock() else {
+                return;
+            };
+            for record in records {
+                let word = |at: usize| {
+                    u32::from_be_bytes([
+                        record[at],
+                        record[at + 1],
+                        record[at + 2],
+                        record[at + 3],
+                    ])
+                };
+                plot.line(k, word(8), at, word(12) != 0);
+            }
+        }
     }
 }
 
@@ -1405,18 +1509,39 @@ pub(crate) mod tests {
             .expect("the example reads")
     }
 
-    /// The thermostat example's three conversions and their vote are traced,
-    /// in one panel in kelvin with the thermostat's setpoint; the thermostat
-    /// is one switch driving both heaters; and a sensor's own counts are not
+    /// What reaches the ground in a configuration: the sources of its links
+    /// to the ground, as tcsmoc asks.
+    ///
+    /// # Arguments
+    ///
+    /// * `graph` - The configuration.
+    ///
+    /// # Returns
+    ///
+    /// Whether a node's data reaches the ground.
+    fn reaching(graph: &Graph) -> impl Fn(&str) -> bool {
+        let sources: Vec<String> = tcslibgs::graph::telemetry::of(graph)
+            .expect("its links to the ground")
+            .into_iter()
+            .map(|link| link.source)
+            .collect();
+        move |name| sources.iter().any(|source| source == name)
+    }
+
+    /// The thermostat example's three sensors and their vote are traced, in
+    /// one panel in kelvin, with the thermostat's setpoint, though its
+    /// decision does not reach the ground; what does is the lines sensing
+    /// the two heaters, each a strip; and a sensor's own counts are not
     /// plotted.
     #[test]
-    fn the_thermostat_example_plots_its_temperatures_and_a_switch() {
-        let plot = Plot::of(&example("thermostat"), |_| true).expect("a plot");
+    fn the_thermostat_example_plots_its_temperatures_and_its_heaters() {
+        let graph = example("thermostat");
+        let plot = Plot::of(&graph, reaching(&graph)).expect("a plot");
         let (panels, switches) = plot.layout();
         assert_eq!(panels.len(), 1);
         assert_eq!(panels[0].0, Unit::Kelvin);
         assert_eq!(panels[0].1.len(), 4);
-        assert_eq!(switches, 1);
+        assert_eq!(switches, 2);
         assert_eq!(plot.panels[0].setpoints, vec![293.15]);
         assert_eq!(
             plot.plotted("ambient"),
@@ -1426,18 +1551,50 @@ pub(crate) mod tests {
             plot.plotted("temp2"),
             Some(Plotted::Trace(2, Unit::Kelvin))
         );
-        assert_eq!(plot.plotted("thermostat"), Some(Plotted::Switch(0)));
+        assert_eq!(plot.plotted("gpio-in-tmass"), Some(Plotted::Lines(0)));
+        assert_eq!(plot.plotted("thermostat"), None);
         assert_eq!(plot.plotted("temp_1"), None);
 
         let mut drawn = Drawn::default();
         plot.draw(Instant::now(), 100.0, 60.0, &mut drawn);
         assert_eq!(drawn.said, "Nothing heard yet");
-        assert_eq!(
-            drawn.switches[0].label,
-            "thermostat \u{2192} heaters_1, heaters_2"
-        );
-        assert_eq!(drawn.switches[0].on, None, "nothing heard yet");
+        let labels: Vec<&str> =
+            drawn.switches.iter().map(|s| s.label.as_str()).collect();
+        assert_eq!(labels, ["gpio-in-tmass line 2", "gpio-in-tmass line 3"]);
+        assert!(drawn.switches.iter().all(|s| s.on.is_none()));
         assert!(drawn.panels[0].paths.iter().all(String::is_empty));
+    }
+
+    /// A GPIO payload's records, one for each line, each set that line's
+    /// strip; a record of a line the node does not name, or a datum that is
+    /// not whole records, changes nothing.
+    #[test]
+    fn each_lines_record_sets_its_strip() {
+        let graph = example("thermostat");
+        let plot = Mutex::new(Plot::of(&graph, reaching(&graph)).unwrap());
+        let record = |line: u32, on: u32| {
+            let mut record = [0u8; EVENT_BYTES];
+            record[8..12].copy_from_slice(&line.to_be_bytes());
+            record[12..].copy_from_slice(&on.to_be_bytes());
+            record
+        };
+        let t0 = Instant::now();
+        plot.lock().unwrap().reading(0, t0, 293.0);
+        let mut both = record(2, 1).to_vec();
+        both.extend(record(3, 0));
+        take(&plot, Plotted::Lines(0), &both, t0);
+        take(&plot, Plotted::Lines(0), &record(7, 1), t0);
+        take(&plot, Plotted::Lines(0), &both[..20], t0);
+        let mut drawn = Drawn::default();
+        plot.lock().unwrap().draw(
+            t0 + Duration::from_secs(1),
+            100.0,
+            60.0,
+            &mut drawn,
+        );
+        let states: Vec<Option<bool>> =
+            drawn.switches.iter().map(|s| s.on).collect();
+        assert_eq!(states, [Some(true), Some(false)]);
     }
 
     /// The descent example's values are in three units, so three panels,
@@ -1754,7 +1911,7 @@ pub(crate) mod tests {
         });
         graph.links.push(Link {
             from: "thermostat_low".to_string(),
-            to: Destinations::of(vec!["heaters_2".to_string()]),
+            to: Destinations::of(vec!["gpio-out-tmass2".to_string()]),
             comment: None,
         });
         let plot = Plot::of(&graph, |_| true).expect("a plot");
@@ -1767,8 +1924,10 @@ pub(crate) mod tests {
         assert_eq!(
             labels,
             vec![
-                "thermostat \u{2192} heaters_1, heaters_2",
-                "thermostat_low \u{2192} heaters_2",
+                "gpio-in-tmass line 2",
+                "gpio-in-tmass line 3",
+                "thermostat \u{2192} gpio-out-tmass1, gpio-out-tmass2",
+                "thermostat_low \u{2192} gpio-out-tmass2",
             ]
         );
     }

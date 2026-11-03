@@ -5429,13 +5429,13 @@ above it, is a strip for each switch -- a ``hysteresis`` node drawn into a
 gateway node, named with what it drives, such as ``thermostat →
 gpio-out-tmass1, gpio-out-tmass2``; and each line of a GPIO payload drawn into
 one that watches lines, named with its line, such as ``gpio-in-tmass line 2``
-in the thermostat example, whose lines sense its heaters -- vermillion with
+in the thermostat example, whose lines sense its heaters -- green with
 ``on`` written in it while it is on or high, grey while it is off or low, and
 its last state said beside it. With two thermostats each
 driving a heater there are two strips, one under the other, so which heater
 is on, or both, is read straight off them. Nothing of a switch is
-drawn on the panels, which keeps a switch on from being taken for the band's
-pale red. A thermostat tells the ground only when its decision changes, so a
+drawn on the panels, which keeps the strips apart from the values and the
+band. A thermostat tells the ground only when its decision changes, so a
 switch is drawn from each change to the next, and before the first is heard
 it is not drawn at all, its state said as ``not heard`` rather than guessed
 as off.
@@ -5445,8 +5445,8 @@ heater is what it does, and its strip stays off; which is why the thermostat
 example sends its heaters' lines down rather than its thermostat's decision.
 
 The colours are Okabe and Ito's, which readers with each common kind of colour
-blindness tell apart: blue, bluish green, reddish purple, sky blue and black
-for the values, and vermillion, which no value uses, for a switch on. The
+blindness tell apart: blue, vermillion, reddish purple, sky blue and black
+for the values, and bluish green, which no value uses, for a switch on. The
 band's yellow and red are their yellow and vermillion paled toward white,
 light enough that every line keeps its contrast against them. None is alone:
 the legend names each value beside its colour with its latest reading, the

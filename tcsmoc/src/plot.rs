@@ -52,10 +52,10 @@
 //! yellow and pale red readers with red-green colour blindness can confuse,
 //! so each region is said in words on the panel -- "high", "too high",
 //! "low", "too low" -- each edge is a line, and the legend names the band's
-//! edges and its thermostat. The red is told from a switch on by more than
-//! its shade: a switch is drawn only on its own strip under the panels, in
-//! full vermillion with "on" written in it, and nothing of a switch is drawn
-//! on a panel.
+//! edges and its thermostat. A switch on is green, the colour people read
+//! as on, and never by its shade alone: a switch is drawn only on its own
+//! strip under the panels, in full bluish green with "on" written in it, and
+//! nothing of a switch is drawn on a panel.
 
 use std::collections::VecDeque;
 use std::fmt::Write as _;
@@ -151,11 +151,11 @@ const HISTORY: usize = 4096;
 const CHANGES: usize = 1024;
 
 /// The traces' colours, in the order values are listed: Okabe and Ito's
-/// blue, bluish green, reddish purple, sky blue and black. Their orange and
-/// vermillion are kept for the switches, so a trace is never the colour of a
-/// switch on, and their yellow is left out, being too pale to read on white.
+/// blue, vermillion, reddish purple, sky blue and black. Their bluish green
+/// is kept for the switches, so a trace is never the colour of a switch on;
+/// their orange and yellow are left out, being too pale to read on white.
 pub const TRACE_COLOURS: [u32; 5] =
-    [0x0072B2, 0x009E73, 0xCC79A7, 0x56B4E9, 0x000000];
+    [0x0072B2, 0xD55E00, 0xCC79A7, 0x56B4E9, 0x000000];
 
 /// One reading kept for the whole run.
 #[derive(Debug, Clone, Copy)]

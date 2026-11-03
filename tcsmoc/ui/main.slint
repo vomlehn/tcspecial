@@ -1111,18 +1111,17 @@ export struct SwitchShown {
 // The colours are Okabe and Ito's, told apart with each common kind of
 // colour blindness, and never alone: each trace is named in its panel's
 // legend with its latest reading, each switch's state is said in words, and
-// a setpoint's rule is labelled. Vermillion is the switches' alone, so that
-// no value is the colour of a switch on.
+// a setpoint's rule is labelled. Bluish green, the colour people read as
+// on, is the switches' alone, so that no value is the colour of a switch on.
 //
 // A thermostat's band is drawn behind its panel's traces in their yellow and
 // vermillion paled toward white -- 25% of #F0E442 and 15% of #D55E00 -- so
 // pale that every trace keeps most of the contrast it has on white. A pale
 // yellow and a pale red can look alike to a reader with red-green colour
 // blindness, so each region is said in words at the panel's left, each edge
-// is a line, and the legend names the band. The pale red is never mistaken
-// for a switch on: a switch is drawn on its own strip under the panels, in
-// full vermillion with "on" written in it, and nothing of a switch is drawn
-// on a panel.
+// is a line, and the legend names the band. A switch is drawn on its own
+// strip under the panels, in full bluish green with "on" written in it, and
+// nothing of a switch is drawn on a panel.
 export component PlotWindow inherits Window {
     default-font-size: Fonts.window;
     title: "tcsmoc: plot";
@@ -1149,7 +1148,7 @@ export component PlotWindow inherits Window {
         (area.height - (root.panels.length - 1) * root.gap)
             / max(1, root.panels.length);
 
-    property <color> switch-on: #D55E00;
+    property <color> switch-on: #009E73;
     property <color> switch-off: #D4D8DD;
     // Okabe and Ito's yellow and vermillion, paled toward white.
     property <color> band-near: #FBF8D0;
@@ -1399,7 +1398,7 @@ export component PlotWindow inherits Window {
         // change lines up with the values above it: one strip a switch,
         // labelled with what it drives, so that with two heaters on two
         // thermostats, which is on, or both, is read straight off them. Full
-        // vermillion with "on" written in it while on, which no trace and
+        // bluish green with "on" written in it while on, which no trace and
         // neither band tint is.
         for switch in root.switches: HorizontalLayout {
             spacing: root.gap;
@@ -1425,7 +1424,7 @@ export component PlotWindow inherits Window {
                         height: parent.height;
                         background: span.on ? root.switch-on
                                             : root.switch-off;
-                        // Black on vermillion, 5.4 to 1; left out where
+                        // Black on bluish green, 6.1 to 1; left out where
                         // the span is too narrow to hold it.
                         Text {
                             x: 4px;

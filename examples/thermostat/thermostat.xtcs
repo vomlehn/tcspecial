@@ -81,7 +81,7 @@
     </payloads>
     <tcsgui>
         <nodes>
-            <node name="../thermostat-common/thermostat" x="242" y="166"/>
+            <node name="../thermostat-common/thermostat" x="563" y="374"/>
             <node name="gateway" x="790" y="34"/>
             <node name="temp_1" x="34" y="34"/>
             <node name="temp_2" x="34" y="166"/>

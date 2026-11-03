@@ -500,10 +500,24 @@ pub fn compare(first: &Path, second: &Path, report: &mut Report) {
 
     let mut differences = Vec::new();
     differences_between(&one, &two, &mut Vec::new(), &mut differences);
-    let text = std::fs::read_to_string(second).unwrap_or_default();
+    // Every file of the second, for a difference to be reported in the one
+    // that says the thing: a configuration that includes others has most of
+    // what it says in them.
+    let (files, homes) = match tcslibgs::graph::Graph::load(second) {
+        Ok(graph) => (graph.files, graph.homes),
+        Err(_) => (vec![second.to_path_buf()], Default::default()),
+    };
+    let files: Vec<(PathBuf, String)> = files
+        .into_iter()
+        .map(|file| {
+            let text = std::fs::read_to_string(&file).unwrap_or_default();
+            (file, text)
+        })
+        .collect();
     let (first_name, second_name) = (first.display(), second.display());
     for (path, said) in differences {
-        let line = line_of_path(&text, &path);
+        let (file, line) = where_written(&files, &homes, &path)
+            .unwrap_or((second.to_path_buf(), THE_FILE_ITSELF));
         let message = match said {
             Said::Both(a, b) => format!(
                 "{}: {first_name} says {a} and {second_name} says {b}",
@@ -526,8 +540,48 @@ pub fn compare(first: &Path, second: &Path, report: &mut Report) {
                 path.join(" / ")
             ),
         };
-        report.add(second, line, message);
+        report.add(&file, line, message);
     }
+}
+
+/// Finds the file and line a difference is written at, among a
+/// configuration's files.
+///
+/// A node's, and a link's, in the file the node is written in; anything
+/// else in the first file that writes it. See [`line_of_path`].
+///
+/// # Arguments
+///
+/// * `files` - Each file of the configuration, the top one first, with its
+///             text.
+/// * `homes` - The file each node is written in, by name.
+/// * `path`  - The path to the thing, as [`differences_between`] gives it.
+///
+/// # Returns
+///
+/// The file and the line, from 1; `None` where no file writes it.
+fn where_written(
+    files: &[(PathBuf, String)],
+    homes: &std::collections::BTreeMap<String, PathBuf>,
+    path: &[String],
+) -> Option<(PathBuf, usize)> {
+    // The node a path about a node or a link is about, which is the first
+    // thing a file writes of it: by that, the file is the one it is in.
+    let node = match path.first().map(String::as_str) {
+        Some("nodes" | "links") => path
+            .get(1)
+            .map(|name| name.split('.').next().unwrap_or(name).to_string()),
+        _ => None,
+    };
+    let found = |(file, text): &(PathBuf, String)| {
+        let line = line_of_path(text, path);
+        (line != THE_FILE_ITSELF).then(|| (file.clone(), line))
+    };
+    let home = node.and_then(|node| homes.get(&node));
+    if let Some(home) = files.iter().find(|(file, _)| Some(file) == home) {
+        return found(home).or(Some((home.0.clone(), THE_FILE_ITSELF)));
+    }
+    files.iter().find_map(found)
 }
 
 /// What two files say about one thing they differ on.

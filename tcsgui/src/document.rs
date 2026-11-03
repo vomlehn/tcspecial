@@ -1129,10 +1129,13 @@ impl Document {
         }
         // And the simulator's entry for it, where there is one: the two files
         // are joined by name, so a name changed in one of them has to change
-        // in the other or the pair stops being a pair. See `crate::sim`.
+        // in the other or the pair stops being a pair. By the node's own
+        // name, which is how the simulator's file keys it wherever the node
+        // is drawn. See `crate::sim::Simulator::key_of`.
         if let Some(simulator) = &mut self.simulator {
-            if let Some(settings) = simulator.payloads.remove(&was) {
-                simulator.payloads.insert(whole.clone(), settings);
+            let key = crate::sim::Simulator::key_of(&was);
+            if let Some(settings) = simulator.payloads.remove(&key) {
+                simulator.payloads.insert(now.to_string(), settings);
             }
         }
     }
@@ -1543,10 +1546,14 @@ impl Document {
                 // the configuration by the payload's name and by nothing
                 // else: a rename that left its entry behind would leave a set
                 // of settings naming a payload that is not there, which the
-                // next session refuses the file for. See `crate::sim`.
+                // next session refuses the file for. By the node's own name,
+                // as the file keys it: see `crate::sim::Simulator::key_of`.
                 if let Some(simulator) = &mut self.simulator {
-                    if let Some(settings) = simulator.payloads.remove(was) {
-                        simulator.payloads.insert(now.clone(), settings);
+                    let key_of = crate::sim::Simulator::key_of;
+                    if let Some(settings) =
+                        simulator.payloads.remove(&key_of(was))
+                    {
+                        simulator.payloads.insert(key_of(now), settings);
                     }
                 }
             }
@@ -5228,6 +5235,34 @@ mod tests {
         });
         assert_eq!(document.sharing_a_name(), vec![0, 3]);
         assert_eq!(document.spare_name(3), "i2c-3");
+    }
+
+    /// A node in a subdiagram renamed by position takes its simulated
+    /// settings with it, held under its own name before and after: the
+    /// simulator's file names a payload so wherever it is drawn.
+    #[test]
+    fn a_payload_in_a_subdiagram_renamed_by_position_keeps_its_settings() {
+        let mut document = Document::new();
+        let home = Some("zone".to_string());
+        document.apply(&Edit::AddNode {
+            name: "temp_1".to_string(),
+            node_type: "i2c".to_string(),
+            home: home.clone(),
+        });
+        document.simulator = Some(crate::sim::Simulator::new(
+            std::path::Path::new("vehiclesim.yaml"),
+        ));
+        document.apply(&Edit::SetSimPayload {
+            payload: crate::sim::Simulator::key_of("zone/temp_1"),
+            setting: "packet_interval".to_string(),
+            was: None,
+            now: Some("1 s".to_string()),
+        });
+
+        document.rename_at(0, "temp_2");
+        let payloads = &document.simulator.as_ref().expect("one").payloads;
+        assert_eq!(payloads.keys().collect::<Vec<_>>(), vec!["temp_2"]);
+        assert_eq!(payloads["temp_2"]["packet_interval"], "1 s");
     }
 
     /// Two pages may each hold a node of the same name, which is not a

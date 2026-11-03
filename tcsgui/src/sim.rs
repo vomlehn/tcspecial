@@ -211,6 +211,29 @@ impl Simulator {
         }
     }
 
+    /// The name a node's simulated settings are held under, from the name
+    /// the editor holds the node under.
+    ///
+    /// The node's own name, without the subdiagram it is drawn in: the file
+    /// joins a simulated payload to its payload by that name alone, as
+    /// tcssim does, and the reader allows no two nodes one name across every
+    /// file of a configuration. So a payload in an included file is
+    /// `gpio-in-tmass` here, never `../thermostat-common/thermostat/
+    /// gpio-in-tmass`, and the settings are held exactly as the file keys
+    /// them.
+    ///
+    /// # Arguments
+    ///
+    /// * `held` - The node's name as the editor holds it, qualified by its
+    ///            subdiagram or not.
+    ///
+    /// # Returns
+    ///
+    /// The key into [`Simulator::payloads`].
+    pub fn key_of(held: &str) -> String {
+        crate::Qualified::parse(held).written()
+    }
+
     /// What a payload or a group may be asked, for a window to show.
     ///
     /// The settings list, and for a payload the group it takes its settings

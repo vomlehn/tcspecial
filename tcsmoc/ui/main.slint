@@ -1111,8 +1111,9 @@ export struct SwitchShown {
 // The colours are Okabe and Ito's, told apart with each common kind of
 // colour blindness, and never alone: each trace is named in its panel's
 // legend with its latest reading, each switch's state is said in words, and
-// a setpoint's rule is labelled. Bluish green, the colour people read as
-// on, is the switches' alone, so that no value is the colour of a switch on.
+// a setpoint's rule is labelled. A switch on is bluish green, the colour
+// people read as on; a trace may be the same green, being a line on a panel
+// where a switch is a strip under them with "on" written in it.
 //
 // A thermostat's band is drawn behind its panel's traces in their yellow and
 // vermillion paled toward white -- 25% of #F0E442 and 15% of #D55E00 -- so
@@ -1398,8 +1399,8 @@ export component PlotWindow inherits Window {
         // change lines up with the values above it: one strip a switch,
         // labelled with what it drives, so that with two heaters on two
         // thermostats, which is on, or both, is read straight off them. Full
-        // bluish green with "on" written in it while on, which no trace and
-        // neither band tint is.
+        // bluish green with "on" written in it while on, which neither band
+        // tint is.
         for switch in root.switches: HorizontalLayout {
             spacing: root.gap;
             Text {

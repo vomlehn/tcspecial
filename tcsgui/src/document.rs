@@ -79,6 +79,12 @@ pub struct Command {
     /// are.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub comment: Option<String>,
+    /// The file it is written in: a subdiagram, or `None` for the top
+    /// diagram, where a binding made in the editor goes. Kept so that a
+    /// binding read from an included file is written back there rather than
+    /// moved into the top file by a save.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub home: Home,
 }
 
 /// Which line of a file's structure a comment is written above.
@@ -96,6 +102,10 @@ pub struct Command {
     Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize,
 )]
 pub enum Heading {
+    /// At the head of the file, before anything it says, with a blank line
+    /// under it: what the file is, which a file shared by two
+    /// configurations says for both of them.
+    File,
     /// Above the line that opens the section: `payloads:` or `<payloads>`.
     Section(String),
     /// Under that line, above the section's first type group.
@@ -275,6 +285,15 @@ pub struct Document {
     /// which is what a checker is for.
     #[serde(default)]
     pub groups: BTreeMap<String, String>,
+    /// The subdiagram each group is declared in, by group name; a group not
+    /// named here is the top file's, where a group made in the editor goes.
+    ///
+    /// Kept apart from `groups` and left alone when a group is removed, so
+    /// that undoing the removal puts it back in the file it came from, and
+    /// so that a save writes a group read from an included file back there
+    /// rather than moving it into the top file.
+    #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
+    pub group_homes: BTreeMap<String, String>,
     /// What the ground may set in flight.
     ///
     /// Not editable on the canvas yet, and written out whatever else happens:
@@ -523,8 +542,11 @@ impl Document {
     ///
     /// Absolute: `temp_1` for a node of the top diagram and
     /// `zone/temp_1` for one inside a subdiagram. That is how the editor
-    /// holds a name everywhere except in a file, where it is written relative
-    /// to the file it is in -- see [`Qualified::written_from`].
+    /// holds a name everywhere except in a file, where it is written as the
+    /// node's own -- see [`Qualified::written`]. A subdiagram's box in the
+    /// top diagram is named by its include, which may be a path such as
+    /// `../common/zone`: its `/` says no home, so a box of the whole name is
+    /// looked for first.
     ///
     /// # Arguments
     ///
@@ -534,6 +556,13 @@ impl Document {
     ///
     /// The node, or `None` if there is none of that name.
     pub fn node(&self, name: &str) -> Option<&Node> {
+        if let Some(node) = self
+            .nodes
+            .iter()
+            .find(|n| n.home.is_none() && n.name == name)
+        {
+            return Some(node);
+        }
         let wanted = Qualified::parse(name);
         self.nodes
             .iter()
@@ -550,6 +579,15 @@ impl Document {
     ///
     /// The node, or `None` if there is none of that name.
     fn node_mut(&mut self, name: &str) -> Option<&mut Node> {
+        // A subdiagram's box first, whose name, a path, has a `/` in it
+        // that does not say a home: see `Document::node`.
+        if let Some(at) = self
+            .nodes
+            .iter()
+            .position(|n| n.home.is_none() && n.name == name)
+        {
+            return self.nodes.get_mut(at);
+        }
         let wanted = Qualified::parse(name);
         self.nodes
             .iter_mut()
@@ -581,7 +619,35 @@ impl Document {
                 found.push(node.name.clone());
             }
         }
+        // And a file that declares a group or a binding and holds no node,
+        // which is still a file the top one includes.
+        let declared = self
+            .groups
+            .keys()
+            .filter_map(|group| self.group_homes.get(group))
+            .chain(self.commands.iter().filter_map(|c| c.home.as_ref()));
+        for home in declared {
+            if !found.contains(home) {
+                found.push(home.clone());
+            }
+        }
         found
+    }
+
+    /// The groups declared in one file, each with its interval.
+    ///
+    /// # Arguments
+    ///
+    /// * `home` - The subdiagram, or `None` for the top diagram.
+    ///
+    /// # Returns
+    ///
+    /// The groups, by name.
+    fn groups_in(&self, home: &Home) -> Vec<(&String, &String)> {
+        self.groups
+            .iter()
+            .filter(|(name, _)| self.group_homes.get(*name) == home.as_ref())
+            .collect()
     }
 
     /// The nodes that live in `home`.
@@ -607,6 +673,11 @@ impl Document {
     ) -> Vec<(&str, Vec<&Node>)> {
         let mut grouped: BTreeMap<&str, Vec<&Node>> = BTreeMap::new();
         for node in self.nodes_in(home) {
+            // A subdiagram's box is the editor's own and no node: what a
+            // file says of it is its include, and where it was drawn.
+            if node.node_type == "subdiagram" {
+                continue;
+            }
             if section_of(&node.node_type) == section {
                 grouped.entry(&node.node_type).or_default().push(node);
             }
@@ -672,6 +743,11 @@ impl Document {
     pub fn forget_lost_comments(&mut self) {
         let nodes = &self.nodes;
         self.remarks.retain(|remark| {
+            // What a file is said to be is kept while there is the file,
+            // which a save writes whatever is in it.
+            if remark.heading == Heading::File {
+                return true;
+            }
             nodes.iter().any(|node| {
                 node.home == remark.home
                     && match &remark.heading {
@@ -681,6 +757,7 @@ impl Document {
                         Heading::Type(node_type) => {
                             &node.node_type == node_type
                         }
+                        Heading::File => true,
                     }
             })
         });
@@ -1620,6 +1697,10 @@ impl Document {
                 if let Some(interval) = self.groups.remove(was) {
                     self.groups.insert(now.clone(), interval);
                 }
+                // In the file it was declared in, under its new name.
+                if let Some(home) = self.group_homes.remove(was) {
+                    self.group_homes.insert(now.clone(), home);
+                }
                 // And every node that named it. A node's group is how it gets
                 // its interval, so a rename that left them behind would be a
                 // rename that silently unscheduled a dozen sensors.
@@ -2064,7 +2145,16 @@ impl Document {
         out.push_str(&format!(
             "    xsi:noNamespaceSchemaLocation=\"{schema}\">\n"
         ));
-        if let Some(description) = &self.description {
+        // What the file is, with the blank line under it that keeps it the
+        // file's rather than the first entry's: see `read::comments_of`.
+        if let Some(header) = self.remark(home, &Heading::File) {
+            xml_comment(&mut out, Some(header), 4);
+            out.push('\n');
+        }
+        // The configuration's description, in the top file only: a file it
+        // includes may be included by another configuration too, which says
+        // what it is itself.
+        if let (None, Some(description)) = (home, &self.description) {
             out.push_str(&format!(
                 "    <description>{}</description>\n",
                 escape(description)
@@ -2116,7 +2206,10 @@ impl Document {
         }
 
         if home.is_none() {
-            for name in self.subdiagrams() {
+            // In order of name, which is the order they are digested in.
+            let mut included = self.subdiagrams();
+            included.sort();
+            for name in included {
                 out.push_str(&format!(
                     "    <include>{}</include>\n",
                     escape(&name)
@@ -2124,8 +2217,8 @@ impl Document {
             }
         }
 
-        if home.is_none() {
-            for (name, interval) in &self.groups {
+        {
+            for (name, interval) in self.groups_in(home) {
                 out.push_str("    <payload_groups>\n");
                 out.push_str(&format!(
                     "        <name>{}</name>\n",
@@ -2258,11 +2351,12 @@ impl Document {
             out.push_str(&format!("    </{}>\n", section.name()));
         }
 
-        // The command bindings, which only the top file declares: what the
-        // ground may change is a property of the whole configuration rather
-        // than of one page of it.
-        if home.is_none() {
-            for command in &self.commands {
+        // The command bindings, each in the file it was read from: what the
+        // ground may change is a property of the whole configuration, and the
+        // file a binding is written in is whoever wrote it's choice. One made
+        // in the editor goes in the top file.
+        {
+            for command in self.commands.iter().filter(|c| &c.home == home) {
                 if let Some(comment) = &command.comment {
                     for line in comment_lines(comment, 4) {
                         out.push_str(&format!(
@@ -2310,7 +2404,7 @@ impl Document {
             for (node, concern) in &here {
                 out.push_str(&format!(
                     "            <node name=\"{}\" concern=\"{}\"/>\n",
-                    escape(&Qualified::parse(node).written_from(home)),
+                    escape(&Qualified::parse(node).written()),
                     escape(concern)
                 ));
             }
@@ -2363,8 +2457,17 @@ impl Document {
                 crate::nodes::CONFIG_JSON_SCHEMA
             )
         ));
-        // No version: a configuration has no such field.
-        if let Some(description) = &self.description {
+        // What the file is, as the XML writer writes it. The blank line that
+        // keeps it the file's is the one every section begins with, and one
+        // of its own above the description, which begins with none.
+        let header = self.remark(home, &Heading::File);
+        yaml_comment(&mut out, header, 0, 4);
+        // No version: a configuration has no such field. The description in
+        // the top file only, as the XML writer has it.
+        if let (None, Some(description)) = (home, &self.description) {
+            if header.is_some() {
+                out.push('\n');
+            }
             out.push_str(&format!("description: {}\n", quoted(description)));
         }
 
@@ -2428,7 +2531,8 @@ impl Document {
         // Only the top diagram has them: a subdiagram that included another
         // would be a nesting this editor does not make.
         if home.is_none() {
-            let included = self.subdiagrams();
+            let mut included = self.subdiagrams();
+            included.sort();
             if !included.is_empty() {
                 out.push_str("\ninclude:\n");
                 for name in &included {
@@ -2437,11 +2541,13 @@ impl Document {
             }
         }
 
-        // The groups, which only the top file declares: a group is a property
-        // of the whole configuration rather than of one page of it.
-        if home.is_none() && !self.groups.is_empty() {
+        // The groups, each in the file it was read from, as the command
+        // bindings are: see the XML writer. One made in the editor goes in
+        // the top file.
+        let groups = self.groups_in(home);
+        if !groups.is_empty() {
             out.push_str("\npayload_groups:\n");
-            for (name, interval) in &self.groups {
+            for (name, interval) in groups {
                 out.push_str(&format!(
                     "  - name: {}\n    interval: {}\n",
                     quoted(name),
@@ -2577,10 +2683,12 @@ impl Document {
             }
         }
 
-        // The command bindings, top file only: see the XML writer.
-        if home.is_none() && !self.commands.is_empty() {
+        // The command bindings, each in its own file: see the XML writer.
+        let commands: Vec<&Command> =
+            self.commands.iter().filter(|c| &c.home == home).collect();
+        if !commands.is_empty() {
             out.push_str("\ncommands:\n");
-            for command in &self.commands {
+            for command in commands {
                 if let Some(comment) = &command.comment {
                     for line in comment_lines(comment, 4) {
                         out.push_str(&format!("  # {line}\n"));
@@ -2624,7 +2732,7 @@ impl Document {
             for (node, concern) in here {
                 out.push_str(&format!(
                     "    - {{ node: {}, concern: {} }}\n",
-                    plain(&Qualified::parse(node).written_from(home)),
+                    plain(&Qualified::parse(node).written()),
                     plain(concern)
                 ));
             }
@@ -2724,7 +2832,7 @@ impl Document {
                     continue;
                 }
                 destinations.push(Bound {
-                    target: Qualified::parse(&link.to).written_from(home),
+                    target: Qualified::parse(&link.to).written(),
                     input: link.input.clone(),
                 });
                 if comment.is_none() {
@@ -3334,6 +3442,7 @@ pub fn thermostat_example() -> Document {
             "the zone temperature the heaters are held at, in kelvin"
                 .to_string(),
         ),
+        home: None,
     });
 
     document

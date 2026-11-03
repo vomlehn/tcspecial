@@ -84,18 +84,57 @@ pub fn read(path: &Path) -> Result<Document, String> {
 
     // Which file each node came from, which is what says whether it is in the
     // top diagram or in a subdiagram: a node from an included file belongs to
-    // that file's page, under the file's own stem.
+    // that file's page, under the name the include list gives the file.
     let home_of = |name: &str| -> Option<String> {
-        let from = graph.homes.get(name)?;
-        if from == path {
-            return None;
-        }
-        from.file_stem()
-            .and_then(|stem| stem.to_str())
-            .map(str::to_string)
+        graph.include_name(graph.homes.get(name)?)
     };
 
-    let said = comments_of(path);
+    // And which file each group and command binding is declared in, so that
+    // a save writes each back where it was rather than into the top file.
+    // The graph merges them, so each included file is read again on its own
+    // for what it declares.
+    let mut binding_homes: BTreeMap<(String, String), String> = BTreeMap::new();
+    for file in graph.files.iter().skip(1) {
+        let Some(name) = graph.include_name(file) else {
+            continue;
+        };
+        let declared =
+            tcslibgs::graph::read_one(file).map_err(|e| format!("{e}"))?;
+        for group in &declared.payload_groups {
+            document
+                .group_homes
+                .insert(group.name.clone(), name.clone());
+        }
+        for binding in &declared.commands {
+            binding_homes.insert(
+                (binding.from.clone(), binding.sets.clone()),
+                name.clone(),
+            );
+        }
+    }
+
+    // The comments, from every file: a node's and a link's are found by the
+    // node's name, which is one node's in the whole configuration, and what
+    // is said about a file's structure is kept with that file.
+    let mut said = comments_of(path);
+    let mut remarks: Vec<(Heading, String, Option<String>)> = said
+        .remarks
+        .drain(..)
+        .map(|(heading, text)| (heading, text, None))
+        .collect();
+    for file in graph.files.iter().skip(1) {
+        let home = graph.include_name(file);
+        let other = comments_of(file);
+        said.nodes.extend(other.nodes);
+        said.links.extend(other.links);
+        said.commands.extend(other.commands);
+        remarks.extend(
+            other
+                .remarks
+                .into_iter()
+                .map(|(heading, text)| (heading, text, home.clone())),
+        );
+    }
 
     for node in &graph.nodes {
         let home = home_of(&node.name);
@@ -116,7 +155,9 @@ pub fn read(path: &Path) -> Result<Document, String> {
         }
 
         document.nodes.push(Node {
-            name: Qualified::of(&node.name, &home).absolute(),
+            // Its own name: the home says which page it is on, and the two
+            // together are the name the editor holds it by elsewhere.
+            name: node.name.clone(),
             node_type: node.node_type.clone(),
             attributes,
             // Where it was drawn, from the editor's own section at the end of
@@ -131,6 +172,20 @@ pub fn read(path: &Path) -> Result<Document, String> {
         });
     }
 
+    // And a box in the top diagram for each file it includes, which is what
+    // opens that file's page: named by its include, and drawn where the top
+    // file's own section put it.
+    for name in graph.included() {
+        document.nodes.push(Node {
+            at: graph.placed.get(&name).map_or((0, 0), |at| (at.x, at.y)),
+            name,
+            node_type: "subdiagram".to_string(),
+            attributes: BTreeMap::new(),
+            home: None,
+            comment: None,
+        });
+    }
+
     for link in &graph.links {
         // One document link per destination: a link to three places is three
         // lines on the canvas, and each is drawn and deleted on its own.
@@ -138,9 +193,12 @@ pub fn read(path: &Path) -> Result<Document, String> {
             let Destination { node, input } = Destination::parse(destination);
             // The leaving end, split from the terminal it names: everything in
             // the editor that looks a link's source up looks up a node.
+            // Each end in the file its node is in, which is what the editor
+            // holds a name by: a link names a node by its own name whichever
+            // file either is in.
             let origin = link.origin();
-            let from = Qualified::parse(&origin.node);
-            let to = Qualified::parse(&node);
+            let from = Qualified::of(&origin.node, &home_of(&origin.node));
+            let to = Qualified::of(&node, &home_of(&node));
             let mut line = Link::joining(
                 &from.absolute(),
                 origin.input.as_deref(),
@@ -169,18 +227,20 @@ pub fn read(path: &Path) -> Result<Document, String> {
             from: binding.from.clone(),
             sets: binding.sets.clone(),
             comment: said.commands.get(&binding.sets).cloned(),
+            home: binding_homes
+                .get(&(binding.from.clone(), binding.sets.clone()))
+                .cloned(),
         });
     }
 
-    // What is said about the file's structure rather than its entries: a
-    // section, a type group, a line of the tcspecial section. The top file's
-    // only, as every comment here is; and only those whose subject was read,
-    // which is what the editor holds them to from now on.
-    document.remarks = said
-        .remarks
+    // What is said about each file's structure rather than its entries: the
+    // file itself, a section, a type group, a line of the tcspecial section;
+    // and only those whose subject was read, which is what the editor holds
+    // them to from now on.
+    document.remarks = remarks
         .into_iter()
-        .map(|(heading, text)| Remark {
-            home: None,
+        .map(|(heading, text, home)| Remark {
+            home,
             heading,
             text,
         })
@@ -267,6 +327,12 @@ fn comments_of(path: &Path) -> Said {
     let mut inside: Option<String> = None;
     let mut within = Within::default();
     let mut lines = text.lines().peekable();
+    // Whether the file has begun to say anything, and in XML whether the
+    // scan is inside the root element's opening tag, which is not saying
+    // anything yet: a comment before then, with a blank line under it, is
+    // the file's own -- see `Heading::File`.
+    let mut begun = false;
+    let mut opening = false;
 
     while let Some(line) = lines.next() {
         let trimmed = line.trim();
@@ -285,10 +351,35 @@ fn comments_of(path: &Path) -> Said {
 
         // A blank line ends a comment's claim on whatever comes next: a
         // heading at the top of a file is not a note about the first node.
+        // It is the file's, unless it is the line that names the schema,
+        // which is the writer's own.
         if trimmed.is_empty() {
+            let header = waiting.join("\n");
+            if !begun
+                && !waiting.is_empty()
+                && !header.starts_with("yaml-language-server")
+            {
+                said.remarks.push((Heading::File, header));
+            }
             waiting.clear();
             continue;
         }
+
+        // The XML declaration and the root element's opening tag, over
+        // however many lines it takes, say nothing yet.
+        if xml && !begun {
+            if trimmed.starts_with("<?xml") {
+                continue;
+            }
+            if trimmed.starts_with("<configuration") {
+                opening = true;
+            }
+            if opening {
+                opening = !trimmed.ends_with('>');
+                continue;
+            }
+        }
+        begun = true;
 
         // The node an attribute belongs to, whether or not anything is
         // waiting: a comment three attributes further down is still about this

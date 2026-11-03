@@ -118,7 +118,9 @@ fn the_interface_digest_is_printed_alone() {
 /// `--keep=<directory>` keeps a configuration with nothing wrong with it
 /// under its checksum, read-only, and says where; again, it writes nothing
 /// and says it is kept already. One with errors is not kept, and the store
-/// is what tcspecial loads from.
+/// is what tcspecial loads from. The thermostat example, copied, includes a
+/// file in a directory beside its own, so its top file is kept one `top`
+/// down in its tree.
 #[test]
 fn a_checked_configuration_is_kept_under_its_checksum() {
     use std::os::unix::fs::PermissionsExt;
@@ -127,16 +129,22 @@ fn a_checked_configuration_is_kept_under_its_checksum() {
     let store = dir.path().join("kept");
     std::fs::create_dir(&store).expect("a store");
     let keep = format!("--keep={}", store.display());
-    // One file: a configuration kept on board includes files only by names
-    // beside it, and the ping example's include is a path into ping-common.
-    let example = Path::new(env!("CARGO_MANIFEST_DIR"))
-        .join("../examples/minimal/minimal.ytcs");
+    let examples = Path::new(env!("CARGO_MANIFEST_DIR")).join("../examples");
+    for file in [
+        "thermostat/thermostat.ytcs",
+        "thermostat-common/thermostat.ytcs",
+    ] {
+        let to = dir.path().join(file);
+        std::fs::create_dir_all(to.parent().expect("a directory"))
+            .expect("a directory");
+        std::fs::copy(examples.join(file), &to).expect("copied");
+    }
+    let example = dir.path().join("thermostat/thermostat.ytcs");
     let example = example.to_str().expect("a path");
     let checksum =
         tcslibgs::config_digest::digest_of_file(example).expect("it digests");
-    let kept = store
-        .join(checksum.to_string())
-        .join(format!("{checksum}.ytcs"));
+    let tree = store.join(checksum.to_string());
+    let kept = tree.join("top").join(format!("{checksum}.ytcs"));
 
     let (lines, status) = run(&[&keep, example]);
     assert_eq!(status, 0, "{lines:?}");
@@ -149,6 +157,7 @@ fn a_checked_configuration_is_kept_under_its_checksum() {
     );
     let mode = std::fs::metadata(&kept).expect("kept").permissions().mode();
     assert_eq!(mode & 0o777, 0o444, "read-only");
+    assert!(tree.join("thermostat-common/thermostat.ytcs").is_file());
     let (graph, _) = tcslibgs::store::Store::at(&store)
         .load(checksum)
         .expect("it loads by its checksum");

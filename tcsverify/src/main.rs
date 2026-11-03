@@ -78,9 +78,11 @@ configuration.
                      wrong with it, keep it in <directory>, the directory a
                      tcspecial section's configurations attribute names,
                      under its checksum -- <checksum>/<checksum>.ytcs or
-                     .xtcs, with each file it includes beside it under its
-                     include name, mode 0444 -- as the vehicle keeps a
-                     configuration it may restart onto. One whose
+                     .xtcs, one top/ further down for each directory its
+                     includes climb with .., and each file it includes
+                     where its include name puts it, mode 0444 -- as the
+                     vehicle keeps a configuration it may restart onto.
+                     One whose
                      checksum is kept already is not written again.
                      Prints where it is kept. For first
                      provisioning and for testing: making the directory

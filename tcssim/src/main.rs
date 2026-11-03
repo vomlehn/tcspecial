@@ -2763,7 +2763,7 @@ mod tests {
 
     /// Runs the thermostat example's physics with no window and no vehicle:
     /// its world, its three sensors with their errors, the median of their
-    /// readings, and its thermostat deciding on it every tenth of a second,
+    /// readings, and its thermostat deciding on it once a second,
     /// as the payload group is read, sending each change to both heaters.
     /// A heater disabled, as its panel would have it, gets the decisions
     /// and stays off, as it does in tcssim.
@@ -2837,7 +2837,7 @@ mod tests {
             heater.enable_at(enabled[n], 0.0);
         }
 
-        let step = 0.1;
+        let step = 1.0;
         let mut decided = false;
         let mut run = ThermostatRun {
             coldest: f64::INFINITY,

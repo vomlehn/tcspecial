@@ -2477,7 +2477,7 @@ heaters, and the lines that say what the heaters are doing.</p>
 </div>
 <p>The worked example of computing aboard, and of surviving a part that fails.
 Three temperature sensors -- <tt class="docutils literal">temp_1</tt>, <tt class="docutils literal">temp_2</tt> and <tt class="docutils literal">temp_3</tt> -- are read
-together ten times a second as the group <tt class="docutils literal">zone_temps</tt>, which is what a
+together once a second as the group <tt class="docutils literal">zone_temps</tt>, which is what a
 group is for: readings that will be compared are taken as close together as
 the hardware allows.</p>
 <p>Every sensor is the far end of a UDP socket on this host, ports 5201 to 5203,
@@ -2581,12 +2581,12 @@ of three seeds -- tcssim's tests
 <tt class="docutils literal">the_thermostat_example_holds_the_zone_with_both_heaters</tt> and
 <tt class="docutils literal">the_thermostat_example_holds_the_zone_with_a_heater_disabled</tt> -- has, with
 both heaters, the zone never more than two half bands from the setpoint and
-within one about four fifths of the time, the heaters on a quarter of the
+within one about three quarters of the time, the heaters on a quarter of the
 time and switching together some seventy-five times an orbit; with one
 disabled, the zone never more than two half bands from the setpoint, the
 working heater on about half the time and the disabled one never heating;
 and with neither, the zone falling from the band to its surroundings, as
-cold as 287.4 K in the first orbit.</p>
+cold as 287.1 K in the first orbit.</p>
 <p><tt class="docutils literal">make <span class="pre">-C</span> examples <span class="pre">run-thermostat</span></tt> runs it, on a host with the kernel's
 simulated chip.</p>
 </div>
@@ -4017,7 +4017,7 @@ which the thermostat example shares with thermostat-yamcs.</p>
     </span><span class="name tag">connects</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">zone.temperature</span><span class="whitespace">
     </span><span class="name tag">drift</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal string">&quot;0.05</span><span class="name variable"> </span><span class="literal string">K&quot;</span><span class="whitespace">
     </span><span class="name tag">drift_time</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal string">&quot;30</span><span class="name variable"> </span><span class="literal string">min&quot;</span><span class="whitespace">
-    </span><span class="name tag">packet_interval</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">100 ms</span><span class="whitespace">
+    </span><span class="name tag">packet_interval</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">1 s</span><span class="whitespace">
     </span><span class="name tag">simulate</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">true</span><span class="whitespace">
 
 </span><span class="name tag">simulated_payloads</span><span class="punctuation">:</span><span class="whitespace">

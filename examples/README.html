@@ -796,22 +796,23 @@ Rust.</td>
 </table>
 <h3 id="thermostat">thermostat</h3>
 <p>A control loop, aboard. Three temperature sensors are read together,
-every 100 ms, as the group <code>zone_temps</code>: <code>temp_1</code>,
-<code>temp_2</code> and <code>temp_3</code>. Each reading goes through a
-conversion of its own to kelvin – <code>temp1</code>,
-<code>temp2</code>, <code>temp3</code>, the parts differing in format
-and scale – and the three meet at <code>ambient</code>, which takes
-their median, so that one sensor failing cannot take the zone’s
-temperature with it. <code>thermostat</code> holds that to a setpoint,
-293.15 K with a half band of 2 K, and drives two heaters, each through a
-GPIO line of its own, <code>gpio-out-tmass1</code> and
-<code>gpio-out-tmass2</code>, which go on and off together. Its decision
-is logged and not sent down: what the ground hears is
-<code>gpio-in-tmass</code>, two lines on the thermal mass sensing the
-heaters, read for their levels every second, so the ground sees what the
-heaters are doing rather than what they were told. The ground commands
-the setpoint, and <code>housekeeping</code> logs the readings, the
-decisions and the lines in <code>/tmp/telemetry</code>.</p>
+once a second, as the group <code>zone_temps</code>:
+<code>temp_1</code>, <code>temp_2</code> and <code>temp_3</code>. Each
+reading goes through a conversion of its own to kelvin –
+<code>temp1</code>, <code>temp2</code>, <code>temp3</code>, the parts
+differing in format and scale – and the three meet at
+<code>ambient</code>, which takes their median, so that one sensor
+failing cannot take the zone’s temperature with it.
+<code>thermostat</code> holds that to a setpoint, 293.15 K with a half
+band of 2 K, and drives two heaters, each through a GPIO line of its
+own, <code>gpio-out-tmass1</code> and <code>gpio-out-tmass2</code>,
+which go on and off together. Its decision is logged and not sent down:
+what the ground hears is <code>gpio-in-tmass</code>, two lines on the
+thermal mass sensing the heaters, read for their levels every second, so
+the ground sees what the heaters are doing rather than what they were
+told. The ground commands the setpoint, and <code>housekeeping</code>
+logs the readings, the decisions and the lines in
+<code>/tmp/telemetry</code>.</p>
 <p>The sensors are the far end of UDP sockets on this host, ports 5201
 to 5203, which tcssim stands in for. The heaters’ switches and the lines
 sensing them are lines 2 to 5 of the kernel’s simulated GPIO chip,

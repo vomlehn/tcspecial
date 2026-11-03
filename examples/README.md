@@ -461,8 +461,8 @@ with it aboard and on the ground.
 
 ### thermostat
 
-A control loop, aboard. Three temperature sensors are read together, every
-100 ms, as the group `zone_temps`: `temp_1`, `temp_2` and `temp_3`. Each
+A control loop, aboard. Three temperature sensors are read together, once a
+second, as the group `zone_temps`: `temp_1`, `temp_2` and `temp_3`. Each
 reading goes through a conversion of its own to kelvin -- `temp1`, `temp2`,
 `temp3`, the parts differing in format and scale -- and the three meet at
 `ambient`, which takes their median, so that one sensor failing cannot take

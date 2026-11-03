@@ -4278,11 +4278,13 @@ vehicle's and the gateway's. The arithmetic
 is <tt class="docutils literal"><span class="pre">tcsgui::list_shares_after</span></tt>, in Rust where it can be tested, and the
 markup reports a drag as how far it went and how tall the column is -- what a
 share is depends on what it is a share of.</p>
-<p>No list may be squeezed below a twentieth of the column, so a line dragged to
-the top or the bottom stops a twentieth short of it. It is the rule the working
-panes already have and the same constant: a list with nothing showing is a list
-whose entries cannot be reached, and a line dragged to the edge is easy to do
-by accident and hard to understand afterwards.</p>
+<p>No list may be squeezed below a tenth of the column, so a line dragged to
+the top or the bottom stops a tenth short of it. It is the rule the working
+panes already have and the same constant: some of every list is always to be
+seen, because a list with nothing showing is a list whose entries cannot be
+reached, and a line dragged to the edge is easy to do by accident and hard to
+understand afterwards. The floor was a twentieth once, which left a list half
+its own heading.</p>
 <p>And every list shows a node when the window opens, which a share of a column
 cannot be trusted to do by itself: a twentieth of an 820-pixel window is
 forty-one pixels, enough for the list's own heading and nothing under it. So
@@ -4319,8 +4321,10 @@ without its unit, one required and not given. A component the reader would
 refuse is drawn red on the canvas. Placing, setting and removing a component
 are edits like any other, each taken back by one undo, and removing one
 removes the connections that join it, which come back with it. Without a
-simulator file the list is greyed and says to open one, and the Physics pane
-is not drawn. The world's <tt class="docutils literal">ambient_temp</tt> and its connections are edited in
+simulator file the list is greyed and says to open one, and so does the
+Physics pane, which is drawn all the same: some of every pane is always to be
+seen, and a pane that came and went with a second file would be one nobody
+could find. The world's <tt class="docutils literal">ambient_temp</tt> and its connections are edited in
 the simulator file for now.</p>
 <p>Where the Physics pane's line and the physics list's line are is kept in the
 preferences file beside the others: the pane's width as a percentage of the
@@ -4333,10 +4337,10 @@ column shows at a glance what is different. Links cross the dividers freely --
 that is what a payload is for -- and only positions are confined.</p>
 <p>Each divider is drawn, and each can be moved: it carries a handle halfway down
 it, and dragging that handle moves the line and resizes the two panes either
-side of it. No pane may be squeezed below a twentieth of the working pane, so
+side of it. No pane may be squeezed below a tenth of the working pane, so
 none can be dragged shut -- a pane with nothing visible in it is a pane whose
 nodes cannot be reached, and the drag that does it is one press away. With
-three panes that means a divider stops a twentieth short of its neighbour as
+three panes that means a divider stops a tenth short of its neighbour as
 well as of the edge. A divider also stops against a node rather than passing
 over it: against the right edge of the rightmost node of the pane on its left
 and the left edge of the leftmost node of the pane on its right. The

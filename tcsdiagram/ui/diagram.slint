@@ -1032,6 +1032,10 @@ export component PhysicsGround inherits Rectangle {
     // How deep the band is: the other three panes', so that the four line
     // up. SheetGround works it out from its labels; this one is told.
     in property <length> heading-tall: 30px;
+    // What the pane says under its heading when there is nothing it can
+    // hold -- an editor with no simulator file open -- and nothing where
+    // there is.
+    in property <string> note: "";
 
     width: root.physics-width;
     height: 100%;
@@ -1052,5 +1056,16 @@ export component PhysicsGround inherits Rectangle {
             font-italic: true;
             color: #9ca3af;
         }
+    }
+
+    if root.note != "": Text {
+        x: Space.step;
+        y: root.heading-tall + Space.step;
+        width: root.physics-width - 2 * Space.step;
+        text: root.note;
+        wrap: word-wrap;
+        font-size: Type.small;
+        font-italic: true;
+        color: #6b7280;
     }
 }

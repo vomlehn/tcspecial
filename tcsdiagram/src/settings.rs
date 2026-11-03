@@ -38,14 +38,16 @@ use std::path::PathBuf;
 /// The least of the working pane either side may be reduced to, as a
 /// percentage.
 ///
-/// Asked for: neither pane may be squeezed below a twentieth of the working
-/// pane. A pane with nothing visible in it is a pane whose nodes cannot be
-/// reached, and a divider dragged to the edge is easy to do by accident and
-/// hard to understand afterwards.
-pub const LEAST: i32 = 5;
+/// Asked for: some of every pane and every list is always to be seen. A
+/// tenth rather than the twentieth this once was, because a twentieth of the
+/// selection column left a list half its own heading, which is a list nobody
+/// can tell is there. A pane with nothing visible in it is a pane whose nodes
+/// cannot be reached, and a divider dragged to the edge is easy to do by
+/// accident and hard to understand afterwards.
+pub const LEAST: i32 = 10;
 
 /// And the most one pane may take, which is the same rule from the other
-/// side: the other two keep a twentieth each.
+/// side: the other two keep a tenth each.
 pub const MOST: i32 = 100 - 2 * LEAST;
 
 /// How the canvas is divided until somebody divides it differently.
@@ -169,6 +171,39 @@ pub fn shares(gateway_percent: i32, vehicle_percent: i32) -> (i32, i32) {
 /// The physics list's share, in per cent.
 pub fn physics_list_share(physics: i32, gateway: i32, vehicle: i32) -> i32 {
     physics.clamp(LEAST, (100 - gateway - vehicle - LEAST).max(LEAST))
+}
+
+/// The selection column's shares, all four lists kept open together.
+///
+/// The column holds four lists where the canvas holds three working panes,
+/// so [`shares`], which keeps a third share open, is not enough here: the
+/// gateway and vehicle lists are kept to what leaves the physics list and the
+/// payload list a [`LEAST`] each, and the physics list to what leaves the
+/// payload list its own. The payload list takes what is left, and is the
+/// one that gives way first; then the physics list.
+///
+/// # Arguments
+///
+/// * `gateway` - The share asked for the gateway list, in per cent.
+/// * `vehicle` - The share asked for the vehicle list, in per cent.
+/// * `physics` - The share asked for the physics list, in per cent.
+///
+/// # Returns
+///
+/// The gateway, vehicle and physics lists' shares, in per cent, each at
+/// least [`LEAST`] and leaving the payload list at least [`LEAST`].
+pub fn list_shares(
+    gateway: i32,
+    vehicle: i32,
+    physics: i32,
+) -> (i32, i32, i32) {
+    let gateway = gateway.clamp(LEAST, 100 - 3 * LEAST);
+    let vehicle = vehicle.clamp(LEAST, 100 - 2 * LEAST - gateway);
+    (
+        gateway,
+        vehicle,
+        physics_list_share(physics, gateway, vehicle),
+    )
 }
 
 /// The directory the editor keeps its own files in, found and not made.
@@ -300,20 +335,33 @@ fn settings_in(text: &str, whose: &str) -> Settings {
     // written before the lists could be resized says nothing about them,
     // which is the defaults -- not a share taken out of anything, because
     // nobody arranged these yet.
-    let (list_gateway_percent, list_vehicle_percent) = shares(
-        percent_in(text, whose, "gateway_list_percent", DEFAULT_LIST_GATEWAY),
-        percent_in(text, whose, "vehicle_list_percent", DEFAULT_LIST_VEHICLE),
-    );
-
     // The Physics pane and its list, which a file written before there was a
-    // Physics pane says nothing about: the defaults.
+    // Physics pane says nothing about: the defaults. The four lists are
+    // brought inside the rule together, because each is allowed alone and
+    // four allowed shares can still add up to more than the column.
+    let (list_gateway_percent, list_vehicle_percent, list_physics_percent) =
+        list_shares(
+            percent_in(
+                text,
+                whose,
+                "gateway_list_percent",
+                DEFAULT_LIST_GATEWAY,
+            ),
+            percent_in(
+                text,
+                whose,
+                "vehicle_list_percent",
+                DEFAULT_LIST_VEHICLE,
+            ),
+            percent_in(
+                text,
+                whose,
+                "physics_list_percent",
+                DEFAULT_LIST_PHYSICS,
+            ),
+        );
     let physics_percent =
         percent_in(text, whose, "physics_pane_percent", DEFAULT_PHYSICS);
-    let list_physics_percent = physics_list_share(
-        percent_in(text, whose, "physics_list_percent", DEFAULT_LIST_PHYSICS),
-        list_gateway_percent,
-        list_vehicle_percent,
-    );
 
     Settings {
         gateway_percent,
@@ -494,9 +542,14 @@ mod tests {
                 (settings.gateway_percent, settings.vehicle_percent),
                 (gateway, vehicle)
             );
+            // The lists as the four-list rule keeps them: a share the
+            // canvas allows can be more than the column can give one list
+            // beside three others, and that is brought in, not read wrong.
+            let (kept_gateway, kept_vehicle, _) =
+                list_shares(list_gateway, list_vehicle, DEFAULT_LIST_PHYSICS);
             assert_eq!(
                 (settings.list_gateway_percent, settings.list_vehicle_percent),
-                (list_gateway, list_vehicle)
+                (kept_gateway, kept_vehicle)
             );
         }
 
@@ -544,6 +597,52 @@ mod tests {
         assert_eq!(physics_list_share(90, 20, 30), 100 - 20 - 30 - LEAST);
     }
 
+    /// Four list shares, each allowed alone, that leave the payload list
+    /// nothing between them are brought inside the rule together.
+    ///
+    /// What a preferences file held once a list's floor had been raised: a
+    /// vehicle list under the new floor was refused and given its default,
+    /// and the default and the other two together took the whole column, so
+    /// the payload list was not drawn at all.
+    #[test]
+    fn every_list_keeps_a_tenth() {
+        for (gateway, vehicle, physics) in [
+            (58, DEFAULT_LIST_VEHICLE, DEFAULT_LIST_PHYSICS),
+            (MOST, MOST, MOST),
+            (0, 0, 0),
+            (
+                DEFAULT_LIST_GATEWAY,
+                DEFAULT_LIST_VEHICLE,
+                DEFAULT_LIST_PHYSICS,
+            ),
+        ] {
+            let (g, v, p) = list_shares(gateway, vehicle, physics);
+            let payload = 100 - g - v - p;
+            for share in [g, v, p, payload] {
+                assert!(
+                    share >= LEAST,
+                    "{gateway}, {vehicle} and {physics} became {g}, {v}, {p} \
+                     and {payload} for the payloads"
+                );
+            }
+        }
+        // Shares that leave room are left as they were asked.
+        assert_eq!(list_shares(20, 35, 20), (20, 35, 20));
+
+        // And through the reader, which is where the file that showed it
+        // came in.
+        let text = "<settings><gateway_list_percent>58</gateway_list_percent>\
+                    <vehicle_list_percent>5</vehicle_list_percent>\
+                    <physics_list_percent>20</physics_list_percent>\
+                    </settings>";
+        let settings = settings_in(text, "the test");
+        let payload = 100
+            - settings.list_gateway_percent
+            - settings.list_vehicle_percent
+            - settings.list_physics_percent;
+        assert!(payload >= LEAST, "{settings:?}");
+    }
+
     /// Two shares that leave the third pane nothing are brought inside the
     /// rule.
     ///
@@ -551,10 +650,10 @@ mod tests {
     /// a divider dragged to the edge. The payload pane is the one that gives
     /// way, being the one that is not stated.
     #[test]
-    fn every_pane_keeps_a_twentieth() {
+    fn every_pane_keeps_a_tenth() {
         assert_eq!(shares(15, 60), (15, 60));
         // Between them they asked for everything.
-        assert_eq!(shares(50, 50), (50, 45));
+        assert_eq!(shares(50, 50), (50, 40));
         assert_eq!(shares(MOST, MOST), (MOST, LEAST));
         // And neither may be squeezed out itself.
         assert_eq!(shares(0, 200), (LEAST, MOST));
@@ -603,8 +702,10 @@ mod tests {
     fn a_percentage_outside_the_rule_is_refused() {
         for (said, expected) in [
             ("60", 60),
-            ("5", LEAST),
-            ("90", MOST),
+            ("10", LEAST),
+            ("80", MOST),
+            // Under the floor this once had, and not under it now.
+            ("5", DEFAULT_VEHICLE),
             ("0", DEFAULT_VEHICLE),
             ("100", DEFAULT_VEHICLE),
             ("-20", DEFAULT_VEHICLE),

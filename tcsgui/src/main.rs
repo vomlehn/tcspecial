@@ -75,9 +75,9 @@ slint::include_modules!();
 /// How far one divider may be dragged, given what is already on the canvas.
 ///
 /// Two rules, and the narrower of the two wins. No pane may be squeezed below
-/// a twentieth of the working pane, which is what was asked for and is in
+/// a tenth of the working pane, which is what was asked for and is in
 /// `settings.rs` as the percentages that are allowed -- so a divider also
-/// stops a twentieth short of its neighbour. And a divider does not pass a
+/// stops a tenth short of its neighbour. And a divider does not pass a
 /// node: it stops against the right edge of the rightmost node of the pane on
 /// its left and against the left edge of the leftmost node of the pane on its
 /// right.
@@ -1501,16 +1501,11 @@ fn put(
     ui.set_vehicle_list_percent(lists.1);
     ui.set_has_simulator(editor.document().simulator.is_some());
     let (physics_nodes, physics_links) = physics_views_of(editor, dividers);
-    // The Physics pane only where there is a simulator file for it to be
-    // the world of: without one it would be a column nothing can be put in,
-    // taking room from the panes that can. The list stays, greyed, saying
-    // why.
-    let physics_width = if editor.document().simulator.is_some() {
-        dividers.physics
-    } else {
-        0
-    };
-    ui.set_physics_width(physics_width as f32);
+    // The Physics pane whether or not there is a simulator file for it to be
+    // the world of: some of every pane is always to be seen, and a pane that
+    // appeared only with a second file would be one nobody knew to look for.
+    // Without one it says so, as the list does.
+    ui.set_physics_width(dividers.physics as f32);
     ui.set_physics_nodes(ModelRc::from(Rc::new(VecModel::from(physics_nodes))));
     ui.set_physics_links(ModelRc::from(Rc::new(VecModel::from(physics_links))));
     let (nodes, links) = views_of(editor, home, held);
@@ -1854,7 +1849,7 @@ fn drag_divider(
 /// third alone, which is what a person dragging it expects: the list above
 /// grows by what the list below gives up. Nothing may be squeezed below
 /// [`settings::LEAST`] per cent of the column, so a line dragged to the top or
-/// the bottom stops a twentieth short of it -- a list with nothing showing is
+/// the bottom stops a tenth short of it -- a list with nothing showing is
 /// a list whose entries cannot be reached, and a line dragged to the edge is
 /// easy to do by accident and hard to understand afterwards.
 ///
@@ -1877,8 +1872,9 @@ fn drag_list_divider(
     tall: f32,
 ) {
     let lists = views.borrow().lists.clone();
+    let physics = views.borrow().physics_list.clone();
     let was = lists.get();
-    let now = list_shares_after(was, which, dy, tall);
+    let now = list_shares_after(was, physics.get(), which, dy, tall);
     if now == was {
         // It did not move, or it was already against what stops it: nothing
         // to redraw, and nothing to write.
@@ -1887,8 +1883,7 @@ fn drag_list_divider(
     lists.set(now);
     // The payload list takes what the other three leave, so the physics list
     // gives way where the two below it have taken its room.
-    let physics = views.borrow().physics_list.clone();
-    physics.set(settings::physics_list_share(physics.get(), now.0, now.1));
+    physics.set(settings::list_shares(now.0, now.1, physics.get()).2);
 
     remember(&views.borrow());
     views.borrow().refresh(&editor.borrow());
@@ -1984,8 +1979,9 @@ fn drag_physics_list_divider(
 
 /// Works out what the two shares become when a line is dragged this far.
 ///
-/// `was` is the gateway list's share and the vehicle list's, the payload list
-/// taking what is left; `which` is the list above the line that moved -- the
+/// `was` is the gateway list's share and the vehicle list's, and `physics` the
+/// physics list's at the top, the payload list taking what is left; `which`
+/// is the list above the line that moved -- the
 /// payload list for the upper line, the vehicle list for the lower one, the
 /// lists running payloads, vehicle, gateway down the column; `dy` is how far it
 /// went and `tall` how tall the column is, both in pixels.
@@ -2000,6 +1996,9 @@ fn drag_physics_list_divider(
 ///
 /// * `(gateway, vehicle)` - The gateway list's and the vehicle list's
 ///                          shares of the column now, in per cent.
+/// * `physics`            - The physics list's share, which neither line
+///                          moves but which the payload list's room is
+///                          what is left after.
 /// * `which`              - The list above the line that moved:
 ///                          `Pane::Payloads` for the upper line, anything else
 ///                          for the lower.
@@ -2013,6 +2012,7 @@ fn drag_physics_list_divider(
 /// The gateway list's and the vehicle list's new shares, in per cent.
 fn list_shares_after(
     (gateway, vehicle): (i32, i32),
+    physics: i32,
     which: Pane,
     dy: f32,
     tall: f32,
@@ -2027,7 +2027,7 @@ fn list_shares_after(
     // Each line moves only the boundary between its own two neighbours, so
     // the step is held to what both of them can give: the third list is not
     // touched however far the line goes.
-    let payload = 100 - gateway - vehicle;
+    let payload = 100 - gateway - vehicle - physics;
     let least = settings::LEAST;
     let asked = match which {
         // The upper line takes from the vehicle list and gives to the payload
@@ -2043,7 +2043,9 @@ fn list_shares_after(
             (gateway - step, vehicle + step)
         }
     };
-    settings::shares(asked.0, asked.1)
+    let (gateway, vehicle, _) =
+        settings::list_shares(asked.0, asked.1, physics);
+    (gateway, vehicle)
 }
 
 /// Shows what might be wrong, with somewhere to go and something to decide.
@@ -6163,6 +6165,10 @@ mod tests {
         dividers_for(settings::DEFAULT_GATEWAY, settings::DEFAULT_VEHICLE)
     }
 
+    /// The physics list's share the list tests take, which neither line
+    /// between the other lists moves.
+    const PHYSICS: i32 = settings::DEFAULT_LIST_PHYSICS;
+
     /// And how the selection column is divided, until somebody drags a line.
     ///
     /// # Returns
@@ -6580,7 +6586,7 @@ mod tests {
 
     /// A line between two lists cannot squeeze either of them away.
     ///
-    /// The floor asked for: a twentieth of the column, whichever line is
+    /// The floor asked for: a tenth of the column, whichever line is
     /// dragged and however far. A list squeezed to nothing is a list whose
     /// entries cannot be reached, and a line dragged to the end of its travel
     /// is easy to do by accident and hard to understand afterwards -- so the
@@ -6596,8 +6602,8 @@ mod tests {
             (Pane::Vehicle, 4000.0),
         ] {
             let (gateway, vehicle) =
-                list_shares_after(lists(), which, dy, 800.0);
-            let payload = 100 - gateway - vehicle;
+                list_shares_after(lists(), PHYSICS, which, dy, 800.0);
+            let payload = 100 - gateway - vehicle - PHYSICS;
             for (name, share) in [
                 ("gateway", gateway),
                 ("vehicle", vehicle),
@@ -6617,13 +6623,13 @@ mod tests {
         // what it takes from the vehicle list.
         let (was_gateway, was_vehicle) = lists();
         let (gateway, vehicle) =
-            list_shares_after(lists(), Pane::Payloads, 80.0, 800.0);
+            list_shares_after(lists(), PHYSICS, Pane::Payloads, 80.0, 800.0);
         assert_eq!((gateway, vehicle), (was_gateway, was_vehicle - 10));
 
         // And the lower line takes from the gateway list and gives to the
         // vehicle's, leaving the payload list alone.
         let (gateway, vehicle) =
-            list_shares_after(lists(), Pane::Vehicle, 80.0, 800.0);
+            list_shares_after(lists(), PHYSICS, Pane::Vehicle, 80.0, 800.0);
         assert_eq!((gateway, vehicle), (was_gateway - 10, was_vehicle + 10));
         assert_eq!(
             100 - gateway - vehicle,
@@ -6635,7 +6641,7 @@ mod tests {
         // redrawn and no settings file is written: a line nudged by a pixel on
         // a tall column is not a preference.
         assert_eq!(
-            list_shares_after(lists(), Pane::Payloads, 2.0, 800.0),
+            list_shares_after(lists(), PHYSICS, Pane::Payloads, 2.0, 800.0),
             lists()
         );
     }
@@ -9166,7 +9172,7 @@ mod tests {
         assert!(clear, "{second:?} covers {first_payload:?}");
     }
 
-    /// Neither line can squeeze a pane below a twentieth of the working area.
+    /// Neither line can squeeze a pane below a tenth of the working area.
     ///
     /// Both lines and all three panes, which is three rules in one place: the
     /// payload line keeps the payload pane and the vehicle's open, and the
@@ -9218,7 +9224,7 @@ mod tests {
                     assert!(
                         right - left >= least,
                         "{which:?} at {at} leaves the {} pane {} wide, and a \
-                         twentieth is {least}",
+                         tenth is {least}",
                         pane.label(),
                         right - left
                     );
@@ -9687,9 +9693,9 @@ mod tests {
 
     /// No working pane can be squeezed away.
     ///
-    /// The rule that was asked for: each pane keeps at least a twentieth of
+    /// The rule that was asked for: each pane keeps at least a tenth of
     /// the working pane, so none can be dragged shut -- and with three of
-    /// them, a divider stops a twentieth short of its neighbour as well as of
+    /// them, a divider stops a tenth short of its neighbour as well as of
     /// the edge. A pane with nothing visible in it is a pane whose nodes
     /// cannot be reached, and the drag that does it is one press away.
     #[test]
@@ -9699,7 +9705,7 @@ mod tests {
         let step = WORKING_WIDTH * settings::LEAST / 100;
 
         let (low, high) = divider_range(&document, d, Pane::Payloads);
-        assert_eq!(low, step, "the payload pane keeps a twentieth");
+        assert_eq!(low, step, "the payload pane keeps a tenth");
         assert_eq!(high, d.vehicle - step, "and so does the vehicle's");
 
         let (low, high) = divider_range(&document, d, Pane::Vehicle);
@@ -9707,7 +9713,7 @@ mod tests {
         assert_eq!(
             high,
             WORKING_WIDTH - step,
-            "the gateway pane keeps a twentieth"
+            "the gateway pane keeps a tenth"
         );
         assert!(low > 0 && high < WORKING_WIDTH);
     }

@@ -127,8 +127,10 @@ fn a_checked_configuration_is_kept_under_its_checksum() {
     let store = dir.path().join("kept");
     std::fs::create_dir(&store).expect("a store");
     let keep = format!("--keep={}", store.display());
+    // One file: a configuration kept on board includes files only by names
+    // beside it, and the ping example's include is a path into ping-common.
     let example = Path::new(env!("CARGO_MANIFEST_DIR"))
-        .join("../examples/ping/ping.ytcs");
+        .join("../examples/minimal/minimal.ytcs");
     let example = example.to_str().expect("a path");
     let checksum =
         tcslibgs::config_digest::digest_of_file(example).expect("it digests");
@@ -150,7 +152,13 @@ fn a_checked_configuration_is_kept_under_its_checksum() {
     let (graph, _) = tcslibgs::store::Store::at(&store)
         .load(checksum)
         .expect("it loads by its checksum");
-    assert_eq!(graph.nodes.len(), 2);
+    assert_eq!(
+        graph.nodes.len(),
+        tcslibgs::graph::Graph::load(example)
+            .expect("the example reads")
+            .nodes
+            .len()
+    );
 
     let (lines, status) = run(&[&keep, example]);
     assert_eq!(status, 0);
@@ -230,9 +238,10 @@ fn set_interface_rewrites_only_the_interface() {
     let ours = tcslibgs::InterfaceDigest::of_this_build().to_string();
     let stale = "0123456789abcdef0123456789abcdef";
     let mut paths = Vec::new();
-    for name in ["ping.ytcs", "ping.xtcs"] {
+    // An example that includes no other file, so that its copy reads.
+    for name in ["minimal.ytcs", "minimal.xtcs"] {
         let shipped = Path::new(env!("CARGO_MANIFEST_DIR"))
-            .join("../examples/ping")
+            .join("../examples/minimal")
             .join(name);
         let good = std::fs::read_to_string(&shipped).expect("the example");
         let path = dir.path().join(name);

@@ -115,7 +115,8 @@ pub struct GraphFile {
         alias = "@xsi:noNamespaceSchemaLocation"
     )]
     pub xml_schema_location: Option<String>,
-    /// Other files this one is made of, by name without an extension.
+    /// Other files this one is made of, each by its path from this file's
+    /// directory without an extension: `zone`, `../common/zone`.
     ///
     /// Named rather than discovered. Each is read in the same format as the
     /// file that named it: a set of files half in YAML and half in XML is
@@ -1110,8 +1111,9 @@ impl Graph {
     /// Reads a configuration, following its includes.
     ///
     /// The top file first, then each file it names, each in the top file's
-    /// format and beside it. An include that names a file twice, or a cycle of
-    /// includes, is refused rather than read twice.
+    /// format and at its include name read from the top file's directory --
+    /// see [`include_path`]. An include that names a file twice, or names the
+    /// top file, is refused rather than read twice.
     ///
     /// # Arguments
     ///
@@ -1125,7 +1127,8 @@ impl Graph {
     /// # Errors
     ///
     /// [`TcsError::Config`], naming the file, for a file that does not read,
-    /// an include named twice, an included file with a `tcspecial` section or
+    /// an include name of a shape [`include_path`] refuses, an include named
+    /// twice, an included file with a `tcspecial` section or
     /// includes of its own, a node in the wrong section, and data sinks whose
     /// flags disagree with the links.
     pub fn load<P: AsRef<Path>>(path: P) -> TcsResult<Graph> {
@@ -1155,16 +1158,22 @@ impl Graph {
         graph.absorb(path, &top, &mut mirror)?;
         graph.files.push(path.to_path_buf());
 
+        // Each file once, by what it is rather than by how it was named:
+        // `zone` and `../vehicle/zone` from a top file in `vehicle` are one
+        // file, and so is a name that comes back to the top file itself.
+        let mut seen = vec![canonical(path)?];
         for name in &top.include {
-            let included = beside(path, name);
-            if graph.files.contains(&included) {
+            let included = include_path(path, name)?;
+            let file: GraphFile = read_one(&included)?;
+            let real = canonical(&included)?;
+            if seen.contains(&real) {
                 return Err(TcsError::Config(format!(
-                    "{}: {} is included twice",
+                    "{}: {} is included twice, or is this file",
                     path.display(),
                     included.display()
                 )));
             }
-            let file: GraphFile = read_one(&included)?;
+            seen.push(real);
             if file.tcspecial.is_some() {
                 return Err(TcsError::Config(format!(
                     "{}: an included file may not have a tcspecial section -- \
@@ -1206,28 +1215,48 @@ impl Graph {
 
     /// Says the names the top file's include list gave its other files.
     ///
-    /// Each as the include list wrote it: the included file's path beside
-    /// the top file, without the extension [`Graph::load`] gave it.
+    /// Each as the include list wrote it -- `zone`, or
+    /// `../thermostat-common/thermostat` -- which is the included file's path
+    /// from the top file's directory without the extension [`Graph::load`]
+    /// gave it. The same set of files is named the same from wherever it is
+    /// read, which is what lets the digest take these names in.
     ///
     /// # Returns
     ///
     /// The names, in the order the include list gave them; none for a
     /// configuration of one file, or one not read from files.
     pub fn included(&self) -> Vec<String> {
-        let Some(top) = self.files.first() else {
-            return Vec::new();
-        };
-        let dir = top.parent().unwrap_or(Path::new(""));
-        self.files[1..]
+        self.files
             .iter()
-            .map(|file| {
-                file.strip_prefix(dir)
-                    .unwrap_or(file)
-                    .with_extension("")
-                    .to_string_lossy()
-                    .into_owned()
-            })
+            .skip(1)
+            .filter_map(|file| self.include_name(file))
             .collect()
+    }
+
+    /// Says the name the top file's include list gave one of the other
+    /// files, as [`Graph::included`] gives it.
+    ///
+    /// # Arguments
+    ///
+    /// * `file` - One of [`Graph::files`].
+    ///
+    /// # Returns
+    ///
+    /// The include name, or `None` for the top file and for a file that is
+    /// not one of this configuration's.
+    pub fn include_name(&self, file: &Path) -> Option<String> {
+        let top = self.files.first()?;
+        if file == top || !self.files.iter().any(|f| f == file) {
+            return None;
+        }
+        let dir = top.parent().unwrap_or(Path::new(""));
+        Some(
+            file.strip_prefix(dir)
+                .unwrap_or(file)
+                .with_extension("")
+                .to_string_lossy()
+                .into_owned(),
+        )
     }
 
     /// Takes in one file: its nodes, the links they carry, and the rest.
@@ -1320,7 +1349,11 @@ impl Graph {
     }
 }
 
-/// Reads one file of a configuration.
+/// Reads one file of a configuration, without following its includes.
+///
+/// [`Graph::load`] is what reads a configuration; this is for a reader that
+/// needs to know which of its files says what, as the editor does to write
+/// each group and command binding back to the file it came from.
 ///
 /// The sections of an older spelling are named before the file is read as a
 /// graph: a file still written in them is not a graph with problems in it,
@@ -1339,7 +1372,7 @@ impl Graph {
 /// [`TcsError::Config`], naming the file, for an extension that is no
 /// format, a file that cannot be read or parsed, and a section of an older
 /// spelling.
-fn read_one(path: &Path) -> TcsResult<GraphFile> {
+pub fn read_one(path: &Path) -> TcsResult<GraphFile> {
     let format = ConfigFormat::of_file(path)?;
     let text = std::fs::read_to_string(path)
         .map_err(|e| TcsError::Config(format!("{}: {e}", path.display())))?;
@@ -1401,8 +1434,22 @@ fn read_one(path: &Path) -> TcsResult<GraphFile> {
     Ok(file)
 }
 
-/// Says where an included file sits: beside the file that named it, in the
-/// same format.
+/// Says where an included file is: its include name, read from the
+/// directory of the file that named it, in that file's format.
+///
+/// A name is a relative path without an extension, its parts separated by
+/// `/`: `zone` beside the top file, `../thermostat-common/thermostat` in a
+/// directory beside the top file's. Each part is a name or `..`. Refused are
+/// an empty name, an absolute one, and a part that is empty or `.`: those
+/// last say nothing a name without them does not, and a name is written into
+/// the digest as it is written in the file, so two spellings of one path
+/// would be two digests of one configuration. An absolute name would make
+/// the configuration mean something different on every machine it is
+/// copied to, and so would a name that began with `~` or named an
+/// environment variable with `$`, were either expanded. Neither is: both
+/// are refused rather than read as a file's name, because somebody who
+/// wrote one meant the expansion, and a digest that depended on a home
+/// directory or a variable could not be worked out from the files alone.
 ///
 /// # Arguments
 ///
@@ -1411,16 +1458,62 @@ fn read_one(path: &Path) -> TcsResult<GraphFile> {
 ///
 /// # Returns
 ///
-/// The included file's path.
-fn beside(top: &Path, name: &str) -> PathBuf {
+/// The included file's path: the top file's directory joined with the name,
+/// the top file's extension added.
+///
+/// # Errors
+///
+/// [`TcsError::Config`], naming the top file and the include, for a name of
+/// a shape refused above.
+fn include_path(top: &Path, name: &str) -> TcsResult<PathBuf> {
+    let refused = |why: &str| {
+        Err(TcsError::Config(format!(
+            "{}: the include \"{name}\" {why}: an include is relative to \
+             this file's directory, naming a file by its path from there \
+             without an extension, such as zone or ../common/zone",
+            top.display()
+        )))
+    };
+    if name.is_empty() {
+        return refused("is empty");
+    }
+    if name.starts_with('/') {
+        return refused("is an absolute path");
+    }
+    if name.split('/').any(|part| part.is_empty() || part == ".") {
+        return refused("has a part that is empty or \".\"");
+    }
+    if name.starts_with('~') {
+        return refused("begins with ~, which is not expanded");
+    }
+    if name.contains('$') {
+        return refused("has a $ in it, and no variable is expanded");
+    }
     let extension = top
         .extension()
         .and_then(|e| e.to_str())
         .unwrap_or("ytcs")
         .to_string();
-    let mut path = top.to_path_buf();
-    path.set_file_name(format!("{name}.{extension}"));
-    path
+    let dir = top.parent().unwrap_or(Path::new(""));
+    Ok(dir.join(format!("{name}.{extension}")))
+}
+
+/// Says what a file is, whatever path it was reached by.
+///
+/// # Arguments
+///
+/// * `path` - The file.
+///
+/// # Returns
+///
+/// Its canonical path, every link and `..` resolved.
+///
+/// # Errors
+///
+/// [`TcsError::Config`], naming the file, for one that cannot be found.
+fn canonical(path: &Path) -> TcsResult<PathBuf> {
+    std::fs::canonicalize(path)
+        .map_err(|e| TcsError::Config(format!("{}: {e}", path.display())))
 }
 
 /// Reads a length of time: a number, a space, and a unit.
@@ -2215,6 +2308,84 @@ gateways:
         let said =
             format!("{}", Graph::load(&top).expect_err("twice is refused"));
         assert!(said.contains("included twice"), "{said}");
+    }
+
+    /// A file reached by two include names is still included twice, and so
+    /// is the top file named as an include.
+    #[test]
+    fn a_file_named_two_ways_is_still_included_twice() {
+        let where_ = tempfile::tempdir().expect("a directory");
+        let vehicle = where_.path().join("vehicle");
+        std::fs::create_dir(&vehicle).unwrap();
+        let top = vehicle.join("top.ytcs");
+        std::fs::write(vehicle.join("zone.ytcs"), "payloads: []\n").unwrap();
+
+        for names in ["zone\n  - ../vehicle/zone", "../vehicle/top"] {
+            std::fs::write(&top, format!("include:\n  - {names}\n")).unwrap();
+            let said =
+                format!("{}", Graph::load(&top).expect_err("twice is refused"));
+            assert!(said.contains("included twice"), "{said}");
+        }
+    }
+
+    /// An include may name a file in another directory, by its path from
+    /// the top file's, and it is known by that name as it was written.
+    #[test]
+    fn an_include_may_be_in_another_directory() {
+        let where_ = tempfile::tempdir().expect("a directory");
+        for dir in ["vehicle", "common"] {
+            std::fs::create_dir(where_.path().join(dir)).unwrap();
+        }
+        let top = where_.path().join("vehicle/top.ytcs");
+        std::fs::write(&top, "include:\n  - ../common/zone\n").unwrap();
+        std::fs::write(
+            where_.path().join("common/zone.ytcs"),
+            "vehicle:\n  - type ping:\n      - { compute: p }\n",
+        )
+        .unwrap();
+
+        let graph = Graph::load(&top).expect("it reads");
+        assert!(graph.node("p").is_some(), "the include was not read");
+        assert_eq!(graph.included(), vec!["../common/zone".to_string()]);
+
+        // And from another working directory, by another path to the same
+        // top file, it is named the same, which is what the digest takes.
+        let again =
+            Graph::load(where_.path().join("common/../vehicle/top.ytcs"))
+                .expect("it reads");
+        assert_eq!(again.included(), graph.included());
+    }
+
+    /// An include name that is absolute, empty, or has a part that is empty
+    /// or `.` is refused, saying which and what a name is.
+    #[test]
+    fn an_include_name_of_the_wrong_shape_is_refused() {
+        let where_ = tempfile::tempdir().expect("a directory");
+        let top = where_.path().join("vehicle.ytcs");
+        std::fs::write(where_.path().join("zone.ytcs"), "payloads: []\n")
+            .unwrap();
+        let absolute = where_.path().join("zone");
+        for (name, why) in [
+            ("\"\"", "is empty"),
+            (absolute.to_str().unwrap(), "is an absolute path"),
+            ("./zone", "has a part that is empty"),
+            ("sub//zone", "has a part that is empty"),
+            ("zone/", "has a part that is empty"),
+            ("~/zone", "begins with ~"),
+            ("~zone", "begins with ~"),
+            ("$HOME/zone", "has a $ in it"),
+            ("${COMMON}/zone", "has a $ in it"),
+        ] {
+            std::fs::write(&top, format!("include:\n  - {name}\n")).unwrap();
+            let said =
+                format!("{}", Graph::load(&top).expect_err("it is refused"));
+            assert!(said.contains(why), "{name}: {said}");
+            assert!(said.contains("../common/zone"), "{name}: {said}");
+            assert!(
+                said.contains("relative to this file's directory"),
+                "{name}: {said}"
+            );
+        }
     }
 
     /// An included file may not include others.

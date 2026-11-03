@@ -153,8 +153,18 @@ fn the_python_counts_payload_telemetry_apids_as_the_rust_does() {
         \x20   <tcsgui>";
     assert_eq!(text.matches("    <tcsgui>").count(), 1, "one tcsgui");
     let text = text.replace("    <tcsgui>", payloads);
+    // In a directory of its own, with the file it includes beside it, as in
+    // `examples`.
     let dir = tempfile::tempdir().expect("a directory");
-    let path = dir.path().join("with-payloads.xtcs");
+    for sub in ["ping-yamcs", "ping-common"] {
+        std::fs::create_dir(dir.path().join(sub)).expect("a directory");
+    }
+    std::fs::copy(
+        here().join("../ping-common/ping.xtcs"),
+        dir.path().join("ping-common/ping.xtcs"),
+    )
+    .expect("copied");
+    let path = dir.path().join("ping-yamcs/with-payloads.xtcs");
     std::fs::write(&path, text).expect("written");
 
     let graph = Graph::load(&path).expect("the copy reads");

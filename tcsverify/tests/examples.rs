@@ -4,7 +4,9 @@
 //! configuration, `<name>.ytcs` and the same in XML, `<name>.xtcs`, and the
 //! simulator configuration beside it, `<name>-sim.yaml`. They are discovered
 //! rather than listed, so an example added to the directory is checked
-//! without anyone having to remember to name it here.
+//! without anyone having to remember to name it here. A file that an example
+//! includes -- the shared parts of two examples, in a `-common` directory --
+//! is not an example: it is checked as part of each that includes it.
 
 use std::path::{Path, PathBuf};
 
@@ -32,7 +34,7 @@ fn entries(dir: &Path) -> impl Iterator<Item = PathBuf> {
 /// # Returns
 ///
 /// The files' paths, sorted.
-fn example_files(extension: &str) -> Vec<PathBuf> {
+fn every_file(extension: &str) -> Vec<PathBuf> {
     let mut files: Vec<PathBuf> = entries(&examples_dir())
         .filter(|path| path.is_dir())
         .flat_map(|dir| entries(&dir).collect::<Vec<_>>())
@@ -40,6 +42,67 @@ fn example_files(extension: &str) -> Vec<PathBuf> {
         .collect();
     files.sort();
     files
+}
+
+/// Finds every file an example includes, by what it is.
+///
+/// A file that does not load is passed over here: an included file need not
+/// load on its own, and an example that does not load is an example, which
+/// the tests below then refuse.
+///
+/// # Returns
+///
+/// Each included file's canonical path, once for each file that includes
+/// it.
+fn included() -> Vec<PathBuf> {
+    every_file("ytcs")
+        .into_iter()
+        .chain(every_file("xtcs"))
+        .filter_map(|path| Graph::load(path).ok())
+        .flat_map(|graph| graph.files.into_iter().skip(1))
+        .map(|file| file.canonicalize().expect("an included file is there"))
+        .collect()
+}
+
+/// Finds every example's file with the given extension: every file of an
+/// example directory but those an example includes.
+///
+/// # Arguments
+///
+/// * `extension` - The extension, without its dot.
+///
+/// # Returns
+///
+/// The files' paths, sorted.
+fn example_files(extension: &str) -> Vec<PathBuf> {
+    let included = included();
+    every_file(extension)
+        .into_iter()
+        .filter(|path| {
+            !included.contains(&path.canonicalize().expect("it is there"))
+        })
+        .collect()
+}
+
+/// Every file an example includes is included by at least two, which is
+/// what a file of its own is for, and is in a `-common` directory, which is
+/// where the README says shared parts are.
+#[test]
+fn every_included_file_is_shared() {
+    let included = included();
+    assert!(!included.is_empty(), "nothing is included");
+    for file in &included {
+        let times = included.iter().filter(|other| *other == file).count();
+        // Once for each example that includes it, in its own spelling.
+        assert!(times >= 2, "{} is included once", file.display());
+        let dir = file.parent().and_then(|d| d.file_name());
+        assert!(
+            dir.and_then(|d| d.to_str())
+                .is_some_and(|d| d.ends_with("-common")),
+            "{} is not in a -common directory",
+            file.display()
+        );
+    }
 }
 
 /// Lists the examples' configurations in YAML.

@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<configuration
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:noNamespaceSchemaLocation="../../tcsgui/share/schema/tcspecial.xsd">
+    <!-- The vehicle the two ping examples share, which each includes: the
+         ping node, which answers each ping it is sent. What differs
+         between the two is in each example's own file: the tcspecial
+         section and the gateway node, which is called gateway in both, the
+         name the ping node's answer is sent to it by. -->
+
+    <vehicle>
+        <type name="ping">
+            <!-- Answers each ping with the vehicle's time on the end: see
+                 tcslibgs::node::vehicle::ping for what a ping and its
+                 answer say. -->
+            <compute name="ping">
+                <payload-out><target>gateway</target></payload-out>
+                <gateway-in>true</gateway-in>
+            </compute>
+        </type>
+    </vehicle>
+    <tcsgui>
+        <nodes>
+            <node name="ping" x="34" y="34"/>
+        </nodes>
+    </tcsgui>
+</configuration>

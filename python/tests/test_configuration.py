@@ -134,11 +134,71 @@ class ConfigurationTest(unittest.TestCase):
                 with self.assertRaisesRegex(ValueError, "line"):
                     configuration.load(path)
 
-    def test_an_include_is_refused_rather_than_counted_wrong(self):
-        directory, path = written("<include>more</include>")
-        with directory:
-            with self.assertRaisesRegex(ValueError, "includes other files"):
-                configuration.load(path)
+    def test_an_included_files_nodes_are_counted_with_the_top_files(self):
+        # From a directory beside the top file's, by its path from there:
+        # the ids are each node's place among every file's names.
+        with tempfile.TemporaryDirectory() as directory:
+            here = Path(directory)
+            (here / "vehicle").mkdir()
+            (here / "common").mkdir()
+            top = here / "vehicle" / "top.xtcs"
+            top.write_text(
+                "<configuration><include>../common/zone</include>"
+                '<payloads><type name="i2c"><payload name="b"/></type>'
+                "</payloads></configuration>")
+            (here / "common" / "zone.xtcs").write_text(
+                '<configuration><payloads><type name="i2c"><payload name="a"/>'
+                '<payload name="c"/></type></payloads></configuration>')
+            config = configuration.load(top)
+            self.assertEqual(config.included, ["../common/zone"])
+            self.assertEqual([config.device_id(n) for n in "abc"],
+                             [0, 1, 2])
+
+    def test_an_include_name_says_includes_are_relative(self):
+        # Nothing is expanded: a ~ or a variable is refused, saying what an
+        # include is, rather than looked for as a file of that name.
+        for name in ["~/zone", "$HOME/zone", "/zone"]:
+            with self.subTest(name=name):
+                directory, path = written(f"<include>{name}</include>")
+                with directory:
+                    with self.assertRaisesRegex(
+                            ValueError, "relative to this file's directory"):
+                        configuration.load(path)
+
+    def test_an_include_is_refused_as_the_rust_refuses_it(self):
+        refused = {
+            "<include></include>": "is empty",
+            "<include>/zone</include>": "is an absolute path",
+            "<include>./zone</include>": "part that is empty",
+            "<include>a//zone</include>": "part that is empty",
+            "<include>~/zone</include>": "begins with ~",
+            "<include>$HOME/zone</include>": r"has a \$ in it",
+            "<include>${COMMON}/zone</include>": r"has a \$ in it",
+            "<include>zone</include><include>zone</include>":
+                "included twice",
+            "<include>vehicle</include>": "included twice",
+            "<include>section</include>": "may not have a tcspecial",
+            "<include>nests</include>": "may not include others",
+            "<include>zone</include>"
+            '<payloads><type name="i2c"><payload name="a"/></type>'
+            "</payloads>": 'node called "a" here and in',
+        }
+        for text, why in refused.items():
+            with self.subTest(text=text):
+                directory, path = written(text)
+                with directory:
+                    here = path.parent
+                    (here / "zone.xtcs").write_text(
+                        '<configuration><payloads><type name="i2c">'
+                        '<payload name="a"/></type></payloads>'
+                        "</configuration>")
+                    (here / "section.xtcs").write_text(
+                        "<configuration><tcspecial/></configuration>")
+                    (here / "nests.xtcs").write_text(
+                        "<configuration><include>zone</include>"
+                        "</configuration>")
+                    with self.assertRaisesRegex(ValueError, why):
+                        configuration.load(path)
 
     def test_the_two_spellings_read_alike(self):
         # The YAML and the XML of one example say the same thing, so they are

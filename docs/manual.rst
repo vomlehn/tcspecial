@@ -448,6 +448,29 @@ the simulator configuration file
     tcsmoc, which shows it and acts on none of it. There is nothing in it
     about the payloads themselves.
 
+A configuration may be written as several files. The one named on the command
+line is the top file, and its ``include`` list names the others, each read in
+the top file's spelling and taken in as if it were written there:
+
+.. code-block:: yaml
+
+   include:
+     - ../thermostat-common/thermostat
+
+An include is relative to the top file's directory: it is the file's path from
+there, without the extension, ``zone`` for ``zone.ytcs`` beside the top file
+and ``../thermostat-common/thermostat`` for ``thermostat.ytcs`` in a directory
+beside the top file's. Nothing in it is expanded, so an include that is
+absolute, that begins with ``~`` or that has a ``$`` in it is refused, saying
+so, rather than looked for as a file of that name; so is an empty one, and one
+with a part that is empty or ``.``. An included file has no ``tcspecial``
+section and includes no others, no file is included twice, and no two files
+have a node of one name, since a node is known by its name in every file:
+a line in one file may run to a node in another. The digest takes in each
+include as it is written, so a set of files digests alike from wherever it is
+read. Two examples that fly one vehicle include it from a directory of their
+own: see `The thermostat-yamcs example`_.
+
 tcspecial once read a configuration of its own as well, named by
 ``TCSPECIAL_CONFIG_PATH``, which said where commands are taken, where beacons
 go and where the log is written. Every configuration must state those in its ``tcspecial`` section, so
@@ -2615,8 +2638,9 @@ beside ``Command``. It opens the same panel, in a window of its own: the
 button, the ping sent and the answer, and the three times. Both ground stations
 keep them by the same rules, ``tcslib::ping`` in Rust and
 ``examples/ping-common/ping_ground.py`` in Python. ``examples/ping-common``
-holds what the ping example shares with ping-yamcs, the ping link and the
-window, and is not an example itself.
+holds what the ping example shares with ping-yamcs, the ping link, the
+window and the ``ping`` node, in ``ping-common/ping.ytcs`` and its XML,
+which both configurations include, and is not an example itself.
 
 The ping-yamcs example
 ----------------------
@@ -2723,15 +2747,21 @@ The thermostat example with Yamcs at the ground end, as ping-yamcs is the
 ping example with it. The vehicle is the thermostat's, and so is the
 physics model tcssim joins its stand-ins to,
 ``examples/thermostat-common/thermostat-physics.yaml``, which the two
-simulator files name; the two configurations and the two simulator files
-are written in both examples, as neither format can include the other, and
-a test, ``examples/thermostat-yamcs/tests/shared.rs``, holds each copy to
-the other. What differs is the gateway, ``yamcs``: the beacon is telemetry
-of APID ``0x110``, CONNECT and its answer are on ``0x111``, and each source
-drawn into the gateway node comes down as telemetry of its ``apid_base``,
-``0x400``, plus the source's device id -- ``ambient`` on ``0x400``,
-``gpio-in-tmass`` on ``0x402``, and ``temp1`` to ``temp3`` on ``0x406`` to
-``0x408``.
+simulator files name. The vehicle is written once, in
+``examples/thermostat-common/thermostat.ytcs`` and its XML, which both
+configurations include: the conversions, the vote, the thermostat and its
+log, the heaters and the lines sensing them, the ``zone_temps`` group and
+the setpoint's binding. Each example's own file has its ``tcspecial``
+section, its gateway node, called ``gateway`` in both, and the three
+sensors, whose ports differ so that the two can run at once. A simulator
+file includes no other, so the two simulator files are written in both
+examples, and a test, ``examples/thermostat-yamcs/tests/shared.rs``, holds
+each copy to the other. What differs is the gateway, ``yamcs``: the beacon
+is telemetry of APID ``0x110``, CONNECT and its answer are on ``0x111``, and
+each source drawn into the gateway node comes down as telemetry of its
+``apid_base``, ``0x400``, plus the source's device id -- ``ambient`` on
+``0x400``, ``gpio-in-tmass`` on ``0x402``, and ``temp1`` to ``temp3`` on
+``0x406`` to ``0x408``.
 
 The mission database gives each of them a parameter of the type the
 configuration says its data are (see `What the vehicle answers to`_): the
@@ -4296,12 +4326,14 @@ Each spelling is checked with the simulator file, the first named first, and
 then the two are compared: every section, every attribute and every value, as
 the programs read them -- which is what a configuration's digest is taken over,
 so two spellings this finds no difference between are two that tcspecial and
-tcsmoc agree on. A difference is reported at the line of the second file it is
-on, saying what each file says:
+tcsmoc agree on. Files a configuration includes are compared with it, each
+with its own spelling. A difference is reported at the line of the second
+spelling it is on, in whichever of its files that is, saying what each says:
+the thermostat is in the file the thermostat example includes.
 
 .. code-block:: console
 
-   examples/thermostat/thermostat.ytcs:95: error: nodes / thermostat / attributes / setpoint: examples/thermostat/thermostat.xtcs says "290" and examples/thermostat/thermostat.ytcs says "293.15"
+   examples/thermostat/../thermostat-common/thermostat.ytcs:72: error: nodes / thermostat / attributes / setpoint: examples/thermostat/thermostat.xtcs says "290" and examples/thermostat/thermostat.ytcs says "293.15"
 
 The order anything is written in is not compared: nothing in a configuration
 is in an order that means anything, and a node's device id comes from its
@@ -4352,7 +4384,7 @@ that::
 and before the problems::
 
    $ cargo run --bin tcsverify -- --digest examples/thermostat/thermostat.ytcs
-   examples/thermostat/thermostat.ytcs: md5 2e863fd2024ec28240ba599e5e627a10
+   examples/thermostat/thermostat.ytcs: md5 bd9fd88e7cf85dbd02d6cb834f0b9eaf
 
 That is the digest tcspecial prints as it starts and puts in every beacon, and
 the MOC compares with its own: two ends whose digests agree have read one
@@ -4705,7 +4737,10 @@ each file it includes sits beside it under the name its include list gives
 it. The checksum takes in those names, so it says the shape of the tree as
 well as what is in it. Left out, the vehicle keeps none, and a restart may
 name only the configuration it runs. An include name must be a file's
-name, not a path, must not begin with a dot, and must not be the checksum.
+name, not a path, must not begin with a dot, and must not be the checksum,
+so a configuration that includes a file in another directory, as the
+thermostat and ping examples do, is not kept: written for a vehicle, its
+files are put in one directory and include one another by name.
 A checksum is computed again each time its configuration is loaded, and
 one whose checksum is not its name -- cut short as it was written, or
 damaged -- is not loaded.

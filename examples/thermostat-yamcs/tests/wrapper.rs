@@ -203,6 +203,10 @@ fn a_beacon_decodes_as_the_vehicle_framed_it() {
 /// A copy of the example whose readings are `to_value` conversions in a
 /// unit, and whose vote is so in that unit too.
 ///
+/// The readings are in the file the example includes, so that is copied
+/// with them changed, into a `thermostat-common` beside the copy of the
+/// example, as in `examples`; both in a directory of the unit's own.
+///
 /// # Arguments
 ///
 /// * `dir`  - Where to write it.
@@ -212,8 +216,8 @@ fn a_beacon_decodes_as_the_vehicle_framed_it() {
 ///
 /// The copy's path.
 fn in_unit(dir: &Path, unit: Unit) -> PathBuf {
-    let said = std::fs::read_to_string(here().join("thermostat-yamcs.xtcs"))
-        .expect("the example reads");
+    let common = here().join("../thermostat-common/thermostat.xtcs");
+    let said = std::fs::read_to_string(&common).expect("the common file reads");
     let changed = said.replace(
         "<function>to_kelvin</function>",
         &format!(
@@ -222,8 +226,14 @@ fn in_unit(dir: &Path, unit: Unit) -> PathBuf {
         ),
     );
     assert_ne!(said, changed, "the readings are to_kelvin conversions");
-    let path = dir.join(format!("in-{unit:?}.xtcs"));
-    std::fs::write(&path, changed).expect("written");
+    let at = dir.join(format!("{unit:?}"));
+    for sub in ["thermostat-yamcs", "thermostat-common"] {
+        std::fs::create_dir_all(at.join(sub)).expect("a directory");
+    }
+    std::fs::write(at.join("thermostat-common/thermostat.xtcs"), changed)
+        .expect("written");
+    let path = at.join("thermostat-yamcs/in.xtcs");
+    std::fs::copy(here().join("thermostat-yamcs.xtcs"), &path).expect("copied");
     path
 }
 

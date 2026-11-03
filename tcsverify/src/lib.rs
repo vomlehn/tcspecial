@@ -500,10 +500,24 @@ pub fn compare(first: &Path, second: &Path, report: &mut Report) {
 
     let mut differences = Vec::new();
     differences_between(&one, &two, &mut Vec::new(), &mut differences);
-    let text = std::fs::read_to_string(second).unwrap_or_default();
+    // Every file of the second, for a difference to be reported in the one
+    // that says the thing: a configuration that includes others has most of
+    // what it says in them.
+    let (files, homes) = match tcslibgs::graph::Graph::load(second) {
+        Ok(graph) => (graph.files, graph.homes),
+        Err(_) => (vec![second.to_path_buf()], Default::default()),
+    };
+    let files: Vec<(PathBuf, String)> = files
+        .into_iter()
+        .map(|file| {
+            let text = std::fs::read_to_string(&file).unwrap_or_default();
+            (file, text)
+        })
+        .collect();
     let (first_name, second_name) = (first.display(), second.display());
     for (path, said) in differences {
-        let line = line_of_path(&text, &path);
+        let (file, line) = where_written(&files, &homes, &path)
+            .unwrap_or((second.to_path_buf(), THE_FILE_ITSELF));
         let message = match said {
             Said::Both(a, b) => format!(
                 "{}: {first_name} says {a} and {second_name} says {b}",
@@ -526,8 +540,48 @@ pub fn compare(first: &Path, second: &Path, report: &mut Report) {
                 path.join(" / ")
             ),
         };
-        report.add(second, line, message);
+        report.add(&file, line, message);
     }
+}
+
+/// Finds the file and line a difference is written at, among a
+/// configuration's files.
+///
+/// A node's, and a link's, in the file the node is written in; anything
+/// else in the first file that writes it. See [`line_of_path`].
+///
+/// # Arguments
+///
+/// * `files` - Each file of the configuration, the top one first, with its
+///             text.
+/// * `homes` - The file each node is written in, by name.
+/// * `path`  - The path to the thing, as [`differences_between`] gives it.
+///
+/// # Returns
+///
+/// The file and the line, from 1; `None` where no file writes it.
+fn where_written(
+    files: &[(PathBuf, String)],
+    homes: &std::collections::BTreeMap<String, PathBuf>,
+    path: &[String],
+) -> Option<(PathBuf, usize)> {
+    // The node a path about a node or a link is about, which is the first
+    // thing a file writes of it: by that, the file is the one it is in.
+    let node = match path.first().map(String::as_str) {
+        Some("nodes" | "links") => path
+            .get(1)
+            .map(|name| name.split('.').next().unwrap_or(name).to_string()),
+        _ => None,
+    };
+    let found = |(file, text): &(PathBuf, String)| {
+        let line = line_of_path(text, path);
+        (line != THE_FILE_ITSELF).then(|| (file.clone(), line))
+    };
+    let home = node.and_then(|node| homes.get(&node));
+    if let Some(home) = files.iter().find(|(file, _)| Some(file) == home) {
+        return found(home).or(Some((home.0.clone(), THE_FILE_ITSELF)));
+    }
+    files.iter().find_map(found)
 }
 
 /// What two files say about one thing they differ on.
@@ -1213,11 +1267,14 @@ mod tests {
     use tcslibgs::graph::built::OPTIONAL_TYPES as ALL;
 
     /// Copies the thermostat example's two spellings and its simulator file
-    /// to a directory of their own, with `change` made to the XML.
+    /// to a directory of their own, with the common file they include and
+    /// the physics model in a directory beside it, as in `examples`, and
+    /// with `change` made to the XML of both.
     ///
     /// # Arguments
     ///
-    /// * `change` - Takes the XML's text and gives what is written instead.
+    /// * `change` - Takes an XML file's text and gives what is written
+    ///              instead.
     ///
     /// # Returns
     ///
@@ -1226,35 +1283,36 @@ mod tests {
     fn thermostat_pair(
         change: impl Fn(String) -> String,
     ) -> (tempfile::TempDir, PathBuf, PathBuf, PathBuf) {
-        let root = Path::new(env!("CARGO_MANIFEST_DIR"))
-            .join("../examples/thermostat");
+        let examples =
+            Path::new(env!("CARGO_MANIFEST_DIR")).join("../examples");
         let dir = tempfile::tempdir().expect("a directory");
         let at = |name: &str| dir.path().join(name);
-        std::fs::copy(root.join("thermostat.ytcs"), at("thermostat.ytcs"))
-            .expect("copied");
-        // The physics model is the one thermostat-yamcs shares, in
-        // thermostat-common, and the copy names its own copy beside it.
-        std::fs::copy(
-            root.join("../thermostat-common/thermostat-physics.yaml"),
-            at("thermostat-physics.yaml"),
-        )
-        .expect("copied");
-        let shared = "physics: ../thermostat-common/thermostat-physics.yaml";
-        let sim = std::fs::read_to_string(root.join("thermostat-sim.yaml"))
-            .expect("the simulator file");
-        assert!(sim.contains(shared), "it names the shared model");
-        std::fs::write(
-            at("thermostat-sim.yaml"),
-            sim.replace(shared, "physics: thermostat-physics.yaml"),
-        )
-        .expect("written");
-        let xml = std::fs::read_to_string(root.join("thermostat.xtcs"))
-            .expect("the XML");
-        std::fs::write(at("thermostat.xtcs"), change(xml)).expect("written");
+        for (sub, files) in [
+            ("thermostat", ["thermostat", "thermostat-sim.yaml"]),
+            (
+                "thermostat-common",
+                ["thermostat", "thermostat-physics.yaml"],
+            ),
+        ] {
+            std::fs::create_dir(at(sub)).expect("a directory");
+            let copy = |name: String| {
+                std::fs::copy(
+                    examples.join(sub).join(&name),
+                    at(sub).join(&name),
+                )
+                .expect("copied");
+            };
+            copy(format!("{}.ytcs", files[0]));
+            copy(files[1].to_string());
+            let xml = format!("{}.xtcs", files[0]);
+            let text = std::fs::read_to_string(examples.join(sub).join(&xml))
+                .expect("the XML");
+            std::fs::write(at(sub).join(&xml), change(text)).expect("written");
+        }
         let (xml, yaml, sim) = (
-            at("thermostat.xtcs"),
-            at("thermostat.ytcs"),
-            at("thermostat-sim.yaml"),
+            at("thermostat/thermostat.xtcs"),
+            at("thermostat/thermostat.ytcs"),
+            at("thermostat/thermostat-sim.yaml"),
         );
         (dir, xml, yaml, sim)
     }
@@ -1314,8 +1372,10 @@ mod tests {
     /// the model's joins.
     #[test]
     fn the_physics_model_is_reported_at_its_own_lines() {
-        let (dir, _, yaml, sim) = thermostat_pair(|xml| xml);
-        let model = dir.path().join("thermostat-physics.yaml");
+        let (_dir, _, yaml, sim) = thermostat_pair(|xml| xml);
+        // Named as the simulator file names it, which is how it is reported.
+        let model =
+            sim.with_file_name("../thermostat-common/thermostat-physics.yaml");
         let edit = |path: &Path, from: &str, to: &str| {
             let text = std::fs::read_to_string(path).expect("read");
             assert!(text.contains(from), "{from}");
@@ -1429,7 +1489,12 @@ mod tests {
         let said = report.said();
         assert_eq!(report.findings.len(), 1, "{said:?}");
         let finding = &report.findings[0];
-        assert_eq!(finding.file, xml);
+        // In the file the thermostat is written in, which is the one the
+        // example includes.
+        assert_eq!(
+            finding.file,
+            xml.with_file_name("../thermostat-common/thermostat.xtcs")
+        );
         assert!(
             finding
                 .message
@@ -1438,7 +1503,7 @@ mod tests {
                 && finding.message.contains("says \"290\""),
             "{said:?}"
         );
-        let text = std::fs::read_to_string(&xml).expect("the XML");
+        let text = std::fs::read_to_string(&finding.file).expect("the XML");
         let line = text.lines().nth(finding.line - 1).expect("a line");
         assert!(
             line.contains("<setpoint>290"),

@@ -21,12 +21,19 @@
 //! into differently by each. What it buys is the freedom to connect anything
 //! to anything without restructuring the diagram first.
 //!
-//! **A name that crosses is qualified.** Since a link may name a node in
-//! another file, names have to be unambiguous across the whole assembly -- and
-//! requiring them to be globally unique would make including one subdiagram
-//! twice impossible, which is exactly the reuse a separate file is for. So a
-//! node is named plainly within its own file and `subdiagram/node` from
-//! outside it. A name is local until it has to travel.
+//! **A name is the node's own in every file.** The configuration reader,
+//! `tcslibgs::graph::Graph::load`, knows a node by its bare name across every
+//! file of a configuration -- no two nodes share one, whichever files they
+//! are in -- so a link in one file names a node in another just as it names
+//! one beside it, and that is how every file is written. The editor holds a
+//! node under `subdiagram/node`, which says which file it is drawn in, but
+//! writes only the `node`.
+//!
+//! **A subdiagram is named by its include.** Its name is the one the top
+//! file's include list gives it: the file's path from the top file's
+//! directory without an extension, `zone` beside it or
+//! `../thermostat-common/thermostat` elsewhere. A node's own name has no `/`
+//! in it, so the last `/` of a held name is the one that divides the two.
 
 /// Where a node lives: the top diagram, or one subdiagram.
 ///
@@ -48,18 +55,19 @@ pub struct Qualified {
 }
 
 impl Qualified {
-    /// Reads a name as a link wrote it.
+    /// Reads a name as the editor holds it.
     ///
-    /// One separator and no more: `zone/temp_1` reaches into `zone`, and
-    /// a name with two separators in it is a name this cannot mean anything
-    /// by, so the whole of it after the first is taken as the node's. That
-    /// keeps the function total -- a name is always readable as something --
-    /// and leaves saying so to the validation, which has somewhere to report
-    /// it.
+    /// The last separator divides it: `zone/temp_1` is in `zone`, and
+    /// `../common/zone/temp_1` in `../common/zone`, a subdiagram's name being
+    /// a path and a node's name having no `/` in it. A name with nothing
+    /// either side of its last separator is taken as a plain one. That keeps
+    /// the function total -- a name is always readable as something -- and
+    /// leaves saying what is wrong with it to the validation, which has
+    /// somewhere to report it.
     ///
     /// # Arguments
     ///
-    /// * `name` - The name as a link wrote it, such as `zone/temp_1` or
+    /// * `name` - The name as the editor holds it, such as `zone/temp_1` or
     ///            `temp_1`.
     ///
     /// # Returns
@@ -67,7 +75,7 @@ impl Qualified {
     /// The subdiagram the name reaches into, if it says one, and the node's
     /// name.
     pub fn parse(name: &str) -> Qualified {
-        match name.split_once('/') {
+        match name.rsplit_once('/') {
             Some((home, node)) if !home.is_empty() && !node.is_empty() => {
                 Qualified {
                     in_: Some(home.to_string()),
@@ -81,27 +89,17 @@ impl Qualified {
         }
     }
 
-    /// How this name is written in a link that lives in `from`.
+    /// How this name is written in a file.
     ///
-    /// Plain where the two are in the same file, qualified where they are not.
-    /// This is the half that keeps a subdiagram's own links readable: inside
-    /// `zone.ytcs` a link says `temp_1`, and only a link reaching out of
-    /// it says `zone/temp_1`.
-    ///
-    /// # Arguments
-    ///
-    /// * `from` - The subdiagram the link lives in, or `None` for the top
-    ///            diagram.
+    /// The node's own name, in whichever file: the reader knows a node by it
+    /// across every file of a configuration, and a name written
+    /// `zone/temp_1` would be a node nobody has. See the module's notes.
     ///
     /// # Returns
     ///
-    /// The name as the link should write it.
-    pub fn written_from(&self, from: &Home) -> String {
-        match (&self.in_, from) {
-            (a, b) if a == b => self.node.clone(),
-            (Some(home), _) => format!("{home}/{}", self.node),
-            (None, _) => self.node.clone(),
-        }
+    /// The name as a file writes it.
+    pub fn written(&self) -> String {
+        self.node.clone()
     }
 
     /// The name this is, seen from outside every file.
@@ -140,15 +138,17 @@ impl Qualified {
 
 /// The file a subdiagram is kept in, given the name it goes by.
 ///
-/// The name is the file's stem, so `zone` is `zone.ytcs` beside the diagram
-/// that includes it. Which extension is the including file's: a configuration
-/// written in XML keeps its subdiagrams in XML, because a set of files half in
-/// one language and half in the other is a thing nobody meant and everybody
-/// would have to remember.
+/// The name is the file's path from the including diagram's directory without
+/// its extension, so `zone` is `zone.ytcs` beside the diagram that includes it,
+/// and `../common/zone` is `zone.ytcs` in `common`, a directory beside the
+/// diagram's. Which extension is the including file's: a configuration written
+/// in XML keeps its subdiagrams in XML, because a set of files half in one
+/// language and half in the other is a thing nobody meant and everybody would
+/// have to remember.
 ///
 /// # Arguments
 ///
-/// * `name` - The subdiagram's name, which is the file's stem.
+/// * `name` - The subdiagram's name, which is its include name.
 /// * `like` - The path of the including file, whose directory and extension the
 ///            subdiagram's file takes; YAML if it has no extension.
 ///
@@ -171,26 +171,16 @@ mod tests {
     use super::*;
     use std::path::Path;
 
-    /// A name is local until it has to travel.
+    /// A name is written as the node's own, whichever file it is in and
+    /// whichever file names it, because that is how the reader knows it.
     #[test]
-    fn a_name_is_plain_at_home_and_qualified_away_from_it() {
+    fn a_name_is_written_as_the_nodes_own() {
         let inside = Qualified::of("temp_1", &Some("zone".to_string()));
+        assert_eq!(inside.written(), "temp_1");
+        assert_eq!(inside.absolute(), "zone/temp_1");
 
-        // Written from inside the same subdiagram: plain.
-        assert_eq!(inside.written_from(&Some("zone".to_string())), "temp_1");
-
-        // Written from the top diagram, or from another subdiagram: qualified.
-        assert_eq!(inside.written_from(&None), "zone/temp_1");
-        assert_eq!(
-            inside.written_from(&Some("antenna".to_string())),
-            "zone/temp_1"
-        );
-
-        // And a node of the top diagram is plain from anywhere, there being no
-        // file name to qualify it with.
         let top = Qualified::of("gateway", &None);
-        assert_eq!(top.written_from(&None), "gateway");
-        assert_eq!(top.written_from(&Some("zone".to_string())), "gateway");
+        assert_eq!(top.written(), "gateway");
     }
 
     /// Reading a name back gives what was written.
@@ -199,6 +189,12 @@ mod tests {
         for (text, in_, node) in [
             ("zone/temp_1", Some("zone"), "temp_1"),
             ("gateway", None, "gateway"),
+            // A subdiagram named by a path, as one in another directory is.
+            (
+                "../thermostat-common/thermostat/temp1",
+                Some("../thermostat-common/thermostat"),
+                "temp1",
+            ),
         ] {
             let read = Qualified::parse(text);
             assert_eq!(read.in_.as_deref(), in_, "{text}");
@@ -236,14 +232,15 @@ mod tests {
             assert_eq!(read.node, odd, "{odd:?}");
         }
 
-        // More than one separator: everything after the first is the node's,
-        // which is a name no node has, so the link dangles and is reported.
+        // More than one separator: the last divides it, everything before
+        // being the subdiagram's name.
         let read = Qualified::parse("zone/inner/temp");
-        assert_eq!(read.in_.as_deref(), Some("zone"));
-        assert_eq!(read.node, "inner/temp");
+        assert_eq!(read.in_.as_deref(), Some("zone/inner"));
+        assert_eq!(read.node, "temp");
     }
 
-    /// A subdiagram's file sits beside its parent, in the parent's format.
+    /// A subdiagram's file is at its name from its parent's directory, in the
+    /// parent's format.
     #[test]
     fn a_subdiagram_is_a_file_beside_its_parent() {
         assert_eq!(
@@ -255,6 +252,12 @@ mod tests {
         assert_eq!(
             file_for("zone", Path::new("/var/lib/tcs/vehicle.xtcs")),
             Path::new("/var/lib/tcs/zone.xtcs")
+        );
+        // And one named by a path is that path from the parent's directory,
+        // written as it is named.
+        assert_eq!(
+            file_for("../common/zone", Path::new("/var/lib/tcs/vehicle.ytcs")),
+            Path::new("/var/lib/tcs/../common/zone.ytcs")
         );
     }
 }

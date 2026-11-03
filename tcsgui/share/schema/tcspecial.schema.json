@@ -2022,7 +2022,7 @@
       "type": "string"
     },
     "include": {
-      "description": "Other files this one is made of, by name without an extension: named rather than discovered, so the set of files a configuration is made of is itself written down.",
+      "description": "Other files this one is made of, each by its path from this file's directory without an extension -- zone, or ../common/zone -- read in this file's format: named rather than discovered, so the set of files a configuration is made of is itself written down. Not an absolute path, and no part empty or \".\".",
       "type": "array",
       "items": {
         "type": "string"

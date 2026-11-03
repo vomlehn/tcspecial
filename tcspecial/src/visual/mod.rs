@@ -509,14 +509,15 @@ mod tests {
         assert_eq!(checked, lines.len(), "every line is some delivery's");
     }
 
-    /// Every line of the example is drawn: its nodes are all in one file, so
-    /// all of them are on the page.
+    /// Every line of the worked example is drawn: its nodes are all in one
+    /// file, so all of them are on the page. (The thermostat example's are
+    /// not: most of them are in the file it includes.)
     #[test]
     fn every_line_of_a_configuration_in_one_file_is_drawn() {
         let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("..");
-        let graph =
-            Graph::load(root.join("examples/thermostat/thermostat.ytcs"))
-                .expect("the example reads");
+        let graph = Graph::load(root.join("tests/manual/thermostat.ytcs"))
+            .expect("the example reads");
+        assert_eq!(graph.files.len(), 1, "it is one file");
         let lines = lines_of(&graph);
         let top = graph.files.first();
         assert!(lines.iter().all(|line| graph.homes.get(&line.from) == top

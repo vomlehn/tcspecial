@@ -1010,9 +1010,7 @@ fn every_key_of_a_shipped_simulator_file_is_in_its_schema() {
                             );
                             if key == "components" {
                                 grouped(file, said, "component", &|named| {
-                                    sim["$defs"]
-                                        .get(named)
-                                        .map(|component| words(component))
+                                    sim["$defs"].get(named).map(words)
                                 });
                             }
                         }

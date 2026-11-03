@@ -66,14 +66,25 @@ pub fn save(settings: Settings) {
     let Some(path) = path() else {
         return;
     };
-    let (gateway, vehicle) =
+    let (gateway_percent, vehicle_percent) =
         shares(settings.gateway_percent, settings.vehicle_percent);
-    let (list_gateway, list_vehicle) =
+    let (list_gateway_percent, list_vehicle_percent) =
         shares(settings.list_gateway_percent, settings.list_vehicle_percent);
-    if let Err(why) = crate::save::write_atomically(
-        &path,
-        written(gateway, vehicle, list_gateway, list_vehicle).as_bytes(),
-    ) {
+    let kept = Settings {
+        gateway_percent,
+        vehicle_percent,
+        list_gateway_percent,
+        list_vehicle_percent,
+        physics_percent: settings.physics_percent.clamp(LEAST, MOST),
+        list_physics_percent: physics_list_share(
+            settings.list_physics_percent,
+            list_gateway_percent,
+            list_vehicle_percent,
+        ),
+    };
+    if let Err(why) =
+        crate::save::write_atomically(&path, written(&kept).as_bytes())
+    {
         eprintln!("tcsgui: {} cannot be written: {why}", path.display());
     }
 }
@@ -114,6 +125,7 @@ mod tests {
             vehicle_percent: 40,
             list_gateway_percent: 15,
             list_vehicle_percent: 45,
+            ..Settings::default()
         });
         assert_eq!(load().gateway_percent, 20);
         assert_eq!(load().vehicle_percent, 40);

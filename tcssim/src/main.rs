@@ -319,7 +319,7 @@ fn update_row(
 /// thermostats the simulator stands in for, none or several.
 type Attachments = (BTreeMap<String, Attachment>, Vec<Arc<Thermostat>>);
 
-/// Makes the world of the physics model the simulator file names, works out
+/// Makes the world of the simulator file's physics model, works out
 /// what each simulated payload is to it, by payload name, and makes the
 /// thermostats the simulator stands in for, if the file names any.
 ///
@@ -371,7 +371,7 @@ fn joined_to_the_world(
         if let Some(name) = stands_in.first() {
             return Err(format!(
                 "thermostat: {name} is to be stood in for, and no physics \
-                 model is named for it to read or warm"
+                 model is written for it to read or warm"
             ));
         }
         return Ok((BTreeMap::new(), Vec::new()));
@@ -380,11 +380,13 @@ fn joined_to_the_world(
     // A model needs a graph to take its sensors' encodings from: without the
     // graph's conversions nothing says which bytes stand for a reading.
     let Some(graph) = graph else {
-        return Err("a physics model is named, and no graph was read: a \
+        return Err(
+            "the simulator file has a physics model, and no graph was read: a \
                     simulated sensor sends the bytes a to_kelvin or to_value \
                     node reads back as what it reports, and without a graph \
                     there is no such node"
-            .to_string());
+                .to_string(),
+        );
     };
 
     // What the world's and the sensors' random draws start from: the file's,

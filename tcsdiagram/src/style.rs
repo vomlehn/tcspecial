@@ -217,6 +217,7 @@ pub enum Ground {
     Gateway,
     Vehicle,
     Payloads,
+    Physics,
 }
 
 /// Which ground a pane is painted.
@@ -236,6 +237,7 @@ pub fn ground_of(pane: crate::pane::Pane) -> Ground {
         crate::pane::Pane::Gateway => Ground::Gateway,
         crate::pane::Pane::Vehicle => Ground::Vehicle,
         crate::pane::Pane::Payloads => Ground::Payloads,
+        crate::pane::Pane::Physics => Ground::Physics,
     }
 }
 

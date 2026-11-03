@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- A physics section in XML, which a physics model has never been
+     written in: it is a YAML simulator file's. -->
+<simulator>
+  <physics>zone-physics.yaml</physics>
+</simulator>

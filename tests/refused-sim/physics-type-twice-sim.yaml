@@ -1,0 +1,7 @@
+world:
+  physics:
+    components:
+      - type bus:
+          - component: a
+      - type bus:
+          - component: b

@@ -1,0 +1,6 @@
+# A simulator file naming its physics model in a file of its own, as one
+# once did: the model is the simulator file's physics section now.
+tcssim:
+  ready: 127.0.0.1:7999
+
+physics: zone-physics.yaml

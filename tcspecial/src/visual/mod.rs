@@ -2,7 +2,9 @@
 //!
 //! The graph is drawn as tcsgui draws the configuration -- the three working
 //! panes, every node where the editor would put it, every link along the
-//! route the editor gives it, all of it from `tcsdiagram` -- and a link is lit
+//! route the editor gives it, all of it from `tcsdiagram` -- with the
+//! simulator file's physics in the Physics pane to their left, as the editor
+//! draws it too, and a link is lit
 //! while data crosses it: a line three times as wide and a shade lighter is
 //! drawn under it, for [`LINE_BLINK`] after each datum is sent. The ordinary
 //! line stays on top, so the drawing is the editor's whether anything is
@@ -297,8 +299,9 @@ fn draw(
     lines: &[Line],
 ) -> Shown {
     let settings = tcsdiagram::settings::read().settings;
-    let dividers =
+    let mut dividers =
         pane::dividers_for(settings.gateway_percent, settings.vehicle_percent);
+    dividers.physics = pane::physics_width(settings.physics_percent);
 
     let top = graph.files.first();
     let here = |name: &str| graph.homes.get(name) == top || top.is_none();
@@ -329,6 +332,8 @@ fn draw(
             here: here(&node.name),
         })
         .collect();
+
+    draw_physics(window, path, &sheet, dividers);
 
     let nodes: Vec<ui::NodeView> = sheet
         .iter()
@@ -383,6 +388,59 @@ fn draw(
     window.set_gateway_ground(colour(&ground_of(style::Ground::Gateway)));
 
     Shown { links, rows }
+}
+
+/// Puts the simulator file's physics in the window's Physics pane.
+///
+/// The simulator file is the one tcssim and tcsmoc would read for this
+/// configuration -- the one `PAYLOAD_SIM_YAML` names, and otherwise the one
+/// named for it beside it -- read here for the drawing and for nothing else:
+/// the vehicle never reads it, and what it flies is not changed by it. With
+/// none, the Physics pane is drawn empty. With one that cannot be read, the
+/// pane is drawn empty and why is said: the window is to watch a vehicle by,
+/// and a simulator file tcssim would refuse is tcssim's to refuse.
+///
+/// # Arguments
+///
+/// * `window`   - The window to draw in.
+/// * `path`     - The configuration file.
+/// * `sheet`    - The configuration's nodes, where they are drawn, which the
+///                stand-ins' links go to.
+/// * `dividers` - Where the panes are, the Physics pane's width included.
+fn draw_physics(
+    window: &ui::VisualWindow,
+    path: &str,
+    sheet: &[OnSheet],
+    dividers: pane::Dividers,
+) {
+    window.set_physics_width(dividers.physics as f32);
+    window.set_physics_ground(colour(&ground_of(style::Ground::Physics)));
+
+    let sim = std::env::var("PAYLOAD_SIM_YAML")
+        .ok()
+        .filter(|named| !named.is_empty())
+        .or_else(|| tcslibgs::config::sim_path_beside(path));
+    let Some(sim) = sim else {
+        return;
+    };
+    let file = match tcslibgs::sim_config::SimConfigFile::load(&sim) {
+        Ok(file) => file,
+        Err(why) => {
+            eprintln!(
+                "tcspecial --visual: the Physics pane is drawn empty, as \
+                 {sim} cannot be read: {why}"
+            );
+            return;
+        }
+    };
+    let drawn = tcsdiagram::physics::of_simulator(&file);
+    let (nodes, links) = drawn.looks(sheet, dividers, dividers.physics);
+    window.set_physics_nodes(ModelRc::new(VecModel::from(
+        nodes.into_iter().map(node_view).collect::<Vec<_>>(),
+    )));
+    window.set_physics_links(ModelRc::new(VecModel::from(
+        links.into_iter().map(link_view).collect::<Vec<_>>(),
+    )));
 }
 
 /// A hex colour as Slint's. See tcsdiagram::look::rgb.

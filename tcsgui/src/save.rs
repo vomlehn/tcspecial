@@ -27,6 +27,12 @@
 //!
 //! If anything fails, the temporary file is removed and the error says what
 //! happened. The target is untouched, which is the promise this module makes.
+//!
+//! A name that is a symbolic link is written through: the file it leads to
+//! is the target, and the link is left a link. Two examples share one
+//! simulator file by a link to it in each, and a rename over the link would
+//! make that example's a copy of its own, which nothing would keep the same
+//! as the other.
 
 use std::fs::{self, File, OpenOptions};
 use std::io::Write;
@@ -57,6 +63,8 @@ pub enum SaveError {
     /// The temporary file could not be renamed over the target. The target is
     /// whatever it was.
     Replace { path: PathBuf, why: std::io::Error },
+    /// The name is a symbolic link that could not be followed to a file.
+    Link { path: PathBuf, why: std::io::Error },
 }
 
 impl std::fmt::Display for SaveError {
@@ -96,6 +104,12 @@ impl std::fmt::Display for SaveError {
                  old ones ({why}). The file on disk is unchanged",
                 path.display()
             ),
+            SaveError::Link { path, why } => write!(
+                f,
+                "{}: it is a link that could not be followed to the file it \
+                 names ({why}). Nothing has been written",
+                path.display()
+            ),
         }
     }
 }
@@ -119,6 +133,11 @@ impl std::error::Error for SaveError {}
 /// the temporary, writing or syncing it, renaming it over `path`, or syncing
 /// the directory afterwards.
 pub fn write_atomically(path: &Path, contents: &[u8]) -> Result<(), SaveError> {
+    let followed = followed(path).map_err(|why| SaveError::Link {
+        path: path.to_path_buf(),
+        why,
+    })?;
+    let path = followed.as_path();
     let directory = path.parent().filter(|p| !p.as_os_str().is_empty());
     let directory = match directory {
         Some(directory) => directory,
@@ -195,6 +214,47 @@ pub fn write_atomically(path: &Path, contents: &[u8]) -> Result<(), SaveError> {
         path: directory.to_path_buf(),
         why,
     })
+}
+
+/// The file a name leads to: the name itself, or where the symbolic links
+/// it is lead, each followed in turn from the directory it is in.
+///
+/// The last component only. A directory on the way that is a link is one a
+/// rename works through as it stands, and writing beside the file it leads
+/// to is what the temporary is for.
+///
+/// # Arguments
+///
+/// * `path` - The name to be written.
+///
+/// # Returns
+///
+/// The path of the file to replace, which may not exist yet.
+///
+/// # Errors
+///
+/// What reading a link said, or, for links that lead to one another in a
+/// circle, an error saying so.
+fn followed(path: &Path) -> std::io::Result<PathBuf> {
+    // As many as the kernel follows before giving up with ELOOP.
+    const MOST_LINKS: usize = 40;
+    let mut at = path.to_path_buf();
+    for _ in 0..MOST_LINKS {
+        match fs::symlink_metadata(&at) {
+            Ok(meta) if meta.file_type().is_symlink() => {
+                let to = fs::read_link(&at)?;
+                at = match at.parent() {
+                    Some(directory) if to.is_relative() => directory.join(to),
+                    _ => to,
+                };
+            }
+            // Not a link, or not there yet: this is the file.
+            _ => return Ok(at),
+        }
+    }
+    Err(std::io::Error::other(format!(
+        "more than {MOST_LINKS} links in a row, which lead in a circle"
+    )))
 }
 
 /// Which step of writing the contents failed.
@@ -274,6 +334,36 @@ fn temporary_beside(path: &Path) -> PathBuf {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// A name that is a link is written through: the file it leads to takes
+    /// the contents, and the link stays a link.
+    #[test]
+    fn a_link_is_written_through_and_stays_a_link() {
+        let where_ = tempfile::tempdir().expect("a directory");
+        let common = where_.path().join("common");
+        let example = where_.path().join("example");
+        fs::create_dir(&common).expect("made");
+        fs::create_dir(&example).expect("made");
+        let shared = common.join("shared-sim.yaml");
+        fs::write(&shared, b"old\n").expect("written");
+        let link = example.join("example-sim.yaml");
+        std::os::unix::fs::symlink("../common/shared-sim.yaml", &link)
+            .expect("linked");
+
+        write_atomically(&link, b"new\n").expect("written through");
+        assert!(fs::symlink_metadata(&link)
+            .expect("there")
+            .file_type()
+            .is_symlink());
+        assert_eq!(fs::read(&shared).unwrap(), b"new\n");
+        assert_eq!(fs::read(&link).unwrap(), b"new\n");
+
+        // Links in a circle are refused, and nothing is written.
+        let circle = where_.path().join("circle");
+        std::os::unix::fs::symlink("circle", &circle).expect("linked");
+        let why = write_atomically(&circle, b"x").expect_err("a circle");
+        assert!(matches!(why, SaveError::Link { .. }), "{why}");
+    }
 
     /// What was asked for is what is there afterwards.
     #[test]

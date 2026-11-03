@@ -18,16 +18,17 @@ they have in common from a directory of its own, which is not an example:
 `ping-yamcs` both show, and `ping.ytcs` and `ping.xtcs`, the ping node,
 which both configurations include; `thermostat-common` holds
 `thermostat.ytcs` and `thermostat.xtcs`, the vehicle both thermostat
-configurations include, and the physics model both simulator files name.
-Each configuration includes its common file by its path from its own
+configurations include, and `thermostat-sim.yaml`, the simulator file,
+physics model and all, which each thermostat example's `-sim.yaml` is a
+link to, so that each is found beside its configuration by name. Each
+configuration includes its common file by its path from its own
 directory, `../thermostat-common/thermostat`, and keeps for itself only what
 differs: its `tcspecial` section, its gateway node -- called `gateway` in
 both, which is the name the common file's links send to -- and, for the
-thermostat, the three sensors, whose ports differ so that the two can run
-at once. A common file is not checked on its own, having no `tcspecial`
-section; it is checked as part of each configuration that includes it. A
-simulator file includes no other, so the two thermostat simulator files are
-written in both, and a test holds the two copies to each other:
+thermostat, the three sensors, whose ports differ. A common file is not
+checked on its own, having no `tcspecial` section; it is checked as part
+of each configuration that includes it. A test holds the links to the
+shared simulator file:
 `examples/thermostat-yamcs/tests/shared.rs`. `yamcs-common` is not an
 example either: it is the Rust the tests of the examples through Yamcs share.
 
@@ -493,11 +494,11 @@ lines 0 and 1 of it, so the two run at once. Aboard the sensors would be on
 I2C and SPI, as `tests/manual/thermostat.ytcs` has them; those buses are
 flown against stand-ins by `make stand-ins-test`.
 
-tcssim joins the stand-ins to the vehicle's physics model,
-`thermostat-common/thermostat-physics.yaml`, which `thermostat-sim.yaml`
-names, as thermostat-yamcs's simulator file does: a zone and two
-heaters, each a part simulated alone and joined to the zone under
-`connections`. All three sensors are joined to `zone.temperature`, each from
+tcssim joins the stand-ins to the vehicle's physics model, in the world
+section of `thermostat-sim.yaml`, a link to
+`thermostat-common/thermostat-sim.yaml`, which thermostat-yamcs's simulator
+file is a link to too: a zone and two heaters, each a part simulated alone
+and joined to the zone under `connections`. All three sensors are joined to `zone.temperature`, each from
 a place of its own on the zone, so their readings agree and the vote
 produces a temperature. The zone starts at 292.15 K, inside the band, and
 cools towards its surroundings, 288.15 K, just inside the
@@ -546,8 +547,10 @@ The thermostat example with [Yamcs](https://yamcs.org) at the ground end,
 as ping-yamcs is the ping example with it. The vehicle is the thermostat's
 -- the same conversions, vote, thermostat, heaters, GPIO lines and log,
 from the file both include, `thermostat-common/thermostat.ytcs`, the same
-three sensors, at ports of its own, and the same physics model,
-`thermostat-common/thermostat-physics.yaml` -- and what differs is
+three sensors, at ports of its own, and the same simulator file,
+`thermostat-common/thermostat-sim.yaml`, physics model and all, each
+example's being a link to it; the two cannot run at once, their heaters
+being the same lines of one GPIO chip -- and what differs is
 the configuration's gateway, `yamcs`, so every packet to and from the
 ground carries a CCSDS primary header:
 
@@ -637,8 +640,8 @@ sets itself full whenever the current falls to nought. `shedding`, a
 hysteresis around 0.4, sheds the science instrument below three tenths by
 driving `science`, port 5302, and restores it above half.
 
-tcssim stands in for all three, joined to the vehicle's physics model,
-`battery-physics.yaml`: a sun, a solar array, two loads, a bus and a battery,
+tcssim stands in for all three, joined to the vehicle's physics model, in
+the world section of `battery-sim.yaml`: a sun, a solar array, two loads, a bus and a battery,
 each a part simulated alone and joined under `connections`. The orbit is six
 minutes and the battery small, so that a run sees, in one orbit, the battery
 charge and fill, the eclipse drain it, the science load shed and the sun bring
@@ -676,8 +679,8 @@ four bytes of a value, which the engine's stand-in reads as the ratio it is.
 `doppler`, port 5402, sends the velocity for the ground, and `touchdown`,
 port 5403, a switch on a landing leg, says `1` when the lander is down.
 
-tcssim stands in for all four, joined to the vehicle's physics model,
-`descent-physics.yaml`: an engine and the body it brakes, five hundred metres
+tcssim stands in for all four, joined to the vehicle's physics model, in
+the world section of `descent-sim.yaml`: an engine and the body it brakes, five hundred metres
 up and falling at twenty metres a second. The body falls by the rocket
 equation, and the moment it reaches the ground is found ahead of time and met
 exactly; the touchdown switch's stand-in waits on the model for it, and

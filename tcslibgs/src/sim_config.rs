@@ -41,12 +41,12 @@
 
 use std::collections::{BTreeMap, BTreeSet};
 use std::fmt;
-use std::path::{Path, PathBuf};
+use std::path::Path;
 use std::time::Duration;
 
 use crate::physics::setting::{quantity, size_of, time_of, wander_of, Wander};
 use crate::physics::terminal::{At, Direction, Kind};
-use crate::physics::{Model, PhysicsFile, PhysicsProblem};
+use crate::physics::{Model, PhysicsProblem, WorldSection};
 use crate::verify::About;
 use crate::{
     one_host, ConfigFormat, DHConfig, DHType, EndpointConfig, NetworkProtocol,
@@ -1401,28 +1401,23 @@ pub struct SimConfigFile {
     /// The groups of settings, in name order.
     #[serde(default, deserialize_with = "crate::sim_grouped::groups")]
     pub simulated_payload_groups: Vec<SimGroup>,
-    /// The physics model the payloads are attached to, as this file names
-    /// it: a path, relative to the directory this file is in.
-    ///
-    /// A file of its own, because a vehicle's physics outlives any one
-    /// configuration of its payloads: see [`crate::physics`]. Unstated is a
-    /// set whose stand-ins are attached to nothing.
-    #[serde(default, deserialize_with = "blank_is_unstated")]
-    pub physics: Option<String>,
-    /// A `thermal_mass` section, which a simulator file held before the
-    /// physics model had a file of its own. Read only to be refused, saying
-    /// where it goes now: see [`MOVED_THERMAL_MASS`].
-    #[serde(default, rename = "thermal_mass")]
-    pub moved_thermal_mass: Option<IgnoredAny>,
-    /// The physics model the file names, which the payloads are joined to:
-    /// read from that model by [`SimConfigFile::read_physics`], and never
-    /// from this file.
+    /// The world the payloads are joined to: the vehicle's physics model,
+    /// its components and the connections between them, which the
+    /// stand-ins measure and act on, and the ambient temperature its zones'
+    /// surroundings are about. Unstated is a set whose stand-ins are joined
+    /// to nothing.
     ///
     /// The model is not a payload. It is what the payloads are joined by:
     /// the sensors report a zone's temperature and the heaters warm it, so
-    /// what the vehicle reads is a consequence of what it drove.
-    #[serde(skip)]
-    pub model: Option<PhysicsFile>,
+    /// what the vehicle reads is a consequence of what it drove. See
+    /// [`crate::physics`].
+    #[serde(default)]
+    pub world: Option<WorldSection>,
+    /// A `thermal_mass` section, which a simulator file held before the
+    /// physics model was made of parts. Read only to be refused, saying
+    /// what it is now: see [`MOVED_THERMAL_MASS`].
+    #[serde(default, rename = "thermal_mass")]
+    pub moved_thermal_mass: Option<IgnoredAny>,
     /// The simulated payloads, of every type, in name order.
     #[serde(default, deserialize_with = "crate::sim_grouped::payloads")]
     pub simulated_payloads: Vec<SimPayload>,
@@ -1488,7 +1483,7 @@ pub enum Attached {
 /// # Returns
 ///
 /// Each terminal as written, trimmed.
-fn terminals_of(said: &str) -> impl Iterator<Item = &str> {
+pub fn terminals_of(said: &str) -> impl Iterator<Item = &str> {
     said.split(',').map(str::trim)
 }
 
@@ -1639,15 +1634,15 @@ impl Faults {
 /// What a simulator file with a `thermal_mass` section is told: where the
 /// masses are written now.
 pub const MOVED_THERMAL_MASS: &str = "a simulator file no longer declares \
-    thermal masses: they are the vehicle's physics, and are written in a \
-    physics model of their own, made of parts: a thermal_zone for each mass \
-    and a heater for each heater, joined under connections:. Write it in a \
-    file of its own -- <name>-physics.yaml, as \
-    examples/thermostat-common/thermostat-physics.yaml is -- and name that \
-    file here with physics: and its path from this file's directory";
+    thermal masses: they are the vehicle's physics, and are written in its \
+    world section, made of parts: a thermal_zone for each mass and a heater \
+    for each heater, listed under world: physics: components: and joined \
+    under world: physics: connections:, with the temperature a mass's \
+    surroundings were as the world's ambient_temp, as \
+    examples/thermostat-common/thermostat-sim.yaml writes them";
 
 impl SimConfigFile {
-    /// Read a simulator configuration file, and the physics model it names.
+    /// Read a simulator configuration file.
     ///
     /// # Arguments
     ///
@@ -1655,12 +1650,12 @@ impl SimConfigFile {
     ///
     /// # Returns
     ///
-    /// The file, with the physics model it names.
+    /// The file, with its physics model.
     ///
     /// # Errors
     ///
-    /// `TcsError::Config` where the file cannot be read or parsed, or where
-    /// [`SimConfigFile::read_physics`] refuses its model.
+    /// `TcsError::Config` where the file cannot be read or parsed, or still
+    /// declares thermal masses itself: see [`MOVED_THERMAL_MASS`].
     pub fn load<P: AsRef<Path>>(path: P) -> TcsResult<Self> {
         let path = path.as_ref();
         let format = ConfigFormat::from_data_path(path).ok_or_else(|| {
@@ -1671,13 +1666,17 @@ impl SimConfigFile {
             ))
         })?;
         let text = std::fs::read_to_string(path)?;
-        let mut file = SimConfigFile::parse(&text, format)?;
-        file.read_physics(path).map_err(TcsError::Config)?;
+        let file = SimConfigFile::parse(&text, format)?;
+        if file.moved_thermal_mass.is_some() {
+            return Err(TcsError::Config(format!(
+                "{}: {MOVED_THERMAL_MASS}",
+                path.display()
+            )));
+        }
         Ok(file)
     }
 
-    /// Reads a simulator file from its text, without the physics model it
-    /// names.
+    /// Reads a simulator file from its text.
     ///
     /// # Arguments
     ///
@@ -1690,61 +1689,14 @@ impl SimConfigFile {
     ///
     /// # Errors
     ///
-    /// A file in the shape it had before its payloads were grouped by type,
-    /// at its line, and whatever the parser refuses.
+    /// A file in a shape it had before -- its payloads not grouped by type,
+    /// or its physics model in a file of its own -- at its line, and
+    /// whatever the parser refuses.
     pub fn parse(text: &str, format: ConfigFormat) -> TcsResult<Self> {
         if let Some(why) = crate::sim_reshaped::sim_refused(text, format) {
             return Err(TcsError::Config(why));
         }
         format.parse(text)
-    }
-
-    /// Where the physics model this file names is.
-    ///
-    /// # Arguments
-    ///
-    /// * `sim_path` - Where this file is: the model is named relative to the
-    ///                directory it is in.
-    ///
-    /// # Returns
-    ///
-    /// The model's path, or `None` where the file names none.
-    pub fn physics_path(&self, sim_path: &Path) -> Option<PathBuf> {
-        let named = self.physics.as_deref()?;
-        let directory = sim_path.parent().unwrap_or(Path::new(""));
-        Some(directory.join(named))
-    }
-
-    /// Reads the physics model this file names, which its payloads are
-    /// joined to.
-    ///
-    /// # Arguments
-    ///
-    /// * `sim_path` - Where this file is, which the model is named relative
-    ///                to.
-    ///
-    /// # Errors
-    ///
-    /// [`MOVED_THERMAL_MASS`] for a file that still declares masses itself,
-    /// and the model's own complaint, naming it, where it cannot be read.
-    pub fn read_physics(&mut self, sim_path: &Path) -> Result<(), String> {
-        if self.moved_thermal_mass.is_some() {
-            return Err(format!(
-                "{}: {MOVED_THERMAL_MASS}",
-                sim_path.display()
-            ));
-        }
-        let Some(model) = self.physics_path(sim_path) else {
-            return Ok(());
-        };
-        let model = PhysicsFile::load(&model).map_err(|e| {
-            format!(
-                "{}: physics names a model that cannot be had: {e}",
-                sim_path.display()
-            )
-        })?;
-        self.model = Some(model);
-        Ok(())
     }
 
     /// Where tcssim answers whether it is ready: the `tcssim` section's
@@ -1778,10 +1730,10 @@ impl SimConfigFile {
         })
     }
 
-    /// The physics model this file names, with its figures read and the
+    /// The physics model this file holds, with its figures read and the
     /// stand-ins' joins to it checked.
     ///
-    /// The model alone is checked by [`PhysicsFile::problems`]. What only
+    /// The model alone is checked by [`WorldSection::problems`]. What only
     /// this file can say is how the stand-ins join it, and these are refused
     /// here:
     ///
@@ -1802,15 +1754,12 @@ impl SimConfigFile {
     ///
     /// [`SimConfigError::BadPhysics`] for the first problem.
     pub fn physics(&self) -> Result<Option<Model>, SimConfigError> {
-        let Some(file) = &self.model else {
+        let Some(file) = &self.world else {
             return Ok(None);
         };
         let model = file.resolve().map_err(SimConfigError::BadPhysics)?;
         let bad = |component: &str, why: String| {
-            SimConfigError::BadPhysics(PhysicsProblem {
-                component: Some(component.to_string()),
-                why,
-            })
+            SimConfigError::BadPhysics(PhysicsProblem::of(component, why))
         };
 
         // What each stand-in is joined to, where it names a terminal there
@@ -1981,7 +1930,7 @@ impl SimConfigFile {
     /// # Returns
     ///
     /// Its settings, laid over its group's where it names a declared one.
-    fn settings_of(&self, payload: &SimPayload) -> SimSettings {
+    pub fn settings_of(&self, payload: &SimPayload) -> SimSettings {
         match payload.group.as_ref().and_then(|name| {
             self.simulated_payload_groups
                 .iter()
@@ -1999,7 +1948,7 @@ impl SimConfigFile {
     ///
     /// * `payload`  - The payload's name, for the complaint.
     /// * `settings` - Its settings, laid over its group's.
-    /// * `model`    - The physics model, if the file names one.
+    /// * `model`    - The physics model, if the file has one.
     ///
     /// # Returns
     ///
@@ -2042,8 +1991,8 @@ impl SimConfigFile {
         };
         let Some(model) = model else {
             return Err(bad(format!(
-                "connects: {said}, and this file names no physics model for \
-                 it to be in: name one with physics: <name>-physics.yaml"
+                "connects: {said}, and this file has no physics model for it \
+                 to be in: write one under world: physics:"
             )));
         };
         // Several terminals, one for each of a GPIO payload's lines, each a
@@ -2222,7 +2171,7 @@ impl SimConfigFile {
         // One that does not read is reported by `physics`, at its own
         // lines, and the joins to it are not judged: each would be refused
         // as naming a terminal of nothing, which is the wrong fault.
-        let model = self.model.as_ref().map(PhysicsFile::resolve);
+        let model = self.world.as_ref().map(WorldSection::resolve);
 
         // One handler at a time, because one payload's settings are its own:
         // a reader is told what is wrong with each rather than what is wrong
@@ -4391,24 +4340,25 @@ simulated_payloads:
 
     /// The physics model the attachment tests join to: two heaters warming
     /// one zone, as the thermostat example's does.
-    const MODEL: &str = "physics:
-  - type heater:
-      - component: heater_1
-        power: \"60 W\"
-        voltage: \"28 V\"
-      - component: heater_2
-        power: \"60 W\"
-        voltage: \"28 V\"
-  - type thermal_zone:
-      - component: zone
-        capacity: \"20 J/K\"
-        environment: \"283.15 K\"
-        time_constant: 50 s
-connections:
-  - from: heater_1.heat
-    to: zone.heat
-  - from: heater_2.heat
-    to: zone.heat
+    const MODEL: &str = "ambient_temp: \"283.15 K\"
+physics:
+  components:
+    - type heater:
+        - component: heater_1
+          power: \"60 W\"
+          voltage: \"28 V\"
+        - component: heater_2
+          power: \"60 W\"
+          voltage: \"28 V\"
+    - type thermal_zone:
+        - component: zone
+          capacity: \"20 J/K\"
+          time_constant: 50 s
+  connections:
+    - from: heater_1.heat
+      to: zone.heat
+    - from: heater_2.heat
+      to: zone.heat
 ";
 
     /// A simulator file joined to [`MODEL`], with a sensor DH0, a heater
@@ -4423,7 +4373,7 @@ connections:
     ///
     /// # Returns
     ///
-    /// The file, parsed, with the model as `read_physics` would read it.
+    /// The file, parsed, with the model as its physics section.
     fn joined(sensor: &str, heater: &str, other: &str) -> SimConfigFile {
         let indent = |lines: &str| {
             lines
@@ -4444,7 +4394,8 @@ connections:
             entry("DH1", heater),
             entry("DH2", other)
         ));
-        file.model = Some(PhysicsFile::parse(MODEL).expect("the model parses"));
+        file.world =
+            Some(WorldSection::parse(MODEL).expect("the model parses"));
         file
     }
 
@@ -4463,10 +4414,11 @@ connections:
     const HEATER_2: &str = "connects: heater_2.on";
 
     /// A simulator file that still declares its masses itself is refused,
-    /// told where they go now, and one naming a model it cannot have is
-    /// refused naming the model.
+    /// told where they go now; one naming a model in a file of its own is
+    /// refused, told to move it in; and one with its model in its world
+    /// section reads it.
     #[test]
-    fn the_model_is_its_own_file() {
+    fn the_model_is_the_worlds() {
         let dir = tempfile::tempdir().expect("a directory");
         let sim = dir.path().join("set-sim.yaml");
         std::fs::write(
@@ -4476,18 +4428,20 @@ connections:
         )
         .expect("written");
         let why = SimConfigFile::load(&sim).expect_err("moved").to_string();
-        assert!(why.contains("physics model of their own"), "{why}");
+        assert!(why.contains("world section"), "{why}");
 
-        std::fs::write(&sim, "physics: nowhere-physics.yaml\n")
-            .expect("written");
-        let why = SimConfigFile::load(&sim).expect_err("missing").to_string();
-        assert!(why.contains("nowhere-physics.yaml"), "{why}");
-
-        std::fs::write(dir.path().join("set-physics.yaml"), MODEL)
-            .expect("written");
         std::fs::write(&sim, "physics: set-physics.yaml\n").expect("written");
+        let why = SimConfigFile::load(&sim).expect_err("named").to_string();
+        assert!(why.contains("set-physics.yaml"), "{why}");
+        assert!(why.contains("components:"), "{why}");
+
+        let inline: String =
+            MODEL.lines().map(|line| format!("  {line}\n")).collect();
+        std::fs::write(&sim, format!("world:\n{inline}")).expect("written");
         let file = SimConfigFile::load(&sim).expect("it reads its model");
-        assert_eq!(file.model.expect("a model").physics.len(), 3);
+        let world = file.world.expect("a model");
+        assert_eq!(world.physics.components.len(), 3);
+        assert_eq!(world.ambient_temp.as_deref(), Some("283.15 K"));
     }
 
     /// A sensor joined to an output reports it, in its unit, and a heater
@@ -4584,9 +4538,9 @@ connections:
 
         // And one with no model to be in.
         let mut file = joined(SENSOR, HEATER_1, HEATER_2);
-        file.model = None;
+        file.world = None;
         let err = file.resolve(&handlers()).unwrap_err().to_string();
-        assert!(err.contains("names no physics model"), "{err}");
+        assert!(err.contains("has no physics model"), "{err}");
     }
 
     /// A stand-in drives an engine's throttle, a value, and another reports
@@ -4598,23 +4552,24 @@ connections:
             "connects: engine.throttle",
             "connects: lander.altitude",
         );
-        file.model = Some(
-            PhysicsFile::parse(
+        file.world = Some(
+            WorldSection::parse(
                 "physics:
-  - type body:
-      - component: lander
-        altitude: \"500 m\"
-        gravity: \"1.62 m/s2\"
-        mass: \"1500 kg\"
-        velocity: \"-20 m/s\"
-  - type engine:
-      - component: engine
-        fuel: \"800 kg\"
-        isp: 311 s
-        thrust: \"16000 N\"
-connections:
-  - { from: engine.force, to: lander.force }
-  - { from: engine.flow, to: lander.flow }
+  components:
+    - type body:
+        - component: lander
+          altitude: \"500 m\"
+          gravity: \"1.62 m/s2\"
+          mass: \"1500 kg\"
+          velocity: \"-20 m/s\"
+    - type engine:
+        - component: engine
+          fuel: \"800 kg\"
+          isp: 311 s
+          thrust: \"16000 N\"
+  connections:
+    - { from: engine.force, to: lander.force }
+    - { from: engine.flow, to: lander.flow }
 ",
             )
             .expect("the model parses"),
@@ -4664,20 +4619,23 @@ connections:
         assert!(err.to_string().contains("heater_2.on is joined"), "{err}");
 
         let mut file = joined(SENSOR, HEATER_1, HEATER_2);
-        let model = file.model.as_mut().expect("a model");
-        model.physics.push(crate::physics::Component::ThermalZone(
-            crate::physics::thermal_zone::ThermalZone {
-                name: "spare".to_string(),
-                environment: "283.15 K".to_string(),
-                time_constant: "50 s".to_string(),
-                capacity: "20 J/K".to_string(),
-                swing: None,
-                period: None,
-                wander: None,
-                wander_time: None,
-                start: None,
-            },
-        ));
+        let model = file.world.as_mut().expect("a model");
+        model
+            .physics
+            .components
+            .push(crate::physics::Component::ThermalZone(
+                crate::physics::thermal_zone::ThermalZone {
+                    name: "spare".to_string(),
+                    moved_environment: None,
+                    time_constant: "50 s".to_string(),
+                    capacity: "20 J/K".to_string(),
+                    swing: None,
+                    period: None,
+                    wander: None,
+                    wander_time: None,
+                    start: None,
+                },
+            ));
         let err = file.physics().unwrap_err().to_string();
         assert!(err.contains("\"spare\": nothing is joined"), "{err}");
     }

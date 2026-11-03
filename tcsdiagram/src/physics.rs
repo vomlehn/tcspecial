@@ -10,13 +10,6 @@
 //! physics component is never in one. So the drawing is the same every
 //! time a model is opened, in the one order the model has.
 //!
-//! A component whose heat, or whatever else it puts out, all goes into one
-//! other component is drawn inside that one, as a heater is inside the zone
-//! it warms: the two are one body on the vehicle, and what joins the
-//! sensors and the heaters' lines to them is drawn to one block, not
-//! spread over several. The connection between them is the nesting, and is
-//! not drawn again as a line.
-//!
 //! A physics node is the one shape no node of a configuration's has -- a
 //! hexagon, pointed at both ends, with a dotted edge -- in the Physics pane's
 //! own reddish purple, and labelled with its type as well as its name. It
@@ -162,18 +155,14 @@ pub fn of_simulator(sim: &tcslibgs::sim_config::SimConfigFile) -> Drawn {
     drawn
 }
 
-/// How far a component drawn inside another is in from that one's sides,
-/// and how far below the one above it, in pixels.
-pub const INSIDE: u32 = 8;
-
-/// How much of the Physics pane right of its blocks is kept for the lanes
+/// How much of the Physics pane right of its nodes is kept for the lanes
 /// the joins run down to the payloads, in pixels.
 pub const LANES: i32 = 24;
 
-/// The narrowest a block is drawn, however narrow the pane: its two
+/// The narrowest a node is drawn, however narrow the pane: its two
 /// terminals and the hexagon's points, with the name elided to its first
 /// letters. A tenth of the working width, the narrowest the pane is let be
-/// (see `settings::LEAST`), less the lanes: the block and its lanes fit even
+/// (see `settings::LEAST`), less the lanes: the node and its lanes fit even
 /// then, and the pane is dragged wider to read the names.
 pub const NARROWEST: u32 = 72;
 
@@ -184,81 +173,25 @@ pub struct Place {
     pub at: (i32, i32),
     /// Its width and height.
     pub size: (u32, u32),
-    /// The right edge of the block it is drawn in: its own, or the right
-    /// edge of the component it is inside. Every line to the component
-    /// leaves the block from there.
-    pub right: i32,
-}
-
-/// Which component each is drawn inside, if any.
-///
-/// One whose every connection goes from it into one other component, which
-/// itself goes into nothing, is drawn inside that one: a heater inside the
-/// zone it warms. Only one deep, so that a block is never a nest of blocks
-/// that a narrow pane could not hold; anything else stands alone.
-///
-/// # Arguments
-///
-/// * `names`       - The components' names.
-/// * `connections` - The model's connections, from and to, as the file
-///                   writes them.
-///
-/// # Returns
-///
-/// For each name, the index in `names` of the one it is drawn inside.
-pub fn hosts_of(
-    names: &[&str],
-    connections: &[(&str, &str)],
-) -> Vec<Option<usize>> {
-    let component = |end: &str| {
-        let name = end.split_once('.').map_or(end, |(name, _)| name);
-        names.iter().position(|n| *n == name)
-    };
-    // Where each component's connections go, by index; None for one that
-    // goes nowhere, and a component's own index for one whose connections
-    // go to more than one.
-    let mut into: Vec<Option<usize>> = vec![None; names.len()];
-    for (from, to) in connections {
-        let (Some(a), Some(b)) = (component(from), component(to)) else {
-            continue;
-        };
-        into[a] = match into[a] {
-            None => Some(b),
-            Some(was) if was == b => Some(b),
-            Some(_) => Some(a),
-        };
-    }
-    (0..names.len())
-        .map(|i| match into[i] {
-            Some(host) if host != i && into[host].is_none() => Some(host),
-            _ => None,
-        })
-        .collect()
 }
 
 /// Where each component goes: down the Physics pane, in name order, a step
-/// apart, clear of the pane's heading, and each drawn inside another under
-/// that one's name.
+/// apart, clear of the pane's heading.
 ///
 /// # Arguments
 ///
 /// * `names`    - The components' names, in the order they are drawn.
-/// * `hosts`    - Which each is drawn inside: see [`hosts_of`].
 /// * `dividers` - Where the panes are, which says how wide the Physics pane
 ///                is.
 ///
 /// # Returns
 ///
 /// Each name's place.
-pub fn layout(
-    names: &[&str],
-    hosts: &[Option<usize>],
-    dividers: Dividers,
-) -> Vec<Place> {
+pub fn layout(names: &[&str], dividers: Dividers) -> Vec<Place> {
     let (left, right) = edges_of(Pane::Physics, dividers);
     // As wide as SIZE where the pane has room for that and the lanes the
     // joins run down beside it, and narrower where it has not, so that a
-    // narrow pane keeps its blocks in it rather than under the payloads.
+    // narrow pane keeps its nodes in it rather than under the payloads.
     // Never narrower than NARROWEST, which still holds both terminals and
     // a little of the name.
     let fits = |x: i32| right - x - LANES;
@@ -268,36 +201,20 @@ pub fn layout(
         left
     };
     let width = (SIZE.0 as i32).min(fits(x)).max(NARROWEST as i32);
-    // One step of the node grid between one block and the next.
+    // One step of the node grid between one node and the next.
     let gap = (NODE_STEP_MM as f64 * PX_PER_MM).round() as i32;
-    let (height, inside) = (SIZE.1 as i32, INSIDE as i32);
-    let mut places = vec![
-        Place {
-            at: (x, 0),
-            size: (width as u32, SIZE.1),
-            right: x + width,
-        };
-        names.len()
-    ];
     let mut y = node_ceil(NAMES.0 + NAMES.1);
-    for host in 0..names.len() {
-        if hosts[host].is_some() {
-            continue;
-        }
-        let guests: Vec<usize> = (0..names.len())
-            .filter(|&g| hosts[g] == Some(host))
-            .collect();
-        for (n, &guest) in guests.iter().enumerate() {
-            places[guest].at =
-                (x + inside, y + height + n as i32 * (height + inside));
-            places[guest].size = ((width - 2 * inside) as u32, SIZE.1);
-        }
-        let tall = height + guests.len() as i32 * (height + inside);
-        places[host].at = (x, y);
-        places[host].size = (width as u32, tall as u32);
-        y = node_ceil(y + tall + gap);
-    }
-    places
+    names
+        .iter()
+        .map(|_| {
+            let place = Place {
+                at: (x, y),
+                size: (width as u32, SIZE.1),
+            };
+            y = node_ceil(y + SIZE.1 as i32 + gap);
+            place
+        })
+        .collect()
 }
 
 /// What a physics node looks like.
@@ -375,9 +292,6 @@ pub fn node_look(
         terminal_column: (style::TERMINAL_COLUMN as i32
             + style::room_of(outline, size)) as f32,
         inset: style::room_of(outline, size) as f32,
-        // A block with others drawn inside it is named at its top, above
-        // them, where its name is not covered.
-        label_top: size.1 > SIZE.1,
     }
 }
 
@@ -406,11 +320,9 @@ fn has(kind: &str, output: bool) -> bool {
 /// Where a physics node's output or input terminal is drawn, from its upper
 /// left corner.
 ///
-/// At the right, the output in the top row and the input in the row under
-/// it, both within the top [`SIZE`] of the node: a block with others inside
-/// it keeps its terminals beside its own name, where nothing inside covers
-/// them. In from the right by however far the hexagon's side is in along
-/// the terminal's rows.
+/// At the right, the output in the top row and the input in the bottom
+/// one, in from the right by however far the hexagon's side is in along the
+/// terminal's rows.
 ///
 /// # Arguments
 ///
@@ -426,7 +338,7 @@ pub fn terminal_at(size: (u32, u32), output: bool) -> (i32, i32) {
     let y = if output {
         inset
     } else {
-        SIZE.1 as i32 - inset - tall
+        size.1 as i32 - inset - tall
     };
     let room = style::hexagon_room(size.1, y, y + tall);
     (size.0 as i32 - inset - style::TERMINAL.0 as i32 - room, y)
@@ -463,29 +375,17 @@ pub fn looks(
     shift: i32,
 ) -> (Vec<NodeLook>, Vec<LinkLook>) {
     let names: Vec<&str> = components.iter().map(|c| c.name).collect();
-    let hosts = hosts_of(&names, connections);
-    let places = layout(&names, &hosts, dividers);
+    let places = layout(&names, dividers);
     let place_of =
         |name: &str| names.iter().position(|n| *n == name).map(|i| places[i]);
 
-    // Each block before what is drawn inside it, so that what is inside is
-    // drawn over it and is what a press on it reaches.
-    let mut drawn: Vec<NodeLook> = Vec::new();
-    for i in 0..components.len() {
-        if hosts[i].is_some() {
-            continue;
-        }
-        for j in std::iter::once(i)
-            .chain((0..components.len()).filter(|&g| hosts[g] == Some(i)))
-        {
-            let place = places[j];
-            drawn.push(node_look(
-                &components[j],
-                (place.at.0 + shift, place.at.1),
-                place.size,
-            ));
-        }
-    }
+    let drawn: Vec<NodeLook> = components
+        .iter()
+        .zip(&places)
+        .map(|(component, place)| {
+            node_look(component, (place.at.0 + shift, place.at.1), place.size)
+        })
+        .collect();
 
     // Where a line leaves or arrives at a component: the right of its
     // output or its input terminal, halfway down it.
@@ -498,9 +398,8 @@ pub fn looks(
     };
     let mut links = Vec::new();
     // Each connection a loop out of its output's terminal, past the right of
-    // the blocks, and back into its input's, a little further out each, so
-    // that two do not run down one line. One into the block it is drawn
-    // inside is that nesting, and not drawn again.
+    // the nodes, and back into its input's, a little further out each, so
+    // that two do not run down one line.
     for (n, (from, to)) in connections.iter().enumerate() {
         let (Some((a, _)), Some((b, _))) =
             (from.split_once('.'), to.split_once('.'))
@@ -510,18 +409,9 @@ pub fn looks(
         let (Some(a_at), Some(b_at)) = (place_of(a), place_of(b)) else {
             continue;
         };
-        let (Some(i), Some(j)) = (
-            names.iter().position(|n| *n == a),
-            names.iter().position(|n| *n == b),
-        ) else {
-            continue;
-        };
-        if hosts[i] == Some(j) {
-            continue;
-        }
         let start = end_at(a_at, true);
         let end = end_at(b_at, false);
-        let right = (a_at.right.max(b_at.right) + shift) as f32;
+        let right = (a_at.at.0 + a_at.size.0 as i32 + shift) as f32;
         let out = right + 8.0 + 6.0 * (n % 3) as f32;
         let points = [start, (out, start.1), (out, end.1), end];
         links.push(link(&points));
@@ -669,11 +559,7 @@ mod tests {
     #[test]
     fn the_components_go_down_the_physics_pane() {
         let dividers = default_dividers();
-        let places = layout(
-            &["heater_1", "heater_2", "zone"],
-            &[None, None, None],
-            dividers,
-        );
+        let places = layout(&["heater_1", "heater_2", "zone"], dividers);
         let (left, right) = edges_of(Pane::Physics, dividers);
         for (i, place) in places.iter().enumerate() {
             let (x, y) = place.at;
@@ -688,37 +574,26 @@ mod tests {
         assert!(right <= 0, "the Physics pane is left of the payloads");
     }
 
-    /// Heaters that warm a zone are drawn inside the zone's block, under its
-    /// name, and every line to them leaves that one block: the sensors and
-    /// the heaters' lines are joined to one thermal mass, not to three
-    /// blocks.
+    /// Heaters that warm a zone are drawn as nodes of their own, apart from
+    /// the zone, with a line from each heater's output terminal into the
+    /// zone's input terminal; and a join leaves or arrives at the terminal
+    /// of the component it names.
     #[test]
-    fn the_heaters_are_drawn_inside_the_zone_they_warm() {
-        let names = ["heater_1", "heater_2", "zone"];
+    fn the_heaters_stand_apart_from_the_zone_they_warm() {
         let connections = [
             ("heater_1.heat", "zone.heat"),
             ("heater_2.heat", "zone.heat"),
         ];
-        let hosts = hosts_of(&names, &connections);
-        assert_eq!(hosts, [Some(2), Some(2), None]);
-
         let dividers = default_dividers();
-        let places = layout(&names, &hosts, dividers);
+        let names = ["heater_1", "heater_2", "zone"];
+        let places = layout(&names, dividers);
         let zone = places[2];
-        // Right and bottom edges.
-        let end =
-            |p: &Place| (p.at.0 + p.size.0 as i32, p.at.1 + p.size.1 as i32);
-        for heater in &places[..2] {
+        for pair in places.windows(2) {
             assert!(
-                heater.at.0 > zone.at.0
-                    && end(heater).0 < end(&zone).0
-                    && heater.at.1 >= zone.at.1 + SIZE.1 as i32
-                    && end(heater).1 < end(&zone).1,
-                "inside the zone, under its name: {places:?}"
+                pair[1].at.1 >= pair[0].at.1 + pair[0].size.1 as i32,
+                "none on another: {places:?}"
             );
-            assert_eq!(heater.right, zone.right);
         }
-        assert!(places[1].at.1 >= places[0].at.1 + SIZE.1 as i32);
 
         let component = |name, kind| Component {
             name,
@@ -755,13 +630,12 @@ mod tests {
             dividers,
             dividers.physics,
         );
-        // The zone first, so that the heaters are drawn over it and a press
-        // on one reaches the heater.
         let order: Vec<&str> = drawn.iter().map(|n| n.name.as_str()).collect();
-        assert_eq!(order, ["zone", "heater_1", "heater_2"]);
-        assert!(drawn[0].label_top && !drawn[1].label_top);
-        // No line for the heat: the nesting says it.
-        assert_eq!(links.len(), 2, "only the two joins are drawn");
+        assert_eq!(order, ["heater_1", "heater_2", "zone"]);
+        assert!(drawn.iter().all(|n| n.height == SIZE.1 as f32));
+        // Two lines for the heat and two for the joins.
+        assert_eq!(links.len(), 4);
+
         // The zone's temperature leaves by the zone's output terminal, and
         // heater_1's switching arrives at heater_1's input terminal: each at
         // the right of its terminal, halfway down it. A dashed line starts
@@ -779,15 +653,24 @@ mod tests {
             let mut it = said.split(' ').map(|n| n.parse::<f32>().unwrap());
             (it.next().unwrap(), it.next().unwrap())
         };
-        let first = parse(links[0].route[2..].split(" L ").next().unwrap());
-        assert_eq!(first, point(zone, true), "{}", links[0].route);
-        let last = parse(links[1].route.rsplit(" L ").next().unwrap());
-        let wanted = point(places[0], false);
-        assert!(
-            last.1 == wanted.1 && (0.0..=5.0).contains(&(last.0 - wanted.0)),
-            "ends at {last:?}, not at {wanted:?}: {}",
-            links[1].route
-        );
+        let first =
+            |n: usize| parse(links[n].route[2..].split(" L ").next().unwrap());
+        let ends = |n: usize, wanted: (f32, f32)| {
+            let last = parse(links[n].route.rsplit(" L ").next().unwrap());
+            assert!(
+                last.1 == wanted.1
+                    && (0.0..=5.0).contains(&(last.0 - wanted.0)),
+                "ends at {last:?}, not at {wanted:?}: {}",
+                links[n].route
+            );
+        };
+        // Each heater's heat out of its output and into the zone's input.
+        for (n, heater) in places[..2].iter().enumerate() {
+            assert_eq!(first(n), point(*heater, true), "{}", links[n].route);
+            ends(n, point(zone, false));
+        }
+        assert_eq!(first(2), point(zone, true), "{}", links[2].route);
+        ends(3, point(places[0], false));
     }
 
     /// A physics node is a hexagon, the one outline no configuration's node
@@ -800,8 +683,7 @@ mod tests {
             kind,
             faulty: false,
         };
-        let block = (SIZE.0, 3 * SIZE.1);
-        for size in [SIZE, block] {
+        for size in [SIZE, (super::NARROWEST, SIZE.1)] {
             let look = node_look(&component("heater"), (0, 0), size);
             assert_eq!(look.outline, "hexagon");
             let shown: Vec<&TerminalLook> = [
@@ -817,12 +699,11 @@ mod tests {
             let (out, into) = (&look.gateway_out, &look.payload_in);
             assert!(out.rightward && !into.rightward);
             assert!(out.y + style::TERMINAL.1 as f32 <= into.y, "apart");
-            // Both in the node's top row of SIZE, and inside the hexagon at
-            // both of their corners on the right.
+            // Both inside the hexagon at both of their corners on the right.
             let polygon = style::polygon_of(style::Outline::Hexagon, size);
             let half = size.1 as f32 / 2.0;
             for t in [out, into] {
-                assert!(t.y + style::TERMINAL.1 as f32 <= SIZE.1 as f32);
+                assert!(t.y + style::TERMINAL.1 as f32 <= size.1 as f32);
                 let right = t.x + style::TERMINAL.0 as f32;
                 for y in [t.y, t.y + style::TERMINAL.1 as f32] {
                     let edge =
@@ -843,13 +724,12 @@ mod tests {
         }
     }
 
-    /// A narrow Physics pane keeps its blocks in it, with the joins' lanes
+    /// A narrow Physics pane keeps its nodes in it, with the joins' lanes
     /// beside them, rather than drawing them under the payloads; a wide one
     /// draws them at their full width.
     #[test]
-    fn a_narrow_pane_narrows_its_blocks() {
+    fn a_narrow_pane_narrows_its_nodes() {
         let names = ["heater_1", "zone"];
-        let hosts = [Some(1), None];
         let least = crate::pane::WORKING_WIDTH * crate::settings::LEAST / 100;
         for physics in [least, 105, 192, 400] {
             let dividers = Dividers {
@@ -857,38 +737,23 @@ mod tests {
                 ..default_dividers()
             };
             let (left, right) = edges_of(Pane::Physics, dividers);
-            let places = layout(&names, &hosts, dividers);
-            let zone = places[1];
-            assert!(zone.at.0 >= left, "{physics}: {places:?}");
-            assert!(zone.right + LANES <= right, "{physics}: {places:?}");
-            assert_eq!(
-                zone.size.0 == SIZE.0,
-                right - left >= SIZE.0 as i32 + LANES + 8,
-                "{physics}: {places:?}"
-            );
-            assert!(places[0].right == zone.right);
-            assert!(places[0].at.0 + (places[0].size.0 as i32) < zone.right);
+            let places = layout(&names, dividers);
+            for place in &places {
+                let end = place.at.0 + place.size.0 as i32;
+                assert!(place.at.0 >= left, "{physics}: {places:?}");
+                assert!(end + LANES <= right, "{physics}: {places:?}");
+                assert_eq!(
+                    place.size.0 == SIZE.0,
+                    right - left >= SIZE.0 as i32 + LANES + 8,
+                    "{physics}: {places:?}"
+                );
+            }
         }
     }
 
-    /// A component whose connections go to two others, or into one that
-    /// goes on into another, stands alone: a block is one deep.
-    #[test]
-    fn only_a_component_feeding_one_end_is_drawn_inside_it() {
-        let names = ["a", "b", "c"];
-        assert_eq!(
-            hosts_of(&names, &[("a.out", "b.in"), ("a.out", "c.in")]),
-            [None, None, None]
-        );
-        assert_eq!(
-            hosts_of(&names, &[("a.out", "b.in"), ("b.out", "c.in")]),
-            [None, Some(2), None]
-        );
-    }
-
-    /// A join is drawn between a component and its payload's node, dashed
-    /// and in the Physics pane's line colour; a join to a node not on the
-    /// page is not drawn.
+    /// A connection is drawn between its two components and a join between
+    /// a component and its payload's node, both dashed and in the Physics
+    /// pane's line colour; a join to a node not on the page is not drawn.
     #[test]
     fn connections_and_joins_are_dashed_links() {
         let components = [
@@ -929,23 +794,17 @@ mod tests {
             dividers.physics,
         );
         assert_eq!(drawn.len(), 2);
-        // The heater is inside the zone, drawn after it.
-        assert!(drawn[0].faulty && !drawn[1].faulty);
-        assert_eq!(drawn[1].node_type, "heater");
+        assert!(drawn[1].faulty && !drawn[0].faulty);
+        assert_eq!(drawn[0].node_type, "heater");
         assert!(drawn.iter().all(|n| n.x >= 0.0), "shifted into view");
-        assert_eq!(
-            links.len(),
-            1,
-            "the join to elsewhere is not drawn, nor the heat into the \
-             zone the heater is drawn inside"
-        );
+        assert_eq!(links.len(), 2, "the join to elsewhere is not drawn");
         for link in &links {
             assert_eq!(link.ink, PHYSICS_LINE);
             assert!(link.route.matches('M').count() > 2, "dashed");
         }
         // The zone's temperature is an output: its join arrives at the
         // payload, going right.
-        assert!(links[0]
+        assert!(links[1]
             .head
             .contains(&format!("{}", 34 + dividers.physics)));
     }

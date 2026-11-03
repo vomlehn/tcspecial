@@ -6879,20 +6879,38 @@ Keeping configurations on board
 Requirement
     A configuration is kept as a tree: a directory named by its checksum,
     holding its top file, named by the checksum too, and each file the top
-    file includes, under the name its include list gives it. The checksum
-    takes in those names, so that it says the shape of the tree as well as
-    what is in it, and two configurations that each include a ``zone``
-    of their own are kept apart. An include name that is a path, begins
-    with a dot or is the checksum is refused when the configuration is
-    kept and when it is loaded, saying so.
+    file includes, where its include name, read from the top file's
+    directory, puts it. The top file is as far down the tree as its
+    includes climb with ``..``, so that every one of them is inside it.
+    The checksum takes in the include names as they are written, so that
+    it says the shape of the tree as well as what is in it, and two
+    configurations that each include a ``zone`` of their own are kept
+    apart. An include name with a part that begins with a dot, other than
+    ``..``, whose last part is the checksum, or that puts its file where
+    another of the configuration's is, is refused when the configuration
+    is kept and when it is loaded, saying so, and so is a kept top file
+    that is not as far down as its includes climb.
 
 As built, a configuration is kept as ``<checksum>/<checksum>.ytcs`` or
 ``<checksum>/<checksum>.xtcs`` -- its checksum in 32 lower-case hex digits,
-and the extension that says how it is read, the one it was given -- with
-each file it includes beside it, in the directory the ``tcspecial``
-section's ``configurations`` names. It is written to a hidden directory
-beside its name and renamed into place, and removed by being renamed out
-of the way first, so that a power failure leaves the whole of it or none.
+and the extension that says how it is read, the one it was given -- in
+the directory the ``tcspecial`` section's ``configurations`` names, with
+one directory named ``top`` between the two for each ``..`` the include
+that climbs furthest goes above the top file's directory, worked out from
+the names alone. Each file it includes is at its include name from the
+top file's directory, with the top file's extension, and each directory
+an include name passes through is made. The thermostat example, which
+includes ``../thermostat-common/thermostat``, is
+``<checksum>/top/<checksum>.ytcs`` and
+``<checksum>/thermostat-common/thermostat.ytcs``. One name for every level
+says nothing but how far the includes climb; a configuration whose
+includes are all beside it has none, which is how every configuration was
+kept before an include could be a path. A load finds the top file by
+looking in the tree and then down each ``top`` in turn, and reads its
+include list before anything it includes. It is written to a hidden
+directory beside its name, every file and directory in it flushed, and
+renamed into place, and removed by being renamed out of the way first, so
+that a power failure leaves the whole of it or none.
 A section that names none is a vehicle that keeps no configurations: it
 runs the one on its command line, and a RESTART may name only that and the
 one running.

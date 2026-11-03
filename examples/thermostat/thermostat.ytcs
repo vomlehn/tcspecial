@@ -73,7 +73,7 @@ payloads:
 
 tcsgui:
   nodes:
-    - { node: ../thermostat-common/thermostat, x: 242, y: 166 }
+    - { node: ../thermostat-common/thermostat, x: 563, y: 374 }
     - { node: gateway, x: 790, y: 34 }
     - { node: temp_1, x: 34, y: 34 }
     - { node: temp_2, x: 34, y: 166 }

@@ -170,6 +170,10 @@ mod tests {
     use super::*;
 
     /// The example's zone, as a file states it.
+    ///
+    /// # Returns
+    ///
+    /// It, with nothing optional stated.
     fn zone() -> ThermalZone {
         ThermalZone {
             name: "zone".to_string(),

@@ -32,6 +32,9 @@ tcspecial:
     recv: "0.0.0.0:7200"
     send: "127.0.0.1:7210"
 
+include:
+  - ../ping-common/ping
+
 gateways:
   - type gateway_radio:
       # The ground's end of the link, both ways. A ping goes up to address:port,
@@ -46,16 +49,7 @@ gateways:
           - target: ping
         payload-in: true
 
-vehicle:
-  - type ping:
-      # Answers each ping with the vehicle's time on the end: see
-      # tcslibgs::node::vehicle::ping for what a ping and its answer say.
-      - compute: ping
-        payload-out:
-          - target: gateway
-        gateway-in: true
-
 tcsgui:
   nodes:
+    - { node: ../ping-common/ping, x: 34, y: 34 }
     - { node: gateway, x: 469, y: 34 }
-    - { node: ping, x: 34, y: 34 }

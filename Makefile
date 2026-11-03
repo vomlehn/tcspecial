@@ -432,11 +432,13 @@ SPELLINGS = \
 
 # Every shipped configuration, both spellings: the examples, the thermostat
 # fixture and the top-level example, but not the simulator files, which
-# name no interface.
+# name no interface, nor the files in examples/*-common that two examples
+# include, which have no tcspecial section to name one in.
 SHIPPED_CONFIGURATIONS = example.ytcs example.xtcs \
 	tests/manual/thermostat.ytcs tests/manual/thermostat.xtcs \
-	$(wildcard examples/*/*.ytcs) \
-	$(wildcard examples/*/*.xtcs)
+	$(filter-out $(wildcard examples/*-common/*), \
+		$(wildcard examples/*/*.ytcs) \
+		$(wildcard examples/*/*.xtcs))
 
 # Write this build's interface digest into every shipped configuration, in
 # place and changing nothing else, after tcslibgs/xtce/link.xtce changes:

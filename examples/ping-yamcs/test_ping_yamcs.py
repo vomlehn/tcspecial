@@ -10,6 +10,7 @@ Run from the repository's root::
 import dataclasses
 import re
 import sys
+import shutil
 import tempfile
 import textwrap
 import types
@@ -195,7 +196,8 @@ def with_more_nodes(directory):
     the gateway node -- "pong", a payload -- and two payloads nothing
     touches, "sensor" and "tank", which report over payload_telemetry.
     Their names sort after "gateway" and "ping", whose device ids stay 0
-    and 1.
+    and 1. Written in a ``ping-yamcs`` directory of its own, with a copy of
+    the file it includes in a ``ping-common`` beside it, as in ``examples``.
 
     Args:
         directory: Where to write it.
@@ -228,7 +230,11 @@ def with_more_nodes(directory):
         """), " " * 4)
     if text.count("    <tcsgui>") != 1:
         raise ValueError("the example has no one tcsgui section")
-    path = directory / "with-more-nodes.xtcs"
+    common = directory / "ping-common"
+    common.mkdir(exist_ok=True)
+    shutil.copy(HERE.parent / "ping-common" / "ping.xtcs", common)
+    (directory / "ping-yamcs").mkdir(exist_ok=True)
+    path = directory / "ping-yamcs" / "with-more-nodes.xtcs"
     path.write_text(text.replace("    <tcsgui>", payloads + "    <tcsgui>"))
     return path
 

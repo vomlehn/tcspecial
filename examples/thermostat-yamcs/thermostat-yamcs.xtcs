@@ -54,18 +54,16 @@
             <send>127.0.0.1:0</send>
         </tcs_cmd>
     </tcspecial>
-    <payload_groups>
-        <name>zone_temps</name>
-        <interval>1 s</interval>
-    </payload_groups>
+    <include>../thermostat-common/thermostat</include>
     <gateways>
         <type name="gateway_yamcs">
-            <!-- Yamcs's end of the link. Each reading and decision drawn
-                 into this node comes down to Yamcs at ground_base plus its
-                 source's device id (thermostat is the last of the twelve
-                 names, device id 11, so 17711) as telemetry of APID
-                 apid_base plus that device id, 0x40b. What Yamcs sends up
-                 to address:port goes as a telecommand of APID apid_base. -->
+            <!-- Yamcs's end of the link. Each reading drawn into this node
+                 comes down to Yamcs at ground_base plus its source's device
+                 id (temp3 is the ninth of the thirteen names, here and in
+                 the file this one includes, device id 8, so 17708) as
+                 telemetry of APID apid_base plus that device id, 0x408.
+                 What Yamcs sends up to address:port goes as a telecommand
+                 of APID apid_base. -->
             <gateway name="gateway">
                 <address>127.0.0.1</address>
                 <apid_base>0x400</apid_base>
@@ -75,122 +73,7 @@
             </gateway>
         </type>
     </gateways>
-    <vehicle>
-        <type name="compute">
-            <!-- One temperature out of the three, by the algorithm named: -->
-            <!-- median takes the middle reading, closest_mean the mean of -->
-            <!-- the two that agree best. Either leaves a sensor that has -->
-            <!-- gone wrong out of the answer, which a mean over all three -->
-            <!-- would not, and it produces a value on every arrival, so one -->
-            <!-- sensor that stops reporting is outvoted rather than -->
-            <!-- stopping the vehicle from deciding anything. -->
-            <compute name="ambient">
-                <algorithm>median</algorithm>
-                <function>vote</function>
-                <inputs>in0,in1,in2</inputs>
-                <payload-out><target>gateway</target></payload-out>
-                <payload-out><target>thermostat</target></payload-out>
-                <payload-in>true</payload-in>
-            </compute>
-            <compute name="temp1">
-                <format>i16_be</format>
-                <function>to_kelvin</function>
-                <offset>273.15</offset>
-                <scale>0.0625</scale>
-                <payload-out><target>ambient</target><input>in0</input></payload-out>
-                <payload-out><target>gateway</target></payload-out>
-                <payload-out><target>housekeeping</target></payload-out>
-                <payload-in>true</payload-in>
-            </compute>
-            <compute name="temp2">
-                <format>i16_be</format>
-                <function>to_kelvin</function>
-                <offset>273.15</offset>
-                <scale>0.0625</scale>
-                <payload-out><target>ambient</target><input>in1</input></payload-out>
-                <payload-out><target>gateway</target></payload-out>
-                <payload-out><target>housekeeping</target></payload-out>
-                <payload-in>true</payload-in>
-            </compute>
-            <compute name="temp3">
-                <format>u24_be</format>
-                <function>to_kelvin</function>
-                <offset>255.37</offset>
-                <scale>0.0078</scale>
-                <payload-out><target>ambient</target><input>in2</input></payload-out>
-                <payload-out><target>gateway</target></payload-out>
-                <payload-out><target>housekeeping</target></payload-out>
-                <payload-in>true</payload-in>
-            </compute>
-            <!-- setpoint is set from the ground; half_band is how far -->
-            <!-- either side of it the heaters are switched at, the setpoint -->
-            <!-- being in the middle of the band. -->
-            <compute name="thermostat">
-                <function>hysteresis</function>
-                <half_band>2.0</half_band>
-                <setpoint>293.15</setpoint>
-                <!-- asserted below the setpoint, unasserted above it. Two -->
-                <!-- heaters, because one failing must not leave the mass -->
-                <!-- with no way to be warmed: either alone holds the band -->
-                <!-- while the orbit is warm, and both together hold it in -->
-                <!-- the cold too, each switched through a line of its own. -->
-                <!-- What it decides goes to the heaters and the log and not -->
-                <!-- to the ground: the ground is told what the heaters are -->
-                <!-- doing, by gpio-in-tmass, which a heater that has failed -->
-                <!-- does not hide. -->
-                <gateway-out><target>gpio-out-tmass1</target></gateway-out>
-                <gateway-out><target>gpio-out-tmass2</target></gateway-out>
-                <payload-out><target>housekeeping</target></payload-out>
-                <payload-in>true</payload-in>
-            </compute>
-        </type>
-        <type name="log">
-            <compute name="housekeeping">
-                <directory>/tmp/telemetry</directory>
-                <format>variable_ts_rc</format>
-                <payload-in>true</payload-in>
-            </compute>
-        </type>
-    </vehicle>
     <payloads>
-        <!-- The heaters and the lines that sense them, on the thermal -->
-        <!-- mass, through the simulated chip of the kernel, which -->
-        <!-- bin/mk-kernel-stand-ins makes: lines 2 to 5, which leaves 0 -->
-        <!-- and 1 to the gpio example. -->
-        <type name="gpio">
-            <!-- Two lines on the thermal mass, one sensing each heater: -->
-            <!-- high while it is heating. Read every second for what they -->
-            <!-- are, rather than for when they change, so the ground hears -->
-            <!-- the state of the heaters on a beat and a lost report is -->
-            <!-- made good by the next; one bit a line, each a sixteen-byte -->
-            <!-- record of when, which line and what it is, to the ground -->
-            <!-- and the log. -->
-            <!-- Disabled from the ground, it reports nothing at all. -->
-            <payload name="gpio-in-tmass">
-                <edge>none</edge>
-                <lines>2,3</lines>
-                <path>/dev/gpiochip1</path>
-                <state_interval>1 s</state_interval>
-                <payload-out><target>gateway</target></payload-out>
-                <payload-out><target>housekeeping</target></payload-out>
-            </payload>
-            <!-- The switches of the two heaters, each a line the thermostat -->
-            <!-- drives - 1 for on, 0 for off. One payload each, so that one -->
-            <!-- can be stopped from the ground while the other goes on -->
-            <!-- warming the mass. -->
-            <payload name="gpio-out-tmass1">
-                <direction>output</direction>
-                <lines>4</lines>
-                <path>/dev/gpiochip1</path>
-                <gateway-in>true</gateway-in>
-            </payload>
-            <payload name="gpio-out-tmass2">
-                <direction>output</direction>
-                <lines>5</lines>
-                <path>/dev/gpiochip1</path>
-                <gateway-in>true</gateway-in>
-            </payload>
-        </type>
         <!-- The sensors are each the far end of a UDP socket, which -->
         <!-- tcssim stands in for with nothing more than a socket, so that -->
         <!-- they touch no hardware. The buses these parts would be on -->
@@ -227,26 +110,13 @@
             </payload>
         </type>
     </payloads>
-    <!-- the zone temperature the heaters are held at, in kelvin -->
-    <commands>
-        <from>gateway</from>
-        <sets>thermostat.setpoint</sets>
-    </commands>
     <tcsgui>
         <nodes>
-            <node name="ambient" x="469" y="166"/>
+            <node name="../thermostat-common/thermostat" x="242" y="166"/>
             <node name="gateway" x="790" y="34"/>
-            <node name="gpio-in-tmass" x="242" y="470"/>
-            <node name="gpio-out-tmass1" x="34" y="393"/>
-            <node name="gpio-out-tmass2" x="34" y="470"/>
-            <node name="housekeeping" x="469" y="374"/>
-            <node name="temp1" x="242" y="34"/>
-            <node name="temp2" x="242" y="166"/>
-            <node name="temp3" x="242" y="280"/>
             <node name="temp_1" x="34" y="34"/>
             <node name="temp_2" x="34" y="166"/>
             <node name="temp_3" x="34" y="280"/>
-            <node name="thermostat" x="601" y="242"/>
         </nodes>
     </tcsgui>
 </configuration>

@@ -13,12 +13,20 @@ payload: `beacon` does, its ground station watching something tcspecial sends
 on its own account, and so does `ping`, whose ground station is Python 3.
 
 Two examples that are one example with another ground station share what
-they have in common from a directory of its own, which is not an example
-and holds no configuration: `ping-common` holds the ping link and the
-window that `ping` and `ping-yamcs` both show, and `thermostat-common` the
-physics model the simulator files of `thermostat` and `thermostat-yamcs`
-both name. What a file cannot refer to -- a simulator file includes no
-other, and a ground station in Python reads no configuration includes -- is
+they have in common from a directory of its own, which is not an example:
+`ping-common` holds the ping link and the window that `ping` and
+`ping-yamcs` both show, and `ping.ytcs` and `ping.xtcs`, the ping node,
+which both configurations include; `thermostat-common` holds
+`thermostat.ytcs` and `thermostat.xtcs`, the vehicle both thermostat
+configurations include, and the physics model both simulator files name.
+Each configuration includes its common file by its path from its own
+directory, `../thermostat-common/thermostat`, and keeps for itself only what
+differs: its `tcspecial` section, its gateway node -- called `gateway` in
+both, which is the name the common file's links send to -- and, for the
+thermostat, the three sensors, whose ports differ so that the two can run
+at once. A common file is not checked on its own, having no `tcspecial`
+section; it is checked as part of each configuration that includes it. A
+simulator file includes no other, so the two thermostat simulator files are
 written in both, and a test holds the two copies to each other:
 `examples/thermostat-yamcs/tests/shared.rs`. `yamcs-common` is not an
 example either: it is the Rust the tests of the examples through Yamcs share.
@@ -536,10 +544,10 @@ Languages:
 
 The thermostat example with [Yamcs](https://yamcs.org) at the ground end,
 as ping-yamcs is the ping example with it. The vehicle is the thermostat's
--- the same sensors, conversions, vote, thermostat, heaters, GPIO lines and
-log, which
-`tests/shared.rs` holds to the thermostat example's, and the same physics
-model, `thermostat-common/thermostat-physics.yaml` -- and what differs is
+-- the same conversions, vote, thermostat, heaters, GPIO lines and log,
+from the file both include, `thermostat-common/thermostat.ytcs`, the same
+three sensors, at ports of its own, and the same physics model,
+`thermostat-common/thermostat-physics.yaml` -- and what differs is
 the configuration's gateway, `yamcs`, so every packet to and from the
 ground carries a CCSDS primary header:
 
@@ -599,8 +607,8 @@ to `Form::of`, and its table of units to `tcslibgs::unit`; `wrapper.rs`
 works the generated mission database as Yamcs would, with
 `examples/yamcs-common`'s interpreter, on what the vehicle sends -- each
 value as `value_bytes` makes it, in every unit there is, and each decision;
-`shared.rs` holds its vehicle and simulator file to the thermostat
-example's; and `python.rs` runs `test_thermostat_yamcs.py`. None needs
+`shared.rs` holds its simulator file to the thermostat example's; and
+`python.rs` runs `test_thermostat_yamcs.py`. None needs
 Yamcs or opens a window.
 
 Its ports are all in the seventeen thousands, which no other example uses,

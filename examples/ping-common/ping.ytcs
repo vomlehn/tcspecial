@@ -1,0 +1,20 @@
+# yaml-language-server: $schema=../../tcsgui/share/schema/tcspecial.schema.json
+
+# The vehicle the two ping examples share, which each includes: the ping
+# node, which answers each ping it is sent. What differs between the two
+# is in each example's own file: the tcspecial section and the gateway
+# node, which is called gateway in both, the name the ping node's answer
+# is sent to it by.
+
+vehicle:
+  - type ping:
+      # Answers each ping with the vehicle's time on the end: see
+      # tcslibgs::node::vehicle::ping for what a ping and its answer say.
+      - compute: ping
+        payload-out:
+          - target: gateway
+        gateway-in: true
+
+tcsgui:
+  nodes:
+    - { node: ping, x: 34, y: 34 }

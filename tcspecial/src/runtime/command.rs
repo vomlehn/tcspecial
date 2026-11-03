@@ -1523,6 +1523,32 @@ mod tests {
         }
     }
 
+    /// Waits for a test's restart counter to reach a count.
+    ///
+    /// The interpreter asks for a restart only once its answer has gone, so
+    /// the answer can reach the test before the asking is counted: reading
+    /// the counter the moment the answer arrives is a race the test would
+    /// sometimes lose. Two seconds is far longer than the asking takes.
+    ///
+    /// # Arguments
+    ///
+    /// * `counter` - The test's count of the restarts asked for.
+    /// * `want`    - The count to wait for.
+    ///
+    /// # Returns
+    ///
+    /// The count: `want` once reached, or whatever it is when the wait ends.
+    fn asked_by(counter: &std::sync::atomic::AtomicU32, want: u32) -> u32 {
+        let until = std::time::Instant::now() + Duration::from_secs(2);
+        loop {
+            let now = counter.load(Ordering::SeqCst);
+            if now >= want || std::time::Instant::now() >= until {
+                return now;
+            }
+            std::thread::sleep(Duration::from_millis(5));
+        }
+    }
+
     /// Makes a graph of two nodes, so that an id can be right and an id can
     /// be out of range.
     ///
@@ -2577,11 +2603,7 @@ vehicle:
         // The right key and the arm's target, the running configuration:
         // taken, once, which is a plain restart.
         assert_eq!(restart(7, 42, running), CommandStatus::Success);
-        assert_eq!(
-            ASKED.load(Ordering::SeqCst),
-            1,
-            "the restart was asked for"
-        );
+        assert_eq!(asked_by(&ASKED, 1), 1, "the restart was asked for");
 
         // And the arm is used up.
         assert_eq!(restart(8, 42, running), CommandStatus::NotArmed);
@@ -2692,7 +2714,7 @@ vehicle:
 
         // Onto the arm's own: taken.
         assert_eq!(restart(4, armed_onto), CommandStatus::Success);
-        assert_eq!(ASKED.load(Ordering::SeqCst), 1);
+        assert_eq!(asked_by(&ASKED, 1), 1);
     }
 
     /// An arm lasts as long as the configuration's `restart_arm_valid` and

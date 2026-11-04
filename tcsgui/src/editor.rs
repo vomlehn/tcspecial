@@ -29,9 +29,11 @@
 //! had it. Of the two, losing one undo is the better failure, so that is the
 //! order.
 
+use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};
 
 use crate::document::{Document, Fault};
+use crate::faithful::Written;
 use crate::journal::{Edit, Journal};
 use crate::save::{write_atomically, SaveError};
 
@@ -81,6 +83,15 @@ pub struct Editor {
     /// one way to be sure a session started to look writes nothing is for the
     /// thing that writes to refuse. See [`Editor::set_read_only`].
     read_only: bool,
+    /// Each file as the session last read or wrote it: what the editor
+    /// wrote, or would have written, for it then, and what it held.
+    ///
+    /// What lets a save change only what was edited: the next text for a
+    /// file is the file as it was with the edit merged into it, rather than
+    /// the editor's own text throughout. See `crate::faithful`. A file the
+    /// session has neither read nor written has nothing here, and is
+    /// written as the editor writes it.
+    written: BTreeMap<PathBuf, Written>,
 }
 
 impl Editor {
@@ -104,6 +115,7 @@ impl Editor {
             said: None,
             simulator_path: None,
             read_only: false,
+            written: BTreeMap::new(),
         }
     }
 
@@ -173,6 +185,15 @@ impl Editor {
         match crate::read::read(path) {
             Ok(mut document) => {
                 document.settle(dividers);
+                // What the editor would write for the files as they are,
+                // taken after settling, so that a node settling moved is not
+                // an edit: its line is written as the file had it until
+                // somebody moves the node. Where settling puts a node
+                // depends on the window's panes, which are not a fact about
+                // the file, and a save writes only what was edited.
+                if let Ok(files) = document.files(path) {
+                    editor.remember(files);
+                }
                 editor.document = document;
             }
             Err(why) => {
@@ -225,6 +246,16 @@ impl Editor {
 
         match crate::sim::read(path) {
             Ok(simulator) => {
+                // A file not there yet is begun with an entry for each
+                // payload: see `crate::sim::Simulator::begun`.
+                let simulator = if path.exists() {
+                    simulator
+                } else {
+                    crate::sim::Simulator::begun(
+                        path,
+                        &self.document.simulated_payloads(),
+                    )
+                };
                 // Every simulated payload has to name a payload of the
                 // configuration: that name is the whole of how the two files
                 // are joined, so one that names nothing is a set of settings
@@ -249,6 +280,9 @@ impl Editor {
                     .collect();
                 if stray.is_empty() {
                     self.document.simulator = Some(simulator);
+                    // And what the editor would write for it as it is.
+                    let file = self.document.simulator_file();
+                    self.remember(file.into_iter().collect());
                 } else {
                     self.trouble = Some(format!(
                         "{}: {} names no payload of {}; a simulated payload \
@@ -504,11 +538,25 @@ impl Editor {
         // all again, which the next edit does and the Save button does on
         // demand. A failure here stops before the journal is touched, so the
         // history never gets ahead of the configuration.
-        for (path, text) in &files {
-            if let Err(why) = write_atomically(path, text.as_bytes()) {
+        //
+        // Each as the file it was with the edit made to it, so that a save
+        // changes only what was edited: see `crate::faithful`.
+        for (path, now) in files {
+            let text = match self.written.get(&path) {
+                Some(written) => crate::faithful::text(&path, written, &now),
+                None => now.clone(),
+            };
+            if let Err(why) = write_atomically(&path, text.as_bytes()) {
                 self.trouble = Some(describe(&why));
                 return;
             }
+            self.written.insert(
+                path,
+                Written {
+                    base: now,
+                    kept: text,
+                },
+            );
         }
         // The configuration is on the disk. Whatever happens to the history
         // below, there is nothing left in the document that no file has.
@@ -521,6 +569,24 @@ impl Editor {
             self.trouble = Some(format!(
                 "the configuration is saved, but its history is not: {why}"
             ));
+        }
+    }
+
+    /// Holds what the editor writes for each of some files beside what each
+    /// file holds, for the next save to merge an edit into: see
+    /// [`Editor::written`].
+    ///
+    /// A file that cannot be read -- one not there yet among them -- is
+    /// left out, and is written as the editor writes it.
+    ///
+    /// # Arguments
+    ///
+    /// * `files` - Each file's path, with what the editor writes for it.
+    fn remember(&mut self, files: Vec<(PathBuf, String)>) {
+        for (path, base) in files {
+            if let Ok(kept) = std::fs::read_to_string(&path) {
+                self.written.insert(path, Written { base, kept });
+            }
         }
     }
 
@@ -673,9 +739,9 @@ mod tests {
     /// enforces everywhere else. And the file is byte for byte what it was:
     /// opening a configuration to look at it is not editing it, and an editor
     /// that rewrote a file under version control by being pointed at it would
-    /// be an editor nobody could point at anything. The corrected positions
-    /// reach the disk with the first real edit, which rewrites the file
-    /// anyway.
+    /// be an editor nobody could point at anything. Nor does an edit of
+    /// something else write them, a save writing only what was edited; a
+    /// corrected position reaches the disk when its node is moved.
     #[test]
     fn opening_settles_the_panes_without_writing_the_file() {
         let dividers = crate::pane::default_dividers();
@@ -744,21 +810,38 @@ tcsgui:
         // put a node back where the editor refuses to put one.
         assert_eq!(editor.undo_depth(), 0);
 
-        // The first real edit writes it, as every edit does.
+        // An edit of something else writes that, and not the positions.
         editor.edit(Edit::SetNodeComment {
             node: "temp_1".into(),
             was: None,
             now: Some("the fore sensor".into()),
         });
         let written = std::fs::read_to_string(&path).unwrap();
-        assert_ne!(written, by_hand);
+        assert_eq!(
+            written,
+            by_hand.replace(
+                "      - payload: temp_1\n",
+                "      # the fore sensor\n      - payload: temp_1\n"
+            )
+        );
+
+        // Moving the node writes where it now is.
+        let was = editor.document().node("gateway").expect("it").at;
+        let at = (was.0, was.1 + 100);
+        editor.edit(Edit::MoveNode {
+            node: "gateway".into(),
+            was,
+            now: at,
+        });
+        let written = std::fs::read_to_string(&path).unwrap();
         assert!(
             written.contains(&format!(
-                "x: {}",
-                crate::pane::node_ceil(dividers.vehicle)
+                "{{ node: gateway, x: {}, y: {} }}",
+                at.0, at.1
             )),
             "the settled position was not written: {written}"
         );
+        editor.forget_history();
     }
 
     /// Saving when there is nothing to save writes the files anyway.
@@ -1174,7 +1257,7 @@ tcsgui:
         );
         let entry = written
             .split("- payload: ")
-            .find(|entry| entry.starts_with("\"gpio-in-tmass\""))
+            .find(|entry| entry.starts_with("gpio-in-tmass\n"))
             .expect("the payload's entry");
         assert!(entry.contains("drop_percent: 7\n"), "{entry}");
 
@@ -1263,25 +1346,28 @@ tcsgui:
         let written =
             std::fs::read_to_string(&sim).expect("the simulator file");
         assert!(
-            written.contains("packet_interval: \"1 s\""),
+            written.contains("        packet_interval: 1 s\n"),
             "the setting did not reach the file: {written}"
         );
     }
 
-    /// A session given a simulator configuration writes a form, whether or
-    /// not anything has been typed into it.
+    /// A simulator configuration the session begins names each payload of
+    /// the configuration under its type, and says nothing else.
     ///
-    /// A form, because a file with nothing in it leaves its reader unable to
-    /// tell which payloads there are to configure or what can be said about
-    /// them. Every payload of the configuration and every setting of a
-    /// payload, empty until somebody fills one in.
+    /// It was a form once, every setting of every payload written with
+    /// nothing after it, so that the file said what there was to answer.
+    /// That made every file the editor touched a form too: a file somebody
+    /// wrote with three settings came back with fifteen empty keys apiece.
+    /// A key with nothing after it says nothing to the simulator, and the
+    /// windows are where the questions are asked. So a new file says which
+    /// payloads there are, and from then on holds what somebody says.
     #[test]
-    fn a_new_simulator_configuration_is_written_as_a_form() {
+    fn a_new_simulator_configuration_names_each_payload() {
         let where_ = tempfile::tempdir().expect("a directory");
         let path = where_.path().join("vehicle.ytcs");
         let sim = where_.path().join("vehiclesim.yaml");
         // Two payloads and something that is not one: a computation has
-        // nothing standing in for it, so it has no settings to offer.
+        // nothing standing in for it, so it has no entry.
         std::fs::write(
             &path,
             "payloads:\n  - type i2c:\n      - payload: sensor\n  \
@@ -1303,40 +1389,20 @@ tcsgui:
 
         let written =
             std::fs::read_to_string(&sim).expect("the simulator file");
-        for (payload, kind) in [("sensor", "i2c"), ("payload", "network")] {
-            assert!(
-                written.contains(&format!(
-                    "  - type {kind}:\n      - payload: \"{payload}\"\n"
-                )),
-                "{written}"
-            );
-        }
-        assert!(
-            !written.contains("mean"),
-            "a computation is not simulated: {written}"
-        );
-        // And every setting a payload may state, written with nothing after
-        // it: the question is in the file and the answer is not. Nothing
-        // rather than `""`, which would say somebody had typed two quotation
-        // marks -- and the two read the same, so the honest spelling is the
-        // one a person would have written.
-        for setting in
-            ["group", "packet_interval", "drop_percent", "close_after"]
-        {
-            assert!(
-                written.contains(&format!("    {setting}:\n")),
-                "{setting}: {written}"
-            );
-        }
-        assert!(
-            !written.contains("\"\""),
-            "an unanswered setting is nothing, not an empty string: {written}"
+        let body = written.split_once('\n').expect("a schema line").1;
+        assert_eq!(
+            body,
+            "\nsimulated_payloads:\n  - type i2c:\n      - payload: sensor\n\
+             \n  - type network:\n      - payload: payload\n",
+            "{written}"
         );
 
-        // The form loads: an empty setting is one not stated, so a file
-        // nobody has filled in is still a file the simulator can read.
-        tcslibgs::sim_config::SimConfigFile::load(&sim)
-            .expect("the simulator should read the form the editor wrote");
+        // And it reads back as those entries, as the session holds them.
+        let mut again = Editor::open(&path, crate::pane::default_dividers());
+        again.open_simulator(&sim);
+        assert_eq!(again.trouble(), None, "{:?}", again.trouble());
+        let simulator = again.document().simulator.as_ref().expect("opened");
+        assert_eq!(simulator.kinds.len(), 2, "{simulator:?}");
     }
 
     /// A simulator configuration has to be named `.yaml`, and a name that is
@@ -1756,6 +1822,370 @@ tcsgui:
                 .to_string_lossy()
                 .starts_with("graph-"),
             "{named:?}"
+        );
+    }
+
+    /// Copies every shipped configuration and simulator file into a
+    /// directory, laid out as the repository lays them out, with the
+    /// schemas they name, so that a test can save them without touching
+    /// the repository's own.
+    ///
+    /// A link is copied as a link, as the thermostat's simulator file is.
+    ///
+    /// # Arguments
+    ///
+    /// * `into` - The directory.
+    ///
+    /// # Returns
+    ///
+    /// Each configuration copied, with its simulator file where it has one:
+    /// the file beside it named after it with `-sim.yaml` on the end.
+    fn shipped_tree(into: &Path) -> Vec<(PathBuf, Option<PathBuf>)> {
+        let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("..");
+        let mut directories = vec![
+            PathBuf::from("tests/manual"),
+            PathBuf::from("tcsgui/share/schema"),
+        ];
+        for entry in std::fs::read_dir(root.join("examples")).expect("listed") {
+            let entry = entry.expect("an entry");
+            if entry.file_type().expect("a type").is_dir() {
+                directories.push(Path::new("examples").join(entry.file_name()));
+            }
+        }
+        let mut configurations = Vec::new();
+        for directory in directories {
+            std::fs::create_dir_all(into.join(&directory)).expect("made");
+            for entry in std::fs::read_dir(root.join(&directory)).expect("ls") {
+                let entry = entry.expect("an entry");
+                let name = PathBuf::from(entry.file_name());
+                let extension = name.extension().and_then(|e| e.to_str());
+                let wanted = directory.ends_with("schema")
+                    || matches!(extension, Some("ytcs" | "xtcs" | "yaml"));
+                if !wanted {
+                    continue;
+                }
+                let to = into.join(&directory).join(&name);
+                if entry.file_type().expect("a type").is_symlink() {
+                    let target = std::fs::read_link(entry.path()).expect("it");
+                    std::os::unix::fs::symlink(target, &to).expect("linked");
+                } else if entry.file_type().expect("a type").is_file() {
+                    std::fs::copy(entry.path(), &to).expect("copied");
+                }
+                if matches!(extension, Some("ytcs" | "xtcs")) {
+                    let stem = name.file_stem().expect("a stem");
+                    let sim = into
+                        .join(&directory)
+                        .join(format!("{}-sim.yaml", stem.to_string_lossy()));
+                    configurations.push((to, sim.exists().then_some(sim)));
+                }
+            }
+        }
+        configurations.sort();
+        configurations
+    }
+
+    /// Every file under a directory, by its path, with what it holds and,
+    /// for a link, where it leads.
+    ///
+    /// # Arguments
+    ///
+    /// * `root` - The directory.
+    ///
+    /// # Returns
+    ///
+    /// The files, by path.
+    fn every_file(root: &Path) -> BTreeMap<PathBuf, (Option<PathBuf>, String)> {
+        let mut files = BTreeMap::new();
+        let mut waiting = vec![root.to_path_buf()];
+        while let Some(directory) = waiting.pop() {
+            for entry in std::fs::read_dir(&directory).expect("listed") {
+                let entry = entry.expect("an entry");
+                let path = entry.path();
+                let kind = entry.file_type().expect("a type");
+                if kind.is_dir() {
+                    waiting.push(path);
+                    continue;
+                }
+                let link = kind
+                    .is_symlink()
+                    .then(|| std::fs::read_link(&path).expect("its target"));
+                let text = std::fs::read_to_string(&path).expect("readable");
+                files.insert(path, (link, text));
+            }
+        }
+        files
+    }
+
+    /// Opening a shipped configuration and saving it with no edit leaves
+    /// every file as it was, byte for byte: both spellings, the included
+    /// files and the simulator file.
+    ///
+    /// A save rewrote them all once, in the editor's own hand: comments
+    /// broken again, quotes put round names, fifteen empty keys added to
+    /// every simulated payload and `simulate: true` made a string. A save
+    /// writes what was edited, and here nothing was.
+    #[test]
+    fn saving_a_shipped_configuration_unedited_changes_no_file() {
+        let where_ = tempfile::tempdir().expect("a directory");
+        let configurations = shipped_tree(where_.path());
+        let with_sim = configurations.iter().filter(|(_, s)| s.is_some());
+        assert!(with_sim.count() >= 14, "{configurations:?}");
+        assert!(configurations.len() >= 34, "{configurations:?}");
+        let before = every_file(where_.path());
+
+        let mut saved = 0;
+        for (path, sim) in &configurations {
+            let mut editor =
+                Editor::open(path, crate::pane::default_dividers());
+            // A file that does not open on its own -- one only ever
+            // included, which names nodes of the file including it -- is not
+            // a configuration to save.
+            if editor.trouble().is_some() {
+                let parent = path.parent().expect("a directory");
+                assert!(
+                    parent.to_string_lossy().ends_with("-common"),
+                    "{}: {:?}",
+                    path.display(),
+                    editor.trouble()
+                );
+                continue;
+            }
+            saved += 1;
+            if let Some(sim) = sim {
+                editor.open_simulator(sim);
+            }
+            editor.save();
+            assert_eq!(editor.trouble(), None, "{}", path.display());
+            editor.forget_history();
+            let after = every_file(where_.path());
+            for (file, was) in &before {
+                let now = after.get(file).expect("still there");
+                assert!(
+                    now == was,
+                    "saving {} changed {}:\n{}",
+                    path.display(),
+                    file.display(),
+                    similar::TextDiff::from_lines(&was.1, &now.1)
+                        .unified_diff()
+                        .header("was", "written")
+                );
+            }
+            assert_eq!(after.len(), before.len(), "{}", path.display());
+        }
+        assert!(saved >= 30, "only {saved} were saved");
+    }
+
+    /// Each file of a set after an edit, held against the set before it: the
+    /// files named changed as given, and every other file not at all.
+    ///
+    /// # Arguments
+    ///
+    /// * `before`  - Every file before the edit.
+    /// * `root`    - The directory they are in.
+    /// * `changed` - Each file that changes, by its path under `root`, with
+    ///               the text it held that changes and what it becomes. A
+    ///               link to one changes with it.
+    fn only_changed(
+        before: &BTreeMap<PathBuf, (Option<PathBuf>, String)>,
+        root: &Path,
+        changed: &[(&str, &str, &str)],
+    ) {
+        let after = every_file(root);
+        assert_eq!(after.len(), before.len());
+        for (file, (link, was)) in before {
+            let now = &after[file];
+            assert_eq!(&now.0, link, "{}", file.display());
+            let mut expected = was.clone();
+            for (name, old, new) in changed {
+                // A link changes as the file it leads to does.
+                let target = std::fs::canonicalize(file).expect("there");
+                if target.ends_with(name) {
+                    assert_eq!(
+                        was.matches(old).count(),
+                        1,
+                        "{}: {old}",
+                        file.display()
+                    );
+                    expected = expected.replace(old, new);
+                }
+            }
+            assert!(
+                now.1 == expected,
+                "{} is not as expected:\n{}",
+                file.display(),
+                similar::TextDiff::from_lines(&expected, &now.1)
+                    .unified_diff()
+                    .header("expected", "written")
+            );
+        }
+    }
+
+    /// Moving a node changes its position line, in both spellings of the
+    /// file it is drawn in, and no other line of any file.
+    #[test]
+    fn moving_a_node_changes_only_its_position_line() {
+        let where_ = tempfile::tempdir().expect("a directory");
+        shipped_tree(where_.path());
+        let root = where_.path();
+        let path = root.join("examples/thermostat/thermostat.ytcs");
+        let sim = root.join("examples/thermostat/thermostat-sim.yaml");
+        let before = every_file(root);
+
+        let mut editor = Editor::open(&path, crate::pane::default_dividers());
+        editor.open_simulator(&sim);
+        assert_eq!(editor.trouble(), None, "{:?}", editor.trouble());
+        let at = |editor: &Editor, name: &str| {
+            editor.document().node(name).expect("the node").at
+        };
+        let was = at(&editor, "gateway");
+        assert_eq!(was, (790, 34));
+        editor.edit(Edit::MoveNode {
+            node: "gateway".to_string(),
+            was,
+            now: (800, 40),
+        });
+        assert_eq!(editor.trouble(), None, "{:?}", editor.trouble());
+        only_changed(
+            &before,
+            root,
+            &[
+                (
+                    "examples/thermostat/thermostat.ytcs",
+                    "    - { node: gateway, x: 790, y: 34 }\n",
+                    "    - { node: gateway, x: 800, y: 40 }\n",
+                ),
+                (
+                    "examples/thermostat/thermostat.xtcs",
+                    "<node name=\"gateway\" x=\"790\" y=\"34\"/>",
+                    "<node name=\"gateway\" x=\"800\" y=\"40\"/>",
+                ),
+            ],
+        );
+
+        // And one drawn in the included file: that file's position line.
+        let before = every_file(root);
+        let held = "../thermostat-common/thermostat/gpio-in-tmass";
+        // Wherever settling put it as the file was opened, which depends
+        // on the panes: the file has it at 91, 544.
+        let was = at(&editor, held);
+        editor.edit(Edit::MoveNode {
+            node: held.to_string(),
+            was,
+            now: (95, 550),
+        });
+        assert_eq!(editor.trouble(), None, "{:?}", editor.trouble());
+        editor.forget_history();
+        only_changed(
+            &before,
+            root,
+            &[
+                (
+                    "examples/thermostat-common/thermostat.ytcs",
+                    "    - { node: gpio-in-tmass, x: 91, y: 544 }\n",
+                    "    - { node: gpio-in-tmass, x: 95, y: 550 }\n",
+                ),
+                (
+                    "examples/thermostat-common/thermostat.xtcs",
+                    "<node name=\"gpio-in-tmass\" x=\"91\" y=\"544\"/>",
+                    "<node name=\"gpio-in-tmass\" x=\"95\" y=\"550\"/>",
+                ),
+            ],
+        );
+    }
+
+    /// Setting one simulated setting changes that setting's line, or adds
+    /// it, or takes it out, and no other line: the comments, the blank
+    /// lines, the quoting and the folded description all stay.
+    #[test]
+    fn setting_one_simulated_setting_changes_only_its_line() {
+        let where_ = tempfile::tempdir().expect("a directory");
+        shipped_tree(where_.path());
+        let root = where_.path();
+        let path = root.join("examples/thermostat/thermostat.ytcs");
+        let sim = root.join("examples/thermostat/thermostat-sim.yaml");
+        let common = "examples/thermostat-common/thermostat-sim.yaml";
+
+        let mut editor = Editor::open(&path, crate::pane::default_dividers());
+        editor.open_simulator(&sim);
+        assert_eq!(editor.trouble(), None, "{:?}", editor.trouble());
+        let set = |editor: &mut Editor,
+                   setting: &str,
+                   was: Option<&str>,
+                   now: Option<&str>| {
+            editor.edit(Edit::SetSimPayload {
+                payload: "temp_1".to_string(),
+                setting: setting.to_string(),
+                was: was.map(str::to_string),
+                now: now.map(str::to_string),
+            });
+            assert_eq!(editor.trouble(), None, "{:?}", editor.trouble());
+        };
+
+        // A value changed.
+        let before = every_file(root);
+        set(&mut editor, "lag", Some("4 s"), Some("5 s"));
+        only_changed(
+            &before,
+            root,
+            &[(
+                common,
+                "temp_1\n        accuracy: \"0.5 K\"\n        \
+                 group: zone_temps\n        lag: 4 s\n",
+                "temp_1\n        accuracy: \"0.5 K\"\n        \
+                 group: zone_temps\n        lag: 5 s\n",
+            )],
+        );
+
+        // A setting added, in its place among the others.
+        let before = every_file(root);
+        set(&mut editor, "jitter", None, Some("10 ms"));
+        only_changed(
+            &before,
+            root,
+            &[(
+                common,
+                "        group: zone_temps\n        lag: 5 s\n",
+                "        group: zone_temps\n        jitter: 10 ms\n        \
+                 lag: 5 s\n",
+            )],
+        );
+
+        // A value its author quoted, which keeps its quotes.
+        let before = every_file(root);
+        set(&mut editor, "accuracy", Some("0.5 K"), Some("0.4 K"));
+        only_changed(
+            &before,
+            root,
+            &[(
+                common,
+                "- payload: temp_1\n        accuracy: \"0.5 K\"\n",
+                "- payload: temp_1\n        accuracy: \"0.4 K\"\n",
+            )],
+        );
+
+        // And one emptied, which takes its line with it.
+        let before = every_file(root);
+        set(&mut editor, "jitter", Some("10 ms"), None);
+        only_changed(&before, root, &[(common, "        jitter: 10 ms\n", "")]);
+
+        // A physics figure, likewise.
+        let before = every_file(root);
+        editor.edit(Edit::SetPhysics {
+            component: "heater_2".to_string(),
+            setting: "power".to_string(),
+            was: Some("4 W".to_string()),
+            now: Some("5 W".to_string()),
+        });
+        assert_eq!(editor.trouble(), None, "{:?}", editor.trouble());
+        editor.forget_history();
+        only_changed(
+            &before,
+            root,
+            &[(
+                common,
+                "- component: heater_2\n            power: \"4 W\"\n",
+                "- component: heater_2\n            power: \"5 W\"\n",
+            )],
         );
     }
 }

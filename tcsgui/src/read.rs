@@ -943,7 +943,7 @@ mod tests {
                 );
 
                 // The top file, its other spelling, and the common file in
-                // this spelling, written where they are.
+                // this spelling and the other, written where they are.
                 let files = document.files(&top).expect("a known format");
                 let shared = format!("{common}.{extension}");
                 let paths: Vec<&Path> =
@@ -955,6 +955,9 @@ mod tests {
                         top.with_extension(if xml { "ytcs" } else { "xtcs" })
                             .as_path(),
                         top.with_file_name(format!("../{shared}")).as_path(),
+                        top.with_file_name(format!("../{shared}"))
+                            .with_extension(if xml { "ytcs" } else { "xtcs" })
+                            .as_path(),
                     ],
                     "{name}"
                 );

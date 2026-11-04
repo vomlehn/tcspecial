@@ -5058,14 +5058,15 @@ and arranging puts it where anybody could have dragged it.
 The menu bar holds what belongs to the configuration as a whole rather than to
 anything on the canvas -- there is nothing to press on a diagram that would mean
 "the configuration", or "the groups", or "the way out". **File** holds Save,
-the two kinds of group, and Exit; **Edit** holds the tcspecial parameters,
-arranging the nodes, and generating the Rust.
+Save as, the two kinds of group, and Exit; **Edit** holds the tcspecial
+parameters, arranging the nodes, and generating the Rust.
 
 Exit offers to write anything the files do not have before it goes, which is
-normally nothing. Three answers rather than two: *Save and leave*, *Leave
-without saving* -- because somebody who has just been told the device is full
-may want to go and deal with it, and a program that insisted on writing first
-would be one they cannot get out of -- and *Stay*, because the menu is next to
+normally nothing. Four answers rather than two: *Save and leave*, *Save as and
+leave*, for files that cannot be written where they are, *Leave without
+saving* -- because somebody who has just been told the device is full may want
+to go and deal with it, and a program that insisted on writing first would be
+one they cannot get out of -- and *Stay*, because the menu is next to
 everything else and gets pressed by accident.
 
 The undo history
@@ -5588,6 +5589,20 @@ who has been taught by every other program to save their work. The way out of
 the program does the same for anything the files do not have, and says on the
 error output whether it got there -- leaving a session's work in a process that
 is ending is the one way this editor could lose anything.
+
+Save as is for when the files cannot be written where they are -- a directory
+made read-only, a device that is full -- and for a copy. It asks in the
+desktop's own Save dialog for a new name for the top file, and writes every
+file of the session there: both spellings where the configuration is kept as a
+pair, each included file placed relative to the new top file as it was to the
+old one, so the names the top file includes them by still find them, and the
+simulator's file beside the new top file under its own name. The copy is the
+same configuration, with the same digest, and each file is written as a save
+writes it, changing only what was edited. Before it writes over a file that is
+already there it asks, and it writes nothing until it has. The session carries
+on in the new files, and its undo history goes with it, so undo reaches back
+past the Save as and past a crash after it; the old files' history is thrown
+away, because it describes edits the old files may not have.
 
 Anything that goes wrong is said twice: in the red line along the bottom of the
 window, and in a small window of its own that has to be acknowledged. The line

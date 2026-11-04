@@ -380,6 +380,146 @@ impl Editor {
         self.persist();
     }
 
+    /// Writes every file of the configuration somewhere else, and carries on
+    /// the session there: Save as.
+    ///
+    /// For when the files cannot be written where they are -- a directory
+    /// made read-only, a device that is full -- and for a copy somebody
+    /// wants. Every file the session writes is written, each placed relative
+    /// to `to` as it is to the top file now, so the names the top file
+    /// includes them by still find them and the copy is the same
+    /// configuration: see [`Document::files_moved`]. The simulator's file
+    /// goes beside the new top file under its own name. Each is written as
+    /// the file it was with the session's edits made to it, as a save writes
+    /// it.
+    ///
+    /// The history goes too, under the new name, so that undo carries on in
+    /// the new files and past a crash there. The old name's is thrown away:
+    /// it describes edits the old files may not have, and this session no
+    /// longer writes them.
+    ///
+    /// Asks before replacing a file that is there already, by returning the
+    /// list, unless `replace` says it has asked -- except `to` itself, which
+    /// the dialog that named it has asked about, and the session's own
+    /// files, which a save writes anyway. Nothing is written until it has
+    /// asked.
+    ///
+    /// A write that fails is said in red, as a save's is, and the session
+    /// stays where it was: the files written before it are left at the new
+    /// place, which the message says.
+    ///
+    /// # Arguments
+    ///
+    /// * `to`      - The new top file, whose extension says its format.
+    /// * `replace` - Whether replacing files already there has been agreed.
+    ///
+    /// # Returns
+    ///
+    /// The files it would replace, if it stopped to ask; otherwise none, the
+    /// outcome being in [`Editor::trouble`] and [`Editor::said`].
+    pub fn save_as(&mut self, to: &Path, replace: bool) -> Vec<PathBuf> {
+        if self.read_only {
+            return Vec::new();
+        }
+        if same_file(to, &self.path) {
+            self.save();
+            return Vec::new();
+        }
+
+        // The simulator's file beside the new top file, under its own name.
+        let simulator = self.document.simulator.as_ref().map(|simulator| {
+            let name = simulator.path.file_name().unwrap_or_default();
+            to.with_file_name(name)
+        });
+        let files = match self.document.files_moved(
+            &self.path,
+            to,
+            simulator.as_deref(),
+        ) {
+            Ok(files) => files,
+            Err(why) => {
+                self.trouble = Some(why);
+                return Vec::new();
+            }
+        };
+
+        // By where each name leads, worked out from the name: an included
+        // file is named a directory up from the new top file, whose own
+        // directory may not be there yet for the system to go up from.
+        if !replace {
+            let replacing: Vec<PathBuf> = files
+                .iter()
+                .map(|file| path_clean::clean(&file.to))
+                .filter(|at| !same_file(at, to) && at.exists())
+                .filter(|at| !files.iter().any(|own| same_file(&own.from, at)))
+                .collect();
+            if !replacing.is_empty() {
+                return replacing;
+            }
+        }
+
+        self.trouble = None;
+        self.said = None;
+        let mut written = BTreeMap::new();
+        for file in &files {
+            // Merged into the old file where it is the same format, so that
+            // what the edits did not touch is copied as it was.
+            let old = self
+                .written
+                .get(&file.from)
+                .filter(|_| file.from.extension() == file.to.extension());
+            let text = match old {
+                Some(old) => crate::faithful::text(&file.to, old, &file.text),
+                None => file.text.clone(),
+            };
+            if let Err(why) = write_atomically(&file.to, text.as_bytes()) {
+                let done: Vec<PathBuf> =
+                    written.keys().map(path_clean::clean).collect();
+                let done: Vec<&PathBuf> = done.iter().collect();
+                self.trouble = Some(if done.is_empty() {
+                    describe(&why)
+                } else {
+                    format!(
+                        "{}; the session is still in {}, and {} written",
+                        describe(&why),
+                        self.path.display(),
+                        said_paths(&done)
+                    )
+                });
+                return Vec::new();
+            }
+            written.insert(
+                file.to.clone(),
+                Written {
+                    base: file.text.clone(),
+                    kept: text,
+                },
+            );
+        }
+
+        // Every file is at the new place: the session is there now.
+        crate::history::forget(&self.path);
+        self.path = to.to_path_buf();
+        if let (Some(at), Some(now)) =
+            (&simulator, self.document.simulator.as_mut())
+        {
+            now.path = at.clone();
+            self.simulator_path = Some(at.clone());
+        }
+        self.written = written;
+        self.unsaved = false;
+        self.said = Some(format!("saved as {}", to.display()));
+
+        if let Err(why) = crate::history::write(&self.path, &self.journal) {
+            self.trouble = Some(format!(
+                "the configuration is saved as {}, but its history is not: \
+                 {why}",
+                to.display()
+            ));
+        }
+        Vec::new()
+    }
+
     /// Applies an edit, records it, and writes both files.
     ///
     /// The document is changed whether or not the write succeeds: refusing the
@@ -611,6 +751,44 @@ fn describe(why: &SaveError) -> String {
     format!("{why}")
 }
 
+/// Whether two names are one file: the same file where both are there, and
+/// the same name where either is not.
+///
+/// # Arguments
+///
+/// * `one`   - A file's name.
+/// * `other` - Another.
+///
+/// # Returns
+///
+/// Whether writing one would write the other.
+fn same_file(one: &Path, other: &Path) -> bool {
+    let (one, other) = (path_clean::clean(one), path_clean::clean(other));
+    match (one.canonicalize(), other.canonicalize()) {
+        (Ok(one), Ok(other)) => one == other,
+        _ => one == other,
+    }
+}
+
+/// Some files as a sentence says them, with "is" or "are" to follow.
+///
+/// # Arguments
+///
+/// * `paths` - The files.
+///
+/// # Returns
+///
+/// The files joined as [`said_list`] joins names, and the verb.
+fn said_paths(paths: &[&PathBuf]) -> String {
+    let names: Vec<String> = paths
+        .iter()
+        .map(|path| path.display().to_string())
+        .collect();
+    let names: Vec<&String> = names.iter().collect();
+    let verb = if names.len() == 1 { "is" } else { "are" };
+    format!("{} {verb}", said_list(&names))
+}
+
 /// A list of names as a sentence says them.
 ///
 /// One name is quoted; two are joined by "and"; more are a comma list with an
@@ -715,9 +893,12 @@ mod tests {
         assert!(!editor.redo());
         editor.settle_name(0, "renamed");
         editor.arrange(crate::pane::default_dividers());
+        let copy = where_.path().join("copy").join("vehicle.ytcs");
+        assert!(editor.save_as(&copy, true).is_empty());
         editor.forget_history();
 
         assert_eq!(editor.document(), &read, "the document changed");
+        assert!(!copy.exists(), "a read-only session saved a copy");
         assert_eq!(editor.undo_depth(), 0);
         assert!(!editor.unsaved(), "nothing is waiting to be written");
         assert_eq!(
@@ -1300,6 +1481,137 @@ tcsgui:
         }
         let top = into.join("thermostat");
         (top.join("thermostat.ytcs"), top.join("thermostat-sim.yaml"))
+    }
+
+    /// Every file of a configuration the session writes, by its path: the
+    /// thermostat's two spellings, its included common file in both, and
+    /// its simulator file.
+    ///
+    /// # Arguments
+    ///
+    /// * `top` - The top file, `<somewhere>/thermostat/<name>.ytcs`.
+    ///
+    /// # Returns
+    ///
+    /// The files, in the order the editor writes them.
+    fn thermostat_files(top: &Path) -> Vec<PathBuf> {
+        let common = top.with_file_name("../thermostat-common/thermostat");
+        vec![
+            top.to_path_buf(),
+            top.with_extension("xtcs"),
+            common.with_extension("ytcs"),
+            common.with_extension("xtcs"),
+            top.with_file_name("thermostat-sim.yaml"),
+        ]
+    }
+
+    /// Save as writes every file somewhere else when the files cannot be
+    /// written where they are, and the session carries on there, undo and
+    /// all.
+    ///
+    /// The thermostat's directory is made read-only, so an edit cannot be
+    /// saved. Save as then writes the whole configuration -- both spellings,
+    /// the common file it includes a directory up, and the simulator file --
+    /// placed as the old files are placed, so the copy opens as the
+    /// configuration did. What the edit did not touch is copied byte for
+    /// byte. The history is at the new name and not the old, and an undo
+    /// after it is written to the copy.
+    #[test]
+    fn save_as_writes_the_configuration_elsewhere_and_carries_on() {
+        use std::os::unix::fs::PermissionsExt;
+
+        let where_ = tempfile::tempdir().expect("a directory");
+        std::fs::create_dir(where_.path().join("old")).expect("a directory");
+        let (path, sim) = thermostat_example(&where_.path().join("old"));
+        let mut editor = Editor::open(&path, crate::pane::default_dividers());
+        editor.open_simulator(&sim);
+        assert_eq!(editor.trouble(), None, "{:?}", editor.trouble());
+
+        let shut = path.parent().expect("its directory").to_path_buf();
+        let mode = |mode| {
+            std::fs::set_permissions(
+                &shut,
+                std::fs::Permissions::from_mode(mode),
+            )
+            .expect("permissions set")
+        };
+        mode(0o555);
+        editor.edit(add("temp_9", "i2c"));
+        let failed = editor.trouble().map(str::to_string);
+        mode(0o755);
+        assert!(failed.is_some(), "the edit was saved after all");
+        assert!(editor.unsaved());
+
+        let copy = where_.path().join("new/thermostat/copy.ytcs");
+        assert!(editor.save_as(&copy, false).is_empty(), "nothing is there");
+        assert_eq!(editor.trouble(), None, "{:?}", editor.trouble());
+        assert!(!editor.unsaved());
+        assert_eq!(
+            editor.files(),
+            (
+                copy.as_path(),
+                Some(&*copy.with_file_name("thermostat-sim.yaml"))
+            )
+        );
+
+        let old = thermostat_files(&path);
+        let new = thermostat_files(&copy);
+        // The two spellings of the top file have the edit; the rest are
+        // copies.
+        for (at, (old, new)) in old.iter().zip(&new).enumerate() {
+            let was = std::fs::read_to_string(old).expect("the old file");
+            let now = std::fs::read_to_string(new).unwrap_or_else(|_| {
+                panic!("{} was not written", new.display())
+            });
+            if at < 2 {
+                assert!(now.contains("temp_9"), "{}: {now}", new.display());
+            } else {
+                assert_eq!(now, was, "{} is not a copy", new.display());
+            }
+        }
+
+        let mut again = Editor::open(&copy, crate::pane::default_dividers());
+        again.open_simulator(&new[4]);
+        assert_eq!(again.trouble(), None, "{:?}", again.trouble());
+        assert!(again.document().node("temp_9").is_some());
+        assert_eq!(
+            crate::history::read(&copy).map(|journal| journal.depth()),
+            Some(1),
+            "the history went with the configuration"
+        );
+        assert!(crate::history::read(&path).is_none(), "and left the old");
+
+        assert!(editor.undo());
+        let now = std::fs::read_to_string(&copy).expect("the copy");
+        assert!(!now.contains("temp_9"), "the undo was not written: {now}");
+        editor.forget_history();
+    }
+
+    /// Save as asks before it replaces a file that is there already, and
+    /// writes nothing until it has: a copy put beside other work must not
+    /// write over half of it and then stop to ask about the rest.
+    #[test]
+    fn save_as_asks_before_replacing_a_file() {
+        let where_ = tempfile::tempdir().expect("a directory");
+        std::fs::create_dir(where_.path().join("old")).expect("a directory");
+        let (path, sim) = thermostat_example(&where_.path().join("old"));
+        let mut editor = Editor::open(&path, crate::pane::default_dividers());
+        editor.open_simulator(&sim);
+
+        let copy = where_.path().join("new/thermostat/copy.ytcs");
+        let there = where_.path().join("new/thermostat-common/thermostat.ytcs");
+        std::fs::create_dir_all(there.parent().unwrap()).expect("made");
+        std::fs::write(&there, "somebody's\n").expect("written");
+
+        assert_eq!(editor.save_as(&copy, false), vec![there.clone()]);
+        assert!(!copy.exists(), "written before asking");
+        assert_eq!(editor.files().0, path.as_path(), "the session moved");
+
+        assert!(editor.save_as(&copy, true).is_empty());
+        assert_eq!(editor.trouble(), None, "{:?}", editor.trouble());
+        assert!(copy.exists());
+        assert_ne!(std::fs::read_to_string(&there).unwrap(), "somebody's\n");
+        editor.forget_history();
     }
 
     /// The shipped thermostat opens with its simulator file, though every

@@ -1390,6 +1390,7 @@ export component MainWindow inherits Window {
     callback vehicle-divider-moved(length);
     callback open-subdiagram(string);
     callback save-clicked();
+    callback save-as-clicked();
     callback link-started(string, string);
     callback link-finished(length, length);
     // Where the pointer is while a line is being drawn. See drawing-route.
@@ -1430,6 +1431,14 @@ export component MainWindow inherits Window {
                 enabled: !root.inert && !Session.read-only;
                 title: "Save";
                 activated => { root.save-clicked(); }
+            }
+            // Every file of the session written somewhere else, and the
+            // session carried on there: for files that cannot be written
+            // where they are, and for a copy. See Editor::save_as.
+            MenuItem {
+                enabled: !root.inert && !Session.read-only;
+                title: "Save as...";
+                activated => { root.save-as-clicked(); }
             }
             MenuSeparator { }
             // The groups, which are not on the canvas either: a group is a set
@@ -1707,6 +1716,7 @@ export component SubWindow inherits Window {
     callback payload-divider-moved(length);
     callback vehicle-divider-moved(length);
     callback save-clicked();
+    callback save-as-clicked();
     callback link-started(string, string);
     callback link-finished(length, length);
     // Where the pointer is while a line is being drawn. See drawing-route.
@@ -1743,6 +1753,14 @@ export component SubWindow inherits Window {
                 enabled: !Session.read-only;
                 title: "Save";
                 activated => { root.save-clicked(); }
+            }
+            // Every file of the session written somewhere else, and the
+            // session carried on there: for files that cannot be written
+            // where they are, and for a copy. See Editor::save_as.
+            MenuItem {
+                enabled: !Session.read-only;
+                title: "Save as...";
+                activated => { root.save-as-clicked(); }
             }
             MenuSeparator { }
             // The groups, which are not on the canvas either: a group is a set
@@ -2752,6 +2770,67 @@ export component DeleteWindow inherits Window {
     }
 }
 
+// The question Save as asks before it writes over files that are there
+// already: which they are, and whether to go on. Nothing is written until it
+// is answered.
+export component ReplaceWindow inherits Window {
+    default-font-size: Fonts.window;
+    title: "Replace files";
+    background: Colors.window;
+    min-width: 360px;
+    min-height: 160px;
+    preferred-width: 480px;
+
+    // The files that would be replaced, one to a line.
+    in property <string> files: "";
+
+    callback confirmed();
+    callback cancelled();
+
+    VerticalLayout {
+        padding: Space.wide;
+        spacing: Space.step;
+
+        Copyable {
+            text: "Save as would replace files that are already there:";
+            font-size: Type.strong;
+            font-weight: Type.bold;
+            wrap: word-wrap;
+        }
+        Copyable {
+            text: root.files;
+            font-size: Type.body;
+            wrap: word-wrap;
+        }
+        Copyable {
+            text: "Each would hold this configuration's file of that name "
+                + "instead.";
+            font-size: Type.small;
+            color: #6b7280;
+            wrap: word-wrap;
+        }
+
+        Rectangle { vertical-stretch: 1; }
+
+        HorizontalLayout {
+            spacing: Space.step;
+            Button {
+                text: "Cancel";
+                clicked => { root.cancelled(); }
+            }
+            CopyButton {
+                said: "Save as would replace files that are already there:\n"
+                    + root.files;
+            }
+            Rectangle { }
+            Button {
+                text: "Replace";
+                clicked => { root.confirmed(); }
+            }
+        }
+    }
+}
+
 export component LeaveWindow inherits Window {
     default-font-size: Fonts.window;
     title: "Leave tcsgui";
@@ -2764,6 +2843,7 @@ export component LeaveWindow inherits Window {
     in property <string> trouble: "";
 
     callback saved();
+    callback saved-as();
     callback left();
     callback stayed();
 
@@ -2807,6 +2887,12 @@ export component LeaveWindow inherits Window {
             Button {
                 text: "Leave without saving";
                 clicked => { root.left(); }
+            }
+            // For files that cannot be written where they are: every file
+            // of the session somewhere else, and then out.
+            Button {
+                text: "Save as and leave...";
+                clicked => { root.saved-as(); }
             }
             Button {
                 text: "Save and leave";

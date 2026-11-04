@@ -66,7 +66,7 @@ class YamcsGatewayTest(unittest.TestCase):
                 "<gateway name=\"m\"><ground_base>127.0.0.1:9000</ground_base>"
                 "<apid_base>0x200</apid_base></gateway></type></gateways>"
                 "<vehicle><type name=\"ping\"><compute name=\"p\">"
-                "<payload-out><target>m</target></payload-out></compute>"
+                "<world-out>m.p</world-out></compute>"
                 "</type></vehicle></configuration>")
             config = configuration.load(path)
             self.assertEqual(config.downlink("m", "p"),
@@ -92,11 +92,13 @@ gateways:
       - gateway: m
         apid_base: "0x200"
         ground_base: "127.0.0.1:9000"
+        world-in: [p]
 vehicle:
   - type ping:
       - compute: p
-        payload-out:
-          - target: m
+        moc-in: [m]
+        world-out:
+          - m.p
 payloads:
   - type network:
       - payload: n
@@ -136,8 +138,8 @@ def yamcs(directory, base="0x300", gateway="yamcs", renamed=None,
                             '        ground_base: "127.0.0.1:9000"\n'
                             '        address: "127.0.0.1"\n'
                             '        port: "9500"\n'
-                            "        gateway-out:\n"
-                            "          - target: p\n")
+                            "        moc-out:\n"
+                            "          - p.m\n")
     for old, new in (renamed or {}).items():
         text = (text.replace(f": {old}\n", f": {new}\n")
                 .replace(f"from: {old},", f"from: {new},"))
@@ -304,8 +306,8 @@ class MdbTest(unittest.TestCase):
         config = yamcs(self.directory.name, ping_from_m=True)
         path = Path(config.path)
         path.write_text(path.read_text().replace(
-            "          - target: p\n",
-            "          - target: p\n          - target: n\n"))
+            "          - p.m\n",
+            "          - p.m\n          - n.m\n"))
         config = configuration.load(path)
         uplink, = generated.uplinks(config)
         self.assertEqual((uplink.command, uplink.document), ("m", None))

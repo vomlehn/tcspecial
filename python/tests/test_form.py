@@ -34,55 +34,55 @@ gateways:
       - gateway: g
         apid_base: "0x200"
         ground_base: "127.0.0.1:9000"
-        payload-in: true
+        world-in: [c, d, p, t, v, s]
 vehicle:
   - type compute:
       - compute: c
         {c}
+        world-in: [s]
         format: "i16_be"
         offset: "0"
         scale: "1"
-        payload-out:
-          - target: g
-          - target: v
-            input: in0
+        world-out:
+          - g.c
+          - v.in0
       - compute: d
         {d}
         format: "i16_be"
         offset: "0"
         scale: "1"
-        payload-out:
-          - target: g
-          - target: v
-            input: in1
+        world-out:
+          - g.d
+          - v.in1
       - compute: p
         function: "process"
         executable: "/bin/cat"
         unit: "W"
-        payload-out:
-          - target: g
+        world-out:
+          - g.p
       - compute: t
         function: "hysteresis"
         half_band: "1"
         setpoint: "10"
-        payload-out:
-          - target: g
+        world-in: [v]
+        world-out:
+          - g.t
       - compute: v
         algorithm: "median"
         function: "vote"
-        inputs: "in0,in1"
-        payload-out:
-          - target: g
-          - target: t
+        world-in: [in0, in1]
+        world-out:
+          - g.v
+          - t.v
 payloads:
   - type network:
       - payload: s
         address: "127.0.0.1"
         port: "9401"
         protocol: "udp"
-        payload-out:
-          - target: c
-          - target: g
+        world-out:
+          - c.s
+          - g.s
 """
 
 #: How a conversion to kelvin, and one to a unit, are written.

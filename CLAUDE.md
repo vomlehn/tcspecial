@@ -55,13 +55,20 @@ attributes and checks in `tcslibgs::node`, the flight-side node in
 - **gateway**: the side of the graph that commands tcspecial and takes its
   telemetry, and the node it is reached through: `gateway_radio` for the
   ground, `gateway_fprime` for an F´ computer, `gateway_cfs` for cFS's
-  software bus, joined as an SBN peer. Its section is `gateway:`, its links
-  `gateway-in` and `gateway-out`, and `tee-gateway`, `null-gateway` and
-  `app_gateway_veh` stand beside it. All of these were `moc` once; a file
-  still saying so is refused, told the new word
-  (`tcslibgs::graph::renamed`).
+  software bus, joined as an SBN peer. Its section is `gateway:`, and
+  `tee-gateway`, `null-gateway` and `app_gateway_veh` stand beside it. All
+  of these were `moc` once; a file still saying so is refused, told the new
+  word (`tcslibgs::graph::renamed`).
 - **MOC**: the mission operations center, on the ground. Still the word for
-  the ground itself -- tcsmoc, "the MOC sends" -- but never for a node.
+  the ground itself -- tcsmoc, "the MOC sends" -- and for the terminals
+  below, but never for a node.
+- **terminals**: `world-in` (upper left), `world-out` (upper right),
+  `moc-out` (lower left), `moc-in` (lower right). `world-` carries a
+  payload's readings towards the ground, `moc-` what the ground sends back.
+  A link is written under the source as `node.name`, and the node it
+  reaches lists `name` under the sink -- `world-in: [readings]`; a vote's
+  world-in names are its inputs. They were `payload-` and `gateway-`, and
+  a file still saying so is refused, told the new word.
 - **device file**: a filesystem entry, `device_file` in code and `type:`.
 - App node types are named stream-then-side: `app_payload_veh`,
   `app_gateway_veh` and `app_all_veh` on the vehicle; `app_pl` and

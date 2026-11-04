@@ -1481,6 +1481,7 @@ mod tests {
   - type gateway_radio:
       - gateway: ground
         ground_base: \"127.0.0.1:5100\"
+        world-in: [exchanged, asked, floored, always]
 payloads:
   - type i2c:
       - payload: exchanged
@@ -1488,8 +1489,7 @@ payloads:
         path: \"/dev/i2c-1\"
         trigger: \"55\"
         trigger_interval: \"100 ms\"
-        payload-out:
-          - target: ground
+        world-out: [ground.exchanged]
   - type network:
       - payload: asked
         address: \"127.0.0.1\"
@@ -1497,22 +1497,20 @@ payloads:
         protocol: udp
         trigger: \"55\"
         trigger_interval: \"100 ms\"
-        payload-out:
-          - target: ground
+        world-out: [ground.asked]
       - payload: floored
         address: \"127.0.0.1\"
         poll_interval: \"100 ms\"
         port: \"7001\"
         protocol: udp
-        payload-out:
-          - target: ground
+        world-out: [ground.floored]
 ",
         );
         if every_pass {
             text.push_str(
                 // One more network node, under the type the text ends with.
                 "      - { payload: always, protocol: udp, address: \
-                 \"127.0.0.1\", port: \"7003\", payload-out: ground }\n",
+                 \"127.0.0.1\", port: \"7003\", world-out: ground.always }\n",
             );
         }
         std::fs::write(&path, text).expect("written");
@@ -1651,6 +1649,7 @@ payloads:
   - type gateway_radio:
       - gateway: ground
         ground_base: \"127.0.0.1:5100\"
+        world-in: [exchanged, floored]
 payloads:
   - type i2c:
       - payload: exchanged
@@ -1658,16 +1657,14 @@ payloads:
         path: \"/dev/i2c-1\"
         trigger: \"55\"
         trigger_interval: \"100 ms\"
-        payload-out:
-          - target: ground
+        world-out: [ground.exchanged]
   - type network:
       - payload: floored
         address: \"127.0.0.1\"
         poll_interval: \"300 ms\"
         port: \"7001\"
         protocol: udp
-        payload-out:
-          - target: ground
+        world-out: [ground.floored]
 ",
         )
         .expect("written");
@@ -1731,13 +1728,12 @@ payloads:
         protocol: udp
         trigger: \"55\"
         trigger_interval: \"100 ms\"
-        payload-out:
-          - target: average
+        world-out: [average.asked]
 vehicle:
   - type compute:
       - compute: average
         function: mean
-        inputs: 1
+        world-in: [asked]
 ",
         )
         .expect("written");
@@ -1855,13 +1851,12 @@ vehicle:
         protocol: udp
         trigger: \"55\"
         trigger_interval: \"100 ms\"
-        payload-out:
-          - target: average
+        world-out: [average.asked]
 vehicle:
   - type compute:
       - compute: average
         function: mean
-        inputs: 1
+        world-in: [asked]
 ",
         )
         .expect("written");
@@ -1997,13 +1992,12 @@ vehicle:
         protocol: udp
         trigger: \"[55]\"
         trigger_interval: \"100 ms\"
-        payload-out:
-          - target: average
+        world-out: [average.asked]
 vehicle:
   - type compute:
       - compute: average
         function: mean
-        inputs: 1
+        world-in: [asked]
 ",
         )
         .expect("written");
@@ -2059,13 +2053,12 @@ vehicle:
         poll_interval: \"100 ms\"
         port: \"7006\"
         protocol: udp
-        payload-out:
-          - target: average
+        world-out: [average.asked]
 vehicle:
   - type compute:
       - compute: average
         function: mean
-        inputs: 1
+        world-in: [asked]
 ",
         )
         .expect("written");
@@ -2155,13 +2148,12 @@ vehicle:
         poll_interval: \"100 ms\"
         port: \"7007\"
         protocol: udp
-        payload-out:
-          - target: average
+        world-out: [average.asked]
 vehicle:
   - type compute:
       - compute: average
         function: mean
-        inputs: 1
+        world-in: [asked]
 ",
         )
         .expect("written");
@@ -2914,13 +2906,13 @@ vehicle:
         address: 127.0.0.1
         ground_base: \"127.0.0.1:5100\"
         port: \"5000\"
-        gateway-out:
-          - target: pinger
+        moc-out: [pinger.ground]
+        world-in: [pinger]
 vehicle:
   - type ping:
       - compute: pinger
-        payload-out:
-          - target: ground
+        world-out: [ground.pinger]
+        moc-in: [ground]
 ",
         )
         .expect("written");
@@ -3015,13 +3007,13 @@ vehicle:
         apid_base: \"0x200\"
         ground_base: \"127.0.0.1:{}\"
         port: \"{gateway_port}\"
-        gateway-out:
-          - target: pinger
+        moc-out: [pinger.ground]
+        world-in: [pinger]
 vehicle:
   - type ping:
       - compute: pinger
-        payload-out:
-          - target: ground
+        world-out: [ground.pinger]
+        moc-in: [ground]
 ",
                 ground_port - 1
             ),

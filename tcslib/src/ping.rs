@@ -12,7 +12,7 @@
 //! * [`route_of`] finds a `ping` node the ground can reach, and the `gateway`
 //!   node a ping goes up through and its answer comes down through.
 //! * [`Uplink`] sends to a gateway node: the address and port it binds aboard,
-//!   which is what leaves it by its `gateway-out` links. The answer comes down
+//!   which is what leaves it by its `moc-out` links. The answer comes down
 //!   as any node's data does, through [`crate::gateway::GatewayReceiver`].
 //!   It is the one way up to a gateway node, for a ping and for any other
 //!   datum a station sends -- tcslib-c's `tcs_uplink` is it, for C and C++
@@ -57,7 +57,7 @@ use crate::matched::Matched;
 pub struct Route {
     /// The `ping` node.
     pub node: String,
-    /// The gateway node a ping goes up through, by its `gateway-out` link to
+    /// The gateway node a ping goes up through, by its `moc-out` link to
     /// the `ping` node, and the answer comes down through, by the `ping` node's
     /// link to it.
     pub gateway: String,
@@ -216,7 +216,7 @@ impl Uplink {
     /// commanding, as its client sends nothing but CONNECT, RESTART_ARM and
     /// RESTART until it is.
     ///
-    /// What goes up to a gateway node leaves it by its `gateway-out` links
+    /// What goes up to a gateway node leaves it by its `moc-out` links
     /// for a payload, so it drives that payload as a command does: a heater
     /// switched, a line set. A datum that means one thing under the
     /// station's configuration may mean another under the vehicle's, so it

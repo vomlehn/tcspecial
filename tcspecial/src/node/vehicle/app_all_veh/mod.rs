@@ -19,7 +19,7 @@
 //! asks it -- both of its interfaces, turn and turn about, so that a busy
 //! stream does not starve the other. Each datum it produces says which stream
 //! it is on, and the fabric follows only the links that carry that stream:
-//! without it, a reading would go out of this node's `gateway-out` as well and
+//! without it, a reading would go out of this node's `moc-out` as well and
 //! the ground's commands would carry telemetry.
 
 use std::process::ExitStatus;

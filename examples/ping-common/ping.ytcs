@@ -11,9 +11,9 @@ vehicle:
       # Answers each ping with the vehicle's time on the end: see
       # tcslibgs::node::vehicle::ping for what a ping and its answer say.
       - compute: ping
-        payload-out:
-          - target: gateway
-        gateway-in: true
+        world-out:
+          - gateway.ping
+        moc-in: [gateway]
 
 tcsgui:
   nodes:

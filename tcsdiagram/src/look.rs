@@ -40,7 +40,7 @@ use crate::style::{self, NodeType};
 /// # Arguments
 ///
 /// * `leaves_by` - The terminal the line leaves its source by:
-///                 `payload-out`, `gateway-out`, or anything else or nothing
+///                 `world-out`, `moc-out`, or anything else or nothing
 ///                 for a stream that cannot be told.
 ///
 /// # Returns
@@ -48,8 +48,8 @@ use crate::style::{self, NodeType};
 /// The line's colour, `#rrggbb`.
 pub fn line_ink(leaves_by: Option<&str>) -> String {
     match leaves_by {
-        Some("payload-out") => PAYLOAD_LINE,
-        Some("gateway-out") => GATEWAY_LINE,
+        Some("world-out") => PAYLOAD_LINE,
+        Some("moc-out") => GATEWAY_LINE,
         _ => LINE_GREY,
     }
     .to_string()

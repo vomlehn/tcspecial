@@ -20,7 +20,7 @@ for each:
   way tcspecial works them out, so the two ends cannot disagree about them.
 - **Sending it data.** `ping::Uplink` sends a datum up to a gateway node, to
   the address and port it binds aboard, from which it leaves by the node's
-  `gateway-out` links: a ping to a ping node, or a command to a heater. Gated
+  `moc-out` links: a ping to a ping node, or a command to a heater. Gated
   by the station's match, with `gated_by`, it sends only while the station is
   matched for commanding, as `TcsClient` does every command but CONNECT,
   RESTART_ARM and RESTART.

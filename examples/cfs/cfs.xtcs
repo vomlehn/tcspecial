@@ -74,14 +74,14 @@
         <type name="gateway_cfs">
             <!-- The software bus's end of the link, both ways. What the bus
                  publishes as cmd_msgid, 0x4281, is taken by this node and
-                 leaves it by gateway-out for the heater. What comes down is
+                 leaves it by moc-out for the heater. What comes down is
                  published as tlm_base plus the device id of the node that
                  sent it: the thermometer, device id 2, as 0x4242. -->
             <gateway name="fsw">
                 <cmd_msgid>0x4281</cmd_msgid>
                 <tlm_base>0x4240</tlm_base>
-                <gateway-out><target>heater</target></gateway-out>
-                <payload-in>true</payload-in>
+                <moc-out>heater.fsw</moc-out>
+                <world-in>thermometer</world-in>
             </gateway>
         </type>
     </gateways>
@@ -93,14 +93,14 @@
                 <address>127.0.0.1</address>
                 <port>8601</port>
                 <protocol>udp</protocol>
-                <gateway-in>true</gateway-in>
+                <moc-in>fsw</moc-in>
             </payload>
             <!-- A thermometer whose readings go to the flight computer. -->
             <payload name="thermometer">
                 <address>127.0.0.1</address>
                 <port>8602</port>
                 <protocol>udp</protocol>
-                <payload-out><target>fsw</target></payload-out>
+                <world-out>fsw.thermometer</world-out>
             </payload>
         </type>
     </payloads>

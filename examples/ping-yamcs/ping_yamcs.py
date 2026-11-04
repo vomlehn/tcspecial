@@ -189,7 +189,7 @@ class Setup:
             raise ValueError(f'{self.path}: "{self.gateway}" sends its data '
                              "to nodes that are not all ping nodes, so Yamcs "
                              "has no ping command for it: draw its "
-                             "gateway-out links to the ping node alone")
+                             "moc-out links to the ping node alone")
         self.ping_command = generated.qualified(uplink.command)
         # And the parameters its answer arrives as.
         self.ping_reply = [generated.qualified(name)

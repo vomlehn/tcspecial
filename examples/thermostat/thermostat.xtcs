@@ -38,7 +38,11 @@
                 <address>127.0.0.1</address>
                 <ground_base>127.0.0.1:5100</ground_base>
                 <port>5000</port>
-                <payload-in>true</payload-in>
+                <world-in>ambient</world-in>
+                <world-in>gpio-in-tmass</world-in>
+                <world-in>temp1</world-in>
+                <world-in>temp2</world-in>
+                <world-in>temp3</world-in>
             </gateway>
         </type>
     </gateways>
@@ -57,7 +61,7 @@
                 <group>zone_temps</group>
                 <port>5201</port>
                 <protocol>udp</protocol>
-                <payload-out><target>temp1</target></payload-out>
+                <world-out>temp1.temp_1</world-out>
             </payload>
             <!-- The second of the trio; the same part as temp_1. -->
             <payload name="temp_2">
@@ -65,7 +69,7 @@
                 <group>zone_temps</group>
                 <port>5202</port>
                 <protocol>udp</protocol>
-                <payload-out><target>temp2</target></payload-out>
+                <world-out>temp2.temp_2</world-out>
             </payload>
             <!-- The third. A different part: three bytes, unsigned, its own -->
             <!-- scale and so its own conversion, so that no one part number -->
@@ -75,7 +79,7 @@
                 <group>zone_temps</group>
                 <port>5203</port>
                 <protocol>udp</protocol>
-                <payload-out><target>temp3</target></payload-out>
+                <world-out>temp3.temp_3</world-out>
             </payload>
         </type>
     </payloads>

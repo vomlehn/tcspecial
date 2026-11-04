@@ -1722,7 +1722,7 @@ impl Graph {
                 continue;
             }
             // Whatever terminal it leaves by: a payload read through its
-            // `payload-out` is a payload that is read.
+            // `world-out` is a payload that is read.
             let read = self.links.iter().any(|link| {
                 link.from.split('.').next().unwrap_or(&link.from) == node.name
             });
@@ -1743,7 +1743,7 @@ impl Graph {
     /// Every named input of this node that a link binds.
     ///
     /// A terminal is not one of them. `in0` is which *of several* ways into a
-    /// computation and a mean is built on knowing; `gateway-in` is which *way*
+    /// computation and a mean is built on knowing; `moc-in` is which *way*
     /// the data is going, and a link may name it on a computation as it does on
     /// any other type. Counting one as an input would make a mean over `in0`
     /// and `in1` look like a mean over three things the moment somebody drew a
@@ -1781,7 +1781,7 @@ impl Graph {
     /// source of it, and naming it twice would read as two.
     ///
     /// Named as the node, whatever terminal the link left by: a complaint that
-    /// said `"n.payload-out" produces records of three bytes` would be naming a
+    /// said `"n.world-out" produces records of three bytes` would be naming a
     /// thing the file has no entry for.
     ///
     /// # Arguments
@@ -2070,6 +2070,7 @@ mod tests {
             homes: BTreeMap::new(),
             placed: BTreeMap::new(),
             set_aside: Default::default(),
+            named: Default::default(),
         }
     }
 
@@ -2972,16 +2973,13 @@ mod tests {
                 node("c", "gateway_radio"),
             ],
             vec![
-                link("a.payload-out", &["through.payload-in"]),
-                link("through.payload-out", &["c.payload-in"]),
-                link(
-                    "c.gateway-out",
-                    &["through.gateway-in", "back.gateway-in"],
-                ),
-                link("through.gateway-out", &["a.gateway-in"]),
-                link("b.payload-out", &["fore.payload-in", "c.payload-in"]),
-                link("fore.gateway-out", &["b.gateway-in"]),
-                link("back.payload-out", &["c.payload-in"]),
+                link("a.world-out", &["through.world-in"]),
+                link("through.world-out", &["c.world-in"]),
+                link("c.moc-out", &["through.moc-in", "back.moc-in"]),
+                link("through.moc-out", &["a.moc-in"]),
+                link("b.world-out", &["fore.world-in", "c.world-in"]),
+                link("fore.moc-out", &["b.moc-in"]),
+                link("back.world-out", &["c.world-in"]),
             ],
         );
         assert_eq!(
@@ -4298,7 +4296,7 @@ mod tests {
                 link("average", &["gateway"]),
                 // And the ground reaching it, drawn to the corner where what
                 // the ground sends arrives.
-                link("gateway.gateway-out", &["average.gateway-in"]),
+                link("gateway.moc-out", &["average.moc-in"]),
             ],
         );
         let problems = g.check();
@@ -4489,7 +4487,7 @@ mod tests {
             .unwrap_or_else(|| panic!("{problems:?}"));
         // Saying what it does have, which is the one thing a reader needs.
         assert!(
-            why.contains("telemetry") && why.contains("payload-in"),
+            why.contains("telemetry") && why.contains("world-in"),
             "{why}"
         );
         // Reported on the node the link leaves, which is where the link is
@@ -4505,7 +4503,7 @@ mod tests {
         // knows.
         let g = graph(
             vec![node("a", "i2c"), node("c", "gateway_radio")],
-            vec![link("a", &["c.gateway-out"])],
+            vec![link("a", &["c.moc-out"])],
         );
         let problems = g.check();
         assert!(
@@ -4532,8 +4530,8 @@ mod tests {
             problems.iter().any(|p| matches!(
                 p,
                 Problem::BadTerminal { why, .. }
-                    if why.contains("payload-out")
-                        && why.contains("gateway-out")
+                    if why.contains("world-out")
+                        && why.contains("moc-out")
             )),
             "{problems:?}"
         );
@@ -4552,7 +4550,7 @@ mod tests {
             // A data source at one end and a data sink at the other, so the
             // ends themselves are right -- and the stream is vehicleward
             // where it leaves and groundward where it arrives.
-            vec![link("n.gateway-out", &["c.payload-in"])],
+            vec![link("n.moc-out", &["c.world-in"])],
         );
         let problems = g.check();
         let said = problems
@@ -4567,7 +4565,7 @@ mod tests {
     ///
     /// A link may not carry one stream into the other -- see
     /// `a_link_may_not_carry_two_streams` -- so a tee is how a datum from the
-    /// ground reaches a payload-in, or a reading reaches a gateway-in, and its
+    /// ground reaches a world-in, or a reading reaches a moc-in, and its
     /// two sources each name the stream they carry.
     #[test]
     fn a_tee_sends_one_stream_both_ways_and_a_null_node_ends_one() {
@@ -4588,11 +4586,11 @@ mod tests {
             ],
             vec![
                 link("a", &["readings"]),
-                link("readings.payload-out", &["c", "heard"]),
-                link("readings.gateway-out", &["told"]),
+                link("readings.world-out", &["c", "heard"]),
+                link("readings.moc-out", &["told"]),
                 link("c", &["commands"]),
-                link("commands.gateway-out", &["a"]),
-                link("commands.payload-out", &["also_heard"]),
+                link("commands.moc-out", &["a"]),
+                link("commands.world-out", &["also_heard"]),
             ],
         );
         let problems = g.check();
@@ -4700,13 +4698,13 @@ mod tests {
 
     /// A ping node hears the ground and answers it, and is told nothing else.
     ///
-    /// What the ground sends arrives at its `gateway-in` and its answer leaves
-    /// by its `payload-out`, so it stands between a ground link's two ends.
+    /// What the ground sends arrives at its `moc-in` and its answer leaves
+    /// by its `world-out`, so it stands between a ground link's two ends.
     #[test]
     fn a_ping_node_answers_the_ground_and_is_told_nothing() {
         let g = graph(
             vec![node("c", "gateway_radio"), node("p", "ping")],
-            vec![link("c.gateway-out", &["p"]), link("p", &["c"])],
+            vec![link("c.moc-out", &["p"]), link("p", &["c"])],
         );
         assert_eq!(g.check(), Vec::new());
 
@@ -4718,7 +4716,7 @@ mod tests {
                 node("c", "gateway_radio"),
                 node("p", "ping"),
             ],
-            vec![link("a.payload-out", &["p.payload-in"]), link("p", &["c"])],
+            vec![link("a.world-out", &["p.world-in"]), link("p", &["c"])],
         );
         assert_ne!(g.check(), Vec::new());
 
@@ -4729,7 +4727,7 @@ mod tests {
             .insert("interval".to_string(), Scalar::of("1 s"));
         let g = graph(
             vec![node("c", "gateway_radio"), said_something],
-            vec![link("c.gateway-out", &["p"]), link("p", &["c"])],
+            vec![link("c.moc-out", &["p"]), link("p", &["c"])],
         );
         let problems = g.check();
         assert!(
@@ -4775,14 +4773,14 @@ mod tests {
                 node("b", "i2c"),
                 node("n", "null-payload"),
             ],
-            vec![link("a", &["n.payload-in"]), link("b", &["n.payload-in"])],
+            vec![link("a", &["n.world-in"]), link("b", &["n.world-in"])],
         );
         let problems = g.check();
         assert!(
             problems.iter().any(|p| matches!(
                 p,
                 Problem::InputBoundTwice { node, input }
-                    if node == "n" && input == "payload-in"
+                    if node == "n" && input == "world-in"
             )),
             "{problems:?}"
         );
@@ -4890,8 +4888,8 @@ mod tests {
             Problem::CrossedStreams {
                 from: "n".into(),
                 link: "\"n\" to \"c\"".into(),
-                leaves: "payload-out".into(),
-                arrives: "gateway-out".into(),
+                leaves: "world-out".into(),
+                arrives: "moc-out".into(),
             },
             Problem::DuplicateLink {
                 from: "a".into(),

@@ -29,6 +29,29 @@ Everything is written in the one order a configuration has, which is by name:
 the types of a section, the nodes of a type, a node's attributes, then its
 links and their destinations, then the sinks it says a line arrives at.
 
+A link is written as lines under the data source it leaves by, each the node
+it reaches and the name it arrives there by, and the node it reaches lists
+that name under the sink the line arrives at::
+
+    payloads:
+      - type i2c:
+          - payload: temp_1
+            world-out:
+              - vote.in0
+    vehicle:
+      - type compute:
+          - compute: vote
+            function: vote
+            world-in: [in0, in1, in2]
+
+The name is the input an old link named, ``input: in0``, and otherwise the
+name of the node the line leaves. The old shape's sinks, ``world-in: true``,
+said only that a line arrives; they are written as the names that do. A
+vote's ``inputs`` are the names under its world-in now, and are written there.
+The names a node lists are worked out from the links in the one file, so a
+line from a file this one includes, or that includes it, is not counted: add
+its name by hand, which loading the configuration says to do.
+
 The comments are kept. A comment above a node moves with the node, and one
 above an attribute or a link with that attribute or link. The comment above
 the first node of a section that is in paragraphs -- an empty comment line
@@ -98,10 +121,13 @@ SECTIONS = {"gateway": ("gateways", "gateway"),
             "payloads": ("payloads", "payload")}
 
 #: A node's links, by the data source they leave.
-LINKS = ("gateway-out", "payload-out")
+LINKS = ("moc-out", "world-out")
 
-#: A node's sinks, which say whether a line arrives there.
-SINKS = ("gateway-in", "payload-in")
+#: A node's sinks, each listing the names a line arrives there by.
+SINKS = ("moc-in", "world-in")
+
+#: The sink a line leaving by each data source arrives at.
+ARRIVES = {"moc-out": "moc-in", "world-out": "world-in"}
 
 #: The attributes a node writes as a list, whose entries are a set:
 #: ``tcslibgs::graph::LISTED``.
@@ -456,6 +482,148 @@ def destinations_of(value, report, where):
     return sorted(out, key=lambda d: (d[0], d[1] or ""))
 
 
+def vote_inputs(said):
+    """The inputs an old vote's ``inputs`` attribute names.
+
+    Args:
+        said: The attribute's text, or ``None``.
+
+    Returns:
+        Each name, in the order given.
+    """
+    if said is None:
+        return []
+    return [one for one in re.split(r"[,\s]+", str(said)) if one]
+
+
+def line_to(target, entry, sender):
+    """A link's destination as a line is written: the node it reaches and the
+    name it arrives by.
+
+    Args:
+        target: The node it reaches.
+        entry:  The input the old link named, or ``None``.
+        sender: The node it leaves, whose name it arrives by otherwise.
+
+    Returns:
+        ``target.name``.
+    """
+    return f"{target}.{entry if entry is not None else sender}"
+
+
+class Arrivals:
+    """The names each node lists under its sinks, from the lines to it."""
+
+    def __init__(self):
+        """Nothing arriving anywhere yet."""
+        self.names = {}
+
+    def add(self, node, sink, name):
+        """Note that a line arrives at a node's sink by a name.
+
+        Args:
+            node: The node it reaches.
+            sink: ``world-in`` or ``moc-in``.
+            name: The name it arrives by.
+        """
+        theirs = self.names.setdefault(node, {}).setdefault(sink, [])
+        if name not in theirs:
+            theirs.append(name)
+
+    def link(self, sender, key, destinations):
+        """Note the lines one link sends.
+
+        Args:
+            sender:       The node it leaves.
+            key:          The data source it leaves by.
+            destinations: Each as ``(target, input)``.
+        """
+        for target, entry in destinations:
+            self.add(target, ARRIVES[key],
+                     entry if entry is not None else sender)
+
+    def of(self, node, report):
+        """The names a node lists, under each sink.
+
+        Args:
+            node:   The node.
+            report: Where to say a name that would be listed twice.
+
+        Returns:
+            ``(sink, names)`` for each sink that has any, in the order they
+            are written, the names in the order of their text.
+        """
+        theirs = self.names.get(node, {})
+        out = []
+        for sink in sorted(SINKS):
+            names = sorted(theirs.get(sink, []))
+            if names:
+                out.append((sink, names))
+        both = set(theirs.get("world-in", [])) & set(theirs.get("moc-in", []))
+        for name in sorted(both):
+            report.say(f"\"{node}\" is reached by \"{name}\" under both its "
+                       "sinks, and a name is listed once: rename one, in "
+                       "the line and in the list")
+        return out
+
+
+def yaml_arrivals(document):
+    """The names each node of a YAML configuration lists, from its links.
+
+    Read from the whole file before any of it is written, since the names a
+    node lists are said by the nodes that send to it, wherever they are.
+
+    Args:
+        document: The parsed file, in the old shape, the new, or both.
+
+    Returns:
+        The :class:`Arrivals`.
+    """
+    arrivals = Arrivals()
+    if not isinstance(document, dict):
+        return arrivals
+    for section, (now, word) in SECTIONS.items():
+        for key in sorted({section, now}):
+            value = document.get(key)
+            if isinstance(value, dict):
+                value = [value]
+            if not isinstance(value, list):
+                continue
+            for entry in value:
+                for name, said in yaml_said(entry, word):
+                    for link in LINKS:
+                        arrivals.link(name, link,
+                                      destinations_of(said.get(link), None,
+                                                      link))
+                    for one in vote_inputs(said.get("inputs")):
+                        arrivals.add(name, "world-in", one)
+    return arrivals
+
+
+def yaml_said(entry, word):
+    """The nodes one entry of a section says, in either shape.
+
+    Args:
+        entry: The entry: an old node, ``{name: ..., type: ...}``, or a type of
+               new ones, ``{"type i2c": [{payload: ...}]}``.
+        word:  The word the section names a node by in the new shape.
+
+    Returns:
+        Each node as ``(name, what it says)``.
+    """
+    if not isinstance(entry, dict):
+        return []
+    if "name" in entry:
+        return [(str(entry["name"]), entry)]
+    out = []
+    for key, inside in entry.items():
+        if not str(key).startswith("type ") or not isinstance(inside, list):
+            continue
+        out.extend((str(one[word]), one) for one in inside
+                   if isinstance(one, dict) and word in one)
+    return out
+
+
 class YamlNode:
     """One node of the old shape, taken apart."""
 
@@ -630,9 +798,7 @@ def yaml_key_lines(node, key, comments, chunk, value, report, at=YAML_KEY):
             out.extend(yaml_comment(inner, at, report))
         out.append(f"{pad}{key}:")
         for target, entry in destinations_of(value, report, key):
-            out.append(f"{pad}  - target: {target}")
-            if entry is not None:
-                out.append(f"{pad}    input: {entry}")
+            out.append(f"{pad}  - {line_to(target, entry, node.name)}")
         return out
     out.append(pad + chunk[0])
     rest = chunk[1:]
@@ -644,14 +810,42 @@ def yaml_key_lines(node, key, comments, chunk, value, report, at=YAML_KEY):
     return out
 
 
-def yaml_section(name, above, body, report):
+def yaml_sink_lines(node, arrivals, comments, report):
+    """Write the names a node lists under its sinks.
+
+    Args:
+        node:     The node.
+        arrivals: The names each node lists.
+        comments: The comment lines above the sinks and inputs the old shape
+                  wrote, which go above these.
+        report:   Where to say what cannot be kept.
+
+    Returns:
+        Its lines.
+    """
+    out = []
+    lists = arrivals.of(node.name, report)
+    if comments:
+        if lists:
+            out.extend(yaml_comment(comments, YAML_KEY, report))
+        else:
+            report.say(f"the comments above the sinks of \"{node.name}\", "
+                       "which nothing arrives at, are dropped with them")
+    for sink, names in lists:
+        out.append(f"{' ' * YAML_KEY}{sink}: "
+                   f"[{', '.join(plain(name) for name in names)}]")
+    return out
+
+
+def yaml_section(name, above, body, report, arrivals):
     """Write a section of nodes in the new shape.
 
     Args:
-        name:   The section's old name.
-        above:  The comment lines above its key.
-        body:   Its lines under its key.
-        report: Where to say what cannot be kept.
+        name:     The section's old name.
+        above:    The comment lines above its key.
+        body:     Its lines under its key.
+        report:   Where to say what cannot be kept.
+        arrivals: The names each node lists under its sinks.
 
     Returns:
         Its lines.
@@ -677,10 +871,17 @@ def yaml_section(name, above, body, report):
         for node in sorted(by_type[node_type], key=lambda n: n.name):
             out.extend(yaml_comment(node.above, YAML_NODE, report))
             out.append(f"{' ' * YAML_NODE}- {word}: {node.name_text}")
-            for key, comments, chunk, value in sorted(node.keys,
+            # The old sinks and a vote's inputs are written again as the
+            # names that arrive, after everything else.
+            moved = [k for k in node.keys if k[0] in SINKS or k[0] == "inputs"]
+            kept = [k for k in node.keys if k not in moved]
+            for key, comments, chunk, value in sorted(kept,
                                                       key=lambda k: kind(k[0])):
                 out.extend(yaml_key_lines(node, key, comments, chunk, value,
                                           report))
+            out.extend(yaml_sink_lines(node, arrivals,
+                                       [c for k in moved for c in k[1]],
+                                       report))
     if trailing:
         report.say(f"{name}: the comment at the end of the section is kept at "
                    "its end")
@@ -754,9 +955,11 @@ def convert_yaml(text, report):
     Returns:
         The new text; the same text for a file already in the new shape.
     """
-    old = yaml_is_old(yaml.safe_load(text))
+    document = yaml.safe_load(text)
+    old = yaml_is_old(document)
     if not old:
         return text
+    arrivals = yaml_arrivals(document)
     lines = text.split("\n")
     out = []
     for item in top_blocks(lines):
@@ -765,7 +968,8 @@ def convert_yaml(text, report):
             continue
         _, key, above, own = item
         if key in old and key in SECTIONS:
-            out.extend(yaml_section(key, above, own[1:], report))
+            out.extend(yaml_section(key, above, own[1:], report,
+                                    arrivals))
         elif key in old and key == "tcsgui":
             # Its blank lines after are not its own.
             body = own[1:]
@@ -1056,9 +1260,9 @@ def xml_destination(child):
     """The destination a link element says.
 
     Args:
-        child: The element: ``<payload-out><target>k_1</target>
-               </payload-out>``, perhaps with an ``<input>``, or
-               ``<payload-out>k_1</payload-out>``.
+        child: The element: ``<world-out><target>k_1</target>
+               </world-out>``, perhaps with an ``<input>``, or
+               ``<world-out>k_1</world-out>``.
 
     Returns:
         ``(target, input)``.
@@ -1074,14 +1278,37 @@ def xml_destination(child):
     return (text_of(target), None if entry is None else text_of(entry))
 
 
-def xml_node_lines(node, word, report, at=XML_NODE):
+def xml_arrivals(nodes):
+    """The names each node of an XML configuration lists, from its links.
+
+    Args:
+        nodes: Every node of the old shape the file has.
+
+    Returns:
+        The :class:`Arrivals`.
+    """
+    arrivals = Arrivals()
+    for node in nodes:
+        for key, _, child in node.children:
+            if key in LINKS:
+                arrivals.link(node.name, key, [xml_destination(child)])
+            elif key == "inputs":
+                for one in vote_inputs(text_of(child)):
+                    arrivals.add(node.name, "world-in", one)
+    return arrivals
+
+
+def xml_node_lines(node, word, report, at=XML_NODE, arrivals=None):
     """Write one node in the new shape.
 
     Args:
-        node:   The node.
-        word:   The element its section writes a node as.
-        report: Where to say what cannot be kept.
-        at:     The column it is written at, its children four further in.
+        node:     The node.
+        word:     The element its section writes a node as.
+        report:   Where to say what cannot be kept.
+        at:       The column it is written at, its children four further in.
+        arrivals: The names each node lists under its sinks, for a node of a
+                  configuration; ``None`` for one of a simulator file, which
+                  has no links.
 
     Returns:
         Its lines.
@@ -1091,7 +1318,15 @@ def xml_node_lines(node, word, report, at=XML_NODE):
     pad = " " * child_at
     keyed = [c for c in node.children if c[0] is not None]
     loose = [c for c in node.children if c[0] is None]
-    if not keyed and not loose:
+    # The old sinks and a vote's inputs are written again as the names that
+    # arrive, after everything else.
+    moved = []
+    lists = []
+    if arrivals is not None:
+        moved = [c for c in keyed if c[0] in SINKS or c[0] == "inputs"]
+        keyed = [c for c in keyed if c not in moved]
+        lists = arrivals.of(node.name, report)
+    if not keyed and not loose and not lists:
         out.append(f"{' ' * at}<{word} name={quoteattr(node.name)}/>")
         return out
     out.append(f"{' ' * at}<{word} name={quoteattr(node.name)}>")
@@ -1111,7 +1346,8 @@ def xml_node_lines(node, word, report, at=XML_NODE):
             continue
         if key in SINKS and links:
             for link in sorted(links):
-                out.extend(xml_link_lines(link, *links[link], report))
+                out.extend(xml_link_lines(link, *links[link], node.name,
+                                          report))
             links = {}
         out.extend(comments_at(comments, child_at, report))
         if len(child):
@@ -1119,20 +1355,29 @@ def xml_node_lines(node, word, report, at=XML_NODE):
                              "an attribute does not")
         out.append(f"{pad}<{key}>{escape(text_of(child))}</{key}>")
     for link in sorted(links):
-        out.extend(xml_link_lines(link, *links[link], report))
+        out.extend(xml_link_lines(link, *links[link], node.name, report))
+    above = [c for _, comments, _ in moved for c in comments]
+    if above and not lists:
+        report.say(f"the comments above the sinks of \"{node.name}\", which "
+                   "nothing arrives at, are dropped with them")
+    if lists:
+        out.extend(comments_at(above, child_at, report))
+    for sink, names in lists:
+        out.extend(f"{pad}<{sink}>{escape(name)}</{sink}>" for name in names)
     for _, comments, _ in loose:
         out.extend(comments_at(comments, child_at, report))
     out.append(f"{' ' * at}</{word}>")
     return out
 
 
-def xml_link_lines(key, comments, destinations, report):
-    """Write one link of a node, each destination an element of its own.
+def xml_link_lines(key, comments, destinations, sender, report):
+    """Write one link of a node, each line an element of its own.
 
     Args:
         key:          The data source it leaves by.
         comments:     The comments above it.
         destinations: Each destination as ``(target, input)``.
+        sender:       The node it leaves.
         report:       Where to say what cannot be filled.
 
     Returns:
@@ -1140,21 +1385,20 @@ def xml_link_lines(key, comments, destinations, report):
     """
     out = comments_at(comments, XML_CHILD, report)
     for target, entry in sorted(destinations, key=lambda d: (d[0], d[1] or "")):
-        said = f"<target>{escape(target)}</target>"
-        if entry is not None:
-            said += f"<input>{escape(entry)}</input>"
+        said = escape(line_to(target, entry, sender))
         out.append(f"{' ' * XML_CHILD}<{key}>{said}</{key}>")
     return out
 
 
-def xml_section(name, nodes, about, report):
+def xml_section(name, nodes, about, report, arrivals):
     """Write a section of nodes in the new shape.
 
     Args:
-        name:   The section's old name.
-        nodes:  Its nodes.
-        about:  The comments at its top, each ``(text, column)``.
-        report: Where to say what cannot be kept.
+        name:     The section's old name.
+        nodes:    Its nodes.
+        about:    The comments at its top, each ``(text, column)``.
+        report:   Where to say what cannot be kept.
+        arrivals: The names each node lists under its sinks.
 
     Returns:
         Its lines.
@@ -1168,7 +1412,8 @@ def xml_section(name, nodes, about, report):
     for node_type in sorted(by_type):
         out.append(f"{' ' * XML_TYPE}<type name={quoteattr(node_type)}>")
         for node in sorted(by_type[node_type], key=lambda n: n.name):
-            out.extend(xml_node_lines(node, word, report))
+            out.extend(xml_node_lines(node, word, report,
+                                      arrivals=arrivals))
         out.append(f"{' ' * XML_TYPE}</type>")
     out.append(f"{' ' * XML_SECTION}</{now}>")
     return out
@@ -1319,6 +1564,8 @@ def convert_xml(text, report):
             edits.append((start, end, ""))
     if not edits:
         return text
+    arrivals = xml_arrivals([node for theirs in nodes.values()
+                             for node in theirs])
     sections = {}
     for name, theirs in nodes.items():
         if not theirs:
@@ -1332,7 +1579,8 @@ def convert_xml(text, report):
             report.say(f"{name}: the first paragraphs of the comment above "
                        f"\"{theirs[0].name}\" are taken to be about the "
                        "section, and kept at its top")
-        sections[name] = ("\n".join(xml_section(name, theirs, about, report))
+        sections[name] = ("\n".join(xml_section(name, theirs, about, report,
+                                                 arrivals))
                           + "\n")
     out = bytearray()
     done = 0

@@ -1572,13 +1572,12 @@ mod tests {
         address: \"0x48\"
         path: /dev/i2c-1
         poll_interval: \"1 s\"
-        payload-out:
-          - target: average
+        world-out: [average.inside]
 vehicle:
   - type compute:
       - compute: average
         function: mean
-        inputs: 1
+        world-in: [inside]
 ",
         )
         .expect("written");
@@ -2157,13 +2156,13 @@ vehicle:
         address: 127.0.0.1
         ground_base: \"127.0.0.1:5100\"
         port: \"5000\"
-        gateway-out:
-          - target: pinger
+        moc-out: [pinger.ground]
+        world-in: [pinger]
 vehicle:
   - type ping:
       - compute: pinger
-        payload-out:
-          - target: ground
+        world-out: [ground.pinger]
+        moc-in: [ground]
 ",
         )
         .expect("written");

@@ -14,9 +14,10 @@ attributes:
   - name: inputs
     required: true
     about: >
-      Which inputs it votes over, comma separated. The links must bind
-      exactly these: a vote whose third link was deleted would quietly
-      become a vote over two, which has no majority in it.
+      Which inputs it votes over, comma separated, which the file writes as
+      the names under its world-in. The links must bind exactly these: a
+      vote whose third link was deleted would quietly become a vote over
+      two, which has no majority in it.
   - name: algorithm
     required: true
     about: >

@@ -213,7 +213,7 @@ def with_more_nodes(directory):
                     <address>127.0.0.1</address>
                     <port>16800</port>
                     <protocol>udp</protocol>
-                    <payload-out><target>gateway</target></payload-out>
+                    <world-out>gateway.pong</world-out>
                 </payload>
                 <payload name="sensor">
                     <address>127.0.0.1</address>
@@ -230,6 +230,13 @@ def with_more_nodes(directory):
         """), " " * 4)
     if text.count("    <tcsgui>") != 1:
         raise ValueError("the example has no one tcsgui section")
+    # The gateway node lists the name pong's line arrives by, as every node
+    # a line reaches does.
+    arrives = "<world-in>ping</world-in>"
+    if text.count(arrives) != 1:
+        raise ValueError("the example's gateway node has no one world-in")
+    text = text.replace(
+        arrives, arrives + "\n                <world-in>pong</world-in>")
     common = directory / "ping-common"
     common.mkdir(exist_ok=True)
     shutil.copy(HERE.parent / "ping-common" / "ping.xtcs", common)

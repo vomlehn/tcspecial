@@ -101,17 +101,17 @@ pub struct Described {
 /// state plainly and what a reader of one can check at a glance: a type either
 /// has somewhere for a stream to arrive or it has not. The names the four
 /// answer to are `tcslibgs::graph::terminals`'s -- `payload-sink` is the
-/// terminal called `payload-in` -- and `Terminals::each` is the one place that
+/// terminal called `world-in` -- and `Terminals::each` is the one place that
 /// correspondence is written.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub struct Terminals {
-    /// Where the payload's own data arrives: the terminal `payload-in`.
+    /// Where the payload's own data arrives: the terminal `world-in`.
     pub payload_sink: bool,
-    /// And where it leaves: `payload-out`.
+    /// And where it leaves: `world-out`.
     pub payload_source: bool,
-    /// Where what the ground sends arrives: `gateway-in`.
+    /// Where what the ground sends arrives: `moc-in`.
     pub gateway_sink: bool,
-    /// And where it leaves: `gateway-out`.
+    /// And where it leaves: `moc-out`.
     pub gateway_source: bool,
 }
 
@@ -131,10 +131,10 @@ impl Terminals {
     #[cfg(test)]
     pub fn each(&self) -> [(&'static str, bool); 4] {
         [
-            ("payload-in", self.payload_sink),
-            ("payload-out", self.payload_source),
-            ("gateway-in", self.gateway_sink),
-            ("gateway-out", self.gateway_source),
+            ("world-in", self.payload_sink),
+            ("world-out", self.payload_source),
+            ("moc-in", self.gateway_sink),
+            ("moc-out", self.gateway_source),
         ]
     }
 }

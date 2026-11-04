@@ -28,7 +28,7 @@
 //!
 //! * `app_pl` writes payload data and reads nothing. A payload that is never
 //!   asked -- it reports of its own accord -- so its one terminal is a
-//!   `payload-out` and nothing may be linked into it.
+//!   `world-out` and nothing may be linked into it.
 //! * `app_all_pl` reads gateway data and writes payload data, which is the
 //!   shape every other payload has: it is asked for a reading, by a trigger or
 //!   a command, and answers with one.

@@ -45,7 +45,7 @@
             <!-- port of its own, because nothing comes back up. -->
             <gateway name="gateway-1">
                 <ground_base>127.0.0.1:5100</ground_base>
-                <payload-in>true</payload-in>
+                <world-in>lorem</world-in>
             </gateway>
         </type>
     </gateways>
@@ -61,7 +61,7 @@
             <payload name="lorem">
                 <app-payload-arg>1</app-payload-arg>
                 <executable>examples/simple-app/lorem_pl.py</executable>
-                <payload-out><target>gateway-1</target></payload-out>
+                <world-out>gateway-1.lorem</world-out>
             </payload>
         </type>
     </payloads>

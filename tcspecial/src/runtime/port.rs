@@ -1246,7 +1246,7 @@ impl TeePort {
 
 impl Port for TeePort {
     /// What arrived, on no stream in particular: so that it goes down every
-    /// link leaving the node, the `gateway-out` ones and the `payload-out` ones
+    /// link leaving the node, the `moc-out` ones and the `world-out` ones
     /// alike, which is what a tee is for. One stream arrives at a tee, so no
     /// other is mixed into it.
     fn take(&mut self, buffer: &mut [u8]) -> Result<Taken, String> {
@@ -1497,7 +1497,7 @@ impl Port for AppPort {
     /// The stream travels with the bytes because this is the node that needs
     /// it to: an `app_all_veh` writes payload data on the one interface and
     /// gateway data on the other, and delivering a reading down the links
-    /// leaving its `gateway-out` would send telemetry out as a command. See
+    /// leaving its `moc-out` would send telemetry out as a command. See
     /// [`Taken`].
     ///
     /// A packet of no bytes is read and goes no further. The interfaces carry
@@ -1942,6 +1942,7 @@ mod tests {
             homes: Default::default(),
             placed: Default::default(),
             set_aside: Default::default(),
+            named: Default::default(),
         };
         let mut port =
             EndpointPort::open(&gps, &Routes::of(&graph), &Abandon::nothing())
@@ -2039,6 +2040,7 @@ mod tests {
             homes: Default::default(),
             placed: Default::default(),
             set_aside: Default::default(),
+            named: Default::default(),
         };
         let routes = Routes::of(&graph);
 
@@ -2289,6 +2291,7 @@ mod tests {
                 homes: Default::default(),
                 placed: Default::default(),
                 set_aside: Default::default(),
+                named: Default::default(),
             })
         };
 
@@ -2378,6 +2381,7 @@ mod tests {
             homes: Default::default(),
             placed: Default::default(),
             set_aside: Default::default(),
+            named: Default::default(),
         });
         let mut port = EndpointPort::open(&node, &routes, &Abandon::nothing())
             .expect("the vehicle waits for the payload");
@@ -2462,6 +2466,7 @@ mod tests {
             homes: Default::default(),
             placed: Default::default(),
             set_aside: Default::default(),
+            named: Default::default(),
         });
 
         let _port = EndpointPort::open(&node, &routes, &Abandon::nothing())

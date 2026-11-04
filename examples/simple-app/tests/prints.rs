@@ -39,14 +39,14 @@ fn configuration() -> (tempfile::TempDir, PathBuf, u16) {
   - type gateway_radio:
       - gateway: gateway
         ground_base: \"127.0.0.1:{}\"
+        world-in: [lorem]
 payloads:
   - type network:
       - payload: lorem
         address: \"127.0.0.1\"
         port: \"7001\"
         protocol: udp
-        payload-out:
-          - target: gateway
+        world-out: [gateway.lorem]
 ",
             port - 1
         ),
@@ -210,14 +210,14 @@ gateways:
   - type gateway_radio:
       - gateway: gateway
         ground_base: \"127.0.0.1:{}\"
+        world-in: [lorem]
 payloads:
   - type network:
       - payload: lorem
         address: \"127.0.0.1\"
         port: \"7001\"
         protocol: udp
-        payload-out:
-          - target: gateway
+        world-out: [gateway.lorem]
 ",
             tcslib::InterfaceDigest::of_this_build(),
             free(),

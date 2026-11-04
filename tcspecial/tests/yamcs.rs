@@ -102,13 +102,13 @@ gateways:
         apid_base: \"0x200\"
         ground_base: \"127.0.0.1:{}\"
         port: \"{gateway_at}\"
-        gateway-out:
-          - target: pinger
+        moc-out: [pinger.ground]
+        world-in: [pinger]
 vehicle:
   - type ping:
       - compute: pinger
-        payload-out:
-          - target: ground
+        world-out: [ground.pinger]
+        moc-in: [ground]
 ",
             tcslibgs::InterfaceDigest::of_this_build(),
             port(&beacons),

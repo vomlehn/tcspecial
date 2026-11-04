@@ -147,7 +147,7 @@ enum Job {
 ///
 /// `Some` is a node that produces on more than one terminal and knows which
 /// -- an `app_all_veh`, whose two interfaces are two streams. Delivering its
-/// reading to the links leaving its `gateway-out` would send telemetry out as a
+/// reading to the links leaving its `moc-out` would send telemetry out as a
 /// command, so the stream travels with the bytes.
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
 pub struct Taken {
@@ -2051,31 +2051,30 @@ mod tests {
             "gateways:
   - type gateway_radio:
       - gateway: ground
-        gateway-out:
-          - target: commands
+        moc-out: [commands.ground]
+        world-in: [commands, readings]
 payloads:
   - type network:
       - payload: valve
         address: \"127.0.0.1\"
         port: \"7001\"
         protocol: udp
-        payload-out:
-          - target: readings
+        world-out: [readings.valve]
+        moc-in: [commands]
 vehicle:
   - type null-gateway:
       - compute: dropped
+        moc-in: [readings]
   - type tee-gateway:
       - compute: commands
-        gateway-out:
-          - target: valve
-        payload-out:
-          - target: ground
+        moc-out: [valve.commands]
+        world-out: [ground.commands]
+        moc-in: [ground]
   - type tee-payload:
       - compute: readings
-        gateway-out:
-          - target: dropped
-        payload-out:
-          - target: ground
+        moc-out: [dropped.readings]
+        world-out: [ground.readings]
+        world-in: [valve]
 ",
         )
         .expect("written");
@@ -2439,7 +2438,7 @@ vehicle:
             heaters.lock().expect("the record").given,
             // Vehicleward: what a thermostat sends a heater is a command, and
             // the link it goes down is the one leaving the computation's
-            // `gateway-out`.
+            // `moc-out`.
             vec![(None, Some(Stream::Vehicleward), b"1".to_vec())],
             "294 is more than two degrees below 300"
         );
@@ -2701,6 +2700,7 @@ vehicle:
             homes: Default::default(),
             placed: Default::default(),
             set_aside: Default::default(),
+            named: Default::default(),
         };
 
         let mut fabric = Fabric::new(Routes::of(&graph), 64);
@@ -2892,6 +2892,7 @@ vehicle:
             homes: Default::default(),
             placed: Default::default(),
             set_aside: Default::default(),
+            named: Default::default(),
         })
     }
 

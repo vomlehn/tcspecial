@@ -49,7 +49,7 @@ payloads:
     for id in 0..count {
         text.push_str(&format!(
             "      - payload: DH{id}\n        path: /dev/null{id}\n        \
-             payload-out:\n          - target: nowhere{id}\n"
+             world-out: [nowhere{id}.DH{id}]\n"
         ));
     }
     let path = dir.join("set.ytcs");
@@ -486,14 +486,14 @@ gateways:
         address: \"127.0.0.1\"
         port: \"5000\"
         ground_base: \"127.0.0.1:5100\"
-        gateway-out:
-          - target: pinger
+        moc-out: [pinger.ground]
+        world-in: [pinger]
 vehicle:
   - type {node_type}:
       - compute: pinger
 {node}
-        payload-out:
-          - target: ground
+        world-out: [ground.pinger]
+        moc-in: [ground]
 "
     );
     let path = dir.join("one.ytcs");

@@ -2,8 +2,8 @@
 # vehicle at all.
 #
 # Every payload aboard reports to one of these: the telemetry arrives at its
-# payload-in, told apart by the payload id its socket carries, and what the
-# ground sends leaves by its gateway-out. It is at the root of this tree rather
+# world-in, told apart by the payload id its socket carries, and what the
+# ground sends leaves by its moc-out. It is at the root of this tree rather
 # than in a family of its own because it has no Rust of its own: a ground
 # link is served by the network payload code,
 # tcspecial/src/node/payload/network/.

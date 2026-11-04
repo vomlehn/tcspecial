@@ -14,8 +14,8 @@
                  tcslibgs::node::vehicle::ping for what a ping and its
                  answer say. -->
             <compute name="ping">
-                <payload-out><target>gateway</target></payload-out>
-                <gateway-in>true</gateway-in>
+                <world-out>gateway.ping</world-out>
+                <moc-in>gateway</moc-in>
             </compute>
         </type>
     </vehicle>

@@ -39,7 +39,7 @@
         <type name="gateway_radio">
             <!-- The ground's end of the link, both ways. What the ground
                  sends goes up to address:port, which this node binds
-                 aboard, and leaves it by gateway-out for the motor's
+                 aboard, and leaves it by moc-out for the motor's
                  commands. What comes down arrives at ground_base plus the
                  device id of the node that sent it: the motor's status,
                  device id 2, at 127.0.0.1:3702. -->
@@ -47,8 +47,8 @@
                 <address>127.0.0.1</address>
                 <ground_base>127.0.0.1:3700</ground_base>
                 <port>3600</port>
-                <gateway-out><target>motor_command</target></gateway-out>
-                <payload-in>true</payload-in>
+                <moc-out>motor_command.ground</moc-out>
+                <world-in>motor_status</world-in>
             </gateway>
         </type>
     </gateways>
@@ -60,7 +60,7 @@
             <payload name="motor_command">
                 <can_id>0x124</can_id>
                 <interface>vcan0</interface>
-                <gateway-in>true</gateway-in>
+                <moc-in>ground</moc-in>
             </payload>
             <!-- A motor controller on the CAN bus vcan0, which sends its
                  status in frames carrying the identifier 0x123 and takes
@@ -74,7 +74,7 @@
             <payload name="motor_status">
                 <can_id>0x123</can_id>
                 <interface>vcan0</interface>
-                <payload-out><target>ground</target></payload-out>
+                <world-out>ground.motor_status</world-out>
             </payload>
         </type>
     </payloads>

@@ -60,15 +60,15 @@ tcspecial:
 gateways:
   - type gateway_cfs:
       # The software bus's end of the link, both ways. What the bus publishes as
-      # cmd_msgid, 0x4281, is taken by this node and leaves it by gateway-out
+      # cmd_msgid, 0x4281, is taken by this node and leaves it by moc-out
       # for the heater. What comes down is published as tlm_base plus the device
       # id of the node that sent it: the thermometer, device id 2, as 0x4242.
       - gateway: fsw
         cmd_msgid: "0x4281"
         tlm_base: "0x4240"
-        gateway-out:
-          - target: heater
-        payload-in: true
+        moc-out:
+          - heater.fsw
+        world-in: [thermometer]
 
 payloads:
   - type network:
@@ -78,14 +78,14 @@ payloads:
         address: "127.0.0.1"
         port: "8601"
         protocol: "udp"
-        gateway-in: true
+        moc-in: [fsw]
       # A thermometer whose readings go to the flight computer.
       - payload: thermometer
         address: "127.0.0.1"
         port: "8602"
         protocol: "udp"
-        payload-out:
-          - target: fsw
+        world-out:
+          - fsw.thermometer
 
 tcsgui:
   nodes:

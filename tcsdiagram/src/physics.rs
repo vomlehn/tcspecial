@@ -376,10 +376,10 @@ pub fn node_look(
         // The two on the right, in the two slots the markup draws on the
         // right, so the name is padded away from them; which slots says
         // nothing more, a physics node being joined only by its lines.
-        gateway_in: none.clone(),
-        gateway_out: terminal(true),
-        payload_in: terminal(false),
-        payload_out: none,
+        moc_in: none.clone(),
+        moc_out: terminal(true),
+        world_in: terminal(false),
+        world_out: none,
         terminal_column: (style::TERMINAL_COLUMN as i32
             + style::room_of(outline, size)) as f32,
         inset: style::room_of(outline, size) as f32,
@@ -780,17 +780,13 @@ mod tests {
         for size in [SIZE, (super::NARROWEST, SIZE.1)] {
             let look = node_look(&component("heater"), (0, 0), size);
             assert_eq!(look.outline, "hexagon");
-            let shown: Vec<&TerminalLook> = [
-                &look.gateway_in,
-                &look.gateway_out,
-                &look.payload_in,
-                &look.payload_out,
-            ]
-            .into_iter()
-            .filter(|t| t.shown)
-            .collect();
+            let shown: Vec<&TerminalLook> =
+                [&look.moc_in, &look.moc_out, &look.world_in, &look.world_out]
+                    .into_iter()
+                    .filter(|t| t.shown)
+                    .collect();
             assert_eq!(shown.len(), 2, "one each way: {look:?}");
-            let (out, into) = (&look.gateway_out, &look.payload_in);
+            let (out, into) = (&look.moc_out, &look.world_in);
             assert!(out.rightward && !into.rightward);
             assert!(out.y + style::TERMINAL.1 as f32 <= into.y, "apart");
             // Both inside the hexagon at both of their corners on the right.
@@ -809,9 +805,9 @@ mod tests {
         // A zone gives out its temperature and takes heat; a type there is
         // no such component of has neither.
         let zone = node_look(&component("thermal_mass"), (0, 0), SIZE);
-        assert!(zone.gateway_out.shown && zone.payload_in.shown);
+        assert!(zone.moc_out.shown && zone.world_in.shown);
         let unknown = node_look(&component("nonesuch"), (0, 0), SIZE);
-        assert!(!unknown.gateway_out.shown && !unknown.payload_in.shown);
+        assert!(!unknown.moc_out.shown && !unknown.world_in.shown);
         // And no node type is drawn as one.
         for kind in style::NodeType::ALL {
             assert_ne!(kind.appearance().outline, style::Outline::Hexagon);

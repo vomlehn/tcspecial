@@ -348,9 +348,9 @@ impl Terminals {
 ///
 /// Two rows and two columns, and the arrangement is the two streams: the
 /// groundward one along the top, left to right, arriving from the payload at
-/// `payload-in` and leaving for the ground at `payload-out`; the vehicleward
+/// `world-in` and leaving for the ground at `world-out`; the vehicleward
 /// one along the bottom, right to left, arriving from the ground at
-/// `gateway-in` and leaving for the payload at `gateway-out`.
+/// `moc-in` and leaving for the payload at `moc-out`.
 ///
 /// Which means the arrows all point the way the data actually travels across
 /// the canvas, because the canvas is laid out the same way: the payloads are
@@ -373,12 +373,12 @@ pub fn corner_of(terminal: &str) -> Option<Corner> {
         // The payload's own data along the top, travelling rightwards: it
         // arrives from a payload on the left and leaves for the ground on the
         // right.
-        "payload-in" => Some(Corner {
+        "world-in" => Some(Corner {
             top: true,
             left: true,
             rightward: true,
         }),
-        "payload-out" => Some(Corner {
+        "world-out" => Some(Corner {
             top: true,
             left: false,
             rightward: true,
@@ -386,12 +386,12 @@ pub fn corner_of(terminal: &str) -> Option<Corner> {
         // And what the ground sends along the bottom, travelling leftwards:
         // it arrives from the ground on the right and leaves for a payload on
         // the left.
-        "gateway-out" => Some(Corner {
+        "moc-out" => Some(Corner {
             top: false,
             left: true,
             rightward: false,
         }),
-        "gateway-in" => Some(Corner {
+        "moc-in" => Some(Corner {
             top: false,
             left: false,
             rightward: false,
@@ -415,7 +415,7 @@ pub struct Corner {
     /// sends points left.
     ///
     /// All four carry one. A terminal's name says whose data it is and whether
-    /// it arrives or leaves -- `payload-in`, `gateway-out` -- and the arrow
+    /// it arrives or leaves -- `world-in`, `moc-out` -- and the arrow
     /// says which way that is on the screen, which is the half a reader can
     /// take in without reading.
     pub rightward: bool,
@@ -872,8 +872,8 @@ pub fn terminal_at(
 /// `named` is what the link wrote, where it wrote one, and `sink` says which
 /// end of the link this is. Three answers in order of authority: the terminal
 /// the link named, where the type has it; the only terminal of that kind,
-/// where there is one; and otherwise the groundward one -- `payload-in`
-/// where data arrives and `payload-out` where it leaves -- because telemetry
+/// where there is one; and otherwise the groundward one -- `world-in`
+/// where data arrives and `world-out` where it leaves -- because telemetry
 /// on its way to the ground is what a node does unless the file says
 /// otherwise.
 ///
@@ -918,7 +918,7 @@ pub fn terminal_for(
     match ours {
         [only] => Some(only),
         _ => {
-            let groundward = if sink { "payload-in" } else { "payload-out" };
+            let groundward = if sink { "world-in" } else { "world-out" };
             ours.iter()
                 .find(|terminal| **terminal == groundward)
                 .copied()
@@ -1442,13 +1442,13 @@ impl NodeType {
         }
         match self {
             NodeType::Log => Terminals {
-                sinks: &["payload-in"],
+                sinks: &["world-in"],
                 sources: &[],
             },
             // A computation and a page: both ends of both streams.
             _ => Terminals {
-                sinks: &["payload-in", "gateway-in"],
-                sources: &["payload-out", "gateway-out"],
+                sinks: &["world-in", "moc-in"],
+                sources: &["world-out", "moc-out"],
             },
         }
     }
@@ -1465,7 +1465,7 @@ impl NodeType {
     /// is one of the boxes on the screen. Asking the schema's table instead
     /// threw away what a person had just said -- a computation has two data
     /// sinks drawn on it and the schema calls its sinks its own business, so a
-    /// line dragged to the `gateway-in` in its upper left was recorded as a
+    /// line dragged to the `moc-in` in its upper left was recorded as a
     /// link naming no terminal, and then drawn arriving at the other corner.
     ///
     /// # Arguments
@@ -2277,14 +2277,14 @@ mod tests {
                 // The top row is the payload's own data, on its way to the
                 // ground, and the bottom row is what the ground sends back.
                 // Each row runs one way.
-                let payloads = terminal.starts_with("payload-");
-                assert_eq!(corner.top, payloads, "{terminal}");
-                assert_eq!(corner.rightward, payloads, "{terminal}");
+                let world = terminal.starts_with("world-");
+                assert_eq!(corner.top, world, "{terminal}");
+                assert_eq!(corner.rightward, world, "{terminal}");
                 // Leaving on the side the data is going to, arriving on the
                 // side it comes from: the payloads are to the left of the
                 // vehicle and the ground to its right.
                 let from_the_left =
-                    *terminal == "payload-in" || *terminal == "gateway-out";
+                    *terminal == "world-in" || *terminal == "moc-out";
                 assert_eq!(corner.left, from_the_left, "{terminal}");
             }
         }
@@ -2372,20 +2372,20 @@ mod tests {
     /// Every box carries an arrow, pointing the way its data travels.
     ///
     /// The name says whose data a terminal carries and whether it arrives or
-    /// leaves -- `payload-in`, `gateway-out` -- and the arrow says which way
+    /// leaves -- `world-in`, `moc-out` -- and the arrow says which way
     /// that is on the screen. One statement of it, derived from the stream
     /// rather than written out per corner: the payload's own data is on its way
     /// to the ground, which is rightwards, and what the ground sends is on its
     /// way to a payload, which is leftwards.
     #[test]
     fn every_terminal_carries_an_arrow_the_way_its_data_goes() {
-        for terminal in ["payload-in", "payload-out"] {
+        for terminal in ["world-in", "world-out"] {
             assert!(
                 corner_of(terminal).expect("a corner").rightward,
                 "{terminal}: the payload's own data is on its way to the ground"
             );
         }
-        for terminal in ["gateway-in", "gateway-out"] {
+        for terminal in ["moc-in", "moc-out"] {
             assert!(
                 !corner_of(terminal).expect("a corner").rightward,
                 "{terminal}: what the ground sends is on its way to a payload"
@@ -2448,7 +2448,7 @@ mod tests {
             );
         }
 
-        assert!(NodeType::Log.terminals().has("payload-in"));
+        assert!(NodeType::Log.terminals().has("world-in"));
         assert!(
             NodeType::Log.terminals().sources.is_empty(),
             "nothing is read from a log"
@@ -2500,29 +2500,23 @@ mod tests {
     fn a_line_is_drawn_to_the_terminal_the_link_means() {
         // Named, and the type has it.
         assert_eq!(
-            terminal_for("app_all_veh", Some("gateway-in"), true),
-            Some("gateway-in")
+            terminal_for("app_all_veh", Some("moc-in"), true),
+            Some("moc-in")
         );
         // Named, and the type has not: a computation's own input, which is
         // not a terminal. The groundward sink is where readings arrive.
         assert_eq!(
             terminal_for("compute", Some("in0"), true),
-            Some("payload-in")
+            Some("world-in")
         );
         // Nothing named, and one of that kind: the one.
-        assert_eq!(terminal_for("i2c", None, false), Some("payload-out"));
-        assert_eq!(
-            terminal_for("gateway_radio", None, true),
-            Some("payload-in")
-        );
+        assert_eq!(terminal_for("i2c", None, false), Some("world-out"));
+        assert_eq!(terminal_for("gateway_radio", None, true), Some("world-in"));
         // Nothing named and two of that kind: the groundward one, which is
         // what a node does unless the file says otherwise. The checking
         // refuses such a file; the canvas still has to draw it.
-        assert_eq!(
-            terminal_for("app_all_veh", None, false),
-            Some("payload-out")
-        );
-        assert_eq!(terminal_for("app_all_veh", None, true), Some("payload-in"));
+        assert_eq!(terminal_for("app_all_veh", None, false), Some("world-out"));
+        assert_eq!(terminal_for("app_all_veh", None, true), Some("world-in"));
         // Nothing to read from a log, and nothing known about a type this
         // build does not have.
         assert_eq!(terminal_for("log", None, false), None);
@@ -2545,12 +2539,9 @@ mod tests {
         // going right, and what asks for them arrives at the bottom going
         // left.
         let ((x, y), rightward) =
-            attachment("i2c", at, "payload-out").expect("a payload");
-        let room = room_at(
-            drawn.outline,
-            drawn.size,
-            corner_of("payload-out").unwrap(),
-        );
+            attachment("i2c", at, "world-out").expect("a payload");
+        let room =
+            room_at(drawn.outline, drawn.size, corner_of("world-out").unwrap());
         assert!(
             room > 0,
             "a payload leans, so its upper right is in from the side"
@@ -2564,7 +2555,7 @@ mod tests {
         assert!(y < at.1 as f32 + height as f32 / 2.0, "the upper corner");
 
         let ((_, lower), rightward) =
-            attachment("i2c", at, "gateway-in").expect("a payload");
+            attachment("i2c", at, "moc-in").expect("a payload");
         assert!(
             !rightward && lower > y,
             "what asks arrives at the lower corner"
@@ -2572,13 +2563,13 @@ mod tests {
 
         // And the ground link's pair, both on its left.
         let ((x, _), _) =
-            attachment("gateway_radio", at, "payload-in").expect("the ground");
+            attachment("gateway_radio", at, "world-in").expect("the ground");
         assert_eq!(x, at.0 as f32);
 
         // A terminal a node does not have is not a place to join it, and
         // neither is a name that is not a terminal at all.
         assert_eq!(attachment("i2c", at, "in0"), None);
-        assert_eq!(attachment("contraption", at, "payload-out"), None);
+        assert_eq!(attachment("contraption", at, "world-out"), None);
         let _ = width;
     }
 

@@ -4782,7 +4782,7 @@ fn wire_physics(
         window.on_physics_link_started(move |name, terminal| {
             *drawing.borrow_mut() = Some(PhysicsEnd {
                 component: name.to_string(),
-                output: terminal.as_str() == "gateway-out",
+                output: terminal.as_str() == "moc-out",
             });
         });
     }
@@ -5528,8 +5528,8 @@ fn dropped(
     let (sink_pressed, _) =
         tcslibgs::graph::terminals::stream_of(&pressed.terminal)?;
 
-    // The end being carried keeps its own terminal: a `payload-in` taken
-    // off one node goes on another node's `payload-in` and nowhere else.
+    // The end being carried keeps its own terminal: a `world-in` taken
+    // off one node goes on another node's `world-in` and nowhere else.
     let Some(over) = landed(document, home, (x, y), &pressed.terminal) else {
         // Over nothing at all. From the end a line *leaves* by, that is how a
         // line is deleted: pull the wire out of the thing that is sending and
@@ -5718,8 +5718,8 @@ fn attached(document: &Document, at: &Drawing, sink: bool) -> Vec<Link> {
 /// mind;
 ///
 /// let go of over a terminal that does not pair with the one it started at. A
-/// `payload-out` may only be linked to a `payload-in` and a `gateway-out` only
-/// to a `gateway-in`: that is one stream, named at each of its ends, and
+/// `world-out` may only be linked to a `world-in` and a `moc-out` only
+/// to a `moc-in`: that is one stream, named at each of its ends, and
 /// anything else would carry one stream into the other. The rule is
 /// `tcslibgs::graph::terminals::pairs_with`, which is also what the checking
 /// refuses a written-out configuration for;
@@ -5833,8 +5833,8 @@ fn anchored(
 /// Anywhere on the node will do -- its name, its middle, a corner box -- and
 /// `wanted` is the terminal it attaches to, which the gesture already knows.
 /// A stream has one name at each of its ends, so a line drawn from a
-/// `payload-out` can only arrive at a `payload-in`, and an end carried off a
-/// `payload-in` can only be put down on another `payload-in`: there is
+/// `world-out` can only arrive at a `world-in`, and an end carried off a
+/// `world-in` can only be put down on another `world-in`: there is
 /// nothing else the gesture could have meant. The terminals are still drawn,
 /// because they are what says which streams a type carries and which way --
 /// but hitting a box in a corner is work the editor can do instead of the
@@ -5924,7 +5924,7 @@ fn arriving_at(
 /// And about the end it leaves by, which is always the terminal pressed.
 ///
 /// Always, because a link *is* an attribute of the node it leaves, named after
-/// that terminal: `payload-out: k_1` is where the link is written, so there is
+/// that terminal: `world-out: k_1` is where the link is written, so there is
 /// no such thing as a link whose source terminal the file does not say.
 fn leaving_by(from: &Drawing) -> Option<String> {
     Some(from.terminal.clone())
@@ -6469,10 +6469,10 @@ fn node_view(look: tcsdiagram::view::NodeLook, selected: bool) -> NodeView {
         selected,
         summary: look.summary.into(),
         openable: look.openable,
-        gateway_in: terminal(look.gateway_in),
-        gateway_out: terminal(look.gateway_out),
-        payload_in: terminal(look.payload_in),
-        payload_out: terminal(look.payload_out),
+        moc_in: terminal(look.moc_in),
+        moc_out: terminal(look.moc_out),
+        world_in: terminal(look.world_in),
+        world_out: terminal(look.world_out),
         terminal_column: look.terminal_column,
         inset: look.inset,
     }
@@ -7353,8 +7353,9 @@ mod tests {
             &path,
             "payload_groups:\n  - name: idle\n    interval: 3 s\n\
              payloads:\n  - type i2c:\n      - payload: a\n        \
-             payload-out: gateway\n\
-             gateways:\n  - type gateway_radio:\n      - gateway: gateway\n",
+             world-out: gateway.a\n\
+             gateways:\n  - type gateway_radio:\n      - gateway: gateway\n        \
+             world-in: [a]\n",
         )
         .expect("a configuration with an empty group and an unfinished node");
 
@@ -7790,34 +7791,31 @@ mod tests {
 
         // A payload: what the ground sends arrives, and its readings leave.
         let sensor = view("i2c");
-        assert!(sensor.gateway_in.shown && sensor.payload_out.shown);
-        assert!(!sensor.gateway_out.shown && !sensor.payload_in.shown);
+        assert!(sensor.moc_in.shown && sensor.world_out.shown);
+        assert!(!sensor.moc_out.shown && !sensor.world_in.shown);
         // Both on its right, and the arrows point the way the data travels:
         // its own readings leave along the top going right, and what asks for
         // them arrives along the bottom going left.
-        assert!(sensor.gateway_in.x > sensor.width / 2.0);
-        assert!(sensor.payload_out.x > sensor.width / 2.0);
-        assert!(sensor.payload_out.y < sensor.gateway_in.y);
-        assert!(!sensor.gateway_in.rightward && sensor.payload_out.rightward);
+        assert!(sensor.moc_in.x > sensor.width / 2.0);
+        assert!(sensor.world_out.x > sensor.width / 2.0);
+        assert!(sensor.world_out.y < sensor.moc_in.y);
+        assert!(!sensor.moc_in.rightward && sensor.world_out.rightward);
 
         // The ground: the other end of both, and both on its left.
         let gateway = view("gateway_radio");
-        assert!(gateway.gateway_out.shown && gateway.payload_in.shown);
-        assert!(!gateway.gateway_in.shown && !gateway.payload_out.shown);
-        assert!(gateway.gateway_out.x < gateway.width / 2.0);
-        assert!(gateway.payload_in.x < gateway.width / 2.0);
-        assert!(gateway.payload_in.y < gateway.gateway_out.y);
+        assert!(gateway.moc_out.shown && gateway.world_in.shown);
+        assert!(!gateway.moc_in.shown && !gateway.world_out.shown);
+        assert!(gateway.moc_out.x < gateway.width / 2.0);
+        assert!(gateway.world_in.x < gateway.width / 2.0);
+        assert!(gateway.world_in.y < gateway.moc_out.y);
 
         // A page has all four: what is inside it may have any of them, and
         // nothing out here knows which -- so a line can be drawn to a page
         // either way on either stream.
         let page = view("subdiagram");
-        for terminal in [
-            &page.gateway_in,
-            &page.gateway_out,
-            &page.payload_in,
-            &page.payload_out,
-        ] {
+        for terminal in
+            [&page.moc_in, &page.moc_out, &page.world_in, &page.world_out]
+        {
             assert!(terminal.shown);
         }
 
@@ -7826,15 +7824,15 @@ mod tests {
         // type nothing here can describe -- and there is nothing to be gained
         // by letting a line be drawn to one.
         let unknown = view("contraption");
-        assert!(!unknown.gateway_in.shown && !unknown.payload_out.shown);
+        assert!(!unknown.moc_in.shown && !unknown.world_out.shown);
 
         // Every terminal is drawn inside its node, which is what makes the box
         // a person presses and the box a link arrives at the same box.
         for (node, terminal) in [
-            (&sensor, &sensor.gateway_in),
-            (&sensor, &sensor.payload_out),
-            (&gateway, &gateway.gateway_out),
-            (&gateway, &gateway.payload_in),
+            (&sensor, &sensor.moc_in),
+            (&sensor, &sensor.world_out),
+            (&gateway, &gateway.moc_out),
+            (&gateway, &gateway.world_in),
         ] {
             assert!(terminal.x >= 0.0 && terminal.y >= 0.0);
             assert!(terminal.x + style::TERMINAL.0 as f32 <= node.width);
@@ -8650,8 +8648,8 @@ mod tests {
     /// A link's ends are placed on the terminals it is attached to.
     ///
     /// Which is the drawing the canvas is for: the readings leave a payload by
-    /// its `payload-out`, in its upper right corner, and arrive at the
-    /// computation by its `payload-in`, in that node's upper left -- so the
+    /// its `world-out`, in its upper right corner, and arrive at the
+    /// computation by its `world-in`, in that node's upper left -- so the
     /// line runs rightward along the top of both, the way the data goes and
     /// the way the panes are arranged. It used to leave the middle of the
     /// source's right edge and arrive at the middle of the target's left edge,
@@ -8722,13 +8720,13 @@ mod tests {
         assert_eq!(links.len(), 1);
         let view = &links[0];
 
-        // It starts on the payload's own `payload-out` terminal, which is the
+        // It starts on the payload's own `world-out` terminal, which is the
         // right edge of its upper right corner, and finishes on the
-        // computation's `payload-in`, the left edge of its upper left
+        // computation's `world-in`, the left edge of its upper left
         // corner -- so the line touches both boxes it joins and crosses
         // neither shape.
         let ((start_x, start_y), leaves_right) =
-            style::attachment("i2c", (24, 24), "payload-out")
+            style::attachment("i2c", (24, 24), "world-out")
                 .expect("a payload's source");
         assert!(leaves_right, "the readings leave towards the ground");
         assert!(
@@ -8739,7 +8737,7 @@ mod tests {
         );
 
         let ((end_x, end_y), _) =
-            style::attachment("compute", (400, 40), "payload-in")
+            style::attachment("compute", (400, 40), "world-in")
                 .expect("a sink");
         assert!(
             view.route.ends_with(&format!("{end_x:.1} {end_y:.1}")),
@@ -8828,33 +8826,33 @@ mod tests {
             )
         };
 
-        // The readings, from the payload to the ground: a payload-out let go of
-        // over a payload-in. Neither end names its terminal, both types
+        // The readings, from the payload to the ground: a world-out let go of
+        // over a world-in. Neither end names its terminal, both types
         // having one of each -- which is what keeps a saved file saying
         // `{ from: sensor, to: ground }`.
         let link = joined(
             &document,
             &None,
-            &drawn("sensor", "payload-out"),
-            over("ground", "payload-in"),
+            &drawn("sensor", "world-out"),
+            over("ground", "world-in"),
         )
         .expect("a payload's readings reach the ground");
         assert_eq!(link.from, "sensor");
         // The terminal it leaves by, always: a link is written as an
         // attribute of its own node, named after that terminal.
-        assert_eq!(link.origin.as_deref(), Some("payload-out"));
+        assert_eq!(link.origin.as_deref(), Some("world-out"));
         assert_eq!(link.to, "ground");
         // And nothing at the arriving end, the ground link having one data
         // sink: the schema reads an unnamed end as that one.
         assert_eq!(link.input, None);
 
-        // And back the other way, which is the other stream: a gateway-out let
-        // go of over a gateway-in.
+        // And back the other way, which is the other stream: a moc-out let
+        // go of over a moc-in.
         let back = joined(
             &document,
             &None,
-            &drawn("ground", "gateway-out"),
-            over("sensor", "gateway-in"),
+            &drawn("ground", "moc-out"),
+            over("sensor", "moc-in"),
         )
         .expect("what the ground sends reaches the payload");
         assert_eq!(
@@ -8867,25 +8865,25 @@ mod tests {
         let through = joined(
             &document,
             &None,
-            &drawn("through", "payload-out"),
-            over("ground", "payload-in"),
+            &drawn("through", "world-out"),
+            over("ground", "world-in"),
         )
         .expect("a null node reaches the ground");
-        assert_eq!(through.origin.as_deref(), Some("payload-out"));
+        assert_eq!(through.origin.as_deref(), Some("world-out"));
 
         // Now the gestures that are not links.
 
         // Let go of over the far node's own data source, which is still a
         // release over that node: the line lands on the terminal the stream
-        // names -- the ground's payload-in -- as it would anywhere else on
+        // names -- the ground's world-in -- as it would anywhere else on
         // the box. What may be joined to what has not changed; what has gone
         // is having to hit a small box to say it.
         assert_eq!(
             joined(
                 &document,
                 &None,
-                &drawn("sensor", "payload-out"),
-                over("ground", "gateway-out"),
+                &drawn("sensor", "world-out"),
+                over("ground", "moc-out"),
             ),
             Some(link.clone()),
             "a release anywhere on the node makes the link the stream allows"
@@ -8896,7 +8894,7 @@ mod tests {
             joined(
                 &document,
                 &None,
-                &drawn("sensor", "payload-out"),
+                &drawn("sensor", "world-out"),
                 middle("ground")
             ),
             Some(link.clone())
@@ -8909,11 +8907,11 @@ mod tests {
             joined(
                 &document,
                 &None,
-                &drawn("through", "gateway-out"),
+                &drawn("through", "moc-out"),
                 middle("ground"),
             ),
             None,
-            "a gateway node has no gateway-in to arrive at"
+            "a gateway node has no moc-in to arrive at"
         );
 
         // Let go of over nothing.
@@ -8921,7 +8919,7 @@ mod tests {
             joined(
                 &document,
                 &None,
-                &drawn("sensor", "payload-out"),
+                &drawn("sensor", "world-out"),
                 (900.0, 400.0)
             ),
             None
@@ -8933,8 +8931,8 @@ mod tests {
             joined(
                 &document,
                 &None,
-                &drawn("through", "payload-out"),
-                over("through", "gateway-in"),
+                &drawn("through", "world-out"),
+                over("through", "moc-in"),
             ),
             None
         );
@@ -8946,8 +8944,8 @@ mod tests {
         let backwards = joined(
             &document,
             &None,
-            &drawn("ground", "payload-in"),
-            over("sensor", "payload-out"),
+            &drawn("ground", "world-in"),
+            over("sensor", "world-out"),
         )
         .expect("a link drawn from the sink end");
         assert_eq!(
@@ -8957,32 +8955,32 @@ mod tests {
 
         // And from a data sink onto the *node*, which is the same gesture with
         // nothing to aim at: a sink is fed by one stream, so the terminal the
-        // line leaves by is the payload's payload-out whether or not the hand
+        // line leaves by is the payload's world-out whether or not the hand
         // found the box.
         assert_eq!(
             joined(
                 &document,
                 &None,
-                &drawn("ground", "payload-in"),
+                &drawn("ground", "world-in"),
                 middle("sensor"),
             ),
             Some(link.clone()),
             "a line from a data sink should reach a node dropped anywhere on it"
         );
 
-        // Released over the null node's own payload-out box, which is a release
-        // over the null node: the readings land on its payload-in, that
+        // Released over the null node's own world-out box, which is a release
+        // over the null node: the readings land on its world-in, that
         // being where a groundward stream arrives.
         let through_sink = joined(
             &document,
             &None,
-            &drawn("sensor", "payload-out"),
-            over("through", "payload-out"),
+            &drawn("sensor", "world-out"),
+            over("through", "world-out"),
         )
         .expect("the readings reach the node in the way");
         assert_eq!(
             (through_sink.to.as_str(), through_sink.input.as_deref(),),
-            ("through", Some("payload-in")),
+            ("through", Some("world-in")),
             "a null node has two data sinks, so the file says which"
         );
 
@@ -8993,8 +8991,8 @@ mod tests {
             joined(
                 &document,
                 &None,
-                &drawn("sensor", "payload-out"),
-                over("ground", "payload-in"),
+                &drawn("sensor", "world-out"),
+                over("ground", "world-in"),
             ),
             None,
             "the same link twice"
@@ -9071,7 +9069,7 @@ mod tests {
             });
         }
         // The readings of one sensor, reaching the ground.
-        let held = Link::joining("sensor", Some("payload-out"), "ground", None);
+        let held = Link::joining("sensor", Some("world-out"), "ground", None);
         document.apply(&Edit::AddLink { link: held.clone() });
 
         // Where each node is and what it is, copied out so that a link can be
@@ -9107,7 +9105,7 @@ mod tests {
         // arrives.
         let pressed = Drawing {
             node: "ground".to_string(),
-            terminal: "payload-in".to_string(),
+            terminal: "world-in".to_string(),
             holding: Some(held.clone()),
         };
 
@@ -9119,7 +9117,7 @@ mod tests {
                 &None,
                 &held,
                 &pressed,
-                over("ground", "payload-in")
+                over("ground", "world-in")
             ),
             None
         );
@@ -9138,16 +9136,16 @@ mod tests {
             &None,
             &held,
             &pressed,
-            over("through", "payload-in"),
+            over("through", "world-in"),
         )
         .expect("a sink that pairs with the source");
         match moved {
             Edit::MoveLink { was, now } => {
                 assert_eq!(was, held);
                 assert_eq!(now.from, "sensor", "the far end stays put");
-                assert_eq!(now.origin.as_deref(), Some("payload-out"));
+                assert_eq!(now.origin.as_deref(), Some("world-out"));
                 assert_eq!(now.to, "through");
-                assert_eq!(now.input.as_deref(), Some("payload-in"));
+                assert_eq!(now.input.as_deref(), Some("world-in"));
             }
             other => panic!("{other:?}"),
         }
@@ -9155,10 +9153,10 @@ mod tests {
         // Anywhere on that node is the same answer, which is what makes this
         // worth aiming loosely: the corner box of its other stream, the box
         // of one of its data sources, and the middle of it all put the end on
-        // its payload-in, that being where a groundward stream arrives.
+        // its world-in, that being where a groundward stream arrives.
         for landing in [
-            over("through", "gateway-in"),
-            over("through", "payload-out"),
+            over("through", "moc-in"),
+            over("through", "world-out"),
             middle("through"),
         ] {
             assert_eq!(
@@ -9167,12 +9165,12 @@ mod tests {
                     was: held.clone(),
                     now: Link::joining(
                         "sensor",
-                        Some("payload-out"),
+                        Some("world-out"),
                         "through",
-                        Some("payload-in")
+                        Some("world-in")
                     ),
                 }),
-                "a release anywhere on the node moves the end to its payload-in"
+                "a release anywhere on the node moves the end to its world-in"
             );
         }
 
@@ -9184,26 +9182,21 @@ mod tests {
                 &None,
                 &held,
                 &pressed,
-                over("sensor", "gateway-in")
+                over("sensor", "moc-in")
             ),
             None
         );
 
         // And onto a node that cannot be this end but could be the other one,
         // the gesture is read as drawing a line rather than moving one: a
-        // payload has no payload-in, so dropping the ground's arriving end
+        // payload has no world-in, so dropping the ground's arriving end
         // on one means "this payload reports here too". The ground's sink
         // takes as many as the configuration gives it, which is what makes
         // that a sentence and not a contradiction.
         assert_eq!(
             dropped(&document, &None, &held, &pressed, middle("other")),
             Some(Edit::AddLink {
-                link: Link::joining(
-                    "other",
-                    Some("payload-out"),
-                    "ground",
-                    None
-                )
+                link: Link::joining("other", Some("world-out"), "ground", None)
             }),
             "a second line into the ground should be drawn, not refused"
         );
@@ -9218,10 +9211,10 @@ mod tests {
         );
 
         // And the source end moves the same way: taken hold of at the
-        // sensor's `payload-out` and put on another sensor's.
+        // sensor's `world-out` and put on another sensor's.
         let pressed = Drawing {
             node: "sensor".to_string(),
-            terminal: "payload-out".to_string(),
+            terminal: "world-out".to_string(),
             holding: Some(held.clone()),
         };
         let moved = dropped(
@@ -9229,13 +9222,13 @@ mod tests {
             &None,
             &held,
             &pressed,
-            over("other", "payload-out"),
+            over("other", "world-out"),
         )
         .expect("another sensor's readings may reach the same ground");
         match moved {
             Edit::MoveLink { now, .. } => {
                 assert_eq!(now.from, "other");
-                assert_eq!(now.origin.as_deref(), Some("payload-out"));
+                assert_eq!(now.origin.as_deref(), Some("world-out"));
                 assert_eq!(now.to, "ground", "the far end stays put");
             }
             other => panic!("{other:?}"),
@@ -9245,7 +9238,7 @@ mod tests {
         // nothing: two lines between one pair of terminals lie on top of each
         // other and deliver twice.
         document.apply(&Edit::AddLink {
-            link: Link::joining("other", Some("payload-out"), "ground", None),
+            link: Link::joining("other", Some("world-out"), "ground", None),
         });
         assert_eq!(
             dropped(
@@ -9253,7 +9246,7 @@ mod tests {
                 &None,
                 &held,
                 &pressed,
-                over("other", "payload-out")
+                over("other", "world-out")
             ),
             None
         );
@@ -9262,7 +9255,7 @@ mod tests {
     /// A second line out of a data source is drawn from that source.
     ///
     /// The gesture somebody tried first and found dead: a gateway node already
-    /// feeding one payload, pressed on its `gateway-out` and let go of over a
+    /// feeding one payload, pressed on its `moc-out` and let go of over a
     /// second payload. That terminal has one line on it, so the press means
     /// "pick this line up" -- and a payload cannot be a data source, so there
     /// was nowhere for the end to land and nothing happened at all. What they
@@ -9295,14 +9288,14 @@ mod tests {
         }
         // The line that is already there, which is what made the gesture
         // ambiguous: the ground feeds one payload.
-        let held = Link::joining("ground", Some("gateway-out"), "i2c", None);
+        let held = Link::joining("ground", Some("moc-out"), "i2c", None);
         document.apply(&Edit::AddLink { link: held.clone() });
 
-        // Pressed on the ground's gateway-out, which hands over the line it
+        // Pressed on the ground's moc-out, which hands over the line it
         // has, and let go of in the middle of the other payload.
         let pressed = Drawing {
             node: "ground".to_string(),
-            terminal: "gateway-out".to_string(),
+            terminal: "moc-out".to_string(),
             holding: Some(held.clone()),
         };
         let (width, height) = size_of("spi");
@@ -9315,7 +9308,7 @@ mod tests {
         assert_eq!(
             dropped(&document, &None, &held, &pressed, over),
             Some(Edit::AddLink {
-                link: Link::joining("ground", Some("gateway-out"), "spi", None)
+                link: Link::joining("ground", Some("moc-out"), "spi", None)
             }),
             "the second line was not drawn"
         );
@@ -9359,19 +9352,19 @@ mod tests {
 
         // Nothing linked yet: nothing to hand over.
         assert!(
-            attached(&document, &at("sensor", "payload-out"), false).is_empty()
+            attached(&document, &at("sensor", "world-out"), false).is_empty()
         );
 
         document.apply(&Edit::AddLink {
-            link: Link::joining("sensor", Some("payload-out"), "ground", None),
+            link: Link::joining("sensor", Some("world-out"), "ground", None),
         });
         assert_eq!(
-            attached(&document, &at("sensor", "payload-out"), false).len(),
+            attached(&document, &at("sensor", "world-out"), false).len(),
             1
         );
         // And the sink end of the same link, from the other side.
         assert_eq!(
-            attached(&document, &at("ground", "payload-in"), true).len(),
+            attached(&document, &at("ground", "world-in"), true).len(),
             1
         );
 
@@ -9380,23 +9373,23 @@ mod tests {
         document.apply(&Edit::AddLink {
             link: Link::joining(
                 "sensor",
-                Some("payload-out"),
+                Some("world-out"),
                 "housekeeping",
                 None,
             ),
         });
         assert_eq!(
-            attached(&document, &at("sensor", "payload-out"), false).len(),
+            attached(&document, &at("sensor", "world-out"), false).len(),
             2
         );
 
         // The ground's sink takes many, and the same is true of it: every
         // payload aboard reports to the one ground link.
         document.apply(&Edit::AddLink {
-            link: Link::joining("other", Some("payload-out"), "ground", None),
+            link: Link::joining("other", Some("world-out"), "ground", None),
         });
         assert_eq!(
-            attached(&document, &at("ground", "payload-in"), true).len(),
+            attached(&document, &at("ground", "world-in"), true).len(),
             2
         );
     }
@@ -9404,8 +9397,8 @@ mod tests {
     /// A link to a terminal is recorded as the terminal that was pressed.
     ///
     /// The fault this is here for: a line dragged from the ground link's
-    /// `gateway-out` to the upper left corner of a computation -- its
-    /// `gateway-in` -- was recorded as a link naming no terminal at all, and
+    /// `moc-out` to the upper left corner of a computation -- its
+    /// `moc-in` -- was recorded as a link naming no terminal at all, and
     /// then drawn arriving at the computation's lower right. Twice wrong: what
     /// somebody had just said was thrown away, and the drawing then guessed the
     /// other stream.
@@ -9449,28 +9442,27 @@ mod tests {
             &None,
             &Drawing {
                 node: "ground".to_string(),
-                terminal: "gateway-out".to_string(),
+                terminal: "moc-out".to_string(),
                 holding: None,
             },
-            over("to_kelvin", "compute", (300, 120), "gateway-in"),
+            over("to_kelvin", "compute", (300, 120), "moc-in"),
         )
         .expect("the ground reaches a computation");
 
         assert_eq!(link.from, "ground");
-        assert_eq!(link.origin.as_deref(), Some("gateway-out"));
+        assert_eq!(link.origin.as_deref(), Some("moc-out"));
         assert_eq!(link.to, "to_kelvin");
         // The terminal that was pressed, which is the whole of what the
         // gesture said: a computation has two data sinks, so the file has to
         // say which.
-        assert_eq!(link.input.as_deref(), Some("gateway-in"));
+        assert_eq!(link.input.as_deref(), Some("moc-in"));
 
         // And the line is drawn to that corner: the upper left, where what
         // the ground sends arrives.
         document.apply(&Edit::AddLink { link });
         let ends = ends_of(&document, &document.links[0], &None);
-        let ((x, y), _) =
-            style::attachment("compute", (300, 120), "gateway-in")
-                .expect("a terminal");
+        let ((x, y), _) = style::attachment("compute", (300, 120), "moc-in")
+            .expect("a terminal");
         assert_eq!(
             ends.to,
             (x, y),
@@ -9492,7 +9484,7 @@ mod tests {
         });
         assert!(declares_inputs(&document, "zone_temp"));
         assert_eq!(
-            arriving_at(&document, "zone_temp", "payload-in").as_deref(),
+            arriving_at(&document, "zone_temp", "world-in").as_deref(),
             Some("in0"),
             "a mean is filled by name, not by terminal"
         );
@@ -9500,8 +9492,8 @@ mod tests {
 
     /// A link the file does not name a sink for is drawn at the pairing one.
     ///
-    /// A link leaving `gateway-out` carries what the ground sends, so it
-    /// arrives at a `gateway-in`: the same stream, named at its other end. The
+    /// A link leaving `moc-out` carries what the ground sends, so it
+    /// arrives at a `moc-in`: the same stream, named at its other end. The
     /// drawing used to fall back to the groundward sink whatever the link
     /// carried, which drew a command from the ground arriving at the corner
     /// the readings leave by.
@@ -9527,12 +9519,12 @@ mod tests {
         }
         // Written by hand, naming the source and not the sink.
         document.apply(&Edit::AddLink {
-            link: Link::joining("ground", Some("gateway-out"), "through", None),
+            link: Link::joining("ground", Some("moc-out"), "through", None),
         });
 
         let ends = ends_of(&document, &document.links[0], &None);
         let ((x, y), _) =
-            style::attachment("app_all_veh", (300, 120), "gateway-in")
+            style::attachment("app_all_veh", (300, 120), "moc-in")
                 .expect("the sink");
         assert_eq!(
             ends.to,
@@ -11022,7 +11014,7 @@ mod tests {
         editor.borrow_mut().edit(Edit::AddLink {
             link: journal::Link::joining(
                 "sensor",
-                Some("payload-out"),
+                Some("world-out"),
                 "ground",
                 None,
             ),
@@ -11219,12 +11211,11 @@ mod tests {
             slint::LogicalPosition::new(origin.x + x, origin.y + y)
         };
 
-        // Pressed on the payload's payload-out, which is where its readings
+        // Pressed on the payload's world-out, which is where its readings
         // leave.
         let node = editor.borrow().document().node("sensor").expect("it").at;
         let (x, y, width, height) =
-            style::terminal_box("i2c", node, "payload-out")
-                .expect("a terminal");
+            style::terminal_box("i2c", node, "world-out").expect("a terminal");
         let from = at(x + width / 2.0, y + height / 2.0);
 
         // Nothing drawn before the gesture.
@@ -11590,7 +11581,7 @@ mod tests {
         let twice = |to: &str| {
             journal::Link::joining(
                 to,
-                Some("payload-out"),
+                Some("world-out"),
                 "zone_temp",
                 Some("in0"),
             )
@@ -11675,7 +11666,7 @@ mod tests {
         editor.borrow_mut().edit(Edit::AddLink {
             link: journal::Link::joining(
                 "sensor",
-                Some("payload-out"),
+                Some("world-out"),
                 "ground",
                 None,
             ),
@@ -11748,7 +11739,7 @@ mod tests {
             "sensor",
             "i2c",
             (dividers().vehicle + 24, 120),
-            "payload-out",
+            "world-out",
         );
         ui.window()
             .dispatch_event(WindowEvent::PointerMoved { position: from });
@@ -12089,8 +12080,8 @@ mod tests {
             )
         };
 
-        let from = middle("sensor", "payload-out");
-        let to = middle("ground", "payload-in");
+        let from = middle("sensor", "world-out");
+        let to = middle("ground", "world-in");
 
         ui.window()
             .dispatch_event(WindowEvent::PointerMoved { position: from });
@@ -12119,7 +12110,7 @@ mod tests {
         // The end it leaves by is named, that being the attribute the link is
         // written under; the end it arrives at is not, the ground link having
         // one data sink.
-        assert_eq!(links[0].origin.as_deref(), Some("payload-out"));
+        assert_eq!(links[0].origin.as_deref(), Some("world-out"));
         assert_eq!(links[0].input, None);
 
         // And the node did not move: a press on a terminal draws a link, and
@@ -12133,7 +12124,7 @@ mod tests {
         // The same gesture let go of anywhere on the node, which is the way
         // a person actually draws one: the other sensor's readings dropped in
         // the middle of the ground link's box. The terminal is the stream's
-        // own answer -- a payload-out arrives at a payload-in -- so there is
+        // own answer -- a world-out arrives at a world-in -- so there is
         // nothing to aim at.
         let gesture = |from: slint::LogicalPosition,
                        to: slint::LogicalPosition| {
@@ -12151,7 +12142,7 @@ mod tests {
             });
         };
 
-        gesture(middle("other", "payload-out"), centre("ground"));
+        gesture(middle("other", "world-out"), centre("ground"));
         let links = editor.borrow().document().links.clone();
         assert_eq!(
             links.len(),
@@ -12163,16 +12154,16 @@ mod tests {
             .find(|link| link.from == "other")
             .expect("the second line");
         assert_eq!(made.to, "ground");
-        assert_eq!(made.origin.as_deref(), Some("payload-out"));
+        assert_eq!(made.origin.as_deref(), Some("world-out"));
 
         // And a node with no terminal of that stream takes nothing: a payload
         // receives what asks it for a reading, so what arrives at its
-        // gateway-in leaves a gateway-out -- and a payload has none to offer.
-        gesture(middle("other", "gateway-in"), centre("sensor"));
+        // moc-in leaves a moc-out -- and a payload has none to offer.
+        gesture(middle("other", "moc-in"), centre("sensor"));
         assert_eq!(
             editor.borrow().document().links.len(),
             2,
-            "a payload has no gateway-out for a line to leave by"
+            "a payload has no moc-out for a line to leave by"
         );
     }
 

@@ -56,10 +56,10 @@ pub struct NodeLook {
     pub faulty: bool,
     pub summary: String,
     pub openable: bool,
-    pub gateway_in: TerminalLook,
-    pub gateway_out: TerminalLook,
-    pub payload_in: TerminalLook,
-    pub payload_out: TerminalLook,
+    pub moc_in: TerminalLook,
+    pub moc_out: TerminalLook,
+    pub world_in: TerminalLook,
+    pub world_out: TerminalLook,
     pub terminal_column: f32,
     pub inset: f32,
 }
@@ -176,10 +176,10 @@ pub fn node_look(
         // this build does not know has none: the shape already says it cannot
         // be placed, and four arrows on it would be four claims about a type
         // nothing here can describe.
-        gateway_in: terminal_look("gateway-in", terminals, outline, size, at),
-        gateway_out: terminal_look("gateway-out", terminals, outline, size, at),
-        payload_in: terminal_look("payload-in", terminals, outline, size, at),
-        payload_out: terminal_look("payload-out", terminals, outline, size, at),
+        moc_in: terminal_look("moc-in", terminals, outline, size, at),
+        moc_out: terminal_look("moc-out", terminals, outline, size, at),
+        world_in: terminal_look("world-in", terminals, outline, size, at),
+        world_out: terminal_look("world-out", terminals, outline, size, at),
         // The column the name is padded away from, plus whatever the outline
         // is missing at its widest: a slanted shape moves its terminals in,
         // and a name padded by the column alone would be padded into them.
@@ -345,8 +345,8 @@ pub fn ends(nodes: &[OnSheet], line: &LineOnSheet) -> route::Ends {
         style::attachment(node.node_type, node.at, terminal)
     };
     // Which data sink the line arrives at, where the link does not say. The
-    // one that pairs with the source it left: a link leaving `gateway-out`
-    // arrives at a `gateway-in`, that being the same stream named at its other
+    // one that pairs with the source it left: a link leaving `moc-out`
+    // arrives at a `moc-in`, that being the same stream named at its other
     // end -- see tcslibgs::graph::terminals::answers. Without this the drawing
     // fell back to the groundward sink whatever the link carried, so a command
     // from the ground was drawn arriving at the corner the readings leave by.
@@ -462,7 +462,7 @@ pub fn link_looks(nodes: &[OnSheet], lines: &[LineOnSheet]) -> Vec<LinkLook> {
             // A terminal is not one of those, and is not labelled: it is drawn
             // as the corner the line is attached to and as the arrow in it,
             // which says the same thing in the place a reader is already
-            // looking. A label reading "payload-in" beside every line would
+            // looking. A label reading "world-in" beside every line would
             // be the name of the thing the picture is showing.
             let named_input = line.input.filter(|input| {
                 tcslibgs::graph::terminals::stream_of(input).is_none()

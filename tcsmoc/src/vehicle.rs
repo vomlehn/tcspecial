@@ -3062,11 +3062,11 @@ pub(crate) mod tests {
   - type gateway_radio:
       - gateway: ground
         ground_base: \"127.0.0.1:{}\"
+        world-in: [pinger]
 vehicle:
   - type ping:
       - compute: pinger
-        payload-out:
-          - target: ground
+        world-out: [ground.pinger]
 ",
                 port - 1
             ),
@@ -3148,20 +3148,19 @@ vehicle:
   - type gateway_radio:
       - gateway: ground
         ground_base: \"127.0.0.1:{}\"
+        world-in: [a, b]
 payloads:
   - type network:
       - payload: a
         address: \"127.0.0.1\"
         port: \"7001\"
         protocol: udp
-        payload-out:
-          - target: ground
+        world-out: [ground.a]
       - payload: b
         address: \"127.0.0.1\"
         port: \"7002\"
         protocol: udp
-        payload-out:
-          - target: ground
+        world-out: [ground.b]
 ",
                 // a and b sort before ground: device ids 0 and 1.
                 port
@@ -3475,15 +3474,13 @@ payloads:
         address: \"127.0.0.1\"
         ground_base: \"127.0.0.1:9100\"
         port: \"{port}\"
-        gateway-out:
-          - target: ping
-        payload-in: true
+        moc-out: [ping.gateway]
+        world-in: [ping]
 vehicle:
   - type ping:
       - compute: ping
-        payload-out:
-          - target: gateway
-        gateway-in: true
+        world-out: [gateway.ping]
+        moc-in: [gateway]
 "
             ),
         )

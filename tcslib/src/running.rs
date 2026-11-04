@@ -200,14 +200,14 @@ fn a_datum_received_into_a_buffer_allocates_nothing() {
   - type gateway_radio:
       - gateway: ground
         ground_base: \"127.0.0.1:{}\"
+        world-in: [a]
 payloads:
   - type network:
       - payload: a
         address: \"127.0.0.1\"
         port: \"7001\"
         protocol: udp
-        payload-out:
-          - target: ground
+        world-out: [ground.a]
 ",
             port
         ),
@@ -252,14 +252,14 @@ fn a_datum_longer_than_the_buffer_is_refused() {
   - type gateway_radio:
       - gateway: ground
         ground_base: \"127.0.0.1:{}\"
+        world-in: [a]
 payloads:
   - type network:
       - payload: a
         address: \"127.0.0.1\"
         port: \"7001\"
         protocol: udp
-        payload-out:
-          - target: ground
+        world-out: [ground.a]
 ",
             port
         ),

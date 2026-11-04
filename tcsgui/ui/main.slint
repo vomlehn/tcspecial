@@ -475,8 +475,8 @@ component Surface inherits Rectangle {
     callback physics-delete(string);
     // A component dragged by this much, by its name, as node-moved is.
     callback physics-moved(string, length, length);
-    // A line drawn from a component's terminal -- `gateway-out` for its one
-    // output, `payload-in` for its one input -- followed while the hand
+    // A line drawn from a component's terminal -- `moc-out` for its one
+    // output, `world-in` for its one input -- followed while the hand
     // moves and let go of on the canvas, as link-started, link-moved and
     // link-finished are for a configuration's node.
     callback physics-link-started(string, string);
@@ -1300,8 +1300,8 @@ export component MainWindow inherits Window {
     callback physics-delete(string);
     // A component dragged by this much, by its name, as node-moved is.
     callback physics-moved(string, length, length);
-    // A line drawn from a component's terminal -- `gateway-out` for its one
-    // output, `payload-in` for its one input -- followed while the hand
+    // A line drawn from a component's terminal -- `moc-out` for its one
+    // output, `world-in` for its one input -- followed while the hand
     // moves and let go of on the canvas, as link-started, link-moved and
     // link-finished are for a configuration's node.
     callback physics-link-started(string, string);

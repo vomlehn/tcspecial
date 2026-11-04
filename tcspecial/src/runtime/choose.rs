@@ -475,15 +475,13 @@ gateways:
         address: \"127.0.0.1\"
         ground_base: \"127.0.0.1:10\"
         port: \"{}\"
-        gateway-out:
-          - target: p
-        payload-in: true
+        moc-out: [p.g]
+        world-in: [p]
 vehicle:
   - type ping:
       - compute: p
-        payload-out:
-          - target: g
-        gateway-in: true
+        world-out: [g.p]
+        moc-in: [g]
 ",
                 tcslibgs::InterfaceDigest::of_this_build(),
                 dir.path().join("tcspecial.state").display(),

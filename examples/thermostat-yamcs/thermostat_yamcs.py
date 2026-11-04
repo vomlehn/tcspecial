@@ -167,7 +167,7 @@ class Source:
     #: What the configuration says its data are: a
     #: :class:`tcslibgs.form.Form`.
     form: object
-    #: The nodes a decision of its drives, by its ``gateway-out`` links:
+    #: The nodes a decision of its drives, by its ``moc-out`` links:
     #: the heaters, for the thermostat.
     drives: tuple = ()
 
@@ -230,12 +230,12 @@ class Setup:
             link: The source's :class:`tcslibgs.yamcs.Telemetry`.
 
         Returns:
-            The names its ``gateway-out`` links reach, in order, for a
+            The names its ``moc-out`` links reach, in order, for a
             source of decisions; none for any other.
         """
         if link.form.kind != "Decision":
             return ()
-        targets = self.config.node(link.source).links.get("gateway-out", [])
+        targets = self.config.node(link.source).links.get("moc-out", [])
         return tuple(target.split(".", 1)[0] for target in targets)
 
     def describe(self, run_dir, http_port):

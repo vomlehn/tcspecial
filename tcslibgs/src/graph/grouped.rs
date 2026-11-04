@@ -54,7 +54,7 @@ use serde::de::{self, DeserializeSeed, MapAccess, SeqAccess, Visitor};
 use serde::Deserializer;
 
 use super::{
-    entries, said_so, section_of, types_in, Aside, Destinations, Listed, Node,
+    entries, names_of, section_of, types_in, Aside, Destinations, Listed, Node,
     NodeFile, Placed, Section, LISTED,
 };
 use crate::endpoint_config::Scalar;
@@ -586,8 +586,10 @@ impl NodeSeed {
     /// Whether it may repeat.
     fn repeats(&self, key: &str) -> bool {
         self.language == Language::Xml
-            && (key == "payload-out"
-                || key == "gateway-out"
+            && (key == "world-out"
+                || key == "moc-out"
+                || key == "world-in"
+                || key == "moc-in"
                 || LISTED.contains(&key))
     }
 }
@@ -613,10 +615,10 @@ impl<'de> Visitor<'de> for NodeSeed {
         let mut seen: BTreeSet<String> = BTreeSet::new();
 
         let mut attributes: BTreeMap<String, Scalar> = BTreeMap::new();
-        let mut payload_out: Vec<String> = Vec::new();
-        let mut gateway_out: Vec<String> = Vec::new();
-        let mut payload_in: Option<bool> = None;
-        let mut gateway_in: Option<bool> = None;
+        let mut world_out: Vec<String> = Vec::new();
+        let mut moc_out: Vec<String> = Vec::new();
+        let mut world_in: Vec<String> = Vec::new();
+        let mut moc_in: Vec<String> = Vec::new();
         let mut lists: BTreeMap<String, Vec<String>> = BTreeMap::new();
 
         let who = |name: &Option<String>| match name {
@@ -702,31 +704,37 @@ impl<'de> Visitor<'de> for NodeSeed {
                 // A data source, and the one place a file says what is
                 // linked to what. Repeats add to it rather than replacing
                 // it: that is what several XML elements of one name mean.
-                "payload-out" => payload_out.extend(
+                "world-out" => world_out.extend(
                     map.next_value::<Destinations>()?
                         .each()
                         .into_iter()
                         .map(str::to_string),
                 ),
-                "gateway-out" => gateway_out.extend(
+                "moc-out" => moc_out.extend(
                     map.next_value::<Destinations>()?
                         .each()
                         .into_iter()
                         .map(str::to_string),
                 ),
-                // A data sink, which says whether a line arrives there -- a
-                // record of links written on the nodes they leave, and not a
-                // link. Checked against those links as the configuration is
-                // read: see `mirror`.
-                "payload-in" => {
-                    payload_in = Some(said_so("payload-in", &mut map)?)
-                }
-                "gateway-in" => {
-                    gateway_in = Some(said_so("gateway-in", &mut map)?)
+                // A data sink, and the names a line may arrive at it by,
+                // which each link to this node names: see `mirror`. Repeats
+                // add to it, as world-out's do.
+                "world-in" => world_in.extend(names_of("world-in", &mut map)?),
+                "moc-in" => moc_in.extend(names_of("moc-in", &mut map)?),
+                // A vote's inputs were an attribute of their own, and are the
+                // names under its world-in now: one list of them, where the
+                // links to them are written to.
+                "inputs" => {
+                    return Err(de::Error::custom(format!(
+                        "{} says inputs, which are the names under its \
+                         world-in now: write `world-in: [in0, in1, in2]` and \
+                         take inputs out",
+                        who(&name)
+                    )))
                 }
                 // A list of alternatives, each a run of bytes: a YAML list,
                 // or a repeated XML element, whose repeats add to it as
-                // payload-out's do. See `Listed`.
+                // world-out's do. See `Listed`.
                 listed if LISTED.contains(&listed) => {
                     let attribute = listed.to_string();
                     let listed = map.next_value::<Listed>()?;
@@ -768,6 +776,18 @@ impl<'de> Visitor<'de> for NodeSeed {
             attributes.insert(attribute, Scalar::of(each.join(", ")));
         }
 
+        // A vote is over the inputs its world-in names, which is what its
+        // computation reads them from: one list, in the file, and the model's
+        // `inputs` made from it here and nowhere else. See
+        // `crate::node::vehicle::compute::params_of`.
+        let votes = attributes
+            .get("function")
+            .is_some_and(|function| function.as_str() == "vote");
+        if self.node_type == "compute" && votes && !world_in.is_empty() {
+            attributes
+                .insert("inputs".to_string(), Scalar::of(world_in.join(",")));
+        }
+
         let Some(name) = name else {
             return Err(de::Error::custom(format!(
                 "a {} node has no name: write it as {}",
@@ -782,10 +802,10 @@ impl<'de> Visitor<'de> for NodeSeed {
                 group,
                 attributes,
             },
-            payload_out,
-            gateway_out,
-            payload_in,
-            gateway_in,
+            world_out,
+            moc_out,
+            world_in,
+            moc_in,
         })
     }
 }
@@ -1363,12 +1383,12 @@ mod tests {
         let file = read(
             ConfigFormat::Xml,
             &xml("<type name=\"i2c\"><payload name=\"a\">\
-                 <payload-out><target>b</target></payload-out>\
-                 <payload-out><target>c</target></payload-out>\
+                 <world-out>b.a</world-out>\
+                 <world-out>c.a</world-out>\
                  </payload></type>"),
         )
         .expect("a link to two places");
-        assert_eq!(file.payloads[0].nodes[0].payload_out, ["b", "c"]);
+        assert_eq!(file.payloads[0].nodes[0].world_out, ["b.a", "c.a"]);
     }
 
     /// A type grouped twice in one section is refused: its nodes go under

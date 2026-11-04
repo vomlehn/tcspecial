@@ -2,8 +2,8 @@
 #
 # A payload: what the vehicle carries this flight, and this one is a program
 # the mission wrote rather than a device on a bus. Its readings leave by
-# payload-out on their way to the ground, and what asks for them -- a trigger,
-# a command -- arrives at gateway-in, which is the shape every payload has. It
+# world-out on their way to the ground, and what asks for them -- a trigger,
+# a command -- arrives at moc-in, which is the shape every payload has. It
 # is run with one file interface, on which it reads what asks and writes the
 # answer, so the bytes that ask are the datum itself and there is no trigger to
 # state. The interfaces and the packets they carry are tcsapp; its Rust is

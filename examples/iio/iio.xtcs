@@ -39,14 +39,14 @@
         <type name="gateway_radio">
             <!-- The ground's end of the link. Nothing goes up to an IIO
                  sensor, which is read and never written, so nothing leaves
-                 this node by gateway-out; what comes down arrives at
+                 this node by moc-out; what comes down arrives at
                  ground_base plus the device id of the node that sent it:
                  the sensor, device id 1, at 127.0.0.1:3741. -->
             <gateway name="ground">
                 <address>127.0.0.1</address>
                 <ground_base>127.0.0.1:3740</ground_base>
                 <port>3640</port>
-                <payload-in>true</payload-in>
+                <world-in>sensor</world-in>
             </gateway>
         </type>
     </gateways>
@@ -63,7 +63,7 @@
                  path to write here. -->
             <payload name="sensor">
                 <path>/dev/iio:device1</path>
-                <payload-out><target>ground</target></payload-out>
+                <world-out>ground.sensor</world-out>
             </payload>
         </type>
     </payloads>

@@ -52,11 +52,12 @@ from . import sbn as _sbn
 NODE_SECTIONS = {"gateways": "gateway", "vehicle": "compute",
                  "payloads": "payload"}
 
-#: A node's links, each by the data source it leaves.
-LINKS = ("payload-out", "gateway-out")
+#: A node's links, each by the data source it leaves, and each written as the
+#: node it reaches and the name it arrives by: ``gateway.readings``.
+LINKS = ("world-out", "moc-out")
 
-#: A node's data sinks, which say whether a line arrives there.
-SINKS = ("payload-in", "gateway-in")
+#: A node's data sinks, each listing the names a line may arrive by.
+SINKS = ("world-in", "moc-in")
 
 #: The attributes a node writes as a list: ``tcslibgs::graph::LISTED``.
 LISTED = ("terminators",)
@@ -348,7 +349,7 @@ class Node:
     #: links.
     attributes: dict = field(default_factory=dict)
     #: The nodes each of its terminals is linked to, by terminal:
-    #: ``{"payload-out": ["gateway"]}``.
+    #: ``{"world-out": ["gateway"]}``.
     links: dict = field(default_factory=dict)
 
 
@@ -500,7 +501,7 @@ class Configuration:
 
         Raises:
             ValueError: Either node is missing, ``gateway`` is not a gateway
-                        on a bus, ``source`` has no ``payload-out`` link to
+                        on a bus, ``source`` has no ``world-out`` link to
                         it, or the base does not read or the sum not fit.
         """
         node = self._gateway(gateway)
@@ -534,7 +535,7 @@ class Configuration:
         for name in (node.name for node in self.nodes):
             msgids.add(self.node_answer_msgid(name))
         for node in self.nodes:
-            for target in node.links.get("payload-out", []):
+            for target in node.links.get("world-out", []):
                 kind = self._kind(target)
                 if kind in ON_BUS:
                     msgids.add(self.downlink_msgid(target, node.name))
@@ -615,7 +616,7 @@ class Configuration:
 
         Raises:
             ValueError: As :meth:`uplink_apid`, ``source`` has no
-                        ``payload-out`` link to ``gateway``, or the sum is
+                        ``world-out`` link to ``gateway``, or the sum is
                         past eleven bits.
         """
         base = self.uplink_apid(gateway)
@@ -717,7 +718,7 @@ class Configuration:
                                 node=gateway.name))
         for gateway in gateways:
             for node in self.nodes:
-                if gateway.name not in node.links.get("payload-out", []):
+                if gateway.name not in node.links.get("world-out", []):
                     continue
                 used.append(ApidUse(
                     self.downlink_apid(gateway.name, node.name), "downlink",
@@ -897,7 +898,7 @@ class Configuration:
 
         Returns:
             The :class:`HostPort` it binds aboard, which is what leaves it by
-            its ``gateway-out`` links.
+            its ``moc-out`` links.
 
         Raises:
             ValueError: There is no such gateway node, or it states no address
@@ -929,7 +930,7 @@ class Configuration:
 
         Raises:
             ValueError: Either node is missing, ``gateway`` is not a gateway,
-                        ``source`` has no ``payload-out`` link to it, the base
+                        ``source`` has no ``world-out`` link to it, the base
                         is not an address and a port, or the port counted on
                         is past 65535.
         """
@@ -960,13 +961,13 @@ class Configuration:
             source:  The source's name.
 
         Raises:
-            ValueError: ``source`` is missing, or has no ``payload-out`` link
+            ValueError: ``source`` is missing, or has no ``world-out`` link
                         to ``gateway``.
         """
-        if gateway not in self.node(source).links.get("payload-out", []):
+        if gateway not in self.node(source).links.get("world-out", []):
             raise ValueError(
                 f'{self.path}: "{source}" sends nothing to "{gateway}": it has '
-                "no payload-out link to it"
+                "no world-out link to it"
             )
 
     def _gateway(self, name):
@@ -1589,17 +1590,20 @@ def _xml_node(reader, section, node_type, element):
                                 f'"{name}" says <{child.tag}>, which a node '
                                 'does not: its name is its name attribute, '
                                 'its type the type it is written under')
-        if child.tag in seen and child.tag not in LINKS + LISTED:
+        if child.tag in seen and child.tag not in LINKS + SINKS + LISTED:
             raise reader.refuse(child.line,
                                 f'"{name}" states <{child.tag}> twice')
         seen.add(child.tag)
         if child.tag in LINKS:
-            target = child.find("target")
-            said = (target.text if target is not None else child.text).strip()
+            said = _destination(reader, child.line, child.tag,
+                                child.find("target") is not None,
+                                child.text.strip())
             node.links.setdefault(child.tag, []).append(said)
         elif child.tag in SINKS:
-            _sink(reader, child.line, child.tag, child.text.strip())
-            node.attributes[child.tag] = child.text.strip()
+            name = _sink(reader, child.line, child.tag, child.text.strip())
+            had = node.attributes.get(child.tag)
+            node.attributes[child.tag] = (name if had is None
+                                          else f"{had}, {name}")
         elif child.tag in LISTED:
             had = node.attributes.get(child.tag)
             one = child.text.strip()
@@ -1654,19 +1658,62 @@ def _layout_entry(reader, line, what, said, seen):
 
 
 def _sink(reader, line, sink, said):
-    """Refuse a data sink that says anything but true or false.
+    """Read one name a data sink lists, as ``tcslibgs::graph`` reads it.
 
     Args:
         reader: The reader, for the complaint.
         line:   The line it is on.
         sink:   The sink.
-        said:   What it says.
+        said:   The name.
+
+    Returns:
+        The name.
 
     Raises:
-        ValueError: It is neither.
+        ValueError: It is the flag a sink once was, or not one word.
     """
-    if said not in ("true", "false"):
-        raise reader.refuse(line, f'{sink}: "{said}" is not true or false')
+    if said in ("true", "false"):
+        raise reader.refuse(line,
+                            f'{sink}: "{said}" is a name for where a line may '
+                            'arrive here, not whether one does: list the '
+                            f'names, as `{sink}: [readings]`')
+    if not said or any(c in said for c in ".,  "):
+        raise reader.refuse(line, f'{sink}: "{said}" is not a name')
+    return said
+
+
+def _destination(reader, line, source, entry, said):
+    """Read where one line goes, as ``tcslibgs::graph`` reads it, and keep
+    the node it reaches.
+
+    The name after the dot is the node's own business: what a ground
+    station reads here is which node each line reaches.
+
+    Args:
+        reader: The reader, for the complaint.
+        line:   The line it is on.
+        source: The data source it leaves by.
+        entry:  Whether it was written as an entry with a ``target``.
+        said:   The destination, ``node.name``.
+
+    Returns:
+        The node.
+
+    Raises:
+        ValueError: It is an entry, or names no name.
+    """
+    if entry:
+        raise reader.refuse(line,
+                            f"{source}: a link is written as the node it "
+                            "reaches and the name it arrives by, "
+                            "`zone_temp.in0`, and not as an entry with "
+                            "`target`")
+    node, dot, name = said.partition(".")
+    if not dot or not node or not name:
+        raise reader.refuse(line,
+                            f'{source}: "{said}" names no name to arrive by: '
+                            f"write it as `{said}.<name>`")
+    return node
 
 
 def _load_xml(path):
@@ -1938,12 +1985,14 @@ def _yaml_node(reader, section, node_type, item, construct):
         elif key in LINKS:
             said = construct(value)
             for one in said if isinstance(said, list) else [said]:
-                target = one.get("target", "") if isinstance(one, dict) else one
-                links.setdefault(key, []).append(_scalar(target))
+                entry = isinstance(one, dict)
+                links.setdefault(key, []).append(_destination(
+                    reader, at, key, entry, "" if entry else _scalar(one)))
         elif key in SINKS:
-            said = _scalar(construct(value))
-            _sink(reader, at, key, said)
-            attributes[key] = said
+            said = construct(value)
+            names = [_sink(reader, at, key, _scalar(one))
+                     for one in (said if isinstance(said, list) else [said])]
+            attributes[key] = ", ".join(names)
         elif key in LISTED:
             said = construct(value)
             said = said if isinstance(said, list) else [said]

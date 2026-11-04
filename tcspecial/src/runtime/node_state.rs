@@ -844,13 +844,12 @@ mod tests {
         address: \"0x48\"
         path: /dev/i2c-1
         poll_interval: \"1 s\"
-        payload-out:
-          - target: average
+        world-out: [average.inside]
 vehicle:
   - type compute:
       - compute: average
         function: mean
-        inputs: 1
+        world-in: [inside]
 ",
         )
         .expect("written");

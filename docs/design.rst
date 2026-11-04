@@ -268,33 +268,25 @@ link
     numbers and a zero.
 
     A link is written as an **attribute of the node it leaves**, named after
-    the data source it leaves by, with one entry per line:
+    the data source it leaves by, one line each: the node the line reaches and
+    the name it arrives there by, separated by a dot.
 
     .. code-block:: yaml
 
        - type compute:
            - compute: k_fore
              function: "to_kelvin"
-             payload-out:
-               - target: gateway
-               - target: mean_temp
-                 input: in0
-               - target: housekeeping
+             world-out:
+               - gateway.k_fore
+               - mean_temp.in0
+               - housekeeping.k_fore
 
-    An entry's ``target`` is the node the line goes to and its ``input`` is
-    which of that node's inputs it feeds, where it feeds a named one. One entry
-    per line is what makes several of them safe: the alternative was two lists
-    read against each other, and a list one name short is a configuration that
-    reads as valid and delivers a reading to somebody else's input. A word an
-    entry does not know is refused rather than ignored, because ``targte:
-    gateway`` quietly ignored is a line that goes nowhere.
-
-    The short spelling is still read -- ``payload-out: gateway``, or
-    ``payload-out: [gateway, mean_temp.in0]``, the node and its input separated
-    by a dot. Every configuration written before entries existed says what it
-    said, and a link to one place is still a line somebody can write in a line.
-    All of them read into the same thing, because every rule about a link is
-    about where it goes and not about how the file said so.
+    One line per entry is what makes several of them safe: nothing pairs by
+    position, so a list one name short cannot deliver a reading to somebody
+    else's input. One line needs no list -- ``world-out: gateway.k_fore``. The
+    entry a link was once written as, ``- target: gateway`` with an
+    ``input:`` beside it, is refused and told the line to write instead,
+    because it names no name to arrive by.
 
     So there is no links section. A node and the links out of it are read,
     written and deleted together, which is where a reader of the file wants
@@ -303,56 +295,45 @@ link
     of a configuration a link belongs in. A link is in the file its source node
     is in, once, however far it reaches.
 
-    The node a link arrives at says so as well, under the data sink it arrives
-    at:
+    The node a link arrives at lists the names a line may arrive by, under the
+    data sink each belongs to:
 
     .. code-block:: yaml
 
        - type compute:
            - compute: mean_temp
              function: "mean"
-             inputs: "in0,in1,in2"
-             payload-out:
-               - target: gateway
-               - target: thermostat
-             payload-in: true
+             world-out:
+               - gateway.mean_temp
+               - thermostat.mean_temp
+             world-in: [in0, in1, in2]
 
-    That is a record of the links above and not a link. The point of it is a
-    node whose entry said nothing about what fed it: a sensor's entry named
-    everywhere its reading went, and the computation at the other end named
-    nothing, so a reader had to read the whole configuration against a node to
-    see whether anything reached it. Now a node's entry says it is connected at
-    both ends.
+    That is the node saying where it may be joined, on the node, so that a
+    node's entry says what it is connected at both ends and a link is written
+    to a name the node at its far end gave rather than to whatever the writer
+    guessed. A line to a name its far end does not list is refused where the
+    configuration is read, saying which names it does list; so is a name
+    listed twice, one listed under a sink the node's type does not have, and a
+    line from one source to two names of one node, which would be two copies
+    of every datum. A name may be listed with nothing arriving at it: a list
+    is where a node may be joined, and what must be joined is the rules'
+    business -- a vote over an input nothing sends is refused as that.
 
-    A flag and not the name of the node the line comes from. That name is
-    written on the node the line leaves, which is where the link is; a copy of
-    it here would be the same connection written twice, and at a sink that
-    several lines arrive at one name would read as "and nothing else" -- the
-    ground's sink is such a sink in every configuration, every payload aboard
-    reporting to it. What a node can say about its own sink without repeating
-    the graph is whether anything arrives there, and that is what it says.
-    ``false`` is a node saying none does.
+    A name is one word, with no dot, comma or space in it, the dot being what
+    parts it from its node in a line. The editor names a line it draws after
+    the node it leaves -- ``gateway.k_fore`` -- which says at a glance where
+    the line comes from, and writes a sink's names in name order, a sink's
+    names being a set. A vote's world-in names are its inputs: there is no
+    ``inputs`` attribute, and a file that says one is refused and told so.
 
     Which sink a line arrives at is the stream's own answer -- what leaves by
-    ``payload-out`` arrives at a ``payload-in`` and nowhere else -- so a
-    destination's named input, ``mean_temp.in0``, counts at the stream's sink.
-    Which input it feeds is written once, on the node the link leaves.
-
-    Two statements of one fact can disagree, and the answer to that is not to
-    believe the second one. The flag is checked against the links it is a
-    record of where the configuration is read, and both directions are refused:
-    a sink that says a line arrives where none does, and one that says none
-    does where a link is written. Nothing downstream reads it --
-    ``tcslibgs::graph::mirror`` has it only long enough to check it -- so the
-    graph the vehicle flies comes from one place however many places say so.
-
-    It is optional. A file written by hand may say nothing about its sinks and
-    be complete: there is nothing in a flag the links do not already say, and
-    every configuration written before these existed still reads. A word that
-    is neither ``true`` nor ``false`` is refused saying what the field means,
-    rather than read as a name -- a name there was legal for a while, and a
-    file written against that is better refused than half understood. The
-    editor writes the flags on every node it writes.
+    ``world-out`` arrives at a ``world-in`` and nowhere else -- so a line to a
+    name the node lists under its other sink is refused as the backwards line
+    it is. ``tcslibgs::graph::mirror`` matches every line to its name as the
+    configuration is read and then sets the names aside: the graph the vehicle
+    flies is the sink each line arrives at, and for a vote the input, and
+    nothing aboard reads the names. The editor keeps them, and writes them
+    back as they were.
 
     In memory they are still a list, because every rule about a link is about
     both of its ends and a list is what a rule can be written against.
@@ -476,20 +457,20 @@ There are four:
      - arrives at
      - what it carries
    * - groundward
-     - ``payload-out``
-     - ``payload-in``
+     - ``world-out``
+     - ``world-in``
      - a payload's readings, on their way to the ground
    * - vehicleward
-     - ``gateway-out``
-     - ``gateway-in``
+     - ``moc-out``
+     - ``moc-in``
      - what the ground sends back: a command, a trigger, a setpoint
 
-So one stream is named twice -- ``payload-out`` where it leaves a node and
-``payload-in`` where it arrives at the next -- and the two words are a sentence
+So one stream is named twice -- ``world-out`` where it leaves a node and
+``world-in`` where it arrives at the next -- and the two words are a sentence
 about the same bytes read from either end. The names say nothing about the type
-at the far end: with no vehicle node in the way, a payload's ``payload-out``
-connects to a gateway link's ``payload-in``, and with one it connects to that
-node's ``payload-in`` instead and the node's own ``payload-out`` carries it the
+at the far end: with no vehicle node in the way, a payload's ``world-out``
+connects to a gateway link's ``world-in``, and with one it connects to that
+node's ``world-in`` instead and the node's own ``world-out`` carries it the
 rest of the way.
 
 A link end is written ``node.terminal``, and may be written as ``node`` alone
@@ -501,31 +482,31 @@ which, which is why the links out of a tee name their terminals.
 Which types have which:
 
 payloads
-    ``gateway-in`` and ``payload-out``. A payload receives what asks it for a
+    ``moc-in`` and ``world-out``. A payload receives what asks it for a
     reading -- a trigger, a command, a byte written to a line -- and sends what
     it read.
 
 gateway links
-    ``payload-in`` and ``gateway-out``. The ground is the other end of both.
+    ``world-in`` and ``moc-out``. The ground is the other end of both.
 
 ``null-gateway``
-    ``gateway-in`` alone: what the ground sends arrives, and nothing leaves.
+    ``moc-in`` alone: what the ground sends arrives, and nothing leaves.
 
 ``null-payload``
-    ``payload-in`` alone: a payload's data arrives, and nothing leaves.
+    ``world-in`` alone: a payload's data arrives, and nothing leaves.
 
 ``tee-gateway``
-    ``gateway-in``, and both sources, ``gateway-out`` and ``payload-out``: what
+    ``moc-in``, and both sources, ``moc-out`` and ``world-out``: what
     the ground sends arrives, and leaves both ways.
 
 ``tee-payload``
-    ``payload-in``, and both sources, ``payload-out`` and ``gateway-out``.
+    ``world-in``, and both sources, ``world-out`` and ``moc-out``.
 
 ``app_all_veh``
     all four, a program with both interfaces: see `App nodes`_.
 
 ``ping``
-    ``gateway-in`` and ``payload-out``, a payload's pair: what the ground sends
+    ``moc-in`` and ``world-out``, a payload's pair: what the ground sends
     arrives, and the answer leaves groundward, to arrive at a gateway link.
 
 A computation's and a log's terminals are their own rules' business: a
@@ -560,9 +541,9 @@ Requirement
 
 Requirement
     Each terminal may be linked to one other terminal, and the pairing is four
-    sentences: a ``payload-out`` only to a ``payload-in``, a ``payload-in`` only
-    to a ``payload-out``, a ``gateway-out`` only to a ``gateway-in``, a
-    ``gateway-in`` only to a ``gateway-out``. Which is one sentence twice over
+    sentences: a ``world-out`` only to a ``world-in``, a ``world-in`` only
+    to a ``world-out``, a ``moc-out`` only to a ``moc-in``, a
+    ``moc-in`` only to a ``moc-out``. Which is one sentence twice over
     -- a stream leaves at one terminal and arrives at the other -- so the
     pairing is derived from the table above rather than written out again.
 
@@ -797,14 +778,14 @@ transport, ``tcslib::bus``, lets tcsmoc and every station on tcslib command
 a vehicle that answers to cFS through it (see `What crosses the bus`_).
 
 The gateway nodes are written in the ``gateways`` section, linked through
-``gateway-in`` and ``gateway-out``, with ``tee-gateway``, ``null-gateway`` and
+``moc-in`` and ``moc-out``, with ``tee-gateway``, ``null-gateway`` and
 ``app_gateway_veh`` beside them. Each of those was named for the MOC while the
 ground was the only thing a vehicle answered to: the section and the radio's
 node type were ``moc``, the links ``moc-in`` and ``moc-out``, the others
 ``tee-moc``, ``null-moc`` and ``app_moc_veh``, and an app's argument for the
 stream ``app-moc-arg``. The rename was held back to land with the ``payload``
 rename and no longer is; the ``payload`` rename still is, so ``payloads:``,
-``payload-in`` and ``payload-out`` keep their names. The section was then
+``world-in`` and ``world-out`` keep their names. The section was then
 ``gateway``, and became ``gateways`` when the nodes were grouped by type; a
 file in that older shape is refused as well, saying how the node it found
 first is written now.
@@ -856,8 +837,8 @@ node, and there are three kinds of gateway:
      - ``address``, ``port``, ``bridge_base``, ``fprime_id_base``
 
 All four are in the ``gateways`` section, and all four have the terminals
-the radio's has: ``payload-in``, which takes as many sources as the
-configuration gives it, and ``gateway-out``.
+the radio's has: ``world-in``, which takes as many sources as the
+configuration gives it, and ``moc-out``.
 
 One kind per configuration
 ~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -982,7 +963,7 @@ is stated once, in ``tcspecial``:
          - gateway: fsw
            cmd_msgid: "0x4281"
            tlm_base: "0x4240"
-           payload-in: true
+           world-in: [thermometer]
 
 (The numbers are illustrative, and laid out for the message-ID mapping below;
 the allotment is the mission's. ``beacon.reset_interval`` is required here as
@@ -1322,7 +1303,7 @@ and the deployment sends them to the ground with whatever it already uses.
            port: "7600"
            bridge_base: "10.0.0.1:7700"
            fprime_id_base: "0x3000"
-           payload-in: true
+           world-in: [heater_wanted, thermometer, zone_temp]
 
 A type of its own although the wire is the radio's, because what is at the far
 end decides what the configuration has to say and what can be made from it.
@@ -1411,7 +1392,7 @@ command's response and an event.
 
 ``SEND_DATA`` is the one command that is not tcspecial's: it sends its text
 up to the gateway node, as one datum, by tcslib-c's ``tcs_uplink``, and the
-node leaves it by its ``gateway-out`` links for the nodes they reach -- in
+node leaves it by its ``moc-out`` links for the nodes they reach -- in
 the fprime example, ``1`` or ``0`` to the heater. Text, because what a
 gateway node's links drive here is a line or a program, which take text, and
 because a byte array is something nobody at F´'s ground system can type. It
@@ -1917,14 +1898,14 @@ Requirement
      - type compute:
          # Each a conversion, its function and its terms as above.
          - compute: k_aft
-           payload-out: [gateway, mean_temp.in1, housekeeping]
+           world-out: [gateway, mean_temp.in1, housekeeping]
          - compute: k_bay
-           payload-out: [gateway, mean_temp.in2, housekeeping]
+           world-out: [gateway, mean_temp.in2, housekeeping]
          - compute: k_fore
-           payload-out: [gateway, mean_temp.in0, housekeeping]
+           world-out: [gateway, mean_temp.in0, housekeeping]
          - compute: thermostat
-           gateway-out: [heaters]
-           payload-out: [housekeeping]
+           moc-out: [heaters]
+           world-out: [housekeeping]
      - type log:
          - compute: housekeeping
            directory: /var/log/tcspecial
@@ -1947,23 +1928,23 @@ in the file showed.
 
 ``null-gateway`` and ``null-payload``
     take one stream -- what the ground sends at a ``null-gateway``'s
-    ``gateway-in``, a payload's data at a ``null-payload``'s ``payload-in`` --
+    ``moc-in``, a payload's data at a ``null-payload``'s ``world-in`` --
     and drop it. For a stream that has to go somewhere and has nowhere to go
     yet. They have no data source.
 
 ``tee-gateway`` and ``tee-payload``
     take one stream and send each datum on both ways. A ``tee-gateway`` sends
-    what arrives at its ``gateway-in`` on by its ``gateway-out``, as it was
-    going, and again by its ``payload-out``; a ``tee-payload`` sends what
-    arrives at its ``payload-in`` on by its ``payload-out`` and again by its
-    ``gateway-out``.
+    what arrives at its ``moc-in`` on by its ``moc-out``, as it was
+    going, and again by its ``world-out``; a ``tee-payload`` sends what
+    arrives at its ``world-in`` on by its ``world-out`` and again by its
+    ``moc-out``.
 
 .. code-block:: yaml
 
    gateways:
      - type gateway_radio:
          - { gateway: ground, address: 127.0.0.1, port: "5000",
-             ground_base: "127.0.0.1:5100", gateway-out: echo }
+             ground_base: "127.0.0.1:5100", moc-out: echo }
    payloads:
      - type gpio:
          - { payload: heater, direction: output, lines: "4",
@@ -1973,8 +1954,8 @@ in the file showed.
          # What the ground sends the heater, and back to the ground to be
          # seen.
          - compute: echo
-           gateway-out: [heater]
-           payload-out: [ground]
+           moc-out: [heater]
+           world-out: [ground]
 
 Requirement
     A tee delivers each datum that arrives at it to every link leaving each of
@@ -2010,10 +1991,10 @@ far apart the two clocks are -- which a ping is the one exchange able to show.
    gateways:
      - type gateway_radio:
          - { gateway: ground, address: 127.0.0.1, port: "5000",
-             ground_base: "127.0.0.1:5100", gateway-out: pinger }
+             ground_base: "127.0.0.1:5100", moc-out: pinger }
    vehicle:
      - type ping:
-         - { compute: pinger, payload-out: ground }
+         - { compute: pinger, world-out: ground }
 
 The ground sends its pings to the gateway link's ``address`` and ``port``, and
 the answers arrive at its ``ground_base`` plus the ping node's device id, as any
@@ -2513,7 +2494,7 @@ A node with more than one terminal at either end has to be told and has to say.
 An ``app_all_veh`` is the one that does: it reads payload data on the one
 interface and gateway data on the other, so each datum it produces belongs to
 one of the two, and delivering a reading to the links leaving its
-``gateway-out`` would send telemetry out as a command. So the stream travels
+``moc-out`` would send telemetry out as a command. So the stream travels
 with the bytes -- ``Taken`` carries it out of a node, ``Arriving`` carries it in
 -- and ``Fabric`` follows only the links that carry it.
 
@@ -3811,7 +3792,7 @@ Requirement
     does not name it. Delivering it would make a file that says something it
     does not mean work by accident. A *terminal* is not one of those -- see
     `Terminals: where a link is attached`_ -- and never reaches a port: a
-    device's ``gateway-in`` is its one way in, spelled, and is resolved where
+    device's ``moc-in`` is its one way in, spelled, and is resolved where
     the routing table is built.
 
 Requirement
@@ -3932,11 +3913,11 @@ on demand, whether or not anything was edited:
 
 A comment above a link is kept, and a link is now an attribute -- so this is
 the one attribute whose comment survives a save: the run of comment lines above
-a ``payload-out:`` or ``gateway-out:`` is read as a note about the links that
+a ``world-out:`` or ``moc-out:`` is read as a note about the links that
 attribute makes. Where the attribute names several destinations the note is
 about all of them, one line carrying one comment.
 
-A comment above a ``payload-in:`` or ``gateway-in:`` is not kept, those being
+A comment above a ``world-in:`` or ``moc-in:`` is not kept, those being
 a record of links rather than links: the note belongs above the link, at the
 end it is written at, and a comment the editor kept in a derived line would be
 a comment it moved. It is the fourth kind in the list above.
@@ -4316,9 +4297,9 @@ A node is drawn with its terminals on it: a rectangle of 36 by 14 pixels in
 each corner it has one in, with an arrow in it pointing the way the data on it
 travels across the canvas. Two rows, which are the two streams. Along the top,
 left to right, the payload's own data on its way to the ground: it arrives at
-``payload-in`` and leaves at ``payload-out``. Along the bottom, right to left,
-what the ground sends on its way to a payload: it arrives at ``gateway-in`` and
-leaves at ``gateway-out``. Each box's upper left corner is on one of the lines
+``world-in`` and leaves at ``world-out``. Along the bottom, right to left,
+what the ground sends on its way to a payload: it arrives at ``moc-in`` and
+leaves at ``moc-out``. Each box's upper left corner is on one of the lines
 five millimetres apart, so the terminals of nodes line up with each other and
 with those lines, and a line between two level terminals runs along one: worked
 out from where the node is, a millimetre not being a whole number of pixels,
@@ -4379,7 +4360,7 @@ change.
 Which rules apply to a node depends on which pane it is in, because that is
 what the data flow is: a payload is where the payload's own data begins and a
 gateway link is where it ends, and the other stream runs the other way. A
-payload's ``payload-out`` with nothing on it is a concern -- those readings
+payload's ``world-out`` with nothing on it is a concern -- those readings
 reach nobody -- where a computation's is not, a computation being free to send
 its result the other way or to be read by nothing yet. What is asked of a
 vehicle node is that a stream passing through it comes out somewhere, which is
@@ -4463,8 +4444,8 @@ link them, which is one thing to learn instead of two.
 Where it is let go of is a node and not a terminal. Anywhere on the node will
 do -- its name, its middle, a corner box, the wrong corner box -- because
 there is nothing else the gesture could have meant: a stream has one name at
-each of its ends, so a line drawn from a ``payload-out`` can only arrive at a
-``payload-in``, and the editor works out which terminal that is and draws the
+each of its ends, so a line drawn from a ``world-out`` can only arrive at a
+``world-in``, and the editor works out which terminal that is and draws the
 line to it. The terminals stay drawn, since they are what says which streams a
 type carries and which way; what has gone is having to hit a small box in a
 corner to say something the stream already said.
@@ -4481,8 +4462,8 @@ let go of decides what happens to it. Anywhere on the node it is already
 attached to: nothing changes, a gesture that has thought better of itself
 leaving no trace. On another node that has that terminal: the link moves there,
 in one edit, so one undo puts it back -- the end being carried keeps its own
-name, a ``payload-in`` taken off one node going on another node's
-``payload-in`` and nowhere else. On a node that has no such terminal, or one
+name, a ``world-in`` taken off one node going on another node's
+``world-in`` and nowhere else. On a node that has no such terminal, or one
 the same link already reaches: nothing changes, as a line that cannot be drawn
 is not drawn.
 
@@ -4506,7 +4487,7 @@ Where it lands settles that. A node that could be *this* end -- one with the
 same terminal -- takes the end, which is the re-routing gesture. A node that
 could only be the *other* end gets a new line instead, and the line that was
 picked up stays where it was. So the gateway node already feeding one payload,
-pressed on its ``gateway-out`` and let go of over a second payload, feeds the
+pressed on its ``moc-out`` and let go of over a second payload, feeds the
 second one as well: a payload cannot be a data source, so there is nothing else
 the gesture could have meant.
 
@@ -4631,7 +4612,7 @@ notation that means *data crossing a boundary* rather than a thing or a step,
 and a payload is exactly that boundary. It leans right, as the symbol is
 drawn, so the corners it gives away are the top left and the bottom right.
 
-The top left is where a payload's ``payload-out`` terminal is, so this is the
+The top left is where a payload's ``world-out`` terminal is, so this is the
 first shape whose slant had to be paid for rather than dodged. Three things
 move with it, all of them from ``style::room_at``, which says how far in the
 shape is at the row a given terminal sits in: the terminal box itself, so the
@@ -5284,7 +5265,7 @@ Two things follow from that division. A node's attributes are the union over
 every node type -- a bus address, a baud rate and a setpoint are all allowed on
 any node -- because a schema that knew which type takes which would be a second
 copy of rules that already exist. And the XSD cannot say that a node's
-``group`` appears at most once: ``payload-out`` may appear many times, several
+``group`` appears at most once: ``world-out`` may appear many times, several
 destinations being several elements, and XSD 1.0 allows neither repeats nor a
 mixture inside ``xs:all``. A node that says a word twice is refused where the
 file is read instead, and so is a type written twice in a section. A node's
@@ -5726,55 +5707,55 @@ addresses are its own. What is here is checked as it stands, with a
    gateways:
      - type gateway_radio:
          - { gateway: gateway, address: "10.0.0.1", port: "5000",
-             ground_base: "10.0.0.2:5100", payload-in: true }
+             ground_base: "10.0.0.2:5100",
+             world-in: [ambient, temp1, temp2, temp3, thermostat] }
 
    vehicle:
      - type compute:
          - { compute: temp1, function: to_kelvin, format: i16_be,
-             scale: "0.0625", offset: "273.15", payload-in: true,
-             payload-out: [{ target: gateway },
-                           { target: ambient, input: in0 }] }
+             scale: "0.0625", offset: "273.15", world-in: [temp_1],
+             world-out: [gateway.temp1, ambient.in0] }
          - { compute: temp2, function: to_kelvin, format: i16_be,
-             scale: "0.0625", offset: "273.15", payload-in: true,
-             payload-out: [{ target: gateway },
-                           { target: ambient, input: in1 }] }
+             scale: "0.0625", offset: "273.15", world-in: [temp_2],
+             world-out: [gateway.temp2, ambient.in1] }
          - { compute: temp3, function: to_kelvin, format: u24_be,
-             scale: "0.0078", offset: "255.37", payload-in: true,
-             payload-out: [{ target: gateway },
-                           { target: ambient, input: in2 }] }
+             scale: "0.0078", offset: "255.37", world-in: [temp_3],
+             world-out: [gateway.temp3, ambient.in2] }
 
          - { compute: thermostat, function: hysteresis,
-             setpoint: "293.15", half_band: "2.0", payload-in: true,
-             payload-out: [{ target: gateway }],
-             gateway-out: [{ target: heaters_1 }, { target: heaters_2 }] }
+             setpoint: "293.15", half_band: "2.0", world-in: [ambient],
+             world-out: [gateway.thermostat],
+             moc-out: [heaters_1.thermostat, heaters_2.thermostat] }
          - { compute: ambient, function: vote, algorithm: median,
-             inputs: "in0,in1,in2", payload-in: true,
-             payload-out: [{ target: gateway }, { target: thermostat }] }
+             world-in: [in0, in1, in2],
+             world-out: [gateway.ambient, thermostat.ambient] }
 
    payloads:
      - type gpio:
          - { payload: heaters_1, direction: output, path: "/dev/gpiochip0",
-             lines: "3,4,5", gateway-in: true }
+             lines: "3,4,5", moc-in: [thermostat] }
          - { payload: heaters_2, direction: output, path: "/dev/gpiochip0",
-             lines: "6,7,8", gateway-in: true }
+             lines: "6,7,8", moc-in: [thermostat] }
      - type i2c:
          - { payload: temp_1, group: zone_temps, path: "/dev/i2c-1",
-             address: "0x48", read_size: "2", payload-out: [{ target: temp1 }] }
+             address: "0x48", read_size: "2", world-out: [temp1.temp_1] }
          - { payload: temp_2, group: zone_temps, path: "/dev/i2c-1",
-             address: "0x49", read_size: "2", payload-out: [{ target: temp2 }] }
+             address: "0x49", read_size: "2", world-out: [temp2.temp_2] }
      - type spi:
          - { payload: temp_3, group: zone_temps, path: "/dev/spidev0.0",
              max_speed: "1000000", spi_mode: "0", read_size: "3",
-             payload-out: [{ target: temp3 }] }
+             world-out: [temp3.temp_3] }
 
    commands:
      - { from: gateway, sets: thermostat.setpoint }
 
 A line is written once, on the node it leaves, under the terminal it leaves
-by: ``payload-out`` on each sensor names the conversion it feeds, and the
-conversions name the vote's input they bind. The thermostat's decision leaves
+by, as the node it reaches and the name it arrives by: ``world-out`` on each
+sensor names the conversion it feeds, and the conversions name the vote's
+input they bind. Each node lists, under its sinks, the names a line may arrive
+at it by. The thermostat's decision leaves
 by two terminals, which is the file saying two different things with it -- its
-``payload-out`` sends it to the ground as telemetry, and its ``gateway-out``
+``world-out`` sends it to the ground as telemetry, and its ``moc-out``
 drives the two heaters.
 
 Several things in that file are refusals waiting to happen, which is the point.
@@ -7218,7 +7199,7 @@ Requirement
 
 Requirement
     A datum a station sends up to a gateway node, which leaves it by its
-    ``gateway-out`` links to drive a payload, is held to the same match: a
+    ``moc-out`` links to drive a payload, is held to the same match: a
     station that keeps one sends nothing up, and says so, while it is not
     matched for commanding. ``tcslib::ping::Uplink`` is the one way up,
     gated by ``Uplink::gated_by``, and the C/C++ library's ``tcs_uplink``
@@ -9072,7 +9053,7 @@ Requirement
     leave, each one's destinations by name; payload groups by name; command
     bindings by where they come from and then what they set; included files
     by name; and the entries of a set-valued attribute -- a vote's
-    ``inputs``, gpio ``lines``, ``terminators`` -- in one spelling, sorted.
+    inputs, gpio ``lines``, ``terminators`` -- in one spelling, sorted.
     ``tcslibgs::config_digest::interpretation_of_graph`` is the one place it
     is written down.
 

@@ -68,19 +68,19 @@
       }
     },
     "payload-sink": {
-      "description": "Whether the payload's own data arrives at a node of this type: the terminal `payload-in`. Absent is false.",
+      "description": "Whether the payload's own data arrives at a node of this type: the terminal `world-in`. Absent is false.",
       "type": "boolean"
     },
     "payload-source": {
-      "description": "Whether the payload's own data leaves a node of this type, on its way to the ground: the terminal `payload-out`. Absent is false.",
+      "description": "Whether the payload's own data leaves a node of this type, on its way to the ground: the terminal `world-out`. Absent is false.",
       "type": "boolean"
     },
     "gateway-sink": {
-      "description": "Whether what the ground sends arrives at a node of this type: the terminal `gateway-in`. Absent is false.",
+      "description": "Whether what the ground sends arrives at a node of this type: the terminal `moc-in`. Absent is false.",
       "type": "boolean"
     },
     "gateway-source": {
-      "description": "Whether what the ground sends leaves a node of this type, on its way to a payload: the terminal `gateway-out`. Absent is false.",
+      "description": "Whether what the ground sends leaves a node of this type, on its way to a payload: the terminal `moc-out`. Absent is false.",
       "type": "boolean"
     }
   },

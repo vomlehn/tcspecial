@@ -534,20 +534,19 @@ mod tests {
   - type gateway_radio:
       - gateway: ground
         ground_base: \"127.0.0.1:{}\"
+        world-in: [a, b]
 payloads:
   - type network:
       - payload: a
         address: \"127.0.0.1\"
         port: \"7001\"
         protocol: udp
-        payload-out:
-          - target: ground
+        world-out: [ground.a]
       - payload: b
         address: \"127.0.0.1\"
         port: \"7002\"
         protocol: udp
-        payload-out:
-          - target: ground
+        world-out: [ground.b]
 ",
                 port
             ),
@@ -608,14 +607,14 @@ payloads:
       - gateway: fsw
         bridge_base: \"127.0.0.1:{}\"
         fprime_id_base: \"0x3000\"
+        world-in: [a]
 payloads:
   - type network:
       - payload: a
         address: \"127.0.0.1\"
         port: \"7001\"
         protocol: udp
-        payload-out:
-          - target: fsw
+        world-out: [fsw.a]
 ",
                 port
             ),

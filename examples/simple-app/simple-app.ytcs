@@ -38,7 +38,7 @@ gateways:
       # comes back up.
       - gateway: gateway-1
         ground_base: "127.0.0.1:5100"
-        payload-in: true
+        world-in: [lorem]
 
 payloads:
   # A payload that is a program rather than a device: it is never
@@ -52,8 +52,8 @@ payloads:
       - payload: lorem
         app-payload-arg: "1"
         executable: "examples/simple-app/lorem_pl.py"
-        payload-out:
-          - target: gateway-1
+        world-out:
+          - gateway-1.lorem
 
 tcsgui:
   nodes:

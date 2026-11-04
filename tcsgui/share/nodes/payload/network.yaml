@@ -2,8 +2,8 @@
 # raw IP.
 #
 # A payload: what the vehicle carries this flight. Its readings leave by
-# payload-out on their way to the ground, and what asks for them -- a
-# trigger, a command -- arrives at gateway-in. Its Rust is
+# world-out on their way to the ground, and what asks for them -- a
+# trigger, a command -- arrives at moc-in. Its Rust is
 # tcspecial/src/node/payload/network/.
 node: network
 type: network

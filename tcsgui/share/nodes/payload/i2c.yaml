@@ -1,8 +1,8 @@
 # A sensor or a controller on an I2C bus.
 #
 # A payload: what the vehicle carries this flight. Its readings leave by
-# payload-out on their way to the ground, and what asks for them -- a
-# trigger, a command -- arrives at gateway-in. Its Rust is
+# world-out on their way to the ground, and what asks for them -- a
+# trigger, a command -- arrives at moc-in. Its Rust is
 # tcspecial/src/node/payload/i2c/.
 node: i2c
 type: i2c

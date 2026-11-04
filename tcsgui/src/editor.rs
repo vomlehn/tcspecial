@@ -756,7 +756,8 @@ gateways:
       - gateway: gateway
         address: \"10.0.0.1\"
         port: \"5000\"
-        gateway-out: temp_1
+        moc-out: temp_1.gateway
+        world-in: [temp_1]
 
 payloads:
   - type i2c:
@@ -764,7 +765,8 @@ payloads:
         path: \"/dev/i2c-1\"
         address: \"0x48\"
         trigger: \"01\"
-        payload-out: gateway
+        world-out: gateway.temp_1
+        moc-in: [gateway]
 
 tcsgui:
   nodes:
@@ -1832,11 +1834,11 @@ tcsgui:
         // once, and with the far end plain, gateway having no subdiagram to
         // qualify it with.
         assert!(
-            inner.contains("payload-out:\n          - target: gateway\n"),
+            inner.contains("world-out:\n          - gateway.temp_1\n"),
             "the crossing link should be written on the node it leaves: {inner}"
         );
         assert!(
-            !top.contains("payload-out:"),
+            !top.contains("world-out:"),
             "the crossing link is written twice: {top}"
         );
     }

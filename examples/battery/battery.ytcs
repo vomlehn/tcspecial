@@ -34,7 +34,7 @@ gateways:
         address: "127.0.0.1"
         ground_base: "127.0.0.1:5100"
         port: "5000"
-        payload-in: true
+        world-in: [battery_amps, bus_volts, charge, shedding]
 
 vehicle:
   - type compute:
@@ -46,11 +46,11 @@ vehicle:
         offset: "0"
         scale: "0.001"
         unit: "A"
-        payload-out:
-          - target: charge
-          - target: gateway
-          - target: housekeeping
-        payload-in: true
+        world-out:
+          - charge.battery_amps
+          - gateway.battery_amps
+          - housekeeping.battery_amps
+        world-in: [shunt]
       # The power monitor's two bytes are millivolts, unsigned, most
       # significant first: up to 65 volts, which is twice the bus.
       - compute: bus_volts
@@ -59,10 +59,10 @@ vehicle:
         offset: "0"
         scale: "0.001"
         unit: "V"
-        payload-out:
-          - target: gateway
-          - target: housekeeping
-        payload-in: true
+        world-out:
+          - gateway.bus_volts
+          - housekeeping.bus_volts
+        world-in: [monitor]
       # The battery's state of charge, which nothing aboard measures: a
       # program counts the charge in and out from the shunt's readings,
       # coulomb by coulomb, and answers the fraction of its capacity the
@@ -75,11 +75,11 @@ vehicle:
         function: "process"
         timeout: "1 s"
         unit: "ratio"
-        payload-out:
-          - target: gateway
-          - target: housekeeping
-          - target: shedding
-        payload-in: true
+        world-out:
+          - gateway.charge
+          - housekeeping.charge
+          - shedding.charge
+        world-in: [battery_amps]
       # Sheds the science load when the charge runs low: asserted below the
       # band, shedding it, and unasserted above it, restoring it. The band is
       # wide, a fifth of the battery, so that one eclipse sheds it once
@@ -88,17 +88,17 @@ vehicle:
         function: "hysteresis"
         half_band: "0.1"
         setpoint: "0.4"
-        gateway-out:
-          - target: science
-        payload-out:
-          - target: gateway
-          - target: housekeeping
-        payload-in: true
+        moc-out:
+          - science.shedding
+        world-out:
+          - gateway.shedding
+          - housekeeping.shedding
+        world-in: [charge]
   - type log:
       - compute: housekeeping
         directory: "/tmp/telemetry"
         format: "variable_ts_rc"
-        payload-in: true
+        world-in: [battery_amps, bus_volts, charge, shedding]
 
 payloads:
   # Every payload is the far end of a UDP socket or a serial line, which
@@ -111,15 +111,15 @@ payloads:
         address: "127.0.0.1"
         port: "5302"
         protocol: "udp"
-        gateway-in: true
+        moc-in: [shedding]
       # The shunt in the battery's lead, which sends its current twice a
       # second of its own accord.
       - payload: shunt
         address: "127.0.0.1"
         port: "5301"
         protocol: "udp"
-        payload-out:
-          - target: battery_amps
+        world-out:
+          - battery_amps.shunt
   - type serial:
       # The power monitor, on a serial line: asked for the bus voltage twice a
       # second, it answers two bytes.
@@ -132,8 +132,8 @@ payloads:
         stop_bits: "1"
         trigger: '"V?\r"'
         trigger_interval: "500 ms"
-        payload-out:
-          - target: bus_volts
+        world-out:
+          - bus_volts.monitor
 
 commands:
   # the state of charge the science load is shed around, as a fraction

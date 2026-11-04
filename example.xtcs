@@ -32,7 +32,7 @@
                 <address>127.0.0.1</address>
                 <ground_base>127.0.0.1:5100</ground_base>
                 <port>5000</port>
-                <payload-in>true</payload-in>
+                <world-in>spi-1</world-in>
             </gateway>
         </type>
     </gateways>
@@ -43,7 +43,7 @@
                 <path>/dev/spidev0.0</path>
                 <spi_mode>0</spi_mode>
                 <stand_in>127.0.0.1:7951</stand_in>
-                <payload-out><target>gateway-1</target></payload-out>
+                <world-out>gateway-1.spi-1</world-out>
             </payload>
         </type>
     </payloads>

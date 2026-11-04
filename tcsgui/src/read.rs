@@ -153,6 +153,35 @@ pub fn read(path: &Path) -> Result<Document, String> {
         if let Some(group) = &node.group {
             attributes.insert("group".to_string(), group.clone());
         }
+        // The names a line may arrive by that no line does, which the panel
+        // shows with the rest of the node's words and the writers put back in
+        // the sink's list. A name a line arrives by is the line's -- see
+        // `Link::name` -- and a vote's world-in is its inputs, which it holds
+        // as that already, so neither is said twice.
+        if let Some(sinks) = graph.named.sinks.get(&node.name) {
+            let votes = attributes.contains_key("inputs");
+            let used: Vec<&str> = graph
+                .named
+                .written
+                .values()
+                .filter_map(|written| written.split_once('.'))
+                .filter(|(to, _)| *to == node.name)
+                .map(|(_, name)| name)
+                .collect();
+            for (sink, names) in
+                [("world-in", &sinks.world_in), ("moc-in", &sinks.moc_in)]
+            {
+                let spare: Vec<&str> = names
+                    .iter()
+                    .map(String::as_str)
+                    .filter(|name| !used.contains(name))
+                    .collect();
+                if spare.is_empty() || (votes && sink == "world-in") {
+                    continue;
+                }
+                attributes.insert(sink.to_string(), spare.join(", "));
+            }
+        }
 
         document.nodes.push(Node {
             // Its own name: the home says which page it is on, and the two
@@ -205,6 +234,17 @@ pub fn read(path: &Path) -> Result<Document, String> {
                 &to.absolute(),
                 input.as_deref(),
             );
+            // The name it arrives by, where the file chose one of its own, so
+            // that a save writes it back as it was; the one the editor would
+            // give it is left to be given again. See `Link::name`.
+            let given = line.arrives_by();
+            line.name = graph
+                .named
+                .written
+                .get(&(link.from.clone(), destination.to_string()))
+                .and_then(|written| written.split_once('.'))
+                .map(|(_, name)| name.to_string())
+                .filter(|name| *name != given);
             // What somebody wrote above the attribute this link is written
             // under, which is a note about the connection: see Said::links.
             line.comment = link.comment.clone().or_else(|| {
@@ -259,7 +299,7 @@ struct Said {
     /// By the node a link leaves and the data source it leaves by.
     ///
     /// Which is where a link is written now: an attribute of its own node,
-    /// named after the terminal. So a comment above `payload-out:` is about the
+    /// named after the terminal. So a comment above `world-out:` is about the
     /// links that attribute makes -- all of them, where it names several
     /// destinations, because one line carries one comment.
     links: BTreeMap<(String, String), String>,
@@ -618,8 +658,8 @@ fn comment_over_lines<'a, I: Iterator<Item = &'a str>>(
 
 /// Which data source this line writes, if it writes one.
 ///
-/// `payload-out: k_1` in YAML and `<payload-out>k_1</payload-out>` in XML --
-/// and the list form too, a comment above `payload-out: [a, b]` being about
+/// `world-out: k_1` in YAML and `<world-out>k_1</world-out>` in XML --
+/// and the list form too, a comment above `world-out: [a, b]` being about
 /// both of them. The two names are the schema's: see
 /// `tcslibgs::graph::terminals`.
 ///
@@ -630,10 +670,10 @@ fn comment_over_lines<'a, I: Iterator<Item = &'a str>>(
 ///
 /// # Returns
 ///
-/// The terminal's name, `payload-out` or `gateway-out`, or `None` if the line
+/// The terminal's name, `world-out` or `moc-out`, or `None` if the line
 /// writes neither.
 fn source_named(line: &str, xml: bool) -> Option<String> {
-    for terminal in ["payload-out", "gateway-out"] {
+    for terminal in ["world-out", "moc-out"] {
         let is = if xml {
             line.starts_with(&format!("<{terminal}>"))
         } else {
@@ -890,9 +930,9 @@ mod tests {
         // ways: each link names the data source it leaves by, that being the
         // attribute it is written under.
         for link in [
-            Link::joining("sensor", Some("payload-out"), "through", None),
-            Link::joining("through", Some("payload-out"), "ground", None),
-            Link::joining("through", Some("gateway-out"), "sensor", None),
+            Link::joining("sensor", Some("world-out"), "through", None),
+            Link::joining("through", Some("world-out"), "ground", None),
+            Link::joining("through", Some("moc-out"), "sensor", None),
         ] {
             document.apply(&Edit::AddLink { link });
         }

@@ -39,15 +39,16 @@
         <type name="gateway_radio">
             <!-- The ground's end of the link, both ways. What the ground
                  sends goes up to address:port, which this node binds
-                 aboard, and leaves it by gateway-out for the tee. What
+                 aboard, and leaves it by moc-out for the tee. What
                  comes down arrives at ground_base plus the device id of the
                  node that sent it. -->
             <gateway name="ground">
                 <address>127.0.0.1</address>
                 <ground_base>127.0.0.1:8700</ground_base>
                 <port>8600</port>
-                <gateway-out><target>echo</target></gateway-out>
-                <payload-in>true</payload-in>
+                <moc-out>echo.ground</moc-out>
+                <world-in>echo</world-in>
+                <world-in>readings</world-in>
             </gateway>
         </type>
     </gateways>
@@ -59,7 +60,7 @@
                 <address>127.0.0.1</address>
                 <port>8001</port>
                 <protocol>udp</protocol>
-                <gateway-in>true</gateway-in>
+                <moc-in>echo</moc-in>
             </payload>
             <!-- A sensor whose readings go to the ground and are copied -->
             <!-- aboard. -->
@@ -67,14 +68,14 @@
                 <address>127.0.0.1</address>
                 <port>8002</port>
                 <protocol>udp</protocol>
-                <payload-out><target>readings</target></payload-out>
+                <world-out>readings.sensor</world-out>
             </payload>
             <!-- A payload whose data nobody wants yet. -->
             <payload name="spare">
                 <address>127.0.0.1</address>
                 <port>8003</port>
                 <protocol>udp</protocol>
-                <payload-out><target>unheard</target></payload-out>
+                <world-out>unheard.spare</world-out>
             </payload>
         </type>
     </payloads>
@@ -82,13 +83,13 @@
         <type name="null-gateway">
             <!-- Takes what arrives from the ground's side and drops it. -->
             <compute name="dropped">
-                <gateway-in>true</gateway-in>
+                <moc-in>readings</moc-in>
             </compute>
         </type>
         <type name="null-payload">
             <!-- Takes the spare payload's data and drops it. -->
             <compute name="unheard">
-                <payload-in>true</payload-in>
+                <world-in>spare</world-in>
             </compute>
         </type>
         <type name="tee-gateway">
@@ -97,9 +98,9 @@
                  that the ground sees what the vehicle was told. A tee has
                  two data sources, so each link names its own. -->
             <compute name="echo">
-                <gateway-out><target>heater</target></gateway-out>
-                <payload-out><target>ground</target></payload-out>
-                <gateway-in>true</gateway-in>
+                <moc-out>heater.echo</moc-out>
+                <world-out>ground.echo</world-out>
+                <moc-in>ground</moc-in>
             </compute>
         </type>
         <type name="tee-payload">
@@ -108,9 +109,9 @@
                  where something aboard that took readings as commands would
                  be. -->
             <compute name="readings">
-                <gateway-out><target>dropped</target></gateway-out>
-                <payload-out><target>ground</target></payload-out>
-                <payload-in>true</payload-in>
+                <moc-out>dropped.readings</moc-out>
+                <world-out>ground.readings</world-out>
+                <world-in>sensor</world-in>
             </compute>
         </type>
     </vehicle>

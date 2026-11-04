@@ -215,21 +215,56 @@ impl Concern {
     }
 }
 
-/// Where one line goes, as a file writes it: its entry.
+/// Where one line goes, as a file writes it: the node it reaches and the name
+/// it arrives by, `zone_temp.in0`, under the data source it leaves by. Not a
+/// type the document holds: the document holds links, and this is one of them
+/// on its way into a file.
 ///
-/// A link out of a node is written as an entry under the data source it leaves
-/// by -- `- target: zone_temp`, and `input: in0` where it feeds a named input
-/// -- so what the writers need is the two apart. Not a type the document holds:
-/// the document holds links, and this is one of them on its way into a file.
-///
-/// See `tcslibgs::graph::Destinations` for the spellings a reader accepts.
+/// See `tcslibgs::graph::Destinations` for how a reader takes it.
 struct Bound {
     /// The node the line goes to, written as the file names it: a node on
     /// another page is named from the page this one is written on.
     target: String,
-    /// Which of that node's inputs it feeds, or which of its data sinks it
-    /// arrives at, where either had to be said.
-    input: Option<String>,
+    /// The name it arrives by: see `Link::arrives_by`.
+    name: String,
+}
+
+impl Bound {
+    /// The line as the file writes it.
+    fn written(&self) -> String {
+        format!("{}.{}", self.target, self.name)
+    }
+}
+
+/// Whether a node's attribute is written as one of its sinks' lists of names
+/// rather than as an attribute: see `Document::sinks`.
+///
+/// # Arguments
+///
+/// * `node`      - The node.
+/// * `attribute` - The attribute.
+///
+/// # Returns
+///
+/// Whether the sink lists write it.
+fn in_a_sink(node: &Node, attribute: &str) -> bool {
+    attribute == "world-in" || attribute == "moc-in" || votes(node, attribute)
+}
+
+/// Whether this is a vote's inputs, which a file writes as its world-in.
+///
+/// # Arguments
+///
+/// * `node`      - The node.
+/// * `attribute` - The attribute.
+///
+/// # Returns
+///
+/// Whether it is.
+fn votes(node: &Node, attribute: &str) -> bool {
+    attribute == "inputs"
+        && node.node_type == "compute"
+        && node.attributes.get("function").map(String::as_str) == Some("vote")
 }
 
 /// The whole of what is being edited.
@@ -926,7 +961,7 @@ impl Document {
     /// Which rules apply to a node depends on which pane it is in, because the
     /// data flows one way through the panes: a payload is where the payload's
     /// own data begins and a gateway link is where it ends, and the other
-    /// stream runs the other way. So a payload's `payload-out` with nothing on
+    /// stream runs the other way. So a payload's `world-out` with nothing on
     /// it is a concern -- those readings reach nobody -- where a computation's
     /// is not, a computation being free to send its result the other way or to
     /// be read by nothing yet. What is asked of a vehicle node is that a stream
@@ -2413,8 +2448,9 @@ impl Document {
                     let mut inside = String::new();
                     for (attribute, value) in &node.attributes {
                         // Left out where it is empty, as the YAML writer does
-                        // it.
-                        if value.trim().is_empty() {
+                        // it, and the sinks' names, which are written below.
+                        if value.trim().is_empty() || in_a_sink(node, attribute)
+                        {
                             continue;
                         }
                         // A list is the element once for each entry, which
@@ -2441,30 +2477,20 @@ impl Document {
                         if let Some(comment) = &comment {
                             xml_comment(&mut inside, Some(comment), 16);
                         }
-                        for Bound { target, input } in destinations {
-                            // One element per line, the entry's words inside
-                            // it, short enough to read as one line.
-                            let said = match input {
-                                Some(input) => format!(
-                                    "<target>{}</target><input>{}</input>",
-                                    escape(&target),
-                                    escape(&input)
-                                ),
-                                None => format!(
-                                    "<target>{}</target>",
-                                    escape(&target)
-                                ),
-                            };
+                        for bound in destinations {
                             inside.push_str(&format!(
-                                "                <{terminal}>{said}\
-                                 </{terminal}>\n"
+                                "                <{terminal}>{}</{terminal}>\n",
+                                escape(&bound.written())
                             ));
                         }
                     }
-                    for sink in self.arriving(node, home) {
-                        inside.push_str(&format!(
-                            "                <{sink}>true</{sink}>\n"
-                        ));
+                    for (sink, names) in self.sinks(node, home) {
+                        for name in names {
+                            inside.push_str(&format!(
+                                "                <{sink}>{}</{sink}>\n",
+                                escape(&name)
+                            ));
+                        }
                     }
                     if inside.is_empty() {
                         out.push_str(&format!(
@@ -2746,7 +2772,8 @@ impl Document {
                         // back as much as on the way out: a hand-written
                         // `address:` with nothing after it would otherwise be
                         // saved as `address: ""`.
-                        if value.trim().is_empty() {
+                        if value.trim().is_empty() || in_a_sink(node, attribute)
+                        {
                             continue;
                         }
                         // Quoted, which is not fussiness. A YAML reader turns
@@ -2782,22 +2809,25 @@ impl Document {
                             yaml_comment(&mut out, Some(comment), 8);
                         }
                         out.push_str(&format!("        {terminal}:\n"));
-                        for Bound { target, input } in destinations {
+                        for bound in destinations {
                             out.push_str(&format!(
-                                "          - target: {target}\n"
+                                "          - {}\n",
+                                bound.written()
                             ));
-                            if let Some(input) = input {
-                                out.push_str(&format!(
-                                    "            input: {input}\n"
-                                ));
-                            }
                         }
                     }
                     // And which of its data sinks something arrives at, which
                     // is the same lines seen from the other end. See
                     // `arriving`.
-                    for sink in self.arriving(node, home) {
-                        out.push_str(&format!("        {sink}: true\n"));
+                    for (sink, names) in self.sinks(node, home) {
+                        out.push_str(&format!(
+                            "        {sink}: [{}]\n",
+                            names
+                                .iter()
+                                .map(|name| plain(name))
+                                .collect::<Vec<_>>()
+                                .join(", ")
+                        ));
                     }
                 }
             }
@@ -2886,7 +2916,7 @@ impl Document {
 
     /// What leaves a node, by the data source it leaves by.
     ///
-    /// A link is an attribute of the node it leaves -- `payload-out: k_1` -- so
+    /// A link is an attribute of the node it leaves -- `world-out: k_1` -- so
     /// writing a node means writing the links out of it, named after their
     /// terminal. Which terminal is the editor's own table where the link does
     /// not say: a payload has one data source and the line was drawn from it.
@@ -2901,13 +2931,9 @@ impl Document {
     /// second says nothing about it. A link written in both files it touched
     /// would be read as two.
     ///
-    /// One entry per line, each naming the node it goes to as its `target` and
-    /// the input it feeds where it feeds a named one -- which is why this
-    /// hands back the two apart rather than the `node.input` the short
-    /// spelling joins with a dot. Several lines out of one terminal are
-    /// several entries, so nothing in a file pairs by position: two lists read
-    /// against each other, one of them a name short, would be a configuration
-    /// that reads as valid and delivers a reading to the wrong input.
+    /// One entry per line, each the node it goes to and the name it arrives
+    /// by. Several lines out of one terminal are several entries, so nothing
+    /// in a file pairs by position.
     ///
     /// # Arguments
     ///
@@ -2917,8 +2943,8 @@ impl Document {
     ///
     /// # Returns
     ///
-    /// For each data source with something on it, `payload-out` then
-    /// `gateway-out`: the terminal's name, an entry per link, and the first
+    /// For each data source with something on it, `world-out` then
+    /// `moc-out`: the terminal's name, an entry per link, and the first
     /// comment found on any of them.
     fn leaving(
         &self,
@@ -2929,7 +2955,7 @@ impl Document {
             Vec::new();
         // In the one order: the terminals by name, and each one's
         // destinations by the node they reach and then the input.
-        for terminal in ["gateway-out", "payload-out"] {
+        for terminal in ["moc-out", "world-out"] {
             let mut destinations: Vec<Bound> = Vec::new();
             // One line carries one comment, so the attribute's comment is the
             // first thing written about any of the links under it. Nothing in
@@ -2951,7 +2977,7 @@ impl Document {
                 }
                 destinations.push(Bound {
                     target: Qualified::parse(&link.to).written(),
-                    input: link.input.clone(),
+                    name: link.arrives_by(),
                 });
                 if comment.is_none() {
                     comment = link.comment.clone();
@@ -2959,7 +2985,7 @@ impl Document {
             }
             if !destinations.is_empty() {
                 destinations.sort_by(|a, b| {
-                    (&a.target, &a.input).cmp(&(&b.target, &b.input))
+                    (&a.target, &a.name).cmp(&(&b.target, &b.name))
                 });
                 leaving.push((terminal, destinations, comment));
             }
@@ -2967,26 +2993,14 @@ impl Document {
         leaving
     }
 
-    /// Which of a node's data sinks a line arrives at, where any does.
+    /// The names each of a node's data sinks lists, where it lists any.
     ///
-    /// The other end of what `leaving` writes, and a record of it rather than
-    /// the link itself: `payload-in: true` on the node a reading reaches
-    /// says that something arrives there, where the `payload-out` on the node
-    /// it left says what and where. Written so that a node's entry says it is
-    /// connected at both ends, instead of only where it leaves -- which, for
-    /// a node that is mostly fed, was most of a node's entry saying nothing.
-    ///
-    /// A flag and not the name of the node the line comes from. That name is
-    /// on the node the line leaves; a copy of it here would be the same
-    /// connection written twice, and at a sink several lines arrive at -- the
-    /// ground's, in every configuration -- one name reads as "and nothing
-    /// else".
-    ///
-    /// Which sink a line arrives at is the stream's own answer: what leaves by
-    /// `payload-out` arrives at a `payload-in` and nowhere else, so a
-    /// destination that named an input -- `zone_temp.in0` -- counts at the
-    /// stream's sink. Only the sinks something arrives at are written, as a
-    /// node with nothing leaving it writes no `payload-out`.
+    /// The names the node was given -- its `world-in` and `moc-in`, and a
+    /// vote's inputs, which are its world-in -- and after them the name of
+    /// every line arriving there that is not among them yet, so that a file
+    /// the editor writes never sends a line to a name its far end does not
+    /// list. A line drawn in the editor arrives by a name of its own: see
+    /// `Link::arrives_by`. In name order.
     ///
     /// # Arguments
     ///
@@ -2995,44 +3009,88 @@ impl Document {
     ///
     /// # Returns
     ///
-    /// The sinks something arrives at, `payload-in` then `gateway-in`.
-    fn arriving(&self, node: &Node, home: &Home) -> Vec<&'static str> {
-        let mut arriving: Vec<&'static str> = Vec::new();
+    /// Each sink with a name, `moc-in` then `world-in`, and its names.
+    fn sinks(
+        &self,
+        node: &Node,
+        home: &Home,
+    ) -> Vec<(&'static str, Vec<String>)> {
+        let mut sinks = Vec::new();
         let ours = Qualified::of(&node.name, home).absolute();
-        for sink in ["gateway-in", "payload-in"] {
-            let any = self.links.iter().filter(|l| l.to == ours).any(|link| {
-                // Which sink of this node the line arrives at, which needs the
-                // terminal it left by: the two are one stream read from either
-                // end. The node it left is found by its whole name, which is
-                // what the link holds -- `zone/temp_1` for a node in a
-                // subdiagram, where the node's own name is `temp_1` -- and
-                // which is what tells two nodes of one name apart.
-                let Some(from) = self.nodes.iter().find(|n| {
-                    Qualified::of(&n.name, &n.home).absolute() == link.from
-                }) else {
-                    return false;
-                };
-                let left_by = crate::style::terminal_for(
-                    &from.node_type,
-                    link.origin.as_deref(),
-                    false,
-                );
-                let at = match link.input.as_deref() {
-                    Some(named)
-                        if tcslibgs::graph::terminals::stream_of(named)
-                            .is_some() =>
-                    {
-                        Some(named)
-                    }
-                    _ => left_by.and_then(tcslibgs::graph::terminals::answers),
-                };
-                at == Some(sink)
-            });
-            if any {
-                arriving.push(sink);
+        for sink in ["moc-in", "world-in"] {
+            let given = node
+                .attributes
+                .iter()
+                .filter(|(attribute, _)| {
+                    attribute.as_str() == sink
+                        || (sink == "world-in" && votes(node, attribute))
+                })
+                .flat_map(|(_, value)| {
+                    value
+                        .split([',', ' '])
+                        .map(str::trim)
+                        .filter(|name| !name.is_empty())
+                        .map(str::to_string)
+                        .collect::<Vec<_>>()
+                });
+            let mut names: Vec<String> = Vec::new();
+            for name in given {
+                if !names.contains(&name) {
+                    names.push(name);
+                }
+            }
+            for link in self.links.iter().filter(|l| l.to == ours) {
+                if self.arrives_at(link) != Some(sink) {
+                    continue;
+                }
+                let name = link.arrives_by();
+                if !names.contains(&name) {
+                    names.push(name);
+                }
+            }
+            // In the order of their text, a sink's names being a set whose
+            // order means nothing, as a listed attribute's entries are: so one
+            // document is one file however its lines were drawn.
+            names.sort_unstable();
+            if !names.is_empty() {
+                sinks.push((sink, names));
             }
         }
-        arriving
+        sinks
+    }
+
+    /// Which data sink a line arrives at.
+    ///
+    /// The one at the other end of the stream it leaves by, which needs the
+    /// terminal it left by: the two are one stream read from either end. The
+    /// node it left is found by its whole name, which is what the link holds
+    /// -- `zone/temp_1` for a node in a subdiagram -- and which is what tells
+    /// two nodes of one name apart. A line that names the sink, as one to a
+    /// type with two must, arrives where it says.
+    ///
+    /// # Arguments
+    ///
+    /// * `link` - The line.
+    ///
+    /// # Returns
+    ///
+    /// `world-in` or `moc-in`, or `None` where the node it leaves is not in
+    /// the document.
+    fn arrives_at(&self, link: &Link) -> Option<&'static str> {
+        match link.input.as_deref() {
+            Some("world-in") => return Some("world-in"),
+            Some("moc-in") => return Some("moc-in"),
+            _ => {}
+        }
+        let from = self.nodes.iter().find(|n| {
+            Qualified::of(&n.name, &n.home).absolute() == link.from
+        })?;
+        let left_by = crate::style::terminal_for(
+            &from.node_type,
+            link.origin.as_deref(),
+            false,
+        );
+        left_by.and_then(tcslibgs::graph::terminals::answers)
     }
 }
 
@@ -3505,56 +3563,39 @@ pub fn thermostat_example() -> Document {
         });
     };
 
-    link(&mut document, "temp_1", "payload-out", "temp1", None);
-    link(&mut document, "temp_2", "payload-out", "temp2", None);
-    link(&mut document, "temp_3", "payload-out", "temp3", None);
+    link(&mut document, "temp_1", "world-out", "temp1", None);
+    link(&mut document, "temp_2", "world-out", "temp2", None);
+    link(&mut document, "temp_3", "world-out", "temp3", None);
 
     // The "T": each converted reading goes to the ground, into the vote, and
     // into the log.
     for (from, input) in [("temp1", "in0"), ("temp2", "in1"), ("temp3", "in2")]
     {
-        link(&mut document, from, "payload-out", "gateway", None);
-        link(&mut document, from, "payload-out", "ambient", Some(input));
-        link(&mut document, from, "payload-out", "housekeeping", None);
+        link(&mut document, from, "world-out", "gateway", None);
+        link(&mut document, from, "world-out", "ambient", Some(input));
+        link(&mut document, from, "world-out", "housekeeping", None);
     }
 
-    link(&mut document, "ambient", "payload-out", "gateway", None);
-    link(&mut document, "ambient", "payload-out", "thermostat", None);
+    link(&mut document, "ambient", "world-out", "gateway", None);
+    link(&mut document, "ambient", "world-out", "thermostat", None);
     // The heaters are a payload, so what drives them leaves the thermostat by
-    // its gateway-out: the vehicleward stream, which is what reaches a payload.
+    // its moc-out: the vehicleward stream, which is what reaches a payload.
+    link(&mut document, "thermostat", "moc-out", "heaters_1", None);
+    link(&mut document, "thermostat", "moc-out", "heaters_2", None);
     link(
         &mut document,
         "thermostat",
-        "gateway-out",
-        "heaters_1",
-        None,
-    );
-    link(
-        &mut document,
-        "thermostat",
-        "gateway-out",
-        "heaters_2",
-        None,
-    );
-    link(
-        &mut document,
-        "thermostat",
-        "payload-out",
+        "world-out",
         "housekeeping",
         None,
     );
-    link(&mut document, "thermostat", "payload-out", "gateway", None);
+    link(&mut document, "thermostat", "world-out", "gateway", None);
     // The comment belongs to the terminal rather than to one link, so both
     // of the heaters carry it: that is what reading the file back gives, a
-    // comment above `gateway-out` being about the block and not its first line.
+    // comment above `moc-out` being about the block and not its first line.
     for heater in ["heaters_1", "heaters_2"] {
         document.apply(&Edit::SetLinkComment {
-            link: Link::joining(
-                "thermostat",
-                Some("gateway-out"),
-                heater,
-                None,
-            ),
+            link: Link::joining("thermostat", Some("moc-out"), heater, None),
             was: None,
             now: Some(
                 comment_lines(
@@ -4714,7 +4755,7 @@ mod tests {
             // is undone like any other.
             Edit::SetAside {
                 node: "a".into(),
-                kind: "payload-out-goes-nowhere".into(),
+                kind: "world-out-goes-nowhere".into(),
                 aside: true,
             },
             // A whole layout in one edit: where each node was, and where the
@@ -5178,11 +5219,10 @@ mod tests {
 
     /// A line is written at both of the nodes it joins.
     ///
-    /// On the node it leaves, which is the link; and on the node it arrives
-    /// at, which is a record of it -- so that a node's entry says what it is
-    /// connected to without the whole file having to be read against it. Both
-    /// spellings, because a configuration saved under the other name must say
-    /// the same thing.
+    /// On the node it leaves, as the node it reaches and the name it arrives
+    /// by; and on the node it arrives at, which lists that name under the sink
+    /// it arrives at. Both spellings, because a configuration saved under the
+    /// other name must say the same thing.
     #[test]
     fn a_link_is_written_at_both_of_its_ends() {
         use crate::journal::Link;
@@ -5191,43 +5231,41 @@ mod tests {
         document.apply(&add("temp_1", "i2c"));
         document.apply(&add("gateway", "gateway_radio"));
         document.apply(&Edit::AddLink {
-            link: Link::joining("temp_1", Some("payload-out"), "gateway", None),
+            link: Link::joining("temp_1", Some("world-out"), "gateway", None),
         });
 
         let yaml = document.to_yaml();
         assert!(
-            yaml.contains(
-                "        payload-out:\n          - target: gateway\n"
-            ),
+            yaml.contains("        world-out:\n          - gateway.temp_1\n"),
             "{yaml}"
         );
         assert!(
-            yaml.contains("        payload-in: true\n"),
-            "the arriving end does not say so: {yaml}"
+            yaml.contains("        world-in: [temp_1]\n"),
+            "the arriving end does not list the name: {yaml}"
         );
 
         let xml = document.to_xml();
         assert!(
-            xml.contains("<payload-out><target>gateway</target></payload-out>"),
+            xml.contains("<world-out>gateway.temp_1</world-out>"),
             "{xml}"
         );
         assert!(
-            xml.contains("<payload-in>true</payload-in>"),
-            "the arriving end does not say so: {xml}"
+            xml.contains("<world-in>temp_1</world-in>"),
+            "the arriving end does not list the name: {xml}"
         );
 
         // And the record is of the stream, not of the terminal somebody drew
-        // from: what leaves by payload-out arrives at payload-in and nowhere
+        // from: what leaves by world-out arrives at world-in and nowhere
         // else, so the payload's own sink says nothing about this link.
-        assert!(!yaml.contains("gateway-in"), "{yaml}");
+        assert!(!yaml.contains("moc-in"), "{yaml}");
     }
 
-    /// A sink several lines arrive at says what one line says: that they do.
+    /// A sink several lines arrive at lists each line's name once, in name
+    /// order.
     ///
     /// The ground's case, which is every configuration: each payload aboard
-    /// reports to the one gateway node, told apart by the socket its id names.
-    /// Which is the reason this is a flag rather than a name -- one name there
-    /// would read as "and nothing else".
+    /// reports to the one gateway node, told apart by the socket its id
+    /// names.
     #[test]
     fn a_sink_that_several_links_arrive_at_says_so_once() {
         use crate::journal::Link;
@@ -5237,13 +5275,13 @@ mod tests {
         for name in ["temp_2", "temp_1"] {
             document.apply(&add(name, "i2c"));
             document.apply(&Edit::AddLink {
-                link: Link::joining(name, Some("payload-out"), "gateway", None),
+                link: Link::joining(name, Some("world-out"), "gateway", None),
             });
         }
 
         let yaml = document.to_yaml();
         assert_eq!(
-            yaml.matches("payload-in: true").count(),
+            yaml.matches("world-in: [temp_1, temp_2]\n").count(),
             1,
             "once, for the sink and not for each line: {yaml}"
         );
@@ -5423,8 +5461,8 @@ mod tests {
         assert_eq!(
             said,
             vec![
-                "payload-out-goes-nowhere".to_string(),
-                "gateway-out-goes-nowhere".to_string()
+                "world-out-goes-nowhere".to_string(),
+                "moc-out-goes-nowhere".to_string()
             ],
             "{:?}",
             document.concerns()
@@ -5435,7 +5473,7 @@ mod tests {
         document.apply(&Edit::AddLink {
             link: Link::joining(
                 "sensor",
-                Some("payload-out"),
+                Some("world-out"),
                 "zone_temp",
                 Some("in0"),
             ),
@@ -5443,7 +5481,7 @@ mod tests {
         let said: Vec<String> =
             document.concerns().iter().map(|c| c.kind()).collect();
         assert!(
-            !said.contains(&"payload-out-goes-nowhere".to_string()),
+            !said.contains(&"world-out-goes-nowhere".to_string()),
             "{said:?}"
         );
         assert!(said.contains(&"nothing-leaves".to_string()), "{said:?}");
@@ -5451,18 +5489,13 @@ mod tests {
         // And on to the ground, which is the shape the whole graph is: a
         // payload, vehicle nodes, a gateway link.
         document.apply(&Edit::AddLink {
-            link: Link::joining(
-                "zone_temp",
-                Some("payload-out"),
-                "ground",
-                None,
-            ),
+            link: Link::joining("zone_temp", Some("world-out"), "ground", None),
         });
         let said: Vec<String> =
             document.concerns().iter().map(|c| c.kind()).collect();
         assert_eq!(
             said,
-            vec!["gateway-out-goes-nowhere".to_string()],
+            vec!["moc-out-goes-nowhere".to_string()],
             "{:?}",
             document.concerns()
         );
@@ -5472,7 +5505,7 @@ mod tests {
         document.apply(&Edit::AddLink {
             link: Link::joining(
                 "zone_temp",
-                Some("payload-out"),
+                Some("world-out"),
                 "housekeeping",
                 None,
             ),
@@ -5537,7 +5570,7 @@ mod tests {
         // still in the document, which is what makes it come back if the line
         // is deleted.
         document.apply(&Edit::AddLink {
-            link: Link::joining("sensor", Some("payload-out"), "ground", None),
+            link: Link::joining("sensor", Some("world-out"), "ground", None),
         });
         let (raised, aside) = document.concerns_apart();
         assert!(
@@ -5559,7 +5592,7 @@ mod tests {
         document.apply(&add("sensor", "i2c"));
         document.apply(&Edit::SetAside {
             node: "sensor".into(),
-            kind: "payload-out-goes-nowhere".into(),
+            kind: "world-out-goes-nowhere".into(),
             aside: true,
         });
 
@@ -5567,7 +5600,7 @@ mod tests {
         assert!(
             yaml.contains(
                 "  set-aside:\n    - { node: sensor, concern: \
-                 payload-out-goes-nowhere }"
+                 world-out-goes-nowhere }"
             ),
             "{yaml}"
         );
@@ -5576,7 +5609,7 @@ mod tests {
             xml.contains(concat!(
                 "<set-aside>\n",
                 "            <node name=\"sensor\" ",
-                "concern=\"payload-out-goes-nowhere\"/>\n",
+                "concern=\"world-out-goes-nowhere\"/>\n",
                 "        </set-aside>"
             )),
             "{xml}"
@@ -5773,7 +5806,12 @@ mod tests {
                 "{} is missing from the XML",
                 node.name
             );
-            for (attribute, value) in &node.attributes {
+            // A vote's inputs are its world-in, which is written as that.
+            for (attribute, value) in node
+                .attributes
+                .iter()
+                .filter(|(attribute, _)| !in_a_sink(node, attribute))
+            {
                 assert!(
                     yaml.contains(&format!("{attribute}: \"{value}\"")),
                     "{}.{attribute} is missing from the YAML",
@@ -5811,22 +5849,10 @@ mod tests {
         // alone where the node has one, inside a list where it has several.
         // Both spellings say it, each in its own way.
         for link in &document.links {
-            let (yaml_said, xml_said) = match &link.input {
-                Some(input) => (
-                    format!(
-                        "- target: {}\n            input: {input}\n",
-                        link.to
-                    ),
-                    format!(
-                        "<target>{}</target><input>{input}</input>",
-                        link.to
-                    ),
-                ),
-                None => (
-                    format!("- target: {}\n", link.to),
-                    format!("<target>{}</target>", link.to),
-                ),
-            };
+            // The node it reaches and the name it arrives by, in both.
+            let line = format!("{}.{}", link.to, link.arrives_by());
+            let yaml_said = format!("- {line}\n");
+            let xml_said = format!(">{line}</");
             assert!(
                 yaml.contains(&yaml_said),
                 "{} to {} is missing from the YAML",
@@ -5989,8 +6015,8 @@ mod tests {
             .expect("files");
         let (_, top) = &files[0];
         assert!(
-            top.contains("payload-in: true"),
-            "the ground does not say a line arrives: {top}"
+            top.contains("world-in: [temp_1]"),
+            "the ground does not list the line's name: {top}"
         );
     }
 
@@ -6037,9 +6063,9 @@ mod tests {
             .files(Path::new("/tmp/vehicle.ytcs"))
             .expect("files");
         let (_, top) = &files[0];
-        assert!(top.contains("payload-in: true"), "{top}");
+        assert!(top.contains("world-in: [p]"), "{top}");
         assert!(
-            !top.contains("gateway-in"),
+            !top.contains("moc-in"),
             "the line was recorded at the sink of zone/p's stream: {top}"
         );
     }
@@ -6079,7 +6105,7 @@ mod tests {
 
         let written: usize = files
             .iter()
-            .map(|(_, text)| text.matches("- target: gateway").count())
+            .map(|(_, text)| text.matches("- gateway.temp_1").count())
             .sum();
         assert_eq!(written, 1, "the crossing link was written {written} times");
 
@@ -6093,7 +6119,7 @@ mod tests {
             .find(|(path, _)| path.ends_with("zone.ytcs"))
             .expect("the subdiagram's file");
         assert!(
-            inner.contains("payload-out:\n          - target: gateway\n"),
+            inner.contains("world-out:\n          - gateway.temp_1\n"),
             "{inner}"
         );
 
@@ -6185,16 +6211,14 @@ mod tests {
         // `quoted`.
         assert!(yaml.contains("address: \"0x48\""), "{yaml}");
         // The three sections, and the link as an attribute of the node it
-        // leaves: a payload's readings leave by its payload-out, and the input
+        // leaves: a payload's readings leave by its world-out, and the input
         // they arrive at is named after the dot.
         assert!(yaml.contains("\npayloads:\n"), "{yaml}");
         assert!(yaml.contains("\nvehicle:\n"), "{yaml}");
         assert!(
-            yaml.contains(
-                "        payload-out:\n          - target: \
-                           zone_temp\n            input: in0\n"
-            ),
-            "a link into a named input is written as one entry: {yaml}"
+            yaml.contains("        world-out:\n          - zone_temp.in0\n"),
+            "a link into a named input is written as its node and the \
+             input: {yaml}"
         );
         assert!(
             !yaml.contains("\nlinks:"),

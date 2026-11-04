@@ -2,7 +2,7 @@
 #
 # A payload: what the vehicle carries this flight, and this one is a program
 # the mission wrote rather than a device on a bus. Its readings leave by
-# payload-out on their way to the ground, and nothing arrives: it is the one
+# world-out on their way to the ground, and nothing arrives: it is the one
 # node type with no data sink at all, because there is nothing to ask it with
 # -- it samples on a clock of its own, or reports when something happens, and
 # what decides is in the program. It is run with one file interface, which it

@@ -39,7 +39,7 @@
         <type name="gateway_radio">
             <!-- The ground's end of the link, both ways. What the ground
                  sends goes up to address:port, which this node binds
-                 aboard, and leaves it by gateway-out for the lamp. What
+                 aboard, and leaves it by moc-out for the lamp. What
                  comes down arrives at ground_base plus the device id of the
                  node that sent it: the switch, device id 2, at
                  127.0.0.1:3722. -->
@@ -47,8 +47,8 @@
                 <address>127.0.0.1</address>
                 <ground_base>127.0.0.1:3720</ground_base>
                 <port>3620</port>
-                <gateway-out><target>lamp</target></gateway-out>
-                <payload-in>true</payload-in>
+                <moc-out>lamp.ground</moc-out>
+                <world-in>switch</world-in>
             </gateway>
         </type>
     </gateways>
@@ -60,7 +60,7 @@
                 <direction>output</direction>
                 <lines>1</lines>
                 <path>/dev/gpiochip1</path>
-                <gateway-in>true</gateway-in>
+                <moc-in>ground</moc-in>
             </payload>
             <!-- Two lines of one chip, each a payload of its own because
                  one is read and the other driven, and a payload's lines go
@@ -77,7 +77,7 @@
                 <edge>both</edge>
                 <lines>0</lines>
                 <path>/dev/gpiochip1</path>
-                <payload-out><target>ground</target></payload-out>
+                <world-out>ground.switch</world-out>
             </payload>
         </type>
     </payloads>

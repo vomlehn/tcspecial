@@ -98,7 +98,7 @@ module Tcs {
     ) opcode 6
 
     @ Send a datum up to the gateway node, which leaves it by its
-    @ gateway-out links for the nodes they reach: 1 or 0 to a heater, say.
+    @ moc-out links for the nodes they reach: 1 or 0 to a heater, say.
     @ Sent only while the bridge is matched for commanding
     async command SEND_DATA(
       data: string size DATUM_BYTES @< The datum, as text

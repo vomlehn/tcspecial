@@ -39,7 +39,7 @@ gateways:
   - type gateway_fprime:
       # The F´ bridge's end of the link, both ways. What the bridge sends goes
       # up to address:port, which this node binds aboard, and leaves it by
-      # gateway-out for the heater. What comes down arrives at bridge_base plus
+      # moc-out for the heater. What comes down arrives at bridge_base plus
       # the device id of the node that sent it, and the bridge gives it the F´
       # ID fprime_id_base plus that same id: heater_wanted, device id 2, arrives
       # at 127.0.0.1:9702 as 0x3002, the thermometer, device id 3, at
@@ -50,9 +50,9 @@ gateways:
         bridge_base: "127.0.0.1:9700"
         fprime_id_base: "0x3000"
         port: "9600"
-        gateway-out:
-          - target: heater
-        payload-in: true
+        moc-out:
+          - heater.fsw
+        world-in: [heater_wanted, thermometer, zone_temp]
 
 payloads:
   - type network:
@@ -62,7 +62,7 @@ payloads:
         address: "127.0.0.1"
         port: "9001"
         protocol: "udp"
-        gateway-in: true
+        moc-in: [fsw]
       # A thermometer, two bytes, signed, big endian, in sixteenths of a degree,
       # whose readings go to the flight computer as they are, and to zone_temp
       # to be made a temperature.
@@ -70,9 +70,9 @@ payloads:
         address: "127.0.0.1"
         port: "9002"
         protocol: "udp"
-        payload-out:
-          - target: fsw
-          - target: zone_temp
+        world-out:
+          - fsw.thermometer
+          - zone_temp.thermometer
 
 vehicle:
   - type compute:
@@ -84,9 +84,9 @@ vehicle:
         function: "hysteresis"
         half_band: "0.5"
         setpoint: "284.15"
-        payload-out:
-          - target: fsw
-        payload-in: true
+        world-out:
+          - fsw.heater_wanted
+        world-in: [zone_temp]
       # The thermometer's readings made a value, a temperature in kelvin, which
       # the bridge's channel for it holds as one.
       - compute: zone_temp
@@ -94,10 +94,10 @@ vehicle:
         function: "to_kelvin"
         offset: "273.15"
         scale: "0.0625"
-        payload-out:
-          - target: fsw
-          - target: heater_wanted
-        payload-in: true
+        world-out:
+          - fsw.zone_temp
+          - heater_wanted.zone_temp
+        world-in: [thermometer]
 
 tcsgui:
   nodes:

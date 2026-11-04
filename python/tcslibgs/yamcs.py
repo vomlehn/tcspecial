@@ -304,7 +304,7 @@ def _shared_document(config, gateway):
         ValueError: A node it names does not exist.
     """
     documents = set()
-    for target in gateway.links.get("gateway-out", []):
+    for target in gateway.links.get("moc-out", []):
         # A destination may name the node's input after a point.
         name = target.split(".", 1)[0]
         documents.add(interface.node_document(config.node(name).node_type))

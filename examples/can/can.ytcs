@@ -34,16 +34,16 @@ gateways:
   - type gateway_radio:
       # The ground's end of the link, both ways. What the ground sends goes up
       # to address:port, which this node binds aboard, and leaves it by
-      # gateway-out for the motor's commands. What comes down arrives at
+      # moc-out for the motor's commands. What comes down arrives at
       # ground_base plus the device id of the node that sent it: the motor's
       # status, device id 2, at 127.0.0.1:3702.
       - gateway: ground
         address: "127.0.0.1"
         ground_base: "127.0.0.1:3700"
         port: "3600"
-        gateway-out:
-          - target: motor_command
-        payload-in: true
+        moc-out:
+          - motor_command.ground
+        world-in: [motor_status]
 
 payloads:
   # A motor controller on the CAN bus vcan0, which sends its status in frames
@@ -58,13 +58,13 @@ payloads:
       - payload: motor_command
         can_id: "0x124"
         interface: "vcan0"
-        gateway-in: true
+        moc-in: [ground]
       # Each status frame goes to the ground as it arrives.
       - payload: motor_status
         can_id: "0x123"
         interface: "vcan0"
-        payload-out:
-          - target: ground
+        world-out:
+          - ground.motor_status
 
 tcsgui:
   nodes:

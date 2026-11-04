@@ -7,6 +7,12 @@
 //! `docs/design.rst` -- and every word a file wrote for that side was renamed
 //! with it.
 //!
+//! Then the terminals: `payload-` and `gateway-` became `world-` and `moc-`,
+//! for the two sides of the graph each stream travels between -- the world a
+//! payload reads, and the MOC that commands it -- and their shape changed
+//! with them. A sink lists names, a link is written to one, and a file in the
+//! old words is told both.
+//!
 //! A file still written in the old words is refused here, by line, and told
 //! the word to write instead. Refused rather than read as before, because one
 //! word for two things is what the rename was for, and a reader that took
@@ -39,7 +45,18 @@ struct Renamed {
     old: &'static str,
     place: Place,
     new: &'static str,
+    /// What else changed with the word, said after it, where anything did.
+    then: &'static str,
 }
+
+/// What a sink holds now, said after its new name.
+const SINK: &str = ", and list under it the names a line may arrive by, as \
+                    `[readings]`";
+
+/// And what a source holds: each line as the node it reaches and the name
+/// it arrives by.
+const SOURCE: &str = ", and write each line under it as the node it reaches \
+                      and a name that node lists, as `[gateway.readings]`";
 
 /// Every word that was renamed, and the word it is now: the one list, which
 /// the reader and its tests both read.
@@ -48,41 +65,65 @@ const RENAMED: &[Renamed] = &[
         old: "moc",
         place: Place::Section,
         new: "gateways",
+        then: "",
     },
     Renamed {
         old: "moc",
         place: Place::NodeType,
         new: "gateway_radio",
+        then: "",
     },
     Renamed {
         old: "tee-moc",
         place: Place::NodeType,
         new: "tee-gateway",
+        then: "",
     },
     Renamed {
         old: "null-moc",
         place: Place::NodeType,
         new: "null-gateway",
+        then: "",
     },
     Renamed {
         old: "app_moc_veh",
         place: Place::NodeType,
         new: "app_gateway_veh",
+        then: "",
+    },
+    // The four terminals, named for the side of the graph each stream
+    // belongs to: the world a payload reads, and the MOC that commands it.
+    // Their shape changed with them: a sink lists the names a line may
+    // arrive by, and a link is written to one of those.
+    Renamed {
+        old: "payload-in",
+        place: Place::Key,
+        new: "world-in",
+        then: SINK,
     },
     Renamed {
-        old: "moc-in",
+        old: "payload-out",
         place: Place::Key,
-        new: "gateway-in",
+        new: "world-out",
+        then: SOURCE,
     },
     Renamed {
-        old: "moc-out",
+        old: "gateway-in",
         place: Place::Key,
-        new: "gateway-out",
+        new: "moc-in",
+        then: SINK,
+    },
+    Renamed {
+        old: "gateway-out",
+        place: Place::Key,
+        new: "moc-out",
+        then: SOURCE,
     },
     Renamed {
         old: "app-moc-arg",
         place: Place::Key,
         new: "app-gateway-arg",
+        then: "",
     },
 ];
 
@@ -123,8 +164,8 @@ pub fn refused(text: &str, format: ConfigFormat) -> Option<String> {
         Place::Key => said.old.to_string(),
     };
     Some(format!(
-        "at line {line}, {what} is called {} now: rename it",
-        said.new
+        "at line {line}, {what} is called {} now: rename it{}",
+        said.new, said.then
     ))
 }
 
@@ -386,22 +427,24 @@ mod tests {
                     gateways:\n  \
                     - type gateway_radio:\n      \
                     - gateway: down\n        \
-                    gateway-out:\n          \
-                    - target: sensor\n          \
-                    - target: echo\n          \
-                    - target: drop\n          \
-                    - target: app\n\
+                    world-in: [readings]\n        \
+                    moc-out:\n          \
+                    - sensor.asked\n          \
+                    - echo.asked\n          \
+                    - drop.asked\n          \
+                    - app.asked\n\
                     payloads:\n  \
                     - type i2c:\n      \
-                    - { payload: sensor, gateway-in: true }\n\
+                    - { payload: sensor, moc-in: [asked] }\n\
                     vehicle:\n  \
                     - type tee-gateway:\n      \
-                    - { compute: echo, gateway-in: true }\n  \
+                    - { compute: echo, moc-in: [asked] }\n  \
                     - type null-gateway:\n      \
-                    - { compute: drop, gateway-in: true }\n  \
+                    - { compute: drop, moc-in: [asked] }\n  \
                     - type app_gateway_veh:\n      \
                     - compute: app\n        \
-                    gateway-in: true\n        \
+                    moc-in: [asked]\n        \
+                    world-out: [down.readings]\n        \
                     app-gateway-arg: \"1\"\n";
         assert!(text.contains(new), "{new}");
         text.replacen(new, old, 1)
@@ -424,27 +467,29 @@ mod tests {
                     <gateways>\n\
                     <type name=\"gateway_radio\">\n\
                     <gateway name=\"down\">\n\
-                    <gateway-out><target>sensor</target></gateway-out>\n\
-                    <gateway-out><target>echo</target></gateway-out>\n\
-                    <gateway-out><target>drop</target></gateway-out>\n\
-                    <gateway-out><target>app</target></gateway-out>\n\
+                    <world-in>readings</world-in>\n\
+                    <moc-out>sensor.asked</moc-out>\n\
+                    <moc-out>echo.asked</moc-out>\n\
+                    <moc-out>drop.asked</moc-out>\n\
+                    <moc-out>app.asked</moc-out>\n\
                     </gateway>\n\
                     </type>\n\
                     </gateways>\n\
                     <payloads>\n\
                     <type name=\"i2c\">\n\
                     <payload name=\"sensor\">\n\
-                    <gateway-in>true</gateway-in>\n\
+                    <moc-in>asked</moc-in>\n\
                     </payload>\n\
                     </type>\n\
                     </payloads>\n\
                     <vehicle>\n\
                     <type name=\"tee-gateway\"><compute name=\"echo\">\
-                    <gateway-in>true</gateway-in></compute></type>\n\
+                    <moc-in>asked</moc-in></compute></type>\n\
                     <type name=\"null-gateway\"><compute name=\"drop\">\
-                    <gateway-in>true</gateway-in></compute></type>\n\
+                    <moc-in>asked</moc-in></compute></type>\n\
                     <type name=\"app_gateway_veh\"><compute name=\"app\">\n\
-                    <gateway-in>true</gateway-in>\n\
+                    <moc-in>asked</moc-in>\n\
+                    <world-out>down.readings</world-out>\n\
                     <app-gateway-arg>1</app-gateway-arg></compute></type>\n\
                     </vehicle>\n\
                     </configuration>\n";
@@ -519,12 +564,14 @@ mod tests {
                 "app_gateway_veh",
             ),
             (
-                "gateway-in: true }",
-                "moc-in: true }",
-                "moc-in",
+                "moc-in: [asked] }",
+                "gateway-in: [asked] }",
                 "gateway-in",
+                "moc-in",
             ),
-            ("gateway-out:", "moc-out:", "moc-out", "gateway-out"),
+            ("moc-out:", "gateway-out:", "gateway-out", "moc-out"),
+            ("world-in:", "payload-in:", "payload-in", "world-in"),
+            ("world-out:", "payload-out:", "payload-out", "world-out"),
             (
                 "app-gateway-arg:",
                 "app-moc-arg:",
@@ -542,7 +589,7 @@ mod tests {
                 )),
                 "{said}"
             );
-            assert!(said.ends_with("rename it"), "{said}");
+            assert!(said.contains("now: rename it"), "{said}");
         }
     }
 
@@ -575,14 +622,10 @@ mod tests {
                 "the node type app_moc_veh",
                 "app_gateway_veh",
             ),
-            ("gateway-in>", "moc-in>", "moc-in", "gateway-in"),
-            (
-                "<gateway-in>true</gateway-in>\n</payload>",
-                "<moc-in/>\n</payload>",
-                "moc-in",
-                "gateway-in",
-            ),
-            ("gateway-out>", "moc-out>", "moc-out", "gateway-out"),
+            ("moc-in>", "gateway-in>", "gateway-in", "moc-in"),
+            ("moc-out>", "gateway-out>", "gateway-out", "moc-out"),
+            ("world-in>", "payload-in>", "payload-in", "world-in"),
+            ("world-out>", "payload-out>", "payload-out", "world-out"),
             (
                 "app-gateway-arg>",
                 "app-moc-arg>",
@@ -609,7 +652,7 @@ mod tests {
     fn an_old_word_only_talked_about_is_taken() {
         let yaml = format!(
             "# moc: was the section, and type: moc the radio\n\
-             description: \"moc: type: moc, moc-in: true\"\n{}",
+             description: \"moc: type: moc, gateway-in: true\"\n{}",
             yaml_with("gateway: down", "gateway: moc")
         );
         assert_eq!(refused(&yaml, ConfigFormat::Yaml), None);
@@ -617,7 +660,7 @@ mod tests {
         let xml = xml_with("<gateway name=\"down\">", "<gateway name=\"moc\">")
             .replace(
                 "<description>a file</description>",
-                "<!-- <moc><type>moc</type><moc-in/></moc> -->\n\
+                "<!-- <moc><type>moc</type><gateway-in/></moc> -->\n\
              <description>&lt;moc&gt; type moc</description>",
             );
         assert_eq!(refused(&xml, ConfigFormat::Xml), None);
@@ -649,8 +692,8 @@ mod tests {
                 );
                 assert!(
                     why.contains(&format!(
-                        " is called {} now: rename it",
-                        said.new
+                        " is called {} now: rename it{}",
+                        said.new, said.then
                     )),
                     "{why}"
                 );
@@ -735,11 +778,11 @@ mod tests {
     #[test]
     fn a_comment_is_not_the_line_pointed_at() {
         let text = format!(
-            "# Each node is told moc-out: below\n{}",
-            yaml_with("gateway-out:", "moc-out:")
+            "# Each node is told gateway-out: below\n{}",
+            yaml_with("moc-out:", "gateway-out:")
         );
         let said = refused(&text, ConfigFormat::Yaml).expect("refused");
-        let line = line_of(&text, "    moc-out:");
+        let line = line_of(&text, "    gateway-out:");
         assert!(said.starts_with(&format!("at line {line}, ")), "{said}");
     }
 }

@@ -38,7 +38,10 @@
                 <address>127.0.0.1</address>
                 <ground_base>127.0.0.1:5100</ground_base>
                 <port>5000</port>
-                <payload-in>true</payload-in>
+                <world-in>battery_amps</world-in>
+                <world-in>bus_volts</world-in>
+                <world-in>charge</world-in>
+                <world-in>shedding</world-in>
             </gateway>
         </type>
     </gateways>
@@ -53,10 +56,10 @@
                 <offset>0</offset>
                 <scale>0.001</scale>
                 <unit>A</unit>
-                <payload-out><target>charge</target></payload-out>
-                <payload-out><target>gateway</target></payload-out>
-                <payload-out><target>housekeeping</target></payload-out>
-                <payload-in>true</payload-in>
+                <world-out>charge.battery_amps</world-out>
+                <world-out>gateway.battery_amps</world-out>
+                <world-out>housekeeping.battery_amps</world-out>
+                <world-in>shunt</world-in>
             </compute>
             <!-- The power monitor's two bytes are millivolts, unsigned, most
                  significant first: up to 65 volts, which is twice the bus. -->
@@ -66,9 +69,9 @@
                 <offset>0</offset>
                 <scale>0.001</scale>
                 <unit>V</unit>
-                <payload-out><target>gateway</target></payload-out>
-                <payload-out><target>housekeeping</target></payload-out>
-                <payload-in>true</payload-in>
+                <world-out>gateway.bus_volts</world-out>
+                <world-out>housekeeping.bus_volts</world-out>
+                <world-in>monitor</world-in>
             </compute>
             <!-- The battery's state of charge, which nothing aboard
                  measures: a program counts the charge in and out from the
@@ -81,10 +84,10 @@
                 <function>process</function>
                 <timeout>1 s</timeout>
                 <unit>ratio</unit>
-                <payload-out><target>gateway</target></payload-out>
-                <payload-out><target>housekeeping</target></payload-out>
-                <payload-out><target>shedding</target></payload-out>
-                <payload-in>true</payload-in>
+                <world-out>gateway.charge</world-out>
+                <world-out>housekeeping.charge</world-out>
+                <world-out>shedding.charge</world-out>
+                <world-in>battery_amps</world-in>
             </compute>
             <!-- Sheds the science load when the charge runs low: asserted
                  below the band, shedding it, and unasserted above it,
@@ -93,17 +96,20 @@
                 <function>hysteresis</function>
                 <half_band>0.1</half_band>
                 <setpoint>0.4</setpoint>
-                <gateway-out><target>science</target></gateway-out>
-                <payload-out><target>gateway</target></payload-out>
-                <payload-out><target>housekeeping</target></payload-out>
-                <payload-in>true</payload-in>
+                <moc-out>science.shedding</moc-out>
+                <world-out>gateway.shedding</world-out>
+                <world-out>housekeeping.shedding</world-out>
+                <world-in>charge</world-in>
             </compute>
         </type>
         <type name="log">
             <compute name="housekeeping">
                 <directory>/tmp/telemetry</directory>
                 <format>variable_ts_rc</format>
-                <payload-in>true</payload-in>
+                <world-in>battery_amps</world-in>
+                <world-in>bus_volts</world-in>
+                <world-in>charge</world-in>
+                <world-in>shedding</world-in>
             </compute>
         </type>
     </vehicle>
@@ -115,7 +121,7 @@
                 <address>127.0.0.1</address>
                 <port>5302</port>
                 <protocol>udp</protocol>
-                <gateway-in>true</gateway-in>
+                <moc-in>shedding</moc-in>
             </payload>
             <!-- The shunt in the battery's lead, which sends its current
                  twice a second of its own accord. -->
@@ -123,7 +129,7 @@
                 <address>127.0.0.1</address>
                 <port>5301</port>
                 <protocol>udp</protocol>
-                <payload-out><target>battery_amps</target></payload-out>
+                <world-out>battery_amps.shunt</world-out>
             </payload>
         </type>
         <type name="serial">
@@ -138,7 +144,7 @@
                 <stop_bits>1</stop_bits>
                 <trigger>"V?\r"</trigger>
                 <trigger_interval>500 ms</trigger_interval>
-                <payload-out><target>bus_volts</target></payload-out>
+                <world-out>bus_volts.monitor</world-out>
             </payload>
         </type>
     </payloads>

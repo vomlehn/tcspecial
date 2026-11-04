@@ -1444,8 +1444,8 @@ mod tests {
                 "<payload name=\"heater\">",
             )
             .replace(
-                "<target>gpio-out-tmass1</target>",
-                "<target>heater</target>",
+                "<moc-out>gpio-out-tmass1.thermostat</moc-out>",
+                "<moc-out>heater.thermostat</moc-out>",
             )
         });
         let mut report = Report::default();
@@ -1602,14 +1602,14 @@ payloads:
         address: \"0x48\"
         group: temps
         path: \"/dev/i2c-1\"
-        payload-out:
-          - target: gateway
+        world-out: [gateway.sensor]
 gateways:
   - type gateway_radio:
       - gateway: gateway
         address: \"10.0.0.1\"
         ground_base: \"10.0.0.2:5100\"
         port: \"5000\"
+        world-in: [sensor]
 ";
 
     /// A simulator file that names a payload the simulator will not stand in
@@ -1624,18 +1624,18 @@ gateways:
         let configuration = format!(
             "{SOUND_GRAPH}vehicle:
   - type tee-gateway:
-      - {{ compute: echo, gateway-out: heater }}
+      - {{ compute: echo, moc-out: [heater.echo], moc-in: [gateway] }}
 "
         )
         .replace(
-            "          - target: gateway\ngateways:\n",
-            "          - target: gateway\n  - type network:\n      \
+            "        world-out: [gateway.sensor]\ngateways:\n",
+            "        world-out: [gateway.sensor]\n  - type network:\n      \
              - { payload: heater, protocol: udp, address: \"127.0.0.1\", \
-             port: \"8001\" }\ngateways:\n",
+             port: \"8001\", moc-in: [echo] }\ngateways:\n",
         )
         .replace(
             "        port: \"5000\"\n",
-            "        port: \"5000\"\n        gateway-out: echo\n",
+            "        port: \"5000\"\n        moc-out: [echo.gateway]\n",
         );
         let sim = "simulated_payloads:\n  \
                    - type i2c:\n      \
@@ -1720,18 +1720,13 @@ payloads:
       - payload: a
         group: temps
         path: \"/dev/i2c-1\"
-        payload-out:
-          - target: nowhere
-  - type spi:
-      - payload: b
-        path: \"/dev/spidev0.0\"
-        payload-out:
-          - target: b
+        world-out: [nowhere.a]
 vehicle:
   - type compute:
-      - compute: m
+      - compute: b
         function: mean
-        inputs: \"in0\"
+        world-out: [b.b]
+        world-in: [b]
 ",
         );
 
@@ -1794,8 +1789,6 @@ vehicle:
 gateways:
   - type gateway_radio:
       - gateway: gateway
-        gateway-out:
-          - target: gateway
 ",
         )
         .unwrap();
@@ -1896,7 +1889,7 @@ gateways:
         <type name=\"i2c\">
             <payload name=\"a\">
                 <path>/dev/i2c-1</path>
-                <payload-out><target>nowhere</target></payload-out>
+                <world-out>nowhere.a</world-out>
             </payload>
         </type>
     </payloads>
@@ -2008,16 +2001,13 @@ payloads:
             "  - type device-file:
       - payload: first
         path: /dev/urandom
-        payload-out:
-          - target: nowhere
+        world-out: [nowhere.first]
       - payload: second
         path: /dev/full
-        payload-out:
-          - target: elsewhere
+        world-out: [elsewhere.second]
       - payload: third
         path: /dev/random
-        payload-out:
-          - target: anywhere
+        world-out: [anywhere.third]
       # and GOOD's own:
 ",
         );
@@ -2031,7 +2021,7 @@ payloads:
         // names, which is the one order a configuration has.
         let lines: Vec<usize> =
             report.findings.iter().map(|f| f.line).collect();
-        assert_eq!(lines, vec![25, 29, 33], "{:?}", report.findings);
+        assert_eq!(lines, vec![25, 28, 31], "{:?}", report.findings);
         for (finding, missing) in
             report
                 .findings
@@ -2290,7 +2280,7 @@ payloads:
         // are not joined.
         let text = GOOD.replace(
             "    read_size: \"4\"\n",
-            "    payload-out:\n      - target: nowhere\n",
+            "    world-out: [nowhere.DH0]\n",
         );
         let set = written(
             ".ytcs",
@@ -2323,7 +2313,7 @@ payloads:
             // A link to a node that is not there, which is one error each.
             payloads.push_str(&format!(
                 "      - payload: DH{id}\n        path: /dev/null{id}\n        \
-                 payload-out:\n          - target: nowhere{id}\n"
+                 world-out: [nowhere{id}.DH{id}]\n"
             ));
         }
         let head = GOOD

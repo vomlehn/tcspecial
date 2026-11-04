@@ -197,56 +197,49 @@ terminal
     data source and every ``-in`` a data sink. There are four of them, two per
     stream:
 
-    ``payload-out`` is where a payload's readings leave and ``payload-in`` is
-    where they arrive; ``gateway-out`` is where what the ground sends leaves and
-    ``gateway-in`` is where it arrives. A payload has ``gateway-in`` and
-    ``payload-out``; a gateway link has ``payload-in`` and ``gateway-out``; a
-    ``null-gateway`` has ``gateway-in`` alone and a ``null-payload``
-    ``payload-in`` alone; a ``tee-gateway`` has ``gateway-in``, ``gateway-out``
-    and ``payload-out``, and a ``tee-payload`` ``payload-in``, ``payload-out``
-    and ``gateway-out``; an ``app_all_veh`` has all four; and a ``ping`` node
-    has a payload's pair, ``gateway-in`` and ``payload-out``. With no vehicle
-    node in the way, a payload's ``payload-out`` connects to a gateway link's
-    ``payload-in``.
+    ``world-out`` is where a payload's readings leave and ``world-in`` is
+    where they arrive; ``moc-out`` is where what the ground sends leaves and
+    ``moc-in`` is where it arrives. A payload has ``moc-in`` and
+    ``world-out``; a gateway link has ``world-in`` and ``moc-out``; a
+    ``null-gateway`` has ``moc-in`` alone and a ``null-payload``
+    ``world-in`` alone; a ``tee-gateway`` has ``moc-in``, ``moc-out``
+    and ``world-out``, and a ``tee-payload`` ``world-in``, ``world-out``
+    and ``moc-out``; an ``app_all_veh`` has all four; and a ``ping`` node
+    has a payload's pair, ``moc-in`` and ``world-out``. With no vehicle
+    node in the way, a payload's ``world-out`` connects to a gateway link's
+    ``world-in``.
 
     A link is written as an attribute of the node it leaves, named after the
-    data source it leaves by, with one entry per line:
+    data source it leaves by, one line each: the node the line reaches and the
+    name it arrives there by, separated by a dot.
 
     .. code-block:: yaml
 
        - type compute:
            - compute: k_fore
-             payload-out:
-               - target: gateway
-               - target: mean_temp
-                 input: in0
+             world-out:
+               - gateway.k_fore
+               - mean_temp.in0
 
-    An entry's ``target`` is the node the line goes to; its ``input`` is which
-    of that node's inputs it feeds, or which of its data sinks it arrives at,
-    where either has to be said -- ``node`` alone will do wherever the type has
-    one data sink, which is every type but ``app_all_veh``. A link leaving a type
-    with two data sources -- a tee, an ``app_all_veh`` -- is written under the
-    one it leaves by, which says which. The short spelling is read
-    as well, the destination written as ``node`` or ``node.terminal``, alone or
-    in a list: ``payload-out: k_fore``, or ``payload-out: [gateway,
-    mean_temp.in0]``.
+    A link leaving a type with two data sources -- a tee, an ``app_all_veh``
+    -- is written under the one it leaves by, which says which. One line needs
+    no list: ``world-out: gateway.k_fore``.
 
     A data sink takes one data source; a data source may reach several sinks;
     and a gateway link's sink takes as many as the configuration gives it, every
     payload's telemetry arriving at the ground on its own socket.
 
-    The node at the arriving end says so under the data sink the line arrives
-    at: ``payload-in: true``, and ``false`` for a sink nothing arrives at.
-    It is a record and not the link -- the link is the attribute on the node it
-    leaves, and that is the one the software reads -- so a file may leave these
-    out and still be complete. Which node a line comes from is not repeated
-    here: that is written on the node it leaves, and at a sink several lines
-    arrive at, one name would read as the only one. A flag that disagrees with
-    the links is refused where the file is read. tcsgui writes them.
+    The node at the arriving end lists, under each data sink, the names a
+    line may arrive there by -- ``world-in: [k_fore]`` on the gateway, and a
+    vote's world-in is its inputs, ``world-in: [in0, in1, in2]``. A line to a
+    name its far end does not list is refused where the file is read, saying
+    which names it does list. A name is one word with no dot in it, and may be
+    listed with nothing arriving at it yet. tcsgui names a line it draws after
+    the node it leaves, and adds the name to the list for you.
 
-    Each terminal may be linked to one other: a ``payload-out`` to a
-    ``payload-in``, a ``payload-in`` to a ``payload-out``, a ``gateway-out`` to
-    a ``gateway-in``, a ``gateway-in`` to a ``gateway-out``. Anything else would
+    Each terminal may be linked to one other: a ``world-out`` to a
+    ``world-in``, a ``world-in`` to a ``world-out``, a ``moc-out`` to
+    a ``moc-in``, a ``moc-in`` to a ``moc-out``. Anything else would
     carry one stream into the other. In tcsgui the terminals are drawn as small
     boxes in a node's corners, each with an arrow saying which way its data
     goes: the payload's own data along the top pointing right, towards the
@@ -257,26 +250,26 @@ terminal
     and the line is drawn to whichever of its terminals the stream arrives at.
     A node with no terminal of that stream takes nothing, and a gateway link has
     none on its right at all: the payload data it receives arrives at the
-    ``payload-in`` in its upper left, and what it sends leaves by the
-    ``gateway-out`` in its lower left.
+    ``world-in`` in its upper left, and what it sends leaves by the
+    ``moc-out`` in its lower left.
 
 ``null-gateway`` and ``null-payload`` nodes
     Vehicle nodes that take one stream and drop it: a ``null-gateway`` takes
-    what the ground sends at its ``gateway-in``, and a ``null-payload`` takes a
-    payload's data at its ``payload-in``. Neither has a data source, so nothing
+    what the ground sends at its ``moc-in``, and a ``null-payload`` takes a
+    payload's data at its ``world-in``. Neither has a data source, so nothing
     can be linked out of one. For a stream that has to go somewhere and has
     nowhere to go yet. They take no attributes.
 
 ``tee-gateway`` and ``tee-payload`` nodes
     Vehicle nodes that take one stream and send each datum on both ways. A
-    ``tee-gateway`` takes what the ground sends at its ``gateway-in`` and sends
-    it on by its ``gateway-out``, as it was going, and again by its
-    ``payload-out``, as payload data. A ``tee-payload`` takes a payload's data
-    at its ``payload-in`` and sends it on by its ``payload-out`` and again by
-    its ``gateway-out``, as gateway data. A link cannot carry one stream into
-    the other, so a tee is how what the ground sends reaches a ``payload-in`` --
+    ``tee-gateway`` takes what the ground sends at its ``moc-in`` and sends
+    it on by its ``moc-out``, as it was going, and again by its
+    ``world-out``, as payload data. A ``tee-payload`` takes a payload's data
+    at its ``world-in`` and sends it on by its ``world-out`` and again by
+    its ``moc-out``, as gateway data. A link cannot carry one stream into
+    the other, so a tee is how what the ground sends reaches a ``world-in`` --
     the ground's own, to see what it sent, or a log's -- and how a payload's
-    reading reaches a ``gateway-in``. Each data source may reach as many sinks
+    reading reaches a ``moc-in``. Each data source may reach as many sinks
     as any other, so every link out of a tee gets a copy. A link out of one
     names the source it leaves by, there being two:
 
@@ -284,14 +277,14 @@ terminal
 
        - type tee-gateway:
            - compute: echo
-             gateway-out: [heater]
-             payload-out: [gateway]
+             moc-out: [heater]
+             world-out: [gateway]
 
     They take no attributes.
 
 ``ping`` node
     A vehicle node that answers the ground. Link a gateway link's
-    ``gateway-out`` to it and its ``payload-out`` back to the gateway link. Each
+    ``moc-out`` to it and its ``world-out`` back to the gateway link. Each
     ping the ground sends, ``ping #<count> <time>``, comes back with a space and
     the vehicle's time on the end. Each time is seconds since the UNIX epoch
     with nine digits after the point, such as ``1760900000.000000001``, and the
@@ -1924,13 +1917,13 @@ which is what a panel in the MOC shows.
            direction: "output"
            lines: "3,4,5"
            path: "/dev/gpiochip0"
-           gateway-in: true
+           moc-in: [thermostat]
 
          - payload: heaters_2
            direction: "output"
            lines: "6,7,8"
            path: "/dev/gpiochip0"
-           gateway-in: true
+           moc-in: [thermostat]
 
      - type i2c:
          - payload: temp_1
@@ -1938,16 +1931,16 @@ which is what a panel in the MOC shows.
            group: "zone_temps"
            path: "/dev/i2c-1"
            read_size: "2"
-           payload-out:
-             - target: temp1
+           world-out:
+             - temp1.temp_1
 
          - payload: temp_2
            address: "0x49"
            group: "zone_temps"
            path: "/dev/i2c-1"
            read_size: "2"
-           payload-out:
-             - target: temp2
+           world-out:
+             - temp2.temp_2
 
      - type spi:
          - payload: temp_3
@@ -1956,8 +1949,8 @@ which is what a panel in the MOC shows.
            path: "/dev/spidev0.0"
            read_size: "3"
            spi_mode: "0"
-           payload-out:
-             - target: temp3
+           world-out:
+             - temp3.temp_3
 
 The same configuration in the other spelling is
 ``tests/manual/thermostat.xtcs``, which a test holds to saying the same
@@ -2376,7 +2369,7 @@ descent from the altitudes by an alpha-beta filter, flies a rate in proportion
 to the altitude -- six hundredths of it a second, between twenty and one --
 and answers the throttle that holds the lander's weight and closes the gap
 between the rate it has and the rate it wants, as a ``ratio``. Its answers go
-by its ``gateway-out`` link to ``engine``, the engine's throttle, which is
+by its ``moc-out`` link to ``engine``, the engine's throttle, which is
 driven with a value: four bytes of millionths, read by the stand-in as the
 ratio guidance answered. Half a metre up guidance cuts the engine for good,
 and the lander drops the rest.
@@ -2540,7 +2533,7 @@ The ping example
 ----------------
 .. figure:: ../examples/ping/ping.svg
    :alt: The ping example: the ground station ping_gateway.py sends a ping up to
-         the gateway node, which hands it to the ping node by its gateway-out
+         the gateway node, which hands it to the ping node by its moc-out
          link; the ping node answers with the vehicle's time on the end, and the
          answer comes back down through the gateway node to the ground, beside
          the beacon panel.
@@ -2551,8 +2544,8 @@ The ping example
 The one exchange that shows how long the link takes each way, and how far the
 two ends' clocks are apart. The ground station sends ``ping #<count> <time>``
 up to the gateway node, which binds ``address:port`` aboard and hands it by its
-``gateway-out`` link to the ``ping`` node. The ``ping`` node answers with the
-ping, a space, and the vehicle's time, and sends that by its ``payload-out``
+``moc-out`` link to the ``ping`` node. The ``ping`` node answers with the
+ping, a space, and the vehicle's time, and sends that by its ``world-out``
 link back to the gateway node and so down to the ground, at ``ground_base`` plus
 its device id. Each time is seconds since the UNIX epoch to the nanosecond:
 ``1760900000.000000001``. What a ping and its answer say is
@@ -2821,12 +2814,12 @@ The tees example
 The four nodes that do nothing to what passes, each taking one stream. What
 the ground sends goes up to the gateway node ``ground``, which binds
 ``127.0.0.1:8600`` aboard, and leaves it for ``echo``, a ``tee-gateway``. The
-tee sends each command on by its ``gateway-out`` to the ``heater``, as it was
-going, and again by its ``payload-out`` back to ``ground`` -- so the ground sees
+tee sends each command on by its ``moc-out`` to the ``heater``, as it was
+going, and again by its ``world-out`` back to ``ground`` -- so the ground sees
 what the vehicle was told, arriving at ``ground_base`` plus ``echo``'s device
 id, ``127.0.0.1:8701``. The ``sensor``'s readings go to ``readings``, a
 ``tee-payload``, which sends each down to the ground at ``127.0.0.1:8704`` and
-again by its ``gateway-out`` to ``dropped``, a ``null-gateway``, standing where
+again by its ``moc-out`` to ``dropped``, a ``null-gateway``, standing where
 something aboard that took readings as commands would be. The ``spare``
 payload's data goes to ``unheard``, a ``null-payload``: nobody wants it yet.
 
@@ -2868,7 +2861,7 @@ is as ``bridge_base``, counted on the same way: the ``thermometer``, device id
 of the F´ IDs the bridge gives what arrives, counted on by the same device id
 -- the thermometer's readings are F´ channel ``0x3003`` -- which the bridge's
 model is made from and nothing aboard reads. A command the bridge sends up to
-``fsw``, which binds ``127.0.0.1:9600``, leaves it by its ``gateway-out`` for
+``fsw``, which binds ``127.0.0.1:9600``, leaves it by its ``moc-out`` for
 the ``heater``.
 
 The thermometer's readings go to ``zone_temp`` too, a ``to_kelvin`` compute
@@ -2957,7 +2950,7 @@ of the configuration to restart onto as tcsverify prints it, or nothing for
 this one's; the vehicle's answer is a ``RestartAnswered`` event, and after a
 restart the bridge connects to the start that comes back by itself, saying
 ``Matched`` again. ``SEND_DATA`` sends its text up to the gateway node, which leaves it
-by its ``gateway-out`` links -- ``SEND_DATA 1`` turns the example's heater on,
+by its ``moc-out`` links -- ``SEND_DATA 1`` turns the example's heater on,
 and ``SEND_DATA 0`` off -- and is said in a ``DataSent`` event; it goes only
 while the bridge is matched for commanding, and is refused before, as every
 command but CONNECT and the restarts is. What the vehicle's beacon says is
@@ -3086,7 +3079,7 @@ counted on by each source's device id: the ``thermometer``, device id 2, is
 published as ``0x4242``. It has no address and no port, and one written on it
 is refused: it is reached through the peer. A command the bus publishes as its
 ``cmd_msgid``, ``0x4281``, is taken by ``fsw`` and leaves it by its
-``gateway-out`` for the ``heater``; ``cmd_msgid`` is required where a line or
+``moc-out`` for the ``heater``; ``cmd_msgid`` is required where a line or
 a command binding leaves the node.
 
 Each tcspecial packet is wrapped in a cFS packet as it goes -- the CCSDS
@@ -3167,10 +3160,10 @@ carrying the identifier ``0x123`` and takes commands in frames carrying
 ``0x124``. Two identifiers make two payloads: each opens a socket of its own
 on the bus, filtered to its identifier, so ``motor_status`` hears the status
 frames and nothing else, and ``motor_command`` hears nothing it has not sent.
-Each status frame's data goes by ``motor_status``'s ``payload-out`` to the
+Each status frame's data goes by ``motor_status``'s ``world-out`` to the
 gateway node ``ground`` and down to the MOC at ``ground_base`` plus its
 device id, ``127.0.0.1:3702``. What the ground sends up to ``ground``, which
-binds ``127.0.0.1:3600``, leaves it by its ``gateway-out`` for
+binds ``127.0.0.1:3600``, leaves it by its ``moc-out`` for
 ``motor_command`` and goes out as one frame, so a command is at most eight
 bytes.
 
@@ -3196,9 +3189,9 @@ The gpio example
 Two lines of one chip, each a payload of its own because one is read and the
 other driven, and a payload's lines all go one way. ``switch`` watches line 0
 for both edges: each becomes a sixteen-byte record -- when, which line, and
-what it became -- that goes by its ``payload-out`` to ``ground`` and down to
+what it became -- that goes by its ``world-out`` to ``ground`` and down to
 the MOC at ``127.0.0.1:3722``. ``lamp`` drives line 1: what the ground sends
-up to ``127.0.0.1:3620`` leaves ``ground`` by its ``gateway-out`` for it, the
+up to ``127.0.0.1:3620`` leaves ``ground`` by its ``moc-out`` for it, the
 text ``1`` lighting the lamp and ``0`` putting it out.
 
 The chip is one of the kernel's ``gpio-sim``, which ``sudo
@@ -3222,9 +3215,9 @@ The iio example
    ``examples/iio``: a sensor's sample buffer.
 
 A sensor's buffer, which hands over whole sample sets as they are taken.
-``sensor`` reads it and each read's sets go by its ``payload-out`` to
+``sensor`` reads it and each read's sets go by its ``world-out`` to
 ``ground`` and down to the MOC at ``127.0.0.1:3741``. Nothing goes up: a
-buffer is read and never written, so ``ground`` has no ``gateway-out``. Which
+buffer is read and never written, so ``ground`` has no ``moc-out``. Which
 channels are in a set and how often one is taken are the sensor's settings,
 made in ``sysfs`` by whoever brings it up, and nothing in the configuration.
 

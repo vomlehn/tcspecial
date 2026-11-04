@@ -2,27 +2,17 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://github.com/vomlehn/tcspecial/schema/tcspecial.schema.json",
   "title": "tcspecial configuration",
-  "description": "The shape of a configuration: which sections there are, what an entry may say, and which words are words. Not whether it can be flown -- which attributes a node of a given type must state, whether two payloads claim one socket, whether a mean's inputs are the ones its links bind are rules about meaning, tested against real buses, and tcsverify is the one place they live. A file this accepts may still be refused, and the refusal will say why.",
+  "description": "The shape of a configuration: which sections there are, what an entry may say, and which words are words. Not whether it can be flown -- which attributes a node of a given type must state, whether two payloads claim one socket, whether a link arrives by a name its far end lists are rules about meaning, tested against real buses, and tcsverify is the one place they live. A file this accepts may still be refused, and the refusal will say why.",
   "$defs": {
-    "linkEntry": {
-      "description": "One line out of a node: the node it goes to, and which of that node's inputs it feeds where it feeds a named one. One entry per line, so several lines are several entries and nothing pairs by position.",
-      "type": "object",
-      "properties": {
-        "target": {
-          "description": "The node this line goes to.",
-          "type": "string",
-          "pattern": "^[A-Za-z_][A-Za-z0-9_./-]*(\\.[A-Za-z_][A-Za-z0-9_-]*)?$"
-        },
-        "input": {
-          "description": "Which of that node's inputs the line feeds, or which of its data sinks it arrives at, where either has to be said.",
-          "type": "string",
-          "pattern": "^[A-Za-z_][A-Za-z0-9_-]*$"
-        }
-      },
-      "required": [
-        "target"
-      ],
-      "additionalProperties": false
+    "destination": {
+      "description": "One line out of a node: the node it reaches and the name it arrives there by, separated by a dot, `gateway.readings`. The name is one the node it reaches lists under the sink the line arrives at.",
+      "type": "string",
+      "pattern": "^[A-Za-z_][A-Za-z0-9_./-]*\\.[A-Za-z_][A-Za-z0-9_-]*$"
+    },
+    "arrival": {
+      "description": "A name a line may arrive at one of a node's data sinks by: one word, with no dot in it.",
+      "type": "string",
+      "pattern": "^[A-Za-z_][A-Za-z0-9_-]*$"
     },
     "gatewayNode": {
       "type": "object",
@@ -36,73 +26,65 @@
           "description": "The payload group that reads it, where it is in one. Optional, though a payload that states a trigger needs one: the interval of its group is how often it is asked.",
           "type": "string"
         },
-        "payload-out": {
-          "description": "The lines that leave this node by its `payload-out`, one entry each. An entry names the node the line goes to as its `target`, and `input` where it feeds a named input of that node. The short spellings are read too: the destination as a string, `node` or `node.terminal`, alone or in a list.",
+        "world-out": {
+          "description": "The lines that leave this node by its `world-out`: each the node it reaches and the name it arrives by, `node.name`, alone or in a list.",
           "oneOf": [
             {
-              "description": "One line, written as an entry.",
-              "$ref": "#/$defs/linkEntry"
+              "$ref": "#/$defs/destination"
             },
             {
-              "description": "One line, written as the node it reaches: `node` or `node.terminal`.",
-              "type": "string",
-              "pattern": "^[A-Za-z_][A-Za-z0-9_./-]*(\\.[A-Za-z_][A-Za-z0-9_-]*)?$"
-            },
-            {
-              "description": "Several lines, each an entry or a destination.",
               "type": "array",
               "items": {
-                "oneOf": [
-                  {
-                    "$ref": "#/$defs/linkEntry"
-                  },
-                  {
-                    "type": "string",
-                    "pattern": "^[A-Za-z_][A-Za-z0-9_./-]*(\\.[A-Za-z_][A-Za-z0-9_-]*)?$"
-                  }
-                ]
+                "$ref": "#/$defs/destination"
               },
               "minItems": 1
             }
           ]
         },
-        "gateway-out": {
-          "description": "The lines that leave this node by its `gateway-out`, one entry each. An entry names the node the line goes to as its `target`, and `input` where it feeds a named input of that node. The short spellings are read too: the destination as a string, `node` or `node.terminal`, alone or in a list.",
+        "moc-out": {
+          "description": "The lines that leave this node by its `moc-out`: each the node it reaches and the name it arrives by, `node.name`, alone or in a list.",
           "oneOf": [
             {
-              "description": "One line, written as an entry.",
-              "$ref": "#/$defs/linkEntry"
+              "$ref": "#/$defs/destination"
             },
             {
-              "description": "One line, written as the node it reaches: `node` or `node.terminal`.",
-              "type": "string",
-              "pattern": "^[A-Za-z_][A-Za-z0-9_./-]*(\\.[A-Za-z_][A-Za-z0-9_-]*)?$"
-            },
-            {
-              "description": "Several lines, each an entry or a destination.",
               "type": "array",
               "items": {
-                "oneOf": [
-                  {
-                    "$ref": "#/$defs/linkEntry"
-                  },
-                  {
-                    "type": "string",
-                    "pattern": "^[A-Za-z_][A-Za-z0-9_./-]*(\\.[A-Za-z_][A-Za-z0-9_-]*)?$"
-                  }
-                ]
+                "$ref": "#/$defs/destination"
               },
               "minItems": 1
             }
           ]
         },
-        "payload-in": {
-          "description": "Whether a line arrives at this node's `payload-in` sink. A record of the links written on the nodes they leave, and not a link: which node a line comes from is written on that node. A file may leave it out; one that disagrees with the links is refused where it is read.",
-          "type": "boolean"
+        "world-in": {
+          "description": "The names a groundward line may arrive at this node's `world-in` by, which a link to it names after the dot. A vote's world-in names are its inputs.",
+          "oneOf": [
+            {
+              "$ref": "#/$defs/arrival"
+            },
+            {
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/arrival"
+              },
+              "minItems": 1
+            }
+          ]
         },
-        "gateway-in": {
-          "description": "Whether a line arrives at this node's `gateway-in` sink. A record of the links written on the nodes they leave, and not a link: which node a line comes from is written on that node. A file may leave it out; one that disagrees with the links is refused where it is read.",
-          "type": "boolean"
+        "moc-in": {
+          "description": "The names a vehicleward line may arrive at this node's `moc-in` by, which a link to it names after the dot. A vote's world-in names are its inputs.",
+          "oneOf": [
+            {
+              "$ref": "#/$defs/arrival"
+            },
+            {
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/arrival"
+              },
+              "minItems": 1
+            }
+          ]
         },
         "path": {
           "type": [
@@ -576,14 +558,6 @@
             "null"
           ]
         },
-        "inputs": {
-          "type": [
-            "string",
-            "number",
-            "boolean",
-            "null"
-          ]
-        },
         "format": {
           "type": [
             "string",
@@ -719,73 +693,65 @@
           "description": "The payload group that reads it, where it is in one. Optional, though a payload that states a trigger needs one: the interval of its group is how often it is asked.",
           "type": "string"
         },
-        "payload-out": {
-          "description": "The lines that leave this node by its `payload-out`, one entry each. An entry names the node the line goes to as its `target`, and `input` where it feeds a named input of that node. The short spellings are read too: the destination as a string, `node` or `node.terminal`, alone or in a list.",
+        "world-out": {
+          "description": "The lines that leave this node by its `world-out`: each the node it reaches and the name it arrives by, `node.name`, alone or in a list.",
           "oneOf": [
             {
-              "description": "One line, written as an entry.",
-              "$ref": "#/$defs/linkEntry"
+              "$ref": "#/$defs/destination"
             },
             {
-              "description": "One line, written as the node it reaches: `node` or `node.terminal`.",
-              "type": "string",
-              "pattern": "^[A-Za-z_][A-Za-z0-9_./-]*(\\.[A-Za-z_][A-Za-z0-9_-]*)?$"
-            },
-            {
-              "description": "Several lines, each an entry or a destination.",
               "type": "array",
               "items": {
-                "oneOf": [
-                  {
-                    "$ref": "#/$defs/linkEntry"
-                  },
-                  {
-                    "type": "string",
-                    "pattern": "^[A-Za-z_][A-Za-z0-9_./-]*(\\.[A-Za-z_][A-Za-z0-9_-]*)?$"
-                  }
-                ]
+                "$ref": "#/$defs/destination"
               },
               "minItems": 1
             }
           ]
         },
-        "gateway-out": {
-          "description": "The lines that leave this node by its `gateway-out`, one entry each. An entry names the node the line goes to as its `target`, and `input` where it feeds a named input of that node. The short spellings are read too: the destination as a string, `node` or `node.terminal`, alone or in a list.",
+        "moc-out": {
+          "description": "The lines that leave this node by its `moc-out`: each the node it reaches and the name it arrives by, `node.name`, alone or in a list.",
           "oneOf": [
             {
-              "description": "One line, written as an entry.",
-              "$ref": "#/$defs/linkEntry"
+              "$ref": "#/$defs/destination"
             },
             {
-              "description": "One line, written as the node it reaches: `node` or `node.terminal`.",
-              "type": "string",
-              "pattern": "^[A-Za-z_][A-Za-z0-9_./-]*(\\.[A-Za-z_][A-Za-z0-9_-]*)?$"
-            },
-            {
-              "description": "Several lines, each an entry or a destination.",
               "type": "array",
               "items": {
-                "oneOf": [
-                  {
-                    "$ref": "#/$defs/linkEntry"
-                  },
-                  {
-                    "type": "string",
-                    "pattern": "^[A-Za-z_][A-Za-z0-9_./-]*(\\.[A-Za-z_][A-Za-z0-9_-]*)?$"
-                  }
-                ]
+                "$ref": "#/$defs/destination"
               },
               "minItems": 1
             }
           ]
         },
-        "payload-in": {
-          "description": "Whether a line arrives at this node's `payload-in` sink. A record of the links written on the nodes they leave, and not a link: which node a line comes from is written on that node. A file may leave it out; one that disagrees with the links is refused where it is read.",
-          "type": "boolean"
+        "world-in": {
+          "description": "The names a groundward line may arrive at this node's `world-in` by, which a link to it names after the dot. A vote's world-in names are its inputs.",
+          "oneOf": [
+            {
+              "$ref": "#/$defs/arrival"
+            },
+            {
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/arrival"
+              },
+              "minItems": 1
+            }
+          ]
         },
-        "gateway-in": {
-          "description": "Whether a line arrives at this node's `gateway-in` sink. A record of the links written on the nodes they leave, and not a link: which node a line comes from is written on that node. A file may leave it out; one that disagrees with the links is refused where it is read.",
-          "type": "boolean"
+        "moc-in": {
+          "description": "The names a vehicleward line may arrive at this node's `moc-in` by, which a link to it names after the dot. A vote's world-in names are its inputs.",
+          "oneOf": [
+            {
+              "$ref": "#/$defs/arrival"
+            },
+            {
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/arrival"
+              },
+              "minItems": 1
+            }
+          ]
         },
         "path": {
           "type": [
@@ -1198,14 +1164,6 @@
           ]
         },
         "function": {
-          "type": [
-            "string",
-            "number",
-            "boolean",
-            "null"
-          ]
-        },
-        "inputs": {
           "type": [
             "string",
             "number",
@@ -1372,73 +1330,65 @@
           "description": "The payload group that reads it, where it is in one. Optional, though a payload that states a trigger needs one: the interval of its group is how often it is asked.",
           "type": "string"
         },
-        "payload-out": {
-          "description": "The lines that leave this node by its `payload-out`, one entry each. An entry names the node the line goes to as its `target`, and `input` where it feeds a named input of that node. The short spellings are read too: the destination as a string, `node` or `node.terminal`, alone or in a list.",
+        "world-out": {
+          "description": "The lines that leave this node by its `world-out`: each the node it reaches and the name it arrives by, `node.name`, alone or in a list.",
           "oneOf": [
             {
-              "description": "One line, written as an entry.",
-              "$ref": "#/$defs/linkEntry"
+              "$ref": "#/$defs/destination"
             },
             {
-              "description": "One line, written as the node it reaches: `node` or `node.terminal`.",
-              "type": "string",
-              "pattern": "^[A-Za-z_][A-Za-z0-9_./-]*(\\.[A-Za-z_][A-Za-z0-9_-]*)?$"
-            },
-            {
-              "description": "Several lines, each an entry or a destination.",
               "type": "array",
               "items": {
-                "oneOf": [
-                  {
-                    "$ref": "#/$defs/linkEntry"
-                  },
-                  {
-                    "type": "string",
-                    "pattern": "^[A-Za-z_][A-Za-z0-9_./-]*(\\.[A-Za-z_][A-Za-z0-9_-]*)?$"
-                  }
-                ]
+                "$ref": "#/$defs/destination"
               },
               "minItems": 1
             }
           ]
         },
-        "gateway-out": {
-          "description": "The lines that leave this node by its `gateway-out`, one entry each. An entry names the node the line goes to as its `target`, and `input` where it feeds a named input of that node. The short spellings are read too: the destination as a string, `node` or `node.terminal`, alone or in a list.",
+        "moc-out": {
+          "description": "The lines that leave this node by its `moc-out`: each the node it reaches and the name it arrives by, `node.name`, alone or in a list.",
           "oneOf": [
             {
-              "description": "One line, written as an entry.",
-              "$ref": "#/$defs/linkEntry"
+              "$ref": "#/$defs/destination"
             },
             {
-              "description": "One line, written as the node it reaches: `node` or `node.terminal`.",
-              "type": "string",
-              "pattern": "^[A-Za-z_][A-Za-z0-9_./-]*(\\.[A-Za-z_][A-Za-z0-9_-]*)?$"
-            },
-            {
-              "description": "Several lines, each an entry or a destination.",
               "type": "array",
               "items": {
-                "oneOf": [
-                  {
-                    "$ref": "#/$defs/linkEntry"
-                  },
-                  {
-                    "type": "string",
-                    "pattern": "^[A-Za-z_][A-Za-z0-9_./-]*(\\.[A-Za-z_][A-Za-z0-9_-]*)?$"
-                  }
-                ]
+                "$ref": "#/$defs/destination"
               },
               "minItems": 1
             }
           ]
         },
-        "payload-in": {
-          "description": "Whether a line arrives at this node's `payload-in` sink. A record of the links written on the nodes they leave, and not a link: which node a line comes from is written on that node. A file may leave it out; one that disagrees with the links is refused where it is read.",
-          "type": "boolean"
+        "world-in": {
+          "description": "The names a groundward line may arrive at this node's `world-in` by, which a link to it names after the dot. A vote's world-in names are its inputs.",
+          "oneOf": [
+            {
+              "$ref": "#/$defs/arrival"
+            },
+            {
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/arrival"
+              },
+              "minItems": 1
+            }
+          ]
         },
-        "gateway-in": {
-          "description": "Whether a line arrives at this node's `gateway-in` sink. A record of the links written on the nodes they leave, and not a link: which node a line comes from is written on that node. A file may leave it out; one that disagrees with the links is refused where it is read.",
-          "type": "boolean"
+        "moc-in": {
+          "description": "The names a vehicleward line may arrive at this node's `moc-in` by, which a link to it names after the dot. A vote's world-in names are its inputs.",
+          "oneOf": [
+            {
+              "$ref": "#/$defs/arrival"
+            },
+            {
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/arrival"
+              },
+              "minItems": 1
+            }
+          ]
         },
         "path": {
           "type": [
@@ -1851,14 +1801,6 @@
           ]
         },
         "function": {
-          "type": [
-            "string",
-            "number",
-            "boolean",
-            "null"
-          ]
-        },
-        "inputs": {
           "type": [
             "string",
             "number",

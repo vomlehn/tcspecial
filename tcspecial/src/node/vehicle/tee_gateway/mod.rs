@@ -2,11 +2,11 @@
 //! `tee-gateway`.
 //!
 //! A link carries one stream and may not carry it into the other -- a
-//! `gateway-out` goes to a `gateway-in` and nowhere else -- so where what the
-//! ground sends has to reach a `payload-in` as well, a tee is what does it. A
-//! `tee-gateway` takes each datum the ground sends at its `gateway-in` and
-//! sends it on by its `gateway-out`, as it was going, and again by its
-//! `payload-out`. Its mirror is the `tee-payload`, in `super::tee_payload`,
+//! `moc-out` goes to a `moc-in` and nowhere else -- so where what the
+//! ground sends has to reach a `world-in` as well, a tee is what does it. A
+//! `tee-gateway` takes each datum the ground sends at its `moc-in` and
+//! sends it on by its `moc-out`, as it was going, and again by its
+//! `world-out`. Its mirror is the `tee-payload`, in `super::tee_payload`,
 //! which holds what arrives in the same [`Through`].
 //!
 //! What a tee is told is nothing. It has no attributes, and the

@@ -1,199 +1,264 @@
-//! What a node's entry says about its own data sinks.
+//! Where a line may arrive at a node, and the lines that do.
 //!
 //! A line between two nodes is written on the node it leaves, under the data
-//! source it leaves by, with the node it reaches named by the entry's
-//! `target`. The node it arrives at says so too, under the sink it arrives
-//! at: `payload-in: true`. The first is what the configuration means --
-//! [`NodeFile::links`](super::NodeFile::links) derives the graph from it and
-//! the flight software reads nothing else. The second is a record of the same
-//! fact at the other end, so that a node's own entry says it is connected
-//! without the rest of the file having to be read against it.
+//! source it leaves by, as the node it reaches and a name: `world-out:
+//! [zone_temp.in0]`. The node it reaches lists that name under the sink it
+//! arrives at -- `world-in: [in0, in1, in2]` -- which is the node saying where
+//! it may be joined. The two are matched here, as the configuration is read:
+//! a line to a name its far end does not list is refused, saying which names
+//! it does, because a link to a guessed name is a link to whatever the guess
+//! happened to hit.
 //!
-//! A flag and not a name. It named the node the data came from for a while,
-//! which is a second copy of the link and reads as "and nothing else" the
-//! moment a second line arrives at the same sink -- the ground's does, every
-//! payload aboard reporting to it. What a node can say about its own sink
-//! without repeating the graph is whether anything arrives there at all, and
-//! that is what this is.
+//! A name may be listed with nothing arriving at it: a list is where a node
+//! may be joined, not a promise that it is. What has to be joined is the
+//! rules' business -- a vote over an input nothing sends is refused as that,
+//! in [`crate::graph::check`].
 //!
-//! Two statements of one fact can still disagree, and the answer to that is
-//! not to believe the second one. The flag is checked against the links it is
-//! a record of where the configuration is read, and a disagreement is refused
-//! saying which two entries say different things. Nothing downstream ever
-//! reads it.
-//!
-//! It is optional. A file somebody wrote by hand may say nothing about its
-//! sinks and be complete -- there is nothing here the links do not already say
-//! -- and every file written before this existed stays readable.
+//! Matched, each line is turned into what it means, which is what every rule
+//! and the flight software read: the sink it arrives at, and for a vote the
+//! input. The names themselves are kept apart, in [`Named`], for the editor,
+//! which writes them back; nothing aboard reads them.
 
-use std::collections::{BTreeMap, BTreeSet};
+use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};
 
 use crate::error::{TcsError, TcsResult};
 
-use super::terminals::{answers, stream_of, terminal_at};
-use super::{Destination, Graph, NodeFile};
+use super::terminals::{answers, terminal_at, terminals_of};
+use super::{Destination, Destinations, Graph, Named, Node, NodeFile, Sinks};
 
-/// What the files said about their nodes' data sinks.
+/// What the files said about where their nodes may be joined.
 ///
-/// Gathered as the files are read and thrown away once it has been checked:
-/// see [`Mirror::check`]. It is not part of [`Graph`] because it is not part
-/// of the configuration -- it is a second statement of part of it, and a
-/// second statement that anything went on to read would be a second answer to
-/// the question of what is linked to what.
+/// Gathered as the files are read and used once all of them have been: a
+/// line may cross from an included file into the top one, so a name and the
+/// line to it are not necessarily in the same file. See [`Mirror::resolve`].
 #[derive(Debug, Default)]
 pub struct Mirror {
-    /// By the node that said it and the sink it was said of: whether a line
-    /// arrives there, and the file that said so.
-    said: BTreeMap<(String, String), Recorded>,
-}
-
-/// One sink's flag, and where it was read from.
-#[derive(Debug)]
-struct Recorded {
-    /// The file it is in, so that a complaint can say which one to open. Not
-    /// necessarily the file the link itself is written in: a link may cross
-    /// from an included file into the top one.
-    from: PathBuf,
-    /// What it said: a line arrives here, or none does.
-    arrives: bool,
+    /// By node: the file its entry is in, and the names it listed.
+    said: BTreeMap<String, (PathBuf, Sinks)>,
 }
 
 impl Mirror {
-    /// Takes in what one node's entry said about its sinks.
+    /// Takes in the names one node's entry listed.
     ///
     /// # Arguments
     ///
     /// * `from` - The file the entry is in.
     /// * `said` - The entry.
     pub fn record(&mut self, from: &Path, said: &NodeFile) {
-        for (sink, arrives) in said.arriving() {
-            let Some(arrives) = arrives else { continue };
-            self.said.insert(
-                (said.node.name.clone(), sink.to_string()),
-                Recorded {
-                    from: from.to_path_buf(),
-                    arrives,
+        self.said.insert(
+            said.node.name.clone(),
+            (
+                from.to_path_buf(),
+                Sinks {
+                    world_in: said.world_in.clone(),
+                    moc_in: said.moc_in.clone(),
                 },
-            );
-        }
+            ),
+        );
     }
 
-    /// Whether every flag agrees with the links it is a record of.
+    /// Matches each line to a name its far end lists, and makes it what it
+    /// means.
     ///
-    /// Both ways round, and each is a sentence about two entries rather than
-    /// about one: a sink that says a line arrives where none does, and one
-    /// that says none does where one is written. The configuration is refused
-    /// for either, because a file that contradicts itself about its own graph
-    /// is a file whose other half may be the wrong one.
+    /// A node's names first, each once and under a sink its type has; then
+    /// each line, which must name its node and a name that node lists under
+    /// the sink the line's stream arrives at. A line to a node nothing
+    /// declares is left as written, for the checking to say there is no such
+    /// node.
     ///
     /// # Arguments
     ///
-    /// * `graph` - The configuration the flags were read from.
+    /// * `graph` - The configuration, every file in it read. Its links are
+    ///             made what they mean, and its [`Named`] filled in.
     ///
     /// # Returns
     ///
-    /// `Ok(())` when every flag agrees.
+    /// `Ok(())` once every line is matched.
     ///
     /// # Errors
     ///
-    /// [`TcsError::Config`], naming the file, for a flag on a sink the node's
-    /// type does not have, or one that disagrees with the links.
-    pub fn check(&self, graph: &Graph) -> TcsResult<()> {
-        let arriving = arrivals(graph);
-
-        for ((node, sink), recorded) in &self.said {
-            let at = recorded.from.display();
-            // A sink the type does not have, said as what it is before
-            // anything is compared: "a payload has no data sink called
-            // payload-in" is the useful complaint, not "nothing arrives
-            // there".
-            if let Some(said) = graph.node(node) {
-                if let Err(why) = terminal_at(&said.node_type, Some(sink), true)
-                {
-                    return Err(TcsError::Config(format!(
-                        "{at}: \"{node}\" says {sink}: {why}"
-                    )));
+    /// [`TcsError::Config`], naming the file, for a name listed twice or
+    /// under a sink the type does not have, a line naming no name, a name its
+    /// far end does not list under the sink it arrives at, and two lines from
+    /// one source to one node.
+    pub fn resolve(&self, graph: &mut Graph) -> TcsResult<()> {
+        for (node, (from, sinks)) in &self.said {
+            let at = from.display();
+            let mut seen: Vec<&str> = Vec::new();
+            for (sink, names) in
+                [("world-in", &sinks.world_in), ("moc-in", &sinks.moc_in)]
+            {
+                for name in names {
+                    if seen.contains(&name.as_str()) {
+                        return Err(TcsError::Config(format!(
+                            "{at}: \"{node}\" lists \"{name}\" twice: a \
+                             name is where a line arrives, and two of one \
+                             name would leave a line to it meaning either. \
+                             List it once, under one sink"
+                        )));
+                    }
+                    seen.push(name);
                 }
-            }
-
-            let links = arriving.get(&(node.clone(), sink.clone()));
-            let sources: Vec<&str> = links
-                .map(|links| links.iter().map(String::as_str).collect())
-                .unwrap_or_default();
-
-            match (recorded.arrives, sources.as_slice()) {
-                (true, []) => {
-                    return Err(TcsError::Config(format!(
-                        "{at}: \"{node}\" says a line arrives at its {sink}, \
-                         and none does. A line is recorded at both of its ends \
-                         and the two must agree: the link itself is written on \
-                         the node it leaves, as an entry under the data source \
-                         it leaves by"
-                    )))
+                if names.is_empty() {
+                    continue;
                 }
-                (false, [first, ..]) => {
-                    return Err(TcsError::Config(format!(
-                        "{at}: \"{node}\" says no line arrives at its {sink}, \
-                         and \"{first}\" sends one there"
-                    )))
+                // A sink the type does not have, said as what it is: "a
+                // payload has no data sink called world-in" is the useful
+                // complaint, not one about the lines to it.
+                if let Some(said) = graph.node(node) {
+                    if let Err(why) =
+                        terminal_at(&said.node_type, Some(sink), true)
+                    {
+                        return Err(TcsError::Config(format!(
+                            "{at}: \"{node}\" lists names under {sink}: \
+                             {why}"
+                        )));
+                    }
                 }
-                _ => {}
             }
         }
 
+        let mut written = BTreeMap::new();
+        let mut links = std::mem::take(&mut graph.links);
+        for link in &mut links {
+            let origin = link.origin();
+            // The source terminal, which every link read from a node has: a
+            // link is written under the terminal it leaves by. One that
+            // names none, or a terminal of no stream, is the checking's to
+            // complain about.
+            let Some(leaves) = origin.input.as_deref() else {
+                continue;
+            };
+            let Some(sink) = answers(leaves) else {
+                continue;
+            };
+            let at = graph
+                .homes
+                .get(&origin.node)
+                .map(|home| home.display().to_string())
+                .unwrap_or_default();
+            let mut meant: Vec<String> = Vec::new();
+            for destination in link.to.each() {
+                let Destination { node, input } =
+                    Destination::parse(destination);
+                let (Some((_, sinks)), Some(reached)) =
+                    (self.said.get(&node), graph.node(&node))
+                else {
+                    meant.push(destination.to_string());
+                    continue;
+                };
+                let (ours, theirs, other) = if sink == "world-in" {
+                    (&sinks.world_in, &sinks.moc_in, "moc-in")
+                } else {
+                    (&sinks.moc_in, &sinks.world_in, "world-in")
+                };
+                let listed = || match ours.as_slice() {
+                    [] => format!("it lists none under its {sink}"),
+                    names => format!(
+                        "it lists {} under its {sink}",
+                        names
+                            .iter()
+                            .map(|name| format!("\"{name}\""))
+                            .collect::<Vec<_>>()
+                            .join(", ")
+                    ),
+                };
+                let sender = &origin.node;
+                let Some(name) = input else {
+                    return Err(TcsError::Config(format!(
+                        "{at}: \"{sender}\" sends a line to \"{node}\" by \
+                         its {leaves} and names no name for it to arrive by: \
+                         write it as `{node}.<name>`, with a name \"{node}\" \
+                         lists under its {sink}, and {}",
+                        listed()
+                    )));
+                };
+                if !ours.contains(&name) {
+                    let why = if theirs.contains(&name) {
+                        format!(
+                            "\"{node}\" lists \"{name}\" under its {other}, \
+                             and a line leaving by a {leaves} arrives at a \
+                             {sink}"
+                        )
+                    } else {
+                        format!(
+                            "\"{node}\" lists no \"{name}\" under its \
+                             {sink}: add it there, or send to a name it \
+                             lists -- {}",
+                            listed()
+                        )
+                    };
+                    return Err(TcsError::Config(format!(
+                        "{at}: \"{sender}\" sends a line to \
+                         \"{destination}\", and {why}"
+                    )));
+                }
+                let means = meaning(reached, sink, &name);
+                if meant.contains(&means) {
+                    return Err(TcsError::Config(format!(
+                        "{at}: \"{sender}\" sends two lines by its {leaves} \
+                         to \"{node}\", and one carries everything it sends \
+                         there: take out \"{destination}\""
+                    )));
+                }
+                written.insert(
+                    (link.from.clone(), means.clone()),
+                    destination.to_string(),
+                );
+                meant.push(means);
+            }
+            link.to = Destinations::of(meant);
+        }
+        graph.links = links;
+
+        graph.named = Named {
+            sinks: self
+                .said
+                .iter()
+                .map(|(node, (_, sinks))| (node.clone(), sinks.clone()))
+                .collect(),
+            written,
+        };
         Ok(())
     }
 }
 
-/// Finds what arrives at each sink.
+/// Says what a line arriving at a node by a name means.
 ///
-/// Derived from the links, which are the configuration. The sink a link
-/// arrives at is the one the destination named, where it named one of the
-/// four; otherwise it is the one at the other end of the stream it leaves by
-/// -- a `payload-out` arrives at a `payload-in` and nowhere else, so a file
-/// that did not say it still said it.
-///
-/// The names are here for the complaint rather than for the comparison: what
-/// a flag is checked against is whether this is empty, and what a person needs
-/// told is which node they forgot.
+/// The sink it arrives at, written the way every rule reads a destination:
+/// the node alone where the type has one sink, and the node and the sink
+/// where it has two. A vote's world-in names are its inputs, so a line to one
+/// of those is to that input. A computation or a log has one sink of each
+/// stream, which is the node alone.
 ///
 /// # Arguments
 ///
-/// * `graph` - The configuration.
+/// * `node` - The node the line reaches.
+/// * `sink` - The sink it arrives at, `world-in` or `moc-in`.
+/// * `name` - The name it arrives by.
 ///
 /// # Returns
 ///
-/// By node and sink, the nodes that send there.
-fn arrivals(graph: &Graph) -> BTreeMap<(String, String), BTreeSet<String>> {
-    let mut arriving: BTreeMap<(String, String), BTreeSet<String>> =
-        BTreeMap::new();
-    for link in &graph.links {
-        let origin = link.origin();
-        // The source terminal, which every link has: a link is
-        // written under the terminal it leaves by, so the name is how it was
-        // found at all.
-        let Some(leaves) = origin.input.as_deref() else {
-            continue;
-        };
-        for destination in link.to.each() {
-            let said = Destination::parse(destination);
-            let sink = match said.input.as_deref() {
-                Some(named) if stream_of(named).is_some() => named.to_string(),
-                // A computation's own input, or nothing named: either way the
-                // stream says where it arrives.
-                _ => match answers(leaves) {
-                    Some(sink) => sink.to_string(),
-                    None => continue,
-                },
-            };
-            arriving
-                .entry((said.node.clone(), sink))
-                .or_default()
-                .insert(origin.node.clone());
+/// The destination, `node`, `node.<sink>` or `node.<input>`.
+fn meaning(node: &Node, sink: &str, name: &str) -> String {
+    match terminals_of(&node.node_type) {
+        Some(terminals) if terminals.sinks.len() > 1 => {
+            format!("{}.{sink}", node.name)
+        }
+        Some(_) => node.name.clone(),
+        None => {
+            let votes = node
+                .attributes
+                .get("function")
+                .is_some_and(|function| function.as_str() == "vote");
+            if votes && sink == "world-in" {
+                format!("{}.{name}", node.name)
+            } else {
+                node.name.clone()
+            }
         }
     }
-    arriving
 }
 
 #[cfg(test)]
@@ -201,12 +266,8 @@ mod tests {
     use super::*;
 
     /// Loads a configuration of one payload and the ground, with whatever the
-    /// two entries are given to say about their own data sinks.
-    ///
-    /// The groundward link is the payload's `payload-out: gateway` and the
-    /// vehicleward one is the ground's `gateway-out: payload`, so the flags
-    /// that agree with them are `payload-in: true` on the ground and
-    /// `gateway-in: true` on the payload.
+    /// two entries are given to say about where they may be joined and where
+    /// they send.
     ///
     /// # Arguments
     ///
@@ -253,8 +314,6 @@ gateways:
       - gateway: gateway
         address: \"10.0.0.1\"
         port: \"5000\"
-        gateway-out:
-          - target: payload
 {gateway_says}
 payloads:
   - type i2c:
@@ -262,8 +321,6 @@ payloads:
         path: \"/dev/i2c-1\"
         address: \"0x48\"
         read_size: \"2\"
-        payload-out:
-          - target: gateway
 {payload_says}
 "
             ),
@@ -272,96 +329,118 @@ payloads:
         Graph::load(&path)
     }
 
-    /// Both sinks saying a line arrives, where one does, is a configuration
-    /// that reads.
+    /// The ground's half: where it may be joined, and what it sends.
+    const GATEWAY: &str = "        world-in: [readings]
+        moc-out: [payload.asked]";
+    /// And the payload's.
+    const PAYLOAD: &str = "        moc-in: [asked]
+        world-out: [gateway.readings]";
+
+    /// A line to a name its far end lists is read, as what it means, and
+    /// the name is kept for the editor.
     #[test]
-    fn a_flag_that_agrees_with_the_links_is_read() {
-        let graph =
-            pair("        payload-in: true", "        gateway-in: true")
-                .expect("both ends saying the same thing");
-        assert_eq!(graph.links.len(), 2, "the flags are not links");
+    fn a_line_to_a_listed_name_is_read() {
+        let graph = pair(GATEWAY, PAYLOAD).expect("both ends agree");
+        let to = |from: &str| {
+            let link = graph
+                .links
+                .iter()
+                .find(|link| link.from == from)
+                .expect("the link");
+            link.to.each().join(",")
+        };
+        assert_eq!(to("payload.world-out"), "gateway");
+        assert_eq!(to("gateway.moc-out"), "payload");
+        assert_eq!(
+            graph.named.written
+                [&("payload.world-out".to_string(), "gateway".to_string())],
+            "gateway.readings"
+        );
+        assert_eq!(graph.named.sinks["payload"].moc_in, ["asked"]);
     }
 
-    /// Saying nothing is a file that is still complete.
-    ///
-    /// Every configuration written before a sink could say anything, and every
-    /// one somebody writes by hand without bothering: there is nothing in a
-    /// flag that the links do not already say.
+    /// A name listed with nothing arriving at it is where the node may be
+    /// joined, and reads.
     #[test]
-    fn a_file_that_says_nothing_about_its_sinks_is_read() {
-        let graph = pair("", "").expect("the links are the configuration");
-        assert_eq!(graph.links.len(), 2);
+    fn a_name_nothing_arrives_at_is_read() {
+        pair("        world-in: [readings, spare]", "")
+            .expect("a name may wait for a line");
     }
 
-    /// A sink that claims a line nothing sends is refused.
+    /// A line to a name nobody listed is refused, saying which the node
+    /// does list.
     #[test]
-    fn a_sink_that_claims_a_line_nothing_sends_is_refused() {
-        let said = format!(
-            "{}",
-            pair(
-                "        payload-in: true",
-                "        gateway-in: true\n        payload-in: true"
-            )
-            .expect_err("a payload has no payload-in")
-        );
-        assert!(
-            said.contains("no data sink called \"payload-in\""),
-            "{said}"
-        );
+    fn a_line_to_a_name_not_listed_is_refused() {
+        let said = pair(
+            GATEWAY,
+            "        moc-in: [asked]\n        world-out: [gateway.reading]",
+        )
+        .expect_err("gateway lists readings, not reading")
+        .to_string();
+        assert!(said.contains("lists no \"reading\""), "{said}");
+        assert!(said.contains("\"readings\""), "{said}");
 
-        // And on a node that does have the sink, with nothing arriving at it:
-        // a null node takes the ground's data, and this one is sent none.
-        let said = format!(
-            "{}",
-            pair(
-                "        payload-in: true",
-                "        gateway-in: true\nvehicle:\n  \
-                 - type null-gateway:\n      - compute: through\n        \
-                 gateway-in: true",
-            )
-            .expect_err("nothing sends the null-gateway node anything")
-        );
-        assert!(said.contains("none does"), "{said}");
-        assert!(said.contains("\"through\""), "{said}");
+        // A name under the other sink, said as that.
+        let said = pair(
+            "        world-in: [readings]\n        moc-in: [x]",
+            "        world-out: [gateway.x]",
+        )
+        .expect_err("a payload sink has no moc-in on the ground");
+        assert!(said.to_string().contains("no data sink"), "{said}");
+
+        // And a line naming no name at all.
+        let said = pair(
+            "        world-in: [readings]",
+            "        world-out: [gateway]",
+        )
+        .expect_err("no name")
+        .to_string();
+        assert!(said.contains("`gateway.<name>`"), "{said}");
     }
 
-    /// And one that denies a line somebody sends it.
-    ///
-    /// The direction that matters more: a sink saying `false` is a sink
-    /// somebody has read as unconnected, and the link says otherwise.
+    /// A name listed twice, or under a sink the type does not have, is
+    /// refused.
     #[test]
-    fn a_sink_that_denies_a_line_it_is_sent_is_refused() {
-        let said = format!(
-            "{}",
-            pair("        payload-in: false", "        gateway-in: true")
-                .expect_err("the payload sends its readings there")
-        );
-        assert!(said.contains("\"payload\" sends one there"), "{said}");
+    fn a_name_listed_twice_or_in_the_wrong_place_is_refused() {
+        let said = pair("        world-in: [readings, readings]", "")
+            .expect_err("twice")
+            .to_string();
+        assert!(said.contains("twice"), "{said}");
+
+        let said = pair("", "        world-in: [readings]")
+            .expect_err("a payload has no world-in")
+            .to_string();
+        assert!(said.contains("no data sink called \"world-in\""), "{said}");
     }
 
-    /// `false` where nothing arrives is true, and reads.
+    /// The flag a sink once was is refused, told what it holds now.
     #[test]
-    fn a_sink_that_denies_a_line_nobody_sends_is_read() {
-        pair("        payload-in: true", "        gateway-in: false")
-            .expect_err("the ground sends the payload what it asks with");
-        pair("        payload-in: true", "        gateway-in: true")
-            .expect("and says so when it says so");
+    fn a_sink_written_as_a_flag_is_refused() {
+        let said = pair("        world-in: true", "")
+            .expect_err("a flag is not a name")
+            .to_string();
+        assert!(said.contains("list the names"), "{said}");
     }
 
-    /// A word that is neither true nor false is refused, saying what the
-    /// field means.
-    ///
-    /// It named the node the data came from for a while. A file written
-    /// against that is refused rather than half understood -- the name read as
-    /// a word nobody knows would be a sink quietly saying nothing.
+    /// A vote's world-in names are its inputs, and a line to one is to that
+    /// input.
     #[test]
-    fn a_sink_given_a_name_instead_of_a_flag_is_refused() {
-        let said = format!(
-            "{}",
-            pair("        payload-in: payload", "        gateway-in: true")
-                .expect_err("a name is not a flag")
-        );
-        assert!(said.contains("is not true or false"), "{said}");
-        assert!(said.contains("written on that node"), "{said}");
+    fn a_vote_is_over_the_names_it_lists() {
+        let graph = pair(
+            GATEWAY,
+            "        moc-in: [asked]\n        world-out: [vote.a]\n\
+             vehicle:\n  - type compute:\n      - compute: vote\n        \
+             function: vote\n        algorithm: median\n        \
+             world-in: [a, b, c]",
+        )
+        .expect("a vote over three");
+        let vote = graph.node("vote").expect("the vote");
+        assert_eq!(vote.attributes["inputs"].as_str(), "a,b,c");
+        let link = graph
+            .links
+            .iter()
+            .find(|link| link.from == "payload.world-out")
+            .expect("the link");
+        assert_eq!(link.to.each(), ["vote.a"]);
     }
 }

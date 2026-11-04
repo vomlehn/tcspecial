@@ -877,14 +877,13 @@ mod tests {
       - payload: a
         address: \"0x48\"
         path: /dev/i2c-1
-        payload-out:
-          - target: nobody
+        world-out: [nobody.a]
 vehicle:
   - type compute:
       - compute: b
         function: mean
-        payload-out:
-          - target: b
+        world-out: [b.b]
+        world-in: [b]
 ",
         )
         .expect("the file is written");

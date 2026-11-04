@@ -312,7 +312,7 @@ pub struct Link {
     /// `tcslibgs::graph::terminals`.
     ///
     /// Written into the file as part of the `from`:
-    /// `from: through.payload-out`. Kept apart from the name here because
+    /// `from: through.world-out`. Kept apart from the name here because
     /// everything in the editor that looks a link's source up looks up a
     /// node, and a field that sometimes held `node.terminal` would be a name
     /// that sometimes is not one.
@@ -328,6 +328,17 @@ pub struct Link {
     /// question for the name: `tcslibgs::graph::terminals::stream_of` knows
     /// the four terminals and nothing else does.
     pub input: Option<String>,
+    /// The name the line arrives by, as the file wrote it after the dot:
+    /// `in0` in `ambient.in0`, `readings` in `gateway.readings`. A name the
+    /// node it reaches lists under the sink the line arrives at.
+    ///
+    /// `None` for a line drawn in the editor, which is written with the name
+    /// [`Link::arrives_by`] gives it. Kept apart from `input`, which is what
+    /// the line means -- the input of a vote it feeds, or the sink of a type
+    /// with two -- because a name somebody chose is theirs, and an editor that
+    /// rewrote it would change a line nobody edited.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub name: Option<String>,
     /// What somebody wrote about this connection.
     ///
     /// Not part of what makes one link the same connection as another -- see
@@ -398,7 +409,32 @@ impl Link {
             origin: origin.map(|t| t.to_string()),
             to: to.to_string(),
             input: input.map(|i| i.to_string()),
+            name: None,
             comment: None,
+        }
+    }
+
+    /// The name this line arrives by.
+    ///
+    /// The one it was read with, where it was; otherwise the input it feeds,
+    /// where that is a vote's input, which is the vote's own name for it; and
+    /// otherwise the name of the node it leaves, the bare name without its
+    /// subdiagram, which says at a glance where the line comes from.
+    ///
+    /// # Returns
+    ///
+    /// The name.
+    pub fn arrives_by(&self) -> String {
+        if let Some(name) = &self.name {
+            return name.clone();
+        }
+        match self.input.as_deref() {
+            Some(input)
+                if tcslibgs::graph::terminals::stream_of(input).is_none() =>
+            {
+                input.to_string()
+            }
+            _ => crate::subdiagram::Qualified::parse(&self.from).node,
         }
     }
 }

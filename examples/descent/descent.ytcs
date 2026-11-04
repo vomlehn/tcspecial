@@ -34,7 +34,7 @@ gateways:
         address: "127.0.0.1"
         ground_base: "127.0.0.1:5100"
         port: "5000"
-        payload-in: true
+        world-in: [altitude, descent_rate, guidance, touchdown]
 
 vehicle:
   - type compute:
@@ -46,11 +46,11 @@ vehicle:
         offset: "0"
         scale: "0.01"
         unit: "m"
-        payload-out:
-          - target: gateway
-          - target: guidance
-          - target: housekeeping
-        payload-in: true
+        world-out:
+          - gateway.altitude
+          - guidance.altitude
+          - housekeeping.altitude
+        world-in: [radar]
       # The velocimeter's two bytes are centimetres a second, signed: up is
       # more than nought, so a descent is less.
       - compute: descent_rate
@@ -59,10 +59,10 @@ vehicle:
         offset: "0"
         scale: "0.01"
         unit: "m/s"
-        payload-out:
-          - target: gateway
-          - target: housekeeping
-        payload-in: true
+        world-out:
+          - gateway.descent_rate
+          - housekeeping.descent_rate
+        world-in: [doppler]
       # The throttle, from the altitude: a program, flying a descent that
       # slows as the ground nears and cutting the engine half a metre up. A
       # Python 3 script beside this file, named relative to the repository's
@@ -73,17 +73,17 @@ vehicle:
         function: "process"
         timeout: "1 s"
         unit: "ratio"
-        gateway-out:
-          - target: engine
-        payload-out:
-          - target: gateway
-          - target: housekeeping
-        payload-in: true
+        moc-out:
+          - engine.guidance
+        world-out:
+          - gateway.guidance
+          - housekeeping.guidance
+        world-in: [altitude]
   - type log:
       - compute: housekeeping
         directory: "/tmp/telemetry"
         format: "variable_ts_rc"
-        payload-in: true
+        world-in: [altitude, descent_rate, guidance, touchdown]
 
 payloads:
   # Every payload is the far end of a UDP socket, which tcssim stands in
@@ -94,27 +94,27 @@ payloads:
         address: "127.0.0.1"
         port: "5402"
         protocol: "udp"
-        payload-out:
-          - target: descent_rate
+        world-out:
+          - descent_rate.doppler
       # The engine's throttle, driven by what guidance answers.
       - payload: engine
         address: "127.0.0.1"
         port: "5404"
         protocol: "udp"
-        gateway-in: true
+        moc-in: [guidance]
       # The radar altimeter, which sends ten readings a second.
       - payload: radar
         address: "127.0.0.1"
         port: "5401"
         protocol: "udp"
-        payload-out:
-          - target: altitude
+        world-out:
+          - altitude.radar
       # The switch on a landing leg, whose 1 is the ground's word that the
       # lander is down: straight to the ground and to the log.
       - payload: touchdown
         address: "127.0.0.1"
         port: "5403"
         protocol: "udp"
-        payload-out:
-          - target: gateway
-          - target: housekeeping
+        world-out:
+          - gateway.touchdown
+          - housekeeping.touchdown

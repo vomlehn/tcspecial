@@ -79,16 +79,16 @@ fn each_ping_is_answered_and_timed_and_the_beacon_is_heard() {
                 <address>127.0.0.1</address>
                 <ground_base>127.0.0.1:{}</ground_base>
                 <port>{}</port>
-                <gateway-out><target>ping</target></gateway-out>
-                <payload-in>true</payload-in>
+                <moc-out>ping.gateway</moc-out>
+                <world-in>ping</world-in>
             </gateway>
         </type>
     </gateways>
     <vehicle>
         <type name=\"ping\">
             <compute name=\"ping\">
-                <payload-out><target>gateway</target></payload-out>
-                <gateway-in>true</gateway-in>
+                <world-out>gateway.ping</world-out>
+                <moc-in>gateway</moc-in>
             </compute>
         </type>
     </vehicle>

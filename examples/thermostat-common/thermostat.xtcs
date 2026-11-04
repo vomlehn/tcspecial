@@ -28,40 +28,41 @@
             <compute name="ambient">
                 <algorithm>median</algorithm>
                 <function>vote</function>
-                <inputs>in0,in1,in2</inputs>
-                <payload-out><target>gateway</target></payload-out>
-                <payload-out><target>thermostat</target></payload-out>
-                <payload-in>true</payload-in>
+                <world-out>gateway.ambient</world-out>
+                <world-out>thermostat.ambient</world-out>
+                <world-in>in0</world-in>
+                <world-in>in1</world-in>
+                <world-in>in2</world-in>
             </compute>
             <compute name="temp1">
                 <format>i16_be</format>
                 <function>to_kelvin</function>
                 <offset>273.15</offset>
                 <scale>0.0625</scale>
-                <payload-out><target>ambient</target><input>in0</input></payload-out>
-                <payload-out><target>gateway</target></payload-out>
-                <payload-out><target>housekeeping</target></payload-out>
-                <payload-in>true</payload-in>
+                <world-out>ambient.in0</world-out>
+                <world-out>gateway.temp1</world-out>
+                <world-out>housekeeping.temp1</world-out>
+                <world-in>temp_1</world-in>
             </compute>
             <compute name="temp2">
                 <format>i16_be</format>
                 <function>to_kelvin</function>
                 <offset>273.15</offset>
                 <scale>0.0625</scale>
-                <payload-out><target>ambient</target><input>in1</input></payload-out>
-                <payload-out><target>gateway</target></payload-out>
-                <payload-out><target>housekeeping</target></payload-out>
-                <payload-in>true</payload-in>
+                <world-out>ambient.in1</world-out>
+                <world-out>gateway.temp2</world-out>
+                <world-out>housekeeping.temp2</world-out>
+                <world-in>temp_2</world-in>
             </compute>
             <compute name="temp3">
                 <format>u24_be</format>
                 <function>to_kelvin</function>
                 <offset>255.37</offset>
                 <scale>0.0078</scale>
-                <payload-out><target>ambient</target><input>in2</input></payload-out>
-                <payload-out><target>gateway</target></payload-out>
-                <payload-out><target>housekeeping</target></payload-out>
-                <payload-in>true</payload-in>
+                <world-out>ambient.in2</world-out>
+                <world-out>gateway.temp3</world-out>
+                <world-out>housekeeping.temp3</world-out>
+                <world-in>temp_3</world-in>
             </compute>
             <!-- setpoint is set from the ground; half_band is how far -->
             <!-- either side of it the heaters are switched at, the setpoint -->
@@ -79,17 +80,21 @@
                 <!-- to the ground: the ground is told what the heaters are -->
                 <!-- doing, by gpio-in-tmass, which a heater that has failed -->
                 <!-- does not hide. -->
-                <gateway-out><target>gpio-out-tmass1</target></gateway-out>
-                <gateway-out><target>gpio-out-tmass2</target></gateway-out>
-                <payload-out><target>housekeeping</target></payload-out>
-                <payload-in>true</payload-in>
+                <moc-out>gpio-out-tmass1.thermostat</moc-out>
+                <moc-out>gpio-out-tmass2.thermostat</moc-out>
+                <world-out>housekeeping.thermostat</world-out>
+                <world-in>ambient</world-in>
             </compute>
         </type>
         <type name="log">
             <compute name="housekeeping">
                 <directory>/tmp/telemetry</directory>
                 <format>variable_ts_rc</format>
-                <payload-in>true</payload-in>
+                <world-in>gpio-in-tmass</world-in>
+                <world-in>temp1</world-in>
+                <world-in>temp2</world-in>
+                <world-in>temp3</world-in>
+                <world-in>thermostat</world-in>
             </compute>
         </type>
     </vehicle>
@@ -112,8 +117,8 @@
                 <lines>2,3</lines>
                 <path>/dev/gpiochip1</path>
                 <state_interval>1 s</state_interval>
-                <payload-out><target>gateway</target></payload-out>
-                <payload-out><target>housekeeping</target></payload-out>
+                <world-out>gateway.gpio-in-tmass</world-out>
+                <world-out>housekeeping.gpio-in-tmass</world-out>
             </payload>
             <!-- The switches of the two heaters, each a line the thermostat -->
             <!-- drives - 1 for on, 0 for off. One payload each, so that one -->
@@ -123,13 +128,13 @@
                 <direction>output</direction>
                 <lines>4</lines>
                 <path>/dev/gpiochip1</path>
-                <gateway-in>true</gateway-in>
+                <moc-in>thermostat</moc-in>
             </payload>
             <payload name="gpio-out-tmass2">
                 <direction>output</direction>
                 <lines>5</lines>
                 <path>/dev/gpiochip1</path>
-                <gateway-in>true</gateway-in>
+                <moc-in>thermostat</moc-in>
             </payload>
         </type>
     </payloads>

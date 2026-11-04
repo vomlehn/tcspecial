@@ -39,7 +39,11 @@
                 <address>10.0.0.1</address>
                 <ground_base>10.0.0.2:5100</ground_base>
                 <port>5000</port>
-                <payload-in>true</payload-in>
+                <world-in>ambient</world-in>
+                <world-in>temp1</world-in>
+                <world-in>temp2</world-in>
+                <world-in>temp3</world-in>
+                <world-in>thermostat</world-in>
             </gateway>
         </type>
     </gateways>
@@ -55,40 +59,41 @@
             <compute name="ambient">
                 <algorithm>median</algorithm>
                 <function>vote</function>
-                <inputs>in0,in1,in2</inputs>
-                <payload-out><target>gateway</target></payload-out>
-                <payload-out><target>thermostat</target></payload-out>
-                <payload-in>true</payload-in>
+                <world-out>gateway.ambient</world-out>
+                <world-out>thermostat.ambient</world-out>
+                <world-in>in0</world-in>
+                <world-in>in1</world-in>
+                <world-in>in2</world-in>
             </compute>
             <compute name="temp1">
                 <format>i16_be</format>
                 <function>to_kelvin</function>
                 <offset>273.15</offset>
                 <scale>0.0625</scale>
-                <payload-out><target>ambient</target><input>in0</input></payload-out>
-                <payload-out><target>gateway</target></payload-out>
-                <payload-out><target>housekeeping</target></payload-out>
-                <payload-in>true</payload-in>
+                <world-out>ambient.in0</world-out>
+                <world-out>gateway.temp1</world-out>
+                <world-out>housekeeping.temp1</world-out>
+                <world-in>temp_1</world-in>
             </compute>
             <compute name="temp2">
                 <format>i16_be</format>
                 <function>to_kelvin</function>
                 <offset>273.15</offset>
                 <scale>0.0625</scale>
-                <payload-out><target>ambient</target><input>in1</input></payload-out>
-                <payload-out><target>gateway</target></payload-out>
-                <payload-out><target>housekeeping</target></payload-out>
-                <payload-in>true</payload-in>
+                <world-out>ambient.in1</world-out>
+                <world-out>gateway.temp2</world-out>
+                <world-out>housekeeping.temp2</world-out>
+                <world-in>temp_2</world-in>
             </compute>
             <compute name="temp3">
                 <format>u24_be</format>
                 <function>to_kelvin</function>
                 <offset>255.37</offset>
                 <scale>0.0078</scale>
-                <payload-out><target>ambient</target><input>in2</input></payload-out>
-                <payload-out><target>gateway</target></payload-out>
-                <payload-out><target>housekeeping</target></payload-out>
-                <payload-in>true</payload-in>
+                <world-out>ambient.in2</world-out>
+                <world-out>gateway.temp3</world-out>
+                <world-out>housekeeping.temp3</world-out>
+                <world-in>temp_3</world-in>
             </compute>
             <!-- setpoint is set from the ground; half_band is how far
                  either side of it the heaters are switched at, the setpoint
@@ -102,18 +107,21 @@
                      with no way to be warmed: either alone holds the band
                      while the orbit is warm, and both together hold it in
                      the cold too. -->
-                <gateway-out><target>heaters_1</target></gateway-out>
-                <gateway-out><target>heaters_2</target></gateway-out>
-                <payload-out><target>gateway</target></payload-out>
-                <payload-out><target>housekeeping</target></payload-out>
-                <payload-in>true</payload-in>
+                <moc-out>heaters_1.thermostat</moc-out>
+                <moc-out>heaters_2.thermostat</moc-out>
+                <world-out>gateway.thermostat</world-out>
+                <world-out>housekeeping.thermostat</world-out>
+                <world-in>ambient</world-in>
             </compute>
         </type>
         <type name="log">
             <compute name="housekeeping">
                 <directory>/var/log/tcspecial</directory>
                 <format>variable_ts_rc</format>
-                <payload-in>true</payload-in>
+                <world-in>temp1</world-in>
+                <world-in>temp2</world-in>
+                <world-in>temp3</world-in>
+                <world-in>thermostat</world-in>
             </compute>
         </type>
     </vehicle>
@@ -127,13 +135,13 @@
                 <direction>output</direction>
                 <lines>3,4,5</lines>
                 <path>/dev/gpiochip0</path>
-                <gateway-in>true</gateway-in>
+                <moc-in>thermostat</moc-in>
             </payload>
             <payload name="heaters_2">
                 <direction>output</direction>
                 <lines>6,7,8</lines>
                 <path>/dev/gpiochip0</path>
-                <gateway-in>true</gateway-in>
+                <moc-in>thermostat</moc-in>
             </payload>
         </type>
         <type name="i2c">
@@ -145,7 +153,7 @@
                 <group>zone_temps</group>
                 <path>/dev/i2c-1</path>
                 <read_size>2</read_size>
-                <payload-out><target>temp1</target></payload-out>
+                <world-out>temp1.temp_1</world-out>
             </payload>
             <!-- The second of the trio; the same part as temp_1, on the
                  same bus. -->
@@ -154,7 +162,7 @@
                 <group>zone_temps</group>
                 <path>/dev/i2c-1</path>
                 <read_size>2</read_size>
-                <payload-out><target>temp2</target></payload-out>
+                <world-out>temp2.temp_2</world-out>
             </payload>
         </type>
         <type name="spi">
@@ -168,7 +176,7 @@
                 <path>/dev/spidev0.0</path>
                 <read_size>3</read_size>
                 <spi_mode>0</spi_mode>
-                <payload-out><target>temp3</target></payload-out>
+                <world-out>temp3.temp_3</world-out>
             </payload>
         </type>
     </payloads>

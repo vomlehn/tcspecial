@@ -27,7 +27,7 @@ gateways:
         address: "127.0.0.1"
         ground_base: "127.0.0.1:5100"
         port: "5000"
-        payload-in: true
+        world-in: [spi-1]
 
 payloads:
   - type spi:
@@ -36,8 +36,8 @@ payloads:
         path: "/dev/spidev0.0"
         spi_mode: "0"
         stand_in: "127.0.0.1:7951"
-        payload-out:
-          - target: gateway-1
+        world-out:
+          - gateway-1.spi-1
 
 tcsgui:
   nodes:

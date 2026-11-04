@@ -9,7 +9,7 @@
 // example's two configuration files to read (YAML where neither is given);
 // --restart, to arm a restart of the vehicle and restart it, which a station
 // does only when it means to; --send=<text>, to send the text up to the
-// gateway node, which leaves it by its gateway-out links for the nodes they
+// gateway node, which leaves it by its moc-out links for the nodes they
 // reach; the configuration; the gateway node to take data from and send to;
 // and the node to ask about. Run from the repository's root none need
 // be given, and it watches the ping example.

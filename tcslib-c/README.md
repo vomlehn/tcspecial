@@ -59,7 +59,7 @@ peer (see "A vehicle on a cFS software bus" in
   reads one as on or off.
 - **Data up.** `tcs_uplink_open` opens the way up to a gateway node that
   binds an address and port aboard, and each `tcs_uplink_send` sends one
-  datum there, which leaves the node by its `gateway-out` links for the
+  datum there, which leaves the node by its `moc-out` links for the
   nodes they reach: a heater driven, a line set. It is tcslib's
   `ping::Uplink`, the way the ping goes up. What goes up drives a payload
   as a command does, so it goes only while the station is matched for

@@ -834,9 +834,9 @@ pub fn params_of(
         "vote" => {
             let inputs = attributes.get("inputs").ok_or_else(|| {
                 named(
-                    "inputs is not set: a vote says which inputs it is over, \
-                     so that a link deleted from it is a fault and not a vote \
-                     over fewer"
+                    "its world-in lists no inputs: a vote names the inputs it \
+                     is over, as `world-in: [in0, in1, in2]`, so that a link \
+                     deleted from it is a fault and not a vote over fewer"
                         .to_string(),
                 )
             })?;
@@ -1527,7 +1527,7 @@ mod tests {
                 ],
                 "offset",
             ),
-            (vec![("function", "vote")], "inputs is not set"),
+            (vec![("function", "vote")], "its world-in lists no inputs"),
             (
                 vec![("function", "vote"), ("inputs", "in0,in1,in2")],
                 "algorithm is not set",

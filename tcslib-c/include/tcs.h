@@ -392,7 +392,7 @@ int tcs_decision_on(const uint8_t *data, size_t length, int *on);
 /* ---- Data up to the vehicle --------------------------------------------- */
 
 /* The way up to a gateway node: the address and port it binds aboard, from
- * which what is sent leaves by its gateway-out links for the nodes they
+ * which what is sent leaves by its moc-out links for the nodes they
  * reach. What goes up drives those nodes, as a command does, so it goes only
  * while the station is matched for commanding: see
  * tcs_configuration_matched(). */

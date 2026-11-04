@@ -5,8 +5,8 @@
   What this checks is the shape of the file: which sections there are, what an
   entry may say, and which words are words. What it cannot check is whether the
   configuration can be flown. Which attributes a node of a given type must
-  state, whether two payloads claim one socket, whether a vote's inputs are the
-  ones its links bind: those are rules about meaning, they are tested against
+  state, whether two payloads claim one socket, whether a link arrives by a
+  name its far end lists: those are rules about meaning, they are tested against
   real buses, and tcsverify is the one place they live. A file this accepts may
   still be refused, and the refusal will say why.
 
@@ -21,8 +21,8 @@
 
   A node's content is a choice of known element names repeated in any order,
   which is as close as XSD 1.0 comes to "these words and no others". It cannot
-  say that `group` appears at most once, because `payload-out` may appear many
-  times (several destinations are several elements) and XSD 1.0's xs:all
+  say that `group` appears at most once, because `world-out` may appear many
+  times (several destinations are several elements, as several names are) and XSD 1.0's xs:all
   allows neither repeats nor a mixture. A node that says a word twice is
   refused where the file is read instead, and so is a type written twice in a
   section, or a section written twice.
@@ -36,41 +36,21 @@
            elementFormDefault="qualified">
 
   <!-- Where data leaves a node: a link, written as an attribute of the node
-       it leaves. One element per line.
-
-       The spelling tcsgui writes is an entry: `target` names the node the line
-       goes to and `input` names which of that node's inputs it feeds, where it
-       feeds a named one. The short spelling is still read, the whole element
-       being the destination as `node` or `node.terminal`.
-
-       Which is why this is mixed content with optional children: XSD 1.0
-       cannot say "text, or these elements, but not both", so a file with both
-       in one element is accepted here and refused where it is read. -->
-  <xs:complexType name="destination" mixed="true">
-    <xs:sequence>
-      <xs:element name="target" type="nodename" minOccurs="0"/>
-      <xs:element name="input" type="nodename" minOccurs="0"/>
-    </xs:sequence>
-  </xs:complexType>
-
-  <!-- A name, with the node and terminal spelling a link end may use. -->
-  <xs:simpleType name="nodename">
+       it leaves. One element per line, its text the node the line reaches
+       and the name it arrives by, separated by a dot: gateway.readings. -->
+  <xs:simpleType name="destination">
     <xs:restriction base="xs:string">
-      <xs:pattern
-        value="[A-Za-z_][A-Za-z0-9_./-]*(\.[A-Za-z_][A-Za-z0-9_-]*)?"/>
+      <xs:pattern value="[A-Za-z_][A-Za-z0-9_./-]*\.[A-Za-z_][A-Za-z0-9_-]*"/>
     </xs:restriction>
   </xs:simpleType>
 
-  <!-- Whether a line arrives at one of a node's data sinks: true, or false
-       for a node saying none does. A record of the links written on the nodes
-       they leave, and not a link: which node a line comes from is written on
-       that node, and a copy of the name here would be the same connection
-       twice over. It would also read as "and nothing else" at a sink several
-       lines arrive at, which the ground's is in every configuration. A file
-       may leave these out, and one that disagrees with the links is refused
-       where it is read. -->
-  <xs:simpleType name="source">
-    <xs:restriction base="xs:boolean"/>
+  <!-- A name a line may arrive at one of a node's data sinks by, which a
+       link to the node names after the dot. One element per name; one word,
+       with no dot in it. -->
+  <xs:simpleType name="arrival">
+    <xs:restriction base="xs:string">
+      <xs:pattern value="[A-Za-z_][A-Za-z0-9_-]*"/>
+    </xs:restriction>
   </xs:simpleType>
 
   <!-- What a node is called, unique across the configuration. -->
@@ -176,13 +156,12 @@
       <!-- The payload group that reads it, where it is in one. -->
       <xs:element name="group" type="xs:string"/>
       <!-- The two data sources, which are where links are written. -->
-      <xs:element name="payload-out" type="destination"/>
-      <xs:element name="gateway-out" type="destination"/>
-      <!-- And the two data sinks, which say whether a line arrives there.
-           A record of the links written at the other end rather than a link,
-           and optional. See the `source` type above. -->
-      <xs:element name="payload-in" type="source"/>
-      <xs:element name="gateway-in" type="source"/>
+      <xs:element name="world-out" type="destination"/>
+      <xs:element name="moc-out" type="destination"/>
+      <!-- And the two data sinks, each the names a line may arrive by:
+           a vote's are its inputs. See the `arrival` type above. -->
+      <xs:element name="world-in" type="arrival"/>
+      <xs:element name="moc-in" type="arrival"/>
       <!-- Where a node is. -->
       <xs:element name="path" type="xs:string"/>
       <xs:element name="address" type="xs:string"/>
@@ -277,7 +256,6 @@
       <xs:element name="state_interval" type="xs:string"/>
       <!-- A computation, and what each of them is told. -->
       <xs:element name="function" type="xs:string"/>
-      <xs:element name="inputs" type="xs:string"/>
       <xs:element name="format" type="xs:string"/>
       <xs:element name="scale" type="xs:string"/>
       <xs:element name="offset" type="xs:string"/>

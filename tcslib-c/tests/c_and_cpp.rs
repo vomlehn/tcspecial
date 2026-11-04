@@ -226,15 +226,13 @@ gateways:
         address: \"127.0.0.1\"
         ground_base: \"127.0.0.1:{}\"
         port: \"{}\"
-        gateway-out:
-          - target: ping
-        payload-in: true
+        moc-out: [ping.gateway]
+        world-in: [ping]
 vehicle:
   - type ping:
       - compute: ping
-        payload-out:
-          - target: gateway
-        gateway-in: true
+        world-out: [gateway.ping]
+        moc-in: [gateway]
 ",
             port(&beacon),
             dir.path().display(),

@@ -745,9 +745,10 @@ mod tests {
              payload_groups:\n  - { name: g1, interval: 1 s }\n  \
              - { name: g2, interval: 2 s }\n\
              vehicle:\n  - type compute:\n      - compute: v\n        \
-             function: vote\n        inputs: \"in0,in1,in2\"\n        \
-             payload-out:\n          - target: x\n          - target: y\n  \
-             - type log:\n      - compute: x\n      - compute: y\n\
+             function: vote\n        world-in: [in0, in1, in2]\n        \
+             world-out:\n          - x.v\n          - y.v\n  \
+             - type log:\n      - { compute: x, world-in: [v] }\n      \
+             - { compute: y, world-in: [v] }\n\
              payloads:\n  - type gpio:\n      - payload: p\n        \
              lines: \"0, 1\"\n        chip: c\n  \
              - type serial:\n      - payload: s\n        \
@@ -764,10 +765,12 @@ mod tests {
              terminators:\n          - '[0D]'\n          - '[0A]'\n  \
              - type gpio:\n      - payload: p\n        chip: c\n        \
              lines: \"1 0\"\n\
-             vehicle:\n  - type log:\n      - compute: y\n      \
-             - compute: x\n  - type compute:\n      - compute: v\n        \
-             payload-out:\n          - target: y\n          \
-             - target: x\n        inputs: \"in2, in1 in0\"\n        \
+             vehicle:\n  - type log:\n      \
+             - { compute: y, world-in: [v] }\n      \
+             - { compute: x, world-in: [v] }\n  - type compute:\n      \
+             - compute: v\n        \
+             world-out:\n          - y.v\n          \
+             - x.v\n        world-in: [in2, in1, in0]\n        \
              function: vote\n\
              payload_groups:\n  - { name: g2, interval: 2 s }\n  \
              - { name: g1, interval: 1 s }\n\

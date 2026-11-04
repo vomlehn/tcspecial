@@ -34,7 +34,7 @@ gateways:
         address: "127.0.0.1"
         ground_base: "127.0.0.1:5100"
         port: "5000"
-        payload-in: true
+        world-in: [ambient, gpio-in-tmass, temp1, temp2, temp3]
 
 payloads:
   # The sensors are each the far end of a UDP socket, which tcssim stands in
@@ -50,16 +50,16 @@ payloads:
         group: "zone_temps"
         port: "5201"
         protocol: "udp"
-        payload-out:
-          - target: temp1
+        world-out:
+          - temp1.temp_1
       # The second of the trio; the same part as temp_1.
       - payload: temp_2
         address: "127.0.0.1"
         group: "zone_temps"
         port: "5202"
         protocol: "udp"
-        payload-out:
-          - target: temp2
+        world-out:
+          - temp2.temp_2
       # The third. A different part: three bytes, unsigned, its own scale and
       # so its own conversion, so that no one part number can take the whole
       # trio out.
@@ -68,8 +68,8 @@ payloads:
         group: "zone_temps"
         port: "5203"
         protocol: "udp"
-        payload-out:
-          - target: temp3
+        world-out:
+          - temp3.temp_3
 
 tcsgui:
   nodes:

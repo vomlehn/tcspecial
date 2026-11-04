@@ -107,10 +107,10 @@ class ConfigurationTest(unittest.TestCase):
         directory, path = written(
             '<payloads><type name="i2c"><payload name="b"/><payload name="a"/>'
             '</type></payloads><gateways><type name="gateway_radio"><gateway '
-            'name="m"><ground_base>127.0.0.1:9000</ground_base></gateway>'
-            '</type></gateways>'
-            '<vehicle><type name="ping"><compute name="p"><payload-out>'
-            '<target>m</target></payload-out></compute></type></vehicle>')
+            'name="m"><ground_base>127.0.0.1:9000</ground_base>'
+            '<world-in>p</world-in></gateway></type></gateways>'
+            '<vehicle><type name="ping"><compute name="p"><world-out>'
+            'm.p</world-out></compute></type></vehicle>')
         with directory:
             config = configuration.load(path)
             self.assertEqual([config.device_id(n) for n in "abmp"],

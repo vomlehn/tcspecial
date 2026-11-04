@@ -33,7 +33,7 @@ gateways:
         address: "10.0.0.1"
         ground_base: "10.0.0.2:5100"
         port: "5000"
-        payload-in: true
+        world-in: [ambient, temp1, temp2, temp3, thermostat]
 
 vehicle:
   - type compute:
@@ -47,44 +47,40 @@ vehicle:
       - compute: ambient
         algorithm: "median"
         function: "vote"
-        inputs: "in0,in1,in2"
-        payload-out:
-          - target: gateway
-          - target: thermostat
-        payload-in: true
+        world-out:
+          - gateway.ambient
+          - thermostat.ambient
+        world-in: [in0, in1, in2]
       - compute: temp1
         format: "i16_be"
         function: "to_kelvin"
         offset: "273.15"
         scale: "0.0625"
-        payload-out:
-          - target: ambient
-            input: in0
-          - target: gateway
-          - target: housekeeping
-        payload-in: true
+        world-out:
+          - ambient.in0
+          - gateway.temp1
+          - housekeeping.temp1
+        world-in: [temp_1]
       - compute: temp2
         format: "i16_be"
         function: "to_kelvin"
         offset: "273.15"
         scale: "0.0625"
-        payload-out:
-          - target: ambient
-            input: in1
-          - target: gateway
-          - target: housekeeping
-        payload-in: true
+        world-out:
+          - ambient.in1
+          - gateway.temp2
+          - housekeeping.temp2
+        world-in: [temp_2]
       - compute: temp3
         format: "u24_be"
         function: "to_kelvin"
         offset: "255.37"
         scale: "0.0078"
-        payload-out:
-          - target: ambient
-            input: in2
-          - target: gateway
-          - target: housekeeping
-        payload-in: true
+        world-out:
+          - ambient.in2
+          - gateway.temp3
+          - housekeeping.temp3
+        world-in: [temp_3]
       # setpoint is set from the ground; half_band is how far
       # either side of it the heaters are switched at, the setpoint
       # being in the middle of the band.
@@ -97,18 +93,18 @@ vehicle:
         # with no way to be warmed: either alone holds the band
         # while the orbit is warm, and both together hold it in
         # the cold too.
-        gateway-out:
-          - target: heaters_1
-          - target: heaters_2
-        payload-out:
-          - target: gateway
-          - target: housekeeping
-        payload-in: true
+        moc-out:
+          - heaters_1.thermostat
+          - heaters_2.thermostat
+        world-out:
+          - gateway.thermostat
+          - housekeeping.thermostat
+        world-in: [ambient]
   - type log:
       - compute: housekeeping
         directory: "/var/log/tcspecial"
         format: "variable_ts_rc"
-        payload-in: true
+        world-in: [temp1, temp2, temp3, thermostat]
 
 payloads:
   - type gpio:
@@ -120,12 +116,12 @@ payloads:
         direction: "output"
         lines: "3,4,5"
         path: "/dev/gpiochip0"
-        gateway-in: true
+        moc-in: [thermostat]
       - payload: heaters_2
         direction: "output"
         lines: "6,7,8"
         path: "/dev/gpiochip0"
-        gateway-in: true
+        moc-in: [thermostat]
   - type i2c:
       # One of three sensors of the same place, a trio, so that the
       # temperature survives one of them going wrong. Two bytes,
@@ -135,8 +131,8 @@ payloads:
         group: "zone_temps"
         path: "/dev/i2c-1"
         read_size: "2"
-        payload-out:
-          - target: temp1
+        world-out:
+          - temp1.temp_1
       # The second of the trio; the same part as temp_1, on the
       # same bus.
       - payload: temp_2
@@ -144,8 +140,8 @@ payloads:
         group: "zone_temps"
         path: "/dev/i2c-1"
         read_size: "2"
-        payload-out:
-          - target: temp2
+        world-out:
+          - temp2.temp_2
   - type spi:
       # The third. A different part on a different bus: three
       # bytes, unsigned, its own scale and so its own conversion,
@@ -157,8 +153,8 @@ payloads:
         path: "/dev/spidev0.0"
         read_size: "3"
         spi_mode: "0"
-        payload-out:
-          - target: temp3
+        world-out:
+          - temp3.temp_3
 
 commands:
   # the zone temperature the heaters are held at, in kelvin

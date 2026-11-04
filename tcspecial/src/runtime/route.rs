@@ -79,7 +79,7 @@ pub struct Delivery {
 /// Three places to look, in the order a reader of the file would:
 ///
 /// * the terminal the link leaves by, which is where a file says it --
-///   `n.payload-out` is groundward and says so;
+///   `n.world-out` is groundward and says so;
 /// * failing that, the terminal it arrives at, for a link written from a node
 ///   with one source into a node with several sinks;
 /// * and failing both, the only terminal the type at either end has. A payload
@@ -223,7 +223,7 @@ impl Routes {
         let mut line = 0;
         for link in &graph.links {
             // The node it leaves, whatever terminal it leaves by. The routing
-            // question is which node, so `n.payload-out` and `n` are one
+            // question is which node, so `n.world-out` and `n` are one
             // source here -- and which way the data is going is the link's own
             // and is settled once, below.
             let from = link.origin().node;
@@ -482,18 +482,18 @@ mod tests {
             .find(|d| d.to == "ambient")
             .expect("a delivery into the mean");
         assert_eq!(into_mean.input.as_deref(), Some("in0"));
-        let payload_out = from_k_fore
+        let world_out = from_k_fore
             .iter()
             .find(|d| d.to == "temp1 to gateway")
             .unwrap();
-        assert_eq!(payload_out.input, None);
+        assert_eq!(world_out.input, None);
     }
 
     /// A link that names its terminals routes as one that does not.
     ///
     /// A terminal says which way the data is going and not which of several
-    /// ways in -- see `tcslibgs::graph::terminals` -- so `a.payload-out` to
-    /// `c.payload-in` is the same delivery as `a` to `c`. It matters here
+    /// ways in -- see `tcslibgs::graph::terminals` -- so `a.world-out` to
+    /// `c.world-in` is the same delivery as `a` to `c`. It matters here
     /// and not only in the checking: a terminal carried through as a named
     /// input would reach a device's port, which refuses an input a device does
     /// not have, and a configuration that passed the ground check would stop
@@ -531,10 +531,11 @@ mod tests {
             homes: std::collections::BTreeMap::new(),
             placed: std::collections::BTreeMap::new(),
             set_aside: Default::default(),
+            named: Default::default(),
         };
 
         let plain = Routes::of(&one_link("a", "c"));
-        let named = Routes::of(&one_link("a.payload-out", "c.payload-in"));
+        let named = Routes::of(&one_link("a.world-out", "c.world-in"));
 
         for routes in [&plain, &named] {
             let deliveries = routes.from("a");
@@ -548,14 +549,14 @@ mod tests {
         assert_eq!(plain.from("a"), named.from("a"));
 
         // Including the stream, which both settle the same way: the file says
-        // `payload-out` in the one and an i2c node has no other source in the
+        // `world-out` in the one and an i2c node has no other source in the
         // other, so the link is groundward either way it was written.
         assert_eq!(plain.from("a")[0].stream, Some(Stream::Groundward));
 
         // And a computation's named input is still carried, which is the
         // distinction: `in0` is which of several ways in, and the mean is
         // built on knowing.
-        let into_mean = Routes::of(&one_link("a.payload-out", "m.in0"));
+        let into_mean = Routes::of(&one_link("a.world-out", "m.in0"));
         assert_eq!(into_mean.from("a")[0].input.as_deref(), Some("in0"));
         assert_eq!(into_mean.source_of("m", "in0"), Some("a"));
     }

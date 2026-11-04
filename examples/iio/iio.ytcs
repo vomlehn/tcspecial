@@ -33,14 +33,14 @@ tcspecial:
 gateways:
   - type gateway_radio:
       # The ground's end of the link. Nothing goes up to an IIO sensor, which is
-      # read and never written, so nothing leaves this node by gateway-out; what
+      # read and never written, so nothing leaves this node by moc-out; what
       # comes down arrives at ground_base plus the device id of the node that
       # sent it: the sensor, device id 1, at 127.0.0.1:3741.
       - gateway: ground
         address: "127.0.0.1"
         ground_base: "127.0.0.1:3740"
         port: "3640"
-        payload-in: true
+        world-in: [sensor]
 
 payloads:
   - type iio:
@@ -53,8 +53,8 @@ payloads:
       # the number it was given, which is the path to write here.
       - payload: sensor
         path: "/dev/iio:device1"
-        payload-out:
-          - target: ground
+        world-out:
+          - ground.sensor
 
 tcsgui:
   nodes:

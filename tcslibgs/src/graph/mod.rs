@@ -13,18 +13,16 @@
 //! disagree about what a node is are two statements of one fact.
 //!
 //! A link is an attribute of the node it leaves, named after the data source
-//! it leaves by, with one entry per line: `payload-out: [{ target: k_1 }]` is a
-//! link from this node's `payload-out` terminal to `k_1`, and an entry naming
-//! an `input` as well feeds a named input of the node it reaches. The short
-//! spelling is read too -- `payload-out: k_1`,
-//! `payload-out: [gateway, zone_temp.in0]` -- and means the same thing; see
-//! [`Destinations`].
+//! it leaves by, with one entry per line, each the node it reaches and the
+//! name it arrives there by: `world-out: [k_1.reading]` is a link from this
+//! node's `world-out` terminal to the input `k_1` lists as `reading`. A node
+//! lists the names a line may arrive at it by under the sink each belongs
+//! to -- `world-in: [reading]` -- so that a node's own entry says where it
+//! may be joined, and a link to a name nobody listed is refused. See
+//! [`mirror`], which matches the two.
 //!
 //! So there is no links section, and a node and the links out of it are read,
-//! written and deleted together. The node it arrives at says so as well --
-//! `payload-in: true`, under the sink it arrives at -- so that a node's
-//! entry says it is connected at both ends; that flag is checked against these
-//! links and otherwise never read. See [`mirror`].
+//! written and deleted together.
 //!
 //! In memory they are still a list -- see [`Link`] -- because every rule about
 //! a link is about both of its ends, and a list of them is what a rule can be
@@ -478,41 +476,38 @@ pub fn starts_and_stops(node_type: &str) -> bool {
 #[derive(Debug, Clone, PartialEq)]
 pub struct NodeFile {
     pub node: Node,
-    /// Where this node's groundward data goes: the sinks its `payload-out`
-    /// reaches.
-    pub payload_out: Vec<String>,
-    /// And its vehicleward data: the sinks its `gateway-out` reaches.
-    pub gateway_out: Vec<String>,
-    /// Whether a line arrives at this node's `payload-in` sink, as the entry
-    /// says so.
+    /// Where this node's groundward data goes: each line its `world-out`
+    /// sends, as the node it reaches and the name it arrives by,
+    /// `k_1.reading`.
+    pub world_out: Vec<String>,
+    /// And its vehicleward data: each line its `moc-out` sends.
+    pub moc_out: Vec<String>,
+    /// The names a groundward line may arrive at this node by: its
+    /// `world-in`.
     ///
-    /// A record of the links written at the other end rather than a link, and
-    /// the only thing in this structure that nothing downstream reads: see
-    /// [`mirror`]. `None` is a file that said nothing about it, which is
-    /// allowed; `Some(true)` is a node saying a groundward line arrives here
-    /// and `Some(false)` one saying none does, and either is refused where the
-    /// links say otherwise.
-    pub payload_in: Option<bool>,
-    /// And whether one arrives at its `gateway-in` sink.
-    pub gateway_in: Option<bool>,
+    /// Where the node may be joined, said on the node, so that a link is
+    /// written to a name the node at its other end gave and not to whatever
+    /// the writer guessed. A vote's are its inputs. See [`mirror`].
+    pub world_in: Vec<String>,
+    /// And the names a vehicleward line may arrive by: its `moc-in`.
+    pub moc_in: Vec<String>,
 }
 
 impl NodeFile {
     /// Makes the links this node's sources make.
     ///
     /// One per destination, each `from` naming the node and the data source it
-    /// leaves by -- `k_1.payload-out` -- which is what every rule about a link
+    /// leaves by -- `k_1.world-out` -- which is what every rule about a link
     /// already reads: see [`Link::origin`].
     ///
     /// # Returns
     ///
-    /// One link for each data source with destinations, `payload-out` first.
+    /// One link for each data source with destinations, `world-out` first.
     pub fn links(&self) -> Vec<Link> {
         let mut links = Vec::new();
-        for (terminal, destinations) in [
-            ("payload-out", &self.payload_out),
-            ("gateway-out", &self.gateway_out),
-        ] {
+        for (terminal, destinations) in
+            [("world-out", &self.world_out), ("moc-out", &self.moc_out)]
+        {
             if destinations.is_empty() {
                 continue;
             }
@@ -525,21 +520,16 @@ impl NodeFile {
         links
     }
 
-    /// What this entry said about each of its sinks.
+    /// The names this entry gave each of its sinks.
     ///
-    /// The mirror of [`NodeFile::links`], and deliberately not links: this is
-    /// a record of links written elsewhere, and a record read as a link would
-    /// be the same connection in the graph twice.
+    /// The other end of [`NodeFile::links`], and deliberately not links:
+    /// where a node may be joined, which [`mirror`] matches each link to.
     ///
     /// # Returns
     ///
-    /// Each sink's terminal and what the entry said of it, `None` for
-    /// nothing.
-    pub fn arriving(&self) -> Vec<(&'static str, Option<bool>)> {
-        vec![
-            ("payload-in", self.payload_in),
-            ("gateway-in", self.gateway_in),
-        ]
+    /// Each sink's terminal and the names listed under it.
+    pub fn arriving(&self) -> [(&'static str, &[String]); 2] {
+        [("world-in", &self.world_in), ("moc-in", &self.moc_in)]
     }
 }
 
@@ -642,7 +632,7 @@ pub struct Link {
 impl Link {
     /// Which node this link leaves, and by which of its data sources.
     ///
-    /// Written the way a destination is -- `temp_1.payload-out` -- because the
+    /// Written the way a destination is -- `temp_1.world-out` -- because the
     /// two ends of a link are the same kind of thing: a node and one of its
     /// terminals. A node with one source needs no name after the dot, so every
     /// file written before there were names for these still says what it said.
@@ -653,29 +643,19 @@ impl Link {
 
 /// One or several destinations, however the file wrote them.
 ///
-/// The spelling the editor writes is one entry per line, the node it reaches
-/// named by the entry's `target`:
+/// Each the node a line reaches and the name it arrives by, separated by a
+/// dot, one per line:
 ///
 /// ```yaml
-/// payload-out:
-///   - target: gateway
-///   - target: zone_temp
-///     input: in0
+/// world-out:
+///   - gateway.readings
+///   - zone_temp.in0
 /// ```
 ///
-/// A line is then one entry rather than one element of two lists, which is
-/// what makes several destinations safe to write: nothing pairs by position,
-/// so a list that slips by one cannot turn a reading into somebody else's
-/// input. In XML the same thing is a repeated `<payload-out>` with `<target>`
-/// in it.
-///
-/// The short spellings are still read: `payload-out: gateway` and
-/// `payload-out: [gateway, zone_temp.in0]`, the node and its input separated
-/// by a dot. Every configuration written before entries existed says what it
-/// said, and a link to one place is a line somebody can still write in a line.
-/// All of them read into the same thing -- a destination as `node` or
-/// `node.input` -- because every rule about a link is about where it goes and
-/// not about how the file said so.
+/// One entry per line, so several destinations are several entries and
+/// nothing pairs by position. In XML the same thing is a repeated
+/// `<world-out>` with the destination as its text. One destination needs no
+/// list: `world-out: gateway.readings`.
 ///
 /// Read by hand rather than as an untagged enum, for the reason [`Scalar`]
 /// exists: a value written as an XML child element does not arrive as a
@@ -735,7 +715,7 @@ impl<'de> Deserialize<'de> for Destinations {
             }
 
             /// One entry -- `{ target: gateway }` -- or one XML element with
-            /// text in it: `<payload-out>gateway</payload-out>`.
+            /// text in it: `<world-out>gateway</world-out>`.
             fn visit_map<A: MapAccess<'de>>(
                 self,
                 map: A,
@@ -836,6 +816,15 @@ impl<'de> Deserialize<'de> for Listed {
                 Ok(Listed(vec![Scalar::of(v.to_string())]))
             }
 
+            /// A YAML boolean, kept as its word so that whoever asked for
+            /// the list can say why it is not one.
+            fn visit_bool<E: serde::de::Error>(
+                self,
+                v: bool,
+            ) -> Result<Listed, E> {
+                Ok(Listed(vec![Scalar::of(v.to_string())]))
+            }
+
             /// Nothing after the key, which says an empty list.
             fn visit_unit<E: serde::de::Error>(self) -> Result<Listed, E> {
                 Ok(Listed(Vec::new()))
@@ -871,17 +860,16 @@ impl<'de> Deserialize<'de> for Listed {
     }
 }
 
-/// Reads whether a node's entry says a line arrives at one of its sinks.
+/// Reads the names a node's entry lists under one of its sinks.
 ///
-/// `payload-in: true`, and `false` for a node saying none does. Read through
-/// [`Scalar`] rather than as a `bool` because XML has no booleans: the text of
-/// `<payload-in>true</payload-in>` is the word, and the word is what both
-/// languages have in common.
+/// `world-in: [in0, in1]` in YAML, and a repeated `<world-in>` in XML, each
+/// name an entry of its own; one name needs no list. A name is a word: no dot,
+/// which is what parts it from its node in a destination, and no comma or
+/// space, which would make one name read as several.
 ///
-/// Anything else is refused saying what the field means. It named the node the
-/// data came from for a while, which read as "and nothing else" the moment a
-/// second line arrived -- so a file written against that is refused rather
-/// than half understood.
+/// `true` and `false` are refused, saying what the field holds now. A sink
+/// said whether a line arrived there once, and a file written then would
+/// otherwise list a name nobody meant.
 ///
 /// # Arguments
 ///
@@ -890,43 +878,52 @@ impl<'de> Deserialize<'de> for Listed {
 ///
 /// # Returns
 ///
-/// Whether a line arrives there.
+/// The names, in the order written.
 ///
 /// # Errors
 ///
-/// What the map's next value fails with, and a custom error for a value
-/// that is neither `true` nor `false`.
-fn said_so<'de, A: serde::de::MapAccess<'de>>(
+/// What the map's next value fails with, and a custom error for a flag, an
+/// empty name, and a name with a dot, a comma or a space in it.
+fn names_of<'de, A: serde::de::MapAccess<'de>>(
     sink: &str,
     map: &mut A,
-) -> Result<bool, A::Error> {
+) -> Result<Vec<String>, A::Error> {
     use serde::de::Error;
 
-    let said = map.next_value::<Scalar>()?;
-    match said.as_str().trim() {
-        "true" => Ok(true),
-        "false" => Ok(false),
-        other => Err(A::Error::custom(format!(
-            "{sink}: \"{other}\" is not true or false. A data sink says \
-             whether a line arrives there and nothing more -- which node it \
-             comes from is written on that node, as the link itself"
-        ))),
+    let listed = map.next_value::<Listed>()?;
+    let mut names = Vec::new();
+    for one in &listed.0 {
+        let name = one.as_str().trim();
+        if name == "true" || name == "false" {
+            return Err(A::Error::custom(format!(
+                "{sink}: \"{name}\" is a name for where a line may arrive \
+                 here, not whether one does: list the names, as \
+                 `{sink}: [readings]`, and write each link to one of them, \
+                 as `<node>.readings`"
+            )));
+        }
+        if name.is_empty() || name.contains(['.', ',', ' ']) {
+            return Err(A::Error::custom(format!(
+                "{sink}: \"{name}\" is not a name. A name is one word, with \
+                 no dot, comma or space in it: a link is written to it as \
+                 `<node>.<name>`, and the dot is what parts the two"
+            )));
+        }
+        names.push(name.to_string());
     }
+    Ok(names)
 }
 
 /// Reads the destination a mapping names, however the mapping got there.
 ///
-/// Two shapes arrive here. An entry -- `{ target: zone_temp, input: in0 }` --
-/// which is what the editor writes and what a person writing a link by hand
-/// now has to write for a link to a named input. And an XML element with text
-/// in it, `<payload-out>gateway</payload-out>`, which quick-xml hands over as a
-/// map of one entry whose value is the text: the short spelling, in the
-/// language where it does not arrive as a string.
+/// An XML element with text in it, `<world-out>gateway.readings</world-out>`,
+/// which quick-xml hands over as a map of one entry whose value is the text:
+/// the destination, in the language where it does not arrive as a string.
 ///
-/// Told apart by `target`, which the entry form always has. A mapping with
-/// neither `target` nor exactly one entry is refused rather than guessed at,
-/// and so is a word in an entry that is not `target` or `input`: a misspelled
-/// `targte` silently ignored is a link that quietly goes nowhere.
+/// Anything else is refused, saying how a destination is written. An entry
+/// naming a `target`, and an `input` beside it, is how a destination was once
+/// written, and is told the new shape rather than read: a file that says
+/// `target: gateway` names no name to arrive by.
 ///
 /// # Arguments
 ///
@@ -934,70 +931,42 @@ fn said_so<'de, A: serde::de::MapAccess<'de>>(
 ///
 /// # Returns
 ///
-/// The destination as a file would write it inline: `node` or
-/// `node.input`.
+/// The destination as written, `node.name`.
 ///
 /// # Errors
 ///
-/// What the map fails with, and a custom error for a word that is not
-/// `target` or `input`, an `input` with no `target`, and a mapping with
-/// neither a target nor text.
+/// What the map fails with, and a custom error for a mapping with anything
+/// but text in it.
 fn written_as<'de, A: serde::de::MapAccess<'de>>(
     mut map: A,
 ) -> Result<String, A::Error> {
     use serde::de::Error;
 
-    let mut target: Option<String> = None;
-    let mut input: Option<String> = None;
     let mut text: Option<String> = None;
-    let mut unknown: Option<String> = None;
+    let mut said: Option<String> = None;
 
     while let Some(key) = map.next_key::<String>()? {
         match key.as_str() {
-            "target" => {
-                target = Some(map.next_value::<Scalar>()?.as_str().to_string())
-            }
-            "input" => {
-                input = Some(map.next_value::<Scalar>()?.as_str().to_string())
-            }
-            // What XML calls the text of an element, which is how the short
-            // spelling arrives in that language:
-            // `<payload-out>gateway</payload-out>`.
             "$text" => {
                 text = Some(map.next_value::<Scalar>()?.as_str().to_string())
             }
-            // And nothing else. A word nobody knows is a misspelling, and a
-            // misspelled `target` read as a name would be a link that quietly
-            // goes nowhere.
             other => {
-                unknown = Some(other.to_string());
+                said.get_or_insert_with(|| other.to_string());
                 map.next_value::<serde::de::IgnoredAny>()?;
             }
         }
     }
 
-    if let Some(unknown) = unknown {
-        return Err(A::Error::custom(format!(
-            "\"{unknown}\" is not a word a link entry knows: an entry says \
-             `target`, the node the line goes to, and may say `input`, which \
-             of that node's inputs it feeds"
-        )));
-    }
-
-    match (target, input, text) {
-        // An entry, which may name the input it feeds.
-        (Some(target), input, _) => Ok(match input {
-            Some(input) => format!("{target}.{input}"),
-            None => target,
-        }),
-        (None, Some(input), _) => Err(A::Error::custom(format!(
-            "a link entry that says `input: {input}` has to say which node \
-             that input belongs to, as `target`"
+    match (text, said) {
+        (Some(text), None) => Ok(text),
+        (_, Some(said)) => Err(A::Error::custom(format!(
+            "a link is written as the node it reaches and the name it arrives \
+             there by, separated by a dot -- `zone_temp.in0` -- and not as an \
+             entry saying `{said}`: write the entry as that one line"
         ))),
-        // The short spelling, in XML.
-        (None, None, Some(text)) => Ok(text),
-        (None, None, None) => Err(A::Error::custom(
-            "a destination is a node, or an entry naming its target",
+        (None, None) => Err(A::Error::custom(
+            "a destination is the node a line reaches and the name it \
+             arrives by, `node.name`",
         )),
     }
 }
@@ -1105,6 +1074,33 @@ pub struct Graph {
     /// -- a concern is a question about a drawing and not about a vehicle --
     /// and the one reader is tcsgui. See [`Tcsgui::set_aside`].
     pub set_aside: std::collections::BTreeSet<(String, String)>,
+    /// What the files call the arriving ends of their links: each node's
+    /// names, and the name each link was written to.
+    ///
+    /// Apart from [`Graph::links`], which say what each link means, because
+    /// nothing aboard needs the names: they say where a node may be joined,
+    /// which the file is held to as it is read -- see [`mirror`] -- and which
+    /// the editor writes back.
+    pub named: Named,
+}
+
+/// The names the files give the arriving ends of their links.
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub struct Named {
+    /// By node, the names listed under its `world-in` and its `moc-in`.
+    pub sinks: BTreeMap<String, Sinks>,
+    /// The destination each link was written to, `node.name`: by the
+    /// link's `from` and the destination in [`Graph::links`] it means.
+    pub written: BTreeMap<(String, String), String>,
+}
+
+/// One node's names for where a line may arrive at it.
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub struct Sinks {
+    /// Its `world-in`: the names a groundward line may arrive by.
+    pub world_in: Vec<String>,
+    /// Its `moc-in`: the names a vehicleward line may arrive by.
+    pub moc_in: Vec<String>,
 }
 
 impl Graph {
@@ -1129,8 +1125,8 @@ impl Graph {
     /// [`TcsError::Config`], naming the file, for a file that does not read,
     /// an include name of a shape [`include_path`] refuses, an include named
     /// twice, an included file with a `tcspecial` section or
-    /// includes of its own, a node in the wrong section, and data sinks whose
-    /// flags disagree with the links.
+    /// includes of its own, a node in the wrong section, and a link to a
+    /// name its far end does not list.
     pub fn load<P: AsRef<Path>>(path: P) -> TcsResult<Graph> {
         let path = path.as_ref();
         let mut graph = Graph {
@@ -1144,6 +1140,7 @@ impl Graph {
             homes: BTreeMap::new(),
             placed: BTreeMap::new(),
             set_aside: std::collections::BTreeSet::new(),
+            named: Named::default(),
         };
 
         // What the files record at the arriving ends of their links, gathered
@@ -1200,6 +1197,10 @@ impl Graph {
         // files it includes -- so a node's device id, its place in this
         // list, is its place among the names (see `telemetry::ids`), and the
         // links are held by the node they leave and then where they go.
+        // Each link matched to a name its far end listed, and turned into
+        // what it means, before anything is ordered by what a link means.
+        mirror.resolve(&mut graph)?;
+
         graph.nodes.sort_by(|a, b| a.name.cmp(&b.name));
         for link in &mut graph.links {
             link.to.0.sort();
@@ -1207,8 +1208,6 @@ impl Graph {
         graph.links.sort_by(|a, b| {
             (&a.from, a.to.each()).cmp(&(&b.from, b.to.each()))
         });
-
-        mirror.check(&graph)?;
 
         Ok(graph)
     }
@@ -1414,7 +1413,7 @@ pub fn read_one(path: &Path) -> TcsResult<GraphFile> {
             "links",
             file.links.is_some(),
             "a link is an attribute of the node it leaves, named after the \
-             data source it leaves by: `payload_out: k_1`",
+             data source it leaves by: `world_out: k_1`",
         ),
         (
             "groups",
@@ -2231,7 +2230,7 @@ tcspecial:
 gateways:
   - type gateway_radio:
       - { gateway: gateway, address: \"10.0.0.1\", port: \"5000\", \
-             ground_base: \"10.0.0.2:5100\" }
+             ground_base: \"10.0.0.2:5100\", world-in: [zone] }
 ",
         )
         .unwrap();
@@ -2244,7 +2243,7 @@ gateways:
             "payloads:\n  \
              - type i2c:\n      \
              - { payload: zone_sensor, path: \"/dev/i2c-1\", \
-             address: \"0x48\", payload-out: gateway }\n",
+             address: \"0x48\", world-out: gateway.zone }\n",
         )
         .unwrap();
 
@@ -2429,55 +2428,47 @@ gateways:
         assert_eq!(many.to.each(), vec!["b", "c.in0"]);
     }
 
-    /// The entry spelling, which is the one the editor writes.
-    ///
-    /// One entry per line, each naming its target, so that several
-    /// destinations are several entries rather than two lists read against
-    /// each other. It means the same thing as the short spelling above, which
-    /// is what the assertions say: both come out as a destination.
+    /// A link is written as the node it reaches and the name it arrives
+    /// by, one line each: a list, or one destination on its own.
     #[test]
-    fn a_link_may_be_written_as_an_entry_naming_its_target() {
+    fn a_link_is_written_as_its_node_and_a_name() {
         let said = yaml_node(
             "compute",
             "compute: k_1
-payload-out:
-  - target: gateway
-  - target: zone_temp
-    input: in0
+world-out:
+  - gateway.readings
+  - zone_temp.in0
 ",
         )
-        .expect("entries");
-        assert_eq!(said.payload_out, vec!["gateway", "zone_temp.in0"]);
+        .expect("a list");
+        assert_eq!(said.world_out, vec!["gateway.readings", "zone_temp.in0"]);
 
-        // One entry on its own needs no list, as one destination needs no
-        // list.
-        let one = yaml_node(
+        let one = yaml_node("compute", "compute: a\nworld-out: gateway.a\n")
+            .expect("one");
+        assert_eq!(one.world_out, vec!["gateway.a"]);
+
+        let xml = xml_node(
             "compute",
-            "compute: a\npayload-out: { target: gateway }\n",
+            "<compute name=\"k_1\"><world-out>gateway.readings</world-out>\
+             <world-out>zone_temp.in0</world-out></compute>",
         )
-        .expect("one entry");
-        assert_eq!(one.payload_out, vec!["gateway"]);
+        .expect("repeated elements");
+        assert_eq!(xml.world_out, said.world_out);
     }
 
-    /// A misspelled word in an entry is refused, not ignored.
-    ///
-    /// `targte: gateway` read as an entry naming nothing is a link that quietly
-    /// goes nowhere, which is the kind of fault a configuration file exists to
-    /// make impossible.
+    /// The entry a link was once written as is refused, told the line to
+    /// write instead: `target: gateway` names no name to arrive by.
     #[test]
-    fn a_word_an_entry_does_not_know_is_refused() {
-        let said = yaml_node(
-            "compute",
-            "compute: a\npayload-out:\n  - targte: gateway\n",
-        )
-        .expect_err("a misspelling is refused");
-        assert!(said.contains("target"), "{said}");
-
-        // And an input with no node to belong to.
-        let said =
-            yaml_node("compute", "compute: a\npayload-out:\n  - input: in0\n")
-                .expect_err("an input names no node");
-        assert!(said.contains("which node"), "{said}");
+    fn a_link_written_as_an_entry_is_refused() {
+        for entry in [
+            "compute: a\nworld-out:\n  - target: gateway\n",
+            "compute: a\nworld-out:\n  - { target: z, input: in0 }\n",
+            "compute: a\nworld-out: { target: gateway }\n",
+        ] {
+            let said = yaml_node("compute", entry).expect_err("an entry");
+            assert!(said.contains("`zone_temp.in0`"), "{said}");
+            assert!(said.contains("`target`"), "{said}");
+        }
     }
 
     /// A node's terminators are a list: a YAML sequence, or a repeated XML

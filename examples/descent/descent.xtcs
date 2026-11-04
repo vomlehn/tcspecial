@@ -38,7 +38,10 @@
                 <address>127.0.0.1</address>
                 <ground_base>127.0.0.1:5100</ground_base>
                 <port>5000</port>
-                <payload-in>true</payload-in>
+                <world-in>altitude</world-in>
+                <world-in>descent_rate</world-in>
+                <world-in>guidance</world-in>
+                <world-in>touchdown</world-in>
             </gateway>
         </type>
     </gateways>
@@ -53,10 +56,10 @@
                 <offset>0</offset>
                 <scale>0.01</scale>
                 <unit>m</unit>
-                <payload-out><target>gateway</target></payload-out>
-                <payload-out><target>guidance</target></payload-out>
-                <payload-out><target>housekeeping</target></payload-out>
-                <payload-in>true</payload-in>
+                <world-out>gateway.altitude</world-out>
+                <world-out>guidance.altitude</world-out>
+                <world-out>housekeeping.altitude</world-out>
+                <world-in>radar</world-in>
             </compute>
             <!-- The velocimeter's two bytes are centimetres a second,
                  signed: up is more than nought, so a descent is less. -->
@@ -66,9 +69,9 @@
                 <offset>0</offset>
                 <scale>0.01</scale>
                 <unit>m/s</unit>
-                <payload-out><target>gateway</target></payload-out>
-                <payload-out><target>housekeeping</target></payload-out>
-                <payload-in>true</payload-in>
+                <world-out>gateway.descent_rate</world-out>
+                <world-out>housekeeping.descent_rate</world-out>
+                <world-in>doppler</world-in>
             </compute>
             <!-- The throttle, from the altitude: a program, flying a
                  descent that slows as the ground nears and cutting the
@@ -81,17 +84,20 @@
                 <function>process</function>
                 <timeout>1 s</timeout>
                 <unit>ratio</unit>
-                <gateway-out><target>engine</target></gateway-out>
-                <payload-out><target>gateway</target></payload-out>
-                <payload-out><target>housekeeping</target></payload-out>
-                <payload-in>true</payload-in>
+                <moc-out>engine.guidance</moc-out>
+                <world-out>gateway.guidance</world-out>
+                <world-out>housekeeping.guidance</world-out>
+                <world-in>altitude</world-in>
             </compute>
         </type>
         <type name="log">
             <compute name="housekeeping">
                 <directory>/tmp/telemetry</directory>
                 <format>variable_ts_rc</format>
-                <payload-in>true</payload-in>
+                <world-in>altitude</world-in>
+                <world-in>descent_rate</world-in>
+                <world-in>guidance</world-in>
+                <world-in>touchdown</world-in>
             </compute>
         </type>
     </vehicle>
@@ -102,21 +108,21 @@
                 <address>127.0.0.1</address>
                 <port>5402</port>
                 <protocol>udp</protocol>
-                <payload-out><target>descent_rate</target></payload-out>
+                <world-out>descent_rate.doppler</world-out>
             </payload>
             <!-- The engine's throttle, driven by what guidance answers. -->
             <payload name="engine">
                 <address>127.0.0.1</address>
                 <port>5404</port>
                 <protocol>udp</protocol>
-                <gateway-in>true</gateway-in>
+                <moc-in>guidance</moc-in>
             </payload>
             <!-- The radar altimeter, which sends ten readings a second. -->
             <payload name="radar">
                 <address>127.0.0.1</address>
                 <port>5401</port>
                 <protocol>udp</protocol>
-                <payload-out><target>altitude</target></payload-out>
+                <world-out>altitude.radar</world-out>
             </payload>
             <!-- The switch on a landing leg, whose 1 is the ground's word
                  that the lander is down: straight to the ground and to the
@@ -125,8 +131,8 @@
                 <address>127.0.0.1</address>
                 <port>5403</port>
                 <protocol>udp</protocol>
-                <payload-out><target>gateway</target></payload-out>
-                <payload-out><target>housekeeping</target></payload-out>
+                <world-out>gateway.touchdown</world-out>
+                <world-out>housekeeping.touchdown</world-out>
             </payload>
         </type>
     </payloads>

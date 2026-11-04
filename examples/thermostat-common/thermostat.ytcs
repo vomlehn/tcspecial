@@ -25,44 +25,40 @@ vehicle:
       - compute: ambient
         algorithm: "median"
         function: "vote"
-        inputs: "in0,in1,in2"
-        payload-out:
-          - target: gateway
-          - target: thermostat
-        payload-in: true
+        world-out:
+          - gateway.ambient
+          - thermostat.ambient
+        world-in: [in0, in1, in2]
       - compute: temp1
         format: "i16_be"
         function: "to_kelvin"
         offset: "273.15"
         scale: "0.0625"
-        payload-out:
-          - target: ambient
-            input: in0
-          - target: gateway
-          - target: housekeeping
-        payload-in: true
+        world-out:
+          - ambient.in0
+          - gateway.temp1
+          - housekeeping.temp1
+        world-in: [temp_1]
       - compute: temp2
         format: "i16_be"
         function: "to_kelvin"
         offset: "273.15"
         scale: "0.0625"
-        payload-out:
-          - target: ambient
-            input: in1
-          - target: gateway
-          - target: housekeeping
-        payload-in: true
+        world-out:
+          - ambient.in1
+          - gateway.temp2
+          - housekeeping.temp2
+        world-in: [temp_2]
       - compute: temp3
         format: "u24_be"
         function: "to_kelvin"
         offset: "255.37"
         scale: "0.0078"
-        payload-out:
-          - target: ambient
-            input: in2
-          - target: gateway
-          - target: housekeeping
-        payload-in: true
+        world-out:
+          - ambient.in2
+          - gateway.temp3
+          - housekeeping.temp3
+        world-in: [temp_3]
       # setpoint is set from the ground; half_band is how far either side
       # of it the heaters are switched at, the setpoint being in the middle
       # of the band.
@@ -77,17 +73,17 @@ vehicle:
         # decides goes to the heaters and the log and not to the ground: the
         # ground is told what the heaters are doing, by gpio-in-tmass, which a
         # heater that has failed does not hide.
-        gateway-out:
-          - target: gpio-out-tmass1
-          - target: gpio-out-tmass2
-        payload-out:
-          - target: housekeeping
-        payload-in: true
+        moc-out:
+          - gpio-out-tmass1.thermostat
+          - gpio-out-tmass2.thermostat
+        world-out:
+          - housekeeping.thermostat
+        world-in: [ambient]
   - type log:
       - compute: housekeeping
         directory: "/tmp/telemetry"
         format: "variable_ts_rc"
-        payload-in: true
+        world-in: [gpio-in-tmass, temp1, temp2, temp3, thermostat]
 
 payloads:
   # The heaters and the lines that sense them, on the thermal mass, through
@@ -105,9 +101,9 @@ payloads:
         lines: "2,3"
         path: "/dev/gpiochip1"
         state_interval: "1 s"
-        payload-out:
-          - target: gateway
-          - target: housekeeping
+        world-out:
+          - gateway.gpio-in-tmass
+          - housekeeping.gpio-in-tmass
       # The two heaters' switches, each a line the thermostat drives -- 1 for
       # on, 0 for off. One payload each, so that one can be stopped from the
       # ground while the other goes on warming the mass.
@@ -115,12 +111,12 @@ payloads:
         direction: "output"
         lines: "4"
         path: "/dev/gpiochip1"
-        gateway-in: true
+        moc-in: [thermostat]
       - payload: gpio-out-tmass2
         direction: "output"
         lines: "5"
         path: "/dev/gpiochip1"
-        gateway-in: true
+        moc-in: [thermostat]
 
 commands:
   # the zone temperature the heaters are held at, in kelvin

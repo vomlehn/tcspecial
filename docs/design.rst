@@ -4065,6 +4065,20 @@ Where the Physics pane's line and the physics list's line are is kept in the
 preferences file beside the others: the pane's width as a percentage of the
 working width, and the list's share of the column.
 
+Some of every pane is in view whatever the window's width, too. A window
+narrower than the sheet draws the sheet smaller, as much as it takes for all
+four panes to fit beside the selection panes, down to half size; and the main
+window cannot be made narrower than the sheet at half size and the selection
+panes together, so the sheet never has to be scrolled sideways to find a
+pane. Before, a narrowed window cut the panes off at its right edge and the
+Gateway pane went first. Drawn smaller rather than with narrower panes,
+because a node's place is kept in its file in the sheet's pixels: narrower
+panes would leave nodes outside them that nobody had moved. Only the drawing
+is scaled. A drag, a line drawn, a node placed, a divider moved and the
+sheet scrolled are all still measured in the sheet's own pixels, so nothing
+that reads a position knows how large it is drawn. Half size is the floor
+because below it a node's type cannot be read.
+
 What that buys is a drawing that can be compared with last mission's. The three
 parts change on different schedules -- the ground is the other end of the link
 and not the vehicle at all, the vehicle's own graph persists, and what it
@@ -4074,7 +4088,9 @@ that is what a payload is for -- and only positions are confined.
 
 Each divider is drawn, and each can be moved: it carries a handle halfway down
 it, and dragging that handle moves the line and resizes the two panes either
-side of it. No pane may be squeezed below a tenth of the working pane, so
+side of it. The line and its handle are drawn over the sheet and not on it, as
+tall as the window shows, so they stay in view however far down the sheet is
+scrolled; drawn on it, they scrolled away with the top of the sheet. No pane may be squeezed below a tenth of the working pane, so
 none can be dragged shut -- a pane with nothing visible in it is a pane whose
 nodes cannot be reached, and the drag that does it is one press away. With
 three panes that means a divider stops a tenth short of its neighbour as

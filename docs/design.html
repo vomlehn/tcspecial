@@ -11311,7 +11311,7 @@ drove, and the whole loop can be watched closing.</p>
 the stand-ins joined to it, so that one file says the whole of what the
 simulator simulates and a stand-in's <tt class="docutils literal">connects</tt> names a terminal the
 same file says is there. The world also states <tt class="docutils literal">ambient_temp</tt>, the
-one temperature every thermal zone's surroundings are about, required
+one temperature every thermal mass's surroundings are about, required
 where there is a zone. The world is YAML only: a simulator file written
 in XML has none, and one with a <tt class="docutils literal">world</tt> or a <tt class="docutils literal">physics</tt> element is
 refused.</dd>
@@ -11328,10 +11328,10 @@ configuration's nodes are, and a list of connections between them, as a
 configuration has links: <tt class="docutils literal">components</tt> and <tt class="docutils literal">connections</tt>, under
 <tt class="docutils literal">physics</tt>. Each entry of <tt class="docutils literal">components</tt> is <tt class="docutils literal">type</tt> and a type,
 <tt class="docutils literal">- type heater:</tt>, holding the components of that type, each
-named by <tt class="docutils literal">component</tt>. The types are <tt class="docutils literal">heater</tt>, <tt class="docutils literal">thermal_zone</tt>,
+named by <tt class="docutils literal">component</tt>. The types are <tt class="docutils literal">heater</tt>, <tt class="docutils literal">thermal_mass</tt>,
 <tt class="docutils literal">sun</tt>, <tt class="docutils literal">solar_array</tt>, <tt class="docutils literal">load</tt>, <tt class="docutils literal">bus</tt>, <tt class="docutils literal">battery</tt>, <tt class="docutils literal">engine</tt> and
-<tt class="docutils literal">body</tt>, and a type of any other is refused; a <tt class="docutils literal">thermal_mass</tt>, the one
-type there was before a model was made of parts, is told what it is now.
+<tt class="docutils literal">body</tt>, and a type of any other is refused; a <tt class="docutils literal">thermal_zone</tt>, which
+is what a <tt class="docutils literal">thermal_mass</tt> was called before, is told the name it has now.
 A type is written once, with a component under it. Each type's settings,
 terminals and rules are stated once, in <tt class="docutils literal"><span class="pre">tcslibgs::physics</span></tt>; its
 arithmetic is the simulator's, in <tt class="docutils literal"><span class="pre">tcssim::physics</span></tt>.</dd>
@@ -11378,7 +11378,7 @@ which differ by the zone's heat capacity. A fraction, which has no unit,
 is written bare.</dd>
 <dt>Requirement</dt>
 <dd>A heater states its power at its nominal voltage and that voltage. A
-thermal zone sits in surroundings about the world's <tt class="docutils literal">ambient_temp</tt>,
+thermal mass sits in surroundings about the world's <tt class="docutils literal">ambient_temp</tt>,
 and states its time constant -- how long it takes to lose a given
 fraction of the difference between itself and its surroundings -- and
 its heat capacity, which turns a heater's watts into kelvin a second.</dd>
@@ -11457,7 +11457,7 @@ next one.</dd>
 time after time, is stopped after ten thousand and the log says so: the
 world falls behind rather than every stand-in waiting on it for ever.</dd>
 </dl>
-<p><strong>A thermal zone and its heaters</strong></p>
+<p><strong>A thermal mass and its heaters</strong></p>
 <p>A heater's heat goes as the square of its supply voltage and its current as
 the voltage, <tt class="docutils literal">power * (1 + <span class="pre">v)^2</span></tt> and <tt class="docutils literal">power / voltage * (1 + v)</tt> with
 <tt class="docutils literal">v</tt> the supply's departure from nominal, nought while it is off. A zone's
@@ -11795,7 +11795,7 @@ with nothing more than a socket.</p>
           </span><span class="punctuation indicator">-</span><span class="whitespace"> </span><span class="name tag">component</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">heater_2</span><span class="whitespace">
             </span><span class="name tag">power</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal string">&quot;60</span><span class="name variable"> </span><span class="literal string">W&quot;</span><span class="whitespace">
             </span><span class="name tag">voltage</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal string">&quot;28</span><span class="name variable"> </span><span class="literal string">V&quot;</span><span class="whitespace">
-      </span><span class="punctuation indicator">-</span><span class="whitespace"> </span><span class="name tag">type thermal_zone</span><span class="punctuation">:</span><span class="whitespace">
+      </span><span class="punctuation indicator">-</span><span class="whitespace"> </span><span class="name tag">type thermal_mass</span><span class="punctuation">:</span><span class="whitespace">
           </span><span class="punctuation indicator">-</span><span class="whitespace"> </span><span class="name tag">component</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">zone</span><span class="whitespace">
             </span><span class="name tag">capacity</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal string">&quot;20</span><span class="name variable"> </span><span class="literal string">J/K&quot;</span><span class="whitespace">
             </span><span class="name tag">time_constant</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal string">&quot;50</span><span class="name variable"> </span><span class="literal string">s&quot;</span><span class="whitespace">

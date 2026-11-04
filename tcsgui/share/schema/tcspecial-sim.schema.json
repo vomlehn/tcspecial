@@ -46,7 +46,7 @@
             "string",
             "null"
           ],
-          "description": "The temperature every thermal zone's surroundings are about, written with its unit: `288.15 K`. One for the world, every zone being in the one set of surroundings; each zone says how they vary about it with its swing and its wander. Required where there is a thermal zone."
+          "description": "The temperature every thermal mass's surroundings are about, written with its unit: `288.15 K`. One for the world, every zone being in the one set of surroundings; each zone says how they vary about it with its swing and its wander. Required where there is a thermal mass."
         },
         "physics": {
           "type": "object",
@@ -67,11 +67,11 @@
                       "$ref": "#/$defs/heater"
                     }
                   },
-                  "type thermal_zone": {
+                  "type thermal_mass": {
                     "type": "array",
                     "minItems": 1,
                     "items": {
-                      "$ref": "#/$defs/thermal_zone"
+                      "$ref": "#/$defs/thermal_mass"
                     }
                   },
                   "type sun": {
@@ -643,8 +643,8 @@
       ],
       "additionalProperties": false
     },
-    "thermal_zone": {
-      "description": "A thermal zone: one body at one temperature, which cools towards its surroundings, the world's ambient_temp, and is warmed by the heat joined to it. It starts at ambient_temp unless `start` says otherwise, because a vehicle coming up cold is the case a thermostat exists for. Its terminals are heat, in W, the sum of every heater's joined to it; and temperature, in K.",
+    "thermal_mass": {
+      "description": "A thermal mass: one body at one temperature, which cools towards its surroundings, the world's ambient_temp, and is warmed by the heat joined to it. It starts at ambient_temp unless `start` says otherwise, because a vehicle coming up cold is the case a thermostat exists for. Its terminals are heat, in W, the sum of every heater's joined to it; and temperature, in K.",
       "type": "object",
       "properties": {
         "component": {

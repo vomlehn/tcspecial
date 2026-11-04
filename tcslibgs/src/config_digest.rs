@@ -816,7 +816,7 @@ mod tests {
                      - component: h1\n            power: \"1 W\"\n            \
                      voltage: \"1 V\"\n          - component: h2\n            \
                      voltage: \"1 V\"\n            power: \"1 W\"\n      \
-                     - type thermal_zone:\n          - component: z\n            \
+                     - type thermal_mass:\n          - component: z\n            \
                      time_constant: 1 s\n            capacity: \"1 J/K\"\n    \
                      connections:\n      - { from: h1.heat, to: z.heat }\n      \
                      - { from: h2.heat, to: z.heat }\n";

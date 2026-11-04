@@ -7,7 +7,7 @@ physics:
       - component: heater_1
         power: "4 W"
         voltage: "28 V"
-  - type thermal_zone:
+  - type thermal_mass:
       - component: zone
         capacity: "20 J/K"
         environment: "283.15 K"

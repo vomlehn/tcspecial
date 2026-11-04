@@ -3,7 +3,7 @@
 //!
 //! The `physics` of the simulator file's `world` section, beside the
 //! stand-ins that are joined to it; the world also states its
-//! `ambient_temp`, the one temperature every thermal zone's surroundings
+//! `ambient_temp`, the one temperature every thermal mass's surroundings
 //! are about: see [`WorldSection`]. It was once a file of its own, named by the simulator file,
 //! so that one vehicle could be shared by several configurations of its
 //! payloads; but a model in another file is a second file to find, to keep
@@ -27,7 +27,7 @@
 //!           - component: heater_1
 //!             power: "60 W"
 //!             voltage: "28 V"
-//!       - type thermal_zone:
+//!       - type thermal_mass:
 //!           - component: zone
 //!             time_constant: "50 s"
 //!             capacity: "20 J/K"
@@ -76,7 +76,7 @@ pub mod setting;
 pub mod solar_array;
 pub mod sun;
 pub mod terminal;
-pub mod thermal_zone;
+pub mod thermal_mass;
 
 use std::collections::BTreeMap;
 
@@ -94,7 +94,7 @@ use terminal::{At, Direction, Terminal};
 /// of them.
 pub const TYPES: &[&str] = &[
     "heater",
-    "thermal_zone",
+    "thermal_mass",
     "sun",
     "solar_array",
     "load",
@@ -109,11 +109,11 @@ pub const TYPES: &[&str] = &[
 #[derive(Debug, Clone, Default, Deserialize, PartialEq)]
 #[serde(deny_unknown_fields)]
 pub struct WorldSection {
-    /// The temperature every thermal zone's surroundings are about, in
+    /// The temperature every thermal mass's surroundings are about, in
     /// kelvin: `"288.15 K"`. One for the world, because a vehicle's zones
     /// are in one set of surroundings; each zone says how they vary about
     /// it, by its `swing` and its `wander`. Required where there is a
-    /// thermal zone.
+    /// thermal mass.
     ///
     /// Fixed, and not a figure that follows the vehicle's setpoint: a zone
     /// whose surroundings tracked the setpoint could never be driven away
@@ -150,8 +150,8 @@ pub struct PhysicsSection {
 pub enum Component {
     #[serde(rename = "heater")]
     Heater(heater::Heater),
-    #[serde(rename = "thermal_zone")]
-    ThermalZone(thermal_zone::ThermalZone),
+    #[serde(rename = "thermal_mass")]
+    ThermalMass(thermal_mass::ThermalMass),
     #[serde(rename = "sun")]
     Sun(sun::Sun),
     #[serde(rename = "solar_array")]
@@ -166,10 +166,10 @@ pub enum Component {
     Engine(engine::Engine),
     #[serde(rename = "body")]
     Body(body::Body),
-    /// The one type there was before a model was made of parts. Read only
-    /// to be refused, saying what it is now: see [`MASS_MADE_OF_PARTS`].
-    #[serde(rename = "thermal_mass")]
-    ThermalMass(Moved),
+    /// What a thermal mass was called before it was renamed. Read only to
+    /// be refused, saying what it is now: see [`ZONE_IS_A_MASS`].
+    #[serde(rename = "thermal_zone")]
+    ThermalZone(Moved),
 }
 
 /// A component of a type there is no longer, read only to be refused.
@@ -188,16 +188,11 @@ pub const CONNECTIONS: &str = "world.physics.connections";
 /// Where a problem with the world's `ambient_temp` is reported.
 pub const AMBIENT: &str = "world.ambient_temp";
 
-/// What a model with a `thermal_mass` is told.
-pub const MASS_MADE_OF_PARTS: &str = "a thermal_mass is now made of parts: \
-    a thermal_zone, with time_constant and a capacity in J/K, its \
-    surroundings the world's ambient_temp, and a heater for each heater, \
-    with its power in W and its voltage in V, joined under connections: \
-    from each heater's heat to the zone's heat. A stand-in then names the \
-    terminal it is joined to, connects: zone.temperature or connects: \
-    heater_1.on, in place of reads, heats, output, input and rate. The \
-    world section of examples/thermostat-common/thermostat-sim.yaml is one \
-    written so";
+/// What a model with a `thermal_mass` is told: the type's old name, as
+/// `moc` is a gateway's (see `crate::graph::renamed`).
+pub const ZONE_IS_A_MASS: &str = "thermal_mass is now called thermal_mass: \
+    write the entry as `- type thermal_mass:`, with the same settings and \
+    the same terminals, heat and temperature";
 
 /// A connection between two components, as a file writes it.
 #[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
@@ -218,7 +213,7 @@ impl Component {
     pub fn name(&self) -> &str {
         match self {
             Component::Heater(e) => &e.name,
-            Component::ThermalZone(e) => &e.name,
+            Component::ThermalMass(e) => &e.name,
             Component::Sun(e) => &e.name,
             Component::SolarArray(e) => &e.name,
             Component::Load(e) => &e.name,
@@ -226,7 +221,7 @@ impl Component {
             Component::Battery(e) => &e.name,
             Component::Engine(e) => &e.name,
             Component::Body(e) => &e.name,
-            Component::ThermalMass(e) => &e.name,
+            Component::ThermalZone(e) => &e.name,
         }
     }
 
@@ -238,7 +233,7 @@ impl Component {
     pub fn type_name(&self) -> &'static str {
         match self {
             Component::Heater(_) => "heater",
-            Component::ThermalZone(_) => "thermal_zone",
+            Component::ThermalMass(_) => "thermal_mass",
             Component::Sun(_) => "sun",
             Component::SolarArray(_) => "solar_array",
             Component::Load(_) => "load",
@@ -246,7 +241,7 @@ impl Component {
             Component::Battery(_) => "battery",
             Component::Engine(_) => "engine",
             Component::Body(_) => "body",
-            Component::ThermalMass(_) => "thermal_mass",
+            Component::ThermalZone(_) => "thermal_zone",
         }
     }
 }
@@ -265,7 +260,7 @@ impl Component {
 pub fn settings_of(type_name: &str) -> Option<&'static [&'static str]> {
     match type_name {
         "heater" => Some(heater::SETTINGS),
-        "thermal_zone" => Some(thermal_zone::SETTINGS),
+        "thermal_mass" => Some(thermal_mass::SETTINGS),
         "sun" => Some(sun::SETTINGS),
         "solar_array" => Some(solar_array::SETTINGS),
         "load" => Some(load::SETTINGS),
@@ -289,7 +284,7 @@ pub fn settings_of(type_name: &str) -> Option<&'static [&'static str]> {
 pub fn terminals_of(type_name: &str) -> Option<&'static [Terminal]> {
     match type_name {
         "heater" => Some(heater::TERMINALS),
-        "thermal_zone" => Some(thermal_zone::TERMINALS),
+        "thermal_mass" => Some(thermal_mass::TERMINALS),
         "sun" => Some(sun::TERMINALS),
         "solar_array" => Some(solar_array::TERMINALS),
         "load" => Some(load::TERMINALS),
@@ -423,7 +418,7 @@ pub struct Resolved {
 #[derive(Debug, Clone, PartialEq)]
 pub enum Resolution {
     Heater(heater::Resolved),
-    ThermalZone(thermal_zone::Resolved),
+    ThermalMass(thermal_mass::Resolved),
     Sun(sun::Resolved),
     SolarArray(solar_array::Resolved),
     Load(load::Resolved),
@@ -443,7 +438,7 @@ impl Resolution {
     pub fn type_name(&self) -> &'static str {
         match self {
             Resolution::Heater(_) => "heater",
-            Resolution::ThermalZone(_) => "thermal_zone",
+            Resolution::ThermalMass(_) => "thermal_mass",
             Resolution::Sun(_) => "sun",
             Resolution::SolarArray(_) => "solar_array",
             Resolution::Load(_) => "load",
@@ -462,7 +457,7 @@ impl Resolution {
     pub fn terminals(&self) -> &'static [Terminal] {
         match self {
             Resolution::Heater(_) => heater::TERMINALS,
-            Resolution::ThermalZone(_) => thermal_zone::TERMINALS,
+            Resolution::ThermalMass(_) => thermal_mass::TERMINALS,
             Resolution::Sun(_) => sun::TERMINALS,
             Resolution::SolarArray(_) => solar_array::TERMINALS,
             Resolution::Load(_) => load::TERMINALS,
@@ -632,7 +627,7 @@ impl WorldSection {
             .physics
             .components
             .iter()
-            .any(|c| matches!(c, Component::ThermalZone(_)));
+            .any(|c| matches!(c, Component::ThermalMass(_)));
         let ambient = match &self.ambient_temp {
             Some(said) => {
                 match setting::quantity("ambient_temp", said, Some("K")) {
@@ -645,7 +640,7 @@ impl WorldSection {
             }
             None if zones => {
                 problems.push(PhysicsProblem::of_ambient(
-                    "it is not stated, and a thermal_zone's surroundings are \
+                    "it is not stated, and a thermal_mass's surroundings are \
                      about it: state it under world:, as ambient_temp: \
                      \"288.15 K\"",
                 ));
@@ -680,9 +675,9 @@ impl WorldSection {
                 Component::Heater(e) => e.resolve().map(Resolution::Heater),
                 // A zone with no ambient temperature to be about has been
                 // refused for that already, once, at the world.
-                Component::ThermalZone(e) => match ambient {
+                Component::ThermalMass(e) => match ambient {
                     Some(ambient) => {
-                        e.resolve(ambient).map(Resolution::ThermalZone)
+                        e.resolve(ambient).map(Resolution::ThermalMass)
                     }
                     None => continue,
                 },
@@ -695,9 +690,7 @@ impl WorldSection {
                 Component::Battery(e) => e.resolve().map(Resolution::Battery),
                 Component::Engine(e) => e.resolve().map(Resolution::Engine),
                 Component::Body(e) => e.resolve().map(Resolution::Body),
-                Component::ThermalMass(_) => {
-                    Err(MASS_MADE_OF_PARTS.to_string())
-                }
+                Component::ThermalZone(_) => Err(ZONE_IS_A_MASS.to_string()),
             };
             match what {
                 Ok(what) => model.components.push(Resolved {
@@ -914,7 +907,7 @@ mod tests {
     /// The thermostat's model: two heaters warming one zone.
     const ZONE: &str = "\
 components:
-  - type thermal_zone:
+  - type thermal_mass:
       - component: zone
         time_constant: 50 s
         capacity: \"20 J/K\"
@@ -953,7 +946,7 @@ connections:
         };
         assert_eq!((heater.power, heater.voltage), (60.0, 28.0));
         assert_eq!(heater.supply.size, 0.02);
-        let Resolution::ThermalZone(zone) = &model.components[2].what else {
+        let Resolution::ThermalMass(zone) = &model.components[2].what else {
             panic!("a zone: {:?}", model.components[2]);
         };
         assert_eq!((zone.environment, zone.capacity), (283.15, 20.0));
@@ -988,7 +981,7 @@ components:
         ripple: \"0.02\"
         voltage: \"28 V\"
         power: \"60 W\"
-  - type thermal_zone:
+  - type thermal_mass:
       - component: zone
         capacity: \"20 J/K\"
         time_constant: 50 s
@@ -1040,9 +1033,9 @@ components:
     /// means nothing; and every pair it offers is one a file may write.
     #[test]
     fn a_line_between_two_components_means_the_terminals_of_one_kind() {
-        assert_eq!(connectable("heater", "thermal_zone"), [("heat", "heat")]);
-        assert!(connectable("thermal_zone", "heater").is_empty());
-        assert!(connectable("nonesuch", "thermal_zone").is_empty());
+        assert_eq!(connectable("heater", "thermal_mass"), [("heat", "heat")]);
+        assert!(connectable("thermal_mass", "heater").is_empty());
+        assert!(connectable("nonesuch", "thermal_mass").is_empty());
         for from in TYPES {
             for to in TYPES {
                 for (output, input) in connectable(from, to) {
@@ -1065,20 +1058,18 @@ components:
         }
     }
 
-    /// A thermal mass, which a model held before it was made of parts, is
-    /// refused, saying what it is now.
+    /// A thermal zone, which a thermal mass was called before, is refused
+    /// at its component, told the name it has now.
     #[test]
-    fn a_thermal_mass_is_told_what_it_is_now() {
+    fn a_thermal_mass_is_told_its_new_name() {
         let file = parse(
-            "components:\n  - type thermal_mass:\n      \
-             - component: basic\n        \
-             environment: \"283.15\"\n        inputs: \"in1\"\n",
+            "components:\n  - type thermal_zone:\n      \
+             - component: zone\n        capacity: \"20 J/K\"\n",
         )
         .expect("it parses, to be refused");
         let problem = file.resolve().expect_err("refused");
-        assert_eq!(problem.about(), About::PhysicsComponent("basic".into()));
-        assert!(problem.why.contains("thermal_zone"), "{problem}");
-        assert!(problem.why.contains("connects:"), "{problem}");
+        assert_eq!(problem.about(), About::PhysicsComponent("zone".into()));
+        assert!(problem.why.contains("type thermal_mass"), "{problem}");
     }
 
     /// Every type listed reads, with the settings its list names, and has
@@ -1156,7 +1147,7 @@ components:
     #[test]
     fn a_zone_is_in_the_worlds_ambient_temperature() {
         let model = parse(ZONE).expect("parses").resolve().expect("resolves");
-        let Resolution::ThermalZone(zone) = &model.components[2].what else {
+        let Resolution::ThermalMass(zone) = &model.components[2].what else {
             panic!("a zone: {:?}", model.components[2]);
         };
         assert_eq!(zone.environment, 283.15);

@@ -34,7 +34,7 @@
 //! file -- `physics: thermostat-physics.yaml` -- with its components in a
 //! `physics` list and its `connections` beside it. It is the `physics` of
 //! the simulator file's `world` section now, those two under it, and the
-//! temperature each thermal zone gave as its `environment` is the world's
+//! temperature each thermal mass gave as its `environment` is the world's
 //! `ambient_temp`: see [`crate::physics`]. A simulator file that names a
 //! model, a model given where a simulator file is wanted, and a `physics`
 //! section at the top of a file, are refused here with where it goes; and
@@ -74,7 +74,7 @@ pub fn sim_refused(text: &str, format: ConfigFormat) -> Option<String> {
 const MOVE_THE_MODEL: &str = "Write the model in the simulator file's \
     world section now, its components under physics: components:, its \
     connections under physics: connections:, and the temperature its zones' \
-    surroundings are about, which each thermal_zone stated as its \
+    surroundings are about, which each thermal_mass stated as its \
     environment, once as the world's ambient_temp, as `world: { \
     ambient_temp: \"288.15 K\", physics: { components: [ { type heater: [ { \
     component: heater_1, ... } ] } ], connections: [ { from: heater_1.heat, \
@@ -435,10 +435,10 @@ mod tests {
     fn a_physics_component_of_the_old_shape_is_refused_at_its_line() {
         let text =
             "description: d\nworld:\n  physics:\n    components:\n      \
-                    - name: zone\n        type: thermal_zone\n";
+                    - name: zone\n        type: thermal_mass\n";
         let why = sim_refused(text, ConfigFormat::Yaml).expect("refused");
         assert!(why.starts_with("at line 5,"), "{why}");
-        assert!(why.contains("type thermal_zone:"), "{why}");
+        assert!(why.contains("type thermal_mass:"), "{why}");
         assert!(why.contains("component: zone"), "{why}");
     }
 

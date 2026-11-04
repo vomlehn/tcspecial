@@ -12,7 +12,7 @@
 //!           - component: heater_1
 //!             power: "60 W"
 //!             voltage: "28 V"
-//!       - type thermal_zone:
+//!       - type thermal_mass:
 //!           - component: zone
 //!             time_constant: "50 s"
 //! ```
@@ -33,7 +33,7 @@ use serde::de::{self, DeserializeSeed, MapAccess, SeqAccess, Visitor};
 use serde::{Deserialize, Deserializer};
 
 use super::{
-    battery, body, bus, engine, heater, load, solar_array, sun, thermal_zone,
+    battery, body, bus, engine, heater, load, solar_array, sun, thermal_mass,
     Component, Moved, TYPES,
 };
 
@@ -73,8 +73,8 @@ pub fn components<'de, D: Deserializer<'de>>(
 /// # Errors
 ///
 /// A message for a key that is not the word `type`, one space and one of the
-/// [`TYPES`] -- or `thermal_mass`, which is read to be refused, saying what
-/// it is now.
+/// [`TYPES`] -- or `thermal_zone`, which is read to be refused, saying what
+/// it is called now.
 fn type_in_key(key: &str) -> Result<String, String> {
     let Some(named) = key.strip_prefix("type ") else {
         return Err(format!(
@@ -89,7 +89,7 @@ fn type_in_key(key: &str) -> Result<String, String> {
             named.trim()
         ));
     }
-    if !TYPES.contains(&named) && named != "thermal_mass" {
+    if !TYPES.contains(&named) && named != "thermal_zone" {
         return Err(format!(
             "{named} is not a type of physics component, which are {}",
             TYPES.join(", ")
@@ -254,8 +254,8 @@ impl<'de> DeserializeSeed<'de> for OneComponent<'_> {
     ) -> Result<Component, D::Error> {
         Ok(match self.0 {
             "heater" => Component::Heater(heater::Heater::deserialize(d)?),
-            "thermal_zone" => Component::ThermalZone(
-                thermal_zone::ThermalZone::deserialize(d)?,
+            "thermal_mass" => Component::ThermalMass(
+                thermal_mass::ThermalMass::deserialize(d)?,
             ),
             "sun" => Component::Sun(sun::Sun::deserialize(d)?),
             "solar_array" => {
@@ -266,7 +266,7 @@ impl<'de> DeserializeSeed<'de> for OneComponent<'_> {
             "battery" => Component::Battery(battery::Battery::deserialize(d)?),
             "engine" => Component::Engine(engine::Engine::deserialize(d)?),
             "body" => Component::Body(body::Body::deserialize(d)?),
-            "thermal_mass" => Component::ThermalMass(Moved::deserialize(d)?),
+            "thermal_zone" => Component::ThermalZone(Moved::deserialize(d)?),
             other => {
                 return Err(de::Error::custom(format!(
                     "{other} is not a type of physics component"

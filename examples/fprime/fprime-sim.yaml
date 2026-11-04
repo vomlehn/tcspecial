@@ -32,7 +32,7 @@ world:
             power: "20 W"
             voltage: "28 V"
 
-      - type thermal_zone:
+      - type thermal_mass:
           # The zone, starting at and settling to ten degrees, losing any
           # difference with a hundred second constant.
           - component: zone

@@ -1686,7 +1686,7 @@ impl Faults {
 /// masses are written now.
 pub const MOVED_THERMAL_MASS: &str = "a simulator file no longer declares \
     thermal masses: they are the vehicle's physics, and are written in its \
-    world section, made of parts: a thermal_zone for each mass and a heater \
+    world section, made of parts: a thermal_mass for each mass and a heater \
     for each heater, listed under world: physics: components: and joined \
     under world: physics: connections:, with the temperature a mass's \
     surroundings were as the world's ambient_temp, as \
@@ -4401,7 +4401,7 @@ physics:
         - component: heater_2
           power: \"60 W\"
           voltage: \"28 V\"
-    - type thermal_zone:
+    - type thermal_mass:
         - component: zone
           capacity: \"20 J/K\"
           time_constant: 50 s
@@ -4722,8 +4722,8 @@ physics:
         model
             .physics
             .components
-            .push(crate::physics::Component::ThermalZone(
-                crate::physics::thermal_zone::ThermalZone {
+            .push(crate::physics::Component::ThermalMass(
+                crate::physics::thermal_mass::ThermalMass {
                     name: "spare".to_string(),
                     moved_environment: None,
                     time_constant: "50 s".to_string(),

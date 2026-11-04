@@ -24,7 +24,7 @@ pub mod random;
 pub mod sensor;
 pub mod solar_array;
 pub mod sun;
-pub mod thermal_zone;
+pub mod thermal_mass;
 pub mod world;
 
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
@@ -569,7 +569,7 @@ pub(crate) mod tests {
       - component: heater_2
         power: \"60 W\"
         voltage: \"28 V\"
-  - type thermal_zone:
+  - type thermal_mass:
       - component: zone
         capacity: \"20 J/K\"
         time_constant: 50 s

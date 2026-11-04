@@ -1,7 +1,7 @@
-//! A thermal zone: one body at one temperature, which heat warms and its
+//! A thermal mass: one body at one temperature, which heat warms and its
 //! surroundings pull back.
 //!
-//! Its terminals are `tcslibgs::physics::thermal_zone`'s: `heat`, in watts,
+//! Its terminals are `tcslibgs::physics::thermal_mass`'s: `heat`, in watts,
 //! the sum of what every heater joined to it gives; `temperature`, in
 //! kelvin, what it is.
 //!
@@ -67,19 +67,19 @@ use std::f64::consts::TAU;
 
 use rand::rngs::StdRng;
 use rand::SeedableRng;
-use tcslibgs::physics::thermal_zone::Resolved;
+use tcslibgs::physics::thermal_mass::Resolved;
 
 use super::component::Component;
 use super::random::{seed_for, settled, wandered};
 
-/// Its terminals' places, in `tcslibgs::physics::thermal_zone::TERMINALS`'s
+/// Its terminals' places, in `tcslibgs::physics::thermal_mass::TERMINALS`'s
 /// order, which a test holds this to.
 const HEAT: usize = 0;
 const TEMPERATURE: usize = 1;
 
-/// A thermal zone of the world.
+/// A thermal mass of the world.
 #[derive(Debug)]
-pub struct ThermalZone {
+pub struct ThermalMass {
     figures: Resolved,
     /// Its time constant, in seconds.
     tau: f64,
@@ -95,7 +95,7 @@ pub struct ThermalZone {
     rng: StdRng,
 }
 
-impl ThermalZone {
+impl ThermalMass {
     /// Makes a zone at its environment, with nothing warming it.
     ///
     /// # Arguments
@@ -109,7 +109,7 @@ impl ThermalZone {
     /// The zone, at its environment as it is at simulated time nought:
     /// wandered as far as a first draw says, and at the middle of its
     /// swing. Or where the model states it starts.
-    pub fn new(name: &str, figures: Resolved, seed: u64) -> ThermalZone {
+    pub fn new(name: &str, figures: Resolved, seed: u64) -> ThermalMass {
         let mut rng =
             StdRng::seed_from_u64(seed_for(seed, &format!("component:{name}")));
         let wander = settled(&figures.wander, &mut rng);
@@ -119,7 +119,7 @@ impl ThermalZone {
             0.0
         };
         let temperature = figures.start.unwrap_or(figures.environment + wander);
-        ThermalZone {
+        ThermalMass {
             tau: figures.time_constant.as_secs_f64(),
             omega,
             temperature,
@@ -150,7 +150,7 @@ impl ThermalZone {
     }
 }
 
-impl Component for ThermalZone {
+impl Component for ThermalMass {
     fn hold(&mut self, inputs: &[f64]) {
         self.heat = inputs[HEAT];
     }
@@ -184,7 +184,7 @@ impl Component for ThermalZone {
 mod tests {
     use super::*;
     use std::time::Duration;
-    use tcslibgs::physics::thermal_zone::TERMINALS;
+    use tcslibgs::physics::thermal_mass::TERMINALS;
     use tcslibgs::physics::Wander;
 
     /// The example's zone: ten kelvin below a setpoint of 293.15, losing
@@ -213,7 +213,7 @@ mod tests {
     /// side.
     #[test]
     fn a_zone_settles_at_its_environment() {
-        let mut zone = ThermalZone::new("zone", zone(), 0);
+        let mut zone = ThermalMass::new("zone", zone(), 0);
 
         // It starts there, which is what a vehicle coming up cold is.
         assert!((zone.output(TEMPERATURE) - 283.15).abs() < 1e-9);
@@ -242,7 +242,7 @@ mod tests {
     /// rate.
     #[test]
     fn the_cooling_rate_at_the_setpoint_is_a_fifth_of_a_kelvin() {
-        let mut zone = ThermalZone::new("zone", zone(), 0);
+        let mut zone = ThermalMass::new("zone", zone(), 0);
         zone.temperature = 293.15;
         // Over a tenth of a second, which is the example's sample interval.
         zone.advance(0.0, 0.1);
@@ -258,7 +258,7 @@ mod tests {
     /// constant rests three hundred kelvin above the environment.
     #[test]
     fn its_heat_decides_where_it_settles() {
-        let mut zone = ThermalZone::new("zone", zone(), 0);
+        let mut zone = ThermalMass::new("zone", zone(), 0);
         zone.hold(&[120.0, 0.0]);
         zone.advance(0.0, 10_000.0);
         let settled = zone.output(TEMPERATURE);
@@ -274,7 +274,7 @@ mod tests {
             period: Duration::from_secs(100),
             ..zone()
         };
-        let mut zone = ThermalZone::new("zone", swing, 0);
+        let mut zone = ThermalMass::new("zone", swing, 0);
         // Two watts on twenty joules a kelvin: a tenth of a kelvin a second.
         zone.hold(&[2.0, 0.0]);
         zone.temperature = 290.0;
@@ -310,7 +310,7 @@ mod tests {
             },
             ..zone()
         };
-        let mut zone = ThermalZone::new("zone", wandering, 3);
+        let mut zone = ThermalMass::new("zone", wandering, 3);
         let mut squares = 0.0;
         let n = 100_000;
         for i in 0..n {
@@ -332,7 +332,7 @@ mod tests {
             ..zone()
         };
         let run = |seed| {
-            let mut zone = ThermalZone::new("zone", wandering, seed);
+            let mut zone = ThermalMass::new("zone", wandering, seed);
             (1..20)
                 .map(|i| {
                     zone.advance((i - 1) as f64, i as f64);
@@ -348,7 +348,7 @@ mod tests {
     /// twice in one instant must not do.
     #[test]
     fn an_interval_of_no_time_changes_nothing() {
-        let mut zone = ThermalZone::new("zone", zone(), 0);
+        let mut zone = ThermalMass::new("zone", zone(), 0);
         zone.hold(&[60.0, 0.0]);
         zone.advance(0.0, 1.0);
         let first = zone.output(TEMPERATURE);
@@ -369,7 +369,7 @@ mod tests {
         };
         for seed in 0..10 {
             assert_eq!(
-                ThermalZone::new("zone", started, seed).output(TEMPERATURE),
+                ThermalMass::new("zone", started, seed).output(TEMPERATURE),
                 292.15
             );
         }

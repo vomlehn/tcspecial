@@ -1061,7 +1061,7 @@ fn every_shipped_simulator_file_is_valid_against_its_schema() {
     let world = "world:\n  ambient_temp: \"288.15 K\"\n  physics:\n    \
                  components:\n      - type heater:\n          \
                  - component: h\n            power: \"4 W\"\n            \
-                 voltage: \"28 V\"\n      - type thermal_zone:\n          \
+                 voltage: \"28 V\"\n      - type thermal_mass:\n          \
                  - component: zone\n            capacity: \"20 J/K\"\n            \
                  time_constant: \"50 s\"\n    connections:\n      \
                  - { from: h.heat, to: zone.heat }\n";

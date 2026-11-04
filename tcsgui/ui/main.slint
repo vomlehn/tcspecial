@@ -193,7 +193,6 @@ component SelectionPane inherits Rectangle {
                 if !p.is-heading: NodeShape {
                     node: p.node;
                     transform-scale: root.shrink;
-                    transform-origin: { x: 0px, y: 0px };
                     opacity: root.enabled ? 1 : 0.4;
                 }
                 // The whole row, so the hit area is the row and not only the
@@ -419,12 +418,33 @@ component Surface inherits Rectangle {
     // Two-way, because both ends of it have something to say: a person
     // scrolling moves it, and placing a node sets it so the new node is at the
     // top of the view -- see tcsdiagram::pane::place_in. The offset is the
-    // viewport's own, which is negative as it scrolls down; Rust reads it back
-    // as the top of the view.
+    // viewport's, which is negative as it scrolls down, but in the sheet's
+    // own pixels rather than the window's, so that Rust reads it back as the
+    // top of the view whatever the sheet is drawn at: see `zoom`.
     in-out property <length> canvas-offset: 0px;
     // How much of the sheet the window is showing, which is what decides
-    // whether a place is in view.
-    out property <length> canvas-view-height: sheet.visible-height;
+    // whether a place is in view; in the sheet's pixels, likewise.
+    out property <length> canvas-view-height: sheet.visible-height / zoom;
+
+    // How large the sheet is drawn: whole, or smaller, so that a window too
+    // narrow for all of it shows some of every pane rather than none of the
+    // last. Drawn smaller rather than with narrower panes because a node's
+    // place is in its file, in the sheet's pixels; narrower panes would put
+    // nodes outside them that nobody had moved. Never under a half, below
+    // which a node's type cannot be read, and the window is never made
+    // narrower than the sheet at a half: see MainWindow's min-width. Only
+    // the drawing scales -- a node dragged, a line drawn and a node placed
+    // are all in the sheet's pixels, which the window toolkit maps a press
+    // into -- so nothing that reads a position knows it.
+    out property <float> zoom: max(0.5, min(1.0, sheet.visible-width
+        / max(1px, root.physics-width + root.working-width)));
+
+    // The view's place kept as the sheet's, both ways: a person scrolling
+    // moves the viewport, and Rust or a change of zoom moves it back to the
+    // same place on the sheet. Each is set only from the other, so the two
+    // settle at once rather than chasing each other.
+    changed canvas-offset => { sheet.content-y = root.canvas-offset * zoom; }
+    changed zoom => { sheet.content-y = root.canvas-offset * zoom; }
 
     // How many concerns there are, and how many were set aside: see the two
     // buttons in the bar.
@@ -762,164 +782,177 @@ component Surface inherits Rectangle {
             // The bars are the ScrollView's own, so the horizontal one sits
             // along the bottom of all three panes and the vertical one down
             // the right of them.
-            sheet := ScrollView {
+            // The sheet, and over it the dividers, which stay in view
+            // however far it is scrolled: see below.
+            Rectangle {
                 horizontal-stretch: 1;
-                content-width: root.physics-width + root.working-width;
-                content-height: root.working-height;
-                content-y <=> root.canvas-offset;
-
-                // One ground for all three panes, with a heading band at the
-                // top of each: the panes are columns of one sheet, so one
-                // sheet is what they are painted. Which pane a reader is
-                // looking at is said by the band at its head and by the
-                // dividers between them, and the tints are kept for the two
-                // places they say something -- those bands, and the selection
-                // panes a node is taken from.
-                // The Physics pane, left of the configuration's sheet, and
-                // the sheet itself beside it, in the coordinates its file
-                // holds: see tcsdiagram::pane. The physics links under
-                // everything, the sheet being transparent, and the physics
-                // nodes over it, in their own pane.
-                page := Rectangle {
-                    width: root.physics-width + root.working-width;
-                    height: root.working-height;
-                    background: white;
-                    border-width: 1px;
-                    border-color: #d8d8d4;
-
-                    if root.shows-physics && root.physics-width > 0:
-                    PhysicsGround {
-                        x: 0;
-                        y: 0;
-                        physics-width: root.physics-width;
-                        physics-ground: root.physics-ground;
-                        note: root.has-world ? ""
-                            : "Open a simulator file to place physics.";
+                sheet := ScrollView {
+                width: 100%;
+                height: 100%;
+                    content-width: (root.physics-width + root.working-width)
+                        * root.zoom;
+                    content-height: root.working-height * root.zoom;
+                    changed content-y => {
+                        root.canvas-offset = self.content-y / root.zoom;
                     }
-                    for l in root.physics-links: LinkLine {
+
+                    // One ground for all three panes, with a heading band at
+                    // the top of each: the panes are columns of one sheet, so
+                    // one sheet is what they are painted. Which pane a reader
+                    // is looking at is said by the band at its head and by the
+                    // dividers between them, and the tints are kept for the two
+                    // places they say something -- those bands, and the
+                    // selection panes a node is taken from.
+                    // The Physics pane, left of the configuration's sheet, and
+                    // the sheet itself beside it, in the coordinates its file
+                    // holds: see tcsdiagram::pane. The physics links under
+                    // everything, the sheet being transparent, and the physics
+                    // nodes over it, in their own pane.
+                    page := Rectangle {
+                        width: root.physics-width + root.working-width;
+                        height: root.working-height;
+                        transform-scale: root.zoom;
+                        background: white;
+                        border-width: 1px;
+                        border-color: #d8d8d4;
+
+                        if root.shows-physics && root.physics-width > 0:
+                        PhysicsGround {
+                            x: 0;
+                            y: 0;
+                            physics-width: root.physics-width;
+                            physics-ground: root.physics-ground;
+                            note: root.has-world ? ""
+                                : "Open a simulator file to place physics.";
+                        }
+                        for l in root.physics-links: LinkLine {
+                            link: l;
+                        }
+
+                    canvas := Rectangle {
+                        x: root.physics-width;
+                        width: root.working-width;
+                        height: root.working-height;
+                        background: transparent;
+
+                        SheetGround {
+                            working-width: root.working-width;
+                            payload-divider: root.payload-divider;
+                            vehicle-divider: root.vehicle-divider;
+                            payload-ground: root.payload-ground;
+                            vehicle-ground: root.vehicle-ground;
+                            gateway-ground: root.gateway-ground;
+                        }
+
+
+                    // An empty canvas looks broken rather than new, so it says
+                    // which way out.
+                    if nodes.length == 0: Text {
+                        x: Space.room;
+                        y: Space.room;
+                        text: "Press a node type on the left to place one.";
+                        font-size: Type.body;
+                        font-italic: true;
+                        color: #9ca3af;
+                    }
+
+                    // Links under nodes, so a line never crosses a label.
+                    for l in links: LinkLine {
                         link: l;
                     }
-
-                canvas := Rectangle {
-                    x: root.physics-width;
-                    width: root.working-width;
-                    height: root.working-height;
-                    background: transparent;
-
-                    SheetGround {
-                        working-width: root.working-width;
-                        payload-divider: root.payload-divider;
-                        vehicle-divider: root.vehicle-divider;
-                        payload-ground: root.payload-ground;
-                        vehicle-ground: root.vehicle-ground;
-                        gateway-ground: root.gateway-ground;
+                    // And the line being drawn, under them as well: it is a
+                    // link that is not one yet, and it follows the pointer, so
+                    // it is redrawn as the hand moves rather than when the
+                    // document changes.
+                    if root.drawing-route != "": Path {
+                        width: 100%;
+                        height: 100%;
+                        viewbox-x: 0;
+                        viewbox-y: 0;
+                        viewbox-width: self.width / 1px;
+                        viewbox-height: self.height / 1px;
+                        commands: root.drawing-route;
+                        stroke: #6b7280;
+                        stroke-width: 1.25px;
+                        fill: transparent;
                     }
-
-
-                // An empty canvas looks broken rather than new, so it says
-                // which way out.
-                if nodes.length == 0: Text {
-                    x: Space.room;
-                    y: Space.room;
-                    text: "Press a node type on the left to place one.";
-                    font-size: Type.body;
-                    font-italic: true;
-                    color: #9ca3af;
-                }
-
-                // Links under nodes, so a line never crosses a label.
-                for l in links: LinkLine {
-                    link: l;
-                }
-                // And the line being drawn, under them as well: it is a link
-                // that is not one yet, and it follows the pointer, so it is
-                // redrawn as the hand moves rather than when the document
-                // changes.
-                if root.drawing-route != "": Path {
-                    width: 100%;
-                    height: 100%;
-                    viewbox-x: 0;
-                    viewbox-y: 0;
-                    viewbox-width: self.width / 1px;
-                    viewbox-height: self.height / 1px;
-                    commands: root.drawing-route;
-                    stroke: #6b7280;
-                    stroke-width: 1.25px;
-                    fill: transparent;
-                }
-                for n in nodes: NodeShape {
-                    node: n;
-                    draggable: true;
-                    selected: n.name == root.selected;
-                    dragged(dx, dy) => { node-moved(n.name, dx, dy); }
-                    open-requested => { open-subdiagram(n.name); }
-                    link-from(terminal) => { link-started(n.name, terminal); }
-                    link-dropped(x, y) => { link-finished(x, y); }
-                    link-dragging(x, y) => { link-moved(x, y); }
-                    chosen => { node-selected(n.name); }
-                    edit-requested => { node-edit(n.name); }
-                    delete-requested => { node-delete(n.name); }
-                }
-                }
-
-                    // Moved, edited, deleted and joined as a configuration's
-                    // nodes are: a press that stays put offers the menu, one
-                    // that moves drags the component, and a press on a
-                    // terminal draws a line.
-                    for n in root.physics-nodes: NodeShape {
+                    for n in nodes: NodeShape {
                         node: n;
                         draggable: true;
-                        dragged(dx, dy) => {
-                            root.physics-moved(n.name, dx, dy);
-                        }
-                        edit-requested => { root.physics-edit(n.name); }
-                        delete-requested => { root.physics-delete(n.name); }
+                        selected: n.name == root.selected;
+                        dragged(dx, dy) => { node-moved(n.name, dx, dy); }
+                        open-requested => { open-subdiagram(n.name); }
                         link-from(terminal) => {
-                            root.physics-link-started(n.name, terminal);
+                            link-started(n.name, terminal);
                         }
-                        link-dragging(x, y) => {
-                            root.physics-link-moved(x, y);
-                        }
-                        link-dropped(x, y) => {
-                            root.physics-link-finished(x, y);
-                        }
+                        link-dropped(x, y) => { link-finished(x, y); }
+                        link-dragging(x, y) => { link-moved(x, y); }
+                        chosen => { node-selected(n.name); }
+                        edit-requested => { node-edit(n.name); }
+                        delete-requested => { node-delete(n.name); }
+                    }
                     }
 
-                    // Which terminals a line just drawn means, where it could
-                    // mean more than one: asked where it was let go of, one
-                    // button each and one to draw nothing. A question rather
-                    // than a guess, because a heater's heat and its heating
-                    // are both outputs and a line to the wrong one is a
-                    // simulator that reads something other than was meant.
-                    if root.physics-choices.length > 0: Rectangle {
-                        x: root.physics-choice-x;
-                        y: root.physics-choice-y;
-                        width: asked.preferred-width;
-                        height: asked.preferred-height;
-                        background: Colors.window;
-                        border-width: 1px;
-                        border-color: #6b7280;
-                        border-radius: 4px;
-                        drop-shadow-blur: 8px;
-                        drop-shadow-color: #00000044;
-                        // Takes the presses that miss its buttons, so that
-                        // none reaches the node underneath.
-                        TouchArea { }
-                        asked := VerticalLayout {
-                            padding: Space.tight;
-                            spacing: Space.tight;
-                            Text {
-                                text: "Join which?";
-                                font-size: Type.small;
-                                font-weight: 700;
+                        // Moved, edited, deleted and joined as a
+                        // configuration's nodes are: a press that stays put
+                        // offers the menu, one that moves drags the component,
+                        // and a press on a terminal draws a line.
+                        for n in root.physics-nodes: NodeShape {
+                            node: n;
+                            draggable: true;
+                            dragged(dx, dy) => {
+                                root.physics-moved(n.name, dx, dy);
                             }
-                            for choice[i] in root.physics-choices: Button {
-                                text: choice;
-                                clicked => { root.physics-chosen(i); }
+                            edit-requested => { root.physics-edit(n.name); }
+                            delete-requested => { root.physics-delete(n.name); }
+                            link-from(terminal) => {
+                                root.physics-link-started(n.name, terminal);
                             }
-                            Button {
-                                text: "Cancel";
-                                clicked => { root.physics-chosen(-1); }
+                            link-dragging(x, y) => {
+                                root.physics-link-moved(x, y);
+                            }
+                            link-dropped(x, y) => {
+                                root.physics-link-finished(x, y);
+                            }
+                        }
+
+                        // Which terminals a line just drawn means, where it
+                        // could mean more than one: asked where it was let go
+                        // of, one button each and one to draw nothing. A
+                        // question rather than a guess, because a heater's heat
+                        // and its heating are both outputs and a line to the
+                        // wrong one is a simulator that reads something other
+                        // than was meant.
+                        if root.physics-choices.length > 0: Rectangle {
+                            x: root.physics-choice-x;
+                            y: root.physics-choice-y;
+                            width: asked.preferred-width;
+                            height: asked.preferred-height;
+                            background: Colors.window;
+                            border-width: 1px;
+                            border-color: #6b7280;
+                            border-radius: 4px;
+                            drop-shadow-blur: 8px;
+                            drop-shadow-color: #00000044;
+                            // Takes the presses that miss its buttons, so that
+                            // none reaches the node underneath.
+                            TouchArea { }
+                            asked := VerticalLayout {
+                                padding: Space.tight;
+                                spacing: Space.tight;
+                                Text {
+                                    text: "Join which?";
+                                    font-size: Type.small;
+                                    font-weight: 700;
+                                }
+                                for choice[i] in root.physics-choices: Button {
+                                    text: choice;
+                                    clicked => { root.physics-chosen(i); }
+                                }
+                                Button {
+                                    text: "Cancel";
+                                    clicked => { root.physics-chosen(-1); }
+                                }
                             }
                         }
                     }
@@ -938,26 +971,27 @@ component Surface inherits Rectangle {
                 //
                 // Shifted by the sheet's own horizontal offset, so a divider
                 // stays over the column it divides when the sheet is scrolled
-                // sideways.
+                // sideways; and at the sheet's zoom, being outside it, with
+                // a drag said back in the sheet's pixels.
                 if root.shows-physics && root.physics-width > 0: PaneDivider {
                     width: 100%;
                     height: 100%;
-                    at: root.physics-width + sheet.content-x;
-                    moved(dx) => { root.physics-divider-moved(dx); }
+                    at: root.physics-width * root.zoom + sheet.content-x;
+                    moved(dx) => { root.physics-divider-moved(dx / root.zoom); }
                 }
                 PaneDivider {
                     width: 100%;
                     height: 100%;
-                    at: root.physics-width + root.payload-divider
+                    at: (root.physics-width + root.payload-divider) * root.zoom
                         + sheet.content-x;
-                    moved(dx) => { root.payload-divider-moved(dx); }
+                    moved(dx) => { root.payload-divider-moved(dx / root.zoom); }
                 }
                 PaneDivider {
                     width: 100%;
                     height: 100%;
-                    at: root.physics-width + root.vehicle-divider
+                    at: (root.physics-width + root.vehicle-divider) * root.zoom
                         + sheet.content-x;
-                    moved(dx) => { root.vehicle-divider-moved(dx); }
+                    moved(dx) => { root.vehicle-divider-moved(dx / root.zoom); }
                 }
             }
 
@@ -1248,10 +1282,14 @@ export component MainWindow inherits Window {
     // those pixels.
     //
     // The minimum is smaller because a window that cannot be made to fit a
-    // screen is a window that cannot be used on it: squeezed, the right of
-    // the payload working pane goes off the edge, which is a nuisance rather
-    // than a failure.
-    min-width: 760px;
+    // screen is a window that cannot be used on it. Squeezed, the sheet is
+    // drawn smaller to keep every pane in view -- see Surface's `zoom` --
+    // down to a half, and the minimum is what holds the whole sheet at a
+    // half beside the selection panes: narrower, the last pane went off the
+    // edge of the window, and a pane nobody can see is one nobody knows is
+    // there. 40 is the selection panes' gaps and the sheet's scroll bar.
+    min-width: max(760px, 180px + 40px
+        + (root.physics-width + root.working-width) / 2);
     min-height: 600px;
     preferred-width: 1180px + root.physics-width;
     preferred-height: 820px;
@@ -1355,6 +1393,10 @@ export component MainWindow inherits Window {
     // because a person scrolling moves it and placing a node sets it.
     in-out property <length> canvas-offset: 0px;
     out property <length> canvas-view-height: surface.canvas-view-height;
+    // How large the sheet is drawn, and how narrow the window may be, for
+    // the tests: see Surface's `zoom`.
+    out property <float> sheet-zoom: surface.zoom;
+    out property <length> narrowest: root.min-width;
     in property <color> gateway-ground: white;
     in property <color> vehicle-ground: white;
     in property <color> payload-ground: white;

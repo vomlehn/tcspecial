@@ -7119,6 +7119,46 @@ mod tests {
         assert!(said(&["a.ytcs", "b.ytcs", "c.ytcs"]).is_err());
     }
 
+    /// A window too narrow for the whole sheet draws it smaller, so that
+    /// some of every pane is in view, and never so small, nor the window so
+    /// narrow, that the sheet does not fit; a window wide enough draws it
+    /// whole.
+    #[test]
+    fn a_narrow_window_draws_the_sheet_smaller_to_show_every_pane() {
+        i_slint_backend_testing::init_no_event_loop();
+        let window = MainWindow::new().expect("a window");
+        let physics = pane::physics_width(settings::DEFAULT_PHYSICS);
+        window.set_physics_width(physics as f32);
+        window.set_working_width(WORKING_WIDTH as f32);
+        window.set_working_height(pane::WORKING_HEIGHT as f32);
+        window.show().expect("the window shows");
+        let sheet = (physics + WORKING_WIDTH) as f32;
+
+        window
+            .window()
+            .set_size(slint::LogicalSize::new(2000.0, 800.0));
+        assert_eq!(window.get_sheet_zoom(), 1.0);
+
+        // Narrower than the sheet: drawn smaller, all of it beside the
+        // selection panes.
+        window
+            .window()
+            .set_size(slint::LogicalSize::new(900.0, 800.0));
+        let zoom = window.get_sheet_zoom();
+        assert!((0.5..1.0).contains(&zoom), "drawn at {zoom}");
+        assert!(sheet * zoom <= 900.0 - 180.0, "drawn at {zoom}");
+
+        // And at the narrowest the window may be, the sheet at a half or
+        // more still fits.
+        let width = window.get_narrowest();
+        window
+            .window()
+            .set_size(slint::LogicalSize::new(width, 800.0));
+        let zoom = window.get_sheet_zoom();
+        assert!(zoom >= 0.5, "drawn at {zoom}");
+        assert!(sheet * zoom <= width - 180.0, "drawn at {zoom} in {width}");
+    }
+
     /// In a read-only session the problems question's Edit and Delete are
     /// greyed, and what would rename or act on a node is greyed with them;
     /// the ways out of the question are not.

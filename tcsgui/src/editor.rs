@@ -1028,6 +1028,7 @@ tcsgui:
                 .map(|(a, b)| (a.clone(), b.clone()))
                 .collect(),
             connections: before.connections_of(&name),
+            joins: Vec::new(),
         });
         assert!(!world(&editor).components.contains_key(&name));
         assert!(world(&editor).connections.is_empty());
@@ -1041,6 +1042,119 @@ tcsgui:
         assert!(!world(&editor).components.contains_key(&name));
         tcslibgs::sim_config::SimConfigFile::load(&sim)
             .expect("the simulator reads what the editor wrote");
+    }
+
+    /// A physics component moved, a connection made and a stand-in joined
+    /// each reach the simulator file, are read back by a second session and
+    /// by the simulator's own reader, and are each taken back by one undo:
+    /// the position goes from the file with the undo, and with the
+    /// component.
+    #[test]
+    fn a_physics_component_is_moved_and_joined_in_the_world() {
+        let where_ = tempfile::tempdir().expect("a directory");
+        let path = where_.path().join("vehicle.ytcs");
+        let sim = where_.path().join("vehicle-sim.yaml");
+        std::fs::write(
+            &sim,
+            "world:\n  ambient_temp: \"283.15 K\"\n  physics:\n    \
+             components:\n      - type heater:\n          \
+             - component: heater_1\n            power: \"4 W\"\n            \
+             voltage: \"28 V\"\n      - type thermal_zone:\n          \
+             - component: zone\n            capacity: \"20 J/K\"\n            \
+             time_constant: \"50 s\"\n",
+        )
+        .expect("written");
+        let mut editor = Editor::open(&path, crate::pane::default_dividers());
+        editor.open_simulator(&sim);
+        assert_eq!(editor.trouble(), None, "{:?}", editor.trouble());
+        editor.edit(add("temp_1", "network"));
+        let world = |editor: &Editor| {
+            editor
+                .document()
+                .simulator
+                .as_ref()
+                .expect("a simulator file")
+                .world
+                .clone()
+        };
+        let read = || std::fs::read_to_string(&sim).expect("the file");
+
+        editor.edit(Edit::MovePhysics {
+            component: "zone".into(),
+            was: None,
+            now: Some((-180, 162)),
+        });
+        assert!(
+            read().contains(
+                "tcsgui:\n  nodes:\n    - { node: zone, x: -180, y: 162 }"
+            ),
+            "{}",
+            read()
+        );
+        editor.edit(Edit::AddConnection {
+            from: "heater_1.heat".into(),
+            to: "zone.heat".into(),
+        });
+        editor.edit(Edit::SetSimPayload {
+            payload: "temp_1".into(),
+            setting: "connects".into(),
+            was: None,
+            now: Some("zone.temperature".into()),
+        });
+        let written = read();
+        assert!(written.contains("from: heater_1.heat"), "{written}");
+        assert!(written.contains("connects: zone.temperature"), "{written}");
+
+        // A second session finds all three, and so does the simulator.
+        let mut reopened = Editor::open(&path, crate::pane::default_dividers());
+        reopened.open_simulator(&sim);
+        let again = world(&reopened);
+        assert_eq!(again.placed.get("zone"), Some(&(-180, 162)));
+        assert!(again
+            .connections
+            .contains(&("heater_1.heat".into(), "zone.heat".into())));
+        let file = tcslibgs::sim_config::SimConfigFile::load(&sim)
+            .expect("the simulator reads what the editor wrote");
+        assert_eq!(file.tcsgui.expect("positions").nodes.len(), 1);
+
+        // The zone removed takes its connection and its stand-in's join with
+        // it, which would name nothing otherwise, and one undo puts all of
+        // it back.
+        let simulator = |editor: &Editor| {
+            editor
+                .document()
+                .simulator
+                .clone()
+                .expect("a simulator file")
+        };
+        let before = simulator(&editor);
+        editor.edit(Edit::RemovePhysics {
+            name: "zone".into(),
+            kind: "thermal_zone".into(),
+            settings: Vec::new(),
+            connections: before.world.connections_of("zone"),
+            joins: before.joins_of("zone"),
+        });
+        assert!(world(&editor).connections.is_empty());
+        assert!(
+            !simulator(&editor).payloads["temp_1"].contains_key("connects"),
+            "{:?}",
+            simulator(&editor).payloads
+        );
+        assert!(!read().contains("zone.temperature"), "{}", read());
+        editor.undo();
+        assert_eq!(
+            simulator(&editor).payloads["temp_1"]["connects"],
+            "zone.temperature"
+        );
+
+        // Each taken back by one undo.
+        editor.undo();
+        editor.undo();
+        assert!(world(&editor).connections.is_empty());
+        editor.undo();
+        assert!(world(&editor).placed.is_empty());
+        assert!(!read().contains("tcsgui:"), "{}", read());
     }
 
     /// A simulator file that cannot be read leaves the session usable.

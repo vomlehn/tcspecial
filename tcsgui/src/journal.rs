@@ -214,15 +214,21 @@ pub enum Edit {
     /// A physics component placed in the simulator file's world, of a type,
     /// with nothing stated yet. Undone by removing it.
     AddPhysics { name: String, kind: String },
-    /// A physics component removed, with what it stated and the connections
-    /// that joined it, so that undo puts back the component that was there
-    /// and not an empty one of the same name: removing a component removes
-    /// its connections, which would name nothing otherwise.
+    /// A physics component removed, with what it stated, the connections
+    /// that joined it and the stand-ins joined to it, so that undo puts back
+    /// the component that was there and not an empty one of the same name:
+    /// removing a component removes its connections and takes it out of
+    /// every stand-in's `connects`, which would name nothing otherwise, as
+    /// removing a node removes its links.
     RemovePhysics {
         name: String,
         kind: String,
         settings: Vec<(String, String)>,
         connections: Vec<(String, String)>,
+        /// Each simulated payload that named one of its terminals, and its
+        /// whole `connects` as it was.
+        #[serde(default)]
+        joins: Vec<(String, String)>,
     },
     /// A physics component put back as it was.
     RestorePhysics {
@@ -230,6 +236,8 @@ pub enum Edit {
         kind: String,
         settings: Vec<(String, String)>,
         connections: Vec<(String, String)>,
+        #[serde(default)]
+        joins: Vec<(String, String)>,
     },
     /// A setting of one physics component was set.
     SetPhysics {
@@ -238,6 +246,20 @@ pub enum Edit {
         was: Option<String>,
         now: Option<String>,
     },
+    /// A physics component was moved in the Physics pane, as a node is.
+    /// `was` is `None` for one the simulator file had not placed, which undo
+    /// gives back to the layout by name.
+    MovePhysics {
+        component: String,
+        was: Option<(i32, i32)>,
+        now: Option<(i32, i32)>,
+    },
+    /// A connection was made between two physics components, from an
+    /// output to an input, as the file writes them: `heater_1.heat` and
+    /// `zone.heat`. Undone by taking it away.
+    AddConnection { from: String, to: String },
+    /// A connection was taken away. Undone by making it again.
+    RemoveConnection { from: String, to: String },
     /// A node was moved on the canvas. Not a change to the configuration --
     /// the vehicle does not care where the box is -- but it is in the history
     /// because a person who drags a node expects undo to put it back.
@@ -519,28 +541,50 @@ impl Edit {
                 kind: kind.clone(),
                 settings: Vec::new(),
                 connections: Vec::new(),
+                joins: Vec::new(),
             },
             Edit::RemovePhysics {
                 name,
                 kind,
                 settings,
                 connections,
+                joins,
             } => Edit::RestorePhysics {
                 name: name.clone(),
                 kind: kind.clone(),
                 settings: settings.clone(),
                 connections: connections.clone(),
+                joins: joins.clone(),
             },
             Edit::RestorePhysics {
                 name,
                 kind,
                 settings,
                 connections,
+                joins,
             } => Edit::RemovePhysics {
                 name: name.clone(),
                 kind: kind.clone(),
                 settings: settings.clone(),
                 connections: connections.clone(),
+                joins: joins.clone(),
+            },
+            Edit::MovePhysics {
+                component,
+                was,
+                now,
+            } => Edit::MovePhysics {
+                component: component.clone(),
+                was: *now,
+                now: *was,
+            },
+            Edit::AddConnection { from, to } => Edit::RemoveConnection {
+                from: from.clone(),
+                to: to.clone(),
+            },
+            Edit::RemoveConnection { from, to } => Edit::AddConnection {
+                from: from.clone(),
+                to: to.clone(),
             },
             Edit::SetPhysics {
                 component,
@@ -707,6 +751,15 @@ impl Edit {
             Edit::SetPhysics {
                 component, setting, ..
             } => format!("set {setting} of \"{component}\""),
+            Edit::MovePhysics { component, .. } => {
+                format!("move \"{component}\"")
+            }
+            Edit::AddConnection { from, to } => {
+                format!("join {from} to {to}")
+            }
+            Edit::RemoveConnection { from, to } => {
+                format!("take away the join of {from} to {to}")
+            }
             Edit::AddGroup { name, .. } => format!("add group \"{name}\""),
             Edit::RemoveGroup { name, .. } => {
                 format!("remove group \"{name}\"")

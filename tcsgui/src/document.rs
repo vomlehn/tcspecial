@@ -1692,13 +1692,32 @@ impl Document {
                     );
                 }
             }
-            Edit::RemovePhysics { name, .. } => {
+            Edit::RemovePhysics { name, joins, .. } => {
                 if let Some(simulator) = &mut self.simulator {
                     let world = &mut simulator.world;
                     for joined in world.connections_of(name) {
                         world.connections.remove(&joined);
                     }
                     world.components.remove(name);
+                    // Each stand-in keeps the terminals of other components
+                    // it named, in their order, and loses its connects where
+                    // that was all it named.
+                    let mine = format!("{name}.");
+                    for (payload, was) in joins {
+                        let kept: Vec<&str> =
+                            tcslibgs::sim_config::terminals_of(was)
+                                .filter(|said| !said.starts_with(&mine))
+                                .collect();
+                        let said = simulator
+                            .payloads
+                            .entry(payload.clone())
+                            .or_default();
+                        if kept.is_empty() {
+                            said.remove("connects");
+                        } else {
+                            said.insert("connects".into(), kept.join(", "));
+                        }
+                    }
                 }
             }
             Edit::RestorePhysics {
@@ -1706,8 +1725,16 @@ impl Document {
                 kind,
                 settings,
                 connections,
+                joins,
             } => {
                 if let Some(simulator) = &mut self.simulator {
+                    for (payload, was) in joins {
+                        simulator
+                            .payloads
+                            .entry(payload.clone())
+                            .or_default()
+                            .insert("connects".into(), was.clone());
+                    }
                     let world = &mut simulator.world;
                     world.components.insert(
                         name.clone(),
@@ -1741,6 +1768,35 @@ impl Document {
                             said.settings.remove(setting);
                         }
                     }
+                }
+            }
+            Edit::MovePhysics { component, now, .. } => {
+                if let Some(simulator) = &mut self.simulator {
+                    let placed = &mut simulator.world.placed;
+                    match now {
+                        Some(at) => {
+                            placed.insert(component.clone(), *at);
+                        }
+                        None => {
+                            placed.remove(component);
+                        }
+                    }
+                }
+            }
+            Edit::AddConnection { from, to } => {
+                if let Some(simulator) = &mut self.simulator {
+                    simulator
+                        .world
+                        .connections
+                        .insert((from.clone(), to.clone()));
+                }
+            }
+            Edit::RemoveConnection { from, to } => {
+                if let Some(simulator) = &mut self.simulator {
+                    simulator
+                        .world
+                        .connections
+                        .remove(&(from.clone(), to.clone()));
                 }
             }
             Edit::AddGroup { name, interval } => {
@@ -4524,6 +4580,9 @@ mod tests {
                 Edit::RemovePhysics { .. } => (),
                 Edit::RestorePhysics { .. } => (),
                 Edit::SetPhysics { .. } => (),
+                Edit::MovePhysics { .. } => (),
+                Edit::AddConnection { .. } => (),
+                Edit::RemoveConnection { .. } => (),
                 Edit::AddGroup { .. } => (),
                 Edit::RemoveGroup { .. } => (),
                 Edit::SetGroupInterval { .. } => (),
@@ -4561,6 +4620,11 @@ mod tests {
             ));
             document.apply(&Edit::AddSimGroup {
                 name: "steady_1hz".into(),
+            });
+            // A physics connection, so that taking one away has one to take.
+            document.apply(&Edit::AddConnection {
+                from: "heater_1.heat".into(),
+                to: "zone.heat".into(),
             });
             document.apply(&Edit::SetSimGroup {
                 group: "steady_1hz".into(),
@@ -4693,6 +4757,21 @@ mod tests {
             Edit::RestoreSimGroup {
                 name: "bay".into(),
                 settings: vec![("packet_interval".into(), "250 ms".into())],
+            },
+            // A physics component put somewhere, from being laid out by
+            // name; and a connection made, and one taken away.
+            Edit::MovePhysics {
+                component: "zone".into(),
+                was: None,
+                now: Some((-180, 98)),
+            },
+            Edit::AddConnection {
+                from: "heater_2.heat".into(),
+                to: "zone.heat".into(),
+            },
+            Edit::RemoveConnection {
+                from: "heater_1.heat".into(),
+                to: "zone.heat".into(),
             },
             // And one that clears a parameter, which takes the line out of
             // the file rather than writing it empty.

@@ -4007,9 +4007,24 @@ pane*, labelled ``Physics``, which holds the simulator file's world -- its
 physics components -- and not anything of the configuration's. It is drawn
 beside the working width rather than in it, at negative positions in the
 coordinates the configuration holds, so that adding it moved nothing a file
-had placed. Its components are laid out down it by name, the one order a model
-has, and are not dragged: a configuration file is where a node's position is
-kept, and a physics component is never in one. A component is the one shape no
+had placed. A component is drawn where it was put, which the simulator file
+keeps in a ``tcsgui`` section of its own, last in the file as a
+configuration's is:
+
+.. code-block:: yaml
+
+   tcsgui:
+     nodes:
+       - { node: zone, x: -193, y: 280 }
+
+The simulator file and not the configuration, because the world is that
+file's: two configurations that share one simulator file, as the thermostat
+examples do, share one drawing of its world. A component it does not place is
+laid out down the pane by name, the one order a model has, so a model nobody
+has arranged is drawn the same every time; one placed outside the pane is
+brought inside it, and one placed on another steps down until it is clear,
+as a node does. A position left behind by a component removed is kept, as a
+configuration's is, and not written again. A component is the one shape no
 node type has, a hexagon pointed at both ends with a dotted edge, narrower
 than every node -- and narrower still in a pane too narrow for it and the
 lanes its lines run down, so that it stays in its pane -- in the pane's own
@@ -4035,14 +4050,34 @@ a name nothing has -- ``heater_3`` -- with nothing stated, and opens the
 physics window on it, which shows its type's settings and, under them, what
 the simulator's own reader says is wrong with it as it is typed: a figure
 without its unit, one required and not given. A component the reader would
-refuse is drawn red on the canvas. Placing, setting and removing a component
-are edits like any other, each taken back by one undo, and removing one
-removes the connections that join it, which come back with it. Without a
+refuse is drawn red on the canvas.
+
+A component is then handled as a node is. Dragged, it moves, on the grid and
+inside its pane; pressed without moving, it offers Edit, which opens the
+physics window on it, and Delete. A line drawn from its output or its input
+terminal and let go of over another component is a connection between them,
+and over a payload, or the box of a subdiagram, which is all of one the top
+page shows, it joins that payload's stand-in to the component: its
+``connects`` is set to the terminal, or, for a GPIO payload watching lines,
+given the terminal after those it names already, one decision a line. The
+line says only which two things, the component being drawn with one output
+and one input whatever its type has, so the terminals come from the rules a
+file is held to -- ``tcslibgs::physics::connectable`` for a connection, an
+output to an input of one kind, and ``tcslibgs::sim_config::may_join`` for a
+stand-in -- and a join already made is not offered again. Where that leaves
+one thing, it is made; where it leaves several, as a heater's heat, current
+and heating to a sensor, they are offered where the line was let go of, with
+Cancel, rather than one guessed at: a line to the wrong terminal is a
+simulator that reads something other than was meant. Moving, connecting and
+joining, like placing, setting and removing, are edits like any other, each
+taken back by one undo. Removing a component removes the connections that join
+it and takes it out of every stand-in's ``connects``, as removing a node
+removes its links, and all of it comes back with one undo. Without a
 simulator file the list is greyed and says to open one, and so does the
 Physics pane, which is drawn all the same: some of every pane is always to be
 seen, and a pane that came and went with a second file would be one nobody
-could find. The world's ``ambient_temp`` and its connections are edited in
-the simulator file for now.
+could find. The world's ``ambient_temp`` is edited in the simulator file for
+now, and so is a connection or a join that is to be taken away.
 
 Where the Physics pane's line and the physics list's line are is kept in the
 preferences file beside the others: the pane's width as a percentage of the

@@ -754,25 +754,8 @@ fn joined(model: &Model, connection: &Connection) -> Result<Joined, String> {
     let to = At::parse("to", &connection.to)?;
     let (from_place, from_terminal) = model.find(&from)?;
     let (to_place, to_terminal) = model.find(&to)?;
-    if from_terminal.direction != Direction::Out {
-        return Err(format!(
-            "from {from}, which is an input: a connection goes from an output \
-             to an input"
-        ));
-    }
-    if to_terminal.direction != Direction::In {
-        return Err(format!(
-            "to {to}, which is an output: a connection goes from an output to \
-             an input"
-        ));
-    }
-    if from_terminal.kind != to_terminal.kind {
-        return Err(format!(
-            "{from} gives {} and {to} takes {}: a connection joins two \
-             terminals of one kind",
-            from_terminal.kind.describe(),
-            to_terminal.kind.describe()
-        ));
+    if let Some(why) = why_not(&from, &from_terminal, &to, &to_terminal) {
+        return Err(why);
     }
     let joined = Joined {
         from: from_place,
@@ -784,6 +767,87 @@ fn joined(model: &Model, connection: &Connection) -> Result<Joined, String> {
         ));
     }
     Ok(joined)
+}
+
+/// Why two terminals cannot be connected, if they cannot.
+///
+/// The rule for a connection, stated once: from an output, to an input, of
+/// one kind. A file's connections are checked by it, and the editor asks it
+/// which terminals a line drawn between two components can mean: see
+/// [`connectable`].
+///
+/// # Arguments
+///
+/// * `from`          - The `from` end, as written, for the message.
+/// * `from_terminal` - Its terminal.
+/// * `to`            - The `to` end, as written.
+/// * `to_terminal`   - Its terminal.
+///
+/// # Returns
+///
+/// What is wrong, in the words a file's author is told it in, or `None`.
+fn why_not(
+    from: &dyn std::fmt::Display,
+    from_terminal: &Terminal,
+    to: &dyn std::fmt::Display,
+    to_terminal: &Terminal,
+) -> Option<String> {
+    if from_terminal.direction != Direction::Out {
+        return Some(format!(
+            "from {from}, which is an input: a connection goes from an output \
+             to an input"
+        ));
+    }
+    if to_terminal.direction != Direction::In {
+        return Some(format!(
+            "to {to}, which is an output: a connection goes from an output to \
+             an input"
+        ));
+    }
+    if from_terminal.kind != to_terminal.kind {
+        return Some(format!(
+            "{from} gives {} and {to} takes {}: a connection joins two \
+             terminals of one kind",
+            from_terminal.kind.describe(),
+            to_terminal.kind.describe()
+        ));
+    }
+    None
+}
+
+/// Every way a component of one type can be connected to one of another:
+/// each output of the first and input of the second that [`why_not`] lets
+/// be joined.
+///
+/// What a line drawn from one component to another can mean. The editor
+/// draws a component with one output and one input whatever its type has,
+/// so a line between two says only which two components: this says which
+/// terminals, and where it says more than one the person drawing it is
+/// asked which.
+///
+/// # Arguments
+///
+/// * `from` - The type the line is drawn from.
+/// * `to`   - The type it is drawn to.
+///
+/// # Returns
+///
+/// Each output's name and input's name, in the order the types list their
+/// terminals; nothing for a type there is no such component of.
+pub fn connectable(from: &str, to: &str) -> Vec<(&'static str, &'static str)> {
+    let (Some(outputs), Some(inputs)) = (terminals_of(from), terminals_of(to))
+    else {
+        return Vec::new();
+    };
+    let mut found = Vec::new();
+    for output in outputs {
+        for input in inputs {
+            if why_not(&output.name, output, &input.name, input).is_none() {
+                found.push((output.name, input.name));
+            }
+        }
+    }
+    found
 }
 
 /// Finds every input that takes one output and was given more.
@@ -968,6 +1032,36 @@ components:
         ] {
             let why = parse(text).expect_err(text).to_string();
             assert!(why.contains(said), "{text}: {why}");
+        }
+    }
+
+    /// A line drawn from a heater to a zone can mean only its heat into the
+    /// zone's; one drawn the other way, or from a type there is none of,
+    /// means nothing; and every pair it offers is one a file may write.
+    #[test]
+    fn a_line_between_two_components_means_the_terminals_of_one_kind() {
+        assert_eq!(connectable("heater", "thermal_zone"), [("heat", "heat")]);
+        assert!(connectable("thermal_zone", "heater").is_empty());
+        assert!(connectable("nonesuch", "thermal_zone").is_empty());
+        for from in TYPES {
+            for to in TYPES {
+                for (output, input) in connectable(from, to) {
+                    let find = |kind: &str, name: &str| {
+                        *terminals_of(kind)
+                            .unwrap()
+                            .iter()
+                            .find(|t| t.name == name)
+                            .unwrap()
+                    };
+                    assert!(why_not(
+                        &output,
+                        &find(from, output),
+                        &input,
+                        &find(to, input)
+                    )
+                    .is_none());
+                }
+            }
         }
     }
 

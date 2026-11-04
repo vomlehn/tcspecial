@@ -102,6 +102,12 @@ pub struct World {
     /// `heater_1.heat` and `zone.heat`. A set, in name order: nothing in
     /// a model is in an order that means anything.
     pub connections: std::collections::BTreeSet<(String, String)>,
+    /// Where each component was put in the Physics pane, by name, as the
+    /// file's `tcsgui` section says: a component named nowhere here is laid
+    /// out by name. Kept for a component removed, so that undo puts it back
+    /// where it was.
+    #[serde(default)]
+    pub placed: BTreeMap<String, (i32, i32)>,
 }
 
 /// One component of the physics model.
@@ -197,6 +203,30 @@ impl World {
 }
 
 impl Simulator {
+    /// The simulated payloads joined to a component, each with its whole
+    /// `connects` as it stands: what removing the component takes out of
+    /// them, and undoing it puts back.
+    ///
+    /// # Arguments
+    ///
+    /// * `name` - The component.
+    ///
+    /// # Returns
+    ///
+    /// Each payload, as the file keys it, and its `connects`, in name order.
+    pub fn joins_of(&self, name: &str) -> Vec<(String, String)> {
+        let mine = format!("{name}.");
+        self.payloads
+            .iter()
+            .filter_map(|(payload, settings)| {
+                let said = settings.get("connects")?;
+                tcslibgs::sim_config::terminals_of(said)
+                    .any(|terminal| terminal.starts_with(&mine))
+                    .then(|| (payload.clone(), said.clone()))
+            })
+            .collect()
+    }
+
     /// An empty simulator configuration for this file.
     ///
     /// # Arguments
@@ -351,6 +381,10 @@ struct File {
     simulated_payload_groups: Vec<Entry>,
     #[serde(default, deserialize_with = "tcslibgs::sim_grouped::payloads")]
     simulated_payloads: Vec<Entry>,
+    /// Where the editor drew each physics component, read as every program
+    /// reads it.
+    #[serde(default)]
+    tcsgui: Option<tcslibgs::sim_config::SimTcsgui>,
 }
 
 /// The `world` section, as it parses: permissive, as [`File`] is.
@@ -585,6 +619,14 @@ pub fn read(path: &Path) -> Result<Simulator, Trouble> {
     if let Some(world) = file.world {
         simulator.world = world_of(world).map_err(Trouble::Unusable)?;
     }
+    // Where each component was drawn: see World::placed.
+    if let Some(tcsgui) = &file.tcsgui {
+        simulator.world.placed = tcsgui
+            .nodes
+            .iter()
+            .map(|placed| (placed.name.clone(), (placed.x, placed.y)))
+            .collect();
+    }
     simulator.tcssim = file
         .tcssim
         .into_iter()
@@ -768,6 +810,27 @@ pub fn to_yaml(simulator: &Simulator, payloads: &[(String, String)]) -> String {
                 ));
                 entry_settings(&mut out, said, "        ");
             }
+        }
+    }
+
+    // Where each component was drawn, last, as a configuration's own
+    // tcsgui section is: about a screen and not the vehicle. Only the
+    // components the world has, as a configuration writes its nodes'
+    // positions from the nodes it has: a position left behind by one
+    // removed is kept for undo, and goes from the file.
+    let placed: Vec<(&String, &(i32, i32))> = simulator
+        .world
+        .placed
+        .iter()
+        .filter(|(name, _)| simulator.world.components.contains_key(*name))
+        .collect();
+    if !placed.is_empty() {
+        out.push_str("\ntcsgui:\n  nodes:\n");
+        for (name, (x, y)) in placed {
+            out.push_str(&format!(
+                "    - {{ node: {}, x: {x}, y: {y} }}\n",
+                name_scalar(name)
+            ));
         }
     }
     out

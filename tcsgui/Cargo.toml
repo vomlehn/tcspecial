@@ -26,6 +26,12 @@ serde = { version = "1.0", features = ["derive"] }
 # YAML, so a history written before the change still reads.
 serde_norway = "0.9.42"
 libc = "0.2"
+# The line diffs a save is merged from, so that a file is written back with
+# only the lines an edit changed: see `faithful`.
+similar = "3.2"
+# Reads an XML file back after such a merge, to hold it to what the editor
+# would have written. The version tcslibgs reads configurations with.
+quick-xml = "0.42"
 
 [dev-dependencies]
 # Lays the window out headlessly, so a test can measure it rather than a

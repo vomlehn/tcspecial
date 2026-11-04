@@ -78,7 +78,9 @@ pub struct Simulator {
     /// The type each simulated payload was written under in the file, by
     /// its name: not a setting, and offered by no window, the configuration
     /// deciding a payload's type. Kept for an entry the configuration has
-    /// no payload of, which is written back under the type it came with.
+    /// no payload of, which is written back under the type it came with --
+    /// and as the list of entries the file has, each written back while it
+    /// is here whether or not it states anything.
     #[serde(default)]
     pub kinds: BTreeMap<String, String>,
 }
@@ -211,6 +213,32 @@ impl Simulator {
         }
     }
 
+    /// A simulator configuration for a file the editor begins: each payload
+    /// named under its type, and nothing else.
+    ///
+    /// So that the new file says which payloads there are to simulate,
+    /// without a key for every question a payload could be asked: a key
+    /// with nothing after it is a line that says nothing, and the windows
+    /// are where the questions are.
+    ///
+    /// # Arguments
+    ///
+    /// * `path`     - The file the configuration is to be written to.
+    /// * `payloads` - The configuration's payloads that can be simulated,
+    ///                each with its type.
+    ///
+    /// # Returns
+    ///
+    /// The configuration, with an entry and no settings for each payload.
+    pub fn begun(path: &Path, payloads: &[(String, String)]) -> Self {
+        let mut simulator = Simulator::new(path);
+        for (name, kind) in payloads {
+            simulator.payloads.insert(name.clone(), Settings::new());
+            simulator.kinds.insert(name.clone(), kind.clone());
+        }
+        simulator
+    }
+
     /// The name a node's simulated settings are held under, from the name
     /// the editor holds the node under.
     ///
@@ -232,6 +260,22 @@ impl Simulator {
     /// The key into [`Simulator::payloads`].
     pub fn key_of(held: &str) -> String {
         crate::Qualified::parse(held).written()
+    }
+
+    /// Renames a simulated payload, its settings and the type it was
+    /// written under with it.
+    ///
+    /// # Arguments
+    ///
+    /// * `was` - The name it had.
+    /// * `now` - The name it has.
+    pub fn rename(&mut self, was: &str, now: &str) {
+        if let Some(settings) = self.payloads.remove(was) {
+            self.payloads.insert(now.to_string(), settings);
+        }
+        if let Some(kind) = self.kinds.remove(was) {
+            self.kinds.insert(now.to_string(), kind);
+        }
     }
 
     /// What a payload or a group may be asked, for a window to show.
@@ -597,30 +641,40 @@ pub fn read(path: &Path) -> Result<Simulator, Trouble> {
 
 /// The simulator configuration as YAML.
 ///
-/// A form, not a summary. Every payload the configuration has gets an entry
-/// and every entry gets every setting, written empty where nobody has filled
-/// it in -- so the file read on its own says what there is to configure
-/// instead of saying nothing until something has been typed. The simulator's
-/// own reader takes a setting written empty as a setting not stated, which is
-/// what makes a half-filled form a file that still loads: see
-/// `tcslibgs::sim_config`.
+/// What the file says and nothing else: every key that holds a value, and
+/// no key that does not. A setting somebody empties leaves the file, as one
+/// cleared in the configuration does, and a payload is written with only
+/// what it states. A file the editor begins names each payload of the
+/// configuration under its type and nothing more -- see
+/// [`Simulator::begun`] -- and from then on an entry is written while it is
+/// in the file or states something.
+///
+/// Scalars as a person writes them: bare wherever YAML reads the bare word
+/// as what was typed, so that `true` is a boolean, `1 s` a time and
+/// `heater_1` a name, and in double quotes only where it would read as
+/// something else. A physics figure is the exception, and is quoted as
+/// every shipped world quotes it: each is read as text, its unit and all,
+/// and a bare `0.02` would be a number. A description too long for a line
+/// is folded over several, as one written by hand is.
 ///
 /// `payloads` is the configuration's payload nodes and their types, because
-/// it is the configuration that decides which payloads there are to simulate
-/// and what each is. An entry the simulator file holds for a name that is not
-/// among them is written out too, under the type the file gave it: it is
-/// somebody's typing, and `tcsverify` is what says a simulated payload names
-/// no payload.
+/// it is the configuration that decides what each payload is: an entry is
+/// written under its payload's type. An entry the simulator file holds for a
+/// name that is not among them is written out too, under the type the file
+/// gave it: it is somebody's typing, and `tcsverify` is what says a simulated
+/// payload names no payload.
 ///
 /// In the one order a simulator file has, whatever order anything was made
 /// in: the groups by name, the simulated payloads grouped by type, the types
 /// by name and a type's payloads by name, and each entry's settings by name.
+/// The file a session read is written back as it was, with only the edit
+/// made to it -- see `crate::faithful` -- so this order is the order of
+/// what the editor adds, and of a file it begins.
 ///
 /// # Arguments
 ///
 /// * `simulator` - The simulator configuration to write.
-/// * `payloads`  - The configuration's payload nodes, each with its type;
-///                 each gets an entry.
+/// * `payloads`  - The configuration's payload nodes, each with its type.
 ///
 /// # Returns
 ///
@@ -643,117 +697,132 @@ pub fn to_yaml(simulator: &Simulator, payloads: &[(String, String)]) -> String {
     ));
 
     if let Some(description) = &simulator.description {
-        out.push_str(&format!("\ndescription: {}\n", quoted(description)));
+        out.push('\n');
+        out.push_str(&folded("description: ", description));
     }
 
-    // What tcssim itself is told, as the file said it. Not written as a form:
-    // a section with nothing in it is one the simulator refuses, and what it
-    // must say -- an address no other run uses -- is not the editor's to
-    // invent.
-    let said: Vec<(&String, &str)> = simulator
-        .tcssim
-        .iter()
-        .map(|(field, value)| (field, value.trim()))
-        .filter(|(_, value)| !value.is_empty())
-        .collect();
+    // What tcssim itself is told, as the file said it. A section with
+    // nothing in it is one the simulator refuses, and what it must say -- an
+    // address no other run uses -- is not the editor's to invent.
+    let said = stated(&simulator.tcssim);
     if !said.is_empty() {
         out.push_str("\ntcssim:\n");
         for (field, value) in said {
-            out.push_str(&format!("  {field}: {}\n", quoted(value)));
+            out.push_str(&format!("  {field}: {}\n", setting(value)));
         }
     }
 
     // The physics model the payloads attach to, before them, because that
     // is the order the file reads in: a model exists and then payloads attach
     // to it.
-    world_yaml(&mut out, &simulator.world);
+    world_written(&mut out, &simulator.world, false);
 
-    // Each group, in name order, as the map holds them.
+    // Each group, in name order, as the map holds them, a blank line apart.
     if !simulator.groups.is_empty() {
         out.push_str("\nsimulated_payload_groups:\n");
-        for (name, said) in &simulator.groups {
-            out.push_str(&format!("  - group: {}\n", quoted(name)));
-            entry_settings(&mut out, false, said, "    ");
+        for (at, (name, said)) in simulator.groups.iter().enumerate() {
+            if at > 0 {
+                out.push('\n');
+            }
+            out.push_str(&format!("  - group: {}\n", name_scalar(name)));
+            entry_settings(&mut out, said, "    ");
         }
     }
 
-    // Each payload of the configuration under its type, then whatever the
-    // file holds for a name that is not one, under the type the file gave
-    // it. A name with no type from either -- which reading a file never
-    // makes, every entry read being written under one -- has nowhere to be
-    // written, and is left out.
+    // Each entry under its payload's type, or failing that under the type
+    // the file gave it. A name with no type from either -- which reading a
+    // file never makes, every entry read being written under one -- has
+    // nowhere to be written, and is left out.
     let mut typed: BTreeMap<&str, BTreeMap<&str, &Settings>> = BTreeMap::new();
     let empty = Settings::new();
-    for (name, kind) in payloads {
-        typed
-            .entry(kind.as_str())
-            .or_default()
-            .insert(name, simulator.payloads.get(name).unwrap_or(&empty));
-    }
-    for (name, said) in &simulator.payloads {
-        if payloads.iter().any(|(theirs, _)| theirs == name) {
+    let mut names: Vec<&String> = simulator.payloads.keys().collect();
+    names.extend(simulator.kinds.keys());
+    for name in names {
+        let said = simulator.payloads.get(name).unwrap_or(&empty);
+        if stated(said).is_empty() && !simulator.kinds.contains_key(name) {
             continue;
         }
-        if let Some(kind) = simulator.kinds.get(name) {
+        let kind = payloads
+            .iter()
+            .find(|(theirs, _)| theirs == name)
+            .map(|(_, kind)| kind)
+            .or_else(|| simulator.kinds.get(name));
+        if let Some(kind) = kind {
             typed.entry(kind.as_str()).or_default().insert(name, said);
         }
     }
     if !typed.is_empty() {
         out.push_str("\nsimulated_payloads:\n");
-        for (kind, entries) in typed {
+        for (at, (kind, entries)) in typed.into_iter().enumerate() {
+            if at > 0 {
+                out.push('\n');
+            }
             out.push_str(&format!("  - type {kind}:\n"));
-            for (name, said) in entries {
-                out.push_str(&format!("      - payload: {}\n", quoted(name)));
-                entry_settings(&mut out, true, said, "        ");
+            for (at, (name, said)) in entries.into_iter().enumerate() {
+                if at > 0 {
+                    out.push('\n');
+                }
+                out.push_str(&format!(
+                    "      - payload: {}\n",
+                    name_scalar(name)
+                ));
+                entry_settings(&mut out, said, "        ");
             }
         }
     }
     out
 }
 
+/// The settings that hold a value, in name order.
+///
+/// # Arguments
+///
+/// * `said` - An entry's settings.
+///
+/// # Returns
+///
+/// Each setting's name and value, trimmed, leaving out any with nothing in
+/// it: a setting written empty is one not stated.
+fn stated(said: &Settings) -> Vec<(&String, &str)> {
+    said.iter()
+        .map(|(field, value)| (field, value.trim()))
+        .filter(|(_, value)| !value.is_empty())
+        .collect()
+}
+
 /// Writes the world section, where the world holds anything.
 ///
 /// In the one order a world has: its ambient temperature, then the types of
-/// its physics by name, a type's components by name, each with every
-/// setting its type states and anything else it was read with, by name,
-/// written empty where nobody has answered it, as a payload's are; and the
-/// connections by what they join.
+/// its physics by name, a type's components by name, each with what it
+/// states, by name; and the connections by what they join. A blank line
+/// between components and between types, as the shipped worlds have.
+///
+/// For the checking, the same with every setting a component's type states
+/// written, and an ambient temperature, as an empty text where nobody has
+/// given one, so that a figure the reader requires and is not given is
+/// refused at its component, as one that does not read is, rather than as
+/// a file that does not parse. The file has no such line: a key with
+/// nothing in it is not written.
 ///
 /// # Arguments
 ///
-/// * `out`   - Where the lines are written.
-/// * `world` - The world.
-fn world_yaml(out: &mut String, world: &World) {
-    world_written(out, world, false);
-}
-
-/// Writes the world section, as [`world_yaml`] does, with a setting nobody
-/// has answered written either with nothing after it or as an empty text.
-///
-/// The file has the first, which is a question not yet answered; the
-/// checking has the second, so that a figure the reader requires and is not
-/// given is refused at its component, as one that does not read is, rather
-/// than as a file that does not parse.
-///
-/// # Arguments
-///
-/// * `out`    - Where the lines are written.
-/// * `world`  - The world.
-/// * `empty`  - Whether an unanswered setting is written as `""`.
-fn world_written(out: &mut String, world: &World, empty: bool) {
-    let blank = if empty { " \"\"" } else { "" };
+/// * `out`      - Where the lines are written.
+/// * `world`    - The world.
+/// * `checking` - Whether this is for the checking rather than the file.
+fn world_written(out: &mut String, world: &World, checking: bool) {
     if world.is_empty() {
         return;
     }
     out.push_str("\nworld:\n");
-    match world.ambient_temp.trim() {
-        "" => out.push_str(&format!("  ambient_temp:{blank}\n")),
-        said => {
-            out.push_str(&format!("  ambient_temp: \"{}\"\n", escaped(said)))
-        }
+    let ambient = world.ambient_temp.trim();
+    if !ambient.is_empty() || checking {
+        out.push_str(&format!("  ambient_temp: {}\n", quoted(ambient)));
     }
     if world.components.is_empty() && world.connections.is_empty() {
         return;
+    }
+    if !ambient.is_empty() {
+        out.push('\n');
     }
     out.push_str("  physics:\n");
     let mut typed: BTreeMap<&str, Vec<(&String, &PhysicsComponent)>> =
@@ -767,107 +836,128 @@ fn world_written(out: &mut String, world: &World, empty: bool) {
     if !typed.is_empty() {
         out.push_str("    components:\n");
     }
-    for (kind, components) in typed {
+    for (at, (kind, components)) in typed.iter().enumerate() {
+        if at > 0 {
+            out.push('\n');
+        }
         out.push_str(&format!("      - type {kind}:\n"));
-        for (name, component) in components {
-            out.push_str(&format!("          - component: {}\n", quoted(name)));
-            let mut settings: Vec<&str> = tcslibgs::physics::settings_of(kind)
-                .unwrap_or_default()
-                .to_vec();
+        for (at, (name, component)) in components.iter().enumerate() {
+            if at > 0 {
+                out.push('\n');
+            }
+            out.push_str(&format!(
+                "          - component: {}\n",
+                name_scalar(name)
+            ));
+            let mut settings: Vec<&str> = if checking {
+                tcslibgs::physics::settings_of(kind)
+                    .unwrap_or_default()
+                    .to_vec()
+            } else {
+                Vec::new()
+            };
             settings.extend(
-                component
-                    .settings
-                    .keys()
-                    .map(String::as_str)
+                stated(&component.settings)
+                    .into_iter()
+                    .map(|(setting, _)| setting.as_str())
                     .filter(|setting| !settings.contains(setting))
                     .collect::<Vec<_>>(),
             );
             settings.sort_unstable();
             for setting in settings {
-                match component.settings.get(setting).map(|v| v.trim()) {
-                    Some(value) if !value.is_empty() => out.push_str(&format!(
-                        "            {setting}: \"{}\"\n",
-                        escaped(value)
-                    )),
-                    _ => out
-                        .push_str(&format!("            {setting}:{blank}\n")),
-                }
+                let value = component.settings.get(setting).map(|v| v.trim());
+                out.push_str(&format!(
+                    "            {setting}: {}\n",
+                    quoted(value.unwrap_or_default())
+                ));
             }
         }
     }
     if !world.connections.is_empty() {
+        if !typed.is_empty() {
+            out.push('\n');
+        }
         out.push_str("    connections:\n");
         for (from, to) in &world.connections {
             out.push_str(&format!(
                 "      - from: {}\n        to: {}\n",
-                quoted(from),
-                quoted(to)
+                name_scalar(from),
+                name_scalar(to)
             ));
         }
     }
 }
 
-/// Writes every setting an entry may state, by name, and then anything the
-/// file carried that this build does not know about -- which is kept for the
-/// reason the window shows it: a line nobody can see is a line that gets
-/// written back out without anybody knowing it is there.
+/// Writes the settings an entry states, by name: those this build knows and
+/// anything else the file carried, which is kept for the reason the window
+/// shows it -- a line nobody can see is a line that gets written back out
+/// without anybody knowing it is there.
 ///
 /// # Arguments
 ///
-/// * `out`     - Where the lines are written.
-/// * `payload` - Whether the entry is a payload's, which has `group`, rather
-///               than a group's.
-/// * `said`    - What the entry says.
-/// * `indent`  - What each line begins with.
-fn entry_settings(
-    out: &mut String,
-    payload: bool,
-    said: &Settings,
-    indent: &str,
-) {
-    let mut settings: Vec<&str> = Simulator::fields(payload);
-    let theirs: Vec<&str> = said
-        .keys()
-        .map(String::as_str)
-        .filter(|setting| !settings.contains(setting))
-        .collect();
-    settings.extend(theirs);
-    settings.sort_unstable();
-    for setting in settings {
-        // A setting nobody has answered is written with nothing after the
-        // colon rather than with an empty string. The two read the same --
-        // see `blank_is_unstated` -- and they do not say the same: `""` is a
-        // value somebody could have typed, and nothing at all is a question
-        // not yet answered, which is what the form is for. The name stays in
-        // the file either way, because what the form is for is saying which
-        // questions there are.
-        match said.get(setting).map(|value| value.trim()) {
-            Some(value) if !value.is_empty() => {
-                out.push_str(&format!(
-                    "{indent}{setting}: {}\n",
-                    quoted(value)
-                ));
-            }
-            _ => out.push_str(&format!("{indent}{setting}:\n")),
-        }
+/// * `out`    - Where the lines are written.
+/// * `said`   - What the entry says.
+/// * `indent` - What each line begins with.
+fn entry_settings(out: &mut String, said: &Settings, indent: &str) {
+    for (setting, value) in stated(said) {
+        out.push_str(&format!("{indent}{setting}: {}\n", self::setting(value)));
     }
 }
 
-/// A YAML scalar, quoted unless it is a plain whole number.
+/// What YAML reads a bare word as, if it reads it as one value.
 ///
-/// Not the rule the configuration writer uses, and the difference is the
-/// reader at the other end. A graph's attributes are read as `Scalar`, which
-/// takes a value however the file spelled it, so that writer quotes everything
-/// and a round trip cannot change what a file means. The simulator's settings
-/// are read into the types it wants -- `packet_interval` is a length of time
-/// and `segment_size` a number -- and
-/// a quoted 1000 is refused as "invalid type: string".
+/// # Arguments
 ///
-/// So a value that is a whole number goes out as one and everything else is
-/// quoted. Mechanical rather than a second list of which settings are numeric:
-/// a list would be a third statement of the schema, and the one thing it would
-/// buy -- writing `protocol: "1"` quoted -- is a value the simulator refuses
-/// whichever way it is spelled.
+/// * `word` - The word, as it would follow a key's colon.
+///
+/// # Returns
+///
+/// The value it reads as, or `None` where it does not read as a single
+/// value: where it is a list, a map, or not YAML at all.
+fn bare_reading(word: &str) -> Option<serde_norway::Value> {
+    if word.is_empty() || word.trim() != word || word.contains('\n') {
+        return None;
+    }
+    let read: serde_norway::Mapping =
+        serde_norway::from_str(&format!("k: {word}\n")).ok()?;
+    let value = read.get("k")?.clone();
+    match value {
+        serde_norway::Value::Sequence(_)
+        | serde_norway::Value::Mapping(_)
+        | serde_norway::Value::Tagged(_) => None,
+        value => Some(value),
+    }
+}
+
+/// A name, bare where YAML reads it bare as that name, and quoted
+/// otherwise: `heater_1` bare, `null` and `0x48` quoted.
+///
+/// # Arguments
+///
+/// * `name` - The name.
+///
+/// # Returns
+///
+/// The name as YAML.
+fn name_scalar(name: &str) -> String {
+    match bare_reading(name) {
+        Some(serde_norway::Value::String(read)) if read == name => {
+            name.to_string()
+        }
+        _ => quoted(name),
+    }
+}
+
+/// A setting's value, bare where YAML reads it bare as what was typed, and
+/// quoted otherwise.
+///
+/// Not the rule for a name, and the difference is the reader at the other
+/// end. The simulator reads its settings into the types it wants --
+/// `simulate` is a boolean, `segment_size` a number and `packet_interval` a
+/// length of time -- and a quoted `true` or `1000` is refused as "invalid
+/// type: string". So a value that reads bare as a number or a boolean
+/// spelled as it was typed goes out bare, as one, and so does one that
+/// reads bare as the text typed; anything else is quoted.
 ///
 /// # Arguments
 ///
@@ -875,21 +965,71 @@ fn entry_settings(
 ///
 /// # Returns
 ///
-/// The value as YAML: bare if it is all digits, otherwise double-quoted with
-/// backslashes and quotes escaped.
-fn quoted(value: &str) -> String {
-    if !value.is_empty() && value.bytes().all(|byte| byte.is_ascii_digit()) {
-        return value.to_string();
+/// The value as YAML.
+fn setting(value: &str) -> String {
+    use serde_norway::Value;
+    let same = match bare_reading(value) {
+        Some(Value::String(read)) => read == value,
+        Some(Value::Bool(read)) => read.to_string() == value,
+        Some(Value::Number(read)) => read.to_string() == value,
+        _ => false,
+    };
+    if same {
+        value.to_string()
+    } else {
+        quoted(value)
     }
-    format!("\"{}\"", escaped(value))
 }
 
-/// A value with its backslashes and double quotes escaped, to be written
-/// between double quotes.
+/// A key and a text value as lines, folded over several where it runs past
+/// eighty columns and YAML reads the folded lines as the one text.
 ///
-/// A physics figure is always written quoted, whole numbers too: every one
-/// is read as text, its unit and all, and a bare fraction such as `0.02`
-/// would otherwise be a number to YAML and a string to nobody.
+/// # Arguments
+///
+/// * `key`   - The key and its colon and space, as `description: `.
+/// * `value` - The text.
+///
+/// # Returns
+///
+/// The lines, each ending in a newline: the text bare and folded with an
+/// indent of two where that reads back as it, bare on one line where only
+/// that does, and quoted on one line otherwise.
+fn folded(key: &str, value: &str) -> String {
+    let one = format!("{key}{}\n", name_scalar(value));
+    if one.len() <= 81 || name_scalar(value) != value {
+        return one;
+    }
+    let mut lines: Vec<String> = vec![key.to_string()];
+    for word in value.split(' ') {
+        let last = lines.last_mut().expect("a line");
+        let fresh = last.trim().is_empty() || last.ends_with(": ");
+        if fresh {
+            last.push_str(word);
+        } else if last.len() + 1 + word.len() <= 80 {
+            last.push(' ');
+            last.push_str(word);
+        } else {
+            lines.push(format!("  {word}"));
+        }
+    }
+    let text = lines.join("\n") + "\n";
+    let reads: Option<serde_norway::Mapping> =
+        serde_norway::from_str(&text).ok();
+    let key_name = key.trim_end().trim_end_matches(':');
+    let same = reads
+        .as_ref()
+        .and_then(|map| map.get(key_name))
+        .and_then(|value| value.as_str())
+        == Some(value);
+    if same {
+        text
+    } else {
+        one
+    }
+}
+
+/// A value in double quotes, with its backslashes and double quotes
+/// escaped.
 ///
 /// # Arguments
 ///
@@ -897,9 +1037,9 @@ fn quoted(value: &str) -> String {
 ///
 /// # Returns
 ///
-/// It, escaped.
-fn escaped(value: &str) -> String {
-    value.replace('\\', "\\\\").replace('"', "\\\"")
+/// It, quoted.
+fn quoted(value: &str) -> String {
+    format!("\"{}\"", value.replace('\\', "\\\\").replace('"', "\\\""))
 }
 
 #[cfg(test)]
@@ -955,9 +1095,8 @@ mod tests {
                 read_back.description, simulator.description,
                 "{extension}"
             );
-            // The file is a form: every setting of every entry is written,
-            // empty where nobody has filled it in, so what comes back is what
-            // went in plus the blanks.
+            // What comes back is what went in: each setting that holds a
+            // value, and nothing for one that does not.
             for (name, said) in &simulator.groups {
                 let back = read_back.groups.get(name).expect("the group");
                 for (setting, value) in said {
@@ -970,20 +1109,20 @@ mod tests {
             }
             let back = read_back.payloads.get("payload").expect("the payload");
             for (setting, value) in &simulator.payloads["payload"] {
+                if value.is_empty() {
+                    continue;
+                }
                 assert_eq!(
                     back.get(setting),
                     Some(value),
                     "{extension} {setting}"
                 );
             }
-            // Including the one that was cleared, which comes back empty: the
-            // simulator's own reader takes a setting written empty as a
-            // setting not stated, so a blank in the form is not a value.
-            assert_eq!(back.get("jitter").map(String::as_str), Some(""));
-            assert!(
-                back.contains_key("segment_size"),
-                "{extension}: every setting is offered, filled in or not"
-            );
+            // But not the one that was cleared, or any nobody has given: a
+            // key with nothing after it is not written.
+            assert!(!back.contains_key("jitter"), "{extension}");
+            assert!(!back.contains_key("segment_size"), "{extension}");
+            assert_eq!(back.len(), 3, "{extension}: {back:?}");
         }
     }
 
@@ -1232,7 +1371,7 @@ mod tests {
         // under the type it came with.
         let written = to_yaml(&simulator, &[]);
         assert!(
-            written.contains("  - type spi:\n      - payload: \"payload\"\n"),
+            written.contains("  - type spi:\n      - payload: payload\n"),
             "{written}"
         );
     }
@@ -1263,7 +1402,13 @@ mod tests {
         let written = to_yaml(&simulator, &payloads);
         let at = |what: &str| written.find(what).expect(what);
         assert!(at("type network:") < at("type spi:"), "{written}");
-        assert!(at("payload: \"a\"") < at("payload: \"c\""), "{written}");
+        assert!(at("payload: a\n") < at("payload: c\n"), "{written}");
+        // A boolean and a time each bare, as a person writes them.
+        assert!(written.contains("        simulate: true\n"), "{written}");
+        assert!(
+            written.contains("        packet_interval: 1 s\n"),
+            "{written}"
+        );
         assert!(at("packet_interval:") < at("simulate:"), "{written}");
         std::fs::write(&path, &written).expect("written");
         tcslibgs::sim_config::SimConfigFile::load(&path)

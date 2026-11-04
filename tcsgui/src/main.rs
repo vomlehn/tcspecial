@@ -34,6 +34,7 @@
 
 mod document;
 mod editor;
+mod faithful;
 mod history;
 mod journal;
 mod nodes;

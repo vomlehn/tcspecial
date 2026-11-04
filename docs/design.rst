@@ -5022,6 +5022,18 @@ highest below -- and then the sheet is scrolled so the new node's top is at the
 top of the view. A node placed where it cannot be seen is a press that did
 nothing as far as the person who made it can tell.
 
+The main window's title says what it is and the file it is editing --
+"TCSpecial Configuration: /home/someone/working/thermostat/thermostat.xtcs" --
+the path made absolute and changed by **Save as**. That is where somebody
+looks to tell two editors apart, which look alike everywhere else. A path too
+long for the title bar is shortened in the middle, as file managers and
+editors shorten one: its first element, an ellipsis for what is left out, and
+as many of its last elements as fit -- "/home/…/thermostat/thermostat.xtcs"
+-- and never less than the first and the last.
+Shortened by the program and not left to the window system, which cuts a title
+at the end, and the end of a path is the file's name. The title is fitted
+again as the window is made wider or narrower.
+
 **Arrange**, on the bar and as **Edit -> Arrange the nodes**, lays every node
 out afresh, the way its data flows, each page on its own and each node in its
 own pane. The payloads stand in a column down the left of theirs; the

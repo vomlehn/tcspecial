@@ -368,21 +368,31 @@ pub fn node_look(
         .to_string(),
         mark: crate::look::MARK,
         faulty: component.faulty,
-        // Its type is said under its name, as every node's is: a physics
+        // Its type is said along its top, as every node's is: a physics
         // node's shape is the one shape for every type, so the words are
         // what tell a heater from a zone.
         summary: String::new(),
         openable: false,
-        // The two on the right, in the two slots the markup draws on the
-        // right, so the name is padded away from them; which slots says
-        // nothing more, a physics node being joined only by its lines.
-        moc_in: none.clone(),
-        moc_out: terminal(true),
-        world_in: terminal(false),
-        world_out: none,
+        // The two on the right, in the slots of the corners they are drawn
+        // in -- the output top right, the input bottom right -- so that the
+        // type along the top stops short of the one there.
+        moc_in: terminal(false),
+        moc_out: none.clone(),
+        world_in: none,
+        world_out: terminal(true),
         terminal_column: (style::TERMINAL_COLUMN as i32
             + style::room_of(outline, size)) as f32,
         inset: style::room_of(outline, size) as f32,
+        terminal_row: style::TERMINAL_ROW as f32,
+        type_band: {
+            let (left, right) = style::type_band(
+                outline,
+                size,
+                at,
+                (false, has(component.kind, true)),
+            );
+            (left as f32, right as f32)
+        },
     }
 }
 
@@ -786,7 +796,7 @@ mod tests {
                     .filter(|t| t.shown)
                     .collect();
             assert_eq!(shown.len(), 2, "one each way: {look:?}");
-            let (out, into) = (&look.moc_out, &look.world_in);
+            let (out, into) = (&look.world_out, &look.moc_in);
             assert!(out.rightward && !into.rightward);
             assert!(out.y + style::TERMINAL.1 as f32 <= into.y, "apart");
             // Both inside the hexagon at both of their corners on the right.
@@ -805,9 +815,9 @@ mod tests {
         // A zone gives out its temperature and takes heat; a type there is
         // no such component of has neither.
         let zone = node_look(&component("thermal_mass"), (0, 0), SIZE);
-        assert!(zone.moc_out.shown && zone.world_in.shown);
+        assert!(zone.world_out.shown && zone.moc_in.shown);
         let unknown = node_look(&component("nonesuch"), (0, 0), SIZE);
-        assert!(!unknown.moc_out.shown && !unknown.world_in.shown);
+        assert!(!unknown.world_out.shown && !unknown.moc_in.shown);
         // And no node type is drawn as one.
         for kind in style::NodeType::ALL {
             assert_ne!(kind.appearance().outline, style::Outline::Hexagon);

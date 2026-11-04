@@ -6475,6 +6475,10 @@ fn node_view(look: tcsdiagram::view::NodeLook, selected: bool) -> NodeView {
         world_out: terminal(look.world_out),
         terminal_column: look.terminal_column,
         inset: look.inset,
+        terminal_row: look.terminal_row,
+        type_left: look.type_band.0,
+        type_right: look.type_band.1,
+        type_size: tcsdiagram::style::TYPE_SIZE as f32,
     }
 }
 

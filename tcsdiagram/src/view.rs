@@ -62,6 +62,11 @@ pub struct NodeLook {
     pub world_out: TerminalLook,
     pub terminal_column: f32,
     pub inset: f32,
+    /// How tall a row of terminals is: see [`style::TERMINAL_ROW`].
+    pub terminal_row: f32,
+    /// Where the type is written along the top, from the node's left side:
+    /// see [`style::type_band`].
+    pub type_band: (f32, f32),
 }
 
 /// What a node of this type looks like, at `at`.
@@ -188,6 +193,16 @@ pub fn node_look(
         // The room anything drawn inside the shape has to leave at the sides,
         // which is nothing unless the shape leans: see style::room_of.
         inset: style::room_of(outline, size) as f32,
+        terminal_row: style::TERMINAL_ROW as f32,
+        type_band: {
+            let (left, right) = style::type_band(
+                outline,
+                size,
+                at,
+                (terminals.has("world-in"), terminals.has("world-out")),
+            );
+            (left as f32, right as f32)
+        },
     }
 }
 

@@ -1524,6 +1524,9 @@ fn put(
     let (raised, aside) = editor.document().concerns_apart();
     ui.set_concern_count(raised.len() as i32);
     ui.set_aside_count(aside.len() as i32);
+    ui.set_outside_count(
+        editor.document().outside_panes(home, dividers) as i32,
+    );
 }
 
 /// Puts the editor's state into one open subdiagram's window, as [`put`]
@@ -1565,6 +1568,9 @@ fn put_sub(
     window.set_redo_label(label(editor.journal().next_redo()));
     window.set_trouble(editor.trouble().unwrap_or_default().into());
     window.set_said(editor.said().unwrap_or_default().into());
+    window.set_outside_count(
+        editor.document().outside_panes(&home, dividers) as i32
+    );
 }
 
 /// Puts what a node says about itself into its own window.

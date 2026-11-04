@@ -144,7 +144,7 @@
             <node name="gpio-in-tmass" x="91" y="544"/>
             <node name="gpio-out-tmass1" x="34" y="393"/>
             <node name="gpio-out-tmass2" x="34" y="469"/>
-            <node name="housekeeping" x="469" y="374"/>
+            <node name="housekeeping" x="469" y="450"/>
             <node name="temp1" x="261" y="34"/>
             <node name="temp2" x="261" y="166"/>
             <node name="temp3" x="261" y="280"/>

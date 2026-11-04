@@ -3639,9 +3639,9 @@ link to it beside each configuration. The world is YAML only: a simulator
 file written in XML has none.</p>
 <pre class="code text literal-block">
 world                  in the simulator file. Optional
-  ambient_temp         the temperature every thermal zone's surroundings
+  ambient_temp         the temperature every thermal mass's surroundings
                        are about: &quot;288.15 K&quot;. Required where there is a
-                       thermal_zone
+                       thermal_mass
   physics
     components         the components, grouped by type
     connections        how they are joined, each from an output to an
@@ -3690,7 +3690,7 @@ heater                 a resistance on a supply, switched on and off
   ripple_time          how slowly it varies, as a length of time. With
                        ripple and refused without it
 
-thermal_zone           one body at one temperature, in surroundings
+thermal_mass           one body at one temperature, in surroundings
                        about the world's ambient_temp
   component            the name connections and stand-ins use
   time_constant        how fast it loses the difference, as a length
@@ -3754,15 +3754,15 @@ body                   a mass falling under gravity, pushed and burning
 <p>Every figure is written with its unit, and one without it, or in another
 unit, is refused, saying what to write: a bare <tt class="docutils literal">60</tt> could be watts or
 kelvin a second. A fraction, which has no unit, is written bare. A
-<tt class="docutils literal">thermal_mass</tt>, the one type there was before a model was made of parts, is
-refused, told what it is now.</p>
+<tt class="docutils literal">thermal_zone</tt>, which is what a <tt class="docutils literal">thermal_mass</tt> was called before, is
+refused, told the name it has now.</p>
 <p>Each type has fixed terminals, the places it is joined at, each an input or an
 output, carrying a value in one unit or a decision:</p>
 <pre class="code text literal-block">
 heater         on            in    a decision: whether it is on
                heat          out   W, nought while off
                current       out   A, nought while off
-thermal_zone   heat          in    W, the sum of everything joined to it
+thermal_mass   heat          in    W, the sum of everything joined to it
                temperature   out   K
 sun            light         out   a ratio: one lit, nought in shadow
 solar_array    light         in    a ratio
@@ -3872,7 +3872,7 @@ vehicle drives.</p>
           </span><span class="punctuation indicator">-</span><span class="whitespace"> </span><span class="name tag">component</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">heater_2</span><span class="whitespace">
             </span><span class="name tag">power</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal string">&quot;60</span><span class="name variable"> </span><span class="literal string">W&quot;</span><span class="whitespace">
             </span><span class="name tag">voltage</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal string">&quot;28</span><span class="name variable"> </span><span class="literal string">V&quot;</span><span class="whitespace">
-      </span><span class="punctuation indicator">-</span><span class="whitespace"> </span><span class="name tag">type thermal_zone</span><span class="punctuation">:</span><span class="whitespace">
+      </span><span class="punctuation indicator">-</span><span class="whitespace"> </span><span class="name tag">type thermal_mass</span><span class="punctuation">:</span><span class="whitespace">
           </span><span class="punctuation indicator">-</span><span class="whitespace"> </span><span class="name tag">component</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">zone</span><span class="whitespace">
             </span><span class="name tag">capacity</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal string">&quot;20</span><span class="name variable"> </span><span class="literal string">J/K&quot;</span><span class="whitespace">
             </span><span class="name tag">time_constant</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal string">&quot;50</span><span class="name variable"> </span><span class="literal string">s&quot;</span><span class="whitespace">  </span><span class="comment single"># a fifth of a kelvin a second at it</span><span class="whitespace">
@@ -4068,7 +4068,7 @@ example shares with thermostat-yamcs, its world shortened here:</p>
           </span><span class="punctuation indicator">-</span><span class="whitespace"> </span><span class="name tag">component</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">heater_2</span><span class="whitespace">
             </span><span class="name tag">power</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal string">&quot;4</span><span class="name variable"> </span><span class="literal string">W&quot;</span><span class="whitespace">
             </span><span class="name tag">voltage</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal string">&quot;28</span><span class="name variable"> </span><span class="literal string">V&quot;</span><span class="whitespace">
-      </span><span class="punctuation indicator">-</span><span class="whitespace"> </span><span class="name tag">type thermal_zone</span><span class="punctuation">:</span><span class="whitespace">
+      </span><span class="punctuation indicator">-</span><span class="whitespace"> </span><span class="name tag">type thermal_mass</span><span class="punctuation">:</span><span class="whitespace">
           </span><span class="punctuation indicator">-</span><span class="whitespace"> </span><span class="name tag">component</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">zone</span><span class="whitespace">
             </span><span class="name tag">capacity</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal string">&quot;20</span><span class="name variable"> </span><span class="literal string">J/K&quot;</span><span class="whitespace">
             </span><span class="name tag">start</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal string">&quot;292.15</span><span class="name variable"> </span><span class="literal string">K&quot;</span><span class="whitespace">

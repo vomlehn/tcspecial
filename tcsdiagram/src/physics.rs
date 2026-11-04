@@ -48,7 +48,7 @@ pub const NODE_TYPE: &str = "physics";
 pub struct Component<'a> {
     /// What it is called.
     pub name: &'a str,
-    /// Its type: `heater`, `thermal_zone` and so on.
+    /// Its type: `heater`, `thermal_mass` and so on.
     pub kind: &'a str,
     /// Whether something is wrong with it, which paints it red.
     pub faulty: bool,
@@ -696,7 +696,7 @@ mod tests {
         let components = [
             component("heater_1", "heater"),
             component("heater_2", "heater"),
-            component("zone", "thermal_zone"),
+            component("zone", "thermal_mass"),
         ];
         let node = |name: &str, y| OnSheet {
             name: name.to_string(),
@@ -808,7 +808,7 @@ mod tests {
         }
         // A zone gives out its temperature and takes heat; a type there is
         // no such component of has neither.
-        let zone = node_look(&component("thermal_zone"), (0, 0), SIZE);
+        let zone = node_look(&component("thermal_mass"), (0, 0), SIZE);
         assert!(zone.gateway_out.shown && zone.payload_in.shown);
         let unknown = node_look(&component("nonesuch"), (0, 0), SIZE);
         assert!(!unknown.gateway_out.shown && !unknown.payload_in.shown);
@@ -854,7 +854,7 @@ mod tests {
 
         // And what the file says reaches the drawing.
         let drawn = Drawn {
-            components: vec![("zone".into(), "thermal_zone".into())],
+            components: vec![("zone".into(), "thermal_mass".into())],
             placed: [("zone".to_string(), put)].into_iter().collect(),
             ..Drawn::default()
         };
@@ -902,7 +902,7 @@ mod tests {
             },
             Component {
                 name: "zone",
-                kind: "thermal_zone",
+                kind: "thermal_mass",
                 faulty: true,
                 placed: None,
             },

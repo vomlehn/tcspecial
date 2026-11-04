@@ -59,7 +59,7 @@ use super::load::Load;
 use super::queue::Queue;
 use super::solar_array::SolarArray;
 use super::sun::Sun;
-use super::thermal_zone::ThermalZone;
+use super::thermal_mass::ThermalMass;
 
 /// The most events one advance lets happen before it stops, with a word in
 /// the log.
@@ -127,8 +127,8 @@ impl World {
                     Resolution::Heater(figures) => {
                         Box::new(Heater::new(&component.name, *figures, seed))
                     }
-                    Resolution::ThermalZone(figures) => Box::new(
-                        ThermalZone::new(&component.name, *figures, seed),
+                    Resolution::ThermalMass(figures) => Box::new(
+                        ThermalMass::new(&component.name, *figures, seed),
                     ),
                     Resolution::Sun(figures) => Box::new(Sun::new(*figures)),
                     Resolution::SolarArray(figures) => {

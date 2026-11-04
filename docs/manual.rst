@@ -3441,9 +3441,9 @@ file written in XML has none.
 .. code-block:: text
 
    world                  in the simulator file. Optional
-     ambient_temp         the temperature every thermal zone's surroundings
+     ambient_temp         the temperature every thermal mass's surroundings
                           are about: "288.15 K". Required where there is a
-                          thermal_zone
+                          thermal_mass
      physics
        components         the components, grouped by type
        connections        how they are joined, each from an output to an
@@ -3498,7 +3498,7 @@ Each component is one simple part, of one of these types:
      ripple_time          how slowly it varies, as a length of time. With
                           ripple and refused without it
 
-   thermal_zone           one body at one temperature, in surroundings
+   thermal_mass           one body at one temperature, in surroundings
                           about the world's ambient_temp
      component            the name connections and stand-ins use
      time_constant        how fast it loses the difference, as a length
@@ -3562,8 +3562,8 @@ Each component is one simple part, of one of these types:
 Every figure is written with its unit, and one without it, or in another
 unit, is refused, saying what to write: a bare ``60`` could be watts or
 kelvin a second. A fraction, which has no unit, is written bare. A
-``thermal_mass``, the one type there was before a model was made of parts, is
-refused, told what it is now.
+``thermal_zone``, which is what a ``thermal_mass`` was called before, is
+refused, told the name it has now.
 
 Each type has fixed terminals, the places it is joined at, each an input or an
 output, carrying a value in one unit or a decision:
@@ -3573,7 +3573,7 @@ output, carrying a value in one unit or a decision:
    heater         on            in    a decision: whether it is on
                   heat          out   W, nought while off
                   current       out   A, nought while off
-   thermal_zone   heat          in    W, the sum of everything joined to it
+   thermal_mass   heat          in    W, the sum of everything joined to it
                   temperature   out   K
    sun            light         out   a ratio: one lit, nought in shadow
    solar_array    light         in    a ratio
@@ -3693,7 +3693,7 @@ A simulator file with a model, and its payloads joined to it:
              - component: heater_2
                power: "60 W"
                voltage: "28 V"
-         - type thermal_zone:
+         - type thermal_mass:
              - component: zone
                capacity: "20 J/K"
                time_constant: "50 s"  # a fifth of a kelvin a second at it
@@ -3914,7 +3914,7 @@ example shares with thermostat-yamcs, its world shortened here:
              - component: heater_2
                power: "4 W"
                voltage: "28 V"
-         - type thermal_zone:
+         - type thermal_mass:
              - component: zone
                capacity: "20 J/K"
                start: "292.15 K"

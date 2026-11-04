@@ -5379,7 +5379,7 @@ fn physics_palette() -> ModelRc<PaletteEntry> {
 /// The physics component types by family, as the physics list heads them:
 /// every one of `tcslibgs::physics::TYPES` once, which a test holds it to.
 const PHYSICS_FAMILIES: &[(&str, &[&str])] = &[
-    ("Thermal", &["heater", "thermal_zone"]),
+    ("Thermal", &["heater", "thermal_mass"]),
     ("Power", &["battery", "bus", "load", "solar_array", "sun"]),
     ("Motion", &["body", "engine"]),
 ];
@@ -7196,7 +7196,7 @@ mod tests {
             "world:\n  ambient_temp: \"283.15 K\"\n  physics:\n    \
              components:\n      - type heater:\n          \
              - component: heater_1\n          - component: heater_2\n      \
-             - type thermal_zone:\n          - component: zone\n",
+             - type thermal_mass:\n          - component: zone\n",
         )
         .expect("written");
         let mut editor = Editor::open(&path, dividers());

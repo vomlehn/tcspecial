@@ -974,7 +974,7 @@ tcsgui:
         std::fs::write(
             &sim,
             "world:\n  ambient_temp: \"283.15 K\"\n  physics:\n    \
-             components:\n      - type thermal_zone:\n          \
+             components:\n      - type thermal_mass:\n          \
              - component: zone\n            capacity: \"20 J/K\"\n            \
              time_constant: \"50 s\"\n",
         )
@@ -1059,7 +1059,7 @@ tcsgui:
             "world:\n  ambient_temp: \"283.15 K\"\n  physics:\n    \
              components:\n      - type heater:\n          \
              - component: heater_1\n            power: \"4 W\"\n            \
-             voltage: \"28 V\"\n      - type thermal_zone:\n          \
+             voltage: \"28 V\"\n      - type thermal_mass:\n          \
              - component: zone\n            capacity: \"20 J/K\"\n            \
              time_constant: \"50 s\"\n",
         )
@@ -1130,7 +1130,7 @@ tcsgui:
         let before = simulator(&editor);
         editor.edit(Edit::RemovePhysics {
             name: "zone".into(),
-            kind: "thermal_zone".into(),
+            kind: "thermal_mass".into(),
             settings: Vec::new(),
             connections: before.world.connections_of("zone"),
             joins: before.joins_of("zone"),

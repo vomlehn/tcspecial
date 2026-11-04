@@ -86,7 +86,7 @@ world:
             ripple_time: "20 s"
             voltage: "28 V"
 
-      - type thermal_zone:
+      - type thermal_mass:
           # The zone loses the difference between itself and its
           # surroundings with a fifty second constant, which at the setpoint
           # is a tenth of a kelvin a second of cooling, and takes twenty

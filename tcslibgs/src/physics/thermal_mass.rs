@@ -1,4 +1,4 @@
-//! A thermal zone: one body at one temperature, which heat warms and its
+//! A thermal mass: one body at one temperature, which heat warms and its
 //! surroundings pull back.
 //!
 //! It takes `heat`, in watts, the sum of every heater's connected to it, and
@@ -14,7 +14,7 @@
 //! `period` -- an orbit's sun and shadow -- and wander at random by
 //! `wander`, over `wander_time`. It starts at its surroundings, or at
 //! `start` where that is stated. The arithmetic is tcssim's
-//! `physics::thermal_zone`.
+//! `physics::thermal_mass`.
 
 use std::time::Duration;
 
@@ -45,10 +45,10 @@ pub const SETTINGS: &[&str] = &[
     "start",
 ];
 
-/// A thermal zone, as a physics model states it.
+/// A thermal mass, as a physics model states it.
 #[derive(Debug, Clone, Deserialize, Serialize, PartialEq)]
 #[serde(deny_unknown_fields)]
-pub struct ThermalZone {
+pub struct ThermalMass {
     /// What it is called, which is how a connection or a stand-in names it.
     #[serde(rename = "component")]
     pub name: String,
@@ -99,9 +99,9 @@ pub struct ThermalZone {
 /// What a zone that states its own `environment` is told.
 pub const MOVED_ENVIRONMENT: &str = "environment is the world's now: state \
     it once, as ambient_temp under world:, beside physics:, and every \
-    thermal_zone takes its surroundings from it";
+    thermal_mass takes its surroundings from it";
 
-/// A thermal zone with its figures read.
+/// A thermal mass with its figures read.
 #[derive(Debug, Clone, Copy, PartialEq, Default)]
 pub struct Resolved {
     /// The temperature it tends towards with nothing warming it, in kelvin:
@@ -121,7 +121,7 @@ pub struct Resolved {
     pub start: Option<f64>,
 }
 
-impl ThermalZone {
+impl ThermalMass {
     /// Reads its figures.
     ///
     /// # Arguments
@@ -188,8 +188,8 @@ mod tests {
     /// # Returns
     ///
     /// It, with nothing optional stated.
-    fn zone() -> ThermalZone {
-        ThermalZone {
+    fn zone() -> ThermalMass {
+        ThermalMass {
             name: "zone".to_string(),
             moved_environment: None,
             time_constant: "50 s".to_string(),
@@ -208,7 +208,7 @@ mod tests {
     fn a_start_is_read_in_kelvin() {
         assert_eq!(zone().resolve(288.15).unwrap().start, None);
 
-        let started = ThermalZone {
+        let started = ThermalMass {
             start: Some("292.15 K".to_string()),
             ..zone()
         }
@@ -221,7 +221,7 @@ mod tests {
     /// write.
     #[test]
     fn a_start_that_cannot_be_used_is_refused() {
-        let err = ThermalZone {
+        let err = ThermalMass {
             start: Some("292.15".to_string()),
             ..zone()
         }
@@ -229,7 +229,7 @@ mod tests {
         .unwrap_err();
         assert!(err.contains("start: \"292.15\" has no unit"), "{err}");
 
-        let err = ThermalZone {
+        let err = ThermalMass {
             start: Some("19 C".to_string()),
             ..zone()
         }

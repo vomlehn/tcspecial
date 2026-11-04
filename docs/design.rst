@@ -11078,7 +11078,7 @@ Requirement
     the stand-ins joined to it, so that one file says the whole of what the
     simulator simulates and a stand-in's ``connects`` names a terminal the
     same file says is there. The world also states ``ambient_temp``, the
-    one temperature every thermal zone's surroundings are about, required
+    one temperature every thermal mass's surroundings are about, required
     where there is a zone. The world is YAML only: a simulator file written
     in XML has none, and one with a ``world`` or a ``physics`` element is
     refused.
@@ -11097,10 +11097,10 @@ Requirement
     configuration has links: ``components`` and ``connections``, under
     ``physics``. Each entry of ``components`` is ``type`` and a type,
     ``- type heater:``, holding the components of that type, each
-    named by ``component``. The types are ``heater``, ``thermal_zone``,
+    named by ``component``. The types are ``heater``, ``thermal_mass``,
     ``sun``, ``solar_array``, ``load``, ``bus``, ``battery``, ``engine`` and
-    ``body``, and a type of any other is refused; a ``thermal_mass``, the one
-    type there was before a model was made of parts, is told what it is now.
+    ``body``, and a type of any other is refused; a ``thermal_zone``, which
+    is what a ``thermal_mass`` was called before, is told the name it has now.
     A type is written once, with a component under it. Each type's settings,
     terminals and rules are stated once, in ``tcslibgs::physics``; its
     arithmetic is the simulator's, in ``tcssim::physics``.
@@ -11154,7 +11154,7 @@ Requirement
 
 Requirement
     A heater states its power at its nominal voltage and that voltage. A
-    thermal zone sits in surroundings about the world's ``ambient_temp``,
+    thermal mass sits in surroundings about the world's ``ambient_temp``,
     and states its time constant -- how long it takes to lose a given
     fraction of the difference between itself and its surroundings -- and
     its heat capacity, which turns a heater's watts into kelvin a second.
@@ -11245,7 +11245,7 @@ Requirement
     time after time, is stopped after ten thousand and the log says so: the
     world falls behind rather than every stand-in waiting on it for ever.
 
-**A thermal zone and its heaters**
+**A thermal mass and its heaters**
 
 A heater's heat goes as the square of its supply voltage and its current as
 the voltage, ``power * (1 + v)^2`` and ``power / voltage * (1 + v)`` with
@@ -11628,7 +11628,7 @@ with nothing more than a socket.
              - component: heater_2
                power: "60 W"
                voltage: "28 V"
-         - type thermal_zone:
+         - type thermal_mass:
              - component: zone
                capacity: "20 J/K"
                time_constant: "50 s"

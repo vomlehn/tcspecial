@@ -92,7 +92,7 @@ pub struct Simulator {
     Debug, Clone, Default, PartialEq, Eq, serde::Serialize, serde::Deserialize,
 )]
 pub struct World {
-    /// The temperature every thermal zone's surroundings are about, as
+    /// The temperature every thermal mass's surroundings are about, as
     /// written: `288.15 K`. Empty where unstated.
     #[serde(default)]
     pub ambient_temp: String,
@@ -1204,7 +1204,7 @@ mod tests {
             "  ambient_temp: \"283.15 K\"\n",
             "  physics:\n",
             "    components:\n",
-            "      - type thermal_zone:\n",
+            "      - type thermal_mass:\n",
             "          - component: zone\n",
             "            time_constant: \"50 s\"\n",
             "            capacity: \"20 J/K\"\n",
@@ -1230,7 +1230,7 @@ mod tests {
 
         let read_in = read(&path).expect("it reads");
         let zone = &read_in.world.components["zone"];
-        assert_eq!(zone.kind, "thermal_zone");
+        assert_eq!(zone.kind, "thermal_mass");
         assert_eq!(zone.settings["capacity"], "20 J/K");
         assert!(read_in
             .world
@@ -1244,7 +1244,7 @@ mod tests {
         ];
         let written = to_yaml(&read_in, &payloads);
         let at = |what: &str| written.find(what).expect(what);
-        assert!(at("type heater:") < at("type thermal_zone:"), "{written}");
+        assert!(at("type heater:") < at("type thermal_mass:"), "{written}");
         assert!(at("capacity:") < at("time_constant:"), "{written}");
         std::fs::write(&path, &written).expect("written");
         let back = read(&path).expect("it reads again");
@@ -1290,7 +1290,7 @@ mod tests {
         world.components.insert(
             "zone".to_string(),
             PhysicsComponent {
-                kind: "thermal_zone".to_string(),
+                kind: "thermal_mass".to_string(),
                 settings: Settings::new(),
             },
         );

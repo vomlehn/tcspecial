@@ -552,52 +552,6 @@ export component NodeShape inherits Rectangle {
             }
         }
 
-        // A subdiagram is opened from a mark in its own corner.
-        //
-        // Not a double press on the box: a single press already drags it, and a
-        // gesture that means one thing or another depending on timing is a
-        // gesture that does the wrong one under pressure. A mark that says
-        // "there is more in here" is also the only hint a closed box gives that
-        // it can be opened at all.
-        // The middle of the bottom edge, which is the one place on a node
-        // that nothing else is in: the four terminals hold the four corners
-        // and the type the top.
-        if node.openable: Rectangle {
-            x: (root.width - 14px) / 2;
-            y: root.height - 14px - 3px;
-            width: 14px;
-            height: 14px;
-            border-width: 1px;
-            border-color: mark;
-            background: open-touch.has-hover
-                ? mark.with-alpha(0.35)
-                : transparent;
-
-            // Two narrow lines making a cross, which reads as "expand" without
-            // a word or an icon file.
-            Rectangle {
-                x: 3px;
-                y: 6px;
-                width: 8px;
-                height: 1px;
-                background: mark;
-            }
-            Rectangle {
-                x: 6px;
-                y: 3px;
-                width: 1px;
-                height: 8px;
-                background: mark;
-            }
-
-            open-touch := TouchArea {
-                width: 100%;
-                height: 100%;
-                mouse-cursor: MouseCursor.pointer;
-                clicked => { open-requested(); }
-            }
-        }
-
         // The area a drag is taken from, over the whole node so that a press
         // anywhere on it moves it.
         //
@@ -695,6 +649,56 @@ export component NodeShape inherits Rectangle {
                             self.mouse-y - self.pressed-y);
                 }
             }
+        }
+    }
+
+    // A subdiagram is opened from a mark in its own corner.
+    //
+    // Not a double press on the box: a single press already drags it, and a
+    // gesture that means one thing or another depending on timing is a
+    // gesture that does the wrong one under pressure. A mark that says
+    // "there is more in here" is also the only hint a closed box gives that
+    // it can be opened at all.
+    // The middle of the bottom edge, which is the one place on a node
+    // that nothing else is in: the four terminals hold the four corners
+    // and the type the top.
+    //
+    // After the grip, as the terminals are and for their reason: the grip
+    // covers the whole node, so a mark under it was a press that opened the
+    // node's menu instead. It follows a drag by hand for the same reason.
+    if node.openable: Rectangle {
+        x: (root.width - 14px) / 2 + drag-x;
+        y: root.height - 14px - 3px + drag-y;
+        width: 14px;
+        height: 14px;
+        border-width: 1px;
+        border-color: mark;
+        background: open-touch.has-hover
+            ? mark.with-alpha(0.35)
+            : transparent;
+
+        // Two narrow lines making a cross, which reads as "expand" without
+        // a word or an icon file.
+        Rectangle {
+            x: 3px;
+            y: 6px;
+            width: 8px;
+            height: 1px;
+            background: mark;
+        }
+        Rectangle {
+            x: 6px;
+            y: 3px;
+            width: 1px;
+            height: 8px;
+            background: mark;
+        }
+
+        open-touch := TouchArea {
+            width: 100%;
+            height: 100%;
+            mouse-cursor: MouseCursor.pointer;
+            clicked => { open-requested(); }
         }
     }
 

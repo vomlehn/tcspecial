@@ -432,6 +432,10 @@ component Surface inherits Rectangle {
     in property <int> aside-count: 0;
     callback show-concerns();
     callback show-aside();
+    // How many of this page's nodes lie outside their own panes, across,
+    // and the button that lays them out again: see the bar.
+    in property <int> outside-count: 0;
+    callback arrange();
 
     in property <string> trouble: "";
     // And what the last command did, where it did something worth saying:
@@ -563,6 +567,23 @@ component Surface inherits Rectangle {
                 accessible-label: "Save";
                 enabled: !Session.read-only;
                 clicked => { root.save-clicked(); }
+            }
+            // Every node laid out afresh, the way its data flows: see
+            // Document::arranged. On the bar as well as in the Edit menu,
+            // because the time it is wanted is when nodes have gone off the
+            // side of the window, and a command in a menu is one somebody
+            // has to know to look for. Emphasised then, and saying why in
+            // words, so the emphasis is never colour alone; down the sheet
+            // nothing is ever off, the sheet scrolling.
+            Button {
+                text: outside-count == 0 ? "Arrange"
+                    : "Arrange: " + outside-count
+                        + (outside-count == 1
+                            ? " node is outside its pane"
+                            : " nodes are outside their panes");
+                primary: outside-count > 0;
+                enabled: !Session.read-only;
+                clicked => { root.arrange(); }
             }
 
             // What might be wrong, and what somebody has decided not to act
@@ -1340,6 +1361,9 @@ export component MainWindow inherits Window {
     in property <int> aside-count: 0;
     callback show-concerns();
     callback show-aside();
+    // How many of this page's nodes lie outside their own panes, across,
+    // and the button that lays them out again: see the bar.
+    in property <int> outside-count: 0;
 
     in property <string> trouble: "";
     in property <string> said: "";
@@ -1513,6 +1537,8 @@ export component MainWindow inherits Window {
         trouble: root.trouble;
         concern-count: root.concern-count;
         aside-count: root.aside-count;
+        outside-count: root.outside-count;
+        arrange => { root.arrange(); }
         show-concerns => { root.show-concerns(); }
         show-aside => { root.show-aside(); }
         said: root.said;
@@ -1655,6 +1681,9 @@ export component SubWindow inherits Window {
     in property <int> aside-count: 0;
     callback show-concerns();
     callback show-aside();
+    // How many of this page's nodes lie outside their own panes, across,
+    // and the button that lays them out again: see the bar.
+    in property <int> outside-count: 0;
 
     in property <string> trouble: "";
     in property <string> said: "";
@@ -1801,6 +1830,8 @@ export component SubWindow inherits Window {
         trouble: root.trouble;
         concern-count: root.concern-count;
         aside-count: root.aside-count;
+        outside-count: root.outside-count;
+        arrange => { root.arrange(); }
         show-concerns => { root.show-concerns(); }
         show-aside => { root.show-aside(); }
         said: root.said;

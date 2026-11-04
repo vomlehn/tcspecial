@@ -1284,24 +1284,28 @@ impl Document {
 
     /// Where every node would go if the diagram were laid out afresh.
     ///
-    /// What **Edit -> Arrange the nodes** is: each node at the top of its own
-    /// pane, in the order of their names, nothing covering anything,
-    /// and all of it where the top of the sheet is -- which is where the view
-    /// starts. It is what a person reaches for when a configuration read out
-    /// of a file is spread over more sheet than the window shows, or when a
-    /// morning's dragging has left it in a state nobody can read.
+    /// What the **Arrange** button and **Edit -> Arrange the nodes** do. Each
+    /// page on its own, each node in its own pane, laid out the way the data
+    /// flows: the payloads in a column down the left of theirs, the vehicle's
+    /// nodes in columns by how many steps from a payload each is -- what a
+    /// conversion feeds standing to the right of the conversion -- and the
+    /// ground in a column of its own. Within a column the nodes are in the
+    /// order of what feeds them, so the lines between two columns cross as
+    /// little as they can, and each node is level with what feeds it where
+    /// there is room, so a line between them runs straight. A pane too narrow
+    /// for every step of the vehicle's graph holds the later steps in its last
+    /// column.
+    ///
+    /// All of it from the top of the sheet, which is where the view starts,
+    /// clear of the pane names and of each other, on the node grid. It is
+    /// what a person reaches for when a configuration read out of a file is
+    /// spread over more sheet than the window shows, or lies outside the
+    /// panes the window has, or when a morning's dragging has left it in a
+    /// state nobody can read.
     ///
     /// Only the nodes that would move come back, each with where it would go:
     /// that is what [`Edit::Arrange`] carries, and a node already in the right
     /// place does not belong in an undo.
-    ///
-    /// The places come from [`crate::pane::place_in`], which is the same rule
-    /// that puts a newly added node somewhere: one statement of "as high as it
-    /// will go in its own pane without covering anything", so an arranged
-    /// diagram and a grown one look alike. The view it is placed into is the
-    /// whole sheet from the top, because arranging is what a person does to
-    /// bring everything into view rather than to fit it around what they are
-    /// looking at now.
     ///
     /// # Arguments
     ///
@@ -1310,33 +1314,271 @@ impl Document {
     ///
     /// # Returns
     ///
-    /// The name of each node that would move, with its new upper left corner.
+    /// The name of each node that would move, as the editor holds it, with
+    /// its new upper left corner.
     pub fn arranged(
         &self,
         dividers: crate::pane::Dividers,
     ) -> Vec<(String, (i32, i32))> {
-        let mut taken: Vec<(i32, i32, u32, u32)> = Vec::new();
-        let mut moved = Vec::new();
+        let mut homes: Vec<&Home> = Vec::new();
+        for node in &self.nodes {
+            if !homes.contains(&&node.home) {
+                homes.push(&node.home);
+            }
+        }
+        homes
+            .into_iter()
+            .flat_map(|home| self.arranged_page(home, dividers))
+            .collect()
+    }
 
-        // By name, the one order a configuration has, so that the same nodes
-        // are arranged alike however the session came to hold them.
-        let mut nodes: Vec<&Node> = self.nodes.iter().collect();
+    /// Where every node of one page would go: see [`Document::arranged`].
+    ///
+    /// # Arguments
+    ///
+    /// * `home`     - The page.
+    /// * `dividers` - Where the working panes meet.
+    ///
+    /// # Returns
+    ///
+    /// Each node of the page that would move, by its whole name, with where
+    /// it would go.
+    fn arranged_page(
+        &self,
+        home: &Home,
+        dividers: crate::pane::Dividers,
+    ) -> Vec<(String, (i32, i32))> {
+        use crate::pane::{edges_of, node_after, node_ceil, pane_of, Pane};
+
+        // By name, the one order a configuration has, so that the same
+        // nodes are arranged alike however the session came to hold them.
+        let mut nodes: Vec<&Node> = self.nodes_in(home);
         nodes.sort_by(|a, b| a.name.cmp(&b.name));
-        for node in nodes {
-            let at = crate::pane::place_in(
-                &taken,
-                &node.node_type,
-                dividers,
-                (0, crate::pane::WORKING_HEIGHT),
-            );
-            let (width, height) = size_of(&node.node_type);
-            taken.push((at.0, at.1, width, height));
-            if at != node.at {
-                moved.push((node.name.clone(), at));
+        let named: Vec<String> = nodes
+            .iter()
+            .map(|node| Qualified::of(&node.name, &node.home).absolute())
+            .collect();
+        let index = |name: &str| named.iter().position(|n| n == name);
+
+        // What feeds what on this page, by index: every line, either
+        // stream, and apart from it the readings' lines alone, which are
+        // what says how many steps from a payload a vehicle node is. The
+        // commands' lines run back the other way, and counting them would
+        // make every loop through a thermostat a graph with no first step.
+        let mut feeds: Vec<(usize, usize)> = Vec::new();
+        let mut readings: Vec<(usize, usize)> = Vec::new();
+        for link in &self.links {
+            if let (Some(from), Some(to)) = (index(&link.from), index(&link.to))
+            {
+                if from == to {
+                    continue;
+                }
+                feeds.push((from, to));
+                if self.arrives_at(link) == Some("world-in") {
+                    readings.push((from, to));
+                }
             }
         }
 
+        // The vehicle's steps: nought for a node nothing aboard feeds, and
+        // one more than the furthest of what feeds it. As many passes as
+        // there are nodes, which is as long as any path can be; a loop of
+        // readings, which the rules refuse, stops there rather than forever.
+        let panes: Vec<Pane> =
+            nodes.iter().map(|node| pane_of(&node.node_type)).collect();
+        let mut step = vec![0usize; nodes.len()];
+        for _ in 0..nodes.len() {
+            let mut changed = false;
+            for &(from, to) in &readings {
+                if panes[from] == Pane::Vehicle
+                    && panes[to] == Pane::Vehicle
+                    && step[to] < step[from] + 1
+                {
+                    step[to] = step[from] + 1;
+                    changed = true;
+                }
+            }
+            if !changed {
+                break;
+            }
+        }
+
+        // The columns, left to right: the payloads, the vehicle's as many as
+        // its pane holds, and the ground. A column is a pane, and where in
+        // it the column's nodes stand.
+        let width = crate::style::WIDTH as i32;
+        let gap = node_after(node_ceil(0)) - node_ceil(0);
+        let (left, right) = edges_of(Pane::Vehicle, dividers);
+        // A gap before each column, the first's being the pane's margin: so
+        // the last column's right edge is the left plus a gap and a width for
+        // each, which is what has to be inside the pane.
+        let room = ((right - left) / (width + gap)).max(1) as usize;
+        let column_of = |at: usize| -> usize {
+            match panes[at] {
+                Pane::Physics | Pane::Payloads => 0,
+                Pane::Vehicle => 1 + step[at].min(room - 1),
+                Pane::Gateway => room + 1,
+            }
+        };
+        let columns = room + 2;
+        let x_of = |at: usize, column: usize| -> i32 {
+            let node_type = &nodes[at].node_type;
+            let (left, _) = edges_of(panes[at], dividers);
+            let within = match panes[at] {
+                Pane::Vehicle => (column - 1) as i32 * (width + gap),
+                _ => 0,
+            };
+            crate::pane::confine(node_type, dividers, (left + gap + within, 0))
+                .0
+        };
+
+        // The order down each column: what feeds a node, on average, where
+        // it stands in the columns to its left; the payloads, which nothing
+        // feeds, in the order of what they feed, once that is known. Ties by
+        // name, which is the order they came in.
+        let mut row = vec![0f32; nodes.len()];
+        let mut order: Vec<Vec<usize>> = vec![Vec::new(); columns];
+        for at in 0..nodes.len() {
+            order[column_of(at)].push(at);
+        }
+        for (i, &at) in order[0].iter().enumerate() {
+            row[at] = i as f32;
+        }
+        let mean = |of: &[f32]| -> Option<f32> {
+            (!of.is_empty()).then(|| of.iter().sum::<f32>() / of.len() as f32)
+        };
+        for pass in 0..2 {
+            for (column, members) in order.iter_mut().enumerate().skip(1) {
+                let mut ranked: Vec<(f32, usize)> = members
+                    .iter()
+                    .map(|&at| {
+                        let fed: Vec<f32> = feeds
+                            .iter()
+                            .filter(|&&(from, to)| {
+                                to == at && column_of(from) < column
+                            })
+                            .map(|&(from, _)| row[from])
+                            .collect();
+                        (mean(&fed).unwrap_or(row[at]), at)
+                    })
+                    .collect();
+                ranked.sort_by(|a, b| a.0.total_cmp(&b.0));
+                *members = ranked.iter().map(|&(_, at)| at).collect();
+                for (i, &at) in members.iter().enumerate() {
+                    row[at] = i as f32;
+                }
+            }
+            // And the payloads by what they feed, once, so that the second
+            // pass orders the rest against them.
+            if pass == 0 {
+                let mut ranked: Vec<(f32, usize)> = order[0]
+                    .iter()
+                    .map(|&at| {
+                        let fed: Vec<f32> = feeds
+                            .iter()
+                            .filter(|&&(from, to)| {
+                                from == at && column_of(to) > 0
+                            })
+                            .map(|&(_, to)| row[to])
+                            .collect();
+                        (mean(&fed).unwrap_or(row[at]), at)
+                    })
+                    .collect();
+                ranked.sort_by(|a, b| a.0.total_cmp(&b.0));
+                order[0] = ranked.iter().map(|&(_, at)| at).collect();
+                for (i, &at) in order[0].iter().enumerate() {
+                    row[at] = i as f32;
+                }
+            }
+        }
+
+        // Down each column, left to right: each node level with what feeds
+        // it where there is room, and otherwise under the one above it. The
+        // first place is under the pane's name; the next is a step of the
+        // grid below the node above.
+        let top = node_ceil(crate::pane::NAMES.1);
+        let mut at_y: Vec<Option<i32>> = vec![None; nodes.len()];
+        let place =
+            |order: &[usize],
+             at_y: &mut Vec<Option<i32>>,
+             wanted: &dyn Fn(usize) -> Option<i32>| {
+                let mut next = top;
+                for &at in order {
+                    let y = wanted(at)
+                        .map(|y| crate::pane::on_node_grid(y).max(next))
+                        .unwrap_or(next);
+                    at_y[at] = Some(y);
+                    let (_, height) = size_of(&nodes[at].node_type);
+                    next = node_ceil(y + height as i32 + gap);
+                }
+            };
+        for (column, members) in order.iter().enumerate() {
+            let placed = at_y.clone();
+            let wanted = |at: usize| -> Option<i32> {
+                let fed: Vec<f32> = feeds
+                    .iter()
+                    .filter(|&&(from, to)| to == at && column_of(from) < column)
+                    .filter_map(|&(from, _)| placed[from].map(|y| y as f32))
+                    .collect();
+                mean(&fed).map(|y| y.round() as i32)
+            };
+            place(members, &mut at_y, &wanted);
+        }
+        // And the payloads again, level with what they feed now that it has
+        // a place: a column of sensors each beside its own conversion.
+        let placed = at_y.clone();
+        let wanted = |at: usize| -> Option<i32> {
+            let fed: Vec<f32> = feeds
+                .iter()
+                .filter(|&&(from, to)| from == at && column_of(to) > 0)
+                .filter_map(|&(_, to)| placed[to].map(|y| y as f32))
+                .collect();
+            mean(&fed).map(|y| y.round() as i32)
+        };
+        place(&order[0], &mut at_y, &wanted);
+
+        let mut moved = Vec::new();
+        for (at, node) in nodes.iter().enumerate() {
+            let now = (x_of(at, column_of(at)), at_y[at].unwrap_or(top));
+            if now != node.at {
+                moved.push((named[at].clone(), now));
+            }
+        }
         moved
+    }
+
+    /// How many of a page's nodes lie outside their own pane, across.
+    ///
+    /// Wholly or partly: a node overhanging its pane's edge is a node half
+    /// of which may be off the side of the window, and one in another pane
+    /// is a node drawn where its type does not belong. What the Arrange
+    /// button is emphasised for. Down the sheet nothing is outside -- the
+    /// sheet scrolls.
+    ///
+    /// # Arguments
+    ///
+    /// * `home`     - The page.
+    /// * `dividers` - Where the working panes meet.
+    ///
+    /// # Returns
+    ///
+    /// How many.
+    pub fn outside_panes(
+        &self,
+        home: &Home,
+        dividers: crate::pane::Dividers,
+    ) -> usize {
+        self.nodes_in(home)
+            .iter()
+            .filter(|node| {
+                let (left, right) = crate::pane::edges_of(
+                    crate::pane::pane_of(&node.node_type),
+                    dividers,
+                );
+                let (width, _) = size_of(&node.node_type);
+                node.at.0 < left || node.at.0 + width as i32 > right
+            })
+            .count()
     }
 
     /// Where each of these nodes is now, for the undo of an arrangement.
@@ -5685,6 +5927,94 @@ mod tests {
             "{:?}",
             document.arranged(dividers)
         );
+    }
+
+    /// Arranging lays a configuration out the way its data flows, and a
+    /// second arrangement changes nothing.
+    ///
+    /// The worked thermostat: its three sensors in the payload pane, each
+    /// level with the conversion it feeds; the conversions in the vehicle
+    /// pane's first column, the vote to their right and the thermostat to
+    /// the right of that; the ground in its own pane.
+    #[test]
+    fn arranging_follows_the_data_and_settles() {
+        let dividers = crate::pane::default_dividers();
+        let mut document = thermostat_example();
+        let now = document.arranged(dividers);
+        document.apply(&Edit::Arrange {
+            was: document.where_each_is(&now),
+            now,
+        });
+        let at = |name: &str| document.node(name).expect(name).at;
+
+        for (sensor, conversion) in [
+            ("temp_1", "temp1"),
+            ("temp_2", "temp2"),
+            ("temp_3", "temp3"),
+        ] {
+            assert_eq!(at(sensor).1, at(conversion).1, "{sensor}");
+            assert!(at(sensor).0 < at(conversion).0, "{sensor}");
+        }
+        assert!(at("temp1").0 < at("ambient").0);
+        assert!(at("ambient").0 < at("thermostat").0);
+        for node in &document.nodes {
+            let (left, right) = crate::pane::edges_of(
+                crate::pane::pane_of(&node.node_type),
+                dividers,
+            );
+            let (width, _) = size_of(&node.node_type);
+            assert!(
+                node.at.0 >= left && node.at.0 + width as i32 <= right,
+                "{} is at {:?}, outside {left}..{right}",
+                node.name,
+                node.at
+            );
+        }
+        assert_eq!(document.outside_panes(&None, dividers), 0);
+
+        assert_eq!(document.arranged(dividers), Vec::new());
+    }
+
+    /// A configuration of several pages settles too: each page is arranged
+    /// on its own, lines to another page left out of where a node goes, and
+    /// a second arrangement moves nothing.
+    #[test]
+    fn a_configuration_of_pages_settles_when_arranged() {
+        let dividers = crate::pane::default_dividers();
+        let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("..");
+        let path = root.join("examples/thermostat-yamcs/thermostat-yamcs.ytcs");
+        let mut document = crate::read::read(&path).expect("it reads");
+        let now = document.arranged(dividers);
+        assert!(!now.is_empty());
+        document.apply(&Edit::Arrange {
+            was: document.where_each_is(&now),
+            now,
+        });
+        assert_eq!(document.arranged(dividers), Vec::new());
+    }
+
+    /// A node outside its own pane, across, is counted, which is what the
+    /// Arrange button is emphasised for; one inside it is not, however far
+    /// down the sheet it is.
+    #[test]
+    fn a_node_outside_its_pane_is_counted() {
+        let dividers = crate::pane::default_dividers();
+        let mut document = Document::new();
+        document.apply(&add("sensor", "i2c"));
+        document.apply(&Edit::MoveNode {
+            node: "sensor".to_string(),
+            was: (0, 0),
+            now: (34, 2000),
+        });
+        assert_eq!(document.outside_panes(&None, dividers), 0);
+
+        // Overhanging the divider into the vehicle's pane.
+        document.apply(&Edit::MoveNode {
+            node: "sensor".to_string(),
+            was: (34, 2000),
+            now: (dividers.payloads - 20, 34),
+        });
+        assert_eq!(document.outside_panes(&None, dividers), 1);
     }
 
     /// One undo puts a hand-made layout back.

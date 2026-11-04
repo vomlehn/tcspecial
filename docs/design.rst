@@ -5022,13 +5022,30 @@ highest below -- and then the sheet is scrolled so the new node's top is at the
 top of the view. A node placed where it cannot be seen is a press that did
 nothing as far as the person who made it can tell.
 
-**Edit -> Arrange the nodes** applies that rule to every node at once: each to
-the top of its own pane, in the order of their names, nothing covering
-anything, and the view back at the top of the sheet. The sheet is 960 by 2400
-and a window shows a few hundred pixels of it, so a configuration read out of a
-file -- or one left spread about by a morning's dragging -- can have most of
-itself outside the window with nothing to say so. This is the one press that
-brings it back.
+**Arrange**, on the bar and as **Edit -> Arrange the nodes**, lays every node
+out afresh, the way its data flows, each page on its own and each node in its
+own pane. The payloads stand in a column down the left of theirs; the
+vehicle's nodes in columns by how many steps of readings lie between each and a
+payload, so what a conversion feeds stands to the right of the conversion; the
+ground in a column of its own. A vehicle pane too narrow for every step holds
+the later ones in its last column. Within a column the nodes are in the order
+of what feeds them, so the lines between two columns cross as little as they
+can, and each node is level with what feeds it where there is room -- a
+sensor beside its own conversion -- so a line between them runs straight. All
+of it from the top of the sheet, clear of the pane names and of each other, on
+the node grid, and the view back at the top. The sheet is 960 by 2400 and a
+window shows a few hundred pixels of it, so a configuration read out of a file
+-- or one left spread about by a morning's dragging -- can have most of itself
+outside the window with nothing to say so. This is the one press that brings it
+back, and a second press moves nothing.
+
+The button is emphasised, and says why in words -- "Arrange: 2 nodes are
+outside their panes" -- while any node on the page lies wholly or partly outside
+its own pane across: a node overhanging a divider somebody dragged, which is
+how a node comes to be off the side of the window. Down the sheet nothing is
+outside, the sheet scrolling, so nothing there is counted. On the bar and not
+only in the menu because the time it is wanted is when nodes have gone out of
+sight, and a command in a menu is one somebody has to know to look for.
 
 It is one edit, not one per node, so one undo puts a hand-made layout back:
 somebody who arranged a diagram carefully and then tidied it by accident must

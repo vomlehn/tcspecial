@@ -67,13 +67,9 @@ pub struct Editor {
     /// else changes, so silence would leave them wondering whether the menu
     /// item did anything.
     said: Option<String>,
-    /// The simulator file this session was given, whether or not it could be
-    /// opened.
-    ///
-    /// Apart from `document.simulator`, which is what was read from it and is
-    /// nothing when the file was refused: the file is still the one the
-    /// session is about, and it is what `tcsverify` is asked about as the
-    /// editor starts -- see [`Editor::files`].
+    /// The simulator file this session opened, if it was given one: what
+    /// `tcsverify` is asked about as the editor starts -- see
+    /// [`Editor::files`].
     simulator_path: Option<PathBuf>,
     /// Whether this session may change anything: false for one started with
     /// `--read-only`.
@@ -161,9 +157,17 @@ impl Editor {
     /// cannot be undone. That is the trade the write order was chosen for --
     /// see the top of this file -- and losing one undo is the better failure.
     ///
-    /// A file that cannot be read is said so and opened as nothing: an editor
-    /// that refused to start on a damaged file would be an editor that cannot
-    /// be used to fix one.
+    /// A file that is there and cannot be read is refused, and nothing is
+    /// opened. It was opened as nothing, so that the editor could be used to
+    /// fix it, and that was the editor's most dangerous habit: the session
+    /// still wrote to the file, every edit is written as it is made, and the
+    /// first one replaced the whole configuration -- both spellings of it --
+    /// with the little that had been drawn in an empty window. The file was
+    /// never read, so no undo could put it back. A file that does not read is
+    /// put right in a text editor, by the message saying why.
+    ///
+    /// A file that is not there yet is not refused: that is how a new
+    /// configuration is begun.
     ///
     /// `dividers` is where the three working panes meet, and it is here
     /// because what is read has to obey the rule the editor enforces: a
@@ -177,33 +181,30 @@ impl Editor {
     ///
     /// # Returns
     ///
-    /// The session. What stopped the file being read, if anything, is in its
-    /// trouble.
-    pub fn open(path: &Path, dividers: crate::pane::Dividers) -> Self {
+    /// The session.
+    ///
+    /// # Errors
+    ///
+    /// A message naming the file and saying why it cannot be read.
+    pub fn open(
+        path: &Path,
+        dividers: crate::pane::Dividers,
+    ) -> Result<Self, String> {
         let mut editor = Editor::new(path);
 
-        match crate::read::read(path) {
-            Ok(mut document) => {
-                document.settle(dividers);
-                // What the editor would write for the files as they are,
-                // taken after settling, so that a node settling moved is not
-                // an edit: its line is written as the file had it until
-                // somebody moves the node. Where settling puts a node
-                // depends on the window's panes, which are not a fact about
-                // the file, and a save writes only what was edited.
-                if let Ok(files) = document.files(path) {
-                    editor.remember(files);
-                }
-                editor.document = document;
-            }
-            Err(why) => {
-                editor.trouble =
-                    Some(format!("{} cannot be read: {why}", path.display()));
-                // No history either: a journal belongs to the document it
-                // describes, and the document is not the one that was meant.
-                return editor;
-            }
-        };
+        let mut document = crate::read::read(path).map_err(|why| {
+            format!("{} cannot be read: {why}", path.display())
+        })?;
+        document.settle(dividers);
+        // What the editor would write for the files as they are, taken after
+        // settling, so that a node settling moved is not an edit: its line is
+        // written as the file had it until somebody moves the node. Where
+        // settling puts a node depends on the window's panes, which are not a
+        // fact about the file, and a save writes only what was edited.
+        if let Ok(files) = document.files(path) {
+            editor.remember(files);
+        }
+        editor.document = document;
 
         // A journal that cannot be read costs the undo and not the work, so it
         // is passed over in silence rather than reported: there is nothing the
@@ -213,106 +214,88 @@ impl Editor {
         if let Some(journal) = crate::history::read(path) {
             editor.journal = journal;
         }
-        editor
+        Ok(editor)
     }
 
     /// Also opens the simulator's configuration, from a second file.
     ///
     /// Part of the same session on purpose: the two files are edited
     /// together, checked together and must agree, so one Save writes both and
-    /// one Undo takes back whichever of them the last edit touched. A file
-    /// that cannot be read is said so and opened as nothing, as the
-    /// configuration is: an editor that refused to start on a damaged file
-    /// would be an editor that cannot be used to fix one.
+    /// one Undo takes back whichever of them the last edit touched.
+    ///
+    /// A file that is there and cannot be opened is refused, for the reason
+    /// the configuration is: the session would write over it at the next
+    /// edit with what little had been typed into an empty one. So is one
+    /// that reads but cannot be joined to the configuration, which would be
+    /// written back with half of itself missing. A file not there yet is
+    /// begun.
     ///
     /// # Arguments
     ///
     /// * `path` - The simulator configuration file, which must be named `.yaml`
     ///            and need not exist yet.
-    pub fn open_simulator(&mut self, path: &Path) {
+    ///
+    /// # Errors
+    ///
+    /// A message naming the file and saying why it cannot be opened. Nothing
+    /// of it is in the session.
+    pub fn open_simulator(&mut self, path: &Path) -> Result<(), String> {
+        // A name that is not YAML is refused outright: the editor writes a
+        // simulator configuration as YAML, so adopting such a name would
+        // mean writing YAML to a file called something else at the next
+        // Save.
+        crate::sim::must_be_yaml(path)?;
+
+        let simulator = crate::sim::read(path).map_err(|trouble| {
+            format!("{} cannot be read: {}", path.display(), trouble.why())
+        })?;
+        // A file not there yet is begun with an entry for each payload: see
+        // `crate::sim::Simulator::begun`.
+        let simulator = if path.exists() {
+            simulator
+        } else {
+            crate::sim::Simulator::begun(
+                path,
+                &self.document.simulated_payloads(),
+            )
+        };
+
+        // Every simulated payload has to name a payload of the
+        // configuration: that name is the whole of how the two files are
+        // joined, so one that names nothing is a set of settings that drives
+        // nothing -- which is what a misspelling looks like.
+        //
+        // By each payload's own name, wherever it is drawn: the file names a
+        // payload in an included file as it names one in the top file, the
+        // reader allowing no two nodes one name across all of them. See
+        // `crate::sim::Simulator::key_of`.
+        let stray: Vec<&String> = simulator
+            .payloads
+            .keys()
+            .filter(|name| {
+                !self.document.nodes.iter().any(|node| {
+                    crate::pane::is_payload(&node.node_type)
+                        && &&node.name == name
+                })
+            })
+            .collect();
+        if !stray.is_empty() {
+            return Err(format!(
+                "{}: {} names no payload of {}; a simulated payload names the \
+                 payload it stands in for, so the two files are joined by the \
+                 name and this one joins nothing",
+                path.display(),
+                said_list(&stray),
+                self.path.display()
+            ));
+        }
+
         self.simulator_path = Some(path.to_path_buf());
-
-        // A name that is not YAML is refused outright, and nothing is opened
-        // for it: the editor writes a simulator configuration as YAML, so
-        // adopting such a name would mean writing YAML to a file called
-        // something else at the next Save. The configuration itself is still
-        // edited; what is lost is the simulator's half of the session, which
-        // is what the message says.
-        if let Err(why) = crate::sim::must_be_yaml(path) {
-            self.trouble = Some(why);
-            self.document.simulator = None;
-            return;
-        }
-
-        match crate::sim::read(path) {
-            Ok(simulator) => {
-                // A file not there yet is begun with an entry for each
-                // payload: see `crate::sim::Simulator::begun`.
-                let simulator = if path.exists() {
-                    simulator
-                } else {
-                    crate::sim::Simulator::begun(
-                        path,
-                        &self.document.simulated_payloads(),
-                    )
-                };
-                // Every simulated payload has to name a payload of the
-                // configuration: that name is the whole of how the two files
-                // are joined, so one that names nothing is a set of settings
-                // that drives nothing -- which is what a misspelling looks
-                // like. Refused rather than adopted, because adopting it
-                // means writing the file back on the next edit with the
-                // stray entry still in it and nothing said.
-                //
-                // By each payload's own name, wherever it is drawn: the file
-                // names a payload in an included file as it names one in the
-                // top file, the reader allowing no two nodes one name across
-                // all of them. See `crate::sim::Simulator::key_of`.
-                let stray: Vec<&String> = simulator
-                    .payloads
-                    .keys()
-                    .filter(|name| {
-                        !self.document.nodes.iter().any(|node| {
-                            crate::pane::is_payload(&node.node_type)
-                                && &&node.name == name
-                        })
-                    })
-                    .collect();
-                if stray.is_empty() {
-                    self.document.simulator = Some(simulator);
-                    // And what the editor would write for it as it is.
-                    let file = self.document.simulator_file();
-                    self.remember(file.into_iter().collect());
-                } else {
-                    self.trouble = Some(format!(
-                        "{}: {} names no payload of {}; a simulated payload \
-                         names the payload it stands in for, so the two files \
-                         are joined by the name and this one joins nothing",
-                        path.display(),
-                        said_list(&stray),
-                        self.path.display()
-                    ));
-                    self.document.simulator = None;
-                }
-            }
-            Err(trouble) => {
-                self.trouble = Some(format!(
-                    "{} cannot be read: {}",
-                    path.display(),
-                    trouble.why()
-                ));
-                // An empty one in its place where the file cannot be read at
-                // all, so that the windows have somewhere to put what
-                // somebody types rather than being unreachable for the rest
-                // of the session -- and nothing at all where the file parses
-                // but says something the two files cannot both mean: that one
-                // would be written back with half of itself missing. See
-                // `crate::sim::Trouble`.
-                self.document.simulator = trouble
-                    .leaves_somewhere_to_type()
-                    .then(|| crate::sim::Simulator::new(path));
-            }
-        }
+        self.document.simulator = Some(simulator);
+        // And what the editor would write for it as it is.
+        let file = self.document.simulator_file();
+        self.remember(file.into_iter().collect());
+        Ok(())
     }
 
     pub fn document(&self) -> &Document {
@@ -874,7 +857,8 @@ mod tests {
         let journal = crate::history::journal_for(&path);
         let journal_before = journal.as_ref().map(|j| std::fs::read(j).ok());
 
-        let mut editor = Editor::open(&path, crate::pane::default_dividers());
+        let mut editor = Editor::open(&path, crate::pane::default_dividers())
+            .expect("it opens");
         editor.set_read_only(true);
         let read = editor.document().clone();
 
@@ -956,7 +940,7 @@ tcsgui:
 ";
         std::fs::write(&path, by_hand).expect("a file");
 
-        let mut editor = Editor::open(&path, dividers);
+        let mut editor = Editor::open(&path, dividers).expect("it opens");
         assert_eq!(editor.trouble(), None, "{:?}", editor.trouble());
 
         // The payload is in the payload working pane.
@@ -1106,8 +1090,9 @@ tcsgui:
         let path = where_.path().join("vehicle.ytcs");
         let sim = where_.path().join("vehiclesim.yaml");
 
-        let mut editor = Editor::open(&path, crate::pane::default_dividers());
-        editor.open_simulator(&sim);
+        let mut editor = Editor::open(&path, crate::pane::default_dividers())
+            .expect("it opens");
+        editor.open_simulator(&sim).expect("it opens");
         assert_eq!(editor.trouble(), None, "{:?}", editor.trouble());
 
         editor.edit(add("payload", "network"));
@@ -1128,8 +1113,9 @@ tcsgui:
 
         // And read back: a second session on the same pair finds what the
         // first left.
-        let mut reopened = Editor::open(&path, crate::pane::default_dividers());
-        reopened.open_simulator(&sim);
+        let mut reopened = Editor::open(&path, crate::pane::default_dividers())
+            .expect("it opens");
+        reopened.open_simulator(&sim).expect("it opens");
         assert_eq!(
             reopened
                 .document()
@@ -1162,8 +1148,9 @@ tcsgui:
              time_constant: \"50 s\"\n",
         )
         .expect("written");
-        let mut editor = Editor::open(&path, crate::pane::default_dividers());
-        editor.open_simulator(&sim);
+        let mut editor = Editor::open(&path, crate::pane::default_dividers())
+            .expect("it opens");
+        editor.open_simulator(&sim).expect("it opens");
         assert_eq!(editor.trouble(), None, "{:?}", editor.trouble());
         let world = |editor: &Editor| {
             editor
@@ -1247,8 +1234,9 @@ tcsgui:
              time_constant: \"50 s\"\n",
         )
         .expect("written");
-        let mut editor = Editor::open(&path, crate::pane::default_dividers());
-        editor.open_simulator(&sim);
+        let mut editor = Editor::open(&path, crate::pane::default_dividers())
+            .expect("it opens");
+        editor.open_simulator(&sim).expect("it opens");
         assert_eq!(editor.trouble(), None, "{:?}", editor.trouble());
         editor.edit(add("temp_1", "network"));
         let world = |editor: &Editor| {
@@ -1289,8 +1277,9 @@ tcsgui:
         assert!(written.contains("connects: zone.temperature"), "{written}");
 
         // A second session finds all three, and so does the simulator.
-        let mut reopened = Editor::open(&path, crate::pane::default_dividers());
-        reopened.open_simulator(&sim);
+        let mut reopened = Editor::open(&path, crate::pane::default_dividers())
+            .expect("it opens");
+        reopened.open_simulator(&sim).expect("it opens");
         let again = world(&reopened);
         assert_eq!(again.placed.get("zone"), Some(&(-180, 162)));
         assert!(again
@@ -1340,13 +1329,13 @@ tcsgui:
         assert!(!read().contains("tcsgui:"), "{}", read());
     }
 
-    /// A simulator file that cannot be read leaves the session usable.
+    /// A simulator file that is there and cannot be read is refused, and
+    /// left as it was.
     ///
-    /// Said in red, and opened as nothing rather than refused: an editor that
-    /// would not start on a damaged file is an editor that cannot be used to
-    /// fix one.
+    /// It used to be opened as an empty one, so that there was somewhere to
+    /// type -- and the next edit wrote that empty one over the file.
     #[test]
-    fn a_damaged_simulator_file_is_reported_and_opened_as_nothing() {
+    fn a_damaged_simulator_file_is_refused() {
         let where_ = tempfile::tempdir().expect("a directory");
         let sim = where_.path().join("vehiclesim.yaml");
         std::fs::write(&sim, "simulated_payloads: [[[\n").expect("a file");
@@ -1354,14 +1343,16 @@ tcsgui:
         let mut editor = Editor::open(
             &where_.path().join("vehicle.ytcs"),
             crate::pane::default_dividers(),
-        );
-        editor.open_simulator(&sim);
-
-        let said = editor.trouble().expect("this should be reported");
+        )
+        .expect("it opens");
+        let said = editor.open_simulator(&sim).expect_err("it is refused");
         assert!(said.contains("vehiclesim.yaml"), "{said}");
-        // And there is somewhere to type, so the windows are not unreachable
-        // for the rest of the session.
-        assert!(editor.document().simulator.is_some());
+        assert!(editor.document().simulator.is_none());
+        assert_eq!(editor.files().1, None, "the session took it on");
+        assert_eq!(
+            std::fs::read_to_string(&sim).unwrap(),
+            "simulated_payloads: [[[\n"
+        );
     }
 
     /// A simulator file with two entries of one name is refused, and so is
@@ -1392,9 +1383,9 @@ tcsgui:
              simulate: true\n        packet_interval: 900 ms\n",
         )
         .expect("a simulator file");
-        let mut editor = Editor::open(&path, crate::pane::default_dividers());
-        editor.open_simulator(&twice);
-        let said = editor.trouble().expect("this should be reported");
+        let mut editor = Editor::open(&path, crate::pane::default_dividers())
+            .expect("it opens");
+        let said = editor.open_simulator(&twice).expect_err("it is refused");
         assert!(said.contains("payload"), "{said}");
         assert!(
             editor.document().simulator.is_none(),
@@ -1414,9 +1405,9 @@ tcsgui:
              - payload: paylod\n        simulate: true\n",
         )
         .expect("a simulator file");
-        let mut editor = Editor::open(&path, crate::pane::default_dividers());
-        editor.open_simulator(&stray);
-        let said = editor.trouble().expect("this should be reported");
+        let mut editor = Editor::open(&path, crate::pane::default_dividers())
+            .expect("it opens");
+        let said = editor.open_simulator(&stray).expect_err("it is refused");
         assert!(said.contains("paylod"), "{said}");
         assert!(editor.document().simulator.is_none());
 
@@ -1429,8 +1420,9 @@ tcsgui:
              packet_interval: 500 ms\n",
         )
         .expect("a simulator file");
-        let mut editor = Editor::open(&path, crate::pane::default_dividers());
-        editor.open_simulator(&good);
+        let mut editor = Editor::open(&path, crate::pane::default_dividers())
+            .expect("it opens");
+        editor.open_simulator(&good).expect("it opens");
         assert!(editor.trouble().is_none(), "{:?}", editor.trouble());
         assert!(editor.document().simulator.is_some());
 
@@ -1444,8 +1436,9 @@ tcsgui:
         let written =
             std::fs::read_to_string(&good).expect("the simulator file");
         assert!(written.contains("payload-1"), "{written}");
-        let mut again = Editor::open(&path, crate::pane::default_dividers());
-        again.open_simulator(&good);
+        let mut again = Editor::open(&path, crate::pane::default_dividers())
+            .expect("it opens");
+        again.open_simulator(&good).expect("it opens");
         assert!(again.trouble().is_none(), "{:?}", again.trouble());
     }
 
@@ -1523,8 +1516,9 @@ tcsgui:
         let where_ = tempfile::tempdir().expect("a directory");
         std::fs::create_dir(where_.path().join("old")).expect("a directory");
         let (path, sim) = thermostat_example(&where_.path().join("old"));
-        let mut editor = Editor::open(&path, crate::pane::default_dividers());
-        editor.open_simulator(&sim);
+        let mut editor = Editor::open(&path, crate::pane::default_dividers())
+            .expect("it opens");
+        editor.open_simulator(&sim).expect("it opens");
         assert_eq!(editor.trouble(), None, "{:?}", editor.trouble());
 
         let shut = path.parent().expect("its directory").to_path_buf();
@@ -1570,8 +1564,9 @@ tcsgui:
             }
         }
 
-        let mut again = Editor::open(&copy, crate::pane::default_dividers());
-        again.open_simulator(&new[4]);
+        let mut again = Editor::open(&copy, crate::pane::default_dividers())
+            .expect("it opens");
+        again.open_simulator(&new[4]).expect("it opens");
         assert_eq!(again.trouble(), None, "{:?}", again.trouble());
         assert!(again.document().node("temp_9").is_some());
         assert_eq!(
@@ -1595,8 +1590,9 @@ tcsgui:
         let where_ = tempfile::tempdir().expect("a directory");
         std::fs::create_dir(where_.path().join("old")).expect("a directory");
         let (path, sim) = thermostat_example(&where_.path().join("old"));
-        let mut editor = Editor::open(&path, crate::pane::default_dividers());
-        editor.open_simulator(&sim);
+        let mut editor = Editor::open(&path, crate::pane::default_dividers())
+            .expect("it opens");
+        editor.open_simulator(&sim).expect("it opens");
 
         let copy = where_.path().join("new/thermostat/copy.ytcs");
         let there = where_.path().join("new/thermostat-common/thermostat.ytcs");
@@ -1627,9 +1623,10 @@ tcsgui:
         let where_ = tempfile::tempdir().expect("a directory");
         let (path, sim) = thermostat_example(where_.path());
 
-        let mut editor = Editor::open(&path, crate::pane::default_dividers());
+        let mut editor = Editor::open(&path, crate::pane::default_dividers())
+            .expect("it opens");
         assert_eq!(editor.trouble(), None, "{:?}", editor.trouble());
-        editor.open_simulator(&sim);
+        editor.open_simulator(&sim).expect("it opens");
         assert_eq!(editor.trouble(), None, "{:?}", editor.trouble());
 
         let simulator =
@@ -1666,8 +1663,9 @@ tcsgui:
         let (path, sim) = thermostat_example(where_.path());
         let held = "../thermostat-common/thermostat/gpio-in-tmass";
 
-        let mut editor = Editor::open(&path, crate::pane::default_dividers());
-        editor.open_simulator(&sim);
+        let mut editor = Editor::open(&path, crate::pane::default_dividers())
+            .expect("it opens");
+        editor.open_simulator(&sim).expect("it opens");
         assert_eq!(editor.trouble(), None, "{:?}", editor.trouble());
         assert!(editor.document().node(held).is_some(), "held so");
 
@@ -1689,8 +1687,9 @@ tcsgui:
             .expect("the payload's entry");
         assert!(entry.contains("drop_percent: 7\n"), "{entry}");
 
-        let mut again = Editor::open(&path, crate::pane::default_dividers());
-        again.open_simulator(&sim);
+        let mut again = Editor::open(&path, crate::pane::default_dividers())
+            .expect("it opens");
+        again.open_simulator(&sim).expect("it opens");
         assert_eq!(again.trouble(), None, "{:?}", again.trouble());
 
         // Renamed where it is, as the problems panel renames a node: the
@@ -1711,8 +1710,9 @@ tcsgui:
                 .map(String::as_str),
             Some("7")
         );
-        let mut again = Editor::open(&path, crate::pane::default_dividers());
-        again.open_simulator(&sim);
+        let mut again = Editor::open(&path, crate::pane::default_dividers())
+            .expect("it opens");
+        again.open_simulator(&sim).expect("it opens");
         assert_eq!(again.trouble(), None, "{:?}", again.trouble());
         assert!(again
             .document()
@@ -1721,6 +1721,29 @@ tcsgui:
             .is_some_and(|simulator| simulator
                 .payloads
                 .contains_key("gpio-in-mass")));
+    }
+
+    /// A configuration that is there and cannot be read is refused, and the
+    /// file is left as it was.
+    ///
+    /// It used to be opened as an empty document, which the first edit then
+    /// wrote over the file -- and over its other spelling -- with nothing to
+    /// undo back to. A file not there yet still opens: that is how a new
+    /// configuration is begun.
+    #[test]
+    fn a_damaged_configuration_is_refused() {
+        let where_ = tempfile::tempdir().expect("a directory");
+        let path = where_.path().join("vehicle.ytcs");
+        std::fs::write(&path, "nodes: [[[\n").expect("a file");
+
+        let said = Editor::open(&path, crate::pane::default_dividers())
+            .err()
+            .expect("it is refused");
+        assert!(said.contains("vehicle.ytcs cannot be read"), "{said}");
+        assert_eq!(std::fs::read_to_string(&path).unwrap(), "nodes: [[[\n");
+
+        let new = where_.path().join("new.ytcs");
+        assert!(Editor::open(&new, crate::pane::default_dividers()).is_ok());
     }
 
     /// A file that names a node twice is not opened: a node's name is what
@@ -1737,8 +1760,9 @@ tcsgui:
         )
         .expect("a configuration naming a node twice");
 
-        let editor = Editor::open(&path, crate::pane::default_dividers());
-        let trouble = editor.trouble().expect("it is refused");
+        let trouble = Editor::open(&path, crate::pane::default_dividers())
+            .err()
+            .expect("it is refused");
         assert!(trouble.contains("\"i2c\" twice"), "{trouble}");
         assert!(trouble.contains("at line 4"), "{trouble}");
     }
@@ -1760,8 +1784,9 @@ tcsgui:
         )
         .expect("a configuration");
 
-        let mut editor = Editor::open(&path, crate::pane::default_dividers());
-        editor.open_simulator(&sim);
+        let mut editor = Editor::open(&path, crate::pane::default_dividers())
+            .expect("it opens");
+        editor.open_simulator(&sim).expect("it opens");
         assert!(editor.document().simulator.is_some(), "the session has one");
 
         editor.edit(Edit::SetSimPayload {
@@ -1804,8 +1829,9 @@ tcsgui:
         )
         .expect("a configuration");
 
-        let mut editor = Editor::open(&path, crate::pane::default_dividers());
-        editor.open_simulator(&sim);
+        let mut editor = Editor::open(&path, crate::pane::default_dividers())
+            .expect("it opens");
+        editor.open_simulator(&sim).expect("it opens");
         // One edit, so that the files are written: the editor writes on every
         // edit, and this one is about the configuration rather than the
         // simulator.
@@ -1826,8 +1852,9 @@ tcsgui:
         );
 
         // And it reads back as those entries, as the session holds them.
-        let mut again = Editor::open(&path, crate::pane::default_dividers());
-        again.open_simulator(&sim);
+        let mut again = Editor::open(&path, crate::pane::default_dividers())
+            .expect("it opens");
+        again.open_simulator(&sim).expect("it opens");
         assert_eq!(again.trouble(), None, "{:?}", again.trouble());
         let simulator = again.document().simulator.as_ref().expect("opened");
         assert_eq!(simulator.kinds.len(), 2, "{simulator:?}");
@@ -1859,10 +1886,10 @@ tcsgui:
             let mut editor = Editor::open(
                 &where_.path().join("vehicle.ytcs"),
                 crate::pane::default_dividers(),
-            );
-            editor.open_simulator(&sim);
+            )
+            .expect("it opens");
 
-            let said = editor.trouble().expect("this should be reported");
+            let said = editor.open_simulator(&sim).expect_err("it is refused");
             assert!(
                 said.contains(name) && said.contains(".yaml"),
                 "{name}: {said}"
@@ -1882,8 +1909,9 @@ tcsgui:
             let mut editor = Editor::open(
                 &where_.path().join("vehicle.ytcs"),
                 crate::pane::default_dividers(),
-            );
-            editor.open_simulator(&sim);
+            )
+            .expect("it opens");
+            editor.open_simulator(&sim).expect("it opens");
 
             assert!(
                 editor.trouble().is_none(),
@@ -1928,7 +1956,8 @@ tcsgui:
         assert!(written.contains("zone_temps"), "{written}");
         assert!(written.contains("3 s"), "{written}");
 
-        let reopened = Editor::open(&path, crate::pane::default_dividers());
+        let reopened = Editor::open(&path, crate::pane::default_dividers())
+            .expect("it opens");
         assert_eq!(
             reopened
                 .document()
@@ -1961,7 +1990,8 @@ tcsgui:
         }
 
         let mut recovered =
-            Editor::open(&path, crate::pane::default_dividers());
+            Editor::open(&path, crate::pane::default_dividers())
+                .expect("it opens");
         assert_eq!(
             recovered.document().nodes.len(),
             3,
@@ -2093,7 +2123,8 @@ tcsgui:
         // What a recovery would find: one node and one edit of history, which
         // agree with each other. The second edit is lost, which is what a
         // device that could not be written to costs.
-        let recovered = Editor::open(&path, crate::pane::default_dividers());
+        let recovered = Editor::open(&path, crate::pane::default_dividers())
+            .expect("it opens");
         assert_eq!(recovered.document().nodes.len(), 1);
         assert_eq!(recovered.undo_depth(), 1);
     }
@@ -2197,7 +2228,8 @@ tcsgui:
         // And the history is beside it as it is for YAML, so undo reaches past
         // a crash whichever format the configuration is written in.
         editor.edit(add("temp_2", "i2c"));
-        let recovered = Editor::open(&path, crate::pane::default_dividers());
+        let recovered = Editor::open(&path, crate::pane::default_dividers())
+            .expect("it opens");
         assert_eq!(recovered.undo_depth(), 2);
         assert_eq!(recovered.document().nodes.len(), 2);
     }
@@ -2363,24 +2395,24 @@ tcsgui:
 
         let mut saved = 0;
         for (path, sim) in &configurations {
-            let mut editor =
-                Editor::open(path, crate::pane::default_dividers());
             // A file that does not open on its own -- one only ever
             // included, which names nodes of the file including it -- is not
             // a configuration to save.
-            if editor.trouble().is_some() {
-                let parent = path.parent().expect("a directory");
-                assert!(
-                    parent.to_string_lossy().ends_with("-common"),
-                    "{}: {:?}",
-                    path.display(),
-                    editor.trouble()
-                );
-                continue;
-            }
+            let mut editor =
+                match Editor::open(path, crate::pane::default_dividers()) {
+                    Ok(editor) => editor,
+                    Err(why) => {
+                        let parent = path.parent().expect("a directory");
+                        assert!(
+                            parent.to_string_lossy().ends_with("-common"),
+                            "{why}"
+                        );
+                        continue;
+                    }
+                };
             saved += 1;
             if let Some(sim) = sim {
-                editor.open_simulator(sim);
+                editor.open_simulator(sim).expect("it opens");
             }
             editor.save();
             assert_eq!(editor.trouble(), None, "{}", path.display());
@@ -2459,8 +2491,9 @@ tcsgui:
         let sim = root.join("examples/thermostat/thermostat-sim.yaml");
         let before = every_file(root);
 
-        let mut editor = Editor::open(&path, crate::pane::default_dividers());
-        editor.open_simulator(&sim);
+        let mut editor = Editor::open(&path, crate::pane::default_dividers())
+            .expect("it opens");
+        editor.open_simulator(&sim).expect("it opens");
         assert_eq!(editor.trouble(), None, "{:?}", editor.trouble());
         let at = |editor: &Editor, name: &str| {
             editor.document().node(name).expect("the node").at
@@ -2533,8 +2566,9 @@ tcsgui:
         let sim = root.join("examples/thermostat/thermostat-sim.yaml");
         let common = "examples/thermostat-common/thermostat-sim.yaml";
 
-        let mut editor = Editor::open(&path, crate::pane::default_dividers());
-        editor.open_simulator(&sim);
+        let mut editor = Editor::open(&path, crate::pane::default_dividers())
+            .expect("it opens");
+        editor.open_simulator(&sim).expect("it opens");
         assert_eq!(editor.trouble(), None, "{:?}", editor.trouble());
         let set = |editor: &mut Editor,
                    setting: &str,

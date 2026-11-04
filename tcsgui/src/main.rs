@@ -734,17 +734,25 @@ fn main() -> Result<(), slint::PlatformError> {
     }
 
     // The configuration: see Editor::open.
-    let editor = Rc::new(RefCell::new(Editor::open(
-        std::path::Path::new(&path),
-        divider.get(),
-    )));
+    //
+    // A file that is there and cannot be opened ends the editor, saying why:
+    // a session on it would write over it at the first edit with what had
+    // been drawn in an empty window. A file not there yet is begun.
+    let refused = |why: String| -> ! {
+        eprintln!("tcsgui: {why}");
+        std::process::exit(1);
+    };
+    let editor = Editor::open(std::path::Path::new(&path), divider.get())
+        .unwrap_or_else(|why| refused(why));
+    let editor = Rc::new(RefCell::new(editor));
     // Before anything can be edited -- the seeding below included, which is
     // an edit like any other and so is not made.
     editor.borrow_mut().set_read_only(read_only());
     if let Some(simulator) = &simulator {
         editor
             .borrow_mut()
-            .open_simulator(std::path::Path::new(simulator));
+            .open_simulator(std::path::Path::new(simulator))
+            .unwrap_or_else(|why| refused(why));
     }
     seed(&mut editor.borrow_mut());
 
@@ -6201,9 +6209,9 @@ fn free_input(document: &Document, node: &str) -> Option<String> {
 /// ground station on it.
 ///
 /// Only for a configuration that is genuinely new. A document with nodes in it
-/// has its own; one with a history behind it is a session being recovered, and
-/// an empty one there means somebody deleted what was in it; and a file that
-/// could not be read is a file to be repaired, not written over.
+/// has its own, and one with a history behind it is a session being recovered:
+/// an empty one there means somebody deleted what was in it. A file that could
+/// not be read is never opened at all: see `Editor::open`.
 ///
 /// # Arguments
 ///
@@ -6211,8 +6219,7 @@ fn free_input(document: &Document, node: &str) -> Option<String> {
 fn seed(editor: &mut Editor) {
     let fresh = editor.document().nodes.is_empty()
         && editor.undo_depth() == 0
-        && editor.journal().redoable() == 0
-        && editor.trouble().is_none();
+        && editor.journal().redoable() == 0;
     if !fresh {
         return;
     }
@@ -7438,8 +7445,8 @@ mod tests {
              - type thermal_mass:\n          - component: zone\n",
         )
         .expect("written");
-        let mut editor = Editor::open(&path, dividers());
-        editor.open_simulator(&sim);
+        let mut editor = Editor::open(&path, dividers()).expect("it opens");
+        editor.open_simulator(&sim).expect("it opens");
         for (name, kind, at) in [
             ("lines-in", "gpio", (34, 34)),
             ("lines-out", "gpio", (34, 166)),
@@ -7546,7 +7553,7 @@ mod tests {
         // come to hold one, and has to be drawn while it does.
         let where_ = tempfile::tempdir().expect("a directory");
         let path = where_.path().join("vehicle.ytcs");
-        let mut editor = Editor::open(&path, dividers());
+        let mut editor = Editor::open(&path, dividers()).expect("it opens");
         editor.edit(Edit::AddNode {
             name: "odd".into(),
             node_type: "contraption".into(),
@@ -7598,7 +7605,7 @@ mod tests {
         )
         .expect("a configuration with an empty group and an unfinished node");
 
-        let editor = Editor::open(&path, dividers());
+        let editor = Editor::open(&path, dividers()).expect("it opens");
         let troubles = startup_troubles(&editor);
         let said: Vec<&str> =
             troubles.iter().map(|t| t.said.as_str()).collect();
@@ -7644,7 +7651,8 @@ mod tests {
     #[test]
     fn a_new_configuration_starts_with_nothing_to_say() {
         let where_ = tempfile::tempdir().expect("a directory");
-        let editor = Editor::open(&where_.path().join("new.ytcs"), dividers());
+        let editor = Editor::open(&where_.path().join("new.ytcs"), dividers())
+            .expect("it opens");
         assert!(verified(&editor).is_empty());
     }
 
@@ -9251,7 +9259,7 @@ mod tests {
 
         let where_ = tempfile::tempdir().expect("a directory");
         let path = where_.path().join("vehicle.ytcs");
-        let mut editor = Editor::open(&path, dividers());
+        let mut editor = Editor::open(&path, dividers()).expect("it opens");
         editor.edit(Edit::AddNode {
             name: "sensor".to_string(),
             node_type: "i2c".to_string(),
@@ -10040,7 +10048,7 @@ mod tests {
              executable: /bin/true\n        app-payload-arg: \"--bay\"\n",
         )
         .expect("a payload that is a program");
-        let editor = Editor::open(&path, dividers());
+        let editor = Editor::open(&path, dividers()).expect("it opens");
 
         let (_, _, _, fields, _) = panel_of(&editor, &None, Some("bay"));
         let kind = |name: &str| {
@@ -10093,7 +10101,7 @@ mod tests {
              executable: /bin/true\n        app-payload-arg: \"--bay\"\n",
         )
         .expect("a payload that is a program");
-        let editor = Editor::open(&path, dividers());
+        let editor = Editor::open(&path, dividers()).expect("it opens");
 
         let (_, _, _, fields, about) = panel_of(&editor, &None, Some("bay"));
         assert!(!about.is_empty(), "the node's own description says nothing");
@@ -10323,7 +10331,8 @@ mod tests {
         // canvas out at once.
         let where_ = tempfile::tempdir().expect("a directory");
         let mut editor =
-            Editor::open(&where_.path().join("vehicle.ytcs"), dividers());
+            Editor::open(&where_.path().join("vehicle.ytcs"), dividers())
+                .expect("it opens");
         for (name, kind) in [
             ("a", "i2c"),
             ("b", "i2c"),
@@ -10602,7 +10611,7 @@ mod tests {
     fn a_new_configuration_starts_with_the_ground_station() {
         let where_ = tempfile::tempdir().expect("a directory");
         let path = where_.path().join("vehicle.ytcs");
-        let mut editor = Editor::open(&path, dividers());
+        let mut editor = Editor::open(&path, dividers()).expect("it opens");
         seed(&mut editor);
 
         // And what tcspecial is configured with: every attribute of it, and
@@ -10676,15 +10685,16 @@ mod tests {
 
     /// Nothing is seeded into a configuration that is not new.
     ///
-    /// Three ways a document can be empty and not new, and all three would be
-    /// the editor putting back something somebody had got rid of.
+    /// Two ways a document can be empty and not new, and both would be the
+    /// editor putting back something somebody had got rid of.
     #[test]
     fn a_configuration_that_is_not_new_is_left_alone() {
         let where_ = tempfile::tempdir().expect("a directory");
 
         // One that has something in it.
         let mut editor =
-            Editor::open(&where_.path().join("a.ytcs"), dividers());
+            Editor::open(&where_.path().join("a.ytcs"), dividers())
+                .expect("it opens");
         editor.edit(Edit::AddNode {
             name: "to_kelvin".into(),
             node_type: "compute".into(),
@@ -10695,7 +10705,8 @@ mod tests {
 
         // One somebody has emptied, which has a history behind it.
         let mut editor =
-            Editor::open(&where_.path().join("b.ytcs"), dividers());
+            Editor::open(&where_.path().join("b.ytcs"), dividers())
+                .expect("it opens");
         editor.edit(Edit::AddNode {
             name: "to_kelvin".into(),
             node_type: "compute".into(),
@@ -10707,23 +10718,6 @@ mod tests {
         assert!(
             editor.document().node("gateway-1").is_none(),
             "a configuration somebody emptied was refilled"
-        );
-
-        // And one that could not be read, which is a file to repair rather
-        // than a file to write over.
-        let damaged = where_.path().join("c.ytcs");
-        std::fs::write(&damaged, "nodes: [[[\n").expect("a file");
-        let mut editor = Editor::open(&damaged, dividers());
-        assert!(
-            editor.trouble().is_some(),
-            "a damaged file should be reported"
-        );
-        seed(&mut editor);
-        assert!(editor.document().node("gateway-1").is_none());
-        assert_eq!(
-            std::fs::read_to_string(&damaged).unwrap(),
-            "nodes: [[[\n",
-            "a damaged configuration was written over"
         );
     }
 
@@ -10750,7 +10744,8 @@ mod tests {
             let editor = Editor::open(
                 &root.join(format!("tests/manual/thermostat.{extension}")),
                 dividers(),
-            );
+            )
+            .expect("it opens");
             let document = editor.document();
 
             // The same boxes and the same ends views_of works out, because
@@ -10919,7 +10914,9 @@ mod tests {
              executable: /bin/true\n        app-payload-arg: \"1\"\n",
         )
         .expect("a payload that is a program");
-        let editor = Rc::new(RefCell::new(Editor::open(&path, dividers())));
+        let editor = Rc::new(RefCell::new(
+            Editor::open(&path, dividers()).expect("it opens"),
+        ));
         let ui = MainWindow::new().expect("a window");
         let views = views_for(&ui);
 
@@ -10973,7 +10970,7 @@ mod tests {
              executable: /bin/true\n        app-payload-arg: \"\"\n",
         )
         .expect("a payload whose argument is stated as nothing");
-        let mut reopened = Editor::open(&path, dividers());
+        let mut reopened = Editor::open(&path, dividers()).expect("it opens");
         reopened.edit(Edit::MoveNode {
             node: "bay".to_string(),
             was: (0, 0),
@@ -11050,7 +11047,9 @@ mod tests {
             "payload_groups:\n  - name: idle\n    interval: 3 s\n",
         )
         .expect("a configuration with a group nothing is in");
-        let editor = Rc::new(RefCell::new(Editor::open(&path, dividers())));
+        let editor = Rc::new(RefCell::new(
+            Editor::open(&path, dividers()).expect("it opens"),
+        ));
 
         let ui = MainWindow::new().expect("a window");
         let views = views_for(&ui);
@@ -11106,7 +11105,9 @@ mod tests {
             "payload_groups:\n  - name: idle\n    interval: 3 s\n",
         )
         .expect("a configuration with a group nothing is in");
-        let editor = Rc::new(RefCell::new(Editor::open(&path, dividers())));
+        let editor = Rc::new(RefCell::new(
+            Editor::open(&path, dividers()).expect("it opens"),
+        ));
 
         let ui = MainWindow::new().expect("a window");
         let views = views_for(&ui);
@@ -11146,7 +11147,9 @@ mod tests {
             "payload_groups:\n  - name: idle\n    interval: 3 s\n",
         )
         .expect("a configuration with a group nothing is in");
-        let editor = Rc::new(RefCell::new(Editor::open(&path, dividers())));
+        let editor = Rc::new(RefCell::new(
+            Editor::open(&path, dividers()).expect("it opens"),
+        ));
 
         let ui = MainWindow::new().expect("a window");
         let views = views_for(&ui);
@@ -11194,7 +11197,9 @@ mod tests {
             "payload_groups:\n  - name: idle\n    interval: 3 s\n",
         )
         .expect("a configuration with a group nothing is in");
-        let editor = Rc::new(RefCell::new(Editor::open(&path, dividers())));
+        let editor = Rc::new(RefCell::new(
+            Editor::open(&path, dividers()).expect("it opens"),
+        ));
 
         let ui = MainWindow::new().expect("a window");
         let views = views_for(&ui);
@@ -11238,10 +11243,10 @@ mod tests {
         use std::rc::Rc;
 
         let where_ = tempfile::tempdir().expect("a directory");
-        let editor = Rc::new(RefCell::new(Editor::open(
-            &where_.path().join("vehicle.ytcs"),
-            dividers(),
-        )));
+        let editor = Rc::new(RefCell::new(
+            Editor::open(&where_.path().join("vehicle.ytcs"), dividers())
+                .expect("it opens"),
+        ));
         for (name, node_type) in
             [("ground", "gateway_radio"), ("sensor", "i2c")]
         {
@@ -11383,10 +11388,10 @@ mod tests {
         use std::rc::Rc;
 
         let where_ = tempfile::tempdir().expect("a directory");
-        let editor = Rc::new(RefCell::new(Editor::open(
-            &where_.path().join("drawn.ytcs"),
-            dividers(),
-        )));
+        let editor = Rc::new(RefCell::new(
+            Editor::open(&where_.path().join("drawn.ytcs"), dividers())
+                .expect("it opens"),
+        ));
         for (name, node_type, at) in [
             ("sensor", "i2c", (dividers().vehicle + 24, 120)),
             ("ground", "gateway_radio", (16, 120)),
@@ -11520,10 +11525,10 @@ mod tests {
         use std::rc::Rc;
 
         let where_ = tempfile::tempdir().expect("a directory");
-        let editor = Rc::new(RefCell::new(Editor::open(
-            &where_.path().join("vehicle.ytcs"),
-            dividers(),
-        )));
+        let editor = Rc::new(RefCell::new(
+            Editor::open(&where_.path().join("vehicle.ytcs"), dividers())
+                .expect("it opens"),
+        ));
         for (name, node_type, at) in [
             ("ground", "gateway_radio", (16, 1600)),
             ("sensor", "i2c", (dividers().vehicle + 24, 1200)),
@@ -11628,7 +11633,9 @@ mod tests {
         std::fs::create_dir(&locked).unwrap();
         let path = locked.join("vehicle.ytcs");
 
-        let editor = Rc::new(RefCell::new(Editor::open(&path, dividers())));
+        let editor = Rc::new(RefCell::new(
+            Editor::open(&path, dividers()).expect("it opens"),
+        ));
         let ui = MainWindow::new().expect("a window");
         let views = Rc::new(RefCell::new(Views {
             top: ui.as_weak(),
@@ -11757,10 +11764,10 @@ mod tests {
         use std::rc::Rc;
 
         let where_ = tempfile::tempdir().expect("a directory");
-        let editor = Rc::new(RefCell::new(Editor::open(
-            &where_.path().join("vehicle.ytcs"),
-            dividers(),
-        )));
+        let editor = Rc::new(RefCell::new(
+            Editor::open(&where_.path().join("vehicle.ytcs"), dividers())
+                .expect("it opens"),
+        ));
         for (name, node_type) in [
             ("temp_1", "i2c"),
             ("temp_2", "i2c"),
@@ -11889,10 +11896,10 @@ mod tests {
         use std::rc::Rc;
 
         let where_ = tempfile::tempdir().expect("a directory");
-        let editor = Rc::new(RefCell::new(Editor::open(
-            &where_.path().join("pulled.ytcs"),
-            dividers(),
-        )));
+        let editor = Rc::new(RefCell::new(
+            Editor::open(&where_.path().join("pulled.ytcs"), dividers())
+                .expect("it opens"),
+        ));
         for (name, node_type, at) in [
             ("ground", "gateway_radio", (16, 120)),
             ("sensor", "i2c", (dividers().vehicle + 24, 120)),
@@ -12037,10 +12044,10 @@ mod tests {
         use std::rc::Rc;
 
         let where_ = tempfile::tempdir().expect("a directory");
-        let editor = Rc::new(RefCell::new(Editor::open(
-            &where_.path().join("placed.ytcs"),
-            dividers(),
-        )));
+        let editor = Rc::new(RefCell::new(
+            Editor::open(&where_.path().join("placed.ytcs"), dividers())
+                .expect("it opens"),
+        ));
 
         let ui = MainWindow::new().expect("a window");
         furnish!(&ui, descriptions());
@@ -12220,10 +12227,10 @@ mod tests {
         use std::rc::Rc;
 
         let where_ = tempfile::tempdir().expect("a directory");
-        let editor = Rc::new(RefCell::new(Editor::open(
-            &where_.path().join("drawn.ytcs"),
-            dividers(),
-        )));
+        let editor = Rc::new(RefCell::new(
+            Editor::open(&where_.path().join("drawn.ytcs"), dividers())
+                .expect("it opens"),
+        ));
         // A payload in the payload working pane and the ground link in its
         // own, which is where the two of them belong -- and the arrangement
         // the terminals are drawn for: the readings leave the payload's lower
@@ -12429,7 +12436,9 @@ mod tests {
 
         for extension in ["ytcs", "xtcs"] {
             let path = root.join(format!("example.{extension}"));
-            let editor = Rc::new(RefCell::new(Editor::open(&path, dividers())));
+            let editor = Rc::new(RefCell::new(
+                Editor::open(&path, dividers()).expect("it opens"),
+            ));
             assert_eq!(
                 editor.borrow().trouble(),
                 None,
@@ -12488,7 +12497,8 @@ mod tests {
             let editor = Editor::open(
                 &root.join(format!("tests/manual/thermostat.{extension}")),
                 dividers(),
-            );
+            )
+            .expect("it opens");
             let ui = MainWindow::new().expect("a window");
             furnish!(&ui, descriptions());
             put(&ui, &editor, &None, None, dividers(), lists(), None);
@@ -12533,10 +12543,10 @@ mod tests {
         // and a test that wrote into the repository would be a test that
         // rewrote whatever it was pointed at.
         let where_ = tempfile::tempdir().expect("a directory");
-        let editor = Rc::new(RefCell::new(Editor::open(
-            &where_.path().join("graph.ytcs"),
-            dividers(),
-        )));
+        let editor = Rc::new(RefCell::new(
+            Editor::open(&where_.path().join("graph.ytcs"), dividers())
+                .expect("it opens"),
+        ));
         // A compute rather than a device: a device is a payload and is held
         // in the payload working pane, so a drag of one measures the pane's
         // edge as much as the gesture. That is worth a test of its own, and
@@ -12694,10 +12704,10 @@ mod tests {
         use std::rc::Rc;
 
         let where_ = tempfile::tempdir().expect("a directory");
-        let editor = Rc::new(RefCell::new(Editor::open(
-            &where_.path().join("graph.ytcs"),
-            dividers(),
-        )));
+        let editor = Rc::new(RefCell::new(
+            Editor::open(&where_.path().join("graph.ytcs"), dividers())
+                .expect("it opens"),
+        ));
         editor.borrow_mut().edit(Edit::AddNode {
             name: "temp_1".to_string(),
             node_type: "i2c".to_string(),
@@ -12809,10 +12819,10 @@ mod tests {
         use std::rc::Rc;
 
         let where_ = tempfile::tempdir().expect("a directory");
-        let editor = Rc::new(RefCell::new(Editor::open(
-            &where_.path().join("vehicle.ytcs"),
-            dividers(),
-        )));
+        let editor = Rc::new(RefCell::new(
+            Editor::open(&where_.path().join("vehicle.ytcs"), dividers())
+                .expect("it opens"),
+        ));
 
         let ui = MainWindow::new().expect("a window");
         let views = Rc::new(RefCell::new(Views {
@@ -12969,10 +12979,10 @@ mod tests {
         use std::rc::Rc;
 
         let where_ = tempfile::tempdir().expect("a directory");
-        let editor = Rc::new(RefCell::new(Editor::open(
-            &where_.path().join("vehicle.ytcs"),
-            dividers(),
-        )));
+        let editor = Rc::new(RefCell::new(
+            Editor::open(&where_.path().join("vehicle.ytcs"), dividers())
+                .expect("it opens"),
+        ));
         for (name, interval) in [("zone_temps", "3 s"), ("bay", "5 s")] {
             editor.borrow_mut().edit(Edit::AddGroup {
                 name: name.into(),
@@ -13059,7 +13069,9 @@ mod tests {
         std::fs::create_dir(&locked).unwrap();
         let path = locked.join("vehicle.ytcs");
 
-        let editor = Rc::new(RefCell::new(Editor::open(&path, dividers())));
+        let editor = Rc::new(RefCell::new(
+            Editor::open(&path, dividers()).expect("it opens"),
+        ));
         let ui = MainWindow::new().expect("a window");
         let views = Rc::new(RefCell::new(Views {
             top: ui.as_weak(),
@@ -13186,10 +13198,10 @@ mod tests {
         use std::rc::Rc;
 
         let where_ = tempfile::tempdir().expect("a directory");
-        let editor = Rc::new(RefCell::new(Editor::open(
-            &where_.path().join("vehicle.ytcs"),
-            dividers(),
-        )));
+        let editor = Rc::new(RefCell::new(
+            Editor::open(&where_.path().join("vehicle.ytcs"), dividers())
+                .expect("it opens"),
+        ));
         {
             let mut editor = editor.borrow_mut();
             // Inside the vehicle working pane, which is where a computation
@@ -13437,10 +13449,10 @@ mod tests {
         use std::rc::Rc;
 
         let where_ = tempfile::tempdir().expect("a directory");
-        let editor = Rc::new(RefCell::new(Editor::open(
-            &where_.path().join("vehicle.ytcs"),
-            dividers(),
-        )));
+        let editor = Rc::new(RefCell::new(
+            Editor::open(&where_.path().join("vehicle.ytcs"), dividers())
+                .expect("it opens"),
+        ));
         {
             let mut editor = editor.borrow_mut();
             for (name, node_type) in [("temp_1", "i2c"), ("k", "compute")] {
@@ -13463,7 +13475,8 @@ mod tests {
 
         editor
             .borrow_mut()
-            .open_simulator(&where_.path().join("vehiclesim.yaml"));
+            .open_simulator(&where_.path().join("vehiclesim.yaml"))
+            .expect("it opens");
 
         // Now the payload's panel is its attributes, a rule, and the
         // simulator's settings for it.
@@ -13579,13 +13592,14 @@ mod tests {
         use std::rc::Rc;
 
         let where_ = tempfile::tempdir().expect("a directory");
-        let editor = Rc::new(RefCell::new(Editor::open(
-            &where_.path().join("vehicle.ytcs"),
-            dividers(),
-        )));
+        let editor = Rc::new(RefCell::new(
+            Editor::open(&where_.path().join("vehicle.ytcs"), dividers())
+                .expect("it opens"),
+        ));
         editor
             .borrow_mut()
-            .open_simulator(&where_.path().join("vehiclesim.yaml"));
+            .open_simulator(&where_.path().join("vehiclesim.yaml"))
+            .expect("it opens");
 
         let ui = MainWindow::new().expect("a window");
         let views = Rc::new(RefCell::new(Views {
@@ -13696,10 +13710,10 @@ mod tests {
         use std::rc::Rc;
 
         let where_ = tempfile::tempdir().expect("a directory");
-        let editor = Rc::new(RefCell::new(Editor::open(
-            &where_.path().join("vehicle.ytcs"),
-            dividers(),
-        )));
+        let editor = Rc::new(RefCell::new(
+            Editor::open(&where_.path().join("vehicle.ytcs"), dividers())
+                .expect("it opens"),
+        ));
         {
             let mut editor = editor.borrow_mut();
             editor.edit(Edit::AddGroup {

@@ -535,16 +535,12 @@ pub fn must_be_yaml(path: &Path) -> Result<(), String> {
     ))
 }
 
-/// Why a simulator file was not opened, and what to do about it.
+/// Why a simulator file was not opened.
 ///
-/// Two kinds, because they want opposite answers. A file the editor cannot
-/// *read* is one it cannot write back faithfully either, so the session goes
-/// on with an empty one and somewhere to type -- an editor that would not
-/// start on a damaged file is an editor that cannot be used to fix one. A file
-/// the editor can read but must not *use* is a different matter: it parses, so
-/// adopting half of it would mean writing the other half away at the next
-/// edit. That one is refused, and the file is left on the disk exactly as it
-/// is.
+/// Two kinds: a file the editor cannot *read*, and one it can read but must
+/// not *use*, which parses and says something the two files cannot both
+/// mean. The editor refuses both alike, leaving the file on the disk exactly
+/// as it is: see `Editor::open_simulator`.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Trouble {
     /// It cannot be parsed, or its name is not a YAML one.
@@ -559,11 +555,6 @@ impl Trouble {
         match self {
             Trouble::Unreadable(why) | Trouble::Unusable(why) => why,
         }
-    }
-
-    /// Whether the session should carry on with an empty one in its place.
-    pub fn leaves_somewhere_to_type(&self) -> bool {
-        matches!(self, Trouble::Unreadable(_))
     }
 }
 

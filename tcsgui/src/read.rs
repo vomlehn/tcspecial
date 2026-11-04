@@ -588,8 +588,9 @@ fn tcspecial_line(
 ///
 /// # Returns
 ///
-/// Each line of the comment's text, trimmed and unescaped, leaving out any
-/// with nothing on them.
+/// Each line of the comment's text, trimmed, leaving out any with nothing
+/// on them at its start and its end. Not unescaped: XML reads no entity
+/// inside a comment.
 fn comment_over_lines<'a, I: Iterator<Item = &'a str>>(
     first: &str,
     lines: &mut I,
@@ -607,10 +608,12 @@ fn comment_over_lines<'a, I: Iterator<Item = &'a str>>(
             None => break,
         }
     }
-    said.into_iter()
-        .filter(|line| !line.is_empty())
-        .map(|line| unescape(&line))
-        .collect()
+    let first = said.iter().position(|line| !line.is_empty());
+    let last = said.iter().rposition(|line| !line.is_empty());
+    match (first, last) {
+        (Some(first), Some(last)) => said[first..=last].to_vec(),
+        _ => Vec::new(),
+    }
 }
 
 /// Which data source this line writes, if it writes one.
@@ -653,13 +656,12 @@ fn source_named(line: &str, xml: bool) -> Option<String> {
 ///
 /// # Returns
 ///
-/// The comment's text, trimmed and, in XML, unescaped; or `None` if the line
-/// is not a comment.
+/// The comment's text, trimmed; or `None` if the line is not a comment. Not
+/// unescaped in XML, which reads no entity inside a comment.
 fn comment_in(line: &str, xml: bool) -> Option<String> {
     if xml {
         let body = line.strip_prefix("<!--")?.strip_suffix("-->")?;
-        // Unescaped, because the writer escapes it: see `document::escape`.
-        Some(unescape(body.trim()))
+        Some(body.trim().to_string())
     } else {
         let body = line.strip_prefix('#')?;
         Some(body.trim().to_string())
@@ -1412,7 +1414,7 @@ mod tests {
 
             let expected = if xml {
                 "    <!-- what is carried -->\n    <payloads>\n        \
-                 <!-- all of it -->\n        <!-- on a desk -->\n        \
+                 <!-- all of it\n             on a desk -->\n        \
                  <type name=\"i2c\">"
             } else {
                 "# what is carried\npayloads:\n  # all of it\n  \
@@ -1438,10 +1440,10 @@ mod tests {
         }
     }
 
-    /// A long comment about a section is broken to fit eighty columns, as a
-    /// node's is, in both languages.
+    /// A long comment about a section is written as it was given, as a
+    /// node's is, in both languages, and read back the same.
     #[test]
-    fn a_long_comment_about_a_section_fits_eighty_columns() {
+    fn a_long_comment_about_a_section_is_written_as_given() {
         let mut document = two_types();
         let long = "word ".repeat(40);
         for heading in [
@@ -1462,15 +1464,22 @@ mod tests {
             .tcspecial_comments
             .insert("beacon.recv".into(), long.trim().to_string());
 
-        for text in [document.to_yaml(), document.to_xml()] {
+        let where_ = tempfile::tempdir().expect("a directory");
+        for name in ["long.ytcs", "long.xtcs"] {
+            let path = where_.path().join(name);
+            let text = document.to_text(&path).expect("a known format");
             let comments = text
                 .lines()
                 .filter(|l| l.contains("word word"))
                 .collect::<Vec<&str>>();
-            assert!(comments.len() >= 8, "{text}");
+            assert_eq!(comments.len(), 4, "{text}");
             for line in comments {
-                assert!(line.chars().count() <= 80, "too long: {line}");
+                assert!(line.contains(long.trim()), "broken: {line}");
             }
+            std::fs::write(&path, &text).expect("written");
+            let read = read(&path).unwrap_or_else(|e| panic!("{name}: {e}"));
+            assert_eq!(read.remarks, document.remarks, "{name}");
+            assert_eq!(read.to_text(&path).expect("known"), text, "{name}");
         }
     }
 

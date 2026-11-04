@@ -3470,10 +3470,10 @@ acts on it; tcsmoc reads it too, to show what the tcssim it started is
 simulating, and does without it if it is not there.</p>
 <p>Every setting but <tt class="docutils literal">simulate</tt> is optional, and <strong>a setting written empty is a
 setting not stated</strong>: <tt class="docutils literal">packet_interval: &quot;&quot;</tt> and no <tt class="docutils literal">packet_interval</tt> at all mean
-the same thing. That is what lets tcsgui write one of these files as a form --
-every payload of the configuration, every setting of a payload, blank until
-somebody fills one in -- and have the file load all the same. A value that is
-there and wrong is still refused, naming it.</p>
+the same thing, so a file somebody has half filled in still loads. tcsgui
+writes only the settings that hold a value, and a file it begins names each
+payload under its type and nothing else. A value that is there and wrong is
+still refused, naming it.</p>
 <pre class="code text literal-block">
 simulated_payload_groups        optional
   group                the name payloads refer to, naming the entry

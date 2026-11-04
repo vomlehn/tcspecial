@@ -6089,10 +6089,16 @@ that satisfies both.
      - tcspecial
      - Waiting on several descriptors at once, and file controls.
      - `repository <https://github.com/nix-rust/nix>`__
+   * - `path-clean <https://crates.io/crates/path-clean>`__
+     - 1.0
+     - `1.0.1 <https://docs.rs/path-clean/1.0.1>`__
+     - tcsgui
+     - Where a name with ``..`` in it leads, for the files Save as writes.
+     - `repository <https://github.com/danreeves/path-clean>`__
    * - `quick-xml <https://crates.io/crates/quick-xml>`__
      - 0.42
      - `0.42.0 <https://docs.rs/quick-xml/0.42.0>`__
-     - tcslibgs
+     - tcsgui, tcslibgs
      - Reads configuration files written in XML.
      - `repository <https://github.com/tafia/quick-xml>`__
    * - `rand <https://crates.io/crates/rand>`__
@@ -6101,6 +6107,12 @@ that satisfies both.
      - tcssim
      - What a simulated payload sends, and the faults it is told to make.
      - `repository <https://github.com/rust-random/rand>`__
+   * - `rfd <https://crates.io/crates/rfd>`__
+     - 0.17
+     - `0.17.2 <https://docs.rs/rfd/0.17.2>`__
+     - tcsgui
+     - The desktop's own Save dialog, for Save as, through the XDG desktop portal.
+     - `repository <https://github.com/PolyMeilex/rfd>`__
    * - `serde <https://crates.io/crates/serde>`__
      - 1.0
      - `1.0.229 <https://docs.rs/serde/1.0.229>`__
@@ -6120,6 +6132,12 @@ that satisfies both.
      - Reads configuration files written in YAML, and the editor's undo
        history, which it keeps on disk.
      - `repository <https://github.com/cafkafk/serde-yaml>`__
+   * - `similar <https://crates.io/crates/similar>`__
+     - 3.2
+     - `3.2.1 <https://docs.rs/similar/3.2.1>`__
+     - tcsgui
+     - The line diffs a save is merged from, so a file changes only where it was edited.
+     - `repository <https://github.com/mitsuhiko/similar>`__
    * - `slint <https://crates.io/crates/slint>`__
      - 1.3, 1.18
      - `1.18.1 <https://docs.rs/slint/1.18.1>`__

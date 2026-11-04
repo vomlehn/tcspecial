@@ -268,6 +268,18 @@ fn votes(node: &Node, attribute: &str) -> bool {
 }
 
 /// The whole of what is being edited.
+/// One file of a configuration being written somewhere else: see
+/// [`Document::files_moved`].
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Moved {
+    /// Where the file is now.
+    pub from: std::path::PathBuf,
+    /// Where it is going.
+    pub to: std::path::PathBuf,
+    /// What goes in it there.
+    pub text: String,
+}
+
 #[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
 pub struct Document {
     /// The concerns somebody has decided not to act on, by node and kind.
@@ -2403,10 +2415,66 @@ impl Document {
         &self,
         path: &std::path::Path,
     ) -> Result<Vec<(std::path::PathBuf, String)>, String> {
+        let files = self.files_moved(path, path, None)?;
+        Ok(files
+            .into_iter()
+            .map(|moved| (moved.to, moved.text))
+            .collect())
+    }
+
+    /// Every file this document is written as, moved to be written somewhere
+    /// else: what Save as writes.
+    ///
+    /// The same files [`Document::files`] gives for `from`, each placed
+    /// relative to `to` as it is to `from` -- an included file a directory
+    /// up from the old top file is a directory up from the new one -- so that
+    /// the names the top file includes them by still find them, and the copy
+    /// is the same configuration with the same digest. The top file and its
+    /// other spelling take `to`'s name; every other file keeps its own.
+    ///
+    /// The other spellings are those `from` has, wherever `to` is: a copy of
+    /// a configuration kept as a pair is the pair.
+    ///
+    /// The text is what the editor writes for each file at its new place,
+    /// which differs from the old only where a file says where its schema
+    /// is.
+    ///
+    /// # Arguments
+    ///
+    /// * `from`      - The top diagram's file now.
+    /// * `to`        - Where it is going, whose extension says which format
+    ///                 every file but the simulator's is written in.
+    /// * `simulator` - Where the simulator's file is going, or `None` to
+    ///                 leave it where it is.
+    ///
+    /// # Returns
+    ///
+    /// Each file, in the order [`Document::files`] gives them, with where it
+    /// was and where it goes.
+    ///
+    /// # Errors
+    ///
+    /// A message naming the file if its extension is not `.ytcs` or
+    /// `.xtcs`.
+    pub fn files_moved(
+        &self,
+        from: &std::path::Path,
+        to: &std::path::Path,
+        simulator: Option<&std::path::Path>,
+    ) -> Result<Vec<Moved>, String> {
         let mut written = Vec::new();
 
         // The top diagram, and the includes that say what else to read.
-        written.push((path.to_path_buf(), self.text_for(&None, path)?));
+        //
+        // Each moved file is said to come from the old one in its own
+        // spelling where there is one, so that a copy made in the other
+        // spelling of a pair is the copy of that file.
+        let paired = self.other_spelling(from).is_some();
+        written.push(Moved {
+            from: same_spelling(from, to, paired),
+            to: to.to_path_buf(),
+            text: self.text_for(&None, to)?,
+        });
 
         // And the same configuration in the other spelling, where one is
         // already there beside it. A configuration that exists as both
@@ -2419,19 +2487,32 @@ impl Document {
         // Only where the sibling exists. Writing one that does not would be
         // the editor deciding somebody wants their configuration in two
         // languages, which is not a thing to decide for them.
-        if let Some(beside) = self.other_spelling(path) {
-            written.push((beside.clone(), self.text_for(&None, &beside)?));
+        if let Some(beside_to) = swapped(to).filter(|_| paired) {
+            written.push(Moved {
+                text: self.text_for(&None, &beside_to)?,
+                from: spelled_like(from, &beside_to),
+                to: beside_to,
+            });
         }
 
         // Each subdiagram, and its other spelling where that is there too,
         // for the same reason as the top diagram's.
         for name in self.subdiagrams() {
             let home = Some(name.clone());
-            let file = file_for(&name, path);
-            written.push((file.clone(), self.text_for(&home, path)?));
-            if let Some(beside) = self.other_spelling(&file) {
-                let text = self.text_for(&home, &beside)?;
-                written.push((beside, text));
+            let file = file_for(&name, from);
+            let file_to = file_for(&name, to);
+            let paired = self.other_spelling(&file).is_some();
+            written.push(Moved {
+                from: same_spelling(&file, &file_to, paired),
+                to: file_to.clone(),
+                text: self.text_for(&home, to)?,
+            });
+            if let Some(beside_to) = swapped(&file_to).filter(|_| paired) {
+                written.push(Moved {
+                    text: self.text_for(&home, &beside_to)?,
+                    from: spelled_like(&file, &beside_to),
+                    to: beside_to,
+                });
             }
         }
 
@@ -2439,7 +2520,16 @@ impl Document {
         // of the same set on purpose: the two files are edited together,
         // checked together and must agree, so one Save writes both and one
         // Undo takes back whichever of them the last edit touched.
-        written.extend(self.simulator_file());
+        if let Some(simulator_now) = self.simulator.as_ref() {
+            let at = simulator.unwrap_or(&simulator_now.path);
+            if let Some((_, text)) = self.simulator_file_at(at) {
+                written.push(Moved {
+                    from: simulator_now.path.clone(),
+                    to: at.to_path_buf(),
+                    text,
+                });
+            }
+        }
         Ok(written)
     }
 
@@ -2457,10 +2547,34 @@ impl Document {
     /// configuration.
     pub fn simulator_file(&self) -> Option<(std::path::PathBuf, String)> {
         let simulator = self.simulator.as_ref()?;
+        self.simulator_file_at(&simulator.path)
+    }
+
+    /// The simulator configuration's file and what goes in it, written at
+    /// `at` rather than where it was read from.
+    ///
+    /// Apart from [`Document::simulator_file`] because the file says where
+    /// its schema is relative to itself, so the text depends on where it is
+    /// going.
+    ///
+    /// # Arguments
+    ///
+    /// * `at` - Where the file is going.
+    ///
+    /// # Returns
+    ///
+    /// `at` with the file's contents, or `None` without a simulator
+    /// configuration.
+    pub fn simulator_file_at(
+        &self,
+        at: &std::path::Path,
+    ) -> Option<(std::path::PathBuf, String)> {
+        let mut simulator = self.simulator.clone()?;
+        simulator.path = at.to_path_buf();
         let payloads = self.simulated_payloads();
         Some((
             simulator.path.clone(),
-            crate::sim::to_yaml(simulator, &payloads),
+            crate::sim::to_yaml(&simulator, &payloads),
         ))
     }
 
@@ -3148,12 +3262,7 @@ impl Document {
         &self,
         path: &std::path::Path,
     ) -> Option<std::path::PathBuf> {
-        let other = match ConfigFormat::from_path(path)? {
-            ConfigFormat::Yaml => ConfigFormat::Xml,
-            ConfigFormat::Xml => ConfigFormat::Yaml,
-        };
-        Some(path.with_extension(other.extension()))
-            .filter(|beside| beside.is_file())
+        swapped(path).filter(|beside| beside.is_file())
     }
 
     /// What leaves a node, by the data source it leaves by.
@@ -3333,6 +3442,69 @@ impl Document {
             false,
         );
         left_by.and_then(tcslibgs::graph::terminals::answers)
+    }
+}
+
+/// `path` in the other spelling of a configuration, whether or not that
+/// file is there.
+///
+/// # Arguments
+///
+/// * `path` - A `.ytcs` or `.xtcs` file.
+///
+/// # Returns
+///
+/// `path` with the other extension, or `None` for a name that is neither.
+fn swapped(path: &std::path::Path) -> Option<std::path::PathBuf> {
+    let other = match ConfigFormat::from_path(path)? {
+        ConfigFormat::Yaml => ConfigFormat::Xml,
+        ConfigFormat::Xml => ConfigFormat::Yaml,
+    };
+    Some(path.with_extension(other.extension()))
+}
+
+/// The file a moved file is the copy of: the old file in the new one's
+/// spelling where the old one is kept in both, and the old file otherwise.
+///
+/// # Arguments
+///
+/// * `from`   - The old file.
+/// * `to`     - Where the copy goes.
+/// * `paired` - Whether `from` has its other spelling beside it.
+///
+/// # Returns
+///
+/// The old file to copy.
+fn same_spelling(
+    from: &std::path::Path,
+    to: &std::path::Path,
+    paired: bool,
+) -> std::path::PathBuf {
+    if paired {
+        spelled_like(from, to)
+    } else {
+        from.to_path_buf()
+    }
+}
+
+/// `path` with the extension of `like`: where the other spelling of a
+/// file goes.
+///
+/// # Arguments
+///
+/// * `path` - The file in one spelling.
+/// * `like` - A file in the other.
+///
+/// # Returns
+///
+/// `path`, extended as `like` is.
+fn spelled_like(
+    path: &std::path::Path,
+    like: &std::path::Path,
+) -> std::path::PathBuf {
+    match like.extension() {
+        Some(extension) => path.with_extension(extension),
+        None => path.to_path_buf(),
     }
 }
 

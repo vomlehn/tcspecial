@@ -32,6 +32,15 @@ similar = "3.2"
 # Reads an XML file back after such a merge, to hold it to what the editor
 # would have written. The version tcslibgs reads configurations with.
 quick-xml = "0.42"
+# The desktop's own Save dialog, for Save as: through the XDG desktop portal,
+# over the D-Bus crate the window toolkit already brings in, rather than GTK.
+rfd = { version = "0.17.2", default-features = false, features = [
+    "xdg-portal",
+] }
+# Where a name with `..` in it leads, worked out from the name alone: an
+# included file a directory up from a new top file is in a directory that
+# need not be there yet, which the file system cannot resolve.
+path-clean = "1.0.1"
 
 [dev-dependencies]
 # Lays the window out headlessly, so a test can measure it rather than a

@@ -217,6 +217,12 @@ struct Views {
     /// Held so that pressing Exit twice does not stack two of them, and so
     /// that answering it can take it away again.
     leaving: Option<LeaveWindow>,
+    /// The question Save as asks before it writes over files that are there
+    /// already, while it is being asked.
+    ///
+    /// Held so that the window lives while it waits, and so that a second
+    /// Save as replaces the question rather than stacking another.
+    replacing: Option<ReplaceWindow>,
     /// The list of what might be wrong, while it is open.
     ///
     /// One window for both lists -- what has not been looked at and what was
@@ -759,6 +765,7 @@ fn main() -> Result<(), slint::PlatformError> {
         parameters: None,
         attributes: BTreeMap::new(),
         leaving: None,
+        replacing: None,
         concerns: None,
         deleting: None,
         names: None,
@@ -897,6 +904,8 @@ fn main() -> Result<(), slint::PlatformError> {
     // and one plain sentence either way.
     let mut kept = false;
     if editor.borrow().unsaved() {
+        // Named as it is now, which Save as may have changed.
+        let path = editor.borrow().files().0.display().to_string();
         editor.borrow_mut().save();
         match editor.borrow().trouble() {
             None => eprintln!("tcsgui: saved {path} on the way out"),
@@ -1135,6 +1144,15 @@ macro_rules! wiring {
                 window.on_save_clicked(move || {
                     editor.borrow_mut().save();
                     views.borrow().refresh(&editor.borrow());
+                });
+            }
+            {
+                // Every file somewhere else, from the File menu: see
+                // save_as.
+                let editor = editor.clone();
+                let views = views.clone();
+                window.on_save_as_clicked(move || {
+                    save_as(&editor, &views, false);
                 });
             }
             {
@@ -3479,6 +3497,15 @@ fn leave(editor: &Rc<RefCell<Editor>>, views: &Rc<RefCell<Views>>) {
             });
         }
         {
+            // Where the files cannot be written where they are: somewhere
+            // else, and then out. See save_as.
+            let editor = editor.clone();
+            let views = views.clone();
+            window.on_saved_as(move || {
+                save_as(&editor, &views, true);
+            });
+        }
+        {
             let views = views.clone();
             window.on_left(move || {
                 let window = views.borrow_mut().leaving.take();
@@ -3512,6 +3539,164 @@ fn leave(editor: &Rc<RefCell<Editor>>, views: &Rc<RefCell<Views>>) {
             eprintln!("tcsgui: the offer to save cannot be shown: {e}");
             slint::quit_event_loop().ok();
         }
+    }
+}
+
+/// Asks where to write the configuration, and writes it there: Save as.
+///
+/// In the desktop's own Save dialog, which starts at the file the session
+/// writes now. The dialog runs while the editor goes on drawing; what it
+/// answers is written by [`write_as`]. A name given without an extension
+/// takes the current file's, the format being one the session already
+/// writes.
+///
+/// # Arguments
+///
+/// * `editor`  - The session.
+/// * `views`   - The windows.
+/// * `leaving` - Whether this is the way out: the editor quits once the
+///               files are written.
+fn save_as(
+    editor: &Rc<RefCell<Editor>>,
+    views: &Rc<RefCell<Views>>,
+    leaving: bool,
+) {
+    let now = editor.borrow().files().0.to_path_buf();
+    let mut dialog = rfd::AsyncFileDialog::new()
+        .set_title("Save the configuration as")
+        .add_filter("tcspecial configuration", &["ytcs", "xtcs"]);
+    if let Some(directory) = std::path::absolute(&now)
+        .ok()
+        .and_then(|now| now.parent().map(|parent| parent.to_path_buf()))
+    {
+        dialog = dialog.set_directory(directory);
+    }
+    if let Some(name) = now.file_name() {
+        dialog = dialog.set_file_name(name.to_string_lossy());
+    }
+
+    let editor = editor.clone();
+    let views = views.clone();
+    let asked = slint::spawn_local(async move {
+        let Some(chosen) = dialog.save_file().await else {
+            return;
+        };
+        let mut to = chosen.path().to_path_buf();
+        if to.extension().is_none() {
+            if let Some(extension) = now.extension() {
+                to.set_extension(extension);
+            }
+        }
+        write_as(&editor, &views, &to, false, leaving);
+    });
+    if let Err(e) = asked {
+        eprintln!("tcsgui: the Save as dialog cannot be shown: {e}");
+    }
+}
+
+/// Writes the configuration to `to`, asking first about any file there
+/// already: see `Editor::save_as`.
+///
+/// # Arguments
+///
+/// * `editor`  - The session.
+/// * `views`   - The windows.
+/// * `to`      - The new top file.
+/// * `replace` - Whether replacing files already there has been agreed.
+/// * `leaving` - Whether to quit once the files are written.
+fn write_as(
+    editor: &Rc<RefCell<Editor>>,
+    views: &Rc<RefCell<Views>>,
+    to: &std::path::Path,
+    replace: bool,
+    leaving: bool,
+) {
+    let replacing = editor.borrow_mut().save_as(to, replace);
+    if !replacing.is_empty() {
+        ask_replace(editor, views, to, &replacing, leaving);
+        return;
+    }
+    views.borrow().refresh(&editor.borrow());
+    if !leaving {
+        return;
+    }
+    if !editor.borrow().unsaved() {
+        slint::quit_event_loop().ok();
+        return;
+    }
+    // Still not written. Said in the offer to leave, which is still open:
+    // the one thing not to do is quit quietly.
+    let trouble = editor.borrow().trouble().unwrap_or_default().to_string();
+    eprintln!("tcsgui: still not saved: {trouble}");
+    if let Some(window) = views.borrow().leaving.as_ref() {
+        window.set_trouble(trouble.into());
+    }
+}
+
+/// Asks whether Save as may write over files that are there already.
+///
+/// # Arguments
+///
+/// * `editor`    - The session.
+/// * `views`     - The windows, which keep the question while it is asked.
+/// * `to`        - The new top file.
+/// * `replacing` - The files that would be written over.
+/// * `leaving`   - Whether to quit once the files are written.
+fn ask_replace(
+    editor: &Rc<RefCell<Editor>>,
+    views: &Rc<RefCell<Views>>,
+    to: &std::path::Path,
+    replacing: &[std::path::PathBuf],
+    leaving: bool,
+) {
+    let window = match ReplaceWindow::new() {
+        Ok(window) => {
+            session!(&window);
+            window
+        }
+        Err(e) => {
+            // Nothing written, and nothing to ask with: said, rather than
+            // writing over the files unasked.
+            eprintln!("tcsgui: replacing files cannot be asked about: {e}");
+            return;
+        }
+    };
+    let files: Vec<String> = replacing
+        .iter()
+        .map(|path| path.display().to_string())
+        .collect();
+    window.set_files(files.join("\n").into());
+    {
+        let editor = editor.clone();
+        let views = views.clone();
+        let to = to.to_path_buf();
+        window.on_confirmed(move || {
+            hide_replacing(&views);
+            write_as(&editor, &views, &to, true, leaving);
+        });
+    }
+    {
+        let views = views.clone();
+        window.on_cancelled(move || hide_replacing(&views));
+    }
+    if let Err(e) = window.show() {
+        eprintln!("tcsgui: replacing files cannot be asked about: {e}");
+        return;
+    }
+    if let Some(old) = views.borrow_mut().replacing.replace(window) {
+        let _ = old.hide();
+    }
+}
+
+/// Takes away the question about replacing files, answered either way.
+///
+/// # Arguments
+///
+/// * `views` - The windows, which hold the question.
+fn hide_replacing(views: &Rc<RefCell<Views>>) {
+    let window = views.borrow_mut().replacing.take();
+    if let Some(window) = window {
+        let _ = window.hide();
     }
 }
 
@@ -10786,6 +10971,7 @@ mod tests {
             parameters: None,
             attributes: BTreeMap::new(),
             leaving: None,
+            replacing: None,
             concerns: None,
             deleting: None,
             names: None,
@@ -11046,6 +11232,7 @@ mod tests {
             parameters: None,
             attributes: BTreeMap::new(),
             leaving: None,
+            replacing: None,
             concerns: None,
             deleting: None,
             names: None,
@@ -11188,6 +11375,7 @@ mod tests {
             parameters: None,
             attributes: BTreeMap::new(),
             leaving: None,
+            replacing: None,
             concerns: None,
             deleting: None,
             names: None,
@@ -11325,6 +11513,7 @@ mod tests {
             parameters: None,
             attributes: BTreeMap::new(),
             leaving: None,
+            replacing: None,
             concerns: None,
             deleting: None,
             names: None,
@@ -11411,6 +11600,7 @@ mod tests {
             parameters: None,
             attributes: BTreeMap::new(),
             leaving: None,
+            replacing: None,
             concerns: None,
             deleting: None,
             names: None,
@@ -11554,6 +11744,7 @@ mod tests {
             parameters: None,
             attributes: BTreeMap::new(),
             leaving: None,
+            replacing: None,
             concerns: None,
             deleting: None,
             names: None,
@@ -11698,6 +11889,7 @@ mod tests {
             parameters: None,
             attributes: BTreeMap::new(),
             leaving: None,
+            replacing: None,
             concerns: None,
             deleting: None,
             names: None,
@@ -11822,6 +12014,7 @@ mod tests {
             parameters: None,
             attributes: BTreeMap::new(),
             leaving: None,
+            replacing: None,
             concerns: None,
             deleting: None,
             names: None,
@@ -12024,6 +12217,7 @@ mod tests {
             parameters: None,
             attributes: BTreeMap::new(),
             leaving: None,
+            replacing: None,
             concerns: None,
             deleting: None,
             names: None,
@@ -12340,6 +12534,7 @@ mod tests {
             parameters: None,
             attributes: BTreeMap::new(),
             leaving: None,
+            replacing: None,
             concerns: None,
             deleting: None,
             names: None,
@@ -12488,6 +12683,7 @@ mod tests {
             parameters: None,
             attributes: BTreeMap::new(),
             leaving: None,
+            replacing: None,
             concerns: None,
             deleting: None,
             names: None,
@@ -12589,6 +12785,7 @@ mod tests {
             parameters: None,
             attributes: BTreeMap::new(),
             leaving: None,
+            replacing: None,
             concerns: None,
             deleting: None,
             names: None,
@@ -12754,6 +12951,7 @@ mod tests {
             parameters: None,
             attributes: BTreeMap::new(),
             leaving: None,
+            replacing: None,
             concerns: None,
             deleting: None,
             names: None,
@@ -12833,6 +13031,7 @@ mod tests {
             parameters: None,
             attributes: BTreeMap::new(),
             leaving: None,
+            replacing: None,
             concerns: None,
             deleting: None,
             names: None,
@@ -12990,6 +13189,7 @@ mod tests {
             parameters: None,
             attributes: BTreeMap::new(),
             leaving: None,
+            replacing: None,
             concerns: None,
             deleting: None,
             names: None,
@@ -13268,6 +13468,7 @@ mod tests {
             parameters: None,
             attributes: BTreeMap::new(),
             leaving: None,
+            replacing: None,
             concerns: None,
             deleting: None,
             names: None,
@@ -13357,6 +13558,7 @@ mod tests {
             parameters: None,
             attributes: BTreeMap::new(),
             leaving: None,
+            replacing: None,
             concerns: None,
             deleting: None,
             names: None,
@@ -13490,6 +13692,7 @@ mod tests {
             parameters: None,
             attributes: BTreeMap::new(),
             leaving: None,
+            replacing: None,
             concerns: None,
             deleting: None,
             names: None,

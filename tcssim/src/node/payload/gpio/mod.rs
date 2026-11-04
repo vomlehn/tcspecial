@@ -146,7 +146,7 @@ pub fn run_gpio_node(
         watch_driven_lines(&config, &running, &stats, &lines);
         return;
     }
-    if let Some(world @ crate::physics::Attachment::Pulls { .. }) =
+    if let Some(world @ crate::node::physics::Attachment::Pulls { .. }) =
         &config.attachment
     {
         pull_to_the_world(&config, world, &running, &stats, &lines);
@@ -214,7 +214,7 @@ pub fn run_gpio_node(
 /// * `lines`   - The chip's lines, from [`lines_of`], in the node's order.
 fn pull_to_the_world(
     config: &PayloadConfig,
-    world: &crate::physics::Attachment,
+    world: &crate::node::physics::Attachment,
     running: &AtomicBool,
     stats: &std::sync::Mutex<PayloadStats>,
     lines: &[SimulatedLine],
@@ -270,7 +270,7 @@ fn pull_to_the_world(
 /// Disabled -- its panel's button off -- the part is unpowered: a move is
 /// counted, as every stand-in counts what arrives, and kept as the latest
 /// decision, and the part stays off until it is enabled. See
-/// [`crate::physics::Power`].
+/// [`crate::node::physics::Power`].
 ///
 /// # Arguments
 ///
@@ -304,7 +304,7 @@ fn watch_driven_lines(
         }
         if now != was && !first {
             if now.iter().all(|&v| v == now[0]) {
-                crate::physics::driven(
+                crate::node::physics::driven(
                     &config.attachment,
                     &config.name,
                     &now[..1],

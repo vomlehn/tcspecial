@@ -1,6 +1,6 @@
 //! An engine: thrust in proportion to its throttle, while its fuel lasts.
 //!
-//! Its terminals are `tcslibgs::physics::engine`'s: `throttle`, a ratio;
+//! Its terminals are `tcslibgs::node::physics::engine`'s: `throttle`, a ratio;
 //! `force`, in newtons; and `flow`, the fuel it burns, in kilograms a
 //! second.
 //!
@@ -8,11 +8,11 @@
 //! and reaches nought at a moment it can say: its next event. From then on
 //! it gives out nothing.
 
-use tcslibgs::physics::engine::Resolved;
+use tcslibgs::node::physics::engine::Resolved;
 
 use super::component::Component;
 
-/// Its terminals' places, in `tcslibgs::physics::engine::TERMINALS`'s
+/// Its terminals' places, in `tcslibgs::node::physics::engine::TERMINALS`'s
 /// order, which a test holds this to.
 const THROTTLE: usize = 0;
 const FORCE: usize = 1;
@@ -108,7 +108,7 @@ impl Component for Engine {
 mod tests {
     use super::*;
     use std::time::Duration;
-    use tcslibgs::physics::engine::TERMINALS;
+    use tcslibgs::node::physics::engine::TERMINALS;
 
     /// The places here are the type's.
     #[test]

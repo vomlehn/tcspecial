@@ -1075,7 +1075,7 @@ fn sensors_read_as_they_report(
         return;
     };
     use tcslibgs::graph::simulated::{driving_of, reading_of};
-    use tcslibgs::physics::terminal::Kind;
+    use tcslibgs::node::physics::terminal::Kind;
     use tcslibgs::sim_config::Attached;
     for (dh, settled) in handlers.iter().zip(&resolved) {
         let name = &dh.name.0;

@@ -2,7 +2,7 @@
 //!
 //! Where `node` holds the stand-ins for the hardware at the far end of each
 //! node, this holds what that hardware would sense and change: the components
-//! of the vehicle's physics model -- see `tcslibgs::physics` -- each a part
+//! of the vehicle's physics model -- see `tcslibgs::node::physics` -- each a part
 //! simulated alone, joined into one [`world::World`] that is advanced from
 //! event to event as the stand-ins ask about it. So what a sensor reports
 //! follows from what the vehicle did.
@@ -31,8 +31,8 @@ use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::sync::{Arc, Mutex, MutexGuard};
 use std::time::{Duration, Instant};
 
+use tcslibgs::node::physics::Place;
 use tcslibgs::node::vehicle::compute::{from_value, Format, ToValueParams};
-use tcslibgs::physics::Place;
 use tcslibgs::unit::Unit;
 
 use sensor::Sensor;
@@ -527,8 +527,8 @@ pub(crate) mod tests {
     use crate::payload::{PayloadConfig, PayloadProtocol, SimulatedPayload};
     use std::sync::atomic::AtomicU32;
     use std::time::Duration;
-    use tcslibgs::physics::terminal::At;
-    use tcslibgs::physics::WorldSection;
+    use tcslibgs::node::physics::terminal::At;
+    use tcslibgs::node::physics::WorldSection;
     use tcslibgs::sim_config::SensorErrors;
     use tcslibgs::unit::Unit;
 

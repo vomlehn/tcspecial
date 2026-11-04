@@ -115,7 +115,7 @@ pub struct World {
     Debug, Clone, Default, PartialEq, Eq, serde::Serialize, serde::Deserialize,
 )]
 pub struct PhysicsComponent {
-    /// Its type, one of `tcslibgs::physics::TYPES`.
+    /// Its type, one of `tcslibgs::node::physics::TYPES`.
     pub kind: String,
     /// What it states, by setting name.
     pub settings: Settings,
@@ -447,12 +447,12 @@ fn world_of(file: WorldFile) -> Result<World, String> {
         for (key, components) in entry {
             let kind = key
                 .strip_prefix("type ")
-                .filter(|kind| tcslibgs::physics::TYPES.contains(kind))
+                .filter(|kind| tcslibgs::node::physics::TYPES.contains(kind))
                 .ok_or_else(|| {
                     format!(
                         "physics components: \"{key}\" is not the word type \
                          and one of {}",
-                        tcslibgs::physics::TYPES.join(", ")
+                        tcslibgs::node::physics::TYPES.join(", ")
                     )
                 })?;
             for mut said in components {
@@ -913,7 +913,7 @@ fn world_written(out: &mut String, world: &World, checking: bool) {
                 name_scalar(name)
             ));
             let mut settings: Vec<&str> = if checking {
-                tcslibgs::physics::settings_of(kind)
+                tcslibgs::node::physics::settings_of(kind)
                     .unwrap_or_default()
                     .to_vec()
             } else {

@@ -3,7 +3,7 @@
 use rand::rngs::StdRng;
 use rand::Rng;
 use rand_distr::StandardNormal;
-use tcslibgs::physics::Wander;
+use tcslibgs::node::physics::Wander;
 
 /// A seed for one thing in a run, from the run's seed and the thing's name.
 ///

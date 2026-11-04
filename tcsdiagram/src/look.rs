@@ -164,7 +164,7 @@ pub fn tint_of(node_type: &str) -> String {
         Pane::Vehicle => VEHICLE_RUNGS,
         Pane::Payloads => PAYLOAD_RUNGS,
         // No type of a configuration's is in it; a physics component is
-        // drawn by `crate::physics`, in its own tint.
+        // drawn by `crate::node::physics`, in its own tint.
         Pane::Physics => &[PHYSICS_TINT],
     };
     let order = ramp_order(pane);

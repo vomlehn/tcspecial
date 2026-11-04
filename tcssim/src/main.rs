@@ -53,15 +53,15 @@ use tcslibgs::{
 
 use std::collections::BTreeMap;
 
+use crate::node::physics;
+use crate::node::physics::sensor::Sensor;
+use crate::node::physics::Attachment;
 use crate::node::vehicle::thermostat::Thermostat;
-use crate::physics::sensor::Sensor;
-use crate::physics::Attachment;
 
 mod endpoint;
 mod grid;
 mod node;
 mod payload;
-mod physics;
 mod pty;
 mod ready;
 
@@ -358,7 +358,7 @@ fn joined_to_the_world(
     sims: &[ResolvedSim],
     dh_configs: &[DHConfig],
 ) -> Result<Attachments, String> {
-    use tcslibgs::physics::terminal::Kind;
+    use tcslibgs::node::physics::terminal::Kind;
     use tcslibgs::sim_config::Attached;
 
     let model = sim_file.physics().map_err(|e| e.to_string())?;
@@ -413,7 +413,7 @@ fn joined_to_the_world(
     ));
     // Each terminal is one the model has: `physics` refused a stand-in
     // naming another before this was reached.
-    let place = |at: &tcslibgs::physics::terminal::At| {
+    let place = |at: &tcslibgs::node::physics::terminal::At| {
         model.find(at).map(|(place, _)| place)
     };
 
@@ -462,7 +462,7 @@ fn joined_to_the_world(
                 // --sending, enables it.
                 let heater = matches!(
                     model.components[place.component].what,
-                    tcslibgs::physics::Resolution::Heater(_)
+                    tcslibgs::node::physics::Resolution::Heater(_)
                 );
                 Attachment::Drives {
                     world: world.clone(),
@@ -2821,7 +2821,7 @@ mod tests {
                 }
                 Attachment::Drives { place, .. } => {
                     // Its heat, the output after its on.
-                    let heat = tcslibgs::physics::Place {
+                    let heat = tcslibgs::node::physics::Place {
                         terminal: place.terminal + 1,
                         ..*place
                     };

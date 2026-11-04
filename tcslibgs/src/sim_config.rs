@@ -44,9 +44,11 @@ use std::fmt;
 use std::path::Path;
 use std::time::Duration;
 
-use crate::physics::setting::{quantity, size_of, time_of, wander_of, Wander};
-use crate::physics::terminal::{At, Direction, Kind};
-use crate::physics::{Model, PhysicsProblem, WorldSection};
+use crate::node::physics::setting::{
+    quantity, size_of, time_of, wander_of, Wander,
+};
+use crate::node::physics::terminal::{At, Direction, Kind};
+use crate::node::physics::{Model, PhysicsProblem, WorldSection};
 use crate::verify::About;
 use crate::{
     one_host, ConfigFormat, DHConfig, DHType, EndpointConfig, NetworkProtocol,
@@ -1034,7 +1036,7 @@ pub struct SimSettings {
     /// configuration says its readings are in -- and joined to an input, it
     /// drives it: what the vehicle writes to a heater switches the heater.
     /// Which it is, is the terminal's direction, which the model's component
-    /// type fixes: see [`crate::physics::terminal`].
+    /// type fixes: see [`crate::node::physics::terminal`].
     ///
     /// Three sensors joined to one zone report one temperature, each in its
     /// own encoding, which is what lets a configuration's voting be
@@ -1410,7 +1412,7 @@ pub struct SimConfigFile {
     /// The model is not a payload. It is what the payloads are joined by:
     /// the sensors report a zone's temperature and the heaters warm it, so
     /// what the vehicle reads is a consequence of what it drove. See
-    /// [`crate::physics`].
+    /// [`crate::node::physics`].
     #[serde(default)]
     pub world: Option<WorldSection>,
     /// A `thermal_mass` section, which a simulator file held before the
@@ -1602,7 +1604,7 @@ fn lined(
 /// Whether the two may be joined.
 pub fn may_join(
     watches_lines: bool,
-    terminal: &crate::physics::terminal::Terminal,
+    terminal: &crate::node::physics::terminal::Terminal,
 ) -> bool {
     !watches_lines
         || (terminal.direction == Direction::Out
@@ -1816,7 +1818,7 @@ impl SimConfigFile {
         // What each stand-in is joined to, where it names a terminal there
         // is: one that does not is refused with the payload, by
         // `attachment`, which is the entry to point at.
-        let mut driven: BTreeMap<crate::physics::Place, String> =
+        let mut driven: BTreeMap<crate::node::physics::Place, String> =
             BTreeMap::new();
         let mut joined: BTreeSet<usize> = BTreeSet::new();
         for payload in &self.simulated_payloads {
@@ -1874,7 +1876,7 @@ impl SimConfigFile {
                 ));
             }
             for (t, terminal) in component.what.terminals().iter().enumerate() {
-                let place = crate::physics::Place {
+                let place = crate::node::physics::Place {
                     component: n,
                     terminal: t,
                 };
@@ -4500,7 +4502,8 @@ physics:
     /// may be joined to any terminal.
     #[test]
     fn a_payload_watching_lines_joins_only_decisions() {
-        let heater = crate::physics::terminals_of("heater").expect("a type");
+        let heater =
+            crate::node::physics::terminals_of("heater").expect("a type");
         let joins = |watches: bool| -> Vec<&str> {
             heater
                 .iter()
@@ -4719,11 +4722,9 @@ physics:
 
         let mut file = joined(SENSOR, HEATER_1, HEATER_2);
         let model = file.world.as_mut().expect("a model");
-        model
-            .physics
-            .components
-            .push(crate::physics::Component::ThermalMass(
-                crate::physics::thermal_mass::ThermalMass {
+        model.physics.components.push(
+            crate::node::physics::Component::ThermalMass(
+                crate::node::physics::thermal_mass::ThermalMass {
                     name: "spare".to_string(),
                     moved_environment: None,
                     time_constant: "50 s".to_string(),
@@ -4734,7 +4735,8 @@ physics:
                     wander_time: None,
                     start: None,
                 },
-            ));
+            ),
+        );
         let err = file.physics().unwrap_err().to_string();
         assert!(err.contains("\"spare\": nothing is joined"), "{err}");
     }

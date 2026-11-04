@@ -38,7 +38,7 @@ use std::sync::Mutex;
 
 use tcslibgs::node::vehicle::compute::{HysteresisParams, ToValueParams};
 
-use crate::physics::{driven, Attachment};
+use crate::node::physics::{driven, Attachment};
 
 /// What the heaters should be doing.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -233,12 +233,12 @@ fn median(temperatures: impl Iterator<Item = f64>) -> f64 {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::physics::tests::zone_world;
-    use crate::physics::{encode, world::World};
+    use crate::node::physics::tests::zone_world;
+    use crate::node::physics::{encode, world::World};
     use std::sync::Arc;
     use std::time::Instant;
+    use tcslibgs::node::physics::Place;
     use tcslibgs::node::vehicle::compute::Format;
-    use tcslibgs::physics::Place;
 
     /// The thermostat example's sensor's encoding.
     ///
@@ -273,7 +273,7 @@ mod tests {
                 world: world.clone(),
                 place: place("heater_1.on"),
                 unit: None,
-                power: Arc::new(crate::physics::Power::new(true, true)),
+                power: Arc::new(crate::node::physics::Power::new(true, true)),
             },
         )];
         let params = HysteresisParams {

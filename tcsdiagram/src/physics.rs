@@ -4,11 +4,11 @@
 //! node it stands in for.
 //!
 //! The Physics pane is left of the payloads, at negative x in the
-//! coordinates the configuration holds -- see `crate::pane` -- and its
-//! nodes are laid out here, by name, top to bottom, rather than placed by
-//! hand: a configuration file is where a node's position is kept, and a
-//! physics component is never in one. So the drawing is the same every
-//! time a model is opened, in the one order the model has.
+//! coordinates the configuration holds -- see `crate::pane`. A component
+//! is drawn where the simulator file's `tcsgui` section says it was put,
+//! kept inside the pane; one the section does not place is laid out here,
+//! down the pane by name, so that a model nobody has arranged is drawn the
+//! same every time it is opened, in the one order a model has.
 //!
 //! A physics node is the one shape no node of a configuration's has -- a
 //! hexagon, pointed at both ends, with a dotted edge -- in the Physics pane's
@@ -34,6 +34,11 @@ use crate::{route, style};
 /// Physics pane; and wide enough for a name beside its terminals.
 pub const SIZE: (u32, u32) = (150, 44);
 
+/// How far from a terminal's left a line meets it, and how far from its top:
+/// the middle of its right side, where [`looks`] ends every physics line.
+pub const TERMINAL_RIGHT: f32 = style::TERMINAL.0 as f32;
+pub const TERMINAL_MIDDLE: f32 = style::TERMINAL.1 as f32 / 2.0;
+
 /// The type a physics node is drawn as, for the windows' lists: never one of
 /// a configuration's.
 pub const NODE_TYPE: &str = "physics";
@@ -47,6 +52,9 @@ pub struct Component<'a> {
     pub kind: &'a str,
     /// Whether something is wrong with it, which paints it red.
     pub faulty: bool,
+    /// Where the simulator file's `tcsgui` section says it was put, if it
+    /// says.
+    pub placed: Option<(i32, i32)>,
 }
 
 /// A stand-in's `connects`, as the drawing needs it: which payload node, and
@@ -70,6 +78,8 @@ pub struct Drawn {
     pub connections: Vec<(String, String)>,
     /// Each stand-in's payload and a terminal it is joined to.
     pub joins: Vec<(String, String)>,
+    /// Where the `tcsgui` section put each component it places, by name.
+    pub placed: std::collections::BTreeMap<String, (i32, i32)>,
 }
 
 impl Drawn {
@@ -97,6 +107,7 @@ impl Drawn {
                 name,
                 kind,
                 faulty: false,
+                placed: self.placed.get(name).copied(),
             })
             .collect();
         let connections: Vec<(&str, &str)> = self
@@ -142,6 +153,13 @@ pub fn of_simulator(sim: &tcslibgs::sim_config::SimConfigFile) -> Drawn {
             .collect();
         drawn.connections.sort();
     }
+    if let Some(tcsgui) = &sim.tcsgui {
+        drawn.placed = tcsgui
+            .nodes
+            .iter()
+            .map(|placed| (placed.name.clone(), (placed.x, placed.y)))
+            .collect();
+    }
     for payload in &sim.simulated_payloads {
         if let Some(said) = sim.settings_of(payload).connects {
             for terminal in tcslibgs::sim_config::terminals_of(&said) {
@@ -175,46 +193,119 @@ pub struct Place {
     pub size: (u32, u32),
 }
 
-/// Where each component goes: down the Physics pane, in name order, a step
-/// apart, clear of the pane's heading.
+/// How wide a physics node is drawn in a pane this wide.
+///
+/// As wide as [`SIZE`] where the pane has room for that and the lanes the
+/// joins run down beside it, and narrower where it has not, so that a
+/// narrow pane keeps its nodes in it rather than under the payloads. Never
+/// narrower than [`NARROWEST`], which still holds both terminals and a
+/// little of the name.
 ///
 /// # Arguments
 ///
-/// * `names`    - The components' names, in the order they are drawn.
+/// * `dividers` - Where the panes are.
+///
+/// # Returns
+///
+/// The width, in pixels.
+pub fn width_in(dividers: Dividers) -> i32 {
+    let (left, right) = edges_of(Pane::Physics, dividers);
+    let room = right - node_ceil(left) - LANES;
+    let room = if room >= SIZE.0 as i32 {
+        room
+    } else {
+        right - left - LANES
+    };
+    (SIZE.0 as i32).min(room).max(NARROWEST as i32)
+}
+
+/// Where a physics node put at `at` is drawn: inside the Physics pane, clear
+/// of its heading, and left of the lanes the joins run down.
+///
+/// Brought back inside rather than refused, as a configuration's node is
+/// (see `crate::pane::confine`): a node pushed at the edge moves along it,
+/// and a position from a file written for wider panes still draws the node
+/// where it can be seen and pressed.
+///
+/// # Arguments
+///
+/// * `at`       - Where it was put, its upper left corner, in the
+///                coordinates the file holds.
+/// * `dividers` - Where the panes are.
+///
+/// # Returns
+///
+/// Where it is drawn.
+pub fn confine(at: (i32, i32), dividers: Dividers) -> (i32, i32) {
+    let (left, right) = edges_of(Pane::Physics, dividers);
+    let furthest = (right - LANES - width_in(dividers)).max(left);
+    let top = node_ceil(NAMES.0 + NAMES.1);
+    (at.0.clamp(left, furthest), at.1.max(top))
+}
+
+/// Where each component goes.
+///
+/// One the `tcsgui` section placed goes where it was put, brought inside the
+/// pane by [`confine`]; one it did not goes down the pane, in name order, a
+/// step apart, clear of the heading. Then, in that order, any that covers
+/// one before it steps down until it is clear, as a configuration's nodes
+/// do (see `crate::pane::settle`): of two in one place the first keeps it,
+/// and none is drawn where it hides another.
+///
+/// # Arguments
+///
+/// * `placed`   - For each component, in the order drawn, where it was put,
+///                if anywhere.
 /// * `dividers` - Where the panes are, which says how wide the Physics pane
 ///                is.
 ///
 /// # Returns
 ///
-/// Each name's place.
-pub fn layout(names: &[&str], dividers: Dividers) -> Vec<Place> {
+/// Each component's place.
+pub fn layout(placed: &[Option<(i32, i32)>], dividers: Dividers) -> Vec<Place> {
     let (left, right) = edges_of(Pane::Physics, dividers);
-    // As wide as SIZE where the pane has room for that and the lanes the
-    // joins run down beside it, and narrower where it has not, so that a
-    // narrow pane keeps its nodes in it rather than under the payloads.
-    // Never narrower than NARROWEST, which still holds both terminals and
-    // a little of the name.
-    let fits = |x: i32| right - x - LANES;
-    let x = if fits(node_ceil(left)) >= SIZE.0 as i32 {
+    let width = width_in(dividers);
+    let x = if right - node_ceil(left) - LANES >= SIZE.0 as i32 {
         node_ceil(left)
     } else {
         left
     };
-    let width = (SIZE.0 as i32).min(fits(x)).max(NARROWEST as i32);
     // One step of the node grid between one node and the next.
     let gap = (NODE_STEP_MM as f64 * PX_PER_MM).round() as i32;
+    let size = (width as u32, SIZE.1);
     let mut y = node_ceil(NAMES.0 + NAMES.1);
-    names
+    let mut places: Vec<Place> = placed
         .iter()
-        .map(|_| {
-            let place = Place {
-                at: (x, y),
-                size: (width as u32, SIZE.1),
-            };
-            y = node_ceil(y + SIZE.1 as i32 + gap);
-            place
+        .map(|placed| match placed {
+            Some(at) => Place {
+                at: confine(*at, dividers),
+                size,
+            },
+            None => {
+                let place = Place { at: (x, y), size };
+                y = node_ceil(y + SIZE.1 as i32 + gap);
+                place
+            }
         })
-        .collect()
+        .collect();
+    let covers = |a: (i32, i32), b: (i32, i32)| {
+        a.0 < b.0 + width
+            && b.0 < a.0 + width
+            && a.1 < b.1 + SIZE.1 as i32
+            && b.1 < a.1 + SIZE.1 as i32
+    };
+    for at in 1..places.len() {
+        // A bound on the steps, as settle has, so that nothing a file says
+        // can keep this going.
+        for _ in 0..200 {
+            let here = places[at].at;
+            if !places[..at].iter().any(|other| covers(here, other.at)) {
+                break;
+            }
+            places[at].at.1 = node_ceil(here.1 + 32);
+        }
+    }
+    places
 }
 
 /// What a physics node looks like.
@@ -375,7 +466,9 @@ pub fn looks(
     shift: i32,
 ) -> (Vec<NodeLook>, Vec<LinkLook>) {
     let names: Vec<&str> = components.iter().map(|c| c.name).collect();
-    let places = layout(&names, dividers);
+    let placed: Vec<Option<(i32, i32)>> =
+        components.iter().map(|c| c.placed).collect();
+    let places = layout(&placed, dividers);
     let place_of =
         |name: &str| names.iter().position(|n| *n == name).map(|i| places[i]);
 
@@ -559,7 +652,7 @@ mod tests {
     #[test]
     fn the_components_go_down_the_physics_pane() {
         let dividers = default_dividers();
-        let places = layout(&["heater_1", "heater_2", "zone"], dividers);
+        let places = layout(&[None, None, None], dividers);
         let (left, right) = edges_of(Pane::Physics, dividers);
         for (i, place) in places.iter().enumerate() {
             let (x, y) = place.at;
@@ -585,8 +678,7 @@ mod tests {
             ("heater_2.heat", "zone.heat"),
         ];
         let dividers = default_dividers();
-        let names = ["heater_1", "heater_2", "zone"];
-        let places = layout(&names, dividers);
+        let places = layout(&[None, None, None], dividers);
         let zone = places[2];
         for pair in places.windows(2) {
             assert!(
@@ -599,6 +691,7 @@ mod tests {
             name,
             kind,
             faulty: false,
+            placed: None,
         };
         let components = [
             component("heater_1", "heater"),
@@ -682,6 +775,7 @@ mod tests {
             name: "it",
             kind,
             faulty: false,
+            placed: None,
         };
         for size in [SIZE, (super::NARROWEST, SIZE.1)] {
             let look = node_look(&component("heater"), (0, 0), size);
@@ -724,12 +818,55 @@ mod tests {
         }
     }
 
+    /// A component the `tcsgui` section placed is drawn where it was put,
+    /// brought inside the pane when it was put outside it; one it did not
+    /// place goes down the pane; and one put on top of another steps down
+    /// until it is clear, the first keeping its place.
+    #[test]
+    fn a_placed_component_is_drawn_where_it_was_put() {
+        let dividers = default_dividers();
+        let (left, right) = edges_of(Pane::Physics, dividers);
+        let top = node_ceil(NAMES.0 + NAMES.1);
+        let put = (left + 4, 300);
+        let places = layout(
+            &[Some(put), None, Some((right + 500, -40)), Some(put)],
+            dividers,
+        );
+        assert_eq!(places[0].at, put, "where it was put");
+        assert_eq!(places[1].at.1, top, "the first unplaced, at the top");
+        let pushed = places[2].at;
+        assert!(pushed.1 >= top, "below the heading: {places:?}");
+        assert!(
+            pushed.0 + places[2].size.0 as i32 + LANES <= right,
+            "left of the lanes: {places:?}"
+        );
+        // Brought in where confine brings it, and then down past the
+        // unplaced one at the top, which was there first.
+        let brought = confine((right + 500, -40), dividers);
+        assert_eq!(brought.1, top);
+        assert_eq!(pushed.0, brought.0);
+        assert!(pushed.1 >= places[1].at.1 + SIZE.1 as i32, "{places:?}");
+        assert_eq!(places[3].at.0, put.0);
+        assert!(
+            places[3].at.1 >= put.1 + SIZE.1 as i32,
+            "the second in one place steps down: {places:?}"
+        );
+
+        // And what the file says reaches the drawing.
+        let drawn = Drawn {
+            components: vec![("zone".into(), "thermal_zone".into())],
+            placed: [("zone".to_string(), put)].into_iter().collect(),
+            ..Drawn::default()
+        };
+        let (nodes, _) = drawn.looks(&[], dividers, 0);
+        assert_eq!((nodes[0].x, nodes[0].y), (put.0 as f32, put.1 as f32));
+    }
+
     /// A narrow Physics pane keeps its nodes in it, with the joins' lanes
     /// beside them, rather than drawing them under the payloads; a wide one
     /// draws them at their full width.
     #[test]
     fn a_narrow_pane_narrows_its_nodes() {
-        let names = ["heater_1", "zone"];
         let least = crate::pane::WORKING_WIDTH * crate::settings::LEAST / 100;
         for physics in [least, 105, 192, 400] {
             let dividers = Dividers {
@@ -737,7 +874,7 @@ mod tests {
                 ..default_dividers()
             };
             let (left, right) = edges_of(Pane::Physics, dividers);
-            let places = layout(&names, dividers);
+            let places = layout(&[None, None], dividers);
             for place in &places {
                 let end = place.at.0 + place.size.0 as i32;
                 assert!(place.at.0 >= left, "{physics}: {places:?}");
@@ -761,11 +898,13 @@ mod tests {
                 name: "heater_1",
                 kind: "heater",
                 faulty: false,
+                placed: None,
             },
             Component {
                 name: "zone",
                 kind: "thermal_zone",
                 faulty: true,
+                placed: None,
             },
         ];
         let nodes = [OnSheet {

@@ -473,6 +473,24 @@ component Surface inherits Rectangle {
     callback place-physics(string);
     callback physics-edit(string);
     callback physics-delete(string);
+    // A component dragged by this much, by its name, as node-moved is.
+    callback physics-moved(string, length, length);
+    // A line drawn from a component's terminal -- `gateway-out` for its one
+    // output, `payload-in` for its one input -- followed while the hand
+    // moves and let go of on the canvas, as link-started, link-moved and
+    // link-finished are for a configuration's node.
+    callback physics-link-started(string, string);
+    callback physics-link-moved(length, length);
+    callback physics-link-finished(length, length);
+    // What a line just drawn could mean, where it could mean more than one
+    // thing: each a terminal or a pair, as words, offered at the place it
+    // was let go of, in the coordinates of the whole canvas. Empty when
+    // nothing is being asked.
+    in property <[string]> physics-choices: [];
+    in property <length> physics-choice-x: 0px;
+    in property <length> physics-choice-y: 0px;
+    // Which was chosen, by its place in the list; -1 for none.
+    callback physics-chosen(int);
     callback open-subdiagram(string);
     // Write every file of the configuration now.
     callback save-clicked();
@@ -823,13 +841,66 @@ component Surface inherits Rectangle {
                 }
                 }
 
+                    // Moved, edited, deleted and joined as a configuration's
+                    // nodes are: a press that stays put offers the menu, one
+                    // that moves drags the component, and a press on a
+                    // terminal draws a line.
                     for n in root.physics-nodes: NodeShape {
                         node: n;
+                        draggable: true;
+                        dragged(dx, dy) => {
+                            root.physics-moved(n.name, dx, dy);
+                        }
                         edit-requested => { root.physics-edit(n.name); }
                         delete-requested => { root.physics-delete(n.name); }
-                        // Pressing a component opens it, as its menu's Edit
-                        // does: it has nothing else a press could mean.
-                        chosen => { root.physics-edit(n.name); }
+                        link-from(terminal) => {
+                            root.physics-link-started(n.name, terminal);
+                        }
+                        link-dragging(x, y) => {
+                            root.physics-link-moved(x, y);
+                        }
+                        link-dropped(x, y) => {
+                            root.physics-link-finished(x, y);
+                        }
+                    }
+
+                    // Which terminals a line just drawn means, where it could
+                    // mean more than one: asked where it was let go of, one
+                    // button each and one to draw nothing. A question rather
+                    // than a guess, because a heater's heat and its heating
+                    // are both outputs and a line to the wrong one is a
+                    // simulator that reads something other than was meant.
+                    if root.physics-choices.length > 0: Rectangle {
+                        x: root.physics-choice-x;
+                        y: root.physics-choice-y;
+                        width: asked.preferred-width;
+                        height: asked.preferred-height;
+                        background: Colors.window;
+                        border-width: 1px;
+                        border-color: #6b7280;
+                        border-radius: 4px;
+                        drop-shadow-blur: 8px;
+                        drop-shadow-color: #00000044;
+                        // Takes the presses that miss its buttons, so that
+                        // none reaches the node underneath.
+                        TouchArea { }
+                        asked := VerticalLayout {
+                            padding: Space.tight;
+                            spacing: Space.tight;
+                            Text {
+                                text: "Join which?";
+                                font-size: Type.small;
+                                font-weight: 700;
+                            }
+                            for choice[i] in root.physics-choices: Button {
+                                text: choice;
+                                clicked => { root.physics-chosen(i); }
+                            }
+                            Button {
+                                text: "Cancel";
+                                clicked => { root.physics-chosen(-1); }
+                            }
+                        }
                     }
                 }
 
@@ -1227,6 +1298,24 @@ export component MainWindow inherits Window {
     callback place-physics(string);
     callback physics-edit(string);
     callback physics-delete(string);
+    // A component dragged by this much, by its name, as node-moved is.
+    callback physics-moved(string, length, length);
+    // A line drawn from a component's terminal -- `gateway-out` for its one
+    // output, `payload-in` for its one input -- followed while the hand
+    // moves and let go of on the canvas, as link-started, link-moved and
+    // link-finished are for a configuration's node.
+    callback physics-link-started(string, string);
+    callback physics-link-moved(length, length);
+    callback physics-link-finished(length, length);
+    // What a line just drawn could mean, where it could mean more than one
+    // thing: each a terminal or a pair, as words, offered at the place it
+    // was let go of, in the coordinates of the whole canvas. Empty when
+    // nothing is being asked.
+    in property <[string]> physics-choices: [];
+    in property <length> physics-choice-x: 0px;
+    in property <length> physics-choice-y: 0px;
+    // Which was chosen, by its place in the list; -1 for none.
+    callback physics-chosen(int);
     in property <length> payload-divider: 0px;
     in property <length> vehicle-divider: 0px;
     in property <length> working-width: 0px;
@@ -1393,6 +1482,14 @@ export component MainWindow inherits Window {
         place-physics(t) => { root.place-physics(t); }
         physics-edit(n) => { root.physics-edit(n); }
         physics-delete(n) => { root.physics-delete(n); }
+        physics-moved(n, dx, dy) => { root.physics-moved(n, dx, dy); }
+        physics-link-started(n, t) => { root.physics-link-started(n, t); }
+        physics-link-moved(x, y) => { root.physics-link-moved(x, y); }
+        physics-link-finished(x, y) => { root.physics-link-finished(x, y); }
+        physics-choices: root.physics-choices;
+        physics-choice-x: root.physics-choice-x;
+        physics-choice-y: root.physics-choice-y;
+        physics-chosen(i) => { root.physics-chosen(i); }
         payload-divider: root.payload-divider;
         vehicle-divider: root.vehicle-divider;
         gateway-list-percent: root.gateway-list-percent;

@@ -3464,8 +3464,27 @@ now: a simulator file still naming a model in a file of its own,
 ``physics`` section at the top of a simulator file, not under ``world``; a
 zone stating its own ``environment``, which is the world's ``ambient_temp``;
 a component with ``name:`` and ``type:`` of its own; and a simulator file
-still declaring masses itself. Each component is one simple part, of one of
-these types:
+still declaring masses itself.
+
+Where tcsgui drew each component is kept last in the simulator file, in a
+``tcsgui`` section of its own, as a configuration keeps its nodes' places:
+
+.. code-block:: yaml
+
+   tcsgui:
+     nodes:
+       - { node: zone, x: -193, y: 280 }
+
+tcssim ignores it. A component it does not name is laid out down tcsgui's
+Physics pane by name, so the section is never needed, and it is written as
+components are moved there. In tcsgui a component is moved, edited, deleted
+and joined as a node is: drag it, press it for Edit and Delete, and draw a
+line from its output or input terminal to another component, for a
+connection, or to a payload, to set that payload's ``connects``. Where a line
+could mean more than one terminal -- a heater's heat, current and heating,
+to a sensor -- tcsgui asks which.
+
+Each component is one simple part, of one of these types:
 
 .. code-block:: text
 

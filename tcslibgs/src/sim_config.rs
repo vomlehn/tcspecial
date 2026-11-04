@@ -1166,10 +1166,10 @@ pub struct SimSettings {
 /// `packet_interval_ms: ""` and no `packet_interval_ms` at all mean the same
 /// thing here, which is the rule the editor states for every field it offers:
 /// absent and empty are one thing to the checking, and a cleared field is not
-/// an answer. It matters because the editor writes a new simulator
-/// configuration as a form -- every setting of every payload, empty until
-/// somebody fills it in -- and a form that nothing could load would be a file
-/// written to be rejected.
+/// an answer. It matters for the files written as forms -- every setting of
+/// every payload, empty until somebody fills it in -- by hand, or by the
+/// editor before it wrote only what holds a value: a form that nothing could
+/// load would be a file written to be rejected.
 ///
 /// The value is taken as the text a file wrote, number or string alike, and
 /// parsed from that: see [`crate::Scalar`]. A value that is not empty and not
@@ -1421,6 +1421,32 @@ pub struct SimConfigFile {
     /// The simulated payloads, of every type, in name order.
     #[serde(default, deserialize_with = "crate::sim_grouped::payloads")]
     pub simulated_payloads: Vec<SimPayload>,
+    /// What the editor arranged: where each physics component was drawn.
+    ///
+    /// Here, and not in a configuration's own `tcsgui` section, because the
+    /// physics is this file's: two configurations that share one simulator
+    /// file share its world, and should be shown one drawing of it. Last in
+    /// the file for the reason a configuration's is, being about a screen
+    /// and not the vehicle. See [`SimTcsgui`].
+    #[serde(default)]
+    pub tcsgui: Option<SimTcsgui>,
+}
+
+/// The simulator file's `tcsgui` section.
+///
+/// A component named here and nowhere else is a position left behind by a
+/// component somebody deleted: kept rather than refused, as a
+/// configuration's are, because it says nothing about the vehicle and the
+/// editor writes the section again from the components it has. A component
+/// named nowhere here is laid out by the editor, down the Physics pane by
+/// name.
+#[derive(Debug, Clone, Default, Deserialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub struct SimTcsgui {
+    /// Where each component was drawn, by name, written as a
+    /// configuration's nodes are: `- { node: zone, x: -160, y: 34 }`.
+    #[serde(default, deserialize_with = "crate::graph::grouped::layout")]
+    pub nodes: Vec<crate::graph::Placed>,
 }
 
 /// The simulator file's `tcssim` section.
@@ -1556,6 +1582,31 @@ fn lined(
         ))),
         (attached, _) => Ok(attached),
     }
+}
+
+/// Whether a stand-in may be joined to this terminal of a component.
+///
+/// What [`lined`] holds a file to, put as the editor asks it when a line is
+/// drawn between a payload and a component: a payload watching GPIO lines
+/// is pulled to decisions, so only a decision output; any other may report
+/// a value, signal a decision or drive an input.
+///
+/// # Arguments
+///
+/// * `watches_lines` - Whether the payload is a GPIO node watching lines,
+///                     rather than driving them.
+/// * `terminal`      - The terminal.
+///
+/// # Returns
+///
+/// Whether the two may be joined.
+pub fn may_join(
+    watches_lines: bool,
+    terminal: &crate::physics::terminal::Terminal,
+) -> bool {
+    !watches_lines
+        || (terminal.direction == Direction::Out
+            && terminal.kind == Kind::Decision)
 }
 
 /// What a sensor gets wrong, as a datasheet would say it, in the unit of
@@ -4442,6 +4493,54 @@ physics:
         let world = file.world.expect("a model");
         assert_eq!(world.physics.components.len(), 3);
         assert_eq!(world.ambient_temp.as_deref(), Some("283.15 K"));
+    }
+
+    /// What the editor offers a payload watching lines is what a file may
+    /// join it to: a decision output and nothing else; any other payload
+    /// may be joined to any terminal.
+    #[test]
+    fn a_payload_watching_lines_joins_only_decisions() {
+        let heater = crate::physics::terminals_of("heater").expect("a type");
+        let joins = |watches: bool| -> Vec<&str> {
+            heater
+                .iter()
+                .filter(|t| may_join(watches, t))
+                .map(|t| t.name)
+                .collect()
+        };
+        assert_eq!(joins(true), ["heating"]);
+        assert_eq!(joins(false), ["on", "heat", "current", "heating"]);
+    }
+
+    /// Where the editor drew each physics component is read from the
+    /// `tcsgui` section, a position for a component the world has not is
+    /// kept, and a position that is not two whole numbers is refused, named.
+    #[test]
+    fn the_physics_positions_are_read_from_the_tcsgui_section() {
+        let file = parse(
+            "tcsgui:\n  nodes:\n    - { node: zone, x: -160, y: 34 }\n    \
+             - { node: gone, x: -160, y: 98 }\n",
+        );
+        let placed = file.tcsgui.expect("a tcsgui section").nodes;
+        assert_eq!(placed.len(), 2);
+        assert_eq!(
+            (placed[0].name.as_str(), placed[0].x, placed[0].y),
+            ("zone", -160, 34)
+        );
+        assert!(parse("description: none\n").tcsgui.is_none());
+
+        let why = SimConfigFile::parse(
+            "tcsgui:\n  nodes:\n    - { node: zone, x: left, y: 34 }\n",
+            ConfigFormat::Yaml,
+        )
+        .expect_err("not a number")
+        .to_string();
+        assert!(why.contains("zone") && why.contains("left"), "{why}");
+        let why =
+            SimConfigFile::parse("tcsgui:\n  places: []\n", ConfigFormat::Yaml)
+                .expect_err("not a key the section has")
+                .to_string();
+        assert!(why.contains("places"), "{why}");
     }
 
     /// A sensor joined to an output reports it, in its unit, and a heater

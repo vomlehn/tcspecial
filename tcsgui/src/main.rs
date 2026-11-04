@@ -58,7 +58,7 @@ use slint::{ModelRc, VecModel};
 // where the panes are divided. Named here so that `crate::pane` and the rest
 // read as they did while these were this program's own.
 use tcsdiagram::look::ground_of;
-use tcsdiagram::{look, pane, route, style};
+use tcsdiagram::{look, pane, physics, route, style};
 
 use document::{Document, Fault};
 use editor::Editor;
@@ -4600,6 +4600,7 @@ fn physics_views_of(
             name,
             kind: &component.kind,
             faulty: faulty(name),
+            placed: world.placed.get(name).copied(),
         })
         .collect();
     let connections: Vec<(&str, &str)> = world
@@ -4728,6 +4729,430 @@ fn wire_physics(
             drag_physics_list_divider(&editor, &views, dy, tall);
         });
     }
+    {
+        // A component dragged: put where it was let go of, on the grid and
+        // inside the Physics pane, as a node is. A drag that ends where it
+        // started records nothing; a press that did not move never gets
+        // here, the markup offering its menu instead.
+        let editor = editor.clone();
+        let views = views.clone();
+        window.on_physics_moved(move |name, dx, dy| {
+            let dividers = views.borrow().divider.get();
+            {
+                let mut editor = editor.borrow_mut();
+                let Some((was, drawn)) = physics_places(&editor, dividers)
+                    .into_iter()
+                    .find(|(component, ..)| name == component.as_str())
+                    .map(|(_, _, place)| place.at)
+                    .and_then(|drawn| {
+                        let world =
+                            &editor.document().simulator.as_ref()?.world;
+                        Some((world.placed.get(name.as_str()).copied(), drawn))
+                    })
+                else {
+                    return;
+                };
+                let now = tcsdiagram::physics::confine(
+                    snap((
+                        drawn.0 + dx.round() as i32,
+                        drawn.1 + dy.round() as i32,
+                    )),
+                    dividers,
+                );
+                if now != drawn {
+                    editor.edit(Edit::MovePhysics {
+                        component: name.to_string(),
+                        was,
+                        now: Some(now),
+                    });
+                }
+            }
+            views.borrow().refresh(&editor.borrow());
+        });
+    }
+
+    // A line drawn from a component's terminal: which component and which
+    // way while the hand moves, and what it could mean, while that is being
+    // asked.
+    let drawing: Rc<RefCell<Option<PhysicsEnd>>> = Rc::new(RefCell::new(None));
+    let asking: Rc<RefCell<Vec<PhysicsJoin>>> =
+        Rc::new(RefCell::new(Vec::new()));
+    {
+        let drawing = drawing.clone();
+        window.on_physics_link_started(move |name, terminal| {
+            *drawing.borrow_mut() = Some(PhysicsEnd {
+                component: name.to_string(),
+                output: terminal.as_str() == "gateway-out",
+            });
+        });
+    }
+    {
+        // The line follows the hand, from the terminal pressed, as a line
+        // drawn from a node's does. Drawn on the configuration's canvas,
+        // which starts at the Physics pane's right edge.
+        let editor = editor.clone();
+        let views = views.clone();
+        let drawing = drawing.clone();
+        let weak = window.as_weak();
+        window.on_physics_link_moved(move |x, y| {
+            let Some(window) = weak.upgrade() else {
+                return;
+            };
+            let dividers = views.borrow().divider.get();
+            let shift = dividers.physics as f32;
+            let route = drawing
+                .borrow()
+                .as_ref()
+                .and_then(|end| {
+                    let (_, _, place) =
+                        physics_places(&editor.borrow(), dividers)
+                            .into_iter()
+                            .find(|(name, ..)| *name == end.component)?;
+                    let (tx, ty) = physics::terminal_at(place.size, end.output);
+                    let anchor = (
+                        (place.at.0 + tx) as f32 + physics::TERMINAL_RIGHT,
+                        (place.at.1 + ty) as f32 + physics::TERMINAL_MIDDLE,
+                    );
+                    Some(tcsdiagram::route::drawing(anchor, (x - shift, y)))
+                })
+                .unwrap_or_default();
+            window.set_drawing_route(route.into());
+        });
+    }
+    {
+        // Let go of: over another component, a connection between the two;
+        // over a payload, or the box of a subdiagram holding payloads, a
+        // stand-in's connects. One thing it can mean is done; several are
+        // asked about, where it was let go of; none is nothing.
+        let editor = editor.clone();
+        let views = views.clone();
+        let drawing = drawing.clone();
+        let asking = asking.clone();
+        let weak = window.as_weak();
+        window.on_physics_link_finished(move |x, y| {
+            let Some(window) = weak.upgrade() else {
+                return;
+            };
+            window.set_drawing_route(Default::default());
+            let Some(end) = drawing.borrow_mut().take() else {
+                return;
+            };
+            let dividers = views.borrow().divider.get();
+            let meant = physics_joins(&editor.borrow(), dividers, &end, (x, y));
+            match meant.as_slice() {
+                [] => {}
+                [one] => {
+                    let edit = physics_edit(&editor.borrow(), one);
+                    if let Some(edit) = edit {
+                        editor.borrow_mut().edit(edit);
+                    }
+                }
+                several => {
+                    let said: Vec<slint::SharedString> =
+                        several.iter().map(|j| j.said().into()).collect();
+                    window.set_physics_choices(ModelRc::from(Rc::new(
+                        VecModel::from(said),
+                    )));
+                    window.set_physics_choice_x(x);
+                    window.set_physics_choice_y(y);
+                    *asking.borrow_mut() = meant;
+                }
+            }
+            views.borrow().refresh(&editor.borrow());
+        });
+    }
+    {
+        // The answer to what a line meant: the one chosen is made, and
+        // Cancel makes nothing.
+        let editor = editor.clone();
+        let views = views.clone();
+        let weak = window.as_weak();
+        window.on_physics_chosen(move |chosen| {
+            if let Some(window) = weak.upgrade() {
+                window.set_physics_choices(ModelRc::default());
+            }
+            let meant = std::mem::take(&mut *asking.borrow_mut());
+            let Some(join) = usize::try_from(chosen)
+                .ok()
+                .and_then(|chosen| meant.get(chosen))
+            else {
+                return;
+            };
+            let edit = physics_edit(&editor.borrow(), join);
+            if let Some(edit) = edit {
+                editor.borrow_mut().edit(edit);
+            }
+            views.borrow().refresh(&editor.borrow());
+        });
+    }
+}
+
+/// One end of a line being drawn from a physics component: the component,
+/// and whether it was drawn from its output rather than its input.
+#[derive(Debug, Clone, PartialEq, Eq)]
+struct PhysicsEnd {
+    component: String,
+    output: bool,
+}
+
+/// One thing a line drawn from a physics component can mean.
+#[derive(Debug, Clone, PartialEq, Eq)]
+enum PhysicsJoin {
+    /// A connection, from an output to an input, as the file writes them:
+    /// `heater_1.heat` and `zone.heat`.
+    Connection { from: String, to: String },
+    /// A stand-in joined to a terminal: the payload, as the simulator file
+    /// keys it, and the terminal, as `heater_1.on`.
+    StandIn { payload: String, terminal: String },
+}
+
+impl PhysicsJoin {
+    /// How it is offered, where a line could mean more than one thing:
+    /// what is joined to what, in the words a file uses.
+    ///
+    /// # Returns
+    ///
+    /// The words.
+    fn said(&self) -> String {
+        match self {
+            PhysicsJoin::Connection { from, to } => format!("{from} to {to}"),
+            PhysicsJoin::StandIn { payload, terminal } => {
+                format!("{payload} with {terminal}")
+            }
+        }
+    }
+}
+
+/// Where each physics component is drawn, by name, with its type, in the
+/// order the Physics pane draws them: the one layout, which the drawing and
+/// a drag both take.
+///
+/// # Arguments
+///
+/// * `editor`   - The session.
+/// * `dividers` - Where the panes are.
+///
+/// # Returns
+///
+/// Each component's name, type and place; nothing without a simulator file.
+fn physics_places(
+    editor: &Editor,
+    dividers: Dividers,
+) -> Vec<(String, String, tcsdiagram::physics::Place)> {
+    let Some(simulator) = &editor.document().simulator else {
+        return Vec::new();
+    };
+    let world = &simulator.world;
+    let placed: Vec<Option<(i32, i32)>> = world
+        .components
+        .keys()
+        .map(|name| world.placed.get(name).copied())
+        .collect();
+    world
+        .components
+        .iter()
+        .zip(physics::layout(&placed, dividers))
+        .map(|((name, component), place)| {
+            (name.clone(), component.kind.clone(), place)
+        })
+        .collect()
+}
+
+/// Everything a line drawn from a physics component and let go of at a
+/// point can mean.
+///
+/// Over another component, each pair of terminals the two can be connected
+/// by, the way the line was drawn: `tcslibgs::physics::connectable` says
+/// which. Over a payload on the top page, or the box of a subdiagram, which
+/// is all of a subdiagram the top page shows, each payload there and each
+/// terminal of the component, the way the line was drawn, its stand-in may
+/// be joined to: `tcslibgs::sim_config::may_join` says which. A join that is
+/// already made is not offered again.
+///
+/// # Arguments
+///
+/// * `editor`   - The session.
+/// * `dividers` - Where the panes are.
+/// * `end`      - The component the line was drawn from, and which way.
+/// * `at`       - Where it was let go of, in the coordinates of the whole
+///                canvas, whose nought is the Physics pane's left edge.
+///
+/// # Returns
+///
+/// Each thing it can mean, in the order the types list their terminals.
+fn physics_joins(
+    editor: &Editor,
+    dividers: Dividers,
+    end: &PhysicsEnd,
+    at: (f32, f32),
+) -> Vec<PhysicsJoin> {
+    let (x, y) = at;
+    let document = editor.document();
+    let Some(simulator) = &document.simulator else {
+        return Vec::new();
+    };
+    let places = physics_places(editor, dividers);
+    let Some(kind) = places
+        .iter()
+        .find(|(name, ..)| *name == end.component)
+        .map(|(_, kind, _)| kind.clone())
+    else {
+        return Vec::new();
+    };
+    let shift = dividers.physics as f32;
+
+    let over = places.iter().find(|(_, _, place)| {
+        let left = (place.at.0 + dividers.physics) as f32;
+        let top = place.at.1 as f32;
+        x >= left
+            && x <= left + place.size.0 as f32
+            && y >= top
+            && y <= top + place.size.1 as f32
+    });
+    if let Some((other, their_kind, _)) = over {
+        if *other == end.component {
+            return Vec::new();
+        }
+        let (from, to, outputs_of, inputs_of) = if end.output {
+            (&end.component, other, &kind, their_kind)
+        } else {
+            (other, &end.component, their_kind, &kind)
+        };
+        return tcslibgs::physics::connectable(outputs_of, inputs_of)
+            .into_iter()
+            .map(|(output, input)| PhysicsJoin::Connection {
+                from: format!("{from}.{output}"),
+                to: format!("{to}.{input}"),
+            })
+            .filter(|join| match join {
+                PhysicsJoin::Connection { from, to } => !simulator
+                    .world
+                    .connections
+                    .contains(&(from.clone(), to.clone())),
+                PhysicsJoin::StandIn { .. } => true,
+            })
+            .collect();
+    }
+
+    // The top page's node under the point, in the configuration's own
+    // coordinates; and the payloads it is, or holds.
+    let Some(under) = node_under(document, &None, (x - shift, y)) else {
+        return Vec::new();
+    };
+    let Some(terminals) = tcslibgs::physics::terminals_of(&kind) else {
+        return Vec::new();
+    };
+    let way = if end.output {
+        tcslibgs::physics::terminal::Direction::Out
+    } else {
+        tcslibgs::physics::terminal::Direction::In
+    };
+    let mut meant = Vec::new();
+    for node in &document.nodes {
+        let drawn = node.home.as_deref().unwrap_or(node.name.as_str());
+        if drawn != under || pane::pane_of(&node.node_type) != Pane::Payloads {
+            continue;
+        }
+        let payload = crate::sim::Simulator::key_of(&node.name);
+        let said = simulator
+            .payloads
+            .get(&payload)
+            .and_then(|settings| settings.get("connects"))
+            .map(String::as_str)
+            .unwrap_or_default();
+        let joined: Vec<&str> =
+            tcslibgs::sim_config::terminals_of(said).collect();
+        let watches = watches_lines(&node.node_type, &node.attributes);
+        for terminal in terminals {
+            let named = format!("{}.{}", end.component, terminal.name);
+            if terminal.direction == way
+                && tcslibgs::sim_config::may_join(watches, terminal)
+                && !joined.contains(&named.as_str())
+            {
+                meant.push(PhysicsJoin::StandIn {
+                    payload: payload.clone(),
+                    terminal: named,
+                });
+            }
+        }
+    }
+    meant
+}
+
+/// Whether a payload is a GPIO node watching its lines, rather than one
+/// driving them: whose stand-in is pulled to a decision for each line.
+///
+/// # Arguments
+///
+/// * `node_type`  - The payload's type.
+/// * `attributes` - What it states.
+///
+/// # Returns
+///
+/// Whether it watches lines; `false` for a direction that is neither,
+/// which the checking reports.
+fn watches_lines(
+    node_type: &str,
+    attributes: &BTreeMap<String, String>,
+) -> bool {
+    use tcslibgs::node::payload::gpio::Direction;
+    node_type == "gpio"
+        && attributes
+            .get("direction")
+            .map_or(Ok(Direction::default()), |said| Direction::of(said.trim()))
+            .is_ok_and(|direction| !direction.is_output())
+}
+
+/// The edit that makes a join.
+///
+/// A connection is added. A stand-in's `connects` is set to the terminal,
+/// or, for a payload watching lines, given the terminal after those it
+/// names already, one decision for each line in the order of its lines.
+///
+/// # Arguments
+///
+/// * `editor` - The session.
+/// * `join`   - What to make.
+///
+/// # Returns
+///
+/// The edit; `None` without a simulator file.
+fn physics_edit(editor: &Editor, join: &PhysicsJoin) -> Option<Edit> {
+    let document = editor.document();
+    let simulator = document.simulator.as_ref()?;
+    match join {
+        PhysicsJoin::Connection { from, to } => Some(Edit::AddConnection {
+            from: from.clone(),
+            to: to.clone(),
+        }),
+        PhysicsJoin::StandIn { payload, terminal } => {
+            let was = simulator
+                .payloads
+                .get(payload)
+                .and_then(|settings| settings.get("connects"))
+                .filter(|said| !said.trim().is_empty())
+                .cloned();
+            let watches = document
+                .nodes
+                .iter()
+                .find(|node| {
+                    crate::sim::Simulator::key_of(&node.name) == *payload
+                })
+                .is_some_and(|node| {
+                    watches_lines(&node.node_type, &node.attributes)
+                });
+            let now = match (&was, watches) {
+                (Some(was), true) => format!("{was}, {terminal}"),
+                _ => terminal.clone(),
+            };
+            Some(Edit::SetSimPayload {
+                payload: payload.clone(),
+                setting: "connects".to_string(),
+                was,
+                now: Some(now),
+            })
+        }
+    }
 }
 
 /// Removes a physics component, with the connections that join it, in one
@@ -4750,6 +5175,7 @@ fn remove_physics(editor: &Rc<RefCell<Editor>>, name: &str) {
                 .map(|(a, b)| (a.clone(), b.clone()))
                 .collect(),
             connections: s.world.connections_of(name),
+            joins: s.joins_of(name),
         })
     }) else {
         return;
@@ -4934,6 +5360,7 @@ fn physics_palette() -> ModelRc<PaletteEntry> {
                     name: kind,
                     kind,
                     faulty: false,
+                    placed: None,
                 },
                 (8, 2),
                 tcsdiagram::physics::SIZE,
@@ -6751,6 +7178,120 @@ mod tests {
                 "a row with nothing to press: {trouble:?}"
             );
         }
+    }
+
+    /// A line drawn from a physics component means what its terminals and
+    /// the thing it is let go of over allow: from a heater's output to a
+    /// zone, its heat into the zone's; to a GPIO payload watching lines,
+    /// only its heating, which is added after the decisions the payload
+    /// names already; to a sensor, each output, which is asked about; and
+    /// from the zone's output back to itself, or to a heater, nothing.
+    #[test]
+    fn a_line_from_a_physics_component_means_what_its_terminals_allow() {
+        let where_ = tempfile::tempdir().expect("a directory");
+        let path = where_.path().join("vehicle.ytcs");
+        let sim = where_.path().join("vehicle-sim.yaml");
+        std::fs::write(
+            &sim,
+            "world:\n  ambient_temp: \"283.15 K\"\n  physics:\n    \
+             components:\n      - type heater:\n          \
+             - component: heater_1\n          - component: heater_2\n      \
+             - type thermal_zone:\n          - component: zone\n",
+        )
+        .expect("written");
+        let mut editor = Editor::open(&path, dividers());
+        editor.open_simulator(&sim);
+        for (name, kind, at) in [
+            ("lines-in", "gpio", (34, 34)),
+            ("lines-out", "gpio", (34, 166)),
+            ("temp_1", "network", (34, 280)),
+        ] {
+            editor.edit(Edit::AddNode {
+                name: name.into(),
+                node_type: kind.into(),
+                home: None,
+            });
+            editor.edit(Edit::MoveNode {
+                node: name.into(),
+                was: (0, 0),
+                now: at,
+            });
+        }
+        editor.edit(Edit::SetAttribute {
+            node: "lines-out".into(),
+            attribute: "direction".into(),
+            was: None,
+            now: Some("output".into()),
+        });
+        editor.edit(Edit::SetSimPayload {
+            payload: "lines-in".into(),
+            setting: "connects".into(),
+            was: None,
+            now: Some("heater_2.heating".into()),
+        });
+
+        let dividers = dividers();
+        let shift = dividers.physics as f32;
+        let middle_of = |name: &str| {
+            let (_, _, place) = physics_places(&editor, dividers)
+                .into_iter()
+                .find(|(component, ..)| component == name)
+                .expect("drawn");
+            (
+                (place.at.0 + dividers.physics) as f32 + 20.0,
+                place.at.1 as f32 + 20.0,
+            )
+        };
+        let over =
+            |at: (i32, i32)| (at.0 as f32 + shift + 40.0, at.1 as f32 + 20.0);
+        let from = |component: &str, output: bool| PhysicsEnd {
+            component: component.into(),
+            output,
+        };
+        let joins =
+            |end: PhysicsEnd, at| physics_joins(&editor, dividers, &end, at);
+        let stand_in = |payload: &str, terminal: &str| PhysicsJoin::StandIn {
+            payload: payload.into(),
+            terminal: terminal.into(),
+        };
+
+        assert_eq!(
+            joins(from("heater_1", true), middle_of("zone")),
+            [PhysicsJoin::Connection {
+                from: "heater_1.heat".into(),
+                to: "zone.heat".into(),
+            }]
+        );
+        assert!(joins(from("zone", true), middle_of("zone")).is_empty());
+        assert!(joins(from("zone", true), middle_of("heater_1")).is_empty());
+
+        let pulled = joins(from("heater_1", true), over((34, 34)));
+        assert_eq!(pulled, [stand_in("lines-in", "heater_1.heating")]);
+        assert_eq!(
+            physics_edit(&editor, &pulled[0]),
+            Some(Edit::SetSimPayload {
+                payload: "lines-in".into(),
+                setting: "connects".into(),
+                was: Some("heater_2.heating".into()),
+                now: Some("heater_2.heating, heater_1.heating".into()),
+            })
+        );
+        assert!(
+            joins(from("heater_2", true), over((34, 34))).is_empty(),
+            "a decision the payload names already is not offered again"
+        );
+        assert_eq!(
+            joins(from("heater_1", false), over((34, 166))),
+            [stand_in("lines-out", "heater_1.on")]
+        );
+        assert_eq!(
+            joins(from("heater_1", true), over((34, 280))).len(),
+            3,
+            "heat, current and heating, asked about"
+        );
+        assert!(
+            joins(from("heater_1", true), (shift + 900.0, 900.0)).is_empty()
+        );
     }
 
     /// Doing nothing leaves the node on the canvas, in its own working pane.

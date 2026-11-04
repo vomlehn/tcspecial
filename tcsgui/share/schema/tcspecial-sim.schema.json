@@ -360,6 +360,38 @@
           }
         }
       }
+    },
+    "tcsgui": {
+      "description": "What the editor arranged: where each physics component of the world was drawn. Last in the file and in a section of its own, because the sections above say what tcssim stands in for and this says where somebody put the boxes on a screen; tcssim ignores it. A component named here and not in the world is a position left behind, and kept; a component named nowhere here is laid out by the editor. Each entry names the component it is about by its first key, `node: <name>`, as a configuration's tcsgui section names its nodes.",
+      "type": "object",
+      "properties": {
+        "nodes": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "node": {
+                "description": "The physics component this is about, as its `component:` names it.",
+                "type": "string",
+                "minLength": 1
+              },
+              "x": {
+                "type": "integer"
+              },
+              "y": {
+                "type": "integer"
+              }
+            },
+            "required": [
+              "node",
+              "x",
+              "y"
+            ],
+            "additionalProperties": false
+          }
+        }
+      },
+      "additionalProperties": false
     }
   },
   "additionalProperties": false,

@@ -3662,8 +3662,23 @@ now: a simulator file still naming a model in a file of its own,
 <tt class="docutils literal">physics</tt> section at the top of a simulator file, not under <tt class="docutils literal">world</tt>; a
 zone stating its own <tt class="docutils literal">environment</tt>, which is the world's <tt class="docutils literal">ambient_temp</tt>;
 a component with <tt class="docutils literal">name:</tt> and <tt class="docutils literal">type:</tt> of its own; and a simulator file
-still declaring masses itself. Each component is one simple part, of one of
-these types:</p>
+still declaring masses itself.</p>
+<p>Where tcsgui drew each component is kept last in the simulator file, in a
+<tt class="docutils literal">tcsgui</tt> section of its own, as a configuration keeps its nodes' places:</p>
+<pre class="code yaml literal-block">
+<span class="name tag">tcsgui</span><span class="punctuation">:</span><span class="whitespace">
+  </span><span class="name tag">nodes</span><span class="punctuation">:</span><span class="whitespace">
+    </span><span class="punctuation indicator">-</span><span class="whitespace"> </span><span class="punctuation indicator">{</span><span class="name tag"> node</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="name variable">zone</span><span class="punctuation indicator">,</span><span class="name tag"> x</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="name variable">-193</span><span class="punctuation indicator">,</span><span class="name tag"> y</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="name variable">280</span><span class="whitespace"> </span><span class="punctuation indicator">}</span>
+</pre>
+<p>tcssim ignores it. A component it does not name is laid out down tcsgui's
+Physics pane by name, so the section is never needed, and it is written as
+components are moved there. In tcsgui a component is moved, edited, deleted
+and joined as a node is: drag it, press it for Edit and Delete, and draw a
+line from its output or input terminal to another component, for a
+connection, or to a payload, to set that payload's <tt class="docutils literal">connects</tt>. Where a line
+could mean more than one terminal -- a heater's heat, current and heating,
+to a sensor -- tcsgui asks which.</p>
+<p>Each component is one simple part, of one of these types:</p>
 <pre class="code text literal-block">
 heater                 a resistance on a supply, switched on and off
   component            the name connections and stand-ins use

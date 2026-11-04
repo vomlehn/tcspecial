@@ -868,9 +868,9 @@ impl Document {
     /// This is a change to the document, so the honest thing is to say what it
     /// is not. It is not an edit: nothing goes in the history, because undoing
     /// it would put a node back somewhere the editor refuses to put one. And
-    /// it writes nothing by itself -- the file is untouched until something is
-    /// actually edited, at which point these positions are written with
-    /// everything else, because every edit rewrites the whole file.
+    /// it writes nothing by itself, nor does an edit of anything else: a save
+    /// writes only what was edited -- see `crate::faithful` -- and a node
+    /// settled here is written where it now is when it is moved.
     ///
     /// And on the grid: a node whose upper left corner is not on a grid point
     /// is moved to the nearest one, which is the rule a drag obeys as well --
@@ -1133,10 +1133,7 @@ impl Document {
         // name, which is how the simulator's file keys it wherever the node
         // is drawn. See `crate::sim::Simulator::key_of`.
         if let Some(simulator) = &mut self.simulator {
-            let key = crate::sim::Simulator::key_of(&was);
-            if let Some(settings) = simulator.payloads.remove(&key) {
-                simulator.payloads.insert(now.to_string(), settings);
-            }
+            simulator.rename(&crate::sim::Simulator::key_of(&was), now);
         }
     }
 
@@ -1550,11 +1547,7 @@ impl Document {
                 // as the file keys it: see `crate::sim::Simulator::key_of`.
                 if let Some(simulator) = &mut self.simulator {
                     let key_of = crate::sim::Simulator::key_of;
-                    if let Some(settings) =
-                        simulator.payloads.remove(&key_of(was))
-                    {
-                        simulator.payloads.insert(key_of(now), settings);
-                    }
+                    simulator.rename(&key_of(was), &key_of(now));
                 }
             }
             Edit::AddLink { link } => {
@@ -2097,44 +2090,68 @@ impl Document {
             written.push((beside.clone(), self.text_for(&None, &beside)?));
         }
 
+        // Each subdiagram, and its other spelling where that is there too,
+        // for the same reason as the top diagram's.
         for name in self.subdiagrams() {
             let home = Some(name.clone());
-            written.push((file_for(&name, path), self.text_for(&home, path)?));
+            let file = file_for(&name, path);
+            written.push((file.clone(), self.text_for(&home, path)?));
+            if let Some(beside) = self.other_spelling(&file) {
+                let text = self.text_for(&home, &beside)?;
+                written.push((beside, text));
+            }
         }
 
         // And the simulator's own file, where the session was given one. Part
         // of the same set on purpose: the two files are edited together,
         // checked together and must agree, so one Save writes both and one
         // Undo takes back whichever of them the last edit touched.
-        //
-        // As YAML whatever the configuration beside it is written in: a
-        // simulator configuration is a YAML file, and its name has to say so
-        // -- see `sim::must_be_yaml` -- so there is one spelling of it and
-        // nothing here to choose between.
-        if let Some(simulator) = &self.simulator {
-            // The configuration's own payloads and their types, because it
-            // is what decides which payloads there are to simulate and what
-            // each is: a file written from the simulator's entries alone
-            // would say nothing about a payload nobody had typed a setting
-            // for yet. The writer puts them in order. Only the payloads a
-            // stand-in can be made for, of a kind of payload: one that is a
-            // program is the program itself, and has no type a simulated
-            // payload can be written under.
-            let payloads: Vec<(String, String)> = self
-                .nodes
-                .iter()
-                .filter(|node| crate::pane::is_payload(&node.node_type))
-                .filter(|node| {
-                    tcslibgs::DHType::from_spelling(&node.node_type).is_some()
-                })
-                .map(|node| (node.name.clone(), node.node_type.clone()))
-                .collect();
-            written.push((
-                simulator.path.clone(),
-                crate::sim::to_yaml(simulator, &payloads),
-            ));
-        }
+        written.extend(self.simulator_file());
         Ok(written)
+    }
+
+    /// The simulator configuration's file and what goes in it, where the
+    /// session was given one.
+    ///
+    /// As YAML whatever the configuration beside it is written in: a
+    /// simulator configuration is a YAML file, and its name has to say so --
+    /// see `sim::must_be_yaml` -- so there is one spelling of it and nothing
+    /// here to choose between.
+    ///
+    /// # Returns
+    ///
+    /// The file's path with its contents, or `None` without a simulator
+    /// configuration.
+    pub fn simulator_file(&self) -> Option<(std::path::PathBuf, String)> {
+        let simulator = self.simulator.as_ref()?;
+        let payloads = self.simulated_payloads();
+        Some((
+            simulator.path.clone(),
+            crate::sim::to_yaml(simulator, &payloads),
+        ))
+    }
+
+    /// The payloads a simulator configuration can have an entry for, each
+    /// with its type.
+    ///
+    /// The configuration's own payloads and their types, because it is what
+    /// decides which payloads there are to simulate and what each is. Only
+    /// the payloads a stand-in can be made for, of a kind of payload: one
+    /// that is a program is the program itself, and has no type a simulated
+    /// payload can be written under.
+    ///
+    /// # Returns
+    ///
+    /// Each payload's name and type, in the order the document holds them.
+    pub fn simulated_payloads(&self) -> Vec<(String, String)> {
+        self.nodes
+            .iter()
+            .filter(|node| crate::pane::is_payload(&node.node_type))
+            .filter(|node| {
+                tcslibgs::DHType::from_spelling(&node.node_type).is_some()
+            })
+            .map(|node| (node.name.clone(), node.node_type.clone()))
+            .collect()
     }
 
     /// One file's worth: the nodes at `home` and the links that start there.

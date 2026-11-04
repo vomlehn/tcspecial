@@ -2406,12 +2406,7 @@ impl Document {
                 ));
                 for node in nodes {
                     if let Some(comment) = &node.comment {
-                        for line in comment_lines(comment, 12) {
-                            out.push_str(&format!(
-                                "            <!-- {} -->\n",
-                                escape(&comment_safe(&line))
-                            ));
-                        }
+                        xml_comment(&mut out, Some(comment), 12);
                     }
                     // What is inside the node, written after its opening
                     // tag; a node with nothing to say is one empty element.
@@ -2444,12 +2439,7 @@ impl Document {
                         self.leaving(node, home)
                     {
                         if let Some(comment) = &comment {
-                            for line in comment_lines(comment, 16) {
-                                inside.push_str(&format!(
-                                    "                <!-- {} -->\n",
-                                    escape(&comment_safe(&line))
-                                ));
-                            }
+                            xml_comment(&mut inside, Some(comment), 16);
                         }
                         for Bound { target, input } in destinations {
                             // One element per line, the entry's words inside
@@ -2502,12 +2492,7 @@ impl Document {
         {
             for command in self.commands.iter().filter(|c| &c.home == home) {
                 if let Some(comment) = &command.comment {
-                    for line in comment_lines(comment, 4) {
-                        out.push_str(&format!(
-                            "    <!-- {} -->\n",
-                            escape(&comment_safe(&line))
-                        ));
-                    }
+                    xml_comment(&mut out, Some(comment), 4);
                 }
                 out.push_str("    <commands>\n");
                 out.push_str(&format!(
@@ -2605,7 +2590,7 @@ impl Document {
         // keeps it the file's is the one every section begins with, and one
         // of its own above the description, which begins with none.
         let header = self.remark(home, &Heading::File);
-        yaml_comment(&mut out, header, 0, 4);
+        yaml_comment(&mut out, header, 0);
         // No version: a configuration has no such field. The description in
         // the top file only, as the XML writer has it.
         if let (None, Some(description)) = (home, &self.description) {
@@ -2639,7 +2624,6 @@ impl Document {
                                 &mut out,
                                 self.tcspecial_comment(&parent, &attribute),
                                 2,
-                                8,
                             );
                             out.push_str(&format!(
                                 "  {attribute}: {}\n",
@@ -2652,7 +2636,6 @@ impl Document {
                         &mut out,
                         self.tcspecial_comment("", &parent),
                         2,
-                        8,
                     );
                     out.push_str(&format!("  {parent}:\n"));
                     for (attribute, value) in under {
@@ -2660,7 +2643,6 @@ impl Document {
                             &mut out,
                             self.tcspecial_comment(&parent, &attribute),
                             4,
-                            12,
                         );
                         out.push_str(&format!(
                             "    {attribute}: {}\n",
@@ -2730,18 +2712,16 @@ impl Document {
                 &mut out,
                 self.remark(home, &Heading::Section(name.clone())),
                 0,
-                4,
             );
             out.push_str(&format!("{name}:\n"));
             yaml_comment(
                 &mut out,
                 self.remark(home, &Heading::Opening(name)),
                 2,
-                8,
             );
             for (node_type, nodes) in grouped {
                 let heading = Heading::Type(node_type.to_string());
-                yaml_comment(&mut out, self.remark(home, &heading), 2, 8);
+                yaml_comment(&mut out, self.remark(home, &heading), 2);
                 out.push_str(&format!("  - type {node_type}:\n"));
                 for node in nodes {
                     // Above the entry it belongs to, as a comment and not as a
@@ -2751,9 +2731,7 @@ impl Document {
                     // the two spellings carry the same comment: see
                     // `comment_lines`.
                     if let Some(comment) = &node.comment {
-                        for line in comment_lines(comment, 12) {
-                            out.push_str(&format!("      # {line}\n"));
-                        }
+                        yaml_comment(&mut out, Some(comment), 6);
                     }
                     out.push_str(&format!(
                         "      - {word}: {}\n",
@@ -2801,9 +2779,7 @@ impl Document {
                         self.leaving(node, home)
                     {
                         if let Some(comment) = &comment {
-                            for line in comment_lines(comment, 16) {
-                                out.push_str(&format!("        # {line}\n"));
-                            }
+                            yaml_comment(&mut out, Some(comment), 8);
                         }
                         out.push_str(&format!("        {terminal}:\n"));
                         for Bound { target, input } in destinations {
@@ -2834,9 +2810,7 @@ impl Document {
             out.push_str("\ncommands:\n");
             for command in commands {
                 if let Some(comment) = &command.comment {
-                    for line in comment_lines(comment, 4) {
-                        out.push_str(&format!("  # {line}\n"));
-                    }
+                    yaml_comment(&mut out, Some(comment), 2);
                 }
                 out.push_str(&format!(
                     "  - {{ from: {}, sets: {} }}\n",
@@ -3100,7 +3074,9 @@ fn quoted(value: &str) -> String {
 /// type reads back as nothing and the file no longer says what it says.
 ///
 /// So: bare where the text is a letter or an underscore followed by letters,
-/// digits and the punctuation a name uses, and quoted otherwise. That is
+/// digits and the punctuation a name uses, or a relative path -- an
+/// included file's name, `../thermostat-common/thermostat` -- and quoted
+/// otherwise. That is
 /// narrower than YAML's own rule on purpose -- what is safe here is what is
 /// safe in both formats and in every YAML reader, and a name this quotes
 /// unnecessarily is a name with quotes round it rather than a file that is
@@ -3122,10 +3098,12 @@ fn plain(value: &str) -> String {
 
     let bare = !value.is_empty()
         && !RESERVED.contains(&value)
-        && value
+        && (value
             .chars()
             .next()
             .is_some_and(|c| c.is_ascii_alphabetic() || c == '_')
+            || value.starts_with("./")
+            || value.starts_with("../"))
         && value
             .chars()
             .all(|c| c.is_ascii_alphanumeric() || "_-./".contains(c));
@@ -3199,19 +3177,24 @@ pub(crate) fn comment_safe(line: &str) -> String {
     out.trim_end_matches('-').trim_end().to_string()
 }
 
-/// The longest a comment's line may be in a written file, marks and indent
-/// included.
+/// The longest a comment's line may be in the worked example, marks and
+/// indent included.
+#[cfg(test)]
 pub(crate) const COMMENT_LINE: usize = 80;
 
 /// How much of a line the marks around a comment take, in the format that
 /// takes more of them: the XML one, `<!-- ` and ` -->` after the indent, where
 /// YAML takes only `# ` after the same indent.
+#[cfg(test)]
 fn comment_room(indent: usize) -> usize {
     COMMENT_LINE.saturating_sub(indent + "<!-- ".len() + " -->".len())
 }
 
 /// A comment, as the lines it is written in at this indent: each of its own
 /// lines, and any that would run past [`COMMENT_LINE`] broken between words.
+///
+/// For composing the worked example's comments, which are written here as
+/// paragraphs. The writers never break a comment: see [`yaml_comment`].
 ///
 /// One set of lines for both formats, measured against the one that takes
 /// more room, so a configuration carries the same comment whichever spelling
@@ -3229,6 +3212,7 @@ fn comment_room(indent: usize) -> usize {
 /// # Returns
 ///
 /// The lines to write, without marks or indent.
+#[cfg(test)]
 pub(crate) fn comment_lines(comment: &str, indent: usize) -> Vec<String> {
     let room = comment_room(indent);
     let width = |text: &str| escape(&comment_safe(text)).chars().count();
@@ -3260,31 +3244,33 @@ pub(crate) fn comment_lines(comment: &str, indent: usize) -> Vec<String> {
 
 /// Writes a comment as YAML, a `#` line for each of its lines.
 ///
-/// Broken where the XML writer breaks the same comment, so the two spellings
-/// carry the same lines: see [`comment_lines`].
+/// Each line as it is held, which is as it was read: a comment is the
+/// author's, broken where they broke it, and a writer that broke it again
+/// to a width of its own would change every comment it was not asked to.
 ///
 /// # Arguments
 ///
 /// * `out`     - The text being written.
 /// * `comment` - The comment, if there is one; nothing is written if not.
 /// * `indent`  - How many columns the `#` is indented.
-/// * `xml`     - How many columns the XML spelling indents the same comment,
-///               which is what its lines are measured at.
-fn yaml_comment(
-    out: &mut String,
-    comment: Option<&str>,
-    indent: usize,
-    xml: usize,
-) {
-    for line in comment.map(|c| comment_lines(c, xml)).unwrap_or_default() {
-        out.push_str(&format!("{:indent$}# {line}\n", ""));
+fn yaml_comment(out: &mut String, comment: Option<&str>, indent: usize) {
+    for line in comment.map(str::lines).into_iter().flatten() {
+        if line.is_empty() {
+            out.push_str(&format!("{:indent$}#\n", ""));
+        } else {
+            out.push_str(&format!("{:indent$}# {line}\n", ""));
+        }
     }
 }
 
-/// Writes a comment as XML, a `<!-- -->` line for each of its lines.
+/// Writes a comment as XML: one `<!-- -->`, its lines after the first
+/// under the first line's text, as a comment written by hand is laid out.
 ///
-/// Made safe on the way: see [`comment_safe`], since XML has no way to say
-/// two hyphens in a row inside a comment.
+/// Each line as it is held, as the YAML writer writes it, except for the one
+/// thing XML cannot carry: two hyphens in a row, which end a comment and
+/// have no escape -- see [`comment_safe`]. Nothing else is escaped. XML
+/// reads no entity inside a comment, so `&apos;` there is six characters
+/// and not an apostrophe.
 ///
 /// # Arguments
 ///
@@ -3292,15 +3278,23 @@ fn yaml_comment(
 /// * `comment` - The comment, if there is one; nothing is written if not.
 /// * `indent`  - How many columns the `<!--` is indented.
 fn xml_comment(out: &mut String, comment: Option<&str>, indent: usize) {
-    for line in comment
-        .map(|c| comment_lines(c, indent))
-        .unwrap_or_default()
-    {
-        out.push_str(&format!(
-            "{:indent$}<!-- {} -->\n",
-            "",
-            escape(&comment_safe(&line))
-        ));
+    let Some(comment) = comment else {
+        return;
+    };
+    let lines: Vec<String> = comment.lines().map(comment_safe).collect();
+    let last = lines.len().saturating_sub(1);
+    for (at, line) in lines.iter().enumerate() {
+        let start = if at == 0 {
+            format!("{:indent$}<!--", "")
+        } else {
+            format!("{:indent$}    ", "")
+        };
+        let end = if at == last { " -->" } else { "" };
+        if line.is_empty() && at != 0 && at != last {
+            out.push('\n');
+        } else {
+            out.push_str(&format!("{start} {line}{end}\n"));
+        }
     }
 }
 
@@ -4956,55 +4950,58 @@ mod tests {
         assert!(yaml.contains("  # the second one"), "{yaml}");
     }
 
-    /// No line of a comment is written longer than eighty characters, in
-    /// either format, and the two formats break it in the same places.
+    /// A comment is written as it was given, however long its lines, in
+    /// both formats: a writer that broke a comment again to a width of its
+    /// own would change every comment it was not asked to.
     ///
-    /// On a node, on a link and on a command binding, which are written at
-    /// three indents; with a word in the comment longer than any line, which
-    /// is a long line rather than a word cut in two; and with markup in it,
-    /// which XML writes longer than it is.
+    /// In XML as one comment, its lines under the first line's text, with
+    /// the one change XML makes: see `comment_safe`.
     #[test]
-    fn a_long_comment_is_broken_to_fit_eighty_characters() {
+    fn a_long_comment_is_written_as_it_was_given() {
+        let long = "the second of the two sensors on the forward bulkhead, \
+                    which was moved there after the rework & is read at its \
+                    own address <see ECR-114> now that the first one shares \
+                    the bus -- for now";
+        let mut document = Document::new();
+        document.apply(&add("a", "i2c"));
+        document.apply(&Edit::SetNodeComment {
+            node: "a".into(),
+            was: None,
+            now: Some(format!("{long}\n\n  an indented line")),
+        });
+
+        let yaml = document.to_yaml();
+        assert!(
+            yaml.contains(&format!(
+                "      # {long}\n      #\n      #   an indented line\n"
+            )),
+            "{yaml}"
+        );
+        let xml = document.to_xml();
+        assert!(
+            xml.contains(&format!(
+                "            <!-- {}\n\n                   an indented \
+                 line -->\n",
+                long.replace("--", "-")
+            )),
+            "{xml}"
+        );
+    }
+
+    /// The worked example's comments are composed as paragraphs, and broken
+    /// to fit eighty columns where they are written: by words, an indented
+    /// line keeping its indent, a word longer than a line left whole.
+    #[test]
+    fn the_worked_examples_comments_are_broken_by_words() {
         let long = "the second of the two sensors on the forward bulkhead, \
                     which was moved there after the rework & is read at its \
                     own address <see ECR-114> now that the first one shares \
                     the bus";
-        let mut document = Document::new();
-        document.apply(&add("a", "i2c"));
-        document.apply(&add("b", "compute"));
-        document.apply(&Edit::SetNodeComment {
-            node: "a".into(),
-            was: None,
-            now: Some(format!(
-                "{long}\nshort\n  an indented line that goes on \
-                               and on and on well past where a line should stop"
-            )),
-        });
-        let mut link = Link::new("a", "b", None);
-        link.comment = Some(long.to_string());
-        document.apply(&Edit::AddLink { link });
-
         let lines = comment_lines(long, 8);
         assert!(lines.len() > 1, "{lines:?}");
         assert_eq!(lines.join(" "), long, "only the line breaks change");
+        assert!(lines.iter().all(|l| l.len() + 8 + 9 <= COMMENT_LINE));
 
-        for (format, text) in
-            [("yaml", document.to_yaml()), ("xml", document.to_xml())]
-        {
-            for line in text.lines() {
-                let comment =
-                    line.trim_start().starts_with('#') || line.contains("<!--");
-                if comment && !line.contains("yaml-language-server") {
-                    assert!(
-                        line.chars().count() <= COMMENT_LINE,
-                        "{format}: {} characters: {line:?}",
-                        line.chars().count()
-                    );
-                }
-            }
-        }
-
-        // The indented line keeps its indent on the lines it is broken into.
         let indented = comment_lines(
             "  an indented line that goes on and on and on well past where a \
              line should stop",
@@ -5016,7 +5013,6 @@ mod tests {
             "{indented:?}"
         );
 
-        // And a word longer than a line is left whole.
         let word = "x".repeat(100);
         assert_eq!(comment_lines(&word, 4), vec![word.clone()]);
     }
@@ -5058,7 +5054,8 @@ mod tests {
         assert!(said.contains("rename it graph.ytcs"), "{said}");
     }
 
-    /// The five characters XML cannot carry raw.
+    /// A comment with markup in it is written as it is, XML reading no
+    /// markup and no entity inside a comment, and reads back as it was.
     #[test]
     fn a_comment_with_markup_in_it_is_still_a_comment() {
         let mut document = Document::new();
@@ -5070,8 +5067,18 @@ mod tests {
         });
 
         let xml = document.to_xml();
-        assert!(xml.contains("&amp;"), "an ampersand went in raw: {xml}");
-        assert!(xml.contains("&lt;always&gt;"), "{xml}");
+        assert!(
+            xml.contains("<!-- sampled at 1Hz & logged <always> -->"),
+            "{xml}"
+        );
+        let where_ = tempfile::tempdir().expect("a directory");
+        let path = where_.path().join("a.xtcs");
+        std::fs::write(&path, &xml).expect("written");
+        let read = crate::read::read(&path).expect("it reads");
+        assert_eq!(
+            read.node("a").and_then(|a| a.comment.as_deref()),
+            Some("sampled at 1Hz & logged <always>")
+        );
     }
 
     /// A configuration that exists in two spellings is written in both.

@@ -4173,12 +4173,26 @@ visual window settles what it draws by the same rule, and writes nothing.
 
 That is a change to the document, so it is worth saying what it is not. It is
 not an edit: nothing goes into the history, because undoing it would put a node
-back somewhere the editor refuses to put one. And it writes nothing -- the file
-is byte for byte what it was until something is actually edited, at which point
-the corrected positions are written along with everything else, because every
-edit rewrites the whole file. Opening a configuration to look at it is not
-editing it, and an editor that rewrote a file under version control by being
-pointed at it would be an editor nobody could point at anything.
+back somewhere the editor refuses to put one. And it writes nothing, nor does
+an edit of something else: a save writes only what was edited, so a settled
+node's corrected position is written when that node is moved. Where a node
+settles depends on the window's panes, which are not a fact about the file.
+Opening a configuration to look at it is not editing it, and an editor that
+rewrote a file under version control by being pointed at it would be an editor
+nobody could point at anything.
+
+Requirement
+    A save changes only the lines an edit changed, in every file it writes:
+    both spellings, the included files and the simulator's file. Comments,
+    blank lines, the order of keys and how each value is quoted stay as the
+    file had them, and a save with no edit leaves every file byte for byte as
+    it was. The editor writes its model out as it always did and merges the
+    difference the edit made into the file as it was read; the merged file is
+    then read again and held to what the edit should have made it say, and
+    where it says anything else the editor's own text is written instead.
+    See ``tcsgui::faithful``. A comment is written as it was given, never
+    broken again to a width; the one change is XML's, which cannot hold two
+    hyphens in a row inside a comment.
 
 Every node is drawn the same width. Nodes of four widths in a column have no
 edge to line up on, and a diagram built from them looks approximate however
@@ -5117,12 +5131,8 @@ node's attributes, and on the way in as well as the way out: a hand-written
 ``address:`` with nothing after it is read as a question not yet answered -- as
 is ``address: ""`` -- and saved as neither, the line simply not being there.
 
-The simulator's file is the one place a blank is written out, because there the
-blank is the point: that file is a form, with every payload of the
-configuration and every setting a payload may state, so that a reader can see
-what there is to answer. An unanswered setting is written with nothing after
-the colon rather than as ``""``: the two read the same, and ``""`` says
-somebody typed two quotation marks.
+The simulator's file follows the same rule: a setting nobody has answered is
+not written, and a file the editor begins names each payload and nothing more.
 
 A configuration that does not exist yet is given the section's attributes and,
 with one exception, none of its values. The window then has a field apiece and the configuration
@@ -5404,12 +5414,13 @@ there is no second file rather than hidden -- a menu whose entries come and go
 is a menu nobody learns.
 
 Requirement
-    The simulator configuration is written as a form: every payload the
-    configuration has gets an entry, and every entry gets every setting,
-    written empty where nobody has filled it in. A file holding nothing said
-    nothing about which payloads there were to configure or
-    what could be said about them, which is what somebody opening it wanted to
-    know.
+    The simulator configuration is written with every key that holds a value
+    and no key that does not: a setting emptied leaves the file. A file the
+    editor begins names each payload of the configuration under its type and
+    nothing else, so that it says which payloads there are to configure; the
+    windows are where what can be said about them is asked. It was a form
+    once, every setting of every payload written empty, and that made every
+    file the editor saved a form too.
 
     Which payloads there are is the configuration's to say, so the entries are
     its payload nodes, by name -- a computation, a log and the ground
@@ -5420,9 +5431,8 @@ Requirement
 
 Requirement
     The simulator's own reader takes a setting written empty as a setting not
-    stated. Without that the form would be a file written to be rejected: an
-    empty numeric setting was a type error, so a half-filled form could not be
-    loaded at all. It is the rule the editor already states for every field it
+    stated. Without that a file somebody left half filled in would be a file
+    written to be rejected: an empty numeric setting was a type error. It is the rule the editor already states for every field it
     offers -- absent and empty are one thing to the checking, and a cleared
     field is not an answer -- and a value that is there and wrong is still
     refused, naming it.

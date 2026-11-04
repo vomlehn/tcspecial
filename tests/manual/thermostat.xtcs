@@ -45,13 +45,13 @@
     </gateways>
     <vehicle>
         <type name="compute">
-            <!-- One temperature out of the three, by the algorithm named: -->
-            <!-- median takes the middle reading, closest_mean the mean of -->
-            <!-- the two that agree best. Either leaves a sensor that has -->
-            <!-- gone wrong out of the answer, which a mean over all three -->
-            <!-- would not, and it produces a value on every arrival, so one -->
-            <!-- sensor that stops reporting is outvoted rather than -->
-            <!-- stopping the vehicle from deciding anything. -->
+            <!-- One temperature out of the three, by the algorithm named:
+                 median takes the middle reading, closest_mean the mean of
+                 the two that agree best. Either leaves a sensor that has
+                 gone wrong out of the answer, which a mean over all three
+                 would not, and it produces a value on every arrival, so one
+                 sensor that stops reporting is outvoted rather than
+                 stopping the vehicle from deciding anything. -->
             <compute name="ambient">
                 <algorithm>median</algorithm>
                 <function>vote</function>
@@ -90,18 +90,18 @@
                 <payload-out><target>housekeeping</target></payload-out>
                 <payload-in>true</payload-in>
             </compute>
-            <!-- setpoint is set from the ground; half_band is how far -->
-            <!-- either side of it the heaters are switched at, the setpoint -->
-            <!-- being in the middle of the band. -->
+            <!-- setpoint is set from the ground; half_band is how far
+                 either side of it the heaters are switched at, the setpoint
+                 being in the middle of the band. -->
             <compute name="thermostat">
                 <function>hysteresis</function>
                 <half_band>2.0</half_band>
                 <setpoint>293.15</setpoint>
-                <!-- asserted below the setpoint, unasserted above it. Two -->
-                <!-- heaters, because one failing must not leave the mass -->
-                <!-- with no way to be warmed: either alone holds the band -->
-                <!-- while the orbit is warm, and both together hold it in -->
-                <!-- the cold too. -->
+                <!-- asserted below the setpoint, unasserted above it. Two
+                     heaters, because one failing must not leave the mass
+                     with no way to be warmed: either alone holds the band
+                     while the orbit is warm, and both together hold it in
+                     the cold too. -->
                 <gateway-out><target>heaters_1</target></gateway-out>
                 <gateway-out><target>heaters_2</target></gateway-out>
                 <payload-out><target>gateway</target></payload-out>
@@ -119,10 +119,10 @@
     </vehicle>
     <payloads>
         <type name="gpio">
-            <!-- Two heaters, each three circuits driven together, both near -->
-            <!-- the sensors on the same thermal mass. Separate nodes rather -->
-            <!-- than six lines on one, so that one can be stopped from the -->
-            <!-- ground while the other goes on warming the mass. -->
+            <!-- Two heaters, each three circuits driven together, both near
+                 the sensors on the same thermal mass. Separate nodes rather
+                 than six lines on one, so that one can be stopped from the
+                 ground while the other goes on warming the mass. -->
             <payload name="heaters_1">
                 <direction>output</direction>
                 <lines>3,4,5</lines>
@@ -137,9 +137,9 @@
             </payload>
         </type>
         <type name="i2c">
-            <!-- One of three sensors of the same place, a trio, so that the -->
-            <!-- temperature survives one of them going wrong. Two bytes, -->
-            <!-- signed, big endian. -->
+            <!-- One of three sensors of the same place, a trio, so that the
+                 temperature survives one of them going wrong. Two bytes,
+                 signed, big endian. -->
             <payload name="temp_1">
                 <address>0x48</address>
                 <group>zone_temps</group>
@@ -147,8 +147,8 @@
                 <read_size>2</read_size>
                 <payload-out><target>temp1</target></payload-out>
             </payload>
-            <!-- The second of the trio; the same part as temp_1, on the -->
-            <!-- same bus. -->
+            <!-- The second of the trio; the same part as temp_1, on the
+                 same bus. -->
             <payload name="temp_2">
                 <address>0x49</address>
                 <group>zone_temps</group>
@@ -158,10 +158,10 @@
             </payload>
         </type>
         <type name="spi">
-            <!-- The third. A different part on a different bus: three -->
-            <!-- bytes, unsigned, its own scale and so its own conversion, -->
-            <!-- so that no one bus and no one part number can take the -->
-            <!-- whole trio out. -->
+            <!-- The third. A different part on a different bus: three
+                 bytes, unsigned, its own scale and so its own conversion,
+                 so that no one bus and no one part number can take the
+                 whole trio out. -->
             <payload name="temp_3">
                 <group>zone_temps</group>
                 <max_speed>1000000</max_speed>

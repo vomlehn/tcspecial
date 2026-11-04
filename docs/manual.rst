@@ -3248,10 +3248,10 @@ simulating, and does without it if it is not there.
 
 Every setting but ``simulate`` is optional, and **a setting written empty is a
 setting not stated**: ``packet_interval: ""`` and no ``packet_interval`` at all mean
-the same thing. That is what lets tcsgui write one of these files as a form --
-every payload of the configuration, every setting of a payload, blank until
-somebody fills one in -- and have the file load all the same. A value that is
-there and wrong is still refused, naming it.
+the same thing, so a file somebody has half filled in still loads. tcsgui
+writes only the settings that hold a value, and a file it begins names each
+payload under its type and nothing else. A value that is there and wrong is
+still refused, naming it.
 
 .. code-block:: text
 

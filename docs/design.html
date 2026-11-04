@@ -4302,7 +4302,8 @@ configuration's is, and not written again. A component is the one shape no
 node type has, a hexagon pointed at both ends with a dotted edge, narrower
 than every node -- and narrower still in a pane too narrow for it and the
 lanes its lines run down, so that it stays in its pane -- in the pane's own
-reddish purple, with its type written under its name. It has at most two
+reddish purple, with its type written along its top and its name in its
+middle, as every node's are. It has at most two
 terminals, both on its right, towards the payloads: an output at the top,
 which every value it gives out leaves by, and an input under it, which
 everything it takes in arrives at, each shown only where its type has a
@@ -4814,6 +4815,22 @@ past its headings would file a device under whichever heading its first letter
 landed in. The headings keep the table's order, which is the one place that
 order says something -- devices, then the things that are driven, then the ends
 of the graph.</p>
+<p>A node's name is written in the middle of its shape, both ways, which is where
+a reader looks first: the terminals hold the four corners, so the middle is the
+name's alone. Its type is written along the inside of the top, centred between
+the terminals in the two top corners -- or between the shape's own sides where a
+corner has none, a leaning side followed at that row -- so that what a node is
+can be read without remembering what its shape means. There is less room
+between two terminals than across the middle, so the type is set in the
+diagram's own small size, nine pixels, rather than the window's: the one label
+on the canvas that is, and the longest type, <tt class="docutils literal">subdiagram</tt> between four
+terminals, fits at it as drawn (<tt class="docutils literal"><span class="pre">tcsdiagram::style::TYPE_SIZE</span></tt> and
+<tt class="docutils literal">type_band</tt>). A closed subdiagram is taller than the other nodes, 80 pixels
+to their 64, so that what it holds -- how many nodes, and how many lines cross
+its edge -- has room under its name, and the mark that opens it the middle of
+its bottom edge; a line to its lower terminals steps where one to another
+node's would run straight, which is the price of saying what is in it without
+opening it.</p>
 <p>There are three outlines, one to a pane, so the outline says which pane a node
 belongs in before anything else is read: a payload is a parallelogram, a part
 of the vehicle a rectangle with rounded corners, and the ground the plain

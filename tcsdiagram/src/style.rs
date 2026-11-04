@@ -291,8 +291,22 @@ pub fn ground_of(pane: crate::pane::Pane) -> Ground {
 ///
 /// Wide enough for the longest type name at the largest label size, which is
 /// what sets the floor: a label that elides is a label that has stopped being
-/// a channel.
+/// a channel. The type, written along the top between the terminals there, is
+/// set smaller to fit: see [`TYPE_SIZE`].
 pub const WIDTH: u32 = 152;
+
+/// How large a node's type is written, in pixels.
+///
+/// Along the top of the node, between the terminals in its two top corners,
+/// which is less room than the name has: at the window's own size the longer
+/// types -- `subdiagram`, `tee-payload`, `app_all_veh` -- would not fit
+/// between two terminals on a node of [`WIDTH`], and a type cut short is a
+/// type that has stopped saying what the node is. So it is set in the
+/// diagram's own small size, as the names are, rather than the window's: the
+/// one label on the canvas that is, and the reason. At this size the longest,
+/// `subdiagram` and a physics `thermal_mass` in the narrow face, fit as they
+/// are drawn, which is a little wider than a font's own measure says.
+pub const TYPE_SIZE: u32 = 9;
 
 /// How tall every node is drawn, in pixels.
 ///
@@ -307,9 +321,17 @@ pub const WIDTH: u32 = 152;
 /// weight and the colour still do -- see the accessibility tests below -- and
 /// a diagram whose lines run straight is worth the channel.
 ///
-/// Room for the three lines of a label -- the name, the type and a summary --
-/// between the two rows of terminals.
+/// Room for the name between the two rows of terminals, and the type in the
+/// top row between its terminals. A subdiagram's box is the one exception:
+/// see [`SUBDIAGRAM_HEIGHT`].
 pub const HEIGHT: u32 = 64;
+
+/// How tall a subdiagram's box is drawn: taller than the others by the
+/// summary under its name and the mark that opens it, which has the middle of
+/// the bottom edge. A line to its lower terminals steps where one to another
+/// node's would run straight, which is the price of saying what is inside it
+/// without opening it.
+pub const SUBDIAGRAM_HEIGHT: u32 = 80;
 
 /// The one red in the program, and the only thing it is used for.
 ///
@@ -867,6 +889,53 @@ pub fn terminal_at(
     (x - at.0, y - at.1)
 }
 
+/// How far a node's type is kept from what is either side of it along the
+/// top: a terminal box, or the shape's own side.
+pub const TYPE_GAP: i32 = 2;
+
+/// Where a node's type is written along its top: between the terminals in
+/// the two top corners, or the shape's own sides where a corner has none.
+///
+/// A leaning shape's side is followed at the top row, so the type of a
+/// payload, whose upper left corner the slant has given away, starts where
+/// the shape does rather than in the notch beside it.
+///
+/// # Arguments
+///
+/// * `outline`         - The node's outline.
+/// * `size`            - The node's width and height, in pixels.
+/// * `at`              - Where the node is, which the terminals are placed
+///                       from: see [`terminal_at`].
+/// * `(left, right)`   - Whether there is a terminal in the upper left
+///                       corner, and in the upper right.
+///
+/// # Returns
+///
+/// The band's left and right ends, in pixels from the node's left side.
+pub fn type_band(
+    outline: Outline,
+    size: (u32, u32),
+    at: (i32, i32),
+    (left, right): (bool, bool),
+) -> (i32, i32) {
+    let corner = |left| Corner {
+        top: true,
+        left,
+        rightward: true,
+    };
+    let start = if left {
+        terminal_at(outline, corner(true), size, at).0 + TERMINAL.0 as i32
+    } else {
+        room_at(outline, size, corner(true))
+    };
+    let end = if right {
+        terminal_at(outline, corner(false), size, at).0
+    } else {
+        size.0 as i32 - room_at(outline, size, corner(false))
+    };
+    (start + TYPE_GAP, end - TYPE_GAP)
+}
+
 /// Which terminal a link end means on a node of this type, for the drawing.
 ///
 /// `named` is what the link wrote, where it wrote one, and `sink` says which
@@ -1018,6 +1087,12 @@ pub fn terminal_box(
 /// than a row being reserved at the top and the bottom -- which would leave
 /// a few pixels for a name on the shortest node.
 pub const TERMINAL_COLUMN: u32 = TERMINAL.0 + 2 * TERMINAL_INSET;
+
+/// How tall a row of terminals is, with its inset above and below.
+///
+/// The band along the top of a node that its type is written in, between the
+/// terminals in the two top corners.
+pub const TERMINAL_ROW: u32 = TERMINAL.1 + 2 * TERMINAL_INSET;
 
 /// Every node type the editor can place.
 ///
@@ -1884,7 +1959,7 @@ impl NodeType {
                 outline: Rounded,
                 edge: Double,
                 weight: Narrow,
-                size: (WIDTH, HEIGHT),
+                size: (WIDTH, SUBDIAGRAM_HEIGHT),
             },
             // Where the data is kept aboard: rounded, as every part of the
             // vehicle is, and told from the others by a dotted line and a small

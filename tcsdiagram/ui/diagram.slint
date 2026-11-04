@@ -177,6 +177,14 @@ export struct NodeView {
     // sizes above, so that the one statement of how large a terminal is
     // drawn is the one the box and the padding are both taken from.
     terminal-column: length,
+    // How tall a row of terminals is, with its inset: the band along the top
+    // the type is written in. From style.rs, as the column is.
+    terminal-row: length,
+    // Where the type is written along the top, from the node's left side,
+    // and how large: see style::type_band and style::TYPE_SIZE.
+    type-left: length,
+    type-right: length,
+    type-size: length,
 }
 
 export struct LinkView {
@@ -480,29 +488,48 @@ export component NodeShape inherits Rectangle {
             }
         }
 
-        // The name, and under it the type. The type is shown always and not
-        // only on hover: a diagram whose shapes have to be remembered is a
-        // diagram that is read wrongly under pressure.
+        // The type, along the inside of the top, centred between the
+        // terminals there. Shown always and not only on hover: a diagram
+        // whose shapes have to be remembered is a diagram that is read
+        // wrongly under pressure. In the band style::type_band gives it,
+        // and at the size style::TYPE_SIZE says, which is smaller than the
+        // window's: there is less room between two terminals than across
+        // the middle of the node.
+        Text {
+            x: node.type-left;
+            y: 0px;
+            width: node.type-right - node.type-left;
+            height: node.terminal-row;
+            text: node.node-type;
+            color: mark;
+            font-family: node.face == "mono" ? Fonts.mono : "";
+            font-size: node.type-size;
+            horizontal-alignment: center;
+            vertical-alignment: center;
+            overflow: elide;
+        }
+
+        // The name, in the middle of the shape both ways, which is where a
+        // reader looks first: the terminals hold the corners and the type the
+        // top, so the middle is the name's alone. A subdiagram's summary is
+        // under it, the two centred together above the mark that opens it.
         //
-        // Padded away from whichever side carries terminals, and horizontally
-        // rather than vertically: the label stays where it was, in the middle
-        // of the node, and simply stops short of the corner boxes. Reserving
-        // a row at the top and the bottom instead would leave sixteen pixels
-        // for a name on the shortest node.
-        //
-        // A hexagon's side with no terminals is padded by how far its corners
-        // are in, which a label as wide as the node would otherwise cross. A
-        // physics node's alone: a configuration's nodes are laid out as they
-        // always were.
+        // What a closed subdiagram holds: how many nodes, and how many lines
+        // cross its edge. The two things worth knowing about a diagram you
+        // are not looking at. Not a node's comment, which this used to show
+        // as well: a note somebody wrote about a sensor belongs in that
+        // node's own window, beside the attributes it is about.
         VerticalLayout {
-            padding: Space.tight;
-            padding-left: (node.moc-in.shown || node.world-out.shown)
-                ? node.terminal-column
-                : node.outline == "hexagon"
-                    ? Space.tight + node.inset : Space.tight;
-            padding-right: (node.moc-out.shown || node.world-in.shown)
-                ? node.terminal-column : Space.tight;
-            spacing: 1px;
+            x: Space.tight + node.inset;
+            width: parent.width - 2 * self.x;
+            // Between the type and the mark that opens a subdiagram, which
+            // has the middle of the bottom edge: a name and summary centred
+            // on the node would run into one or the other.
+            y: node.openable ? node.terminal-row : 0px;
+            height: node.openable
+                ? parent.height - node.terminal-row - 17px
+                : parent.height;
+            spacing: 0px;
             alignment: center;
 
             Text {
@@ -515,26 +542,9 @@ export component NodeShape inherits Rectangle {
                 horizontal-alignment: center;
                 overflow: elide;
             }
-            Text {
-                text: node.node-type;
-                color: mark;
-                font-family: node.face == "mono" ? Fonts.mono : "";
-                font-size: Type.small;
-                horizontal-alignment: center;
-                overflow: elide;
-            }
-            // What a closed subdiagram holds: how many nodes, and how many
-            // lines cross its edge. The two things worth knowing about a
-            // diagram you are not looking at.
-            //
-            // Not a node's comment, which this used to show as well. A note
-            // somebody wrote about a sensor belongs in that node's own window,
-            // beside the attributes it is about: on the canvas it was a
-            // paragraph in the middle of a diagram, and a diagram is read for
-            // its shape.
             if node.summary != "": Text {
                 text: node.summary;
-                font-size: Type.small;
+                font-size: node.type-size;
                 font-italic: true;
                 color: mark.with-alpha(0.75);
                 horizontal-alignment: center;
@@ -549,11 +559,12 @@ export component NodeShape inherits Rectangle {
         // gesture that does the wrong one under pressure. A mark that says
         // "there is more in here" is also the only hint a closed box gives that
         // it can be opened at all.
-        // The middle of the top edge, which is the one place on a node that
-        // no terminal is in: the four of them hold the four corners.
+        // The middle of the bottom edge, which is the one place on a node
+        // that nothing else is in: the four terminals hold the four corners
+        // and the type the top.
         if node.openable: Rectangle {
             x: (root.width - 14px) / 2;
-            y: 4px;
+            y: root.height - 14px - 3px;
             width: 14px;
             height: 14px;
             border-width: 1px;

@@ -173,9 +173,11 @@ fn points(size: &str) -> Option<f32> {
 ///
 /// Every `font-size` in every `.slint` file is `Fonts.window`, a length of
 /// at least that, or one of tcsgui's `Type` names -- whose definitions are
-/// held to the same rule here. The one exception is a node's label on
-/// tcsgui's canvas, whose size is one of the ways node types are told apart
-/// (see `tcsgui/src/style.rs`). And the Python windows are held to it too:
+/// held to the same rule here. The exceptions are a node's two labels on
+/// the canvas: its name, whose size is one of the ways node types are told
+/// apart, and its type, written between two terminals where there is less
+/// room than the window's size needs (see `tcsdiagram/src/style.rs`,
+/// `TYPE_SIZE`). And the Python windows are held to it too:
 /// a font they name with a size names the size from `tcsui.fonts`.
 #[test]
 fn no_text_is_set_smaller_than_the_one_size() {
@@ -208,6 +210,7 @@ fn no_text_is_set_smaller_than_the_one_size() {
             let allowed = size == "Fonts.window"
                 || size.starts_with("Type.")
                 || size == "node.label-size"
+                || size == "node.type-size"
                 || points(size).is_some_and(|pt| pt >= 12.0);
             assert!(
                 allowed,

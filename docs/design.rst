@@ -4991,12 +4991,22 @@ joined, so two of them are two sets of settings for one payload and the file
 does not say which applies -- and so is an entry naming a payload the
 configuration does not have. Both are refused rather than half-read: the file
 parses, so adopting part of it would mean writing the rest of it away at the
-next edit. A file that cannot be parsed at all is different and keeps its old
-treatment -- reported, and an empty one put in its place, because an editor
-that will not start on a damaged file cannot be used to fix one. That is the
-distinction ``sim::Trouble`` draws. And renaming a payload node carries its
-simulated entry with it, so the editor cannot be the thing that breaks the
-join.
+next edit.
+
+Any file the editor is given that is there and cannot be opened -- the
+configuration or the simulator's, unparsable, unreadable, or one of the
+refusals above -- ends the editor with a message saying which file and why,
+before any window opens. Such a file used to be opened as an empty one, so
+that the editor could be used to fix it, and that was the editor's most
+dangerous habit: the session still wrote to the file, every edit is written as
+it is made, and the first one replaced the whole configuration, both spellings
+of it, with whatever had been drawn in an empty window. The file had never
+been read, so no undo could bring it back. A file that does not read is put
+right in a text editor, by the message. A file that is not there yet is not
+refused: that is how a new configuration is begun.
+
+And renaming a payload node carries its simulated entry with it, so the editor
+cannot be the thing that breaks the join.
 
 A node placed from a palette is named after its type, a hyphen, and the first
 number that is free: ``i2c-1``, then ``i2c-2``, and ``i2c-1`` again if the

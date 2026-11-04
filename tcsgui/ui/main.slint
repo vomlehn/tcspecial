@@ -1226,11 +1226,18 @@ component ProblemsPanel inherits Rectangle {
 
 export component MainWindow inherits Window {
     default-font-size: Fonts.window;
-    // Saying in the title bar when this session changes nothing, which is
-    // where somebody looks to see what a window is.
-    title: Session.read-only
-        ? "TCSpecial Configuration (read-only)"
-        : "TCSpecial Configuration";
+    // Saying in the title bar when this session changes nothing, and which
+    // file it is editing, which is where somebody looks to see what a window
+    // is. The path is shortened to the window's width in Rust -- see
+    // tcsgui::title -- so a narrow window still names the file.
+    title: root.titled(
+        Session.read-only
+            ? "TCSpecial Configuration (read-only)"
+            : "TCSpecial Configuration",
+        root.path, root.width / 1px);
+    // The configuration's top file, as the session knows it.
+    in property <string> path: "";
+    pure callback titled(string, string, float) -> string;
     background: Colors.window;
     // Wide enough for both working panes and both selection panes, which is
     // what the preferred width is: 960 of working area, 180 of selection

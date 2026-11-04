@@ -47,6 +47,7 @@ mod settings;
 mod sight;
 mod sim;
 mod subdiagram;
+mod title;
 
 use std::cell::RefCell;
 use std::collections::BTreeMap;
@@ -510,6 +511,8 @@ impl Views {
             put_node(window, editor, node);
         }
         if let Some(top) = self.top.upgrade() {
+            // Again after every edit, because Save as changes the file.
+            top.set_path(editor.files().0.display().to_string().into());
             put(
                 &top,
                 editor,
@@ -753,6 +756,7 @@ fn main() -> Result<(), slint::PlatformError> {
     ui.set_physics_palette(physics_palette());
     ui.set_physics_ground(colour(&ground_of(style::Ground::Physics)));
     ui.set_physics_list_percent(settings.list_physics_percent);
+    ui.on_titled(|base, path, width| title::titled(&base, &path, width).into());
 
     let views = Rc::new(RefCell::new(Views {
         top: ui.as_weak(),

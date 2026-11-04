@@ -132,7 +132,7 @@ tcsgui:
     - { node: gpio-in-tmass, x: 91, y: 544 }
     - { node: gpio-out-tmass1, x: 34, y: 393 }
     - { node: gpio-out-tmass2, x: 34, y: 469 }
-    - { node: housekeeping, x: 469, y: 374 }
+    - { node: housekeeping, x: 469, y: 450 }
     - { node: temp1, x: 261, y: 34 }
     - { node: temp2, x: 261, y: 166 }
     - { node: temp3, x: 261, y: 280 }

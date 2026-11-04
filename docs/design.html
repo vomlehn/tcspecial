@@ -4305,24 +4305,18 @@ kept, and a physics component is never in one. A component is the one shape no
 node type has, a hexagon pointed at both ends with a dotted edge, narrower
 than every node -- and narrower still in a pane too narrow for it and the
 lanes its lines run down, so that it stays in its pane -- in the pane's own
-reddish purple, with its type written under
-its name. It has at most two terminals, both on its right, towards the
-payloads: an output at the top, which every value it gives out leaves by, and
-an input under it, which everything it takes in arrives at, each shown only
-where its type has a terminal that way. A component's terminals are many and
-named, but which one a line is joined to is written in the file, and a box
-for each would leave no room for the name. A
-component whose every connection goes into one other, which itself goes into
-nothing, is drawn inside that one, under its name: the heaters inside the
-zone they warm, so that the sensors and the heaters' lines are all joined to
-the one block that is the thermal mass, as they are on the vehicle, and the
-nesting is the connection, not drawn again. Only one deep, which a narrow
-pane can hold. Every other physics connection is drawn between the two
-components it joins, and each stand-in's <tt class="docutils literal">connects</tt> between its component
-and the payload node it stands in for, each from or to a terminal, the arrow
-the way the value goes: both dashed and in that purple, where a
-configuration's links are solid. tcspecial's visual window draws the same pane
-from the simulator file tcssim would read for the configuration, and only
+reddish purple, with its type written under its name. It has at most two
+terminals, both on its right, towards the payloads: an output at the top,
+which every value it gives out leaves by, and an input under it, which
+everything it takes in arrives at, each shown only where its type has a
+terminal that way. A component's terminals are many and named, but which one
+a line is joined to is written in the file, and a box for each would leave no
+room for the name. A physics connection is drawn between the two components
+it joins, and each stand-in's <tt class="docutils literal">connects</tt> between its component and the
+payload node it stands in for, each from or to a terminal, the arrow the way
+the value goes: both dashed and in that purple, where a configuration's links
+are solid. tcspecial's visual window draws the same pane from the simulator
+file tcssim would read for the configuration, and only
 draws it. See <tt class="docutils literal"><span class="pre">tcsdiagram::physics</span></tt>.</p>
 <p>The physics list is at the top of the selection column, its pane being the
 leftmost, with a line under it that is dragged as the others are. Its entries

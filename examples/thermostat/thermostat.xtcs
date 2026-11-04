@@ -85,7 +85,7 @@
             <node name="gateway" x="790" y="34"/>
             <node name="temp_1" x="34" y="34"/>
             <node name="temp_2" x="34" y="166"/>
-            <node name="temp_3" x="34" y="280"/>
+            <node name="temp_3" x="53" y="299"/>
         </nodes>
     </tcsgui>
 </configuration>

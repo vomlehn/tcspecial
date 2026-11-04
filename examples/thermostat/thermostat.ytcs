@@ -77,4 +77,4 @@ tcsgui:
     - { node: gateway, x: 790, y: 34 }
     - { node: temp_1, x: 34, y: 34 }
     - { node: temp_2, x: 34, y: 166 }
-    - { node: temp_3, x: 34, y: 280 }
+    - { node: temp_3, x: 53, y: 299 }

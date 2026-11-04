@@ -30,7 +30,7 @@
 //!
 //! Nothing the world does follows the order a model's file is written in.
 //! Its components are in name order and its connections in the order of the
-//! names of what they join, as `tcslibgs::physics::Model` holds them, so the
+//! names of what they join, as `tcslibgs::node::physics::Model` holds them, so the
 //! outputs an input sums are added in one order, and of two events due at
 //! one moment the component whose name sorts first has its event first: see
 //! [`Queue`].
@@ -45,8 +45,8 @@
 use std::sync::{Condvar, Mutex, MutexGuard};
 use std::time::Instant;
 
-use tcslibgs::physics::terminal::{Direction, Terminal};
-use tcslibgs::physics::{Joined, Model, Place, Resolution};
+use tcslibgs::node::physics::terminal::{Direction, Terminal};
+use tcslibgs::node::physics::{Joined, Model, Place, Resolution};
 
 use super::battery::Battery;
 use super::body::Body;
@@ -433,8 +433,8 @@ impl World {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use tcslibgs::physics::terminal::{Kind, Terminal};
-    use tcslibgs::physics::{settings_of, terminals_of, TYPES};
+    use tcslibgs::node::physics::terminal::{Kind, Terminal};
+    use tcslibgs::node::physics::{settings_of, terminals_of, TYPES};
     use tcslibgs::unit::Unit;
 
     /// Every type's terminals fit the room a component's inputs are given,

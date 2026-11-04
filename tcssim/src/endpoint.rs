@@ -71,7 +71,7 @@ pub fn payload_config_from(
 pub fn payload_config_attached(
     dh: &DHConfig,
     sim: &ResolvedSim,
-    attachment: Option<crate::physics::Attachment>,
+    attachment: Option<crate::node::physics::Attachment>,
 ) -> Result<PayloadConfig, String> {
     // What the simulator cannot be, which is tcslibgs's rule so that tcsverify
     // asks it too: see `tcslibgs::simulable`.
@@ -214,7 +214,7 @@ pub fn payload_config_attached(
     };
 
     let sending = match &attachment {
-        Some(crate::physics::Attachment::Drives { power, .. }) => {
+        Some(crate::node::physics::Attachment::Drives { power, .. }) => {
             power.enabled_flag()
         }
         _ => Arc::new(std::sync::atomic::AtomicBool::new(false)),
@@ -247,7 +247,7 @@ pub fn payload_config_attached(
             sim.segment_interval.as_millis() as u32,
         )),
         // A driven part's panel button is its power, so the two are one
-        // flag: see `crate::physics::Power`.
+        // flag: see `crate::node::physics::Power`.
         sending,
         standing: Default::default(),
         driven: dh.driven,

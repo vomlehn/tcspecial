@@ -1339,7 +1339,7 @@ fn the_simulator_schema_takes_the_types_and_settings_the_model_reads() {
         .map(|key| key.strip_prefix("type ").expect("the word type and a type"))
         .collect();
     let wanted: BTreeSet<&str> =
-        tcslibgs::physics::TYPES.iter().copied().collect();
+        tcslibgs::node::physics::TYPES.iter().copied().collect();
     assert_eq!(types, wanted);
     for name in types {
         let component = &json["$defs"][name];
@@ -1356,7 +1356,7 @@ fn the_simulator_schema_takes_the_types_and_settings_the_model_reads() {
             .filter(|key| *key != "component")
             .collect();
         said.sort_unstable();
-        let mut wanted = tcslibgs::physics::settings_of(name)
+        let mut wanted = tcslibgs::node::physics::settings_of(name)
             .expect("a type the model reads")
             .to_vec();
         wanted.sort_unstable();

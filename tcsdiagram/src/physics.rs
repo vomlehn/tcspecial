@@ -398,13 +398,13 @@ pub fn node_look(
 /// `true` where one of its type's terminals goes that way; `false` for a
 /// type there is no such component of.
 fn has(kind: &str, output: bool) -> bool {
-    use tcslibgs::physics::terminal::Direction;
+    use tcslibgs::node::physics::terminal::Direction;
     let wanted = if output {
         Direction::Out
     } else {
         Direction::In
     };
-    tcslibgs::physics::terminals_of(kind)
+    tcslibgs::node::physics::terminals_of(kind)
         .is_some_and(|all| all.iter().any(|t| t.direction == wanted))
 }
 
@@ -532,10 +532,10 @@ pub fn looks(
             .find(|c| c.name == component)
             .map(|c| c.kind)
             .unwrap_or_default();
-        let input = tcslibgs::physics::terminals_of(kind)
+        let input = tcslibgs::node::physics::terminals_of(kind)
             .and_then(|all| all.iter().find(|t| t.name == terminal))
             .is_some_and(|t| {
-                t.direction == tcslibgs::physics::terminal::Direction::In
+                t.direction == tcslibgs::node::physics::terminal::Direction::In
             });
         let (_, tall) = crate::pane::size_of(node.node_type);
         let mine = end_at(place, !input);

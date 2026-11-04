@@ -4043,7 +4043,7 @@ page shows, it joins that payload's stand-in to the component: its
 given the terminal after those it names already, one decision a line. The
 line says only which two things, the component being drawn with one output
 and one input whatever its type has, so the terminals come from the rules a
-file is held to -- ``tcslibgs::physics::connectable`` for a connection, an
+file is held to -- ``tcslibgs::node::physics::connectable`` for a connection, an
 output to an input of one kind, and ``tcslibgs::sim_config::may_join`` for a
 stand-in -- and a join already made is not offered again. Where that leaves
 one thing, it is made; where it leaves several, as a heater's heat, current
@@ -11083,7 +11083,7 @@ Requirement
     ``body``, and a type of any other is refused; a ``thermal_zone``, which
     is what a ``thermal_mass`` was called before, is told the name it has now.
     A type is written once, with a component under it. Each type's settings,
-    terminals and rules are stated once, in ``tcslibgs::physics``; its
+    terminals and rules are stated once, in ``tcslibgs::node::physics``; its
     arithmetic is the simulator's, in ``tcssim::physics``.
 
 Requirement

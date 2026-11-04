@@ -4962,7 +4962,7 @@ fn physics_places(
 /// point can mean.
 ///
 /// Over another component, each pair of terminals the two can be connected
-/// by, the way the line was drawn: `tcslibgs::physics::connectable` says
+/// by, the way the line was drawn: `tcslibgs::node::physics::connectable` says
 /// which. Over a payload on the top page, or the box of a subdiagram, which
 /// is all of a subdiagram the top page shows, each payload there and each
 /// terminal of the component, the way the line was drawn, its stand-in may
@@ -5018,7 +5018,7 @@ fn physics_joins(
         } else {
             (other, &end.component, their_kind, &kind)
         };
-        return tcslibgs::physics::connectable(outputs_of, inputs_of)
+        return tcslibgs::node::physics::connectable(outputs_of, inputs_of)
             .into_iter()
             .map(|(output, input)| PhysicsJoin::Connection {
                 from: format!("{from}.{output}"),
@@ -5039,13 +5039,13 @@ fn physics_joins(
     let Some(under) = node_under(document, &None, (x - shift, y)) else {
         return Vec::new();
     };
-    let Some(terminals) = tcslibgs::physics::terminals_of(&kind) else {
+    let Some(terminals) = tcslibgs::node::physics::terminals_of(&kind) else {
         return Vec::new();
     };
     let way = if end.output {
-        tcslibgs::physics::terminal::Direction::Out
+        tcslibgs::node::physics::terminal::Direction::Out
     } else {
-        tcslibgs::physics::terminal::Direction::In
+        tcslibgs::node::physics::terminal::Direction::In
     };
     let mut meant = Vec::new();
     for node in &document.nodes {
@@ -5312,7 +5312,7 @@ fn put_physics(window: &SimWindow, editor: &Editor, component: &str) {
     window.set_choices(ModelRc::from(Rc::new(VecModel::from(choices))));
     window.set_chosen(chosen.map_or("", |_| component).into());
     let fields: Vec<&'static str> = chosen
-        .and_then(|c| tcslibgs::physics::settings_of(&c.kind))
+        .and_then(|c| tcslibgs::node::physics::settings_of(&c.kind))
         .map(|settings| settings.to_vec())
         .unwrap_or_default();
     let empty = BTreeMap::new();
@@ -5377,7 +5377,7 @@ fn physics_palette() -> ModelRc<PaletteEntry> {
 }
 
 /// The physics component types by family, as the physics list heads them:
-/// every one of `tcslibgs::physics::TYPES` once, which a test holds it to.
+/// every one of `tcslibgs::node::physics::TYPES` once, which a test holds it to.
 const PHYSICS_FAMILIES: &[(&str, &[&str])] = &[
     ("Thermal", &["heater", "thermal_mass"]),
     ("Power", &["battery", "bus", "load", "solar_array", "sun"]),
@@ -6553,7 +6553,7 @@ fn the_physics_list_offers_every_type_once() {
         .flat_map(|(_, kinds)| kinds.iter().copied())
         .collect();
     offered.sort_unstable();
-    let mut known: Vec<&str> = tcslibgs::physics::TYPES.to_vec();
+    let mut known: Vec<&str> = tcslibgs::node::physics::TYPES.to_vec();
     known.sort_unstable();
     assert_eq!(offered, known);
 }

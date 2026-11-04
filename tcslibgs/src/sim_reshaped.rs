@@ -23,7 +23,7 @@
 //! The simulated payloads are grouped by type now, a payload named by the
 //! word `payload`; a group is named by the word `group`; and a model's
 //! components are grouped by type, each named by the word `component`: see
-//! [`crate::sim_grouped`] and [`crate::physics::grouped`]. A file in the old
+//! [`crate::sim_grouped`] and [`crate::node::physics::grouped`]. A file in the old
 //! shape is refused here, at the line of its first entry, and shown how that
 //! entry is written now, as [`crate::graph::reshaped`] refuses a
 //! configuration in its old shape and for the same reason: a file that was
@@ -35,7 +35,7 @@
 //! `physics` list and its `connections` beside it. It is the `physics` of
 //! the simulator file's `world` section now, those two under it, and the
 //! temperature each thermal mass gave as its `environment` is the world's
-//! `ambient_temp`: see [`crate::physics`]. A simulator file that names a
+//! `ambient_temp`: see [`crate::node::physics`]. A simulator file that names a
 //! model, a model given where a simulator file is wanted, and a `physics`
 //! section at the top of a file, are refused here with where it goes; and
 //! so is a `world` in XML, which a model has never been written in.

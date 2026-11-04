@@ -270,7 +270,7 @@ pub fn interpretation_of_simulator(
         })
         .collect();
     let world = file.world.as_ref().map(|world| {
-        let mut components: Vec<&crate::physics::Component> =
+        let mut components: Vec<&crate::node::physics::Component> =
             world.physics.components.iter().collect();
         components.sort_by(|a, b| a.name().cmp(b.name()));
         let mut connections: Vec<(&str, &str)> = world

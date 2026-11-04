@@ -1,6 +1,6 @@
 //! A heater: a resistance on a supply, switched on and off.
 //!
-//! Its terminals are `tcslibgs::physics::heater`'s: `on`, the decision it
+//! Its terminals are `tcslibgs::node::physics::heater`'s: `on`, the decision it
 //! is driven to; `heat`, in watts, what it gives out; `current`, in
 //! amperes, what it draws. Both outputs are nought while it is off.
 //! `heating` is one while it is on and nought while it is off.
@@ -24,12 +24,12 @@
 
 use rand::rngs::StdRng;
 use rand::SeedableRng;
-use tcslibgs::physics::heater::Resolved;
+use tcslibgs::node::physics::heater::Resolved;
 
 use super::component::Component;
 use super::random::{seed_for, settled, wandered};
 
-/// Its terminals' places, in `tcslibgs::physics::heater::TERMINALS`'s
+/// Its terminals' places, in `tcslibgs::node::physics::heater::TERMINALS`'s
 /// order, which a test holds this to.
 const ON: usize = 0;
 const HEAT: usize = 1;
@@ -103,8 +103,8 @@ impl Component for Heater {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use tcslibgs::physics::heater::TERMINALS;
-    use tcslibgs::physics::Wander;
+    use tcslibgs::node::physics::heater::TERMINALS;
+    use tcslibgs::node::physics::Wander;
 
     /// The places here are the type's.
     #[test]

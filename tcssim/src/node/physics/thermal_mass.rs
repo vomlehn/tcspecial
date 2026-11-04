@@ -1,7 +1,7 @@
 //! A thermal mass: one body at one temperature, which heat warms and its
 //! surroundings pull back.
 //!
-//! Its terminals are `tcslibgs::physics::thermal_mass`'s: `heat`, in watts,
+//! Its terminals are `tcslibgs::node::physics::thermal_mass`'s: `heat`, in watts,
 //! the sum of what every heater joined to it gives; `temperature`, in
 //! kelvin, what it is.
 //!
@@ -67,12 +67,12 @@ use std::f64::consts::TAU;
 
 use rand::rngs::StdRng;
 use rand::SeedableRng;
-use tcslibgs::physics::thermal_mass::Resolved;
+use tcslibgs::node::physics::thermal_mass::Resolved;
 
 use super::component::Component;
 use super::random::{seed_for, settled, wandered};
 
-/// Its terminals' places, in `tcslibgs::physics::thermal_mass::TERMINALS`'s
+/// Its terminals' places, in `tcslibgs::node::physics::thermal_mass::TERMINALS`'s
 /// order, which a test holds this to.
 const HEAT: usize = 0;
 const TEMPERATURE: usize = 1;
@@ -184,8 +184,8 @@ impl Component for ThermalMass {
 mod tests {
     use super::*;
     use std::time::Duration;
-    use tcslibgs::physics::thermal_mass::TERMINALS;
-    use tcslibgs::physics::Wander;
+    use tcslibgs::node::physics::thermal_mass::TERMINALS;
+    use tcslibgs::node::physics::Wander;
 
     /// The example's zone: ten kelvin below a setpoint of 293.15, losing
     /// the difference with a fifty second constant, twenty joules a kelvin.

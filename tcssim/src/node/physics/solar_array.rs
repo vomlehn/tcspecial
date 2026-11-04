@@ -1,13 +1,13 @@
 //! A solar array: current in proportion to the light on it.
 //!
-//! Its terminals are `tcslibgs::physics::solar_array`'s: `light`, a ratio,
+//! Its terminals are `tcslibgs::node::physics::solar_array`'s: `light`, a ratio,
 //! and `current`, in amperes, its full-sun current times the light.
 
-use tcslibgs::physics::solar_array::Resolved;
+use tcslibgs::node::physics::solar_array::Resolved;
 
 use super::component::Component;
 
-/// Its terminals' places, in `tcslibgs::physics::solar_array::TERMINALS`'s
+/// Its terminals' places, in `tcslibgs::node::physics::solar_array::TERMINALS`'s
 /// order, which a test holds this to.
 const LIGHT: usize = 0;
 const CURRENT: usize = 1;
@@ -56,7 +56,7 @@ impl Component for SolarArray {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use tcslibgs::physics::solar_array::TERMINALS;
+    use tcslibgs::node::physics::solar_array::TERMINALS;
 
     /// The places here are the type's, and its current goes with its light.
     #[test]

@@ -26,7 +26,7 @@ struct Due {
 pub struct Queue {
     /// Soonest first; of two at one moment, the component whose place is
     /// first, which is the component whose name sorts first: the world's
-    /// components are in name order, as `tcslibgs::physics::Model` holds them,
+    /// components are in name order, as `tcslibgs::node::physics::Model` holds them,
     /// and never in the order a file wrote them. A name is one component's
     /// alone, so this is the whole of the order, and no second key is
     /// wanted.

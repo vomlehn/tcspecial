@@ -107,7 +107,7 @@ pub struct PayloadConfig {
     /// simulator file that names no model: such a payload sends bytes from
     /// a random number generator, which is what this simulator did for
     /// everything before there was a world to read.
-    pub attachment: Option<crate::physics::Attachment>,
+    pub attachment: Option<crate::node::physics::Attachment>,
     /// The thermostats this sensor reports to, where the simulator stands
     /// in for the vehicle's: every reading it sends goes to each as it
     /// leaves. None for every other payload, and for every payload of a run
@@ -355,7 +355,7 @@ impl SimulatedPayload {
     /// either way. For a part the vehicle drives -- a heater -- the button
     /// is its power instead: disabled, it stays off whatever it is sent, and
     /// enabled, it takes the latest it was sent at once. See
-    /// [`crate::physics::Power`].
+    /// [`crate::node::physics::Power`].
     ///
     /// # Arguments
     ///
@@ -368,7 +368,7 @@ impl SimulatedPayload {
     }
 
     /// Says what a part the vehicle drives is doing, in words for its
-    /// panel: see [`crate::physics::Attachment::driving_said`].
+    /// panel: see [`crate::node::physics::Attachment::driving_said`].
     ///
     /// # Returns
     ///
@@ -377,7 +377,7 @@ impl SimulatedPayload {
         self.config
             .attachment
             .as_ref()
-            .map(crate::physics::Attachment::driving_said)
+            .map(crate::node::physics::Attachment::driving_said)
             .unwrap_or_default()
     }
 
@@ -699,7 +699,7 @@ pub(crate) fn a_packet_from<R: Rng>(
     // still means.
     if matches!(
         config.attachment,
-        Some(crate::physics::Attachment::Drives { .. })
+        Some(crate::node::physics::Attachment::Drives { .. })
     ) {
         return Produce::Nothing;
     }
@@ -715,7 +715,7 @@ pub(crate) fn a_packet_from<R: Rng>(
     }
 
     // A sensor joined to the world sends what its terminal is, in the
-    // encoding its own conversion reads back: see `crate::physics`. Every
+    // encoding its own conversion reads back: see `crate::node::physics`. Every
     // other payload sends bytes from the generator, which is what this
     // simulator did for everything before there was a world to read.
     //
@@ -727,7 +727,7 @@ pub(crate) fn a_packet_from<R: Rng>(
     let mut packet: Vec<u8> = match config
         .attachment
         .as_ref()
-        .and_then(crate::physics::Attachment::reading)
+        .and_then(crate::node::physics::Attachment::reading)
     {
         Some(reading) => reading,
         None => generate(rng, pacing.packet_size),

@@ -24,5 +24,8 @@
 
 /// What the vehicle carries: the stand-ins for hardware that is not here.
 pub mod payload;
+/// The physics model the stand-ins measure and act on: one module per
+/// component type, beside the stand-ins that are joined to them.
+pub mod physics;
 /// What the vehicle computes, where the simulator stands in for it.
 pub mod vehicle;

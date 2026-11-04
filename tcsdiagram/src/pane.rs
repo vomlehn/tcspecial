@@ -16,7 +16,7 @@
 //! file holds, so that adding it moved nothing a configuration had placed:
 //! the three working panes are where they always were, and a window that
 //! draws the Physics pane draws the sheet that much further right. Its
-//! nodes are laid out by name rather than placed -- see `crate::physics` --
+//! nodes are laid out by name rather than placed -- see `crate::node::physics` --
 //! because a configuration file is the only place a node's position is kept,
 //! and a physics component is not in one.
 //!

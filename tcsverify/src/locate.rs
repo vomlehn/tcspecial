@@ -220,11 +220,11 @@ fn yaml(text: &str) -> Where {
 
         // The world's ambient temperature and its physics' connections,
         // which a problem with either is reported at: see
-        // `tcslibgs::physics::AMBIENT` and `CONNECTIONS`.
+        // `tcslibgs::node::physics::AMBIENT` and `CONNECTIONS`.
         if section == "world" {
             for (key, at) in [
-                ("ambient_temp:", tcslibgs::physics::AMBIENT),
-                ("connections:", tcslibgs::physics::CONNECTIONS),
+                ("ambient_temp:", tcslibgs::node::physics::AMBIENT),
+                ("connections:", tcslibgs::node::physics::CONNECTIONS),
             ] {
                 if trimmed.starts_with(key) {
                     found.note_section(at, number);
@@ -514,11 +514,12 @@ simulated_payloads:
         let found = Where::of(model, ConfigFormat::Yaml);
         assert_eq!(found.line_of(&About::PhysicsComponent("h".to_string())), 6);
         assert_eq!(
-            found.line_of(&About::Section(tcslibgs::physics::CONNECTIONS)),
+            found
+                .line_of(&About::Section(tcslibgs::node::physics::CONNECTIONS)),
             7
         );
         assert_eq!(
-            found.line_of(&About::Section(tcslibgs::physics::AMBIENT)),
+            found.line_of(&About::Section(tcslibgs::node::physics::AMBIENT)),
             2
         );
     }

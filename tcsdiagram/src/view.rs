@@ -546,6 +546,13 @@ pub fn link_looks(nodes: &[OnSheet], lines: &[LineOnSheet]) -> Vec<LinkLook> {
         .collect();
 
     let mut taken: Vec<Vec<(f32, f32)>> = Vec::new();
+    // The comments already drawn, each with the node its line leaves. A
+    // comment written over a list of links -- the thermostat's, over the two
+    // heaters it drives -- is the list's, and each line in it carries it; drawn
+    // on every one, it is the same words twice, laid over each other where the
+    // lines run together. Drawn on the first line of the list only, and kept
+    // on all of them, so the file is written as it was.
+    let mut commented: Vec<(&str, &str)> = Vec::new();
     lines
         .iter()
         .map(|line| {
@@ -605,7 +612,13 @@ pub fn link_looks(nodes: &[OnSheet], lines: &[LineOnSheet]) -> Vec<LinkLook> {
                 label_y,
                 wide: named_input.is_some(),
                 label,
-                comment: line.comment.unwrap_or_default().to_string(),
+                comment: match line.comment {
+                    Some(said) if !commented.contains(&(line.from, said)) => {
+                        commented.push((line.from, said));
+                        said.to_string()
+                    }
+                    _ => String::new(),
+                },
             }
         })
         .collect()
@@ -614,6 +627,44 @@ pub fn link_looks(nodes: &[OnSheet], lines: &[LineOnSheet]) -> Vec<LinkLook> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// A comment over a list of links is drawn once, on the first, though
+    /// every line in the list carries it; one of another node's is drawn as
+    /// well.
+    #[test]
+    fn a_comment_over_several_lines_is_drawn_once() {
+        let at = |name: &'static str, node_type, x| OnSheet {
+            name: name.into(),
+            node_type,
+            at: (x, 40),
+            here: true,
+            drawn: Drawn::Itself,
+        };
+        let nodes = [
+            at("thermostat", "compute", 400),
+            at("heater1", "gpio", 40),
+            at("heater2", "gpio", 40),
+            at("log", "log", 600),
+        ];
+        let said = "asserted below the setpoint";
+        let line = |from, to, origin| LineOnSheet {
+            from,
+            origin: Some(origin),
+            to,
+            input: None,
+            comment: Some(said),
+        };
+        let lines = [
+            line("thermostat", "heater1", "moc-out"),
+            line("thermostat", "heater2", "moc-out"),
+            line("log", "heater1", "moc-out"),
+        ];
+        let drawn: Vec<String> = link_looks(&nodes, &lines)
+            .into_iter()
+            .map(|look| look.comment)
+            .collect();
+        assert_eq!(drawn, [said, "", said]);
+    }
 
     /// A compute node's type line names its function, and every other node's
     /// its type; and the markup writes that line, not the type.

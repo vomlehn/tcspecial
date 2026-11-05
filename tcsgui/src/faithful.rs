@@ -37,6 +37,12 @@
 //! the editor's own text is written instead. A file that keeps its author's
 //! hand and says the wrong thing would be worse than one that does not, and
 //! the editor's own text is always right.
+//!
+//! The same is done where the merged text names one thing twice -- two
+//! entries for one node -- that the editor's own text names once. A line
+//! merge cannot tell an entry its author put somewhere else from a second
+//! entry, and the comparison above, being a merge of the same kind, makes
+//! the same mistake; a name said twice is one no reader takes.
 
 use std::path::Path;
 
@@ -71,7 +77,12 @@ pub fn text(path: &Path, written: &Written, now: &str) -> String {
     }
     let xml = is_xml(path);
     let merged = merged(&written.base, &written.kept, now, !xml);
-    if says_what_it_should(&merged, written, now, xml) {
+    let twice = |text: &str| named_twice(text, xml);
+    let more_twice = match (twice(&merged), twice(now)) {
+        (Some(merged), Some(now)) => !merged.is_subset(&now),
+        _ => true,
+    };
+    if !more_twice && says_what_it_should(&merged, written, now, xml) {
         merged
     } else {
         now.to_string()
@@ -140,6 +151,129 @@ fn says_what_it_should(
         return false;
     };
     merged == self::merged(&base, &kept, &now, false)
+}
+
+/// The keys under which a node or an entry is named, that a text names more
+/// than once among its siblings.
+///
+/// In XML an element's `name` attribute, among the elements of one parent;
+/// in YAML a list entry's identifying key -- `node`, `payload`, `compute`,
+/// `gateway`, `component`, `subdiagram` or `name` -- among the entries of
+/// one list. Each with where it is, so that `<node name="a">` under `nodes`
+/// and under `set-aside` are two things.
+///
+/// # Arguments
+///
+/// * `text` - The text.
+/// * `xml`  - Whether it is XML rather than YAML.
+///
+/// # Returns
+///
+/// Each name said more than once, with where; `None` where the text does
+/// not read.
+fn named_twice(
+    text: &str,
+    xml: bool,
+) -> Option<std::collections::BTreeSet<String>> {
+    use std::collections::BTreeSet;
+
+    let mut seen: BTreeSet<String> = BTreeSet::new();
+    let mut twice: BTreeSet<String> = BTreeSet::new();
+    let mut note = |key: String| {
+        if !seen.insert(key.clone()) {
+            twice.insert(key);
+        }
+    };
+    if xml {
+        use quick_xml::events::Event;
+
+        // Each open element's path, and how many it has opened inside it, so
+        // that two parents of one name are told apart.
+        let mut path: Vec<String> = Vec::new();
+        let mut counts: Vec<usize> = vec![0];
+        let mut reader = quick_xml::Reader::from_str(text);
+        loop {
+            let (element, empty) = match reader.read_event().ok()? {
+                Event::Start(e) => (e, false),
+                Event::Empty(e) => (e, true),
+                Event::End(_) => {
+                    path.pop();
+                    counts.pop();
+                    continue;
+                }
+                Event::Eof => break,
+                _ => continue,
+            };
+            let tag = element.name().as_ref().to_string();
+            for attribute in element.attributes() {
+                let attribute = attribute.ok()?;
+                if attribute.key.as_ref() == "name" {
+                    note(format!(
+                        "{}/{tag}[name={}]",
+                        path.join("/"),
+                        unescaped(&attribute.value)
+                    ));
+                }
+            }
+            if !empty {
+                let place = counts.last_mut().expect("a parent");
+                *place += 1;
+                path.push(format!("{tag}#{place}"));
+                counts.push(0);
+            }
+        }
+    } else {
+        use serde_norway::Value;
+
+        const NAMING: [&str; 7] = [
+            "node",
+            "payload",
+            "compute",
+            "gateway",
+            "component",
+            "subdiagram",
+            "name",
+        ];
+        /// Notes each list entry's name, with where the list is, and goes
+        /// on into everything inside.
+        ///
+        /// # Arguments
+        ///
+        /// * `value` - What is walked.
+        /// * `at`    - Where it is, as the keys and places that reach it.
+        /// * `note`  - What is told of each entry's name.
+        fn walk(value: &Value, at: &str, note: &mut dyn FnMut(String)) {
+            match value {
+                Value::Sequence(items) => {
+                    for (i, item) in items.iter().enumerate() {
+                        if let Value::Mapping(map) = item {
+                            for key in NAMING {
+                                if let Some(Value::String(name)) = map.get(key)
+                                {
+                                    note(format!("{at}[{key}={name}]"));
+                                }
+                            }
+                        }
+                        walk(item, &format!("{at}/{i}"), note);
+                    }
+                }
+                Value::Mapping(map) => {
+                    for (key, value) in map {
+                        let key = match key {
+                            Value::String(key) => key.clone(),
+                            other => format!("{other:?}"),
+                        };
+                        walk(value, &format!("{at}/{key}"), note);
+                    }
+                }
+                Value::Tagged(tagged) => walk(&tagged.value, at, note),
+                _ => {}
+            }
+        }
+        let value: Value = serde_norway::from_str(text).ok()?;
+        walk(&value, "", &mut note);
+    }
+    Some(twice)
 }
 
 /// Whether a file is written as XML rather than as YAML.
@@ -752,5 +886,65 @@ values:
         let other = "<a><b x='1'>it's</b><c></c></a>";
         assert!(same_meaning(one, other, true));
         assert!(!same_meaning(one, "<a><b x='2'>it's</b><c/></a>", true));
+    }
+
+    /// An entry its author's file has in another place than the editor
+    /// would put it, then edited, is written once.
+    ///
+    /// What the thermostat example's file did: its subdiagram's box was
+    /// first in the `tcsgui` section, where a name that began with `../`
+    /// had sorted it, and the editor puts it last, by the name it has now.
+    /// The merge took the author's line, which the edit had not touched,
+    /// and the edit's line, and wrote the box's place twice, which no
+    /// reader takes.
+    #[test]
+    fn an_entry_the_author_put_elsewhere_is_written_once() {
+        let xml = |first: &str, last: &str| {
+            format!(
+                "<configuration>\n    <tcsgui>\n        <nodes>\n\
+                 {first}            <node name=\"gateway\" x=\"790\" \
+                 y=\"34\"/>\n{last}        </nodes>\n    </tcsgui>\n\
+                 </configuration>\n"
+            )
+        };
+        let boxed = |x: i32, y: i32| {
+            format!(
+                "            <node name=\"thermostat-common\" x=\"{x}\" \
+                 y=\"{y}\"/>\n"
+            )
+        };
+        let written = Written {
+            base: xml("", &boxed(317, 91)),
+            kept: xml(&boxed(317, 91), ""),
+        };
+        let now = xml("", &boxed(299, 53));
+        let saved = text(Path::new("a.xtcs"), &written, &now);
+        assert_eq!(
+            saved.matches("thermostat-common").count(),
+            1,
+            "written once:\n{saved}"
+        );
+        assert!(saved.contains("x=\"299\" y=\"53\""), "{saved}");
+
+        let yaml = |first: &str, last: &str| {
+            format!(
+                "tcsgui:\n  nodes:\n{first}    - {{ node: gateway, x: 790, \
+                 y: 34 }}\n{last}"
+            )
+        };
+        let boxed = |x: i32, y: i32| {
+            format!("    - {{ node: thermostat-common, x: {x}, y: {y} }}\n")
+        };
+        let written = Written {
+            base: yaml("", &boxed(317, 91)),
+            kept: yaml(&boxed(317, 91), ""),
+        };
+        let now = yaml("", &boxed(299, 53));
+        let saved = text(Path::new("a.ytcs"), &written, &now);
+        assert_eq!(
+            saved.matches("thermostat-common").count(),
+            1,
+            "written once:\n{saved}"
+        );
     }
 }

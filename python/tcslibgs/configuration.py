@@ -353,6 +353,37 @@ class Node:
     links: dict = field(default_factory=dict)
 
 
+@dataclass(frozen=True, order=True)
+class Include:
+    """One file a top file includes: ``graph::Include``.
+
+    A subdiagram, by its own name, and the file's path from the top file's
+    directory without an extension.
+    """
+
+    #: The subdiagram's name: no node's, and no other subdiagram's.
+    name: str
+    #: The file's path: see :func:`include_path`.
+    path: str
+
+
+def _include_refused(path, line, why):
+    """The error for an include written as it may not be.
+
+    Args:
+        path: The file, for the complaint.
+        line: The line the include is on.
+        why:  What is wrong.
+
+    Returns:
+        The ``ValueError`` to raise.
+    """
+    return ValueError(
+        f"{path}: at line {line}, {why}: an include names its subdiagram and "
+        "gives its path, `- subdiagram: <name>` with `path: <path>` under it, "
+        'or in XML <include name="<name>" path="<path>"/>')
+
+
 @dataclass
 class Configuration:
     """A configuration, as far as a ground station reads one."""
@@ -366,8 +397,9 @@ class Configuration:
     #: The command bindings, each the gateway node a command arrives on
     #: and the ``node.attribute`` it sets: ``(from, sets)``.
     commands: list = field(default_factory=list)
-    #: The other files the configuration is made of, by the names its
-    #: ``include`` list gives them: see :func:`include_path`.
+    #: The other files the configuration is made of, as its ``include``
+    #: list gives them: each an :class:`Include`, its subdiagram's name and
+    #: its path. See :func:`include_path`.
     included: list = field(default_factory=list)
     #: Whether the file has an ``exports`` section, saying what of it the
     #: files around it may join: only an included file may. What it says is
@@ -1265,8 +1297,21 @@ def _with_includes(path):
             "it names into a file this one includes")
     homes = {node.name: path for node in config.nodes}
     seen = [path.resolve(strict=True)]
-    for name in config.included:
-        included = include_path(path, name)
+    names = [include.name for include in config.included]
+    for include in config.included:
+        name = include.name
+        if not name.strip():
+            raise ValueError(f'{path}: the subdiagram "{name}" has no name')
+        if "." in name or "/" in name:
+            raise ValueError(
+                f'{path}: the subdiagram "{name}" has a dot or a slash in its '
+                "name, which a line reads as separating a node's name from "
+                "an input's or a page's")
+        if names.count(name) > 1:
+            raise ValueError(
+                f'{path}: the subdiagram "{name}" is named twice; each '
+                "subdiagram has a name of its own")
+        included = include_path(path, include.path)
         part, has_section = _load_one(included)
         real = included.resolve(strict=True)
         if real in seen:
@@ -1292,6 +1337,12 @@ def _with_includes(path):
         config.nodes = sorted(config.nodes + part.nodes,
                               key=lambda n: n.name)
         config.commands.extend(part.commands)
+    for name in names:
+        if name in homes:
+            raise ValueError(
+                f'{path}: the subdiagram "{name}" has the name of a node; a '
+                "subdiagram is drawn and joined as a node is, so its name has "
+                "to be its own")
     return config
 
 
@@ -1753,7 +1804,23 @@ def _load_xml(path):
     reader = _Reader(path)
     for element in root.children:
         if element.tag == "include":
-            reader.included.append(element.text.strip())
+            name = element.attributes.get("name")
+            said = element.attributes.get("path")
+            if element.text.strip() and said is None:
+                raise _include_refused(
+                    path, element.line,
+                    f'the include "{element.text.strip()}" is a bare path')
+            if name is None or said is None:
+                raise _include_refused(
+                    path, element.line,
+                    "an include has no " + ("name" if name is None
+                                            else "path"))
+            unknown = set(element.attributes) - {"name", "path"}
+            if unknown or element.children:
+                raise _include_refused(
+                    path, element.line,
+                    "an include has nothing but its name and its path")
+            reader.included.append(Include(name, said))
         if element.tag == "exports":
             reader.has_exports = True
     _xml_old(reader, root)
@@ -2078,12 +2145,26 @@ def _load_yaml(path):
     for key, value, at in sections:
         if key != "include":
             continue
-        for name in _yaml_list(reader, value, "include"):
-            said = construct(name)
-            if not isinstance(said, str):
-                raise reader.refuse(name.start_mark.line + 1,
-                                    "an include is a file's name")
-            reader.included.append(said)
+        for item in _yaml_list(reader, value, "include"):
+            line = item.start_mark.line + 1
+            said = construct(item)
+            if isinstance(said, str):
+                raise _include_refused(
+                    path, line, f'the include "{said}" is a bare path')
+            if not isinstance(said, dict):
+                raise _include_refused(path, line,
+                                       "an include is a subdiagram")
+            if set(said) - {"subdiagram", "path"}:
+                raise _include_refused(
+                    path, line,
+                    "an include has nothing but its name and its path")
+            if "subdiagram" not in said or "path" not in said:
+                raise _include_refused(
+                    path, line,
+                    "an include has no " + ("name" if "subdiagram" not in said
+                                            else "path"))
+            reader.included.append(
+                Include(str(said["subdiagram"]), str(said["path"])))
     _yaml_old(reader, root)
 
     tcspecial = {}

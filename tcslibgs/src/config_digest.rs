@@ -409,13 +409,18 @@ pub fn interpretation_of_graph(
         "links": links,
         "commands": commands,
     });
-    // The names of the files it includes, so that the checksum a kept
-    // configuration is named by says the shape of its tree too: see
-    // `crate::store`. Only where there are some, so that a configuration
-    // of one file keeps the checksum it always had.
+    // The files it includes, each by its subdiagram's name and its path, so
+    // that the checksum a kept configuration is named by says the shape of
+    // its tree too: see `crate::store`. Only where there are some, so that
+    // a configuration of one file keeps the checksum it always had. By name,
+    // the order meaning nothing.
     let mut included = graph.included();
     included.sort();
     if !included.is_empty() {
+        let included: Vec<Value> = included
+            .iter()
+            .map(|i| json!({ "subdiagram": i.name, "path": i.path }))
+            .collect();
         interpretation["include"] = json!(included);
     }
     interpretation
@@ -741,7 +746,7 @@ mod tests {
         let one = written(
             dir.path(),
             "one.ytcs",
-            "include:\n  - a\n  - b\n\
+            "include:\n  - subdiagram: a\n    path: a\n  - subdiagram: b\n    path: b\n\
              payload_groups:\n  - { name: g1, interval: 1 s }\n  \
              - { name: g2, interval: 2 s }\n\
              vehicle:\n  - type compute:\n      - compute: v\n        \
@@ -774,7 +779,7 @@ mod tests {
              function: vote\n\
              payload_groups:\n  - { name: g2, interval: 2 s }\n  \
              - { name: g1, interval: 1 s }\n\
-             include:\n  - b\n  - a\n",
+             include:\n  - subdiagram: b\n    path: b\n  - subdiagram: a\n    path: a\n",
         );
         written(
             dir.path(),

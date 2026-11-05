@@ -1789,7 +1789,8 @@ vehicle:
         std::fs::write(
             &top,
             "include:
-  - zone
+  - subdiagram: zone
+    path: zone
 gateways:
   - type gateway_radio:
       - gateway: gateway

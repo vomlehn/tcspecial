@@ -3825,20 +3825,40 @@ Configuration
 One logical configuration, which may be written as several files.
 
 The top file may carry an ``include`` list naming others; their contents are
-merged into it. Nothing is discovered by scanning a directory: what is read is
+merged into it. Each is a subdiagram, with a name of its own and its file's
+path written under it, as a node is written with its attributes:
+
+.. code-block:: yaml
+
+   include:
+     - subdiagram: thermostat-common
+       path: ../thermostat-common/thermostat
+
+and in XML ``<include name="thermostat-common"
+path="../thermostat-common/thermostat"/>``. Nothing is discovered by scanning a directory: what is read is
 what a file names, so the set of files that make up a configuration is itself
 written down. The digest the beacon carries is taken over the whole set, so the
 ground can say which configuration is flying rather than which top file is.
 
 Requirement
-    An include names a file by its path relative to the top file's
+    A subdiagram's name is its own: no node's and no other subdiagram's,
+    and with no dot or slash in it, which a line reads as separating a
+    node's name from an input's or a page's. A subdiagram is drawn as a node
+    of the top page and joined like one, and a path is no name for it: it
+    says where the file is, which changes when the file moves, and is full of
+    slashes and dots. An include written as a bare path, as includes once
+    were, is refused, saying how to write it now.
+
+Requirement
+    An include's path names a file by its path relative to the top file's
     directory, without an extension, the top file's being given it: ``zone``
     beside the top file, ``../common/zone`` in another directory. Each part
     of it is a name or ``..``. Nothing in it is expanded: an include that is
     empty, absolute, begins with ``~``, has a ``$`` in it, or has a part that
     is empty or ``.`` is refused, saying that includes are relative to the
-    top file. The digest takes in each include as it is written, so the
-    same set of files digests the same from any working directory, and an
+    top file. The digest takes in each include, its name and its path, as
+    it is written, so the same set of files digests the same from any
+    working directory, and an
     expansion would make the digest depend on something that is not in the
     files.
 
@@ -3874,9 +3894,11 @@ configuration that breaks it is refused before it flies.
 ``tcslibgs::graph::Graph::load`` is the reader, and the Python ground
 reader, ``python/tcslibgs/configuration.py``, follows includes by the same
 rules, so that the two count a node's device id among the same names.
-tcsgui opens each included file as a subdiagram named by its include and
-writes each node, group and command binding back to the file it was read
-from.
+tcsgui opens each included file as a subdiagram under its name, keeps its
+path as the box's ``path`` attribute, and writes each node, group and command
+binding back to the file it was read from. A subdiagram is renamed as a node
+is, its box being its name: its nodes, the lines to them and its exports go
+with the name, and its file stays where its path says.
 
 A small vehicle needs no split and should not have one. Where a split earns its
 place, the useful seam is who owns a file and how often it changes, not what
@@ -5094,8 +5116,16 @@ one with a dot or a slash in it, which a line and a page read as separators.
 What is refused is said under the field and nothing changes. A rename is one
 edit, taken back by one undo, and takes the node's lines, its simulator
 settings and its showing at its page's edge with it; a node of a subdiagram
-keeps its page. A subdiagram's box is named for the file it stands for and is
-not renamed in the window.
+keeps its page. A subdiagram's box is renamed the same way, which renames the
+subdiagram -- its page, the lines to its nodes and its exports go with the
+name -- and leaves its file where its ``path`` says.
+
+A physics component is renamed as a node is, in the physics window, by a name
+field over its settings, and held to the same rules: no name any node or other
+component has, and no dot, which a stand-in's ``connects`` reads as separating
+a component's name from a terminal's. The rename is one edit, and every
+connection, every stand-in's and group's ``connects``, and its place in the
+Physics pane say the new name.
 
 The links stay with whoever keeps the name. A link names a name: while two
 nodes shared one, every link naming it was ambiguous, and renaming one of them
@@ -7068,7 +7098,7 @@ Configurations named by their checksum
 
    Built since (2026-10-31): in `Keeping configurations on board`_,
    configurations kept as trees under their checksum in the directory
-   ``configurations`` names, the checksum taking in the include names;
+   ``configurations`` names, the checksum taking in the includes;
    keeping one already held writing nothing; the checksum computed again
    at every load and a mismatch refused; and ``configurations_kept`` read
    and enforced by the store's removal (``tcslibgs::store``), which

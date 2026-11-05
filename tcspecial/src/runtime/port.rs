@@ -1944,6 +1944,7 @@ mod tests {
             set_aside: Default::default(),
             named: Default::default(),
             exports: Default::default(),
+            includes: Vec::new(),
         };
         let mut port =
             EndpointPort::open(&gps, &Routes::of(&graph), &Abandon::nothing())
@@ -2043,6 +2044,7 @@ mod tests {
             set_aside: Default::default(),
             named: Default::default(),
             exports: Default::default(),
+            includes: Vec::new(),
         };
         let routes = Routes::of(&graph);
 
@@ -2295,6 +2297,7 @@ mod tests {
                 set_aside: Default::default(),
                 named: Default::default(),
                 exports: Default::default(),
+                includes: Vec::new(),
             })
         };
 
@@ -2386,6 +2389,7 @@ mod tests {
             set_aside: Default::default(),
             named: Default::default(),
             exports: Default::default(),
+            includes: Vec::new(),
         });
         let mut port = EndpointPort::open(&node, &routes, &Abandon::nothing())
             .expect("the vehicle waits for the payload");
@@ -2472,6 +2476,7 @@ mod tests {
             set_aside: Default::default(),
             named: Default::default(),
             exports: Default::default(),
+            includes: Vec::new(),
         });
 
         let _port = EndpointPort::open(&node, &routes, &Abandon::nothing())

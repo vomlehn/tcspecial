@@ -21,8 +21,9 @@ which both configurations include; `thermostat-common` holds
 configurations include, and `thermostat-sim.yaml`, the simulator file,
 physics model and all, which each thermostat example's `-sim.yaml` is a
 link to, so that each is found beside its configuration by name. Each
-configuration includes its common file by its path from its own
-directory, `../thermostat-common/thermostat`, and keeps for itself only what
+configuration includes its common file as a subdiagram called
+`thermostat-common`, at its path from its own directory,
+`../thermostat-common/thermostat`, and keeps for itself only what
 differs: its `tcspecial` section, its gateway node -- called `gateway` in
 both, which is the name the common file's links send to -- and, for the
 thermostat, the three sensors, whose ports differ. A common file is not

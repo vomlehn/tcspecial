@@ -455,14 +455,22 @@ the simulator configuration file
 
 A configuration may be written as several files. The one named on the command
 line is the top file, and its ``include`` list names the others, each read in
-the top file's spelling and taken in as if it were written there:
+the top file's spelling and taken in as if it were written there. Each is a
+subdiagram, with a name of its own and its file's path under it:
 
 .. code-block:: yaml
 
    include:
-     - ../thermostat-common/thermostat
+     - subdiagram: thermostat-common
+       path: ../thermostat-common/thermostat
 
-An include is relative to the top file's directory: it is the file's path from
+In XML it is one element with the two as attributes, ``<include
+name="thermostat-common" path="../thermostat-common/thermostat"/>``. The name
+is the subdiagram's, the name tcsgui draws its box under, and is no node's
+and no other subdiagram's, with no dot or slash in it. An include written as a
+bare path, as includes once were, is refused, saying how to write it now.
+
+An include's path is relative to the top file's directory: it is the file's path from
 there, without the extension, ``zone`` for ``zone.ytcs`` beside the top file
 and ``../thermostat-common/thermostat`` for ``thermostat.ytcs`` in a directory
 beside the top file's. Nothing in it is expanded, so an include that is
@@ -487,8 +495,8 @@ In XML each name is an element of its own, ``<world-in>temp1</world-in>``,
 inside ``<exports>``. A top file has nothing around it and may not have the
 section. tcsgui draws an included file as a box whose corner terminals are
 its exports, and writes the section back as it read it. The digest takes in each
-include as it is written, so a set of files digests alike from wherever it is
-read. Two examples that fly one vehicle include it from a directory of their
+include, name and path, as it is written, so a set of files digests alike from
+wherever it is read. Two examples that fly one vehicle include it from a directory of their
 own: see `The thermostat-yamcs example`_.
 
 tcspecial once read a configuration of its own as well, named by

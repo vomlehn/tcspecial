@@ -260,6 +260,10 @@ pub enum Edit {
     AddConnection { from: String, to: String },
     /// A connection was taken away. Undone by making it again.
     RemoveConnection { from: String, to: String },
+    /// A physics component was renamed, and with it every connection, every
+    /// stand-in's and group's `connects` and its place in the Physics pane:
+    /// each says the component by name. Undone by renaming it back.
+    RenamePhysics { was: String, now: String },
     /// A node was moved on the canvas. Not a change to the configuration --
     /// the vehicle does not care where the box is -- but it is in the history
     /// because a person who drags a node expects undo to put it back.
@@ -643,6 +647,10 @@ impl Edit {
                 from: from.clone(),
                 to: to.clone(),
             },
+            Edit::RenamePhysics { was, now } => Edit::RenamePhysics {
+                was: now.clone(),
+                now: was.clone(),
+            },
             Edit::SetPhysics {
                 component,
                 setting,
@@ -828,6 +836,9 @@ impl Edit {
             }
             Edit::RemoveConnection { from, to } => {
                 format!("take away the join of {from} to {to}")
+            }
+            Edit::RenamePhysics { was, now } => {
+                format!("rename \"{was}\" to \"{now}\"")
             }
             Edit::AddGroup { name, .. } => format!("add group \"{name}\""),
             Edit::RemoveGroup { name, .. } => {

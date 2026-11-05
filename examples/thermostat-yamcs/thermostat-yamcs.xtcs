@@ -54,7 +54,7 @@
             <send>127.0.0.1:0</send>
         </tcs_cmd>
     </tcspecial>
-    <include>../thermostat-common/thermostat</include>
+    <include name="thermostat-common" path="../thermostat-common/thermostat"/>
     <gateways>
         <type name="gateway_yamcs">
             <!-- Yamcs's end of the link. Each reading drawn into this node
@@ -124,7 +124,7 @@
     </payloads>
     <tcsgui>
         <nodes>
-            <node name="../thermostat-common/thermostat" x="242" y="166"/>
+            <node name="thermostat-common" x="242" y="166"/>
             <node name="gateway" x="790" y="34"/>
             <node name="temp_1" x="34" y="34"/>
             <node name="temp_2" x="34" y="166"/>

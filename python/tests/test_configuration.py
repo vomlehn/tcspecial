@@ -143,14 +143,15 @@ class ConfigurationTest(unittest.TestCase):
             (here / "common").mkdir()
             top = here / "vehicle" / "top.xtcs"
             top.write_text(
-                "<configuration><include>../common/zone</include>"
+                '<configuration><include name="s" path="../common/zone"/>'
                 '<payloads><type name="i2c"><payload name="b"/></type>'
                 "</payloads></configuration>")
             (here / "common" / "zone.xtcs").write_text(
                 '<configuration><payloads><type name="i2c"><payload name="a"/>'
                 '<payload name="c"/></type></payloads></configuration>')
             config = configuration.load(top)
-            self.assertEqual(config.included, ["../common/zone"])
+            self.assertEqual(config.included,
+                             [configuration.Include("s", "../common/zone")])
             self.assertEqual([config.device_id(n) for n in "abc"],
                              [0, 1, 2])
 
@@ -159,31 +160,43 @@ class ConfigurationTest(unittest.TestCase):
         # include is, rather than looked for as a file of that name.
         for name in ["~/zone", "$HOME/zone", "/zone"]:
             with self.subTest(name=name):
-                directory, path = written(f"<include>{name}</include>")
+                directory, path = written(
+                    f'<include name="s" path="{name}"/>')
                 with directory:
                     with self.assertRaisesRegex(
                             ValueError, "relative to this file's directory"):
                         configuration.load(path)
 
     def test_an_include_is_refused_as_the_rust_refuses_it(self):
+        def include(path, name="s"):
+            return f'<include name="{name}" path="{path}"/>'
+
         refused = {
-            "<include></include>": "is empty",
-            "<include>/zone</include>": "is an absolute path",
-            "<include>./zone</include>": "part that is empty",
-            "<include>a//zone</include>": "part that is empty",
-            "<include>~/zone</include>": "begins with ~",
-            "<include>$HOME/zone</include>": r"has a \$ in it",
-            "<include>${COMMON}/zone</include>": r"has a \$ in it",
-            "<include>zone</include><include>zone</include>":
-                "included twice",
-            "<include>vehicle</include>": "included twice",
-            "<include>section</include>": "may not have a tcspecial",
-            "<include>nests</include>": "may not include others",
+            include(""): "is empty",
+            include("/zone"): "is an absolute path",
+            include("./zone"): "part that is empty",
+            include("a//zone"): "part that is empty",
+            include("~/zone"): "begins with ~",
+            include("$HOME/zone"): r"has a \$ in it",
+            include("${COMMON}/zone"): r"has a \$ in it",
+            include("zone") + include("zone", "t"): "included twice",
+            include("vehicle"): "included twice",
+            include("section"): "may not have a tcspecial",
+            include("nests"): "may not include others",
             "<exports><world-in>a</world-in></exports>":
                 "only an included file may have an exports section",
-            "<include>zone</include>"
-            '<payloads><type name="i2c"><payload name="a"/></type>'
+            include("zone")
+            + '<payloads><type name="i2c"><payload name="a"/></type>'
             "</payloads>": 'node called "a" here and in',
+            # Written as includes once were: a bare path.
+            "<include>zone</include>": "is a bare path",
+            '<include name="s"/>': "has no path",
+            # And a subdiagram's name is its own.
+            include("zone", "a.b"): "a dot or a slash",
+            include("zone") + include("section", "s"): "named twice",
+            include("zone", "b")
+            + '<payloads><type name="i2c"><payload name="b"/></type>'
+            "</payloads>": "has the name of a node",
         }
         for text, why in refused.items():
             with self.subTest(text=text):
@@ -197,10 +210,25 @@ class ConfigurationTest(unittest.TestCase):
                     (here / "section.xtcs").write_text(
                         "<configuration><tcspecial/></configuration>")
                     (here / "nests.xtcs").write_text(
-                        "<configuration><include>zone</include>"
+                        '<configuration><include name="z" path="zone"/>'
                         "</configuration>")
                     with self.assertRaisesRegex(ValueError, why):
                         configuration.load(path)
+
+    def test_a_yaml_include_names_its_subdiagram(self):
+        # In YAML a subdiagram is written as a node is, its path under its
+        # name; a bare path is refused, saying how to write it now.
+        with tempfile.TemporaryDirectory() as directory:
+            here = Path(directory)
+            (here / "zone.ytcs").write_text("payloads: []\n")
+            top = here / "top.ytcs"
+            top.write_text("include:\n  - subdiagram: inside\n"
+                           "    path: zone\n")
+            self.assertEqual(configuration.load(top).included,
+                             [configuration.Include("inside", "zone")])
+            top.write_text("include:\n  - zone\n")
+            with self.assertRaisesRegex(ValueError, "subdiagram: <name>"):
+                configuration.load(top)
 
     def test_the_two_spellings_read_alike(self):
         # The YAML and the XML of one example say the same thing, so they are

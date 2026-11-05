@@ -29,16 +29,18 @@
 //! node under `subdiagram/node`, which says which file it is drawn in, but
 //! writes only the `node`.
 //!
-//! **A subdiagram is named by its include.** Its name is the one the top
-//! file's include list gives it: the file's path from the top file's
-//! directory without an extension, `zone` beside it or
-//! `../thermostat-common/thermostat` elsewhere. A node's own name has no `/`
-//! in it, so the last `/` of a held name is the one that divides the two.
+//! **A subdiagram has a name of its own.** The top file's include list
+//! gives each its name and, beside it, its file's path from the top file's
+//! directory without an extension: `zone` at `../thermostat-common/thermostat`.
+//! The name is what the editor holds its page and its nodes under, and the
+//! path, kept as the box's `path` attribute, is only where the file is --
+//! see `Document::include_path`. Neither a name nor a node's has a `/` in
+//! it, so the `/` of a held name is the one that divides the two.
 
 /// Where a node lives: the top diagram, or one subdiagram.
 ///
-/// A `String` rather than an index, because what a subdiagram is called is its
-/// file's name and that is what the configuration says. The top diagram is
+/// A `String` rather than an index, because what a subdiagram is called is
+/// what the configuration says. The top diagram is
 /// `None` -- it has no file of its own in the sense that matters here, being
 /// the file that includes the others.
 pub type Home = Option<String>;
@@ -136,10 +138,10 @@ impl Qualified {
     }
 }
 
-/// The file a subdiagram is kept in, given the name it goes by.
+/// The file a subdiagram is kept in, given its include's path.
 ///
-/// The name is the file's path from the including diagram's directory without
-/// its extension, so `zone` is `zone.ytcs` beside the diagram that includes it,
+/// The path is from the including diagram's directory without its
+/// extension, so `zone` is `zone.ytcs` beside the diagram that includes it,
 /// and `../common/zone` is `zone.ytcs` in `common`, a directory beside the
 /// diagram's. Which extension is the including file's: a configuration written
 /// in XML keeps its subdiagrams in XML, because a set of files half in one
@@ -148,7 +150,7 @@ impl Qualified {
 ///
 /// # Arguments
 ///
-/// * `name` - The subdiagram's name, which is its include name.
+/// * `name` - The include's path.
 /// * `like` - The path of the including file, whose directory and extension the
 ///            subdiagram's file takes; YAML if it has no extension.
 ///
@@ -189,12 +191,6 @@ mod tests {
         for (text, in_, node) in [
             ("zone/temp_1", Some("zone"), "temp_1"),
             ("gateway", None, "gateway"),
-            // A subdiagram named by a path, as one in another directory is.
-            (
-                "../thermostat-common/thermostat/temp1",
-                Some("../thermostat-common/thermostat"),
-                "temp1",
-            ),
         ] {
             let read = Qualified::parse(text);
             assert_eq!(read.in_.as_deref(), in_, "{text}");

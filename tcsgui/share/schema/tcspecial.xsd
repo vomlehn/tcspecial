@@ -573,6 +573,15 @@
     </xs:all>
   </xs:complexType>
 
+  <!-- One file this one includes: a subdiagram, by its own name, and the
+       file's path from this file's directory without an extension, such
+       as zone or ../common/zone, read in this file's format. The name is no
+       node's and no other subdiagram's, with no dot or slash in it. -->
+  <xs:complexType name="include">
+    <xs:attribute name="name" type="xs:string" use="required"/>
+    <xs:attribute name="path" type="xs:string" use="required"/>
+  </xs:complexType>
+
   <!-- What of an included file the files around it may join: by
        terminal, the nodes whose terminal of that name a line from another
        file may reach. Each terminal written once for each node it names,
@@ -606,7 +615,7 @@
     <xs:complexType>
       <xs:choice minOccurs="0" maxOccurs="unbounded">
         <xs:element name="description" type="xs:string"/>
-        <xs:element name="include" type="xs:string"/>
+        <xs:element name="include" type="include"/>
         <xs:element name="exports" type="exports"/>
         <xs:element name="tcspecial" type="tcspecial"/>
         <xs:element name="payload_groups" type="payload_group"/>

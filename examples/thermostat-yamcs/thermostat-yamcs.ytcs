@@ -46,7 +46,8 @@ tcspecial:
     send: "127.0.0.1:0"
 
 include:
-  - ../thermostat-common/thermostat
+  - subdiagram: thermostat-common
+    path: ../thermostat-common/thermostat
 
 gateways:
   - type gateway_yamcs:
@@ -105,7 +106,7 @@ payloads:
 
 tcsgui:
   nodes:
-    - { node: ../thermostat-common/thermostat, x: 242, y: 166 }
+    - { node: thermostat-common, x: 242, y: 166 }
     - { node: gateway, x: 790, y: 34 }
     - { node: temp_1, x: 34, y: 34 }
     - { node: temp_2, x: 34, y: 166 }

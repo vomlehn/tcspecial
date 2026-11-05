@@ -443,9 +443,12 @@ impl Store {
                 self.dir.display()
             )
         })?;
-        let names = crate::graph::read_one(&path)
+        let names: Vec<String> = crate::graph::read_one(&path)
             .map_err(|e| format!("{}: {e}", path.display()))?
-            .include;
+            .include
+            .into_iter()
+            .map(|include| include.path)
+            .collect();
         let ext = path.extension().and_then(|e| e.to_str()).unwrap_or("");
         layout(&path, &names, digest, found_at, ext)?;
         let needed = depth(&path, &names, digest)?;
@@ -526,7 +529,11 @@ impl Store {
                     path.display()
                 )
             })?;
-        let names = graph.included();
+        let names: Vec<String> = graph
+            .included()
+            .into_iter()
+            .map(|include| include.path)
+            .collect();
         let climbs = depth(path, &names, digest)?;
         let layout = layout(path, &names, digest, climbs, &ext)?;
         let cannot = |what: &str, e: std::io::Error| {
@@ -819,7 +826,11 @@ mod tests {
         )
         .unwrap();
         let path = dir.join(format!("{top}.ytcs"));
-        std::fs::write(&path, format!("include:\n  - {name}\n")).unwrap();
+        std::fs::write(
+            &path,
+            format!("include:\n  - subdiagram: sub\n    path: {name}\n"),
+        )
+        .unwrap();
         path
     }
 
@@ -854,7 +865,9 @@ mod tests {
 
         let (graph, read_from) = store.load(digest).expect("it loads");
         assert_eq!(read_from, *kept.path());
-        assert_eq!(graph.included(), vec!["zone".to_string()]);
+        let paths: Vec<String> =
+            graph.included().into_iter().map(|i| i.path).collect();
+        assert_eq!(paths, vec!["zone".to_string()]);
         assert_eq!(graph.nodes.len(), 1, "the included file's node");
         let again = store.keep(&top).expect("kept");
         assert_eq!(again, (digest, Kept::Already(read_from)));
@@ -985,10 +998,9 @@ mod tests {
 
             let (graph, read_from) = store.load(digest).expect("it loads");
             assert_eq!(read_from, *kept.path());
-            assert_eq!(
-                graph.included(),
-                vec![format!("../{example}-common/{common}")]
-            );
+            let paths: Vec<String> =
+                graph.included().into_iter().map(|i| i.path).collect();
+            assert_eq!(paths, vec![format!("../{example}-common/{common}")]);
             assert_eq!(
                 graph.nodes.len(),
                 Graph::load(&top).unwrap().nodes.len()
@@ -1020,7 +1032,7 @@ mod tests {
         put(&from.path().join("a/b/near.ytcs"), &format!("{node}n }}\n"));
         std::fs::create_dir(from.path().join("a/b/sub")).unwrap();
         let top = from.path().join("a/b/top.ytcs");
-        put(&top, "include:\n  - ../../shared/zone\n  - sub/../near\n");
+        put(&top, "include:\n  - subdiagram: zone\n    path: ../../shared/zone\n  - subdiagram: near\n    path: sub/../near\n");
         let original = crate::config_digest::digest_of_file(&top).unwrap();
 
         let (digest, kept) = store.keep(&top).expect("kept");
@@ -1052,7 +1064,8 @@ mod tests {
         let store = Store::at(store_dir.path());
         let node = "vehicle:\n  - type ping:\n      - { compute: z }\n";
         put(&from.path().join("common/zone.ytcs"), node);
-        let include = "include:\n  - ../common/zone\n";
+        let include =
+            "include:\n  - subdiagram: zone\n    path: ../common/zone\n";
         let top = from.path().join("vehicle/top.ytcs");
         put(&top, include);
         let digest = crate::config_digest::digest_of_file(&top).unwrap();

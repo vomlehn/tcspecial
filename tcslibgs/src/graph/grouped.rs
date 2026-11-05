@@ -1510,7 +1510,7 @@ mod tests {
 
         std::fs::write(
             &top,
-            "include:\n  - other\npayloads:\n  - type i2c:\n      \
+            "include:\n  - subdiagram: other\n    path: other\npayloads:\n  - type i2c:\n      \
              - payload: a\n",
         )
         .expect("written");

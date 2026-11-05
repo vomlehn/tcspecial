@@ -1080,6 +1080,85 @@ pub fn terminal_box(
     ))
 }
 
+/// How wide the margin is either side of a subdiagram's page, which holds
+/// the page's edge: the four terminals a line from another file arrives at
+/// or leaves by. See `tcslibgs::graph::exports`.
+///
+/// Outside the working panes rather than over them, because the panes are
+/// where nodes go, and an edge drawn over the payload pane's first column
+/// would be drawn over the payloads in it.
+pub const EDGE: u32 = TERMINAL.0 + 2 * EDGE_GAP;
+
+/// The room either side of an edge terminal in its margin.
+const EDGE_GAP: u32 = 10;
+
+/// How far down the page an edge's upper row of terminals is: below the
+/// band the panes are named in.
+const EDGE_TOP: u32 = 48;
+
+/// How far apart the edge's two rows of terminals are.
+const EDGE_ROW: u32 = TERMINAL.1 + 18;
+
+/// The box one of a subdiagram's edge terminals is drawn in.
+///
+/// Each where the corner of the same name is on a node: `world-in` and
+/// `moc-out` on the left, `world-out` and `moc-in` on the right, the
+/// readings' row above what the ground sends. So the edge reads as the
+/// subdiagram's box seen from inside, which is what it is.
+///
+/// # Arguments
+///
+/// * `terminal` - The terminal's name.
+/// * `width`    - How wide the working panes are: the right margin begins
+///                there, and the left one ends at nought.
+///
+/// # Returns
+///
+/// The box's left, top, width and height, in the working panes' own
+/// coordinates, the left margin's being below nought; `None` for a name that
+/// is not one of the four.
+pub fn edge_box(terminal: &str, width: f32) -> Option<(f32, f32, f32, f32)> {
+    let corner = corner_of(terminal)?;
+    let x = if corner.left {
+        -((EDGE_GAP + TERMINAL.0) as f32)
+    } else {
+        width + EDGE_GAP as f32
+    };
+    let row = if corner.top { 0 } else { EDGE_ROW };
+    Some((
+        x,
+        (EDGE_TOP + row) as f32,
+        TERMINAL.0 as f32,
+        TERMINAL.1 as f32,
+    ))
+}
+
+/// Where a line joins one of a subdiagram's edge terminals, and which way it
+/// points there.
+///
+/// At the working panes' own edge, halfway down the terminal's row: the
+/// line runs up to the margin and the terminal sits in it, so no line is
+/// drawn in the margin and none has a point below nought.
+///
+/// # Arguments
+///
+/// * `terminal` - The terminal's name.
+/// * `width`    - How wide the working panes are.
+///
+/// # Returns
+///
+/// The point, and whether the line points right there; `None` for a name
+/// that is not one of the four.
+pub fn edge_attachment(
+    terminal: &str,
+    width: f32,
+) -> Option<((f32, f32), bool)> {
+    let corner = corner_of(terminal)?;
+    let (_, y, _, height) = edge_box(terminal, width)?;
+    let x = if corner.left { 0.0 } else { width };
+    Some(((x, y + height / 2.0), corner.rightward))
+}
+
 /// How much of a node's width a terminal takes up, with room to spare.
 ///
 /// What the label is padded by on whichever side carries terminals: the name
@@ -2048,6 +2127,33 @@ impl NodeType {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// A subdiagram's edge terminals are in its margins, each on the side
+    /// and in the row its corner has on a box, and a line joins each at the
+    /// working panes' own edge: never in the margin, never below nought.
+    #[test]
+    fn the_edge_is_the_box_seen_from_inside() {
+        let width = 960.0;
+        for terminal in ["world-in", "world-out", "moc-in", "moc-out"] {
+            let corner = corner_of(terminal).expect("a corner");
+            let (x, y, w, _) = edge_box(terminal, width).expect("a box");
+            let ((ax, ay), rightward) =
+                edge_attachment(terminal, width).expect("a point");
+            if corner.left {
+                assert!(x >= -(EDGE as f32) && x + w <= 0.0, "{terminal}");
+                assert_eq!(ax, 0.0, "{terminal}");
+            } else {
+                assert!(x >= width && x + w <= width + EDGE as f32);
+                assert_eq!(ax, width, "{terminal}");
+            }
+            assert!(ay > y, "{terminal}: joined halfway down its box");
+            assert_eq!(rightward, corner.rightward, "{terminal}");
+        }
+        let (_, readings, _, _) = edge_box("world-in", width).unwrap();
+        let (_, commands, _, _) = edge_box("moc-out", width).unwrap();
+        assert!(readings < commands, "the readings' row is above");
+        assert_eq!(edge_box("nowhere", width), None);
+    }
 
     /// Every outline is a polygon, stays inside its own box, and holds the
     /// terminals it is drawn with.

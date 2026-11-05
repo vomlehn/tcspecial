@@ -232,7 +232,7 @@ export struct LinkView {
 // and the file say the same thing. Drawn as one filled path in a viewbox the
 // size of the box, which is how everything else here is drawn: no image and no
 // icon font, so nothing can fail to load.
-component Terminal inherits Rectangle {
+export component Terminal inherits Rectangle {
     in property <color> ink;
     // What is drawn on the node's body. See NodeView::mark.
     in property <color> mark;

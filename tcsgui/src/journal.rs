@@ -766,9 +766,9 @@ impl Edit {
                 ..
             } => {
                 if *exported {
-                    format!("show \"{node}\"'s {terminal} outside")
+                    format!("show the {terminal} of \"{node}\" outside")
                 } else {
-                    format!("hide \"{node}\"'s {terminal} from outside")
+                    format!("hide the {terminal} of \"{node}\" from outside")
                 }
             }
             Edit::SetAside { node, aside, .. } => {

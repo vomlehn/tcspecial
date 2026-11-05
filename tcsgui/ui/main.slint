@@ -10,7 +10,7 @@ import { Colors } from "../../tcsui/ui/colors.slint";
 // program's Rust sees them as its own.
 import {
     Session, Space, Type, TerminalView, NodeView, LinkView, NodeShape,
-    LinkLine, SheetGround, PhysicsGround
+    LinkLine, SheetGround, PhysicsGround, Terminal
 } from "../../tcsdiagram/ui/diagram.slint";
 export { Session, Space, Type, TerminalView, NodeView, LinkView }
 
@@ -50,6 +50,16 @@ export struct ProblemRow {
 export struct JoinOffer {
     said: string,
     open: bool,
+}
+
+// One of a subdiagram's edge terminals, where its box would have it: its
+// name, where it is drawn in the working panes' own coordinates, and which
+// way its arrow points. See tcsdiagram::style::edge_box.
+export struct EdgeView {
+    terminal: string,
+    x: length,
+    y: length,
+    rightward: bool,
 }
 
 // One row of the palette: a family's heading, or a type to place.
@@ -446,7 +456,20 @@ component Surface inherits Rectangle {
     // are all in the sheet's pixels, which the window toolkit maps a press
     // into -- so nothing that reads a position knows it.
     out property <float> zoom: max(0.5, min(1.0, sheet.visible-width
-        / max(1px, root.physics-width + root.working-width)));
+        / max(1px, root.sheet-width)));
+    // A subdiagram's page: how wide the margin either side of the working
+    // panes is, which holds the page's edge, and the edge's terminals, in
+    // the working panes' own coordinates. Nought and none on the top page,
+    // which has nothing outside it. See tcsdiagram::style::edge_box.
+    in property <length> edge-width: 0px;
+    in property <[EdgeView]> edge-terminals: [];
+    // A line taken from one of the edge's terminals, by name.
+    callback edge-started(string);
+    // Where the working panes begin on the sheet, past the Physics pane and
+    // the left margin; and how wide the whole sheet is.
+    property <length> left: root.physics-width + root.edge-width;
+    property <length> sheet-width: root.physics-width + 2 * root.edge-width
+        + root.working-width;
 
     // The view's place kept as the sheet's, both ways: a person scrolling
     // moves the viewport, and Rust or a change of zoom moves it back to the
@@ -828,7 +851,7 @@ component Surface inherits Rectangle {
                 sheet := ScrollView {
                 width: 100%;
                 height: 100%;
-                    content-width: (root.physics-width + root.working-width)
+                    content-width: root.sheet-width
                         * root.zoom;
                     content-height: root.working-height * root.zoom;
                     changed content-y => {
@@ -848,7 +871,7 @@ component Surface inherits Rectangle {
                     // everything, the sheet being transparent, and the physics
                     // nodes over it, in their own pane.
                     page := Rectangle {
-                        width: root.physics-width + root.working-width;
+                        width: root.sheet-width;
                         height: root.working-height;
                         transform-scale: root.zoom;
                         background: white;
@@ -869,7 +892,7 @@ component Surface inherits Rectangle {
                         }
 
                     canvas := Rectangle {
-                        x: root.physics-width;
+                        x: root.left;
                         width: root.working-width;
                         height: root.working-height;
                         background: transparent;
@@ -951,6 +974,45 @@ component Surface inherits Rectangle {
                             }
                         }
 
+                        // A subdiagram's edge: a margin either side of the
+                        // working panes, each named as what it is, holding
+                        // the terminals a line from another file arrives at
+                        // or leaves by -- the subdiagram's box seen from
+                        // inside. In the margins rather than over the panes,
+                        // which are where nodes go. Pale and named, so that
+                        // what the margin is does not rest on its colour.
+                        for side in root.edge-width > 0 ? [0, 1] : []:
+                        Rectangle {
+                            x: side == 0 ? root.physics-width
+                                : root.left + root.working-width;
+                            width: root.edge-width;
+                            height: root.working-height;
+                            background: #f3f4f6;
+                            border-width: 1px;
+                            border-color: #d1d5db;
+                            Text {
+                                x: (parent.width - self.width) / 2;
+                                y: 140px;
+                                text: "outside";
+                                font-size: Type.small;
+                                font-italic: true;
+                                color: #4b5563;
+                            }
+                        }
+                        for edge in root.edge-terminals: Terminal {
+                            x: root.left + edge.x;
+                            y: edge.y;
+                            rightward: edge.rightward;
+                            sink: edge.terminal == "world-in"
+                                || edge.terminal == "moc-in";
+                            ink: #4b5563;
+                            mark: #374151;
+                            grabbed => { root.edge-started(edge.terminal); }
+                            dragged(x, y) => {
+                                root.link-moved(edge.x + x, edge.y + y);
+                            }
+                        }
+
                         // While a line is in hand, every click on the sheet
                         // is about the line: on a node, what the line can be
                         // made into there; on bare sheet, putting it down.
@@ -978,7 +1040,7 @@ component Surface inherits Rectangle {
                                             self.mouse-x, self.mouse-y);
                                     } else {
                                         root.link-moved(
-                                            self.mouse-x - root.physics-width,
+                                            self.mouse-x - root.left,
                                             self.mouse-y);
                                     }
                                 }
@@ -992,7 +1054,7 @@ component Surface inherits Rectangle {
                                             self.mouse-x, self.mouse-y);
                                     } else {
                                         root.link-clicked(
-                                            self.mouse-x - root.physics-width,
+                                            self.mouse-x - root.left,
                                             self.mouse-y);
                                     }
                                 }
@@ -1080,14 +1142,14 @@ component Surface inherits Rectangle {
                 PaneDivider {
                     width: 100%;
                     height: 100%;
-                    at: (root.physics-width + root.payload-divider) * root.zoom
+                    at: (root.left + root.payload-divider) * root.zoom
                         + sheet.content-x;
                     moved(dx) => { root.payload-divider-moved(dx / root.zoom); }
                 }
                 PaneDivider {
                     width: 100%;
                     height: 100%;
-                    at: (root.physics-width + root.vehicle-divider) * root.zoom
+                    at: (root.left + root.vehicle-divider) * root.zoom
                         + sheet.content-x;
                     moved(dx) => { root.vehicle-divider-moved(dx / root.zoom); }
                 }
@@ -1597,6 +1659,11 @@ export component MainWindow inherits Window {
     in property <string> join-hint: "";
     in property <[JoinOffer]> join-offers: [];
     in property <string> join-heading: "";
+    // A subdiagram's edge: see Surface's. The main window draws the top
+    // page, which has none.
+    in property <length> edge-width: 0px;
+    in property <[EdgeView]> edge-terminals: [];
+    callback edge-started(string);
     callback node-selected(string);
     // What a node's own menu asks for: see NodeShape's menu.
     callback node-edit(string);
@@ -1771,6 +1838,9 @@ export component MainWindow inherits Window {
         join-hint: root.join-hint;
         join-offers: root.join-offers;
         join-heading: root.join-heading;
+        edge-width: root.edge-width;
+        edge-terminals: root.edge-terminals;
+        edge-started(terminal) => { root.edge-started(terminal); }
         selected: root.selected;
         node-selected(n) => { root.node-selected(n); }
         node-edit(n) => { root.node-edit(n); }
@@ -1936,6 +2006,11 @@ export component SubWindow inherits Window {
     in property <string> join-hint: "";
     in property <[JoinOffer]> join-offers: [];
     in property <string> join-heading: "";
+    // A subdiagram's edge: see Surface's. The main window draws the top
+    // page, which has none.
+    in property <length> edge-width: 0px;
+    in property <[EdgeView]> edge-terminals: [];
+    callback edge-started(string);
     callback node-selected(string);
     // What a node's own menu asks for: see NodeShape's menu.
     callback node-edit(string);
@@ -2087,6 +2162,9 @@ export component SubWindow inherits Window {
         join-hint: root.join-hint;
         join-offers: root.join-offers;
         join-heading: root.join-heading;
+        edge-width: root.edge-width;
+        edge-terminals: root.edge-terminals;
+        edge-started(terminal) => { root.edge-started(terminal); }
         selected: root.selected;
         node-selected(n) => { root.node-selected(n); }
         node-edit(n) => { root.node-edit(n); }

@@ -253,8 +253,11 @@ terminal
     click on bare sheet puts the line down. A line already drawn is picked up
     by clicking the terminal at either end of it: the next node clicked offers
     to move that end there, and the node it was picked up from, or the Delete
-    key, offers to take it out. A node with no terminal of that stream offers
-    nothing, and a gateway link has none on its right at all: the payload data it receives arrives at the
+    key, offers to take it out. A subdiagram's box offers the nodes its file
+    exports at that terminal; inside the subdiagram, its page has an edge in
+    a margin either side, labelled *outside*, and clicking an edge terminal
+    and then a node offers to show that node outside there, or to hide it.
+    A node with no terminal of that stream offers nothing, and a gateway link has none on its right at all: the payload data it receives arrives at the
     ``world-in`` in its upper left, and what it sends leaves by the
     ``moc-out`` in its lower left.
 

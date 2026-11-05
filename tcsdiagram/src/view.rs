@@ -261,6 +261,30 @@ pub struct OnSheet<'a> {
     pub node_type: &'a str,
     pub at: (i32, i32),
     pub here: bool,
+    /// Where its lines are drawn to: see [`Drawn`].
+    pub drawn: Drawn,
+}
+
+/// Where a node's lines are drawn to on a page.
+///
+/// A line between two files of a configuration crosses the edge of an
+/// included file -- see `tcslibgs::graph::exports` -- and is drawn to that
+/// edge on both sides of it: to the subdiagram's box on the page the box is
+/// on, and to the page's own edge on the subdiagram's page. Either way the
+/// line is labelled with the node it really reaches, the edge saying no more
+/// than which way the data goes.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum Drawn {
+    /// Where it is, or a stub where it is on another page.
+    #[default]
+    Itself,
+    /// At the terminals of its subdiagram's box, which is the node's `at`
+    /// and `node_type` here.
+    AtItsBox,
+    /// At the edge of the subdiagram's page being drawn, being outside it:
+    /// the terminal facing the node's own, in the margin past the working
+    /// panes, which are this wide. See [`style::edge_box`].
+    AtTheEdge(i32),
 }
 
 /// One line between two nodes, as a drawing needs it.
@@ -371,7 +395,23 @@ pub fn ends(nodes: &[OnSheet], line: &LineOnSheet) -> route::Ends {
         tcslibgs::graph::terminals::answers(leaves)
     };
 
+    // A node outside a subdiagram's page, drawn at the page's edge: at the
+    // edge terminal facing its own, a `world-out` outside being a
+    // `world-in` at the edge.
+    let at_the_edge = |node: &OnSheet, own: Option<&str>| {
+        let Drawn::AtTheEdge(width) = node.drawn else {
+            return None;
+        };
+        let facing = tcslibgs::graph::terminals::answers(own?)?;
+        style::edge_attachment(facing, width as f32)
+    };
+
     let ((x1, y1), leaves_right) = match from {
+        Some(node) if matches!(node.drawn, Drawn::AtTheEdge(_)) => at_the_edge(
+            node,
+            style::terminal_for(node.node_type, line.origin, false),
+        )
+        .unwrap_or(((0.0, 24.0), true)),
         Some(node) if node.here => joined(node, line.origin, false)
             .unwrap_or_else(|| {
                 // A type this build does not know, drawn as a node with no
@@ -393,6 +433,12 @@ pub fn ends(nodes: &[OnSheet], line: &LineOnSheet) -> route::Ends {
         ),
     };
     let ((x2, y2), arrives_right) = match to {
+        Some(node) if matches!(node.drawn, Drawn::AtTheEdge(_)) => {
+            // The terminal the line arrives at outside, which is the one
+            // that pairs with where it leaves.
+            let arrives = pairing(from, line.origin);
+            at_the_edge(node, arrives).unwrap_or(((x1 + 72.0, y1), true))
+        }
         Some(node) if node.here => {
             // What the link wrote, where that is a terminal this type has; the
             // terminal that pairs with the source otherwise. A computation's
@@ -450,7 +496,7 @@ pub fn link_looks(nodes: &[OnSheet], lines: &[LineOnSheet]) -> Vec<LinkLook> {
     // about documents.
     let obstacles: Vec<route::Obstacle> = nodes
         .iter()
-        .filter(|node| node.here)
+        .filter(|node| node.here && node.drawn == Drawn::Itself)
         .map(|node| {
             let (width, height) = size_of(node.node_type);
             route::Obstacle::new(
@@ -473,6 +519,15 @@ pub fn link_looks(nodes: &[OnSheet], lines: &[LineOnSheet]) -> Vec<LinkLook> {
             let from_here = here(nodes, line.from);
             let crossing = !from_here || !here(nodes, line.to);
             let far_end = if from_here { line.to } else { line.from };
+            // And the node an edge stands for, where an end is drawn at one:
+            // by its own name, the edge already saying which file it is in.
+            let stood_for = [line.from, line.to].into_iter().find(|name| {
+                node(nodes, name).is_some_and(|n| n.drawn != Drawn::Itself)
+            });
+            let (crossing, far_end) = match stood_for {
+                Some(name) => (true, name.rsplit('/').next().unwrap_or(name)),
+                None => (crossing, far_end),
+            };
             //
             // A terminal is not one of those, and is not labelled: it is drawn
             // as the corner the line is attached to and as the arrow in it,
@@ -545,6 +600,63 @@ mod tests {
         );
     }
 
+    /// A line that crosses a subdiagram's edge is drawn to it: to the box's
+    /// terminal on the page the box is on, and to the page's own edge on the
+    /// subdiagram's page, labelled either way with the node it reaches.
+    #[test]
+    fn a_line_across_a_subdiagrams_edge_is_drawn_to_it() {
+        let line = LineOnSheet {
+            from: "temp_1",
+            origin: Some("world-out"),
+            to: "zone/temp1",
+            input: None,
+            comment: None,
+        };
+
+        // On the top page, at the box's world-in.
+        let top = [
+            OnSheet {
+                name: "temp_1".into(),
+                node_type: "i2c",
+                at: (40, 80),
+                here: true,
+                drawn: Drawn::Itself,
+            },
+            OnSheet {
+                name: "zone/temp1".into(),
+                node_type: "subdiagram",
+                at: (400, 80),
+                here: true,
+                drawn: Drawn::AtItsBox,
+            },
+        ];
+        let ((x, y), _) =
+            style::attachment("subdiagram", (400, 80), "world-in").unwrap();
+        assert_eq!(ends(&top, &line).to, (x, y));
+        assert_eq!(link_looks(&top, &[line])[0].label, "temp1");
+
+        // And on the subdiagram's page, from the edge's world-in.
+        let inside = [
+            OnSheet {
+                name: "temp_1".into(),
+                node_type: "i2c",
+                at: (40, 80),
+                here: false,
+                drawn: Drawn::AtTheEdge(960),
+            },
+            OnSheet {
+                name: "zone/temp1".into(),
+                node_type: "compute",
+                at: (400, 80),
+                here: true,
+                drawn: Drawn::Itself,
+            },
+        ];
+        let (at, _) = style::edge_attachment("world-in", 960.0).unwrap();
+        assert_eq!(ends(&inside, &line).from, at);
+        assert_eq!(link_looks(&inside, &[line])[0].label, "temp_1");
+    }
+
     /// A line between two nodes on the page leaves the one and reaches the
     /// other, in the colour of the stream it carries, and is labelled with
     /// the named input it arrives at.
@@ -556,12 +668,14 @@ mod tests {
                 node_type: "i2c",
                 at: (40, 80),
                 here: true,
+                drawn: Default::default(),
             },
             OnSheet {
                 name: "mean".into(),
                 node_type: "compute",
                 at: (400, 80),
                 here: true,
+                drawn: Default::default(),
             },
         ];
         let lines = [LineOnSheet {

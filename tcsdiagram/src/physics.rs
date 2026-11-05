@@ -713,6 +713,7 @@ mod tests {
             node_type: "network",
             at: (34, y),
             here: true,
+            drawn: Default::default(),
         };
         let nodes = [node("temp_1", 34), node("gpio-out-1", 200)];
         let joins = [
@@ -918,6 +919,7 @@ mod tests {
             node_type: "network",
             at: (34, 34),
             here: true,
+            drawn: Default::default(),
         }];
         let joins = [
             Join {

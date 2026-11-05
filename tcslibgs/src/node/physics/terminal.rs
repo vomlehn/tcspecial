@@ -28,7 +28,7 @@ pub enum Kind {
     /// A number in a unit, which is what a sensor reports and a
     /// conversion node reads back.
     Value(Unit),
-    /// On or off, which is what a hysteresis node sends to drive a set of
+    /// On or off, which is what a thermostat node sends to drive a set of
     /// discrete lines.
     Decision,
 }

@@ -5,7 +5,7 @@
 //! is anything `tcslibgs::graph::units::unit_of` gives a unit -- a
 //! conversion, a vote, a program's answer -- read by the rule the vehicle
 //! writes it by, `tcslibgs::node::vehicle::compute::from_value`, in that
-//! unit. A switch is a node that sends decisions, a `hysteresis`, read by
+//! unit. A switch is a node that sends decisions, a `thermostat`, read by
 //! `from_decision`; or one line of a GPIO payload that watches lines, read
 //! from the records its node sends -- a line sensing a heater is the
 //! heater's real state, where a thermostat's decision is what it was told.
@@ -462,7 +462,7 @@ impl Plot {
             }
             // A computation the checking refuses is refused before the
             // window opens; one that is not settled here is not plotted.
-            if let Ok(Computation::Hysteresis(params)) =
+            if let Ok(Computation::Thermostat(params)) =
                 params_of(&node.name, &node.attributes)
             {
                 if let Some(unit) = input_unit(graph, &node.name) {

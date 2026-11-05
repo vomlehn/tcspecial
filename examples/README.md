@@ -93,7 +93,7 @@ the vehicle saying it is alive, the vehicle answering a ping. Start with
 | `ping` | The ground pings a `ping` vehicle node and times the answer: the round trip, and the two halves of it. The ground station is Python 3, with the beacon panel and the halves it is built from written again in Python under `python/`, and tests that hold them to the Rust. |
 | `ping-yamcs` | The ping example with Yamcs between the ground station and the vehicle: a `gateway_yamcs` gateway puts a CCSDS primary header on every packet to and from the ground, the beacon included, and `ping_yamcs.py` runs Yamcs on tcspecial's own XTCE and pings through it from the ping example's window. Needs a Yamcs release unpacked somewhere. |
 | `tees` | The four nodes that do nothing to what passes: a `tee-gateway` sends each command on to a heater and back to the ground, a `tee-payload` sends each reading to the ground and on aboard, and a `null-gateway` and a `null-payload` drop what they are sent. `tcspecial/tests/tees.rs` flies it. |
-| `fprime` | A vehicle that answers to an F´ flight computer rather than to the ground: a `gateway_fprime` node sends each reading, the temperature a `to_kelvin` node makes of it and what a `hysteresis` node decides of that, to the deployment's bridge component at its `bridge_base`, and takes the bridge's commands on to a heater. `tcspecial/tests/fprime.rs` flies it, and `make fprime-test` runs the bridge itself, in `fprime/`, against it. |
+| `fprime` | A vehicle that answers to an F´ flight computer rather than to the ground: a `gateway_fprime` node sends each reading, the temperature a `to_kelvin` node makes of it and what a `thermostat` node decides of that, to the deployment's bridge component at its `bridge_base`, and takes the bridge's commands on to a heater. `tcspecial/tests/fprime.rs` flies it, and `make fprime-test` runs the bridge itself, in `fprime/`, against it. |
 | `cfs` | A vehicle that answers to a cFS flight computer: tcspecial joins its software bus as an SBN peer, a `gateway_cfs` node publishes each reading as its `tlm_base` plus the reading's device id, and a command published as its `cmd_msgid` goes on to a heater. Every link is carried over the one peer, as message IDs. `make run-cfs` runs tcsmoc on it, tcssim standing in for the cFS side; `tcspecial/tests/cfs.rs` flies it against a test playing the cFS side, and `tcspecial/tests/cfs_ground.rs` commands it from tcslib. |
 
 ### minimal
@@ -462,9 +462,9 @@ with it aboard and on the ground.
 
 | Directory | Description |
 |---|---|
-| `thermostat` | Three temperature sensors on a thermal mass, two on I2C and one on SPI, converted to kelvin, voted on, and fed to a hysteresis thermostat that drives two heaters, every one stood in for by tcssim, so that it runs on any desk. The setpoint is commanded from the ground, and tcsmoc plots the temperatures and the heaters. |
+| `thermostat` | Three temperature sensors on a thermal mass, two on I2C and one on SPI, converted to kelvin, voted on, and fed to a thermostat that drives two heaters, every one stood in for by tcssim, so that it runs on any desk. The setpoint is commanded from the ground, and tcsmoc plots the temperatures and the heaters. |
 | `thermostat-yamcs` | The thermostat, with Yamcs as its ground station, over CCSDS packets: the zone's temperature and the three readings arrive in Yamcs as temperatures in kelvin, and the thermostat's decision as on or off, each a parameter the configuration types, and a Python 3 program shows them. |
-| `battery` | A power bus through an orbit: a power monitor asked over a serial line, a shunt, the battery's charge counted by a Python 3 program, and the science load shed in eclipse by a hysteresis. tcssim stands in for every payload, joined to a physics model of a sun, a solar array, loads, a bus and a battery. |
+| `battery` | A power bus through an orbit: a power monitor asked over a serial line, a shunt, the battery's charge counted by a Python 3 program, and the science load shed in eclipse by a thermostat. tcssim stands in for every payload, joined to a physics model of a sun, a solar array, loads, a bus and a battery. |
 | `descent` | A lander's terminal descent: a radar altimeter's altitude flown down by a Python 3 guidance program throttling the engine, a Doppler velocimeter, and a touchdown switch that speaks the moment the lander is down. tcssim stands in for every payload, joined to a physics model of an engine and the body it brakes. |
 | `simple-app` | A payload that is a program rather than a device: an `app_pl` node sending a line of text one word per packet, and a ground station that prints the line. Two programs of its own beside the configuration: the payload in Python 3, the ground station in Rust. |
 
@@ -639,7 +639,7 @@ lead, sends the battery's current twice a second over UDP, port 5301, and
 `charge.py`, a Python 3 program beside the configuration that counts the
 current coulomb by coulomb into the battery's state of charge, a ratio, and
 sets itself full whenever the current falls to nought. `shedding`, a
-hysteresis around 0.4, sheds the science instrument below three tenths by
+thermostat around 0.4, sheds the science instrument below three tenths by
 driving `science`, port 5302, and restores it above half.
 
 tcssim stands in for all three, joined to the vehicle's physics model, in
@@ -660,7 +660,7 @@ data.
 Languages:
 
 - MOC: Rust -- tcsmoc.
-- Vehicle: Rust -- tcspecial, whose conversions, hysteresis and log are its
+- Vehicle: Rust -- tcspecial, whose conversions, thermostat and log are its
   own nodes -- and Python 3, the charge count, which is a program of the
   example's.
 - Payload: Rust -- tcssim stands in for the power monitor, with a

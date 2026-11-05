@@ -38,8 +38,8 @@
 //! once all three have arrived and not before, so a reading is never averaged
 //! against a stale one from the pass before.
 
-pub mod hysteresis;
 pub mod process;
+pub mod thermostat;
 pub mod to_kelvin;
 pub mod to_value;
 pub mod vote;
@@ -297,8 +297,8 @@ pub fn make(
 
             Ok(Box::new(vote::Vote::of(params.clone(), reads()?)))
         }
-        Computation::Hysteresis(params) => {
-            Ok(Box::new(hysteresis::Hysteresis::of(*params, reads()?)))
+        Computation::Thermostat(params) => {
+            Ok(Box::new(thermostat::Thermostat::of(*params, reads()?)))
         }
         // Started here, as the configuration is loaded: a program that
         // cannot be executed is a fault found on the ground rather than three
@@ -340,7 +340,7 @@ mod tests {
     ///
     /// The three built-ins joined as the shipped example joins them, because
     /// each of them being right is not the same as the three of them agreeing:
-    /// the vote has to accept what to_kelvin produces, and the hysteresis has
+    /// the vote has to accept what to_kelvin produces, and the thermostat has
     /// to accept what the vote produces. A representation change in one of
     /// them would pass that one's own tests and fail here.
     #[test]
@@ -379,8 +379,8 @@ mod tests {
             tcslibgs::unit::Unit::Kelvin,
         );
 
-        let mut thermostat = hysteresis::Hysteresis::of(
-            tcslibgs::node::vehicle::compute::HysteresisParams {
+        let mut thermostat = thermostat::Thermostat::of(
+            tcslibgs::node::vehicle::compute::ThermostatParams {
                 setpoint: 293.15,
                 half_band: 2.0,
             },
@@ -393,7 +393,7 @@ mod tests {
         ///
         /// * `converters` - The three sensors' conversions.
         /// * `voted`      - The vote over them.
-        /// * `thermostat` - The hysteresis the vote feeds.
+        /// * `thermostat` - The thermostat the vote feeds.
         /// * `counts`     - The three sensors' raw counts.
         ///
         /// # Returns
@@ -402,7 +402,7 @@ mod tests {
         fn pass(
             converters: &mut [to_value::ToValue; 3],
             voted: &mut vote::Vote,
-            thermostat: &mut hysteresis::Hysteresis,
+            thermostat: &mut thermostat::Thermostat,
             counts: [i16; 3],
         ) -> Option<Out> {
             let mut averaged = None;

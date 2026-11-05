@@ -335,7 +335,7 @@ and on aboard, and a <code>null-gateway</code> and a
 <td>A vehicle that answers to an F´ flight computer rather than to the
 ground: a <code>gateway_fprime</code> node sends each reading, the
 temperature a <code>to_kelvin</code> node makes of it and what a
-<code>hysteresis</code> node decides of that, to the deployment’s bridge
+<code>thermostat</code> node decides of that, to the deployment’s bridge
 component at its <code>bridge_base</code>, and takes the bridge’s
 commands on to a heater. <code>tcspecial/tests/fprime.rs</code> flies
 it, and <code>make fprime-test</code> runs the bridge itself, in
@@ -764,10 +764,10 @@ what is done with it aboard and on the ground.</p>
 <tr>
 <td><code>thermostat</code></td>
 <td>Three temperature sensors on a thermal mass, two on I2C and one on
-SPI, converted to kelvin, voted on, and fed to a hysteresis thermostat
-that drives two heaters, every one stood in for by tcssim, so that it
-runs on any desk. The setpoint is commanded from the ground, and tcsmoc
-plots the temperatures and the heaters.</td>
+SPI, converted to kelvin, voted on, and fed to a thermostat that drives
+two heaters, every one stood in for by tcssim, so that it runs on any
+desk. The setpoint is commanded from the ground, and tcsmoc plots the
+temperatures and the heaters.</td>
 </tr>
 <tr>
 <td><code>thermostat-yamcs</code></td>
@@ -781,7 +781,7 @@ them.</td>
 <td><code>battery</code></td>
 <td>A power bus through an orbit: a power monitor asked over a serial
 line, a shunt, the battery’s charge counted by a Python 3 program, and
-the science load shed in eclipse by a hysteresis. tcssim stands in for
+the science load shed in eclipse by a thermostat. tcssim stands in for
 every payload, joined to a physics model of a sun, a solar array, loads,
 a bus and a battery.</td>
 </tr>
@@ -1010,7 +1010,7 @@ amperes. <code>charge</code> is a <code>process</code> node running
 <code>charge.py</code>, a Python 3 program beside the configuration that
 counts the current coulomb by coulomb into the battery’s state of
 charge, a ratio, and sets itself full whenever the current falls to
-nought. <code>shedding</code>, a hysteresis around 0.4, sheds the
+nought. <code>shedding</code>, a thermostat around 0.4, sheds the
 science instrument below three tenths by driving <code>science</code>,
 port 5302, and restores it above half.</p>
 <p>tcssim stands in for all three, joined to the vehicle’s physics
@@ -1027,7 +1027,7 @@ start the data.</p>
 <p>Languages:</p>
 <ul>
 <li>MOC: Rust – tcsmoc.</li>
-<li>Vehicle: Rust – tcspecial, whose conversions, hysteresis and log are
+<li>Vehicle: Rust – tcspecial, whose conversions, thermostat and log are
 its own nodes – and Python 3, the charge count, which is a program of
 the example’s.</li>
 <li>Payload: Rust – tcssim stands in for the power monitor, with a

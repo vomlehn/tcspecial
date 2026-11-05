@@ -115,7 +115,7 @@
 
   <!-- What tcssim itself is told: the UDP address, as address:port, at
        which it answers whether it has made its stand-ins, required by tcssim
-       to start and by a harness to wait for it; the hysteresis node it
+       to start and by a harness to wait for it; the thermostat node it
        stands in for, if any, which is never stated with tcspecial running;
        and the seed its random numbers start from. -->
   <xs:complexType name="tcssim">

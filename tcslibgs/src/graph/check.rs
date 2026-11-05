@@ -4355,7 +4355,7 @@ mod tests {
         // A thermostat with no band, which used to pass here and be refused
         // when the vehicle started.
         let problems =
-            computation(&[("function", "hysteresis"), ("setpoint", "293.15")]);
+            computation(&[("function", "thermostat"), ("setpoint", "293.15")]);
         assert!(
             problems.iter().any(|p| matches!(
                 p,
@@ -4378,7 +4378,7 @@ mod tests {
 
         // And one that is right, which says nothing.
         let problems = computation(&[
-            ("function", "hysteresis"),
+            ("function", "thermostat"),
             ("setpoint", "293.15"),
             ("half_band", "2.0"),
         ]);

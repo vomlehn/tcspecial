@@ -47,7 +47,7 @@
 //! ```
 //!
 //! `sets` is what makes a type with variants into several entries in the
-//! palette: `compute` is one node type and `mean`, `hysteresis`, `to_kelvin`
+//! palette: `compute` is one node type and `mean`, `thermostat`, `to_kelvin`
 //! and `process` are four things to place, each of which is a compute node with
 //! its `function` already answered.
 //!
@@ -821,8 +821,8 @@ mod tests {
                 "app_all_veh",
                 "app_gateway_veh",
                 "app_payload_veh",
-                "hysteresis",
                 "process",
+                "thermostat",
                 "to_kelvin",
                 "to_value",
                 "vote",
@@ -1007,8 +1007,8 @@ mod tests {
     /// Asked only of the descriptions that are about a type as a whole -- a
     /// payload kind, the ground link, a log -- which is what `node ==
     /// node_type` means. A description that is one *variant* of a type is a
-    /// different thing: `mean` lists what a mean needs and `hysteresis` what a
-    /// hysteresis needs, where the table lists what any compute node may say,
+    /// different thing: `mean` lists what a mean needs and `thermostat` what a
+    /// thermostat needs, where the table lists what any compute node may say,
     /// so the two are not the same list and are not asked to be. For those the
     /// description is the authority, the window being built from it.
     ///
@@ -1222,10 +1222,10 @@ mod tests {
         let thermostat = matching(
             &described,
             "compute",
-            &said(&[("function", "hysteresis"), ("setpoint", "293.15")]),
+            &said(&[("function", "thermostat"), ("setpoint", "293.15")]),
         )
         .expect("and so is this one");
-        assert_eq!(thermostat.node, "hysteresis");
+        assert_eq!(thermostat.node, "thermostat");
 
         // A computation that says no function yet is not described by any of
         // them: a node halfway through being filled in is not a mean because
@@ -1354,7 +1354,7 @@ mod tests {
     /// lists -- a mean for a mean's attributes -- and falls back to this table
     /// for a type the tree does not describe. So the table has to hold every
     /// term any computation takes, or a compute node reached that way has
-    /// nowhere to type one: a hysteresis had nowhere to type its setpoint,
+    /// nowhere to type one: a thermostat had nowhere to type its setpoint,
     /// which is what this test was written for.
     ///
     /// The computations are read from the tree, so a fifth one arriving with

@@ -85,7 +85,7 @@ vehicle:
       # wide, a fifth of the battery, so that one eclipse sheds it once
       # rather than the load chattering on and off at the edge.
       - compute: shedding
-        function: "hysteresis"
+        function: "thermostat"
         half_band: "0.1"
         setpoint: "0.4"
         moc-out:

@@ -1,11 +1,11 @@
 # A comparison against a setpoint, with a band around it.
-node: hysteresis
+node: thermostat
 type: compute
 about: >
   Switches at a setpoint, with a band either side so it does not
   chatter.
 sets:
-  function: hysteresis
+  function: thermostat
 payload-sink: true
 payload-source: true
 gateway-sink: true

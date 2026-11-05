@@ -131,7 +131,7 @@
 
   <rect class="port" x="620" y="578" width="214" height="56" rx="8"/>
   <text class="name" x="632" y="599">ComputePort</text>
-  <text class="kind" x="632" y="616">to_kelvin, mean, hysteresis,</text>
+  <text class="kind" x="632" y="616">to_kelvin, mean, thermostat,</text>
   <text class="detail" x="632" y="629">process: a program, timed</text>
 
   <rect class="port" x="386" y="642" width="222" height="56" rx="8"/>

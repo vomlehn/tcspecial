@@ -94,7 +94,7 @@
                  more: the heater is the flight computer's to drive, and
                  this drives nothing. -->
             <compute name="heater_wanted">
-                <function>hysteresis</function>
+                <function>thermostat</function>
                 <half_band>0.5</half_band>
                 <setpoint>284.15</setpoint>
                 <world-out>fsw.heater_wanted</world-out>

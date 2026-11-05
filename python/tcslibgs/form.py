@@ -11,7 +11,7 @@ some nodes: a compute node says, by its function, what it sends.
   the graph gives it: ``to_kelvin`` is in kelvin, ``to_value`` and
   ``process`` state their own, and a ``vote`` is in its inputs' one unit.
 * A decision -- the text ``1`` or ``0`` (``compute::from_decision``) -- is
-  on or off: what a ``hysteresis`` sends.
+  on or off: what a ``thermostat`` sends.
 * A set of GPIO lines read for their levels on an interval, and watched for
   no edge, sends a sixteen-byte record for each line every time, in the
   order of its offsets, lowest first: its lines' levels.
@@ -86,7 +86,7 @@ def unit_of_symbol(said, what):
 
 #: What a computation's function produces: ``compute::produces``.
 VALUE_FUNCTIONS = ("to_kelvin", "to_value", "vote", "process")
-DECISION_FUNCTIONS = ("hysteresis",)
+DECISION_FUNCTIONS = ("thermostat",)
 
 
 @dataclass(frozen=True)

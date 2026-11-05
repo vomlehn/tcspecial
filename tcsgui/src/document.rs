@@ -4065,7 +4065,7 @@ pub fn thermostat_example() -> Document {
     );
 
     place(&mut document, "thermostat", "compute", (601, 242));
-    set(&mut document, "thermostat", "function", "hysteresis");
+    set(&mut document, "thermostat", "function", "thermostat");
     set(&mut document, "thermostat", "setpoint", "293.15");
     set(&mut document, "thermostat", "half_band", "2.0");
     note(

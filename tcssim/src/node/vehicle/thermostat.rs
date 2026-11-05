@@ -1,9 +1,9 @@
 //! A thermostat: the temperatures the sensors report, a setpoint, a dead
 //! band, and the heaters switched on or off.
 //!
-//! What a configuration's hysteresis node does aboard, done in the simulator
+//! What a configuration's thermostat node does aboard, done in the simulator
 //! so that a zone's loop closes with no tcspecial running. It stands
-//! in for one hysteresis node of the configuration, whose `setpoint` and
+//! in for one thermostat node of the configuration, whose `setpoint` and
 //! `half_band` it takes, and the simulator file names that node: see
 //! `tcslibgs::sim_config::SimTcssim::thermostats`. Several zones, or a
 //! staged thermostat, are several of these, each switching heaters of its
@@ -18,7 +18,7 @@
 //! one that conversion would refuse is ignored.
 //!
 //! The sensors are the simulated payloads that report the world whose data
-//! reaches the hysteresis node in the configuration; the heaters are the
+//! reaches the thermostat node in the configuration; the heaters are the
 //! ones driving it that data from the node reaches.
 //!
 //! # What it decides
@@ -29,14 +29,14 @@
 //! voted to in the thermostat example, and it lets one sensor that has gone
 //! wrong be outvoted.
 //!
-//! The decision is asserted on every reading, as the hysteresis node does
+//! The decision is asserted on every reading, as the thermostat node does
 //! aboard: a heater is held at what was last decided rather than told only
 //! when it changes.
 
 use std::collections::BTreeMap;
 use std::sync::Mutex;
 
-use tcslibgs::node::vehicle::compute::{HysteresisParams, ToValueParams};
+use tcslibgs::node::vehicle::compute::{ThermostatParams, ToValueParams};
 
 use crate::node::physics::{driven, Attachment};
 
@@ -59,13 +59,13 @@ struct State {
     decision: Option<Decision>,
 }
 
-/// A thermostat the simulator runs in place of a hysteresis node.
+/// A thermostat the simulator runs in place of a thermostat node.
 ///
 /// Shared by the sensor stand-ins that report to it, each from its own
 /// thread, so what it has seen is behind a lock.
 #[derive(Debug)]
 pub struct Thermostat {
-    /// The hysteresis node it stands in for.
+    /// The thermostat node it stands in for.
     name: String,
     /// The temperature it holds the zone at, in kelvin.
     setpoint: f64,
@@ -83,7 +83,7 @@ impl Thermostat {
     ///
     /// # Arguments
     ///
-    /// * `name`    - The hysteresis node it stands in for.
+    /// * `name`    - The thermostat node it stands in for.
     /// * `params`  - That node's setpoint and half band.
     /// * `sensors` - Each sensor it reads, by payload name, with how its
     ///               bytes are read.
@@ -95,7 +95,7 @@ impl Thermostat {
     /// The thermostat.
     pub fn new(
         name: &str,
-        params: HysteresisParams,
+        params: ThermostatParams,
         sensors: BTreeMap<String, ToValueParams>,
         heaters: Vec<(String, Attachment)>,
     ) -> Thermostat {
@@ -109,7 +109,7 @@ impl Thermostat {
         }
     }
 
-    /// The hysteresis node it stands in for.
+    /// The thermostat node it stands in for.
     pub fn name(&self) -> &str {
         &self.name
     }
@@ -276,7 +276,7 @@ mod tests {
                 power: Arc::new(crate::node::physics::Power::new(true, true)),
             },
         )];
-        let params = HysteresisParams {
+        let params = ThermostatParams {
             setpoint: 293.15,
             half_band: 2.0,
         };

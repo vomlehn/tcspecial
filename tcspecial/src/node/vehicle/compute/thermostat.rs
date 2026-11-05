@@ -36,7 +36,7 @@
 //! no longer how it is held.
 
 use tcslibgs::node::vehicle::compute::{
-    HysteresisParams, DECISION_OFF, DECISION_ON,
+    ThermostatParams, DECISION_OFF, DECISION_ON,
 };
 use tcslibgs::unit::Unit;
 
@@ -74,7 +74,7 @@ impl Decision {
 
 /// A setpoint and how far either side of it the decision changes.
 #[derive(Debug)]
-pub struct Hysteresis {
+pub struct Thermostat {
     setpoint: f64,
     /// Half the band's width, the setpoint being in the middle of it.
     half_band: f64,
@@ -88,13 +88,13 @@ pub struct Hysteresis {
     unit: Unit,
 }
 
-impl Hysteresis {
+impl Thermostat {
     /// Makes the thermostat these settled parameters describe.
     ///
     /// Nothing to refuse: that a band must be more than nought is
     /// `tcslibgs::node::vehicle::compute`'s rule, where the ground tool applies
     /// it. What is refused here is a *command* that would break it -- see
-    /// [`Hysteresis::set`] -- because a command arrives after the checking.
+    /// [`Thermostat::set`] -- because a command arrives after the checking.
     ///
     /// # Arguments
     ///
@@ -104,8 +104,8 @@ impl Hysteresis {
     /// # Returns
     ///
     /// The thermostat, with no decision made yet.
-    pub fn of(params: HysteresisParams, unit: Unit) -> Hysteresis {
-        Hysteresis {
+    pub fn of(params: ThermostatParams, unit: Unit) -> Thermostat {
+        Thermostat {
             setpoint: params.setpoint,
             half_band: params.half_band,
             last: None,
@@ -149,7 +149,7 @@ impl Hysteresis {
     }
 }
 
-impl Function for Hysteresis {
+impl Function for Thermostat {
     fn give(
         &mut self,
         _input: Option<&str>,
@@ -225,7 +225,7 @@ impl Function for Hysteresis {
             }
             other => {
                 return Err(format!(
-                    "a hysteresis has nothing called \"{other}\" to set: there \
+                    "a thermostat has nothing called \"{other}\" to set: there \
                      are setpoint and half_band"
                 ))
             }
@@ -235,7 +235,7 @@ impl Function for Hysteresis {
     }
 
     fn name(&self) -> &'static str {
-        "hysteresis"
+        "thermostat"
     }
 }
 
@@ -260,9 +260,9 @@ mod tests {
     /// # Returns
     ///
     /// A thermostat set to 293.15 K, two kelvin either side.
-    fn thermostat() -> Hysteresis {
-        Hysteresis::of(
-            HysteresisParams {
+    fn thermostat() -> Thermostat {
+        Thermostat::of(
+            ThermostatParams {
                 setpoint: 293.15,
                 half_band: 2.0,
             },
@@ -400,7 +400,7 @@ mod tests {
             let said = params_of(
                 "thermostat",
                 &[
-                    ("function", "hysteresis"),
+                    ("function", "thermostat"),
                     ("setpoint", "293"),
                     ("half_band", half_band),
                 ]
@@ -436,8 +436,8 @@ mod tests {
     /// asserting `Off` before it had looked would be a decision nobody made.
     #[test]
     fn it_holds_the_heaters_at_the_last_decision() {
-        let mut h = Hysteresis::of(
-            HysteresisParams {
+        let mut h = Thermostat::of(
+            ThermostatParams {
                 setpoint: 293.15,
                 half_band: 2.0,
             },

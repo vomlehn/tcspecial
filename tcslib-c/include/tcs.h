@@ -365,13 +365,13 @@ int tcs_value_in(const char *symbol, const uint8_t *data, size_t length,
 		 double *value);
 
 /* A decision is what a thermostat -- a compute node whose function is
- * hysteresis -- sends: the text 1 to assert, 0 to unassert, which is what the
+ * thermostat -- sends: the text 1 to assert, 0 to unassert, which is what the
  * lines it drives take. As with values, only the configuration says which
  * nodes send decisions, and these two are how a station asks it and reads
  * one. */
 
 /** Says whether a node sends decisions, as the configuration says: a
- * compute node whose function is hysteresis.
+ * compute node whose function is thermostat.
  *
  * @param configuration  The configuration.
  * @param node           The node's name, as a datum's source gives it.

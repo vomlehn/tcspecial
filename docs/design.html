@@ -1920,7 +1920,7 @@ by tcslib-c's <tt class="docutils literal">tcs_value_in</tt> -- <tt class="docut
 value is -- and a datum from it that is not a value is
 written to no channel, counted in <tt class="docutils literal">DataNotValues</tt> and said in an event:
 four bytes made a number whatever they held would be a temperature nobody
-measured. A <tt class="docutils literal">hysteresis</tt> node sends decisions, the text <tt class="docutils literal">1</tt> or <tt class="docutils literal">0</tt>, and
+measured. A <tt class="docutils literal">thermostat</tt> node sends decisions, the text <tt class="docutils literal">1</tt> or <tt class="docutils literal">0</tt>, and
 its channel is a <tt class="docutils literal">bool</tt>, true for on, read by <tt class="docutils literal">tcs_decision_on</tt> --
 <tt class="docutils literal">from_decision</tt>, the one statement of what a decision is, by which a
 <tt class="docutils literal">gpio</tt> node aboard reads the state its lines are driven to -- and a datum
@@ -2308,7 +2308,7 @@ anything is more likely a mistake than an intention.</p>
 <dt>Requirement</dt>
 <dd>A temperature a configuration states is held to the range a value
 carries, and the attributes that are temperatures are the ones held to it:
-a hysteresis's <tt class="docutils literal">setpoint</tt> and <tt class="docutils literal">half_band</tt>, and a conversion's
+a thermostat's <tt class="docutils literal">setpoint</tt> and <tt class="docutils literal">half_band</tt>, and a conversion's
 <tt class="docutils literal">offset</tt>, which is what a count of nought converts to. A <tt class="docutils literal">scale</tt> is
 not -- it is kelvin per count rather than a temperature, and what it may
 be depends on the part's counts, which no file states.</dd>
@@ -2653,9 +2653,19 @@ showed a number somebody could read. The log is read by a program that knows
 the format; the panel is the one place a reader loses something, and it is a
 reading nobody is deciding on.</p>
 <p>A <strong>built-in</strong> names a function compiled into tcspecial: <tt class="docutils literal">to_kelvin</tt>,
-<tt class="docutils literal">mean</tt>, <tt class="docutils literal">hysteresis</tt> and the rest of a catalogue that grows as flights need
+<tt class="docutils literal">mean</tt>, <tt class="docutils literal">thermostat</tt> and the rest of a catalogue that grows as flights need
 it. These are the ones to prefer. They are written in Rust, tested with the
 rest of the software, cannot fail to start, and cost nothing to call.</p>
+<p>The <tt class="docutils literal">thermostat</tt> was called <tt class="docutils literal">hysteresis</tt>, after how it switches rather
+than what it is for, and <tt class="docutils literal">thermostat</tt> is the word a reader looks for in
+tcsgui's list. It is the same computation wherever it switches: the battery
+example's <tt class="docutils literal">shedding</tt> is a thermostat on the charge.</p>
+<dl class="docutils">
+<dt>Requirement</dt>
+<dd>A compute node whose <tt class="docutils literal">function</tt> is <tt class="docutils literal">hysteresis</tt> is refused as it is
+read, saying to write <tt class="docutils literal">thermostat</tt> instead. Refused rather than read
+as the new word, so that a file says one word for one thing.</dd>
+</dl>
 <p>An <strong>external process</strong> names a program. tcspecial starts it, writes what
 arrives on its standard input and reads results from its standard output. It
 buys a computation that can be written in anything and changed without
@@ -5484,7 +5494,7 @@ twice is two statements of what its terminals are. What it says:</p>
 they are held against each other and against the reader by
 <tt class="docutils literal">tcsgui/tests/schema.rs</tt>.</p>
 <p><tt class="docutils literal">sets</tt> is what turns one node type into several things to place. <tt class="docutils literal">compute</tt>
-is one type, and the tree makes it four entries -- <tt class="docutils literal">mean</tt>, <tt class="docutils literal">hysteresis</tt>,
+is one type, and the tree makes it four entries -- <tt class="docutils literal">mean</tt>, <tt class="docutils literal">thermostat</tt>,
 <tt class="docutils literal">to_kelvin</tt> and <tt class="docutils literal">process</tt> -- each a compute node with its <tt class="docutils literal">function</tt>
 already answered. Pressing <tt class="docutils literal">mean</tt> puts down a node called <tt class="docutils literal">mean</tt> that is a
 mean from the moment it exists, so the panel asks it for a mean's attributes
@@ -5970,7 +5980,7 @@ addresses are its own. What is here is checked as it stands, with a
 </span><span class="name tag">          scale</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal string">&quot;0.0078&quot;</span><span class="punctuation indicator">,</span><span class="name tag"> offset</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal string">&quot;255.37&quot;</span><span class="punctuation indicator">,</span><span class="name tag"> world-in</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="punctuation indicator">[</span><span class="name variable">temp_3</span><span class="punctuation indicator">],</span><span class="whitespace">
 </span><span class="name tag">          world-out</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="punctuation indicator">[</span><span class="name variable">gateway.temp3</span><span class="punctuation indicator">,</span><span class="whitespace"> </span><span class="name variable">ambient.in2</span><span class="punctuation indicator">]</span><span class="whitespace"> </span><span class="punctuation indicator">}</span><span class="whitespace">
 
-      </span><span class="punctuation indicator">-</span><span class="whitespace"> </span><span class="punctuation indicator">{</span><span class="name tag"> compute</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="name variable">thermostat</span><span class="punctuation indicator">,</span><span class="name tag"> function</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="name variable">hysteresis</span><span class="punctuation indicator">,</span><span class="whitespace">
+      </span><span class="punctuation indicator">-</span><span class="whitespace"> </span><span class="punctuation indicator">{</span><span class="name tag"> compute</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="name variable">thermostat</span><span class="punctuation indicator">,</span><span class="name tag"> function</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="name variable">thermostat</span><span class="punctuation indicator">,</span><span class="whitespace">
 </span><span class="name tag">          setpoint</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal string">&quot;293.15&quot;</span><span class="punctuation indicator">,</span><span class="name tag"> half_band</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal string">&quot;2.0&quot;</span><span class="punctuation indicator">,</span><span class="name tag"> world-in</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="punctuation indicator">[</span><span class="name variable">ambient</span><span class="punctuation indicator">],</span><span class="whitespace">
 </span><span class="name tag">          world-out</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="punctuation indicator">[</span><span class="name variable">gateway.thermostat</span><span class="punctuation indicator">],</span><span class="whitespace">
 </span><span class="name tag">          moc-out</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="punctuation indicator">[</span><span class="name variable">heaters_1.thermostat</span><span class="punctuation indicator">,</span><span class="whitespace"> </span><span class="name variable">heaters_2.thermostat</span><span class="punctuation indicator">]</span><span class="whitespace"> </span><span class="punctuation indicator">}</span><span class="whitespace">
@@ -11519,7 +11529,7 @@ on the world for the change, and the world advances itself to each event
 it foresees at that event's moment on the wall clock, so the vehicle
 hears of a touchdown when it happens and not at the stand-in's next turn.</dd>
 <dt>Requirement</dt>
-<dd>A stand-in driving a decision takes <tt class="docutils literal">1</tt> or <tt class="docutils literal">0</tt>, as a hysteresis
+<dd>A stand-in driving a decision takes <tt class="docutils literal">1</tt> or <tt class="docutils literal">0</tt>, as a thermostat
 sends it. One driving a value takes four bytes of its unit's steps, as
 every value on a link is, and what reaches it must be values in that
 unit: a node sending another is refused, naming both units, since an
@@ -11774,13 +11784,13 @@ the one vehicle node the simulator has: everything else a vehicle computes
 runs on a workstation as it runs aboard.</p>
 <dl class="docutils">
 <dt>Requirement</dt>
-<dd>The simulator file's <tt class="docutils literal">tcssim</tt> section may name a hysteresis node of
+<dd>The simulator file's <tt class="docutils literal">tcssim</tt> section may name a thermostat node of
 the configuration. tcssim then stands in for it, taking its <tt class="docutils literal">setpoint</tt>
 and <tt class="docutils literal">half_band</tt> from the configuration, which states them once.</dd>
 <dt>Requirement</dt>
 <dd>Its sensors are the simulated payloads reporting the world whose data
 reaches the node, and its heaters the simulated payloads driving it that
-data from the node reaches. A node that is not a hysteresis node, or
+data from the node reaches. A node that is not a thermostat node, or
 that no such sensor reaches, or that reaches no such heater, is refused.</dd>
 <dt>Requirement</dt>
 <dd>It reads what each sensor's stand-in sends, as it leaves: a dropped
@@ -11791,7 +11801,7 @@ both use, and a reading that conversion would refuse is ignored.</dd>
 <dt>Requirement</dt>
 <dd>It decides on the median of each sensor's latest reading, as the example
 votes them, and asserts the decision to every heater on every reading,
-as the hysteresis node does aboard.</dd>
+as the thermostat node does aboard.</dd>
 <dt>Requirement</dt>
 <dd>It is never named with tcspecial running, whose own thermostat switches
 the same heaters.</dd>

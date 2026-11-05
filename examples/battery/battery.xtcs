@@ -93,7 +93,7 @@
                  below the band, shedding it, and unasserted above it,
                  restoring it. -->
             <compute name="shedding">
-                <function>hysteresis</function>
+                <function>thermostat</function>
                 <half_band>0.1</half_band>
                 <setpoint>0.4</setpoint>
                 <moc-out>science.shedding</moc-out>

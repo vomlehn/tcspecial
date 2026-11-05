@@ -3985,6 +3985,19 @@ gateway's -- and which one a shape was pressed in is what decides where it lands
 A node stays in its pane: a drag that would carry a payload rightwards across a
 divider stops at it.
 
+A type is placed from its list in either of two ways. A click places it where
+it fits, as high as it can be in view, and scrolls the sheet to it. A press
+that moves carries the type's shape out of the list under the pointer, drawn
+faint at the sheet's scale, and letting go over the sheet places it there,
+centred on the pointer, on the grid and in its own pane -- a type let go in
+another's pane stops at its own pane's edge, as a drag of a node does, so the
+gesture always places something where it can be seen. Let go anywhere but
+over the sheet, it places nothing. The two are told apart by how far the
+press moved, four pixels, and not by how long it lasted, as a node's click and
+drag are. Both are one edit, and one Undo takes the node away; and both go
+through ``tcsgui::add_node`` (``add_physics`` for a physics component), so
+that a node clicked into being and one carried there are the same node.
+
 Each of the three lists is as tall as its own share of the column, with a line
 between each pair that can be dragged to change the two it is between -- the
 same arrangement as the working panes, turned on its side, and kept in the same

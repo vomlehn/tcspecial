@@ -162,6 +162,13 @@ component SelectionPane inherits Rectangle {
     in property <bool> enabled: true;
     in property <string> note: "";
     callback place-node(string, string, string);
+    // An entry carried out of the list rather than clicked: where the pointer
+    // is while it is carried, and where it was let go, in the window's
+    // coordinates; or the carrying given up by the window system. See
+    // Surface's carry and put-down, which say what the sheet makes of it.
+    callback carry(PaletteEntry, length, length);
+    callback put-down(PaletteEntry, length, length);
+    callback carry-stopped();
 
     background: root.ground;
     border-width: 1px;
@@ -217,13 +224,63 @@ component SelectionPane inherits Rectangle {
                 // The whole row, so the hit area is the row and not only the
                 // shape: a rounded end's corners are not part of the shape,
                 // and a press there should still place one.
+                //
+                // A press that stays put places one where it fits, as it
+                // always has; one that moves carries the shape out to the
+                // sheet, to be put down where it is let go. Told apart by
+                // the distance and not the time, as a node's click and drag
+                // are: a gesture that depends on how long it took does the
+                // wrong thing under pressure.
                 if !p.is-heading: TouchArea {
+                    // Whether this press has moved far enough to be a carry,
+                    // and whether the one just ended was one: a carry let go
+                    // over its own row is not a click as well.
+                    property <bool> carrying: false;
+                    property <bool> carried: false;
                     // Nothing placed in a read-only session, or where this
                     // list has nowhere to place.
                     enabled: !Session.read-only && root.enabled;
-                    mouse-cursor: MouseCursor.pointer;
+                    mouse-cursor: self.carrying
+                        ? MouseCursor.grabbing
+                        : MouseCursor.pointer;
+                    pointer-event(event) => {
+                        if (event.kind == PointerEventKind.down) {
+                            self.carrying = false;
+                            self.carried = false;
+                        }
+                        if (event.kind == PointerEventKind.up
+                            && self.carrying) {
+                            self.carrying = false;
+                            self.carried = true;
+                            root.put-down(p,
+                                self.absolute-position.x + self.mouse-x,
+                                self.absolute-position.y + self.mouse-y);
+                        }
+                        if (event.kind == PointerEventKind.cancel
+                            && self.carrying) {
+                            self.carrying = false;
+                            self.carried = true;
+                            root.carry-stopped();
+                        }
+                    }
+                    moved => {
+                        if (self.pressed && !self.carrying
+                            && (abs(self.mouse-x - self.pressed-x) > 4px
+                                || abs(self.mouse-y - self.pressed-y)
+                                    > 4px)) {
+                            self.carrying = true;
+                        }
+                        if (self.carrying) {
+                            root.carry(p,
+                                self.absolute-position.x + self.mouse-x,
+                                self.absolute-position.y + self.mouse-y);
+                        }
+                    }
                     clicked => {
-                        root.place-node(p.node.name, p.node.node-type, p.sets);
+                        if (!self.carrying && !self.carried) {
+                            root.place-node(p.node.name, p.node.node-type,
+                                p.sets);
+                        }
                     }
                 }
             }
@@ -527,6 +584,64 @@ component Surface inherits Rectangle {
     // A physics component placed from the list, by its type; and one on the
     // canvas, asked to be edited or deleted, by its name.
     callback place-physics(string);
+    // An entry carried out of a list and put down on the sheet: a node by
+    // what was carried, its type and what its entry sets, or a physics
+    // component by its type; with where its top left corner goes, in the
+    // coordinates of the whole sheet, whose nought is the Physics pane's
+    // left edge. Kept to its own pane by tcsgui, as a node dragged is.
+    callback drop-node(string, string, string, length, length);
+    callback drop-physics(string, length, length);
+
+    // The entry being carried out of a list, if one is, and where the pointer
+    // is, in this surface's coordinates: its shape is drawn there, so that
+    // what will be put down, and where, is seen before it is.
+    property <bool> carrying: false;
+    property <NodeView> carried;
+    property <length> carry-x;
+    property <length> carry-y;
+
+    function carry(entry: PaletteEntry, x: length, y: length) {
+        root.carried = entry.node;
+        root.carry-x = x - root.absolute-position.x;
+        root.carry-y = y - root.absolute-position.y;
+        root.carrying = true;
+    }
+
+    // Where an entry was let go, in the window's coordinates, made a place on
+    // the sheet: the shape centred on the pointer, as it was drawn while it
+    // was carried. Let go anywhere but over the sheet -- back over the lists,
+    // say -- it is put back, and nothing is placed.
+    //
+    // The sheet's page is scaled about its middle, which is the toolkit's
+    // origin for a scale, so the point is taken off the scroll and then the
+    // scale undone about that middle.
+    function put-down(entry: PaletteEntry, physics: bool, x: length,
+                      y: length) {
+        root.carrying = false;
+        if (x < sheet.absolute-position.x
+            || x > sheet.absolute-position.x + sheet.visible-width
+            || y < sheet.absolute-position.y
+            || y > sheet.absolute-position.y + sheet.visible-height) {
+            return;
+        }
+        if (physics) {
+            root.drop-physics(entry.node.node-type,
+                page.width / 2 + (x - sheet.absolute-position.x
+                    - sheet.content-x - page.width / 2) / root.zoom
+                    - entry.node.width / 2,
+                page.height / 2 + (y - sheet.absolute-position.y
+                    - sheet.content-y - page.height / 2) / root.zoom
+                    - entry.node.height / 2);
+        } else {
+            root.drop-node(entry.node.name, entry.node.node-type, entry.sets,
+                page.width / 2 + (x - sheet.absolute-position.x
+                    - sheet.content-x - page.width / 2) / root.zoom
+                    - entry.node.width / 2,
+                page.height / 2 + (y - sheet.absolute-position.y
+                    - sheet.content-y - page.height / 2) / root.zoom
+                    - entry.node.height / 2);
+        }
+    }
     callback physics-edit(string);
     callback physics-delete(string);
     // A component dragged by this much, by its name, as node-moved is.
@@ -761,6 +876,11 @@ component Surface inherits Rectangle {
                     place-node(name, t, sets) => {
                         root.place-physics(t);
                     }
+                    carry(entry, x, y) => { root.carry(entry, x, y); }
+                    put-down(entry, x, y) => {
+                        root.put-down(entry, true, x, y);
+                    }
+                    carry-stopped => { root.carrying = false; }
                 }
                 ListDivider {
                     x: 0;
@@ -782,6 +902,11 @@ component Surface inherits Rectangle {
                     place-node(name, t, sets) => {
                         root.place-node(name, t, sets);
                     }
+                    carry(entry, x, y) => { root.carry(entry, x, y); }
+                    put-down(entry, x, y) => {
+                        root.put-down(entry, false, x, y);
+                    }
+                    carry-stopped => { root.carrying = false; }
                 }
                 ListDivider {
                     x: 0;
@@ -803,6 +928,11 @@ component Surface inherits Rectangle {
                     place-node(name, t, sets) => {
                         root.place-node(name, t, sets);
                     }
+                    carry(entry, x, y) => { root.carry(entry, x, y); }
+                    put-down(entry, x, y) => {
+                        root.put-down(entry, false, x, y);
+                    }
+                    carry-stopped => { root.carrying = false; }
                 }
                 ListDivider {
                     x: 0;
@@ -826,6 +956,11 @@ component Surface inherits Rectangle {
                     place-node(name, t, sets) => {
                         root.place-node(name, t, sets);
                     }
+                    carry(entry, x, y) => { root.carry(entry, x, y); }
+                    put-down(entry, x, y) => {
+                        root.put-down(entry, false, x, y);
+                    }
+                    carry-stopped => { root.carrying = false; }
                 }
             }
 
@@ -909,7 +1044,8 @@ component Surface inherits Rectangle {
                     if nodes.length == 0: Text {
                         x: Space.room;
                         y: Space.room;
-                        text: "Press a node type on the left to place one.";
+                        text:
+                            "Click a node type on the left, or drag one here.";
                         font-size: Type.body;
                         font-italic: true;
                         color: #9ca3af;
@@ -1204,6 +1340,17 @@ component Surface inherits Rectangle {
             }
 
         }
+    }
+
+    // The entry being carried, drawn under the pointer at the sheet's scale,
+    // over everything, and faint, because it is not placed until it is let
+    // go. Scaled about its middle, which stays on the pointer.
+    if root.carrying: NodeShape {
+        x: root.carry-x - root.carried.width / 2;
+        y: root.carry-y - root.carried.height / 2;
+        node: root.carried;
+        transform-scale: root.zoom;
+        opacity: 0.6;
     }
 }
 
@@ -1580,6 +1727,10 @@ export component MainWindow inherits Window {
     callback physics-divider-moved(length);
     callback physics-list-divider-moved(length, length);
     callback place-physics(string);
+    // An entry carried out of a list and put down on the sheet: see
+    // Surface.
+    callback drop-node(string, string, string, length, length);
+    callback drop-physics(string, length, length);
     callback physics-edit(string);
     callback physics-delete(string);
     // A component dragged by this much, by its name, as node-moved is.
@@ -1789,6 +1940,10 @@ export component MainWindow inherits Window {
             root.physics-list-divider-moved(dy, tall);
         }
         place-physics(t) => { root.place-physics(t); }
+        drop-physics(t, x, y) => { root.drop-physics(t, x, y); }
+        drop-node(name, t, sets, x, y) => {
+            root.drop-node(name, t, sets, x, y);
+        }
         physics-edit(n) => { root.physics-edit(n); }
         physics-delete(n) => { root.physics-delete(n); }
         physics-moved(n, dx, dy) => { root.physics-moved(n, dx, dy); }

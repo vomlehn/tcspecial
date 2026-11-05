@@ -997,51 +997,14 @@ fn wire(
                     .unwrap_or(0.0)
                     .round() as i32,
             );
-            let at = {
-                let mut editor = editor.borrow_mut();
-                // Named after what was pressed rather than after the
-                // type: a described node is "mean" and not
-                // "compute-3", which is what a reader of the
-                // configuration will be looking for.
-                let name = fresh_name(editor.document(), &called, &home);
-                let at = next_place(
-                    editor.document(),
-                    &home,
-                    &node_type,
-                    views.borrow().divider.get(),
-                    visible,
-                );
-                // A node exists, and then it is somewhere: two edits,
-                // recorded as one group so that one Undo takes the
-                // node away and one Redo puts it back where it was
-                // placed. A drag afterwards is a move of its own, so
-                // undoing that still leaves the node.
-                let mut edits = vec![Edit::AddNode {
-                    name: name.clone(),
-                    node_type: node_type.to_string(),
-                    home: home.clone(),
-                }];
-                // What the description answers for it, before it is
-                // placed: a compute node from the `mean` entry is a
-                // mean from the moment it exists, so the panel asks
-                // for a mean's attributes and the checking holds it to
-                // a mean's rules.
-                for (attribute, value) in stated(&sets) {
-                    edits.push(Edit::SetAttribute {
-                        node: Qualified::of(&name, &home).absolute(),
-                        attribute,
-                        was: None,
-                        now: Some(value),
-                    });
-                }
-                edits.push(Edit::MoveNode {
-                    node: Qualified::of(&name, &home).absolute(),
-                    was: (0, 0),
-                    now: at,
-                });
-                editor.edit(Edit::Group { edits });
-                at
-            };
+            let at = next_place(
+                editor.borrow().document(),
+                &home,
+                &node_type,
+                views.borrow().divider.get(),
+                visible,
+            );
+            add_node(&editor, &home, &called, &node_type, &sets, at);
             views.borrow().refresh(&editor.borrow());
             // And the sheet is scrolled so the new node is at the top
             // of the view. It was placed where it fits, which may be
@@ -1051,6 +1014,29 @@ fn wire(
             if let Some(window) = window_for_place.upgrade() {
                 window.set_canvas_offset(-(at.1 as f32));
             }
+        });
+    }
+    {
+        // An entry carried out of a list and let go on the sheet: the node
+        // goes where it was let go, on the grid and inside its own pane, as
+        // one dragged there would. Let go in another type's pane, it stops
+        // at its own pane's edge rather than being refused, as a drag does,
+        // so that the gesture always places something where it can be seen.
+        let editor = editor.clone();
+        let views = views.clone();
+        let home = home.clone();
+        window.on_drop_node(move |called, node_type, sets, x, y| {
+            let dividers = views.borrow().divider.get();
+            let at = confine(
+                &node_type,
+                dividers,
+                snap((
+                    x.round() as i32 - sheet_left(dividers, &home),
+                    y.round() as i32,
+                )),
+            );
+            add_node(&editor, &home, &called, &node_type, &sets, at);
+            views.borrow().refresh(&editor.borrow());
         });
     }
     {
@@ -5097,6 +5083,58 @@ fn physics_views_of(
     )
 }
 
+/// Adds a physics component of this type, under a name nothing has, with
+/// nothing stated, and opens its window, so that its figures are the next
+/// thing typed.
+///
+/// What clicking an entry of the physics list and carrying one out to the
+/// sheet both do, once. Nothing, in a session with no simulator file.
+///
+/// # Arguments
+///
+/// * `editor` - The one editor every window edits.
+/// * `views`  - The windows, redrawn after the edit.
+/// * `kind`   - The component's type.
+/// * `at`     - Where it goes, on the grid and in the Physics pane; `None`
+///              leaves it to be laid out with the others.
+fn add_physics(
+    editor: &Rc<RefCell<Editor>>,
+    views: &Rc<RefCell<Views>>,
+    kind: &str,
+    at: Option<(i32, i32)>,
+) {
+    let name = {
+        let mut editor = editor.borrow_mut();
+        let Some(simulator) = &editor.document().simulator else {
+            return;
+        };
+        let name = simulator.world.fresh_name(kind);
+        let add = Edit::AddPhysics {
+            name: name.clone(),
+            kind: kind.to_string(),
+        };
+        // One edit either way, so that one Undo takes the component away,
+        // wherever it was put.
+        editor.edit(match at {
+            None => add,
+            Some(at) => Edit::Group {
+                edits: vec![
+                    add,
+                    Edit::MovePhysics {
+                        component: name.clone(),
+                        was: None,
+                        now: Some(at),
+                    },
+                ],
+            },
+        });
+        name
+    };
+    *views.borrow().showing_physics.borrow_mut() = name;
+    show_physics(editor, views);
+    views.borrow().refresh(&editor.borrow());
+}
+
 /// Wires what the main window does with physics: placing a component from
 /// the physics list, editing and deleting one on the canvas, and moving the
 /// Physics pane's line and the physics list's.
@@ -5117,27 +5155,27 @@ fn wire_physics(
     home: &Home,
 ) {
     {
-        // A component of this type, under a name nothing has, with nothing
-        // stated: its window opens on it, so that its figures are the next
-        // thing typed. One edit, which one undo takes away.
+        // Clicked in the physics list: laid out with the others. See
+        // add_physics.
         let editor = editor.clone();
         let views = views.clone();
         window.on_place_physics(move |kind| {
-            let name = {
-                let mut editor = editor.borrow_mut();
-                let Some(simulator) = &editor.document().simulator else {
-                    return;
-                };
-                let name = simulator.world.fresh_name(&kind);
-                editor.edit(Edit::AddPhysics {
-                    name: name.clone(),
-                    kind: kind.to_string(),
-                });
-                name
-            };
-            *views.borrow().showing_physics.borrow_mut() = name;
-            show_physics(&editor, &views);
-            views.borrow().refresh(&editor.borrow());
+            add_physics(&editor, &views, &kind, None);
+        });
+    }
+    {
+        // Carried out of the list and let go: where it was let go, on the
+        // grid and inside the Physics pane, as a component dragged there
+        // would be.
+        let editor = editor.clone();
+        let views = views.clone();
+        window.on_drop_physics(move |kind, x, y| {
+            let dividers = views.borrow().divider.get();
+            let at = tcsdiagram::physics::confine(
+                snap((x.round() as i32, y.round() as i32)),
+                dividers,
+            );
+            add_physics(&editor, &views, &kind, Some(at));
         });
     }
     {
@@ -7282,6 +7320,62 @@ fn next_place(
         .collect();
 
     snap(pane::place_in(&taken, node_type, dividers, visible))
+}
+
+/// Adds a node from a list's entry, on a page, at a place.
+///
+/// What clicking an entry and carrying one out to the sheet both do, once:
+/// the two differ only in where the node goes.
+///
+/// # Arguments
+///
+/// * `editor`    - The one editor every window edits.
+/// * `home`      - The page the node goes on: `None` for the top.
+/// * `called`    - What the entry is called, which names the node.
+/// * `node_type` - The node's type, as spelled in a file.
+/// * `sets`      - What the entry answers for it, as `name=value` pairs.
+/// * `at`        - Where its upper left corner goes, in the working panes'
+///                 coordinates, already on the grid and in its pane.
+fn add_node(
+    editor: &Rc<RefCell<Editor>>,
+    home: &Home,
+    called: &str,
+    node_type: &str,
+    sets: &str,
+    at: (i32, i32),
+) {
+    let mut editor = editor.borrow_mut();
+    // Named after what was pressed rather than after the type: a described
+    // node is "mean" and not "compute-3", which is what a reader of the
+    // configuration will be looking for.
+    let name = fresh_name(editor.document(), called, home);
+    // A node exists, and then it is somewhere: two edits, recorded as one
+    // group so that one Undo takes the node away and one Redo puts it back
+    // where it was placed. A drag afterwards is a move of its own, so
+    // undoing that still leaves the node.
+    let mut edits = vec![Edit::AddNode {
+        name: name.clone(),
+        node_type: node_type.to_string(),
+        home: home.clone(),
+    }];
+    // What the description answers for it, before it is placed: a compute
+    // node from the `mean` entry is a mean from the moment it exists, so the
+    // panel asks for a mean's attributes and the checking holds it to a
+    // mean's rules.
+    for (attribute, value) in stated(sets) {
+        edits.push(Edit::SetAttribute {
+            node: Qualified::of(&name, home).absolute(),
+            attribute,
+            was: None,
+            now: Some(value),
+        });
+    }
+    edits.push(Edit::MoveNode {
+        node: Qualified::of(&name, home).absolute(),
+        was: (0, 0),
+        now: at,
+    });
+    editor.edit(Edit::Group { edits });
 }
 
 /// The nearest point on the grid.
@@ -11984,6 +12078,195 @@ mod tests {
         the_question_offers_a_way_out_of_the_editor();
         closing_the_main_window_closes_what_says_what_is_wrong();
         an_emptied_field_takes_the_attribute_off();
+        a_type_carried_out_of_its_list_goes_where_it_is_let_go();
+        a_physics_type_carried_out_goes_where_it_is_let_go();
+    }
+
+    /// An entry carried out of its list and let go on the sheet is placed
+    /// where it was let go, centred on the pointer; one carried and let go
+    /// back over the lists places nothing.
+    ///
+    /// Through the window, as a person does it: what is being tested is the
+    /// markup's arithmetic from the window's coordinates to the sheet's as
+    /// much as the handler, and nothing short of the whole path says whether
+    /// it lands under the hand.
+    fn a_type_carried_out_of_its_list_goes_where_it_is_let_go() {
+        use i_slint_backend_testing as testing;
+        use slint::platform::{PointerEventButton, WindowEvent};
+        use std::rc::Rc;
+
+        let where_ = tempfile::tempdir().expect("a directory");
+        let editor = Rc::new(RefCell::new(
+            Editor::open(&where_.path().join("graph.ytcs"), dividers())
+                .expect("it opens"),
+        ));
+        let ui = MainWindow::new().expect("a window");
+        furnish!(&ui, descriptions());
+        let views = views_for(&ui);
+        let chosen = views.borrow().chosen.clone();
+        let drawing = views.borrow().drawing.clone();
+        wire(&ui, &editor, &views, &drawing, &chosen, &None);
+        views.borrow().refresh(&editor.borrow());
+        // Wide enough that the sheet is drawn whole, so that a place on it
+        // is a place in the file's pixels.
+        ui.window()
+            .set_size(slint::LogicalSize::new(2400.0, 1000.0));
+        ui.show().expect("the window shows");
+
+        // The thermostat's entry, pressed by its name, which is on the row
+        // and in view: only what is in view can be found.
+        let entry =
+            testing::ElementHandle::find_by_accessible_label(&ui, "thermostat")
+                .next()
+                .expect("the vehicle list offers a thermostat");
+        let (at, size) = (entry.absolute_position(), entry.size());
+        let from = slint::LogicalPosition::new(
+            at.x + size.width / 2.0,
+            at.y + size.height / 2.0,
+        );
+        let canvas =
+            testing::ElementHandle::find_by_element_id(&ui, "Surface::canvas")
+                .next()
+                .expect("the window has a canvas");
+        let origin = canvas.absolute_position();
+        let carry = |to: slint::LogicalPosition| {
+            ui.window()
+                .dispatch_event(WindowEvent::PointerMoved { position: from });
+            ui.window().dispatch_event(WindowEvent::PointerPressed {
+                position: from,
+                button: PointerEventButton::Left,
+            });
+            let steps = 8;
+            for step in 1..=steps {
+                let part = step as f32 / steps as f32;
+                ui.window().dispatch_event(WindowEvent::PointerMoved {
+                    position: slint::LogicalPosition::new(
+                        from.x + (to.x - from.x) * part,
+                        from.y + (to.y - from.y) * part,
+                    ),
+                });
+            }
+            ui.window().dispatch_event(WindowEvent::PointerReleased {
+                position: to,
+                button: PointerEventButton::Left,
+            });
+        };
+
+        // A press that stays put is still a click, which places one where
+        // it fits, as it did before anything could be carried.
+        ui.window()
+            .dispatch_event(WindowEvent::PointerMoved { position: from });
+        ui.window().dispatch_event(WindowEvent::PointerPressed {
+            position: from,
+            button: PointerEventButton::Left,
+        });
+        ui.window().dispatch_event(WindowEvent::PointerReleased {
+            position: from,
+            button: PointerEventButton::Left,
+        });
+        assert!(
+            editor.borrow().document().node("thermostat-1").is_some(),
+            "a click on an entry places one"
+        );
+        editor.borrow_mut().undo();
+        // Placing one scrolls the sheet to it; back to the top, where the
+        // canvas was measured.
+        ui.set_canvas_offset(0.0);
+
+        // Carried a little way down its own list and let go: nothing.
+        carry(slint::LogicalPosition::new(from.x, from.y + 40.0));
+        assert!(
+            editor.borrow().document().node("thermostat-1").is_none(),
+            "an entry let go over the lists places nothing"
+        );
+
+        // Carried to the middle of the vehicle pane, well down the sheet.
+        let into = (dividers().payloads + 200, 400);
+        carry(slint::LogicalPosition::new(
+            origin.x + into.0 as f32,
+            origin.y + into.1 as f32,
+        ));
+        let placed = editor
+            .borrow()
+            .document()
+            .node("thermostat-1")
+            .cloned()
+            .expect("the thermostat is placed where it was let go");
+        assert_eq!(
+            placed.attributes.get("function").map(String::as_str),
+            Some("thermostat"),
+            "what the entry sets is set on the node carried out of it"
+        );
+        let (width, height) = size_of("compute");
+        let centre = (
+            placed.at.0 + width as i32 / 2,
+            placed.at.1 + height as i32 / 2,
+        );
+        let step = pane::on_node_grid(pane::PX_PER_MM.round() as i32 * 6);
+        assert!(
+            (centre.0 - into.0).abs() <= step
+                && (centre.1 - into.1).abs() <= step,
+            "the node is centred at {centre:?}, and was let go at {into:?}"
+        );
+        // One Undo takes it away, as one does a node placed by a click.
+        editor.borrow_mut().undo();
+        assert!(editor.borrow().document().node("thermostat-1").is_none());
+        ui.hide().expect("the window hides");
+    }
+
+    /// A physics type carried out of its list goes where it was let go, on
+    /// the grid and inside the Physics pane, and is one edit.
+    fn a_physics_type_carried_out_goes_where_it_is_let_go() {
+        use std::rc::Rc;
+
+        let where_ = tempfile::tempdir().expect("a directory");
+        let path = where_.path().join("vehicle.ytcs");
+        let sim = where_.path().join("vehicle-sim.yaml");
+        std::fs::write(&sim, "world:\n  ambient_temp: \"283.15 K\"\n")
+            .expect("written");
+        let mut opened = Editor::open(&path, dividers()).expect("it opens");
+        opened.open_simulator(&sim).expect("it opens");
+        let editor = Rc::new(RefCell::new(opened));
+        let ui = MainWindow::new().expect("a window");
+        furnish!(&ui, descriptions());
+        let views = views_for(&ui);
+        wire_physics(&ui, &editor, &views, &None);
+
+        let into = (40, 300);
+        ui.invoke_drop_physics(
+            "thermal_mass".into(),
+            into.0 as f32,
+            into.1 as f32,
+        );
+        let world = editor
+            .borrow()
+            .document()
+            .simulator
+            .as_ref()
+            .expect("a simulator file")
+            .world
+            .clone();
+        let name = world
+            .placed
+            .keys()
+            .next()
+            .cloned()
+            .expect("the component has a place");
+        assert_eq!(
+            world.placed.get(&name).copied(),
+            Some(tcsdiagram::physics::confine(snap(into), dividers())),
+            "{name} is where it was let go"
+        );
+        editor.borrow_mut().undo();
+        assert!(
+            !editor
+                .borrow()
+                .document()
+                .simulator
+                .as_ref()
+                .is_some_and(|sim| sim.world.components.contains_key(&name)),
+            "one Undo takes the component away"
+        );
     }
 
     /// A field somebody clears takes the attribute off, and the file loses

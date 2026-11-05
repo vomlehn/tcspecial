@@ -93,6 +93,9 @@ export struct NodeView {
     name: string,
     // The type's spelling, which is the configuration's word for it.
     node-type: string,
+    // What the line along the top says the node is: the type, or a compute
+    // node's function. See tcsdiagram::view::type_line.
+    type-line: string,
     x: length,
     y: length,
     width: length,
@@ -491,7 +494,7 @@ export component NodeShape inherits Rectangle {
             y: 0px;
             width: node.type-right - node.type-left;
             height: node.terminal-row;
-            text: node.node-type;
+            text: node.type-line;
             color: mark;
             font-family: node.face == "mono" ? Fonts.mono : "";
             font-size: node.type-size;

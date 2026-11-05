@@ -336,13 +336,17 @@ fn draw(
 
     draw_physics(window, path, &sheet, dividers);
 
+    // The sheet is in the order of `nodes`, which is where each node's
+    // function is: a compute node's type line names it.
     let nodes: Vec<ui::NodeView> = sheet
         .iter()
-        .filter(|node| node.here)
-        .map(|node| {
+        .zip(&nodes)
+        .filter(|(node, _)| node.here)
+        .map(|(node, said)| {
             node_view(view::node_look(
                 &node.name,
                 node.node_type,
+                said.attributes.get("function").map(|f| f.as_str()),
                 node.at,
                 false,
                 None,
@@ -473,6 +477,7 @@ fn node_view(look: NodeLook) -> ui::NodeView {
     ui::NodeView {
         name: look.name.into(),
         node_type: look.node_type.into(),
+        type_line: look.type_line.into(),
         x: look.x,
         y: look.y,
         width: look.width,

@@ -70,7 +70,7 @@ vehicle:
       # of it the heaters are switched at, the setpoint being in the middle
       # of the band.
       - compute: thermostat
-        function: "hysteresis"
+        function: "thermostat"
         half_band: "2.0"
         setpoint: "293.15"
         # asserted below the setpoint, unasserted above it. Two heaters, because

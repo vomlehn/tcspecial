@@ -1540,7 +1540,7 @@ impl NodeType {
             //
             // Held against that module by
             // `tests::the_compute_fields_are_every_computations_terms`: three
-            // of these were missing, and a hysteresis placed from a palette
+            // of these were missing, and a thermostat placed from a palette
             // with no description behind it had nowhere to type its setpoint.
             NodeType::Compute => &[
                 ("function", true),
@@ -1553,7 +1553,7 @@ impl NodeType {
                 ("inputs", false),
                 ("algorithm", false),
                 ("age", false),
-                // hysteresis
+                // thermostat
                 ("setpoint", false),
                 ("half_band", false),
                 // process

@@ -2378,7 +2378,7 @@ mod tests {
     }
 
     /// Which nodes send values is the configuration's: in the thermostat
-    /// example, a conversion and the vote do, the hysteresis and a sensor
+    /// example, a conversion and the vote do, the thermostat and a sensor
     /// do not, and a node it lacks is refused.
     #[test]
     fn a_node_sends_values_as_the_configuration_says() {
@@ -2425,7 +2425,7 @@ mod tests {
     }
 
     /// Which nodes send decisions is the configuration's too: in the
-    /// thermostat example, the hysteresis does, and a conversion and a
+    /// thermostat example, the thermostat does, and a conversion and a
     /// sensor do not.
     #[test]
     fn a_node_sends_decisions_as_the_configuration_says() {

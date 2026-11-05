@@ -12,13 +12,13 @@
 //!   business;
 //! * a `vote` is in its inputs' unit, which must be one.
 //!
-//! A `hysteresis` reads values and sends decisions; its setpoint and band
+//! A `thermostat` reads values and sends decisions; its setpoint and band
 //! are in the unit of what it reads, and whether they fit is checked here
 //! too, since that node alone cannot know the unit.
 
 use super::{Destination, Graph};
 use crate::node::vehicle::compute::{
-    params_of, value_count, Computation, HysteresisParams,
+    params_of, value_count, Computation, ThermostatParams,
 };
 use crate::unit::Unit;
 
@@ -68,7 +68,7 @@ fn unit_seen<'a>(
             Some(params.unit)
         }
         Computation::Process(params) => Some(params.unit),
-        Computation::Hysteresis(_) => None,
+        Computation::Thermostat(_) => None,
         Computation::Vote(_) => {
             asking.push(node);
             let units = sources_units(graph, node, asking);
@@ -169,7 +169,7 @@ pub fn problems(graph: &Graph) -> Vec<(String, String)> {
         };
         let reads = match what {
             Computation::Vote(_) => "votes on",
-            Computation::Hysteresis(_) => "decides on",
+            Computation::Thermostat(_) => "decides on",
             Computation::Process(_) => "hands its program",
             Computation::ToKelvin(_) | Computation::ToValue(_) => continue,
         };
@@ -208,7 +208,7 @@ pub fn problems(graph: &Graph) -> Vec<(String, String)> {
             }
         }
 
-        if let (Computation::Hysteresis(params), Some((_, unit)), true) =
+        if let (Computation::Thermostat(params), Some((_, unit)), true) =
             (&what, sent, agree)
         {
             band_fits(&node.name, params, unit, &mut problems);
@@ -228,7 +228,7 @@ pub fn problems(graph: &Graph) -> Vec<(String, String)> {
 /// * `problems` - Where a problem is added.
 fn band_fits(
     node: &str,
-    params: &HysteresisParams,
+    params: &ThermostatParams,
     unit: Unit,
     problems: &mut Vec<(String, String)>,
 ) {

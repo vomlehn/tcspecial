@@ -7184,7 +7184,7 @@ fn palette_of(
         // What the description tree says about this type, where it says
         // anything. A type the tree describes is offered as its descriptions
         // and not as itself: `compute` is one node type, and the tree turns it
-        // into `mean`, `hysteresis`, `to_kelvin` and `process` -- four things
+        // into `mean`, `thermostat`, `to_kelvin` and `process` -- four things
         // to place, each a compute node with its function already answered. A
         // bare `compute` would be a fifth entry that is refused until somebody
         // types the function in by hand.
@@ -8597,7 +8597,7 @@ mod tests {
     ///
     /// A type the tree describes is offered as its descriptions and not as
     /// itself: `compute` is one node type, and the tree turns it into `mean`,
-    /// `hysteresis`, `to_kelvin` and `process`. Each entry is named after the
+    /// `thermostat`, `to_kelvin` and `process`. Each entry is named after the
     /// description and carries what the description answers for it, so placing
     /// one puts down a compute node that is already a mean.
     ///

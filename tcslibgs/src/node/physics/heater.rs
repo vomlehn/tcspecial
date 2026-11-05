@@ -1,6 +1,6 @@
 //! A heater: a resistive element on a supply, switched on and off.
 //!
-//! Driven at `on` by a decision -- a hysteresis node's, through a stand-in
+//! Driven at `on` by a decision -- a thermostat node's, through a stand-in
 //! the vehicle writes to -- and giving out its `heat`, in watts, to whatever
 //! it warms, and drawing its `current`, in amperes, from its supply. Both are
 //! nought while it is off. `heating` says whether it is on, as a decision: what

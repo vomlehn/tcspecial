@@ -349,9 +349,9 @@ type Attachments = (BTreeMap<String, Attachment>, Vec<Arc<Thermostat>>);
 ///
 /// A message if the model or the joins to it are wrong, a model is named but
 /// no graph was read, a sensor's conversion cannot be found in the graph or
-/// is in another unit than its terminal, a thermostat is not a hysteresis
-/// node or has no sensors or no heaters, or two thermostats switch one
-/// heater.
+/// is in another unit than its terminal, a thermostat the file names is not
+/// a thermostat node or has no sensors or no heaters, or two thermostats
+/// switch one heater.
 fn joined_to_the_world(
     sim_file: &SimConfigFile,
     graph: Option<&tcslibgs::graph::Graph>,
@@ -496,7 +496,7 @@ fn joined_to_the_world(
     Ok((attached, thermostats))
 }
 
-/// Makes the thermostat the simulator stands in for a hysteresis node with.
+/// Makes the thermostat the simulator stands in for a thermostat node with.
 ///
 /// Its sensors are the payloads reporting the world whose data reaches the
 /// node, and its heaters the payloads driving it that data from the node
@@ -505,7 +505,7 @@ fn joined_to_the_world(
 /// # Arguments
 ///
 /// * `graph`    - The tcspecial configuration's graph.
-/// * `name`     - The hysteresis node.
+/// * `name`     - The thermostat node.
 /// * `attached` - What each joined payload is to the world.
 ///
 /// # Returns
@@ -514,16 +514,16 @@ fn joined_to_the_world(
 ///
 /// # Errors
 ///
-/// A message if the node is not a hysteresis node, or no sensor reaches it,
+/// A message if the node is not a thermostat node, or no sensor reaches it,
 /// or it reaches no heater.
 fn thermostat_of(
     graph: &tcslibgs::graph::Graph,
     name: &str,
     attached: &BTreeMap<String, Attachment>,
 ) -> Result<Thermostat, String> {
-    use tcslibgs::graph::simulated::{hysteresis_of, reaches};
+    use tcslibgs::graph::simulated::{reaches, thermostat_of};
 
-    let params = hysteresis_of(graph, name)?;
+    let params = thermostat_of(graph, name)?;
     let mut sensors = BTreeMap::new();
     let mut heaters = Vec::new();
     for (payload, attachment) in attached {
@@ -2556,7 +2556,7 @@ mod tests {
         }
     }
 
-    /// Asked to stand in for the thermostat example's hysteresis node, tcssim
+    /// Asked to stand in for the thermostat example's thermostat node, tcssim
     /// reads the three sensors and switches the two heaters, and only the
     /// sensors report to it.
     #[test]
@@ -2588,7 +2588,7 @@ mod tests {
         // sense the heaters.
         assert_eq!(attached.len(), 6);
 
-        // Naming a node that is not a hysteresis node is refused.
+        // Naming a node that is not a thermostat node is refused.
         stand_in_for(&mut sim_file, &["thermostat", "temp1"]);
         assert!(joined_to_the_world(
             &sim_file,
@@ -2605,7 +2605,7 @@ mod tests {
     /// # Arguments
     ///
     /// * `sim_file` - The simulator file, which has a tcssim section.
-    /// * `names`    - The hysteresis nodes, in order.
+    /// * `names`    - The thermostat nodes, in order.
     fn stand_in_for(sim_file: &mut SimConfigFile, names: &[&str]) {
         sim_file
             .tcssim
@@ -2614,7 +2614,7 @@ mod tests {
             .thermostats = names.iter().map(|n| n.to_string()).collect();
     }
 
-    /// Gives the thermostat example's graph a second hysteresis node,
+    /// Gives the thermostat example's graph a second thermostat node,
     /// `backstop`, which reads the vote as `thermostat` does and takes
     /// `gpio-out-tmass2` from it: two thermostats, each with a heater of its own.
     ///
@@ -2786,7 +2786,7 @@ mod tests {
         seconds: f64,
         enabled: [bool; 2],
     ) -> ThermostatRun {
-        use tcslibgs::graph::simulated::hysteresis_of;
+        use tcslibgs::graph::simulated::thermostat_of;
 
         let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("..");
         let payload_path = root.join("examples/thermostat/thermostat.ytcs");
@@ -2802,7 +2802,7 @@ mod tests {
             joined_to_the_world(&sim_file, Some(&graph), &sims, &dh_configs)
                 .expect("the world is made");
 
-        let thermostat = hysteresis_of(&graph, "thermostat").expect("one");
+        let thermostat = thermostat_of(&graph, "thermostat").expect("one");
         let (setpoint, half_band) = (thermostat.setpoint, thermostat.half_band);
         let mut zone = None;
         let mut sensors = Vec::new();

@@ -430,7 +430,7 @@ impl Attachment {
 /// drives an input.
 ///
 /// What arrives at a heater is the thermostat's decision, which a
-/// hysteresis node sends as the text `1` or `0`: the value to drive a set
+/// thermostat node sends as the text `1` or `0`: the value to drive a set
 /// of discrete lines to. What arrives at an engine's throttle is a value,
 /// four bytes of a count of its unit's steps, as every value on a link is.
 /// Anything else is left alone rather than guessed at -- a stand-in sent
@@ -1056,7 +1056,7 @@ connections:
     /// The example's thermostat, as the vehicle's own nodes would decide it.
     ///
     /// The median of the three readings, and a heat decision that turns on
-    /// below the band and off above it -- `vote` and `hysteresis`, whose own
+    /// below the band and off above it -- `vote` and `thermostat`, whose own
     /// arithmetic is tested where it lives. Here they stand in for the
     /// vehicle, so that what is tested is the loop: the world, the encoding,
     /// the two links and the heaters.
@@ -1107,7 +1107,7 @@ connections:
     /// sensors and two simulated heaters, each a payload thread of its own
     /// sending and receiving over real sockets, joined to one world. The
     /// vehicle's part is [`decide`], which is what its `vote` and
-    /// `hysteresis` nodes come to.
+    /// `thermostat` nodes come to.
     ///
     /// It is the one test that can fail for a reason outside this file -- a
     /// loaded machine delays a packet, and a late sample is a late decision
@@ -1289,7 +1289,7 @@ connections:
                 latest.iter().copied().collect::<Option<Vec<f64>>>()
             {
                 // Driven on every sample, which is what the vehicle does:
-                // the hysteresis node asserts its decision each time a
+                // the thermostat node asserts its decision each time a
                 // temperature arrives and the devices are held at it.
                 //
                 // The first word to switch them off is thrown away, as a

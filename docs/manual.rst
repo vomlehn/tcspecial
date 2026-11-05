@@ -1356,7 +1356,7 @@ line to one request at a time, so the second handler's start would fail.
 
 Driven lines are driven together, to the same state. What arrives is a
 **decision** -- the text ``1`` to assert and ``0`` to unassert, which is what
-the hysteresis compute element emits -- and anything else is refused rather
+the thermostat compute element emits -- and anything else is refused rather
 than taken for one of them: the thing on the other end is a
 heater, and a datum that cannot be read is not guessed at. The lines are a
 set and not a pattern because there is nothing in the file to say which line
@@ -1924,7 +1924,7 @@ otherwise produces a payload that looks configured and is not:
   not held to this -- it is units per count, not a value, and what it may be
   depends on counts no file states.
 * **A value in the wrong unit, or no value at all**. Every node feeding a
-  ``vote``, a ``hysteresis`` or a ``process`` must send values, and in one
+  ``vote``, a ``thermostat`` or a ``process`` must send values, and in one
   unit: ``to_kelvin`` sends kelvin, ``to_value`` the ``unit`` it names (``K``,
   ``V``, ``A``, ``W``, ``m``, ``m/s``, ``N``, ``kg/s`` or ``ratio``), a
   ``process`` the ``unit`` it must state, and a vote its inputs'. A vote
@@ -2206,7 +2206,7 @@ The thermostat example
 .. figure:: ../examples/thermostat/thermostat.svg
    :alt: The thermostat example: three temperature sensors of one place,
          converted to kelvin, voted on, logged and sent to the ground, with a
-         hysteresis thermostat driving two heaters, each through a GPIO line,
+         thermostat driving two heaters, each through a GPIO line,
          and two more lines sensing the heaters reported to the ground. Each
          sensor is the far end of a UDP socket and each line one of the
          kernel's simulated chip, which tcssim stands in for.
@@ -2262,7 +2262,7 @@ cold -- it says 296 and the heaters stay off, where a mean would have said
 287.4 and switched them on because one sensor had failed.
 
 The voted temperature goes to the ground, on port 5100, and to ``thermostat``:
-a hysteresis holding the zone at its ``setpoint``, 293.15 K, with a
+a thermostat holding the zone at its ``setpoint``, 293.15 K, with a
 ``half_band`` of 2.0, so the heaters switch two degrees either side of it and
 the setpoint is in the middle of its own band. Its decision is logged, and
 drives two heaters, each switched by a GPIO line of its own,
@@ -2351,7 +2351,7 @@ The battery example
    :alt: The battery example: a power monitor on a serial line and a shunt
          on a UDP socket, their readings made volts and amperes, the
          amperes counted into a state of charge by a program, and a
-         hysteresis shedding the science load when the charge runs low.
+         thermostat shedding the science load when the charge runs low.
          Everything goes to the ground and to a log.
    :width: 100%
 
@@ -2379,7 +2379,7 @@ starts from a guess, so the program sets itself to full whenever the current
 falls to nought, which on this bus happens only when the battery is full and
 what would charge it is shunted.
 
-``shedding`` is a hysteresis on the charge, around 0.4 with a half band of
+``shedding`` is a thermostat on the charge, around 0.4 with a half band of
 0.1: below three tenths it is asserted, and its decision, driven to
 ``science``, sheds the science instrument; above half it is unasserted and
 the instrument comes back. The band is wide so that an eclipse sheds the load
@@ -2897,7 +2897,7 @@ The fprime example
 .. figure:: ../examples/fprime/fprime.svg
    :alt: The fprime example: the thermometer's readings go to fsw, a
          gateway_fprime node, and to zone_temp, a to_kelvin compute node
-         whose temperatures go to fsw too and to heater_wanted, a hysteresis
+         whose temperatures go to fsw too and to heater_wanted, a thermostat
          compute node whose decisions go to fsw, and all three on to the F´
          deployment's TcsBridge component at bridge_base plus the sender's
          device id; a command from the bridge goes up to fsw and on to the
@@ -2930,7 +2930,7 @@ thermometer reports a zone of the physics model, in the encoding ``zone_temp``
 reads back, and the heater's stand-in switches a heater warming it, so that what the
 flight computer sends the heater shows in the temperature it reads.
 
-``zone_temp``'s temperatures go on to ``heater_wanted``, a ``hysteresis``
+``zone_temp``'s temperatures go on to ``heater_wanted``, a ``thermostat``
 compute node -- on below 283.65 K, off above 284.65 K -- whose decisions go
 to ``fsw``: device id 2, ``127.0.0.1:9702``, channel ``0x3002``. It is
 advice and drives nothing, the heater being the flight computer's to drive,
@@ -2979,7 +2979,7 @@ compute node whose function is ``to_kelvin``, ``to_value``, ``vote`` or
 ``zone_temp``, ``0x3004``, in kelvin --
 and a datum from it that is not a value goes to no channel, is counted in
 ``DataNotValues`` and is said in a ``NotAValue`` event. A node that sends
-decisions, a compute node whose function is ``hysteresis``, has a ``bool``
+decisions, a compute node whose function is ``thermostat``, has a ``bool``
 channel, true for on -- ``heater_wanted``, ``0x3002`` -- and a datum from it
 that is not ``1`` or ``0`` goes to no channel, is counted in
 ``DataNotDecisions`` and is said in a ``NotADecision`` event. A thermostat
@@ -3852,7 +3852,7 @@ and supplies varying by two percent.
 
 **Standing in for the thermostat**
 
-tcssim can stand in for hysteresis nodes as well, so that the loop closes
+tcssim can stand in for thermostat nodes as well, so that the loop closes
 in the simulator alone, with no tcspecial running. Name the node in the
 ``tcssim`` section -- or several, separated by commas, for a vehicle with a
 thermostat for each of several zones:
@@ -5527,7 +5527,7 @@ The plot window
 Where a value or a switch reaches the ground -- a node drawn into a gateway
 node that sends values, which is anything with a unit: a ``to_kelvin`` or
 ``to_value`` conversion, a ``vote``, a ``process``'s answers; or a
-``hysteresis``, which sends decisions -- tcsmoc opens a second window beside
+``thermostat``, which sends decisions -- tcsmoc opens a second window beside
 its own, ``tcsmoc: plot``, and its ``Plot`` button opens it again once
 closed.
 
@@ -5574,7 +5574,7 @@ many readings fall in one column of the screen, their lowest and highest are
 drawn, so that a spike is never thinned away.
 
 Under the panels, as wide as them so that a change lines up with the values
-above it, is a strip for each switch -- a ``hysteresis`` node drawn into a
+above it, is a strip for each switch -- a ``thermostat`` node drawn into a
 gateway node, named with what it drives, such as ``thermostat →
 gpio-out-tmass1, gpio-out-tmass2``; and each line of a GPIO payload drawn into
 one that watches lines, named with its line, such as ``gpio-in-tmass line 2``

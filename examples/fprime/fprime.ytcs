@@ -81,7 +81,7 @@ vehicle:
       # true for on. Advice and no more: the heater is the flight computer's to
       # drive, and this drives nothing.
       - compute: heater_wanted
-        function: "hysteresis"
+        function: "thermostat"
         half_band: "0.5"
         setpoint: "284.15"
         world-out:

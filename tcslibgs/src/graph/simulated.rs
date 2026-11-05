@@ -170,7 +170,7 @@ pub fn driving_of(
     }
 }
 
-/// Finds the setpoint and band of a hysteresis node, for a simulator that
+/// Finds the setpoint and band of a thermostat node, for a simulator that
 /// stands in for it.
 ///
 /// # Arguments
@@ -185,11 +185,11 @@ pub fn driving_of(
 /// # Errors
 ///
 /// A message saying so if there is no such node, or it is not a compute node
-/// whose function is `hysteresis`, or its attributes are wrong.
-pub fn hysteresis_of(
+/// whose function is `thermostat`, or its attributes are wrong.
+pub fn thermostat_of(
     graph: &Graph,
     name: &str,
-) -> Result<crate::node::vehicle::compute::HysteresisParams, String> {
+) -> Result<crate::node::vehicle::compute::ThermostatParams, String> {
     use crate::node::vehicle::compute::{params_of, Computation};
 
     let node = graph.node(name).ok_or_else(|| {
@@ -198,15 +198,15 @@ pub fn hysteresis_of(
     if node.node_type != "compute" {
         return Err(format!(
             "thermostat: \"{name}\" is a {} node, and a thermostat is a \
-             compute node whose function is hysteresis",
+             compute node whose function is thermostat",
             node.node_type
         ));
     }
     match params_of(name, &node.attributes)? {
-        Computation::Hysteresis(params) => Ok(params),
+        Computation::Thermostat(params) => Ok(params),
         other => Err(format!(
             "thermostat: \"{name}\" computes {}, and a thermostat computes \
-             hysteresis",
+             thermostat",
             other.function()
         )),
     }
@@ -433,7 +433,7 @@ mod tests {
         assert!(sized.contains(&("temp_3", 3)), "{sized:?}");
     }
 
-    /// The thermostat example's sensors reach its hysteresis node and the
+    /// The thermostat example's sensors reach its thermostat node and the
     /// node reaches its heaters, and not the other way round.
     #[test]
     fn data_reaches_along_the_links() {
@@ -462,14 +462,14 @@ mod tests {
         assert!(why.contains("nothing converts"), "{why}");
     }
 
-    /// A hysteresis node gives its setpoint and band; any other is refused.
+    /// A thermostat node gives its setpoint and band; any other is refused.
     #[test]
-    fn a_thermostat_is_a_hysteresis_node() {
+    fn a_thermostat_node_gives_its_setpoint_and_band() {
         let (graph, _) = example("thermostat");
-        let params = hysteresis_of(&graph, "thermostat").unwrap();
+        let params = thermostat_of(&graph, "thermostat").unwrap();
         assert_eq!((params.setpoint, params.half_band), (293.15, 2.0));
         for name in ["temp1", "temp_1", "nowhere"] {
-            assert!(hysteresis_of(&graph, name).is_err(), "{name}");
+            assert!(thermostat_of(&graph, name).is_err(), "{name}");
         }
     }
 }

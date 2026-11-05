@@ -1463,13 +1463,13 @@ pub struct SimTcssim {
     /// The UDP address, as `address:port`, at which tcssim answers whether it
     /// has made its stand-ins: see `crate::ready`.
     pub ready: String,
-    /// The hysteresis nodes of the configuration tcssim stands in for, in
+    /// The thermostat nodes of the configuration tcssim stands in for, in
     /// the order written, none if the file states none: tcssim then reads
     /// the sensors that feed each and switches the heaters each drives
     /// itself, with each node's setpoint and band, so that a zone's loop
     /// closes with no tcspecial running. A file writes them under
     /// `thermostat`, one name or several separated by commas, as a vehicle
-    /// of several zones, or a staged thermostat, has several hysteresis
+    /// of several zones, or a staged thermostat, has several thermostat
     /// nodes.
     ///
     /// Unstated for a run with tcspecial, whose own thermostats would

@@ -1435,7 +1435,7 @@ by tcslib-c's ``tcs_value_in`` -- ``from_value``, the one statement of what a
 value is -- and a datum from it that is not a value is
 written to no channel, counted in ``DataNotValues`` and said in an event:
 four bytes made a number whatever they held would be a temperature nobody
-measured. A ``hysteresis`` node sends decisions, the text ``1`` or ``0``, and
+measured. A ``thermostat`` node sends decisions, the text ``1`` or ``0``, and
 its channel is a ``bool``, true for on, read by ``tcs_decision_on`` --
 ``from_decision``, the one statement of what a decision is, by which a
 ``gpio`` node aboard reads the state its lines are driven to -- and a datum
@@ -1839,7 +1839,7 @@ anything is more likely a mistake than an intention.
 Requirement
     A temperature a configuration states is held to the range a value
     carries, and the attributes that are temperatures are the ones held to it:
-    a hysteresis's ``setpoint`` and ``half_band``, and a conversion's
+    a thermostat's ``setpoint`` and ``half_band``, and a conversion's
     ``offset``, which is what a count of nought converts to. A ``scale`` is
     not -- it is kelvin per count rather than a temperature, and what it may
     be depends on the part's counts, which no file states.
@@ -2166,9 +2166,19 @@ the format; the panel is the one place a reader loses something, and it is a
 reading nobody is deciding on.
 
 A **built-in** names a function compiled into tcspecial: ``to_kelvin``,
-``mean``, ``hysteresis`` and the rest of a catalogue that grows as flights need
+``mean``, ``thermostat`` and the rest of a catalogue that grows as flights need
 it. These are the ones to prefer. They are written in Rust, tested with the
 rest of the software, cannot fail to start, and cost nothing to call.
+
+The ``thermostat`` was called ``hysteresis``, after how it switches rather
+than what it is for, and ``thermostat`` is the word a reader looks for in
+tcsgui's list. It is the same computation wherever it switches: the battery
+example's ``shedding`` is a thermostat on the charge.
+
+Requirement
+    A compute node whose ``function`` is ``hysteresis`` is refused as it is
+    read, saying to write ``thermostat`` instead. Refused rather than read
+    as the new word, so that a file says one word for one thing.
 
 An **external process** names a program. tcspecial starts it, writes what
 arrives on its standard input and reads results from its standard output. It
@@ -5333,7 +5343,7 @@ they are held against each other and against the reader by
 ``tcsgui/tests/schema.rs``.
 
 ``sets`` is what turns one node type into several things to place. ``compute``
-is one type, and the tree makes it four entries -- ``mean``, ``hysteresis``,
+is one type, and the tree makes it four entries -- ``mean``, ``thermostat``,
 ``to_kelvin`` and ``process`` -- each a compute node with its ``function``
 already answered. Pressing ``mean`` puts down a node called ``mean`` that is a
 mean from the moment it exists, so the panel asks it for a mean's attributes
@@ -5867,7 +5877,7 @@ addresses are its own. What is here is checked as it stands, with a
              scale: "0.0078", offset: "255.37", world-in: [temp_3],
              world-out: [gateway.temp3, ambient.in2] }
 
-         - { compute: thermostat, function: hysteresis,
+         - { compute: thermostat, function: thermostat,
              setpoint: "293.15", half_band: "2.0", world-in: [ambient],
              world-out: [gateway.thermostat],
              moc-out: [heaters_1.thermostat, heaters_2.thermostat] }
@@ -11304,7 +11314,7 @@ Requirement
     hears of a touchdown when it happens and not at the stand-in's next turn.
 
 Requirement
-    A stand-in driving a decision takes ``1`` or ``0``, as a hysteresis
+    A stand-in driving a decision takes ``1`` or ``0``, as a thermostat
     sends it. One driving a value takes four bytes of its unit's steps, as
     every value on a link is, and what reaches it must be values in that
     unit: a node sending another is refused, naming both units, since an
@@ -11596,14 +11606,14 @@ the one vehicle node the simulator has: everything else a vehicle computes
 runs on a workstation as it runs aboard.
 
 Requirement
-    The simulator file's ``tcssim`` section may name a hysteresis node of
+    The simulator file's ``tcssim`` section may name a thermostat node of
     the configuration. tcssim then stands in for it, taking its ``setpoint``
     and ``half_band`` from the configuration, which states them once.
 
 Requirement
     Its sensors are the simulated payloads reporting the world whose data
     reaches the node, and its heaters the simulated payloads driving it that
-    data from the node reaches. A node that is not a hysteresis node, or
+    data from the node reaches. A node that is not a thermostat node, or
     that no such sensor reaches, or that reaches no such heater, is refused.
 
 Requirement
@@ -11616,7 +11626,7 @@ Requirement
 Requirement
     It decides on the median of each sensor's latest reading, as the example
     votes them, and asserts the decision to every heater on every reading,
-    as the hysteresis node does aboard.
+    as the thermostat node does aboard.
 
 Requirement
     It is never named with tcspecial running, whose own thermostat switches

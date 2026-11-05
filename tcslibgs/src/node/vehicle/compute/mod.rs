@@ -212,7 +212,7 @@ pub enum Produces {
 ///
 /// Three of the four make a value: a conversion makes one out of a part's
 /// counts, a vote makes one out of several, and a program's answer is read as
-/// one. A hysteresis is the exception -- what it produces is a decision, the
+/// one. A thermostat is the exception -- what it produces is a decision, the
 /// text `1` or `0`, because what it drives is a set of discrete lines.
 ///
 /// Asked by whoever has to read a datum back: the ground shows a reading as a
@@ -228,12 +228,12 @@ pub enum Produces {
 /// # Returns
 ///
 /// [`Produces::Value`] for `to_kelvin`, `vote` and `process`,
-/// [`Produces::Decision`] for `hysteresis`, and `None` for a name that is not
+/// [`Produces::Decision`] for `thermostat`, and `None` for a name that is not
 /// a computation.
 pub fn produces(function: &str) -> Option<Produces> {
     match function {
         "to_kelvin" | "to_value" | "vote" | "process" => Some(Produces::Value),
-        "hysteresis" => Some(Produces::Decision),
+        "thermostat" => Some(Produces::Decision),
         // Not a computation at all. Said as nothing rather than refused: this
         // answers how to show a datum, and a node nobody can name does not
         // have its data read as a temperature or a decision on the strength
@@ -251,7 +251,7 @@ pub fn produces(function: &str) -> Option<Produces> {
 ///
 /// # Returns
 ///
-/// `true` for `to_kelvin`, `vote` and `process`; `false` for `hysteresis`
+/// `true` for `to_kelvin`, `vote` and `process`; `false` for `thermostat`
 /// and for a name that is not a computation.
 pub fn result_is_a_value(function: &str) -> bool {
     produces(function) == Some(Produces::Value)
@@ -618,7 +618,7 @@ impl Algorithm {
 
 /// A setpoint and how far either side of it the decision changes.
 #[derive(Debug, Clone, Copy, PartialEq)]
-pub struct HysteresisParams {
+pub struct ThermostatParams {
     /// What the reading is held at.
     pub setpoint: f64,
     /// How far from the setpoint the decision changes, each way.
@@ -649,7 +649,7 @@ pub enum Computation {
     ToKelvin(ToValueParams),
     ToValue(ToValueParams),
     Vote(VoteParams),
-    Hysteresis(HysteresisParams),
+    Thermostat(ThermostatParams),
     Process(ProcessParams),
 }
 
@@ -664,7 +664,7 @@ impl Computation {
             Computation::ToKelvin(_) => "to_kelvin",
             Computation::ToValue(_) => "to_value",
             Computation::Vote(_) => "vote",
-            Computation::Hysteresis(_) => "hysteresis",
+            Computation::Thermostat(_) => "thermostat",
             Computation::Process(_) => "process",
         }
     }
@@ -672,7 +672,7 @@ impl Computation {
 
 /// Every function there is, for an error to list.
 pub fn functions() -> &'static str {
-    "to_kelvin, to_value, vote, hysteresis, or process"
+    "to_kelvin, to_value, vote, thermostat, or process"
 }
 
 /// Lists what a computation is told, by name.
@@ -699,7 +699,7 @@ pub fn attributes_of(function: &str) -> Option<&'static [&'static str]> {
         "to_kelvin" => Some(&["function", "format", "scale", "offset"]),
         "to_value" => Some(&["function", "format", "scale", "offset", "unit"]),
         "vote" => Some(&["function", "inputs", "algorithm", "age"]),
-        "hysteresis" => Some(&["function", "setpoint", "half_band"]),
+        "thermostat" => Some(&["function", "setpoint", "half_band"]),
         "process" => {
             Some(&["function", "executable", "timeout", "restart", "unit"])
         }
@@ -747,10 +747,19 @@ pub fn params_of(
     let named = |why: String| format!("\"{what}\" ({function}): {why}");
     // One list, read here and said out loud by `attributes_of`: two would be
     // two places for a parameter to be added to.
+    // The thermostat was called hysteresis once, after how it switches
+    // rather than what it is for. A file still saying so is told the new
+    // word, rather than that no such computation exists.
+    if function == "hysteresis" {
+        return Err(format!(
+            "\"{what}\": the function \"hysteresis\" is now called \
+             \"thermostat\"; change the function to thermostat"
+        ));
+    }
     let Some(own) = attributes_of(function.as_str()) else {
         return Err(format!(
             "\"{what}\": there is no computation called \"{function}\". The \
-             built-in ones are to_kelvin, vote and hysteresis; \"process\" \
+             built-in ones are to_kelvin, vote and thermostat; \"process\" \
              runs a program of your own"
         ));
     };
@@ -896,7 +905,7 @@ pub fn params_of(
                 age,
             }))
         }
-        "hysteresis" => {
+        "thermostat" => {
             // Both are numbers in the unit of what the thermostat reads -- a
             // goal and the width of a band around it -- which this node
             // alone cannot say: whether each is in that unit's range is the
@@ -912,7 +921,7 @@ pub fn params_of(
                 ));
             }
 
-            Ok(Computation::Hysteresis(HysteresisParams {
+            Ok(Computation::Thermostat(ThermostatParams {
                 setpoint: number(attributes, "setpoint").map_err(named)?,
                 half_band,
             }))
@@ -1176,11 +1185,11 @@ mod tests {
         assert!(result_is_a_value("vote"));
         assert!(result_is_a_value("process"));
         assert!(
-            !result_is_a_value("hysteresis"),
+            !result_is_a_value("thermostat"),
             "a decision is not a value"
         );
         assert!(!result_is_a_value("to_kelvan"), "nor is a misspelling");
-        assert_eq!(produces("hysteresis"), Some(Produces::Decision));
+        assert_eq!(produces("thermostat"), Some(Produces::Decision));
         assert_eq!(produces("to_kelvan"), None);
 
         let node = |pairs: &[(&str, &str)]| attributes(pairs);
@@ -1190,14 +1199,14 @@ mod tests {
         ));
         assert!(!node_sends_a_value(
             "compute",
-            &node(&[("function", "hysteresis")])
+            &node(&[("function", "thermostat")])
         ));
         // A compute node with no function is a node that will be refused;
         // until then it does not have its data read as a temperature.
         assert!(!node_sends_a_value("compute", &node(&[])));
         assert!(node_sends_a_decision(
             "compute",
-            &node(&[("function", "hysteresis")])
+            &node(&[("function", "thermostat")])
         ));
         assert!(!node_sends_a_decision(
             "compute",
@@ -1215,11 +1224,27 @@ mod tests {
             assert!(
                 !node_sends_a_decision(
                     node_type,
-                    &node(&[("function", "hysteresis")])
+                    &node(&[("function", "thermostat")])
                 ),
                 "{node_type}"
             );
         }
+    }
+
+    /// A file still calling the thermostat by its old name is told the new
+    /// one.
+    #[test]
+    fn the_old_name_of_the_thermostat_is_refused_with_the_new_one() {
+        let why = params_of(
+            "thermostat",
+            &attributes(&[
+                ("function", "hysteresis"),
+                ("setpoint", "293.15"),
+                ("half_band", "2.0"),
+            ]),
+        )
+        .expect_err("refused");
+        assert!(why.contains("change the function to thermostat"), "{why}");
     }
 
     /// A decision is 1 or 0, with white space either side, and nothing
@@ -1346,7 +1371,7 @@ mod tests {
         // allows would be a rule nobody could satisfy at the edge.
         for setpoint in [coldest, hottest] {
             params(&[
-                ("function", "hysteresis"),
+                ("function", "thermostat"),
                 ("setpoint", &format!("{setpoint}")),
                 ("half_band", "2.0"),
             ]);
@@ -1449,11 +1474,11 @@ mod tests {
 
         assert_eq!(
             params(&[
-                ("function", "hysteresis"),
+                ("function", "thermostat"),
                 ("setpoint", "293.15"),
                 ("half_band", "2.0"),
             ]),
-            Computation::Hysteresis(HysteresisParams {
+            Computation::Thermostat(ThermostatParams {
                 setpoint: 293.15,
                 half_band: 2.0,
             })
@@ -1533,7 +1558,7 @@ mod tests {
                 "algorithm is not set",
             ),
             (
-                vec![("function", "hysteresis"), ("setpoint", "293")],
+                vec![("function", "thermostat"), ("setpoint", "293")],
                 "half_band",
             ),
             (vec![("function", "process")], "executable is not set"),
@@ -1584,7 +1609,7 @@ mod tests {
             ),
             (
                 vec![
-                    ("function", "hysteresis"),
+                    ("function", "thermostat"),
                     ("setpoint", "293"),
                     ("half_band", "0"),
                 ],
@@ -1667,7 +1692,7 @@ mod tests {
     #[test]
     fn an_attribute_nothing_reads_is_refused() {
         let said = refused(&[
-            ("function", "hysteresis"),
+            ("function", "thermostat"),
             ("setpoint", "293.15"),
             ("setpiont", "300.0"),
             ("half_band", "2"),
@@ -1680,7 +1705,7 @@ mod tests {
         // A parameter written with a hyphen for its underscore is told the
         // spelling it has.
         let said = refused(&[
-            ("function", "hysteresis"),
+            ("function", "thermostat"),
             ("setpoint", "293.15"),
             ("half-band", "2"),
         ]);

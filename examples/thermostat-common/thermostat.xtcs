@@ -82,7 +82,7 @@
             <!-- either side of it the heaters are switched at, the setpoint -->
             <!-- being in the middle of the band. -->
             <compute name="thermostat">
-                <function>hysteresis</function>
+                <function>thermostat</function>
                 <half_band>2.0</half_band>
                 <setpoint>293.15</setpoint>
                 <!-- asserted below the setpoint, unasserted above it. Two -->

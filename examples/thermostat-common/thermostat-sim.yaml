@@ -30,7 +30,7 @@
 #
 # To close it in tcssim alone, with no tcspecial running, add
 # "thermostat: thermostat" to the tcssim section below: tcssim then stands in
-# for the hysteresis node of that name, with its setpoint and band. Never
+# for the thermostat node of that name, with its setpoint and band. Never
 # with tcspecial running, whose own thermostat switches the same heaters.
 description: Simulator settings for the payloads of thermostat.ytcs and
   thermostat-yamcs.ytcs

@@ -14,7 +14,7 @@
 //! workstation exactly as they run aboard, and a ground link is a socket that
 //! tcsmoc is at the other end of.
 //!
-//! The exception is `vehicle::thermostat`, which stands in for a hysteresis
+//! The exception is `vehicle::thermostat`, which stands in for a thermostat
 //! node so that a zone's loop -- sensors, a decision, heaters -- can
 //! be closed in the simulator alone, with no tcspecial running.
 //!

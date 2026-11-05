@@ -61,7 +61,7 @@ vehicle:
         world-out:
           - g.p
       - compute: t
-        function: "hysteresis"
+        function: "thermostat"
         half_band: "1"
         setpoint: "10"
         world-in: [v]

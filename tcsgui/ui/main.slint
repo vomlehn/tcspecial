@@ -514,16 +514,17 @@ component Surface inherits Rectangle {
     // into -- so nothing that reads a position knows it.
     out property <float> zoom: max(0.5, min(1.0, sheet.visible-width
         / max(1px, root.sheet-width)));
-    // A subdiagram's page: how wide the margin either side of the working
-    // panes is, which holds the page's edge, and the edge's terminals, in
-    // the working panes' own coordinates. Nought and none on the top page,
-    // which has nothing outside it. See tcsdiagram::style::edge_box.
+    // A subdiagram's page: how wide the margin either side of what is
+    // inside it is -- the Physics pane and the working panes -- which holds
+    // the page's edge, and the edge's terminals, in the working panes' own
+    // coordinates. Nought and none on the top page, which has nothing
+    // outside it. See tcsdiagram::style::edge_box.
     in property <length> edge-width: 0px;
     in property <[EdgeView]> edge-terminals: [];
     // A line taken from one of the edge's terminals, by name.
     callback edge-started(string);
-    // Where the working panes begin on the sheet, past the Physics pane and
-    // the left margin; and how wide the whole sheet is.
+    // Where the working panes begin on the sheet, past the left margin and
+    // the Physics pane, in that order; and how wide the whole sheet is.
     property <length> left: root.physics-width + root.edge-width;
     property <length> sheet-width: root.physics-width + 2 * root.edge-width
         + root.working-width;
@@ -1011,8 +1012,11 @@ component Surface inherits Rectangle {
                         border-width: 1px;
                         border-color: #d8d8d4;
 
+                        // Right of the left margin, against the payloads it
+                        // joins, so that a line from a sensor to the zone
+                        // does not cross the page's edge.
                         if root.physics-width > 0: PhysicsGround {
-                            x: 0;
+                            x: root.edge-width;
                             y: 0;
                             physics-width: root.physics-width;
                             physics-ground: root.physics-ground;
@@ -1116,7 +1120,7 @@ component Surface inherits Rectangle {
                         // what the margin is does not rest on its colour.
                         for side in root.edge-width > 0 ? [0, 1] : []:
                         Rectangle {
-                            x: side == 0 ? root.physics-width
+                            x: side == 0 ? 0
                                 : root.left + root.working-width;
                             width: root.edge-width;
                             height: root.working-height;
@@ -1269,7 +1273,7 @@ component Surface inherits Rectangle {
                 if root.physics-width > 0: PaneDivider {
                     width: 100%;
                     height: 100%;
-                    at: root.physics-width * root.zoom + sheet.content-x;
+                    at: root.left * root.zoom + sheet.content-x;
                     moved(dx) => { root.physics-divider-moved(dx / root.zoom); }
                 }
                 PaneDivider {

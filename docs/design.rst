@@ -4635,7 +4635,7 @@ what of an included file may be joined from outside it. On the page the box
 is on, the line runs to the box's corner terminal of the same name as the
 inner node's, and is labelled with the inner node; the box's four terminals
 are its edge, and what is behind each is named on the lines. Inside, the
-subdiagram's page has a margin either side of its working panes, pale and
+subdiagram's page has a margin either side of what is inside it, pale and
 labelled *outside*, holding the four terminals again where the box has them:
 ``world-in`` and ``moc-out`` on the left, ``world-out`` and ``moc-in``
 on the right. A line from another file runs to the edge terminal facing its
@@ -4647,6 +4647,15 @@ is not. In the margins rather than over the panes, which are where nodes go:
 an edge drawn over the payload pane's first column would be drawn over the
 payloads in it. A line between two subdiagrams is drawn between their boxes on
 the top page, and to the edge on each page.
+
+The Physics pane is inside the edge, left of the payloads, as it is on the top
+page: the left margin is at the page's far left, then the Physics pane, then
+the working panes. It holds nothing of the subdiagram's file -- the physics
+model is the simulator file's, and every page shows the same one -- but it is
+drawn against the payloads it joins, and put past the edge a line from a
+sensor to the zone it reads would cross the edge without leaving the page.
+A line from outside runs from the left margin across the Physics pane to its
+node, its end at the Physics pane's left edge (``tcsgui::inside_of``).
 
 The same three clicks join across the edge. Clicking a subdiagram's box with a
 line in hand offers a line to each node its file exports at that terminal, by

@@ -3540,10 +3540,15 @@ Where tcsgui drew each component is kept last in the simulator file, in a
    tcsgui:
      nodes:
        - { node: zone, x: -193, y: 280 }
+     pages:
+       thermostat-common: [zone]
 
 tcssim ignores it. A component it does not name is laid out down tcsgui's
 Physics pane by name, so the section is never needed, and it is written as
-components are moved there. A component is placed from the physics list
+components are moved there. Each component is drawn on the page it was placed
+from: one placed on a subdiagram's page is listed under that subdiagram's name
+in ``pages``, and one listed nowhere is drawn on the top page. A component
+is placed from the physics list
 as a node is from its own list: click its type, and it is put down the
 pane where the others are, or drag the type onto the Physics pane, and it
 is put where it is let go. In tcsgui a component is moved, edited, deleted

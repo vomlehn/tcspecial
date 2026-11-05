@@ -4651,9 +4651,9 @@ the top page, and to the edge on each page.
 The Physics pane is inside the edge, left of the payloads, as it is on the top
 page: the left margin is at the page's far left, then the Physics pane, then
 the working panes. It holds nothing of the subdiagram's file -- the physics
-model is the simulator file's, and every page shows the same one -- but it is
-drawn against the payloads it joins, and put past the edge a line from a
-sensor to the zone it reads would cross the edge without leaving the page.
+model is the simulator file's -- but it is drawn against the payloads it
+joins, and put past the edge a line from a sensor to the zone it reads would
+cross the edge without leaving the page.
 A line from outside runs from the left margin across the Physics pane to its
 node, its end at the Physics pane's left edge (``tcsgui::inside_of``).
 
@@ -4689,8 +4689,15 @@ saying which subdiagram it draws -- so every page has the same panes, the same
 selection lists, the Physics pane and its list among them, the same bar with
 its counts and the same menus and edits: what can be done on one page can be
 done on every page, because there is nothing a second kind of window could
-leave out. The Physics pane shows the one world, the simulator file's, on
-every page, and a payload of the page is joined to it there. Several pages may
+leave out. The world is one, the simulator file's, and each of its components
+is drawn on one page: the page it was placed from, which the simulator file's
+``tcsgui`` section records under ``pages`` -- ``thermostat-common: [zone]`` --
+and the top page for one it names under none. A component belongs with the
+payloads it stands beside, and a zone made for a subdiagram's sensors drawn on
+every page would be a box on the top page that nothing there is joined to. A
+connection or join to a component on another page is drawn on neither, as one
+to a component the world has not; names are the file's, whatever the page, so
+two components on two pages still cannot share one. Several pages may
 be open at once and cannot disagree, there being one document behind all of
 them, and each window is redrawn from it after every edit. Opening a page that
 is open brings its window forward.

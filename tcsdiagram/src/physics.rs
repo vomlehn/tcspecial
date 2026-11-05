@@ -124,7 +124,8 @@ impl Drawn {
     }
 }
 
-/// What a simulator file's world draws: its components, its connections,
+/// What a simulator file's world draws on the top page: its components
+/// that the `tcsgui` section puts on no subdiagram's page, its connections,
 /// and every simulated payload's `connects`, its group's where it states
 /// none.
 ///
@@ -159,6 +160,12 @@ pub fn of_simulator(sim: &tcslibgs::sim_config::SimConfigFile) -> Drawn {
             .iter()
             .map(|placed| (placed.name.clone(), (placed.x, placed.y)))
             .collect();
+        // The top page's components only, which is the page drawn: one the
+        // editor put on a subdiagram's page is drawn there and not here.
+        let elsewhere: Vec<&String> = tcsgui.pages.values().flatten().collect();
+        drawn
+            .components
+            .retain(|(name, _)| !elsewhere.contains(&name));
     }
     for payload in &sim.simulated_payloads {
         if let Some(said) = sim.settings_of(payload).connects {

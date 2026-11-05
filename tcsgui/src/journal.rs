@@ -254,6 +254,14 @@ pub enum Edit {
         was: Option<(i32, i32)>,
         now: Option<(i32, i32)>,
     },
+    /// A physics component was put on a page: a subdiagram's, by its name,
+    /// or `None` for the top page. Made with the component, on the page it
+    /// was placed from.
+    PagePhysics {
+        component: String,
+        was: Option<String>,
+        now: Option<String>,
+    },
     /// A connection was made between two physics components, from an
     /// output to an input, as the file writes them: `heater_1.heat` and
     /// `zone.heat`. Undone by taking it away.
@@ -639,6 +647,15 @@ impl Edit {
                 was: *now,
                 now: *was,
             },
+            Edit::PagePhysics {
+                component,
+                was,
+                now,
+            } => Edit::PagePhysics {
+                component: component.clone(),
+                was: now.clone(),
+                now: was.clone(),
+            },
             Edit::AddConnection { from, to } => Edit::RemoveConnection {
                 from: from.clone(),
                 to: to.clone(),
@@ -831,6 +848,10 @@ impl Edit {
             Edit::MovePhysics { component, .. } => {
                 format!("move \"{component}\"")
             }
+            Edit::PagePhysics { component, now, .. } => match now {
+                Some(page) => format!("put \"{component}\" on {page}"),
+                None => format!("put \"{component}\" on the top page"),
+            },
             Edit::AddConnection { from, to } => {
                 format!("join {from} to {to}")
             }

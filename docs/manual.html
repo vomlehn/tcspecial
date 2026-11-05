@@ -3728,11 +3728,16 @@ still declaring masses itself.</p>
 <pre class="code yaml literal-block">
 <span class="name tag">tcsgui</span><span class="punctuation">:</span><span class="whitespace">
   </span><span class="name tag">nodes</span><span class="punctuation">:</span><span class="whitespace">
-    </span><span class="punctuation indicator">-</span><span class="whitespace"> </span><span class="punctuation indicator">{</span><span class="name tag"> node</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="name variable">zone</span><span class="punctuation indicator">,</span><span class="name tag"> x</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="name variable">-193</span><span class="punctuation indicator">,</span><span class="name tag"> y</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="name variable">280</span><span class="whitespace"> </span><span class="punctuation indicator">}</span>
+    </span><span class="punctuation indicator">-</span><span class="whitespace"> </span><span class="punctuation indicator">{</span><span class="name tag"> node</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="name variable">zone</span><span class="punctuation indicator">,</span><span class="name tag"> x</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="name variable">-193</span><span class="punctuation indicator">,</span><span class="name tag"> y</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="name variable">280</span><span class="whitespace"> </span><span class="punctuation indicator">}</span><span class="whitespace">
+  </span><span class="name tag">pages</span><span class="punctuation">:</span><span class="whitespace">
+    </span><span class="name tag">thermostat-common</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="punctuation indicator">[</span><span class="name variable">zone</span><span class="punctuation indicator">]</span>
 </pre>
 <p>tcssim ignores it. A component it does not name is laid out down tcsgui's
 Physics pane by name, so the section is never needed, and it is written as
-components are moved there. A component is placed from the physics list
+components are moved there. Each component is drawn on the page it was placed
+from: one placed on a subdiagram's page is listed under that subdiagram's name
+in <tt class="docutils literal">pages</tt>, and one listed nowhere is drawn on the top page. A component
+is placed from the physics list
 as a node is from its own list: click its type, and it is put down the
 pane where the others are, or drag the type onto the Physics pane, and it
 is put where it is let go. In tcsgui a component is moved, edited, deleted

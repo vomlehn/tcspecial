@@ -2421,6 +2421,19 @@ impl Document {
                     }
                 }
             }
+            Edit::PagePhysics { component, now, .. } => {
+                if let Some(simulator) = &mut self.simulator {
+                    let pages = &mut simulator.world.pages;
+                    match now {
+                        Some(page) => {
+                            pages.insert(component.clone(), page.clone());
+                        }
+                        None => {
+                            pages.remove(component);
+                        }
+                    }
+                }
+            }
             Edit::MovePhysics { component, now, .. } => {
                 if let Some(simulator) = &mut self.simulator {
                     let placed = &mut simulator.world.placed;
@@ -5443,6 +5456,7 @@ mod tests {
                 Edit::RestorePhysics { .. } => (),
                 Edit::SetPhysics { .. } => (),
                 Edit::MovePhysics { .. } => (),
+                Edit::PagePhysics { .. } => (),
                 Edit::AddConnection { .. } => (),
                 Edit::RemoveConnection { .. } => (),
                 Edit::RenamePhysics { .. } => (),
@@ -5635,6 +5649,12 @@ mod tests {
                 component: "zone".into(),
                 was: None,
                 now: Some((-180, 98)),
+            },
+            // A component put on a subdiagram's page.
+            Edit::PagePhysics {
+                component: "zone".into(),
+                was: None,
+                now: Some("thermostat-common".into()),
             },
             Edit::AddConnection {
                 from: "heater_2.heat".into(),

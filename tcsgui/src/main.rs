@@ -4343,6 +4343,7 @@ fn show_sim_groups(editor: &Rc<RefCell<Editor>>, views: &Rc<RefCell<Views>>) {
             }
         };
         wire_sim_groups(&window, editor, views);
+        take_when_closed(&window);
         views.borrow_mut().sim_groups = Some(window);
 
         // Something chosen to begin with, so the window opens on a form
@@ -5061,9 +5062,13 @@ fn physics_views_of(
             .iter()
             .any(|(component, _)| component.as_deref() == Some(name))
     };
+    // This page's components only: each is drawn on the page it was placed
+    // on, and a connection or join to one on another page is drawn nowhere,
+    // as one to a component the world has not.
     let components: Vec<tcsdiagram::physics::Component> = world
         .components
         .iter()
+        .filter(|(name, _)| world.on_page(name, home.as_deref()))
         .map(|(name, component)| tcsdiagram::physics::Component {
             name,
             kind: &component.kind,
@@ -5144,12 +5149,15 @@ fn physics_views_of(
 /// * `editor` - The one editor every window edits.
 /// * `views`  - The windows, redrawn after the edit.
 /// * `kind`   - The component's type.
+/// * `home`   - The page it was placed from, which is the one it is drawn on:
+///              `None` for the top.
 /// * `at`     - Where it goes, on the grid and in the Physics pane; `None`
 ///              leaves it to be laid out with the others.
 fn add_physics(
     editor: &Rc<RefCell<Editor>>,
     views: &Rc<RefCell<Views>>,
     kind: &str,
+    home: &Home,
     at: Option<(i32, i32)>,
 ) {
     let name = {
@@ -5157,31 +5165,74 @@ fn add_physics(
         let Some(simulator) = &editor.document().simulator else {
             return;
         };
-        let name = simulator.world.fresh_name(kind);
-        let add = Edit::AddPhysics {
-            name: name.clone(),
-            kind: kind.to_string(),
-        };
-        // One edit either way, so that one Undo takes the component away,
-        // wherever it was put.
-        editor.edit(match at {
-            None => add,
-            Some(at) => Edit::Group {
-                edits: vec![
-                    add,
-                    Edit::MovePhysics {
-                        component: name.clone(),
-                        was: None,
-                        now: Some(at),
-                    },
-                ],
+        let world = &simulator.world;
+        let name = world.fresh_name(kind);
+        // Its page always said, the top's as well: a page kept for a
+        // component removed, for undo, would otherwise be taken by a new one
+        // given its name.
+        let mut edits = vec![
+            Edit::AddPhysics {
+                name: name.clone(),
+                kind: kind.to_string(),
             },
-        });
+            Edit::PagePhysics {
+                component: name.clone(),
+                was: world.pages.get(&name).cloned(),
+                now: home.clone(),
+            },
+        ];
+        if let Some(at) = at {
+            edits.push(Edit::MovePhysics {
+                component: name.clone(),
+                was: None,
+                now: Some(at),
+            });
+        }
+        // One edit, so that one Undo takes the component away, wherever it
+        // was put.
+        editor.edit(Edit::Group { edits });
         name
     };
+    take_physics_draft(views);
     *views.borrow().showing_physics.borrow_mut() = name;
     show_physics(editor, views);
     views.borrow().refresh(&editor.borrow());
+}
+
+/// Takes what was typed into the physics window and not yet taken, for the
+/// component it shows, before it is made to show another: the window is one,
+/// reused, and a value typed for one component is that one's.
+///
+/// # Arguments
+///
+/// * `views` - The windows, which keep the physics window once it is made.
+fn take_physics_draft(views: &Rc<RefCell<Views>>) {
+    let window = views
+        .borrow()
+        .physics
+        .as_ref()
+        .and_then(|window| window.as_weak().upgrade());
+    if let Some(window) = window {
+        window.invoke_take();
+    }
+}
+
+/// Has a settings window take what was typed and not yet taken when the
+/// window system closes it, as leaving a field takes it: a value that
+/// vanished because the window was closed one way and not another would be
+/// a value nobody could trust to be there.
+///
+/// # Arguments
+///
+/// * `window` - The window.
+fn take_when_closed(window: &SimWindow) {
+    let weak = window.as_weak();
+    window.window().on_close_requested(move || {
+        if let Some(window) = weak.upgrade() {
+            window.invoke_take();
+        }
+        slint::CloseRequestResponse::HideWindow
+    });
 }
 
 /// Wires what the main window does with physics: placing a component from
@@ -5208,8 +5259,9 @@ fn wire_physics(
         // add_physics.
         let editor = editor.clone();
         let views = views.clone();
+        let home = home.clone();
         window.on_place_physics(move |kind| {
-            add_physics(&editor, &views, &kind, None);
+            add_physics(&editor, &views, &kind, &home, None);
         });
     }
     {
@@ -5230,13 +5282,14 @@ fn wire_physics(
                 )),
                 dividers,
             );
-            add_physics(&editor, &views, &kind, Some(at));
+            add_physics(&editor, &views, &kind, &home, Some(at));
         });
     }
     {
         let editor = editor.clone();
         let views = views.clone();
         window.on_physics_edit(move |name| {
+            take_physics_draft(&views);
             *views.borrow().showing_physics.borrow_mut() = name.to_string();
             show_physics(&editor, &views);
         });
@@ -5270,19 +5323,24 @@ fn wire_physics(
         // here, the markup offering its menu instead.
         let editor = editor.clone();
         let views = views.clone();
+        let home = home.clone();
         window.on_physics_moved(move |name, dx, dy| {
             let dividers = views.borrow().divider.get();
             {
                 let mut editor = editor.borrow_mut();
-                let Some((was, drawn)) = physics_places(&editor, dividers)
-                    .into_iter()
-                    .find(|(component, ..)| name == component.as_str())
-                    .map(|(_, _, place)| place.at)
-                    .and_then(|drawn| {
-                        let world =
-                            &editor.document().simulator.as_ref()?.world;
-                        Some((world.placed.get(name.as_str()).copied(), drawn))
-                    })
+                let Some((was, drawn)) =
+                    physics_places(&editor, dividers, &home)
+                        .into_iter()
+                        .find(|(component, ..)| name == component.as_str())
+                        .map(|(_, _, place)| place.at)
+                        .and_then(|drawn| {
+                            let world =
+                                &editor.document().simulator.as_ref()?.world;
+                            Some((
+                                world.placed.get(name.as_str()).copied(),
+                                drawn,
+                            ))
+                        })
                 else {
                     return;
                 };
@@ -5349,7 +5407,7 @@ fn wire_physics(
                 .as_ref()
                 .and_then(|end| {
                     let (_, _, place) =
-                        physics_places(&editor.borrow(), dividers)
+                        physics_places(&editor.borrow(), dividers, &home)
                             .into_iter()
                             .find(|(name, ..)| *name == end.component)?;
                     let (tx, ty) = physics::terminal_at(place.size, end.output);
@@ -5524,6 +5582,8 @@ impl PhysicsJoin {
 ///
 /// * `editor`   - The session.
 /// * `dividers` - Where the panes are.
+/// * `home`     - The page: `None` for the top. Only its own components
+///                are drawn on a page: see `sim::World::pages`.
 ///
 /// # Returns
 ///
@@ -5531,19 +5591,22 @@ impl PhysicsJoin {
 fn physics_places(
     editor: &Editor,
     dividers: Dividers,
+    home: &Home,
 ) -> Vec<(String, String, tcsdiagram::physics::Place)> {
     let Some(simulator) = &editor.document().simulator else {
         return Vec::new();
     };
     let world = &simulator.world;
-    let placed: Vec<Option<(i32, i32)>> = world
-        .components
-        .keys()
-        .map(|name| world.placed.get(name).copied())
-        .collect();
-    world
+    let here: Vec<(&String, &crate::sim::PhysicsComponent)> = world
         .components
         .iter()
+        .filter(|(name, _)| world.on_page(name, home.as_deref()))
+        .collect();
+    let placed: Vec<Option<(i32, i32)>> = here
+        .iter()
+        .map(|(name, _)| world.placed.get(*name).copied())
+        .collect();
+    here.into_iter()
         .zip(physics::layout(&placed, dividers))
         .map(|((name, component), place)| {
             (name.clone(), component.kind.clone(), place)
@@ -5587,7 +5650,7 @@ fn physics_joins(
     let (x, y) = at;
     let document = editor.document();
     let simulator = document.simulator.as_ref()?;
-    let places = physics_places(editor, dividers);
+    let places = physics_places(editor, dividers, home);
     let Some(kind) = places
         .iter()
         .find(|(name, ..)| *name == end.component)
@@ -5895,6 +5958,7 @@ fn show_physics(editor: &Rc<RefCell<Editor>>, views: &Rc<RefCell<Views>>) {
                 views.borrow().refresh(&editor.borrow());
             });
         }
+        take_when_closed(&window);
         views.borrow_mut().physics = Some(window);
     }
     let window = views
@@ -8604,7 +8668,7 @@ mod tests {
         let dividers = dividers();
         let shift = dividers.physics as f32;
         let middle_of = |name: &str| {
-            let (_, _, place) = physics_places(&editor, dividers)
+            let (_, _, place) = physics_places(&editor, dividers, &None)
                 .into_iter()
                 .find(|(component, ..)| component == name)
                 .expect("drawn");
@@ -12285,6 +12349,67 @@ mod tests {
         a_type_carried_out_of_its_list_goes_where_it_is_let_go();
         a_physics_type_carried_out_goes_where_it_is_let_go();
         a_typed_value_is_taken_when_it_is_done();
+        a_component_placed_on_a_page_is_drawn_only_there();
+    }
+
+    /// A physics component placed from a subdiagram's page is drawn on that
+    /// page and not on the top page; and its window names it in a field, with
+    /// nothing to choose another by.
+    fn a_component_placed_on_a_page_is_drawn_only_there() {
+        use i_slint_backend_testing as testing;
+        use std::rc::Rc;
+
+        let where_ = tempfile::tempdir().expect("a directory");
+        let path = where_.path().join("vehicle.ytcs");
+        let sim = where_.path().join("vehicle-sim.yaml");
+        std::fs::write(&sim, "world:\n  ambient_temp: \"283.15 K\"\n")
+            .expect("written");
+        let mut opened = Editor::open(&path, dividers()).expect("it opens");
+        opened.open_simulator(&sim).expect("it opens");
+        let editor = Rc::new(RefCell::new(opened));
+        let ui = MainWindow::new().expect("a window");
+        furnish!(&ui, descriptions());
+        let views = views_for(&ui);
+        let page: Home = Some("zone".to_string());
+        wire_physics(&ui, &editor, &views, &page);
+
+        ui.invoke_place_physics("thermal_mass".into());
+        let drawn = |home: &Home| {
+            physics_views_of(&editor.borrow(), dividers(), home).0.len()
+        };
+        assert_eq!(drawn(&page), 1, "drawn on the page it was placed from");
+        assert_eq!(drawn(&None), 0, "and not on the top page");
+        let written = std::fs::read_to_string(&sim).expect("the file");
+        assert!(
+            written.contains("pages:\n    zone: [thermal_mass_1]"),
+            "{written}"
+        );
+
+        let window = views
+            .borrow()
+            .physics
+            .as_ref()
+            .and_then(|window| window.as_weak().upgrade())
+            .expect("its window");
+        window.show().expect("the window shows");
+        assert!(
+            testing::ElementHandle::find_by_accessible_label(&window, "name")
+                .next()
+                .is_some(),
+            "a field for its name"
+        );
+        assert_eq!(
+            testing::ElementHandle::find_by_element_type_name(
+                &window, "ComboBox"
+            )
+            .count(),
+            0,
+            "nothing to choose another component by"
+        );
+        window.hide().expect("the window hides");
+
+        editor.borrow_mut().undo();
+        assert_eq!(drawn(&page), 0, "one Undo takes it away");
     }
 
     /// What is typed into a node's field is taken when it is done with --

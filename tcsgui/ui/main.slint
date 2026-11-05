@@ -2426,6 +2426,21 @@ export component SimWindow inherits Window {
     callback remove();
     callback setting-set(string, string);
 
+    // What is being typed into a setting and has not been taken yet, taken
+    // when somebody is done with it, as a node's window takes its fields:
+    // see NodeWindow.
+    property <string> draft-setting: "";
+    property <string> draft-value: "";
+
+    // Takes what has been typed and not yet taken. Public so that the
+    // window closed by the window system takes it too.
+    public function take() {
+        if (root.draft-setting != "") {
+            root.setting-set(root.draft-setting, root.draft-value);
+            root.draft-setting = "";
+        }
+    }
+
     VerticalLayout {
         padding: Space.wide;
         spacing: Space.step;
@@ -2444,32 +2459,48 @@ export component SimWindow inherits Window {
 
         HorizontalLayout {
             spacing: Space.step;
-            ComboBox {
+            // Which one, for the simulated payloads and the groups, which a
+            // window holds all of. A physics component's window is opened
+            // from the component, and is about it: its name is in the
+            // chooser's place, as a field to rename it by, as a node's is.
+            if !root.can-rename: ComboBox {
                 model: root.choices;
                 current-value: root.chosen;
                 horizontal-stretch: 1;
-                selected(value) => { root.choose(value); }
+                // What was typed for the one chosen before is that one's.
+                selected(value) => {
+                    root.take();
+                    root.choose(value);
+                }
+            }
+            // Renamed on accept; a name another component or any node has
+            // is refused, and said why under it.
+            if root.can-rename: LineEdit {
+                text: root.chosen;
+                read-only: Session.read-only;
+                accessible-label: "name";
+                horizontal-stretch: 1;
+                accepted => { root.renamed(self.text); }
             }
             if root.can-add: Button {
                 text: "New";
                 enabled: !Session.read-only;
-                clicked => { root.add(); }
+                clicked => {
+                    root.take();
+                    root.add();
+                }
             }
             if root.can-add || root.can-remove: Button {
                 text: "Remove";
                 enabled: root.chosen != "" && !Session.read-only;
-                clicked => { root.remove(); }
+                // Nothing typed for what is removed is kept.
+                clicked => {
+                    root.draft-setting = "";
+                    root.remove();
+                }
             }
         }
 
-        // The name, as a field: renamed on accept, and a name another
-        // component or any node has refused, and said why under it.
-        if root.can-rename && root.chosen != "": LineEdit {
-            text: root.chosen;
-            read-only: Session.read-only;
-            accessible-label: "name";
-            accepted => { root.renamed(self.text); }
-        }
         if root.can-rename && root.name-trouble != "": Text {
             text: root.name-trouble;
             color: #c0392b;
@@ -2502,7 +2533,17 @@ export component SimWindow inherits Window {
                         text: f.value;
                         read-only: Session.read-only;
                         font-size: Fonts.window;
-                        edited => { root.setting-set(f.name, self.text); }
+                        accessible-label: f.name;
+                        edited => {
+                            root.draft-setting = f.name;
+                            root.draft-value = self.text;
+                        }
+                        accepted => { root.take(); }
+                        changed has-focus => {
+                            if (!self.has-focus) {
+                                root.take();
+                            }
+                        }
                     }
                 }
                 Rectangle { }

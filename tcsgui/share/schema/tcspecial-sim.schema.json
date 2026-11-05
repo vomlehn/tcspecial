@@ -389,6 +389,17 @@
             ],
             "additionalProperties": false
           }
+        },
+        "pages": {
+          "description": "Which subdiagram's page each component is drawn on, by the subdiagram's name, each a list of components: `thermostat-common: [zone]`. A component named under none is drawn on the top page.",
+          "type": "object",
+          "additionalProperties": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1
+            }
+          }
         }
       },
       "additionalProperties": false

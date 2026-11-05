@@ -1454,6 +1454,15 @@ pub struct SimTcsgui {
     /// configuration's nodes are: `- { node: zone, x: -160, y: 34 }`.
     #[serde(default, deserialize_with = "crate::graph::grouped::layout")]
     pub nodes: Vec<crate::graph::Placed>,
+    /// Which subdiagram's page each component is drawn on, by the
+    /// subdiagram's name: `thermostat-common: [zone]`. A component named
+    /// under none is drawn on the top page.
+    ///
+    /// A list beside `nodes` rather than a key in each of its entries, whose
+    /// shape is a configuration's own `tcsgui` section's and read by the one
+    /// reader of both: a page is something only a component has.
+    #[serde(default)]
+    pub pages: std::collections::BTreeMap<String, Vec<String>>,
 }
 
 /// The simulator file's `tcssim` section.
@@ -4518,6 +4527,20 @@ physics:
         };
         assert_eq!(joins(true), ["heating"]);
         assert_eq!(joins(false), ["on", "heat", "current", "heating"]);
+    }
+
+    /// Which subdiagram's page each component is drawn on is read from the
+    /// `tcsgui` section, by page; none is no page.
+    #[test]
+    fn the_physics_pages_are_read_from_the_tcsgui_section() {
+        let file = parse(
+            "tcsgui:\n  nodes:\n    - { node: zone, x: -160, y: 34 }\n  \
+             pages:\n    thermostat-common: [zone, heater_1]\n",
+        );
+        let pages = file.tcsgui.expect("a tcsgui section").pages;
+        assert_eq!(pages["thermostat-common"], ["zone", "heater_1"]);
+        let file = parse("tcsgui:\n  nodes: []\n");
+        assert!(file.tcsgui.expect("a tcsgui section").pages.is_empty());
     }
 
     /// Where the editor drew each physics component is read from the

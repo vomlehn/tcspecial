@@ -108,6 +108,11 @@ pub struct World {
     /// where it was.
     #[serde(default)]
     pub placed: BTreeMap<String, (i32, i32)>,
+    /// The subdiagram whose page each component is drawn on, by component,
+    /// as the file's `tcsgui` section says; one named here under none is the
+    /// top page's. Kept for a component removed, as `placed` is.
+    #[serde(default)]
+    pub pages: BTreeMap<String, String>,
 }
 
 /// One component of the physics model.
@@ -122,6 +127,21 @@ pub struct PhysicsComponent {
 }
 
 impl World {
+    /// Whether a component is drawn on a page.
+    ///
+    /// # Arguments
+    ///
+    /// * `name` - The component.
+    /// * `page` - The subdiagram whose page it is, or `None` for the top.
+    ///
+    /// # Returns
+    ///
+    /// Whether the `tcsgui` section puts it there; one it puts nowhere is
+    /// the top page's.
+    pub fn on_page(&self, name: &str, page: Option<&str>) -> bool {
+        self.pages.get(name).map(String::as_str) == page
+    }
+
     /// Whether there is nothing in it.
     ///
     /// # Returns
@@ -308,6 +328,9 @@ impl Simulator {
         }
         if let Some(at) = world.placed.remove(was) {
             world.placed.insert(now.to_string(), at);
+        }
+        if let Some(page) = world.pages.remove(was) {
+            world.pages.insert(now.to_string(), page);
         }
         let mine = format!("{was}.");
         let moved = |terminal: &str| match terminal.strip_prefix(&mine) {
@@ -663,6 +686,15 @@ pub fn read(path: &Path) -> Result<Simulator, Trouble> {
             .iter()
             .map(|placed| (placed.name.clone(), (placed.x, placed.y)))
             .collect();
+        simulator.world.pages = tcsgui
+            .pages
+            .iter()
+            .flat_map(|(page, components)| {
+                components
+                    .iter()
+                    .map(move |component| (component.clone(), page.clone()))
+            })
+            .collect();
     }
     simulator.tcssim = file
         .tcssim
@@ -861,12 +893,35 @@ pub fn to_yaml(simulator: &Simulator, payloads: &[(String, String)]) -> String {
         .iter()
         .filter(|(name, _)| simulator.world.components.contains_key(*name))
         .collect();
+    // And which page each is drawn on, where that is a subdiagram's, by
+    // page and then by name.
+    let mut pages: BTreeMap<&String, Vec<&String>> = BTreeMap::new();
+    for (name, page) in &simulator.world.pages {
+        if simulator.world.components.contains_key(name) {
+            pages.entry(page).or_default().push(name);
+        }
+    }
+    if !placed.is_empty() || !pages.is_empty() {
+        out.push_str("\ntcsgui:\n");
+    }
     if !placed.is_empty() {
-        out.push_str("\ntcsgui:\n  nodes:\n");
+        out.push_str("  nodes:\n");
         for (name, (x, y)) in placed {
             out.push_str(&format!(
                 "    - {{ node: {}, x: {x}, y: {y} }}\n",
                 name_scalar(name)
+            ));
+        }
+    }
+    if !pages.is_empty() {
+        out.push_str("  pages:\n");
+        for (page, names) in pages {
+            let names: Vec<String> =
+                names.iter().map(|name| name_scalar(name)).collect();
+            out.push_str(&format!(
+                "    {}: [{}]\n",
+                name_scalar(page),
+                names.join(", ")
             ));
         }
     }
@@ -1224,6 +1279,40 @@ mod tests {
             assert!(!back.contains_key("segment_size"), "{extension}");
             assert_eq!(back.len(), 3, "{extension}: {back:?}");
         }
+    }
+
+    /// Which page each component is drawn on goes back out as it came in,
+    /// by page, and moves with a component renamed.
+    #[test]
+    fn the_physics_pages_survive_the_editor_and_a_rename() {
+        let where_ = tempfile::tempdir().expect("a directory");
+        let path = where_.path().join("vehicle-sim.yaml");
+        std::fs::write(
+            &path,
+            "world:\n  physics:\n    components:\n      \
+             - type thermal_mass:\n          - component: zone\n          \
+             - component: hall\n\ntcsgui:\n  pages:\n    \
+             thermostat-common: [zone]\n",
+        )
+        .expect("written");
+        let mut read_in = read(&path).expect("it reads");
+        assert!(read_in.world.on_page("zone", Some("thermostat-common")));
+        assert!(read_in.world.on_page("hall", None));
+        assert!(!read_in.world.on_page("zone", None));
+
+        let written = to_yaml(&read_in, &[]);
+        assert!(
+            written.contains("  pages:\n    thermostat-common: [zone]\n"),
+            "{written}"
+        );
+
+        read_in.rename_component("zone", "cabinet");
+        assert!(read_in.world.on_page("cabinet", Some("thermostat-common")));
+        let written = to_yaml(&read_in, &[]);
+        assert!(
+            written.contains("thermostat-common: [cabinet]"),
+            "{written}"
+        );
     }
 
     /// The physics model goes back out as it came in, in name order, and

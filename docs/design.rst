@@ -5476,12 +5476,30 @@ would be an editor a typo turns off. What is wrong goes to the error output, as
 an unreadable preferences file does. Two descriptions of one name are refused
 the same way -- a name picks out one node here as it does in a configuration.
 
-Each attribute's ``about`` is shown at the foot of a node's window, in a box
-that cannot be written in, while that attribute's field has the focus; the
-node's own ``about`` is shown there while no field with something said about it
-has. At the foot rather than beside each field, so that the rows stay a row
-each however long a sentence is, and read-only because what a description says
-is the tree's to say and not the node's.
+Each attribute's ``about`` is shown at the foot of a node's window while that
+attribute's field has the focus; the node's own ``about`` is shown there while
+no field with something said about it has. At the foot rather than beside each
+field, so that the rows stay a row each however long a sentence is, and as
+words rather than a box, because what a description says is the tree's to say
+and not the node's, and Tab passes it by.
+
+Every field of a node's window is in view at once, none scrolled out of sight:
+a field out of sight is one its reader does not know is there, and one Tab
+never reaches, the toolkit's order leaving out what is clipped. So each field
+is its name beside its box, one row tall, and the window is in columns -- the
+node's own attributes, then the simulator's settings for it, which are
+written to a different file and named so by the heading over them, in two
+columns of their own, there being as many as twenty -- and as tall as the
+longest column. Tab goes down each column in turn. A window whose fields grow,
+a complaint appearing over them or a component with more settings shown in
+the physics window, grows with them.
+
+The name is a field like any other, renamed on Enter, with a small "x" beside
+it that clears the field to type a new name from nothing: the one control in
+a node's window and a physics component's alike. A physics component's window
+has nothing to choose another component by -- it is opened from the component
+-- and no button to remove it, a component being deleted from its menu on the
+canvas as a node is.
 
 A value typed into a node's field is taken when it is done with: on Enter, on
 leaving the field, on Close, or when the window is closed. Until then the field

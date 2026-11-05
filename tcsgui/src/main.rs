@@ -1778,6 +1778,31 @@ fn edge_views(dividers: Dividers) -> Vec<EdgeView> {
         .collect()
 }
 
+/// Grows a window of fields to hold all it shows, every field in view and
+/// each box its full width, when what it shows has grown: a window keeps the
+/// size it opened at, and one sized for what it opened on would cut off a
+/// node's fields when a complaint appears over them, or a component's when it
+/// is made to show one with more. A window not yet shown is sized when it is.
+///
+/// A macro because the windows are of several types, each with its own
+/// `wanted-width` and `wanted-height`, the size its markup wants.
+macro_rules! fit {
+    ($window:expr) => {{
+        let window = $window;
+        let size = window
+            .window()
+            .size()
+            .to_logical(window.window().scale_factor());
+        let wanted = slint::LogicalSize::new(
+            size.width.max(window.get_wanted_width()),
+            size.height.max(window.get_wanted_height()),
+        );
+        if window.window().is_visible() && wanted != size {
+            window.window().set_size(wanted);
+        }
+    }};
+}
+
 /// Puts what a node says about itself into its own window.
 ///
 /// Everything its type declares, whatever else it holds, and -- below a rule
@@ -1810,11 +1835,20 @@ fn put_node(window: &NodeWindow, editor: &Editor, node: &str) {
     window.set_node_type(node_type.into());
     window.set_comment(comment.into());
     window.set_about(about.into());
+    // Where the simulator's settings go on into a second column: half of
+    // them in each, rounding up, so that no column is much taller than the
+    // node's own and the window fits on a screen.
+    let heading = fields.iter().position(|f| f.is_heading);
+    let split = heading.map_or(fields.len(), |at| {
+        at + 1 + (fields.len() - at - 1).div_ceil(2)
+    });
+    window.set_split(split as i32);
     if !refilled(&window.get_fields(), &fields) {
         window.set_fields(ModelRc::from(Rc::new(VecModel::from(fields))));
     }
     window.set_fault(fault.into());
     window.set_trouble(editor.trouble().unwrap_or_default().into());
+    fit!(window);
 }
 
 /// Shows what a node says about itself, making the window if there is not
@@ -4187,6 +4221,7 @@ fn put_sim_groups(window: &SimWindow, editor: &Editor, group: &str) {
         said,
     ));
     window.set_trouble(editor.trouble().unwrap_or_default().into());
+    fit!(window);
 }
 
 /// The fields a simulator window shows: every setting there is, filled in or
@@ -5884,17 +5919,6 @@ fn show_physics(editor: &Rc<RefCell<Editor>>, views: &Rc<RefCell<Views>>) {
             });
         }
         {
-            let editor = editor.clone();
-            let views = views.clone();
-            let showing = showing.clone();
-            window.on_remove(move || {
-                let name = showing.borrow().clone();
-                remove_physics(&editor, &name);
-                showing.borrow_mut().clear();
-                views.borrow().refresh(&editor.borrow());
-            });
-        }
-        {
             // A new name for the component shown, refused as a node's is
             // where another component or any node has it: see
             // `Document::rename_physics_refused`. One edit, and the window
@@ -5975,6 +5999,7 @@ fn show_physics(editor: &Rc<RefCell<Editor>>, views: &Rc<RefCell<Views>>) {
         if let Err(e) = window.show() {
             eprintln!("tcsgui: the physics window cannot be shown: {e}");
         }
+        fit!(&window);
     }
 }
 
@@ -6005,7 +6030,6 @@ fn put_physics(window: &SimWindow, editor: &Editor, component: &str) {
             .into(),
     );
     window.set_can_add(false);
-    window.set_can_remove(true);
     window.set_can_rename(true);
     window.set_choices(ModelRc::from(Rc::new(VecModel::from(choices))));
     window.set_chosen(chosen.map_or("", |_| component).into());
@@ -6032,6 +6056,7 @@ fn put_physics(window: &SimWindow, editor: &Editor, component: &str) {
             .unwrap_or_else(|| said.join("\n"))
             .into(),
     );
+    fit!(window);
 }
 
 /// The physics list: every type of physics component, under its family's
@@ -11529,15 +11554,11 @@ mod tests {
         let tightened: String =
             markup.split_whitespace().collect::<Vec<&str>>().join(" ");
         assert!(
-            tightened.contains(
-                "if !f.is-heading && f.kind == \"boolean\": CheckBox {"
-            ),
+            tightened.contains("if root.field.kind == \"boolean\": CheckBox {"),
             "a boolean field is not offered with a control of two states"
         );
         assert!(
-            tightened.contains(
-                "if !f.is-heading && f.kind != \"boolean\": LineEdit {"
-            ),
+            tightened.contains("if root.field.kind != \"boolean\": LineEdit {"),
             "the other kinds are not offered with a box to write in"
         );
     }
@@ -12350,6 +12371,79 @@ mod tests {
         a_physics_type_carried_out_goes_where_it_is_let_go();
         a_typed_value_is_taken_when_it_is_done();
         a_component_placed_on_a_page_is_drawn_only_there();
+        every_field_of_a_node_is_in_view_and_its_name_clears();
+    }
+
+    /// Every field a node's window offers is in view -- found by the
+    /// toolkit, which finds nothing scrolled out of sight or clipped, and
+    /// which Tab would then never reach -- and the "x" beside the name
+    /// clears it.
+    fn every_field_of_a_node_is_in_view_and_its_name_clears() {
+        use i_slint_backend_testing as testing;
+        use std::rc::Rc;
+
+        // A device with a simulator file, which is the most a node's window
+        // holds: its own attributes and the simulator's settings for it.
+        let where_ = tempfile::tempdir().expect("a directory");
+        let path = where_.path().join("vehicle.ytcs");
+        let sim = where_.path().join("vehicle-sim.yaml");
+        std::fs::write(
+            &path,
+            "payloads:\n  - type i2c_tmass:\n      - payload: temp_1\n        \
+             address: \"0x48\"\n        path: /dev/i2c-1\n",
+        )
+        .expect("a sensor");
+        std::fs::write(
+            &sim,
+            "simulated_payloads:\n  - type i2c_tmass:\n      \
+             - payload: temp_1\n        simulate: true\n",
+        )
+        .expect("its stand-in");
+        let mut opened = Editor::open(&path, dividers()).expect("it opens");
+        opened.open_simulator(&sim).expect("it opens");
+        let editor = Rc::new(RefCell::new(opened));
+        let ui = MainWindow::new().expect("a window");
+        let views = views_for(&ui);
+        show_node(&editor, &views, "temp_1");
+        let window = views
+            .borrow()
+            .attributes
+            .get("temp_1")
+            .map(|window| window.as_weak())
+            .expect("the node's window")
+            .upgrade()
+            .expect("and still there");
+        window.show().expect("the window shows");
+
+        let fields = window.get_fields();
+        let named: Vec<String> = fields
+            .iter()
+            .filter(|f| !f.is_heading && f.kind != "boolean")
+            .map(|f| f.name.to_string())
+            .collect();
+        assert!(named.len() > 20, "a sensor and its stand-in: {named:?}");
+        for name in &named {
+            assert!(
+                testing::ElementHandle::find_by_accessible_label(&window, name)
+                    .next()
+                    .is_some(),
+                "{name} is out of view"
+            );
+        }
+
+        let clear = testing::ElementHandle::find_by_accessible_label(
+            &window,
+            "clear the name",
+        )
+        .next()
+        .expect("an x beside the name");
+        clear.invoke_accessible_default_action();
+        let name =
+            testing::ElementHandle::find_by_accessible_label(&window, "name")
+                .next()
+                .expect("the name's field");
+        assert_eq!(name.accessible_value().as_deref(), Some(""));
+        window.hide().expect("the window hides");
     }
 
     /// A physics component placed from a subdiagram's page is drawn on that

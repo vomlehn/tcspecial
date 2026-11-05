@@ -8,6 +8,14 @@
          section and the gateway node, which is called gateway in both, the
          name the ping node's answer is sent to it by. -->
 
+    <!-- What the files that include this one may join: the ping node,
+         which the gateway node sends pings to and which answers to the
+         gateway node. -->
+    <exports>
+        <moc-in>ping</moc-in>
+        <world-out>ping</world-out>
+    </exports>
+
     <vehicle>
         <type name="ping">
             <!-- Answers each ping with the vehicle's time on the end: see

@@ -4150,7 +4150,27 @@ files.</dd>
 at all, whatever path names it; and a node's name is its own in every
 file, so no two files have a node of one name and a link or a command
 binding in one file may name a node in another.</dd>
+<dt>Requirement</dt>
+<dd>A line that crosses into or out of an included file reaches it only at
+a node the file exports at that terminal. An included file's
+<tt class="docutils literal">exports</tt> section lists, under each of <tt class="docutils literal"><span class="pre">world-in</span></tt>, <tt class="docutils literal"><span class="pre">world-out</span></tt>,
+<tt class="docutils literal"><span class="pre">moc-in</span></tt> and <tt class="docutils literal"><span class="pre">moc-out</span></tt>, the nodes of that file whose terminal of
+that name a line from another file may reach; a line crossing anywhere
+else is refused, saying which list to add the node to, and so is a list
+naming a node that is not in the file or a terminal its type has not
+got. A top file has nothing around it, and one with an <tt class="docutils literal">exports</tt>
+section is refused as it is read.</dd>
 </dl>
+<p>An included file is a part of the vehicle somebody else may own, and its
+<tt class="docutils literal">exports</tt> are its edge: what of it the files around it are allowed to join.
+Stated in the file rather than worked out from the lines that happen to cross
+it, because an edge is something a reader of the file can check, and a page
+anything outside could reach into would have none -- one line drawn to the
+wrong node across it is a line nothing would question. The links are written as
+they always were, node to node, so nothing aboard reads the section and the
+flight software runs the same graph whether a file exports or not; the check is
+<tt class="docutils literal"><span class="pre">tcslibgs::graph::Graph::check</span></tt>'s, which tcspecial runs as it loads, so a
+configuration that breaks it is refused before it flies.</p>
 <p><tt class="docutils literal"><span class="pre">tcslibgs::graph::Graph::load</span></tt> is the reader, and the Python ground
 reader, <tt class="docutils literal">python/tcslibgs/configuration.py</tt>, follows includes by the same
 rules, so that the two count a node's device id among the same names.

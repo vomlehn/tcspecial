@@ -279,6 +279,16 @@ pub enum Edit {
         /// Whether it is being set aside, as against taken up again.
         aside: bool,
     },
+    /// A node of a subdiagram's file made reachable at one of its terminals
+    /// from outside that file, or no longer reachable there: see
+    /// `tcslibgs::graph::exports`. `node` is its own name, as the file's
+    /// `exports` lists it. Undone by the same edit the other way.
+    SetExport {
+        home: String,
+        terminal: String,
+        node: String,
+        exported: bool,
+    },
     /// Every node brought to the top of its own pane, in one edit.
     ///
     /// What **Edit -> Arrange the nodes** does. One edit and not one per node,
@@ -506,6 +516,17 @@ impl Edit {
                 node: node.clone(),
                 was: *now,
                 now: *was,
+            },
+            Edit::SetExport {
+                home,
+                terminal,
+                node,
+                exported,
+            } => Edit::SetExport {
+                home: home.clone(),
+                terminal: terminal.clone(),
+                node: node.clone(),
+                exported: !exported,
             },
             Edit::SetAside { node, kind, aside } => Edit::SetAside {
                 node: node.clone(),
@@ -738,6 +759,18 @@ impl Edit {
                 format!("move the link from \"{}\" to \"{}\"", was.to, now.to)
             }
             Edit::MoveNode { node, .. } => format!("move \"{node}\""),
+            Edit::SetExport {
+                terminal,
+                node,
+                exported,
+                ..
+            } => {
+                if *exported {
+                    format!("show \"{node}\"'s {terminal} outside")
+                } else {
+                    format!("hide \"{node}\"'s {terminal} from outside")
+                }
+            }
             Edit::SetAside { node, aside, .. } => {
                 if *aside {
                     format!("set aside what \"{node}\" says")

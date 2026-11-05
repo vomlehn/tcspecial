@@ -10,6 +10,13 @@
 # node is called gateway in both, which is the name the links here
 # send to it by and the command binding takes the setpoint from.
 
+# What the examples that include this file may join: the three
+# conversions, whose readings arrive from the sensors in each example's
+# own file, and every reading that leaves for the gateway node there.
+exports:
+  world-in: [temp1, temp2, temp3]
+  world-out: [ambient, gpio-in-tmass, temp1, temp2, temp3]
+
 payload_groups:
   - name: "zone_temps"
     interval: "1 s"

@@ -369,6 +369,10 @@ class Configuration:
     #: The other files the configuration is made of, by the names its
     #: ``include`` list gives them: see :func:`include_path`.
     included: list = field(default_factory=list)
+    #: Whether the file has an ``exports`` section, saying what of it the
+    #: files around it may join: only an included file may. What it says is
+    #: the Rust checking's business, a ground station reading nothing of it.
+    has_exports: bool = False
 
     def node(self, name):
         """The node called ``name``.
@@ -1246,12 +1250,19 @@ def _with_includes(path):
 
     Raises:
         ValueError: A file is refused, an include name is refused, a file is
-                    included twice or is the top file, an included file has
-                    a ``tcspecial`` section or includes of its own, or two
-                    files have a node of one name.
+                    included twice or is the top file, the top file has an
+                    ``exports`` section, an included file has a ``tcspecial``
+                    section or includes of its own, or two files have a node
+                    of one name.
         OSError: A file cannot be read.
     """
     config, _ = _load_one(path)
+    if config.has_exports:
+        raise ValueError(
+            f"{path}: only an included file may have an exports section -- it "
+            "says what of that file the files around it may join, and this "
+            "file has none around it. Take the section out, or move the nodes "
+            "it names into a file this one includes")
     homes = {node.name: path for node in config.nodes}
     seen = [path.resolve(strict=True)]
     for name in config.included:
@@ -1362,6 +1373,7 @@ class _Reader:
         self.nodes = []
         self.commands = []
         self.included = []
+        self.has_exports = False
 
     def refuse(self, line, why):
         """The error for something refused.
@@ -1407,7 +1419,8 @@ class _Reader:
         return (Configuration(path=self.path, tcspecial=tcspecial,
                               nodes=sorted(self.nodes, key=lambda n: n.name),
                               commands=list(self.commands),
-                              included=list(self.included)),
+                              included=list(self.included),
+                              has_exports=self.has_exports),
                 has_section)
 
 
@@ -1741,6 +1754,8 @@ def _load_xml(path):
     for element in root.children:
         if element.tag == "include":
             reader.included.append(element.text.strip())
+        if element.tag == "exports":
+            reader.has_exports = True
     _xml_old(reader, root)
 
     tcspecial = {}
@@ -2059,6 +2074,7 @@ def _load_yaml(path):
         return constructor.construct_object(value, deep=True)
 
     sections = _yaml_mapping(reader, root, "the file")
+    reader.has_exports = any(key == "exports" for key, _, _ in sections)
     for key, value, at in sections:
         if key != "include":
             continue

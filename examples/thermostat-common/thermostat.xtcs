@@ -12,6 +12,20 @@
     <!-- node is called gateway in both, which is the name the links here -->
     <!-- send to it by and the command binding takes the setpoint from. -->
 
+    <!-- What the examples that include this file may join: the three -->
+    <!-- conversions, whose readings arrive from the sensors in each -->
+    <!-- example's own file, and every reading that leaves for the gateway -->
+    <!-- node there. -->
+    <exports>
+        <world-in>temp1</world-in>
+        <world-in>temp2</world-in>
+        <world-in>temp3</world-in>
+        <world-out>ambient</world-out>
+        <world-out>gpio-in-tmass</world-out>
+        <world-out>temp1</world-out>
+        <world-out>temp2</world-out>
+        <world-out>temp3</world-out>
+    </exports>
     <payload_groups>
         <name>zone_temps</name>
         <interval>1 s</interval>

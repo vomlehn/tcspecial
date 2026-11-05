@@ -3839,6 +3839,28 @@ Requirement
     file, so no two files have a node of one name and a link or a command
     binding in one file may name a node in another.
 
+Requirement
+    A line that crosses into or out of an included file reaches it only at
+    a node the file exports at that terminal. An included file's
+    ``exports`` section lists, under each of ``world-in``, ``world-out``,
+    ``moc-in`` and ``moc-out``, the nodes of that file whose terminal of
+    that name a line from another file may reach; a line crossing anywhere
+    else is refused, saying which list to add the node to, and so is a list
+    naming a node that is not in the file or a terminal its type has not
+    got. A top file has nothing around it, and one with an ``exports``
+    section is refused as it is read.
+
+An included file is a part of the vehicle somebody else may own, and its
+``exports`` are its edge: what of it the files around it are allowed to join.
+Stated in the file rather than worked out from the lines that happen to cross
+it, because an edge is something a reader of the file can check, and a page
+anything outside could reach into would have none -- one line drawn to the
+wrong node across it is a line nothing would question. The links are written as
+they always were, node to node, so nothing aboard reads the section and the
+flight software runs the same graph whether a file exports or not; the check is
+``tcslibgs::graph::Graph::check``'s, which tcspecial runs as it loads, so a
+configuration that breaks it is refused before it flies.
+
 ``tcslibgs::graph::Graph::load`` is the reader, and the Python ground
 reader, ``python/tcslibgs/configuration.py``, follows includes by the same
 rules, so that the two count a node's device id among the same names.

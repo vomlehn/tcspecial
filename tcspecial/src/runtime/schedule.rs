@@ -367,6 +367,7 @@ mod tests {
             placed: BTreeMap::new(),
             set_aside: Default::default(),
             named: Default::default(),
+            exports: Default::default(),
         };
         let schedule = Schedule::of(&graph, Instant::now());
 

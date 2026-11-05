@@ -299,6 +299,28 @@ pub enum Problem {
     /// does nothing, and a configuration is read by people who want to know
     /// what it does.
     Unconnected { node: String },
+    /// A line crossing into or out of an included file at a node that file
+    /// does not export at that terminal: see [`crate::graph::exports`].
+    ///
+    /// `from` is the node the line leaves, which is where it is written;
+    /// `node` is the end in the included file, `terminal` its terminal, and
+    /// `file` the file's include name.
+    NotExported {
+        from: String,
+        link: String,
+        node: String,
+        terminal: String,
+        file: String,
+    },
+    /// An `exports` list naming a node that is not in its file, or a
+    /// terminal that node has not got. `file` is the file's path, which is
+    /// where the list is.
+    BadExport {
+        file: std::path::PathBuf,
+        terminal: String,
+        node: String,
+        why: String,
+    },
 }
 
 impl Problem {
@@ -348,6 +370,10 @@ impl Problem {
             Problem::NotAGatewayLink { from } => About::Node(from.clone()),
             Problem::BindingTwice { .. } => About::Section("commands"),
             Problem::Unconnected { node } => About::Node(node.clone()),
+            // On the line, where the line is written: the fix may as well be
+            // drawing it to another node as exporting this one.
+            Problem::NotExported { from, .. } => About::Node(from.clone()),
+            Problem::BadExport { .. } => About::Section("exports"),
             // On the payload and not on the source: the source is right
             // about where it sends, and the payload is where the trigger
             // would have to be written.
@@ -548,6 +574,26 @@ impl Problem {
                 "\"{node}\" has no link to or from it, so nothing reaches it \
                  and nothing reads it"
             ),
+            Problem::NotExported {
+                link,
+                node,
+                terminal,
+                file,
+                ..
+            } => format!(
+                "{link}: \"{node}\" is in {file}, which does not export its \
+                 {terminal}: add \"{node}\" to {terminal} under exports \
+                 there, or draw the line to a node that file exports"
+            ),
+            Problem::BadExport {
+                terminal,
+                node,
+                why,
+                ..
+            } => format!(
+                "exports: {terminal} names \"{node}\", which {why}: take it \
+                 out of the list, or correct the name"
+            ),
             // The reason already names the node: see reach_of, whose
             // complaints are written to be read on their own.
             Problem::BadNode { why, .. } => why.clone(),
@@ -727,6 +773,150 @@ fn gateway_stray(
              change the node or the section"
         )
     })
+}
+
+impl Graph {
+    /// Finds what is wrong with the included files' `exports`, and with the
+    /// lines that cross into and out of those files: see
+    /// [`crate::graph::exports`].
+    ///
+    /// A line crossing between two files is held to the `exports` of each
+    /// included file it touches, at the terminal it touches there; the top
+    /// file has no `exports` and holds nothing. Each list is held to its
+    /// file: every node it names is a node of that file, with the terminal
+    /// it is listed under.
+    ///
+    /// # Returns
+    ///
+    /// The problems, in the order the links and the files are held.
+    fn exports_problems(&self) -> Vec<Problem> {
+        let mut problems = Vec::new();
+        let top = self.files.first();
+        let include = |file: &std::path::Path| {
+            self.include_name(file)
+                .unwrap_or_else(|| file.display().to_string())
+        };
+
+        for (name, exports) in &self.exports {
+            let Some(file) = self
+                .files
+                .iter()
+                .find(|file| self.include_name(file).as_ref() == Some(name))
+            else {
+                continue;
+            };
+            for (terminal, nodes) in exports.each() {
+                for node in nodes {
+                    let why = match self.node(node) {
+                        None => Some("is not a node".to_string()),
+                        Some(_) if self.homes.get(node) != Some(file) => {
+                            Some("is in another file".to_string())
+                        }
+                        Some(found) => {
+                            terminals::terminals_of(&found.node_type)
+                                .filter(|t| {
+                                    !t.sinks.contains(&terminal)
+                                        && !t.sources.contains(&terminal)
+                                })
+                                .map(|_| {
+                                    format!(
+                                        "is a {} and has no {terminal}",
+                                        found.node_type
+                                    )
+                                })
+                        }
+                    };
+                    if let Some(why) = why {
+                        problems.push(Problem::BadExport {
+                            file: file.clone(),
+                            terminal: terminal.to_string(),
+                            node: node.clone(),
+                            why,
+                        });
+                    }
+                }
+            }
+        }
+
+        for link in &self.links {
+            let origin = link.origin();
+            let Some(leaving) = self.node(&origin.node) else {
+                continue;
+            };
+            let leaves = terminals::terminal_at(
+                &leaving.node_type,
+                origin.input.as_deref(),
+                false,
+            )
+            .ok()
+            .flatten();
+            for destination in link.to.each() {
+                let Destination { node, input } =
+                    Destination::parse(destination);
+                let Some(arriving) = self.node(&node) else {
+                    continue;
+                };
+                let arrives = terminals::terminal_at(
+                    &arriving.node_type,
+                    input.as_deref(),
+                    true,
+                )
+                .ok()
+                .flatten();
+                // A computation's terminals are its own business, so either
+                // end may be unnamed: then it is the one the other end's
+                // stream pairs with, a reading arriving at a `world-in`.
+                let leaves = leaves.clone().or_else(|| {
+                    arrives
+                        .as_deref()
+                        .and_then(terminals::answers)
+                        .map(str::to_string)
+                });
+                let arrives = arrives.or_else(|| {
+                    leaves
+                        .as_deref()
+                        .and_then(terminals::answers)
+                        .map(str::to_string)
+                });
+                let (Some(from_file), Some(to_file)) =
+                    (self.homes.get(&origin.node), self.homes.get(&node))
+                else {
+                    continue;
+                };
+                if from_file == to_file {
+                    continue;
+                }
+                for (end, file, terminal) in [
+                    (&origin.node, from_file, &leaves),
+                    (&node, to_file, &arrives),
+                ] {
+                    let Some(terminal) = terminal else {
+                        continue;
+                    };
+                    if Some(file) == top {
+                        continue;
+                    }
+                    let exported = self
+                        .include_name(file)
+                        .and_then(|name| self.exports.get(&name))
+                        .is_some_and(|e| e.exports(end, terminal));
+                    if !exported {
+                        problems.push(Problem::NotExported {
+                            from: origin.node.clone(),
+                            link: format!(
+                                "\"{}\" to \"{destination}\"",
+                                link.from
+                            ),
+                            node: end.clone(),
+                            terminal: terminal.clone(),
+                            file: include(file),
+                        });
+                    }
+                }
+            }
+        }
+        problems
+    }
 }
 
 impl Graph {
@@ -1144,6 +1334,8 @@ impl Graph {
                 problems.push(Problem::InputBoundTwice { node, input });
             }
         }
+
+        problems.extend(self.exports_problems());
 
         // A payload and the ground link have to be joined to something.
         //
@@ -2071,6 +2263,7 @@ mod tests {
             placed: BTreeMap::new(),
             set_aside: Default::default(),
             named: Default::default(),
+            exports: Default::default(),
         }
     }
 

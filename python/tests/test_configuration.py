@@ -179,6 +179,8 @@ class ConfigurationTest(unittest.TestCase):
             "<include>vehicle</include>": "included twice",
             "<include>section</include>": "may not have a tcspecial",
             "<include>nests</include>": "may not include others",
+            "<exports><world-in>a</world-in></exports>":
+                "only an included file may have an exports section",
             "<include>zone</include>"
             '<payloads><type name="i2c"><payload name="a"/></type>'
             "</payloads>": 'node called "a" here and in',

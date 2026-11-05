@@ -1335,6 +1335,42 @@ macro_rules! wiring {
                 });
             }
             {
+                let drawing = drawing.clone();
+                let home = home.clone();
+                let editor = editor.clone();
+                let views = views.clone();
+                let asking = asking.clone();
+                let weak = window.as_weak();
+                // A line taken from the page's own edge: the subdiagram's box
+                // seen from inside, so the line is the box's, by the box's
+                // name, and the node clicked next is shown or hidden there.
+                window.on_edge_started(move |terminal| {
+                    let Some(inside) = home.clone() else {
+                        return;
+                    };
+                    if let Some(window) = weak.upgrade() {
+                        window.set_join_offers(ModelRc::default());
+                        window.set_join_hint(
+                            format!(
+                                "The edge's {terminal} is in hand: click a \
+                                 node to show it outside there, or to hide \
+                                 it. Escape, or a click on bare sheet, puts \
+                                 it down."
+                            )
+                            .into(),
+                        );
+                        window.set_joining("node".into());
+                    }
+                    asking.borrow_mut().clear();
+                    *drawing.borrow_mut() = Some(Drawing {
+                        node: inside,
+                        terminal: terminal.to_string(),
+                        holding: None,
+                    });
+                    views.borrow().relink(&editor.borrow());
+                });
+            }
+            {
                 let window_for_drawing = window.as_weak();
                 let drawing_for_motion = drawing.clone();
                 let editor_for_motion = editor.clone();
@@ -1387,17 +1423,37 @@ macro_rules! wiring {
                     };
                     let document_node = {
                         let editor = editor.borrow();
+                        let document = editor.document();
                         // A line taken on another page is no line on this
                         // one: see anchored.
-                        anchored(editor.document(), &home, &from)
-                            .and_then(|_| {
-                                node_under(editor.document(), &home, (x, y))
-                            })
-                            .map(|node| {
-                                let offers =
-                                    offered(editor.document(), &from, &node);
-                                (node, offers)
-                            })
+                        let anchor = anchored(document, &home, &from);
+                        // The page's own edge, where a node of the page is
+                        // shown outside it, named for the menu as the
+                        // subdiagram's edge.
+                        let edge = anchor
+                            .and(edge_under(&home, (x, y)))
+                            .zip(home.as_deref())
+                            .map(|(edge, inside)| {
+                                let offers = if from.terminal == edge {
+                                    edge_offers(
+                                        document, inside, &from.node, edge,
+                                    )
+                                } else {
+                                    Vec::new()
+                                };
+                                (format!("{inside}/the edge"), offers)
+                            });
+                        edge.or_else(|| {
+                            anchor
+                                .and_then(|_| {
+                                    node_under(document, &home, (x, y))
+                                })
+                                .map(|node| {
+                                    let offers =
+                                        offered(document, &from, &node);
+                                    (node, offers)
+                                })
+                        })
                     };
                     let Some((node, offers)) = document_node else {
                         stop_joining(&window, &drawing);
@@ -1406,9 +1462,23 @@ macro_rules! wiring {
                     };
                     let shown = Qualified::parse(&node).node;
                     if offers.is_empty() {
+                        let boxed = is_box(editor.borrow().document(), &node);
+                        let at =
+                            tcslibgs::graph::terminals::answers(&from.terminal);
+                        let nothing = match at {
+                            // A box whose file shows nothing there: what to
+                            // do about that is inside it.
+                            Some(at) if boxed => format!(
+                                "{node} shows nothing at its {at}: open it, \
+                                 and join a node to its {at} at the edge."
+                            ),
+                            _ => format!(
+                                "{shown} has nothing this line can join."
+                            ),
+                        };
                         window.set_join_hint(
                             format!(
-                                "{shown} has nothing this line can join. {}",
+                                "{nothing} {}",
                                 in_hand(&from.terminal, from.holding.is_some())
                             )
                             .into(),
@@ -1677,6 +1747,11 @@ fn put_sub(
     window.set_gateway_list_percent(lists.0);
     window.set_vehicle_list_percent(lists.1);
     window.set_has_simulator(editor.document().simulator.is_some());
+    // The page's edge, in its margins: see tcsdiagram::style::edge_box.
+    window.set_edge_width(style::EDGE as f32);
+    window.set_edge_terminals(ModelRc::from(Rc::new(VecModel::from(
+        edge_views(),
+    ))));
     let home = Some(home.to_string());
     let (nodes, links) = views_of(editor, &home, held);
     window.set_selected(chosen.unwrap_or_default().into());
@@ -1691,6 +1766,27 @@ fn put_sub(
     window.set_outside_count(
         editor.document().outside_panes(&home, dividers) as i32
     );
+}
+
+/// A subdiagram's four edge terminals, as its window draws them.
+///
+/// # Returns
+///
+/// Each terminal, where `tcsdiagram::style::edge_box` puts it.
+fn edge_views() -> Vec<EdgeView> {
+    let width = pane::WORKING_WIDTH as f32;
+    ["world-in", "moc-out", "world-out", "moc-in"]
+        .into_iter()
+        .filter_map(|terminal| {
+            let (x, y, _, _) = style::edge_box(terminal, width)?;
+            Some(EdgeView {
+                terminal: terminal.into(),
+                x,
+                y,
+                rightward: style::corner_of(terminal)?.rightward,
+            })
+        })
+        .collect()
 }
 
 /// Puts what a node says about itself into its own window.
@@ -4833,16 +4929,38 @@ fn views_of(
     // page is drawn to a stub whose height is taken from it; and the lines
     // with an end on this one. The drawing is tcsdiagram's, which tcspecial's
     // visual window draws by too: see tcsdiagram::view::link_looks.
-    let sheet = on_sheet(document, home);
+    let mut sheet = on_sheet(document, home);
     let here = |name: &str| &Qualified::parse(name).in_ == home;
+    // A line between two subdiagrams is drawn on the top page, between their
+    // boxes, as well as on each of their pages.
+    let between = |link: &Link| {
+        home.is_none()
+            && Qualified::parse(&link.from).in_
+                != Qualified::parse(&link.to).in_
+    };
+    // And on a subdiagram's page, each node it exports that no line joins
+    // outside yet is drawn joined to the edge all the same: what the edge
+    // shows is what may be joined there, and a node shown at it with
+    // nothing drawn would look like one that is not.
+    let unjoined = unjoined_exports(document, home);
+    if !unjoined.is_empty() {
+        sheet.push(tcsdiagram::view::OnSheet {
+            name: NOT_JOINED_OUTSIDE.to_string(),
+            node_type: "subdiagram",
+            at: (0, 0),
+            here: false,
+            drawn: tcsdiagram::view::Drawn::AtTheEdge(pane::WORKING_WIDTH),
+        });
+    }
     let lines: Vec<tcsdiagram::view::LineOnSheet> = document
         .links
         .iter()
-        .filter(|link| here(&link.from) || here(&link.to))
+        .filter(|link| here(&link.from) || here(&link.to) || between(link))
         // Not the one whose end is in somebody's hand: a line that stayed put
         // while its end was being dragged away would say the gesture had not
         // started. It comes back where the hand put it down, or where it was.
         .filter(|link| !held.is_some_and(|held| held.same_connection(link)))
+        .chain(&unjoined)
         .map(line_on_sheet)
         .collect();
     let links: Vec<LinkView> = tcsdiagram::view::link_looks(&sheet, &lines)
@@ -5770,17 +5888,114 @@ fn on_sheet<'a>(
     document: &'a Document,
     home: &Home,
 ) -> Vec<tcsdiagram::view::OnSheet<'a>> {
+    use tcsdiagram::view::{Drawn, OnSheet};
     document
         .nodes
         .iter()
-        .map(|node| tcsdiagram::view::OnSheet {
+        .map(|node| {
             // As a line names it: qualified by its page. See Document::node.
-            name: Qualified::of(&node.name, &node.home).absolute(),
-            node_type: &node.node_type,
-            at: node.at,
-            here: &node.home == home,
+            let name = Qualified::of(&node.name, &node.home).absolute();
+            let here = &node.home == home;
+            // Seen from the top page, a node in a subdiagram is drawn at its
+            // box, whose terminals are the subdiagram's edge.
+            let boxed = match (home, &node.home) {
+                (None, Some(inside)) => document.nodes.iter().find(|box_| {
+                    box_.home.is_none()
+                        && &box_.name == inside
+                        && box_.node_type == "subdiagram"
+                }),
+                _ => None,
+            };
+            if let Some(box_) = boxed {
+                return OnSheet {
+                    name,
+                    node_type: &box_.node_type,
+                    at: box_.at,
+                    here: true,
+                    drawn: Drawn::AtItsBox,
+                };
+            }
+            // And seen from a subdiagram's page, a node outside it is drawn
+            // at the page's own edge.
+            let drawn = if home.is_some() && !here {
+                Drawn::AtTheEdge(pane::WORKING_WIDTH)
+            } else {
+                Drawn::Itself
+            };
+            OnSheet {
+                name,
+                node_type: &node.node_type,
+                at: node.at,
+                here,
+                drawn,
+            }
         })
         .collect()
+}
+
+/// What the line from a subdiagram's edge to a node it exports is drawn
+/// from, where no line joins the node there yet: see
+/// [`unjoined_exports`].
+const NOT_JOINED_OUTSIDE: &str = "not joined outside";
+
+/// The lines a subdiagram's page draws from its edge to each node it exports
+/// that no line from another file joins there yet.
+///
+/// Drawn so that the edge shows everything that may be joined at it: a node
+/// shown at the edge with no line to it would look like a node that is not.
+/// Each line runs between the node and [`NOT_JOINED_OUTSIDE`], which is
+/// drawn at the edge, the way the stream at that terminal runs.
+///
+/// # Arguments
+///
+/// * `document` - The configuration.
+/// * `home`     - The page drawn: none for the top page, which has no edge.
+///
+/// # Returns
+///
+/// The lines, as links.
+fn unjoined_exports(document: &Document, home: &Home) -> Vec<Link> {
+    let Some(exports) = document.exports_written(home) else {
+        return Vec::new();
+    };
+    let mut lines = Vec::new();
+    for (terminal, nodes) in exports.each() {
+        let Some((sink, _)) = tcslibgs::graph::terminals::stream_of(terminal)
+        else {
+            continue;
+        };
+        for node in nodes {
+            let at = Drawing {
+                node: Qualified {
+                    in_: home.clone(),
+                    node: node.clone(),
+                }
+                .absolute(),
+                terminal: terminal.to_string(),
+                holding: None,
+            };
+            let crossing = attached(document, &at, sink).into_iter().any(|l| {
+                let far = if sink { &l.from } else { &l.to };
+                &Qualified::parse(far).in_ != home
+            });
+            if crossing {
+                continue;
+            }
+            let outside = tcslibgs::graph::terminals::answers(terminal)
+                .unwrap_or_default();
+            lines.push(if sink {
+                Link::joining(NOT_JOINED_OUTSIDE, Some(outside), &at.node, None)
+            } else {
+                Link::joining(
+                    &at.node,
+                    Some(terminal),
+                    NOT_JOINED_OUTSIDE,
+                    None,
+                )
+            });
+        }
+    }
+    lines
 }
 
 /// Gives one of the document's links as tcsdiagram draws it.
@@ -5993,6 +6208,17 @@ fn offers_model(offers: &[Offer]) -> ModelRc<JoinOffer> {
 /// nothing that suits the line, and for a node or type this build cannot
 /// find.
 fn offered(document: &Document, from: &Drawing, node: &str) -> Vec<Offer> {
+    // A line from a subdiagram's own edge, on its page: the node clicked
+    // shown or hidden there.
+    if is_box(document, &from.node)
+        && Qualified::parse(node).in_.as_deref() == Some(from.node.as_str())
+    {
+        return edge_offers(document, &from.node, node, &from.terminal);
+    }
+    // A box at either end, on the top page: the nodes its file exports.
+    if is_box(document, &from.node) || is_box(document, node) {
+        return box_offers(document, from, node);
+    }
     let Some((sink_pressed, _)) =
         tcslibgs::graph::terminals::stream_of(&from.terminal)
     else {
@@ -6258,7 +6484,8 @@ fn fed(
 ///
 /// # Returns
 ///
-/// The node's name within `home`, or `None` over the bare canvas.
+/// The node's absolute name -- see `Document::node` -- or `None` over the
+/// bare canvas.
 fn node_under(
     document: &Document,
     home: &Home,
@@ -6274,7 +6501,10 @@ fn node_under(
                 && y >= node.at.1 as f32
                 && y <= (node.at.1 + height as i32) as f32
         })
-        .map(|node| node.name.clone())
+        // Qualified by its page, as a line names it: a node of a
+        // subdiagram's page is that page's, and its bare name could be
+        // another node's on the top page.
+        .map(|node| Qualified::of(&node.name, home).absolute())
 }
 
 /// Lists the links attached to this terminal of this node.
@@ -6358,9 +6588,257 @@ fn anchored(
         return Some(if sink_pressed { ends.from } else { ends.to });
     }
 
+    // Taken from the page's own edge, which is the subdiagram's box seen
+    // from inside: see `tcsdiagram::style::edge_box`.
+    if home.as_deref() == Some(from.node.as_str()) {
+        let width = pane::WORKING_WIDTH as f32;
+        let (at, _) = style::edge_attachment(&from.terminal, width)?;
+        return Some(at);
+    }
     let node = document.node(&from.node)?;
     let (at, _) = style::attachment(&node.node_type, node.at, &from.terminal)?;
     Some(at)
+}
+
+/// Finds which of a subdiagram's edge terminals is under this point, where
+/// one is.
+///
+/// # Arguments
+///
+/// * `home`   - The page: none for the top page, which has no edge.
+/// * `(x, y)` - The point, in the working panes' own coordinates, which are
+///              below nought in the left margin.
+///
+/// # Returns
+///
+/// The terminal's name.
+fn edge_under(home: &Home, (x, y): (f32, f32)) -> Option<&'static str> {
+    home.as_ref()?;
+    let width = pane::WORKING_WIDTH as f32;
+    ["world-in", "world-out", "moc-in", "moc-out"]
+        .into_iter()
+        .find(|terminal| {
+            style::edge_box(terminal, width).is_some_and(|(l, t, w, h)| {
+                x >= l && x <= l + w && y >= t && y <= t + h
+            })
+        })
+}
+
+/// Whether this is a subdiagram's box: a node of the top page that stands
+/// for a file the top file includes.
+///
+/// # Arguments
+///
+/// * `document` - The configuration.
+/// * `name`     - The node's name.
+///
+/// # Returns
+///
+/// `true` for a box.
+fn is_box(document: &Document, name: &str) -> bool {
+    document.node(name).is_some_and(|node| {
+        node.home.is_none() && node.node_type == "subdiagram"
+    })
+}
+
+/// Lists what can be made of a subdiagram's edge and one of its nodes, at
+/// one terminal: the node shown outside there, or hidden again.
+///
+/// Hiding is offered greyed while a line from another file joins the node
+/// there, saying which: hiding it would leave a line the checking refuses.
+///
+/// # Arguments
+///
+/// * `document` - The configuration.
+/// * `home`     - The subdiagram.
+/// * `node`     - The node, by its qualified name.
+/// * `terminal` - The terminal.
+///
+/// # Returns
+///
+/// The one offer, or none for a node without that terminal.
+fn edge_offers(
+    document: &Document,
+    home: &str,
+    node: &str,
+    terminal: &str,
+) -> Vec<Offer> {
+    let Some(found) = document.node(node) else {
+        return Vec::new();
+    };
+    let has = NodeType::ALL
+        .iter()
+        .find(|t| t.spelling() == found.node_type)
+        .is_some_and(|t| t.terminals().has(terminal));
+    let Some((sink, _)) = tcslibgs::graph::terminals::stream_of(terminal)
+    else {
+        return Vec::new();
+    };
+    if !has || found.home.as_deref() != Some(home) {
+        return Vec::new();
+    }
+    let bare = Qualified::parse(node).node;
+    let exported = document
+        .exports
+        .get(home)
+        .is_some_and(|exports| exports.exports(&bare, terminal));
+    let edit = Edit::SetExport {
+        home: home.to_string(),
+        terminal: terminal.to_string(),
+        node: bare.clone(),
+        exported: !exported,
+    };
+    if !exported {
+        return vec![Offer {
+            said: format!("Show {bare}'s {terminal} outside"),
+            edit: Some(edit),
+        }];
+    }
+    let at = Drawing {
+        node: node.to_string(),
+        terminal: terminal.to_string(),
+        holding: None,
+    };
+    let crossing = attached(document, &at, sink).into_iter().find(|l| {
+        let far = if sink { &l.from } else { &l.to };
+        Qualified::parse(far).in_.as_deref() != Some(home)
+    });
+    let why = crossing.map(|l| {
+        let far = if sink { &l.from } else { &l.to };
+        format!(
+            "a line from outside joins it: {}",
+            Qualified::parse(far).node
+        )
+    });
+    vec![Offer::of(
+        format!("Hide {bare}'s {terminal} from outside"),
+        why,
+        edit,
+    )]
+}
+
+/// The nodes a line may reach at one terminal of a node of the top page:
+/// the node itself, or for a subdiagram's box, each node its file exports
+/// there, each by its qualified name and what a menu calls it.
+///
+/// # Arguments
+///
+/// * `document` - The configuration.
+/// * `node`     - The node.
+/// * `terminal` - The terminal.
+///
+/// # Returns
+///
+/// Each node, and its name for the menu: empty for the node itself.
+fn reached_at(
+    document: &Document,
+    node: &str,
+    terminal: &str,
+) -> Vec<(String, String)> {
+    if !is_box(document, node) {
+        return vec![(node.to_string(), String::new())];
+    }
+    document
+        .exports_written(&Some(node.to_string()))
+        .map(|exports| {
+            exports
+                .each()
+                .iter()
+                .filter(|(at, _)| *at == terminal)
+                .flat_map(|(_, nodes)| nodes.iter())
+                .map(|inner| {
+                    let absolute = Qualified {
+                        in_: Some(node.to_string()),
+                        node: inner.clone(),
+                    }
+                    .absolute();
+                    (absolute, inner.clone())
+                })
+                .collect()
+        })
+        .unwrap_or_default()
+}
+
+/// Lists the new lines a line in hand can be made into where one end or the
+/// other is a subdiagram's box, on the top page: a line to or from each node
+/// the box's file exports at the terminal it reaches.
+///
+/// # Arguments
+///
+/// * `document` - The configuration.
+/// * `from`     - The terminal the line was taken from: of a node, or of a
+///                box.
+/// * `node`     - The node clicked: a node, or a box.
+///
+/// # Returns
+///
+/// Each offer, greyed where it cannot be made, as `offered` greys them.
+fn box_offers(document: &Document, from: &Drawing, node: &str) -> Vec<Offer> {
+    let Some((sink_pressed, _)) =
+        tcslibgs::graph::terminals::stream_of(&from.terminal)
+    else {
+        return Vec::new();
+    };
+    let Some(wanted) = tcslibgs::graph::terminals::answers(&from.terminal)
+    else {
+        return Vec::new();
+    };
+    if node == from.node {
+        return Vec::new();
+    }
+    let has = |name: &str, terminal: &str| {
+        is_box(document, name)
+            || document.node(name).is_some_and(|found| {
+                NodeType::ALL
+                    .iter()
+                    .find(|t| t.spelling() == found.node_type)
+                    .is_some_and(|t| t.terminals().has(terminal))
+            })
+    };
+    if !has(node, wanted) {
+        return Vec::new();
+    }
+    // The leaving end and the arriving end, each a node and its terminal.
+    let ((source, leaves), (sink, arrives)) = if sink_pressed {
+        ((node, wanted), (from.node.as_str(), from.terminal.as_str()))
+    } else {
+        ((from.node.as_str(), from.terminal.as_str()), (node, wanted))
+    };
+    let mut offers = Vec::new();
+    for (leaving, leaving_said) in reached_at(document, source, leaves) {
+        for (arriving, arriving_said) in reached_at(document, sink, arrives) {
+            for (input_said, input) in inputs_at(document, &arriving, arrives) {
+                let link = Link::joining(
+                    &leaving,
+                    Some(leaves),
+                    &arriving,
+                    input.as_deref(),
+                );
+                let why = repeated(document, &link, None).or_else(|| {
+                    fed(document, &arriving, input.as_deref(), arrives, None)
+                });
+                // Named by what is behind each box, and by the input where it
+                // is one a node declares.
+                let to = match (arriving_said.is_empty(), &input) {
+                    (false, Some(input))
+                        if tcslibgs::graph::terminals::stream_of(input)
+                            .is_none() =>
+                    {
+                        format!("{arriving_said}.{input}")
+                    }
+                    (false, _) => arriving_said.clone(),
+                    (true, _) => input_said,
+                };
+                let said = if leaving_said.is_empty() {
+                    format!("New line to {to}")
+                } else {
+                    format!("New line from {leaving_said} to {to}")
+                };
+                offers.push(Offer::of(said, why, Edit::AddLink { link }));
+            }
+        }
+    }
+    offers
 }
 
 /// Decides what to record about the end a line arrives at.
@@ -9105,12 +9583,13 @@ mod tests {
         );
     }
 
-    /// A link that leaves the page is drawn, and says where it goes.
+    /// A link that leaves the page is drawn to the subdiagram's edge, and
+    /// says where it goes.
     ///
     /// Left out it would make a subdiagram look unconnected when it is not;
     /// drawn to the node itself it would have to reach into another window.
     #[test]
-    fn a_crossing_link_is_drawn_to_a_stub_that_names_its_far_end() {
+    fn a_crossing_link_is_drawn_to_the_edge_and_names_its_far_end() {
         let where_ = tempfile::tempdir().expect("a directory");
         let mut editor = Editor::new(&where_.path().join("vehicle.ytcs"));
 
@@ -9138,10 +9617,17 @@ mod tests {
         assert_eq!(inside.len(), 1);
         assert_eq!(inside[0].label, "gateway");
 
-        // And seen from the top diagram, where its source is off the page.
+        // And seen from the top diagram, where its source is behind the
+        // box: drawn from the box's world-out, and named by its own name,
+        // the box already saying which file it is in.
         let (_, top) = views_of(&editor, &None, None);
         assert_eq!(top.len(), 1);
-        assert_eq!(top[0].label, "zone/temp_1");
+        assert_eq!(top[0].label, "temp_1");
+        let link = &editor.document().links[0];
+        let at = editor.document().node("zone").expect("the box").at;
+        let ((x, y), _) =
+            style::attachment("subdiagram", at, "world-out").expect("it");
+        assert_eq!(ends_of(editor.document(), link, &None).from, (x, y));
     }
 
     /// A name is the type, a hyphen and the first free number, and it is
@@ -9560,6 +10046,114 @@ mod tests {
         assert_eq!(
             read.node("sensor").expect("the node").comment.as_deref(),
             Some("0x49 after the rework.\nSee ECR-114.")
+        );
+    }
+
+    /// A subdiagram is joined at its edge: from outside, at the box, to the
+    /// nodes its file exports; and from inside, at the page's edge, where a
+    /// node is shown outside or hidden again.
+    #[test]
+    fn a_subdiagram_is_joined_at_its_edge() {
+        let mut document = of_nodes(&[
+            ("zone", "subdiagram"),
+            ("sensor", "i2c"),
+            ("other", "i2c"),
+            ("ground", "gateway_radio"),
+        ]);
+        for inner in ["temp1", "thermostat"] {
+            document.apply(&Edit::AddNode {
+                name: inner.into(),
+                node_type: "compute".into(),
+                home: Some("zone".into()),
+            });
+        }
+        let export = |terminal: &str, node: &str| Edit::SetExport {
+            home: "zone".into(),
+            terminal: terminal.into(),
+            node: node.into(),
+            exported: true,
+        };
+        document.apply(&export("world-in", "temp1"));
+        document.apply(&export("world-out", "temp1"));
+        document.apply(&Edit::AddLink {
+            link: Link::joining(
+                "sensor",
+                Some("world-out"),
+                "zone/temp1",
+                Some("world-in"),
+            ),
+        });
+
+        // A node of the subdiagram's page is found by the name a line uses
+        // for it, qualified by the page; its bare name is nobody's on the
+        // top page.
+        document.apply(&Edit::MoveNode {
+            node: "zone/thermostat".into(),
+            was: (0, 0),
+            now: (400, 200),
+        });
+        assert_eq!(
+            node_under(&document, &Some("zone".into()), (420.0, 220.0))
+                .as_deref(),
+            Some("zone/thermostat")
+        );
+
+        // From outside, at the box: the nodes it exports, and nothing else.
+        assert_eq!(
+            said(&offered(
+                &document,
+                &in_hand_at("other", "world-out", None),
+                "zone"
+            )),
+            ["New line to temp1 (fed by sensor)"]
+        );
+        let offers = offered(
+            &document,
+            &in_hand_at("zone", "world-out", None),
+            "ground",
+        );
+        assert_eq!(said(&offers), ["New line from temp1 to world-in"]);
+        assert_eq!(
+            offers[0].edit,
+            Some(Edit::AddLink {
+                link: Link::joining(
+                    "zone/temp1",
+                    Some("world-out"),
+                    "ground",
+                    None
+                ),
+            })
+        );
+
+        // From inside, at the edge: a node shown outside, and one hidden
+        // again -- except while a line from outside joins it there.
+        let offers = offered(
+            &document,
+            &in_hand_at("zone", "world-out", None),
+            "zone/thermostat",
+        );
+        assert_eq!(said(&offers), ["Show thermostat's world-out outside"]);
+        assert_eq!(offers[0].edit, Some(export("world-out", "thermostat")));
+        assert_eq!(
+            said(&offered(
+                &document,
+                &in_hand_at("zone", "world-in", None),
+                "zone/temp1",
+            )),
+            ["Hide temp1's world-in from outside (a line from outside \
+                 joins it: sensor)"]
+        );
+
+        // And a node shown outside that nothing joins there yet is drawn
+        // joined to the edge all the same.
+        assert_eq!(
+            unjoined_exports(&document, &Some("zone".into())),
+            [Link::joining(
+                "zone/temp1",
+                Some("world-out"),
+                NOT_JOINED_OUTSIDE,
+                None
+            )]
         );
     }
 

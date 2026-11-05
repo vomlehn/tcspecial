@@ -4584,6 +4584,39 @@ a press on a corner takes a line and a press anywhere else moves the node. That
 is the one thing the arrangement costs: a node can no longer be dragged by its
 corners.
 
+A line that crosses into or out of a subdiagram is drawn to the subdiagram's
+edge on both sides of it -- see *Configuration* for ``exports``, which says
+what of an included file may be joined from outside it. On the page the box
+is on, the line runs to the box's corner terminal of the same name as the
+inner node's, and is labelled with the inner node; the box's four terminals
+are its edge, and what is behind each is named on the lines. Inside, the
+subdiagram's page has a margin either side of its working panes, pale and
+labelled *outside*, holding the four terminals again where the box has them:
+``world-in`` and ``moc-out`` on the left, ``world-out`` and ``moc-in``
+on the right. A line from another file runs to the edge terminal facing its
+own end and is labelled with the node outside it reaches. A node the file
+exports that nothing outside joins yet is drawn joined to the edge all the
+same, its line labelled *not joined outside*, because the edge shows what may
+be joined at it and a node shown there with no line would look like one that
+is not. In the margins rather than over the panes, which are where nodes go:
+an edge drawn over the payload pane's first column would be drawn over the
+payloads in it. A line between two subdiagrams is drawn between their boxes on
+the top page, and to the edge on each page.
+
+The same three clicks join across the edge. Clicking a subdiagram's box with a
+line in hand offers a line to each node its file exports at that terminal, by
+name, greyed as any offer is greyed where it cannot be made; and a line taken
+from one of the box's terminals offers, at the node clicked next, a line from
+each exported node there. A box that exports nothing at that terminal offers no
+menu, and the window says to open it and join a node to its edge. Inside, an
+edge terminal is clicked as a node's terminal is: then a node of the page,
+or a node's terminal and then the edge terminal of the same name, offers to
+show that node outside there, or, where it is shown, to hide it again. Hiding
+is greyed while a line from another file joins the node there, saying which:
+the line would be one the checking refuses. Showing and hiding are edits like
+any other, each taken back by one undo, and written into the file's
+``exports`` as they are made.
+
 A line's colour says which stream it carries, and a line is drawn twice as
 wide as it was. Both halves of that are the same point: a line is the thing a
 reader of a diagram follows, and a grey one two pixels wide left the two
@@ -9028,7 +9061,9 @@ Requirement
     route tcsgui gives it. Where the panes are divided is the person's own
     tcsgui setting, read and never written, and the nodes are settled into
     their panes by the rule the editor settles a file it opens with. A line to
-    a node in an included file is drawn to a stub, as the editor draws it.
+    a node in an included file is drawn to a stub labelled with that node:
+    the window draws the top file's nodes and not the boxes the editor draws
+    for the files it includes.
 
 Requirement
     The drawing is one drawing. What a node, a link and the sheet look like --

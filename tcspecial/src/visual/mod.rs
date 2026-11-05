@@ -330,6 +330,7 @@ fn draw(
             node_type: &node.node_type,
             at: placed.at,
             here: here(&node.name),
+            drawn: Default::default(),
         })
         .collect();
 

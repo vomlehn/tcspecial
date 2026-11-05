@@ -163,7 +163,7 @@ const _: () = assert!(GATEWAY_PLACE.1 >= pane::NAMES.0 + pane::NAMES.1);
 /// from it again. Nothing is copied between windows, so nothing can disagree.
 struct Views {
     top: slint::Weak<MainWindow>,
-    open: BTreeMap<String, SubWindow>,
+    open: BTreeMap<String, MainWindow>,
     /// Where the two dividers between the three working panes sit, in the
     /// coordinates the file holds.
     ///
@@ -524,15 +524,21 @@ impl Views {
             );
         }
         for (name, window) in &self.open {
-            put_sub(
+            window.set_path(editor.files().0.display().to_string().into());
+            put(
                 window,
                 editor,
-                name,
+                &Some(name.clone()),
                 chosen.get(name).map(|s| s.as_str()),
                 divider,
                 lists,
                 held.as_ref(),
             );
+        }
+        // How the selection column is shared, in every window alike.
+        let physics_list = self.physics_list.get();
+        for window in self.top.upgrade().iter().chain(self.open.values()) {
+            window.set_physics_list_percent(physics_list);
         }
     }
 }
@@ -833,51 +839,7 @@ fn main() -> Result<(), slint::PlatformError> {
     // the line being dragged off the drawing: see Views::drawing.
     views.borrow_mut().drawing = drawing.clone();
     wire(&ui, &editor, &views, &drawing, &chosen, &None);
-    wire_physics(&ui, &editor, &views);
-
-    {
-        // Opening a subdiagram. A window per subdiagram, made once and raised
-        // afterwards: pressing the mark twice should bring the window
-        // forward, not make a second one showing the same thing.
-        let editor = editor.clone();
-        let views = views.clone();
-        let drawing = drawing.clone();
-        ui.on_open_subdiagram(move |name| {
-            let name = name.to_string();
-            if let Some(already) = views.borrow().open.get(&name) {
-                let _ = already.show();
-                return;
-            }
-
-            let window = match SubWindow::new() {
-                Ok(window) => {
-                    session!(&window);
-                    window
-                }
-                Err(e) => {
-                    eprintln!("tcsgui: {name} cannot be opened: {e}");
-                    return;
-                }
-            };
-            window.set_editing(name.clone().into());
-            furnish!(&window, descriptions());
-            wire_sub(&window, &editor, &views, &drawing, &chosen, &name);
-            put_sub(
-                &window,
-                &editor.borrow(),
-                &name,
-                None,
-                views.borrow().divider.get(),
-                views.borrow().lists.get(),
-                None,
-            );
-            if let Err(e) = window.show() {
-                eprintln!("tcsgui: {name} cannot be shown: {e}");
-                return;
-            }
-            views.borrow_mut().open.insert(name, window);
-        });
-    }
+    wire_physics(&ui, &editor, &views, &None);
 
     // And the question about whatever is wrong with the file as it arrived,
     // in front of the window that is already up: see `settle_problems`.
@@ -960,707 +922,705 @@ fn main() -> Result<(), slint::PlatformError> {
 /// Wire a window's callbacks to the one editor.
 ///
 /// `home` is the subdiagram the window is editing, so a node placed in it goes
-/// into that subdiagram's file. The two window types have the same callbacks
-/// and so want the same wiring; what differs is only the home they pass.
-macro_rules! wiring {
-    ($name:ident, $window:ty, $put:ident) => {
-        #[allow(clippy::too_many_arguments)]
-        fn $name(
-            window: &$window,
-            editor: &Rc<RefCell<Editor>>,
-            views: &Rc<RefCell<Views>>,
-            drawing: &Rc<RefCell<Option<Drawing>>>,
-            chosen: &Rc<RefCell<BTreeMap<String, String>>>,
-            home: &Home,
-        ) {
-            {
-                let editor = editor.clone();
-                let views = views.clone();
-                window.on_undo_clicked(move || {
-                    editor.borrow_mut().undo();
-                    views.borrow().refresh(&editor.borrow());
-                });
-            }
-            {
-                let editor = editor.clone();
-                let views = views.clone();
-                window.on_redo_clicked(move || {
-                    editor.borrow_mut().redo();
-                    views.borrow().refresh(&editor.borrow());
-                });
-            }
-            {
-                let editor = editor.clone();
-                let views = views.clone();
-                let home = home.clone();
-                // A weak handle to the window the press came from: the
-                // placement depends on what that window is showing, and
-                // scrolling it afterwards is half of what placing a node
-                // means. Weak because the closure outlives nothing and the
-                // window owns the closure.
-                let window_for_place = window.as_weak();
-                window.on_place_node(move |called, node_type, sets| {
-                    // What the window is showing, which is what decides where
-                    // a new node goes: as high as it fits *in view*. The
-                    // window is asked rather than told, because the person
-                    // scrolling is the one who moved it.
-                    let visible = (
-                        (-window_for_place
-                            .upgrade()
-                            .map(|w| w.get_canvas_offset())
-                            .unwrap_or(0.0))
-                        .round() as i32,
-                        window_for_place
-                            .upgrade()
-                            .map(|w| w.get_canvas_view_height())
-                            .unwrap_or(0.0)
-                            .round() as i32,
-                    );
-                    let at = {
-                        let mut editor = editor.borrow_mut();
-                        // Named after what was pressed rather than after the
-                        // type: a described node is "mean" and not
-                        // "compute-3", which is what a reader of the
-                        // configuration will be looking for.
-                        let name =
-                            fresh_name(editor.document(), &called, &home);
-                        let at = next_place(
-                            editor.document(),
-                            &home,
-                            &node_type,
-                            views.borrow().divider.get(),
-                            visible,
-                        );
-                        // A node exists, and then it is somewhere: two edits,
-                        // recorded as one group so that one Undo takes the
-                        // node away and one Redo puts it back where it was
-                        // placed. A drag afterwards is a move of its own, so
-                        // undoing that still leaves the node.
-                        let mut edits = vec![Edit::AddNode {
-                            name: name.clone(),
-                            node_type: node_type.to_string(),
-                            home: home.clone(),
-                        }];
-                        // What the description answers for it, before it is
-                        // placed: a compute node from the `mean` entry is a
-                        // mean from the moment it exists, so the panel asks
-                        // for a mean's attributes and the checking holds it to
-                        // a mean's rules.
-                        for (attribute, value) in stated(&sets) {
-                            edits.push(Edit::SetAttribute {
-                                node: Qualified::of(&name, &home).absolute(),
-                                attribute,
-                                was: None,
-                                now: Some(value),
-                            });
-                        }
-                        edits.push(Edit::MoveNode {
-                            node: Qualified::of(&name, &home).absolute(),
-                            was: (0, 0),
-                            now: at,
-                        });
-                        editor.edit(Edit::Group { edits });
-                        at
-                    };
-                    views.borrow().refresh(&editor.borrow());
-                    // And the sheet is scrolled so the new node is at the top
-                    // of the view. It was placed where it fits, which may be
-                    // above or below what the window was showing; a node
-                    // placed out of sight is a press that did nothing as far
-                    // as the person who made it can tell.
-                    if let Some(window) = window_for_place.upgrade() {
-                        window.set_canvas_offset(-(at.1 as f32));
-                    }
-                });
-            }
-            {
-                let editor = editor.clone();
-                // A second handle, for the click that opens a window: the
-                // borrow taken to read the document has to be dropped before
-                // the window's own handlers can run.
-                let editor_for_click = editor.clone();
-                let views = views.clone();
-                let home = home.clone();
-                window.on_node_moved(move |name, dx, dy| {
-                    {
-                        let mut editor = editor.borrow_mut();
-                        let absolute = Qualified::of(&name, &home).absolute();
-                        // Where it was, from the document rather than from the
-                        // window: the window has been drawing it offset by the
-                        // drag, and the edit has to be relative to the
-                        // document.
-                        let (was, node_type) =
-                            match editor.document().node(&absolute) {
-                                Some(node) => (node.at, node.node_type.clone()),
-                                None => return,
-                            };
-                        // Brought back inside its own pane: a payload dragged
-                        // left stops at the divider rather than crossing it.
-                        // The drag is clamped rather than refused, so pushing
-                        // a node at the edge moves it along the edge instead
-                        // of doing nothing.
-                        let now = confine(
-                            &node_type,
-                            views.borrow().divider.get(),
-                            snap((
-                                was.0 + dx.round() as i32,
-                                was.1 + dy.round() as i32,
-                            )),
-                        );
-                        // A press that moved nothing is a click, and a click
-                        // on a node is a request to see what it says. Told
-                        // apart by the distance and not by the time: a gesture
-                        // that means one thing or another depending on how
-                        // long it took is a gesture that does the wrong one
-                        // under pressure.
-                        //
-                        // The *gesture* and not the position it works out to.
-                        // Those are different questions, and asking the second
-                        // one lost a node's first click: a node whose position
-                        // is not on the grid, or is outside the pane its type
-                        // belongs to -- a file somebody hand-edited, a
-                        // configuration from a build that drew the panes
-                        // differently -- resolves to somewhere other than
-                        // where it is, so `now != was` and a click on it was
-                        // read as a drag. It moved instead of opening, and the
-                        // second click opened it.
-                        if dx.round() as i32 == 0 && dy.round() as i32 == 0 {
-                            drop(editor);
-                            show_node(&editor_for_click, &views, &absolute);
-                            return;
-                        }
-                        // A drag that ends where it started: no edit, and no
-                        // window either. Dragging a node against a divider and
-                        // back is a gesture that changed nothing, and an entry
-                        // in the history for it would be an undo that does
-                        // nothing visible.
-                        if now == was {
-                            return;
-                        }
-                        editor.edit(Edit::MoveNode {
-                            node: absolute,
-                            was,
-                            now,
-                        });
-                    }
-                    views.borrow().refresh(&editor.borrow());
-                });
-            }
-            {
-                // Writing every file of the configuration now. Nothing to do
-                // in the ordinary case -- every edit is written as it is made
-                // -- and the way to retry a write that failed. See
-                // Editor::save.
-                let editor = editor.clone();
-                let views = views.clone();
-                window.on_save_clicked(move || {
-                    editor.borrow_mut().save();
-                    views.borrow().refresh(&editor.borrow());
-                });
-            }
-            {
-                // Every file somewhere else, from the File menu: see
-                // save_as.
-                let editor = editor.clone();
-                let views = views.clone();
-                window.on_save_as_clicked(move || {
-                    save_as(&editor, &views, false);
-                });
-            }
-            {
-                // The menu item that opens what tcspecial is configured with.
-                let editor = editor.clone();
-                let views = views.clone();
-                window.on_edit_parameters(move || {
-                    show_parameters(&editor, &views);
-                });
-            }
-            {
-                // Every node to the top of its own pane, and the view back at
-                // the top of the sheet: see `Editor::arrange`.
-                let editor = editor.clone();
-                let views = views.clone();
-                let window_for_scroll = window.as_weak();
-                window.on_arrange(move || {
-                    let dividers = views.borrow().divider.get();
-                    editor.borrow_mut().arrange(dividers);
-                    // And the view back at the top of the sheet, because that
-                    // is where the nodes have gone. A view left halfway down
-                    // one would make the command look as though it had emptied
-                    // the canvas.
-                    if let Some(window) = window_for_scroll.upgrade() {
-                        window.set_canvas_offset(0.0);
-                    }
-                    views.borrow().refresh(&editor.borrow());
-                });
-            }
-            {
-                // And the simulator's groups of settings. A simulated
-                // payload's own settings are in its node's panel, under a
-                // rule: see panel_of.
-                let editor = editor.clone();
-                let views = views.clone();
-                window.on_edit_simulator_groups(move || {
-                    show_sim_groups(&editor, &views);
-                });
-            }
-            {
-                // The groups, from the File menu. Which group is chosen is
-                // the window's own business now: a list of what a
-                // configuration happens to contain is data, and a control
-                // holding data belongs with the form that edits it.
-                let editor = editor.clone();
-                let views = views.clone();
-                window.on_edit_groups(move || {
-                    show_group(&editor, &views);
-                });
-            }
-            {
-                // The way out. Where something has been changed that the
-                // files do not have, the offer to write it comes first: see
-                // leave.
-                let editor = editor.clone();
-                let views = views.clone();
-                window.on_exit_requested(move || {
-                    leave(&editor, &views);
-                });
-            }
-            {
-                // Moving either divider between the three working panes.
-                //
-                // Told once, when the gesture finishes, as a node's drag is:
-                // the line follows the pointer in the window and this is what
-                // it settles on. Not an edit -- there is nothing to undo,
-                // because the configuration has not changed -- so it is
-                // written to the settings instead of to the history.
-                {
-                    let editor = editor.clone();
-                    let views = views.clone();
-                    window.on_payload_divider_moved(move |dx: f32| {
-                        drag_divider(&editor, &views, Pane::Payloads, dx);
-                    });
-                }
-                {
-                    let editor = editor.clone();
-                    let views = views.clone();
-                    window.on_vehicle_divider_moved(move |dx: f32| {
-                        drag_divider(&editor, &views, Pane::Vehicle, dx);
-                    });
-                }
-                // And either line between the three selection lists, which is
-                // the same gesture down the column: see drag_list_divider.
-                {
-                    let editor = editor.clone();
-                    let views = views.clone();
-                    window.on_payload_list_divider_moved(
-                        move |dy: f32, tall: f32| {
-                            drag_list_divider(
-                                &editor,
-                                &views,
-                                Pane::Payloads,
-                                dy,
-                                tall,
-                            );
-                        },
-                    );
-                }
-                {
-                    let editor = editor.clone();
-                    let views = views.clone();
-                    window.on_vehicle_list_divider_moved(
-                        move |dy: f32, tall: f32| {
-                            drag_list_divider(
-                                &editor,
-                                &views,
-                                Pane::Vehicle,
-                                dy,
-                                tall,
-                            );
-                        },
-                    );
-                }
-            }
-            // Drawing a link, in three clicks: the terminal, which takes a
-            // line in hand; the node it goes to, which offers what it can be
-            // made into there; and the offer. What is offered is the window's
-            // own, because the menu asking it is.
-            let asking: Rc<RefCell<Vec<Offer>>> =
-                Rc::new(RefCell::new(Vec::new()));
-            {
-                let drawing = drawing.clone();
-                let home = home.clone();
-                let editor_for_press = editor.clone();
-                let views_for_press = views.clone();
-                let asking = asking.clone();
-                let weak = window.as_weak();
-                window.on_link_started(move |name, terminal| {
-                    let at = Drawing {
-                        node: Qualified::of(&name, &home).absolute(),
-                        terminal: terminal.to_string(),
-                        holding: None,
-                    };
-                    // A terminal with one link on it is a line being picked up
-                    // by its end; one with none, or with several, is a line
-                    // about to be drawn. See Drawing::holding.
-                    let sink =
-                        tcslibgs::graph::terminals::stream_of(&at.terminal)
-                            .map(|(sink, _)| sink)
-                            .unwrap_or(false);
-                    let held = {
-                        let editor = editor_for_press.borrow();
-                        let theirs = attached(editor.document(), &at, sink);
-                        match theirs.as_slice() {
-                            [one] => Some(one.clone()),
-                            _ => None,
-                        }
-                    };
-                    if let Some(window) = weak.upgrade() {
-                        window.set_join_offers(ModelRc::default());
-                        window.set_join_hint(
-                            in_hand(&at.terminal, held.is_some()).into(),
-                        );
-                        window.set_joining("node".into());
-                    }
-                    asking.borrow_mut().clear();
-                    *drawing.borrow_mut() = Some(Drawing {
-                        holding: held,
-                        ..at
-                    });
-                    // Taken off the drawing while the line is in hand, so it
-                    // follows the hand rather than staying where it was. The
-                    // lines only: rebuilding the nodes would destroy the
-                    // element holding the pointer and the rest of the press
-                    // with it. See Views::relink.
-                    views_for_press.borrow().relink(&editor_for_press.borrow());
-                });
-            }
-            {
-                let drawing = drawing.clone();
-                let home = home.clone();
-                let editor = editor.clone();
-                let views = views.clone();
-                let asking = asking.clone();
-                let weak = window.as_weak();
-                // A line taken from the page's own edge: the subdiagram's box
-                // seen from inside, so the line is the box's, by the box's
-                // name, and the node clicked next is shown or hidden there.
-                window.on_edge_started(move |terminal| {
-                    let Some(inside) = home.clone() else {
-                        return;
-                    };
-                    if let Some(window) = weak.upgrade() {
-                        window.set_join_offers(ModelRc::default());
-                        window.set_join_hint(
-                            format!(
-                                "The edge's {terminal} is in hand: click a \
-                                 node to show it outside there, or to hide \
-                                 it. Escape, or a click on bare sheet, puts \
-                                 it down."
-                            )
-                            .into(),
-                        );
-                        window.set_joining("node".into());
-                    }
-                    asking.borrow_mut().clear();
-                    *drawing.borrow_mut() = Some(Drawing {
-                        node: inside,
-                        terminal: terminal.to_string(),
-                        holding: None,
-                    });
-                    views.borrow().relink(&editor.borrow());
-                });
-            }
-            {
-                let window_for_drawing = window.as_weak();
-                let drawing_for_motion = drawing.clone();
-                let editor_for_motion = editor.clone();
-                let home_for_motion = home.clone();
-                // Where the pointer is, while a line is in hand. The line
-                // follows it: a line that stayed at the terminal until it was
-                // put somewhere would be a gesture with nothing to aim.
-                window.on_link_moved(move |x, y| {
-                    let Some(window) = window_for_drawing.upgrade() else {
-                        return;
-                    };
-                    let said = drawing_for_motion
-                        .borrow()
-                        .as_ref()
-                        .and_then(|from| {
-                            let editor = editor_for_motion.borrow();
-                            let anchor = anchored(
-                                editor.document(),
-                                &home_for_motion,
-                                from,
-                            )?;
-                            Some(route::drawing(anchor, (x, y)))
-                        })
-                        .unwrap_or_default();
-                    window.set_drawing_route(said.into());
-                });
-            }
-            {
-                let editor = editor.clone();
-                let views = views.clone();
-                let drawing = drawing.clone();
-                let home = home.clone();
-                let asking = asking.clone();
-                let weak = window.as_weak();
-                // A click with a line in hand. On bare sheet, the line is put
-                // down and nothing changes; on a node, what the line can be
-                // made into there is asked; and on a node that can take
-                // nothing of it, the line stays in hand and the window says
-                // why, which is a better answer to a near miss than throwing
-                // away a line that took a click to pick up.
-                window.on_link_clicked(move |x, y| {
-                    let Some(window) = weak.upgrade() else {
-                        return;
-                    };
-                    window.set_join_offers(ModelRc::default());
-                    asking.borrow_mut().clear();
-                    let Some(from) = drawing.borrow().clone() else {
-                        stop_joining(&window, &drawing);
-                        return;
-                    };
-                    let document_node = {
-                        let editor = editor.borrow();
-                        let document = editor.document();
-                        // A line taken on another page is no line on this
-                        // one: see anchored.
-                        let anchor = anchored(document, &home, &from);
-                        // The page's own edge, where a node of the page is
-                        // shown outside it, named for the menu as the
-                        // subdiagram's edge.
-                        let edge = anchor
-                            .and(edge_under(&home, (x, y)))
-                            .zip(home.as_deref())
-                            .map(|(edge, inside)| {
-                                let offers = if from.terminal == edge {
-                                    edge_offers(
-                                        document, inside, &from.node, edge,
-                                    )
-                                } else {
-                                    Vec::new()
-                                };
-                                (format!("{inside}/the edge"), offers)
-                            });
-                        edge.or_else(|| {
-                            anchor
-                                .and_then(|_| {
-                                    node_under(document, &home, (x, y))
-                                })
-                                .map(|node| {
-                                    let offers =
-                                        offered(document, &from, &node);
-                                    (node, offers)
-                                })
-                        })
-                    };
-                    let Some((node, offers)) = document_node else {
-                        stop_joining(&window, &drawing);
-                        views.borrow().refresh(&editor.borrow());
-                        return;
-                    };
-                    let shown = Qualified::parse(&node).node;
-                    if offers.is_empty() {
-                        let boxed = is_box(editor.borrow().document(), &node);
-                        let at =
-                            tcslibgs::graph::terminals::answers(&from.terminal);
-                        let nothing = match at {
-                            // A box whose file shows nothing there: what to
-                            // do about that is inside it.
-                            Some(at) if boxed => format!(
-                                "{node} shows nothing at its {at}: open it, \
-                                 and join a node to its {at} at the edge."
-                            ),
-                            _ => format!(
-                                "{shown} has nothing this line can join."
-                            ),
-                        };
-                        window.set_join_hint(
-                            format!(
-                                "{nothing} {}",
-                                in_hand(&from.terminal, from.holding.is_some())
-                            )
-                            .into(),
-                        );
-                        return;
-                    }
-                    window.set_join_heading(shown.into());
-                    window.set_join_offers(offers_model(&offers));
-                    *asking.borrow_mut() = offers;
-                });
-            }
-            {
-                let editor = editor.clone();
-                let views = views.clone();
-                let drawing = drawing.clone();
-                let asking = asking.clone();
-                let weak = window.as_weak();
-                // The offer chosen: its edit is made, and the line is put
-                // down whatever it was.
-                window.on_link_chosen(move |chosen| {
-                    let offers = std::mem::take(&mut *asking.borrow_mut());
-                    if let Some(window) = weak.upgrade() {
-                        stop_joining(&window, &drawing);
-                    }
-                    let edit = usize::try_from(chosen)
-                        .ok()
-                        .and_then(|chosen| offers.into_iter().nth(chosen))
-                        .and_then(|offer| offer.edit);
-                    if let Some(edit) = edit {
-                        editor.borrow_mut().edit(edit);
-                    }
-                    views.borrow().refresh(&editor.borrow());
-                });
-            }
-            {
-                let editor = editor.clone();
-                let views = views.clone();
-                let drawing = drawing.clone();
-                let asking = asking.clone();
-                let weak = window.as_weak();
-                // The line put down, with nothing made of it. Always a
-                // refresh: a line picked up was taken off the drawing while
-                // it was in hand, and has to be put back.
-                window.on_link_stopped(move || {
-                    asking.borrow_mut().clear();
-                    if let Some(window) = weak.upgrade() {
-                        stop_joining(&window, &drawing);
-                    }
-                    views.borrow().refresh(&editor.borrow());
-                });
-            }
-            {
-                let editor = editor.clone();
-                let views = views.clone();
-                let drawing = drawing.clone();
-                let asking = asking.clone();
-                let weak = window.as_weak();
-                // The Delete key, with a line in hand that was picked up off
-                // a terminal: that line taken out. A line being drawn from
-                // nothing has nothing to take out, and is put down.
-                window.on_link_removed(move || {
-                    asking.borrow_mut().clear();
-                    let held = drawing
-                        .borrow()
-                        .as_ref()
-                        .and_then(|from| from.holding.clone());
-                    if let Some(window) = weak.upgrade() {
-                        stop_joining(&window, &drawing);
-                    }
-                    if let Some(link) = held {
-                        editor.borrow_mut().edit(Edit::RemoveLink { link });
-                    }
-                    views.borrow().refresh(&editor.borrow());
-                });
-            }
-            {
-                let editor_for_menu = editor.clone();
-                let views_for_menu = views.clone();
-                let home_for_menu = home.clone();
-                // Edit, from the menu a click on a node opens: the window
-                // that shows what the node says, which is what a click used
-                // to open on its own.
-                window.on_node_edit(move |name| {
-                    let absolute =
-                        Qualified::of(&name, &home_for_menu).absolute();
-                    show_node(&editor_for_menu, &views_for_menu, &absolute);
-                });
-            }
-            {
-                let editor_for_concerns = editor.clone();
-                let views_for_concerns = views.clone();
-                // What might be wrong, and what was set aside: one window,
-                // pointed at either list. See `show_concerns`.
-                window.on_show_concerns(move || {
-                    show_concerns(
-                        &editor_for_concerns,
-                        &views_for_concerns,
-                        false,
-                    );
-                });
-            }
-            {
-                let editor_for_aside = editor.clone();
-                let views_for_aside = views.clone();
-                window.on_show_aside(move || {
-                    show_concerns(&editor_for_aside, &views_for_aside, true);
-                });
-            }
-            {
-                let editor_for_delete = editor.clone();
-                let views_for_delete = views.clone();
-                let home_for_delete = home.clone();
-                // And Delete, which asks before it does anything: see
-                // `confirm_delete`.
-                window.on_node_delete(move |name| {
-                    let absolute =
-                        Qualified::of(&name, &home_for_delete).absolute();
-                    confirm_delete(
-                        &editor_for_delete,
-                        &views_for_delete,
-                        &absolute,
-                    );
-                });
-            }
-            {
-                // Choosing a node: the outline follows, and nothing is
-                // recorded. What the node says about itself is a window of
-                // its own, reached through the node's menu, so a press has
-                // only the outline to change.
-                let views = views.clone();
-                let chosen = chosen.clone();
-                let home = home.clone();
-                window.on_node_selected(move |name| {
-                    chosen.borrow_mut().insert(
-                        home.clone().unwrap_or_default(),
-                        name.to_string(),
-                    );
-                    // The outline only: choosing a node is the same press
-                    // that starts dragging it, and rebuilding the canvas here
-                    // would replace the element the pointer is holding. See
-                    // Views::chose.
-                    views.borrow().chose(&home);
-                });
-            }
-            let _ = window;
-        }
-    };
-}
-
-wiring!(wire, MainWindow, put);
-wiring!(wire_sub_inner, SubWindow, put_sub);
-
-/// Wires a subdiagram's window, which edits that subdiagram.
+/// into that subdiagram's file. Every page's window is the same window, so
+/// every page is wired the same way and can be edited in the same ways; what
+/// differs is only the home it passes.
 ///
 /// # Arguments
 ///
-/// * `window`  - The subdiagram's window.
+/// * `window`  - The window.
 /// * `editor`  - The one editor every window edits.
 /// * `views`   - The windows, redrawn after each edit.
 /// * `drawing` - The link being drawn, while that gesture runs.
 /// * `chosen`  - Which node each window shows as chosen, by the group it
 ///               shows (`""` for the main window).
-/// * `home`    - The name of the group the window shows.
-fn wire_sub(
-    window: &SubWindow,
+/// * `home`    - The page the window shows: `None` for the top.
+#[allow(clippy::too_many_arguments)]
+fn wire(
+    window: &MainWindow,
     editor: &Rc<RefCell<Editor>>,
     views: &Rc<RefCell<Views>>,
     drawing: &Rc<RefCell<Option<Drawing>>>,
     chosen: &Rc<RefCell<BTreeMap<String, String>>>,
-    home: &str,
+    home: &Home,
 ) {
-    wire_sub_inner(
-        window,
-        editor,
-        views,
-        drawing,
-        chosen,
-        &Some(home.to_string()),
-    );
+    {
+        // Opening a subdiagram, from its box's menu or its mark.
+        let editor = editor.clone();
+        let views = views.clone();
+        let drawing = drawing.clone();
+        let chosen = chosen.clone();
+        window.on_open_subdiagram(move |name| {
+            open_page(&editor, &views, &drawing, &chosen, &name);
+        });
+    }
+    {
+        let editor = editor.clone();
+        let views = views.clone();
+        window.on_undo_clicked(move || {
+            editor.borrow_mut().undo();
+            views.borrow().refresh(&editor.borrow());
+        });
+    }
+    {
+        let editor = editor.clone();
+        let views = views.clone();
+        window.on_redo_clicked(move || {
+            editor.borrow_mut().redo();
+            views.borrow().refresh(&editor.borrow());
+        });
+    }
+    {
+        let editor = editor.clone();
+        let views = views.clone();
+        let home = home.clone();
+        // A weak handle to the window the press came from: the
+        // placement depends on what that window is showing, and
+        // scrolling it afterwards is half of what placing a node
+        // means. Weak because the closure outlives nothing and the
+        // window owns the closure.
+        let window_for_place = window.as_weak();
+        window.on_place_node(move |called, node_type, sets| {
+            // What the window is showing, which is what decides where
+            // a new node goes: as high as it fits *in view*. The
+            // window is asked rather than told, because the person
+            // scrolling is the one who moved it.
+            let visible = (
+                (-window_for_place
+                    .upgrade()
+                    .map(|w| w.get_canvas_offset())
+                    .unwrap_or(0.0))
+                .round() as i32,
+                window_for_place
+                    .upgrade()
+                    .map(|w| w.get_canvas_view_height())
+                    .unwrap_or(0.0)
+                    .round() as i32,
+            );
+            let at = {
+                let mut editor = editor.borrow_mut();
+                // Named after what was pressed rather than after the
+                // type: a described node is "mean" and not
+                // "compute-3", which is what a reader of the
+                // configuration will be looking for.
+                let name = fresh_name(editor.document(), &called, &home);
+                let at = next_place(
+                    editor.document(),
+                    &home,
+                    &node_type,
+                    views.borrow().divider.get(),
+                    visible,
+                );
+                // A node exists, and then it is somewhere: two edits,
+                // recorded as one group so that one Undo takes the
+                // node away and one Redo puts it back where it was
+                // placed. A drag afterwards is a move of its own, so
+                // undoing that still leaves the node.
+                let mut edits = vec![Edit::AddNode {
+                    name: name.clone(),
+                    node_type: node_type.to_string(),
+                    home: home.clone(),
+                }];
+                // What the description answers for it, before it is
+                // placed: a compute node from the `mean` entry is a
+                // mean from the moment it exists, so the panel asks
+                // for a mean's attributes and the checking holds it to
+                // a mean's rules.
+                for (attribute, value) in stated(&sets) {
+                    edits.push(Edit::SetAttribute {
+                        node: Qualified::of(&name, &home).absolute(),
+                        attribute,
+                        was: None,
+                        now: Some(value),
+                    });
+                }
+                edits.push(Edit::MoveNode {
+                    node: Qualified::of(&name, &home).absolute(),
+                    was: (0, 0),
+                    now: at,
+                });
+                editor.edit(Edit::Group { edits });
+                at
+            };
+            views.borrow().refresh(&editor.borrow());
+            // And the sheet is scrolled so the new node is at the top
+            // of the view. It was placed where it fits, which may be
+            // above or below what the window was showing; a node
+            // placed out of sight is a press that did nothing as far
+            // as the person who made it can tell.
+            if let Some(window) = window_for_place.upgrade() {
+                window.set_canvas_offset(-(at.1 as f32));
+            }
+        });
+    }
+    {
+        let editor = editor.clone();
+        // A second handle, for the click that opens a window: the
+        // borrow taken to read the document has to be dropped before
+        // the window's own handlers can run.
+        let editor_for_click = editor.clone();
+        let views = views.clone();
+        let home = home.clone();
+        window.on_node_moved(move |name, dx, dy| {
+            {
+                let mut editor = editor.borrow_mut();
+                let absolute = Qualified::of(&name, &home).absolute();
+                // Where it was, from the document rather than from the
+                // window: the window has been drawing it offset by the
+                // drag, and the edit has to be relative to the
+                // document.
+                let (was, node_type) = match editor.document().node(&absolute) {
+                    Some(node) => (node.at, node.node_type.clone()),
+                    None => return,
+                };
+                // Brought back inside its own pane: a payload dragged
+                // left stops at the divider rather than crossing it.
+                // The drag is clamped rather than refused, so pushing
+                // a node at the edge moves it along the edge instead
+                // of doing nothing.
+                let now = confine(
+                    &node_type,
+                    views.borrow().divider.get(),
+                    snap((
+                        was.0 + dx.round() as i32,
+                        was.1 + dy.round() as i32,
+                    )),
+                );
+                // A press that moved nothing is a click, and a click
+                // on a node is a request to see what it says. Told
+                // apart by the distance and not by the time: a gesture
+                // that means one thing or another depending on how
+                // long it took is a gesture that does the wrong one
+                // under pressure.
+                //
+                // The *gesture* and not the position it works out to.
+                // Those are different questions, and asking the second
+                // one lost a node's first click: a node whose position
+                // is not on the grid, or is outside the pane its type
+                // belongs to -- a file somebody hand-edited, a
+                // configuration from a build that drew the panes
+                // differently -- resolves to somewhere other than
+                // where it is, so `now != was` and a click on it was
+                // read as a drag. It moved instead of opening, and the
+                // second click opened it.
+                if dx.round() as i32 == 0 && dy.round() as i32 == 0 {
+                    drop(editor);
+                    show_node(&editor_for_click, &views, &absolute);
+                    return;
+                }
+                // A drag that ends where it started: no edit, and no
+                // window either. Dragging a node against a divider and
+                // back is a gesture that changed nothing, and an entry
+                // in the history for it would be an undo that does
+                // nothing visible.
+                if now == was {
+                    return;
+                }
+                editor.edit(Edit::MoveNode {
+                    node: absolute,
+                    was,
+                    now,
+                });
+            }
+            views.borrow().refresh(&editor.borrow());
+        });
+    }
+    {
+        // Writing every file of the configuration now. Nothing to do
+        // in the ordinary case -- every edit is written as it is made
+        // -- and the way to retry a write that failed. See
+        // Editor::save.
+        let editor = editor.clone();
+        let views = views.clone();
+        window.on_save_clicked(move || {
+            editor.borrow_mut().save();
+            views.borrow().refresh(&editor.borrow());
+        });
+    }
+    {
+        // Every file somewhere else, from the File menu: see
+        // save_as.
+        let editor = editor.clone();
+        let views = views.clone();
+        window.on_save_as_clicked(move || {
+            save_as(&editor, &views, false);
+        });
+    }
+    {
+        // The menu item that opens what tcspecial is configured with.
+        let editor = editor.clone();
+        let views = views.clone();
+        window.on_edit_parameters(move || {
+            show_parameters(&editor, &views);
+        });
+    }
+    {
+        // Every node to the top of its own pane, and the view back at
+        // the top of the sheet: see `Editor::arrange`.
+        let editor = editor.clone();
+        let views = views.clone();
+        let window_for_scroll = window.as_weak();
+        window.on_arrange(move || {
+            let dividers = views.borrow().divider.get();
+            editor.borrow_mut().arrange(dividers);
+            // And the view back at the top of the sheet, because that
+            // is where the nodes have gone. A view left halfway down
+            // one would make the command look as though it had emptied
+            // the canvas.
+            if let Some(window) = window_for_scroll.upgrade() {
+                window.set_canvas_offset(0.0);
+            }
+            views.borrow().refresh(&editor.borrow());
+        });
+    }
+    {
+        // And the simulator's groups of settings. A simulated
+        // payload's own settings are in its node's panel, under a
+        // rule: see panel_of.
+        let editor = editor.clone();
+        let views = views.clone();
+        window.on_edit_simulator_groups(move || {
+            show_sim_groups(&editor, &views);
+        });
+    }
+    {
+        // The groups, from the File menu. Which group is chosen is
+        // the window's own business now: a list of what a
+        // configuration happens to contain is data, and a control
+        // holding data belongs with the form that edits it.
+        let editor = editor.clone();
+        let views = views.clone();
+        window.on_edit_groups(move || {
+            show_group(&editor, &views);
+        });
+    }
+    {
+        // The way out. Where something has been changed that the
+        // files do not have, the offer to write it comes first: see
+        // leave.
+        let editor = editor.clone();
+        let views = views.clone();
+        window.on_exit_requested(move || {
+            leave(&editor, &views);
+        });
+    }
+    {
+        // Moving either divider between the three working panes.
+        //
+        // Told once, when the gesture finishes, as a node's drag is:
+        // the line follows the pointer in the window and this is what
+        // it settles on. Not an edit -- there is nothing to undo,
+        // because the configuration has not changed -- so it is
+        // written to the settings instead of to the history.
+        {
+            let editor = editor.clone();
+            let views = views.clone();
+            window.on_payload_divider_moved(move |dx: f32| {
+                drag_divider(&editor, &views, Pane::Payloads, dx);
+            });
+        }
+        {
+            let editor = editor.clone();
+            let views = views.clone();
+            window.on_vehicle_divider_moved(move |dx: f32| {
+                drag_divider(&editor, &views, Pane::Vehicle, dx);
+            });
+        }
+        // And either line between the three selection lists, which is
+        // the same gesture down the column: see drag_list_divider.
+        {
+            let editor = editor.clone();
+            let views = views.clone();
+            window.on_payload_list_divider_moved(move |dy: f32, tall: f32| {
+                drag_list_divider(&editor, &views, Pane::Payloads, dy, tall);
+            });
+        }
+        {
+            let editor = editor.clone();
+            let views = views.clone();
+            window.on_vehicle_list_divider_moved(move |dy: f32, tall: f32| {
+                drag_list_divider(&editor, &views, Pane::Vehicle, dy, tall);
+            });
+        }
+    }
+    // Drawing a link, in three clicks: the terminal, which takes a
+    // line in hand; the node it goes to, which offers what it can be
+    // made into there; and the offer. What is offered is the window's
+    // own, because the menu asking it is.
+    let asking: Rc<RefCell<Vec<Offer>>> = Rc::new(RefCell::new(Vec::new()));
+    {
+        let drawing = drawing.clone();
+        let home = home.clone();
+        let editor_for_press = editor.clone();
+        let views_for_press = views.clone();
+        let asking = asking.clone();
+        let weak = window.as_weak();
+        window.on_link_started(move |name, terminal| {
+            let at = Drawing {
+                node: Qualified::of(&name, &home).absolute(),
+                terminal: terminal.to_string(),
+                holding: None,
+            };
+            // A terminal with one link on it is a line being picked up
+            // by its end; one with none, or with several, is a line
+            // about to be drawn. See Drawing::holding.
+            let sink = tcslibgs::graph::terminals::stream_of(&at.terminal)
+                .map(|(sink, _)| sink)
+                .unwrap_or(false);
+            let held = {
+                let editor = editor_for_press.borrow();
+                let theirs = attached(editor.document(), &at, sink);
+                match theirs.as_slice() {
+                    [one] => Some(one.clone()),
+                    _ => None,
+                }
+            };
+            if let Some(window) = weak.upgrade() {
+                window.set_join_offers(ModelRc::default());
+                window.set_join_hint(
+                    in_hand(&at.terminal, held.is_some()).into(),
+                );
+                window.set_joining("node".into());
+            }
+            asking.borrow_mut().clear();
+            *drawing.borrow_mut() = Some(Drawing {
+                holding: held,
+                ..at
+            });
+            // Taken off the drawing while the line is in hand, so it
+            // follows the hand rather than staying where it was. The
+            // lines only: rebuilding the nodes would destroy the
+            // element holding the pointer and the rest of the press
+            // with it. See Views::relink.
+            views_for_press.borrow().relink(&editor_for_press.borrow());
+        });
+    }
+    {
+        let drawing = drawing.clone();
+        let home = home.clone();
+        let editor = editor.clone();
+        let views = views.clone();
+        let asking = asking.clone();
+        let weak = window.as_weak();
+        // A line taken from the page's own edge: the subdiagram's box
+        // seen from inside, so the line is the box's, by the box's
+        // name, and the node clicked next is shown or hidden there.
+        window.on_edge_started(move |terminal| {
+            let Some(inside) = home.clone() else {
+                return;
+            };
+            if let Some(window) = weak.upgrade() {
+                window.set_join_offers(ModelRc::default());
+                window.set_join_hint(
+                    format!(
+                        "The edge's {terminal} is in hand: click a \
+                                 node to show it outside there, or to hide \
+                                 it. Escape, or a click on bare sheet, puts \
+                                 it down."
+                    )
+                    .into(),
+                );
+                window.set_joining("node".into());
+            }
+            asking.borrow_mut().clear();
+            *drawing.borrow_mut() = Some(Drawing {
+                node: inside,
+                terminal: terminal.to_string(),
+                holding: None,
+            });
+            views.borrow().relink(&editor.borrow());
+        });
+    }
+    {
+        let window_for_drawing = window.as_weak();
+        let drawing_for_motion = drawing.clone();
+        let editor_for_motion = editor.clone();
+        let home_for_motion = home.clone();
+        // Where the pointer is, while a line is in hand. The line
+        // follows it: a line that stayed at the terminal until it was
+        // put somewhere would be a gesture with nothing to aim.
+        window.on_link_moved(move |x, y| {
+            let Some(window) = window_for_drawing.upgrade() else {
+                return;
+            };
+            let said = drawing_for_motion
+                .borrow()
+                .as_ref()
+                .and_then(|from| {
+                    let editor = editor_for_motion.borrow();
+                    let anchor =
+                        anchored(editor.document(), &home_for_motion, from)?;
+                    Some(route::drawing(anchor, (x, y)))
+                })
+                .unwrap_or_default();
+            window.set_drawing_route(said.into());
+        });
+    }
+    {
+        let editor = editor.clone();
+        let views = views.clone();
+        let drawing = drawing.clone();
+        let home = home.clone();
+        let asking = asking.clone();
+        let weak = window.as_weak();
+        // A click with a line in hand. On bare sheet, the line is put
+        // down and nothing changes; on a node, what the line can be
+        // made into there is asked; and on a node that can take
+        // nothing of it, the line stays in hand and the window says
+        // why, which is a better answer to a near miss than throwing
+        // away a line that took a click to pick up.
+        window.on_link_clicked(move |x, y| {
+            let Some(window) = weak.upgrade() else {
+                return;
+            };
+            window.set_join_offers(ModelRc::default());
+            asking.borrow_mut().clear();
+            let Some(from) = drawing.borrow().clone() else {
+                stop_joining(&window, &drawing);
+                return;
+            };
+            let document_node = {
+                let editor = editor.borrow();
+                let document = editor.document();
+                // A line taken on another page is no line on this
+                // one: see anchored.
+                let anchor = anchored(document, &home, &from);
+                // The page's own edge, where a node of the page is
+                // shown outside it, named for the menu as the
+                // subdiagram's edge.
+                let edge = anchor
+                    .and(edge_under(&home, (x, y)))
+                    .zip(home.as_deref())
+                    .map(|(edge, inside)| {
+                        let offers = if from.terminal == edge {
+                            edge_offers(document, inside, &from.node, edge)
+                        } else {
+                            Vec::new()
+                        };
+                        (format!("{inside}/the edge"), offers)
+                    });
+                edge.or_else(|| {
+                    anchor
+                        .and_then(|_| node_under(document, &home, (x, y)))
+                        .map(|node| {
+                            let offers = offered(document, &from, &node);
+                            (node, offers)
+                        })
+                })
+            };
+            let Some((node, offers)) = document_node else {
+                stop_joining(&window, &drawing);
+                views.borrow().refresh(&editor.borrow());
+                return;
+            };
+            let shown = Qualified::parse(&node).node;
+            if offers.is_empty() {
+                let boxed = is_box(editor.borrow().document(), &node);
+                let at = tcslibgs::graph::terminals::answers(&from.terminal);
+                let nothing = match at {
+                    // A box whose file shows nothing there: what to
+                    // do about that is inside it.
+                    Some(at) if boxed => format!(
+                        "{node} shows nothing at its {at}: open it, \
+                                 and join a node to its {at} at the edge."
+                    ),
+                    _ => format!("{shown} has nothing this line can join."),
+                };
+                window.set_join_hint(
+                    format!(
+                        "{nothing} {}",
+                        in_hand(&from.terminal, from.holding.is_some())
+                    )
+                    .into(),
+                );
+                return;
+            }
+            window.set_join_heading(shown.into());
+            window.set_join_offers(offers_model(&offers));
+            *asking.borrow_mut() = offers;
+        });
+    }
+    {
+        let editor = editor.clone();
+        let views = views.clone();
+        let drawing = drawing.clone();
+        let asking = asking.clone();
+        let weak = window.as_weak();
+        // The offer chosen: its edit is made, and the line is put
+        // down whatever it was.
+        window.on_link_chosen(move |chosen| {
+            let offers = std::mem::take(&mut *asking.borrow_mut());
+            if let Some(window) = weak.upgrade() {
+                stop_joining(&window, &drawing);
+            }
+            let edit = usize::try_from(chosen)
+                .ok()
+                .and_then(|chosen| offers.into_iter().nth(chosen))
+                .and_then(|offer| offer.edit);
+            if let Some(edit) = edit {
+                editor.borrow_mut().edit(edit);
+            }
+            views.borrow().refresh(&editor.borrow());
+        });
+    }
+    {
+        let editor = editor.clone();
+        let views = views.clone();
+        let drawing = drawing.clone();
+        let asking = asking.clone();
+        let weak = window.as_weak();
+        // The line put down, with nothing made of it. Always a
+        // refresh: a line picked up was taken off the drawing while
+        // it was in hand, and has to be put back.
+        window.on_link_stopped(move || {
+            asking.borrow_mut().clear();
+            if let Some(window) = weak.upgrade() {
+                stop_joining(&window, &drawing);
+            }
+            views.borrow().refresh(&editor.borrow());
+        });
+    }
+    {
+        let editor = editor.clone();
+        let views = views.clone();
+        let drawing = drawing.clone();
+        let asking = asking.clone();
+        let weak = window.as_weak();
+        // The Delete key, with a line in hand that was picked up off
+        // a terminal: that line taken out. A line being drawn from
+        // nothing has nothing to take out, and is put down.
+        window.on_link_removed(move || {
+            asking.borrow_mut().clear();
+            let held = drawing
+                .borrow()
+                .as_ref()
+                .and_then(|from| from.holding.clone());
+            if let Some(window) = weak.upgrade() {
+                stop_joining(&window, &drawing);
+            }
+            if let Some(link) = held {
+                editor.borrow_mut().edit(Edit::RemoveLink { link });
+            }
+            views.borrow().refresh(&editor.borrow());
+        });
+    }
+    {
+        let editor_for_menu = editor.clone();
+        let views_for_menu = views.clone();
+        let home_for_menu = home.clone();
+        // Edit, from the menu a click on a node opens: the window
+        // that shows what the node says, which is what a click used
+        // to open on its own.
+        window.on_node_edit(move |name| {
+            let absolute = Qualified::of(&name, &home_for_menu).absolute();
+            show_node(&editor_for_menu, &views_for_menu, &absolute);
+        });
+    }
+    {
+        let editor_for_concerns = editor.clone();
+        let views_for_concerns = views.clone();
+        // What might be wrong, and what was set aside: one window,
+        // pointed at either list. See `show_concerns`.
+        window.on_show_concerns(move || {
+            show_concerns(&editor_for_concerns, &views_for_concerns, false);
+        });
+    }
+    {
+        let editor_for_aside = editor.clone();
+        let views_for_aside = views.clone();
+        window.on_show_aside(move || {
+            show_concerns(&editor_for_aside, &views_for_aside, true);
+        });
+    }
+    {
+        let editor_for_delete = editor.clone();
+        let views_for_delete = views.clone();
+        let home_for_delete = home.clone();
+        // And Delete, which asks before it does anything: see
+        // `confirm_delete`.
+        window.on_node_delete(move |name| {
+            let absolute = Qualified::of(&name, &home_for_delete).absolute();
+            confirm_delete(&editor_for_delete, &views_for_delete, &absolute);
+        });
+    }
+    {
+        // Choosing a node: the outline follows, and nothing is
+        // recorded. What the node says about itself is a window of
+        // its own, reached through the node's menu, so a press has
+        // only the outline to change.
+        let views = views.clone();
+        let chosen = chosen.clone();
+        let home = home.clone();
+        window.on_node_selected(move |name| {
+            chosen
+                .borrow_mut()
+                .insert(home.clone().unwrap_or_default(), name.to_string());
+            // The outline only: choosing a node is the same press
+            // that starts dragging it, and rebuilding the canvas here
+            // would replace the element the pointer is holding. See
+            // Views::chose.
+            views.borrow().chose(&home);
+        });
+    }
+    let _ = window;
 }
 
-/// Puts the editor's state into the top window.
+/// Opens a subdiagram's page in a window of its own: the main window,
+/// drawing that page.
+///
+/// A window per subdiagram, made once and raised afterwards: asking twice
+/// should bring the window forward, not make a second one showing the same
+/// thing. The same window as the top page's, furnished and wired the same
+/// way, so that every page has the same panes, lists and edits.
+///
+/// # Arguments
+///
+/// * `editor`  - The one editor every window edits.
+/// * `views`   - The windows, which keep the new one.
+/// * `drawing` - The link being drawn, while that gesture runs.
+/// * `chosen`  - Which node each window shows as chosen.
+/// * `name`    - The subdiagram, as its box is named.
+fn open_page(
+    editor: &Rc<RefCell<Editor>>,
+    views: &Rc<RefCell<Views>>,
+    drawing: &Rc<RefCell<Option<Drawing>>>,
+    chosen: &Rc<RefCell<BTreeMap<String, String>>>,
+    name: &str,
+) {
+    if let Some(already) = views.borrow().open.get(name) {
+        let _ = already.show();
+        return;
+    }
+
+    let window = match MainWindow::new() {
+        Ok(window) => {
+            session!(&window);
+            window
+        }
+        Err(e) => {
+            eprintln!("tcsgui: {name} cannot be opened: {e}");
+            return;
+        }
+    };
+    window.set_editing(name.into());
+    furnish!(&window, descriptions());
+    window.set_physics_palette(physics_palette());
+    window.set_physics_ground(colour(&ground_of(style::Ground::Physics)));
+    window.on_titled(|base, path, width| {
+        title::titled(&base, &path, width).into()
+    });
+    let home = Some(name.to_string());
+    wire(&window, editor, views, drawing, chosen, &home);
+    wire_physics(&window, editor, views, &home);
+    if let Err(e) = window.show() {
+        eprintln!("tcsgui: {name} cannot be shown: {e}");
+        return;
+    }
+    views.borrow_mut().open.insert(name.to_string(), window);
+    views.borrow().refresh(&editor.borrow());
+}
+
+/// Puts the editor's state into a page's window.
 ///
 /// One function rather than a set of setters called from each place that
 /// changes something: a window refreshed in one place cannot be refreshed
@@ -1668,9 +1628,9 @@ fn wire_sub(
 ///
 /// # Arguments
 ///
-/// * `ui`       - The main window.
+/// * `ui`       - The page's window.
 /// * `editor`   - The session drawn.
-/// * `home`     - The group drawn: `None` for the top of the configuration.
+/// * `home`     - The page drawn: `None` for the top of the configuration.
 /// * `chosen`   - The name of the node drawn as chosen, if any.
 /// * `dividers` - Where the working pane's dividers are.
 /// * `lists`    - The gateway and vehicle selection lists' shares of their
@@ -1691,7 +1651,8 @@ fn put(
     ui.set_gateway_list_percent(lists.0);
     ui.set_vehicle_list_percent(lists.1);
     ui.set_has_simulator(editor.document().simulator.is_some());
-    let (physics_nodes, physics_links) = physics_views_of(editor, dividers);
+    let (physics_nodes, physics_links) =
+        physics_views_of(editor, dividers, home);
     // The Physics pane whether or not there is a simulator file for it to be
     // the world of: some of every pane is always to be seen, and a pane that
     // appeared only with a second file would be one nobody knew to look for.
@@ -1699,6 +1660,21 @@ fn put(
     ui.set_physics_width(dividers.physics as f32);
     ui.set_physics_nodes(ModelRc::from(Rc::new(VecModel::from(physics_nodes))));
     ui.set_physics_links(ModelRc::from(Rc::new(VecModel::from(physics_links))));
+    // A subdiagram's page has an edge, in its margins, where what comes
+    // from outside it arrives and what leaves it goes: see
+    // tcsdiagram::style::edge_box. The top page has nothing outside it.
+    match home {
+        Some(_) => {
+            ui.set_edge_width(style::EDGE as f32);
+            ui.set_edge_terminals(ModelRc::from(Rc::new(VecModel::from(
+                edge_views(),
+            ))));
+        }
+        None => {
+            ui.set_edge_width(0.0);
+            ui.set_edge_terminals(ModelRc::default());
+        }
+    }
     let (nodes, links) = views_of(editor, home, held);
     ui.set_selected(chosen.unwrap_or_default().into());
     ui.set_nodes(ModelRc::from(Rc::new(VecModel::from(nodes))));
@@ -1719,53 +1695,37 @@ fn put(
     );
 }
 
-/// Puts the editor's state into one open subdiagram's window, as [`put`]
-/// does for the top window.
+/// How wide a page's edge is: the margin a subdiagram's page has either side
+/// of its working panes, and the top page has not.
 ///
 /// # Arguments
 ///
-/// * `window`   - The subdiagram's window.
-/// * `editor`   - The session drawn.
-/// * `home`     - The name of the group the window shows.
-/// * `chosen`   - The name of the node drawn as chosen, if any.
-/// * `dividers` - Where the working pane's dividers are.
-/// * `lists`    - The gateway and vehicle selection lists' shares of their
-///                column, in per cent.
-/// * `held`     - The link whose end is being dragged, which is drawn
-///                nowhere.
-fn put_sub(
-    window: &SubWindow,
-    editor: &Editor,
-    home: &str,
-    chosen: Option<&str>,
-    dividers: Dividers,
-    lists: (i32, i32),
-    held: Option<&Link>,
-) {
-    window.set_payload_divider(dividers.payloads as f32);
-    window.set_vehicle_divider(dividers.vehicle as f32);
-    window.set_gateway_list_percent(lists.0);
-    window.set_vehicle_list_percent(lists.1);
-    window.set_has_simulator(editor.document().simulator.is_some());
-    // The page's edge, in its margins: see tcsdiagram::style::edge_box.
-    window.set_edge_width(style::EDGE as f32);
-    window.set_edge_terminals(ModelRc::from(Rc::new(VecModel::from(
-        edge_views(),
-    ))));
-    let home = Some(home.to_string());
-    let (nodes, links) = views_of(editor, &home, held);
-    window.set_selected(chosen.unwrap_or_default().into());
-    window.set_nodes(ModelRc::from(Rc::new(VecModel::from(nodes))));
-    window.set_links(ModelRc::from(Rc::new(VecModel::from(links))));
-    window.set_undo_depth(editor.undo_depth() as i32);
-    window.set_redo_depth(editor.journal().redoable() as i32);
-    window.set_undo_label(label(editor.journal().next_undo()));
-    window.set_redo_label(label(editor.journal().next_redo()));
-    window.set_trouble(editor.trouble().unwrap_or_default().into());
-    window.set_said(editor.said().unwrap_or_default().into());
-    window.set_outside_count(
-        editor.document().outside_panes(&home, dividers) as i32
-    );
+/// * `home` - The page: `None` for the top.
+///
+/// # Returns
+///
+/// The margin's width, in pixels.
+fn edge_of(home: &Home) -> i32 {
+    match home {
+        Some(_) => style::EDGE as i32,
+        None => 0,
+    }
+}
+
+/// Where a page's working panes begin on the whole sheet, whose nought is
+/// the Physics pane's left edge: past the Physics pane, and past the edge on
+/// a subdiagram's page.
+///
+/// # Arguments
+///
+/// * `dividers` - Where the panes are.
+/// * `home`     - The page: `None` for the top.
+///
+/// # Returns
+///
+/// The working panes' left edge, in pixels.
+fn sheet_left(dividers: Dividers, home: &Home) -> i32 {
+    dividers.physics + edge_of(home)
 }
 
 /// A subdiagram's four edge terminals, as its window draws them.
@@ -4992,6 +4952,7 @@ fn views_of(
 fn physics_views_of(
     editor: &Editor,
     dividers: Dividers,
+    home: &Home,
 ) -> (Vec<NodeView>, Vec<LinkView>) {
     let document = editor.document();
     let Some(simulator) = &document.simulator else {
@@ -5020,17 +4981,19 @@ fn physics_views_of(
         .map(|(from, to)| (from.as_str(), to.as_str()))
         .collect();
     // Each simulated payload's own connects, or else its group's, drawn to
-    // where its node is on the top page: the node itself, or the box of the
-    // subdiagram it is in, which is all of a subdiagram the top page shows.
-    // The file names the payload by its own name wherever it is drawn (see
-    // `sim::Simulator::key_of`), and the page names a box by its subdiagram.
+    // where its node is on this page: the node itself, or on the top page
+    // the box of the subdiagram it is in, which is all of a subdiagram the
+    // top page shows; and nowhere on a page it is not on. The file names the
+    // payload by its own name wherever it is drawn (see
+    // `sim::Simulator::key_of`), and the page by its name qualified by its
+    // page, which is where `on_sheet` draws it.
     let mut said: Vec<(String, String)> = Vec::new();
     for (payload, settings) in &simulator.payloads {
         let drawn = document
             .nodes
             .iter()
             .find(|node| &node.name == payload)
-            .and_then(|node| node.home.clone())
+            .map(|node| Qualified::of(&node.name, &node.home).absolute())
             .unwrap_or_else(|| payload.clone());
         let connects = settings
             .get("connects")
@@ -5052,7 +5015,12 @@ fn physics_views_of(
             terminal,
         })
         .collect();
-    let sheet = on_sheet(document, &None);
+    // The page's nodes where the whole sheet has them: a subdiagram's page
+    // has its edge between the Physics pane and the working panes.
+    let mut sheet = on_sheet(document, home);
+    for node in &mut sheet {
+        node.at.0 += edge_of(home);
+    }
     let (nodes, links) = tcsdiagram::physics::looks(
         &components,
         &connections,
@@ -5074,17 +5042,20 @@ fn physics_views_of(
 /// the physics list, editing and deleting one on the canvas, and moving the
 /// Physics pane's line and the physics list's.
 ///
-/// The main window's alone: a subdiagram's window draws no Physics pane.
+/// Every page's window has the Physics pane, a subdiagram's too: the world
+/// is one, the simulator file's, and each page joins its own payloads to it.
 ///
 /// # Arguments
 ///
-/// * `window` - The main window.
+/// * `window` - The page's window.
 /// * `editor` - The one editor every window edits.
 /// * `views`  - The windows, redrawn after each edit.
+/// * `home`   - The page the window shows: `None` for the top.
 fn wire_physics(
     window: &MainWindow,
     editor: &Rc<RefCell<Editor>>,
     views: &Rc<RefCell<Views>>,
+    home: &Home,
 ) {
     {
         // A component of this type, under a name nothing has, with nothing
@@ -5214,12 +5185,14 @@ fn wire_physics(
         let views = views.clone();
         let drawing = drawing.clone();
         let weak = window.as_weak();
+        let home = home.clone();
         window.on_physics_link_moved(move |x, y| {
             let Some(window) = weak.upgrade() else {
                 return;
             };
             let dividers = views.borrow().divider.get();
-            let shift = dividers.physics as f32;
+            let shift = sheet_left(dividers, &home) as f32;
+            let edge = edge_of(&home) as f32;
             let route = drawing
                 .borrow()
                 .as_ref()
@@ -5230,7 +5203,8 @@ fn wire_physics(
                             .find(|(name, ..)| *name == end.component)?;
                     let (tx, ty) = physics::terminal_at(place.size, end.output);
                     let anchor = (
-                        (place.at.0 + tx) as f32 + physics::TERMINAL_RIGHT,
+                        (place.at.0 + tx) as f32 + physics::TERMINAL_RIGHT
+                            - edge,
                         (place.at.1 + ty) as f32 + physics::TERMINAL_MIDDLE,
                     );
                     Some(tcsdiagram::route::drawing(anchor, (x - shift, y)))
@@ -5250,6 +5224,7 @@ fn wire_physics(
         let drawing = drawing.clone();
         let asking = asking.clone();
         let weak = window.as_weak();
+        let home = home.clone();
         window.on_physics_link_clicked(move |x, y| {
             let Some(window) = weak.upgrade() else {
                 return;
@@ -5261,7 +5236,8 @@ fn wire_physics(
                 return;
             };
             let dividers = views.borrow().divider.get();
-            let meant = physics_joins(&editor.borrow(), dividers, &end, (x, y));
+            let meant =
+                physics_joins(&editor.borrow(), dividers, &home, &end, (x, y));
             let Some(meant) = meant else {
                 stop_joining(&window, &drawing);
                 views.borrow().refresh(&editor.borrow());
@@ -5441,6 +5417,7 @@ fn physics_places(
 ///
 /// * `editor`   - The session.
 /// * `dividers` - Where the panes are.
+/// * `home`     - The page clicked on: `None` for the top.
 /// * `end`      - The component the line was drawn from, and which way.
 /// * `at`       - Where it was let go of, in the coordinates of the whole
 ///                canvas, whose nought is the Physics pane's left edge.
@@ -5453,6 +5430,7 @@ fn physics_places(
 fn physics_joins(
     editor: &Editor,
     dividers: Dividers,
+    home: &Home,
     end: &PhysicsEnd,
     at: (f32, f32),
 ) -> Option<Vec<(PhysicsJoin, bool)>> {
@@ -5467,7 +5445,6 @@ fn physics_joins(
     else {
         return Some(Vec::new());
     };
-    let shift = dividers.physics as f32;
 
     let over = places.iter().find(|(_, _, place)| {
         let left = (place.at.0 + dividers.physics) as f32;
@@ -5502,9 +5479,10 @@ fn physics_joins(
         );
     }
 
-    // The top page's node under the point, in the configuration's own
-    // coordinates; and the payloads it is, or holds.
-    let under = node_under(document, &None, (x - shift, y))?;
+    // The page's node under the point, in the configuration's own
+    // coordinates; and the payloads it is, or on the top page holds.
+    let left = sheet_left(dividers, home) as f32;
+    let under = node_under(document, home, (x - left, y))?;
     let Some(terminals) = tcslibgs::node::physics::terminals_of(&kind) else {
         return Some(Vec::new());
     };
@@ -5515,8 +5493,12 @@ fn physics_joins(
     };
     let mut meant = Vec::new();
     for node in &document.nodes {
-        let drawn = node.home.as_deref().unwrap_or(node.name.as_str());
-        if drawn != under || pane::pane_of(&node.node_type) != Pane::Payloads {
+        let itself = Qualified::of(&node.name, &node.home).absolute() == under;
+        let boxed =
+            home.is_none() && node.home.as_deref() == Some(under.as_str());
+        if !(itself || boxed)
+            || pane::pane_of(&node.node_type) != Pane::Payloads
+        {
             continue;
         }
         let payload = crate::sim::Simulator::key_of(&node.name);
@@ -6111,7 +6093,6 @@ macro_rules! joins {
     };
 }
 joins!(MainWindow);
-joins!(SubWindow);
 
 /// Puts the line in hand down, in the window and in the gesture both.
 ///
@@ -8252,7 +8233,7 @@ mod tests {
             output,
         };
         let joins = |end: PhysicsEnd, at| {
-            physics_joins(&editor, dividers, &end, at).expect("a shape")
+            physics_joins(&editor, dividers, &None, &end, at).expect("a shape")
         };
         let stand_in = |payload: &str, terminal: &str| PhysicsJoin::StandIn {
             payload: payload.into(),
@@ -8301,6 +8282,7 @@ mod tests {
             physics_joins(
                 &editor,
                 dividers,
+                &None,
                 &from("heater_1", true),
                 (shift + 900.0, 900.0)
             ),

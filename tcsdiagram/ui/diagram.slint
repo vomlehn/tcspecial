@@ -575,8 +575,17 @@ export component NodeShape inherits Rectangle {
     menu := ContextMenuArea {
         enabled: draggable;
         Menu {
-            // Edit first, because it is what nearly every click wants, and it
-            // is what a click used to do on its own.
+            // A subdiagram's own first: opening it is what a click on one
+            // most often wants, and it is the one command a box has that no
+            // other node does. In a window as the main one is, with the same
+            // panes and lists. Not on a double press: the first press of one
+            // would already be this menu's.
+            if node.openable: MenuItem {
+                title: "Open";
+                activated => { root.open-requested(); }
+            }
+            // Edit first among the rest, because it is what nearly every
+            // click wants, and it is what a click used to do on its own.
             MenuItem {
                 title: "Edit";
                 enabled: !Session.read-only;

@@ -1246,6 +1246,77 @@ impl Document {
         }
     }
 
+    /// Why a node may not be renamed to this, if it may not.
+    ///
+    /// A node's name is how every other part of a configuration knows it, in
+    /// every file of it: the reader allows no two nodes one name across the
+    /// top file and everything it includes, and a link names a node by it
+    /// alone. So a name any other node has is refused, wherever that node is
+    /// drawn -- a physics component's included, the simulator file joining
+    /// payloads to components by name. So is a name with a dot in it, which a
+    /// line reads as the node's name and an input's, or a slash, which the
+    /// editor reads as a page's name and a node's; and no name at all. A
+    /// subdiagram's box is named for the file it stands for, and is renamed by
+    /// renaming that file.
+    ///
+    /// # Arguments
+    ///
+    /// * `node` - The node, by the name a line uses for it.
+    /// * `now`  - The name asked for, as typed.
+    ///
+    /// # Returns
+    ///
+    /// What to say about it, or `None` for a name it may have.
+    pub fn rename_refused(&self, node: &str, now: &str) -> Option<String> {
+        let now = now.trim();
+        let Some(found) = self.node(node) else {
+            return Some(format!("There is no node called \"{node}\"."));
+        };
+        if found.node_type == "subdiagram" {
+            return Some(
+                "A subdiagram is named for the file it stands for.".to_string(),
+            );
+        }
+        if now.is_empty() {
+            return Some("A node has to have a name.".to_string());
+        }
+        if now.contains('.') || now.contains('/') {
+            return Some(format!(
+                "\"{now}\" cannot be a node's name: a line reads what follows \
+                 a dot as an input's name, and the editor what follows a \
+                 slash as a node's on a subdiagram's page."
+            ));
+        }
+        if now == found.name {
+            return None;
+        }
+        let itself = Qualified::of(&found.name, &found.home).absolute();
+        let other = self.nodes.iter().find(|other| {
+            other.name == now
+                && Qualified::of(&other.name, &other.home).absolute() != itself
+        });
+        if let Some(other) = other {
+            let file = match &other.home {
+                Some(home) => format!("in {home}"),
+                None => "in the top file".to_string(),
+            };
+            return Some(format!(
+                "\"{now}\" is already the name of a node {file}; a node's name \
+                 has to be its own across every file of the configuration."
+            ));
+        }
+        let component = self.simulator.as_ref().is_some_and(|simulator| {
+            simulator.world.components.contains_key(now)
+        });
+        if component {
+            return Some(format!(
+                "\"{now}\" is already the name of a physics component, which \
+                 the simulator file joins payloads to by name."
+            ));
+        }
+        None
+    }
+
     /// A name no node has, derived from one that is taken.
     ///
     /// The name with a hyphen and the first free number, or the next free
@@ -1878,8 +1949,10 @@ impl Document {
                 }
             }
             Edit::RenameNode { was, now } => {
+                // Held by its own name, whichever page it is on: the edit
+                // names it as a line does, qualified by its page.
                 if let Some(node) = self.node_mut(was) {
-                    node.name = now.clone();
+                    node.name = Qualified::parse(now).node;
                 }
                 // The links refer by name, so they are renamed with it.
                 for link in &mut self.links {

@@ -4860,6 +4860,28 @@ is greyed while a line from another file joins the node there, saying which:
 the line would be one the checking refuses. Showing and hiding are edits like
 any other, each taken back by one undo, and written into the file's
 <tt class="docutils literal">exports</tt> as they are made.</p>
+<p>And a line to a node outside is drawn from inside too, which is how a gateway's
+data and the MOC's commands reach a node of a subdiagram without leaving its
+page. The same menu, at the edge terminal or at the node, offers a new line to
+each node of another file that has the terminal answering the one in hand --
+<tt class="docutils literal">New line to ground's <span class="pre">world-in</span></tt> -- greyed as any offer is: every node of the
+top file, and a node of another subdiagram where that file shows it at that
+terminal. Choosing one makes the line, and shows the node outside at that
+terminal in the same edit where it was not shown yet, so one undo takes back
+both and no line is made that the checking would refuse.</p>
+<p>A subdiagram is opened by <strong>Open</strong> in its box's menu, or by the mark in the
+middle of its bottom edge, and not by a double press, whose first press would
+already have opened the menu. Its page is drawn in a window that is the main
+window -- the same component, furnished and wired the same way, the title
+saying which subdiagram it draws -- so every page has the same panes, the same
+selection lists, the Physics pane and its list among them, the same bar with
+its counts and the same menus and edits: what can be done on one page can be
+done on every page, because there is nothing a second kind of window could
+leave out. The Physics pane shows the one world, the simulator file's, on
+every page, and a payload of the page is joined to it there. Several pages may
+be open at once and cannot disagree, there being one document behind all of
+them, and each window is redrawn from it after every edit. Opening a page that
+is open brings its window forward.</p>
 <p>A line's colour says which stream it carries, and a line is drawn twice as
 wide as it was. Both halves of that are the same point: a line is the thing a
 reader of a diagram follows, and a grey one two pixels wide left the two
@@ -5231,6 +5253,19 @@ put it back -- which, every edit being written as it is made, would write a
 broken configuration to the disk. Undo takes back what was drawn; this was not
 drawn. The repair is written at once instead, so the document and the file
 never disagree about a name.</p>
+<p>Any node of a working pane, on any page, is renamed in its own window, whose
+name is a field at the top: renamed when the name is accepted rather than at
+each letter, a name being what every line to the node is drawn by. A name any
+other node has is refused, in any file of the configuration -- the reader
+allows no two nodes one name across the top file and its includes, and a line
+names a node by its name alone -- and so is a physics component's, the
+simulator file joining payloads to components by name, and so is no name, or
+one with a dot or a slash in it, which a line and a page read as separators.
+What is refused is said under the field and nothing changes. A rename is one
+edit, taken back by one undo, and takes the node's lines, its simulator
+settings and its showing at its page's edge with it; a node of a subdiagram
+keeps its page. A subdiagram's box is named for the file it stands for and is
+not renamed in the window.</p>
 <p>The links stay with whoever keeps the name. A link names a name: while two
 nodes shared one, every link naming it was ambiguous, and renaming one of them
 does not make the link mean the other. When the last holder of a name is

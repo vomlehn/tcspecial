@@ -2364,6 +2364,14 @@ export component NodeWindow inherits Window {
     preferred-height: 560px;
 
     in property <string> node: "";
+    // Its own name, which is what its field shows and what renaming it
+    // changes: `node` is the name a line uses, qualified by its page.
+    in property <string> name: "";
+    // Whether it can be renamed here: not a subdiagram's box, which is named
+    // for its file, nor anything in a session that changes nothing.
+    in property <bool> renamable: true;
+    // Why the name last typed was refused, if it was.
+    in property <string> name-trouble: "";
     in property <string> node-type: "";
     in property <string> comment: "";
     in property <[FieldView]> fields: [];
@@ -2388,17 +2396,30 @@ export component NodeWindow inherits Window {
     callback attribute-set(string, string);
     callback sim-attribute-set(string, string);
     callback comment-set(string);
+    // A new name typed and accepted.
+    callback renamed(string);
     callback closed();
 
     VerticalLayout {
         padding: Space.step;
         spacing: Space.tight;
 
-        Text {
-            text: root.node;
+        // The name, as a field: renamed on accept and not on every
+        // keystroke, a name being what every line to the node is drawn by,
+        // so each letter typed would be a rename to undo. A name another
+        // node has is refused, and said why, and the old name stays.
+        LineEdit {
+            text: root.name;
+            read-only: Session.read-only || !root.renamable;
             font-size: Type.strong;
-            font-weight: Type.bold;
-            height: 20px;
+            accessible-label: "name";
+            accepted => { root.renamed(self.text); }
+        }
+        if root.name-trouble != "": Text {
+            text: root.name-trouble;
+            color: #c0392b;
+            font-size: Type.small;
+            wrap: word-wrap;
         }
         Text {
             text: root.node-type;

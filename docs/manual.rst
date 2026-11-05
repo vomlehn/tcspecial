@@ -256,7 +256,11 @@ terminal
     key, offers to take it out. A subdiagram's box offers the nodes its file
     exports at that terminal; inside the subdiagram, its page has an edge in
     a margin either side, labelled *outside*, and clicking an edge terminal
-    and then a node offers to show that node outside there, or to hide it.
+    and then a node, or a node's terminal and then the edge, offers to show
+    that node outside there or to hide it, and a new line to each node
+    outside that can take it -- which shows the node outside as well. A
+    subdiagram is opened by **Open** in its box's menu, in a window like the
+    main one, with the same panes, lists, Physics pane and edits.
     A node with no terminal of that stream offers nothing, and a gateway link has none on its right at all: the payload data it receives arrives at the
     ``world-in`` in its upper left, and what it sends leaves by the
     ``moc-out`` in its lower left.

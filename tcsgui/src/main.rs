@@ -1314,9 +1314,9 @@ fn wire(
                 window.set_join_hint(
                     format!(
                         "The edge's {terminal} is in hand: click a \
-                                 node to show it outside there, or to hide \
-                                 it. Escape, or a click on bare sheet, puts \
-                                 it down."
+                                 node to join it to a node outside, or to \
+                                 show it outside there or hide it. Escape, \
+                                 or a click on bare sheet, puts it down."
                     )
                     .into(),
                 );
@@ -1393,7 +1393,12 @@ fn wire(
                     .zip(home.as_deref())
                     .map(|(edge, inside)| {
                         let offers = if from.terminal == edge {
-                            edge_offers(document, inside, &from.node, edge)
+                            let mut offers =
+                                edge_offers(document, inside, &from.node, edge);
+                            offers.extend(outside_offers(
+                                document, inside, &from.node, edge,
+                            ));
+                            offers
                         } else {
                             Vec::new()
                         };
@@ -6194,7 +6199,15 @@ fn offered(document: &Document, from: &Drawing, node: &str) -> Vec<Offer> {
     if is_box(document, &from.node)
         && Qualified::parse(node).in_.as_deref() == Some(from.node.as_str())
     {
-        return edge_offers(document, &from.node, node, &from.terminal);
+        let mut offers =
+            edge_offers(document, &from.node, node, &from.terminal);
+        offers.extend(outside_offers(
+            document,
+            &from.node,
+            node,
+            &from.terminal,
+        ));
+        return offers;
     }
     // A box at either end, on the top page: the nodes its file exports.
     if is_box(document, &from.node) || is_box(document, node) {
@@ -6696,6 +6709,109 @@ fn edge_offers(
         why,
         edit,
     )]
+}
+
+/// Lists the lines a node of a subdiagram can be joined by to each node
+/// outside it, at one terminal of its page's edge: what a gateway's data and
+/// the MOC's commands reach it by, drawn from inside.
+///
+/// Each node of another file that has the terminal answering this one, and
+/// that its own file lets be joined there: a node of the top file always,
+/// and one of another subdiagram where that file exports it at that
+/// terminal. Each line is offered as [`offered`] offers a line between two
+/// nodes, greyed where it cannot be made. Where the node is not shown
+/// outside at this terminal yet, choosing the line shows it there as well,
+/// in the same edit, so one undo takes both back: a line from outside to a
+/// node that is not shown there is one the checking refuses.
+///
+/// # Arguments
+///
+/// * `document` - The configuration.
+/// * `home`     - The subdiagram.
+/// * `node`     - Its node, by its qualified name.
+/// * `terminal` - The node's terminal, which is the edge's terminal of the
+///                same name.
+///
+/// # Returns
+///
+/// Each offer, named by the node outside.
+fn outside_offers(
+    document: &Document,
+    home: &str,
+    node: &str,
+    terminal: &str,
+) -> Vec<Offer> {
+    let Some(found) = document.node(node) else {
+        return Vec::new();
+    };
+    if found.home.as_deref() != Some(home) {
+        return Vec::new();
+    }
+    let Some(wanted) = tcslibgs::graph::terminals::answers(terminal) else {
+        return Vec::new();
+    };
+    let bare = Qualified::parse(node).node;
+    let exported = document
+        .exports
+        .get(home)
+        .is_some_and(|exports| exports.exports(&bare, terminal));
+    let from = Drawing {
+        node: node.to_string(),
+        terminal: terminal.to_string(),
+        holding: None,
+    };
+
+    let mut offers = Vec::new();
+    for outside in &document.nodes {
+        if outside.home.as_deref() == Some(home)
+            || outside.node_type == "subdiagram"
+        {
+            continue;
+        }
+        // A node of another subdiagram is joined only where its own file
+        // shows it.
+        if let Some(other) = &outside.home {
+            let shown = document
+                .exports
+                .get(other)
+                .is_some_and(|exports| exports.exports(&outside.name, wanted));
+            if !shown {
+                continue;
+            }
+        }
+        let far = Qualified::of(&outside.name, &outside.home).absolute();
+        for offer in offered(document, &from, &far) {
+            let edit = offer.edit.map(|edit| {
+                if exported {
+                    edit
+                } else {
+                    Edit::Group {
+                        edits: vec![
+                            Edit::SetExport {
+                                home: home.to_string(),
+                                terminal: terminal.to_string(),
+                                node: bare.clone(),
+                                exported: true,
+                            },
+                            edit,
+                        ],
+                    }
+                }
+            });
+            // Said with the node outside named, as the line it makes reads.
+            let name = &outside.name;
+            let said = match (
+                offer.said.strip_prefix("New line to "),
+                offer.said.strip_prefix("New line from "),
+            ) {
+                (Some(rest), _) => format!("New line to {name}'s {rest}"),
+                (_, Some(rest)) => format!("New line from {name}'s {rest}"),
+                _ => format!("{name}: {}", offer.said),
+            };
+            offers.push(Offer { said, edit });
+        }
+    }
+    offers
 }
 
 /// The nodes a line may reach at one terminal of a node of the top page:
@@ -10114,7 +10230,13 @@ mod tests {
             &in_hand_at("zone", "world-out", None),
             "zone/thermostat",
         );
-        assert_eq!(said(&offers), ["Show thermostat's world-out outside"]);
+        assert_eq!(
+            said(&offers),
+            [
+                "Show thermostat's world-out outside",
+                "New line to ground's world-in",
+            ]
+        );
         assert_eq!(offers[0].edit, Some(export("world-out", "thermostat")));
         assert_eq!(
             said(&offered(
@@ -10122,8 +10244,61 @@ mod tests {
                 &in_hand_at("zone", "world-in", None),
                 "zone/temp1",
             )),
-            ["Hide temp1's world-in from outside (a line from outside \
-                 joins it: sensor)"]
+            [
+                "Hide temp1's world-in from outside (a line from outside \
+                 joins it: sensor)",
+                "New line from sensor's world-out (joined already)",
+                "New line from other's world-out (fed by sensor)",
+            ]
+        );
+
+        // And from inside, a line to a node outside, made at the edge: the
+        // node shown outside there in the same edit, where it was not yet,
+        // so that the line is one the checking accepts.
+        let offers = offered(
+            &document,
+            &in_hand_at("zone", "world-out", None),
+            "zone/thermostat",
+        );
+        let made = offers[1].edit.clone().expect("it can be made");
+        assert_eq!(
+            made,
+            Edit::Group {
+                edits: vec![
+                    export("world-out", "thermostat"),
+                    Edit::AddLink {
+                        link: Link::joining(
+                            "zone/thermostat",
+                            Some("world-out"),
+                            "ground",
+                            None
+                        ),
+                    },
+                ],
+            }
+        );
+        // Taken to the edge from the node's own terminal, the same.
+        assert_eq!(
+            outside_offers(&document, "zone", "zone/thermostat", "world-out")
+                .into_iter()
+                .map(|offer| offer.edit)
+                .collect::<Vec<_>>(),
+            [Some(made)]
+        );
+        // Where it is shown already, the line alone.
+        assert_eq!(
+            outside_offers(&document, "zone", "zone/temp1", "world-out")
+                .into_iter()
+                .map(|offer| offer.edit)
+                .collect::<Vec<_>>(),
+            [Some(Edit::AddLink {
+                link: Link::joining(
+                    "zone/temp1",
+                    Some("world-out"),
+                    "ground",
+                    None
+                ),
+            })]
         );
 
         // And a node shown outside that nothing joins there yet is drawn

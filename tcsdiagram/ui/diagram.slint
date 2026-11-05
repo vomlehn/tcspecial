@@ -245,20 +245,13 @@ component Terminal inherits Rectangle {
     in property <bool> sink;
 
 
-    // A link is being drawn from this terminal, and then let go of -- at this
-    // point, measured from the terminal's own corner.
-    //
-    // The release is reported by the terminal the gesture *started* on, not by
-    // the one it finished over, because that is how a pointer works: a press
-    // grabs it, so every event until the release goes to the thing that was
-    // pressed. What is under the pointer at the end is a question about where
-    // the nodes are, and the answer is worked out in Rust where the geometry
-    // is -- see `terminal_under`.
+    // A line is taken in hand from this terminal. Where it goes is the next
+    // click's business, which the sheet takes: see tcsgui's Surface.
     callback grabbed();
-    callback released(length, length);
-    // And where the pointer is while it is held, so the line being drawn can
-    // follow it: reported by the terminal the gesture started on, as the
-    // release is, because a press grabs the pointer.
+    // Where the pointer is while the button that took the line is still
+    // down, so the line follows it from the start: reported by this terminal,
+    // because a press grabs the pointer and every event until the release
+    // comes here.
     callback dragged(length, length);
 
     width: 24px;
@@ -278,11 +271,13 @@ component Terminal inherits Rectangle {
         // No line drawn in a read-only session.
         enabled: !Session.read-only;
         pointer-event(event) => {
-            if (event.kind == PointerEventKind.down) {
+            // Taken on the press, and nothing on the release: the line stays
+            // in hand until a node is clicked, so a release is not the end of
+            // anything. The left button only, the right one being a node's
+            // menu everywhere else.
+            if (event.kind == PointerEventKind.down
+                && event.button == PointerEventButton.left) {
                 grabbed();
-            }
-            if (event.kind == PointerEventKind.up) {
-                released(self.mouse-x, self.mouse-y);
             }
         }
         moved => {
@@ -327,14 +322,10 @@ export component NodeShape inherits Rectangle {
     callback dragged(length, length);
     // This node is a diagram of its own and somebody asked to see it.
     callback open-requested();
-    // A link is being drawn: pressed on the handle of one node, released over
-    // another.
-    // A link is being drawn: the terminal pressed is remembered, and where
-    // the pointer was let go of says what the other end is. The name of the
-    // terminal pressed is the whole of what the first half says; the second
-    // half is a point on the canvas.
+    // A line is taken in hand from one of this node's terminals, by name.
+    // What it is joined to is chosen at the node clicked next, which is the
+    // sheet's business and not this node's.
     callback link-from(string);
-    callback link-dropped(length, length);
     // Where the pointer is while a line is being drawn from one of this
     // node's terminals. See Terminal::dragged.
     callback link-dragging(length, length);
@@ -726,10 +717,6 @@ export component NodeShape inherits Rectangle {
         ink: ink;
         mark: mark;
         grabbed => { link-from("moc-in"); }
-        released(x, y) => {
-            link-dropped(node.x + node.moc-in.x + x,
-                         node.y + node.moc-in.y + y);
-        }
     }
     if node.moc-out.shown: Terminal {
         x: node.moc-out.x + drag-x;
@@ -743,14 +730,6 @@ export component NodeShape inherits Rectangle {
         ink: ink;
         mark: mark;
         grabbed => { link-from("moc-out"); }
-        // Where the pointer was let go of, in the canvas's own coordinates:
-        // the node is placed at node.x and the terminal sits at its own offset
-        // inside it, so the two and the pointer's offset from the terminal's
-        // corner are the whole of it.
-        released(x, y) => {
-            link-dropped(node.x + node.moc-out.x + x,
-                         node.y + node.moc-out.y + y);
-        }
     }
     if node.world-in.shown: Terminal {
         x: node.world-in.x + drag-x;
@@ -764,12 +743,6 @@ export component NodeShape inherits Rectangle {
         ink: ink;
         mark: mark;
         grabbed => { link-from("world-in"); }
-        released(x, y) => {
-            link-dropped(
-                node.x + node.world-in.x + x,
-                node.y + node.world-in.y + y
-            );
-        }
     }
     if node.world-out.shown: Terminal {
         x: node.world-out.x + drag-x;
@@ -783,10 +756,6 @@ export component NodeShape inherits Rectangle {
         ink: ink;
         mark: mark;
         grabbed => { link-from("world-out"); }
-        released(x, y) => {
-            link-dropped(node.x + node.world-out.x + x,
-                         node.y + node.world-out.y + y);
-        }
     }
 
     // Selection, which is a third outline rather than a colour change: a

@@ -1280,13 +1280,19 @@ macro_rules! wiring {
                     );
                 }
             }
+            // Drawing a link, in three clicks: the terminal, which takes a
+            // line in hand; the node it goes to, which offers what it can be
+            // made into there; and the offer. What is offered is the window's
+            // own, because the menu asking it is.
+            let asking: Rc<RefCell<Vec<Offer>>> =
+                Rc::new(RefCell::new(Vec::new()));
             {
-                // Drawing a link: the terminal pressed is remembered, and the
-                // terminal released over is the other end.
                 let drawing = drawing.clone();
                 let home = home.clone();
                 let editor_for_press = editor.clone();
                 let views_for_press = views.clone();
+                let asking = asking.clone();
+                let weak = window.as_weak();
                 window.on_link_started(move |name, terminal| {
                     let at = Drawing {
                         node: Qualified::of(&name, &home).absolute(),
@@ -1308,14 +1314,22 @@ macro_rules! wiring {
                             _ => None,
                         }
                     };
+                    if let Some(window) = weak.upgrade() {
+                        window.set_join_offers(ModelRc::default());
+                        window.set_join_hint(
+                            in_hand(&at.terminal, held.is_some()).into(),
+                        );
+                        window.set_joining("node".into());
+                    }
+                    asking.borrow_mut().clear();
                     *drawing.borrow_mut() = Some(Drawing {
                         holding: held,
                         ..at
                     });
-                    // Taken off the drawing while the gesture runs, so the
-                    // line follows the hand rather than staying where it was.
-                    // The lines only: rebuilding the nodes would destroy the
-                    // element holding the pointer and the rest of the gesture
+                    // Taken off the drawing while the line is in hand, so it
+                    // follows the hand rather than staying where it was. The
+                    // lines only: rebuilding the nodes would destroy the
+                    // element holding the pointer and the rest of the press
                     // with it. See Views::relink.
                     views_for_press.borrow().relink(&editor_for_press.borrow());
                 });
@@ -1325,10 +1339,9 @@ macro_rules! wiring {
                 let drawing_for_motion = drawing.clone();
                 let editor_for_motion = editor.clone();
                 let home_for_motion = home.clone();
-                // Where the pointer is, while a line is being drawn from a
-                // terminal. The line follows it: a gesture whose line stayed
-                // at the terminal until it was let go of is a gesture with
-                // nothing to aim.
+                // Where the pointer is, while a line is in hand. The line
+                // follows it: a line that stayed at the terminal until it was
+                // put somewhere would be a gesture with nothing to aim.
                 window.on_link_moved(move |x, y| {
                     let Some(window) = window_for_drawing.upgrade() else {
                         return;
@@ -1354,43 +1367,120 @@ macro_rules! wiring {
                 let views = views.clone();
                 let drawing = drawing.clone();
                 let home = home.clone();
-                let window_for_finish = window.as_weak();
-                window.on_link_finished(move |x, y| {
-                    // The line in hand goes first, whatever the gesture turns
-                    // out to have done: it was never a link, and leaving it
-                    // drawn would be a second line nobody made.
-                    if let Some(window) = window_for_finish.upgrade() {
-                        window.set_drawing_route(Default::default());
-                    }
-                    let from = match drawing.borrow_mut().take() {
-                        Some(from) => from,
-                        None => return,
+                let asking = asking.clone();
+                let weak = window.as_weak();
+                // A click with a line in hand. On bare sheet, the line is put
+                // down and nothing changes; on a node, what the line can be
+                // made into there is asked; and on a node that can take
+                // nothing of it, the line stays in hand and the window says
+                // why, which is a better answer to a near miss than throwing
+                // away a line that took a click to pick up.
+                window.on_link_clicked(move |x, y| {
+                    let Some(window) = weak.upgrade() else {
+                        return;
                     };
-                    {
-                        let mut editor = editor.borrow_mut();
-                        // A line that was picked up by its end, or one being
-                        // drawn: two gestures that look the same and do
-                        // different things.
-                        let what = match &from.holding {
-                            Some(held) => dropped(
-                                editor.document(),
-                                &home,
-                                held,
-                                &from,
-                                (x, y),
-                            ),
-                            None => {
-                                joined(editor.document(), &home, &from, (x, y))
-                                    .map(|link| Edit::AddLink { link })
-                            }
-                        };
-                        if let Some(edit) = what {
-                            editor.edit(edit);
-                        }
+                    window.set_join_offers(ModelRc::default());
+                    asking.borrow_mut().clear();
+                    let Some(from) = drawing.borrow().clone() else {
+                        stop_joining(&window, &drawing);
+                        return;
+                    };
+                    let document_node = {
+                        let editor = editor.borrow();
+                        // A line taken on another page is no line on this
+                        // one: see anchored.
+                        anchored(editor.document(), &home, &from)
+                            .and_then(|_| {
+                                node_under(editor.document(), &home, (x, y))
+                            })
+                            .map(|node| {
+                                let offers =
+                                    offered(editor.document(), &from, &node);
+                                (node, offers)
+                            })
+                    };
+                    let Some((node, offers)) = document_node else {
+                        stop_joining(&window, &drawing);
+                        views.borrow().refresh(&editor.borrow());
+                        return;
+                    };
+                    let shown = Qualified::parse(&node).node;
+                    if offers.is_empty() {
+                        window.set_join_hint(
+                            format!(
+                                "{shown} has nothing this line can join. {}",
+                                in_hand(&from.terminal, from.holding.is_some())
+                            )
+                            .into(),
+                        );
+                        return;
                     }
-                    // Always, now: a gesture that changed nothing still has a
-                    // line to put back, the held one having been taken off the
-                    // drawing while the hand was moving.
+                    window.set_join_heading(shown.into());
+                    window.set_join_offers(offers_model(&offers));
+                    *asking.borrow_mut() = offers;
+                });
+            }
+            {
+                let editor = editor.clone();
+                let views = views.clone();
+                let drawing = drawing.clone();
+                let asking = asking.clone();
+                let weak = window.as_weak();
+                // The offer chosen: its edit is made, and the line is put
+                // down whatever it was.
+                window.on_link_chosen(move |chosen| {
+                    let offers = std::mem::take(&mut *asking.borrow_mut());
+                    if let Some(window) = weak.upgrade() {
+                        stop_joining(&window, &drawing);
+                    }
+                    let edit = usize::try_from(chosen)
+                        .ok()
+                        .and_then(|chosen| offers.into_iter().nth(chosen))
+                        .and_then(|offer| offer.edit);
+                    if let Some(edit) = edit {
+                        editor.borrow_mut().edit(edit);
+                    }
+                    views.borrow().refresh(&editor.borrow());
+                });
+            }
+            {
+                let editor = editor.clone();
+                let views = views.clone();
+                let drawing = drawing.clone();
+                let asking = asking.clone();
+                let weak = window.as_weak();
+                // The line put down, with nothing made of it. Always a
+                // refresh: a line picked up was taken off the drawing while
+                // it was in hand, and has to be put back.
+                window.on_link_stopped(move || {
+                    asking.borrow_mut().clear();
+                    if let Some(window) = weak.upgrade() {
+                        stop_joining(&window, &drawing);
+                    }
+                    views.borrow().refresh(&editor.borrow());
+                });
+            }
+            {
+                let editor = editor.clone();
+                let views = views.clone();
+                let drawing = drawing.clone();
+                let asking = asking.clone();
+                let weak = window.as_weak();
+                // The Delete key, with a line in hand that was picked up off
+                // a terminal: that line taken out. A line being drawn from
+                // nothing has nothing to take out, and is put down.
+                window.on_link_removed(move || {
+                    asking.borrow_mut().clear();
+                    let held = drawing
+                        .borrow()
+                        .as_ref()
+                        .and_then(|from| from.holding.clone());
+                    if let Some(window) = weak.upgrade() {
+                        stop_joining(&window, &drawing);
+                    }
+                    if let Some(link) = held {
+                        editor.borrow_mut().edit(Edit::RemoveLink { link });
+                    }
                     views.borrow().refresh(&editor.borrow());
                 });
             }
@@ -4974,18 +5064,27 @@ fn wire_physics(
         });
     }
 
-    // A line drawn from a component's terminal: which component and which
-    // way while the hand moves, and what it could mean, while that is being
-    // asked.
+    // A line taken from a component's terminal: which component and which
+    // way while it is in hand, and what it can be made into, while that is
+    // being asked. The same three clicks as a configuration's node: see
+    // `offered`.
     let drawing: Rc<RefCell<Option<PhysicsEnd>>> = Rc::new(RefCell::new(None));
-    let asking: Rc<RefCell<Vec<PhysicsJoin>>> =
-        Rc::new(RefCell::new(Vec::new()));
+    let asking: Rc<RefCell<Vec<Offer>>> = Rc::new(RefCell::new(Vec::new()));
     {
         let drawing = drawing.clone();
+        let asking = asking.clone();
+        let weak = window.as_weak();
         window.on_physics_link_started(move |name, terminal| {
+            let output = terminal.as_str() == "moc-out";
+            if let Some(window) = weak.upgrade() {
+                window.set_join_offers(ModelRc::default());
+                window.set_join_hint(physics_in_hand(&name, output).into());
+                window.set_joining("physics".into());
+            }
+            asking.borrow_mut().clear();
             *drawing.borrow_mut() = Some(PhysicsEnd {
                 component: name.to_string(),
-                output: terminal.as_str() == "moc-out",
+                output,
             });
         });
     }
@@ -5023,71 +5122,118 @@ fn wire_physics(
         });
     }
     {
-        // Let go of: over another component, a connection between the two;
-        // over a payload, or the box of a subdiagram holding payloads, a
-        // stand-in's connects. One thing it can mean is done; several are
-        // asked about, where it was let go of; none is nothing.
+        // Clicked down: over another component, a connection between the
+        // two; over a payload, or the box of a subdiagram holding payloads, a
+        // stand-in's connects; each offered, and asked about where the click
+        // was. Over bare sheet the line is put down; over a shape that can
+        // take nothing of it, it stays in hand and the window says so.
         let editor = editor.clone();
         let views = views.clone();
         let drawing = drawing.clone();
         let asking = asking.clone();
         let weak = window.as_weak();
-        window.on_physics_link_finished(move |x, y| {
+        window.on_physics_link_clicked(move |x, y| {
             let Some(window) = weak.upgrade() else {
                 return;
             };
-            window.set_drawing_route(Default::default());
-            let Some(end) = drawing.borrow_mut().take() else {
+            window.set_join_offers(ModelRc::default());
+            asking.borrow_mut().clear();
+            let Some(end) = drawing.borrow().clone() else {
+                stop_joining(&window, &drawing);
                 return;
             };
             let dividers = views.borrow().divider.get();
             let meant = physics_joins(&editor.borrow(), dividers, &end, (x, y));
-            match meant.as_slice() {
-                [] => {}
-                [one] => {
-                    let edit = physics_edit(&editor.borrow(), one);
-                    if let Some(edit) = edit {
-                        editor.borrow_mut().edit(edit);
-                    }
-                }
-                several => {
-                    let said: Vec<slint::SharedString> =
-                        several.iter().map(|j| j.said().into()).collect();
-                    window.set_physics_choices(ModelRc::from(Rc::new(
-                        VecModel::from(said),
-                    )));
-                    window.set_physics_choice_x(x);
-                    window.set_physics_choice_y(y);
-                    *asking.borrow_mut() = meant;
-                }
+            let Some(meant) = meant else {
+                stop_joining(&window, &drawing);
+                views.borrow().refresh(&editor.borrow());
+                return;
+            };
+            if meant.is_empty() {
+                window.set_join_hint(
+                    format!(
+                        "Nothing there can join this line. {}",
+                        physics_in_hand(&end.component, end.output)
+                    )
+                    .into(),
+                );
+                return;
             }
-            views.borrow().refresh(&editor.borrow());
+            let offers: Vec<Offer> = meant
+                .iter()
+                .map(|(join, made)| {
+                    let edit = physics_edit(&editor.borrow(), join);
+                    match edit {
+                        Some(edit) if !made => Offer {
+                            said: join.said(),
+                            edit: Some(edit),
+                        },
+                        _ => Offer {
+                            said: format!("{} (joined already)", join.said()),
+                            edit: None,
+                        },
+                    }
+                })
+                .collect();
+            window.set_join_heading("Join which?".into());
+            window.set_join_offers(offers_model(&offers));
+            *asking.borrow_mut() = offers;
         });
     }
     {
-        // The answer to what a line meant: the one chosen is made, and
-        // Cancel makes nothing.
+        // The answer: the one chosen is made, and the line is put down
+        // whatever it was.
         let editor = editor.clone();
         let views = views.clone();
+        let drawing = drawing.clone();
+        let asking = asking.clone();
         let weak = window.as_weak();
         window.on_physics_chosen(move |chosen| {
+            let offers = std::mem::take(&mut *asking.borrow_mut());
             if let Some(window) = weak.upgrade() {
-                window.set_physics_choices(ModelRc::default());
+                stop_joining(&window, &drawing);
             }
-            let meant = std::mem::take(&mut *asking.borrow_mut());
-            let Some(join) = usize::try_from(chosen)
+            let edit = usize::try_from(chosen)
                 .ok()
-                .and_then(|chosen| meant.get(chosen))
-            else {
-                return;
-            };
-            let edit = physics_edit(&editor.borrow(), join);
+                .and_then(|chosen| offers.into_iter().nth(chosen))
+                .and_then(|offer| offer.edit);
             if let Some(edit) = edit {
                 editor.borrow_mut().edit(edit);
             }
             views.borrow().refresh(&editor.borrow());
         });
     }
+    {
+        // Put down with nothing made of it.
+        let editor = editor.clone();
+        let views = views.clone();
+        let weak = window.as_weak();
+        window.on_physics_link_stopped(move || {
+            asking.borrow_mut().clear();
+            if let Some(window) = weak.upgrade() {
+                stop_joining(&window, &drawing);
+            }
+            views.borrow().refresh(&editor.borrow());
+        });
+    }
+}
+
+/// What the window says while a line from a physics component is in hand.
+///
+/// # Arguments
+///
+/// * `component` - The component it was taken from.
+/// * `output`    - Whether it was taken from the component's output.
+///
+/// # Returns
+///
+/// The words.
+fn physics_in_hand(component: &str, output: bool) -> String {
+    let way = if output { "output" } else { "input" };
+    format!(
+        "A line from {component}'s {way} is in hand: click a component or a \
+         payload to join it. Escape, or a click on bare sheet, puts it down."
+    )
 }
 
 /// One end of a line being drawn from a physics component: the component,
@@ -5161,16 +5307,17 @@ fn physics_places(
         .collect()
 }
 
-/// Everything a line drawn from a physics component and let go of at a
-/// point can mean.
+/// Everything a line in hand from a physics component, clicked down at a
+/// point, can mean.
 ///
 /// Over another component, each pair of terminals the two can be connected
 /// by, the way the line was drawn: `tcslibgs::node::physics::connectable` says
 /// which. Over a payload on the top page, or the box of a subdiagram, which
 /// is all of a subdiagram the top page shows, each payload there and each
 /// terminal of the component, the way the line was drawn, its stand-in may
-/// be joined to: `tcslibgs::sim_config::may_join` says which. A join that is
-/// already made is not offered again.
+/// be joined to: `tcslibgs::sim_config::may_join` says which. A join already
+/// made is offered too, marked as made, so that the menu says why it cannot
+/// be chosen rather than leaving somebody to wonder where it went.
 ///
 /// # Arguments
 ///
@@ -5182,25 +5329,25 @@ fn physics_places(
 ///
 /// # Returns
 ///
-/// Each thing it can mean, in the order the types list their terminals.
+/// Each thing it can mean, in the order the types list their terminals, and
+/// whether it is made already; `None` over bare sheet, where there is
+/// nothing to ask about.
 fn physics_joins(
     editor: &Editor,
     dividers: Dividers,
     end: &PhysicsEnd,
     at: (f32, f32),
-) -> Vec<PhysicsJoin> {
+) -> Option<Vec<(PhysicsJoin, bool)>> {
     let (x, y) = at;
     let document = editor.document();
-    let Some(simulator) = &document.simulator else {
-        return Vec::new();
-    };
+    let simulator = document.simulator.as_ref()?;
     let places = physics_places(editor, dividers);
     let Some(kind) = places
         .iter()
         .find(|(name, ..)| *name == end.component)
         .map(|(_, kind, _)| kind.clone())
     else {
-        return Vec::new();
+        return Some(Vec::new());
     };
     let shift = dividers.physics as f32;
 
@@ -5214,36 +5361,34 @@ fn physics_joins(
     });
     if let Some((other, their_kind, _)) = over {
         if *other == end.component {
-            return Vec::new();
+            return Some(Vec::new());
         }
         let (from, to, outputs_of, inputs_of) = if end.output {
             (&end.component, other, &kind, their_kind)
         } else {
             (other, &end.component, their_kind, &kind)
         };
-        return tcslibgs::node::physics::connectable(outputs_of, inputs_of)
-            .into_iter()
-            .map(|(output, input)| PhysicsJoin::Connection {
-                from: format!("{from}.{output}"),
-                to: format!("{to}.{input}"),
-            })
-            .filter(|join| match join {
-                PhysicsJoin::Connection { from, to } => !simulator
-                    .world
-                    .connections
-                    .contains(&(from.clone(), to.clone())),
-                PhysicsJoin::StandIn { .. } => true,
-            })
-            .collect();
+        return Some(
+            tcslibgs::node::physics::connectable(outputs_of, inputs_of)
+                .into_iter()
+                .map(|(output, input)| {
+                    let (from, to) =
+                        (format!("{from}.{output}"), format!("{to}.{input}"));
+                    let made = simulator
+                        .world
+                        .connections
+                        .contains(&(from.clone(), to.clone()));
+                    (PhysicsJoin::Connection { from, to }, made)
+                })
+                .collect(),
+        );
     }
 
     // The top page's node under the point, in the configuration's own
     // coordinates; and the payloads it is, or holds.
-    let Some(under) = node_under(document, &None, (x - shift, y)) else {
-        return Vec::new();
-    };
+    let under = node_under(document, &None, (x - shift, y))?;
     let Some(terminals) = tcslibgs::node::physics::terminals_of(&kind) else {
-        return Vec::new();
+        return Some(Vec::new());
     };
     let way = if end.output {
         tcslibgs::node::physics::terminal::Direction::Out
@@ -5270,16 +5415,19 @@ fn physics_joins(
             let named = format!("{}.{}", end.component, terminal.name);
             if terminal.direction == way
                 && tcslibgs::sim_config::may_join(watches, terminal)
-                && !joined.contains(&named.as_str())
             {
-                meant.push(PhysicsJoin::StandIn {
-                    payload: payload.clone(),
-                    terminal: named,
-                });
+                let made = joined.contains(&named.as_str());
+                meant.push((
+                    PhysicsJoin::StandIn {
+                        payload: payload.clone(),
+                        terminal: named,
+                    },
+                    made,
+                ));
             }
         }
     }
-    meant
+    Some(meant)
 }
 
 /// Whether a payload is a GPIO node watching its lines, rather than one
@@ -5683,147 +5831,416 @@ struct Drawing {
     holding: Option<Link>,
 }
 
-/// Decides what becomes of a link whose end was dragged somewhere.
+/// One thing a line in hand can be made into at the node it was taken to, as
+/// the menu there offers it.
 ///
-/// `held` is the link and `pressed` is the end that was taken hold of; `(x, y)`
-/// is where the pointer was let go of. Four answers, which are the four things
-/// a person can do with the end of a line:
+/// What cannot be done is offered as well, greyed and saying why. A menu that
+/// left out the input somebody was looking for would leave them wondering
+/// whether they had the right node; one that says `in0 (fed by temp1)`
+/// answers the question they were about to ask.
+#[derive(Debug, Clone, PartialEq)]
+struct Offer {
+    /// What the menu says: what choosing it does, and where it cannot be
+    /// chosen, why not.
+    said: String,
+    /// The edit choosing it makes, or `None` for one offered greyed.
+    edit: Option<Edit>,
+}
+
+impl Offer {
+    /// An offer of this edit, greyed where there is a reason it cannot be
+    /// made.
+    ///
+    /// # Arguments
+    ///
+    /// * `said` - What choosing it does.
+    /// * `why`  - Why it cannot be chosen, where it cannot.
+    /// * `edit` - The edit it makes.
+    ///
+    /// # Returns
+    ///
+    /// The offer.
+    fn of(said: String, why: Option<String>, edit: Edit) -> Offer {
+        match why {
+            Some(why) => Offer {
+                said: format!("{said} ({why})"),
+                edit: None,
+            },
+            None => Offer {
+                said,
+                edit: Some(edit),
+            },
+        }
+    }
+}
+
+/// What a window a line can be drawn on is told about the line in hand.
 ///
-/// put it back where it was, or anywhere that is not a terminal at all but is
-/// still on a node: nothing changes. A gesture that has thought better of
-/// itself leaves no trace, and neither does one that landed on a node's label;
+/// The main window and a subdiagram's are two types with the same
+/// properties, so the one way of putting a line down is said once, here.
+trait Joins {
+    /// Puts the line in hand down: no line, no menu, nothing said about it.
+    fn put_down(&self);
+}
+
+macro_rules! joins {
+    ($window:ty) => {
+        impl Joins for $window {
+            fn put_down(&self) {
+                self.set_joining("".into());
+                self.set_join_hint("".into());
+                self.set_join_offers(ModelRc::default());
+                self.set_drawing_route(Default::default());
+            }
+        }
+    };
+}
+joins!(MainWindow);
+joins!(SubWindow);
+
+/// Puts the line in hand down, in the window and in the gesture both.
 ///
-/// drop it on another terminal that suits that end: the link is moved, in one
-/// edit, so one undo puts it back;
+/// # Arguments
 ///
-/// drop it on a terminal that does not suit the end -- the wrong kind, the
-/// wrong stream, its own far node, or one the same link already reaches:
-/// nothing changes, as a line that cannot be drawn is not drawn;
+/// * `window`  - The window the line was in hand in.
+/// * `drawing` - Where the gesture keeps the end the line was taken from.
+fn stop_joining<T>(window: &impl Joins, drawing: &RefCell<Option<T>>) {
+    window.put_down();
+    drawing.borrow_mut().take();
+}
+
+/// What the window says while a line is in hand: what to click next, and
+/// how to put it down.
 ///
-/// and let go of it over no node at all: the link is deleted. Which is the
-/// only way to delete one, and it is the gesture a person reaches for -- pull
-/// the wire out and drop it on the floor.
+/// # Arguments
 ///
-/// Let go of over a node that cannot take this end but could take the other,
-/// the gesture is read as drawing a new line from the pressed terminal
-/// instead: see [`joined`].
+/// * `terminal` - The terminal the line was taken from.
+/// * `held`     - Whether it was a line already there, picked up by its end.
+///
+/// # Returns
+///
+/// The words.
+fn in_hand(terminal: &str, held: bool) -> String {
+    let what = if held {
+        format!(
+            "The line at {terminal} is in hand: click a node to move it or \
+             to draw another, or press Delete to take it out."
+        )
+    } else {
+        format!("A line from {terminal} is in hand: click a node to join it.")
+    };
+    format!("{what} Escape, or a click on bare sheet, puts it down.")
+}
+
+/// The offers, as the menu shows them.
+///
+/// # Arguments
+///
+/// * `offers` - What can be made of the line at the node clicked.
+///
+/// # Returns
+///
+/// A row for each, greyed where it cannot be chosen.
+fn offers_model(offers: &[Offer]) -> ModelRc<JoinOffer> {
+    let rows: Vec<JoinOffer> = offers
+        .iter()
+        .map(|offer| JoinOffer {
+            said: offer.said.clone().into(),
+            open: offer.edit.is_some(),
+        })
+        .collect();
+    ModelRc::from(Rc::new(VecModel::from(rows)))
+}
+
+/// Lists what a line in hand can be made into at this node.
+///
+/// `from` is the terminal the line was taken from, and the link picked up
+/// there if one was; `node` is the node clicked, which may be clicked
+/// anywhere: which terminal the line reaches is a choice from this list, not
+/// a small box to hit. Three kinds of offer, in this order:
+///
+/// a new line, from `from` to each terminal of the node it pairs with -- a
+/// `world-out` with a `world-in` and a `moc-out` with a `moc-in`, which is
+/// `tcslibgs::graph::terminals::pairs_with`, the rule the checking holds a
+/// written-out configuration to. A line may be drawn from either end, so
+/// pressed on a sink this offers the node's source. Into a node that declares
+/// its inputs, as a mean does, one for each input, because which input a
+/// reading is, is the whole of what such a line says;
+///
+/// where a line was picked up, its pressed end moved to this node's terminal
+/// of the same kind, the far end staying where it is: one edit, so one undo
+/// puts it back;
+///
+/// and on the node it was picked up from, the line taken out, which is the
+/// menu's way of removing one beside the Delete key.
+///
+/// Greyed rather than left out: anything from a node to itself, a line the
+/// document has already, and a second line into an input something else
+/// feeds, unless the node takes several -- the ground's: see
+/// `tcslibgs::graph::terminals::merges`. An editor that cannot make a bad
+/// link is worth more than one that makes it and explains afterwards.
 ///
 /// # Arguments
 ///
 /// * `document` - The configuration.
-/// * `home`     - The page the gesture was on: `None` for the top.
-/// * `held`     - The link whose end was taken hold of.
-/// * `pressed`  - The node and terminal of the end taken hold of.
-/// * `(x, y)`   - Where the pointer was let go of, in the canvas's own
-///                coordinates.
+/// * `from`     - The node and terminal the line was taken from, and the
+///                line picked up there if one was.
+/// * `node`     - The node clicked, as `node_under` names it.
 ///
 /// # Returns
 ///
-/// The edit to make -- the link moved, removed, or a new one added -- or
-/// `None` where nothing changes.
-fn dropped(
-    document: &Document,
-    home: &Home,
-    held: &Link,
-    pressed: &Drawing,
-    (x, y): (f32, f32),
-) -> Option<Edit> {
-    let (sink_pressed, _) =
-        tcslibgs::graph::terminals::stream_of(&pressed.terminal)?;
+/// Each offer, in the order the menu shows them; none for a node with
+/// nothing that suits the line, and for a node or type this build cannot
+/// find.
+fn offered(document: &Document, from: &Drawing, node: &str) -> Vec<Offer> {
+    let Some((sink_pressed, _)) =
+        tcslibgs::graph::terminals::stream_of(&from.terminal)
+    else {
+        return Vec::new();
+    };
+    let Some(wanted) = tcslibgs::graph::terminals::answers(&from.terminal)
+    else {
+        return Vec::new();
+    };
+    let Some(terminals) = document.node(node).and_then(|found| {
+        NodeType::ALL
+            .iter()
+            .find(|t| t.spelling() == found.node_type)
+            .map(|t| t.terminals())
+    }) else {
+        return Vec::new();
+    };
+    let mut offers = Vec::new();
 
-    // The end being carried keeps its own terminal: a `world-in` taken
-    // off one node goes on another node's `world-in` and nowhere else.
-    let Some(over) = landed(document, home, (x, y), &pressed.terminal) else {
-        // Over nothing at all. From the end a line *leaves* by, that is how a
-        // line is deleted: pull the wire out of the thing that is sending and
-        // drop it on the floor. From the end it arrives at, it is ignored --
-        // a sink takes one source, so dragging its end away and letting go
-        // over nothing is a slip far more often than it is a decision, and
-        // the line is still written on the node it leaves whatever the
-        // arriving end was dragged over.
-        //
-        // So nothing becomes undeletable: a line into a sink that takes
-        // several -- the ground's -- is deleted from its source end, which has
-        // the one link on it.
-        if node_under(document, home, (x, y)).is_none() {
-            return (!sink_pressed)
-                .then(|| Edit::RemoveLink { link: held.clone() });
+    // A new line, between two nodes: a line from a node to itself is a loop
+    // and not a link.
+    if node != from.node {
+        if sink_pressed {
+            if terminals.sources.contains(&wanted) {
+                let input = arriving_at(document, &from.node, &from.terminal);
+                let link = Link::joining(
+                    node,
+                    Some(wanted),
+                    &from.node,
+                    input.as_deref(),
+                );
+                let why = repeated(document, &link, None).or_else(|| {
+                    fed(
+                        document,
+                        &from.node,
+                        input.as_deref(),
+                        &from.terminal,
+                        None,
+                    )
+                });
+                offers.push(Offer::of(
+                    format!("New line from {wanted}"),
+                    why,
+                    Edit::AddLink { link },
+                ));
+            }
+        } else if terminals.sinks.contains(&wanted) {
+            for (said, input) in inputs_at(document, node, wanted) {
+                let link = Link::joining(
+                    &from.node,
+                    leaving_by(from).as_deref(),
+                    node,
+                    input.as_deref(),
+                );
+                let why = repeated(document, &link, None).or_else(|| {
+                    fed(document, node, input.as_deref(), wanted, None)
+                });
+                offers.push(Offer::of(
+                    format!("New line to {said}"),
+                    why,
+                    Edit::AddLink { link },
+                ));
+            }
         }
-        // Over a node that cannot be this end, but could be the other one:
-        // then the gesture was drawing a new line and not moving this one.
-        //
-        // Which is the only way to draw a second line out of a data source. A
-        // source may feed several sinks; a terminal with one line on it hands
-        // that line over, so pressing a source that already has one and
-        // dropping it on a payload used to do nothing at all -- the payload
-        // cannot be a source, so there was nowhere for the end to go. It is
-        // what somebody tried first, and what they meant was obvious: this
-        // node, fed from here.
-        //
-        // Tried second, so nothing that worked before changes. A node that
-        // *can* take this end still takes it -- that is the re-routing
-        // gesture, and it is the reading a person has when they drag an end
-        // off one vehicle node onto another.
-        return joined(document, home, pressed, (x, y))
-            .map(|link| Edit::AddLink { link });
-    };
+    }
 
-    // Back where it started.
-    if over.node == pressed.node && over.terminal == pressed.terminal {
+    let Some(held) = &from.holding else {
+        return offers;
+    };
+    // The end not in hand, which the end in hand is not moved onto: that
+    // would be a line from a node to itself.
+    let far = if sink_pressed { &held.from } else { &held.to };
+    let pressed = from.terminal.as_str();
+    if node != far {
+        if sink_pressed && terminals.sinks.contains(&pressed) {
+            for (said, input) in inputs_at(document, node, pressed) {
+                let mut now = held.clone();
+                now.to = node.to_string();
+                now.input = input.clone();
+                let why = if now.same_connection(held) {
+                    Some("this line".to_string())
+                } else {
+                    repeated(document, &now, Some(held)).or_else(|| {
+                        fed(
+                            document,
+                            node,
+                            input.as_deref(),
+                            pressed,
+                            Some(held),
+                        )
+                    })
+                };
+                offers.push(Offer::of(
+                    format!("Move the line's end to {said}"),
+                    why,
+                    Edit::MoveLink {
+                        was: held.clone(),
+                        now,
+                    },
+                ));
+            }
+        } else if !sink_pressed && terminals.sources.contains(&pressed) {
+            let mut now = held.clone();
+            now.from = node.to_string();
+            now.origin = leaving_by(from);
+            let why = if now.same_connection(held) {
+                Some("this line".to_string())
+            } else {
+                repeated(document, &now, Some(held))
+            };
+            offers.push(Offer::of(
+                format!("Move the line's start to {pressed}"),
+                why,
+                Edit::MoveLink {
+                    was: held.clone(),
+                    now,
+                },
+            ));
+        }
+    }
+    if node == from.node {
+        offers.push(Offer {
+            said: "Remove this line".to_string(),
+            edit: Some(Edit::RemoveLink { link: held.clone() }),
+        });
+    }
+    offers
+}
+
+/// Lists the inputs a line may arrive at on this terminal of this node, each
+/// as the menu names it and as the link records it.
+///
+/// A node that declares its inputs -- a mean's `in0`, `in1` -- has those at
+/// its `world-in`, which is where a reading arrives and where a line to a
+/// named input is drawn. Otherwise the terminal is the one input, recorded by
+/// name where the type has more than one sink and so the file must say which,
+/// and not otherwise: see [`arriving_at`].
+///
+/// # Arguments
+///
+/// * `document` - The configuration.
+/// * `node`     - The node's qualified name.
+/// * `terminal` - The sink the line arrives at.
+///
+/// # Returns
+///
+/// Each input's name for the menu, and what the link records for it.
+fn inputs_at(
+    document: &Document,
+    node: &str,
+    terminal: &str,
+) -> Vec<(String, Option<String>)> {
+    let declared = (terminal == "world-in")
+        .then(|| document.node(node)?.attributes.get("inputs"))
+        .flatten();
+    if let Some(inputs) = declared {
+        return inputs
+            .split(',')
+            .map(str::trim)
+            .filter(|input| !input.is_empty())
+            .map(|input| (input.to_string(), Some(input.to_string())))
+            .collect();
+    }
+    let named = must_name(document, node, true).then(|| terminal.to_string());
+    vec![(terminal.to_string(), named)]
+}
+
+/// Says why a link cannot be made where the document has it already.
+///
+/// A second line on top of the first would be two deliveries of every datum.
+///
+/// # Arguments
+///
+/// * `document` - The configuration.
+/// * `link`     - The link that would be made.
+/// * `except`   - A link to leave out of the question: the one being moved,
+///                which is about to stop being where it is.
+///
+/// # Returns
+///
+/// The reason, as the menu says it, or `None` where there is none.
+fn repeated(
+    document: &Document,
+    link: &Link,
+    except: Option<&Link>,
+) -> Option<String> {
+    document
+        .links
+        .iter()
+        .filter(|theirs| {
+            except.is_none_or(|held| !theirs.same_connection(held))
+        })
+        .any(|theirs| theirs.same_connection(link))
+        .then(|| "joined already".to_string())
+}
+
+/// Says which node feeds an input already, where another line into it would
+/// be one too many.
+///
+/// A sink is fed by one source: two would interleave two streams that
+/// nothing downstream could tell apart. The ground's is the exception, and
+/// takes as many as the configuration gives it: see
+/// `tcslibgs::graph::terminals::merges`.
+///
+/// # Arguments
+///
+/// * `document` - The configuration.
+/// * `node`     - The node the line would arrive at.
+/// * `input`    - What the line would record there: see [`inputs_at`].
+/// * `terminal` - The sink it would arrive at.
+/// * `except`   - A link to leave out of the question: the one being moved.
+///
+/// # Returns
+///
+/// The reason, naming the node that feeds it, or `None` where it is free.
+fn fed(
+    document: &Document,
+    node: &str,
+    input: Option<&str>,
+    terminal: &str,
+    except: Option<&Link>,
+) -> Option<String> {
+    let found = document.node(node)?;
+    if tcslibgs::graph::terminals::merges(&found.node_type) {
         return None;
     }
-
-    // The far end stays where it is and the pressed end moves.
-    let mut now = held.clone();
-    if sink_pressed {
-        now.to = over.node.clone();
-        now.input = arriving_at(document, &over.node, &over.terminal);
-    } else {
-        now.from = over.node.clone();
-        now.origin = leaving_by(&over);
-    }
-
-    let source = Drawing {
-        node: now.from.clone(),
-        terminal: now.origin.clone().unwrap_or_default(),
-        holding: None,
-    };
-    let sink = Drawing {
-        node: now.to.clone(),
-        terminal: now
-            .input
-            .clone()
-            .filter(|input| {
-                tcslibgs::graph::terminals::stream_of(input).is_some()
-            })
-            .or_else(|| {
+    // A declared input is told apart by its name, and a terminal by where the
+    // drawing puts the lines arriving at it.
+    let declared = input
+        .filter(|input| tcslibgs::graph::terminals::stream_of(input).is_none());
+    document
+        .links
+        .iter()
+        .filter(|theirs| {
+            except.is_none_or(|held| !theirs.same_connection(held))
+        })
+        .filter(|theirs| theirs.to == node)
+        .find(|theirs| match declared {
+            Some(declared) => theirs.input.as_deref() == Some(declared),
+            None => {
                 style::terminal_for(
-                    &document.node(&now.to)?.node_type.clone(),
-                    now.input.as_deref(),
+                    &found.node_type,
+                    theirs.input.as_deref(),
                     true,
-                )
-                .map(str::to_string)
-            })
-            .unwrap_or_default(),
-        holding: None,
-    };
-    if source.node == sink.node {
-        return None;
-    }
-    if !tcslibgs::graph::terminals::pairs_with(&source.terminal, &sink.terminal)
-    {
-        return None;
-    }
-    if document.links.iter().any(|theirs| {
-        theirs.same_connection(&now) && !theirs.same_connection(held)
-    }) {
-        return None;
-    }
-
-    Some(Edit::MoveLink {
-        was: held.clone(),
-        now,
-    })
+                ) == Some(terminal)
+            }
+        })
+        .map(|theirs| format!("fed by {}", Qualified::parse(&theirs.from).node))
 }
 
 /// Finds which node is under this point, where one is.
@@ -5905,90 +6322,6 @@ fn attached(document: &Document, at: &Drawing, sink: bool) -> Vec<Link> {
         .collect()
 }
 
-/// Works out the link a gesture made, where it made one.
-///
-/// `pressed` is the terminal the line was drawn from and `(x, y)` is where the
-/// pointer was let go of, in the canvas's own coordinates. `None` for every
-/// gesture that is not a link, and there are four of those -- each refused
-/// here, as the gesture, rather than drawn and then reported. An editor that
-/// cannot make a bad link is worth more than one that explains it afterwards:
-///
-/// let go of over nothing, or over a terminal of the same kind as the one the
-/// drag started at, which is how a gesture is abandoned;
-///
-/// let go of over the node it started on, which is a loop and not a link --
-/// and releasing on the terminal you pressed is a gesture that changed its
-/// mind;
-///
-/// let go of over a terminal that does not pair with the one it started at. A
-/// `world-out` may only be linked to a `world-in` and a `moc-out` only
-/// to a `moc-in`: that is one stream, named at each of its ends, and
-/// anything else would carry one stream into the other. The rule is
-/// `tcslibgs::graph::terminals::pairs_with`, which is also what the checking
-/// refuses a written-out configuration for;
-///
-/// and a link that is already there, which would otherwise be a second line
-/// on top of the first and two deliveries of every datum.
-///
-/// # Arguments
-///
-/// * `document` - The configuration.
-/// * `home`     - The page the gesture was on: `None` for the top.
-/// * `pressed`  - The node and terminal the line was drawn from.
-/// * `(x, y)`   - Where the pointer was let go of, in the canvas's own
-///                coordinates.
-///
-/// # Returns
-///
-/// The new link, from its source to its sink however it was drawn, or
-/// `None` for a gesture that makes none.
-fn joined(
-    document: &Document,
-    home: &Home,
-    pressed: &Drawing,
-    (x, y): (f32, f32),
-) -> Option<Link> {
-    // Either way about. A link may be drawn from the data source that feeds
-    // it or from the data sink that wants feeding -- the same link, and a
-    // person drawing a diagram works in whichever direction they are reading
-    // it. So which end was pressed decides what is being looked for under the
-    // pointer, and the link is put back in its own order afterwards: a link
-    // leaves a source and arrives at a sink however it was drawn.
-    let (sink_pressed, _) =
-        tcslibgs::graph::terminals::stream_of(&pressed.terminal)?;
-    // The far end of the line, which the stream names: see `landed`.
-    let wanted = tcslibgs::graph::terminals::answers(&pressed.terminal)?;
-    let dropped = landed(document, home, (x, y), wanted)?;
-    let (source, sink) = if sink_pressed {
-        (&dropped, pressed)
-    } else {
-        (pressed, &dropped)
-    };
-
-    if source.node == sink.node {
-        return None;
-    }
-    if !tcslibgs::graph::terminals::pairs_with(&source.terminal, &sink.terminal)
-    {
-        return None;
-    }
-
-    let link = Link::joining(
-        &source.node,
-        leaving_by(source).as_deref(),
-        &sink.node,
-        arriving_at(document, &sink.node, &sink.terminal).as_deref(),
-    );
-    if document
-        .links
-        .iter()
-        .any(|theirs| theirs.same_connection(&link))
-    {
-        return None;
-    }
-    Some(link)
-}
-
 /// Finds where the line a gesture is drawing is anchored: the end that stays
 /// put.
 ///
@@ -6030,64 +6363,6 @@ fn anchored(
     Some(at)
 }
 
-/// Finds where a line being dragged has landed: the node under the pointer,
-/// and the terminal the line attaches to there.
-///
-/// Anywhere on the node will do -- its name, its middle, a corner box -- and
-/// `wanted` is the terminal it attaches to, which the gesture already knows.
-/// A stream has one name at each of its ends, so a line drawn from a
-/// `world-out` can only arrive at a `world-in`, and an end carried off a
-/// `world-in` can only be put down on another `world-in`: there is
-/// nothing else the gesture could have meant. The terminals are still drawn,
-/// because they are what says which streams a type carries and which way --
-/// but hitting a box in a corner is work the editor can do instead of the
-/// person.
-///
-/// `None` where the pointer is over no node, and where the node has no such
-/// terminal: the ground receives readings and is sent nothing, so a line
-/// carrying what the ground sends has nowhere to land on it. A gesture that
-/// cannot make a link still makes nothing; what has changed is how hard it is
-/// to aim, not what may be joined to what.
-///
-/// # Arguments
-///
-/// * `document` - The configuration.
-/// * `home`     - The page the gesture is on: `None` for the top.
-/// * `(x, y)`   - Where the pointer is, in the canvas's own coordinates.
-/// * `wanted`   - The terminal the line attaches to.
-///
-/// # Returns
-///
-/// The node under the pointer with `wanted` as its terminal, holding no
-/// link.
-fn landed(
-    document: &Document,
-    home: &Home,
-    (x, y): (f32, f32),
-    wanted: &str,
-) -> Option<Drawing> {
-    let (sink, _) = tcslibgs::graph::terminals::stream_of(wanted)?;
-    let node = node_under(document, home, (x, y))?;
-    let found = document.node(&node)?;
-    let terminals = NodeType::ALL
-        .iter()
-        .find(|t| t.spelling() == found.node_type)?
-        .terminals();
-    let theirs = if sink {
-        terminals.sinks
-    } else {
-        terminals.sources
-    };
-    if !theirs.contains(&wanted) {
-        return None;
-    }
-    Some(Drawing {
-        node,
-        terminal: wanted.to_string(),
-        holding: None,
-    })
-}
-
 /// Decides what to record about the end a line arrives at.
 ///
 /// Three answers, and the order is the order of authority:
@@ -6118,8 +6393,11 @@ fn arriving_at(
     node: &str,
     terminal: &str,
 ) -> Option<String> {
-    if let Some(input) = free_input(document, node) {
-        return Some(input);
+    // Declared inputs are a reading's, at `world-in`: see [`inputs_at`].
+    if terminal == "world-in" {
+        if let Some(input) = free_input(document, node) {
+            return Some(input);
+        }
     }
     must_name(document, node, true).then(|| terminal.to_string())
 }
@@ -7426,12 +7704,13 @@ mod tests {
         }
     }
 
-    /// A line drawn from a physics component means what its terminals and
-    /// the thing it is let go of over allow: from a heater's output to a
-    /// zone, its heat into the zone's; to a GPIO payload watching lines,
-    /// only its heating, which is added after the decisions the payload
-    /// names already; to a sensor, each output, which is asked about; and
-    /// from the zone's output back to itself, or to a heater, nothing.
+    /// A line from a physics component means what its terminals and the
+    /// thing clicked allow: from a heater's output to a zone, its heat into
+    /// the zone's; to a GPIO payload watching lines, only its heating, which
+    /// is added after the decisions the payload names already; to a sensor,
+    /// each output, which is asked about; and from the zone's output back to
+    /// itself, or to a heater, nothing. A join already made is offered marked
+    /// as made, and bare sheet is nothing to ask about at all.
     #[test]
     fn a_line_from_a_physics_component_means_what_its_terminals_allow() {
         let where_ = tempfile::tempdir().expect("a directory");
@@ -7494,8 +7773,9 @@ mod tests {
             component: component.into(),
             output,
         };
-        let joins =
-            |end: PhysicsEnd, at| physics_joins(&editor, dividers, &end, at);
+        let joins = |end: PhysicsEnd, at| {
+            physics_joins(&editor, dividers, &end, at).expect("a shape")
+        };
         let stand_in = |payload: &str, terminal: &str| PhysicsJoin::StandIn {
             payload: payload.into(),
             terminal: terminal.into(),
@@ -7503,18 +7783,21 @@ mod tests {
 
         assert_eq!(
             joins(from("heater_1", true), middle_of("zone")),
-            [PhysicsJoin::Connection {
-                from: "heater_1.heat".into(),
-                to: "zone.heat".into(),
-            }]
+            [(
+                PhysicsJoin::Connection {
+                    from: "heater_1.heat".into(),
+                    to: "zone.heat".into(),
+                },
+                false
+            )]
         );
         assert!(joins(from("zone", true), middle_of("zone")).is_empty());
         assert!(joins(from("zone", true), middle_of("heater_1")).is_empty());
 
         let pulled = joins(from("heater_1", true), over((34, 34)));
-        assert_eq!(pulled, [stand_in("lines-in", "heater_1.heating")]);
+        assert_eq!(pulled, [(stand_in("lines-in", "heater_1.heating"), false)]);
         assert_eq!(
-            physics_edit(&editor, &pulled[0]),
+            physics_edit(&editor, &pulled[0].0),
             Some(Edit::SetSimPayload {
                 payload: "lines-in".into(),
                 setting: "connects".into(),
@@ -7522,21 +7805,29 @@ mod tests {
                 now: Some("heater_2.heating, heater_1.heating".into()),
             })
         );
-        assert!(
-            joins(from("heater_2", true), over((34, 34))).is_empty(),
-            "a decision the payload names already is not offered again"
+        assert_eq!(
+            joins(from("heater_2", true), over((34, 34))),
+            [(stand_in("lines-in", "heater_2.heating"), true)],
+            "a decision the payload names already is offered as made"
         );
         assert_eq!(
             joins(from("heater_1", false), over((34, 166))),
-            [stand_in("lines-out", "heater_1.on")]
+            [(stand_in("lines-out", "heater_1.on"), false)]
         );
         assert_eq!(
             joins(from("heater_1", true), over((34, 280))).len(),
             3,
             "heat, current and heating, asked about"
         );
-        assert!(
-            joins(from("heater_1", true), (shift + 900.0, 900.0)).is_empty()
+        assert_eq!(
+            physics_joins(
+                &editor,
+                dividers,
+                &from("heater_1", true),
+                (shift + 900.0, 900.0)
+            ),
+            None,
+            "bare sheet is nothing to ask about"
         );
     }
 
@@ -9006,243 +9297,229 @@ mod tests {
         );
     }
 
-    /// A link is drawn from one terminal to the one it pairs with, and
-    /// nothing else is drawn at all.
+    /// A configuration of these nodes, for the tests of what a line in hand
+    /// is offered: where they are does not matter, a node being clicked
+    /// anywhere on it.
     ///
-    /// The gesture, without the window: the terminal pressed and the point the
-    /// pointer was let go of are the whole of what it says, and `joined` is
-    /// what turns those into a link or into nothing. Each refusal here is a
-    /// link the editor cannot make -- which is worth more than one it makes
-    /// and then marks red.
-    #[test]
-    fn a_link_is_drawn_between_terminals_that_pair() {
-        use journal::Edit;
-
+    /// # Arguments
+    ///
+    /// * `nodes` - Each node's name and type.
+    ///
+    /// # Returns
+    ///
+    /// The configuration, with no links.
+    fn of_nodes(nodes: &[(&str, &str)]) -> Document {
         let mut document = Document::new();
-        for (name, node_type, at) in [
-            ("sensor", "i2c", (560, 120)),
-            ("through", "app_all_veh", (300, 120)),
-            ("ground", "gateway_radio", (16, 120)),
-        ] {
+        for (name, node_type) in nodes {
             document.apply(&Edit::AddNode {
-                name: name.into(),
-                node_type: node_type.into(),
+                name: name.to_string(),
+                node_type: node_type.to_string(),
                 home: None,
             });
-            document.apply(&Edit::MoveNode {
-                node: name.into(),
-                was: (0, 0),
-                now: at,
-            });
         }
+        document
+    }
 
-        // The middle of a terminal's box, which is where a person lets go.
-        // Taken from a copy of where the nodes are, so that a link can be
-        // added to the document afterwards without the borrow outliving it.
-        let placed: Vec<(String, String, (i32, i32))> = document
-            .nodes_in(&None)
-            .iter()
-            .map(|node| (node.name.clone(), node.node_type.clone(), node.at))
-            .collect();
-        let over = |node: &str, terminal: &str| {
-            let (_, node_type, at) = placed
-                .iter()
-                .find(|(name, _, _)| name == node)
-                .expect("the node");
-            let (x, y, width, height) =
-                style::terminal_box(node_type, *at, terminal)
-                    .expect("a terminal");
-            (x + width / 2.0, y + height / 2.0)
-        };
-        let drawn = |node: &str, terminal: &str| Drawing {
+    /// A line in hand from this terminal, picked up off it where `holding`
+    /// says so.
+    ///
+    /// # Arguments
+    ///
+    /// * `node`     - The node the line was taken from.
+    /// * `terminal` - The terminal it was taken from.
+    /// * `holding`  - The line picked up there, if one was.
+    ///
+    /// # Returns
+    ///
+    /// The line in hand.
+    fn in_hand_at(
+        node: &str,
+        terminal: &str,
+        holding: Option<&Link>,
+    ) -> Drawing {
+        Drawing {
             node: node.to_string(),
             terminal: terminal.to_string(),
-            holding: None,
-        };
-        // And the middle of a node, which is the other place a person lets go:
-        // a line may be dropped anywhere on the node it is being joined to.
-        let middle = |node: &str| {
-            let (_, node_type, at) = placed
-                .iter()
-                .find(|(name, _, _)| name == node)
-                .expect("the node");
-            let (width, height) = size_of(node_type);
-            (
-                at.0 as f32 + width as f32 / 2.0,
-                at.1 as f32 + height as f32 / 2.0,
-            )
-        };
+            holding: holding.cloned(),
+        }
+    }
 
-        // The readings, from the payload to the ground: a world-out let go of
-        // over a world-in. Neither end names its terminal, both types
-        // having one of each -- which is what keeps a saved file saying
-        // `{ from: sensor, to: ground }`.
-        let link = joined(
-            &document,
-            &None,
-            &drawn("sensor", "world-out"),
-            over("ground", "world-in"),
-        )
-        .expect("a payload's readings reach the ground");
-        assert_eq!(link.from, "sensor");
-        // The terminal it leaves by, always: a link is written as an
-        // attribute of its own node, named after that terminal.
-        assert_eq!(link.origin.as_deref(), Some("world-out"));
-        assert_eq!(link.to, "ground");
-        // And nothing at the arriving end, the ground link having one data
-        // sink: the schema reads an unnamed end as that one.
-        assert_eq!(link.input, None);
+    /// What each offer says, which is what a person reads in the menu.
+    fn said(offers: &[Offer]) -> Vec<&str> {
+        offers.iter().map(|offer| offer.said.as_str()).collect()
+    }
 
-        // And back the other way, which is the other stream: a moc-out let
-        // go of over a moc-in.
-        let back = joined(
-            &document,
-            &None,
-            &drawn("ground", "moc-out"),
-            over("sensor", "moc-in"),
-        )
-        .expect("what the ground sends reaches the payload");
+    /// A line is offered to the inputs that pair with it, and nothing else.
+    ///
+    /// The gesture, without the window: the terminal the line was taken
+    /// from and the node clicked are the whole of what it says, and
+    /// `offered` is what turns those into a menu. What cannot be made is in
+    /// the menu greyed, saying why -- which is worth more than a menu that
+    /// leaves somebody looking for the input they expected, and far more
+    /// than a link made and then marked red.
+    #[test]
+    fn a_line_is_offered_to_the_inputs_that_pair_with_it() {
+        let mut document = of_nodes(&[
+            ("sensor", "i2c"),
+            ("other", "i2c"),
+            ("through", "app_all_veh"),
+            ("ground", "gateway_radio"),
+        ]);
+        let drawn =
+            |node: &str, terminal: &str| in_hand_at(node, terminal, None);
+
+        // The readings, from the payload to the ground: a world-out to a
+        // world-in. Neither end names its input, both types having one --
+        // which is what keeps a saved file saying `{ from: sensor, to:
+        // ground }` -- and the terminal it leaves by is always named, a link
+        // being written under it.
+        let link = Link::joining("sensor", Some("world-out"), "ground", None);
         assert_eq!(
-            (back.from.as_str(), back.to.as_str()),
-            ("ground", "sensor")
+            offered(&document, &drawn("sensor", "world-out"), "ground"),
+            [Offer {
+                said: "New line to world-in".into(),
+                edit: Some(Edit::AddLink { link: link.clone() }),
+            }]
         );
 
-        // A null node has two of each, so its links say which: that is the
-        // whole reason a terminal is written into a file.
-        let through = joined(
-            &document,
-            &None,
-            &drawn("through", "world-out"),
-            over("ground", "world-in"),
-        )
-        .expect("a null node reaches the ground");
-        assert_eq!(through.origin.as_deref(), Some("world-out"));
-
-        // Now the gestures that are not links.
-
-        // Let go of over the far node's own data source, which is still a
-        // release over that node: the line lands on the terminal the stream
-        // names -- the ground's world-in -- as it would anywhere else on
-        // the box. What may be joined to what has not changed; what has gone
-        // is having to hit a small box to say it.
+        // And back the other way, which is the other stream: a moc-out to a
+        // moc-in.
         assert_eq!(
-            joined(
-                &document,
-                &None,
-                &drawn("sensor", "world-out"),
-                over("ground", "moc-out"),
-            ),
-            Some(link.clone()),
-            "a release anywhere on the node makes the link the stream allows"
+            offered(&document, &drawn("ground", "moc-out"), "sensor"),
+            [Offer {
+                said: "New line to moc-in".into(),
+                edit: Some(Edit::AddLink {
+                    link: Link::joining(
+                        "ground",
+                        Some("moc-out"),
+                        "sensor",
+                        None
+                    ),
+                }),
+            }]
         );
 
-        // And the middle of it, which is where a person actually aims.
+        // Drawn from the sink end, which is the same link: a person drawing a
+        // diagram works in whichever direction they are reading it.
         assert_eq!(
-            joined(
-                &document,
-                &None,
-                &drawn("sensor", "world-out"),
-                middle("ground")
-            ),
-            Some(link.clone())
+            offered(&document, &drawn("ground", "world-in"), "sensor"),
+            [Offer {
+                said: "New line from world-out".into(),
+                edit: Some(Edit::AddLink { link: link.clone() }),
+            }]
         );
 
-        // A node with no terminal of that stream takes nothing: the ground
-        // receives readings and is sent nothing, so what the ground sends has
-        // nowhere to land on the ground.
+        // A null node has two data sinks, so a line into it says which: that
+        // is the whole reason a terminal is written into a file.
         assert_eq!(
-            joined(
-                &document,
-                &None,
-                &drawn("through", "moc-out"),
-                middle("ground"),
-            ),
-            None,
+            offered(&document, &drawn("sensor", "world-out"), "through"),
+            [Offer {
+                said: "New line to world-in".into(),
+                edit: Some(Edit::AddLink {
+                    link: Link::joining(
+                        "sensor",
+                        Some("world-out"),
+                        "through",
+                        Some("world-in")
+                    ),
+                }),
+            }]
+        );
+
+        // A node with no terminal of that stream is offered nothing: the
+        // ground receives readings and is sent nothing.
+        assert!(
+            offered(&document, &drawn("through", "moc-out"), "ground")
+                .is_empty(),
             "a gateway node has no moc-in to arrive at"
         );
-
-        // Let go of over nothing.
-        assert_eq!(
-            joined(
-                &document,
-                &None,
-                &drawn("sensor", "world-out"),
-                (900.0, 400.0)
-            ),
-            None
+        // Nor is the node the line was taken from, which would be a loop.
+        assert!(
+            offered(&document, &drawn("through", "world-out"), "through")
+                .is_empty()
         );
 
-        // Let go of over the node it started on, which is a gesture that
-        // changed its mind rather than a request for a loop.
-        assert_eq!(
-            joined(
-                &document,
-                &None,
-                &drawn("through", "world-out"),
-                over("through", "moc-in"),
-            ),
-            None
-        );
-
-        // Drawn the other way about, which is the same link: pressed on the
-        // ground link's data sink and let go of over the payload's data
-        // source. A person drawing a diagram works in whichever direction they
-        // are reading it.
-        let backwards = joined(
-            &document,
-            &None,
-            &drawn("ground", "world-in"),
-            over("sensor", "world-out"),
-        )
-        .expect("a link drawn from the sink end");
-        assert_eq!(
-            backwards, link,
-            "the same link, whichever end it was drawn from"
-        );
-
-        // And from a data sink onto the *node*, which is the same gesture with
-        // nothing to aim at: a sink is fed by one stream, so the terminal the
-        // line leaves by is the payload's world-out whether or not the hand
-        // found the box.
-        assert_eq!(
-            joined(
-                &document,
-                &None,
-                &drawn("ground", "world-in"),
-                middle("sensor"),
-            ),
-            Some(link.clone()),
-            "a line from a data sink should reach a node dropped anywhere on it"
-        );
-
-        // Released over the null node's own world-out box, which is a release
-        // over the null node: the readings land on its world-in, that
-        // being where a groundward stream arrives.
-        let through_sink = joined(
-            &document,
-            &None,
-            &drawn("sensor", "world-out"),
-            over("through", "world-out"),
-        )
-        .expect("the readings reach the node in the way");
-        assert_eq!(
-            (through_sink.to.as_str(), through_sink.input.as_deref(),),
-            ("through", Some("world-in")),
-            "a null node has two data sinks, so the file says which"
-        );
-
-        // And a link that is already there: a second line on top of the first
-        // would be two deliveries of every datum.
+        // A link that is already there is offered greyed: a second line on
+        // top of the first would be two deliveries of every datum.
         document.apply(&Edit::AddLink { link: link.clone() });
         assert_eq!(
-            joined(
-                &document,
-                &None,
-                &drawn("sensor", "world-out"),
-                over("ground", "world-in"),
+            offered(&document, &drawn("sensor", "world-out"), "ground"),
+            [Offer {
+                said: "New line to world-in (joined already)".into(),
+                edit: None,
+            }]
+        );
+        // The ground takes as many as the configuration gives it.
+        assert!(
+            offered(&document, &drawn("other", "world-out"), "ground")[0]
+                .edit
+                .is_some(),
+            "every payload aboard may report to one ground"
+        );
+
+        // And a sink anywhere else takes one: two streams into it could not
+        // be told apart, so the menu says what feeds it already.
+        document.apply(&Edit::AddLink {
+            link: Link::joining(
+                "sensor",
+                Some("world-out"),
+                "through",
+                Some("world-in"),
             ),
-            None,
-            "the same link twice"
+        });
+        assert_eq!(
+            said(&offered(&document, &drawn("other", "world-out"), "through")),
+            ["New line to world-in (fed by sensor)"]
+        );
+    }
+
+    /// Into a node that declares its inputs, the line is offered each.
+    ///
+    /// Which input a reading arrives at is the whole of what a line into a
+    /// mean says, so it is a choice and not a guess: the inputs in the order
+    /// they are declared, the ones already fed greyed and naming what feeds
+    /// them.
+    #[test]
+    fn a_line_into_a_mean_is_offered_each_of_its_inputs() {
+        let mut document = of_nodes(&[
+            ("sensor", "i2c"),
+            ("other", "i2c"),
+            ("zone_temp", "compute"),
+        ]);
+        document.apply(&Edit::SetAttribute {
+            node: "zone_temp".into(),
+            attribute: "inputs".into(),
+            was: None,
+            now: Some("in0, in1".into()),
+        });
+        document.apply(&Edit::AddLink {
+            link: Link::joining(
+                "sensor",
+                Some("world-out"),
+                "zone_temp",
+                Some("in0"),
+            ),
+        });
+
+        let offers = offered(
+            &document,
+            &in_hand_at("other", "world-out", None),
+            "zone_temp",
+        );
+        assert_eq!(
+            said(&offers),
+            ["New line to in0 (fed by sensor)", "New line to in1"]
+        );
+        assert_eq!(
+            offers[1].edit,
+            Some(Edit::AddLink {
+                link: Link::joining(
+                    "other",
+                    Some("world-out"),
+                    "zone_temp",
+                    Some("in1")
+                ),
+            })
         );
     }
 
@@ -9286,283 +9563,139 @@ mod tests {
         );
     }
 
-    /// The end of a line can be taken hold of, moved, or dropped on the floor.
+    /// The end of a line picked up can be moved, or the line taken out.
     ///
-    /// The four things a person can do with it, which is the whole of the
-    /// gesture: put it back, move it to another terminal that suits, try one
-    /// that does not, or let go of it over nothing. The last is also the only
-    /// way to delete a link, and it is the one somebody reaches for -- pull
-    /// the wire out and drop it.
+    /// A terminal with one line on it hands that line over, and the node
+    /// clicked next offers its end moved there -- the far end staying where it
+    /// is, in one edit, so one undo puts it back -- beside whatever new line
+    /// could be drawn from the terminal instead. The node it was picked up
+    /// from offers to take it out.
     #[test]
-    fn the_end_of_a_link_can_be_moved_or_dropped() {
-        use journal::{Edit, Link};
-
-        let mut document = Document::new();
-        for (name, node_type, at) in [
-            ("ground", "gateway_radio", (16, 120)),
-            ("through", "app_all_veh", (300, 120)),
-            ("sensor", "i2c", (600, 120)),
-            ("other", "i2c", (600, 400)),
-        ] {
-            document.apply(&Edit::AddNode {
-                name: name.into(),
-                node_type: node_type.into(),
-                home: None,
-            });
-            document.apply(&Edit::MoveNode {
-                node: name.into(),
-                was: (0, 0),
-                now: at,
-            });
-        }
+    fn the_end_of_a_line_picked_up_can_be_moved_or_taken_out() {
+        let mut document = of_nodes(&[
+            ("ground", "gateway_radio"),
+            ("through", "app_all_veh"),
+            ("sensor", "i2c"),
+            ("other", "i2c"),
+        ]);
         // The readings of one sensor, reaching the ground.
         let held = Link::joining("sensor", Some("world-out"), "ground", None);
         document.apply(&Edit::AddLink { link: held.clone() });
 
-        // Where each node is and what it is, copied out so that a link can be
-        // added to the document afterwards without the borrow outliving it.
-        let placed: Vec<(String, String, (i32, i32))> = document
-            .nodes_in(&None)
-            .iter()
-            .map(|node| (node.name.clone(), node.node_type.clone(), node.at))
-            .collect();
-        let found = |node: &str| {
-            placed
-                .iter()
-                .find(|(name, _, _)| name == node)
-                .expect("the node")
-                .clone()
-        };
-        let at = |node: &str| found(node).2;
-        let kind = |node: &str| found(node).1;
-        let over = |node: &str, terminal: &str| {
-            let (x, y, width, height) =
-                style::terminal_box(&kind(node), at(node), terminal)
-                    .expect("a terminal");
-            (x + width / 2.0, y + height / 2.0)
-        };
-        let middle = |node: &str| {
-            let (width, height) = size_of(&kind(node));
-            (
-                at(node).0 as f32 + width as f32 / 2.0,
-                at(node).1 as f32 + height as f32 / 2.0,
-            )
-        };
-        // The end that was taken hold of: the sink, which is where this link
-        // arrives.
-        let pressed = Drawing {
-            node: "ground".to_string(),
-            terminal: "world-in".to_string(),
-            holding: Some(held.clone()),
-        };
+        // Picked up by the end it arrives at.
+        let pressed = in_hand_at("ground", "world-in", Some(&held));
 
-        // Put back where it came from: nothing happens. A gesture that has
-        // thought better of itself leaves no trace.
+        // Back on its own node: where it is already, greyed, and the offer
+        // to take it out.
         assert_eq!(
-            dropped(
-                &document,
-                &None,
-                &held,
-                &pressed,
-                over("ground", "world-in")
-            ),
-            None
+            offered(&document, &pressed, "ground"),
+            [
+                Offer {
+                    said: "Move the line's end to world-in (this line)".into(),
+                    edit: None,
+                },
+                Offer {
+                    said: "Remove this line".into(),
+                    edit: Some(Edit::RemoveLink { link: held.clone() }),
+                },
+            ]
         );
 
-        // Or anywhere else on the node it is already attached to, which is
-        // the same answer for the same reason: that is where it is.
+        // On a node that can take it: moved there, the sensor staying where
+        // it is; or a new line from that node's own data source into the
+        // ground, which takes as many as it is given.
         assert_eq!(
-            dropped(&document, &None, &held, &pressed, middle("ground")),
-            None
+            offered(&document, &pressed, "through"),
+            [
+                Offer {
+                    said: "New line from world-out".into(),
+                    edit: Some(Edit::AddLink {
+                        link: Link::joining(
+                            "through",
+                            Some("world-out"),
+                            "ground",
+                            None
+                        ),
+                    }),
+                },
+                Offer {
+                    said: "Move the line's end to world-in".into(),
+                    edit: Some(Edit::MoveLink {
+                        was: held.clone(),
+                        now: Link::joining(
+                            "sensor",
+                            Some("world-out"),
+                            "through",
+                            Some("world-in")
+                        ),
+                    }),
+                },
+            ]
         );
 
-        // Moved to a terminal that suits the end: one edit, so one undo puts
-        // it back. The far end -- the sensor -- stays where it is.
-        let moved = dropped(
-            &document,
-            &None,
-            &held,
-            &pressed,
-            over("through", "world-in"),
-        )
-        .expect("a sink that pairs with the source");
-        match moved {
-            Edit::MoveLink { was, now } => {
-                assert_eq!(was, held);
-                assert_eq!(now.from, "sensor", "the far end stays put");
-                assert_eq!(now.origin.as_deref(), Some("world-out"));
-                assert_eq!(now.to, "through");
-                assert_eq!(now.input.as_deref(), Some("world-in"));
-            }
-            other => panic!("{other:?}"),
-        }
+        // Not onto the far node, which would be a line from a node to itself;
+        // and the line it would draw instead is the one in hand.
+        assert_eq!(
+            said(&offered(&document, &pressed, "sensor")),
+            ["New line from world-out (joined already)"]
+        );
 
-        // Anywhere on that node is the same answer, which is what makes this
-        // worth aiming loosely: the corner box of its other stream, the box
-        // of one of its data sources, and the middle of it all put the end on
-        // its world-in, that being where a groundward stream arrives.
-        for landing in [
-            over("through", "moc-in"),
-            over("through", "world-out"),
-            middle("through"),
-        ] {
-            assert_eq!(
-                dropped(&document, &None, &held, &pressed, landing),
-                Some(Edit::MoveLink {
+        // Picked up by the end it leaves by, and its start put on another
+        // sensor's.
+        let pressed = in_hand_at("sensor", "world-out", Some(&held));
+        let moved = Link::joining("other", Some("world-out"), "ground", None);
+        assert_eq!(
+            offered(&document, &pressed, "other"),
+            [Offer {
+                said: "Move the line's start to world-out".into(),
+                edit: Some(Edit::MoveLink {
                     was: held.clone(),
-                    now: Link::joining(
-                        "sensor",
-                        Some("world-out"),
-                        "through",
-                        Some("world-in")
-                    ),
+                    now: moved.clone(),
                 }),
-                "a release anywhere on the node moves the end to its world-in"
-            );
-        }
-
-        // Not onto the far node itself, which would be a link from a node to
-        // itself.
-        assert_eq!(
-            dropped(
-                &document,
-                &None,
-                &held,
-                &pressed,
-                over("sensor", "moc-in")
-            ),
-            None
+            }]
         );
 
-        // And onto a node that cannot be this end but could be the other one,
-        // the gesture is read as drawing a line rather than moving one: a
-        // payload has no world-in, so dropping the ground's arriving end
-        // on one means "this payload reports here too". The ground's sink
-        // takes as many as the configuration gives it, which is what makes
-        // that a sentence and not a contradiction.
+        // And a move that would make a line the document already has is
+        // greyed: two lines between one pair of terminals deliver twice.
+        document.apply(&Edit::AddLink { link: moved });
         assert_eq!(
-            dropped(&document, &None, &held, &pressed, middle("other")),
-            Some(Edit::AddLink {
-                link: Link::joining("other", Some("world-out"), "ground", None)
-            }),
-            "a second line into the ground should be drawn, not refused"
-        );
-
-        // Over nothing at all, from the end the line arrives at: ignored. A
-        // sink takes one source, so letting go of its end over nothing is a
-        // slip more often than a decision.
-        assert_eq!(
-            dropped(&document, &None, &held, &pressed, (40.0, 900.0)),
-            None,
-            "an arriving end dropped on the canvas should change nothing"
-        );
-
-        // And the source end moves the same way: taken hold of at the
-        // sensor's `world-out` and put on another sensor's.
-        let pressed = Drawing {
-            node: "sensor".to_string(),
-            terminal: "world-out".to_string(),
-            holding: Some(held.clone()),
-        };
-        let moved = dropped(
-            &document,
-            &None,
-            &held,
-            &pressed,
-            over("other", "world-out"),
-        )
-        .expect("another sensor's readings may reach the same ground");
-        match moved {
-            Edit::MoveLink { now, .. } => {
-                assert_eq!(now.from, "other");
-                assert_eq!(now.origin.as_deref(), Some("world-out"));
-                assert_eq!(now.to, "ground", "the far end stays put");
-            }
-            other => panic!("{other:?}"),
-        }
-
-        // And a move that would make a link the document already has does
-        // nothing: two lines between one pair of terminals lie on top of each
-        // other and deliver twice.
-        document.apply(&Edit::AddLink {
-            link: Link::joining("other", Some("world-out"), "ground", None),
-        });
-        assert_eq!(
-            dropped(
-                &document,
-                &None,
-                &held,
-                &pressed,
-                over("other", "world-out")
-            ),
-            None
+            said(&offered(&document, &pressed, "other")),
+            ["Move the line's start to world-out (joined already)"]
         );
     }
 
     /// A second line out of a data source is drawn from that source.
     ///
-    /// The gesture somebody tried first and found dead: a gateway node already
-    /// feeding one payload, pressed on its `moc-out` and let go of over a
-    /// second payload. That terminal has one line on it, so the press means
-    /// "pick this line up" -- and a payload cannot be a data source, so there
-    /// was nowhere for the end to land and nothing happened at all. What they
-    /// meant was plain: that node, fed from here.
-    ///
-    /// So a landing that cannot be this end and could be the other one is read
-    /// as a new line. Which is the only gesture there is for a second line out
-    /// of a source: a source may feed several sinks, and the one it already
-    /// feeds is what makes the press ambiguous in the first place.
+    /// The gesture somebody tries first: a gateway node already feeding one
+    /// payload, its `moc-out` clicked and then a second payload. That
+    /// terminal has one line on it, so the click picks the line up -- and a
+    /// payload cannot be a data source, so there is nowhere for that end to
+    /// go. What they meant is plain, and it is what the payload offers: that
+    /// node, fed from here.
     #[test]
     fn a_source_that_already_feeds_one_node_can_feed_another() {
-        use journal::{Edit, Link};
-
-        let mut document = Document::new();
-        for (name, node_type, at) in [
-            ("ground", "gateway_radio", (0, 0)),
-            ("i2c", "i2c", (dividers().vehicle + 8, 0)),
-            ("spi", "spi", (dividers().vehicle + 8, 152)),
-        ] {
-            document.apply(&Edit::AddNode {
-                name: name.to_string(),
-                node_type: node_type.to_string(),
-                home: None,
-            });
-            document.apply(&Edit::MoveNode {
-                node: name.to_string(),
-                was: (0, 0),
-                now: at,
-            });
-        }
-        // The line that is already there, which is what made the gesture
-        // ambiguous: the ground feeds one payload.
+        let mut document = of_nodes(&[
+            ("ground", "gateway_radio"),
+            ("i2c", "i2c"),
+            ("spi", "spi"),
+        ]);
         let held = Link::joining("ground", Some("moc-out"), "i2c", None);
         document.apply(&Edit::AddLink { link: held.clone() });
 
-        // Pressed on the ground's moc-out, which hands over the line it
-        // has, and let go of in the middle of the other payload.
-        let pressed = Drawing {
-            node: "ground".to_string(),
-            terminal: "moc-out".to_string(),
-            holding: Some(held.clone()),
-        };
-        let (width, height) = size_of("spi");
-        let at = document.node("spi").expect("the node").at;
-        let over = (
-            at.0 as f32 + width as f32 / 2.0,
-            at.1 as f32 + height as f32 / 2.0,
-        );
-
         assert_eq!(
-            dropped(&document, &None, &held, &pressed, over),
-            Some(Edit::AddLink {
-                link: Link::joining("ground", Some("moc-out"), "spi", None)
-            }),
-            "the second line was not drawn"
+            offered(
+                &document,
+                &in_hand_at("ground", "moc-out", Some(&held)),
+                "spi"
+            ),
+            [Offer {
+                said: "New line to moc-in".into(),
+                edit: Some(Edit::AddLink {
+                    link: Link::joining("ground", Some("moc-out"), "spi", None)
+                }),
+            }],
+            "the second line was not offered"
         );
-
-        // And the line that was picked up is still there: a gesture that drew
-        // a line did not move one.
-        assert!(document.links.contains(&held));
     }
 
     /// A terminal with one link on it hands it over; one with several does not.
@@ -9675,25 +9808,20 @@ mod tests {
             });
         }
 
-        let over =
-            |node: &str, node_type: &str, at: (i32, i32), terminal: &str| {
-                let (x, y, width, height) =
-                    style::terminal_box(node_type, at, terminal)
-                        .expect("a terminal");
-                let _ = node;
-                (x + width / 2.0, y + height / 2.0)
-            };
-
-        let link = joined(
+        let link = offered(
             &document,
-            &None,
             &Drawing {
                 node: "ground".to_string(),
                 terminal: "moc-out".to_string(),
                 holding: None,
             },
-            over("to_kelvin", "compute", (300, 120), "moc-in"),
+            "to_kelvin",
         )
+        .into_iter()
+        .find_map(|offer| match offer.edit {
+            Some(Edit::AddLink { link }) => Some(link),
+            _ => None,
+        })
         .expect("the ground reaches a computation");
 
         assert_eq!(link.from, "ground");
@@ -10875,8 +11003,8 @@ mod tests {
         the_divider_can_be_dragged();
         a_node_follows_the_pointer_and_reports_where_it_went();
         an_existing_configuration_is_on_the_canvas();
-        a_link_is_drawn_by_dragging_from_a_terminal();
-        a_link_is_deleted_by_dragging_its_end_onto_the_canvas();
+        a_link_is_drawn_by_clicking_a_terminal_then_a_node();
+        a_link_is_taken_out_from_its_own_node();
         placing_a_described_node_answers_what_it_describes();
         an_error_is_put_where_it_cannot_be_missed();
         a_fault_is_put_where_it_cannot_be_missed();
@@ -11373,15 +11501,14 @@ mod tests {
         assert!(views.borrow().deleting.is_none());
     }
 
-    /// While a line is being drawn it follows the pointer, and it goes when
-    /// the gesture ends.
+    /// While a line is in hand it follows the pointer, and it goes when the
+    /// line is put down.
     ///
     /// Through the window, because every part of this is the window's: the
-    /// terminal reports where the pointer is while it holds it, the canvas
-    /// draws a dashed line there, and the line is erased and drawn again on
-    /// every movement. Without it a person aims at nothing -- the line
-    /// appeared only once the gesture was over, which is to say once it was
-    /// too late to aim.
+    /// sheet reports where the pointer is while a line is in hand, with no
+    /// button held, the canvas draws a dashed line there, and the line is
+    /// erased and drawn again on every movement. Without it a person aims at
+    /// nothing.
     fn the_line_being_drawn_follows_the_pointer() {
         use i_slint_backend_testing as testing;
         use slint::platform::{PointerEventButton, WindowEvent};
@@ -11474,9 +11601,13 @@ mod tests {
             position: from,
             button: PointerEventButton::Left,
         });
+        ui.window().dispatch_event(WindowEvent::PointerReleased {
+            position: from,
+            button: PointerEventButton::Left,
+        });
 
-        // Moved partway: a line from the terminal to the pointer, in pieces
-        // because it is dashed.
+        // Moved partway, the button up: a line from the terminal to the
+        // pointer, in pieces because it is dashed.
         let halfway = at(400.0, 200.0);
         ui.window()
             .dispatch_event(WindowEvent::PointerMoved { position: halfway });
@@ -11496,15 +11627,30 @@ mod tests {
         assert_ne!(moved, said, "the line did not follow the pointer");
         assert!(moved.ends_with("L 300.0 320.0"), "{moved}");
 
-        // And let go of over the ground, which makes the link and takes the
-        // line being drawn away: what is on the canvas now is a link.
+        // Clicked on the ground, which asks what to make of it; and while
+        // that is asked the line stays where it was clicked, so the hand can
+        // go to the menu without the line following it there.
         let over = at(16.0 + 40.0, 120.0 + 40.0);
         ui.window()
             .dispatch_event(WindowEvent::PointerMoved { position: over });
+        ui.window().dispatch_event(WindowEvent::PointerPressed {
+            position: over,
+            button: PointerEventButton::Left,
+        });
         ui.window().dispatch_event(WindowEvent::PointerReleased {
             position: over,
             button: PointerEventButton::Left,
         });
+        let asked = ui.get_drawing_route().to_string();
+        assert!(asked.ends_with("L 56.0 160.0"), "{asked}");
+        ui.window().dispatch_event(WindowEvent::PointerMoved {
+            position: at(500.0, 500.0),
+        });
+        assert_eq!(ui.get_drawing_route(), asked, "the line moved while asked");
+
+        // And the offer chosen, which makes the link and takes the line in
+        // hand away: what is on the canvas now is a link.
+        ui.invoke_link_chosen(0);
         assert_eq!(
             ui.get_drawing_route(),
             "",
@@ -11883,14 +12029,14 @@ mod tests {
         assert!(shown().0, "a fault made again should be said again");
     }
 
-    /// Dragging a link's end onto empty canvas deletes it.
+    /// A line picked up and clicked back onto its own node can be taken out.
     ///
     /// Through the window, because that is the half the unit tests cannot
-    /// reach: a data sink has to answer a press at all -- it did not, links
-    /// being drawn only from sources -- and the line has to come off the
-    /// drawing while the hand is moving. It is also the only way to delete a
-    /// link, which is why it is worth a test of its own.
-    fn a_link_is_deleted_by_dragging_its_end_onto_the_canvas() {
+    /// reach: the line has to come off the drawing while it is in hand, and
+    /// the menu its own node offers has to reach the handler. The other way to
+    /// take a line out, the Delete key, is checked with the drawing of one:
+    /// see `a_link_is_drawn_by_clicking_a_terminal_then_a_node`.
+    fn a_link_is_taken_out_from_its_own_node() {
         use i_slint_backend_testing as testing;
         use slint::platform::{PointerEventButton, WindowEvent};
         use std::rc::Rc;
@@ -11982,50 +12128,48 @@ mod tests {
                 )
             };
 
-        // Taken hold of at the payload's own source, which is where this line
-        // leaves: a line is deleted from the end that sends it. The end it
-        // arrives at is ignored when it is dropped on nothing -- a sink takes
-        // one source, so letting go of its end over empty canvas is a slip
-        // more often than a decision -- which `the_end_of_a_link_can_be_moved
-        // _or_dropped` is where that half is checked.
-        let from = middle(
-            "sensor",
-            "i2c",
-            (dividers().vehicle + 24, 120),
-            "world-out",
-        );
-        ui.window()
-            .dispatch_event(WindowEvent::PointerMoved { position: from });
-        ui.window().dispatch_event(WindowEvent::PointerPressed {
-            position: from,
-            button: PointerEventButton::Left,
-        });
+        let click = |at: slint::LogicalPosition| {
+            ui.window()
+                .dispatch_event(WindowEvent::PointerMoved { position: at });
+            ui.window().dispatch_event(WindowEvent::PointerPressed {
+                position: at,
+                button: PointerEventButton::Left,
+            });
+            ui.window().dispatch_event(WindowEvent::PointerReleased {
+                position: at,
+                button: PointerEventButton::Left,
+            });
+        };
 
-        // While the hand is moving, the line is off the drawing: a line that
-        // stayed put would say the gesture had not started.
+        // Picked up at the payload's own source, which has the one line.
+        let at = (dividers().vehicle + 24, 120);
+        click(middle("sensor", "i2c", at, "world-out"));
+
+        // While it is in hand, the line is off the drawing: a line that
+        // stayed put would say nothing had been picked up.
         assert_eq!(ui.get_links().row_count(), 0, "the held line is not drawn");
 
-        // And let go of over empty canvas: in the middle of the vehicle pane,
-        // where neither node is, and inside the window so the toolkit
-        // delivers the event.
-        let onto = slint::LogicalPosition::new(
-            origin.x + dividers().payloads as f32 + 100.0,
-            origin.y + 380.0,
-        );
-        ui.window()
-            .dispatch_event(WindowEvent::PointerMoved { position: onto });
-        ui.window().dispatch_event(WindowEvent::PointerReleased {
-            position: onto,
-            button: PointerEventButton::Left,
-        });
+        // Clicked back onto its own node, which offers to take it out.
+        let (width, height) = size_of("i2c");
+        click(slint::LogicalPosition::new(
+            origin.x + at.0 as f32 + width as f32 / 2.0,
+            origin.y + at.1 as f32 + height as f32 / 2.0,
+        ));
+        testing::ElementHandle::find_by_accessible_label(
+            &ui,
+            "Remove this line",
+        )
+        .next()
+        .expect("the offer to take the line out")
+        .invoke_accessible_default_action();
 
         assert!(
             drawing.borrow().is_none(),
-            "the release should have reached the handler"
+            "the choice should have reached the handler"
         );
         assert!(
             editor.borrow().document().links.is_empty(),
-            "dragging a link's end onto the canvas should delete it: {:?}",
+            "the line should be taken out: {:?}",
             editor.borrow().document().links
         );
         // Undoable, like every other edit.
@@ -12214,14 +12358,16 @@ mod tests {
         }
     }
 
-    /// Dragging from one terminal to another makes the link.
+    /// Clicking a terminal, then a node, then an offer, makes the link.
     ///
     /// The gesture through the window, which is the only way to find out
-    /// whether the terminals can be reached at all: they are drawn inside the
+    /// whether the terminals can be reached at all -- they are drawn inside the
     /// node, over the area a drag is taken from, and a press that went to the
-    /// grip instead would move the node and draw nothing. What `joined`
-    /// decides is tested on its own above; this is the wiring around it.
-    fn a_link_is_drawn_by_dragging_from_a_terminal() {
+    /// grip instead would move the node and draw nothing -- and whether a
+    /// click with a line in hand reaches the line rather than the node under
+    /// it. What `offered` decides is tested on its own above; this is the
+    /// wiring around it.
+    fn a_link_is_drawn_by_clicking_a_terminal_then_a_node() {
         use i_slint_backend_testing as testing;
         use slint::platform::{PointerEventButton, WindowEvent};
         use std::rc::Rc;
@@ -12335,28 +12481,44 @@ mod tests {
             )
         };
 
-        let from = middle("sensor", "world-out");
-        let to = middle("ground", "world-in");
+        let click = |at: slint::LogicalPosition| {
+            ui.window()
+                .dispatch_event(WindowEvent::PointerMoved { position: at });
+            ui.window().dispatch_event(WindowEvent::PointerPressed {
+                position: at,
+                button: PointerEventButton::Left,
+            });
+            ui.window().dispatch_event(WindowEvent::PointerReleased {
+                position: at,
+                button: PointerEventButton::Left,
+            });
+        };
+        // The offer of this name in the menu, chosen as a click on its
+        // button would.
+        let choose = |said: &str| {
+            testing::ElementHandle::find_by_accessible_label(&ui, said)
+                .next()
+                .unwrap_or_else(|| panic!("no offer of {said:?}"))
+                .invoke_accessible_default_action();
+        };
 
-        ui.window()
-            .dispatch_event(WindowEvent::PointerMoved { position: from });
-        ui.window().dispatch_event(WindowEvent::PointerPressed {
-            position: from,
-            button: PointerEventButton::Left,
-        });
-        ui.window()
-            .dispatch_event(WindowEvent::PointerMoved { position: to });
-        ui.window().dispatch_event(WindowEvent::PointerReleased {
-            position: to,
-            button: PointerEventButton::Left,
-        });
+        // The terminal, which takes a line in hand and makes nothing yet.
+        click(middle("sensor", "world-out"));
+        assert_eq!(ui.get_joining(), "node", "the line should be in hand");
+        assert!(editor.borrow().document().links.is_empty());
+        // The node, anywhere on it, which asks rather than makes.
+        click(centre("ground"));
+        assert_eq!(ui.get_join_heading(), "ground");
+        assert!(editor.borrow().document().links.is_empty());
+        // And the offer, which makes the link and puts the line down.
+        choose("New line to world-in");
+        assert_eq!(ui.get_joining(), "", "the line should be put down");
 
         let links = editor.borrow().document().links.clone();
         assert_eq!(
             links.len(),
             1,
-            "dragging from a terminal to one that pairs with it should make \
-             one link: {links:?}"
+            "a terminal, a node and an offer should make one link: {links:?}"
         );
         assert_eq!(
             (links[0].from.as_str(), links[0].to.as_str()),
@@ -12368,7 +12530,7 @@ mod tests {
         assert_eq!(links[0].origin.as_deref(), Some("world-out"));
         assert_eq!(links[0].input, None);
 
-        // And the node did not move: a press on a terminal draws a link, and
+        // And the node did not move: a press on a terminal takes a line, and
         // the drag the same press would otherwise have started is what the
         // terminals sit on top of.
         assert_eq!(
@@ -12376,50 +12538,46 @@ mod tests {
             (dividers().vehicle + 24, 120)
         );
 
-        // The same gesture let go of anywhere on the node, which is the way
-        // a person actually draws one: the other sensor's readings dropped in
-        // the middle of the ground link's box. The terminal is the stream's
-        // own answer -- a world-out arrives at a world-in -- so there is
-        // nothing to aim at.
-        let gesture = |from: slint::LogicalPosition,
-                       to: slint::LogicalPosition| {
-            ui.window()
-                .dispatch_event(WindowEvent::PointerMoved { position: from });
-            ui.window().dispatch_event(WindowEvent::PointerPressed {
-                position: from,
-                button: PointerEventButton::Left,
-            });
-            ui.window()
-                .dispatch_event(WindowEvent::PointerMoved { position: to });
-            ui.window().dispatch_event(WindowEvent::PointerReleased {
-                position: to,
-                button: PointerEventButton::Left,
-            });
-        };
+        // A click on bare sheet puts the line down and makes nothing.
+        click(middle("other", "world-out"));
+        assert_eq!(ui.get_joining(), "node");
+        let bare =
+            slint::LogicalPosition::new(origin.x + 100.0, origin.y + 500.0);
+        click(bare);
+        assert_eq!(ui.get_joining(), "", "bare sheet should put it down");
+        assert_eq!(editor.borrow().document().links.len(), 1);
 
-        gesture(middle("other", "world-out"), centre("ground"));
-        let links = editor.borrow().document().links.clone();
-        assert_eq!(
-            links.len(),
-            2,
-            "a line let go of on a node should be joined to it: {links:?}"
-        );
-        let made = links
-            .iter()
-            .find(|link| link.from == "other")
-            .expect("the second line");
-        assert_eq!(made.to, "ground");
-        assert_eq!(made.origin.as_deref(), Some("world-out"));
+        // So does Escape.
+        click(middle("other", "world-out"));
+        ui.window().dispatch_event(WindowEvent::KeyPressed {
+            text: "\u{1b}".into(),
+        });
+        assert_eq!(ui.get_joining(), "", "Escape should put it down");
 
-        // And a node with no terminal of that stream takes nothing: a payload
-        // receives what asks it for a reading, so what arrives at its
+        // A node with nothing for the line keeps it in hand, and says so: a
+        // payload receives what asks it for a reading, so what arrives at its
         // moc-in leaves a moc-out -- and a payload has none to offer.
-        gesture(middle("other", "moc-in"), centre("sensor"));
-        assert_eq!(
-            editor.borrow().document().links.len(),
-            2,
-            "a payload has no moc-out for a line to leave by"
+        click(middle("other", "moc-in"));
+        click(centre("sensor"));
+        assert_eq!(ui.get_joining(), "node", "a near miss keeps the line");
+        assert!(
+            ui.get_join_hint().starts_with("sensor has nothing"),
+            "{}",
+            ui.get_join_hint()
         );
+        assert_eq!(ui.get_join_offers().row_count(), 0);
+
+        // And a line picked up off a terminal can be taken out with Delete.
+        ui.invoke_link_stopped();
+        click(middle("sensor", "world-out"));
+        ui.window().dispatch_event(WindowEvent::KeyPressed {
+            text: "\u{7f}".into(),
+        });
+        assert!(
+            editor.borrow().document().links.is_empty(),
+            "Delete should take the line in hand out"
+        );
+        assert_eq!(ui.get_joining(), "");
     }
 
     /// Opening a configuration puts it on the canvas.

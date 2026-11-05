@@ -289,6 +289,114 @@ component SelectionPane inherits Rectangle {
     }
 }
 
+// One field of a node's window: its name beside the box it is typed into, or
+// the tick box for a true or false. Beside rather than above, so that a row
+// is one line tall and a node's every attribute is in view at once.
+component FieldRow inherits HorizontalLayout {
+    in property <FieldView> field;
+    // The box took the focus, or lost it; something was typed; Enter; the
+    // tick box ticked or not.
+    callback came();
+    callback went();
+    callback typed(string);
+    callback done();
+    callback ticked(bool);
+    spacing: Space.step;
+
+    Text {
+        // A field the configuration must state says so, and says it
+        // quietly: an empty one is unanswered and not wrong.
+        text: root.field.required ? root.field.name + " *" : root.field.name;
+        font-size: Type.small;
+        // Italic for a setting of the simulator's file. The column says
+        // which file it is; this says it again on every row. Two channels
+        // for one distinction, as the node shapes have.
+        font-italic: root.field.simulated;
+        color: #6b7280;
+        // Wide enough for the longest name, ignore_trigger_percent.
+        width: 180px;
+        vertical-alignment: center;
+        overflow: elide;
+    }
+    // A true or false, which is a control with two states rather than a
+    // box to write the word in: the two answers are the whole of what the
+    // attribute takes, so offering anything else to type is offering a way
+    // to be wrong.
+    //
+    // Unticked is both "false" and a file that says nothing, those meaning
+    // the same thing -- see `tcslibgs::node::vehicle::Restart::of` -- and
+    // ticking it writes the word, so what the file ends up saying is a word
+    // somebody chose and not a box they left alone.
+    if root.field.kind == "boolean": CheckBox {
+        enabled: !Session.read-only;
+        text: root.field.value == "true" ? "true" : "false";
+        checked: root.field.value == "true";
+        horizontal-stretch: 1;
+        changed has-focus => {
+            if (self.has-focus) {
+                root.came();
+            } else {
+                root.went();
+            }
+        }
+        toggled => { root.ticked(self.checked); }
+    }
+    if root.field.kind != "boolean": LineEdit {
+        read-only: Session.read-only;
+        text: root.field.value;
+        font-size: Type.body;
+        min-width: 180px;
+        horizontal-stretch: 1;
+        // Named for a screen reader, and so a test can find it, by the
+        // attribute it is a box for.
+        accessible-label: root.field.name;
+        changed has-focus => {
+            if (self.has-focus) {
+                root.came();
+            } else {
+                root.went();
+            }
+        }
+        edited => { root.typed(self.text); }
+        accepted => { root.done(); }
+    }
+}
+
+// A name, as every window with something named in it shows it: a field to
+// type a new one in, renamed on Enter, and beside it a small "x" that clears
+// the field to type the new one from nothing. One component, so that a node's
+// window and a physics component's offer the one control the one way.
+//
+// Renamed on Enter and not on every keystroke: a name is what every line to
+// the thing is drawn by, so each letter typed would be a rename to undo. A
+// name cleared and left empty renames nothing; the field shows the name again
+// when the window is next drawn.
+component NameField inherits HorizontalLayout {
+    in property <string> name: "";
+    callback renamed(string);
+    spacing: Space.tight;
+
+    field := LineEdit {
+        text: root.name;
+        read-only: Session.read-only;
+        font-size: Fonts.window;
+        accessible-label: "name";
+        horizontal-stretch: 1;
+        accepted => { root.renamed(self.text); }
+    }
+    // Small and plainly a clearing: the letter, not a word, and named for a
+    // screen reader.
+    Button {
+        text: "x";
+        enabled: !Session.read-only;
+        accessible-label: "clear the name";
+        clicked => {
+            field.text = "";
+            field.focus();
+        }
+    }
+}
+
 // One divider between two working panes: the line, its handle, and what a
 // press lands on.
 //
@@ -2388,10 +2496,9 @@ export component SimWindow inherits Window {
     default-font-size: Fonts.window;
     title: root.editing;
     background: Colors.window;
+    // As tall as what it holds, every setting in view, as a node's window.
     min-width: 380px;
-    min-height: 360px;
     preferred-width: 440px;
-    preferred-height: 600px;
 
     // "Simulated payloads" or "Simulator payload groups", which is also the
     // window's title.
@@ -2407,10 +2514,6 @@ export component SimWindow inherits Window {
     // payloads cannot: a simulated payload stands in for a payload of the
     // configuration, so its name is the configuration's and not this file's.
     in property <bool> can-add: false;
-    // And whether it can take one away: the groups can, and so can the
-    // physics components, which are placed from the physics list instead
-    // of made here.
-    in property <bool> can-remove: false;
     // And whether what is chosen can be renamed here, which a physics
     // component can, as a node can in its own window: a simulated payload is
     // named by its payload, and a group's name by the groups' own window.
@@ -2441,7 +2544,15 @@ export component SimWindow inherits Window {
         }
     }
 
-    VerticalLayout {
+    // How tall what it holds wants to be, which tcsgui grows the window to
+    // when what is shown changes: a window sized for the settings it opened
+    // on would cut off those of a component that has more.
+    out property <length> wanted-height: whole.preferred-height;
+    // And how wide: the window's own width and not the layout's, which
+    // would set the description above the settings on one line.
+    out property <length> wanted-width: root.preferred-width;
+
+    whole := VerticalLayout {
         padding: Space.wide;
         spacing: Space.step;
 
@@ -2475,12 +2586,10 @@ export component SimWindow inherits Window {
             }
             // Renamed on accept; a name another component or any node has
             // is refused, and said why under it.
-            if root.can-rename: LineEdit {
-                text: root.chosen;
-                read-only: Session.read-only;
-                accessible-label: "name";
+            if root.can-rename: NameField {
+                name: root.chosen;
                 horizontal-stretch: 1;
-                accepted => { root.renamed(self.text); }
+                renamed(said) => { root.renamed(said); }
             }
             if root.can-add: Button {
                 text: "New";
@@ -2490,7 +2599,10 @@ export component SimWindow inherits Window {
                     root.add();
                 }
             }
-            if root.can-add || root.can-remove: Button {
+            // A group is taken away here; a physics component is taken away
+            // from its menu on the canvas, as a node is, its window having
+            // the name's "x" beside the name, which clears the field.
+            if root.can-add: Button {
                 text: "Remove";
                 enabled: root.chosen != "" && !Session.read-only;
                 // Nothing typed for what is removed is kept.
@@ -2518,35 +2630,19 @@ export component SimWindow inherits Window {
             vertical-stretch: 1;
         }
 
-        if root.chosen != "": ScrollView {
-            vertical-stretch: 1;
-            VerticalLayout {
-                spacing: Space.tight;
-                for f in root.fields: VerticalLayout {
-                    spacing: 1px;
-                    Text {
-                        text: f.name;
-                        font-size: Type.small;
-                        color: #6b7280;
-                    }
-                    LineEdit {
-                        text: f.value;
-                        read-only: Session.read-only;
-                        font-size: Fonts.window;
-                        accessible-label: f.name;
-                        edited => {
-                            root.draft-setting = f.name;
-                            root.draft-value = self.text;
-                        }
-                        accepted => { root.take(); }
-                        changed has-focus => {
-                            if (!self.has-focus) {
-                                root.take();
-                            }
-                        }
-                    }
+        // Every setting in view, none scrolled out of it, each its name
+        // beside its box: see NodeWindow.
+        if root.chosen != "": VerticalLayout {
+            spacing: Space.tight;
+            alignment: start;
+            for f in root.fields: FieldRow {
+                field: f;
+                typed(text) => {
+                    root.draft-setting = f.name;
+                    root.draft-value = text;
                 }
-                Rectangle { }
+                done => { root.take(); }
+                went => { root.take(); }
             }
         }
 
@@ -2581,10 +2677,8 @@ export component NodeWindow inherits Window {
     default-font-size: Fonts.window;
     title: root.node == "" ? "a node" : root.node;
     background: Colors.window;
-    min-width: 300px;
-    min-height: 260px;
-    preferred-width: 340px;
-    preferred-height: 560px;
+    // As tall as what it holds, every field in view: see the fields below.
+    min-width: 360px;
 
     in property <string> node: "";
     // Its own name, which is what its field shows and what renaming it
@@ -2595,6 +2689,9 @@ export component NodeWindow inherits Window {
     in property <string> node-type: "";
     in property <string> comment: "";
     in property <[FieldView]> fields: [];
+    // Where the simulator's settings go on into their second column: the
+    // first field drawn there, by its place in `fields`. See the columns.
+    in property <int> split: 0;
     // What the description tree says about this kind of node, shown at the
     // foot of the window while no field with something said about it has the
     // focus.
@@ -2629,6 +2726,36 @@ export component NodeWindow inherits Window {
     property <bool> comment-drafted: false;
     property <string> comment-draft: "";
 
+    // A field took the focus or lost it, was typed in, or was ticked: one
+    // place for what each means, which both columns call.
+    function came(f: FieldView) {
+        root.focused = f.name;
+        root.focused-about = f.about;
+    }
+    function went(f: FieldView) {
+        // Left: what was typed here is taken.
+        root.take();
+        if (root.focused == f.name) {
+            root.focused = "";
+            root.focused-about = "";
+        }
+    }
+    // Held until it is taken: see take. Two files, two edits: a node's
+    // attribute goes to the configuration and a simulated payload's setting
+    // to the simulator's own file, which the draft remembers.
+    function typed(f: FieldView, text: string) {
+        root.draft-field = f.name;
+        root.draft-value = text;
+        root.draft-simulated = f.simulated;
+    }
+    function ticked(f: FieldView, on: bool) {
+        if (f.simulated) {
+            root.sim-attribute-set(f.name, on ? "true" : "false");
+        } else {
+            root.attribute-set(f.name, on ? "true" : "false");
+        }
+    }
+
     // Takes what has been typed and not yet taken; nothing, where nothing
     // has. Public so that the window closed by the window system takes it
     // too: see tcsgui's show_node.
@@ -2650,24 +2777,25 @@ export component NodeWindow inherits Window {
     callback renamed(string);
     callback closed();
 
+    // How large what it holds wants to be, which tcsgui grows the window to
+    // when what is shown grows: see SimWindow. The width its narrowest, the
+    // layout's being the description at the foot on one line.
+    out property <length> wanted-height: whole.preferred-height;
+    out property <length> wanted-width: root.min-width;
+
     // Every label here as tall as its own font needs, and none given a
     // height: a label held to fourteen pixels was clipped in half once the
     // window's one size grew to twelve points, and the box under it was
     // drawn over what was left.
-    VerticalLayout {
+    whole := VerticalLayout {
         padding: Space.step;
         spacing: Space.tight;
 
-        // The name, as a field: renamed on accept and not on every
-        // keystroke, a name being what every line to the node is drawn by,
-        // so each letter typed would be a rename to undo. A name another
-        // node has is refused, and said why, and the old name stays.
-        LineEdit {
-            text: root.name;
-            read-only: Session.read-only;
-            font-size: Fonts.window;
-            accessible-label: "name";
-            accepted => { root.renamed(self.text); }
+        // A name another node has is refused, and said why, and the old
+        // name stays.
+        NameField {
+            name: root.name;
+            renamed(said) => { root.renamed(said); }
         }
         if root.name-trouble != "": Text {
             text: root.name-trouble;
@@ -2688,117 +2816,78 @@ export component NodeWindow inherits Window {
             wrap: word-wrap;
         }
 
-        ScrollView {
-            vertical-stretch: 1;
+        // Every field in view, and none scrolled out of it: the window is as
+        // tall as its fields. A field scrolled out of sight was one Tab never
+        // reached, the toolkit's order leaving out what is clipped, and one a
+        // reader did not know was there.
+        //
+        // In columns: the node's own attributes, and beside them the
+        // simulator's settings for it, which are written to a different file
+        // -- the heading over them names it -- in two columns of their own,
+        // there being as many as twenty of them. One model and not three,
+        // each column drawing its own rows of it, so that Tab goes down the
+        // first column, then the second, then the third.
+        HorizontalLayout {
+            spacing: Space.wide;
             VerticalLayout {
-                spacing: Space.tight;
-
+                alignment: start;
                 for f in root.fields: VerticalLayout {
-                    spacing: 1px;
-
-                    // Where the node's own attributes end and the simulator's
-                    // settings for it begin. A rule and a name, because the
-                    // fields below it are written to a different file and
-                    // nothing else would say so.
-                    if f.is-heading: Rectangle {
-                        height: Space.wide;
-                        Rectangle {
-                            y: parent.height - 1px;
-                            height: 1px;
-                            background: #d8d8d4;
-                        }
+                    padding-bottom: !f.simulated && !f.is-heading
+                        ? Space.tight : 0px;
+                    if !f.simulated && !f.is-heading: FieldRow {
+                        field: f;
+                        came => { root.came(f); }
+                        went => { root.went(f); }
+                        typed(text) => { root.typed(f, text); }
+                        done => { root.take(); }
+                        ticked(on) => { root.ticked(f, on); }
                     }
+                }
+            }
+            VerticalLayout {
+                alignment: start;
+                for f[i] in root.fields: VerticalLayout {
+                    padding-bottom: (f.simulated && i < root.split)
+                        || f.is-heading ? Space.tight : 0px;
+                    // The heading: what file these go to.
                     if f.is-heading: Text {
                         text: f.name;
                         font-size: Type.small;
                         font-weight: Type.bold;
                         color: #6b7280;
                     }
-
-                    if !f.is-heading: Text {
-                        // A field the configuration must state says so, and
-                        // says it quietly: an empty one is unanswered and not
-                        // wrong.
-                        text: f.required ? f.name + " *" : f.name;
-                        font-size: Type.small;
-                        // Italic for a setting of the simulator's file. The
-                        // rule above says where one file ends and the other
-                        // begins; this says it again on every row, so a
-                        // reader who has scrolled past the rule still knows
-                        // which file they are typing into. Two channels for
-                        // one distinction, as the node shapes have.
-                        font-italic: f.simulated;
-                        color: #6b7280;
-                    }
-                    // A true or false, which is a control with two states
-                    // rather than a box to write the word in: the two answers
-                    // are the whole of what the attribute takes, so offering
-                    // anything else to type is offering a way to be wrong.
-                    //
-                    // Unticked is both "false" and a file that says nothing,
-                    // those meaning the same thing -- see
-                    // `tcslibgs::node::vehicle::Restart::of` -- and ticking it
-                    // writes the word, so what the file ends up saying is a
-                    // word somebody chose and not a box they left alone.
-                    if !f.is-heading && f.kind == "boolean": CheckBox {
-                        enabled: !Session.read-only;
-                        text: f.value == "true" ? "true" : "false";
-                        checked: f.value == "true";
-                        changed has-focus => {
-                            if (self.has-focus) {
-                                root.focused = f.name;
-                                root.focused-about = f.about;
-                            } else if (root.focused == f.name) {
-                                root.focused = "";
-                                root.focused-about = "";
-                            }
-                        }
-                        toggled => {
-                            if (f.simulated) {
-                                root.sim-attribute-set(
-                                    f.name,
-                                    self.checked ? "true" : "false");
-                            } else {
-                                root.attribute-set(
-                                    f.name,
-                                    self.checked ? "true" : "false");
-                            }
-                        }
-                    }
-                    if !f.is-heading && f.kind != "boolean": LineEdit {
-                        read-only: Session.read-only;
-                        text: f.value;
-                        font-size: Type.body;
-                        // Named for a screen reader, and so a test can find
-                        // it, by the attribute it is a box for.
-                        accessible-label: f.name;
-                        changed has-focus => {
-                            if (self.has-focus) {
-                                root.focused = f.name;
-                                root.focused-about = f.about;
-                            } else {
-                                // Left: what was typed here is taken.
-                                root.take();
-                                if (root.focused == f.name) {
-                                    root.focused = "";
-                                    root.focused-about = "";
-                                }
-                            }
-                        }
-                        // Held until it is taken: see take. Two files, two
-                        // edits: a node's attribute goes to the configuration
-                        // and a simulated payload's setting to the
-                        // simulator's own file, which the draft remembers.
-                        edited => {
-                            root.draft-field = f.name;
-                            root.draft-value = self.text;
-                            root.draft-simulated = f.simulated;
-                        }
-                        accepted => { root.take(); }
+                    if f.simulated && !f.is-heading && i < root.split:
+                    FieldRow {
+                        field: f;
+                        came => { root.came(f); }
+                        went => { root.went(f); }
+                        typed(text) => { root.typed(f, text); }
+                        done => { root.take(); }
+                        ticked(on) => { root.ticked(f, on); }
                     }
                 }
-
-                Rectangle { }
+            }
+            VerticalLayout {
+                alignment: start;
+                for f[i] in root.fields: VerticalLayout {
+                    padding-bottom: (f.simulated && i >= root.split)
+                        || f.is-heading ? Space.tight : 0px;
+                    // As tall as the heading beside it, so the rows line up.
+                    if f.is-heading: Text {
+                        text: " ";
+                        font-size: Type.small;
+                        font-weight: Type.bold;
+                    }
+                    if f.simulated && !f.is-heading && i >= root.split:
+                    FieldRow {
+                        field: f;
+                        came => { root.came(f); }
+                        went => { root.went(f); }
+                        typed(text) => { root.typed(f, text); }
+                        done => { root.take(); }
+                        ticked(on) => { root.ticked(f, on); }
+                    }
+                }
             }
         }
 
@@ -2850,12 +2939,14 @@ export component NodeWindow inherits Window {
             font-size: Type.small;
             color: #6b7280;
         }
-        TextEdit {
-            read-only: true;
-            height: 48px;
+        // Words and not a box: nothing is typed here, so Tab passes it by.
+        // As tall as three lines, so the window does not change height as
+        // the focus moves from a field described in one line to one in three.
+        Text {
             text: root.about-shown;
             font-size: Fonts.window;
             wrap: word-wrap;
+            min-height: 3 * Fonts.window * 1.4;
         }
 
         if root.trouble != "": Text {

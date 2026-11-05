@@ -395,10 +395,10 @@ component Surface inherits Rectangle {
     in property <bool> has-world: false;
     // The Physics pane, left of the payloads: how wide it is, what its
     // heading is painted, and its nodes and links, in the coordinates of the
-    // whole canvas, whose nought is the Physics pane's left edge. A window
-    // that shows no Physics pane -- a subdiagram's -- is given a width of
-    // nought and nothing to draw. See tcsdiagram::pane.
-    in property <bool> shows-physics: true;
+    // whole canvas, whose nought is the Physics pane's left edge. Every
+    // window shows it, a subdiagram's too: the physics model is the
+    // simulator file's and one world, so each page shows the same one and
+    // joins its own payloads to it. See tcsdiagram::pane.
     in property <length> physics-width: 0px;
     in property <color> physics-ground: white;
     in property <[NodeView]> physics-nodes: [];
@@ -738,11 +738,9 @@ component Surface inherits Rectangle {
                 // What the shares are of. Named so the dividers can report it:
                 // see ListDivider.
                 property <length> whole: self.height;
-                // The physics list at the top, its pane being the leftmost;
-                // none in a window that shows no Physics pane.
-                property <length> physics-tall: root.shows-physics
-                    ? whole * root.physics-list-percent / 100
-                    : 0px;
+                // The physics list at the top, its pane being the leftmost.
+                property <length> physics-tall:
+                    whole * root.physics-list-percent / 100;
                 property <length> payload-tall:
                     whole - physics-tall - gateway-tall - vehicle-tall;
                 property <length> gateway-tall:
@@ -750,7 +748,7 @@ component Surface inherits Rectangle {
                 property <length> vehicle-tall:
                     whole * root.vehicle-list-percent / 100;
 
-                if root.shows-physics: SelectionPane {
+                SelectionPane {
                     x: 0;
                     y: 0;
                     width: 100%;
@@ -764,7 +762,7 @@ component Surface inherits Rectangle {
                         root.place-physics(t);
                     }
                 }
-                if root.shows-physics: ListDivider {
+                ListDivider {
                     x: 0;
                     y: lists.physics-tall - 7px;
                     width: 100%;
@@ -878,8 +876,7 @@ component Surface inherits Rectangle {
                         border-width: 1px;
                         border-color: #d8d8d4;
 
-                        if root.shows-physics && root.physics-width > 0:
-                        PhysicsGround {
+                        if root.physics-width > 0: PhysicsGround {
                             x: 0;
                             y: 0;
                             physics-width: root.physics-width;
@@ -1133,7 +1130,7 @@ component Surface inherits Rectangle {
                 // stays over the column it divides when the sheet is scrolled
                 // sideways; and at the sheet's zoom, being outside it, with
                 // a drag said back in the sheet's pixels.
-                if root.shows-physics && root.physics-width > 0: PaneDivider {
+                if root.physics-width > 0: PaneDivider {
                     width: 100%;
                     height: 100%;
                     at: root.physics-width * root.zoom + sheet.content-x;
@@ -1476,12 +1473,22 @@ export component MainWindow inherits Window {
     // is. The path is shortened to the window's width in Rust -- see
     // tcsgui::title -- so a narrow window still names the file.
     title: root.titled(
-        Session.read-only
+        (Session.read-only
             ? "TCSpecial Configuration (read-only)"
-            : "TCSpecial Configuration",
+            : "TCSpecial Configuration")
+            + (root.editing != "" ? " -- " + root.editing : ""),
         root.path, root.width / 1px);
     // The configuration's top file, as the session knows it.
     in property <string> path: "";
+    // The subdiagram this window draws, or empty for the top page.
+    //
+    // A subdiagram's window is this window, drawing that subdiagram's page:
+    // the same panes, lists, bar, menus and edits, so that what can be done
+    // on one page can be done on every page. Several may be open at once,
+    // and they cannot disagree with each other or with the top page: there
+    // is one document behind all of them, and each window is redrawn from it
+    // after every edit.
+    in property <string> editing: "";
     pure callback titled(string, string, float) -> string;
     background: Colors.window;
     // Wide enough for both working panes and both selection panes, which is
@@ -1659,8 +1666,7 @@ export component MainWindow inherits Window {
     in property <string> join-hint: "";
     in property <[JoinOffer]> join-offers: [];
     in property <string> join-heading: "";
-    // A subdiagram's edge: see Surface's. The main window draws the top
-    // page, which has none.
+    // A subdiagram's edge: see Surface's. The top page has none.
     in property <length> edge-width: 0px;
     in property <[EdgeView]> edge-terminals: [];
     callback edge-started(string);
@@ -1764,6 +1770,7 @@ export component MainWindow inherits Window {
     surface := Surface {
         width: 100%;
         height: 100%;
+        editing: root.editing;
         nodes: root.nodes;
         links: root.links;
         drawing-route: root.drawing-route;
@@ -1905,270 +1912,6 @@ export component MainWindow inherits Window {
         trouble: root.alert-trouble;
         advice: root.alert-advice;
         acknowledged => { root.alert-acknowledged(); }
-    }
-}
-
-// One open subdiagram.
-//
-// The same surface as the top diagram, given that subdiagram's nodes. Several
-// may be open at once, and they cannot disagree with each other or with the
-// top diagram: there is one document behind all of them, and each window is
-// redrawn from it after every edit.
-export component SubWindow inherits Window {
-    default-font-size: Fonts.window;
-    title: "TCSpecial Configuration -- " + root.editing;
-    background: Colors.window;
-    // The same two working panes as the top diagram, so the same room: a
-    // subdiagram is a page of one configuration and its payloads go on the
-    // same side of it.
-    min-width: 760px;
-    min-height: 520px;
-    preferred-width: 1180px;
-    preferred-height: 760px;
-
-    in property <string> editing: "";
-    in property <[NodeView]> nodes: [];
-    in property <[LinkView]> links: [];
-    // The line a gesture is drawing, as SVG path data in canvas coordinates,
-    // and empty when no gesture is running. Dashed, and in pieces because a
-    // path here has no dash pattern: see tcsdiagram::route::drawing.
-    in property <string> drawing-route: "";
-    // The two selection panes' contents, and the two working panes' geometry.
-    //
-    // All four come from Rust -- see style.rs and main.rs -- because which
-    // types are payloads and where the divider falls are facts about a
-    // configuration rather than about a window, and they are checked by tests
-    // there. Stating the divider in this file as well would be stating it
-    // twice.
-    in property <[PaletteEntry]> gateway-palette: [];
-    in property <[PaletteEntry]> vehicle-palette: [];
-    in property <[PaletteEntry]> payload-palette: [];
-    in property <length> payload-divider: 0px;
-    in property <length> vehicle-divider: 0px;
-    in property <length> working-width: 0px;
-    // How long the sheet is, in the coordinates the file holds: one length
-    // for all three panes, which is what makes them scroll together. From
-    // Rust -- see tcsdiagram::pane::WORKING_HEIGHT -- as the width is.
-    in property <length> working-height: 0px;
-    // Where the sheet is scrolled to, and how much of it is in view: two-way,
-    // because a person scrolling moves it and placing a node sets it.
-    in-out property <length> canvas-offset: 0px;
-    out property <length> canvas-view-height: surface.canvas-view-height;
-    in property <color> gateway-ground: white;
-    in property <color> vehicle-ground: white;
-    in property <color> payload-ground: white;
-    in property <int> undo-depth: 0;
-    in property <int> redo-depth: 0;
-    in property <string> undo-label: "";
-    in property <string> redo-label: "";
-    // How many concerns there are, and how many were set aside: see the two
-    // buttons in the bar.
-    in property <int> concern-count: 0;
-    in property <int> aside-count: 0;
-    callback show-concerns();
-    callback show-aside();
-    // How many of this page's nodes lie outside their own panes, across,
-    // and the button that lays them out again: see the bar.
-    in property <int> outside-count: 0;
-
-    in property <string> trouble: "";
-    in property <string> said: "";
-    in property <string> selected: "";
-
-    callback undo-clicked();
-    callback redo-clicked();
-    callback place-node(string, string, string);
-    callback node-moved(string, length, length);
-    // One of the two dividers between the three working panes was dragged by
-    // this much. Two callbacks and not one with a name in it: which divider
-    // moved is known where the gesture happened, and a string crossing the
-    // boundary would be a name to keep in step in two files.
-    // How the selection column is divided, and its two lines: a subdiagram is
-    // a page of the same configuration, so its lists are arranged the same
-    // way and dragging one of its lines arranges every window's.
-    in property <int> gateway-list-percent: 20;
-    in property <int> vehicle-list-percent: 35;
-    callback payload-list-divider-moved(length, length);
-    callback vehicle-list-divider-moved(length, length);
-    callback payload-divider-moved(length);
-    callback vehicle-divider-moved(length);
-    callback save-clicked();
-    callback save-as-clicked();
-    callback link-started(string, string);
-    callback link-clicked(length, length);
-    callback link-chosen(int);
-    callback link-stopped();
-    callback link-removed();
-    // Where the pointer is while a line is in hand. See drawing-route.
-    callback link-moved(length, length);
-    // The line in hand, and what can be made of it: see Surface's.
-    in property <string> joining: "";
-    in property <string> join-hint: "";
-    in property <[JoinOffer]> join-offers: [];
-    in property <string> join-heading: "";
-    // A subdiagram's edge: see Surface's. The main window draws the top
-    // page, which has none.
-    in property <length> edge-width: 0px;
-    in property <[EdgeView]> edge-terminals: [];
-    callback edge-started(string);
-    callback node-selected(string);
-    // What a node's own menu asks for: see NodeShape's menu.
-    callback node-edit(string);
-    callback node-delete(string);
-    callback edit-parameters();
-    // Every node to the top of its own pane: see the menu item.
-    callback arrange();
-    callback edit-groups();
-    callback edit-simulator-groups();
-    callback exit-requested();
-    in property <bool> has-simulator: false;
-
-    // The menu bar.
-    //
-    // What is in it is what belongs to the configuration as a whole rather
-    // than to anything on the canvas: there is nothing to press on a diagram
-    // that would mean "the configuration", or "the groups", or "the way out",
-    // so a command is how each is reached.
-    MenuBar {
-        Menu {
-            title: "File";
-            // Saving needs no command -- every edit is written as it is made
-            // -- and there is one anyway, for the three things the ordinary
-            // case does not cover: retrying a write that failed once whatever
-            // stopped it is put right, rewriting a set of files left half new
-            // by a failure between two of them, and answering somebody who
-            // has been taught by every other program to save their work. Both
-            // files of a session go together, each written atomically.
-            MenuItem {
-                enabled: !Session.read-only;
-                title: "Save";
-                activated => { root.save-clicked(); }
-            }
-            // Every file of the session written somewhere else, and the
-            // session carried on there: for files that cannot be written
-            // where they are, and for a copy. See Editor::save_as.
-            MenuItem {
-                enabled: !Session.read-only;
-                title: "Save as...";
-                activated => { root.save-as-clicked(); }
-            }
-            MenuSeparator { }
-            // The groups, which are not on the canvas either: a group is a set
-            // of payloads read together, and which payloads those are is
-            // written on the nodes rather than drawn between them.
-            MenuItem {
-                title: "Edit payload groups";
-                activated => { root.edit-groups(); }
-            }
-            // The simulator's groups, where this session was given its file.
-            // Disabled rather than hidden when it was not: a menu whose
-            // entries come and go is a menu nobody learns, and "this needs a
-            // second argument" is better said by a greyed entry than by its
-            // absence.
-            //
-            // There is no entry for the simulated payloads themselves. A
-            // payload's settings belong to a payload that is already on the
-            // canvas, so they are in its own window under a rule: a window of
-            // their own would be a second place to look for what one node
-            // says about itself.
-            MenuItem {
-                title: "Edit simulated payload groups";
-                enabled: root.has-simulator;
-                activated => { root.edit-simulator-groups(); }
-            }
-            MenuSeparator { }
-            MenuItem {
-                title: "Exit";
-                activated => { root.exit-requested(); }
-            }
-        }
-        Menu {
-            title: "Edit";
-            MenuItem {
-                title: "Edit tcspecial parameters";
-                activated => { root.edit-parameters(); }
-            }
-            MenuSeparator { }
-            // Every node to the top of its own pane, nothing covering
-            // anything. For a configuration read out of a file that is spread
-            // over more sheet than the window shows, and for a morning's
-            // dragging that has left one nobody can read.
-            MenuItem {
-                enabled: !Session.read-only;
-                title: "Arrange the nodes";
-                activated => { root.arrange(); }
-            }
-        }
-    }
-
-    surface := Surface {
-        width: 100%;
-        height: 100%;
-        editing: root.editing;
-        nodes: root.nodes;
-        links: root.links;
-        drawing-route: root.drawing-route;
-        gateway-palette: root.gateway-palette;
-        vehicle-palette: root.vehicle-palette;
-        payload-palette: root.payload-palette;
-        // A subdiagram's window draws a page of the configuration, and the
-        // physics model is the simulator file's and not a page's: its pane
-        // and its list are the main window's.
-        shows-physics: false;
-        payload-divider: root.payload-divider;
-        vehicle-divider: root.vehicle-divider;
-        gateway-list-percent: root.gateway-list-percent;
-        vehicle-list-percent: root.vehicle-list-percent;
-        payload-list-divider-moved(dy, tall) => {
-            root.payload-list-divider-moved(dy, tall);
-        }
-        vehicle-list-divider-moved(dy, tall) => {
-            root.vehicle-list-divider-moved(dy, tall);
-        }
-        working-width: root.working-width;
-        working-height: root.working-height;
-        gateway-ground: root.gateway-ground;
-        vehicle-ground: root.vehicle-ground;
-        payload-ground: root.payload-ground;
-        save-clicked => { root.save-clicked(); }
-        undo-depth: root.undo-depth;
-        redo-depth: root.redo-depth;
-        undo-label: root.undo-label;
-        redo-label: root.redo-label;
-        trouble: root.trouble;
-        concern-count: root.concern-count;
-        aside-count: root.aside-count;
-        outside-count: root.outside-count;
-        arrange => { root.arrange(); }
-        show-concerns => { root.show-concerns(); }
-        show-aside => { root.show-aside(); }
-        said: root.said;
-        canvas-offset <=> root.canvas-offset;
-        undo-clicked => { root.undo-clicked(); }
-        redo-clicked => { root.redo-clicked(); }
-        place-node(name, t, sets) => {
-            root.place-node(name, t, sets);
-        }
-        node-moved(n, dx, dy) => { root.node-moved(n, dx, dy); }
-        payload-divider-moved(dx) => { root.payload-divider-moved(dx); }
-        vehicle-divider-moved(dx) => { root.vehicle-divider-moved(dx); }
-        link-started(n, terminal) => { root.link-started(n, terminal); }
-        link-clicked(x, y) => { root.link-clicked(x, y); }
-        link-chosen(i) => { root.link-chosen(i); }
-        link-stopped => { root.link-stopped(); }
-        link-removed => { root.link-removed(); }
-        link-moved(x, y) => { root.link-moved(x, y); }
-        joining: root.joining;
-        join-hint: root.join-hint;
-        join-offers: root.join-offers;
-        join-heading: root.join-heading;
-        edge-width: root.edge-width;
-        edge-terminals: root.edge-terminals;
-        edge-started(terminal) => { root.edge-started(terminal); }
-        selected: root.selected;
-        node-selected(n) => { root.node-selected(n); }
-        node-edit(n) => { root.node-edit(n); }
-        node-delete(n) => { root.node-delete(n); }
     }
 }
 

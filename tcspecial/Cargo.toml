@@ -54,6 +54,8 @@ default = [
     "serial",
     "i2c",
     "spi",
+    "i2c_tmass",
+    "spi_tmass",
     "can",
     "iio",
     "rpmsg",
@@ -70,6 +72,10 @@ device-file = []
 serial = []
 i2c = []
 spi = []
+# A temperature sensor on a thermal mass is a device on its bus, opened as
+# that bus's devices are, so it brings the bus with it.
+i2c_tmass = ["i2c"]
+spi_tmass = ["spi"]
 can = []
 iio = []
 rpmsg = []

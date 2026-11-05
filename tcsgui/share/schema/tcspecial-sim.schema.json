@@ -404,6 +404,8 @@
         "type serial",
         "type i2c",
         "type spi",
+        "type i2c_tmass",
+        "type spi_tmass",
         "type can",
         "type iio",
         "type rpmsg",

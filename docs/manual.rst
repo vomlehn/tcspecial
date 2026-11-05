@@ -1799,6 +1799,39 @@ fails on a serial line.
 There is no parity and there are no stop bits. SPI is clocked and full duplex,
 and a transfer is delimited by the chip select rather than by framing bits.
 
+Temperature Sensors on a Thermal Mass
+-------------------------------------
+Keywords ``type i2c_tmass`` and ``type spi_tmass``. A temperature sensor
+fixed to a thermal mass: on an I2C bus, or a SPI peripheral. In flight each
+is the device on its bus, and says what an ``i2c`` or a ``spi`` node says,
+read the same way; what the type adds is what it is, and one attribute:
+
+.. code-block:: text
+
+   stand_in       a loopback address and port: 127.0.0.1:5201. Under
+                  --simulate=some or all tcspecial reaches the sensor there
+                  over UDP instead of opening its bus, and tcssim answers
+                  with the temperature of the thermal mass the simulator
+                  file joins it to; under none, the flight setting, the bus
+                  is opened
+
+In the simulator file each is listed under its own type and joined to the
+thermal mass's ``temperature`` by ``connects``, as the thermostat example's
+are:
+
+.. code-block:: yaml
+
+   payloads:
+     - type i2c_tmass:
+         - payload: temp_1
+           address: "0x48"
+           path: "/dev/i2c-1"
+           read_size: "2"
+           stand_in: "127.0.0.1:5201"
+
+A build has each as a Cargo feature of its own, which brings in its bus's:
+``--features i2c_tmass`` builds the I2C bus with it.
+
 Making the Kernel's Stand-ins
 -----------------------------
 The CAN and GPIO types are supported because each is flown against the
@@ -2188,10 +2221,13 @@ together once a second as the group ``zone_temps``, which is what a
 group is for: readings that will be compared are taken as close together as
 the hardware allows.
 
-Every sensor is the far end of a UDP socket on this host, ports 5201 to 5203,
-which tcssim stands in for with nothing more than a socket. Aboard, the
-sensors would be on I\ :superscript:`2`\ C and SPI, as `An Example`_ shows;
-those buses are flown against stand-ins by ``make stand-ins-test``. The
+The sensors are temperature sensors on the zone, as a vehicle would carry
+them: ``temp_1`` and ``temp_2`` on an I\ :superscript:`2`\ C bus, of type
+``i2c_tmass``, and ``temp_3`` a SPI peripheral, of type ``spi_tmass`` --
+see `Temperature Sensors on a Thermal Mass`_. On a desk each is reached over
+UDP at its ``stand_in`` on this host, ports 5201 to 5203, where tcssim answers
+with the zone's temperature, so that the example touches no bus; flown, the
+buses are opened. The
 heaters, and the lines that sense them, are GPIO lines 2 to 5 of the kernel's
 simulated chip, ``/dev/gpiochip1``, which tcssim moves and watches: ``sudo
 bin/mk-kernel-stand-ins gpio`` makes it, once, before the example is run --
@@ -3362,8 +3398,9 @@ Stating the type here makes that pairing an error instead.
 
    type                   the type the payload is written under, in the
                           tcspecial configuration's own word: network,
-                          device-file, serial, i2c, spi, can, iio, rpmsg,
-                          gpio or hdlc. Must be the type that configuration
+                          device-file, serial, i2c, spi, i2c_tmass,
+                          spi_tmass, can, iio, rpmsg, gpio or hdlc. Must be
+                          the type that configuration
                           writes it under
    protocol               which transport, for a network payload, and refused
                           for any other type. Must be what that configuration
@@ -5120,8 +5157,9 @@ the path, a host name -- is taken for hardware.
 Four types have nothing in the operating system that stands in for them
 faithfully: an HDLC line has no virtual interface at all, and a
 pseudo-terminal carries a SPI peripheral's, an rpmsg channel's or an IIO
-sensor's bytes without its clock, its channel or its sysfs. A node of one of
-those types may give ``stand_in``, a loopback address and port. Under
+sensor's bytes without its clock, its channel or its sysfs. Two more, the
+temperature sensors ``i2c_tmass`` and ``spi_tmass``, stand in as the thermal
+mass they are fixed to. A node of one of those types may give ``stand_in``, a loopback address and port. Under
 ``--simulate=some`` or ``all`` tcspecial reaches it there over UDP instead of
 opening the device, and tcssim answers there; under ``none`` the device is
 opened, so the configuration that flies is the one that was tested:
@@ -5225,8 +5263,9 @@ Building tcspecial for a vehicle
 
 A tcspecial contains the payload types it was built with, and no others.
 Each type is a Cargo feature named as a configuration writes the type --
-``device-file``, ``serial``, ``i2c``, ``spi``, ``can``, ``iio``, ``rpmsg``,
-``gpio`` and ``hdlc``, and ``raw`` for raw network sockets -- and a build
+``device-file``, ``serial``, ``i2c``, ``spi``, ``i2c_tmass``, ``spi_tmass``,
+``can``, ``iio``, ``rpmsg``, ``gpio`` and ``hdlc``, and ``raw`` for raw network
+sockets, a sensor's feature bringing its bus's with it -- and a build
 with the defaults has all of them, which is what ``cargo build --workspace``
 and the tests make. A build for a vehicle names the types it flies:
 
@@ -5242,8 +5281,8 @@ asks for.
 The network type over UDP, TCP and Unix-domain sockets is in every build,
 because the link to the ground is UDP, and so is every node that reaches no
 interface: computations, logs, tees, null nodes, the ping node and the app
-nodes. ``i2c``, ``spi``, ``can``, ``iio``, ``rpmsg``, ``gpio`` and ``hdlc``
-are Linux interfaces, and asking for one when building for another operating
+nodes. ``i2c``, ``spi``, their sensors, ``can``, ``iio``, ``rpmsg``,
+``gpio`` and ``hdlc`` are Linux interfaces, and asking for one when building for another operating
 system stops the build, saying which.
 
 A build says what it contains:

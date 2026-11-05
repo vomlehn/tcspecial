@@ -568,6 +568,10 @@ pub fn judge(host: &Host, node: &Node, mode: Mode) -> Option<Judged> {
         EndpointConfig::Serial(at) => payload::serial::judged(&at.path),
         EndpointConfig::I2c(at) => payload::i2c::judged(host, &at.bus),
         EndpointConfig::Spi(at) => payload::spi::judged(&at.path),
+        EndpointConfig::I2cTmass(at) => {
+            payload::i2c_tmass::judged(host, &at.bus)
+        }
+        EndpointConfig::SpiTmass(at) => payload::spi_tmass::judged(&at.path),
         EndpointConfig::Can(at) => payload::can::judged(host, &at.interface),
         EndpointConfig::Iio(at) => payload::iio::judged(host, &at.path),
         EndpointConfig::Rpmsg(at) => payload::rpmsg::judged(&at.path),

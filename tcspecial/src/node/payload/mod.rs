@@ -32,6 +32,8 @@ pub mod gpio;
 pub mod hdlc;
 #[cfg(feature = "i2c")]
 pub mod i2c;
+#[cfg(feature = "i2c_tmass")]
+pub mod i2c_tmass;
 #[cfg(feature = "iio")]
 pub mod iio;
 pub mod network;
@@ -41,6 +43,8 @@ pub mod rpmsg;
 pub mod serial;
 #[cfg(feature = "spi")]
 pub mod spi;
+#[cfg(feature = "spi_tmass")]
+pub mod spi_tmass;
 // A payload that is a program rather than a device: one that is asked for a
 // reading, and one that is never asked.
 pub mod app_all_pl;
@@ -62,6 +66,10 @@ pub const BUILT: &[&str] = &[
     "i2c",
     #[cfg(feature = "spi")]
     "spi",
+    #[cfg(feature = "i2c_tmass")]
+    "i2c_tmass",
+    #[cfg(feature = "spi_tmass")]
+    "spi_tmass",
     #[cfg(feature = "can")]
     "can",
     #[cfg(feature = "iio")]
@@ -130,6 +138,8 @@ mod tests {
         feature = "serial",
         feature = "i2c",
         feature = "spi",
+        feature = "i2c_tmass",
+        feature = "spi_tmass",
         feature = "can",
         feature = "iio",
         feature = "rpmsg",
@@ -160,9 +170,19 @@ mod tests {
             .nth(1)
             .expect("Cargo.toml has a [features] table");
         let features = features.split("\n[").next().unwrap_or(features);
+        // Each type's feature is a line of its own, empty or naming the
+        // types it brings with it -- a sensor on a thermal mass brings its
+        // bus. Not the defaults, which span lines, and not a feature that
+        // brings in a dependency, which is no type.
         let mut declared: Vec<&str> = features
             .lines()
-            .filter_map(|line| line.strip_suffix(" = []"))
+            .filter_map(|line| {
+                let (name, value) = line.split_once(" = ")?;
+                (value.starts_with('[')
+                    && value.ends_with(']')
+                    && !value.contains("dep:"))
+                .then_some(name)
+            })
             .collect();
         declared.sort_unstable();
         let mut optional = OPTIONAL_TYPES.to_vec();

@@ -809,11 +809,13 @@ mod tests {
                 "gpio",
                 "hdlc",
                 "i2c",
+                "i2c_tmass",
                 "iio",
                 "network",
                 "rpmsg",
                 "serial",
                 "spi",
+                "spi_tmass",
                 // The vehicle's own, and the three programs among them come
                 // first because the tree is sorted by path.
                 "app_all_veh",

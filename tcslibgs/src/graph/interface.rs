@@ -17,7 +17,8 @@
 /// Whether a payload of this type puts data on its interface by itself.
 ///
 /// `false` for the types whose data is there only because the vehicle read
-/// it: `i2c` and `spi`, where the vehicle clocks the bus, and `device-file`,
+/// it: `i2c` and `spi`, where the vehicle clocks the bus, and the
+/// temperature sensors that are reached as they are, and `device-file`,
 /// where a read is what produces the bytes. `true` for everything else a
 /// payload can be: a socket, a serial or HDLC line, a CAN bus, an rpmsg
 /// channel, an IIO buffer, GPIO lines, and a program.
@@ -25,8 +26,19 @@
 /// A type this table does not know is taken to send: data that arrives is
 /// taken as it arrives, which is the safer of the two for a part nobody has
 /// described -- it is never asked to do more than it was.
+///
+/// # Arguments
+///
+/// * `node_type` - The payload's type, as a configuration spells it.
+///
+/// # Returns
+///
+/// Whether data arrives from it without the vehicle reading it.
 pub fn sends(node_type: &str) -> bool {
-    !matches!(node_type, "i2c" | "spi" | "device-file")
+    !matches!(
+        node_type,
+        "i2c" | "spi" | "i2c_tmass" | "spi_tmass" | "device-file"
+    )
 }
 
 /// Whether a datagram payload is the end that speaks first, and so the end
@@ -65,7 +77,7 @@ mod tests {
     /// The parts that originate nothing are the clocked buses and a file.
     #[test]
     fn only_a_bus_and_a_file_originate_nothing() {
-        for quiet in ["i2c", "spi", "device-file"] {
+        for quiet in ["i2c", "spi", "i2c_tmass", "spi_tmass", "device-file"] {
             assert!(!sends(quiet), "{quiet}");
         }
         for talking in [

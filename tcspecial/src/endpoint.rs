@@ -400,6 +400,20 @@ pub fn bind_endpoint_pair(
             let writer = reader.try_clone()?;
             Ok((Box::new(reader), Box::new(writer)))
         }
+        // A sensor on a thermal mass is opened as the device on its bus is:
+        // see node::payload::i2c_tmass.
+        #[cfg(feature = "i2c_tmass")]
+        EndpointConfig::I2cTmass(i2c_config) => {
+            let reader = I2cEndpoint::new(what, i2c_config)?;
+            let writer = reader.try_clone()?;
+            Ok((Box::new(reader), Box::new(writer)))
+        }
+        #[cfg(feature = "spi_tmass")]
+        EndpointConfig::SpiTmass(spi_config) => {
+            let reader = SpiEndpoint::new(what, spi_config)?;
+            let writer = reader.try_clone()?;
+            Ok((Box::new(reader), Box::new(writer)))
+        }
         // A CAN controller is an interface rather than a file, so this is a
         // socket -- but one socket, shared by the pair, as a device file is:
         // a second socket on the bus would be a second member of it with a
@@ -665,6 +679,20 @@ pub fn hearing_endpoint_pair(
         }
         #[cfg(feature = "spi")]
         EndpointConfig::Spi(spi_config) => {
+            let reader = SpiEndpoint::new(what, spi_config)?;
+            let writer = reader.try_clone()?;
+            Ok((Box::new(reader), Box::new(writer)))
+        }
+        // A sensor on a thermal mass is opened as the device on its bus is:
+        // see node::payload::i2c_tmass.
+        #[cfg(feature = "i2c_tmass")]
+        EndpointConfig::I2cTmass(i2c_config) => {
+            let reader = I2cEndpoint::new(what, i2c_config)?;
+            let writer = reader.try_clone()?;
+            Ok((Box::new(reader), Box::new(writer)))
+        }
+        #[cfg(feature = "spi_tmass")]
+        EndpointConfig::SpiTmass(spi_config) => {
             let reader = SpiEndpoint::new(what, spi_config)?;
             let writer = reader.try_clone()?;
             Ok((Box::new(reader), Box::new(writer)))

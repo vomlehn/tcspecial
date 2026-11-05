@@ -150,6 +150,11 @@ pub enum Edge {
     /// sixth edge because every payload is a parallelogram, and twelve
     /// payload types need twelve lines between six edges and two weights.
     DottedDouble,
+    /// One line of dashes and dots by turns: broken as the dashed line is,
+    /// and told from it by the dot between each pair of dashes. A seventh
+    /// edge for the fourteenth payload type, the six by two weights being
+    /// all taken.
+    DashDotted,
 }
 
 impl Edge {
@@ -170,20 +175,22 @@ impl Edge {
                 | Edge::DashedDouble
                 | Edge::Dotted
                 | Edge::DottedDouble
+                | Edge::DashDotted
         )
     }
 
-    /// The pattern a broken line is drawn in: how long a piece of it is, and
-    /// the gap after it.
+    /// The pattern a broken line is drawn in: each piece of it in turn, how
+    /// long it is and the gap after it.
     ///
     /// # Returns
     ///
-    /// The length of a piece and of the gap after it, in pixels: a dot's for
-    /// a dotted edge, a dash's for any other.
-    fn pattern(self) -> (f32, f32) {
+    /// The pieces, in pixels: a dot's for a dotted edge, a dash and a dot by
+    /// turns for a dash-dotted one, and a dash's for any other.
+    fn pattern(self) -> &'static [(f32, f32)] {
         match self {
-            Edge::Dotted | Edge::DottedDouble => (DOT, DOT_GAP),
-            _ => (DASH, GAP),
+            Edge::Dotted | Edge::DottedDouble => &[(DOT, DOT_GAP)],
+            Edge::DashDotted => &[(DASH, GAP), (DOT, GAP)],
+            _ => &[(DASH, GAP)],
         }
     }
 }
@@ -664,8 +671,8 @@ fn run_of(points: &[(f32, f32)]) -> String {
 /// * `points`      - The polygon's corners, in order.
 /// * `closes`      - Whether a side runs from the last corner back to the
 ///                   first.
-/// * `(dash, gap)` - The length of a dash and of the gap after it, in
-///                   pixels.
+/// * `pattern`     - Each piece in turn, the length of it and of the gap
+///                   after it, in pixels; the pattern repeats.
 ///
 /// # Returns
 ///
@@ -677,8 +684,10 @@ fn run_of(points: &[(f32, f32)]) -> String {
 fn dashes_of(
     points: &[(f32, f32)],
     closes: bool,
-    (dash, gap): (f32, f32),
+    pattern: &[(f32, f32)],
 ) -> String {
+    // How long the whole pattern is, once round: each piece and its gap.
+    let length: f32 = pattern.iter().map(|(piece, gap)| piece + gap).sum();
     let mut sides: Vec<((f32, f32), (f32, f32))> =
         points.windows(2).map(|pair| (pair[0], pair[1])).collect();
     if closes {
@@ -700,21 +709,28 @@ fn dashes_of(
         };
 
         let mut along = -into;
-        while along < span {
-            let start = along.max(0.0);
-            let end = (along + dash).min(span);
-            if end > start {
-                let (sx, sy) = at(start);
-                let (ex, ey) = at(end);
-                if !out.is_empty() {
-                    out.push(' ');
+        'side: loop {
+            for (piece, gap) in pattern {
+                if along >= span {
+                    break 'side;
                 }
-                out.push_str(&format!("M {sx:.1} {sy:.1} L {ex:.1} {ey:.1}"));
+                let start = along.max(0.0);
+                let end = (along + piece).min(span);
+                if end > start {
+                    let (sx, sy) = at(start);
+                    let (ex, ey) = at(end);
+                    if !out.is_empty() {
+                        out.push(' ');
+                    }
+                    out.push_str(&format!(
+                        "M {sx:.1} {sy:.1} L {ex:.1} {ey:.1}"
+                    ));
+                }
+                along += piece + gap;
             }
-            along += dash + gap;
         }
         // Whatever of the pattern this side ended partway through.
-        into = (into + span) % (dash + gap);
+        into = (into + span) % length;
     }
     out
 }
@@ -1181,6 +1197,11 @@ pub const TERMINAL_ROW: u32 = TERMINAL.1 + 2 * TERMINAL_INSET;
 pub enum NodeType {
     I2c,
     Spi,
+    /// A temperature sensor on an I2C bus, fixed to a thermal mass: see
+    /// `tcslibgs::node::payload::i2c_tmass`.
+    I2cTmass,
+    /// And one that is a SPI peripheral.
+    SpiTmass,
     Serial,
     /// A synchronous serial line, which Linux drives as a network interface.
     Hdlc,
@@ -1234,9 +1255,11 @@ pub enum NodeType {
 
 impl NodeType {
     /// Every type, for the palette and for the tests.
-    pub const ALL: [NodeType; 27] = [
+    pub const ALL: [NodeType; 29] = [
         NodeType::I2c,
         NodeType::Spi,
+        NodeType::I2cTmass,
+        NodeType::SpiTmass,
         NodeType::Serial,
         NodeType::Hdlc,
         NodeType::Can,
@@ -1275,6 +1298,8 @@ impl NodeType {
         match self {
             NodeType::I2c => "i2c",
             NodeType::Spi => "spi",
+            NodeType::I2cTmass => "i2c_tmass",
+            NodeType::SpiTmass => "spi_tmass",
             NodeType::Serial => "serial",
             NodeType::Hdlc => "hdlc",
             NodeType::Can => "can",
@@ -1325,6 +1350,40 @@ impl NodeType {
     /// Each attribute's name and whether it must be stated.
     pub fn attributes(self) -> &'static [(&'static str, bool)] {
         match self {
+            // A sensor on a thermal mass says what the device it is reached
+            // as says, and where a run with stand-ins reaches it instead.
+            NodeType::I2cTmass => &[
+                ("path", true),
+                ("address", true),
+                ("group", false),
+                ("trigger", false),
+                ("trigger_interval", false),
+                ("read_delay", false),
+                ("poll_interval", false),
+                ("read_size", false),
+                ("ten_bit", false),
+                ("pec", false),
+                ("retries", false),
+                ("timeout", false),
+                ("init", false),
+                ("stand_in", false),
+            ],
+            NodeType::SpiTmass => &[
+                ("path", true),
+                ("max_speed", true),
+                ("spi_mode", true),
+                ("group", false),
+                ("trigger", false),
+                ("trigger_interval", false),
+                ("read_delay", false),
+                ("poll_interval", false),
+                ("read_size", false),
+                ("bits_per_word", false),
+                ("bit_order", false),
+                ("cs_active", false),
+                ("init", false),
+                ("stand_in", false),
+            ],
             NodeType::I2c => &[
                 ("path", true),
                 ("address", true),
@@ -1656,6 +1715,8 @@ impl NodeType {
         match self {
             NodeType::I2c
             | NodeType::Spi
+            | NodeType::I2cTmass
+            | NodeType::SpiTmass
             | NodeType::Serial
             | NodeType::Hdlc
             | NodeType::Can
@@ -1724,6 +1785,8 @@ impl NodeType {
         match self {
             NodeType::I2c
             | NodeType::Spi
+            | NodeType::I2cTmass
+            | NodeType::SpiTmass
             | NodeType::Serial
             | NodeType::Hdlc
             | NodeType::Can
@@ -1796,6 +1859,29 @@ impl NodeType {
                 outline: Parallelogram,
                 edge: Double,
                 weight: Narrow,
+                size: (WIDTH, HEIGHT),
+            },
+            // The two sensors on a thermal mass share a line of their own,
+            // dashes and dots, which no other type has, and are told from
+            // each other by its weight and their labels.
+            NodeType::I2cTmass => Appearance {
+                face: Face::Plain,
+                label_size: 12,
+                label_weight: 700,
+                label_italic: true,
+                outline: Parallelogram,
+                edge: DashDotted,
+                weight: Narrow,
+                size: (WIDTH, HEIGHT),
+            },
+            NodeType::SpiTmass => Appearance {
+                face: Face::Plain,
+                label_size: 10,
+                label_weight: 700,
+                label_italic: false,
+                outline: Parallelogram,
+                edge: DashDotted,
+                weight: Wide,
                 size: (WIDTH, HEIGHT),
             },
             NodeType::Serial => Appearance {

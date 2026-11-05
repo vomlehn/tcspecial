@@ -166,7 +166,7 @@ simulated_payloads:
         connects: heater_2.on
         simulate: true
 
-  - type network:
+  - type i2c_tmass:
       # Each sensor with its part's datasheet errors, and on its own place on
       # the zone. temp_1 and temp_2 are one part, a digital sensor of a
       # sixteenth of a kelvin a count: accurate to half a kelvin, three
@@ -177,7 +177,6 @@ simulated_payloads:
         group: zone_temps
         lag: 4 s
         noise: "0.03 K"
-        protocol: udp
 
       # The zone is not one temperature throughout: the place temp_2 is on is a
       # fifth of a kelvin warmer than the middle.
@@ -187,8 +186,8 @@ simulated_payloads:
         lag: 4 s
         noise: "0.03 K"
         offset: "+0.2 K"
-        protocol: udp
 
+  - type spi_tmass:
       # A better part, in a heavier package, on a place three tenths of a
       # kelvin cooler: accurate to a quarter of a kelvin, two hundredths of
       # noise, and slower to follow.
@@ -198,4 +197,3 @@ simulated_payloads:
         lag: 6 s
         noise: "0.02 K"
         offset: "-0.3 K"
-        protocol: udp

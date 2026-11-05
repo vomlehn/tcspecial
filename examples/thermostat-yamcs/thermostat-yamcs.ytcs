@@ -64,37 +64,42 @@ gateways:
         world-in: [ambient, gpio-in-tmass, temp1, temp2, temp3]
 
 payloads:
-  # The sensors are each the far end of a UDP socket, which tcssim stands in
-  # for with nothing more than a socket, so that they touch no hardware. The
-  # buses these parts would be on aboard -- I2C, SPI -- are flown against
-  # stand-ins by make stand-ins-test and make kernel-stand-ins-test.
-  - type network:
+  # The three sensors of the zone, two on an I2C bus and one on a SPI bus,
+  # as a vehicle would carry them. On a desk each is reached over UDP at its
+  # stand_in, where tcssim answers with the zone's temperature, so that they
+  # touch no hardware; flown, without stand-ins, the buses are opened.
+  - type i2c_tmass:
       # One of three sensors of the same place, a trio, so that the
       # temperature survives one of them going wrong. Two bytes, signed,
       # big endian.
       - payload: temp_1
-        address: "127.0.0.1"
+        address: "0x48"
         group: "zone_temps"
-        port: "17801"
-        protocol: "udp"
+        path: "/dev/i2c-1"
+        read_size: "2"
+        stand_in: "127.0.0.1:17801"
         world-out:
           - temp1.temp_1
-      # The second of the trio; the same part as temp_1.
+      # The second of the trio; the same part as temp_1, on the same bus.
       - payload: temp_2
-        address: "127.0.0.1"
+        address: "0x49"
         group: "zone_temps"
-        port: "17802"
-        protocol: "udp"
+        path: "/dev/i2c-1"
+        read_size: "2"
+        stand_in: "127.0.0.1:17802"
         world-out:
           - temp2.temp_2
-      # The third. A different part: three bytes, unsigned, its own scale and
-      # so its own conversion, so that no one part number can take the whole
-      # trio out.
+  - type spi_tmass:
+      # The third. A different part on a different bus: three bytes,
+      # unsigned, its own scale and so its own conversion, so that no one
+      # bus and no one part number can take the whole trio out.
       - payload: temp_3
-        address: "127.0.0.1"
         group: "zone_temps"
-        port: "17803"
-        protocol: "udp"
+        max_speed: "1000000"
+        path: "/dev/spidev0.0"
+        read_size: "3"
+        spi_mode: "0"
+        stand_in: "127.0.0.1:17803"
         world-out:
           - temp3.temp_3
 

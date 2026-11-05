@@ -234,7 +234,7 @@ pub fn ramp_order(pane: Pane) -> Vec<&'static str> {
 /// # Returns
 ///
 /// 0 for a type the rungs were chosen for, 1 for an app, 2 for a type
-/// that came after the apps.
+/// that came after the apps, the sensors on a thermal mass among them.
 pub fn came_later(node_type: NodeType) -> u8 {
     match node_type {
         NodeType::AppPayloadVeh
@@ -242,9 +242,13 @@ pub fn came_later(node_type: NodeType) -> u8 {
         | NodeType::AppAllVeh
         | NodeType::AppPl
         | NodeType::AppAllPl => 1,
-        NodeType::NullPayload | NodeType::TeeGateway | NodeType::TeePayload => {
-            2
-        }
+        // And the temperature sensors on a thermal mass, which came after
+        // all of those.
+        NodeType::NullPayload
+        | NodeType::TeeGateway
+        | NodeType::TeePayload
+        | NodeType::I2cTmass
+        | NodeType::SpiTmass => 2,
         _ => 0,
     }
 }

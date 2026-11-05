@@ -8956,9 +8956,11 @@ what was chosen.</p>
 <dt>Requirement</dt>
 <dd>Each payload type is a Cargo feature of the <tt class="docutils literal">tcspecial</tt> crate, declared
 in <tt class="docutils literal">tcspecial/Cargo.toml</tt> and named as the type is written in a
-configuration: <tt class="docutils literal"><span class="pre">device-file</span></tt>, <tt class="docutils literal">serial</tt>, <tt class="docutils literal">i2c</tt>, <tt class="docutils literal">spi</tt>, <tt class="docutils literal">can</tt>,
-<tt class="docutils literal">iio</tt>, <tt class="docutils literal">rpmsg</tt>, <tt class="docutils literal">gpio</tt> and <tt class="docutils literal">hdlc</tt>, with <tt class="docutils literal">raw</tt> for the raw
-protocol of the network type. One word for a type in the configuration,
+configuration: <tt class="docutils literal"><span class="pre">device-file</span></tt>, <tt class="docutils literal">serial</tt>, <tt class="docutils literal">i2c</tt>, <tt class="docutils literal">spi</tt>,
+<tt class="docutils literal">i2c_tmass</tt>, <tt class="docutils literal">spi_tmass</tt>, <tt class="docutils literal">can</tt>, <tt class="docutils literal">iio</tt>, <tt class="docutils literal">rpmsg</tt>, <tt class="docutils literal">gpio</tt> and
+<tt class="docutils literal">hdlc</tt>, with <tt class="docutils literal">raw</tt> for the raw protocol of the network type. A
+sensor's feature brings in its bus's, the sensor being opened as a device
+on that bus is. One word for a type in the configuration,
 the build and the refusal means none of them has to be translated into
 another. The words are <tt class="docutils literal"><span class="pre">tcslibgs::graph::built::OPTIONAL_TYPES</span></tt>, and a
 test holds the features in <tt class="docutils literal">Cargo.toml</tt> to them.</dd>
@@ -12095,7 +12097,9 @@ device-file  the path is a regular file, which is what tcssim makes and
 hdlc         never at its interface: nothing stands in for a
              synchronous line
 hdlc, spi,
-rpmsg, iio   reached at a stand_in, under some or all: the stand_in
+rpmsg, iio,
+i2c_tmass,
+spi_tmass    reached at a stand_in, under some or all: the stand_in
              is a loopback address, so the far end is on this host
 </pre>
 <p class="last">Tcssim stands in for a device-file payload with a regular file at its
@@ -12196,8 +12200,11 @@ loopback address, which cannot be told from a stand-in.</li>
 <dd><p class="first">A node of a type the operating system has nothing faithful to stand in
 for may state <tt class="docutils literal">stand_in</tt>, a loopback <tt class="docutils literal">address:port</tt>, in the tcspecial
 configuration. The types are <tt class="docutils literal">hdlc</tt>, which has no virtual interface at
-all, and <tt class="docutils literal">spi</tt>, <tt class="docutils literal">rpmsg</tt> and <tt class="docutils literal">iio</tt>, whose pseudo-terminal stand-ins
-carry the bytes but not the clock, the channel or the sysfs around them.
+all; <tt class="docutils literal">spi</tt>, <tt class="docutils literal">rpmsg</tt> and <tt class="docutils literal">iio</tt>, whose pseudo-terminal stand-ins
+carry the bytes but not the clock, the channel or the sysfs around them;
+and the temperature sensors <tt class="docutils literal">i2c_tmass</tt> and <tt class="docutils literal">spi_tmass</tt>, whose
+stand-in is the thermal mass they are fixed to, which tcssim answers with
+the temperature of.
 Under <tt class="docutils literal"><span class="pre">--simulate=some</span></tt> or <tt class="docutils literal">all</tt>, tcspecial reaches such a node over
 UDP at its <tt class="docutils literal">stand_in</tt> instead of opening the device, by the rule of
 which end speaks first that a UDP payload has, and tcssim answers there

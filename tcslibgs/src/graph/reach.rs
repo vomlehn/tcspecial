@@ -102,6 +102,10 @@ pub struct Reach {
 /// synchronous line has no virtual interface at all, and a pseudo-terminal
 /// carries a SPI peripheral's bytes without its clock, an rpmsg channel's
 /// messages without its channel and a sensor's samples without its sysfs.
+/// And the two temperature sensors fixed to a thermal mass, `i2c_tmass` and
+/// `spi_tmass`, whose stand-in is the thermal mass itself: tcssim answers at
+/// `stand_in` with the temperature of the one the sensor is joined to, which
+/// no register bank or pseudo-terminal at the device's path could follow.
 ///
 /// Every other type has a stand-in the kernel or tcssim puts at the
 /// endpoint tcspecial opens, which is the better test: the code that runs is
@@ -117,7 +121,12 @@ pub struct Reach {
 pub fn stands_in_over_udp(kind: DHType) -> bool {
     matches!(
         kind,
-        DHType::Hdlc | DHType::Spi | DHType::Rpmsg | DHType::Iio
+        DHType::Hdlc
+            | DHType::Spi
+            | DHType::Rpmsg
+            | DHType::Iio
+            | DHType::I2cTmass
+            | DHType::SpiTmass
     )
 }
 
@@ -399,6 +408,7 @@ pub fn reach_of(node: &Node) -> Result<Reach, String> {
             let on_a_link = crate::types::kind_of_terms(what, kind, terms)?;
             framing = on_a_link.stream().cloned();
             endpoint_of(what, &location_of(what, node, kind)?, &on_a_link)?
+                .as_kind(kind)
         }
     };
 
@@ -786,8 +796,8 @@ fn take(
             return Err(format!(
                 "\"{what}\" is {} {} node, which is simulated at its own \
                  endpoint, so stand_in does not apply to it: only hdlc, spi, \
-                 rpmsg and iio nodes, which the operating system has nothing \
-                 faithful to stand in for, are reached over UDP when simulated",
+                 rpmsg, iio, i2c_tmass and spi_tmass nodes are reached over \
+                 UDP when simulated",
                 kind.article(),
                 node.node_type
             ))
@@ -1143,7 +1153,7 @@ const LOCATORS: &[&str] = &[
 ///
 /// The attributes, out of [`LOCATORS`], that locate a node of that type.
 fn locators(kind: DHType) -> &'static [&'static str] {
-    match kind {
+    match kind.reached_as() {
         // A host and a port, and which protocol is spoken to it -- or, on a
         // raw socket, a host and the IP protocol its datagrams are.
         DHType::Network => &["address", "port", "protocol", "ip_protocol"],
@@ -1185,6 +1195,8 @@ fn kind_of(node: &Node) -> Result<DHType, String> {
     match node.node_type.as_str() {
         "i2c" => Ok(DHType::I2c),
         "spi" => Ok(DHType::Spi),
+        "i2c_tmass" => Ok(DHType::I2cTmass),
+        "spi_tmass" => Ok(DHType::SpiTmass),
         "serial" => Ok(DHType::Serial),
         "can" => Ok(DHType::Can),
         "iio" => Ok(DHType::Iio),
@@ -1298,7 +1310,7 @@ fn location_of(
     .as_str()
     .to_string();
 
-    if kind != DHType::I2c {
+    if kind.reached_as() != DHType::I2c {
         return Ok(EndpointLocation::Path { path });
     }
 
@@ -2627,6 +2639,76 @@ mod tests {
         }
         // Still what it is, for everything that asks what it is.
         assert_eq!(reach.endpoint.kind(), DHType::Rpmsg);
+    }
+
+    /// A temperature sensor on a thermal mass is reached as the device on
+    /// its bus is, as a kind of its own, and at its stand_in in a run with
+    /// stand-ins; and what is wrong with one is said of its own type.
+    #[test]
+    fn a_sensor_on_a_thermal_mass_is_reached_as_its_bus_is() {
+        use crate::simulate::Mode;
+        use crate::types::{I2cConfig, SpiConfig};
+
+        let i2c = reached(
+            "i2c_tmass",
+            &[
+                ("path", "/dev/i2c-1"),
+                ("address", "0x48"),
+                ("stand_in", "127.0.0.1:5201"),
+            ],
+        )
+        .expect("it opens");
+        let bus = match &i2c.endpoint {
+            EndpointConfig::I2cTmass(at) => at.clone(),
+            other => panic!("{other:?}"),
+        };
+        assert_eq!((bus.bus.as_str(), bus.address), ("/dev/i2c-1", 0x48));
+        assert_eq!(i2c.endpoint.kind(), DHType::I2cTmass);
+        // The same bus, as a plain device's endpoint says it.
+        assert_eq!(
+            endpoint("i2c", &[("path", "/dev/i2c-1"), ("address", "0x48")]),
+            Ok(EndpointConfig::I2c(I2cConfig { ..bus }))
+        );
+        assert_eq!(i2c.opened(Mode::None), i2c.endpoint, "flight opens it");
+        assert_eq!(
+            i2c.opened(Mode::All),
+            EndpointConfig::Network(NetworkConfig {
+                protocol: NetworkProtocol::Udp,
+                address: "127.0.0.1".to_string(),
+                port: 5201,
+            })
+        );
+
+        let spi = endpoint(
+            "spi_tmass",
+            &[
+                ("path", "/dev/spidev0.0"),
+                ("max_speed", "1000000"),
+                ("spi_mode", "0"),
+            ],
+        )
+        .expect("it opens");
+        assert!(
+            matches!(&spi, EndpointConfig::SpiTmass(SpiConfig { path, .. })
+                if path == "/dev/spidev0.0"),
+            "{spi:?}"
+        );
+
+        // A term the bus has not got is refused under the type the file
+        // wrote, and so is a missing one.
+        let said = endpoint(
+            "i2c_tmass",
+            &[
+                ("path", "/dev/i2c-1"),
+                ("address", "0x48"),
+                ("spi_mode", "0"),
+            ],
+        )
+        .unwrap_err();
+        assert!(said.contains("i2c_tmass"), "{said}");
+        let said =
+            endpoint("spi_tmass", &[("path", "/dev/spidev0.0")]).unwrap_err();
+        assert!(said.contains("spi_tmass"), "{said}");
     }
 
     /// Only on this host, and only on the types that need one.

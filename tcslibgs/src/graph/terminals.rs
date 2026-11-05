@@ -275,8 +275,10 @@ pub fn terminals_of(node_type: &str) -> Option<Terminals> {
     };
 
     match node_type {
-        "i2c" | "spi" | "serial" | "hdlc" | "can" | "iio" | "rpmsg"
-        | "network" | "device-file" | "gpio" => Some(PAYLOAD),
+        "i2c" | "spi" | "i2c_tmass" | "spi_tmass" | "serial" | "hdlc"
+        | "can" | "iio" | "rpmsg" | "network" | "device-file" | "gpio" => {
+            Some(PAYLOAD)
+        }
         gateway if crate::gateway::is_gateway(gateway) => Some(GATEWAY),
         "null-gateway" => Some(NULL_GATEWAY),
         "null-payload" => Some(NULL_PAYLOAD),

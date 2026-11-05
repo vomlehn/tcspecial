@@ -186,7 +186,7 @@
           "type": "string"
         },
         "stand_in": {
-          "description": "Where an hdlc, spi, rpmsg or iio payload is reached over UDP when it is simulated, as a loopback address and port: 127.0.0.1:7950. Used under --simulate=some or all, and not under none, the flight setting, when the device is opened.",
+          "description": "Where an hdlc, spi, rpmsg, iio, i2c_tmass or spi_tmass payload is reached over UDP when it is simulated, as a loopback address and port: 127.0.0.1:7950. Used under --simulate=some or all, and not under none, the flight setting, when the device is opened.",
           "type": "string"
         },
         "interface": {
@@ -799,7 +799,7 @@
           "type": "string"
         },
         "stand_in": {
-          "description": "Where an hdlc, spi, rpmsg or iio payload is reached over UDP when it is simulated, as a loopback address and port: 127.0.0.1:7950. Used under --simulate=some or all, and not under none, the flight setting, when the device is opened.",
+          "description": "Where an hdlc, spi, rpmsg, iio, i2c_tmass or spi_tmass payload is reached over UDP when it is simulated, as a loopback address and port: 127.0.0.1:7950. Used under --simulate=some or all, and not under none, the flight setting, when the device is opened.",
           "type": "string"
         },
         "interface": {
@@ -1436,7 +1436,7 @@
           "type": "string"
         },
         "stand_in": {
-          "description": "Where an hdlc, spi, rpmsg or iio payload is reached over UDP when it is simulated, as a loopback address and port: 127.0.0.1:7950. Used under --simulate=some or all, and not under none, the flight setting, when the device is opened.",
+          "description": "Where an hdlc, spi, rpmsg, iio, i2c_tmass or spi_tmass payload is reached over UDP when it is simulated, as a loopback address and port: 127.0.0.1:7950. Used under --simulate=some or all, and not under none, the flight setting, when the device is opened.",
           "type": "string"
         },
         "interface": {
@@ -1948,6 +1948,8 @@
         "type serial",
         "type i2c",
         "type spi",
+        "type i2c_tmass",
+        "type spi_tmass",
         "type can",
         "type iio",
         "type rpmsg",

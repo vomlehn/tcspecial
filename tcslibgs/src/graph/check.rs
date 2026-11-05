@@ -2099,11 +2099,15 @@ fn claims_of(name: &str, endpoint: &EndpointConfig) -> Vec<(Claim, String)> {
         EndpointConfig::Hdlc(hdlc) => Claim::Path(hdlc.interface.clone()),
         EndpointConfig::Iio(iio) => Claim::Path(iio.path.clone()),
         EndpointConfig::Rpmsg(rpmsg) => Claim::Path(rpmsg.path.clone()),
-        EndpointConfig::Spi(spi) => Claim::Path(spi.path.clone()),
-        EndpointConfig::I2c(i2c) => Claim::OnBus {
-            bus: i2c.bus.clone(),
-            address: i2c.address,
-        },
+        EndpointConfig::Spi(spi) | EndpointConfig::SpiTmass(spi) => {
+            Claim::Path(spi.path.clone())
+        }
+        EndpointConfig::I2c(i2c) | EndpointConfig::I2cTmass(i2c) => {
+            Claim::OnBus {
+                bus: i2c.bus.clone(),
+                address: i2c.address,
+            }
+        }
         // A CAN bus is shared by design, like an I2C bus, and what one node
         // takes on it is an identifier: two nodes answering to one identifier
         // on one interface are two nodes reading each other's frames.
@@ -2318,8 +2322,10 @@ mod tests {
     fn node(name: &str, node_type: &str) -> Node {
         let mut attributes = BTreeMap::new();
         let minimum: &[(&str, &str)] = match node_type {
-            "i2c" => &[("path", "/dev/i2c-1"), ("address", "0x48")],
-            "spi" => &[
+            "i2c" | "i2c_tmass" => {
+                &[("path", "/dev/i2c-1"), ("address", "0x48")]
+            }
+            "spi" | "spi_tmass" => &[
                 ("path", "/dev/spidev0.0"),
                 ("max_speed", "1000000"),
                 ("spi_mode", "0"),

@@ -171,13 +171,37 @@ pub(crate) fn group_kind_of(
     name: &str,
     g: LinkTerms,
 ) -> EndpointConfigResult<GroupKind> {
+    group_kind_named(name, "i2c", g)
+}
+
+/// Settles an I2C bus's terms for a type that is reached as `i2c` is, naming
+/// that type in a complaint: see [`super::i2c_tmass`].
+///
+/// # Arguments
+///
+/// * `name`      - The group's name, for the messages.
+/// * `node_type` - The type the file wrote, for the messages.
+/// * `g`         - The group's terms as the file states them.
+///
+/// # Returns
+///
+/// The bus's terms, as [`group_kind_of`] gives them.
+///
+/// # Errors
+///
+/// What [`group_kind_of`] refuses.
+pub(crate) fn group_kind_named(
+    name: &str,
+    node_type: &'static str,
+    g: LinkTerms,
+) -> EndpointConfigResult<GroupKind> {
     reject_foreign_fields(
         name,
-        "i2c",
+        node_type,
         &g,
         &["ten_bit", "pec", "retries", "timeout"],
     )?;
-    reject_stream(name, "i2c", g.stream.is_some())?;
+    reject_stream(name, node_type, g.stream.is_some())?;
 
     let ten_bit =
         parse_flag(name, "ten_bit", g.ten_bit.as_ref())?.unwrap_or(false);

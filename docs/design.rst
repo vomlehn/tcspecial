@@ -8780,9 +8780,11 @@ what was chosen.
 Requirement
     Each payload type is a Cargo feature of the ``tcspecial`` crate, declared
     in ``tcspecial/Cargo.toml`` and named as the type is written in a
-    configuration: ``device-file``, ``serial``, ``i2c``, ``spi``, ``can``,
-    ``iio``, ``rpmsg``, ``gpio`` and ``hdlc``, with ``raw`` for the raw
-    protocol of the network type. One word for a type in the configuration,
+    configuration: ``device-file``, ``serial``, ``i2c``, ``spi``,
+    ``i2c_tmass``, ``spi_tmass``, ``can``, ``iio``, ``rpmsg``, ``gpio`` and
+    ``hdlc``, with ``raw`` for the raw protocol of the network type. A
+    sensor's feature brings in its bus's, the sensor being opened as a device
+    on that bus is. One word for a type in the configuration,
     the build and the refusal means none of them has to be translated into
     another. The words are ``tcslibgs::graph::built::OPTIONAL_TYPES``, and a
     test holds the features in ``Cargo.toml`` to them.
@@ -11942,7 +11944,9 @@ Requirement
        hdlc         never at its interface: nothing stands in for a
                     synchronous line
        hdlc, spi,
-       rpmsg, iio   reached at a stand_in, under some or all: the stand_in
+       rpmsg, iio,
+       i2c_tmass,
+       spi_tmass    reached at a stand_in, under some or all: the stand_in
                     is a loopback address, so the far end is on this host
 
     Tcssim stands in for a device-file payload with a regular file at its
@@ -12047,8 +12051,11 @@ Requirement
     A node of a type the operating system has nothing faithful to stand in
     for may state ``stand_in``, a loopback ``address:port``, in the tcspecial
     configuration. The types are ``hdlc``, which has no virtual interface at
-    all, and ``spi``, ``rpmsg`` and ``iio``, whose pseudo-terminal stand-ins
-    carry the bytes but not the clock, the channel or the sysfs around them.
+    all; ``spi``, ``rpmsg`` and ``iio``, whose pseudo-terminal stand-ins
+    carry the bytes but not the clock, the channel or the sysfs around them;
+    and the temperature sensors ``i2c_tmass`` and ``spi_tmass``, whose
+    stand-in is the thermal mass they are fixed to, which tcssim answers with
+    the temperature of.
     Under ``--simulate=some`` or ``all``, tcspecial reaches such a node over
     UDP at its ``stand_in`` instead of opening the device, by the rule of
     which end speaks first that a UDP payload has, and tcssim answers there

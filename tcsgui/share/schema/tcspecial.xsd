@@ -138,6 +138,8 @@
       <xs:enumeration value="serial"/>
       <xs:enumeration value="i2c"/>
       <xs:enumeration value="spi"/>
+      <xs:enumeration value="i2c_tmass"/>
+      <xs:enumeration value="spi_tmass"/>
       <xs:enumeration value="can"/>
       <xs:enumeration value="iio"/>
       <xs:enumeration value="rpmsg"/>
@@ -189,8 +191,8 @@
       <!-- Where a udp or unix_dgram payload that speaks first sends from:
            host:port, or a path. -->
       <xs:element name="sends_from" type="xs:string"/>
-      <!-- Where an hdlc, spi, rpmsg or iio payload is reached over UDP when
-           simulated: a loopback host:port. -->
+      <!-- Where an hdlc, spi, rpmsg, iio, i2c_tmass or spi_tmass payload
+           is reached over UDP when simulated: a loopback host:port. -->
       <xs:element name="stand_in" type="xs:string"/>
       <xs:element name="interface" type="xs:string"/>
       <xs:element name="can_id" type="xs:string"/>

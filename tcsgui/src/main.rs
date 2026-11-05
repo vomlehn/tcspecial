@@ -1782,6 +1782,13 @@ fn put_node(window: &NodeWindow, editor: &Editor, node: &str) {
         .unwrap_or_default();
 
     window.set_node(name.into());
+    window.set_name(Qualified::parse(node).node.into());
+    window.set_renamable(
+        editor
+            .document()
+            .node(node)
+            .is_some_and(|found| found.node_type != "subdiagram"),
+    );
     window.set_node_type(node_type.into());
     window.set_comment(comment.into());
     window.set_about(about.into());
@@ -1946,6 +1953,51 @@ fn wire_node(
                 });
             }
             views.borrow().refresh(&editor.borrow());
+        });
+    }
+    {
+        // A new name, accepted. Refused, with the reason under the field,
+        // where another node has it or it is no name: see
+        // `Document::rename_refused`. Made, as one edit that carries the
+        // node's lines, simulator settings and showing at its page's edge
+        // with it; and the window is the renamed node's from then on, a
+        // window belonging to the name it was opened for.
+        let editor = editor.clone();
+        let views = views.clone();
+        let node = node.to_string();
+        let weak = window.as_weak();
+        window.on_renamed(move |now| {
+            let now = now.trim().to_string();
+            let refused =
+                editor.borrow().document().rename_refused(&node, &now);
+            if let Some(why) = refused {
+                if let Some(window) = weak.upgrade() {
+                    window.set_name_trouble(why.into());
+                }
+                return;
+            }
+            if let Some(window) = weak.upgrade() {
+                window.set_name_trouble("".into());
+            }
+            let was = Qualified::parse(&node);
+            if was.node == now {
+                return;
+            }
+            let renamed = Qualified {
+                in_: was.in_.clone(),
+                node: now,
+            }
+            .absolute();
+            editor.borrow_mut().edit(Edit::RenameNode {
+                was: node.clone(),
+                now: renamed.clone(),
+            });
+            let window = views.borrow_mut().attributes.remove(&node);
+            if let Some(window) = window {
+                let _ = window.hide();
+            }
+            views.borrow().refresh(&editor.borrow());
+            show_node(&editor, &views, &renamed);
         });
     }
     {
@@ -4950,6 +5002,8 @@ fn views_of(
 ///
 /// * `editor`   - The session drawn.
 /// * `dividers` - Where the panes are, the Physics pane's width included.
+/// * `home`     - The page the lines to payloads are drawn on: `None` for
+///                the top.
 ///
 /// # Returns
 ///
@@ -10314,6 +10368,167 @@ mod tests {
         );
     }
 
+    /// A subdiagram opens in a window that is the main window drawing its
+    /// page: its nodes and no others, its edge, the Physics pane and its
+    /// list, and the counts on the bar -- the same window on every page, so
+    /// that what one page can do every page can. Asked twice, it is the same
+    /// window.
+    #[test]
+    fn a_subdiagram_opens_in_a_window_like_the_main_one() {
+        i_slint_backend_testing::init_no_event_loop();
+        let where_ = tempfile::tempdir().expect("a directory");
+        let editor = Rc::new(RefCell::new(Editor::new(
+            &where_.path().join("vehicle.ytcs"),
+        )));
+        for (name, node_type, home) in [
+            ("zone", "subdiagram", None),
+            ("sensor", "i2c", None),
+            ("temp1", "i2c", Some("zone")),
+        ] {
+            editor.borrow_mut().edit(Edit::AddNode {
+                name: name.into(),
+                node_type: node_type.into(),
+                home: home.map(str::to_string),
+            });
+        }
+        let ui = MainWindow::new().expect("a window");
+        let views = views_for(&ui);
+        let drawing = Rc::new(RefCell::new(None));
+        let chosen = Rc::new(RefCell::new(BTreeMap::new()));
+
+        open_page(&editor, &views, &drawing, &chosen, "zone");
+        open_page(&editor, &views, &drawing, &chosen, "zone");
+        assert_eq!(views.borrow().open.len(), 1, "a second window");
+        let page = views.borrow().open["zone"].as_weak().upgrade().unwrap();
+
+        assert_eq!(page.get_editing(), "zone");
+        let names: Vec<String> = page
+            .get_nodes()
+            .iter()
+            .map(|n| n.name.to_string())
+            .collect();
+        assert_eq!(names, ["temp1"]);
+        assert!(page.get_edge_width() > 0.0, "no edge to join outside at");
+        assert!(page.get_physics_width() > 0.0, "no Physics pane");
+        assert!(
+            page.get_physics_palette().row_count() > 0,
+            "no physics list"
+        );
+        assert!(
+            page.get_gateway_palette().row_count() > 0
+                && page.get_vehicle_palette().row_count() > 0
+                && page.get_payload_palette().row_count() > 0,
+            "the selection lists are missing"
+        );
+        // The top page has no edge.
+        views.borrow().refresh(&editor.borrow());
+        assert_eq!(ui.get_edge_width(), 0.0);
+    }
+
+    /// A node is renamed from its own window, to a name no other node has
+    /// in any file, and the name typed is refused, with the reason under the
+    /// field, where another node has it.
+    ///
+    /// A node in a subdiagram keeps its own name -- the page is where it is
+    /// drawn, not part of what it is called -- and takes its lines and its
+    /// showing at the page's edge with it. A name a node of another file
+    /// has is refused as one of its own page's is: the reader allows no two
+    /// nodes one name across the files.
+    #[test]
+    fn a_node_is_renamed_from_its_window_to_a_name_nobody_has() {
+        i_slint_backend_testing::init_no_event_loop();
+        let where_ = tempfile::tempdir().expect("a directory");
+        let editor = Rc::new(RefCell::new(Editor::new(
+            &where_.path().join("vehicle.ytcs"),
+        )));
+        for (name, node_type, home) in [
+            ("zone", "subdiagram", None),
+            ("sensor", "i2c", None),
+            ("ground", "gateway_radio", None),
+            ("temp1", "compute", Some("zone")),
+        ] {
+            editor.borrow_mut().edit(Edit::AddNode {
+                name: name.into(),
+                node_type: node_type.into(),
+                home: home.map(str::to_string),
+            });
+        }
+        editor.borrow_mut().edit(Edit::SetExport {
+            home: "zone".into(),
+            terminal: "world-in".into(),
+            node: "temp1".into(),
+            exported: true,
+        });
+        editor.borrow_mut().edit(Edit::AddLink {
+            link: Link::joining(
+                "sensor",
+                Some("world-out"),
+                "zone/temp1",
+                Some("world-in"),
+            ),
+        });
+
+        // What is refused, and why.
+        let refused = |node: &str, now: &str| {
+            editor
+                .borrow()
+                .document()
+                .rename_refused(node, now)
+                .unwrap_or_default()
+        };
+        assert!(refused("zone/temp1", "sensor").contains("in the top file"));
+        assert!(refused("sensor", "temp1").contains("in zone"));
+        assert!(refused("sensor", " ").contains("has to have a name"));
+        assert!(refused("sensor", "a.b").contains("dot"));
+        assert!(refused("sensor", "a/b").contains("slash"));
+        assert!(refused("zone", "room").contains("file"));
+        assert_eq!(refused("sensor", "sensor"), "");
+        assert_eq!(refused("zone/temp1", "probe"), "");
+
+        let ui = MainWindow::new().expect("a window");
+        let views = views_for(&ui);
+        show_node(&editor, &views, "zone/temp1");
+        let window = |name: &str| {
+            views
+                .borrow()
+                .attributes
+                .get(name)
+                .map(|window| window.as_weak())
+                .and_then(|window| window.upgrade())
+        };
+        let open = window("zone/temp1").expect("its window");
+        assert_eq!(open.get_name(), "temp1");
+
+        // Refused: nothing changes, and the field says why.
+        let depth = editor.borrow().undo_depth();
+        open.invoke_renamed("sensor".into());
+        assert!(open.get_name_trouble().contains("already the name"));
+        assert_eq!(editor.borrow().undo_depth(), depth);
+
+        // Made: one edit, its own name kept on its page, its line and its
+        // showing at the edge with it, and the window the renamed node's.
+        open.invoke_renamed(" probe ".into());
+        assert_eq!(editor.borrow().undo_depth(), depth + 1);
+        {
+            let editor = editor.borrow();
+            let document = editor.document();
+            let probe = document.node("zone/probe").expect("renamed");
+            assert_eq!(probe.name, "probe");
+            assert_eq!(probe.home.as_deref(), Some("zone"));
+            assert!(document.links.iter().any(|l| l.to == "zone/probe"));
+            assert!(document.exports["zone"].exports("probe", "world-in"));
+        }
+        assert!(window("zone/temp1").is_none());
+        assert_eq!(
+            window("zone/probe").expect("its window").get_name(),
+            "probe"
+        );
+
+        // And one undo puts the old name back.
+        assert!(editor.borrow_mut().undo());
+        assert!(editor.borrow().document().node("zone/temp1").is_some());
+    }
+
     /// The end of a line picked up can be moved, or the line taken out.
     ///
     /// A terminal with one line on it hands that line over, and the node
@@ -11016,7 +11231,9 @@ mod tests {
             .iter()
             .position(|field| field.name == "executable")
             .expect("executable is a box to write in");
-        boxes[at].mock_single_click(slint::platform::PointerEventButton::Left);
+        // Past the node's own name, which is the box at the top.
+        boxes[at + 1]
+            .mock_single_click(slint::platform::PointerEventButton::Left);
         assert_eq!(
             window.get_about_shown(),
             executable.about.as_str(),

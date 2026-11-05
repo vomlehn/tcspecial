@@ -464,7 +464,22 @@ so, rather than looked for as a file of that name; so is an empty one, and one
 with a part that is empty or ``.``. An included file has no ``tcspecial``
 section and includes no others, no file is included twice, and no two files
 have a node of one name, since a node is known by its name in every file:
-a line in one file may run to a node in another. The digest takes in each
+a line in one file may run to a node in another. Only to one the other file
+exports, though. An included file's ``exports`` section says, for each of
+the four terminals, which of its nodes a line from another file may reach
+there, and a line that crosses into or out of the file anywhere else is
+refused, saying which list to add the node to:
+
+.. code-block:: yaml
+
+   exports:
+     world-in: [temp1, temp2, temp3]
+     world-out: [ambient, gpio-in-tmass, temp1, temp2, temp3]
+
+In XML each name is an element of its own, ``<world-in>temp1</world-in>``,
+inside ``<exports>``. A top file has nothing around it and may not have the
+section. tcsgui draws an included file as a box whose corner terminals are
+its exports, and writes the section back as it read it. The digest takes in each
 include as it is written, so a set of files digests alike from wherever it is
 read. Two examples that fly one vehicle include it from a directory of their
 own: see `The thermostat-yamcs example`_.

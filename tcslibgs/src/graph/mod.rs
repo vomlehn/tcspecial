@@ -46,6 +46,7 @@
 
 pub mod built;
 pub mod check;
+pub mod exports;
 pub mod fprime;
 pub mod grouped;
 pub mod interface;
@@ -121,6 +122,11 @@ pub struct GraphFile {
     /// something nobody meant and everybody would have to remember.
     #[serde(default)]
     pub include: Vec<String>,
+    /// What of this file may be joined from outside it, where it is an
+    /// included file: see [`exports`]. Refused in a top file, which has
+    /// nothing outside it.
+    #[serde(default)]
+    pub exports: Option<exports::Exports>,
     /// What tcspecial itself is configured with: where commands are taken,
     /// where beacons go, where the telemetry log is written.
     ///
@@ -1082,6 +1088,11 @@ pub struct Graph {
     /// which the file is held to as it is read -- see [`mirror`] -- and which
     /// the editor writes back.
     pub named: Named,
+    /// What each included file exports, by the name the include list gives
+    /// it -- which is the same whichever spelling the files are read in --
+    /// see [`exports`]. A file with no `exports` section exports nothing,
+    /// and has no entry.
+    pub exports: BTreeMap<String, exports::Exports>,
 }
 
 /// The names the files give the arriving ends of their links.
@@ -1141,6 +1152,7 @@ impl Graph {
             placed: BTreeMap::new(),
             set_aside: std::collections::BTreeSet::new(),
             named: Named::default(),
+            exports: BTreeMap::new(),
         };
 
         // What the files record at the arriving ends of their links, gathered
@@ -1150,6 +1162,15 @@ impl Graph {
         let mut mirror = mirror::Mirror::default();
 
         let top: GraphFile = read_one(path)?;
+        if top.exports.is_some() {
+            return Err(TcsError::Config(format!(
+                "{}: only an included file may have an exports section -- \
+                 it says what of that file the files around it may join, \
+                 and this file has none around it. Take the section out, or \
+                 move the nodes it names into a file this one includes",
+                path.display()
+            )));
+        }
         graph.description = top.description.clone();
         graph.tcspecial = top.tcspecial.clone();
         graph.absorb(path, &top, &mut mirror)?;
@@ -1189,6 +1210,9 @@ impl Graph {
                 )));
             }
             graph.absorb(&included, &file, &mut mirror)?;
+            if let Some(exports) = &file.exports {
+                graph.exports.insert(name.clone(), exports.clone());
+            }
             graph.files.push(included);
         }
 
@@ -2240,7 +2264,8 @@ gateways:
         // in.
         std::fs::write(
             where_.path().join("zone.ytcs"),
-            "payloads:\n  \
+            "exports:\n  world-out: [zone_sensor]\n\
+             payloads:\n  \
              - type i2c:\n      \
              - { payload: zone_sensor, path: \"/dev/i2c-1\", \
              address: \"0x48\", world-out: gateway.zone }\n",
@@ -2261,7 +2286,7 @@ gateways:
         assert!(graph.homes["gateway"].ends_with("vehicle.ytcs"));
 
         // And a link across the boundary is sound, which is what including a
-        // file is for.
+        // file is for, at a node the file exports.
         assert_eq!(graph.check(), Vec::new(), "{:?}", graph.check());
     }
 
@@ -2402,6 +2427,105 @@ gateways:
         let said =
             format!("{}", Graph::load(&top).expect_err("nesting is refused"));
         assert!(said.contains("may not include others"), "{said}");
+    }
+
+    /// A line into or out of an included file reaches only what it exports.
+    ///
+    /// A gateway node in the top file, a sensor in it feeding a conversion
+    /// in the included file, and the conversion's reading going back to the
+    /// gateway node: two lines crossing the file's edge, one in and one out.
+    /// Each is refused until the file exports the end it reaches, and the
+    /// refusal says which list to add it to.
+    #[test]
+    fn a_line_crosses_into_an_included_file_only_where_it_exports() {
+        use crate::graph::check::Problem;
+
+        let where_ = tempfile::tempdir().expect("a directory");
+        let top = where_.path().join("vehicle.ytcs");
+        std::fs::write(
+            &top,
+            "include:\n  - zone\n\
+             gateways:\n  - type gateway_radio:\n      \
+             - gateway: ground\n        world-in: [temp]\n\
+             payloads:\n  - type i2c:\n      - payload: sensor\n        \
+             world-out:\n          - temp.sensor\n",
+        )
+        .unwrap();
+        let zone = |exports: &str| {
+            std::fs::write(
+                where_.path().join("zone.ytcs"),
+                format!(
+                    "{exports}vehicle:\n  - type compute:\n      \
+                     - compute: temp\n        function: \"to_kelvin\"\n        \
+                     world-in: [sensor]\n        world-out:\n          \
+                     - ground.temp\n"
+                ),
+            )
+            .unwrap();
+            Graph::load(&top)
+                .expect("it loads")
+                .check()
+                .into_iter()
+                .filter(|p| {
+                    matches!(
+                        p,
+                        Problem::NotExported { .. } | Problem::BadExport { .. }
+                    )
+                })
+                .collect::<Vec<_>>()
+        };
+
+        let refused = zone("");
+        assert_eq!(refused.len(), 2, "{refused:?}");
+        let said: Vec<String> = refused.iter().map(Problem::describe).collect();
+        assert!(
+            said.iter().any(|s| s.contains("\"temp\" is in zone")
+                && s.contains("add \"temp\" to world-in under exports")),
+            "{said:?}"
+        );
+        assert!(
+            said.iter()
+                .any(|s| s.contains("to world-out under exports")),
+            "{said:?}"
+        );
+
+        // Half exported, half refused.
+        assert_eq!(
+            zone("exports:\n  world-in: [temp]\n").len(),
+            1,
+            "the reading going out is not exported yet"
+        );
+        assert!(zone("exports:\n  world-in: [temp]\n  world-out: [temp]\n")
+            .is_empty());
+
+        // And a list naming what is not there, or a terminal the node has
+        // not got.
+        let bad = zone(
+            "exports:\n  world-in: [temp, sensor, nobody]\n  \
+             world-out: [temp]\n",
+        );
+        let why: Vec<String> = bad
+            .iter()
+            .map(|p| match p {
+                Problem::BadExport { node, why, .. } => format!("{node} {why}"),
+                other => panic!("{other:?}"),
+            })
+            .collect();
+        assert_eq!(why, ["sensor is in another file", "nobody is not a node"]);
+    }
+
+    /// A top file has nothing around it, so nothing to export to.
+    #[test]
+    fn a_top_file_may_not_export() {
+        let where_ = tempfile::tempdir().expect("a directory");
+        let top = where_.path().join("vehicle.ytcs");
+        std::fs::write(&top, "exports:\n  world-in: [temp]\n").unwrap();
+
+        let said = format!("{}", Graph::load(&top).expect_err("it is refused"));
+        assert!(
+            said.contains("only an included file may have an exports section"),
+            "{said}"
+        );
     }
 
     /// A name that is not a configuration file is refused before it is read.

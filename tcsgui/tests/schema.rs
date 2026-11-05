@@ -159,6 +159,8 @@ fn the_configuration_schema_has_the_sections_the_reader_reads() {
     for section in [
         "description",
         "include",
+        // What of an included file the files around it may join.
+        "exports",
         "tcspecial",
         "payload_groups",
         "gateways",
@@ -172,7 +174,7 @@ fn the_configuration_schema_has_the_sections_the_reader_reads() {
     }
     // And nothing else: a section the schema offers and the reader refuses
     // would be a schema telling somebody to write a file that cannot be read.
-    assert_eq!(sections.len(), 9, "{sections:?}");
+    assert_eq!(sections.len(), 10, "{sections:?}");
     // And no version: a configuration states none, and the reader refuses
     // one, so a schema offering it would be offering a refusal.
     assert!(!sections.contains("version"), "{sections:?}");

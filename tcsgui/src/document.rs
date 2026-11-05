@@ -341,6 +341,16 @@ pub struct Document {
     /// rather than moving it into the top file.
     #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
     pub group_homes: BTreeMap<String, String>,
+    /// What each subdiagram's file exports, by the subdiagram's name: for
+    /// each terminal, the nodes of that file, by their own names, a line
+    /// from another file may reach there. See
+    /// `tcslibgs::graph::exports`.
+    ///
+    /// Left alone when a node is removed, so that undoing the removal finds
+    /// the node exported as it was; a name with no node behind it is not
+    /// written. See [`Document::exports_written`].
+    #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
+    pub exports: BTreeMap<String, tcslibgs::graph::exports::Exports>,
     /// What the ground may set in flight.
     ///
     /// Not editable on the canvas yet, and written out whatever else happens:
@@ -697,6 +707,48 @@ impl Document {
             .collect()
     }
 
+    /// What a subdiagram's file says it exports, as it is written: each
+    /// list in order of name, and only the nodes the file has.
+    ///
+    /// # Arguments
+    ///
+    /// * `home` - The subdiagram, or `None` for the top diagram, which has
+    ///            nothing outside it to export to.
+    ///
+    /// # Returns
+    ///
+    /// The exports, or `None` where there are none to write.
+    pub fn exports_written(
+        &self,
+        home: &Home,
+    ) -> Option<tcslibgs::graph::exports::Exports> {
+        let said = self.exports.get(home.as_ref()?)?;
+        let kept = |nodes: &Vec<String>| {
+            let mut kept: Vec<String> = nodes
+                .iter()
+                .filter(|node| {
+                    let absolute = Qualified {
+                        in_: home.clone(),
+                        node: (*node).clone(),
+                    }
+                    .absolute();
+                    self.node(&absolute).is_some_and(|n| &n.home == home)
+                })
+                .cloned()
+                .collect();
+            kept.sort();
+            kept.dedup();
+            kept
+        };
+        let written = tcslibgs::graph::exports::Exports {
+            world_in: kept(&said.world_in),
+            world_out: kept(&said.world_out),
+            moc_in: kept(&said.moc_in),
+            moc_out: kept(&said.moc_out),
+        };
+        (!written.is_empty()).then_some(written)
+    }
+
     /// The nodes that live in `home`.
     pub fn nodes_in(&self, home: &Home) -> Vec<&Node> {
         self.nodes.iter().filter(|n| &n.home == home).collect()
@@ -788,12 +840,22 @@ impl Document {
     /// of a type would expect, and undo does not bring it back, as it does
     /// not bring back a removed node's comment.
     pub fn forget_lost_comments(&mut self) {
+        // The files that write an exports section, whose comment is kept.
+        let exported: Vec<Home> = self
+            .exports
+            .keys()
+            .map(|home| Some(home.clone()))
+            .filter(|home| self.exports_written(home).is_some())
+            .collect();
         let nodes = &self.nodes;
         self.remarks.retain(|remark| {
             // What a file is said to be is kept while there is the file,
             // which a save writes whatever is in it.
             if remark.heading == Heading::File {
                 return true;
+            }
+            if remark.heading == Heading::Section("exports".to_string()) {
+                return exported.contains(&remark.home);
             }
             nodes.iter().any(|node| {
                 node.home == remark.home
@@ -1838,6 +1900,24 @@ impl Document {
                     let key_of = crate::sim::Simulator::key_of;
                     simulator.rename(&key_of(was), &key_of(now));
                 }
+                // And its own file's exports, which list it by its own name.
+                let (was, now) = (Qualified::parse(was), Qualified::parse(now));
+                if let Some(exports) =
+                    was.in_.as_ref().and_then(|home| self.exports.get_mut(home))
+                {
+                    for list in [
+                        &mut exports.world_in,
+                        &mut exports.world_out,
+                        &mut exports.moc_in,
+                        &mut exports.moc_out,
+                    ] {
+                        for said in list.iter_mut() {
+                            if *said == was.node {
+                                said.clone_from(&now.node);
+                            }
+                        }
+                    }
+                }
             }
             Edit::AddLink { link } => {
                 // By connection and not by equality: adding a link that is
@@ -1871,6 +1951,32 @@ impl Document {
             Edit::MoveNode { node, now, .. } => {
                 if let Some(node) = self.node_mut(node) {
                     node.at = *now;
+                }
+            }
+            // A node shown or hidden at its subdiagram's edge: see
+            // `Document::exports`. Showing one shown already, or hiding one
+            // hidden, leaves the list as it is.
+            Edit::SetExport {
+                home,
+                terminal,
+                node,
+                exported,
+            } => {
+                let exports = self.exports.entry(home.clone()).or_default();
+                let list = match terminal.as_str() {
+                    "world-in" => &mut exports.world_in,
+                    "world-out" => &mut exports.world_out,
+                    "moc-in" => &mut exports.moc_in,
+                    "moc-out" => &mut exports.moc_out,
+                    _ => return,
+                };
+                list.retain(|said| said != node);
+                if *exported {
+                    list.push(node.clone());
+                    list.sort();
+                }
+                if exports.is_empty() {
+                    self.exports.remove(home);
                 }
             }
             // A decision about a concern, remembered by node and kind: see
@@ -2752,6 +2858,25 @@ impl Document {
             }
         }
 
+        // The exports, where the YAML writer has them.
+        if let Some(exports) = self.exports_written(home) {
+            xml_comment(
+                &mut out,
+                self.remark(home, &Heading::Section("exports".to_string())),
+                4,
+            );
+            out.push_str("    <exports>\n");
+            for (terminal, nodes) in exports.each() {
+                for node in nodes {
+                    out.push_str(&format!(
+                        "        <{terminal}>{}</{terminal}>\n",
+                        escape(node)
+                    ));
+                }
+            }
+            out.push_str("    </exports>\n");
+        }
+
         {
             for (name, interval) in self.groups_in(home) {
                 out.push_str("    <payload_groups>\n");
@@ -3045,6 +3170,27 @@ impl Document {
                 out.push_str("\ninclude:\n");
                 for name in &included {
                     out.push_str(&format!("  - {name}\n"));
+                }
+            }
+        }
+
+        // What of a subdiagram's file the files around it may join, near the
+        // top, because it is what a reader of the file from outside wants
+        // first: see tcslibgs::graph::exports.
+        if let Some(exports) = self.exports_written(home) {
+            out.push('\n');
+            yaml_comment(
+                &mut out,
+                self.remark(home, &Heading::Section("exports".to_string())),
+                0,
+            );
+            out.push_str("exports:\n");
+            for (terminal, nodes) in exports.each() {
+                if !nodes.is_empty() {
+                    out.push_str(&format!(
+                        "  {terminal}: [{}]\n",
+                        nodes.join(", ")
+                    ));
                 }
             }
         }
@@ -5019,6 +5165,7 @@ mod tests {
                 Edit::Arrange { .. } => (),
                 Edit::Group { .. } => (),
                 Edit::SetAside { .. } => (),
+                Edit::SetExport { .. } => (),
                 Edit::SetTcspecial { .. } => (),
                 Edit::SetSimPayload { .. } => (),
                 Edit::SetSimGroup { .. } => (),
@@ -5171,6 +5318,14 @@ mod tests {
                 node: "a".into(),
                 kind: "world-out-goes-nowhere".into(),
                 aside: true,
+            },
+            // A node shown at its subdiagram's edge, which its undo hides
+            // again and takes the emptied list with it.
+            Edit::SetExport {
+                home: "zone".into(),
+                terminal: "world-out".into(),
+                node: "a".into(),
+                exported: true,
             },
             // A whole layout in one edit: where each node was, and where the
             // arrangement put it. Both at (0, 0) to begin with, which is

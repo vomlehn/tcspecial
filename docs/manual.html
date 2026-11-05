@@ -897,7 +897,20 @@ so, rather than looked for as a file of that name; so is an empty one, and one
 with a part that is empty or <tt class="docutils literal">.</tt>. An included file has no <tt class="docutils literal">tcspecial</tt>
 section and includes no others, no file is included twice, and no two files
 have a node of one name, since a node is known by its name in every file:
-a line in one file may run to a node in another. The digest takes in each
+a line in one file may run to a node in another. Only to one the other file
+exports, though. An included file's <tt class="docutils literal">exports</tt> section says, for each of
+the four terminals, which of its nodes a line from another file may reach
+there, and a line that crosses into or out of the file anywhere else is
+refused, saying which list to add the node to:</p>
+<pre class="code yaml literal-block">
+<span class="name tag">exports</span><span class="punctuation">:</span><span class="whitespace">
+  </span><span class="name tag">world-in</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="punctuation indicator">[</span><span class="name variable">temp1</span><span class="punctuation indicator">,</span><span class="whitespace"> </span><span class="name variable">temp2</span><span class="punctuation indicator">,</span><span class="whitespace"> </span><span class="name variable">temp3</span><span class="punctuation indicator">]</span><span class="whitespace">
+  </span><span class="name tag">world-out</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="punctuation indicator">[</span><span class="name variable">ambient</span><span class="punctuation indicator">,</span><span class="whitespace"> </span><span class="name variable">gpio-in-tmass</span><span class="punctuation indicator">,</span><span class="whitespace"> </span><span class="name variable">temp1</span><span class="punctuation indicator">,</span><span class="whitespace"> </span><span class="name variable">temp2</span><span class="punctuation indicator">,</span><span class="whitespace"> </span><span class="name variable">temp3</span><span class="punctuation indicator">]</span>
+</pre>
+<p>In XML each name is an element of its own, <tt class="docutils literal"><span class="pre">&lt;world-in&gt;temp1&lt;/world-in&gt;</span></tt>,
+inside <tt class="docutils literal">&lt;exports&gt;</tt>. A top file has nothing around it and may not have the
+section. tcsgui draws an included file as a box whose corner terminals are
+its exports, and writes the section back as it read it. The digest takes in each
 include as it is written, so a set of files digests alike from wherever it is
 read. Two examples that fly one vehicle include it from a directory of their
 own: see <a class="reference internal" href="#the-thermostat-yamcs-example">The thermostat-yamcs example</a>.</p>

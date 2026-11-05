@@ -899,10 +899,14 @@ fn check_graph(
         }
         let about = problem.about();
 
-        // The file the thing is in, where the problem is about a node; the
-        // top file otherwise, which is where the links and commands are.
-        let home = match &about {
-            tcslibgs::About::Node(name) => graph.homes.get(name).cloned(),
+        // The file the thing is in, where the problem is about a node, or
+        // about an included file's exports; the top file otherwise, which is
+        // where the links and commands are.
+        let home = match (&about, &problem) {
+            (tcslibgs::About::Node(name), _) => graph.homes.get(name).cloned(),
+            (_, tcslibgs::graph::check::Problem::BadExport { file, .. }) => {
+                Some(file.clone())
+            }
             _ => None,
         }
         .unwrap_or_else(|| path.to_path_buf());

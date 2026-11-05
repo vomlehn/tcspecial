@@ -532,6 +532,7 @@ mod tests {
             placed: std::collections::BTreeMap::new(),
             set_aside: Default::default(),
             named: Default::default(),
+            exports: Default::default(),
         };
 
         let plain = Routes::of(&one_link("a", "c"));

@@ -571,6 +571,19 @@
     </xs:all>
   </xs:complexType>
 
+  <!-- What of an included file the files around it may join: by
+       terminal, the nodes whose terminal of that name a line from another
+       file may reach. Each terminal written once for each node it names,
+       which is how XML spells a list. -->
+  <xs:complexType name="exports">
+    <xs:choice minOccurs="0" maxOccurs="unbounded">
+      <xs:element name="world-in" type="xs:string"/>
+      <xs:element name="world-out" type="xs:string"/>
+      <xs:element name="moc-in" type="xs:string"/>
+      <xs:element name="moc-out" type="xs:string"/>
+    </xs:choice>
+  </xs:complexType>
+
   <!-- The file itself.
 
        The sections may be written in any order. The lists among them,
@@ -592,6 +605,7 @@
       <xs:choice minOccurs="0" maxOccurs="unbounded">
         <xs:element name="description" type="xs:string"/>
         <xs:element name="include" type="xs:string"/>
+        <xs:element name="exports" type="exports"/>
         <xs:element name="tcspecial" type="tcspecial"/>
         <xs:element name="payload_groups" type="payload_group"/>
         <xs:element name="gateways" type="gateways"/>

@@ -1970,6 +1970,41 @@
         "type": "string"
       }
     },
+    "exports": {
+      "description": "In a file another includes, what of it the files around it may join: by terminal, the nodes whose terminal of that name a line from another file may reach. A line that crosses into or out of the file at a node it does not export is refused. Not in a top file, which has nothing around it.",
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "world-in": {
+          "description": "Nodes whose readings may arrive from another file.",
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "world-out": {
+          "description": "Nodes whose readings may leave for another file.",
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "moc-in": {
+          "description": "Nodes another file may send what the ground sends to.",
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "moc-out": {
+          "description": "Nodes whose share of what the ground sends may leave for another file.",
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      }
+    },
     "tcspecial": {
       "description": "What tcspecial itself is configured with: where commands are taken, where beacons go, where the telemetry log is written. Everything optional here, because the editor has to be able to write a section somebody is halfway through filling in; what must be answered before a configuration flies is tcsverify's to say.",
       "type": "object",

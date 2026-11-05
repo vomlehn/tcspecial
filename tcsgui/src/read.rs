@@ -100,6 +100,9 @@ pub fn read(path: &Path) -> Result<Document, String> {
         };
         let declared =
             tcslibgs::graph::read_one(file).map_err(|e| format!("{e}"))?;
+        if let Some(exports) = &declared.exports {
+            document.exports.insert(name.clone(), exports.clone());
+        }
         for group in &declared.payload_groups {
             document
                 .group_homes
@@ -479,7 +482,8 @@ enum Structure {
 /// Follows a file's structure past one line, and says which structural line
 /// it is.
 ///
-/// The three node sections and the `tcspecial` section are what is tracked:
+/// The three node sections, an included file's `exports` and the `tcspecial`
+/// section are what is tracked:
 /// a section's own line and its type groups' lines are where comments about
 /// a section or a type are written, and the `tcspecial` section's lines carry
 /// comments about tcspecial's settings. In YAML a section begins with its key
@@ -501,6 +505,19 @@ fn structure_of(
     within: &mut Within,
 ) -> Option<Structure> {
     let trimmed = line.trim();
+    // An included file's exports, whose comment is about the section as a
+    // whole: nothing inside it is a structural line.
+    let exports = if xml {
+        trimmed == "<exports>"
+    } else {
+        trimmed == "exports:" && !line.starts_with(' ')
+    };
+    if exports {
+        *within = Within::default();
+        return Some(Structure::Heading(Heading::Section(
+            "exports".to_string(),
+        )));
+    }
     let section = Section::ALL.into_iter().map(Section::name).find(|name| {
         if xml {
             trimmed == format!("<{name}>")

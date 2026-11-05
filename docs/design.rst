@@ -4731,7 +4731,14 @@ a reader looks first: the terminals hold the four corners, so the middle is the
 name's alone. Its type is written along the inside of the top, centred between
 the terminals in the two top corners -- or between the shape's own sides where a
 corner has none, a leaning side followed at that row -- so that what a node is
-can be read without remembering what its shape means. There is less room
+can be read without remembering what its shape means. A compute node's line
+names its function instead -- ``vote``, ``to_kelvin``, ``thermostat``,
+``process`` -- because ``compute`` is one type and many things, its shape and
+colour are the type's, and a page of computations each written "compute" is a
+page whose reader has to open every node to find the thermostat. The function
+stands alone rather than after "compute, ", the shape already saying that, and
+one with no function yet says ``compute``
+(``tcsdiagram::view::type_line``). There is less room
 between two terminals than across the middle, so the type is set in the
 diagram's own small size, nine pixels, rather than the window's: the one label
 on the canvas that is, and the longest type, ``subdiagram`` between four

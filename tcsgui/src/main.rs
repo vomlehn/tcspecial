@@ -4914,6 +4914,7 @@ fn views_of(
             view_of(
                 &node.name,
                 &node.node_type,
+                node.attributes.get("function").map(String::as_str),
                 node.at,
                 fault,
                 false,
@@ -5923,7 +5924,7 @@ fn physics_palette() -> ModelRc<PaletteEntry> {
     for (family, kinds) in PHYSICS_FAMILIES {
         entries.push(PaletteEntry {
             heading: (*family).into(),
-            node: view_of("", "", (0, 0), None, false, None),
+            node: view_of("", "", None, (0, 0), None, false, None),
             is_heading: true,
             sets: "".into(),
         });
@@ -7473,7 +7474,7 @@ fn palette_of(
             family = t.family();
             entries.push(PaletteEntry {
                 heading: family.into(),
-                node: view_of("", "", (0, 0), None, false, None),
+                node: view_of("", "", None, (0, 0), None, false, None),
                 is_heading: true,
                 sets: "".into(),
             });
@@ -7485,6 +7486,7 @@ fn palette_of(
                 node: view_of(
                     t.spelling(),
                     t.spelling(),
+                    None,
                     (8, 2),
                     None,
                     false,
@@ -7501,6 +7503,7 @@ fn palette_of(
                 node: view_of(
                     &one.node,
                     t.spelling(),
+                    one.sets.get("function").map(String::as_str),
                     (8, 2),
                     None,
                     false,
@@ -7628,6 +7631,8 @@ fn stated(sets: &str) -> Vec<(String, String)> {
 ///
 /// * `name`      - The node's name, as drawn.
 /// * `node_type` - Its type, as spelled in a file.
+/// * `function`  - Its `function`, where it states one: a compute node's
+///                 type line names it. See tcsdiagram::view::type_line.
 /// * `at`        - Its upper left corner.
 /// * `fault`     - What is wrong with it, if anything; only whether there is
 ///                 something is drawn.
@@ -7641,6 +7646,7 @@ fn stated(sets: &str) -> Vec<(String, String)> {
 fn view_of(
     name: &str,
     node_type: &str,
+    function: Option<&str>,
     at: (i32, i32),
     fault: Option<String>,
     selected: bool,
@@ -7652,6 +7658,7 @@ fn view_of(
         tcsdiagram::view::node_look(
             name,
             node_type,
+            function,
             at,
             fault.is_some(),
             summary,
@@ -7680,6 +7687,7 @@ fn node_view(look: tcsdiagram::view::NodeLook, selected: bool) -> NodeView {
     NodeView {
         name: look.name.into(),
         node_type: look.node_type.into(),
+        type_line: look.type_line.into(),
         x: look.x,
         y: look.y,
         width: look.width,
@@ -8960,7 +8968,8 @@ mod tests {
         .expect("the markup this binary was built from");
 
         for kind in style::NodeType::ALL {
-            let view = view_of("n", kind.spelling(), (0, 0), None, false, None);
+            let view =
+                view_of("n", kind.spelling(), None, (0, 0), None, false, None);
             let outline = view.outline.to_string();
             // One of three means, and exactly one. A path is how the markup
             // asks about a shape a corner radius cannot draw, so a type
@@ -9075,8 +9084,9 @@ mod tests {
         // Where a node may be, which is where the terminals' places are
         // worked out from: see `style::terminal_at`.
         let at = (pane::node_ceil(0), pane::node_ceil(0));
-        let view =
-            |node_type: &str| view_of("x", node_type, at, None, false, None);
+        let view = |node_type: &str| {
+            view_of("x", node_type, None, at, None, false, None)
+        };
 
         // A payload: what the ground sends arrives, and its readings leave.
         let sensor = view("i2c");
@@ -9556,12 +9566,52 @@ mod tests {
         }
     }
 
+    /// On a page, a compute node's type line names its function, and any
+    /// other node's its type.
+    #[test]
+    fn a_page_calls_each_computation_by_its_function() {
+        let where_ = tempfile::tempdir().expect("a directory");
+        let mut editor =
+            Editor::open(&where_.path().join("graph.ytcs"), dividers())
+                .expect("it opens");
+        for (name, node_type, function) in [
+            ("ambient", "compute", Some("vote")),
+            ("thermostat", "compute", Some("thermostat")),
+            ("unsure", "compute", None),
+            ("housekeeping", "log", None),
+        ] {
+            editor.edit(Edit::AddNode {
+                name: name.into(),
+                node_type: node_type.into(),
+                home: None,
+            });
+            if let Some(function) = function {
+                editor.edit(Edit::SetAttribute {
+                    node: name.into(),
+                    attribute: "function".into(),
+                    was: None,
+                    now: Some(function.into()),
+                });
+            }
+        }
+        let (nodes, _) = views_of(&editor, &None, None);
+        let said: BTreeMap<String, String> = nodes
+            .iter()
+            .map(|n| (n.name.to_string(), n.type_line.to_string()))
+            .collect();
+        assert_eq!(said["ambient"], "vote");
+        assert_eq!(said["thermostat"], "thermostat");
+        assert_eq!(said["unsure"], "compute");
+        assert_eq!(said["housekeeping"], "log");
+    }
+
     /// A type the build does not know is drawn, marked, and not crashed on.
     #[test]
     fn an_unknown_type_is_shown_as_a_fault() {
         let view = view_of(
             "mystery",
             "contraption",
+            None,
             (0, 0),
             Some("unknown".into()),
             false,
@@ -15419,7 +15469,7 @@ mod tests {
 
         let window = MainWindow::new().expect("a window");
         let at = (120, 90);
-        let node = view_of("temp_1", "i2c", at, None, false, None);
+        let node = view_of("temp_1", "i2c", None, at, None, false, None);
         let (width, height) = (node.width, node.height);
         window.set_nodes(ModelRc::from(Rc::new(VecModel::from(vec![node]))));
 

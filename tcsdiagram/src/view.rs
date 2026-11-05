@@ -34,6 +34,8 @@ pub struct TerminalLook {
 pub struct NodeLook {
     pub name: String,
     pub node_type: String,
+    /// What is written along the top of the node: see [`type_line`].
+    pub type_line: String,
     pub x: f32,
     pub y: f32,
     pub width: f32,
@@ -69,6 +71,35 @@ pub struct NodeLook {
     pub type_band: (f32, f32),
 }
 
+/// What the line along the top of a node says it is: its type, and for a
+/// compute node the function it computes.
+///
+/// A compute node is one type and many things -- a vote, a conversion to
+/// kelvin, a thermostat, a program -- and its shape and colour are the type's,
+/// so the line along its top is the one place that says which it is. A page of
+/// computations each written "compute" is a page whose reader has to open every
+/// node to find the thermostat. The function stands alone rather than after
+/// "compute, ": the shape already says compute, and the band between two
+/// terminals is narrow. One with no function yet says "compute", which is
+/// all that is known of it.
+///
+/// # Arguments
+///
+/// * `node_type` - The node type's spelling.
+/// * `function`  - The node's `function`, where it states one.
+///
+/// # Returns
+///
+/// The words to write.
+pub fn type_line(node_type: &str, function: Option<&str>) -> String {
+    match function.map(str::trim) {
+        Some(function) if node_type == "compute" && !function.is_empty() => {
+            function.to_string()
+        }
+        _ => node_type.to_string(),
+    }
+}
+
 /// What a node of this type looks like, at `at`.
 ///
 /// `faulty` paints it in the error colour; `summary` is what a closed
@@ -79,6 +110,8 @@ pub struct NodeLook {
 /// * `name`      - The node's name, as its label shows it.
 /// * `node_type` - The node type's spelling; a type this build does not
 ///                 know is drawn as a small square in the error colour.
+/// * `function`  - The node's `function`, where it states one: see
+///                 [`type_line`].
 /// * `at`        - Where the node's upper left corner is, in pixels.
 /// * `faulty`    - Whether the node is marked faulty.
 /// * `summary`   - What a closed subdiagram holds, or `None`.
@@ -89,6 +122,7 @@ pub struct NodeLook {
 pub fn node_look(
     name: &str,
     node_type: &str,
+    function: Option<&str>,
     at: (i32, i32),
     faulty: bool,
     summary: Option<&str>,
@@ -142,6 +176,7 @@ pub fn node_look(
     NodeLook {
         name: name.to_string(),
         node_type: node_type.to_string(),
+        type_line: type_line(node_type, function),
         x: at.0 as f32,
         y: at.1 as f32,
         width: size.0 as f32,
@@ -577,6 +612,30 @@ pub fn link_looks(nodes: &[OnSheet], lines: &[LineOnSheet]) -> Vec<LinkLook> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// A compute node's type line names its function, and every other node's
+    /// its type; and the markup writes that line, not the type.
+    #[test]
+    fn a_compute_node_is_called_by_its_function() {
+        assert_eq!(type_line("compute", Some("vote")), "vote");
+        assert_eq!(type_line("compute", Some("thermostat")), "thermostat");
+        // Not yet answered: all that is known is that it computes.
+        assert_eq!(type_line("compute", None), "compute");
+        assert_eq!(type_line("compute", Some(" ")), "compute");
+        // A function on anything else is no part of what it is.
+        assert_eq!(type_line("log", Some("vote")), "log");
+        let look =
+            node_look("ambient", "compute", Some("vote"), (0, 0), false, None);
+        assert_eq!(
+            (look.node_type.as_str(), look.type_line.as_str()),
+            ("compute", "vote")
+        );
+        assert!(
+            include_str!("../ui/diagram.slint")
+                .contains("text: node.type-line;"),
+            "NodeShape no longer writes the type line along the top"
+        );
+    }
 
     /// The markup draws the two widths this says, so a window drawing in
     /// proportion to a line is in proportion to the line it can see.

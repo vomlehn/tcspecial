@@ -4953,7 +4953,14 @@ a reader looks first: the terminals hold the four corners, so the middle is the
 name's alone. Its type is written along the inside of the top, centred between
 the terminals in the two top corners -- or between the shape's own sides where a
 corner has none, a leaning side followed at that row -- so that what a node is
-can be read without remembering what its shape means. There is less room
+can be read without remembering what its shape means. A compute node's line
+names its function instead -- <tt class="docutils literal">vote</tt>, <tt class="docutils literal">to_kelvin</tt>, <tt class="docutils literal">thermostat</tt>,
+<tt class="docutils literal">process</tt> -- because <tt class="docutils literal">compute</tt> is one type and many things, its shape and
+colour are the type's, and a page of computations each written &quot;compute&quot; is a
+page whose reader has to open every node to find the thermostat. The function
+stands alone rather than after &quot;compute, &quot;, the shape already saying that, and
+one with no function yet says <tt class="docutils literal">compute</tt>
+(<tt class="docutils literal"><span class="pre">tcsdiagram::view::type_line</span></tt>). There is less room
 between two terminals than across the middle, so the type is set in the
 diagram's own small size, nine pixels, rather than the window's: the one label
 on the canvas that is, and the longest type, <tt class="docutils literal">subdiagram</tt> between four

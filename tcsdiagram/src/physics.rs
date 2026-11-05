@@ -347,6 +347,7 @@ pub fn node_look(
     NodeLook {
         name: component.name.to_string(),
         node_type: component.kind.to_string(),
+        type_line: component.kind.to_string(),
         x: at.0 as f32,
         y: at.1 as f32,
         width: size.0 as f32,

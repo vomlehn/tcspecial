@@ -2575,10 +2575,44 @@ export component NodeWindow inherits Window {
     callback attribute-set(string, string);
     callback sim-attribute-set(string, string);
     callback comment-set(string);
+
+    // What is being typed into a field, and into the comment, and has not
+    // been taken yet. A value is taken when somebody is done with it: Enter,
+    // leaving the field, Close, or the window closed. Taken a keystroke at a
+    // time it was an edit a keystroke -- an Undo a letter, the file written
+    // and the node judged half typed, its complaint about "0x4" coming and
+    // going above the field and moving the field under the hand.
+    property <string> draft-field: "";
+    property <string> draft-value: "";
+    property <bool> draft-simulated: false;
+    property <bool> comment-drafted: false;
+    property <string> comment-draft: "";
+
+    // Takes what has been typed and not yet taken; nothing, where nothing
+    // has. Public so that the window closed by the window system takes it
+    // too: see tcsgui's show_node.
+    public function take() {
+        if (root.draft-field != "") {
+            if (root.draft-simulated) {
+                root.sim-attribute-set(root.draft-field, root.draft-value);
+            } else {
+                root.attribute-set(root.draft-field, root.draft-value);
+            }
+            root.draft-field = "";
+        }
+        if (root.comment-drafted) {
+            root.comment-drafted = false;
+            root.comment-set(root.comment-draft);
+        }
+    }
     // A new name typed and accepted.
     callback renamed(string);
     callback closed();
 
+    // Every label here as tall as its own font needs, and none given a
+    // height: a label held to fourteen pixels was clipped in half once the
+    // window's one size grew to twelve points, and the box under it was
+    // drawn over what was left.
     VerticalLayout {
         padding: Space.step;
         spacing: Space.tight;
@@ -2604,7 +2638,6 @@ export component NodeWindow inherits Window {
             text: root.node-type;
             font-size: Type.small;
             color: #6b7280;
-            height: 14px;
         }
         if root.fault != "": Text {
             text: root.fault;
@@ -2639,7 +2672,6 @@ export component NodeWindow inherits Window {
                         font-size: Type.small;
                         font-weight: Type.bold;
                         color: #6b7280;
-                        height: 16px;
                     }
 
                     if !f.is-heading: Text {
@@ -2656,7 +2688,6 @@ export component NodeWindow inherits Window {
                         // one distinction, as the node shapes have.
                         font-italic: f.simulated;
                         color: #6b7280;
-                        height: 14px;
                     }
                     // A true or false, which is a control with two states
                     // rather than a box to write the word in: the two answers
@@ -2697,25 +2728,32 @@ export component NodeWindow inherits Window {
                         read-only: Session.read-only;
                         text: f.value;
                         font-size: Type.body;
+                        // Named for a screen reader, and so a test can find
+                        // it, by the attribute it is a box for.
+                        accessible-label: f.name;
                         changed has-focus => {
                             if (self.has-focus) {
                                 root.focused = f.name;
                                 root.focused-about = f.about;
-                            } else if (root.focused == f.name) {
-                                root.focused = "";
-                                root.focused-about = "";
-                            }
-                        }
-                        edited => {
-                            // Two files, two edits: a node's attribute goes to
-                            // the configuration and a simulated payload's
-                            // setting to the simulator's own file.
-                            if (f.simulated) {
-                                root.sim-attribute-set(f.name, self.text);
                             } else {
-                                root.attribute-set(f.name, self.text);
+                                // Left: what was typed here is taken.
+                                root.take();
+                                if (root.focused == f.name) {
+                                    root.focused = "";
+                                    root.focused-about = "";
+                                }
                             }
                         }
+                        // Held until it is taken: see take. Two files, two
+                        // edits: a node's attribute goes to the configuration
+                        // and a simulated payload's setting to the
+                        // simulator's own file, which the draft remembers.
+                        edited => {
+                            root.draft-field = f.name;
+                            root.draft-value = self.text;
+                            root.draft-simulated = f.simulated;
+                        }
+                        accepted => { root.take(); }
                     }
                 }
 
@@ -2741,7 +2779,6 @@ export component NodeWindow inherits Window {
             text: "comment";
             font-size: Type.small;
             color: #6b7280;
-            height: 14px;
         }
         TextEdit {
             read-only: Session.read-only;
@@ -2749,7 +2786,17 @@ export component NodeWindow inherits Window {
             text: root.comment;
             font-size: Fonts.window;
             wrap: word-wrap;
-            edited => { root.comment-set(self.text); }
+            // Several lines, so Enter is a new line and not done: taken on
+            // leaving it, on Close and when the window is closed.
+            edited => {
+                root.comment-draft = self.text;
+                root.comment-drafted = true;
+            }
+            changed has-focus => {
+                if (!self.has-focus) {
+                    root.take();
+                }
+            }
         }
 
         // What the description tree says: about the field being typed into,
@@ -2761,7 +2808,6 @@ export component NodeWindow inherits Window {
             text: "about";
             font-size: Type.small;
             color: #6b7280;
-            height: 14px;
         }
         TextEdit {
             read-only: true;
@@ -2786,7 +2832,10 @@ export component NodeWindow inherits Window {
             Rectangle { }
             Button {
                 text: "Close";
-                clicked => { root.closed(); }
+                clicked => {
+                    root.take();
+                    root.closed();
+                }
             }
         }
     }

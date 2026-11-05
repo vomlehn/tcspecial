@@ -5476,6 +5476,15 @@ has. At the foot rather than beside each field, so that the rows stay a row
 each however long a sentence is, and read-only because what a description says
 is the tree's to say and not the node's.
 
+A value typed into a node's field is taken when it is done with: on Enter, on
+leaving the field, on Close, or when the window is closed. Until then the field
+holds it and nothing else knows of it. Taken a keystroke at a time it was an
+edit a letter -- an Undo for each, the file written for each, and the node
+judged half typed, its complaint about ``0x4`` appearing and vanishing above
+the field and moving the field under the hand. The comment is taken the same
+way, on leaving it or closing, Enter there being a new line. A tick box is
+one press and is taken at once.
+
 Schemas beside the tree
 -----------------------
 

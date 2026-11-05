@@ -2031,6 +2031,19 @@ fn wire_node(
             }
         });
     }
+    {
+        // Closed by the window system rather than by Close: what was typed
+        // and not yet taken is taken all the same, as Close takes it. A
+        // value that vanished because the window was closed one way and not
+        // the other would be a value nobody could trust to be there.
+        let weak = window.as_weak();
+        window.window().on_close_requested(move || {
+            if let Some(window) = weak.upgrade() {
+                window.invoke_take();
+            }
+            slint::CloseRequestResponse::HideWindow
+        });
+    }
 }
 
 /// Settles one divider where a gesture left it.
@@ -12271,6 +12284,97 @@ mod tests {
         an_emptied_field_takes_the_attribute_off();
         a_type_carried_out_of_its_list_goes_where_it_is_let_go();
         a_physics_type_carried_out_goes_where_it_is_let_go();
+        a_typed_value_is_taken_when_it_is_done();
+    }
+
+    /// What is typed into a node's field is taken when it is done with --
+    /// here by Enter -- as one edit, and not a keystroke at a time.
+    ///
+    /// Through the window: a press into the field and keys, as a person
+    /// types. Taken a keystroke at a time it was an edit a letter, each
+    /// undone alone, the file written and the node judged half typed.
+    fn a_typed_value_is_taken_when_it_is_done() {
+        use i_slint_backend_testing as testing;
+        use slint::platform::{PointerEventButton, WindowEvent};
+        use std::rc::Rc;
+
+        let where_ = tempfile::tempdir().expect("a directory");
+        let path = where_.path().join("vehicle.ytcs");
+        std::fs::write(
+            &path,
+            "payloads:\n  - type app_pl:\n      - payload: bay\n        \
+             executable: /bin/true\n        app-payload-arg: \"1\"\n",
+        )
+        .expect("a payload that is a program");
+        let editor = Rc::new(RefCell::new(
+            Editor::open(&path, dividers()).expect("it opens"),
+        ));
+        let ui = MainWindow::new().expect("a window");
+        let views = views_for(&ui);
+        show_node(&editor, &views, "bay");
+        let window = views
+            .borrow()
+            .attributes
+            .get("bay")
+            .map(|window| window.as_weak())
+            .expect("the node's window")
+            .upgrade()
+            .expect("and still there");
+        window.show().expect("the window shows");
+        let said = || {
+            editor
+                .borrow()
+                .document()
+                .node("bay")
+                .and_then(|node| node.attributes.get("app-payload-arg"))
+                .cloned()
+        };
+        let depth = editor.borrow().undo_depth();
+
+        let field = testing::ElementHandle::find_by_accessible_label(
+            &window,
+            "app-payload-arg",
+        )
+        .next()
+        .expect("a box for the attribute");
+        let (at, size) = (field.absolute_position(), field.size());
+        // At the right of the box, past the text, so what is typed goes on
+        // the end of it.
+        let into = slint::LogicalPosition::new(
+            at.x + size.width - 30.0,
+            at.y + size.height / 2.0,
+        );
+        window.window().dispatch_event(WindowEvent::PointerPressed {
+            position: into,
+            button: PointerEventButton::Left,
+        });
+        window
+            .window()
+            .dispatch_event(WindowEvent::PointerReleased {
+                position: into,
+                button: PointerEventButton::Left,
+            });
+        let key = |text: &str| {
+            window
+                .window()
+                .dispatch_event(WindowEvent::KeyPressed { text: text.into() });
+            window
+                .window()
+                .dispatch_event(WindowEvent::KeyReleased { text: text.into() });
+        };
+        key("2");
+        key("3");
+        assert_eq!(said().as_deref(), Some("1"), "nothing taken while typing");
+        assert_eq!(editor.borrow().undo_depth(), depth);
+
+        key("\n");
+        assert_eq!(said().as_deref(), Some("123"), "taken on Enter");
+        assert_eq!(
+            editor.borrow().undo_depth(),
+            depth + 1,
+            "the whole value is one edit"
+        );
+        window.hide().expect("the window hides");
     }
 
     /// An entry carried out of its list and let go on the sheet is placed

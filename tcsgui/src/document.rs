@@ -651,6 +651,53 @@ impl Document {
             .find(|n| n.name == wanted.node && n.home == wanted.in_)
     }
 
+    /// Where a subdiagram's file is, as the top file's include gives it: its
+    /// path from the top file's directory without an extension.
+    ///
+    /// The box's `path` attribute, which is what the include said; and for a
+    /// box placed in the editor, which has none until somebody gives it one,
+    /// the subdiagram's name, so that its file goes beside the top file.
+    ///
+    /// # Arguments
+    ///
+    /// * `home` - The subdiagram's name.
+    ///
+    /// # Returns
+    ///
+    /// The path.
+    pub fn include_path(&self, home: &str) -> String {
+        self.nodes
+            .iter()
+            .find(|node| {
+                node.home.is_none()
+                    && node.node_type == "subdiagram"
+                    && node.name == home
+            })
+            .and_then(|node| node.attributes.get("path"))
+            .filter(|path| !path.trim().is_empty())
+            .cloned()
+            .unwrap_or_else(|| home.to_string())
+    }
+
+    /// A subdiagram's file, beside a top file at `like`: see
+    /// [`Document::include_path`] and [`crate::subdiagram::file_for`].
+    ///
+    /// # Arguments
+    ///
+    /// * `home` - The subdiagram's name.
+    /// * `like` - The top file.
+    ///
+    /// # Returns
+    ///
+    /// The subdiagram's file, in the top file's format.
+    fn file_of(
+        &self,
+        home: &str,
+        like: &std::path::Path,
+    ) -> std::path::PathBuf {
+        file_for(&self.include_path(home), like)
+    }
+
     /// Every subdiagram the document holds, in the order they first appear.
     ///
     /// Taken from the nodes rather than kept in a list beside them: a list
@@ -1246,6 +1293,142 @@ impl Document {
         }
     }
 
+    /// Why a physics component may not be renamed to this, if it may not.
+    ///
+    /// The rules a node's name is held to -- see [`Document::rename_refused`]
+    /// -- because a component is drawn and named as a node is, and the
+    /// simulator file joins a payload to it by name: no name any node or
+    /// other component has, no dot, which `connects` reads as separating a
+    /// component's name from a terminal's, and no slash.
+    ///
+    /// # Arguments
+    ///
+    /// * `component` - The component.
+    /// * `now`       - The name asked for, as typed.
+    ///
+    /// # Returns
+    ///
+    /// What to say about it, or `None` for a name it may have.
+    pub fn rename_physics_refused(
+        &self,
+        component: &str,
+        now: &str,
+    ) -> Option<String> {
+        let now = now.trim();
+        let components = self
+            .simulator
+            .as_ref()
+            .map(|simulator| &simulator.world.components);
+        if !components.is_some_and(|all| all.contains_key(component)) {
+            return Some(format!(
+                "There is no physics component called \"{component}\"."
+            ));
+        }
+        if now.is_empty() {
+            return Some("A component has to have a name.".to_string());
+        }
+        if now.contains('.') || now.contains('/') {
+            return Some(format!(
+                "\"{now}\" cannot be a component's name: connects reads what \
+                 follows a dot as a terminal's name, and the editor what \
+                 follows a slash as a node's on a subdiagram's page."
+            ));
+        }
+        if now == component {
+            return None;
+        }
+        if components.is_some_and(|all| all.contains_key(now)) {
+            return Some(format!(
+                "\"{now}\" is already the name of a physics component."
+            ));
+        }
+        if let Some(node) = self.nodes.iter().find(|node| node.name == now) {
+            let file = match &node.home {
+                Some(home) => format!("in {home}"),
+                None => "in the top file".to_string(),
+            };
+            return Some(format!(
+                "\"{now}\" is already the name of a node {file}; a name has \
+                 to be its own across the configuration and its physics."
+            ));
+        }
+        None
+    }
+
+    /// Whether this is a subdiagram's box: a node of the top page that stands
+    /// for a file the top file includes.
+    ///
+    /// # Arguments
+    ///
+    /// * `name` - The node's name.
+    ///
+    /// # Returns
+    ///
+    /// `true` for a box.
+    pub fn is_subdiagram(&self, name: &str) -> bool {
+        self.nodes.iter().any(|node| {
+            node.home.is_none()
+                && node.node_type == "subdiagram"
+                && node.name == name
+        })
+    }
+
+    /// Renames a subdiagram everywhere its name is said but its box: the
+    /// page each of its nodes is on, each line to or from one of them, its
+    /// exports, the groups and command bindings and remarks its file holds.
+    ///
+    /// The box keeps its `path`, so the file is where it was and is only
+    /// called something else: renaming a subdiagram is not moving its file.
+    ///
+    /// # Arguments
+    ///
+    /// * `was` - Its name now.
+    /// * `now` - The name it is given.
+    fn rename_subdiagram(&mut self, was: &str, now: &str) {
+        let path = self.include_path(was);
+        let same = |home: &Home| home.as_deref() == Some(was);
+        for node in &mut self.nodes {
+            if same(&node.home) {
+                node.home = Some(now.to_string());
+            }
+            if node.home.is_none()
+                && node.node_type == "subdiagram"
+                && node.name == was
+            {
+                node.attributes.insert("path".to_string(), path.clone());
+            }
+        }
+        let moved = |name: &mut String| {
+            let mut said = Qualified::parse(name);
+            if said.in_.as_deref() == Some(was) {
+                said.in_ = Some(now.to_string());
+                *name = said.absolute();
+            }
+        };
+        for link in &mut self.links {
+            moved(&mut link.from);
+            moved(&mut link.to);
+        }
+        if let Some(exports) = self.exports.remove(was) {
+            self.exports.insert(now.to_string(), exports);
+        }
+        for home in self.group_homes.values_mut() {
+            if home == was {
+                *home = now.to_string();
+            }
+        }
+        for command in &mut self.commands {
+            if same(&command.home) {
+                command.home = Some(now.to_string());
+            }
+        }
+        for remark in &mut self.remarks {
+            if same(&remark.home) {
+                remark.home = Some(now.to_string());
+            }
+        }
+    }
+
     /// Why a node may not be renamed to this, if it may not.
     ///
     /// A node's name is how every other part of a configuration knows it, in
@@ -1256,8 +1439,8 @@ impl Document {
     /// payloads to components by name. So is a name with a dot in it, which a
     /// line reads as the node's name and an input's, or a slash, which the
     /// editor reads as a page's name and a node's; and no name at all. A
-    /// subdiagram's box is named for the file it stands for, and is renamed by
-    /// renaming that file.
+    /// subdiagram is renamed as a node is, its box being its name, and a
+    /// physics component as well: see [`Document::rename_physics_refused`].
     ///
     /// # Arguments
     ///
@@ -1272,11 +1455,6 @@ impl Document {
         let Some(found) = self.node(node) else {
             return Some(format!("There is no node called \"{node}\"."));
         };
-        if found.node_type == "subdiagram" {
-            return Some(
-                "A subdiagram is named for the file it stands for.".to_string(),
-            );
-        }
         if now.is_empty() {
             return Some("A node has to have a name.".to_string());
         }
@@ -1949,6 +2127,11 @@ impl Document {
                 }
             }
             Edit::RenameNode { was, now } => {
+                // A subdiagram's box, which is the subdiagram's name: every
+                // page the name is said for is renamed with it.
+                if self.is_subdiagram(was) {
+                    self.rename_subdiagram(was, now);
+                }
                 // Held by its own name, whichever page it is on: the edit
                 // names it as a line does, qualified by its page.
                 if let Some(node) = self.node_mut(was) {
@@ -2259,6 +2442,11 @@ impl Document {
                         .insert((from.clone(), to.clone()));
                 }
             }
+            Edit::RenamePhysics { was, now } => {
+                if let Some(simulator) = &mut self.simulator {
+                    simulator.rename_component(was, now);
+                }
+            }
             Edit::RemoveConnection { from, to } => {
                 if let Some(simulator) = &mut self.simulator {
                     simulator
@@ -2564,9 +2752,9 @@ impl Document {
 
     /// Every file this document is written as, and what goes in each.
     ///
-    /// The top diagram is `path`, and each subdiagram is a file beside it
-    /// named after itself, in the same format -- see
-    /// [`crate::subdiagram::file_for`]. The top file carries an `include` list
+    /// The top diagram is `path`, and each subdiagram is a file at the path
+    /// its include gives, in the same format -- see
+    /// [`Document::include_path`]. The top file carries an `include` list
     /// naming them, which is how the flight software is told what to read:
     /// nothing is discovered by scanning a directory.
     ///
@@ -2678,8 +2866,8 @@ impl Document {
         // for the same reason as the top diagram's.
         for name in self.subdiagrams() {
             let home = Some(name.clone());
-            let file = file_for(&name, from);
-            let file_to = file_for(&name, to);
+            let file = self.file_of(&name, from);
+            let file_to = self.file_of(&name, to);
             let paired = self.other_spelling(&file).is_some();
             written.push(Moved {
                 from: same_spelling(&file, &file_to, paired),
@@ -2925,8 +3113,9 @@ impl Document {
             included.sort();
             for name in included {
                 out.push_str(&format!(
-                    "    <include>{}</include>\n",
-                    escape(&name)
+                    "    <include name=\"{}\" path=\"{}\"/>\n",
+                    escape(&name),
+                    escape(&self.include_path(&name))
                 ));
             }
         }
@@ -3242,7 +3431,11 @@ impl Document {
             if !included.is_empty() {
                 out.push_str("\ninclude:\n");
                 for name in &included {
-                    out.push_str(&format!("  - {name}\n"));
+                    out.push_str(&format!(
+                        "  - subdiagram: {}\n    path: {}\n",
+                        plain(name),
+                        plain(&self.include_path(name))
+                    ));
                 }
             }
         }
@@ -3766,7 +3959,7 @@ fn quoted(value: &str) -> String {
 ///
 /// So: bare where the text is a letter or an underscore followed by letters,
 /// digits and the punctuation a name uses, or a relative path -- an
-/// included file's name, `../thermostat-common/thermostat` -- and quoted
+/// included file's path, `../thermostat-common/thermostat` -- and quoted
 /// otherwise. That is
 /// narrower than YAML's own rule on purpose -- what is safe here is what is
 /// safe in both formats and in every YAML reader, and a name this quotes
@@ -5252,6 +5445,7 @@ mod tests {
                 Edit::MovePhysics { .. } => (),
                 Edit::AddConnection { .. } => (),
                 Edit::RemoveConnection { .. } => (),
+                Edit::RenamePhysics { .. } => (),
                 Edit::AddGroup { .. } => (),
                 Edit::RemoveGroup { .. } => (),
                 Edit::SetGroupInterval { .. } => (),
@@ -6800,6 +6994,140 @@ mod tests {
         );
     }
 
+    /// A subdiagram is renamed as a node is: its nodes' page, the lines that
+    /// reach them, its exports and its include go with the name, and its file
+    /// stays where its path says, being only called something else.
+    #[test]
+    fn a_subdiagram_is_renamed_and_its_file_stays_put() {
+        use std::path::Path;
+
+        let mut document = Document::new();
+        for (name, node_type, home) in [
+            ("zone", "subdiagram", None),
+            ("gateway", "gateway_radio", None),
+            ("temp_1", "i2c", Some("zone")),
+        ] {
+            document.apply(&Edit::AddNode {
+                name: name.into(),
+                node_type: node_type.into(),
+                home: home.map(str::to_string),
+            });
+        }
+        document.apply(&Edit::SetAttribute {
+            node: "zone".into(),
+            attribute: "path".into(),
+            was: None,
+            now: Some("../common/zone".into()),
+        });
+        document.apply(&Edit::SetExport {
+            home: "zone".into(),
+            terminal: "world-out".into(),
+            node: "temp_1".into(),
+            exported: true,
+        });
+        document.apply(&Edit::AddLink {
+            link: Link::new("zone/temp_1", "gateway", None),
+        });
+        assert!(document.rename_refused("zone", "temp_1").is_some());
+        assert_eq!(document.rename_refused("zone", "room"), None);
+
+        document.apply(&Edit::RenameNode {
+            was: "zone".into(),
+            now: "room".into(),
+        });
+        assert!(document.node("room/temp_1").is_some(), "its page");
+        assert!(document.links.iter().any(|l| l.from == "room/temp_1"));
+        assert!(document.exports["room"].exports("temp_1", "world-out"));
+        assert_eq!(document.include_path("room"), "../common/zone");
+        let files = document
+            .files(Path::new("/tmp/top/vehicle.ytcs"))
+            .expect("files");
+        assert!(files[0].1.contains(
+            "include:\n  - subdiagram: room\n    path: ../common/zone\n"
+        ));
+        assert_eq!(files[1].0, Path::new("/tmp/top/../common/zone.ytcs"));
+
+        // And back, by the edit's own inverse.
+        document.apply(
+            &Edit::RenameNode {
+                was: "zone".into(),
+                now: "room".into(),
+            }
+            .inverse(),
+        );
+        assert!(document.node("zone/temp_1").is_some());
+        assert!(document.exports.contains_key("zone"));
+    }
+
+    /// A physics component is renamed as a node is, to a name no node and
+    /// no other component has, and every connection, stand-in and group that
+    /// names it says the new name.
+    #[test]
+    fn a_physics_component_is_renamed_wherever_it_is_named() {
+        let mut document = Document::new();
+        document.apply(&Edit::AddNode {
+            name: "temp_1".into(),
+            node_type: "i2c".into(),
+            home: None,
+        });
+        document.simulator = Some(crate::sim::Simulator::new(
+            std::path::Path::new("vehiclesim.yaml"),
+        ));
+        for (name, kind) in [("heater_1", "heater"), ("zone", "thermal_mass")] {
+            document.apply(&Edit::AddPhysics {
+                name: name.into(),
+                kind: kind.into(),
+            });
+        }
+        document.apply(&Edit::AddConnection {
+            from: "heater_1.heat".into(),
+            to: "zone.heat".into(),
+        });
+        document.apply(&Edit::SetSimPayload {
+            payload: "temp_1".into(),
+            setting: "connects".into(),
+            was: None,
+            now: Some("zone.temperature".into()),
+        });
+        document.apply(&Edit::AddSimGroup {
+            name: "steady".into(),
+        });
+        document.apply(&Edit::SetSimGroup {
+            group: "steady".into(),
+            setting: "connects".into(),
+            was: None,
+            now: Some("heater_1.on".into()),
+        });
+
+        let refused = |now: &str| {
+            document
+                .rename_physics_refused("zone", now)
+                .unwrap_or_default()
+        };
+        assert!(refused("heater_1").contains("physics component"));
+        assert!(refused("temp_1").contains("name of a node"));
+        assert!(refused("a.b").contains("dot"));
+        assert!(refused("").contains("has to have a name"));
+        assert_eq!(refused("cabin_air"), "");
+        assert!(document
+            .rename_refused("temp_1", "zone")
+            .is_some_and(|why| why.contains("physics component")));
+
+        document.apply(&Edit::RenamePhysics {
+            was: "zone".into(),
+            now: "air".into(),
+        });
+        let simulator = document.simulator.as_ref().expect("a simulator");
+        assert!(simulator.world.components.contains_key("air"));
+        assert!(!simulator.world.components.contains_key("zone"));
+        assert!(simulator
+            .world
+            .connections
+            .contains(&("heater_1.heat".into(), "air.heat".into())));
+        assert_eq!(simulator.payloads["temp_1"]["connects"], "air.temperature");
+        assert_eq!(simulator.groups["steady"]["connects"], "heater_1.on");
+    }
+
     /// A crossing link is written once, in the file its source lives in.
     ///
     /// Written in both files it touches, it would be read back as two links;
@@ -6855,7 +7183,10 @@ mod tests {
 
         // And the top file says what it includes.
         let (_, top) = &files[0];
-        assert!(top.contains("include:\n  - zone"), "{top}");
+        assert!(
+            top.contains("include:\n  - subdiagram: zone\n    path: zone\n"),
+            "{top}"
+        );
     }
 
     /// A link into a subdiagram that is not there dangles, and says so.

@@ -1644,7 +1644,7 @@ tcsgui:
             .expect("the payload");
         assert_eq!(
             tmass.home.as_deref(),
-            Some("../thermostat-common/thermostat"),
+            Some("thermostat-common"),
             "the payload this is about is in the included file"
         );
     }
@@ -1654,14 +1654,14 @@ tcsgui:
     /// settings, there too.
     ///
     /// The window a setting is typed into knows the node by the name the
-    /// editor holds it under, `../thermostat-common/thermostat/gpio-in-tmass`
+    /// editor holds it under, `thermostat-common/gpio-in-tmass`
     /// here; the file knows it as `gpio-in-tmass`, and an entry written
     /// under the other name joins nothing the next session can open.
     #[test]
     fn an_included_payloads_simulated_settings_keep_its_own_name() {
         let where_ = tempfile::tempdir().expect("a directory");
         let (path, sim) = thermostat_example(where_.path());
-        let held = "../thermostat-common/thermostat/gpio-in-tmass";
+        let held = "thermostat-common/gpio-in-tmass";
 
         let mut editor = Editor::open(&path, crate::pane::default_dividers())
             .expect("it opens");
@@ -2162,7 +2162,10 @@ tcsgui:
             .expect("the subdiagram");
 
         // The top file names what it includes and holds its own nodes.
-        assert!(top.contains("include:\n  - zone"), "{top}");
+        assert!(
+            top.contains("include:\n  - subdiagram: zone\n    path: zone\n"),
+            "{top}"
+        );
         assert!(top.contains("gateway: gateway"), "{top}");
         assert!(
             !top.contains("payload: temp_1"),
@@ -2207,7 +2210,10 @@ tcsgui:
         let top = std::fs::read_to_string(&path).expect("the top diagram");
         let inner = std::fs::read_to_string(where_.path().join("zone.xtcs"))
             .expect("the subdiagram, in XML as its parent is");
-        assert!(top.contains("<include>zone</include>"), "{top}");
+        assert!(
+            top.contains("<include name=\"zone\" path=\"zone\"/>"),
+            "{top}"
+        );
         assert!(inner.starts_with("<?xml"), "{inner}");
         assert!(inner.contains("<payload name=\"temp_1\""), "{inner}");
     }
@@ -2525,7 +2531,7 @@ tcsgui:
 
         // And one drawn in the included file: that file's position line.
         let before = every_file(root);
-        let held = "../thermostat-common/thermostat/gpio-in-tmass";
+        let held = "thermostat-common/gpio-in-tmass";
         // Wherever settling put it as the file was opened, which depends
         // on the panes: the file has it at 91, 544.
         let was = at(&editor, held);

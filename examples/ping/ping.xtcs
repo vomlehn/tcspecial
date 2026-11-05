@@ -39,7 +39,7 @@
             <send>127.0.0.1:7210</send>
         </tcs_cmd>
     </tcspecial>
-    <include>../ping-common/ping</include>
+    <include name="ping-common" path="../ping-common/ping"/>
     <gateways>
         <type name="gateway_radio">
             <!-- The ground's end of the link, both ways. A ping goes up to
@@ -58,7 +58,7 @@
     </gateways>
     <tcsgui>
         <nodes>
-            <node name="../ping-common/ping" x="34" y="34"/>
+            <node name="ping-common" x="34" y="34"/>
             <node name="gateway" x="469" y="34"/>
         </nodes>
     </tcsgui>

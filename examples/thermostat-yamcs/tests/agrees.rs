@@ -101,7 +101,11 @@ fn worked_out() -> Vec<(String, String)> {
     // Most of it is in the file the two thermostat examples include, so the
     // ids, the ports and the digest are the two readers' of an included set.
     assert_eq!(
-        graph.included(),
+        graph
+            .included()
+            .into_iter()
+            .map(|include| include.path)
+            .collect::<Vec<_>>(),
         ["../thermostat-common/thermostat"],
         "what it includes"
     );

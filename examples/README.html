@@ -212,13 +212,14 @@ vehicle both thermostat configurations include, and
 <code>thermostat-sim.yaml</code>, the simulator file, physics model and
 all, which each thermostat example’s <code>-sim.yaml</code> is a link
 to, so that each is found beside its configuration by name. Each
-configuration includes its common file by its path from its own
-directory, <code>../thermostat-common/thermostat</code>, and keeps for
-itself only what differs: its <code>tcspecial</code> section, its
-gateway node – called <code>gateway</code> in both, which is the name
-the common file’s links send to – and, for the thermostat, the three
-sensors, whose ports differ. A common file is not checked on its own,
-having no <code>tcspecial</code> section; it is checked as part of each
+configuration includes its common file as a subdiagram called
+<code>thermostat-common</code>, at its path from its own directory,
+<code>../thermostat-common/thermostat</code>, and keeps for itself only
+what differs: its <code>tcspecial</code> section, its gateway node –
+called <code>gateway</code> in both, which is the name the common file’s
+links send to – and, for the thermostat, the three sensors, whose ports
+differ. A common file is not checked on its own, having no
+<code>tcspecial</code> section; it is checked as part of each
 configuration that includes it. A test holds the links to the shared
 simulator file: <code>examples/thermostat-yamcs/tests/shared.rs</code>.
 <code>yamcs-common</code> is not an example either: it is the Rust the

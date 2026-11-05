@@ -292,6 +292,52 @@ impl Simulator {
         crate::Qualified::parse(held).written()
     }
 
+    /// Renames a physics component everywhere the file says it: the
+    /// component, its place in the Physics pane, each connection to or from
+    /// one of its terminals, and each stand-in's and group's `connects`
+    /// naming one.
+    ///
+    /// # Arguments
+    ///
+    /// * `was` - Its name now.
+    /// * `now` - The name it is given.
+    pub fn rename_component(&mut self, was: &str, now: &str) {
+        let world = &mut self.world;
+        if let Some(component) = world.components.remove(was) {
+            world.components.insert(now.to_string(), component);
+        }
+        if let Some(at) = world.placed.remove(was) {
+            world.placed.insert(now.to_string(), at);
+        }
+        let mine = format!("{was}.");
+        let moved = |terminal: &str| match terminal.strip_prefix(&mine) {
+            Some(rest) => format!("{now}.{rest}"),
+            None => terminal.to_string(),
+        };
+        world.connections = world
+            .connections
+            .iter()
+            .map(|(from, to)| (moved(from), moved(to)))
+            .collect();
+        for settings in
+            self.payloads.values_mut().chain(self.groups.values_mut())
+        {
+            // Only where it names the component: one that does not is left
+            // as it was written.
+            if let Some(said) = settings.get_mut("connects") {
+                let named: Vec<String> =
+                    tcslibgs::sim_config::terminals_of(said)
+                        .map(moved)
+                        .collect();
+                let was_said: Vec<&str> =
+                    tcslibgs::sim_config::terminals_of(said).collect();
+                if named.iter().zip(&was_said).any(|(now, was)| now != was) {
+                    *said = named.join(", ");
+                }
+            }
+        }
+    }
+
     /// Renames a simulated payload, its settings and the type it was
     /// written under with it.
     ///

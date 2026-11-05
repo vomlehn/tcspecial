@@ -891,12 +891,19 @@ about the payloads themselves.</dd>
 </dl>
 <p>A configuration may be written as several files. The one named on the command
 line is the top file, and its <tt class="docutils literal">include</tt> list names the others, each read in
-the top file's spelling and taken in as if it were written there:</p>
+the top file's spelling and taken in as if it were written there. Each is a
+subdiagram, with a name of its own and its file's path under it:</p>
 <pre class="code yaml literal-block">
 <span class="name tag">include</span><span class="punctuation">:</span><span class="whitespace">
-  </span><span class="punctuation indicator">-</span><span class="whitespace"> </span><span class="literal scalar plain">../thermostat-common/thermostat</span>
+  </span><span class="punctuation indicator">-</span><span class="whitespace"> </span><span class="name tag">subdiagram</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">thermostat-common</span><span class="whitespace">
+    </span><span class="name tag">path</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">../thermostat-common/thermostat</span>
 </pre>
-<p>An include is relative to the top file's directory: it is the file's path from
+<p>In XML it is one element with the two as attributes, <tt class="docutils literal">&lt;include
+<span class="pre">name=&quot;thermostat-common&quot;</span> <span class="pre">path=&quot;../thermostat-common/thermostat&quot;/&gt;</span></tt>. The name
+is the subdiagram's, the name tcsgui draws its box under, and is no node's
+and no other subdiagram's, with no dot or slash in it. An include written as a
+bare path, as includes once were, is refused, saying how to write it now.</p>
+<p>An include's path is relative to the top file's directory: it is the file's path from
 there, without the extension, <tt class="docutils literal">zone</tt> for <tt class="docutils literal">zone.ytcs</tt> beside the top file
 and <tt class="docutils literal"><span class="pre">../thermostat-common/thermostat</span></tt> for <tt class="docutils literal">thermostat.ytcs</tt> in a directory
 beside the top file's. Nothing in it is expanded, so an include that is
@@ -919,8 +926,8 @@ refused, saying which list to add the node to:</p>
 inside <tt class="docutils literal">&lt;exports&gt;</tt>. A top file has nothing around it and may not have the
 section. tcsgui draws an included file as a box whose corner terminals are
 its exports, and writes the section back as it read it. The digest takes in each
-include as it is written, so a set of files digests alike from wherever it is
-read. Two examples that fly one vehicle include it from a directory of their
+include, name and path, as it is written, so a set of files digests alike from
+wherever it is read. Two examples that fly one vehicle include it from a directory of their
 own: see <a class="reference internal" href="#the-thermostat-yamcs-example">The thermostat-yamcs example</a>.</p>
 <p>tcspecial once read a configuration of its own as well, named by
 <tt class="docutils literal">TCSPECIAL_CONFIG_PATH</tt>, which said where commands are taken, where beacons

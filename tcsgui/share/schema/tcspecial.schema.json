@@ -1966,10 +1966,23 @@
       "type": "string"
     },
     "include": {
-      "description": "Other files this one is made of, each by its path from this file's directory without an extension -- zone, or ../common/zone -- read in this file's format: named rather than discovered, so the set of files a configuration is made of is itself written down. Not an absolute path, and no part empty or \".\".",
+      "description": "Other files this one is made of, each a subdiagram with a name of its own and the file's path from this file's directory without an extension -- zone, or ../common/zone -- read in this file's format: named rather than discovered, so the set of files a configuration is made of is itself written down.",
       "type": "array",
       "items": {
-        "type": "string"
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["subdiagram", "path"],
+        "properties": {
+          "subdiagram": {
+            "description": "The subdiagram's name: no node's and no other subdiagram's, with no dot or slash in it.",
+            "type": "string",
+            "pattern": "^[^./]+$"
+          },
+          "path": {
+            "description": "The file's path from this file's directory without an extension. Not an absolute path, and no part empty or \".\".",
+            "type": "string"
+          }
+        }
       }
     },
     "exports": {

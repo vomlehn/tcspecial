@@ -2702,6 +2702,7 @@ vehicle:
             set_aside: Default::default(),
             named: Default::default(),
             exports: Default::default(),
+            includes: Vec::new(),
         };
 
         let mut fabric = Fabric::new(Routes::of(&graph), 64);
@@ -2895,6 +2896,7 @@ vehicle:
             set_aside: Default::default(),
             named: Default::default(),
             exports: Default::default(),
+            includes: Vec::new(),
         })
     }
 

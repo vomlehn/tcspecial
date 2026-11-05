@@ -1769,12 +1769,6 @@ fn put_node(window: &NodeWindow, editor: &Editor, node: &str) {
 
     window.set_node(name.into());
     window.set_name(Qualified::parse(node).node.into());
-    window.set_renamable(
-        editor
-            .document()
-            .node(node)
-            .is_some_and(|found| found.node_type != "subdiagram"),
-    );
     window.set_node_type(node_type.into());
     window.set_comment(comment.into());
     window.set_about(about.into());
@@ -5779,6 +5773,38 @@ fn show_physics(editor: &Rc<RefCell<Editor>>, views: &Rc<RefCell<Views>>) {
             });
         }
         {
+            // A new name for the component shown, refused as a node's is
+            // where another component or any node has it: see
+            // `Document::rename_physics_refused`. One edit, and the window
+            // goes on showing it under its new name.
+            let editor = editor.clone();
+            let views = views.clone();
+            let showing = showing.clone();
+            let weak = window.as_weak();
+            window.on_renamed(move |now| {
+                let was = showing.borrow().clone();
+                let now = now.trim().to_string();
+                let refused = editor
+                    .borrow()
+                    .document()
+                    .rename_physics_refused(&was, &now);
+                if let Some(window) = weak.upgrade() {
+                    window.set_name_trouble(
+                        refused.clone().unwrap_or_default().into(),
+                    );
+                }
+                if refused.is_some() || now == was {
+                    return;
+                }
+                editor.borrow_mut().edit(Edit::RenamePhysics {
+                    was,
+                    now: now.clone(),
+                });
+                *showing.borrow_mut() = now;
+                views.borrow().refresh(&editor.borrow());
+            });
+        }
+        {
             let editor = editor.clone();
             let views = views.clone();
             window.on_setting_set(move |setting, value| {
@@ -5857,6 +5883,7 @@ fn put_physics(window: &SimWindow, editor: &Editor, component: &str) {
     );
     window.set_can_add(false);
     window.set_can_remove(true);
+    window.set_can_rename(true);
     window.set_choices(ModelRc::from(Rc::new(VecModel::from(choices))));
     window.set_chosen(chosen.map_or("", |_| component).into());
     let fields: Vec<&'static str> = chosen
@@ -10575,7 +10602,8 @@ mod tests {
         assert!(refused("sensor", " ").contains("has to have a name"));
         assert!(refused("sensor", "a.b").contains("dot"));
         assert!(refused("sensor", "a/b").contains("slash"));
-        assert!(refused("zone", "room").contains("file"));
+        assert!(refused("zone", "sensor").contains("already the name"));
+        assert_eq!(refused("zone", "room"), "", "a subdiagram is renamed too");
         assert_eq!(refused("sensor", "sensor"), "");
         assert_eq!(refused("zone/temp1", "probe"), "");
 

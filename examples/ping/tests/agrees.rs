@@ -72,7 +72,11 @@ fn worked_out() -> Vec<(String, String)> {
     let path = here().join("ping.ytcs");
     let graph = Graph::load(&path).expect("the example reads");
     assert_eq!(
-        graph.included(),
+        graph
+            .included()
+            .into_iter()
+            .map(|include| include.path)
+            .collect::<Vec<_>>(),
         ["../ping-common/ping"],
         "what it includes"
     );

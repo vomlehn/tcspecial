@@ -207,12 +207,15 @@ pub fn read(path: &Path) -> Result<Document, String> {
     // And a box in the top diagram for each file it includes, which is what
     // opens that file's page: named by its include, and drawn where the top
     // file's own section put it.
-    for name in graph.included() {
+    for include in graph.included() {
+        let name = include.name;
         document.nodes.push(Node {
             at: graph.placed.get(&name).map_or((0, 0), |at| (at.x, at.y)),
             name,
             node_type: "subdiagram".to_string(),
-            attributes: BTreeMap::new(),
+            // Where its file is, which is what the include says beside the
+            // name: see `Document::include_path`.
+            attributes: BTreeMap::from([("path".to_string(), include.path)]),
             home: None,
             comment: None,
         });
@@ -992,8 +995,14 @@ mod tests {
                 let name = format!("{example}/{example}.{extension}");
                 let top = examples.join(&name);
                 let document = read(&top).unwrap_or_else(|e| panic!("{e}"));
-                let include = format!("../{common}");
+                // Named for its directory, and at its path.
+                let include =
+                    common.split('/').next().expect("a directory").to_string();
                 assert_eq!(document.subdiagrams(), vec![include.clone()]);
+                assert_eq!(
+                    document.include_path(&include),
+                    format!("../{common}")
+                );
                 assert!(
                     document.node(&include).is_some_and(|box_| {
                         box_.node_type == "subdiagram" && box_.at != (0, 0)

@@ -368,6 +368,7 @@ mod tests {
             set_aside: Default::default(),
             named: Default::default(),
             exports: Default::default(),
+            includes: Vec::new(),
         };
         let schedule = Schedule::of(&graph, Instant::now());
 

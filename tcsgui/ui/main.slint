@@ -2407,9 +2407,17 @@ export component SimWindow inherits Window {
     // physics components, which are placed from the physics list instead
     // of made here.
     in property <bool> can-remove: false;
+    // And whether what is chosen can be renamed here, which a physics
+    // component can, as a node can in its own window: a simulated payload is
+    // named by its payload, and a group's name by the groups' own window.
+    in property <bool> can-rename: false;
+    // Why the name last typed was refused, if it was.
+    in property <string> name-trouble: "";
     in property <string> trouble: "";
 
     callback choose(string);
+    // A new name for what is chosen, typed and accepted.
+    callback renamed(string);
     callback add();
     callback remove();
     callback setting-set(string, string);
@@ -2448,6 +2456,21 @@ export component SimWindow inherits Window {
                 enabled: root.chosen != "" && !Session.read-only;
                 clicked => { root.remove(); }
             }
+        }
+
+        // The name, as a field: renamed on accept, and a name another
+        // component or any node has refused, and said why under it.
+        if root.can-rename && root.chosen != "": LineEdit {
+            text: root.chosen;
+            read-only: Session.read-only;
+            accessible-label: "name";
+            accepted => { root.renamed(self.text); }
+        }
+        if root.can-rename && root.name-trouble != "": Text {
+            text: root.name-trouble;
+            color: #c0392b;
+            font-size: Type.small;
+            wrap: word-wrap;
         }
 
         if root.chosen == "": Text {
@@ -2522,9 +2545,6 @@ export component NodeWindow inherits Window {
     // Its own name, which is what its field shows and what renaming it
     // changes: `node` is the name a line uses, qualified by its page.
     in property <string> name: "";
-    // Whether it can be renamed here: not a subdiagram's box, which is named
-    // for its file, nor anything in a session that changes nothing.
-    in property <bool> renamable: true;
     // Why the name last typed was refused, if it was.
     in property <string> name-trouble: "";
     in property <string> node-type: "";
@@ -2565,8 +2585,8 @@ export component NodeWindow inherits Window {
         // node has is refused, and said why, and the old name stays.
         LineEdit {
             text: root.name;
-            read-only: Session.read-only || !root.renamable;
-            font-size: Type.strong;
+            read-only: Session.read-only;
+            font-size: Fonts.window;
             accessible-label: "name";
             accepted => { root.renamed(self.text); }
         }

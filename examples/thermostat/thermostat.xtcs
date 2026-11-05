@@ -31,7 +31,7 @@
             <send>127.0.0.1:4100</send>
         </tcs_cmd>
     </tcspecial>
-    <include>../thermostat-common/thermostat</include>
+    <include name="thermostat-common" path="../thermostat-common/thermostat"/>
     <gateways>
         <type name="gateway_radio">
             <gateway name="gateway">
@@ -93,7 +93,7 @@
     </payloads>
     <tcsgui>
         <nodes>
-            <node name="../thermostat-common/thermostat" x="563" y="374"/>
+            <node name="thermostat-common" x="563" y="374"/>
             <node name="gateway" x="790" y="34"/>
             <node name="temp_1" x="34" y="34"/>
             <node name="temp_2" x="34" y="166"/>

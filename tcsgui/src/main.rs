@@ -463,12 +463,14 @@ impl Views {
             .as_ref()
             .and_then(|drawing| drawing.holding.clone());
         if let Some(top) = self.top.upgrade() {
-            let (_, links) = views_of(editor, &None, held.as_ref());
+            let (_, links) =
+                views_of(editor, &None, self.divider.get(), held.as_ref());
             top.set_links(ModelRc::from(Rc::new(VecModel::from(links))));
         }
         for (name, window) in &self.open {
             let home = Some(name.clone());
-            let (_, links) = views_of(editor, &home, held.as_ref());
+            let (_, links) =
+                views_of(editor, &home, self.divider.get(), held.as_ref());
             window.set_links(ModelRc::from(Rc::new(VecModel::from(links))));
         }
     }
@@ -1322,6 +1324,7 @@ fn wire(
         let drawing_for_motion = drawing.clone();
         let editor_for_motion = editor.clone();
         let home_for_motion = home.clone();
+        let views_for_motion = views.clone();
         // Where the pointer is, while a line is in hand. The line
         // follows it: a line that stayed at the terminal until it was
         // put somewhere would be a gesture with nothing to aim.
@@ -1334,8 +1337,12 @@ fn wire(
                 .as_ref()
                 .and_then(|from| {
                     let editor = editor_for_motion.borrow();
-                    let anchor =
-                        anchored(editor.document(), &home_for_motion, from)?;
+                    let anchor = anchored(
+                        editor.document(),
+                        &home_for_motion,
+                        views_for_motion.borrow().divider.get(),
+                        from,
+                    )?;
                     Some(route::drawing(anchor, (x, y)))
                 })
                 .unwrap_or_default();
@@ -1370,12 +1377,13 @@ fn wire(
                 let document = editor.document();
                 // A line taken on another page is no line on this
                 // one: see anchored.
-                let anchor = anchored(document, &home, &from);
+                let dividers = views.borrow().divider.get();
+                let anchor = anchored(document, &home, dividers, &from);
                 // The page's own edge, where a node of the page is
                 // shown outside it, named for the menu as the
                 // subdiagram's edge.
                 let edge = anchor
-                    .and(edge_under(&home, (x, y)))
+                    .and(edge_under(&home, dividers, (x, y)))
                     .zip(home.as_deref())
                     .map(|(edge, inside)| {
                         let offers = if from.terminal == edge {
@@ -1658,7 +1666,7 @@ fn put(
         Some(_) => {
             ui.set_edge_width(style::EDGE as f32);
             ui.set_edge_terminals(ModelRc::from(Rc::new(VecModel::from(
-                edge_views(),
+                edge_views(dividers),
             ))));
         }
         None => {
@@ -1666,7 +1674,7 @@ fn put(
             ui.set_edge_terminals(ModelRc::default());
         }
     }
-    let (nodes, links) = views_of(editor, home, held);
+    let (nodes, links) = views_of(editor, home, dividers, held);
     ui.set_selected(chosen.unwrap_or_default().into());
     ui.set_nodes(ModelRc::from(Rc::new(VecModel::from(nodes))));
     ui.set_links(ModelRc::from(Rc::new(VecModel::from(links))));
@@ -1719,17 +1727,47 @@ fn sheet_left(dividers: Dividers, home: &Home) -> i32 {
     dividers.physics + edge_of(home)
 }
 
+/// Where what is inside a page begins and ends, in the working panes' own
+/// coordinates: from the Physics pane's left edge to the Gateway pane's
+/// right one. A subdiagram's edge is the margin either side of it.
+///
+/// The Physics pane inside rather than outside the edge, though it holds
+/// nothing of the subdiagram's file, because it is drawn against the
+/// payloads it joins: put past the edge, a line from a sensor to the zone
+/// it reads would cross the edge without leaving the page.
+///
+/// # Arguments
+///
+/// * `dividers` - Where the panes are.
+///
+/// # Returns
+///
+/// The left and right of the page's inside, in pixels.
+fn inside_of(dividers: Dividers) -> (i32, i32) {
+    (-dividers.physics, pane::WORKING_WIDTH)
+}
+
+/// [`inside_of`], as the drawing's arithmetic takes it.
+fn inside_f(dividers: Dividers) -> (f32, f32) {
+    let (left, right) = inside_of(dividers);
+    (left as f32, right as f32)
+}
+
 /// A subdiagram's four edge terminals, as its window draws them.
+///
+/// # Arguments
+///
+/// * `dividers` - Where the panes are, which says where the edge is: see
+///                [`inside_of`].
 ///
 /// # Returns
 ///
 /// Each terminal, where `tcsdiagram::style::edge_box` puts it.
-fn edge_views() -> Vec<EdgeView> {
-    let width = pane::WORKING_WIDTH as f32;
+fn edge_views(dividers: Dividers) -> Vec<EdgeView> {
     ["world-in", "moc-out", "world-out", "moc-in"]
         .into_iter()
         .filter_map(|terminal| {
-            let (x, y, _, _) = style::edge_box(terminal, width)?;
+            let (x, y, _, _) = style::edge_box(terminal, inside_f(dividers))?;
             Some(EdgeView {
                 terminal: terminal.into(),
                 x,
@@ -4870,10 +4908,11 @@ fn label(edit: Option<&Edit>) -> slint::SharedString {
 ///
 /// # Arguments
 ///
-/// * `editor` - The session drawn.
-/// * `home`   - The group the window shows: `None` for the top of the
-///              configuration.
-/// * `held`   - The link whose end is being dragged, which is left out.
+/// * `editor`   - The session drawn.
+/// * `home`     - The group the window shows: `None` for the top of the
+///                configuration.
+/// * `dividers` - Where the panes are, which says where the page's edge is.
+/// * `held`     - The link whose end is being dragged, which is left out.
 ///
 /// # Returns
 ///
@@ -4881,6 +4920,7 @@ fn label(edit: Option<&Edit>) -> slint::SharedString {
 fn views_of(
     editor: &Editor,
     home: &Home,
+    dividers: Dividers,
     held: Option<&Link>,
 ) -> (Vec<NodeView>, Vec<LinkView>) {
     let document = editor.document();
@@ -4927,7 +4967,7 @@ fn views_of(
     // page is drawn to a stub whose height is taken from it; and the lines
     // with an end on this one. The drawing is tcsdiagram's, which tcspecial's
     // visual window draws by too: see tcsdiagram::view::link_looks.
-    let mut sheet = on_sheet(document, home);
+    let mut sheet = on_sheet(document, home, dividers);
     let here = |name: &str| &Qualified::parse(name).in_ == home;
     // A line between two subdiagrams is drawn on the top page, between their
     // boxes, as well as on each of their pages.
@@ -4947,7 +4987,10 @@ fn views_of(
             node_type: "subdiagram",
             at: (0, 0),
             here: false,
-            drawn: tcsdiagram::view::Drawn::AtTheEdge(pane::WORKING_WIDTH),
+            drawn: {
+                let (left, right) = inside_of(dividers);
+                tcsdiagram::view::Drawn::AtTheEdge(left, right)
+            },
         });
     }
     let lines: Vec<tcsdiagram::view::LineOnSheet> = document
@@ -5055,19 +5098,17 @@ fn physics_views_of(
             terminal,
         })
         .collect();
-    // The page's nodes where the whole sheet has them: a subdiagram's page
-    // has its edge between the Physics pane and the working panes.
-    let mut sheet = on_sheet(document, home);
-    for node in &mut sheet {
-        node.at.0 += edge_of(home);
-    }
+    // Drawn from where the working panes begin on the whole sheet, the
+    // Physics pane being just left of them, inside a subdiagram's edge as on
+    // the top page.
+    let sheet = on_sheet(document, home, dividers);
     let (nodes, links) = tcsdiagram::physics::looks(
         &components,
         &connections,
         &joins,
         &sheet,
         dividers,
-        dividers.physics,
+        sheet_left(dividers, home),
     );
     (
         nodes
@@ -5161,13 +5202,19 @@ fn wire_physics(
     {
         // Carried out of the list and let go: where it was let go, on the
         // grid and inside the Physics pane, as a component dragged there
-        // would be.
+        // would be. A component's place is kept from where the working
+        // panes begin, which is left of nought, and the sheet's point is
+        // made one.
         let editor = editor.clone();
         let views = views.clone();
+        let home = home.clone();
         window.on_drop_physics(move |kind, x, y| {
             let dividers = views.borrow().divider.get();
             let at = tcsdiagram::physics::confine(
-                snap((x.round() as i32, y.round() as i32)),
+                snap((
+                    x.round() as i32 - sheet_left(dividers, &home),
+                    y.round() as i32,
+                )),
                 dividers,
             );
             add_physics(&editor, &views, &kind, Some(at));
@@ -5284,7 +5331,6 @@ fn wire_physics(
             };
             let dividers = views.borrow().divider.get();
             let shift = sheet_left(dividers, &home) as f32;
-            let edge = edge_of(&home) as f32;
             let route = drawing
                 .borrow()
                 .as_ref()
@@ -5295,8 +5341,7 @@ fn wire_physics(
                             .find(|(name, ..)| *name == end.component)?;
                     let (tx, ty) = physics::terminal_at(place.size, end.output);
                     let anchor = (
-                        (place.at.0 + tx) as f32 + physics::TERMINAL_RIGHT
-                            - edge,
+                        (place.at.0 + tx) as f32 + physics::TERMINAL_RIGHT,
                         (place.at.1 + ty) as f32 + physics::TERMINAL_MIDDLE,
                     );
                     Some(tcsdiagram::route::drawing(anchor, (x - shift, y)))
@@ -5539,7 +5584,7 @@ fn physics_joins(
     };
 
     let over = places.iter().find(|(_, _, place)| {
-        let left = (place.at.0 + dividers.physics) as f32;
+        let left = (place.at.0 + sheet_left(dividers, home)) as f32;
         let top = place.at.1 as f32;
         x >= left
             && x <= left + place.size.0 as f32
@@ -5976,8 +6021,27 @@ const PHYSICS_FAMILIES: &[(&str, &[&str])] = &[
 /// One function because two callers must agree: the canvas draws this, and the
 /// test that no line runs through a node asks about the same geometry. Two
 /// copies of it would be a test of a drawing nobody sees.
-fn ends_of(document: &Document, link: &Link, home: &Home) -> route::Ends {
-    tcsdiagram::view::ends(&on_sheet(document, home), &line_on_sheet(link))
+///
+/// # Arguments
+///
+/// * `document` - The configuration.
+/// * `link`     - The link.
+/// * `home`     - The page drawn: `None` for the top.
+/// * `dividers` - Where the panes are, which says where the page's edge is.
+///
+/// # Returns
+///
+/// The line's two ends, each with which way it points.
+fn ends_of(
+    document: &Document,
+    link: &Link,
+    home: &Home,
+    dividers: Dividers,
+) -> route::Ends {
+    tcsdiagram::view::ends(
+        &on_sheet(document, home, dividers),
+        &line_on_sheet(link),
+    )
 }
 
 /// Lists every node of the document as tcsdiagram draws it, each saying
@@ -5987,6 +6051,8 @@ fn ends_of(document: &Document, link: &Link, home: &Home) -> route::Ends {
 ///
 /// * `document` - The configuration.
 /// * `home`     - The page drawn: `None` for the top of the configuration.
+/// * `dividers` - Where the panes are, which says where a node outside a
+///                subdiagram's page is drawn: at its edge.
 ///
 /// # Returns
 ///
@@ -5994,6 +6060,7 @@ fn ends_of(document: &Document, link: &Link, home: &Home) -> route::Ends {
 fn on_sheet<'a>(
     document: &'a Document,
     home: &Home,
+    dividers: Dividers,
 ) -> Vec<tcsdiagram::view::OnSheet<'a>> {
     use tcsdiagram::view::{Drawn, OnSheet};
     document
@@ -6025,7 +6092,8 @@ fn on_sheet<'a>(
             // And seen from a subdiagram's page, a node outside it is drawn
             // at the page's own edge.
             let drawn = if home.is_some() && !here {
-                Drawn::AtTheEdge(pane::WORKING_WIDTH)
+                let (left, right) = inside_of(dividers);
+                Drawn::AtTheEdge(left, right)
             } else {
                 Drawn::Itself
             };
@@ -6683,6 +6751,7 @@ fn attached(document: &Document, at: &Drawing, sink: bool) -> Vec<Link> {
 ///
 /// * `document` - The configuration.
 /// * `home`     - The page the gesture is on: `None` for the top.
+/// * `dividers` - Where the panes are, which says where the page's edge is.
 /// * `from`     - The terminal the gesture started at, and the link it took
 ///                hold of if any.
 ///
@@ -6692,10 +6761,11 @@ fn attached(document: &Document, at: &Drawing, sink: bool) -> Vec<Link> {
 fn anchored(
     document: &Document,
     home: &Home,
+    dividers: Dividers,
     from: &Drawing,
 ) -> Option<(f32, f32)> {
     if let Some(held) = &from.holding {
-        let ends = ends_of(document, held, home);
+        let ends = ends_of(document, held, home, dividers);
         let (sink_pressed, _) =
             tcslibgs::graph::terminals::stream_of(&from.terminal)?;
         // The end that is not the one in hand.
@@ -6705,8 +6775,8 @@ fn anchored(
     // Taken from the page's own edge, which is the subdiagram's box seen
     // from inside: see `tcsdiagram::style::edge_box`.
     if home.as_deref() == Some(from.node.as_str()) {
-        let width = pane::WORKING_WIDTH as f32;
-        let (at, _) = style::edge_attachment(&from.terminal, width)?;
+        let (at, _) =
+            style::edge_attachment(&from.terminal, inside_f(dividers))?;
         return Some(at);
     }
     let node = document.node(&from.node)?;
@@ -6719,20 +6789,25 @@ fn anchored(
 ///
 /// # Arguments
 ///
-/// * `home`   - The page: none for the top page, which has no edge.
-/// * `(x, y)` - The point, in the working panes' own coordinates, which are
-///              below nought in the left margin.
+/// * `home`     - The page: none for the top page, which has no edge.
+/// * `dividers` - Where the panes are, which says where the edge is.
+/// * `(x, y)`   - The point, in the working panes' own coordinates, which
+///                are left of the Physics pane in the left margin.
 ///
 /// # Returns
 ///
 /// The terminal's name.
-fn edge_under(home: &Home, (x, y): (f32, f32)) -> Option<&'static str> {
+fn edge_under(
+    home: &Home,
+    dividers: Dividers,
+    (x, y): (f32, f32),
+) -> Option<&'static str> {
     home.as_ref()?;
-    let width = pane::WORKING_WIDTH as f32;
     ["world-in", "world-out", "moc-in", "moc-out"]
         .into_iter()
         .find(|terminal| {
-            style::edge_box(terminal, width).is_some_and(|(l, t, w, h)| {
+            let inside = inside_f(dividers);
+            style::edge_box(terminal, inside).is_some_and(|(l, t, w, h)| {
                 x >= l && x <= l + w && y >= t && y <= t + h
             })
         })
@@ -8618,7 +8693,7 @@ mod tests {
         // On the canvas, in the vehicle pane -- which is where a type nothing
         // knows goes, because the two other panes mean something about what a
         // node is and this says nothing.
-        let (nodes, _) = views_of(&editor, &None, None);
+        let (nodes, _) = views_of(&editor, &None, dividers(), None);
         let drawn = nodes
             .iter()
             .find(|view| view.name == "odd")
@@ -9594,7 +9669,7 @@ mod tests {
                 });
             }
         }
-        let (nodes, _) = views_of(&editor, &None, None);
+        let (nodes, _) = views_of(&editor, &None, dividers(), None);
         let said: BTreeMap<String, String> = nodes
             .iter()
             .map(|n| (n.name.to_string(), n.type_line.to_string()))
@@ -9603,6 +9678,39 @@ mod tests {
         assert_eq!(said["thermostat"], "thermostat");
         assert_eq!(said["unsure"], "compute");
         assert_eq!(said["housekeeping"], "log");
+    }
+
+    /// On a subdiagram's page the left margin, its terminals and the lines
+    /// that cross it are left of the Physics pane, which is inside the page
+    /// beside the payloads it joins; the right margin is past the gateway.
+    #[test]
+    fn a_pages_edge_is_outside_its_physics_pane() {
+        let dividers = dividers();
+        let physics_left = -dividers.physics as f32;
+        let left: Vec<EdgeView> = edge_views(dividers)
+            .into_iter()
+            .filter(|edge| edge.x < 0.0)
+            .collect();
+        assert_eq!(left.len(), 2, "world-in and moc-out are on the left");
+        for edge in &left {
+            assert!(
+                edge.x + style::TERMINAL.0 as f32 <= physics_left,
+                "{} is in the left margin, past the Physics pane",
+                edge.terminal
+            );
+            // And found there by a click.
+            let sub = Some("zone".to_string());
+            let middle = (edge.x + 4.0, edge.y + 4.0);
+            assert_eq!(
+                edge_under(&sub, dividers, middle),
+                Some(edge.terminal.as_str()),
+            );
+        }
+        // A line from outside is drawn to the margin's inner side, which is
+        // the Physics pane's left edge.
+        let (at, _) =
+            style::edge_attachment("world-in", inside_f(dividers)).unwrap();
+        assert_eq!(at.0, physics_left);
     }
 
     /// A type the build does not know is drawn, marked, and not crashed on.
@@ -9886,12 +9994,13 @@ mod tests {
             home: Some("zone".into()),
         });
 
-        let (top, _) = views_of(&editor, &None, None);
+        let (top, _) = views_of(&editor, &None, dividers(), None);
         let names: Vec<String> =
             top.iter().map(|n| n.name.to_string()).collect();
         assert_eq!(names, vec!["zone".to_string(), "gateway".to_string()]);
 
-        let (inside, _) = views_of(&editor, &Some("zone".into()), None);
+        let (inside, _) =
+            views_of(&editor, &Some("zone".into()), dividers(), None);
         let names: Vec<String> =
             inside.iter().map(|n| n.name.to_string()).collect();
         assert_eq!(names, vec!["temp_1".to_string()]);
@@ -9936,21 +10045,25 @@ mod tests {
         });
 
         // Seen from inside the subdiagram: one link, named for where it goes.
-        let (_, inside) = views_of(&editor, &Some("zone".into()), None);
+        let (_, inside) =
+            views_of(&editor, &Some("zone".into()), dividers(), None);
         assert_eq!(inside.len(), 1);
         assert_eq!(inside[0].label, "gateway");
 
         // And seen from the top diagram, where its source is behind the
         // box: drawn from the box's world-out, and named by its own name,
         // the box already saying which file it is in.
-        let (_, top) = views_of(&editor, &None, None);
+        let (_, top) = views_of(&editor, &None, dividers(), None);
         assert_eq!(top.len(), 1);
         assert_eq!(top[0].label, "temp_1");
         let link = &editor.document().links[0];
         let at = editor.document().node("zone").expect("the box").at;
         let ((x, y), _) =
             style::attachment("subdiagram", at, "world-out").expect("it");
-        assert_eq!(ends_of(editor.document(), link, &None).from, (x, y));
+        assert_eq!(
+            ends_of(editor.document(), link, &None, dividers()).from,
+            (x, y)
+        );
     }
 
     /// A name is the type, a hyphen and the first free number, and it is
@@ -10063,7 +10176,7 @@ mod tests {
             editor.edit(edit);
         }
 
-        let (_, links) = views_of(&editor, &None, None);
+        let (_, links) = views_of(&editor, &None, dividers(), None);
         assert_eq!(links.len(), 1);
         let view = &links[0];
 
@@ -10973,7 +11086,7 @@ mod tests {
         // And the line is drawn to that corner: the upper left, where what
         // the ground sends arrives.
         document.apply(&Edit::AddLink { link });
-        let ends = ends_of(&document, &document.links[0], &None);
+        let ends = ends_of(&document, &document.links[0], &None, dividers());
         let ((x, y), _) = style::attachment("compute", (300, 120), "moc-in")
             .expect("a terminal");
         assert_eq!(
@@ -11035,7 +11148,7 @@ mod tests {
             link: Link::joining("ground", Some("moc-out"), "through", None),
         });
 
-        let ends = ends_of(&document, &document.links[0], &None);
+        let ends = ends_of(&document, &document.links[0], &None, dividers());
         let ((x, y), _) =
             style::attachment("app_all_veh", (300, 120), "moc-in")
                 .expect("the sink");
@@ -12048,7 +12161,7 @@ mod tests {
             for link in &document.links {
                 // The same ends the canvas draws, which is the point of
                 // asking here: see ends_of.
-                let ends = ends_of(document, link, &None);
+                let ends = ends_of(document, link, &None, dividers());
                 let through = route::runs_through(ends, &obstacles);
                 assert_eq!(
                     through, 0,
@@ -12332,7 +12445,12 @@ mod tests {
             .expect("the component has a place");
         assert_eq!(
             world.placed.get(&name).copied(),
-            Some(tcsdiagram::physics::confine(snap(into), dividers())),
+            // Kept from where the working panes begin, which the Physics
+            // pane is left of: the sheet's point less its width.
+            Some(tcsdiagram::physics::confine(
+                snap((into.0 - dividers().physics, into.1)),
+                dividers()
+            )),
             "{name} is where it was let go"
         );
         editor.borrow_mut().undo();

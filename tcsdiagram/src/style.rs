@@ -1125,20 +1125,26 @@ const EDGE_ROW: u32 = TERMINAL.1 + 18;
 /// # Arguments
 ///
 /// * `terminal` - The terminal's name.
-/// * `width`    - How wide the working panes are: the right margin begins
-///                there, and the left one ends at nought.
+/// * `inside`   - Where what is inside the page begins and ends, in the
+///                working panes' own coordinates: the left margin ends at
+///                the first and the right one begins at the second. The
+///                Physics pane is inside -- it is the page's, left of the
+///                payloads -- so the first is below nought by its width.
 ///
 /// # Returns
 ///
 /// The box's left, top, width and height, in the working panes' own
-/// coordinates, the left margin's being below nought; `None` for a name that
-/// is not one of the four.
-pub fn edge_box(terminal: &str, width: f32) -> Option<(f32, f32, f32, f32)> {
+/// coordinates, the left margin's being left of `inside.0`; `None` for a
+/// name that is not one of the four.
+pub fn edge_box(
+    terminal: &str,
+    inside: (f32, f32),
+) -> Option<(f32, f32, f32, f32)> {
     let corner = corner_of(terminal)?;
     let x = if corner.left {
-        -((EDGE_GAP + TERMINAL.0) as f32)
+        inside.0 - (EDGE_GAP + TERMINAL.0) as f32
     } else {
-        width + EDGE_GAP as f32
+        inside.1 + EDGE_GAP as f32
     };
     let row = if corner.top { 0 } else { EDGE_ROW };
     Some((
@@ -1159,7 +1165,8 @@ pub fn edge_box(terminal: &str, width: f32) -> Option<(f32, f32, f32, f32)> {
 /// # Arguments
 ///
 /// * `terminal` - The terminal's name.
-/// * `width`    - How wide the working panes are.
+/// * `inside`   - Where what is inside the page begins and ends: see
+///                [`edge_box`].
 ///
 /// # Returns
 ///
@@ -1167,11 +1174,11 @@ pub fn edge_box(terminal: &str, width: f32) -> Option<(f32, f32, f32, f32)> {
 /// that is not one of the four.
 pub fn edge_attachment(
     terminal: &str,
-    width: f32,
+    inside: (f32, f32),
 ) -> Option<((f32, f32), bool)> {
     let corner = corner_of(terminal)?;
-    let (_, y, _, height) = edge_box(terminal, width)?;
-    let x = if corner.left { 0.0 } else { width };
+    let (_, y, _, height) = edge_box(terminal, inside)?;
+    let x = if corner.left { inside.0 } else { inside.1 };
     Some(((x, y + height / 2.0), corner.rightward))
 }
 
@@ -2219,15 +2226,20 @@ mod tests {
     /// working panes' own edge: never in the margin, never below nought.
     #[test]
     fn the_edge_is_the_box_seen_from_inside() {
-        let width = 960.0;
+        // The Physics pane, 200 wide, left of nought and inside the page.
+        let (left, width) = (-200.0, 960.0);
         for terminal in ["world-in", "world-out", "moc-in", "moc-out"] {
             let corner = corner_of(terminal).expect("a corner");
-            let (x, y, w, _) = edge_box(terminal, width).expect("a box");
+            let (x, y, w, _) =
+                edge_box(terminal, (left, width)).expect("a box");
             let ((ax, ay), rightward) =
-                edge_attachment(terminal, width).expect("a point");
+                edge_attachment(terminal, (left, width)).expect("a point");
             if corner.left {
-                assert!(x >= -(EDGE as f32) && x + w <= 0.0, "{terminal}");
-                assert_eq!(ax, 0.0, "{terminal}");
+                assert!(
+                    x >= left - EDGE as f32 && x + w <= left,
+                    "{terminal}: in the margin left of the Physics pane"
+                );
+                assert_eq!(ax, left, "{terminal}");
             } else {
                 assert!(x >= width && x + w <= width + EDGE as f32);
                 assert_eq!(ax, width, "{terminal}");
@@ -2235,10 +2247,10 @@ mod tests {
             assert!(ay > y, "{terminal}: joined halfway down its box");
             assert_eq!(rightward, corner.rightward, "{terminal}");
         }
-        let (_, readings, _, _) = edge_box("world-in", width).unwrap();
-        let (_, commands, _, _) = edge_box("moc-out", width).unwrap();
+        let (_, readings, _, _) = edge_box("world-in", (left, width)).unwrap();
+        let (_, commands, _, _) = edge_box("moc-out", (left, width)).unwrap();
         assert!(readings < commands, "the readings' row is above");
-        assert_eq!(edge_box("nowhere", width), None);
+        assert_eq!(edge_box("nowhere", (left, width)), None);
     }
 
     /// Every outline is a polygon, stays inside its own box, and holds the

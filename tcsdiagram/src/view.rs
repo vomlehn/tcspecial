@@ -317,9 +317,9 @@ pub enum Drawn {
     /// and `node_type` here.
     AtItsBox,
     /// At the edge of the subdiagram's page being drawn, being outside it:
-    /// the terminal facing the node's own, in the margin past the working
-    /// panes, which are this wide. See [`style::edge_box`].
-    AtTheEdge(i32),
+    /// the terminal facing the node's own, in the margin past what is inside
+    /// the page, which begins and ends here. See [`style::edge_box`].
+    AtTheEdge(i32, i32),
 }
 
 /// One line between two nodes, as a drawing needs it.
@@ -434,19 +434,21 @@ pub fn ends(nodes: &[OnSheet], line: &LineOnSheet) -> route::Ends {
     // edge terminal facing its own, a `world-out` outside being a
     // `world-in` at the edge.
     let at_the_edge = |node: &OnSheet, own: Option<&str>| {
-        let Drawn::AtTheEdge(width) = node.drawn else {
+        let Drawn::AtTheEdge(left, right) = node.drawn else {
             return None;
         };
         let facing = tcslibgs::graph::terminals::answers(own?)?;
-        style::edge_attachment(facing, width as f32)
+        style::edge_attachment(facing, (left as f32, right as f32))
     };
 
     let ((x1, y1), leaves_right) = match from {
-        Some(node) if matches!(node.drawn, Drawn::AtTheEdge(_)) => at_the_edge(
-            node,
-            style::terminal_for(node.node_type, line.origin, false),
-        )
-        .unwrap_or(((0.0, 24.0), true)),
+        Some(node) if matches!(node.drawn, Drawn::AtTheEdge(..)) => {
+            at_the_edge(
+                node,
+                style::terminal_for(node.node_type, line.origin, false),
+            )
+            .unwrap_or(((0.0, 24.0), true))
+        }
         Some(node) if node.here => joined(node, line.origin, false)
             .unwrap_or_else(|| {
                 // A type this build does not know, drawn as a node with no
@@ -468,7 +470,7 @@ pub fn ends(nodes: &[OnSheet], line: &LineOnSheet) -> route::Ends {
         ),
     };
     let ((x2, y2), arrives_right) = match to {
-        Some(node) if matches!(node.drawn, Drawn::AtTheEdge(_)) => {
+        Some(node) if matches!(node.drawn, Drawn::AtTheEdge(..)) => {
             // The terminal the line arrives at outside, which is the one
             // that pairs with where it leaves.
             let arrives = pairing(from, line.origin);
@@ -701,7 +703,7 @@ mod tests {
                 node_type: "i2c",
                 at: (40, 80),
                 here: false,
-                drawn: Drawn::AtTheEdge(960),
+                drawn: Drawn::AtTheEdge(-200, 960),
             },
             OnSheet {
                 name: "zone/temp1".into(),
@@ -711,7 +713,8 @@ mod tests {
                 drawn: Drawn::Itself,
             },
         ];
-        let (at, _) = style::edge_attachment("world-in", 960.0).unwrap();
+        let (at, _) =
+            style::edge_attachment("world-in", (-200.0, 960.0)).unwrap();
         assert_eq!(ends(&inside, &line).from, at);
         assert_eq!(link_looks(&inside, &[line])[0].label, "temp_1");
     }

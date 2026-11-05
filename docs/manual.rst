@@ -3534,7 +3534,10 @@ Where tcsgui drew each component is kept last in the simulator file, in a
 
 tcssim ignores it. A component it does not name is laid out down tcsgui's
 Physics pane by name, so the section is never needed, and it is written as
-components are moved there. In tcsgui a component is moved, edited, deleted
+components are moved there. A component is placed from the physics list
+as a node is from its own list: click its type, and it is put down the
+pane where the others are, or drag the type onto the Physics pane, and it
+is put where it is let go. In tcsgui a component is moved, edited, deleted
 and joined as a node is: drag it, press it for Edit and Delete, and draw a
 line from its output or input terminal to another component, for a
 connection, or to a payload, to set that payload's ``connects``. Where a line

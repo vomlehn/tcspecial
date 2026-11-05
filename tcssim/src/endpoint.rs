@@ -176,9 +176,13 @@ pub fn payload_config_attached(
             // simulator fills it; see node::payload::i2c. The bus the handler
             // was told to open is made to lead to the stub, as a line's path is
             // made to lead to a pty.
-            (EndpointConfig::I2c(i2c), None) => {
-                (PayloadProtocol::I2c, i2c.bus.clone(), 0, i2c.address)
-            }
+            //
+            // And a sensor on a thermal mass with no stand_in is stood in for
+            // as the device on the bus it is: see node::payload::i2c_tmass.
+            (
+                EndpointConfig::I2c(i2c) | EndpointConfig::I2cTmass(i2c),
+                None,
+            ) => (PayloadProtocol::I2c, i2c.bus.clone(), 0, i2c.address),
             // A peripheral the simulator can carry the bytes of, though not be:
             // nothing emulates one, a peripheral being a thing a controller
             // clocks, so what stands in is a pty as for a serial line. The
@@ -189,9 +193,13 @@ pub fn payload_config_attached(
             // Nothing of the terms comes this way, for the same reason a line's
             // do not: what the handler sets is between the handler and the
             // kernel, and a pty has nowhere to put it.
-            (EndpointConfig::Spi(spi), None) => {
-                (PayloadProtocol::Spi, spi.path.clone(), 0, 0)
-            }
+            //
+            // And as for a sensor on an I2C bus, so for one on a SPI bus: see
+            // node::payload::spi_tmass.
+            (
+                EndpointConfig::Spi(spi) | EndpointConfig::SpiTmass(spi),
+                None,
+            ) => (PayloadProtocol::Spi, spi.path.clone(), 0, 0),
         };
 
     let packet_size = u32::try_from(dh.packet_size).map_err(|_| {
@@ -295,6 +303,14 @@ pub fn endpoint_description(endpoint: &EndpointConfig) -> String {
             format!("I2C {} at {:#04X}", i2c.bus, i2c.address)
         }
         EndpointConfig::Spi(spi) => format!("SPI {} {}", spi.path, spi.mode),
+        // The sensors on a thermal mass say what they are, and then where.
+        EndpointConfig::I2cTmass(i2c) => format!(
+            "I2C temperature sensor {} at {:#04X}",
+            i2c.bus, i2c.address
+        ),
+        EndpointConfig::SpiTmass(spi) => {
+            format!("SPI temperature sensor {} {}", spi.path, spi.mode)
+        }
         EndpointConfig::Can(can) => {
             format!("CAN {} id {:#x}", can.interface, can.can_id)
         }

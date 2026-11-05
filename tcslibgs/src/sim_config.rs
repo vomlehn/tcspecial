@@ -652,6 +652,11 @@ pub fn simulable(dh: &DHConfig) -> Result<(), String> {
             EndpointConfig::I2c(_) => {
                 Some("a bus, where the master's own read is the trigger")
             }
+            // A sensor on a thermal mass is one too, unless it is reached at
+            // its stand_in, where the simulator hears what it is sent.
+            EndpointConfig::I2cTmass(_) if dh.stand_in.is_none() => {
+                Some("a bus, where the master's own read is the trigger")
+            }
             _ => None,
         };
         if let Some(cannot) = cannot {

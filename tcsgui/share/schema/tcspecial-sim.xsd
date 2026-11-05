@@ -26,6 +26,8 @@
       <xs:enumeration value="serial"/>
       <xs:enumeration value="i2c"/>
       <xs:enumeration value="spi"/>
+      <xs:enumeration value="i2c_tmass"/>
+      <xs:enumeration value="spi_tmass"/>
       <xs:enumeration value="can"/>
       <xs:enumeration value="iio"/>
       <xs:enumeration value="rpmsg"/>

@@ -332,7 +332,7 @@ fn endpoint_parameters(out: &mut String, endpoint: &EndpointConfig) {
                 if can.loopback { "yes" } else { "no" }
             );
         }
-        EndpointConfig::I2c(i2c) => {
+        EndpointConfig::I2c(i2c) | EndpointConfig::I2cTmass(i2c) => {
             let _ = writeln!(out, "  bus              {}", i2c.bus);
             let _ = writeln!(out, "  address          {:#04X}", i2c.address);
             let _ = writeln!(
@@ -346,7 +346,7 @@ fn endpoint_parameters(out: &mut String, endpoint: &EndpointConfig) {
                 if i2c.pec { "yes" } else { "no" }
             );
         }
-        EndpointConfig::Spi(spi) => {
+        EndpointConfig::Spi(spi) | EndpointConfig::SpiTmass(spi) => {
             let _ = writeln!(out, "  path             {}", spi.path);
             let _ = writeln!(out, "  max_speed        {} Hz", spi.max_speed);
             let _ = writeln!(out, "  mode             {}", spi.mode);

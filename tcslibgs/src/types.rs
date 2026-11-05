@@ -227,6 +227,13 @@ pub enum DHType {
     I2c,
     /// A handler whose payload is a SPI peripheral.
     Spi,
+    /// A handler whose payload is a temperature sensor on an I2C bus, fixed
+    /// to a thermal mass: an `i2c` device that a run with stand-ins may reach
+    /// over UDP instead. See [`crate::node::payload::i2c_tmass`].
+    I2cTmass,
+    /// And one that is a SPI peripheral: see
+    /// [`crate::node::payload::spi_tmass`].
+    SpiTmass,
     /// A handler whose payload is on a CAN bus.
     ///
     /// See [`crate::node::payload::can`].
@@ -399,12 +406,14 @@ impl DHType {
     /// Every kind, in the order [`DHType::spellings`] lists them: the
     /// interfaces a payload node may be reached over, and the kinds a
     /// simulator file may stand in for.
-    pub const ALL: [DHType; 10] = [
+    pub const ALL: [DHType; 12] = [
         DHType::Network,
         DHType::Device,
         DHType::Serial,
         DHType::I2c,
         DHType::Spi,
+        DHType::I2cTmass,
+        DHType::SpiTmass,
         DHType::Can,
         DHType::Iio,
         DHType::Rpmsg,
@@ -429,6 +438,8 @@ impl DHType {
             DHType::Serial => "serial",
             DHType::I2c => "i2c",
             DHType::Spi => "spi",
+            DHType::I2cTmass => "i2c_tmass",
+            DHType::SpiTmass => "spi_tmass",
             DHType::Can => "can",
             DHType::Iio => "iio",
             DHType::Rpmsg => "rpmsg",
@@ -448,6 +459,26 @@ impl DHType {
         DHType::ALL.into_iter().find(|kind| kind.spelling() == text)
     }
 
+    /// The kind this one is reached as: its own, but for a kind that is
+    /// another kind's device under a name of its own -- an `i2c_tmass` is
+    /// reached as an `i2c` device is, and a `spi_tmass` as a `spi`
+    /// peripheral. See [`crate::node::payload::i2c_tmass`].
+    ///
+    /// The one place that says so, so that locating, opening, judging and
+    /// checking a node ask the same question and a rule written for `i2c` is
+    /// the sensor's too.
+    ///
+    /// # Returns
+    ///
+    /// The kind whose rules this one is held to.
+    pub fn reached_as(self) -> DHType {
+        match self {
+            DHType::I2cTmass => DHType::I2c,
+            DHType::SpiTmass => DHType::Spi,
+            other => other,
+        }
+    }
+
     /// "a" or "an", for a sentence naming this kind.
     ///
     /// `i2c` is the reason this exists: "a i2c payload" is not a thing anyone
@@ -455,17 +486,18 @@ impl DHType {
     ///
     /// # Returns
     ///
-    /// "an" for `i2c` and `iio`, "a" for every other kind.
+    /// "an" for `i2c`, `i2c_tmass` and `iio`, "a" for every other kind.
     pub fn article(&self) -> &'static str {
         match self {
-            DHType::I2c | DHType::Iio => "an",
+            DHType::I2c | DHType::I2cTmass | DHType::Iio => "an",
             _ => "a",
         }
     }
 
     /// Every kind, as a file would write them, for an error to list.
     pub fn spellings() -> String {
-        "network, device-file, serial, i2c, spi, can, iio, rpmsg, gpio, or hdlc"
+        "network, device-file, serial, i2c, spi, i2c_tmass, spi_tmass, can, \
+         iio, rpmsg, gpio, or hdlc"
             .to_string()
     }
 
@@ -1233,6 +1265,11 @@ pub enum EndpointConfig {
     Serial(SerialConfig),
     I2c(I2cConfig),
     Spi(SpiConfig),
+    /// A temperature sensor on an I2C bus, reached as an `i2c` device is:
+    /// the same configuration, a kind of its own. See [`DHType::I2cTmass`].
+    I2cTmass(I2cConfig),
+    /// And one that is a SPI peripheral. See [`DHType::SpiTmass`].
+    SpiTmass(SpiConfig),
     /// See [`CanConfig`].
     Can(CanConfig),
     /// Experimental; see [`IioConfig`].
@@ -1246,6 +1283,30 @@ pub enum EndpointConfig {
 }
 
 impl EndpointConfig {
+    /// This endpoint, as the endpoint of `kind`: an `i2c` device's as an
+    /// `i2c_tmass` sensor's, where `kind` is reached as its kind is. See
+    /// [`DHType::reached_as`].
+    ///
+    /// # Arguments
+    ///
+    /// * `kind` - The kind the node is.
+    ///
+    /// # Returns
+    ///
+    /// The endpoint, of that kind where it is reached as this one is, and
+    /// as it was otherwise.
+    pub fn as_kind(self, kind: DHType) -> EndpointConfig {
+        match (kind, self) {
+            (DHType::I2cTmass, EndpointConfig::I2c(at)) => {
+                EndpointConfig::I2cTmass(at)
+            }
+            (DHType::SpiTmass, EndpointConfig::Spi(at)) => {
+                EndpointConfig::SpiTmass(at)
+            }
+            (_, endpoint) => endpoint,
+        }
+    }
+
     /// Which kind of data handler this endpoint makes.
     ///
     /// The one mapping from an endpoint to a kind, so that the ground asking
@@ -1263,6 +1324,8 @@ impl EndpointConfig {
             EndpointConfig::Serial(_) => DHType::Serial,
             EndpointConfig::I2c(_) => DHType::I2c,
             EndpointConfig::Spi(_) => DHType::Spi,
+            EndpointConfig::I2cTmass(_) => DHType::I2cTmass,
+            EndpointConfig::SpiTmass(_) => DHType::SpiTmass,
             EndpointConfig::Can(_) => DHType::Can,
             EndpointConfig::Iio(_) => DHType::Iio,
             EndpointConfig::Rpmsg(_) => DHType::Rpmsg,
@@ -1446,6 +1509,12 @@ pub(crate) fn kind_of_terms(
         }
         DHType::I2c => crate::node::payload::i2c::group_kind_of(name, wire),
         DHType::Spi => crate::node::payload::spi::group_kind_of(name, wire),
+        DHType::I2cTmass => {
+            crate::node::payload::i2c_tmass::group_kind_of(name, wire)
+        }
+        DHType::SpiTmass => {
+            crate::node::payload::spi_tmass::group_kind_of(name, wire)
+        }
         DHType::Can => crate::node::payload::can::group_kind_of(name, wire),
         DHType::Iio => crate::node::payload::iio::group_kind_of(name, wire),
         DHType::Rpmsg => crate::node::payload::rpmsg::group_kind_of(name, wire),

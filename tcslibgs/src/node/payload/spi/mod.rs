@@ -247,9 +247,33 @@ pub(crate) fn group_kind_of(
     name: &str,
     g: LinkTerms,
 ) -> EndpointConfigResult<GroupKind> {
+    group_kind_named(name, "spi", g)
+}
+
+/// Settles a SPI bus's terms for a type that is reached as `spi` is, naming
+/// that type in a complaint: see [`super::spi_tmass`].
+///
+/// # Arguments
+///
+/// * `name`      - The group's name, for the messages.
+/// * `node_type` - The type the file wrote, for the messages.
+/// * `g`         - The group's terms as the file states them.
+///
+/// # Returns
+///
+/// The bus's terms, as [`group_kind_of`] gives them.
+///
+/// # Errors
+///
+/// What [`group_kind_of`] refuses.
+pub(crate) fn group_kind_named(
+    name: &str,
+    node_type: &'static str,
+    g: LinkTerms,
+) -> EndpointConfigResult<GroupKind> {
     reject_foreign_fields(
         name,
-        "spi",
+        node_type,
         &g,
         &[
             "max_speed",
@@ -259,9 +283,10 @@ pub(crate) fn group_kind_of(
             "cs_active",
         ],
     )?;
-    reject_stream(name, "spi", g.stream.is_some())?;
+    reject_stream(name, node_type, g.stream.is_some())?;
 
-    let max_speed = require(name, "spi", "max_speed", g.max_speed.as_ref())?;
+    let max_speed =
+        require(name, node_type, "max_speed", g.max_speed.as_ref())?;
     let max_speed = parse_u32(name, "max_speed", max_speed)?;
     if max_speed == 0 {
         return Err(bad(name, "max_speed must be greater than zero"));
@@ -270,7 +295,7 @@ pub(crate) fn group_kind_of(
     // Required: no controller default is right for every peripheral,
     // and a mismatched mode fails the way a mismatched data rate
     // fails on a serial line.
-    let mode = require(name, "spi", "spi_mode", g.spi_mode.as_ref())?;
+    let mode = require(name, node_type, "spi_mode", g.spi_mode.as_ref())?;
     let mode = parse_spi_mode(name, mode)?;
 
     let bits_per_word = match g.bits_per_word.as_ref() {

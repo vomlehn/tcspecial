@@ -462,7 +462,7 @@ with it aboard and on the ground.
 
 | Directory | Description |
 |---|---|
-| `thermostat` | Three temperature sensors, converted to kelvin, voted on, and fed to a hysteresis thermostat that drives two heaters, every one a UDP socket tcssim stands in for, so that it runs on any desk. The setpoint is commanded from the ground, and tcsmoc plots the temperatures and the heaters. |
+| `thermostat` | Three temperature sensors on a thermal mass, two on I2C and one on SPI, converted to kelvin, voted on, and fed to a hysteresis thermostat that drives two heaters, every one stood in for by tcssim, so that it runs on any desk. The setpoint is commanded from the ground, and tcsmoc plots the temperatures and the heaters. |
 | `thermostat-yamcs` | The thermostat, with Yamcs as its ground station, over CCSDS packets: the zone's temperature and the three readings arrive in Yamcs as temperatures in kelvin, and the thermostat's decision as on or off, each a parameter the configuration types, and a Python 3 program shows them. |
 | `battery` | A power bus through an orbit: a power monitor asked over a serial line, a shunt, the battery's charge counted by a Python 3 program, and the science load shed in eclipse by a hysteresis. tcssim stands in for every payload, joined to a physics model of a sun, a solar array, loads, a bus and a battery. |
 | `descent` | A lander's terminal descent: a radar altimeter's altitude flown down by a Python 3 guidance program throttling the engine, a Doppler velocimeter, and a touchdown switch that speaks the moment the lander is down. tcssim stands in for every payload, joined to a physics model of an engine and the body it brakes. |
@@ -485,14 +485,16 @@ rather than what they were told. The ground commands the setpoint, and
 `housekeeping` logs the readings, the decisions and the lines in
 `/tmp/telemetry`.
 
-The sensors are the far end of UDP sockets on this host, ports 5201 to 5203,
-which tcssim stands in for. The heaters' switches and the lines sensing them
+The sensors are temperature sensors on the zone: `temp_1` and `temp_2` on an
+I2C bus, of type `i2c_tmass`, and `temp_3` a SPI peripheral, of type
+`spi_tmass`. On a desk each is reached over UDP at its `stand_in` on this
+host, ports 5201 to 5203, where tcssim answers with the zone's temperature;
+flown, the buses are opened. The heaters' switches and the lines sensing them
 are lines 2 to 5 of the kernel's simulated GPIO chip, `/dev/gpiochip1`, which
 tcssim moves and watches: make it once with `sudo bin/mk-kernel-stand-ins
 gpio` (see "Payloads the kernel stands in for", below). The gpio example has
-lines 0 and 1 of it, so the two run at once. Aboard the sensors would be on
-I2C and SPI, as `tests/manual/thermostat.ytcs` has them; those buses are
-flown against stand-ins by `make stand-ins-test`.
+lines 0 and 1 of it, so the two run at once. The buses themselves are flown
+against stand-ins by `make stand-ins-test`, with `tests/manual/thermostat.ytcs`.
 
 tcssim joins the stand-ins to the vehicle's physics model, in the world
 section of `thermostat-sim.yaml`, a link to

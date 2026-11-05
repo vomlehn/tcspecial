@@ -43,6 +43,15 @@ export struct ProblemRow {
     action: string,
 }
 
+// One thing a line in hand can be made into at the node it was taken to,
+// as the menu there offers it: what choosing it does, and whether it can be
+// chosen. One that cannot is shown greyed and says why in its words, so the
+// grey is never the only thing that says so.
+export struct JoinOffer {
+    said: string,
+    open: bool,
+}
+
 // One row of the palette: a family's heading, or a type to place.
 //
 // Headings in the list rather than a nested model: Slint's `for` takes one
@@ -499,30 +508,60 @@ component Surface inherits Rectangle {
     callback physics-delete(string);
     // A component dragged by this much, by its name, as node-moved is.
     callback physics-moved(string, length, length);
-    // A line drawn from a component's terminal -- `moc-out` for its one
-    // output, `world-in` for its one input -- followed while the hand
-    // moves and let go of on the canvas, as link-started, link-moved and
-    // link-finished are for a configuration's node.
+    // A line taken from a component's terminal -- `moc-out` for its one
+    // output, `world-in` for its one input -- followed while the hand moves
+    // and clicked down on the canvas, as link-started, link-moved and
+    // link-clicked are for a configuration's node; in the coordinates of the
+    // whole canvas, whose nought is the Physics pane's left edge.
     callback physics-link-started(string, string);
     callback physics-link-moved(length, length);
-    callback physics-link-finished(length, length);
-    // What a line just drawn could mean, where it could mean more than one
-    // thing: each a terminal or a pair, as words, offered at the place it
-    // was let go of, in the coordinates of the whole canvas. Empty when
-    // nothing is being asked.
-    in property <[string]> physics-choices: [];
-    in property <length> physics-choice-x: 0px;
-    in property <length> physics-choice-y: 0px;
-    // Which was chosen, by its place in the list; -1 for none.
+    callback physics-link-clicked(length, length);
+    // Which of join-offers was chosen, by its place in the list.
     callback physics-chosen(int);
+    // The line put down with nothing made of it.
+    callback physics-link-stopped();
     callback open-subdiagram(string);
     // Write every file of the configuration now.
     callback save-clicked();
-    // Drawing a link: pressed on one node, released on another.
+    // Drawing a link, in three clicks: a terminal, which takes a line in
+    // hand; a node, which offers what the line can be made into there; and
+    // one of those offers. See join-offers.
     callback link-started(string, string);
-    callback link-finished(length, length);
-    // Where the pointer is while a line is being drawn. See drawing-route.
+    callback link-clicked(length, length);
+    // Which of join-offers was chosen, by its place in the list.
+    callback link-chosen(int);
+    // The line put down with nothing made of it: Escape, a right click, a
+    // click on bare sheet, or Cancel.
+    callback link-stopped();
+    // The line in hand, which was picked up off a terminal, taken out: the
+    // Delete key.
+    callback link-removed();
+    // Where the pointer is while a line is in hand. See drawing-route.
     callback link-moved(length, length);
+    // Which kind of line is in hand: "node" for one from a configuration's
+    // node, "physics" for one from a physics component, and empty for none.
+    // While there is one, a click anywhere on the sheet is about the line --
+    // see the TouchArea that takes them -- and not about what is under it.
+    in property <string> joining: "";
+    // What the window says about the line in hand: what to click next, and
+    // how to put it down.
+    in property <string> join-hint: "";
+    // What can be made of the line at the node just clicked, and that node's
+    // name, which heads the menu. Empty when nothing is being asked.
+    in property <[JoinOffer]> join-offers: [];
+    in property <string> join-heading: "";
+    // Where the menu is shown: where the node was clicked, in the
+    // coordinates of the whole canvas.
+    property <length> join-x: 0px;
+    property <length> join-y: 0px;
+    // The line put down, whichever kind it is.
+    function stop-joining() {
+        if (root.joining == "physics") {
+            root.physics-link-stopped();
+        } else {
+            root.link-stopped();
+        }
+    }
     callback node-selected(string);
     // What a node's own menu asks for: see NodeShape's menu.
     callback node-edit(string);
@@ -885,7 +924,6 @@ component Surface inherits Rectangle {
                         link-from(terminal) => {
                             link-started(n.name, terminal);
                         }
-                        link-dropped(x, y) => { link-finished(x, y); }
                         link-dragging(x, y) => { link-moved(x, y); }
                         chosen => { node-selected(n.name); }
                         edit-requested => { node-edit(n.name); }
@@ -911,21 +949,74 @@ component Surface inherits Rectangle {
                             link-dragging(x, y) => {
                                 root.physics-link-moved(x, y);
                             }
-                            link-dropped(x, y) => {
-                                root.physics-link-finished(x, y);
+                        }
+
+                        // While a line is in hand, every click on the sheet
+                        // is about the line: on a node, what the line can be
+                        // made into there; on bare sheet, putting it down.
+                        // Over everything else on the sheet, so that a click
+                        // on a node asks about the line rather than opening
+                        // the node's own menu or starting a drag of it.
+                        //
+                        // Clicks rather than a drag held down from the
+                        // terminal to the node, because a click leaves the
+                        // hand free between the two: to scroll to a node out
+                        // of view, and to rest, which a long drag across a
+                        // tall sheet does not.
+                        if root.joining != "": TouchArea {
+                            width: 100%;
+                            height: 100%;
+                            mouse-cursor: MouseCursor.crosshair;
+                            pointer-event(event) => {
+                                // The line follows the pointer, and stays
+                                // where it was clicked while that node's menu
+                                // is asked.
+                                if (event.kind == PointerEventKind.move
+                                    && root.join-offers.length == 0) {
+                                    if (root.joining == "physics") {
+                                        root.physics-link-moved(
+                                            self.mouse-x, self.mouse-y);
+                                    } else {
+                                        root.link-moved(
+                                            self.mouse-x - root.physics-width,
+                                            self.mouse-y);
+                                    }
+                                }
+                                if (event.kind == PointerEventKind.down
+                                    && event.button
+                                        == PointerEventButton.left) {
+                                    root.join-x = self.mouse-x;
+                                    root.join-y = self.mouse-y;
+                                    if (root.joining == "physics") {
+                                        root.physics-link-clicked(
+                                            self.mouse-x, self.mouse-y);
+                                    } else {
+                                        root.link-clicked(
+                                            self.mouse-x - root.physics-width,
+                                            self.mouse-y);
+                                    }
+                                }
+                                // A right click puts the line down, as it
+                                // closes a menu everywhere else.
+                                if (event.kind == PointerEventKind.down
+                                    && event.button
+                                        == PointerEventButton.right) {
+                                    root.stop-joining();
+                                }
                             }
                         }
 
-                        // Which terminals a line just drawn means, where it
-                        // could mean more than one: asked where it was let go
-                        // of, one button each and one to draw nothing. A
-                        // question rather than a guess, because a heater's heat
-                        // and its heating are both outputs and a line to the
-                        // wrong one is a simulator that reads something other
-                        // than was meant.
-                        if root.physics-choices.length > 0: Rectangle {
-                            x: root.physics-choice-x;
-                            y: root.physics-choice-y;
+                        // What the line can be made into at the node just
+                        // clicked: one button each, greyed where it cannot be
+                        // and saying why, and one to put the line down. A
+                        // question rather than a guess, because which input
+                        // a reading arrives at is what the line says, and a
+                        // heater's heat and its heating are both outputs.
+                        if root.join-offers.length > 0: Rectangle {
+                            // Kept on the sheet: a menu that ran off its
+                            // right edge would hide the offers it was for.
+                            x: min(root.join-x, parent.width - self.width);
+                            y: min(root.join-y, parent.height - self.height);
                             width: asked.preferred-width;
                             height: asked.preferred-height;
                             background: Colors.window;
@@ -935,23 +1026,30 @@ component Surface inherits Rectangle {
                             drop-shadow-blur: 8px;
                             drop-shadow-color: #00000044;
                             // Takes the presses that miss its buttons, so that
-                            // none reaches the node underneath.
+                            // none reaches the sheet underneath.
                             TouchArea { }
                             asked := VerticalLayout {
                                 padding: Space.tight;
                                 spacing: Space.tight;
                                 Text {
-                                    text: "Join which?";
+                                    text: root.join-heading;
                                     font-size: Type.small;
                                     font-weight: 700;
                                 }
-                                for choice[i] in root.physics-choices: Button {
-                                    text: choice;
-                                    clicked => { root.physics-chosen(i); }
+                                for offer[i] in root.join-offers: Button {
+                                    text: offer.said;
+                                    enabled: offer.open;
+                                    clicked => {
+                                        if (root.joining == "physics") {
+                                            root.physics-chosen(i);
+                                        } else {
+                                            root.link-chosen(i);
+                                        }
+                                    }
                                 }
                                 Button {
                                     text: "Cancel";
-                                    clicked => { root.physics-chosen(-1); }
+                                    clicked => { root.stop-joining(); }
                                 }
                             }
                         }
@@ -992,6 +1090,57 @@ component Surface inherits Rectangle {
                     at: (root.physics-width + root.vehicle-divider) * root.zoom
                         + sheet.content-x;
                     moved(dx) => { root.vehicle-divider-moved(dx / root.zoom); }
+                }
+
+                // The keys a line in hand answers: Escape puts it down, and
+                // Delete takes out the line it was picked up from, which is
+                // the one way left to remove a line by hand now that letting
+                // go of it on bare sheet is not a gesture.
+                //
+                // Out here and not on the sheet, because taking the focus
+                // inside a ScrollView scrolls it to whatever took it, and a
+                // sheet that jumped when a line was picked up would throw the
+                // node somebody was aiming at out from under the pointer.
+                if root.joining != "": keys := FocusScope {
+                    width: 0px;
+                    height: 0px;
+                    init => { self.focus(); }
+                    key-pressed(event) => {
+                        if (event.text == Key.Escape) {
+                            root.stop-joining();
+                            return accept;
+                        }
+                        if ((event.text == Key.Delete
+                             || event.text == Key.Backspace)
+                            && root.joining == "node") {
+                            root.link-removed();
+                            return accept;
+                        }
+                        return reject;
+                    }
+                }
+
+                // What to do with the line in hand: along the bottom of the
+                // sheet, where it covers neither the pane headings nor the
+                // top row of nodes, which is where a configuration starts,
+                // and kept there however far the sheet is scrolled, as the
+                // dividers are. A gesture that
+                // spans three clicks has to say it is still going on, or a
+                // click on a node that asks about the line instead of opening
+                // the node's menu looks like a fault.
+                if root.join-hint != "": Rectangle {
+                    x: Space.step;
+                    y: parent.height - self.height - 3 * Space.step;
+                    width: told.preferred-width + 2 * Space.step;
+                    height: told.preferred-height + Space.step;
+                    background: Colors.window;
+                    border-width: 1px;
+                    border-color: #6b7280;
+                    border-radius: 4px;
+                    told := Text {
+                        text: root.join-hint;
+                        font-size: Type.small;
+                    }
                 }
             }
 
@@ -1366,22 +1515,18 @@ export component MainWindow inherits Window {
     callback physics-delete(string);
     // A component dragged by this much, by its name, as node-moved is.
     callback physics-moved(string, length, length);
-    // A line drawn from a component's terminal -- `moc-out` for its one
-    // output, `world-in` for its one input -- followed while the hand
-    // moves and let go of on the canvas, as link-started, link-moved and
-    // link-finished are for a configuration's node.
+    // A line taken from a component's terminal -- `moc-out` for its one
+    // output, `world-in` for its one input -- followed while the hand moves
+    // and clicked down on the canvas, as link-started, link-moved and
+    // link-clicked are for a configuration's node; in the coordinates of the
+    // whole canvas, whose nought is the Physics pane's left edge.
     callback physics-link-started(string, string);
     callback physics-link-moved(length, length);
-    callback physics-link-finished(length, length);
-    // What a line just drawn could mean, where it could mean more than one
-    // thing: each a terminal or a pair, as words, offered at the place it
-    // was let go of, in the coordinates of the whole canvas. Empty when
-    // nothing is being asked.
-    in property <[string]> physics-choices: [];
-    in property <length> physics-choice-x: 0px;
-    in property <length> physics-choice-y: 0px;
-    // Which was chosen, by its place in the list; -1 for none.
+    callback physics-link-clicked(length, length);
+    // Which of join-offers was chosen, by its place in the list.
     callback physics-chosen(int);
+    // The line put down with nothing made of it.
+    callback physics-link-stopped();
     in property <length> payload-divider: 0px;
     in property <length> vehicle-divider: 0px;
     in property <length> working-width: 0px;
@@ -1441,9 +1586,17 @@ export component MainWindow inherits Window {
     callback save-clicked();
     callback save-as-clicked();
     callback link-started(string, string);
-    callback link-finished(length, length);
-    // Where the pointer is while a line is being drawn. See drawing-route.
+    callback link-clicked(length, length);
+    callback link-chosen(int);
+    callback link-stopped();
+    callback link-removed();
+    // Where the pointer is while a line is in hand. See drawing-route.
     callback link-moved(length, length);
+    // The line in hand, and what can be made of it: see Surface's.
+    in property <string> joining: "";
+    in property <string> join-hint: "";
+    in property <[JoinOffer]> join-offers: [];
+    in property <string> join-heading: "";
     callback node-selected(string);
     // What a node's own menu asks for: see NodeShape's menu.
     callback node-edit(string);
@@ -1567,10 +1720,8 @@ export component MainWindow inherits Window {
         physics-moved(n, dx, dy) => { root.physics-moved(n, dx, dy); }
         physics-link-started(n, t) => { root.physics-link-started(n, t); }
         physics-link-moved(x, y) => { root.physics-link-moved(x, y); }
-        physics-link-finished(x, y) => { root.physics-link-finished(x, y); }
-        physics-choices: root.physics-choices;
-        physics-choice-x: root.physics-choice-x;
-        physics-choice-y: root.physics-choice-y;
+        physics-link-clicked(x, y) => { root.physics-link-clicked(x, y); }
+        physics-link-stopped => { root.physics-link-stopped(); }
         physics-chosen(i) => { root.physics-chosen(i); }
         payload-divider: root.payload-divider;
         vehicle-divider: root.vehicle-divider;
@@ -1611,8 +1762,15 @@ export component MainWindow inherits Window {
         vehicle-divider-moved(dx) => { root.vehicle-divider-moved(dx); }
         open-subdiagram(n) => { root.open-subdiagram(n); }
         link-started(n, terminal) => { root.link-started(n, terminal); }
-        link-finished(x, y) => { root.link-finished(x, y); }
+        link-clicked(x, y) => { root.link-clicked(x, y); }
+        link-chosen(i) => { root.link-chosen(i); }
+        link-stopped => { root.link-stopped(); }
+        link-removed => { root.link-removed(); }
         link-moved(x, y) => { root.link-moved(x, y); }
+        joining: root.joining;
+        join-hint: root.join-hint;
+        join-offers: root.join-offers;
+        join-heading: root.join-heading;
         selected: root.selected;
         node-selected(n) => { root.node-selected(n); }
         node-edit(n) => { root.node-edit(n); }
@@ -1767,9 +1925,17 @@ export component SubWindow inherits Window {
     callback save-clicked();
     callback save-as-clicked();
     callback link-started(string, string);
-    callback link-finished(length, length);
-    // Where the pointer is while a line is being drawn. See drawing-route.
+    callback link-clicked(length, length);
+    callback link-chosen(int);
+    callback link-stopped();
+    callback link-removed();
+    // Where the pointer is while a line is in hand. See drawing-route.
     callback link-moved(length, length);
+    // The line in hand, and what can be made of it: see Surface's.
+    in property <string> joining: "";
+    in property <string> join-hint: "";
+    in property <[JoinOffer]> join-offers: [];
+    in property <string> join-heading: "";
     callback node-selected(string);
     // What a node's own menu asks for: see NodeShape's menu.
     callback node-edit(string);
@@ -1912,8 +2078,15 @@ export component SubWindow inherits Window {
         payload-divider-moved(dx) => { root.payload-divider-moved(dx); }
         vehicle-divider-moved(dx) => { root.vehicle-divider-moved(dx); }
         link-started(n, terminal) => { root.link-started(n, terminal); }
-        link-finished(x, y) => { root.link-finished(x, y); }
+        link-clicked(x, y) => { root.link-clicked(x, y); }
+        link-chosen(i) => { root.link-chosen(i); }
+        link-stopped => { root.link-stopped(); }
+        link-removed => { root.link-removed(); }
         link-moved(x, y) => { root.link-moved(x, y); }
+        joining: root.joining;
+        join-hint: root.join-hint;
+        join-offers: root.join-offers;
+        join-heading: root.join-heading;
         selected: root.selected;
         node-selected(n) => { root.node-selected(n); }
         node-edit(n) => { root.node-edit(n); }

@@ -695,11 +695,16 @@ boxes in a node's corners, each with an arrow saying which way its data
 goes: the payload's own data along the top pointing right, towards the
 ground, and what the ground sends along the bottom pointing left, towards
 the payloads -- the canvas having the payloads on the left, the vehicle in
-the middle and the gateway on the right. A link is made by dragging from one
-of them onto the node the line is to reach: anywhere on that node will do,
-and the line is drawn to whichever of its terminals the stream arrives at.
-A node with no terminal of that stream takes nothing, and a gateway link has
-none on its right at all: the payload data it receives arrives at the
+the middle and the gateway on the right. A link is made in three clicks:
+one of them, which takes a line in hand; the node the line is to reach,
+anywhere on it; and, in the menu that node shows, the input the line is to
+arrive at. Inputs that cannot take the line are in the menu greyed, saying
+why -- <tt class="docutils literal">(fed by temp1)</tt>, <tt class="docutils literal">(joined already)</tt>. Escape, a right click or a
+click on bare sheet puts the line down. A line already drawn is picked up
+by clicking the terminal at either end of it: the next node clicked offers
+to move that end there, and the node it was picked up from, or the Delete
+key, offers to take it out. A node with no terminal of that stream offers
+nothing, and a gateway link has none on its right at all: the payload data it receives arrives at the
 <tt class="docutils literal"><span class="pre">world-in</span></tt> in its upper left, and what it sends leaves by the
 <tt class="docutils literal"><span class="pre">moc-out</span></tt> in its lower left.</p>
 </dd>

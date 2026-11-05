@@ -1078,9 +1078,9 @@ to a <tt class="docutils literal"><span class="pre">world-out</span></tt>, a <tt
 <tt class="docutils literal"><span class="pre">moc-in</span></tt> only to a <tt class="docutils literal"><span class="pre">moc-out</span></tt>. Which is one sentence twice over
 -- a stream leaves at one terminal and arrives at the other -- so the
 pairing is derived from the table above rather than written out again.</p>
-<p class="last">The editor is held to it as a <em>gesture</em>: a line dragged from a terminal
-goes to the terminal that pairs with it and to no other, and a node with
-none takes nothing -- so a bad link cannot be drawn in the first place. The checking refuses a written-out configuration
+<p class="last">The editor is held to it as a <em>gesture</em>: a line taken from a terminal is
+offered only the terminals that pair with it, and a node with none is
+offered nothing -- so a bad link cannot be drawn in the first place. The checking refuses a written-out configuration
 for the same reason, which is what a file edited by hand is still held to.
 What that rules out is a link that carries one stream into the other, and
 with it the circular link a drawing could otherwise be made to say.
@@ -4327,8 +4327,9 @@ without its unit, one required and not given. A component the reader would
 refuse is drawn red on the canvas.</p>
 <p>A component is then handled as a node is. Dragged, it moves, on the grid and
 inside its pane; pressed without moving, it offers Edit, which opens the
-physics window on it, and Delete. A line drawn from its output or its input
-terminal and let go of over another component is a connection between them,
+physics window on it, and Delete. A line taken from its output or its input
+terminal, as a node's is, and clicked on another component is a connection
+between them,
 and over a payload, or the box of a subdiagram, which is all of one the top
 page shows, it joins that payload's stand-in to the component: its
 <tt class="docutils literal">connects</tt> is set to the terminal, or, for a GPIO payload watching lines,
@@ -4337,11 +4338,10 @@ line says only which two things, the component being drawn with one output
 and one input whatever its type has, so the terminals come from the rules a
 file is held to -- <tt class="docutils literal"><span class="pre">tcslibgs::node::physics::connectable</span></tt> for a connection, an
 output to an input of one kind, and <tt class="docutils literal"><span class="pre">tcslibgs::sim_config::may_join</span></tt> for a
-stand-in -- and a join already made is not offered again. Where that leaves
-one thing, it is made; where it leaves several, as a heater's heat, current
-and heating to a sensor, they are offered where the line was let go of, with
-Cancel, rather than one guessed at: a line to the wrong terminal is a
-simulator that reads something other than was meant. Moving, connecting and
+stand-in -- and each is offered where the line was clicked, with Cancel, one join or
+several -- a heater's heat, current and heating to a sensor -- rather than one
+guessed at: a line to the wrong terminal is a simulator that reads something
+other than was meant. A join already made is offered greyed, saying so. Moving, connecting and
 joining, like placing, setting and removing, are edits like any other, each
 taken back by one undo. Removing a component removes the connections that join
 it and takes it out of every stand-in's <tt class="docutils literal">connects</tt>, as removing a node
@@ -4599,8 +4599,8 @@ is told whose data it is and whether it arrives or leaves, which is the
 question somebody about to draw a line is asking.</p>
 <p>The boxes were 24 by 10 -- wide enough for an arrow and no wider -- and that is
 a strip to aim at. A press has to land on a terminal exactly, the terminal being
-what says which stream the line carries, where the release only has to land on
-a node; so the box is now twice the area and bigger in both directions, the
+what says which stream the line carries, where the next click only has to
+land on a node; so the box is now twice the area and bigger in both directions, the
 hand being short in whichever one it is short. What bounds them is a node's
 size, 152 by 64, <tt class="docutils literal">app_all_veh</tt> being the one type with all four: two rows
 and their insets have to fit inside that height with daylight between them,
@@ -4699,77 +4699,80 @@ test states the twenty-two as a budget rather than asserting nothing, so that
 a change which brings wholesale overlap back fails, and so that the day the
 router learns to clear the rest the number comes down rather than the rule
 being quietly satisfied by a simpler drawing.</p>
-<p>A link is drawn by dragging from a terminal onto the node it is to reach. The
-terminal is where a line is taken <em>from</em>, and it is the only handle there is:
-there were two round handles on every node -- one on each side, meaning &quot;a link
-leaves here&quot; and &quot;a link arrives here&quot; -- and they are gone, because a node has
-two places a link may leave and two it may arrive at, and a handle in the
-middle of an edge could not say which of them was meant. So the boxes a reader
-looks at to see what may be linked to what are the boxes a person presses to
-link them, which is one thing to learn instead of two.</p>
-<p>Where it is let go of is a node and not a terminal. Anywhere on the node will
-do -- its name, its middle, a corner box, the wrong corner box -- because
-there is nothing else the gesture could have meant: a stream has one name at
-each of its ends, so a line drawn from a <tt class="docutils literal"><span class="pre">world-out</span></tt> can only arrive at a
-<tt class="docutils literal"><span class="pre">world-in</span></tt>, and the editor works out which terminal that is and draws the
-line to it. The terminals stay drawn, since they are what says which streams a
-type carries and which way; what has gone is having to hit a small box in a
-corner to say something the stream already said.</p>
-<p>Which does not widen what may be joined to what. A node with no terminal of
-that stream takes nothing: the ground receives readings and is sent nothing, so
-a line carrying what the ground sends has nowhere to land on a gateway node,
-and a log has nothing to leave it by. The rule is still
-<tt class="docutils literal"><span class="pre">tcslibgs::graph::terminals</span></tt>; only the aiming has changed.</p>
-<p>A link that is already there can be taken hold of by either of its ends. Press
-the terminal it is attached to and the line comes off the drawing; where it is
-let go of decides what happens to it. Anywhere on the node it is already
-attached to: nothing changes, a gesture that has thought better of itself
-leaving no trace. On another node that has that terminal: the link moves there,
-in one edit, so one undo puts it back -- the end being carried keeps its own
-name, a <tt class="docutils literal"><span class="pre">world-in</span></tt> taken off one node going on another node's
-<tt class="docutils literal"><span class="pre">world-in</span></tt> and nowhere else. On a node that has no such terminal, or one
-the same link already reaches: nothing changes, as a line that cannot be drawn
-is not drawn.</p>
-<p>And over no node at all, it depends which end is in the hand. From the end a
-line <em>leaves</em> by, the line is deleted -- the gesture a person reaches for, pull
-the wire out of the thing that is sending and drop it on the floor, and the
-only way to delete one. From the end it <em>arrives</em> at, nothing happens: a sink
-takes one source, so dragging its end away and letting go over empty canvas is
-a slip far more often than a decision, and the line is written on the node it
-leaves whatever its arriving end was dragged across. Nothing becomes
-undeletable by that: a line into a sink that takes several -- the ground's --
-is deleted from its source end, which has the one line on it.</p>
+<p>A link is drawn in three clicks: a terminal, which takes a line in hand; the
+node it is to reach, anywhere on it, which offers what the line can be made
+into there; and one of those offers. The terminal is where a line is taken
+<em>from</em>, and it is the only handle there is: there were two round handles on
+every node -- one on each side, meaning &quot;a link leaves here&quot; and &quot;a link
+arrives here&quot; -- and they are gone, because a node has two places a link may
+leave and two it may arrive at, and a handle in the middle of an edge could not
+say which of them was meant. So the boxes a reader looks at to see what may be
+linked to what are the boxes a person presses to link them, which is one thing
+to learn instead of two.</p>
+<p>Clicks, and not a drag held from the terminal to the node, which is how a line
+was drawn before. A click leaves the hand free between the two: to scroll the sheet to a node that is out of view, which a drag cannot do
+without a second hand on the wheel, and to rest, which a drag across a tall
+sheet does not allow. The line in hand is put down by Escape, by a right click,
+by Cancel in the menu, or by a click on bare sheet, and none of them changes
+anything. While a line is in hand, a box along the bottom of the sheet says so,
+what to click next and how to put it down: a gesture that spans three clicks
+has to say it is still going on, or a click on a node that asks about the line,
+instead of opening the node's own menu, would look like a fault.</p>
+<p>The node is clicked anywhere -- its name, its middle, a corner box, the wrong
+corner box -- and the menu there, headed with the node's name, lists the
+inputs of the stream the line carries: a stream has one name at each of its
+ends, so a line taken from a <tt class="docutils literal"><span class="pre">world-out</span></tt> can only arrive at a
+<tt class="docutils literal"><span class="pre">world-in</span></tt>. Into a node that declares its inputs, as a mean does, the menu
+lists each of them, <tt class="docutils literal">in0</tt>, <tt class="docutils literal">in1</tt> and so on, because which input a reading
+arrives at is the whole of what such a line says: a choice, and not the next
+free one guessed at. Taken from an input, the line goes the other way, and the
+menu offers the node's output of that stream.</p>
+<p>What cannot be made is in the menu too, greyed, and saying why in words, so
+that the grey is never the only thing that says so: <tt class="docutils literal"><span class="pre">world-in</span> (fed by
+temp1)</tt>, an input something else feeds already; <tt class="docutils literal"><span class="pre">world-in</span> (joined
+already)</tt>, a line the configuration has. A menu that left out the input
+somebody was looking for would leave them wondering whether they had the right
+node; one that names what is in the way answers the question they were about
+to ask. A node with nothing at all for the line -- the ground is sent nothing,
+so a line carrying what the ground sends has nothing to reach on a gateway
+node -- offers no menu, and the line stays in hand with the box on the sheet
+saying so, which is a kinder answer to a near miss than throwing away a line
+that took a click to pick up. The rule is still
+<tt class="docutils literal"><span class="pre">tcslibgs::graph::terminals</span></tt>; the menu only says it.</p>
+<p>A link that is already there can be picked up by either of its ends. Click the
+terminal it is attached to and the line comes off the drawing and into the
+hand; the node clicked next offers the pressed end moved there, to its terminal
+of the same name -- a <tt class="docutils literal"><span class="pre">world-in</span></tt> taken off one node goes on another node's
+<tt class="docutils literal"><span class="pre">world-in</span></tt> and nowhere else -- the far end staying where it is, in one
+edit, so one undo puts it back. Beside that, the same menu offers the new line
+the terminal could draw instead, because a terminal with one link on it is
+ambiguous: the gateway node already feeding one payload, its <tt class="docutils literal"><span class="pre">moc-out</span></tt>
+clicked and then a second payload, is offered a second line to that payload,
+the payload having no <tt class="docutils literal"><span class="pre">moc-out</span></tt> for the picked-up end to move to. Clicked
+back on the node it was picked up from, the menu offers to take the line out,
+and so does the Delete key while it is in hand. Those are the two ways to
+remove a line by hand; letting go of it over empty canvas was the way when a
+line was dragged, and a click on bare sheet now only puts the line down.</p>
 <p>A terminal with one link on it hands that link over; one with none starts a new
 one, and so does one with several, because nothing says which of several was
-meant. A data sink takes one source, so dragging from a sink is usually &quot;move
-this line&quot;; a data source may reach several sinks, and the one it already feeds
-is what makes a press on it ambiguous.</p>
-<p>Where it lands settles that. A node that could be <em>this</em> end -- one with the
-same terminal -- takes the end, which is the re-routing gesture. A node that
-could only be the <em>other</em> end gets a new line instead, and the line that was
-picked up stays where it was. So the gateway node already feeding one payload,
-pressed on its <tt class="docutils literal"><span class="pre">moc-out</span></tt> and let go of over a second payload, feeds the
-second one as well: a payload cannot be a data source, so there is nothing else
-the gesture could have meant.</p>
-<p>That case used to do nothing at all, and it is the first thing somebody tried.
-A second line out of a data source could only be drawn from the sink end -- a
-rule nobody guessed, and one the drawing gives no hint of.</p>
-<p>While the hand is moving, the line being drawn follows it: a dashed line from
-the end that is staying put to wherever the pointer is, erased and drawn again
-on every movement. Without it a person aims at nothing -- the line appeared
-when the gesture was already over, which is to say when it was too late to aim
--- and the line in hand is what says the gesture started at all.</p>
+meant.</p>
+<p>While a line is in hand, it follows the pointer: a dashed line from the end
+that is staying put to wherever the pointer is, erased and drawn again on every
+movement. Without it a person aims at nothing, and the line in hand is what
+says the gesture has started at all. While a node's menu is asked, the line
+stays where that node was clicked, so the hand can go to the menu without the
+line following it there.</p>
 <p>Dashed because it is not a connection yet, and straight where a link's own
 route is orthogonal: this one is being aimed, and a route that turned corners
 as the hand moved would jump about under it. The dashes are a run of short
 subpaths, a path in this toolkit having no dash pattern of its own, and the
 last of them ends under the pointer rather than wherever the pattern stopped:
 the tip is what somebody is aiming with. Which end stays put is the terminal
-the gesture started at when a line is being drawn, and the <em>far</em> end when a
+the line was taken from when a line is being drawn, and the <em>far</em> end when a
 line is being carried by one of its ends -- that end is in the hand, and the
 other one is what it still hangs from.</p>
 <p>Only the lines are redrawn, never the nodes. Rebuilding the nodes would
-destroy the element holding the pointer and take the rest of the gesture with
+destroy the element holding the pointer and take the rest of the press with
 it -- which is a fault this window has made once already, when the same press
 that chose a node rebuilt the canvas under it.</p>
 <p>A link may be drawn either way about: from the data source that feeds it or
@@ -4777,22 +4780,23 @@ from the data sink that wants feeding. It is the same link, and the file says
 the same thing -- a person drawing a diagram works in whichever direction they
 are reading it, and an editor that insisted on one would be an editor to be
 remembered rather than used.</p>
-<p>The gesture will not make a link that the configuration check would refuse.
-Letting go over a node that has no terminal of the stream being drawn does
-nothing at all, and so does letting go over the node the drag started on, over
-empty canvas, or over a node the same link is already drawn to. An editor that
-cannot make a bad link is worth more than one that makes it and marks it red --
-and these refusals are the ways a person's hand slips, not ways of being wrong
-about the vehicle.</p>
-<p>Which terminal was pressed is the whole of what the first half of the gesture
-says. The second half is a point: a press grabs the pointer, so every event up
-to the release goes to the terminal that was pressed, and which node is under
-the pointer at the end is worked out from where the nodes are. That arithmetic
-is in Rust, with the rest of the geometry, where it can be tested without a
-window -- and it is now a question about one rectangle per node rather than
-four small ones, which is the whole of what made aiming hard.</p>
+<p>The gesture will not make a link that the configuration check would refuse:
+nothing from a node to itself, nothing that carries one stream into the
+other, nothing the configuration has already, and nothing into an input
+something else feeds unless the node merges, as the ground's does. An editor
+that cannot make a bad link is worth more than one that makes it and marks it
+red -- and these refusals are the ways a person's hand slips, not ways of being
+wrong about the vehicle.</p>
+<p>While a line is in hand, every click on the sheet is about the line. A layer
+over the whole sheet takes the clicks and the pointer's movement, and which
+node is under a click is worked out in Rust from where the nodes are, with the
+rest of the geometry, where it can be tested without a window. The keys that
+put the line down or take it out are taken outside the sheet: taking the focus
+inside a scrolled view scrolls it to whatever took it, and a sheet that jumped
+when a line was picked up would throw the node somebody was aiming at out from
+under the pointer.</p>
 <p>A terminal is drawn inside its node and over the area a drag is taken from, so
-a press on a corner draws a link and a press anywhere else moves the node. That
+a press on a corner takes a line and a press anywhere else moves the node. That
 is the one thing the arrangement costs: a node can no longer be dragged by its
 corners.</p>
 <p>A line's colour says which stream it carries, and a line is drawn twice as

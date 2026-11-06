@@ -21,11 +21,11 @@
 //! rest      = environment + heat / capacity * tau
 //! ```
 //!
-//! which is what this advances by. Exact rather than integrated: the world
-//! is advanced whenever a stand-in asks or a heater is switched, so the
-//! intervals are whatever length the traffic makes them, and a method
-//! whose error grew with the interval would make the simulated temperature
-//! depend on how often somebody looked at it.
+//! which is what this advances by. Exact rather than integrated: the world is
+//! advanced whenever a simulated payload asks or a heater is switched, so the
+//! intervals are whatever length the traffic makes them, and a method whose
+//! error grew with the interval would make the simulated temperature depend on
+//! how often somebody looked at it.
 //!
 //! `rest` is where the zone settles with that heat on for ever, which is
 //! also the figure that says whether its heaters can win at all: with a

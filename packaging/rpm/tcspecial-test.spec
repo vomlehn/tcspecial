@@ -6,7 +6,7 @@ Requires:       tcspecial = %{version}-%{release}
 
 %description
 tcsmoc, a test mission operations center with a window per payload, and
-tcssim, which stands in for the payloads a configuration describes. tcsmoc
+tcssim, which simulates the payloads a configuration describes. tcsmoc
 starts the tcspecial installed beside it and tcssim. Also the test segsend,
 which deletes each filled telemetry log segment it is given. Test software,
 never flown.

@@ -38,7 +38,7 @@ pub use telemetry_log::*;
 ///
 /// `Text file busy` -- `os error 26` -- is what `exec` answers while anything
 /// holds the program open for writing, and in a test binary that includes this
-/// process itself: a test in another thread writes a stand-in program, and a
+/// process itself: a test in another thread writes a simulated program, and a
 /// third thread forks between its own fork and its exec, so the fork inherits
 /// the open descriptor and the program cannot be run until it is closed. The
 /// descriptor goes as soon as that exec happens, so the condition lasts

@@ -1,6 +1,6 @@
 #!/bin/bash
 #
-# Make the kernel stand-in a simulated I2C device needs.
+# Make the dummy device, an i2c-stub bus, a simulated I2C device needs.
 #
 # A device on an I2C bus is one of the payload types the simulator cannot
 # simply be the far end of. A serial line has a pty and a socket has another

@@ -49,7 +49,7 @@ payloads:
       # settings, made in sysfs by whoever brings it up, and nothing here. The
       # device is /dev/iio:device1, which is what the kernel's iio_dummy sensor
       # is numbered on a host with one sensor of its own;
-      # bin/mk-kernel-stand-ins makes that sensor, enables its buffer and prints
+      # bin/mk-kernel-dummies makes that sensor, enables its buffer and prints
       # the number it was given, which is the path to write here.
       - payload: sensor
         path: "/dev/iio:device1"

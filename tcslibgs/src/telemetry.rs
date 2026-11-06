@@ -741,9 +741,8 @@ impl Telemetry {
 
     /// Gives this answer as the answer to the command numbered `sequence`.
     ///
-    /// For a stand-in vehicle, which answers whatever it is asked: the
-    /// ground takes an answer only for the command whose sequence it
-    /// carries.
+    /// For a simulated vehicle, which answers whatever it is asked: the ground
+    /// takes an answer only for the command whose sequence it carries.
     ///
     /// # Arguments
     ///

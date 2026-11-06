@@ -302,7 +302,7 @@ impl<'a> Arriving<'a> {
 /// lock each port is held behind in [`Fabric`]. Every port here is a thing
 /// with a descriptor, a child process or a file, all of which move between
 /// threads; what the bound rules out is a port holding something that cannot,
-/// which a stand-in in a test is the likeliest thing to be.
+/// which a simulated port in a test is the likeliest thing to be.
 pub trait Port: Send {
     /// Takes what this node has produced, if anything.
     ///
@@ -1856,7 +1856,7 @@ mod tests {
         refuse: Option<String>,
         accepts: bool,
         produces: bool,
-        /// Whether this stands in for a device held at what it was told.
+        /// Whether this simulates a device held at what it was told.
         holds: bool,
     }
 
@@ -1921,7 +1921,7 @@ mod tests {
         (record.clone(), Box::new(Recorder(record)))
     }
 
-    /// A recorder standing in for a device: a heater, a valve.
+    /// A recorder simulating a device: a heater, a valve.
     ///
     /// The difference is [`Port::holds`], which is what decides whether a
     /// decision asserted a second time is sent to it.

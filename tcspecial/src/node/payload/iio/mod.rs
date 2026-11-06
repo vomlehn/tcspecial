@@ -1,9 +1,8 @@
 //! The IIO endpoint: a sensor's buffer, read and never written.
 //!
 //! **Experimental, and not yet supported.** Written to be run against the
-//! kernel's dummy sensor by `tests/kernel-stand-ins.rs`, which has not yet
-//! run; see "What Is Supported and What Is Experimental" in
-//! `docs/design.rst`.
+//! kernel's dummy sensor by `tests/kernel-dummies.rs`, which has not yet run;
+//! see "What Is Supported and What Is Experimental" in `docs/design.rst`.
 //!
 //! What a buffered IIO device offers user space is a character device that
 //! hands over packed samples: open it, poll it, read it, and what comes back
@@ -196,7 +195,7 @@ mod tests {
 
     /// Samples are read as the buffer hands them over.
     ///
-    /// A file standing in for the character device, which is what a buffer is
+    /// A file in place of the character device, which is what a buffer is
     /// as far as reading goes: the test is that the endpoint reads what the
     /// device produced, byte for byte.
     #[test]

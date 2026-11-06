@@ -12,9 +12,9 @@
 //! no node ever sends. So a setting names its unit by symbol, and the symbol
 //! is checked as written.
 //!
-//! Used by the physics model's components and by the simulator file's
-//! settings of a stand-in attached to one, whose errors are in the unit of
-//! what it is attached to: one reading of a figure for both files.
+//! Used by the physics model's components and by the simulator file's settings
+//! of a simulated payload attached to one, whose errors are in the unit of what
+//! it is attached to: one reading of a figure for both files.
 
 use std::time::Duration;
 

@@ -1,15 +1,15 @@
 //! One module per node type, in three families.
 //!
-//! A node type is three pieces of code in three crates: what its attributes
-//! are and how they are checked, which is here; the flight-side node, which is
-//! `tcspecial::node`; and the stand-in the simulator puts at the far end of
-//! it, which is `tcssim::node`. The three trees carry the same names, so a
-//! type is `node/payload/i2c` wherever you are standing and
+//! A node type is three pieces of code in three crates: what its attributes are
+//! and how they are checked, which is here; the flight-side node, which is
+//! `tcspecial::node`; and the simulated device the simulator puts at the far
+//! end of it, which is `tcssim::node`. The three trees carry the same names, so
+//! a type is `node/payload/i2c` wherever you are standing and
 //! `grep -r node/payload/gpio` finds everything about discrete lines.
 //!
 //! Three parallel trees rather than one directory per type holding all three
-//! pieces. A single crate per type would either link the simulator's
-//! stand-ins into the flight image or hide them behind cargo features, and
+//! pieces. A single crate per type would either link the simulator's simulated
+//! devices into the flight image or hide them behind cargo features, and
 //! feature combinations are configurations that can be wrong -- which trades
 //! reliability for convenience, the wrong way round for this project.
 //!
@@ -44,10 +44,10 @@ pub mod app;
 /// What the vehicle carries: a device on a bus, a line it drives, a link to
 /// something aboard.
 pub mod payload;
-/// The physics model: the vehicle's physical components, which the
-/// simulator's stand-ins measure and act on. Nodes of the simulator's own
-/// pane, drawn and joined as the others are, and here beside them now that
-/// there are more of them.
+/// The physics model: the vehicle's physical components, which the simulator's
+/// simulated payloads measure and act on. Nodes of the simulator's own pane,
+/// drawn and joined as the others are, and here beside them now that there are
+/// more of them.
 pub mod physics;
 /// What the vehicle itself runs: a computation, a log.
 pub mod vehicle;

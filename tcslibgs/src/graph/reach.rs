@@ -91,25 +91,26 @@ pub struct Reach {
     /// says: the one address its datagrams are read from. See
     /// [`crate::SendsFrom`], and [`sends_from_of`] for what a node may say.
     pub sends_from: Option<crate::SendsFrom>,
-    /// Where the node is reached over UDP when it is simulated, for a type
-    /// the operating system has nothing faithful to stand in for: see
-    /// [`stands_in_over_udp`] and [`Reach::opened`].
-    pub stand_in: Option<std::net::SocketAddr>,
+    /// Where the node is reached over UDP when it is simulated, for a type the
+    /// operating system has no faithful dummy device for: see
+    /// [`simulated_over_udp`] and [`Reach::opened`].
+    pub sim_address: Option<std::net::SocketAddr>,
 }
 
-/// The types that may be reached over UDP when simulated, with `stand_in`,
-/// because the operating system has nothing faithful to stand in for them: a
+/// The types that may be reached over UDP when simulated, with `sim_address`,
+/// because the operating system has no faithful dummy device for them: a
 /// synchronous line has no virtual interface at all, and a pseudo-terminal
 /// carries a SPI peripheral's bytes without its clock, an rpmsg channel's
-/// messages without its channel and a sensor's samples without its sysfs.
-/// And the two temperature sensors fixed to a thermal mass, `i2c_tmass` and
-/// `spi_tmass`, whose stand-in is the thermal mass itself: tcssim answers at
-/// `stand_in` with the temperature of the one the sensor is joined to, which
-/// no register bank or pseudo-terminal at the device's path could follow.
+/// messages without its channel and a sensor's samples without its sysfs. And
+/// the two temperature sensors fixed to a thermal mass, `i2c_tmass` and
+/// `spi_tmass`, whose simulated device is the thermal mass itself: tcssim
+/// answers at `sim_address` with the temperature of the one the sensor is
+/// joined to, which no register bank or pseudo-terminal at the device's path
+/// could follow.
 ///
-/// Every other type has a stand-in the kernel or tcssim puts at the
-/// endpoint tcspecial opens, which is the better test: the code that runs is
-/// the code that flies.
+/// Every other type has a dummy device the kernel makes, or a simulated device
+/// tcssim makes, at the endpoint tcspecial opens, which is the better test: the
+/// code that runs is the code that flies.
 ///
 /// # Arguments
 ///
@@ -117,8 +118,8 @@ pub struct Reach {
 ///
 /// # Returns
 ///
-/// Whether a node of that type may give a `stand_in`.
-pub fn stands_in_over_udp(kind: DHType) -> bool {
+/// Whether a node of that type may give a `sim_address`.
+pub fn simulated_over_udp(kind: DHType) -> bool {
     matches!(
         kind,
         DHType::Hdlc
@@ -131,14 +132,13 @@ pub fn stands_in_over_udp(kind: DHType) -> bool {
 }
 
 impl Reach {
-    /// What tcspecial opens for this node under `mode`: its endpoint, or a
-    /// UDP socket to its `stand_in` where the run has stand-ins and it states
-    /// one.
+    /// What tcspecial opens for this node under `mode`: its endpoint, or a UDP
+    /// socket to its `sim_address` where the run simulates and it states one.
     ///
-    /// The one statement of the rule. Under the flight setting `stand_in` is
+    /// The one statement of the rule. Under the flight setting `sim_address` is
     /// never used, so the configuration that flies is the one that was tested
-    /// and the device is what is opened; under `some` and `all` a node with
-    /// one is reached there, and tcssim answers. See "Saying Which Payloads Are
+    /// and the device is what is opened; under `some` and `all` a node with one
+    /// is reached there, and tcssim answers. See "Saying Which Payloads Are
     /// Simulated" in docs/design.rst.
     ///
     /// # Arguments
@@ -147,10 +147,11 @@ impl Reach {
     ///
     /// # Returns
     ///
-    /// The endpoint to open: a UDP socket to `stand_in` where `mode` is not the
-    /// flight setting and the node gives one, and its own endpoint otherwise.
+    /// The endpoint to open: a UDP socket to `sim_address` where `mode` is not
+    /// the flight setting and the node gives one, and its own endpoint
+    /// otherwise.
     pub fn opened(&self, mode: crate::simulate::Mode) -> EndpointConfig {
-        match self.stand_in {
+        match self.sim_address {
             Some(at) if !mode.is_flight() => {
                 EndpointConfig::Network(NetworkConfig {
                     protocol: NetworkProtocol::Udp,
@@ -243,7 +244,7 @@ pub fn reach_of(node: &Node) -> Result<Reach, String> {
         init,
         read_delay,
         sends_from,
-        stand_in,
+        sim_address,
     } = said;
 
     if stream_stated {
@@ -388,8 +389,8 @@ pub fn reach_of(node: &Node) -> Result<Reach, String> {
                 })
             }
         }
-        // A file, opened: see node::payload::device_file for why that is a type
-        // of its own and not every other type as well.
+        // A file, opened: see tcspecial::node::payload::device_file for why
+        // that is a type of its own and not every other type as well.
         DHType::Device => EndpointConfig::Device(DeviceConfig {
             path: required(
                 what,
@@ -460,7 +461,7 @@ pub fn reach_of(node: &Node) -> Result<Reach, String> {
         ground,
         stream: framing,
         sends_from,
-        stand_in,
+        sim_address,
     })
 }
 
@@ -571,7 +572,7 @@ struct Said {
     init: Option<Vec<u8>>,
     read_delay: Option<std::time::Duration>,
     sends_from: Option<Scalar>,
-    stand_in: Option<std::net::SocketAddr>,
+    sim_address: Option<std::net::SocketAddr>,
 }
 
 impl Default for Said {
@@ -590,7 +591,7 @@ impl Default for Said {
             init: None,
             read_delay: None,
             sends_from: None,
-            stand_in: None,
+            sim_address: None,
         }
     }
 }
@@ -770,34 +771,41 @@ fn take(
         // checked once the protocol is known: see `sends_from_of`.
         "sends_from" => said.sends_from = Some(value.clone()),
         // Where it is reached when simulated, for the types the operating
-        // system cannot stand in for faithfully. On this host and nowhere
-        // else: a stand-in reached off the host would be one nothing here can
-        // tell from the hardware.
-        "stand_in" if stands_in_over_udp(kind) => {
+        // system has no faithful dummy device for. On this host and nowhere
+        // else: a simulated device reached off the host would be one nothing
+        // here can tell from the hardware.
+        "sim_address" if simulated_over_udp(kind) => {
             let said_at = value.as_str().trim();
             let at: std::net::SocketAddr = said_at.parse().map_err(|_| {
                 format!(
-                    "\"{what}\": stand_in is \"{said_at}\", which is not an \
-                     address:port: give where tcssim answers for it, such as \
-                     127.0.0.1:7950"
+                    "\"{what}\": sim_address is \"{said_at}\", which is not \
+                     an address:port: give where tcssim answers for it, such \
+                     as 127.0.0.1:7950"
                 )
             })?;
             if !at.ip().is_loopback() {
                 return Err(format!(
-                    "\"{what}\": stand_in is {at}, which is not on this host: \
-                     give a loopback address, such as 127.0.0.1:{}, so that \
-                     what answers there can only be tcssim",
+                    "\"{what}\": sim_address is {at}, which is not on this \
+                     host: give a loopback address, such as 127.0.0.1:{}, so \
+                     that what answers there can only be tcssim",
                     at.port()
                 ));
             }
-            said.stand_in = Some(at);
+            said.sim_address = Some(at);
         }
+        // The attribute's old name, refused rather than read, so that a file
+        // says the one name.
         "stand_in" => {
             return Err(format!(
+                "\"{what}\": stand_in is now called sim_address: rename it"
+            ))
+        }
+        "sim_address" => {
+            return Err(format!(
                 "\"{what}\" is {} {} node, which is simulated at its own \
-                 endpoint, so stand_in does not apply to it: only hdlc, spi, \
-                 rpmsg, iio, i2c_tmass and spi_tmass nodes are reached over \
-                 UDP when simulated",
+                 endpoint, so sim_address does not apply to it: only hdlc, \
+                 spi, rpmsg, iio, i2c_tmass and spi_tmass nodes are reached \
+                 over UDP when simulated",
                 kind.article(),
                 node.node_type
             ))
@@ -2605,12 +2613,12 @@ mod tests {
         assert_eq!(opened.kind(), DHType::Gpio);
     }
 
-    /// An rpmsg node reaches its endpoint with its channel and its service.
-    /// A type the operating system cannot stand in for may give a stand_in,
-    /// and is reached there over UDP only in a run with stand-ins: under the
-    /// flight setting the device is what is opened.
+    /// An rpmsg node reaches its endpoint with its channel and its service. A
+    /// type the operating system has no faithful dummy device for may give a
+    /// sim_address, and is reached there over UDP only in a simulated run:
+    /// under the flight setting the device is what is opened.
     #[test]
-    fn a_stand_in_is_reached_over_udp_only_when_the_run_has_stand_ins() {
+    fn a_sim_address_is_reached_over_udp_only_when_the_run_simulates() {
         use crate::simulate::Mode;
         let rpmsg = node(
             "channel",
@@ -2618,7 +2626,7 @@ mod tests {
             &[
                 ("path", "/dev/rpmsg0"),
                 ("service", "payload-telemetry"),
-                ("stand_in", "127.0.0.1:7950"),
+                ("sim_address", "127.0.0.1:7950"),
             ],
         );
         let reach = reach_of(&rpmsg).expect("it opens");
@@ -2641,9 +2649,9 @@ mod tests {
         assert_eq!(reach.endpoint.kind(), DHType::Rpmsg);
     }
 
-    /// A temperature sensor on a thermal mass is reached as the device on
-    /// its bus is, as a kind of its own, and at its stand_in in a run with
-    /// stand-ins; and what is wrong with one is said of its own type.
+    /// A temperature sensor on a thermal mass is reached as the device on its
+    /// bus is, as a kind of its own, and at its sim_address in a simulated run;
+    /// and what is wrong with one is said of its own type.
     #[test]
     fn a_sensor_on_a_thermal_mass_is_reached_as_its_bus_is() {
         use crate::simulate::Mode;
@@ -2654,7 +2662,7 @@ mod tests {
             &[
                 ("path", "/dev/i2c-1"),
                 ("address", "0x48"),
-                ("stand_in", "127.0.0.1:5201"),
+                ("sim_address", "127.0.0.1:5201"),
             ],
         )
         .expect("it opens");
@@ -2713,11 +2721,11 @@ mod tests {
 
     /// Only on this host, and only on the types that need one.
     #[test]
-    fn a_stand_in_is_refused_off_the_host_and_on_types_with_their_own() {
+    fn a_sim_address_is_refused_off_the_host_and_on_types_with_their_own() {
         let off = node(
             "line",
             "hdlc",
-            &[("interface", "hdlc0"), ("stand_in", "10.0.0.5:7950")],
+            &[("interface", "hdlc0"), ("sim_address", "10.0.0.5:7950")],
         );
         let said = reach_of(&off).unwrap_err();
         assert!(said.contains("not on this host"), "{said}");
@@ -2730,11 +2738,23 @@ mod tests {
                 ("datarate", "9600"),
                 ("max_length", "64"),
                 ("read_timeout", "none"),
-                ("stand_in", "127.0.0.1:7950"),
+                ("sim_address", "127.0.0.1:7950"),
             ],
         );
         let said = reach_of(&serial).unwrap_err();
-        assert!(said.contains("stand_in does not apply to it"), "{said}");
+        assert!(said.contains("sim_address does not apply to it"), "{said}");
+    }
+
+    /// The attribute's old name is refused, naming the new one.
+    #[test]
+    fn stand_in_is_refused_for_sim_address() {
+        let old = node(
+            "line",
+            "hdlc",
+            &[("interface", "hdlc0"), ("stand_in", "127.0.0.1:7950")],
+        );
+        let said = reach_of(&old).unwrap_err();
+        assert!(said.contains("stand_in is now called sim_address"), "{said}");
     }
 
     #[test]

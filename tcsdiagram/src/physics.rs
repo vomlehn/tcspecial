@@ -1,7 +1,7 @@
 //! How the simulator file's physics model is drawn: its components as nodes
 //! in the Physics pane, its connections as links between them, and each
-//! stand-in's `connects` as a link between its component and the payload
-//! node it stands in for.
+//! simulated payload's `connects` as a link between its component and the
+//! payload node it simulates.
 //!
 //! The Physics pane is left of the payloads, at negative x in the
 //! coordinates the configuration holds -- see `crate::pane`. A component
@@ -57,8 +57,8 @@ pub struct Component<'a> {
     pub placed: Option<(i32, i32)>,
 }
 
-/// A stand-in's `connects`, as the drawing needs it: which payload node, and
-/// which terminal of which component.
+/// A simulated payload's `connects`, as the drawing needs it: which payload
+/// node, and which terminal of which component.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Join<'a> {
     /// The payload node that is simulated.
@@ -76,7 +76,7 @@ pub struct Drawn {
     pub components: Vec<(String, String)>,
     /// Each connection, from and to, in the order of what they join.
     pub connections: Vec<(String, String)>,
-    /// Each stand-in's payload and a terminal it is joined to.
+    /// Each simulated payload and a terminal it is joined to.
     pub joins: Vec<(String, String)>,
     /// Where the `tcsgui` section put each component it places, by name.
     pub placed: std::collections::BTreeMap<String, (i32, i32)>,
@@ -465,7 +465,7 @@ pub fn terminal_at(size: (u32, u32), output: bool) -> (i32, i32) {
 /// Every physics node and link, as the markup draws them.
 ///
 /// Each connection joins two components; each join joins a component to the
-/// payload node that stands in for it, and is drawn only where that node is
+/// payload node it is joined to, and is drawn only where that node is
 /// on the page drawn. A connection or join naming a component the model has
 /// not is drawn nowhere: what is wrong with it is said elsewhere, by the
 /// checking, and a line to nowhere would be a guess about where it went.
@@ -475,7 +475,7 @@ pub fn terminal_at(size: (u32, u32), output: bool) -> (i32, i32) {
 /// * `components`  - The model's components, in the order they are laid out.
 /// * `connections` - The model's connections, each from an output to an
 ///                   input, as the file writes them.
-/// * `joins`       - Each stand-in's `connects`.
+/// * `joins`       - Each simulated payload's `connects`.
 /// * `nodes`       - The configuration's nodes on the page drawn.
 /// * `dividers`    - Where the panes are.
 /// * `shift`       - What is added to every x, for a window that draws the
@@ -539,8 +539,8 @@ pub fn looks(
 
     // Each join between its component's terminal and the left of its
     // payload's node, the arrow the way the data goes: out of the output to
-    // the stand-in that reports it, and from a stand-in into the input it
-    // drives.
+    // the simulated payload that reports it, and from a simulated payload
+    // into the input it drives.
     for (n, join) in joins.iter().enumerate() {
         let Some((component, terminal)) = join.terminal.split_once('.') else {
             continue;

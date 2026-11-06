@@ -94,7 +94,7 @@ vehicle:
 
 payloads:
   # The heaters and the lines that sense them, on the thermal mass, through
-  # the kernel's simulated chip, which bin/mk-kernel-stand-ins makes: lines
+  # the kernel's simulated chip, which bin/mk-kernel-dummies makes: lines
   # 2 to 5, which leaves 0 and 1 to the gpio example.
   - type gpio:
       # Two lines on the thermal mass, one sensing each heater: high while it

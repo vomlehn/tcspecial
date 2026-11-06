@@ -1,7 +1,7 @@
 //! The rpmsg endpoint: a channel to software on another core.
 //!
 //! **Experimental, and not yet supported.** Run against a pseudo-terminal
-//! standing in for the channel, and against no remote processor.
+//! simulating the channel, and against no remote processor.
 //!
 //! What Linux gives user space for an rpmsg channel is a character device that
 //! carries whole messages: a write is one message to the remote, and a read
@@ -18,10 +18,10 @@
 //! So the endpoint reads it and refuses a channel that is not the one the file
 //! asked for.
 //!
-//! Where that file does not exist, nothing is refused. A pty standing in for
-//! the channel has no `sysfs` entry, and neither has an rpmsg device on a
-//! kernel that does not publish the name; the check exists to catch a node
-//! whose number moved, which only a real rpmsg device can do.
+//! Where that file does not exist, nothing is refused. A pty simulating the
+//! channel has no `sysfs` entry, and neither has an rpmsg device on a kernel
+//! that does not publish the name; the check exists to catch a node whose
+//! number moved, which only a real rpmsg device can do.
 
 use std::fs::{File, OpenOptions};
 use std::io::{Read, Write};
@@ -40,8 +40,8 @@ use crate::endpoint::{
 
 /// Where the kernel publishes what an rpmsg node is.
 ///
-/// A constant so that a test can look at a tree of its own, as the I2C
-/// stand-in's scan does.
+/// A constant so that a test can look at a tree of its own, as the I2C dummy
+/// device's scan does.
 const RPMSG_CLASS: &str = "/sys/class/rpmsg";
 
 /// An rpmsg channel, open both ways.
@@ -292,14 +292,14 @@ mod tests {
     fn a_node_the_kernel_says_nothing_about_is_left_alone() {
         let class = tempfile::tempdir().expect("an empty class directory");
         is_that_service("remote", class.path(), "/tmp/a-pty-slave", "device")
-            .expect("a stand-in is not a mismatch");
+            .expect("a simulated device is not a mismatch");
     }
 
     /// Messages go both ways, and one too large is refused rather than split.
     #[test]
     fn a_channel_carries_messages_both_ways() {
-        // A pty, which is what the simulator stands in with: two ends of one
-        // character device.
+        // A pty, which is what the simulator simulates a channel with: two ends
+        // of one character device.
         let mut master = 0;
         let mut slave = 0;
         // SAFETY: both ends are written by the call and checked below.

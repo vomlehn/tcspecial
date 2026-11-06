@@ -2,7 +2,7 @@
 <!--
   A tcspecial simulator configuration, written in XML.
 
-  What tcssim needs in order to stand in for the payloads of a configuration:
+  What tcssim needs in order to simulate the payloads of a configuration:
   how fast each one sends, and what it does wrong. Nothing here describes a
   payload; the configuration does that, and the two are joined by name.
 
@@ -13,11 +13,11 @@
 <xs:schema xmlns:xs="http://www.w3.org/2001/XMLSchema"
            elementFormDefault="qualified">
 
-  <!-- What kind of payload the simulated payloads of a <type> stand in for:
+  <!-- What kind of payload the simulated payloads of a <type> are:
        one of the interfaces a payload is reached over, as DHType spells
        them, which is the type the configuration writes the payload under. A
-       payload that is a program is the program itself and needs no
-       stand-in. xs:token, so that the whitespace around a word is not part
+       payload that is a program is the program itself and is not
+       simulated. xs:token, so that the whitespace around a word is not part
        of it. -->
   <xs:simpleType name="kind">
     <xs:restriction base="xs:token">
@@ -79,7 +79,7 @@
   </xs:complexType>
 
   <!-- A simulated payload, named by its attribute: the payload of the
-       configuration it stands in for. It may name a group to take the
+       configuration it simulates. It may name a group to take the
        settings it does not state from. -->
   <xs:complexType name="payload">
     <xs:choice minOccurs="0" maxOccurs="unbounded">
@@ -114,9 +114,9 @@
   </xs:complexType>
 
   <!-- What tcssim itself is told: the UDP address, as address:port, at
-       which it answers whether it has made its stand-ins, required by tcssim
-       to start and by a harness to wait for it; the thermostat node it
-       stands in for, if any, which is never stated with tcspecial running;
+       which it answers whether it has made its simulated devices, required
+       by tcssim to start and by a harness to wait for it; the thermostat node
+       it plays, if any, which is never stated with tcspecial running;
        and the seed its random numbers start from. -->
   <xs:complexType name="tcssim">
     <xs:all>

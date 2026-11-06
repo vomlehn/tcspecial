@@ -50,7 +50,7 @@ payloads:
   # carrying the identifier 0x123 and takes commands in frames carrying 0x124:
   # two identifiers, so two payloads, each of whose sockets hears its own
   # identifier and nothing else on the bus. vcan0 is the kernel's virtual
-  # bus, which bin/mk-kernel-stand-ins makes; on a vehicle it is the
+  # bus, which bin/mk-kernel-dummies makes; on a vehicle it is the
   # controller's interface, such as can0.
   - type can:
       # Each command the ground sends goes to the motor as one frame, so a

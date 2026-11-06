@@ -3,7 +3,7 @@
 # The mirror of app_payload_veh: it is run with one file interface, on which it
 # reads gateway data and writes payload data, so it takes what travels
 # vehicleward and answers with what travels groundward. Which is the shape a
-# payload has, and what an app of this kind stands in for: something that is
+# payload has, and what an app of this kind plays: something that is
 # asked for a reading and produces one. The interfaces and the packets they
 # carry are tcsapp; its Rust is tcspecial/src/node/vehicle/app_gateway_veh/.
 node: app_gateway_veh

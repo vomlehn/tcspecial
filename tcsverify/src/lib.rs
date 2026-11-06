@@ -23,7 +23,7 @@
 //!   in it is one the graph and the file itself agree on -- a simulated
 //!   payload the graph has, a group the file declares and uses, no setting
 //!   that is not one; see `tcslibgs::SimConfigFile::problems_by_name`. And,
-//!   where those are all right, that the simulator would stand in for what it
+//!   where those are all right, that the simulator would simulate what it
 //!   names -- not for a payload that is only driven, nor for one that is a
 //!   program -- which is `tcslibgs::graph::simulated::handlers`, the question
 //!   tcssim and tcsmoc ask before they start one.
@@ -988,8 +988,8 @@ fn check_graph_simulator(
         report.add(path, found.line_of(&problem.about()), problem.to_string());
     }
 
-    // One answer and not all of them: the simulator stops at the first
-    // payload it will not stand in for, and says which, as the start would.
+    // One answer and not all of them: the simulator stops at the first payload
+    // it will not simulate, and says which, as the start would.
     if named_well && report.room() {
         match tcslibgs::graph::simulated::handlers(graph, &sim) {
             Err(why) => {
@@ -1020,11 +1020,10 @@ fn check_graph_simulator(
         }
     }
 
-    // The model itself, in its words and at its lines: everything wrong
-    // with it alone, and where it stands alone, how the stand-ins join it --
-    // a component nothing is joined to is refused there, and a misspelled
-    // connects would read as one, so only where the payloads are named
-    // well.
+    // The model itself, in its words and at its lines: everything wrong with it
+    // alone, and where it stands alone, how the simulated payloads join it -- a
+    // component nothing is joined to is refused there, and a misspelled
+    // connects would read as one, so only where the payloads are named well.
     if let Some(model) = &sim.world {
         let alone = model.problems();
         for problem in &alone {
@@ -1051,9 +1050,9 @@ fn check_graph_simulator(
 }
 
 /// Checks that each sensor joined to the world feeds one conversion, in the
-/// unit of what it reports, and that what reaches each stand-in driving a
-/// value is in that value's unit, which is what tcssim asks of them as it
-/// starts: see `tcslibgs::graph::simulated::reading_of` and `driving_of`.
+/// unit of what it reports, and that what reaches each simulated payload
+/// driving a value is in that value's unit, which is what tcssim asks of them
+/// as it starts: see `tcslibgs::graph::simulated::reading_of` and `driving_of`.
 ///
 /// # Arguments
 ///
@@ -1073,8 +1072,8 @@ fn sensors_read_as_they_report(
         return;
     };
     // Whether or not the model's joins are right, which is reported at the
-    // model's lines: a stand-in joined to an output it cannot report is a
-    // fault of its own.
+    // model's lines: a simulated payload joined to an output it cannot report
+    // is a fault of its own.
     let Some(resolved) = sim.settled(&handlers) else {
         return;
     };
@@ -1293,9 +1292,9 @@ mod tests {
     }
 
     /// What is wrong with the physics model is reported at its lines, every
-    /// component's, and a stand-in joined to an output its readings are not
-    /// converted from is reported at its entry, whatever else is wrong with
-    /// the model's joins.
+    /// component's, and a simulated payload joined to an output its readings
+    /// are not converted from is reported at its entry, whatever else is wrong
+    /// with the model's joins.
     #[test]
     fn the_physics_model_is_reported_at_its_own_lines() {
         let (_dir, _, yaml, sim) = thermostat_pair(|xml| xml);
@@ -1332,9 +1331,9 @@ mod tests {
         );
         edit(&model, "power: \"4\"", "power: \"4 W\"");
 
-        // A heater's stand-in joined to its heat, an output: the heater's
-        // on is then joined to nothing, at the heater, and the stand-in
-        // reports watts nothing converts, at the stand-in.
+        // A heater's simulated payload joined to its heat, an output: the
+        // heater's on is then joined to nothing, at the heater, and the payload
+        // reports watts nothing converts, at the payload.
         edit(&sim, "connects: heater_2.on", "connects: heater_2.heat");
         let report = verify(&yaml, Some(&sim), Limits::EVERYTHING);
         let said = report.said();
@@ -1353,9 +1352,9 @@ mod tests {
         assert!(report.findings[1].message.contains("nothing converts"));
     }
 
-    /// A stand-in driving a value is reported at its entry where what
-    /// reaches it is in another unit: guidance answering newtons to an
-    /// engine whose throttle is a ratio.
+    /// A simulated payload driving a value is reported at its entry where what
+    /// reaches it is in another unit: guidance answering newtons to an engine
+    /// whose throttle is a ratio.
     #[test]
     fn a_value_driven_in_the_wrong_unit_is_reported() {
         let root =
@@ -1616,12 +1615,12 @@ gateways:
         world-in: [sensor]
 ";
 
-    /// A simulator file that names a payload the simulator will not stand in
-    /// for is refused here, as tcssim and tcsmoc refuse it, on its line.
+    /// A simulator file that names a payload the simulator will not simulate is
+    /// refused here, as tcssim and tcsmoc refuse it, on its line.
     ///
-    /// A heater is driven and never read, so its stand-in sends nothing, and a
-    /// packet interval given it governs nothing: the simulator refuses it, and
-    /// a verifier that said nothing would pass a run that fails.
+    /// A heater is driven and never read, so its simulation sends nothing, and
+    /// a packet interval given it governs nothing: the simulator refuses it,
+    /// and a verifier that said nothing would pass a run that fails.
     #[test]
     fn a_simulated_payload_the_simulator_refuses_is_an_error() {
         // The sound graph with a heater the ground drives through a tee.
@@ -1667,7 +1666,7 @@ gateways:
         assert_eq!(said[0].line, 7, "the heater's entry");
 
         // And without the interval, nothing: a driven payload is simulated,
-        // its stand-in counting what the vehicle sends it.
+        // tcssim counting what the vehicle sends it.
         let set = written(
             ".ytcs",
             &configuration,

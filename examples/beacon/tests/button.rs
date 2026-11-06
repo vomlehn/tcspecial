@@ -1,7 +1,7 @@
 //! The window's button starts the vehicle and stops it.
 //!
 //! Pressed as a person presses it, through Slint's testing backend, with
-//! `sleep` standing in for tcspecial: what is tested is the button and the
+//! `sleep` in place of tcspecial: what is tested is the button and the
 //! process, and a real tcspecial would bind the beacon ports, which a test
 //! run beside a real session must not.
 

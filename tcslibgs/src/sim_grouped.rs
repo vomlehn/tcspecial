@@ -29,13 +29,13 @@
 //! </simulated_payloads>
 //! ```
 //!
-//! A simulated payload's type is the kind of the payload it stands in for,
-//! in the configuration's word -- the type that payload is written under
-//! there -- and is said once, by the entry its payloads are grouped under.
-//! It is the configuration's and not this file's, and is said here only to
-//! be compared with it: see [`crate::sim_config`], which refuses a payload
-//! whose type the configuration does not give it. A group says no type, a
-//! payload's being the one it is written under.
+//! A simulated payload's type is the kind of the payload it simulates, in the
+//! configuration's word -- the type that payload is written under there -- and
+//! is said once, by the entry its payloads are grouped under. It is the
+//! configuration's and not this file's, and is said here only to be compared
+//! with it: see [`crate::sim_config`], which refuses a payload whose type the
+//! configuration does not give it. A group says no type, a payload's being the
+//! one it is written under.
 //!
 //! The order of the types, of the payloads of one and of the groups means
 //! nothing: each list is held in name order, whatever order it is written
@@ -234,7 +234,7 @@ fn kind_of(named: &str) -> Result<(), String> {
         ));
     }
     Err(format!(
-        "{named} is not a kind of payload a simulated payload stands in for, \
+        "{named} is not a kind of payload that can be simulated, \
          which are {}",
         DHType::spellings()
     ))

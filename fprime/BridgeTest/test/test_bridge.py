@@ -1,6 +1,6 @@
 """The F´ bridge, tested from F´'s own ground system.
 
-Run by ``bridge-test``, once tcssim stands in for the configuration's
+Run by ``bridge-test``, once tcssim simulates the configuration's
 payloads and tcspecial flies it, with BridgeTest started by
 ``conftest.py`` to run the bridge on it: see those. Each test is one thing
 ``docs/design.rst`` asks of the bridge, seen as the rest of an F´
@@ -171,7 +171,7 @@ def test_a_node_is_stopped_and_started_again(fprime_test_api):
 
 
 def test_data_sent_up_drives_the_heater(fprime_test_api):
-    # 1 up to fsw, and on to the heater, whose stand-in warms the zone a
+    # 1 up to fsw, and on to the heater, whose simulation warms the zone a
     # kelvin a second while it is on: zone_temp, read back, climbs past
     # anything the zone left to itself reaches, and heater_wanted says the
     # heater is no longer wanted. Then 0, to turn it off.

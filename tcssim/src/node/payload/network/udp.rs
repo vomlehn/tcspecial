@@ -14,7 +14,7 @@ use std::sync::Arc;
 use std::time::Instant;
 
 use crate::payload::{
-    a_packet, could_not_stand_in, ignore_this_request, lateness,
+    a_packet, could_not_simulate, ignore_this_request, lateness,
     send_in_segments, wait_out_packet, wait_while_running, Pacing,
     PayloadConfig, PayloadStats, Produce,
 };
@@ -96,7 +96,7 @@ pub fn run_udp_node(
     let socket = match UdpSocket::bind(&mine) {
         Ok(s) => s,
         Err(e) => {
-            could_not_stand_in(
+            could_not_simulate(
                 &config,
                 format!("failed to bind the UDP device at {mine}: {e}"),
             );
@@ -105,7 +105,7 @@ pub fn run_udp_node(
     };
     if speaks_first {
         if let Err(e) = socket.connect(&handler) {
-            could_not_stand_in(
+            could_not_simulate(
                 &config,
                 format!("failed to reach the handler at {handler}: {e}"),
             );
@@ -186,7 +186,7 @@ pub fn run_udp_node(
             }
         }
 
-        // A stand-in signalling a decision is woken by the decision
+        // A payload signalling a decision is woken by the decision
         // changing, so that the vehicle hears of a touchdown when it
         // happens; every other waits out its interval.
         let until = started + pacing.packet_interval;
@@ -201,7 +201,7 @@ pub fn run_udp_node(
     }
 }
 
-/// Stands in for a payload the vehicle drives and never reads.
+/// Plays a payload the vehicle drives and never reads.
 ///
 /// The loop is the ordinary one with the sending taken out: whatever the
 /// vehicle writes is counted and acted on, and nothing goes the other way.
@@ -224,7 +224,7 @@ fn run_driven_udp_node(
     let socket = match UdpSocket::bind(at) {
         Ok(s) => s,
         Err(e) => {
-            could_not_stand_in(
+            could_not_simulate(
                 &config,
                 format!("failed to wait for the vehicle at {at}: {e}"),
             );
@@ -259,9 +259,9 @@ fn run_driven_udp_node(
                 break;
             }
             // The world is told before the statistics are, so that nothing
-            // holds the stats lock across the world's own. Where the panel
-            // has the device disabled, what arrives is counted, as every
-            // stand-in counts it, and kept as the latest, and the part stays
+            // holds the stats lock across the world's own. Where the panel has
+            // the device disabled, what arrives is counted, as every simulated
+            // payload counts it, and kept as the latest, and the part stays
             // off: see `crate::node::physics::Power`.
             crate::node::physics::driven(
                 &config.attachment,

@@ -474,7 +474,7 @@ impl Format {
     /// temperature. Shorter is the same mistake the other way.
     ///
     /// Here rather than with the conversion that uses it, so that the
-    /// simulator, which stands in for that conversion's thermostat, reads a
+    /// simulator, which simulates that conversion's thermostat, reads a
     /// sensor's bytes as the vehicle does.
     ///
     /// # Arguments

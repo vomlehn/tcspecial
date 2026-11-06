@@ -11,8 +11,8 @@ RUST_LOG = info
 
 # The run's simulation mode, given to every program a run target starts:
 # none, some or all. All by default, because these targets run on a desk with
-# stand-ins, and a program that leaves the flag out gets none -- the flight
-# setting -- and refuses every stand-in. See "Simulation Modes" in
+# simulated and dummy devices, and a program that leaves the flag out gets
+# none -- the flight setting -- and refuses every one. See "Simulation Modes" in
 # docs/design.rst.
 #   make run-simple SIMULATE=some
 SIMULATE = all
@@ -54,7 +54,7 @@ help:
 	@echo "  make run-fprime      - Run tcsmoc on the fprime example," \
 		"playing the F´ bridge"
 	@echo "  make run-cfs         - Run tcsmoc on the cfs example," \
-		"tcssim standing in for the cFS end"
+		"tcssim simulating the cFS end"
 	@echo "  make run-can         - Run tcsmoc on the can example, on the" \
 		"kernel's virtual CAN bus"
 	@echo "  make run-gpio        - Run tcsmoc on the gpio example, on the" \
@@ -73,8 +73,8 @@ help:
 # beside it -- $(1)-sim.yaml, found by name -- simulates anything; its panels
 # show what each source sends to the ground. A payload on a device -- the
 # thermostat's I2C, SPI and GPIO -- needs that device. `make mkstubs` in the
-# top-level directory makes stand-ins for I2C, GPIO, IIO and CAN where there
-# is no hardware; there is no stand-in for SPI, so the thermostat's SPI
+# top-level directory makes dummy devices for I2C, GPIO, IIO and CAN where
+# there is no hardware; the kernel has no dummy for SPI, so the thermostat's SPI
 # sensor needs a real /dev/spidev0.0.
 #
 # The examples log to $(TELEMETRY), which is deleted before each run so that
@@ -139,19 +139,18 @@ run-fprime:
 	$(call runexample_on,fprime)
 
 # Run tcsmoc on the cfs example: a vehicle that answers to a cFS flight
-# computer, tcssim standing in for the cFS end of the software bus and tcsmoc
+# computer, tcssim simulating the cFS end of the software bus and tcsmoc
 # joining that bus as the ground.
 .PHONY: run-cfs
 run-cfs:
 	$(call runexample_on,cfs)
 
-# Run tcsmoc on the examples whose payloads are devices the kernel stands in
-# for: a virtual CAN bus, a gpio-sim chip and an iio_dummy sensor. Each
+# Run tcsmoc on the examples whose payloads are the kernel's dummy devices:
+# a virtual CAN bus, a gpio-sim chip and an iio_dummy sensor. Each
 # device has to be there first, and making one needs root, so these do not:
-# `sudo bin/mk-kernel-stand-ins can gpio iio`, in the top-level directory,
+# `sudo bin/mk-kernel-dummies can gpio iio`, in the top-level directory,
 # makes all three, where the kernel allows, and gives them to the user who
-# ran it. See "Payloads the kernel
-# stands in for" in README.md.
+# ran it. See "Payloads on the kernel's dummy devices" in README.md.
 .PHONY: run-can
 run-can:
 	$(call runexample_on,can)
@@ -208,7 +207,7 @@ run-simple-app: check-python3
 # starts tcspecial and stops it.
 #
 # Both ends again, and no simulator: a beacon comes from tcspecial itself, so
-# nothing has to be standing in for a payload for one to arrive. Only the
+# nothing has to simulate a payload for one to arrive. Only the
 # watcher is started here. tcspecial is not running until its button is
 # pressed, and the window starts it from the binary built beside it -- not
 # through cargo, so that stopping it with kill() stops tcspecial and not a

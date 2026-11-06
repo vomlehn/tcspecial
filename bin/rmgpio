@@ -1,11 +1,11 @@
 #!/bin/bash
 #
-# Remove the GPIO stand-in bin/mkgpio makes.
+# Remove the GPIO dummy device bin/mkgpio makes.
 #
 # The cleanup half of bin/mkgpio, which calls this rather than carrying a copy,
-# as each of the other three pairs does: remaking a stand-in means removing the
-# old one first, and removing it is also worth doing on its own -- after a run,
-# or before leaving a host the way it was found.
+# as each of the other three pairs does: remaking a dummy device means removing
+# the old one first, and removing it is also worth doing on its own -- after a
+# run, or before leaving a host the way it was found.
 #
 # A gpio-sim chip is one device of a module that may hold others, so the chip
 # goes by name and the module stays unless nothing is left for it to hold.

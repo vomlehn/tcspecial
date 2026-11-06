@@ -1,11 +1,11 @@
-//! A pty standing in for a device node.
+//! A pty simulating a device node.
 //!
 //! Two kinds of endpoint are simulated this way. A serial line, where it is a
-//! faithful stand-in: a pty slave is a device file with a line discipline
-//! behind it, and a handler opens it, sets it and reads it exactly as it would
-//! a port. And a SPI peripheral, where it is not: a pty carries the bytes and
-//! has no clock, so what the handler sets a real peripheral to has nowhere to
-//! go. See [`crate::node::payload::serial`] and
+//! faithful simulated device: a pty slave is a device file with a line
+//! discipline behind it, and a handler opens it, sets it and reads it exactly
+//! as it would a port. And a SPI peripheral, where it is not: a pty carries the
+//! bytes and has no clock, so what the handler sets a real peripheral to has
+//! nowhere to go. See [`crate::node::payload::serial`] and
 //! [`crate::node::payload::spi`] for what each makes of that.
 //!
 //! What they share is here: opening the pty, taking the line discipline out of
@@ -37,7 +37,7 @@ impl SimulatedNode {
     ///
     /// # Arguments
     ///
-    /// * `what` - What stands in, for the log line that says where.
+    /// * `what` - What is simulated, for the log line that says where.
     /// * `path` - The configured path a handler opens.
     ///
     /// # Returns
@@ -62,7 +62,7 @@ impl SimulatedNode {
 
         make_the_path_lead_to(&named, &slave)?;
 
-        eprintln!("{} stands in at {} -> {}", what, named.display(), slave);
+        eprintln!("{} is simulated at {} -> {}", what, named.display(), slave);
 
         Ok(Self {
             master,

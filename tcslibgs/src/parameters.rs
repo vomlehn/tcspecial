@@ -105,8 +105,8 @@ pub fn payload_parameters(dh: &DHConfig, sim: Option<&ResolvedSim>) -> String {
         }
     }
 
-    // And from the simulator configuration: how a stand-in for this payload
-    // behaves. None of it reaches tcspecial.
+    // And from the simulator configuration: how this payload behaves when
+    // tcssim simulates it. None of it reaches tcspecial.
     let _ = writeln!(out);
     match sim {
         Some(sim) => simulator_parameters(&mut out, dh, sim),
@@ -526,7 +526,7 @@ mod tests {
             mode: DHMode::Periodic,
             stale_interval: None,
             sends_from: None,
-            stand_in: None,
+            sim_address: None,
             driven: false,
         }
     }
@@ -558,7 +558,7 @@ mod tests {
     ///
     /// The two halves are what the window has to keep apart: one is flight
     /// configuration, which tcspecial serves and the ground controls, and the
-    /// other is how a stand-in behaves and reaches no spacecraft at all. A
+    /// other is how a simulated device behaves and reaches no spacecraft. A
     /// list that mixed them would have someone reading a drop percentage as
     /// something a payload does.
     #[test]

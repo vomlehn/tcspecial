@@ -11,11 +11,11 @@
 //!
 //! # What it reads
 //!
-//! The bytes each sensor stand-in sends, as they leave it: so a reading the
-//! simulator drops never arrives, and one it truncates or corrupts arrives
-//! as the vehicle would see it. Each is read as the conversion the sensor
-//! feeds reads it -- `Format::counts`, then the scale and the offset -- and
-//! one that conversion would refuse is ignored.
+//! The bytes each sensor payload sends, as they leave it: so a reading the
+//! simulator drops never arrives, and one it truncates or corrupts arrives as
+//! the vehicle would see it. Each is read as the conversion the sensor feeds
+//! reads it -- `Format::counts`, then the scale and the offset -- and one that
+//! conversion would refuse is ignored.
 //!
 //! The sensors are the simulated payloads that report the world whose data
 //! reaches the thermostat node in the configuration; the heaters are the
@@ -61,11 +61,11 @@ struct State {
 
 /// A thermostat the simulator runs in place of a thermostat node.
 ///
-/// Shared by the sensor stand-ins that report to it, each from its own
-/// thread, so what it has seen is behind a lock.
+/// Shared by the simulated sensors that report to it, each from its own thread,
+/// so what it has seen is behind a lock.
 #[derive(Debug)]
 pub struct Thermostat {
-    /// The thermostat node it stands in for.
+    /// The thermostat node it simulates.
     name: String,
     /// The temperature it holds the zone at, in kelvin.
     setpoint: f64,
@@ -83,7 +83,7 @@ impl Thermostat {
     ///
     /// # Arguments
     ///
-    /// * `name`    - The thermostat node it stands in for.
+    /// * `name`    - The thermostat node it simulates.
     /// * `params`  - That node's setpoint and half band.
     /// * `sensors` - Each sensor it reads, by payload name, with how its
     ///               bytes are read.
@@ -109,7 +109,7 @@ impl Thermostat {
         }
     }
 
-    /// The thermostat node it stands in for.
+    /// The thermostat node it simulates.
     pub fn name(&self) -> &str {
         &self.name
     }
@@ -310,10 +310,10 @@ mod tests {
         assert_eq!(send("temp_1", 293.15), Some(Decision::Off));
     }
 
-    /// A heater disabled in its panel stays off whatever the stood-in
+    /// A heater disabled in its panel stays off whatever the simulated
     /// thermostat decides, and takes its latest decision when enabled.
     #[test]
-    fn a_disabled_heater_ignores_the_stood_in_thermostat() {
+    fn a_disabled_heater_ignores_the_simulated_thermostat() {
         let (thermostat, world, warming) = thermostat();
         let heater = thermostat.heaters[0].1.clone();
         heater.enable(false);

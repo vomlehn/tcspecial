@@ -226,24 +226,27 @@ simulator file: <code>examples/thermostat-yamcs/tests/shared.rs</code>.
 tests of the examples through Yamcs share.</p>
 <p>A configuration and its simulator file are matched by payload name.
 The simulator file can’t name a payload the configuration doesn’t have,
-nor one the simulator would not stand in for: a payload that is a
-program, which tcspecial runs itself. <code>tcsverify</code> refuses
-either, as tcssim does. A payload that is only driven, such as
-<code>tees</code>’ heater, is simulated like any other: its stand-in
-counts what the vehicle sends it.</p>
+nor one the simulator would not simulate: a payload that is a program,
+which tcspecial runs itself. <code>tcsverify</code> refuses either, as
+tcssim does. A payload that is only driven, such as <code>tees</code>’
+heater, is simulated like any other: tcssim counts what the vehicle
+sends it.</p>
 <p>The YAML and XML files must say the same thing, so change both
 together.</p>
 <p>Every payload a simulator file names says <code>simulate: true</code>
-– itself or in its group, not both – for tcssim to stand in for it;
+– itself or in its group, not both – for tcssim to simulate it;
 <code>simulate: false</code> would leave it to the real device. Every
 simulator file also has a <code>tcssim</code> section giving the address
-at which tcssim says it has made its stand-ins, a port no other example
-uses, so that tcsmoc starts tcspecial only once they are there. The
-<code>make run-*</code> targets give every program
-<code>--simulate=all</code>, the run being one with stand-ins only: a
-program started without <code>--simulate</code> gets the flight setting,
-<code>none</code>, and refuses every stand-in. See “Stand-ins or
-hardware” in the manual.</p>
+at which tcssim says it has made its simulated devices, a port no other
+example uses, so that tcsmoc starts tcspecial only once they are there.
+The <code>make run-*</code> targets give every program
+<code>--simulate=all</code>, the run being one with simulated and dummy
+devices only: a program started without <code>--simulate</code> gets the
+flight setting, <code>none</code>, and refuses every simulated and dummy
+device. A <code>network</code> or <code>device-file</code> payload is a
+real device under any mode, whether or not tcssim answers at its far
+end. See “Simulated, Dummy or Real Devices: –simulate” in the
+manual.</p>
 <p>The examples’ programs – <code>beacon</code>,
 <code>lorem_gateway</code> and <code>ping_gateway.py</code> – are quiet
 unless given <code>-v</code> or <code>--verbose</code>: they print what
@@ -349,8 +352,8 @@ software bus as an SBN peer, a <code>gateway_cfs</code> node publishes
 each reading as its <code>tlm_base</code> plus the reading’s device id,
 and a command published as its <code>cmd_msgid</code> goes on to a
 heater. Every link is carried over the one peer, as message IDs.
-<code>make run-cfs</code> runs tcsmoc on it, tcssim standing in for the
-cFS side; <code>tcspecial/tests/cfs.rs</code> flies it against a test
+<code>make run-cfs</code> runs tcsmoc on it, tcssim simulating the cFS
+side; <code>tcspecial/tests/cfs.rs</code> flies it against a test
 playing the cFS side, and <code>tcspecial/tests/cfs_ground.rs</code>
 commands it from tcslib.</td>
 </tr>
@@ -364,8 +367,8 @@ drawn from it, so its readings go to the ground over the
 <code>tcspecial</code> section’s <code>payload_telemetry</code>:
 tcspecial sends each one to <code>dest_base</code> plus the payload’s
 device id, <code>127.0.0.1:6100</code> for <code>sensor</code>, which is
-device 0. tcssim stands in for <code>sensor</code>, sending a packet
-every second.</p>
+device 0. tcssim simulates <code>sensor</code>, sending a packet every
+second.</p>
 <pre><code>make run-simple</code></pre>
 <p>That runs tcsmoc on the example, which starts tcspecial and tcssim
 itself and shows a panel for <code>sensor</code>: when its last packet
@@ -374,7 +377,7 @@ arrived, what it said, and how many there have been.</p>
 <ul>
 <li>MOC: Rust – tcsmoc.</li>
 <li>Vehicle: Rust – tcspecial.</li>
-<li>Payload: Rust – tcssim stands in for <code>sensor</code>, a network
+<li>Payload: Rust – tcssim simulates <code>sensor</code>, a network
 payload.</li>
 </ul>
 <h3 id="beacon">beacon</h3>
@@ -451,7 +454,7 @@ cargo run --bin beacon -- --xml      # beacon.xtcs</code></pre>
 <li>MOC: Rust – the <code>beacon</code> program, on
 <code>tcslib::beacon</code> and <code>tcsui</code>.</li>
 <li>Vehicle: Rust – tcspecial.</li>
-<li>Payload: Rust – tcssim stands in for <code>sensor</code>, a network
+<li>Payload: Rust – tcssim simulates <code>sensor</code>, a network
 payload.</li>
 </ul>
 <h3 id="ping">ping</h3>
@@ -654,28 +657,28 @@ uses.</p>
 <li>ground program: Python 3 (<code>ping_yamcs.py</code>), with Yamcs
 (Java)</li>
 </ul>
-<h2 id="payloads-the-kernel-stands-in-for">Payloads the kernel stands in
-for</h2>
+<h2 id="payloads-on-the-kernels-dummy-devices">Payloads on the kernel’s
+dummy devices</h2>
 <p>Each is one of the payload types whose far end is a device the kernel
 makes rather than a file or a socket tcssim can make, and each is flown
-against the kernel’s own stand-in for that device by
-<code>tcspecial/tests/kernel-stand-ins.rs</code>, which plays the
-device’s far end through the kernel: that is what makes CAN and GPIO
-supported. IIO stays experimental until its test has passed, which it
-cannot on a kernel whose <code>iio_dummy</code> has no buffer, such as
-Ubuntu’s: see “What Is Supported and What Is Experimental” in
+against the kernel’s dummy device for it by
+<code>tcspecial/tests/kernel-dummies.rs</code>, which plays the device’s
+far end through the kernel: that is what makes CAN and GPIO supported.
+IIO stays experimental until its test has passed, which it cannot on a
+kernel whose <code>iio_dummy</code> has no buffer, such as Ubuntu’s: see
+“What Is Supported and What Is Experimental” in
 <code>docs/design.rst</code>. The devices need root to make, so nothing
 here makes them. Run this once, from the account that runs the examples
 and the tests:</p>
-<pre><code>sudo bin/mk-kernel-stand-ins</code></pre>
+<pre><code>sudo bin/mk-kernel-dummies</code></pre>
 <p>With no arguments it makes the CAN bus and the GPIO chip;
-<code>sudo bin/mk-kernel-stand-ins iio</code> makes the IIO sensor, and
+<code>sudo bin/mk-kernel-dummies iio</code> makes the IIO sensor, and
 <code>can gpio iio</code> all three. It refuses, and makes nothing,
 where this kernel lacks a module one of the types named needs, saying
 which. It gives what it makes to the user who ran it, and prints the
 number the kernel gave the GPIO chip and the IIO sensor.
-<code>sudo bin/rm-kernel-stand-ins</code> takes away whichever were
-made. Nothing either does survives a reboot.</p>
+<code>sudo bin/rm-kernel-dummies</code> takes away whichever were made.
+Nothing either does survives a reboot.</p>
 <table>
 <colgroup>
 <col style="width: 50%" />
@@ -726,26 +729,26 @@ the switch’s line the other way every second and counts the lamp’s
 changes. The configuration names <code>/dev/gpiochip1</code>, which is
 what the simulated chip is on a host with one chip of its own; the
 number is given as chips appear, so write the one
-<code>bin/mk-kernel-stand-ins</code> printed.</p>
+<code>bin/mk-kernel-dummies</code> printed.</p>
 <pre><code>make run-gpio</code></pre>
 <h3 id="iio">iio</h3>
 <p>The sensor is one of the kernel’s <code>iio_dummy</code>, whose
-buffer a software trigger fills a hundred times a second: the kernel
-stands in for it entirely, and tcssim makes nothing. Its buffer is there
-only where the kernel’s <code>iio_dummy</code> was built with
+buffer a software trigger fills a hundred times a second: the dummy
+device is the whole payload, and tcssim makes nothing. Its buffer is
+there only where the kernel’s <code>iio_dummy</code> was built with
 <code>CONFIG_IIO_SIMPLE_DUMMY_BUFFER</code>, which a stock distribution
-kernel’s is not; <code>bin/mk-kernel-stand-ins iio</code> says so where
-it was not, and that is why the type is still experimental. The
+kernel’s is not; <code>bin/mk-kernel-dummies iio</code> says so where it
+was not, and that is why the type is still experimental. The
 configuration names <code>/dev/iio:device1</code>, which is what the
 dummy is on a host with one sensor of its own; write the number
-<code>bin/mk-kernel-stand-ins</code> printed.</p>
+<code>bin/mk-kernel-dummies</code> printed.</p>
 <pre><code>make run-iio</code></pre>
 <p>Languages, for all three:</p>
 <ul>
 <li>MOC: Rust – tcsmoc.</li>
 <li>Vehicle: Rust – tcspecial.</li>
-<li>Payload: the kernel’s stand-in, with tcssim playing the device’s far
-end for CAN and GPIO.</li>
+<li>Payload: the kernel’s dummy device, with tcssim playing the device’s
+far end for CAN and GPIO.</li>
 </ul>
 <h2 id="more-complex-examples">More complex examples</h2>
 <p>Each puts the vehicle to work on its payloads: what they send, and
@@ -766,8 +769,8 @@ what is done with it aboard and on the ground.</p>
 <td><code>thermostat</code></td>
 <td>Three temperature sensors on a thermal mass, two on I2C and one on
 SPI, converted to kelvin, voted on, and fed to a thermostat that drives
-two heaters, every one stood in for by tcssim, so that it runs on any
-desk. The setpoint is commanded from the ground, and tcsmoc plots the
+two heaters, every one simulated by tcssim, so that it runs on any desk.
+The setpoint is commanded from the ground, and tcsmoc plots the
 temperatures and the heaters.</td>
 </tr>
 <tr>
@@ -782,17 +785,17 @@ them.</td>
 <td><code>battery</code></td>
 <td>A power bus through an orbit: a power monitor asked over a serial
 line, a shunt, the battery’s charge counted by a Python 3 program, and
-the science load shed in eclipse by a thermostat. tcssim stands in for
-every payload, joined to a physics model of a sun, a solar array, loads,
-a bus and a battery.</td>
+the science load shed in eclipse by a thermostat. tcssim simulates every
+payload, joined to a physics model of a sun, a solar array, loads, a bus
+and a battery.</td>
 </tr>
 <tr>
 <td><code>descent</code></td>
 <td>A lander’s terminal descent: a radar altimeter’s altitude flown down
 by a Python 3 guidance program throttling the engine, a Doppler
 velocimeter, and a touchdown switch that speaks the moment the lander is
-down. tcssim stands in for every payload, joined to a physics model of
-an engine and the body it brakes.</td>
+down. tcssim simulates every payload, joined to a physics model of an
+engine and the body it brakes.</td>
 </tr>
 <tr>
 <td><code>simple-app</code></td>
@@ -827,18 +830,18 @@ logs the readings, the decisions and the lines in
 and <code>temp_2</code> on an I2C bus, of type <code>i2c_tmass</code>,
 and <code>temp_3</code> a SPI peripheral, of type
 <code>spi_tmass</code>. On a desk each is reached over UDP at its
-<code>stand_in</code> on this host, ports 5201 to 5203, where tcssim
+<code>sim_address</code> on this host, ports 5201 to 5203, where tcssim
 answers with the zone’s temperature; flown, the buses are opened. The
 heaters’ switches and the lines sensing them are lines 2 to 5 of the
-kernel’s simulated GPIO chip, <code>/dev/gpiochip1</code>, which tcssim
+kernel’s dummy GPIO chip, <code>/dev/gpiochip1</code>, which tcssim
 moves and watches: make it once with
-<code>sudo bin/mk-kernel-stand-ins gpio</code> (see “Payloads the kernel
-stands in for”, below). The gpio example has lines 0 and 1 of it, so the
-two run at once. The buses themselves are flown against stand-ins by
-<code>make stand-ins-test</code>, with
+<code>sudo bin/mk-kernel-dummies gpio</code> (see “Payloads on the
+kernel’s dummy devices”, below). The gpio example has lines 0 and 1 of
+it, so the two run at once. The buses themselves are flown against
+simulated devices by <code>make simulated-devices-test</code>, with
 <code>tests/manual/thermostat.ytcs</code>.</p>
-<p>tcssim joins the stand-ins to the vehicle’s physics model, in the
-world section of <code>thermostat-sim.yaml</code>, a link to
+<p>tcssim joins the simulated payloads to the vehicle’s physics model,
+in the world section of <code>thermostat-sim.yaml</code>, a link to
 <code>thermostat-common/thermostat-sim.yaml</code>, which
 thermostat-yamcs’s simulator file is a link to too: a zone and two
 heaters, each a part simulated alone and joined to the zone under
@@ -847,10 +850,10 @@ heaters, each a part simulated alone and joined to the zone under
 so their readings agree and the vote produces a temperature. The zone
 starts at 292.15 K, inside the band, and cools towards its surroundings,
 288.15 K, just inside the plot’s lower red, which swing half a kelvin
-over a ninety minute orbit; each heater’s switch’s stand-in is joined to
+over a ninety minute orbit; each heater’s switch is joined to
 <code>heater_1.on</code> or <code>heater_2.on</code>, so the heaters
 warm it while the vehicle has them on: the loop closes through
-tcspecial. <code>gpio-in-tmass</code>’s stand-in pulls its line 2 to
+tcspecial. tcssim pulls <code>gpio-in-tmass</code>’s line 2 to
 <code>heater_1.heating</code> and its line 3 to
 <code>heater_2.heating</code>, which are on only while each heater is
 really heating. The heaters are four watts each, and either alone holds
@@ -878,9 +881,9 @@ the zone falls behind in the cold part of the orbit.</p>
 <li>MOC: Rust – tcsmoc.</li>
 <li>Vehicle: Rust – tcspecial, whose conversions, vote, thermostat and
 log are its own nodes.</li>
-<li>Payload: Rust – tcssim stands in for the three sensors, with the
-zone they read, and for the heaters’ switches and the lines sensing
-them, on the kernel’s simulated GPIO chip.</li>
+<li>Payload: Rust – tcssim simulates the three sensors, with the zone
+they read, and for the heaters’ switches and the lines sensing them, on
+the kernel’s simulated GPIO chip.</li>
 </ul>
 <h3 id="thermostat-yamcs">thermostat-yamcs</h3>
 <p>The thermostat example with <a href="https://yamcs.org">Yamcs</a> at
@@ -1014,13 +1017,13 @@ charge, a ratio, and sets itself full whenever the current falls to
 nought. <code>shedding</code>, a thermostat around 0.4, sheds the
 science instrument below three tenths by driving <code>science</code>,
 port 5302, and restores it above half.</p>
-<p>tcssim stands in for all three, joined to the vehicle’s physics
-model, in the world section of <code>battery-sim.yaml</code>: a sun, a
-solar array, two loads, a bus and a battery, each a part simulated alone
-and joined under <code>connections</code>. The orbit is six minutes and
-the battery small, so that a run sees, in one orbit, the battery charge
-and fill, the eclipse drain it, the science load shed and the sun bring
-it back. Going into shadow and out, and the battery reaching full, are
+<p>tcssim simulates all three, joined to the vehicle’s physics model, in
+the world section of <code>battery-sim.yaml</code>: a sun, a solar
+array, two loads, a bus and a battery, each a part simulated alone and
+joined under <code>connections</code>. The orbit is six minutes and the
+battery small, so that a run sees, in one orbit, the battery charge and
+fill, the eclipse drain it, the science load shed and the sun bring it
+back. Going into shadow and out, and the battery reaching full, are
 events of the model’s, met at their moments.</p>
 <pre><code>make run-battery</code></pre>
 <p>Press Connect in tcsmoc, and Enable on each payload in tcssim, to
@@ -1031,7 +1034,7 @@ start the data.</p>
 <li>Vehicle: Rust – tcspecial, whose conversions, thermostat and log are
 its own nodes – and Python 3, the charge count, which is a program of
 the example’s.</li>
-<li>Payload: Rust – tcssim stands in for the power monitor, with a
+<li>Payload: Rust – tcssim simulates the power monitor, with a
 pseudo-terminal at its path, the shunt and the science switch.</li>
 </ul>
 <h3 id="descent">descent</h3>
@@ -1044,29 +1047,29 @@ altitude ten times a second, which <code>altitude</code> makes metres.
 <code>guidance.py</code>, a Python 3 program beside the configuration
 that works out the rate of descent from the altitudes, flies a rate that
 slows as the ground nears, and answers a throttle, a ratio, which drives
-<code>engine</code>, port 5404: four bytes of a value, which the
-engine’s stand-in reads as the ratio it is. <code>doppler</code>, port
-5402, sends the velocity for the ground, and <code>touchdown</code>,
-port 5403, a switch on a landing leg, says <code>1</code> when the
-lander is down.</p>
-<p>tcssim stands in for all four, joined to the vehicle’s physics model,
-in the world section of <code>descent-sim.yaml</code>: an engine and the
+<code>engine</code>, port 5404: four bytes of a value, which tcssim’s
+engine reads as the ratio it is. <code>doppler</code>, port 5402, sends
+the velocity for the ground, and <code>touchdown</code>, port 5403, a
+switch on a landing leg, says <code>1</code> when the lander is
+down.</p>
+<p>tcssim simulates all four, joined to the vehicle’s physics model, in
+the world section of <code>descent-sim.yaml</code>: an engine and the
 body it brakes, five hundred metres up and falling at twenty metres a
 second. The body falls by the rocket equation, and the moment it reaches
-the ground is found ahead of time and met exactly; the touchdown
-switch’s stand-in waits on the model for it, and speaks then. A run
-lands in about seventy-five seconds.</p>
+the ground is found ahead of time and met exactly; tcssim’s touchdown
+switch waits on the model for it, and speaks then. A run lands in about
+seventy-five seconds.</p>
 <pre><code>make run-descent</code></pre>
 <p>Press Connect in tcsmoc, and Enable on each payload in tcssim,
 <code>engine</code> and <code>radar</code> first: the lander does not
-start falling until a stand-in starts.</p>
+start falling until a simulated payload starts.</p>
 <p>Languages:</p>
 <ul>
 <li>MOC: Rust – tcsmoc.</li>
 <li>Vehicle: Rust – tcspecial, whose conversions and log are its own
 nodes – and Python 3, the guidance, which is a program of the
 example’s.</li>
-<li>Payload: Rust – tcssim stands in for the radar, the velocimeter, the
+<li>Payload: Rust – tcssim simulates the radar, the velocimeter, the
 switch and the engine.</li>
 </ul>
 <h3 id="simple-app">simple-app</h3>

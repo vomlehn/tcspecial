@@ -4,7 +4,7 @@
 The vehicle is the thermostat example's: three sensors of one zone, each
 converted to kelvin, a vote between them, and a thermostat that switches two
 heaters as the zone's temperature leaves a band about its setpoint, with
-tcssim standing in for the sensors and the heaters on a physics model of the
+tcssim simulating the sensors and the heaters on a physics model of the
 zone. What differs is the ground end of the link: Yamcs
 (https://yamcs.org), which speaks CCSDS packets, so the configuration's
 gateway is ``yamcs``, and every packet to and from the ground carries a
@@ -78,7 +78,7 @@ HTTP_PORT = 17090
 INSTANCE = "thermostat"
 
 #: The run's simulation mode, given to tcssim and tcspecial: every payload
-#: stood in for, as the examples' run targets have it.
+#: simulated, as the examples' run targets have it.
 SIMULATE = "all"
 
 #: How long tcssim is given to say it is ready, in seconds.
@@ -613,7 +613,7 @@ def main(argv):
                               options.verbose)
             simulator.start()
             started.append(simulator)
-            status("waiting for tcssim to make its stand-ins")
+            status("waiting for tcssim to make its simulated devices")
             simulator_ready(setup.path, tcssim, SIMULATOR_PATIENCE)
         if not options.no_vehicle:
             vehicle = Vehicle.for_configuration(setup.path, options.tcspecial,

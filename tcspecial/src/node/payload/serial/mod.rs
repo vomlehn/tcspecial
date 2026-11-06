@@ -109,11 +109,11 @@ impl SerialEndpoint {
             .read(true)
             .write(true)
             // Not this process's terminal. A line that is a tty -- a real
-            // serial port, or a pty standing in for one -- becomes the
-            // controlling terminal of a process that opens it without this,
-            // and then a read from a background process group raises SIGTTIN
-            // and a hangup raises SIGHUP: a handler stopped or killed for
-            // reasons that have nothing to do with its device.
+            // serial port, or a pty tcssim made to simulate one -- becomes the
+            // controlling terminal of a process that opens it without this, and
+            // then a read from a background process group raises SIGTTIN and a
+            // hangup raises SIGHUP: a handler stopped or killed for reasons
+            // that have nothing to do with its device.
             .custom_flags(libc::O_NOCTTY)
             .open(&config.path)?;
 
@@ -147,19 +147,19 @@ impl SerialEndpoint {
     }
 }
 
-/// Sets the line's data rate, byte length, stop bits and parity, and its
-/// RS-485 mode where the configuration gives one and the line is not a
-/// stand-in.
+/// Sets the line's data rate, byte length, stop bits and parity, and its RS-485
+/// mode where the configuration gives one and the line is not a simulated
+/// device.
 ///
 /// Raw rather than canonical: a device link carries bytes, and the line
 /// discipline's editing, echo and newline translation would corrupt them. The
 /// parity is read back once set, because a port may take the call and keep
 /// less than it was given.
 ///
-/// A stand-in -- a pseudo-terminal, which tcssim makes -- has no transceiver
-/// and no RTS to drive, so the RS-485 terms are left unapplied there and the
-/// bytes go both ways as on any line: the bus is simulated by what is at the
-/// far end, and only its electrical turnaround is not.
+/// A simulated line -- a pseudo-terminal, which tcssim makes -- has no
+/// transceiver and no RTS to drive, so the RS-485 terms are left unapplied
+/// there and the bytes go both ways as on any line: the bus is simulated by
+/// what is at the far end, and only its electrical turnaround is not.
 ///
 /// A rate the platform cannot express is reported with the rate in hand,
 /// because the alternative is a line running at a rate nobody chose.
@@ -302,17 +302,19 @@ fn apply_line_terms(
     }
 
     // And last, the electrical layer under all of that, for a line that is a
-    // two-wire bus. After the termios terms, because the mode is a property
-    // of the port rather than of the line discipline and the driver wants the
-    // line already set up; and refused rather than reported, for the reason
-    // serial::rs485::apply gives. Not on a stand-in: under the flight
+    // two-wire bus. After the termios terms, because the mode is a property of
+    // the port rather than of the line discipline and the driver wants the line
+    // already set up; and refused rather than reported, for the reason
+    // serial::rs485::apply gives. Not on a simulated device: under the flight
     // setting none is allowed to start, so a pseudo-terminal here is a run
     // against tcssim, which carries the bus's bytes and has no turnaround.
     if let Some(terms) = &config.rs485 {
-        if tcslibgs::node::payload::serial::judged(&config.path).is_stand_in() {
+        if tcslibgs::node::payload::serial::judged(&config.path)
+            .is_simulated()
+        {
             log::info!(
-                "{what}: {} is a stand-in, so its RS-485 terms are not \
-                 applied",
+                "{what}: {} is a simulated device, so its RS-485 terms are \
+                 not applied",
                 config.path
             );
         } else {
@@ -504,12 +506,12 @@ mod tests {
     /// A line is opened with the parity its configuration asks for, and a
     /// line that will not take one says so.
     ///
-    /// Termios computes a parity bit per character, which is the whole of
-    /// what a start-stop line does about checking. The five values are what a
-    /// UART offers; a pty is the one line that will take none of them but
-    /// `none`, which is a property of the stand-in rather than of the
-    /// configuration -- and since a simulated line is a pty, the handler has
-    /// to say which term was refused rather than leave a file to be bisected.
+    /// Termios computes a parity bit per character, which is the whole of what
+    /// a start-stop line does about checking. The five values are what a UART
+    /// offers; a pty is the one line that will take none of them but `none`,
+    /// which is a property of the simulated line rather than of the
+    /// configuration -- and since a simulated line is a pty, the handler has to
+    /// say which term was refused rather than leave a file to be bisected.
     #[test]
     fn a_line_is_set_to_the_parity_it_was_given() {
         use std::os::unix::io::FromRawFd;
@@ -631,7 +633,7 @@ mod tests {
     /// A pty's slave is a port as far as this endpoint is concerned: it takes
     /// the terms and carries the bytes.
     ///
-    /// Which is the whole of what tcssim stands in for a serial line with. The
+    /// Which is the whole of what tcssim simulates a serial line with. The
     /// terms are stored and ignored by the kernel -- a pty has no cable to run
     /// at 9600 -- so what this shows is that a handler configured for a line
     /// opens one, sets it, and reads what the far end sends, with no hardware
@@ -691,7 +693,7 @@ mod tests {
     /// A pty's slave is a port as far as this endpoint is concerned: it takes
     /// the terms and carries the bytes.
     ///
-    /// Which is the whole of what tcssim stands in for a serial line with. The
+    /// Which is the whole of what tcssim simulates a serial line with. The
     /// terms are stored and ignored by the kernel -- a pty has no cable to run
     /// at 9600 -- so what this shows is that a handler configured for a line
     /// opens one, sets it, and reads what the far end sends, with no hardware
@@ -743,7 +745,7 @@ mod tests {
         );
     }
 
-    /// A line that states RS-485 is stood in for by a pty as any line is: the
+    /// A line that states RS-485 is simulated by a pty as any line is: the
     /// terms are left unapplied there, rather than refused, and the bytes go
     /// both ways.
     ///
@@ -770,7 +772,7 @@ mod tests {
         };
         let mut endpoint =
             SerialEndpoint::new("bus", &config).unwrap_or_else(|e| {
-                panic!("{slave} would not stand in for a bus: {e}")
+                panic!("{slave} would not simulate a bus: {e}")
             });
 
         master.write_all(b"up").expect("the far end writes");

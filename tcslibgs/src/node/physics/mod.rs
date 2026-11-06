@@ -1,16 +1,16 @@
-//! The physics model: the vehicle's physical components, which the
-//! simulator's stand-ins measure and act on.
+//! The physics model: the vehicle's physical components, which the simulator's
+//! simulated payloads measure and act on.
 //!
-//! The `physics` of the simulator file's `world` section, beside the
-//! stand-ins that are joined to it; the world also states its
-//! `ambient_temp`, the one temperature every thermal mass's surroundings
-//! are about: see [`WorldSection`]. It was once a file of its own, named by the simulator file,
-//! so that one vehicle could be shared by several configurations of its
-//! payloads; but a model in another file is a second file to find, to keep
-//! and to send with the first, and a stand-in's `connects` names a terminal
-//! that only the other file says is there. One file says the whole of what
-//! tcssim simulates. A simulator file that still names a model, and a model
-//! written as a file of its own, are refused, told where it goes now: see
+//! The `physics` of the simulator file's `world` section, beside the simulated
+//! payloads that are joined to it; the world also states its `ambient_temp`,
+//! the one temperature every thermal mass's surroundings are about: see
+//! [`WorldSection`]. It was once a file of its own, named by the simulator
+//! file, so that one vehicle could be shared by several configurations of its
+//! payloads; but a model in another file is a second file to find, to keep and
+//! to send with the first, and a simulated payload's `connects` names a
+//! terminal that only the other file says is there. One file says the whole of
+//! what tcssim simulates. A simulator file that still names a model, and a
+//! model written as a file of its own, are refused, told where it goes now: see
 //! [`crate::sim_reshaped`].
 //!
 //! # What it holds
@@ -52,10 +52,10 @@
 //! a connection joins an output to an input of the same kind: see
 //! [`terminal`].
 //!
-//! A stand-in elsewhere in the simulator file is joined to a terminal by
-//! naming it, `connects: zone.temperature`: a sensor reports an output, and
-//! a stand-in the vehicle drives drives an input. This section says only
-//! what the world is.
+//! A simulated payload elsewhere in the simulator file is joined to a terminal
+//! by naming it, `connects: zone.temperature`: a sensor reports an output, and
+//! a payload the vehicle drives drives an input. This section says only what
+//! the world is.
 //!
 //! # Its figures
 //!
@@ -602,7 +602,7 @@ impl WorldSection {
     /// inputs, joins a value in one unit to an input in another, or is a
     /// second output on an input that takes one.
     ///
-    /// What the stand-ins are joined to is the rest of the simulator
+    /// What the simulated payloads are joined to is the rest of the simulator
     /// file's, and checked there: see
     /// `crate::sim_config::SimConfigFile::physics`.
     ///
@@ -667,7 +667,7 @@ impl WorldSection {
                 problems.push(PhysicsProblem::of(
                     name,
                     "two components have this name, and a connection or a \
-                     stand-in names one",
+                     simulated payload names one",
                 ));
                 continue;
             }

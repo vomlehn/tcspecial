@@ -1,10 +1,10 @@
-//! A simulated device at the far end of a Unix-domain socket.
+//! The far end of a Unix-domain socket, played by the simulator.
 //!
-//! The easiest of the kinds to stand in for: the simulator can simply be one.
-//! A Unix socket is a socket, so there is no emulation here and nothing the
-//! simulation leaves out -- unlike a bus, a line, or a peripheral, where
-//! something had to be found to stand in with and something had to be given
-//! up.
+//! The easiest of the kinds to play: the socket is a real one, and the
+//! simulator can simply be its far end. There is no emulation here and
+//! nothing the simulation leaves out -- unlike a bus, a line, or a
+//! peripheral, where a simulated or dummy device had to be found and
+//! something had to be given up.
 //!
 //! What a Unix socket does bring is a path, and which end owns it differs by
 //! protocol, because which end binds does:
@@ -33,7 +33,7 @@ use std::sync::Arc;
 use std::time::Instant;
 
 use crate::payload::{
-    a_packet, could_not_stand_in, hangs_up, ignore_this_request, lateness,
+    a_packet, could_not_simulate, hangs_up, ignore_this_request, lateness,
     send_in_segments, wait_out_packet, wait_while_running, Pacing,
     PayloadConfig, PayloadStats, Produce,
 };
@@ -140,9 +140,9 @@ pub fn run_unix_stream_node(
 ) {
     let path = PathBuf::from(&config.address);
     if let Err(e) = clear_a_dead_socket(&path) {
-        could_not_stand_in(
+        could_not_simulate(
             &config,
-            format!("failed to stand in for a Unix stream device: {}", e),
+            format!("failed to play a Unix stream device: {}", e),
         );
         return;
     }
@@ -150,7 +150,7 @@ pub fn run_unix_stream_node(
     let listener = match UnixListener::bind(&path) {
         Ok(listener) => listener,
         Err(e) => {
-            could_not_stand_in(
+            could_not_simulate(
                 &config,
                 format!("failed to listen at {}: {}", path.display(), e),
             );
@@ -299,9 +299,9 @@ pub fn run_unix_dgram_node(
     };
 
     if let Err(e) = clear_a_dead_socket(&mine) {
-        could_not_stand_in(
+        could_not_simulate(
             &config,
-            format!("failed to stand in for a Unix datagram device: {}", e),
+            format!("failed to play a Unix datagram device: {}", e),
         );
         return;
     }
@@ -309,7 +309,7 @@ pub fn run_unix_dgram_node(
     let socket = match UnixDatagram::bind(&mine) {
         Ok(socket) => socket,
         Err(e) => {
-            could_not_stand_in(
+            could_not_simulate(
                 &config,
                 format!("failed to bind {}: {}", mine.display(), e),
             );
@@ -400,7 +400,7 @@ pub fn run_unix_dgram_node(
     }
 }
 
-/// Stands in for a datagram payload the vehicle drives and never reads.
+/// Plays a datagram payload the vehicle drives and never reads.
 ///
 /// The mirror of `run_driven_udp_node`, and the same loop with the sending
 /// taken out: whatever the vehicle writes is counted and acted on, and
@@ -426,12 +426,9 @@ fn run_driven_unix_dgram_node(
     at: &Path,
 ) {
     if let Err(e) = clear_a_dead_socket(at) {
-        could_not_stand_in(
+        could_not_simulate(
             &config,
-            format!(
-                "failed to stand in for a driven Unix datagram device: {}",
-                e
-            ),
+            format!("failed to play a driven Unix datagram device: {}", e),
         );
         return;
     }
@@ -439,7 +436,7 @@ fn run_driven_unix_dgram_node(
     let socket = match UnixDatagram::bind(at) {
         Ok(socket) => socket,
         Err(e) => {
-            could_not_stand_in(
+            could_not_simulate(
                 &config,
                 format!(
                     "failed to wait for the vehicle at {}: {}",
@@ -479,9 +476,9 @@ fn run_driven_unix_dgram_node(
                 break;
             }
             // The world is told before the statistics are, so that nothing
-            // holds the stats lock across the world's own. Where the panel
-            // has the device disabled, what arrives is counted, as every
-            // stand-in counts it, and kept as the latest, and the part stays
+            // holds the stats lock across the world's own. Where the panel has
+            // the device disabled, what arrives is counted, as every simulated
+            // payload counts it, and kept as the latest, and the part stays
             // off: see `crate::node::physics::Power`.
             crate::node::physics::driven(
                 &config.attachment,
@@ -576,7 +573,7 @@ mod tests {
         }
         assert!(path.exists(), "{} was never bound", path.display());
 
-        // Standing in for the handler.
+        // Playing the handler.
         let mut handler =
             UnixStream::connect(&path).expect("the handler connects");
         handler
@@ -619,7 +616,7 @@ mod tests {
         std::fs::remove_file(a_path_of_its_own(&path.display().to_string()))
             .ok();
 
-        // Standing in for the handler, which is the end that binds.
+        // Playing the handler, which is the end that binds.
         let handler = UnixDatagram::bind(&path).expect("the handler binds");
         handler
             .set_read_timeout(Some(Duration::from_secs(5)))

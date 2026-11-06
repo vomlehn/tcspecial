@@ -31,7 +31,7 @@ for each:
   about a spacecraft without having asked it anything.
 - **Waiting for the simulator.** `simulator::wait` asks tcssim, at the
   address its simulator file gives as `tcssim.ready`, until it has made its
-  stand-ins and is set up for the same configuration, simulator file and
+  simulated devices and is set up for the same configuration, simulator file and
   `--simulate` mode, so that a harness starts tcspecial only once there is
   something for it to find. It says what it last heard when it gives up.
 
@@ -40,11 +40,11 @@ for each:
   on a thread of its own, which turns the bus back into loopback UDP links:
   `command_links_of`, `beacon::open` and `GatewayReceiver::open` use it
   themselves for a configuration that answers to cFS, so a station is written
-  the same either way. `bus::StandIn` is the cFS end, as tcssim stands in for
-  it: the vehicle and the station are both its peers. Only a stand-in takes a
-  station: SBN on a real cFS sends no peer what another published, so a
-  station commands a vehicle behind a real cFS through that cFS's own ground
-  system.
+  the same either way. `bus::SimulatedCfs` is the cFS end, as tcssim
+  simulates it: the vehicle and the station are both its peers. Only the
+  simulated cFS end takes a station: SBN on a real cFS sends no peer what
+  another published, so a station commands a vehicle behind a real cFS
+  through that cFS's own ground system.
 
 The link to tcspecial is UDP, and only UDP: `TcsClient` sends its commands
 through a `UdpConnection` -- on a bus, to the station's peer of it, which

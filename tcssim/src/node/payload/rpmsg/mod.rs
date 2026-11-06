@@ -1,22 +1,22 @@
-//! A simulated device that stands in for software on another core.
+//! A simulated device that plays software on another core.
 //!
 //! **Experimental, and not yet supported.** Run against a pseudo-terminal
-//! standing in for the channel, and against no remote processor.
+//! simulating the channel, and against no remote processor.
 //!
 //! An rpmsg channel is a character device carrying whole messages both ways,
-//! and a pty is a character device carrying bytes both ways -- so the
-//! stand-in is [`crate::pty`] again, with the configured path led to the
-//! slave while the device runs. The handler writes a message and reads an
-//! answer exactly as it would on a real channel.
+//! and a pty is a character device carrying bytes both ways -- so the simulated
+//! device is [`crate::pty`] again, with the configured path led to the slave
+//! while the device runs. The handler writes a message and reads an answer
+//! exactly as it would on a real channel.
 //!
 //! Two things a pty is not. It has no entry under `/sys/class/rpmsg`, so the
-//! handler's check of which channel it is finds nothing to compare against
-//! and passes -- which is deliberate: that check exists to catch a node whose
-//! number moved, and a stand-in has no number to move. And a pty keeps no
-//! message boundaries: the kernel's rpmsg driver hands over one message per
-//! read, where a pty hands over whatever bytes are there. A packet sent as
-//! one write commonly arrives as one read, so the difference shows only where
-//! a device writes faster than the handler reads.
+//! handler's check of which channel it is finds nothing to compare against and
+//! passes -- which is deliberate: that check exists to catch a node whose
+//! number moved, and a simulated device has no number to move. And a pty keeps
+//! no message boundaries: the kernel's rpmsg driver hands over one message per
+//! read, where a pty hands over whatever bytes are there. A packet sent as one
+//! write commonly arrives as one read, so the difference shows only where a
+//! device writes faster than the handler reads.
 //!
 //! Both directions, so a triggered device works here: the simulator reads
 //! the handler's request off the same pty and answers it.
@@ -29,7 +29,7 @@ use std::sync::Arc;
 use std::time::Instant;
 
 use crate::payload::{
-    a_packet, could_not_stand_in, ignore_this_request, lateness,
+    a_packet, could_not_simulate, ignore_this_request, lateness,
     send_in_segments, wait_out_packet, wait_while_running, Pacing,
     PayloadConfig, PayloadStats, Produce,
 };
@@ -53,9 +53,9 @@ pub fn run_rpmsg_node(
     ) {
         Ok(node) => node,
         Err(e) => {
-            could_not_stand_in(
+            could_not_simulate(
                 &config,
-                format!("failed to stand in for an rpmsg channel: {}", e),
+                format!("failed to simulate an rpmsg channel: {}", e),
             );
             return;
         }
@@ -189,11 +189,11 @@ mod tests {
             })
             .expect("the remote sent a message");
         // A whole number of messages, rather than exactly one of them. The
-        // stand-in is a pty and a pty keeps no message boundaries: the remote
-        // writes one message every 20 ms and a read that arrives between two
-        // of them returns both, which a real channel would have handed over
-        // one at a time. Asserting one message read this as a failure about
-        // one run in three.
+        // simulated device is a pty and a pty keeps no message boundaries: the
+        // remote writes one message every 20 ms and a read that arrives between
+        // two of them returns both, which a real channel would have handed over
+        // one at a time. Asserting one message read this as a failure about one
+        // run in three.
         assert!(
             got % 8 == 0,
             "a read should be whole messages of the configured size, and {got} \
@@ -217,7 +217,7 @@ mod tests {
         let mut device = SimulatedPayload::new(channel_at(&path, true, 0));
         device.start().expect("the remote starts");
 
-        // The handler's end of the channel, once the stand-in has made it.
+        // The handler's end of the channel, once the simulator has made it.
         let mut handler = (0..100)
             .find_map(|_| {
                 std::thread::sleep(Duration::from_millis(20));

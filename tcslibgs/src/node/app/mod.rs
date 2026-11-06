@@ -13,8 +13,8 @@
 //! * `app_payload_veh` reads payload data and writes gateway data, so it is a
 //!   sink for what travels groundward and a source of what travels
 //!   vehicleward. The same shape the ground link has, which is the thing an
-//!   app of this kind stands in for: something that consumes readings and
-//!   answers with commands.
+//!   app of this kind takes the place of: something that consumes readings
+//!   and answers with commands.
 //! * `app_gateway_veh` is the mirror of it: gateway data in, payload data out.
 //! * `app_all_veh` has both, which makes it the one kind that can carry a
 //!   stream *through* -- payload data in at the one interface and out at the

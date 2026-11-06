@@ -13,13 +13,13 @@
 //! `--simulate=<mode>` is the run's simulation mode, as tcspecial and tcsmoc
 //! take it: see `tcslibgs::simulate`. Under `none`, the flight setting and
 //! the mode a run without the flag gets, tcssim refuses to start, there being
-//! nothing for it to do in a run that may have no stand-ins. Under `some` and
-//! `all` it checks that what it will stand in for, with what is a stand-in
-//! already, is what the mode allows.
+//! nothing for it to do in a run that may simulate nothing. Under `some` and
+//! `all` it checks that what it will simulate, with what is a simulated or
+//! dummy device already, is what the mode allows.
 //!
-//! Every stand-in is made as tcssim starts and kept until it stops, so that
-//! tcspecial finds them whatever the panels say; a panel's button decides
-//! only whether its payload sends. Before making any, tcssim binds the
+//! Every simulated payload is made as tcssim starts and kept until it stops,
+//! so that tcspecial finds them whatever the panels say; a panel's button
+//! decides only whether its payload sends. Before making any, tcssim binds the
 //! readiness socket its simulator file states as `tcssim.ready`, and answers
 //! there whether they are made: see [`ready`].
 //!
@@ -29,8 +29,9 @@
 //! seconds unless told otherwise.
 //!
 //! SIGHUP, SIGINT and SIGTERM stop tcssim as its Quit button does: every
-//! payload stops and its stand-in is cleared before tcssim exits, with the
-//! status a shell gives a process the signal ended, 128 more than its number.
+//! payload stops and its simulated device is cleared before tcssim exits,
+//! with the status a shell gives a process the signal ended, 128 more than
+//! its number.
 //! A second one, for a stop that is taking too long, ends tcssim at once.
 
 use slint::{Model, ModelRc, SharedString, VecModel};
@@ -70,7 +71,7 @@ use payload::{PayloadConfig, PayloadStats, SimulatedPayload};
 use tcslibgs::graph::Graph;
 use tcslibgs::ready::SetUpFor;
 use tcslibgs::simulate::{
-    counted, disagreement, judge, refusals, Host, Judged, Mode,
+    counted, disagreement, judge, refusals, Host, Judged, Mode, Verdict,
 };
 use tcslibgs::{ResolvedSim, SimConfigFile};
 use tcsverify::startup::Startup;
@@ -316,12 +317,12 @@ fn update_row(
 }
 
 /// What each joined payload is to the world, by payload name, and the
-/// thermostats the simulator stands in for, none or several.
+/// thermostats the simulator plays, none or several.
 type Attachments = (BTreeMap<String, Attachment>, Vec<Arc<Thermostat>>);
 
 /// Makes the world of the simulator file's physics model, works out
 /// what each simulated payload is to it, by payload name, and makes the
-/// thermostats the simulator stands in for, if the file names any.
+/// thermostats the simulator plays, if the file names any.
 ///
 /// One world, shared by every payload joined to it: the sensors read the
 /// state the heaters warm, which is what makes a simulated control loop a
@@ -338,7 +339,7 @@ type Attachments = (BTreeMap<String, Attachment>, Vec<Arc<Thermostat>>);
 /// * `graph`      - The tcspecial configuration's graph, whose conversions
 ///                  give the sensors' encodings, if it was read.
 /// * `sims`       - Each handler's simulator settings, beside `dh_configs`.
-/// * `dh_configs` - The data handlers stood in for.
+/// * `dh_configs` - The data handlers simulated.
 ///
 /// # Returns
 ///
@@ -362,15 +363,15 @@ fn joined_to_the_world(
     use tcslibgs::sim_config::Attached;
 
     let model = sim_file.physics().map_err(|e| e.to_string())?;
-    let stands_in = sim_file
+    let simulating = sim_file
         .tcssim
         .as_ref()
         .map(|tcssim| tcssim.thermostats.clone())
         .unwrap_or_default();
     let Some(model) = model else {
-        if let Some(name) = stands_in.first() {
+        if let Some(name) = simulating.first() {
             return Err(format!(
-                "thermostat: {name} is to be stood in for, and no physics \
+                "thermostat: {name} is to be simulated, and no physics \
                  model is written for it to read or warm"
             ));
         }
@@ -404,14 +405,14 @@ fn joined_to_the_world(
     };
 
     // Keeping pace with the wall clock, which the vehicle at the other end
-    // of every link runs on, from the first question a running stand-in
+    // of every link runs on, from the first question a running payload
     // asks it: see `physics::clock`.
     let world = Arc::new(physics::world::World::new(
         &model,
         physics::clock::Clock::starting_when_asked(1.0),
         seed,
     ));
-    // Each terminal is one the model has: `physics` refused a stand-in
+    // Each terminal is one the model has: `physics` refused a payload
     // naming another before this was reached.
     let place = |at: &tcslibgs::node::physics::terminal::At| {
         model.find(at).map(|(place, _)| place)
@@ -476,9 +477,9 @@ fn joined_to_the_world(
     }
 
     let mut thermostats: Vec<Arc<Thermostat>> = Vec::new();
-    for name in &stands_in {
+    for name in &simulating {
         let thermostat = thermostat_of(graph, name, &attached)?;
-        // Two stand-ins switching one heater would each undo the other's
+        // Two thermostats switching one heater would each undo the other's
         // decision, which no configuration means.
         if let Some((other, heater)) = thermostats.iter().find_map(|other| {
             thermostat
@@ -496,7 +497,7 @@ fn joined_to_the_world(
     Ok((attached, thermostats))
 }
 
-/// Makes the thermostat the simulator stands in for a thermostat node with.
+/// Makes the simulated thermostat that plays a thermostat node.
 ///
 /// Its sensors are the payloads reporting the world whose data reaches the
 /// node, and its heaters the payloads driving it that data from the node
@@ -554,8 +555,8 @@ fn thermostat_of(
     Ok(Thermostat::new(name, params, sensors, heaters))
 }
 
-/// What [`load`] reads out of the pair: the handlers the simulator stands in
-/// for, the simulator file, its settings resolved against them, and the
+/// What [`load`] reads out of the pair: the handlers the simulator
+/// simulates, the simulator file, its settings resolved against them, and the
 /// payloads' own configurations.
 type Loaded = (
     Vec<DHConfig>,
@@ -568,7 +569,7 @@ type Loaded = (
 /// in `startup` whatever stops it being simulated.
 ///
 /// Every one of these is a refusal tcsverify has already made, bar the ones
-/// that are the simulator's alone -- a payload it cannot stand in for, and a
+/// that are the simulator's alone -- a payload it cannot simulate, and a
 /// set with no payloads to simulate, which leaves it nothing to be. They are
 /// asked again rather than assumed: the files can change between the two
 /// reads, and a simulator running on a half-read pair would be worse than one
@@ -639,16 +640,15 @@ fn load(
         }
     };
 
-    // Whether each payload's simulate agrees with what is at its endpoint,
-    // and whether what this simulator will stand in for, with what is a
-    // stand-in already, is what the mode allows. Asked once the file is known
-    // to say simulate once for every payload. A configuration pointing at
+    // Whether each payload's simulate agrees with what is at its endpoint, and
+    // whether what this simulator will simulate, with what is a simulated or
+    // dummy device already, is what the mode allows. Asked once the file is
+    // known to say simulate once for every payload. A configuration pointing at
     // hardware in a file that says it is simulated, or a simulator file that
-    // forgot a payload, is caught here, before anything runs; only
-    // tcspecial's own check protects the hardware, because only tcspecial
-    // opens it.
+    // forgot a payload, is caught here, before anything runs; only tcspecial's
+    // own check protects the hardware, because only tcspecial opens it.
     if let Some(graph) = graph.as_ref() {
-        let refused = stand_ins_refused(graph, &sim_file, sim_path, mode);
+        let refused = simulation_refused(graph, &sim_file, sim_path, mode);
         if !refused.is_empty() {
             for refusal in refused {
                 startup.error(format!("{payload_path}: {refusal}"));
@@ -682,7 +682,7 @@ fn load(
                 sim,
                 joined.get(&dh.name.0).cloned(),
             )?;
-            // A sensor a stood-in thermostat reads reports to it.
+            // A sensor a simulated thermostat reads reports to it.
             config.thermostats = thermostats
                 .iter()
                 .filter(|t| t.reads(&dh.name.0))
@@ -706,8 +706,8 @@ fn load(
     }
     for thermostat in &thermostats {
         eprintln!(
-            "tcssim stands in for the thermostat {}, switching the heaters \
-             from the sensors' readings",
+            "tcssim simulates the thermostat {}, switching the heaters from \
+             the sensors' readings",
             thermostat.name()
         );
     }
@@ -726,10 +726,11 @@ fn load(
 ///
 /// Each payload is compared with what is at its endpoint: see
 /// `tcslibgs::simulate::disagreement`. One the file says is simulated is held
-/// to being reached at a stand-in, one it says is real to not being, and one
-/// it does not name is refused where it is a stand-in all the same, so that
-/// every simulated device is one tcssim controls and shows. For the mode, a
-/// payload is a stand-in when its simulate is true.
+/// to being reached at a simulated or dummy device, one it says is real to
+/// not being, and one it does not name is refused where it is a simulated or
+/// dummy device all the same, so that every payload simulated is one tcssim
+/// controls and shows. For the mode, a payload is simulated when its
+/// simulate is true, and a dummy device stays one.
 ///
 /// # Arguments
 ///
@@ -742,7 +743,7 @@ fn load(
 ///
 /// A message for each disagreement, or, where there are none, for each
 /// refusal under the mode; empty when the pair can be simulated.
-fn stand_ins_refused(
+fn simulation_refused(
     graph: &Graph,
     sim_file: &SimConfigFile,
     sim_path: &str,
@@ -768,11 +769,15 @@ fn stand_ins_refused(
                 &found,
             ));
             let judged = match said {
-                Some(true) => Judged::stand_in(
-                    format!("{sim_path} says simulate: true"),
-                    found.attribute,
-                    found.to_stand_in,
-                ),
+                Some(true) => Judged {
+                    verdict: if found.is_dummy() {
+                        Verdict::Dummy
+                    } else {
+                        Verdict::Simulated
+                    },
+                    found: format!("{sim_path} says simulate: true"),
+                    ..found
+                },
                 _ => found,
             };
             Some((node.name.as_str(), judged))
@@ -788,7 +793,7 @@ fn stand_ins_refused(
         .map(|refusal| match mode {
             Mode::All => format!(
                 "{refusal}, or name it in {sim_path} with simulate: true for \
-                 tcssim to stand in for"
+                 tcssim to simulate"
             ),
             _ => refusal,
         })
@@ -949,7 +954,7 @@ fn take_sending(args: Vec<String>) -> Result<(bool, Vec<String>), String> {
 }
 
 /// Does `--wait`: waits for a simulator started on these files under a mode
-/// to be ready, and says what to exit with. Nothing is stood in for and no
+/// to be ready, and says what to exit with. Nothing is simulated and no
 /// window opens: this is the harness for a run started by hand.
 ///
 /// # Arguments
@@ -1048,7 +1053,7 @@ fn present(startup: &Startup) {
 }
 
 /// Runs tcssim: reads and checks the tcspecial configuration and its
-/// simulator file, makes a stand-in for each simulated payload, and shows
+/// simulator file, simulates each payload it names, and shows
 /// a panel for each until the window is closed. With `--wait` it instead
 /// waits for another simulator to be ready.
 ///
@@ -1087,10 +1092,10 @@ fn main() {
     };
     if mode.is_flight() {
         eprintln!(
-            "tcssim: --simulate={mode} is the flight setting, which allows no \
-             stand-ins, so there is nothing for a simulator to do or to wait \
-             for: give --simulate=some or --simulate=all for a run with \
-             stand-ins"
+            "tcssim: --simulate={mode} is the flight setting, which allows \
+             only real devices, so there is nothing for a simulator to do or \
+             to wait for: give --simulate=some or --simulate=all for a run \
+             that simulates"
         );
         process::exit(1);
     }
@@ -1153,9 +1158,9 @@ fn main() {
     };
 
     // Where this simulator says whether it is ready, bound before any
-    // stand-in is made: a harness asking while it starts is told so, and an
-    // address already held -- by a simulator left running -- stops this one
-    // before it fights that one for the payloads' paths.
+    // payload is simulated: a harness asking while it starts is told so, and
+    // an address already held -- by a simulator left running -- stops this
+    // one before it fights that one for the payloads' paths.
     let readiness =
         match ready_socket(&payload_path, &sim_path, &sim_file, mode) {
             Ok(readiness) => readiness,
@@ -1174,16 +1179,16 @@ fn main() {
     // kept until tcssim ends. See `tcslib::bus`.
     let _cfs_end = match Graph::load(&payload_path)
         .map_err(|e| format!("{payload_path}: {e}"))
-        .and_then(|graph| tcslib::bus::StandIn::open(&graph))
+        .and_then(|graph| tcslib::bus::SimulatedCfs::open(&graph))
     {
-        Ok(stand_in) => {
-            if let Some(stand_in) = &stand_in {
+        Ok(cfs) => {
+            if let Some(cfs) = &cfs {
                 eprintln!(
-                    "standing in for the cFS end at {}",
-                    stand_in.local_addr()
+                    "simulating the cFS end at {}",
+                    cfs.local_addr()
                 );
             }
-            stand_in
+            cfs
         }
         Err(e) => {
             let mut refused = Startup::default();
@@ -1229,7 +1234,8 @@ fn main() {
     ui.window()
         .set_size(grid::window_size(&sizes, &shape, configs.len()));
 
-    // Before any stand-in is made, so that none is left behind by a signal.
+    // Before any payload is simulated, so that nothing is left behind by a
+    // signal.
     let signalled = match note_quit_signals() {
         Ok(signalled) => signalled,
         Err(e) => {
@@ -1238,7 +1244,7 @@ fn main() {
         }
     };
 
-    // Every stand-in made now, and each payload silent until its panel says
+    // Every simulated payload made now, and each silent until its panel says
     // otherwise: what tcspecial finds is then the same whatever anyone has
     // pressed, and the readiness socket can say when all of it is there.
     let (socket, set_up_for) = readiness;
@@ -1312,7 +1318,7 @@ fn main() {
     handle_config_edits(&ui, payloads.clone(), model.clone());
 
     // What the Quit button does, and a signal: every payload stopped, which
-    // clears its stand-in, and the window closed, which ends the event loop.
+    // clears what it made, and the window closed, which ends the event loop.
     let quit: Rc<dyn Fn()> = {
         let payloads = payloads.clone();
         let ui_weak = ui_weak.clone();
@@ -1381,7 +1387,7 @@ const SIGNAL_POLL: Duration = Duration::from_millis(100);
 const SECOND_SIGNAL_STATUS: i32 = 1;
 
 /// Has each of `QUIT_SIGNALS` be noted rather than end tcssim, so that the
-/// event loop can stop the payloads and clear their stand-ins first. A
+/// event loop can stop the payloads and clear what they made first. A
 /// second, should that take too long, ends tcssim at once.
 ///
 /// # Returns
@@ -1523,23 +1529,27 @@ mod tests {
     }
 
     /// A payload's simulate is held to what is at its endpoint: true where
-    /// the far end may be another host is refused, and so is false where it
-    /// is a stand-in -- here, a loopback address.
+    /// it is hardware is refused, and so is false where it is a simulated
+    /// device -- here, an rpmsg channel reached at its sim_address.
     #[test]
     fn simulate_is_held_to_what_is_at_the_endpoint() {
         let dir = tempfile::tempdir().unwrap();
-        let configuration = |address: &str| {
+        let configuration = |simulated: bool| {
             let path = dir.path().join("set.ytcs");
+            let at = if simulated {
+                "        sim_address: \"127.0.0.1:9\"\n"
+            } else {
+                ""
+            };
             std::fs::write(
                 &path,
                 format!(
                     "payloads:
-  - type network:
-      - payload: sensor
-        address: \"{address}\"
-        port: \"9\"
-        protocol: udp
-"
+  - type rpmsg:
+      - payload: channel
+        path: \"/dev/null\"
+        service: \"payload-telemetry\"
+{at}"
                 ),
             )
             .unwrap();
@@ -1548,40 +1558,41 @@ mod tests {
         let sim = |simulate: bool| -> SimConfigFile {
             tcslibgs::format::ConfigFormat::Yaml
                 .parse(&format!(
-                    "simulated_payloads:\n  - type network:\n      \
-                     - payload: sensor\n        simulate: {simulate}\n"
+                    "simulated_payloads:\n  - type rpmsg:\n      \
+                     - payload: channel\n        simulate: {simulate}\n"
                 ))
                 .unwrap()
         };
 
-        assert!(stand_ins_refused(
-            &configuration("127.0.0.1"),
+        assert!(simulation_refused(
+            &configuration(true),
             &sim(true),
             "s.ytcs",
             Mode::All
         )
         .is_empty());
-        let said = stand_ins_refused(
-            &configuration("10.0.0.5"),
+        let said = simulation_refused(
+            &configuration(false),
             &sim(true),
             "s.ytcs",
             Mode::All,
         );
         assert!(said[0].contains("says simulate: true"), "{said:?}");
-        let said = stand_ins_refused(
-            &configuration("127.0.0.1"),
+        let said = simulation_refused(
+            &configuration(true),
             &sim(false),
             "s.ytcs",
             Mode::Some,
         );
         assert!(
             said[0].contains(
-                "a stand-in, and the simulator file says simulate: false"
+                "a simulated device, and the simulator file says simulate: \
+                 false"
             ),
             "{said:?}"
         );
-        assert!(stand_ins_refused(
-            &configuration("10.0.0.5"),
+        assert!(simulation_refused(
+            &configuration(false),
             &sim(false),
             "s.ytcs",
             Mode::Some
@@ -2029,7 +2040,7 @@ mod tests {
                 .collect();
             // An example that simulates nothing has no window to measure:
             // `simple-app`'s payload is a program, which tcspecial runs
-            // rather than reaches, so no simulator stands in for it.
+            // rather than reaches, so no simulator plays it.
             if panels.is_empty() {
                 continue;
             }
@@ -2337,8 +2348,8 @@ mod tests {
     /// as `load` makes them.
     ///
     /// Through `tcslibgs::graph::simulated`, which is what turns a payload
-    /// node into what the simulator stands in for: where it is reached, how
-    /// big a packet is, and whether it answers a trigger.
+    /// node into what the simulator simulates: where it is reached, how big a
+    /// packet is, and whether it answers a trigger.
     ///
     /// # Arguments
     ///
@@ -2347,7 +2358,7 @@ mod tests {
     ///
     /// # Returns
     ///
-    /// A data handler for each payload the simulator stands in for.
+    /// A data handler for each payload the simulator simulates.
     ///
     /// # Panics
     ///
@@ -2366,16 +2377,17 @@ mod tests {
     }
 
     /// Every shipped set's simulator file names every payload that is a
-    /// stand-in, so that tcssim controls and shows each of them. Only that is
+    /// simulated or dummy device, so that tcssim controls and shows each of
+    /// them. Only that is
     /// asked here: whether a device path is real hardware depends on the host
     /// the test runs on.
     #[test]
-    fn every_shipped_stand_in_is_named() {
+    fn every_shipped_simulated_payload_is_named() {
         for (configuration, sim_path) in shipped_sets() {
             let graph =
                 tcslibgs::graph::Graph::load(&configuration).expect("it reads");
             let sim_file = SimConfigFile::load(&sim_path).expect("it reads");
-            let refused: Vec<String> = stand_ins_refused(
+            let refused: Vec<String> = simulation_refused(
                 &graph,
                 &sim_file,
                 &sim_path.display().to_string(),
@@ -2467,7 +2479,7 @@ mod tests {
             mode: Default::default(),
             stale_interval: None,
             sends_from: None,
-            stand_in: None,
+            sim_address: None,
             driven: false,
         }
     }
@@ -2508,8 +2520,8 @@ mod tests {
     // configuration, because some do: `minimal` and `beacon` both have a
     // sensor on a UDP socket, and `minimal`'s simulator file fits either,
     // which is a true thing about two examples rather than a fault. The rule
-    // that matters is that a simulated payload states the kind it stands in
-    // for, and that is tested where the rule is:
+    // that matters is that a simulated payload states the kind of payload it
+    // simulates, and that is tested where the rule is:
     // `tcslibgs::sim_config`'s `the_two_files_cannot_disagree_about_the_kind`.
 
     /// Every shipped set has to describe payloads the simulator can simulate,
@@ -2556,18 +2568,18 @@ mod tests {
         }
     }
 
-    /// Asked to stand in for the thermostat example's thermostat node, tcssim
+    /// Asked to simulate the thermostat example's thermostat node, tcssim
     /// reads the three sensors and switches the two heaters, and only the
     /// sensors report to it.
     #[test]
-    fn tcssim_stands_in_for_the_examples_thermostat() {
+    fn tcssim_simulates_the_examples_thermostat() {
         let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("..");
         let payload_path = root.join("examples/thermostat/thermostat.ytcs");
         let mut sim_file = SimConfigFile::load(
             root.join("examples/thermostat/thermostat-sim.yaml"),
         )
         .expect("the simulator file reads");
-        stand_in_for(&mut sim_file, &["thermostat"]);
+        simulate_for(&mut sim_file, &["thermostat"]);
         let graph = tcslibgs::graph::Graph::load(&payload_path).expect("reads");
         let dh_configs = simulated_payloads_of(&payload_path, &sim_file);
         let sims = sim_file.resolve(&dh_configs).expect("it fits");
@@ -2589,7 +2601,7 @@ mod tests {
         assert_eq!(attached.len(), 6);
 
         // Naming a node that is not a thermostat node is refused.
-        stand_in_for(&mut sim_file, &["thermostat", "temp1"]);
+        simulate_for(&mut sim_file, &["thermostat", "temp1"]);
         assert!(joined_to_the_world(
             &sim_file,
             Some(&graph),
@@ -2600,13 +2612,13 @@ mod tests {
     }
 
     /// Has a simulator file's tcssim section name the thermostats tcssim
-    /// stands in for.
+    /// simulates.
     ///
     /// # Arguments
     ///
     /// * `sim_file` - The simulator file, which has a tcssim section.
     /// * `names`    - The thermostat nodes, in order.
-    fn stand_in_for(sim_file: &mut SimConfigFile, names: &[&str]) {
+    fn simulate_for(sim_file: &mut SimConfigFile, names: &[&str]) {
         sim_file
             .tcssim
             .as_mut()
@@ -2662,17 +2674,17 @@ mod tests {
         graph.links.extend(added);
     }
 
-    /// Several thermostats are stood in for together, each switching the
+    /// Several thermostats are simulated together, each switching the
     /// heaters it drives and reading the sensors that feed it.
     #[test]
-    fn tcssim_stands_in_for_several_thermostats() {
+    fn tcssim_simulates_several_thermostats() {
         let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("..");
         let payload_path = root.join("examples/thermostat/thermostat.ytcs");
         let mut sim_file = SimConfigFile::load(
             root.join("examples/thermostat/thermostat-sim.yaml"),
         )
         .expect("the simulator file reads");
-        stand_in_for(&mut sim_file, &["thermostat", "backstop"]);
+        simulate_for(&mut sim_file, &["thermostat", "backstop"]);
         let mut graph =
             tcslibgs::graph::Graph::load(&payload_path).expect("reads");
         with_a_backstop(&mut graph);
@@ -2696,7 +2708,7 @@ mod tests {
         }
     }
 
-    /// Two stand-ins switching one heater are refused, naming both.
+    /// Two thermostats switching one heater are refused, naming both.
     #[test]
     fn two_thermostats_switching_one_heater_are_refused() {
         let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("..");
@@ -2705,7 +2717,7 @@ mod tests {
             root.join("examples/thermostat/thermostat-sim.yaml"),
         )
         .expect("the simulator file reads");
-        stand_in_for(&mut sim_file, &["thermostat", "backstop"]);
+        simulate_for(&mut sim_file, &["thermostat", "backstop"]);
         let mut graph =
             tcslibgs::graph::Graph::load(&payload_path).expect("reads");
         with_a_backstop(&mut graph);
@@ -3318,7 +3330,7 @@ mod tests {
             mode: Default::default(),
             stale_interval: None,
             sends_from: None,
-            stand_in: None,
+            sim_address: None,
             driven: false,
         };
 

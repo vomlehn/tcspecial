@@ -7,7 +7,7 @@
 //! simulation rather than of the payload, so they are carried here instead.
 //!
 //! The two files are joined by name. A simulated payload names the data handler
-//! it stands in for, and may name a group to take its settings from:
+//! it simulates, and may name a group to take its settings from:
 //!
 //! ```yaml
 //! simulated_payload_groups:
@@ -78,9 +78,9 @@ pub enum SimConfigError {
     /// A simulated payload that states `simulate` and names a group that
     /// states it too.
     SimulateTwice { payload: String, group: String },
-    /// Something wrong with the physics model, or with how the stand-ins
-    /// are joined to it: a component whose figures cannot be read, that
-    /// nothing is joined to, or whose input is driven twice.
+    /// Something wrong with the physics model, or with how the simulated
+    /// payloads are joined to it: a component whose figures cannot be read,
+    /// that nothing is joined to, or whose input is driven twice.
     BadPhysics(PhysicsProblem),
     /// A payload whose connection to the physics model is not one.
     BadAttachment { payload: String, why: String },
@@ -166,7 +166,7 @@ pub enum SimConfigError {
         name: String,
         given: &'static str,
     },
-    /// A setting there was before a stand-in was joined to the physics
+    /// A setting there was before a simulated payload was joined to the physics
     /// model by a terminal, told what it is now.
     MovedSetting {
         what: &'static str,
@@ -180,7 +180,7 @@ pub enum SimConfigError {
         name: String,
         given: String,
     },
-    /// A payload the simulator has nothing to stand in for.
+    /// A payload the simulator has no way to simulate.
     ///
     /// A rule about the simulator rather than about either file, and asked
     /// here all the same: tcssim refuses such a payload as it starts, and a
@@ -210,7 +210,7 @@ impl fmt::Display for SimConfigError {
             SimConfigError::SimulateUnstated { payload } => write!(
                 f,
                 "\"{payload}\" says nowhere whether it is simulated: give it \
-                 simulate: true for tcssim to stand in for it, or simulate: \
+                 simulate: true for tcssim to simulate it, or simulate: \
                  false for the real device, or give it to a group that says"
             ),
             SimConfigError::SimulateTwice { payload, group } => write!(
@@ -283,7 +283,7 @@ impl fmt::Display for SimConfigError {
             SimConfigError::NoKind { payload, actually } => write!(
                 f,
                 "simulated payload \"{}\" does not say what kind of payload it \
-                 stands in for: write it under type {}, as the payload \
+                 simulates: write it under type {}, as the payload \
                  configuration does. It is stated in both files so that the \
                  two can be checked against each other, which is the only \
                  thing that catches a simulator file paired with the wrong \
@@ -567,8 +567,8 @@ fn a_percentage(
     }
 }
 
-/// Whether the simulator has anything to stand in for this payload, and what
-/// to say where it has not.
+/// Whether the simulator has a way to simulate this payload, and what to say
+/// where it has not.
 ///
 /// Here rather than in tcssim, which is the program that cannot do it, so
 /// that the one rule is asked by everything that reads the pair: tcssim as it
@@ -582,29 +582,29 @@ fn a_percentage(
 ///
 /// # Returns
 ///
-/// `Ok(())` if the simulator can stand in for it.
+/// `Ok(())` if the simulator can simulate it.
 ///
 /// # Errors
 ///
-/// What to say, if it is on a synchronous line with no `stand_in`, on a raw
+/// What to say, if it is on a synchronous line with no `sim_address`, on a raw
 /// socket, too large a packet, or triggered on a device file or an I2C bus.
 pub fn simulable(dh: &DHConfig) -> Result<(), String> {
-    // The one type nothing here can stand in for. Every other has something
-    // in the kernel to be: vcan for a CAN bus, i2c-stub for a bus device,
-    // gpio-sim for discrete lines, a pty for a line or a buffer. A
-    // synchronous line has none -- there is no virtual HDLC interface -- so
-    // what is said is that, rather than a payload that looks simulated and is
-    // not.
+    // The one type nothing here can simulate at its own endpoint. Every other
+    // has a dummy device in the kernel or a simulated one tcssim makes: vcan
+    // for a CAN bus, i2c-stub for a bus device, gpio-sim for discrete lines, a
+    // pty for a line or a buffer. A synchronous line has none -- there is no
+    // virtual HDLC interface -- so what is said is that, rather than a payload
+    // that looks simulated and is not.
     //
-    // Unless its node gives a stand_in: then tcspecial reaches it over UDP
-    // when the run has stand-ins, and the simulator answers there.
+    // Unless its node gives a sim_address: then tcspecial reaches it over UDP
+    // when the run simulates, and the simulator answers there.
     if let EndpointConfig::Hdlc(hdlc) = &dh.endpoint {
-        if dh.stand_in.is_none() {
+        if dh.sim_address.is_none() {
             return Err(format!(
                 "simulated payload \"{}\" is on a synchronous line ({}), and \
-                 there is nothing in the kernel that stands in for one: give \
-                 its node a stand_in, such as 127.0.0.1:7950, for tcspecial to \
-                 reach it over UDP when it is simulated, or leave it to a card \
+                 the kernel has no dummy device for one: give its node a \
+                 sim_address, such as 127.0.0.1:7950, for tcspecial to reach \
+                 it over UDP when it is simulated, or leave it to a card \
                  -- a wanxl, a pci200syn, a pc300too or a FarSync -- with \
                  simulate: false",
                 dh.name.0, hdlc.interface
@@ -612,20 +612,20 @@ pub fn simulable(dh: &DHConfig) -> Result<(), String> {
         }
     }
 
-    // Nor a raw socket's. One cannot be opened without CAP_NET_RAW, and on
-    // one host every raw socket of a protocol hears every datagram of it --
-    // the vehicle's own included -- so a stand-in beside tcspecial would be
+    // Nor a raw socket's. One cannot be opened without CAP_NET_RAW, and on one
+    // host every raw socket of a protocol hears every datagram of it -- the
+    // vehicle's own included -- so a simulated one beside tcspecial would be
     // each end reading its own words back. A raw payload is reached on the
     // network it is really on.
     if let EndpointConfig::Network(net) = &dh.endpoint {
         if let NetworkProtocol::Raw(protocol) = net.protocol {
             return Err(format!(
                 "simulated payload \"{}\" is reached on a raw socket (IP \
-                 protocol {protocol} from {}), which nothing here stands in \
-                 for: a raw socket needs CAP_NET_RAW, and on one host every \
-                 raw socket of a protocol hears every datagram of it, its own \
-                 included. Take it out of the simulator file; tcspecial \
-                 reaches it directly",
+                 protocol {protocol} from {}), which nothing here can \
+                 simulate: a raw socket needs CAP_NET_RAW, and on one host \
+                 every raw socket of a protocol hears every datagram of it, \
+                 its own included. Take it out of the simulator file; \
+                 tcspecial reaches it directly",
                 dh.name.0, net.address
             ));
         }
@@ -653,15 +653,15 @@ pub fn simulable(dh: &DHConfig) -> Result<(), String> {
                 Some("a bus, where the master's own read is the trigger")
             }
             // A sensor on a thermal mass is one too, unless it is reached at
-            // its stand_in, where the simulator hears what it is sent.
-            EndpointConfig::I2cTmass(_) if dh.stand_in.is_none() => {
+            // its sim_address, where the simulator hears what it is sent.
+            EndpointConfig::I2cTmass(_) if dh.sim_address.is_none() => {
                 Some("a bus, where the master's own read is the trigger")
             }
             _ => None,
         };
         if let Some(cannot) = cannot {
             return Err(format!(
-                "{} is triggered, but the simulator cannot stand in for a \
+                "{} is triggered, but the simulator cannot simulate a \
                  triggered payload on {cannot}",
                 dh.name.0
             ));
@@ -740,8 +740,8 @@ fn nothing_unknown(
         });
     }
 
-    // What a stand-in said to be joined to a thermal mass, before the model
-    // was made of parts: told what it says now.
+    // What a simulated payload said to be joined to a thermal mass, before the
+    // model was made of parts: told what it says now.
     if let Some(given) = MOVED_SETTINGS.iter().find(|moved| *moved == given) {
         return Err(SimConfigError::MovedSetting {
             what,
@@ -757,7 +757,7 @@ fn nothing_unknown(
     })
 }
 
-/// The settings that joined a stand-in to a thermal mass, which a file
+/// The settings that joined a simulated payload to a thermal mass, which a file
 /// still saying is told [`MOVED_ATTACHMENT`].
 const MOVED_SETTINGS: &[&str] = &[
     "reads",
@@ -769,11 +769,12 @@ const MOVED_SETTINGS: &[&str] = &[
     "ripple_time",
 ];
 
-/// What a stand-in still joined to a thermal mass the old way is told.
-pub const MOVED_ATTACHMENT: &str = "a stand-in is joined to the physics \
-    model by the terminal it is connected to, connects: zone.temperature for \
-    a sensor or connects: heater_1.on for a heater, and a heater's power and \
-    ripple are the heater component's, in the physics model";
+/// What a simulated payload still joined to a thermal mass the old way is told.
+pub const MOVED_ATTACHMENT: &str = "a simulated payload is joined to the \
+    physics model by the terminal it is connected to, connects: \
+    zone.temperature for a sensor or connects: heater_1.on for a heater, and a \
+    heater's power and ripple are the heater component's, in the physics \
+    model";
 
 /// Check this entry against the payload it names.
 ///
@@ -851,8 +852,8 @@ fn what_it_is(
         };
     };
 
-    // Nothing stands in for a raw socket's payload -- see `simulable`, which
-    // is asked next and says so -- so there is nothing here to compare.
+    // Nothing simulates a raw socket's payload -- see `simulable`, which is
+    // asked next and says so -- so there is nothing here to compare.
     if let NetworkProtocol::Raw(_) = network.protocol {
         return Ok(());
     }
@@ -936,8 +937,8 @@ fn what_it_is(
         }
     }
 
-    // And a payload whose node says where it sends from sends from there:
-    // the vehicle reads nothing else, so a stand-in told another address
+    // And a payload whose node says where it sends from sends from there: the
+    // vehicle reads nothing else, so a simulated payload told another address
     // here would be a payload the vehicle turned away. Said once, in the
     // tcspecial configuration, which is the file both ends read it from.
     if sends_from.is_some() {
@@ -1005,8 +1006,8 @@ fn what_it_is(
 /// found rather than being a field no window offers.
 #[derive(Debug, Clone, Default, Deserialize, Serialize, PartialEq, Eq)]
 pub struct SimSettings {
-    /// Whether the payload is simulated: `true` for tcssim to stand in for
-    /// it, `false` for the real device.
+    /// Whether the payload is simulated: `true` for tcssim to simulate it,
+    /// `false` for the real device.
     ///
     /// Required of every simulated payload, from itself or from its group
     /// and never from both: see [`SimConfigFile::simulate_of`]. Not taken over
@@ -1032,8 +1033,8 @@ pub struct SimSettings {
     /// kind.
     #[serde(default, deserialize_with = "blank_is_unstated")]
     pub protocol: Option<String>,
-    /// The terminal of the physics model this stand-in is joined to, as
-    /// the component's name and the terminal's: `zone.temperature`.
+    /// The terminal of the physics model this simulated payload is joined to,
+    /// as the component's name and the terminal's: `zone.temperature`.
     ///
     /// What makes a simulated payload a part of the vehicle rather than a
     /// source of noise. Joined to an output, it reports it -- a sensor
@@ -1048,9 +1049,9 @@ pub struct SimSettings {
     /// exercised: nothing else in a simulator makes two payloads agree.
     #[serde(default, deserialize_with = "blank_is_unstated")]
     pub connects: Option<String>,
-    /// How far the place a reporting stand-in is on sits from what its
-    /// terminal says, in the terminal's unit: `"+0.2 K"`. A body warmed in
-    /// one place is not one temperature throughout. Unstated is none.
+    /// How far the place a reporting simulated payload is on sits from what its
+    /// terminal says, in the terminal's unit: `"+0.2 K"`. A body warmed in one
+    /// place is not one temperature throughout. Unstated is none.
     #[serde(default, deserialize_with = "blank_is_unstated")]
     pub offset: Option<String>,
     /// A sensor's random error on each reading: the standard deviation of
@@ -1373,8 +1374,8 @@ pub struct SimGroup {
     pub unknown: BTreeMap<String, IgnoredAny>,
 }
 
-/// One simulated payload: the data handler it stands in for, the group it takes
-/// its settings from, and whatever it states for itself.
+/// One simulated payload: the data handler it simulates, the group it takes its
+/// settings from, and whatever it states for itself.
 #[derive(Debug, Clone, Deserialize)]
 pub struct SimPayload {
     /// Name of the data handler this payload simulates, written `payload:
@@ -1408,11 +1409,11 @@ pub struct SimConfigFile {
     /// The groups of settings, in name order.
     #[serde(default, deserialize_with = "crate::sim_grouped::groups")]
     pub simulated_payload_groups: Vec<SimGroup>,
-    /// The world the payloads are joined to: the vehicle's physics model,
-    /// its components and the connections between them, which the
-    /// stand-ins measure and act on, and the ambient temperature its zones'
-    /// surroundings are about. Unstated is a set whose stand-ins are joined
-    /// to nothing.
+    /// The world the payloads are joined to: the vehicle's physics model, its
+    /// components and the connections between them, which the simulated
+    /// payloads measure and act on, and the ambient temperature its zones'
+    /// surroundings are about. Unstated is a set whose simulated payloads are
+    /// joined to nothing.
     ///
     /// The model is not a payload. It is what the payloads are joined by:
     /// the sensors report a zone's temperature and the heaters warm it, so
@@ -1470,16 +1471,15 @@ pub struct SimTcsgui {
 #[serde(deny_unknown_fields)]
 pub struct SimTcssim {
     /// The UDP address, as `address:port`, at which tcssim answers whether it
-    /// has made its stand-ins: see `crate::ready`.
+    /// has made its simulated devices: see `crate::ready`.
     pub ready: String,
-    /// The thermostat nodes of the configuration tcssim stands in for, in
-    /// the order written, none if the file states none: tcssim then reads
-    /// the sensors that feed each and switches the heaters each drives
-    /// itself, with each node's setpoint and band, so that a zone's loop
-    /// closes with no tcspecial running. A file writes them under
-    /// `thermostat`, one name or several separated by commas, as a vehicle
-    /// of several zones, or a staged thermostat, has several thermostat
-    /// nodes.
+    /// The thermostat nodes of the configuration tcssim simulates, in the order
+    /// written, none if the file states none: tcssim then reads the sensors
+    /// that feed each and switches the heaters each drives itself, with each
+    /// node's setpoint and band, so that a zone's loop closes with no tcspecial
+    /// running. A file writes them under `thermostat`, one name or several
+    /// separated by commas, as a vehicle of several zones, or a staged
+    /// thermostat, has several thermostat nodes.
     ///
     /// Unstated for a run with tcspecial, whose own thermostats would
     /// otherwise be switching the same heaters.
@@ -1515,8 +1515,8 @@ pub enum Attached {
     Pulls { at: Vec<At> },
 }
 
-/// The terminals a stand-in's `connects` names: one, or one for each line
-/// of a GPIO payload, separated by commas.
+/// The terminals a simulated payload's `connects` names: one, or one for each
+/// line of a GPIO payload, separated by commas.
 ///
 /// # Arguments
 ///
@@ -1529,15 +1529,16 @@ pub fn terminals_of(said: &str) -> impl Iterator<Item = &str> {
     said.split(',').map(str::trim)
 }
 
-/// What a stand-in is to the physics model, now that its node is known.
+/// What a simulated payload is to the physics model, now that its node is
+/// known.
 ///
-/// A GPIO payload that watches lines is the one stand-in with several
+/// A GPIO payload that watches lines is the one simulated payload with several
 /// places to be: each of its lines is pulled to a decision, in the order its
 /// node names the lines, so a line sensing a heater reads what the heater is
 /// doing. One terminal and one line is that too, so it is pulled rather than
 /// signalled. A list of terminals anywhere else, or a count that is not the
-/// lines', is refused: a line nothing pulls, or a decision no line reads,
-/// is a sensor wired to nothing.
+/// lines', is refused: a line nothing pulls, or a decision no line reads, is a
+/// sensor wired to nothing.
 ///
 /// # Arguments
 ///
@@ -1600,7 +1601,7 @@ fn lined(
     }
 }
 
-/// Whether a stand-in may be joined to this terminal of a component.
+/// Whether a simulated payload may be joined to this terminal of a component.
 ///
 /// What [`lined`] holds a file to, put as the editor asks it when a line is
 /// drawn between a payload and a component: a payload watching GPIO lines
@@ -1798,17 +1799,17 @@ impl SimConfigFile {
     }
 
     /// The physics model this file holds, with its figures read and the
-    /// stand-ins' joins to it checked.
+    /// simulated payloads' joins to it checked.
     ///
-    /// The model alone is checked by [`WorldSection::problems`]. What only
-    /// this file can say is how the stand-ins join it, and these are refused
-    /// here:
+    /// The model alone is checked by [`WorldSection::problems`]. What only this
+    /// file can say is how the simulated payloads join it, and these are
+    /// refused here:
     ///
-    /// * a component nothing is joined to -- no connection and no stand-in --
-    ///   which is arithmetic running for no reason, and likeliest a
+    /// * a component nothing is joined to -- no connection and no simulated
+    ///   payload -- which is arithmetic running for no reason, and likeliest a
     ///   misspelled `connects`, which is the fault it would hide;
-    /// * an input driven by two stand-ins, or by one and a connection too:
-    ///   each would switch it over the other, and which was in force would
+    /// * an input driven by two simulated payloads, or by one and a connection
+    ///   too: each would switch it over the other, and which was in force would
     ///   depend on which was driven last;
     /// * an input that must be joined -- a heater's `on` -- and is not,
     ///   which is a part nothing can switch.
@@ -1829,8 +1830,8 @@ impl SimConfigFile {
             SimConfigError::BadPhysics(PhysicsProblem::of(component, why))
         };
 
-        // What each stand-in is joined to, where it names a terminal there
-        // is: one that does not is refused with the payload, by
+        // What each simulated payload is joined to, where it names a terminal
+        // there is: one that does not is refused with the payload, by
         // `attachment`, which is the entry to point at.
         let mut driven: BTreeMap<crate::node::physics::Place, String> =
             BTreeMap::new();
@@ -1884,8 +1885,9 @@ impl SimConfigFile {
                 return Err(bad(
                     &component.name,
                     "nothing is joined to it: a component no connection and no \
-                     stand-in names is a model nobody looks at, and the \
-                     likeliest cause is a connects that names something else"
+                     simulated payload names is a model nobody looks at, and \
+                     the likeliest cause is a connects that names something \
+                     else"
                         .to_string(),
                 ));
             }
@@ -1900,8 +1902,9 @@ impl SimConfigFile {
                     let at = format!("{}.{}", component.name, terminal.name);
                     let how = match terminal.kind {
                         Kind::Decision => format!(
-                            "a {} is switched there, so connect a stand-in \
-                             the vehicle drives to it with connects: {at}",
+                            "a {} is switched there, so connect a simulated \
+                             payload the vehicle drives to it with connects: \
+                             {at}",
                             component.what.type_name()
                         ),
                         Kind::Value(unit) => format!(
@@ -2050,8 +2053,8 @@ impl SimConfigFile {
         let Some(said) = settings.connects.as_deref() else {
             if let Some((what, _)) = errors.iter().find(|(_, s)| s.is_some()) {
                 return Err(bad(format!(
-                    "{what} says what a stand-in gets wrong about the terminal \
-                     it reports, and this one connects to none"
+                    "{what} says what a simulated payload gets wrong about \
+                     the terminal it reports, and this one connects to none"
                 )));
             }
             return Ok(None);
@@ -2133,8 +2136,9 @@ impl SimConfigFile {
                     errors.iter().find(|(_, s)| s.is_some())
                 {
                     return Err(bad(format!(
-                        "{what} says what a stand-in gets wrong about the \
-                         terminal it reports, and this one drives {at}"
+                        "{what} says what a simulated payload gets wrong \
+                         about the terminal it reports, and this one drives \
+                         {at}"
                     )));
                 }
                 Ok(Some(Attached::Drives { at, kind }))
@@ -2180,17 +2184,17 @@ impl SimConfigFile {
         if let Some(problem) = problems.into_iter().next() {
             return Err(problem);
         }
-        // And the model, with how the stand-ins join it, which a reader
-        // checking the file is told at the model's own lines: see
+        // And the model, with how the simulated payloads join it, which a
+        // reader checking the file is told at the model's own lines: see
         // [`Self::physics`].
         self.physics()?;
         Ok(resolved)
     }
 
-    /// Every handler's settled settings, with the model's own check and
-    /// how the stand-ins join it left out: what [`Self::resolve`] gives,
-    /// for a reader that reports those at the model's lines and still wants
-    /// to ask more of each payload.
+    /// Every handler's settled settings, with the model's own check and how the
+    /// simulated payloads join it left out: what [`Self::resolve`] gives, for a
+    /// reader that reports those at the model's lines and still wants to ask
+    /// more of each payload.
     ///
     /// # Arguments
     ///
@@ -2234,10 +2238,10 @@ impl SimConfigFile {
             handlers.iter().map(|dh| dh.name.0.as_str()).collect();
         let mut problems: Vec<SimConfigError> = Vec::new();
         let (groups, payloads) = self.entries(&names, &mut problems);
-        // The model as it stands alone, for the stand-ins to be joined to.
-        // One that does not read is reported by `physics`, at its own
-        // lines, and the joins to it are not judged: each would be refused
-        // as naming a terminal of nothing, which is the wrong fault.
+        // The model as it stands alone, for the simulated payloads to be joined
+        // to. One that does not read is reported by `physics`, at its own
+        // lines, and the joins to it are not judged: each would be refused as
+        // naming a terminal of nothing, which is the wrong fault.
         let model = self.world.as_ref().map(WorldSection::resolve);
 
         // One handler at a time, because one payload's settings are its own:
@@ -2326,8 +2330,8 @@ impl SimConfigFile {
                     })
                 };
 
-            // How often a stand-in produces something: a length of time,
-            // or `CONTINUOUS` for as fast as the payload can be driven.
+            // How often a simulated payload produces something: a length of
+            // time, or `CONTINUOUS` for as fast as the payload can be driven.
             let how_often =
                 |setting: &'static str,
                  said: &Option<String>|
@@ -2637,9 +2641,9 @@ impl SimConfigFile {
         // A name here that no data handler has would otherwise be a line with
         // no effect, which is what a misspelled handler name looks like. Not
         // asked of a payload that is not simulated: it has no data handler
-        // here, the handlers being the payloads tcssim stands in for, and
-        // whether its name is a payload's is asked where the configuration is
-        // -- see `crate::graph::simulated::handlers`.
+        // here, the handlers being the payloads tcssim simulates, and whether
+        // its name is a payload's is asked where the configuration is -- see
+        // `crate::graph::simulated::handlers`.
         for (name, payload) in &payloads {
             if self.simulate_of(payload).is_ok_and(|simulated| !simulated) {
                 continue;
@@ -2714,7 +2718,7 @@ mod tests {
             mode: Default::default(),
             stale_interval: None,
             sends_from: None,
-            stand_in: None,
+            sim_address: None,
             driven: false,
         }
     }
@@ -3074,8 +3078,7 @@ simulated_payloads:
     }
 
     /// A payload that is not simulated has no data handler here, the handlers
-    /// being the payloads tcssim stands in for, and is not reported as naming
-    /// none.
+    /// being the payloads tcssim simulates, and is not reported as naming none.
     #[test]
     fn a_payload_that_is_not_simulated_needs_no_handler() {
         let file = parse(
@@ -3277,10 +3280,10 @@ simulated_payloads:
         );
     }
 
-    /// A payload whose node says where it sends from is stood in for from
-    /// there, and a simulator file that says so again is refused: the
-    /// vehicle reads that address and no other, so a second statement could
-    /// only be the same or a stand-in the vehicle turned away.
+    /// A payload whose node says where it sends from is simulated from there,
+    /// and a simulator file that says so again is refused: the vehicle reads
+    /// that address and no other, so a second statement could only be the same
+    /// or a simulated payload the vehicle turned away.
     #[test]
     fn a_payload_that_says_where_it_sends_from_is_simulated_from_there() {
         let mut sending = handler("DH0", 4);
@@ -3702,7 +3705,7 @@ simulated_payloads:
     /// How a payload is reached may come from its group, like everything
     /// else a payload does not state but its type.
     #[test]
-    fn a_group_may_carry_what_its_payloads_stand_in_for() {
+    fn a_group_may_carry_what_simulating_its_payloads_takes() {
         let file = parse(
             "simulated_payload_groups:\n  \
              - group: datagrams\n    \
@@ -3892,7 +3895,7 @@ simulated_payloads:
             mode: DHMode::Periodic,
             stale_interval: None,
             sends_from: None,
-            stand_in: None,
+            sim_address: None,
             driven: false,
         };
 
@@ -3968,7 +3971,7 @@ simulated_payloads:
             },
             stale_interval: None,
             sends_from: None,
-            stand_in: None,
+            sim_address: None,
             driven: false,
         };
 
@@ -4048,8 +4051,8 @@ simulated_payloads:
     fn a_triggered_payload_takes_no_interval_here() {
         let triggered = |name: &str| DHConfig {
             name: DHName::new(name),
-            // A stream, which is a kind the simulator can stand in for a
-            // triggered payload on: see `simulable`.
+            // A stream, which is a kind the simulator can simulate a triggered
+            // payload on: see `simulable`.
             endpoint: EndpointConfig::Network(NetworkConfig {
                 protocol: NetworkProtocol::Tcp,
                 address: "localhost".to_string(),
@@ -4064,7 +4067,7 @@ simulated_payloads:
             },
             stale_interval: None,
             sends_from: None,
-            stand_in: None,
+            sim_address: None,
             driven: false,
         };
 
@@ -4111,7 +4114,7 @@ simulated_payloads:
     /// A payload the simulator has nothing to be is refused by the file's own
     /// rules, so that `tcsverify` says what tcssim will.
     #[test]
-    fn a_payload_nothing_can_stand_in_for_is_refused() {
+    fn a_payload_nothing_can_simulate_is_refused() {
         let device = DHConfig {
             name: DHName::new("DH0"),
             endpoint: EndpointConfig::Device(DeviceConfig {
@@ -4126,7 +4129,7 @@ simulated_payloads:
             },
             stale_interval: None,
             sends_from: None,
-            stand_in: None,
+            sim_address: None,
             driven: false,
         };
         let file = parse(
@@ -4398,7 +4401,7 @@ simulated_payloads:
             }),
             ..handler("sounder", 64)
         };
-        let said = simulable(&dh).expect_err("nothing stands in for it");
+        let said = simulable(&dh).expect_err("nothing can simulate it");
         assert!(
             said.contains("raw socket") && said.contains("CAP_NET_RAW"),
             "{said}"
@@ -4466,7 +4469,7 @@ physics:
         file
     }
 
-    /// The three handlers [`joined`] stands in for.
+    /// The three handlers [`joined`] simulates.
     ///
     /// # Returns
     ///
@@ -4475,7 +4478,7 @@ physics:
         [handler("DH0", 2), handler("DH1", 1), handler("DH2", 1)]
     }
 
-    /// What a well-joined file's stand-ins are.
+    /// What a well-joined file's simulated payloads are.
     const SENSOR: &str = "connects: zone.temperature";
     const HEATER_1: &str = "connects: heater_1.on";
     const HEATER_2: &str = "connects: heater_2.on";
@@ -4577,7 +4580,7 @@ physics:
     /// A sensor joined to an output reports it, in its unit, and a heater
     /// joined to an input drives it.
     #[test]
-    fn a_stand_in_reports_an_output_or_drives_an_input() {
+    fn a_simulated_payload_reports_an_output_or_drives_an_input() {
         let file = joined(SENSOR, HEATER_1, HEATER_2);
         let resolved = file.resolve(&handlers()).unwrap();
         assert_eq!(
@@ -4648,8 +4651,8 @@ physics:
         ));
     }
 
-    /// A connection that names nothing, or a terminal no stand-in can be
-    /// joined to, is refused, saying which.
+    /// A connection that names nothing, or a terminal no simulated payload can
+    /// be joined to, is refused, saying which.
     #[test]
     fn a_wrong_connects_is_refused() {
         for (sensor, said) in [
@@ -4673,10 +4676,10 @@ physics:
         assert!(err.contains("has no physics model"), "{err}");
     }
 
-    /// A stand-in drives an engine's throttle, a value, and another reports
-    /// a body's contact, a decision, which takes no sensor's errors.
+    /// A simulated payload drives an engine's throttle, a value, and another
+    /// reports a body's contact, a decision, which takes no sensor's errors.
     #[test]
-    fn a_stand_in_drives_a_value_and_signals_a_decision() {
+    fn a_simulated_payload_drives_a_value_and_signals_a_decision() {
         let mut file = joined(
             "connects: lander.contact",
             "connects: engine.throttle",
@@ -4769,7 +4772,7 @@ physics:
         assert!(err.contains("\"spare\": nothing is joined"), "{err}");
     }
 
-    /// The tcssim section may name the thermostat tcssim stands in for.
+    /// The tcssim section may name the thermostat tcssim simulates.
     #[test]
     fn the_tcssim_section_names_a_thermostat() {
         let file = parse(

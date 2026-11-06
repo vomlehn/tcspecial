@@ -282,7 +282,7 @@ impl Editor {
         if !stray.is_empty() {
             return Err(format!(
                 "{}: {} names no payload of {}; a simulated payload names the \
-                 payload it stands in for, so the two files are joined by the \
+                 payload it simulates, so the two files are joined by the \
                  name and this one joins nothing",
                 path.display(),
                 said_list(&stray),
@@ -1214,9 +1214,10 @@ tcsgui:
             .expect("the simulator reads what the editor wrote");
     }
 
-    /// A physics component moved, a connection made and a stand-in joined
-    /// each reach the simulator file, are read back by a second session and
-    /// by the simulator's own reader, and are each taken back by one undo:
+    /// A physics component moved, a connection made and a simulated payload
+    /// joined each reach the simulator file, are read back by a second
+    /// session and by the simulator's own reader, and are each taken back by
+    /// one undo:
     /// the position goes from the file with the undo, and with the
     /// component.
     #[test]
@@ -1289,7 +1290,7 @@ tcsgui:
             .expect("the simulator reads what the editor wrote");
         assert_eq!(file.tcsgui.expect("positions").nodes.len(), 1);
 
-        // The zone removed takes its connection and its stand-in's join with
+        // The zone removed takes its connection and its payload's join with
         // it, which would name nothing otherwise, and one undo puts all of
         // it back.
         let simulator = |editor: &Editor| {
@@ -1820,7 +1821,7 @@ tcsgui:
         let path = where_.path().join("vehicle.ytcs");
         let sim = where_.path().join("vehiclesim.yaml");
         // Two payloads and something that is not one: a computation has
-        // nothing standing in for it, so it has no entry.
+        // nothing simulating it, so it has no entry.
         std::fs::write(
             &path,
             "payloads:\n  - type i2c:\n      - payload: sensor\n  \

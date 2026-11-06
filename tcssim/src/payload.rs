@@ -1,7 +1,7 @@
 //! Simulated payloads: what one is, and the pace it keeps.
 //!
-//! A simulated payload stands in for the hardware at the far end of a data
-//! handler's payload endpoint. What it does is the same whatever that
+//! A simulated payload plays the hardware at the far end of a data handler's
+//! payload endpoint. What it does is the same whatever that
 //! endpoint is -- produce a packet every packet interval, in segments of its
 //! own, from Start until Stop -- and this module holds that: the
 //! configuration, the statistics, the thread, and the pacing.
@@ -118,20 +118,21 @@ pub struct PayloadConfig {
     /// Whether this payload sends: its panel's button.
     ///
     /// Apart from whether it is running, which it is from the moment tcssim
-    /// starts: a stand-in is made as tcssim starts and kept until it stops, so
-    /// that tcspecial finds it whatever the panel says, and the button decides
-    /// only whether anything goes over it. See [`Pacing::a_packet_is_due`].
+    /// starts: its simulation is made as tcssim starts and kept until it stops,
+    /// so that tcspecial finds it whatever the panel says, and the button
+    /// decides only whether anything goes over it. See
+    /// [`Pacing::a_packet_is_due`].
     pub sending: Arc<AtomicBool>,
-    /// Whether its stand-in has been made, which the readiness socket says:
+    /// Whether its simulation has been made, which the readiness socket says:
     /// see [`crate::ready`].
     pub standing: Arc<crate::ready::Standing>,
-    /// Whether the payload is only driven, so that its stand-in sends
+    /// Whether the payload is only driven, so that its simulation sends
     /// nothing and watches what arrives: see `tcslibgs::DHConfig::driven`.
     pub driven: bool,
 }
 
 /// Runs the thread of a payload of its configuration's kind, which makes
-/// its stand-in and then runs it until `running` is cleared.
+/// its simulation and then runs it until `running` is cleared.
 ///
 /// # Arguments
 ///
@@ -195,10 +196,10 @@ fn run_kind(
     }
 }
 
-/// Say that `config`'s payload could not stand in, and why: on stderr, as
-/// everything a payload says of itself is, and on the readiness socket, so
-/// that a harness waiting for it is told rather than left to give up.
-pub(crate) fn could_not_stand_in(config: &PayloadConfig, why: String) {
+/// Say that `config`'s payload could not be simulated, and why: on stderr, as
+/// everything a payload says of itself is, and on the readiness socket, so that
+/// a harness waiting for it is told rather than left to give up.
+pub(crate) fn could_not_simulate(config: &PayloadConfig, why: String) {
     let said = format!("{}: {why}", config.name);
     eprintln!("{said}");
     config.standing.failed(&said);
@@ -210,13 +211,13 @@ pub enum PayloadProtocol {
     Tcp,
     Udp,
     Device,
-    /// A serial line, which the simulator stands in for with a pty: see
+    /// A serial line, which the simulator simulates with a pty: see
     /// [`crate::node::payload::serial`].
     Serial,
-    /// A device on an I2C bus, which the simulator stands in for with the
-    /// kernel's `i2c-stub`: see [`crate::node::payload::i2c`].
+    /// A device on an I2C bus, which the simulator simulates on the kernel's
+    /// dummy bus, `i2c-stub`: see [`crate::node::payload::i2c`].
     I2c,
-    /// A SPI peripheral, which the simulator stands in for with a pty -- the
+    /// A SPI peripheral, which the simulator simulates with a pty -- the
     /// bytes but not the clocking, there being nothing that emulates a
     /// peripheral: see [`crate::node::payload::spi`].
     Spi,
@@ -229,12 +230,12 @@ pub enum PayloadProtocol {
     /// A payload on a CAN bus, which the simulator joins as another member of
     /// the same bus: see [`crate::node::payload::can`].
     Can,
-    /// A sensor's sample buffer, which the simulator stands in for with a pty
-    /// -- the samples but not the sysfs around them: see
+    /// A sensor's sample buffer, which the simulator simulates with a pty --
+    /// the samples but not the sysfs around them: see
     /// [`crate::node::payload::iio`]. Experimental.
     Iio,
-    /// An rpmsg channel to another core, which the simulator stands in for
-    /// with a pty: see [`crate::node::payload::rpmsg`]. Experimental.
+    /// An rpmsg channel to another core, which the simulator simulates with a
+    /// pty: see [`crate::node::payload::rpmsg`]. Experimental.
     Rpmsg,
     /// A set of discrete lines, which the simulator moves through the
     /// kernel's gpio-sim: see [`crate::node::payload::gpio`].
@@ -305,7 +306,7 @@ impl SimulatedPayload {
         }
     }
 
-    /// Starts the payload's thread, which makes its stand-in and runs it.
+    /// Starts the payload's thread, which makes its simulation and runs it.
     /// A thread that ends while still meant to be running marks the
     /// payload's standing failed.
     ///
@@ -338,11 +339,12 @@ impl SimulatedPayload {
             let still_running = running.clone();
             run_kind(config, running, stats);
             // A payload whose thread ends while it is meant to be running has
-            // stopped standing in, whether or not it said why: the readiness
-            // socket says so, and keeps the first reason it was given.
+            // stopped being simulated, whether or not it said why: the
+            // readiness socket says so, and keeps the first reason it was
+            // given.
             if still_running.load(Ordering::SeqCst) {
                 standing.failed(&format!(
-                    "{name}: stopped standing in; see what tcssim said"
+                    "{name}: stopped being simulated; see what tcssim said"
                 ));
             }
         });
@@ -351,7 +353,7 @@ impl SimulatedPayload {
         Ok(())
     }
 
-    /// Have it send, or be silent: its panel's button. Its stand-in is there
+    /// Have it send, or be silent: its panel's button. Its simulation is there
     /// either way. For a part the vehicle drives -- a heater -- the button
     /// is its power instead: disabled, it stays off whatever it is sent, and
     /// enabled, it takes the latest it was sent at once. See
@@ -879,7 +881,7 @@ impl Pacing {
     /// For one that answers requests, exactly when a request has arrived, so
     /// that a trigger is answered once and silence is answered not at all.
     ///
-    /// Never for a payload whose panel has it silent: its stand-in is there,
+    /// Never for a payload whose panel has it silent: its simulation is there,
     /// and nothing goes over it.
     ///
     /// # Arguments

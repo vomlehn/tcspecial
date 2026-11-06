@@ -18,8 +18,8 @@
 //! transmitters. A handler whose line will not take what its file asked for
 //! is refused rather than started; see `apply`.
 //!
-//! Not asked of a stand-in. tcssim's pseudo-terminal carries the bus's bytes
-//! both ways and has no transceiver to turn around, so the serial handler
+//! Not asked of a simulated device. tcssim's pseudo-terminal carries the bus's
+//! bytes both ways and has no transceiver to turn around, so the serial handler
 //! leaves these terms unapplied there: see `apply_line_terms` in the serial
 //! module.
 //!
@@ -299,8 +299,8 @@ mod tests {
     /// pretending.
     ///
     /// A pty has no transceiver and no RTS to drive, which is why the serial
-    /// handler does not ask this of a stand-in. The point of the test is the
-    /// error -- a handler whose line cannot do what its file asked for must
+    /// handler does not ask this of a simulated line. The point of the test is
+    /// the error -- a handler whose line cannot do what its file asked for must
     /// be refused rather than started on a bus it would hold down.
     #[test]
     fn a_pty_refuses_the_mode_and_is_reported() {

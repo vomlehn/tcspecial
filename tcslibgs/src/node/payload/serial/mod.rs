@@ -317,8 +317,8 @@ pub(crate) fn group_kind_of(
     }))
 }
 
-/// Judges whether a serial device is a stand-in: a pseudo-terminal, which is
-/// what tcssim makes for a serial payload. See [`crate::simulate`].
+/// Judges whether a serial device is a simulated device: a pseudo-terminal,
+/// which is what tcssim makes for a serial payload. See [`crate::simulate`].
 ///
 /// # Arguments
 ///
@@ -326,7 +326,7 @@ pub(crate) fn group_kind_of(
 ///
 /// # Returns
 ///
-/// The judgement, with what to change if it is not a stand-in.
+/// The judgement, with what to change if it is a real device.
 pub fn judged(path: &str) -> crate::simulate::Judged {
     crate::simulate::pseudo_terminal(
         path,

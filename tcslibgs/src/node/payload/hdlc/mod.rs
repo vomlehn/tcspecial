@@ -3,8 +3,8 @@
 //!
 //! **Experimental, and not yet supported.** The terms parse and reach an
 //! endpoint; nothing has been run against a card, and unlike every other type
-//! here there is nothing in the kernel to run it against -- see "No stand-in"
-//! below.
+//! here there is nothing in the kernel to run it against -- see "No dummy
+//! device" below.
 //!
 //! # What Linux calls it
 //!
@@ -36,14 +36,14 @@
 //! not generate. Two types with one word between them was the arrangement that
 //! let a file state a clock nothing applied.
 //!
-//! # No stand-in
+//! # No dummy device
 //!
-//! Every other experimental type has something in the kernel to run it
-//! against: `vcan` for a CAN bus, `i2c-stub` for a bus device, `gpio-sim` for
-//! discrete lines, `iio_dummy` for a sensor. There is no virtual HDLC
-//! interface, so this type needs a card -- a `wanxl`, a `pci200syn`, a
-//! `pc300too` or a FarSync -- and the simulator says so where it is asked to
-//! stand in for one.
+//! Every other experimental type has something in the kernel to run it against:
+//! `vcan` for a CAN bus, `i2c-stub` for a bus device, `gpio-sim` for discrete
+//! lines, `iio_dummy` for a sensor. There is no virtual HDLC interface, so this
+//! type needs a card -- a `wanxl`, a `pci200syn`, a `pc300too` or a FarSync --
+//! and the simulator says so where it is asked to simulate one that gives no
+//! `sim_address`.
 
 use std::fmt;
 
@@ -479,9 +479,9 @@ pub(crate) fn group_kind_of(
     }))
 }
 
-/// Judges whether an HDLC interface is a stand-in, which a synchronous line
+/// Judges whether an HDLC interface is a dummy device, which a synchronous line
 /// never is: there is no virtual HDLC interface, so such a payload needs a
-/// card. See [`crate::simulate`].
+/// card, or a `sim_address` to be simulated at. See [`crate::simulate`].
 ///
 /// # Arguments
 ///
@@ -493,7 +493,7 @@ pub(crate) fn group_kind_of(
 pub fn judged(interface: &str) -> crate::simulate::Judged {
     crate::simulate::Judged::hardware(
         format!(
-            "{interface} is a synchronous line, which nothing stands in for"
+            "{interface} is a synchronous line, which has no dummy device"
         ),
         "interface",
         "leave the hdlc node out of a run that must exercise no hardware",

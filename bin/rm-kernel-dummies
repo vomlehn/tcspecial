@@ -1,8 +1,8 @@
 #!/bin/bash
 #
-# Remove what bin/mk-kernel-stand-ins makes:
+# Remove what bin/mk-kernel-dummies makes:
 #
-#   sudo bin/rm-kernel-stand-ins
+#   sudo bin/rm-kernel-dummies
 #
 # Every one of the three, whichever were made: each script it calls --
 # bin/rmvcan, bin/rmgpio and bin/rmiio -- says so and does nothing where
@@ -15,7 +15,7 @@
 
 set -euo pipefail
 
-me="rm-kernel-stand-ins"
+me="rm-kernel-dummies"
 
 if [ "$(id -u)" -ne 0 ]; then
 	echo "$me: removing a kernel device needs root: run it as sudo $0" >&2

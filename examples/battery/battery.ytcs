@@ -102,8 +102,8 @@ vehicle:
 
 payloads:
   # Every payload is the far end of a UDP socket or a serial line, which
-  # tcssim stands in for, so that the example runs on any desk and touches
-  # no hardware.
+  # tcssim plays, so that the example runs on any desk and touches no
+  # hardware.
   - type network:
       # The science instrument's power switch, driven by what shedding decides
       # -- 1 to shed it, 0 to restore it.

@@ -1,9 +1,9 @@
 //! An engine: a throttle, a thrust, and the fuel it burns.
 //!
-//! It takes `throttle`, a ratio from nought to one, which a stand-in the
-//! vehicle drives sets, and gives out its `force`, in newtons -- its full
-//! `thrust` times the throttle -- and the `flow` of fuel it burns doing so,
-//! in kilograms a second. An engine of specific impulse `isp` burns
+//! It takes `throttle`, a ratio from nought to one, which a simulated payload
+//! the vehicle drives sets, and gives out its `force`, in newtons -- its full
+//! `thrust` times the throttle -- and the `flow` of fuel it burns doing so, in
+//! kilograms a second. An engine of specific impulse `isp` burns
 //!
 //! ```text
 //! flow = force / (isp * 9.80665)
@@ -37,7 +37,8 @@ pub const SETTINGS: &[&str] = &["thrust", "isp", "fuel"];
 #[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
 #[serde(deny_unknown_fields)]
 pub struct Engine {
-    /// What it is called, which is how a connection or a stand-in names it.
+    /// What it is called, which is how a connection or a simulated payload
+    /// names it.
     #[serde(rename = "component")]
     pub name: String,
     /// Its thrust at full throttle: `"16000 N"`.

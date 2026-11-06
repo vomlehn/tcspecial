@@ -67,7 +67,7 @@
                  commands in frames carrying 0x124: two identifiers, so two
                  payloads, each of whose sockets hears its own identifier
                  and nothing else on the bus. vcan0 is the kernel's virtual
-                 bus, which bin/mk-kernel-stand-ins makes; on a vehicle it
+                 bus, which bin/mk-kernel-dummies makes; on a vehicle it
                  is the controller's interface, such as can0.
 
                  Each status frame goes to the ground as it arrives. -->

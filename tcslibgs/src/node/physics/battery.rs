@@ -53,7 +53,8 @@ pub const SETTINGS: &[&str] =
 #[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
 #[serde(deny_unknown_fields)]
 pub struct Battery {
-    /// What it is called, which is how a connection or a stand-in names it.
+    /// What it is called, which is how a connection or a simulated payload
+    /// names it.
     #[serde(rename = "component")]
     pub name: String,
     /// How much charge it holds full, in ampere-hours: `"10 Ah"`.

@@ -3,7 +3,7 @@
 # A payload: what the vehicle carries this flight. Its readings leave by
 # world-out on their way to the ground, and what asks for them -- a
 # trigger, a command -- arrives at moc-in. Reached as an i2c device is, and
-# a type of its own for what it is and for stand_in. Its Rust is
+# a type of its own for what it is and for sim_address. Its Rust is
 # tcspecial/src/node/payload/i2c_tmass/, which opens it as
 # tcspecial/src/node/payload/i2c/ does.
 node: i2c_tmass
@@ -89,7 +89,7 @@ attributes:
       quotes, bytes in brackets, or both one after another. A heater that must
       start off, a register to set before the part reads sensibly. A write that
       fails stops the node from starting.
-  - name: stand_in
+  - name: sim_address
     required: false
     about: >
       Where the sensor is reached over UDP when it is simulated, as a

@@ -503,8 +503,8 @@ mod tests {
     use std::time::{Duration, Instant};
     use tcslog::WriteCallbacks;
 
-    /// A stand-in for `segsend` that records each name it is given, in a
-    /// file beside it, and deletes the segment as the shipped one does.
+    /// A simulated `segsend` that records each name it is given, in a file
+    /// beside it, and deletes the segment as the shipped one does.
     ///
     /// Run once with no name before it is returned, which it ignores: see
     /// `crate::when_not_busy`, which is why a program a test has just written
@@ -516,7 +516,7 @@ mod tests {
     ///
     /// # Returns
     ///
-    /// The stand-in's path.
+    /// The simulated program's path.
     ///
     /// # Panics
     ///
@@ -543,15 +543,15 @@ mod tests {
                 .status()
                 .map_err(|e| e.to_string())
         })
-        .expect("the stand-in runs");
+        .expect("the simulated segsend runs");
         program
     }
 
-    /// Reads what the stand-in made by `recording` has been handed.
+    /// Reads what the simulated segsend made by `recording` has been handed.
     ///
     /// # Arguments
     ///
-    /// * `dir` - The directory the stand-in is in.
+    /// * `dir` - The directory the simulated segsend is in.
     ///
     /// # Returns
     ///

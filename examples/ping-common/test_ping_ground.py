@@ -187,7 +187,7 @@ class WindowTest(unittest.TestCase):
                 yield from labels(child)
 
         def mainloop(window, n=0):
-            """Stands in for ``Tk.mainloop``: presses the button, plays the
+            """Replaces ``Tk.mainloop``: presses the button, plays the
             vehicle's answer, reads the window, and runs the real loop until
             it is closed.
 

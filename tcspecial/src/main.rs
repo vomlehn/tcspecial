@@ -14,9 +14,9 @@
 //! setting and the one a run without `--simulate` gets.
 //!
 //! `--simulate=<mode>` is the simulation mode, `none`, `some` or `all`: see
-//! `tcslibgs::simulate`. Each payload is judged a stand-in or not before
-//! anything is opened, and a run whose payloads the mode does not allow is
-//! refused: see `tcspecial::runtime::start`.
+//! `tcslibgs::simulate`. Each payload is judged a real, a dummy or a simulated
+//! device before anything is opened, and a run whose payloads the mode does not
+//! allow is refused: see `tcspecial::runtime::start`.
 //!
 //! `--types` prints the payload types this build contains, separated by
 //! commas, and exits: what `tcsverify --types=` takes, so that a
@@ -73,15 +73,15 @@ fn main() {
 
     // A window asked of a run in the flight setting is refused, whatever the
     // build, before anything is read or opened. The flight setting is what a
-    // run that leaves --simulate out gets, so a window there would be a
-    // window opened in flight, and a run with real hardware and nothing
-    // standing in is either flight or a mistake about which run this is.
-    // First, so that what a flight launch meets does not depend on the build.
+    // run that leaves --simulate out gets, so a window there would be a window
+    // opened in flight, and a run on real devices alone is either flight or a
+    // mistake about which run this is. First, so that what a flight launch
+    // meets does not depend on the build.
     if visual && simulate.is_flight() {
         eprintln!(
-            "tcspecial: --visual is for a run with stand-ins, and this one is \
-             --simulate={simulate}, the flight setting: give --simulate=some \
-             or --simulate=all with it"
+            "tcspecial: --visual is for a run with simulated or dummy \
+             devices, and this one is --simulate={simulate}, the flight \
+             setting: give --simulate=some or --simulate=all with it"
         );
         process::exit(1);
     }

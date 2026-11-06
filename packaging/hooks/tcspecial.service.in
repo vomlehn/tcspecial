@@ -9,7 +9,7 @@
 # ExecStart and the condition to the .xtcs file.
 #
 # No --simulate on the command line: left out it is none, the flight setting,
-# under which tcspecial refuses every stand-in.
+# under which tcspecial refuses every simulated and dummy device.
 
 [Unit]
 Description=tcspecial flight software: the vehicle's payloads as a graph

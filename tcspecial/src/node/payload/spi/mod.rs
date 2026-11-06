@@ -45,14 +45,15 @@ const SPI_CPHA: u8 = 0x01;
 const SPI_CPOL: u8 = 0x02;
 const SPI_CS_HIGH: u8 = 0x04;
 
-/// Whether the node at the end of the path is a peripheral or a stand-in.
+/// Whether the node at the end of the path is a peripheral or a simulated
+/// device.
 ///
-/// A spidev node takes the requests above and clocks a peripheral on the
-/// terms they set. A terminal takes none of them -- it has no clock to set --
-/// and is what tcssim stands in for a peripheral with, there being no module
-/// that emulates one. The bytes of such a link are real and its clocking does
-/// not exist, so a handler on one is told what it has, once, rather than left
-/// to infer it from transfers that work while the terms did not take.
+/// A spidev node takes the requests above and clocks a peripheral on the terms
+/// they set. A terminal takes none of them -- it has no clock to set -- and is
+/// what tcssim simulates a peripheral with, there being no module that emulates
+/// one. The bytes of such a link are real and its clocking does not exist, so a
+/// handler on one is told what it has, once, rather than left to infer it from
+/// transfers that work while the terms did not take.
 ///
 /// Nothing else is accepted. A regular file, or a character device that is
 /// neither of these, is a path naming something other than what the
@@ -62,8 +63,8 @@ const SPI_CS_HIGH: u8 = 0x04;
 enum Clocking {
     /// A real spidev node, set to the configured terms.
     Peripheral,
-    /// A terminal standing in for one: the bytes without the clock.
-    StandIn,
+    /// A terminal simulating one: the bytes without the clock.
+    Simulated,
 }
 
 /// Takes a terminal's line discipline out of the way, so that what it
@@ -114,8 +115,8 @@ fn make_raw(fd: RawFd, on: &str) -> TcsResult<()> {
     Ok(())
 }
 
-/// Whether this descriptor is a terminal, which is what a stand-in for a
-/// peripheral is.
+/// Whether this descriptor is a terminal, which is what a simulated peripheral
+/// is.
 fn is_a_terminal(fd: RawFd) -> bool {
     // SAFETY: isatty reads the descriptor's kind and nothing else.
     unsafe { libc::isatty(fd) == 1 }
@@ -133,9 +134,8 @@ pub struct SpiEndpoint {
 impl SpiEndpoint {
     /// Opens the device and sets the controller to the configured terms.
     ///
-    /// A terminal, which is what stands in for a peripheral, is made raw
-    /// instead and said so in the log; nothing else that refuses the mode
-    /// is accepted.
+    /// A terminal, which is what simulates a peripheral, is made raw instead
+    /// and said so in the log; nothing else that refuses the mode is accepted.
     ///
     /// # Arguments
     ///
@@ -144,7 +144,7 @@ impl SpiEndpoint {
     ///
     /// # Returns
     ///
-    /// The endpoint, a peripheral set to those terms or a raw stand-in.
+    /// The endpoint, a peripheral set to those terms or a raw simulated one.
     ///
     /// # Errors
     ///
@@ -162,11 +162,11 @@ impl SpiEndpoint {
             .read(true)
             .write(true)
             // Not this process's terminal. A device that is a tty -- a real
-            // serial port, or a pty standing in for one -- becomes the
-            // controlling terminal of a process that opens it without this,
-            // and then a read from a background process group raises SIGTTIN
-            // and a hangup raises SIGHUP: a handler stopped or killed for
-            // reasons that have nothing to do with its device.
+            // serial port, or a pty tcssim made to simulate one -- becomes the
+            // controlling terminal of a process that opens it without this, and
+            // then a read from a background process group raises SIGTTIN and a
+            // hangup raises SIGHUP: a handler stopped or killed for reasons
+            // that have nothing to do with its device.
             .custom_flags(libc::O_NOCTTY)
             .open(&config.path)
             .map_err(|e| {
@@ -175,10 +175,9 @@ impl SpiEndpoint {
 
         let fd = device.as_raw_fd();
 
-        // The mode first, and what happens to it decides the rest. A node
-        // that refuses it is not a spidev: a terminal is a stand-in to carry
-        // bytes on, and anything else is a configuration naming the wrong
-        // path.
+        // The mode first, and what happens to it decides the rest. A node that
+        // refuses it is not a spidev: a terminal is a simulated device to carry
+        // bytes on, and anything else is a configuration naming the wrong path.
         match set_u8(fd, SPI_IOC_WR_MODE, mode_bits(config), &on, "its mode") {
             Ok(()) => {}
             Err(_) if is_a_terminal(fd) => {
@@ -191,14 +190,14 @@ impl SpiEndpoint {
                 make_raw(fd, &on)?;
 
                 info!(
-                    "{} is a terminal standing in for a SPI peripheral: it \
+                    "{} is a terminal simulating a SPI peripheral: it \
                      will carry bytes raw, and the mode, clock rate and word \
                      width in the configuration are not applied to anything",
                     on
                 );
                 return Ok(Self {
                     device,
-                    clocking: Clocking::StandIn,
+                    clocking: Clocking::Simulated,
                     _buffer: vec![0u8; ENDPOINT_BUFFER_SIZE],
                 });
             }
@@ -466,14 +465,14 @@ mod tests {
         );
     }
 
-    /// A terminal is taken as a stand-in for a peripheral, and carries bytes.
+    /// A terminal is taken as a simulated peripheral, and carries bytes.
     ///
     /// Which is what tcssim offers: nothing emulates a SPI peripheral, so what
     /// it puts at the end of the path is a pty. The terms do not take -- a pty
     /// has no clock to set -- and the handler says so and carries the bytes
-    /// anyway, because the bytes are the part a stand-in can be honest about.
+    /// anyway, because the bytes are the part a simulation can be honest about.
     #[test]
-    fn a_terminal_is_taken_as_a_stand_in_and_carries_bytes() {
+    fn a_terminal_is_taken_as_simulated_and_carries_bytes() {
         use std::io::Write;
         use std::os::unix::io::FromRawFd;
 
@@ -525,11 +524,11 @@ mod tests {
         };
         let mut endpoint = SpiEndpoint::new("instrument", &config)
             .unwrap_or_else(|e| {
-                panic!("{slave} was not taken as a stand-in: {e}")
+                panic!("{slave} was not taken as simulated: {e}")
             });
         assert_eq!(
             endpoint.clocking,
-            Clocking::StandIn,
+            Clocking::Simulated,
             "a pty was mistaken for a peripheral"
         );
 
@@ -581,8 +580,7 @@ mod tests {
             said.contains("instrument"),
             "the complaint does not say which handler: {said}"
         );
-        // Narrowly: a terminal is a stand-in and a plain file is not. A
-        // handler that accepted anything would open the wrong path
-        // confidently.
+        // Narrowly: a terminal is a simulated device and a plain file is not. A
+        // handler that accepted anything would open the wrong path confidently.
     }
 }

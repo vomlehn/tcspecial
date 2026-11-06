@@ -1,12 +1,12 @@
 //! Whether the simulator is ready: the messages a harness and tcssim exchange
 //! on tcssim's readiness socket.
 //!
-//! A stand-in has to exist before tcspecial looks for it, so whatever starts a
-//! run with stand-ins -- the harness -- starts tcssim first and asks it, at
+//! A simulated device has to exist before tcspecial looks for it, so whatever
+//! starts a simulated run -- the harness -- starts tcssim first and asks it, at
 //! the UDP address its simulator file states as `tcssim.ready`, whether it has
-//! made them. tcspecial takes no part: flight software that knows nothing of
-//! a simulator cannot wait for the wrong one. See "Waiting for the Simulator"
-//! in `docs/design.rst`.
+//! made them. tcspecial takes no part: flight software that knows nothing of a
+//! simulator cannot wait for the wrong one. See "Waiting for the Simulator" in
+//! `docs/design.rst`.
 //!
 //! The exchange is a request and an answer and nothing is held between
 //! exchanges: a request carries a sequence number and the answer carries it
@@ -80,14 +80,15 @@ impl Request {
 /// The simulator's state now.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum State {
-    /// Still making stand-ins.
+    /// Still making simulated devices.
     Starting,
-    /// Every stand-in it will provide exists and answers: each link made,
-    /// each socket bound or listening, each `i2c-stub` chip found and loaded.
-    /// The stand-ins are there; nothing is said about any packet.
+    /// Every simulated device it will provide exists and answers: each link
+    /// made, each socket bound or listening, each `i2c-stub` chip found and
+    /// loaded. The simulated devices are there; nothing is said about any
+    /// packet.
     Ready,
-    /// It could not make a stand-in, or one has stopped: the reason says
-    /// which payload and why.
+    /// It could not make a simulated device, or one has stopped: the reason
+    /// says which payload and why.
     Failed,
 }
 

@@ -1,6 +1,6 @@
-//! The vehicle's own nodes, where the simulator stands in for one.
+//! The vehicle's own nodes, where the simulator simulates one.
 //!
-//! Only the thermostat: see `crate::node` for why the simulator stands in
-//! for no other vehicle node.
+//! Only the thermostat: see `crate::node` for why the simulator simulates no
+//! other vehicle node.
 
 pub mod thermostat;

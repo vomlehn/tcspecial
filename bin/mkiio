@@ -1,17 +1,17 @@
 #!/bin/bash
 #
-# Make the kernel stand-in a simulated IIO sensor needs.
+# Make the dummy device, an iio_dummy sensor, a simulated IIO sensor needs.
 #
 # A sensor's buffer is one of the payload types the simulator cannot simply be
 # the far end of: a buffer is filled by the sensor, and user space is not a
 # sensor. What the kernel offers instead is `iio_dummy`: a sensor with no
 # sensor in it, whose buffer a software trigger fills on a timer.
 #
-# Unlike the I2C and GPIO stand-ins there is no simulator side to this one. A
-# buffer is a stream out of the device and an IIO payload cannot be triggered,
-# so the dummy *is* the payload and tcspecial reads it -- which makes it the
-# more faithful of the two things that can stand in for a sensor, the other
-# being the pty the tests use.
+# Unlike the I2C and GPIO dummy devices there is no simulator side to this
+# one. A buffer is a stream out of the device and an IIO payload cannot be
+# triggered, so the dummy *is* the payload and tcspecial reads it -- which
+# makes it the more faithful of the two ways to run an IIO payload with no
+# sensor, the other being the simulated device, a pty, the tests use.
 #
 # The modules are the kernel's and configuring them needs root, so tcssim does
 # not make a sensor: it finds one and says how to make one if there is none.

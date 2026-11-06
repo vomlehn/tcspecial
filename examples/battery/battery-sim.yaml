@@ -1,11 +1,12 @@
 # yaml-language-server: $schema=../../tcsgui/share/schema/tcspecial-sim.schema.json
 
-# How tcssim stands in for the payloads of battery.ytcs.
+# How tcssim simulates the payloads of battery.ytcs.
 #
 # The two files are joined by name, and nothing here names a payload that
 # file does not have. Only the payloads named here are simulated.
 #
-# Each stand-in is joined to the physics model: the power monitor reports
+# Each simulated payload is joined to the physics model: the power monitor
+# reports
 # the battery's voltage, which on a bus with no regulator is the bus's; the
 # shunt reports the current into the battery; and the science switch sheds
 # the science load. So the loop closes through tcspecial: the shunt's
@@ -13,9 +14,9 @@
 # the shedding changes the current.
 description: Simulator settings for the payloads of battery.ytcs
 
-# Where tcssim answers whether it has made its stand-ins, which whatever
-# starts the run asks before it starts tcspecial. A port no other example
-# uses, so that two can be run at once.
+# Where tcssim answers whether it has made its simulated devices, which
+# whatever starts the run asks before it starts tcspecial. A port no other
+# example uses, so that two can be run at once.
 tcssim:
   ready: "127.0.0.1:7910"
 
@@ -23,7 +24,8 @@ tcssim:
 # parts it is made of. The sun lights the solar array; the array supplies
 # the bus, the loads draw on it, and what is left over charges the battery,
 # or, in shadow, what the array cannot give the battery makes up. The
-# stand-ins below are joined to its terminals by name, with connects.
+# simulated payloads below are joined to its terminals by name, with
+# connects.
 #
 # The orbit is six minutes where a low one is ninety, and the battery a
 # tenth of what a vehicle of these loads would fly, so that a run on a
@@ -83,8 +85,8 @@ world:
 
 simulated_payloads:
   - type network:
-      # Driven and never read: its stand-in sends nothing, counts each decision
-      # the vehicle sends it, and sheds the science load while it is told to.
+      # Driven and never read: tcssim sends nothing, counts each decision the
+      # vehicle sends it, and sheds the science load while it is told to.
       - payload: science
         connects: science.shed
         protocol: udp

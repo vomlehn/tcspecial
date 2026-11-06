@@ -1280,17 +1280,17 @@ pub fn described(graph: &Graph) -> BTreeMap<String, String> {
 mod tests {
     use super::*;
 
-    // What a port answers with, for the stand-ins below.
+    // What a port answers with, for the simulated ports below.
     use crate::runtime::fabric::{Arriving, Taken};
     use std::path::Path;
     use std::sync::atomic::{AtomicUsize, Ordering};
     use std::sync::Mutex as TestLock;
 
-    /// What a stand-in port records, shared with the test that reads it.
+    /// What a simulated port records, shared with the test that reads it.
     ///
     /// A lock and not a `RefCell`, and an `Arc` and not an `Rc`, because a
     /// port is `Send`: a node operation runs on a thread of its own, so
-    /// anything a stand-in holds has to be able to go with it.
+    /// anything a simulated port holds has to be able to go with it.
     type Kept = Arc<TestLock<Vec<Vec<u8>>>>;
 
     /// And a count it keeps, for the same reason.
@@ -1309,10 +1309,9 @@ mod tests {
 
     /// A device that answers with whatever it was given, in order.
     ///
-    /// Standing in for the three sensors, because the example's sensors are
-    /// on buses that are not on this machine. What is being tested is the
-    /// assembly and the loop: with real hardware here these would be tests of
-    /// a bus.
+    /// Playing the three sensors, because the example's sensors are on buses
+    /// that are not on this machine. What is being tested is the assembly and
+    /// the loop: with real hardware here these would be tests of a bus.
     struct Sensor {
         readings: Kept,
     }
@@ -2236,7 +2235,7 @@ vehicle:
         }
     }
 
-    /// Opens the shipped thermostat example with its hardware stood in for.
+    /// Opens the shipped thermostat example with its hardware simulated.
     ///
     /// Its sensors are scripted, its heaters, its ground link and each
     /// source's link to the ground are watched, and its log writes into a
@@ -2890,9 +2889,9 @@ vehicle:
 
     /// A ping from the ground is answered to the ground in the same pass.
     ///
-    /// The ground link stands in for the socket the MOC sends to; the ping
-    /// node is the real one. What reaches the ground is the ping, a space and
-    /// the vehicle's time, over the link drawn from the ping node to the
+    /// The ground link takes the place of the socket the MOC sends to; the
+    /// ping node is the real one. What reaches the ground is the ping, a space
+    /// and the vehicle's time, over the link drawn from the ping node to the
     /// gateway node; and what is not a ping is refused and answers nothing.
     #[test]
     fn a_ping_from_the_ground_is_answered_to_the_ground() {

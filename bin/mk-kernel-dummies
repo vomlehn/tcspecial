@@ -1,14 +1,14 @@
 #!/bin/bash
 #
-# Make the kernel stand-ins the CAN, GPIO and IIO tests fly tcspecial against,
-# and give them to the user who ran this:
+# Make the kernel's dummy devices the CAN, GPIO and IIO tests fly tcspecial
+# against, and give them to the user who ran this:
 #
-#   sudo bin/mk-kernel-stand-ins                # can gpio
-#   sudo bin/mk-kernel-stand-ins can gpio iio   # only those named
+#   sudo bin/mk-kernel-dummies                # can gpio
+#   sudo bin/mk-kernel-dummies can gpio iio   # only those named
 #
 # CAN and GPIO are supported because tcspecial's own node code is run against
-# the kernel's stand-in for each -- vcan for a CAN bus, gpio-sim for a GPIO
-# chip -- by tcspecial/tests/kernel-stand-ins.rs. IIO has a test there too,
+# the kernel's dummy device for each -- vcan for a CAN bus, gpio-sim for a GPIO
+# chip -- by tcspecial/tests/kernel-dummies.rs. IIO has a test there too,
 # against an iio_dummy sensor, and stays experimental until it has passed:
 # a stock distribution kernel builds iio_dummy without the buffer it reads,
 # so it is made only when asked for, and refused where the kernel lacks it.
@@ -25,11 +25,11 @@
 # scripts give what they make to $SUDO_USER, which is who runs the tests.
 #
 # Nothing here survives a reboot, so it is run again after one;
-# bin/rm-kernel-stand-ins takes it all away.
+# bin/rm-kernel-dummies takes it all away.
 
 set -euo pipefail
 
-me="mk-kernel-stand-ins"
+me="mk-kernel-dummies"
 
 if [ "$(id -u)" -ne 0 ]; then
 	echo "$me: making a kernel device needs root: run it as" \
@@ -56,7 +56,7 @@ for kind in "${wanted[@]}"; do
 	can | gpio | iio) ;;
 	*)
 		echo "$me: \"$kind\" is not one of can, gpio and iio, the" \
-			"types this makes stand-ins for" >&2
+			"types this makes dummy devices for" >&2
 		exit 2
 		;;
 	esac
@@ -131,7 +131,7 @@ refused=()
 for kind in "${wanted[@]}"; do
 	why="$(missing_for "$kind")"
 	if [ -n "$why" ]; then
-		echo "$me: cannot make the $kind stand-in: $why" >&2
+		echo "$me: cannot make the $kind dummy device: $why" >&2
 		refused+=("$kind")
 	fi
 done
@@ -173,4 +173,4 @@ done
 
 echo
 echo "$me: made ${wanted[*]} for $user; now, as $user:"
-echo "  cargo test -p tcspecial --test kernel-stand-ins"
+echo "  cargo test -p tcspecial --test kernel-dummies"

@@ -123,9 +123,9 @@ RUST_LOG = info
 
 # The run's simulation mode, given to every program a run target starts:
 # none, some or all. All by default, because these targets run on a desk with
-# stand-ins, and a program that leaves the flag out gets none -- the flight
-# setting -- and refuses every stand-in. See "Simulation Modes" in
-# docs/design.rst.
+# simulated and dummy devices, and a program that leaves the flag out gets
+# none -- the flight setting -- and refuses every one. See "Simulation Modes"
+# in docs/design.rst.
 #   make runmocy SIMULATE=some
 SIMULATE = all
 
@@ -169,28 +169,28 @@ help:
 	@echo "  make verify      - Check one version 2 configuration"
 	@echo "  make mkvcan      - Make the virtual CAN bus a CAN payload" \
 		"needs"
-	@echo "  make mkstubs     - Make every stand-in: I2C, GPIO, IIO and" \
-		"virtual CAN"
+	@echo "  make mkstubs     - Make every dummy device: I2C, GPIO, IIO" \
+		"and virtual CAN"
 	@echo "  make rmvcan      - Remove the virtual CAN buses"
-	@echo "  make rmstubs     - Remove every stand-in those made"
+	@echo "  make rmstubs     - Remove every dummy device those made"
 	@echo "  make fprime-build - Build the F´ bridge and its test" \
 		"deployment, with F´'s tools"
 	@echo "  make fprime-test  - Build them and test the bridge against" \
 		"tcspecial and tcssim"
 	@echo "                     (FPRIME_SCRATCH, or FPRIME_FRAMEWORK and" \
 		"FPRIME_VENV: see fprime/Makefile)"
-	@echo "  make stand-ins-test - Run tcspecial against tcssim with a" \
-		"payload of each type"
+	@echo "  make simulated-devices-test - Run tcspecial against tcssim" \
+		"with a payload of each type"
 	@echo "  make cfs-build   - Build cFS with SBN for this machine, in" \
 		"a scratch directory"
 	@echo "  make cfs-test    - Build it and fly the cfs example against" \
 		"it, tested from the cFS's ground"
 	@echo "                     (CFS_PRISTINE, SBN_SRC and CFS_SCRATCH:" \
 		"see cfs/Makefile)"
-	@echo "  make kernel-stand-ins-test - Run tcspecial against the" \
+	@echo "  make kernel-dummies-test - Run tcspecial against the" \
 		"kernel's vcan, gpio-sim and iio_dummy"
 	@echo "                     (make them first with sudo" \
-		"bin/mk-kernel-stand-ins)"
+		"bin/mk-kernel-dummies)"
 	@echo "  make check       - cargo check, clippy, a format check and" \
 		"an HTML check"
 	@echo "  make html-check  - Fail where a committed HTML page is" \
@@ -508,15 +508,16 @@ runsim:
 mkvcan:
 	bin/mkvcan
 
-# Make every stand-in a payload set may need.
+# Make every dummy device a payload set may need.
 #
 # The four types the simulator cannot simply be the far end of: a device on a
 # bus has to answer when a master addresses it, a discrete line is a wire, a
 # sensor's buffer is filled by the sensor, and a CAN controller is a network
-# interface rather than a file. The kernel stands in for each, and there is one
-# script per type -- bin/mki2c, bin/mkgpio, bin/mkiio and bin/mkvcan -- because
-# a host that needs one commonly does not need the others, and one script that
-# made all four could fail on a type nobody had asked for.
+# interface rather than a file. The kernel makes a dummy device for each, and
+# there is one script per type -- bin/mki2c, bin/mkgpio, bin/mkiio and
+# bin/mkvcan -- because a host that needs one commonly does not need the
+# others, and one script that made all four could fail on a type nobody had
+# asked for.
 #
 # This target is the convenience of having them all: four commands, in any
 # order, each saying what it made. For one type alone, run its script, or the
@@ -540,22 +541,22 @@ mkstubs:
 # Put the host back the way it was found.
 #
 # The cleanup halves of the two targets above, which call these rather than
-# carrying a copy, so that undoing a stand-in is one command whether it is done
-# on its own or as the first half of remaking one.
+# carrying a copy, so that undoing a dummy device is one command whether it is
+# done on its own or as the first half of remaking one.
 #
 # One script per type again, and each is the cleanup half of its own mk script,
-# which calls it rather than carrying a copy -- so undoing a stand-in is the
+# which calls it rather than carrying a copy -- so undoing a dummy device is the
 # same code whether it is done on its own or as the first half of remaking one.
 #
-# None is destructive beyond its own stand-in. rmvcan removes the virtual CAN
-# interfaces and leaves the driver loaded; rmgpio and rmiio remove the chip and
-# the sensor this tree made, by name, since a host's own sit in the same
+# None is destructive beyond its own dummy device. rmvcan removes the virtual
+# CAN interfaces and leaves the driver loaded; rmgpio and rmiio remove the chip
+# and the sensor this tree made, by name, since a host's own sit in the same
 # numbering, and leave another program's alone. rmi2c is the blunt one: an
 # i2c-stub adapter *is* the module, so there is no way to take away one chip
 # and leave another.
 #
-# All of them take a stand-in out from under anything using it, so none is for
-# a moment when a tcssim is running. The rmstubs order is the reverse of
+# All of them take a dummy device out from under anything using it, so none is
+# for a moment when a tcssim is running. The rmstubs order is the reverse of
 # making them, which costs nothing and reads as undoing.
 .PHONY: rmvcan
 rmvcan:
@@ -571,7 +572,7 @@ rmstubs:
 # Check one version 2 configuration.
 #
 # One file and not a pair: a version 2 configuration has no simulator file
-# beside it -- what a node stands in for is the node's own business -- so this
+# beside it -- how a node is simulated is the node's own business -- so this
 # names the file itself rather than a stem the way the runverify targets do.
 #
 # The same TCSGUI_FILE the editor takes, so that checking what was just edited
@@ -694,7 +695,7 @@ clean:
 	@echo "Cleaning build artifacts..."
 	-cargo clean
 	rm -f build.out
-	rm -rf $(STAND_INS_RUN)
+	rm -rf $(SIMULATED_DEVICES_RUN)
 	@echo "✓ Clean complete"
 
 
@@ -1104,7 +1105,7 @@ LINKDIR ?= /usr/local/bin
 STAGE_TARGET = install-$$package
 STAGE_VARS   = SYSCONFDIR=/etc/opt/tcs LOCALSTATEDIR=/var/opt/tcs
 RPM_DEFINES  = --define "_sourcedir $(CURDIR)/packaging/rpm"
-# The scripts in bin/ that make and remove the stand-in devices are not
+# The scripts in bin/ that make and remove the dummy devices are not
 # packaged, but lint-packages checks them with shellcheck as well, so that
 # they are held to what the packaged scripts are.
 LINT_SCRIPTS = $(wildcard bin/*)
@@ -1173,7 +1174,7 @@ check:
 fprime-build:
 	$(MAKE) -C fprime build
 
-# Build the bridge and run its test: tcssim standing in for the fprime
+# Build the bridge and run its test: tcssim simulating the fprime
 # example's payloads, tcspecial flying it, and F´'s ground system commanding
 # the bridge in an F´ deployment and reading its channels, holding the ports'
 # lock while it runs. tcssim's window opens for the length of the test.
@@ -1181,19 +1182,21 @@ fprime-build:
 fprime-test:
 	$(MAKE) -C fprime test
 
-# Where stand-ins-test keeps what a run leaves, emptied at the start of each.
-STAND_INS_RUN = $(CURDIR)/tests/stand-ins/run
+# Where simulated-devices-test keeps what a run leaves, emptied at the start of
+# each.
+SIMULATED_DEVICES_RUN = $(CURDIR)/tests/simulated-devices/run
 
-# Run tcspecial against tcssim with a payload of each type tcssim stands in
-# for, and check that each one's data reaches the ground: see
-# tests/stand-ins/stand-ins-test. CAN and GPIO are tested only where a
-# virtual CAN bus or a gpio-sim chip is already there. tcssim's window opens
-# for the length of the test.
-.PHONY: stand-ins-test
-stand-ins-test:
+# Run tcspecial against tcssim with a payload of each type tcssim simulates,
+# and check that each one's data reaches the ground: see
+# tests/simulated-devices/simulated-devices-test. CAN and GPIO are tested only
+# where a virtual CAN bus or a gpio-sim chip is already there. tcssim's window
+# opens for the length of the test.
+.PHONY: simulated-devices-test
+simulated-devices-test:
 	cd $(RUST) && cargo build --bin tcspecial --bin tcssim --bin tcsverify
-	flock $(TCS_PORTS_LOCK) $(CURDIR)/tests/stand-ins/stand-ins-test \
-		$(CURDIR) $(STAND_INS_RUN)
+	flock $(TCS_PORTS_LOCK) \
+		$(CURDIR)/tests/simulated-devices/simulated-devices-test \
+		$(CURDIR) $(SIMULATED_DEVICES_RUN)
 
 # cFS itself, with SBN v7.0.1 and its UDP module, built with cFS's own tools
 # from a cFS checkout and an SBN checkout into a scratch directory: see
@@ -1212,17 +1215,17 @@ cfs-build:
 cfs-test:
 	$(MAKE) -C cfs test
 
-# Fly tcspecial against the kernel's own stand-ins for a CAN bus, a GPIO chip
+# Fly tcspecial against the kernel's dummy devices for a CAN bus, a GPIO chip
 # and an IIO sensor, playing each device's far end through the kernel: see
-# tcspecial/tests/kernel-stand-ins.rs. The same tests cargo test runs, run
+# tcspecial/tests/kernel-dummies.rs. The same tests cargo test runs, run
 # alone and saying which flew and which were skipped, and why: a test whose
 # device is not there skips, naming the command that makes it. Making the
-# devices needs root, so this does not; run `sudo bin/mk-kernel-stand-ins`
+# devices needs root, so this does not; run `sudo bin/mk-kernel-dummies`
 # first, once after each boot. The tests bind no fixed port, so they take no
 # lock.
-.PHONY: kernel-stand-ins-test
-kernel-stand-ins-test:
-	cd $(RUST) && cargo test -p tcspecial --test kernel-stand-ins \
+.PHONY: kernel-dummies-test
+kernel-dummies-test:
+	cd $(RUST) && cargo test -p tcspecial --test kernel-dummies \
 		-- --nocapture
 
 # Format code

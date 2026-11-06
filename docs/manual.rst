@@ -554,31 +554,32 @@ Supported and experimental interfaces
 Seven types of payload are supported: ``network``, ``device-file``,
 ``serial``, ``i2c``, ``spi``, ``can`` and ``gpio``.
 
-The last two were experimental until each was flown against the kernel's own
-stand-in for its device, which is what supported means for them: tcspecial's
+The last two were experimental until each was flown against the kernel's
+dummy device for it, which is what supported means for them: tcspecial's
 node code is run against a CAN bus of the kernel's ``vcan`` and a chip of its
 ``gpio-sim``, the far end of each played through the kernel and not by
-tcssim, by ``tcspecial/tests/kernel-stand-ins.rs``. Each test checks that the
+tcssim, by ``tcspecial/tests/kernel-dummies.rs``. Each test checks that the
 device's data reaches the ground and that the ground's commands reach the
 device. Each type has an example that the test flies, in ``examples/can`` and
 ``examples/gpio``.
 The devices need root to make, so the tests do not make them: see `Making the
-Kernel's Stand-ins`_. A test whose device is not there skips, saying which
+Kernel's Dummy Devices`_. A test whose device is not there skips, saying which
 device and the command that makes it, so ``cargo test`` passes on a host that
 has not been set up and proves nothing about these types there. What a
-stand-in cannot show is a real controller, chip or sensor: a bus's bitrate
+dummy device cannot show is a real controller, chip or sensor: a bus's bitrate
 and errors, a line's electrical behaviour, a driver's own channels.
 
 Some of what follows is still marked **experimental, not yet supported**:
 RS-485 on a serial line, and the ``iio``, ``rpmsg`` and ``hdlc`` types of
 payload. Each is written, parses, reaches a handler and has tests of its
-rules; none has been run against the hardware it describes or a stand-in the
-kernel makes. ``iio`` has such a stand-in, ``iio_dummy``, and an example and
+rules; none has been run against the hardware it describes or a dummy device
+the kernel makes. ``iio`` has such a dummy device, ``iio_dummy``, and an
+example and
 a test written to fly it, but a stock distribution kernel such as Ubuntu's
 builds the module without the buffer tcspecial reads, so the test has not
 run: the type is promoted once it has passed against a kernel that has the
-buffer (see `An IIO Payload`_). The others stay experimental because nothing
-in the kernel stands in for them, so there is nothing to fly them against
+buffer (see `An IIO Payload`_). The others stay experimental because the
+kernel has no dummy device for them, so there is nothing to fly them against
 short of the hardware: an rpmsg channel needs a remote processor and its
 firmware, a synchronous HDLC line needs a card, and RS-485's direction
 control is the driver of a real UART, which a pseudo-terminal refuses.
@@ -621,7 +622,7 @@ group, or the payload's own ``trigger_interval``, is the clock.
 
 A payload with no ``trigger`` sends on its own, or holds a value to be read,
 so there is nothing to send it. A simulated one that sends is driven at the
-rate its simulator configuration gives it, which is how fast a stand-in
+rate its simulator configuration gives it, which is how fast tcssim
 produces data rather than how fast the payload would.
 
 A payload's name -- ``payload: temp_1`` -- belongs to a handler and never to a
@@ -761,9 +762,10 @@ the ground, and a ``udp`` or ``unix_dgram`` payload that is read and has no
 where it is from what arrives, and as the node opens nothing has. Give it a
 trigger and it is reached at its address, init and all.
 
-tcssim takes an init as something received. A stand-in that is asked answers
-it as it would any request, which a real part would not: the vehicle then
-reads one reading more than it asked for, on the pass after the node opened.
+tcssim takes an init as something received. A simulated payload that is asked
+answers it as it would any request, which a real part would not: the vehicle
+then reads one reading more than it asked for, on the pass after the node
+opened.
 
 How a Payload's Data Is Read
 ----------------------------
@@ -1106,11 +1108,11 @@ alone, strangers counted as above:
 ``sends_from`` is a host and a port over ``udp`` -- an IP address, not a name
 -- and a path over ``unix_dgram``, and never the node's own address, which is
 where the handler waits. It is refused on a stream or a raw socket, which are
-connected and so know their other end already, and on a datagram payload
-that is asked or only driven, which is reached at its address and read only
-from there. Without it, a payload that restarts from a new port is heard
-again at once; with it, the payload must send from the address it names. The
-simulator's stand-in sends from there, and a simulator file that names a
+connected and so know their other end already, and on a datagram payload that
+is asked or only driven, which is reached at its address and read only from
+there. Without it, a payload that restarts from a new port is heard again at
+once; with it, the payload must send from the address it names. tcssim sends
+from there when it simulates the payload, and a simulator file that names a
 ``payload_address`` or ``payload_port`` for it as well is refused.
 
 A Network Payload
@@ -1170,7 +1172,7 @@ tcspecial opens a raw socket of that protocol, connected to the address, so it
 hears only that payload and sends only to it, and a datagram read is handed
 on without its IP header. A raw socket needs ``CAP_NET_RAW``, which tcspecial
 must be given (``setcap cap_net_raw+ep``); without it, the node is refused as
-it opens, saying so. tcssim does not stand in for a raw payload -- on one host
+it opens, saying so. tcssim does not simulate a raw payload -- on one host
 every raw socket of a protocol hears every datagram of it, its own included --
 and refuses a simulator file that asks it to.
 
@@ -1195,7 +1197,7 @@ Nothing else: a plain device has no terms to be set and no address to be
 reached at. A device cannot be triggered -- tcspecial opens it and reads it,
 and there is nothing to write a request to.
 
-The simulator stands in for a device file with a file of text. It makes a
+The simulator plays a device file with a file of text. It makes a
 regular file at ``path`` and adds a packet of lorem ipsum to it every packet
 interval, at the pace and with the faults its simulator file gives, until the
 text runs out, about 2900 bytes of it. tcspecial reads what has been added
@@ -1204,7 +1206,10 @@ is removed when the simulator stops, whether by its ``Quit All`` button or by
 a signal (see `The tcssim window`_); a file left by one killed outright holds
 a prefix of the text, and the next start replaces it. Where something else is
 already at ``path`` -- a real device, or a file the simulator did not write --
-the simulator leaves it alone and says so, rather than standing in for it.
+the simulator leaves it alone and says so, rather than writing over it.
+A device-file payload is a real device under every ``--simulate`` mode,
+whether or not tcssim's file of text is what it opens: see `Simulated, Dummy
+or Real Devices: --simulate`_.
 
 Three other types are reached through a device file too and are not devices in
 this sense: a serial line, a bus and a SPI peripheral each have terms of their
@@ -1226,7 +1231,7 @@ and a payload on it is addressed by the identifier its frames carry.
                   than eight bytes
    loopback       true | false, default true -- whether the controller gives
                   frames to other sockets on this host, which is what lets
-                  tcssim stand in for the payload
+                  tcssim simulate the payload
 
 Both halves of where it is are required. Several payloads commonly share one
 bus and differ only in the identifier, which is the arrangement an
@@ -1237,8 +1242,8 @@ each read the other's frames.
 A frame is its own length and carries eight bytes, or sixty-four as CAN FD,
 and CAN does not fragment -- so a ``read_size`` larger than a frame is
 refused where the file is read rather than discovered a frame at a time. The
-simulator's segment settings still apply: a stand-in's packet may go as
-several frames, each a segment.
+simulator's segment settings still apply: a simulated payload's packet may
+go as several frames, each a segment.
 
 A CAN payload may be triggered, unlike a payload on an
 I\ :superscript:`2`\ C bus. The handler sends its trigger with the same
@@ -1246,7 +1251,7 @@ identifier, and the socket does not receive its own frames, so a handler never
 reads back the trigger it just sent.
 
 The simulator joins the same bus as another member of it, so both ends are
-real -- the one type whose stand-in is as faithful as a socket.
+real -- the one type whose dummy device is as faithful as a socket.
 What it cannot do is make the bus: a virtual one needs
 
 .. code-block:: console
@@ -1282,11 +1287,11 @@ prints in the angle brackets:
    $ ip -brief link show type vcan
    vcan0            UNKNOWN        <NOARP,UP,LOWER_UP>
 
-``tcspecial/tests/kernel-stand-ins.rs`` flies `The can example`_ on such a
+``tcspecial/tests/kernel-dummies.rs`` flies `The can example`_ on such a
 bus, playing the motor itself with a socket of its own rather than with
 tcssim: a frame it puts on the bus reaches the ground, and a command the
-ground sends reaches it as a frame. ``sudo bin/mk-kernel-stand-ins can``
-makes the bus; see `Making the Kernel's Stand-ins`_.
+ground sends reaches it as a frame. ``sudo bin/mk-kernel-dummies can``
+makes the bus; see `Making the Kernel's Dummy Devices`_.
 
 A GPIO Payload
 --------------
@@ -1401,12 +1406,12 @@ simulated set of discretes, and neither do the faults -- there are no bytes to
 drop or corrupt; what it does is pull each of its lines the other way every
 packet interval.
 
-``tcspecial/tests/kernel-stand-ins.rs`` flies `The gpio example`_ on such a
+``tcspecial/tests/kernel-dummies.rs`` flies `The gpio example`_ on such a
 chip, pulling and reading its lines itself rather than through tcssim: each
 pull of the switch's line reaches the ground as a record, and a ``1`` or
 ``0`` from the ground is what the lamp's line becomes. ``sudo
-bin/mk-kernel-stand-ins gpio`` makes the chip and gives it, and its lines'
-pulls, to the user who ran it; see `Making the Kernel's Stand-ins`_.
+bin/mk-kernel-dummies gpio`` makes the chip and gives it, and its lines'
+pulls, to the user who ran it; see `Making the Kernel's Dummy Devices`_.
 
 An HDLC Payload
 ---------------
@@ -1460,15 +1465,15 @@ different from a CAN interface, where the identifier does exactly that.
 Bringing the interface up is the platform's business, as it is for a CAN
 controller: ``ip link set dev hdlc0 up``, from whatever starts the vehicle.
 
-**The kernel has no stand-in.** Every other experimental type has something
+**The kernel has no dummy device.** Every other experimental type has something
 in the kernel to be run against -- ``vcan`` for a CAN bus, ``i2c-stub`` for a
 bus device, ``gpio-sim`` for discrete lines, ``iio_dummy`` for a sensor -- and
 generic HDLC has none: the line itself needs a card, a ``wanxl``, a
-``pci200syn``, a ``pc300too`` or a FarSync. A node that gives ``stand_in``, a
-loopback address and port, is reached there over UDP instead under
+``pci200syn``, a ``pc300too`` or a FarSync. A node that gives ``sim_address``,
+a loopback address and port, is reached there over UDP instead under
 ``--simulate=some`` or ``all``, and tcssim sends its frames there; one that
-does not is hardware, and tcssim refuses to simulate it. See `Stand-ins or
-hardware: --simulate`_.
+does not is hardware, and tcssim refuses to simulate it. See `Simulated, Dummy
+or Real Devices: --simulate`_.
 
 An rpmsg Payload
 ----------------
@@ -1499,7 +1504,7 @@ the file is read.
 An rpmsg payload may be triggered: the channel carries both directions, so the
 handler writes a request and the remote answers.
 
-The simulator stands in for the channel with a pseudo-terminal. What a pty is
+The simulator plays the channel with a pseudo-terminal. What a pty is
 not is a message boundary -- the rpmsg driver hands over one message per read
 where a pty hands over whatever bytes are there -- which shows only where a
 payload writes faster than the handler reads.
@@ -1529,27 +1534,27 @@ An IIO payload cannot be triggered. A buffer is a stream out of the sensor --
 there is nothing on that descriptor to write -- so a file asking for one is
 refused, as a datagram payload asking for one is.
 
-The simulator stands in for the buffer with a pseudo-terminal, as it does for
-a serial line: the path the handler was told to open leads to it while the
-payload runs. What it does not stand in for is the ``sysfs`` half, the
+The simulator plays the buffer with a pseudo-terminal, as it does for a
+serial line: the path the handler was told to open leads to it while the
+payload runs. What it does not simulate is the ``sysfs`` half, the
 channels and the buffer -- which the handler does not touch either.
 
 A pty carries the bytes but is not a buffer, and the kernel offers something
 that is: ``iio_dummy``, a sensor with no sensor in it, whose buffer a software
-trigger fills on a timer. There is no simulator side to that one -- a buffer
-is a stream out of the device and an IIO payload cannot be triggered, so the
-dummy *is* the payload and tcspecial reads it, which makes it the more
-faithful of the two stand-ins. ``bin/mkiio`` makes one and prints the node to
+trigger fills on a timer. There is no simulator side to that one -- a buffer is
+a stream out of the device and an IIO payload cannot be triggered, so the dummy
+*is* the payload and tcspecial reads it, which makes the dummy device more
+faithful than the simulated one. ``bin/mkiio`` makes one and prints the node to
 name in a configuration, and ``bin/rmiio`` takes it away; a host's own sensors
 sit in the same numbering and are left alone, which is why the scripts go by
 name and not by number.
 
-``tcspecial/tests/kernel-stand-ins.rs`` is written to fly `The iio example`_
+``tcspecial/tests/kernel-dummies.rs`` is written to fly `The iio example`_
 on the dummy, checking that what reaches the ground is the kernel's samples,
 in whole sample sets. The dummy has a buffer only where the kernel was built
 with ``CONFIG_IIO_SIMPLE_DUMMY_BUFFER``, which a stock distribution kernel's
 is not -- Ubuntu's is not -- and without one there is no
-``/dev/iio:deviceN`` to read; ``sudo bin/mk-kernel-stand-ins iio`` says so
+``/dev/iio:deviceN`` to read; ``sudo bin/mk-kernel-dummies iio`` says so
 before making anything, and the test says so where it skips. That test is
 what promotes the type, once it has passed.
 
@@ -1630,7 +1635,7 @@ line that will not take what the file asked for is refused rather than
 started.
 
 A simulated line is a pseudo-terminal, which has no transceiver and no RTS
-and would refuse the mode. On a line that is a stand-in tcspecial leaves the
+and would refuse the mode. On a simulated line tcspecial leaves the
 RS-485 terms unapplied, and says so as it starts; tcssim, at the far end,
 receives and sends the bus's bytes as on any line. So a set that states
 ``rs485`` runs against tcssim as it is, and what goes unexercised is only the
@@ -1765,10 +1770,10 @@ through 0x3FF is usable.
 There is no parity or byte length. I\ :superscript:`2`\ C fixes the framing at
 eight data bits, most significant first, followed by an acknowledge bit.
 
-Such a payload cannot be triggered by a simulated stand-in: the master's own
+Such a payload cannot be triggered by tcssim: the master's own
 read is the request, and a second master on the bus cannot see it.
 
-What stands in for the device is the kernel's ``i2c-stub``, an adapter whose
+The dummy device for it is the kernel's ``i2c-stub``, an adapter whose
 chips are a bank of registers in memory: tcssim writes the bank and tcspecial
 reads it. The simulator finds that adapter rather than making one -- loading a
 module needs root -- and says how to make one if there is none.
@@ -1821,12 +1826,13 @@ read the same way; what the type adds is what it is, and one attribute:
 
 .. code-block:: text
 
-   stand_in       a loopback address and port: 127.0.0.1:5201. Under
+   sim_address    a loopback address and port: 127.0.0.1:5201. Under
                   --simulate=some or all tcspecial reaches the sensor there
                   over UDP instead of opening its bus, and tcssim answers
                   with the temperature of the thermal mass the simulator
                   file joins it to; under none, the flight setting, the bus
-                  is opened
+                  is opened. Its old name, stand_in, is refused, naming
+                  sim_address
 
 In the simulator file each is listed under its own type and joined to the
 thermal mass's ``temperature`` by ``connects``, as the thermostat example's
@@ -1840,15 +1846,15 @@ are:
            address: "0x48"
            path: "/dev/i2c-1"
            read_size: "2"
-           stand_in: "127.0.0.1:5201"
+           sim_address: "127.0.0.1:5201"
 
 A build has each as a Cargo feature of its own, which brings in its bus's:
 ``--features i2c_tmass`` builds the I2C bus with it.
 
-Making the Kernel's Stand-ins
------------------------------
+Making the Kernel's Dummy Devices
+---------------------------------
 The CAN and GPIO types are supported because each is flown against the
-kernel's own stand-in for its device: a virtual CAN bus, ``vcan0``, and a
+kernel's dummy device for it: a virtual CAN bus, ``vcan0``, and a
 chip of ``gpio-sim`` with eight lines. The experimental IIO type has a test
 written the same way, against a sensor of ``iio_dummy`` whose buffer an
 ``hrtimer`` trigger fills a hundred times a second, where the kernel's
@@ -1858,11 +1864,11 @@ that runs the tests:
 
 .. code-block:: console
 
-   $ sudo bin/mk-kernel-stand-ins
-   $ make kernel-stand-ins-test
+   $ sudo bin/mk-kernel-dummies
+   $ make kernel-dummies-test
 
 With no arguments the first makes the CAN bus and the GPIO chip; named
-types are made alone, and ``sudo bin/mk-kernel-stand-ins iio`` makes the
+types are made alone, and ``sudo bin/mk-kernel-dummies iio`` makes the
 IIO sensor, or ``can gpio iio`` all three. It checks that the kernel has
 every module the types asked for need -- ``vcan`` and ``can-raw``;
 ``gpio-sim``; ``industrialio-configfs``, ``iio-trig-hrtimer`` and an
@@ -1874,15 +1880,15 @@ kernel makes them root's and the tests are run as the user; a raw CAN socket
 is anyone's to open, so the bus needs nothing. The GPIO chip and the sensor
 are numbered as devices appear, and the scripts print the numbers they got.
 
-The second runs ``tcspecial/tests/kernel-stand-ins.rs`` alone, saying which
-tests flew and which skipped. ``cargo test`` runs the same tests; one whose
-device is not there, or not this user's to use, passes having tested nothing,
-and says so -- which device, and the command that makes it -- where
-``--nocapture`` shows it. The tests bind no fixed port, so they run beside
-anything else; they do use the devices, and ``make stand-ins-test`` uses the
-same bus and chip, so the two are not run at once.
+The second runs ``tcspecial/tests/kernel-dummies.rs`` alone, saying which tests
+flew and which skipped. ``cargo test`` runs the same tests; one whose device is
+not there, or not this user's to use, passes having tested nothing, and says so
+-- which device, and the command that makes it -- where ``--nocapture`` shows
+it. The tests bind no fixed port, so they run beside anything else; they do use
+the devices, and ``make simulated-devices-test`` uses the same bus and chip, so
+the two are not run at once.
 
-``sudo bin/rm-kernel-stand-ins`` takes away whichever were made. Nothing either
+``sudo bin/rm-kernel-dummies`` takes away whichever were made. Nothing either
 does survives a reboot, so the first is run again after one.
 
 What the Configuration Will Not Let Pass
@@ -2056,7 +2062,7 @@ one and disabled in the other; they were the payload's own, ``Send`` and
 A heater, or any part the vehicle drives, sends nothing, so in tcssim the
 same button is its power. Disabled -- as every payload starts, unless tcssim
 is given ``--sending`` -- it is unpowered, or failed, and stays off whatever
-the vehicle, or a thermostat tcssim stands in for, decides: it gives the
+the vehicle, or a thermostat tcssim plays, decides: it gives the
 simulated world no heat. What it is sent meanwhile is kept, the latest
 replacing the one before, and ``Enable`` applies that latest at once, since
 the vehicle sends a decision only when it changes. Nothing aboard changes:
@@ -2073,7 +2079,7 @@ Each payload's panel has a ``Configuration`` button for it, in both windows
 and spelled the same way in each. It shows every
 parameter read for that payload: what the tcspecial configuration said about
 the payload and how it is reached, and what the simulator configuration said
-about how a stand-in for it behaves, each under the name of the file it came
+about how tcssim simulates it, each under the name of the file it came
 from.
 
 It shows nothing but what the files said. What a payload has actually done is
@@ -2222,7 +2228,7 @@ The thermostat example
          thermostat driving two heaters, each through a GPIO line,
          and two more lines sensing the heaters reported to the ground. Each
          sensor is the far end of a UDP socket and each line one of the
-         kernel's simulated chip, which tcssim stands in for.
+         kernel's dummy chip, which tcssim drives.
    :width: 100%
 
    ``examples/thermostat``: a trio of sensors, a vote, a thermostat, its two
@@ -2238,13 +2244,13 @@ The sensors are temperature sensors on the zone, as a vehicle would carry
 them: ``temp_1`` and ``temp_2`` on an I\ :superscript:`2`\ C bus, of type
 ``i2c_tmass``, and ``temp_3`` a SPI peripheral, of type ``spi_tmass`` --
 see `Temperature Sensors on a Thermal Mass`_. On a desk each is reached over
-UDP at its ``stand_in`` on this host, ports 5201 to 5203, where tcssim answers
-with the zone's temperature, so that the example touches no bus; flown, the
-buses are opened. The
+UDP at its ``sim_address`` on this host, ports 5201 to 5203, where tcssim
+answers with the zone's temperature, so that the example touches no bus;
+flown, the buses are opened. The
 heaters, and the lines that sense them, are GPIO lines 2 to 5 of the kernel's
-simulated chip, ``/dev/gpiochip1``, which tcssim moves and watches: ``sudo
-bin/mk-kernel-stand-ins gpio`` makes it, once, before the example is run --
-see `Making the Kernel's Stand-ins`_. The gpio example has lines 0 and 1, so
+dummy chip, ``/dev/gpiochip1``, which tcssim moves and watches: ``sudo
+bin/mk-kernel-dummies gpio`` makes it, once, before the example is run --
+see `Making the Kernel's Dummy Devices`_. The gpio example has lines 0 and 1, so
 the two run at once; the thermostat-yamcs example has the same lines as this,
 so it and this do not.
 
@@ -2304,8 +2310,8 @@ alone.
 No payload here has a telemetry link of its own: the sensors' readings reach
 the ground through their conversions, the heaters' switches are driven and
 never read, and the lines sensing the heaters are drawn into the gateway node.
-Tcssim's stand-ins for the switches count each decision the vehicle drives
-them to, and its stand-in for ``gpio-in-tmass`` pulls each of its lines to its
+Tcssim counts each decision the vehicle drives the switches to, and pulls
+each of ``gpio-in-tmass``'s lines to its
 heater's ``heating`` -- ``connects: heater_1.heating, heater_2.heating``, one
 terminal for each line, in the order of the node's lines.
 
@@ -2324,8 +2330,8 @@ the same vehicle with Yamcs as its ground station, links to too. Its world
 holds the vehicle's physics model: a zone and two heaters joined to it.
 Each sensor reports the zone's temperature, from a place of its own on it, so
 that what the three report is one temperature rather than three streams of
-noise, which is what the model is for; each heater's switch's stand-in
-switches its heater while the vehicle has it on. So the loop closes through tcspecial: see
+noise, which is what the model is for; tcssim switches each heater while the
+vehicle has its switch on. So the loop closes through tcspecial: see
 **The Simulator Configuration** below. Naming the ``thermostat`` node in the file's
 ``tcssim`` section closes it in tcssim alone instead, with no tcspecial
 running.
@@ -2442,7 +2448,7 @@ to the altitude -- six hundredths of it a second, between twenty and one --
 and answers the throttle that holds the lander's weight and closes the gap
 between the rate it has and the rate it wants, as a ``ratio``. Its answers go
 by its ``moc-out`` link to ``engine``, the engine's throttle, which is
-driven with a value: four bytes of millionths, read by the stand-in as the
+driven with a value: four bytes of millionths, read by tcssim as the
 ratio guidance answered. Half a metre up guidance cuts the engine for good,
 and the lander drops the rest.
 
@@ -2458,13 +2464,14 @@ and a half, five hundred metres up and falling at twenty metres a second in
 the Moon's gravity, the engine's force and the fuel it burns joined to it. The
 body falls by the rocket equation in closed form, and the moment it reaches
 the ground -- which no closed form gives -- is found ahead of time and met
-exactly. The touchdown switch's stand-in waits on the model for that moment
+exactly. tcssim's touchdown switch waits on the model for that moment
 rather than for its next turn to send, so the vehicle hears of the landing
 when it happens. A run lands in about seventy-five seconds, at a metre and a
 half a second, with a third of the fuel left.
 
 ``make -C examples run-descent`` runs it, on any desk. The lander does not
-start falling until a stand-in is started -- the run begins when one first
+start falling until a simulated payload is started -- the run begins when
+one first
 asks the model anything -- so enable ``engine`` and ``radar`` in tcssim first,
 and the rest after.
 
@@ -2810,7 +2817,8 @@ The thermostat-yamcs example
 
 The thermostat example with Yamcs at the ground end, as ping-yamcs is the
 ping example with it. The vehicle is the thermostat's, and so is the
-simulator file, with the physics model tcssim joins its stand-ins to: each
+simulator file, with the physics model tcssim joins its simulated payloads
+to: each
 example's is a link to ``examples/thermostat-common/thermostat-sim.yaml``,
 so that each is found beside its configuration by name. The vehicle is
 written once, in ``examples/thermostat-common/thermostat.ytcs`` and its
@@ -2940,7 +2948,7 @@ The thermometer's readings go to ``zone_temp`` too, a ``to_kelvin`` compute
 node that makes each a temperature, and that goes to ``fsw`` as well: device
 id 4, ``127.0.0.1:9704``, channel ``0x3004``. In the simulator file the
 thermometer reports a zone of the physics model, in the encoding ``zone_temp``
-reads back, and the heater's stand-in switches a heater warming it, so that what the
+reads back, and tcssim's heater switches a heater warming it, so that what the
 flight computer sends the heater shows in the temperature it reads.
 
 ``zone_temp``'s temperatures go on to ``heater_wanted``, a ``thermostat``
@@ -3174,8 +3182,8 @@ refusal is logged with what was expected and what arrived each time it
 connects again.
 
 ``make -C examples run-cfs`` runs tcsmoc on the example as
-``run-fprime`` does on its own. tcssim stands in for the cFS side as well as
-for the payloads: it binds ``sbn.peer`` and is the software bus, with the
+``run-fprime`` does on its own. tcssim simulates the cFS side as well as
+the payloads: it binds ``sbn.peer`` and is the software bus, with the
 vehicle and tcsmoc both its peers, so tcsmoc's beacon light, its panels and
 its commands work as they do for a vehicle on the radio. tcsmoc joins as
 processor 3, one more than the larger of ``processor_id`` and
@@ -3183,10 +3191,11 @@ processor 3, one more than the larger of ``processor_id`` and
 on tcslib -- the C/C++ library included -- does the same with no change to
 the station.
 
-Two things follow. tcssim stands in for the cFS side whenever it runs on a
+Two things follow. tcssim simulates the cFS side whenever it runs on a
 configuration that answers to cFS, so it is not run beside a real cFS, which
 would be holding ``sbn.peer`` itself; tcssim says so and stops if it finds
-the address taken. And a ground station can join only the stand-in: SBN on a
+the address taken. And a ground station can join only the simulated cFS
+side: SBN on a
 real cFS never sends one peer what another published, so behind a real cFS
 the vehicle is commanded from that cFS's own ground system, under the
 message IDs above.
@@ -3196,7 +3205,8 @@ the cFS side's SBN: tcspecial subscribes, the beacon and a reading are
 published, a CONNECT and a node command are answered under their answer IDs,
 a command whose checksum is wrong is not, and a command for ``fsw`` reaches
 the heater. ``tcspecial/tests/cfs_ground.rs`` commands it from tcslib
-through the stand-in. The payloads' ports are in the eighty-six hundreds,
+through the simulated cFS side. The payloads' ports are in the eighty-six
+hundreds,
 which no other example uses.
 
 ``make cfs-test`` flies the example against a real cFS. It builds cFS with
@@ -3239,10 +3249,10 @@ binds ``127.0.0.1:3600``, leaves it by its ``moc-out`` for
 ``motor_command`` and goes out as one frame, so a command is at most eight
 bytes.
 
-``vcan0`` is the kernel's virtual bus, which ``sudo bin/mk-kernel-stand-ins``
+``vcan0`` is the kernel's virtual bus, which ``sudo bin/mk-kernel-dummies``
 makes; on a vehicle the interface is the controller's, such as ``can0``, and
 nothing else changes. ``make -C examples run-can`` runs tcsmoc on the example,
-with tcssim on the bus as the motor. ``tcspecial/tests/kernel-stand-ins.rs``
+with tcssim on the bus as the motor. ``tcspecial/tests/kernel-dummies.rs``
 flies it with the test as the motor. Every port the example uses is in the
 thirty-two to thirty-seven hundreds, ending in 00 or 10, which no other
 example uses.
@@ -3267,12 +3277,12 @@ up to ``127.0.0.1:3620`` leaves ``ground`` by its ``moc-out`` for it, the
 text ``1`` lighting the lamp and ``0`` putting it out.
 
 The chip is one of the kernel's ``gpio-sim``, which ``sudo
-bin/mk-kernel-stand-ins`` makes. The configuration names ``/dev/gpiochip1``,
+bin/mk-kernel-dummies`` makes. The configuration names ``/dev/gpiochip1``,
 which is what that chip is on a host with one chip of its own; the number is
 given as chips appear, so a host with another number writes the one the
 script printed. ``make -C examples run-gpio`` runs tcsmoc on the example,
 with tcssim pulling the switch's line every second and counting the lamp's
-changes. ``tcspecial/tests/kernel-stand-ins.rs`` flies it, pulling and
+changes. ``tcspecial/tests/kernel-dummies.rs`` flies it, pulling and
 reading the lines itself. Every port is in the thirty-two to thirty-seven
 hundreds, ending in 20 or 30.
 
@@ -3295,12 +3305,12 @@ made in ``sysfs`` by whoever brings it up, and nothing in the configuration.
 
 The ``iio`` type is experimental, and this example is what its test flies:
 see `An IIO Payload`_. The sensor is one of the kernel's ``iio_dummy``, which
-``sudo bin/mk-kernel-stand-ins iio`` makes where the kernel's has a buffer,
-its buffer filled by a timer, so the kernel
-stands in for it entirely and tcssim makes nothing. The configuration names
+``sudo bin/mk-kernel-dummies iio`` makes where the kernel's has a buffer,
+its buffer filled by a timer, so the dummy device
+is the whole payload and tcssim makes nothing. The configuration names
 ``/dev/iio:device1``, which is what the dummy is on a host with one sensor of
 its own; write the number the script printed. ``make -C examples run-iio``
-runs tcsmoc on the example, and ``tcspecial/tests/kernel-stand-ins.rs`` is
+runs tcsmoc on the example, and ``tcspecial/tests/kernel-dummies.rs`` is
 written to fly it, checking that what arrives is whole sample sets. Every port
 is in the thirty-two to thirty-seven hundreds, ending in 40 or 50.
 
@@ -3329,9 +3339,9 @@ still refused, naming it.
      type <type>          the type of payload, as the tcspecial
                           configuration writes it, holding the list of
                           the simulated payloads of that type
-       payload            the payload this one stands in for, naming the
+       payload            the payload this one simulates, naming the
                           entry
-       simulate           true for tcssim to stand in for it, false for the
+       simulate           true for tcssim to simulate it, false for the
                           real device: required, here or in its group
        protocol           which transport, for a network payload
        payload_address    the socket the payload answers from, if this file
@@ -3355,7 +3365,7 @@ entry; ``tools/convert-format.py`` rewrites it, keeping its comments.
 **Simulated or real: simulate**
 
 Every payload the file names says whether it is simulated, with ``simulate``:
-``true`` has tcssim stand in for it, and ``false`` leaves it to the real
+``true`` has tcssim simulate it, and ``false`` leaves it to the real
 device, for which tcssim makes nothing. It is said once -- in the payload, or
 in the group it names -- and never in both, even where the two would agree: a
 payload does not override its group's. A payload the file does not name is
@@ -3375,21 +3385,23 @@ real too.
          - payload: temp_1
            group: zone_temps
 
-Before it stands in for anything, tcssim compares each payload's ``simulate``
+Before it simulates anything, tcssim compares each payload's ``simulate``
 with what is at the payload's endpoint, by the same rules tcspecial judges a
-stand-in by (see `Stand-ins or hardware: --simulate`_), and will not start on
-a disagreement: ``simulate: true`` where the configuration points at real
-hardware, or ``simulate: false`` where it points at a stand-in. A stand-in
-tcssim makes itself, a pseudo-terminal, a file or a socket, is not there
-yet, and
-that is no disagreement; one the scripts in ``bin/`` make has to be. A
-payload the file does not name whose endpoint is a stand-in all the same is
-refused too: tcssim controls and shows every simulated device, so each one
-is named.
+payload by (see `Simulated, Dummy or Real Devices: --simulate`_), and will
+not start on a disagreement: ``simulate: true`` where the configuration
+points at real hardware, or ``simulate: false`` where it points at a
+simulated or dummy device. A simulated device tcssim makes itself, a
+pseudo-terminal or a socket, is not there yet, and that is no disagreement;
+a dummy device, which the scripts in ``bin/`` make, has to be. A payload the
+file does not name whose endpoint is a simulated or dummy device all the
+same is refused too: tcssim controls and shows every simulated payload, so
+each one is named. A ``network`` or ``device-file`` payload is a real device
+either way and is not compared: ``simulate: true`` has tcssim answer at its
+far end, and ``false`` leaves it to whatever is there.
 
-Each simulated payload has the same panel, whatever stands in for it: its
+Each simulated payload has the same panel, whatever simulates it: its
 button, which has it take part or not, and what it sent and what reached it.
-Where the operating system makes the stand-in, tcssim watches it -- the
+Where the kernel makes a dummy device, tcssim watches it -- the
 lines of a ``gpio-sim`` chip, the registers of an ``i2c-stub`` chip -- and
 counts what the vehicle does to it. Two things cannot be seen: a read of an
 ``i2c-stub`` chip, which changes nothing, and the samples an ``iio_dummy``
@@ -3398,7 +3410,7 @@ heater, sends nothing, counts what the vehicle sends it, and takes no packet
 interval. Switched off, a payload sends nothing, answers nothing and acts on
 nothing -- a heater warms no mass -- and still counts what reaches it.
 
-**What it stands in for**
+**What it simulates**
 
 Two things describe the payload rather than the simulation, and are required
 for that reason. The two files are joined by handler name and by nothing else
@@ -3494,15 +3506,15 @@ it cannot be seen working.
 A physics model gives them something to agree about. It is the vehicle's
 physical parts -- a zone, the heaters that warm it -- each simulated alone and
 joined to the others. Join the sensors to what they measure and the heaters'
-stand-ins to the heaters, and what the vehicle reads becomes a consequence of
+switches to the heaters, and what the vehicle reads becomes a consequence of
 what the vehicle drove.
 
-The model is in the simulator file's ``world`` section, beside the stand-ins
-joined to it, so that one file says the whole of what tcssim simulates and a
-stand-in's ``connects`` names a terminal the same file says is there. Two
+The model is in the simulator file's ``world`` section, beside the simulated
+payloads joined to it, so that one file says the whole of what tcssim simulates
+and a payload's ``connects`` names a terminal the same file says is there. Two
 examples that fly one vehicle share it by sharing the whole simulator file, a
-link to it beside each configuration. The world is YAML only: a simulator
-file written in XML has none.
+link to it beside each configuration. The world is YAML only: a simulator file
+written in XML has none.
 
 .. code-block:: text
 
@@ -3563,7 +3575,7 @@ Each component is one simple part, of one of these types:
 .. code-block:: text
 
    heater                 a resistance on a supply, switched on and off
-     component            the name connections and stand-ins use
+     component            the name connections and payloads use
      power                what it gives out while on, at its nominal
                           voltage: "60 W"
      voltage              its supply's nominal voltage: "28 V"
@@ -3574,7 +3586,7 @@ Each component is one simple part, of one of these types:
 
    thermal_mass           one body at one temperature, in surroundings
                           about the world's ambient_temp
-     component            the name connections and stand-ins use
+     component            the name connections and payloads use
      time_constant        how fast it loses the difference, as a length
                           of time
      capacity             how much heat it takes to warm it a kelvin:
@@ -3591,7 +3603,7 @@ Each component is one simple part, of one of these types:
                           it starts at ambient_temp
 
    sun                    sunlight and shadow, through an orbit
-     component            the name connections and stand-ins use
+     component            the name connections and payloads use
      period               how long one orbit takes: "90 min"
      eclipse              how much of it is in shadow, as a fraction,
                           written bare: "0.35"
@@ -3599,18 +3611,18 @@ Each component is one simple part, of one of these types:
                           of its sunlight, as a fraction. Optional
 
    solar_array            panels turning light into current
-     component            the name connections and stand-ins use
+     component            the name connections and payloads use
      current              what it gives in full sunlight: "7 A"
 
    load                   something on the bus that draws a current
-     component            the name connections and stand-ins use
+     component            the name connections and payloads use
      current              what it draws while it is on: "2 A"
 
    bus                    where the sources' currents and the loads' meet
-     component            the name connections and stand-ins use
+     component            the name connections and payloads use
 
    battery                a store of charge on the bus
-     component            the name connections and stand-ins use
+     component            the name connections and payloads use
      capacity             how much it holds full: "10 Ah"
      empty                its open-circuit voltage empty: "24 V"
      full                 its open-circuit voltage full, more than empty:
@@ -3619,14 +3631,14 @@ Each component is one simple part, of one of these types:
      charge               how full it starts, as a fraction: "0.6"
 
    engine                 a throttled engine and its fuel
-     component            the name connections and stand-ins use
+     component            the name connections and payloads use
      thrust               its thrust at full throttle: "4500 N"
      isp                  its specific impulse, as a length of time:
                           "311 s"
      fuel                 the fuel it starts with: "100 kg"
 
    body                   a mass falling under gravity, pushed and burning
-     component            the name connections and stand-ins use
+     component            the name connections and payloads use
      mass                 its mass at the start, fuel and all: "1500 kg"
      gravity              the gravity it falls in: "1.62 m/s2"
      altitude             how high it starts: "500 m"
@@ -3697,8 +3709,8 @@ surroundings. It starts at the world's ambient temperature with the heaters off,
 vehicle coming up cold is the case a thermostat exists for, unless it states
 ``start``, and then there.
 
-A stand-in is joined to one terminal by a setting of its payload, which like
-every other setting may be stated on a group instead:
+A simulated payload is joined to one terminal by a setting of its own, which
+like every other setting may be stated on a group instead:
 
 .. code-block:: text
 
@@ -3708,30 +3720,29 @@ every other setting may be stated on a group instead:
                           that watches lines names a decision for each line,
                           in the order of its lines: heater_1.heating,
                           heater_2.heating
-   offset                 how far the place a reporting stand-in is on sits
+   offset                 how far the place a reporting payload is on sits
                           from what its terminal says, in the terminal's
                           unit: "+0.2 K". Optional
 
-A stand-in joined to an output reports a value in the encoding of the
-conversion its readings go to, and a decision -- a lander's contact with the
-ground -- as the text ``1`` or ``0``: at once when it changes, waiting on the
-model for the moment rather than for its next turn, and again every packet
-interval. A stand-in joined to an input drives it with what the vehicle sends:
-a decision, ``1`` or ``0``, or a value, four bytes of its unit's steps, which
-has to come from a node sending that unit -- an engine's throttle from a
-``process`` answering a ``ratio``. An input is driven by one stand-in, and not by one and
-a connection too: two would each switch it over the other. A heater's ``on``
-that nothing drives is refused, being a part nothing can switch, and so is a
-component nothing is joined to, which is most likely a misspelled
-``connects``.
+A payload joined to an output reports a value in the encoding of the conversion
+its readings go to, and a decision -- a lander's contact with the ground -- as
+the text ``1`` or ``0``: at once when it changes, waiting on the model for the
+moment rather than for its next turn, and again every packet interval. A
+payload joined to an input drives it with what the vehicle sends: a decision,
+``1`` or ``0``, or a value, four bytes of its unit's steps, which has to come
+from a node sending that unit -- an engine's throttle from a ``process``
+answering a ``ratio``. An input is driven by one payload, and not by one and a
+connection too: two would each switch it over the other. A heater's ``on`` that
+nothing drives is refused, being a part nothing can switch, and so is a
+component nothing is joined to, which is most likely a misspelled ``connects``.
 A GPIO payload that watches lines is pulled rather than signalled: each of its
 lines is held high while its terminal's decision is on, and looked at every
-packet interval -- a line sensing a heater, pulled to the heater's
-``heating``, which is on only while the heater is really heating, so a heater
-disabled in tcssim reads low whatever it is told. One terminal for each line
-is required, and a list of terminals anywhere else is refused.
-The settings that joined a payload to a thermal mass -- ``reads``, ``heats``,
-``output``, ``input``, ``rate`` -- are refused, told what says it now.
+packet interval -- a line sensing a heater, pulled to the heater's ``heating``,
+which is on only while the heater is really heating, so a heater disabled in
+tcssim reads low whatever it is told. One terminal for each line is required,
+and a list of terminals anywhere else is refused. The settings that joined a
+payload to a thermal mass -- ``reads``, ``heats``, ``output``, ``input``,
+``rate`` -- are refused, told what says it now.
 
 A sensor sends the bytes the conversion its readings go to -- ``to_kelvin``
 or ``to_value`` -- will read back as what it reports. The format, the scale
@@ -3740,7 +3751,7 @@ in two files is a scale that can disagree with itself -- so a sensor whose
 readings reach no conversion, or two, or one in another unit than its
 terminal, is refused.
 
-A heater's stand-in sends nothing: being driven is the whole of what it is
+A simulated heater sends nothing: being driven is the whole of what it is
 for. Its packet interval is how often it looks for what the vehicle decided,
 which is the one thing pacing still means for a payload that sends nothing,
 and it wants to be shorter than the sample interval: the vehicle cannot see
@@ -3748,9 +3759,9 @@ the band crossed until its next sample and the heaters cannot hear about it
 until they next look, so the zone overshoots by their heat over the sum of
 the two.
 
-A heater's stand-in has to be a payload the simulator can be driven through:
-a socket, or a set of discrete lines, whose stand-in watches the lines the
-vehicle drives.
+A simulated heater has to be a payload the simulator can be driven through:
+a socket, or a set of discrete lines, which tcssim watches as the vehicle
+drives them.
 
 A simulator file with a model, and its payloads joined to it:
 
@@ -3798,18 +3809,18 @@ A simulator file with a model, and its payloads joined to it:
 
 **How the world moves**
 
-tcssim makes one world of the model, which every stand-in joined to it
+tcssim makes one world of the model, which every simulated payload joined to it
 shares, and nothing ticks: the world is brought up to a moment only when a
-stand-in reads or drives it, and a world nobody asks about costs nothing.
-Between two moments each component is advanced by its closed form, so what
-a sensor reads does not depend on how often it is read. Where a component's
-behaviour would change inside an interval -- a battery reaching full, the
-sun going into shadow, a lander reaching the ground -- it foresees the moment
-as an event, and the world stops there, lets it happen, and goes on, the events waiting in order of when they fall. Simulated time
-keeps pace with the wall clock, which the vehicle runs on, from when the run
-begins: the first time a running stand-in asks the world anything. Until then
-the world waits, so a lander is still where it starts when its radar is
-enabled.
+simulated payload reads or drives it, and a world nobody asks about costs
+nothing. Between two moments each component is advanced by its closed form, so
+what a sensor reads does not depend on how often it is read. Where a
+component's behaviour would change inside an interval -- a battery reaching
+full, the sun going into shadow, a lander reaching the ground -- it foresees
+the moment as an event, and the world stops there, lets it happen, and goes on,
+the events waiting in order of when they fall. Simulated time keeps pace with
+the wall clock, which the vehicle runs on, from when the run begins: the first
+time a running simulated payload asks the world anything. Until then the world
+waits, so a lander is still where it starts when its radar is enabled.
 
 **Physically realistic noise**
 
@@ -3839,10 +3850,10 @@ the unit of the terminal it reports:
                           sensor is a small body of its own and follows the
                           one it is on that far behind
 
-A sensor's errors are refused on a stand-in that drives. At a heater, its
-``ripple`` and ``ripple_time``; in the zone, its ``swing``, ``period``,
+A sensor's errors are refused on a simulated payload that drives. At a heater,
+its ``ripple`` and ``ripple_time``; in the zone, its ``swing``, ``period``,
 ``wander`` and ``wander_time``: what the world does is the model's, and what a
-stand-in gets wrong is the simulator file's.
+simulated sensor gets wrong is the simulator file's.
 
 Everything that wanders -- a sensor's drift, the environment, a supply -- is
 an Ornstein-Uhlenbeck process: a departure drawn back towards nought, whose
@@ -3871,9 +3882,9 @@ one; an environment swinging half a kelvin over ninety minutes and
 wandering a quarter of a kelvin; a start inside the band; places a fifth and three tenths of a kelvin off the middle;
 and supplies varying by two percent.
 
-**Standing in for the thermostat**
+**Simulating the thermostat**
 
-tcssim can stand in for thermostat nodes as well, so that the loop closes
+tcssim can simulate thermostat nodes as well, so that the loop closes
 in the simulator alone, with no tcspecial running. Name the node in the
 ``tcssim`` section -- or several, separated by commas, for a vehicle with a
 thermostat for each of several zones:
@@ -3885,12 +3896,13 @@ thermostat for each of several zones:
      thermostat: thermostat
 
 tcssim then takes each node's ``setpoint`` and ``half_band`` from the
-tcspecial configuration, and stands in for each alone. Its sensors are the
+tcspecial configuration, and simulates each alone. Its sensors are the
 simulated payloads reporting the world whose data reaches the node, and its
 heaters the simulated payloads driving it that data from the node reaches. A
 name left blank between commas, or written twice, is refused, and so are two
 nodes that switch one heater, which would each undo the other. Each reads
-each sensor's bytes as they leave the stand-in -- a dropped reading never
+each sensor's bytes as they leave the simulated sensor -- a dropped reading
+never
 arrives, and a truncated or corrupted one arrives as the vehicle would see
 it -- as the conversion the sensor feeds reads them, and decides on the
 median of each sensor's latest reading: more than the half band over the
@@ -5135,21 +5147,24 @@ overrides the quieter default as well.
    $ RUST_LOG=tcspecial::ci=trace \
        cargo run --bin tcspecial -- --simulate=all tests/manual/thermostat.ytcs
 
-Stand-ins or hardware: ``--simulate``
--------------------------------------
-Nothing in a configuration says whether a payload is the hardware or a
-stand-in for it, and ``/dev/i2c-7`` can be the kernel's I2C stub on one host
+Simulated, Dummy or Real Devices: ``--simulate``
+------------------------------------------------
+Nothing in a configuration says whether a payload is a real device, a dummy
+device the kernel makes under a real device's name or a simulated device
+tcssim makes, and ``/dev/i2c-7`` can be the kernel's I2C stub on one host
 and a real bus on the next. So each run says which kind of run it is, with
 ``--simulate``, given to tcspecial, tcssim and tcsmoc alike:
 
 ``--simulate=none``
-    No payload may be a stand-in. This is the flight setting, and it is what a
-    program started without the flag gets.
+    Every payload must be a real device. This is the flight setting, and it
+    is what a program started without the flag gets.
 ``--simulate=some``
-    At least one payload is a stand-in and at least one is not: a
-    configuration being debugged against part of its hardware.
+    At least one payload is a simulated or dummy device and at least one is
+    a real device: a configuration being debugged against part of its
+    hardware.
 ``--simulate=all``
-    Every payload is a stand-in, so that nothing exercises hardware at all.
+    Every payload is a simulated or dummy device, so that nothing exercises
+    hardware at all.
 
 tcspecial decides for itself what each payload is, from what is at the end
 of its endpoint, before it opens anything, and says so as it starts:
@@ -5158,32 +5173,40 @@ of its endpoint, before it opens anything, and says so as it starts:
 
    simulation mode: all
      temp_1: hardware: /dev/i2c-1 is a real adapter (Synopsys DesignWare I2C adapter)
-     sensor: a stand-in: 127.0.0.1 is a loopback address, so the far end is on this host
+     line: a simulated device: /tmp/ttyS0 resolves to a pseudo-terminal, /dev/pts/3
 
 A run whose payloads the mode does not allow is refused there, each payload
 named with what it reaches, what is there, and what would satisfy the mode.
 
-A payload is a stand-in when its endpoint is something ``bin/`` or tcssim
-makes: an I2C bus whose adapter is the kernel's ``i2c-stub``, a GPIO chip of
-``gpio-sim``, a virtual CAN interface, an IIO sensor of ``iio_dummy``, a path
-that leads to a pseudo-terminal, which is what tcssim makes for a serial, SPI,
-rpmsg or IIO payload, or, for a device-file payload, a regular file, which is
-what tcssim makes for one and which no hardware is. A network payload is a
-stand-in when its address is a loopback address or a Unix-domain path. That is
-the weakest of the judgements: it says only that the far end is on this host,
-and a program on this host in front of real hardware passes it. A synchronous
-HDLC line is never a stand-in, and anything that cannot be told -- nothing at
-the path, a host name -- is taken for hardware.
+A payload is a dummy device when its endpoint is one the scripts in ``bin/``
+have the kernel make: an I2C bus whose adapter is the kernel's ``i2c-stub``,
+a GPIO chip of ``gpio-sim``, a virtual CAN interface, an IIO sensor of
+``iio_dummy``. It is a simulated device when its endpoint is one tcssim
+makes: a path that leads to a pseudo-terminal, which is what tcssim makes
+for a serial, SPI, rpmsg or IIO payload, or a loopback ``sim_address``,
+below. A synchronous HDLC line with no ``sim_address`` is always hardware,
+and anything that cannot be told -- nothing at the path -- is taken for
+hardware.
 
-Four types have nothing in the operating system that stands in for them
+A ``network`` or ``device-file`` payload is a real device under every mode,
+and the mode does not count it: a socket or a file is the same node whether
+tcssim answers at its far end or something else does, so there is nothing
+to tell apart. tcssim answers there when the simulator file says
+``simulate: true`` for it. A run whose only payloads are of these types
+satisfies ``none`` and ``all`` alike, and ``some`` never.
+
+Four types have nothing in the operating system to simulate them
 faithfully: an HDLC line has no virtual interface at all, and a
 pseudo-terminal carries a SPI peripheral's, an rpmsg channel's or an IIO
 sensor's bytes without its clock, its channel or its sysfs. Two more, the
-temperature sensors ``i2c_tmass`` and ``spi_tmass``, stand in as the thermal
-mass they are fixed to. A node of one of those types may give ``stand_in``, a loopback address and port. Under
-``--simulate=some`` or ``all`` tcspecial reaches it there over UDP instead of
-opening the device, and tcssim answers there; under ``none`` the device is
-opened, so the configuration that flies is the one that was tested:
+temperature sensors ``i2c_tmass`` and ``spi_tmass``, are simulated as the
+thermal mass they are fixed to. A node of one of those types may give
+``sim_address``, a loopback address and port. Under ``--simulate=some`` or
+``all`` tcspecial reaches it there over UDP instead of opening the device,
+and tcssim answers there, a simulated device; under ``none`` the device is
+opened, so the configuration that flies is the one that was tested. The
+attribute was once called ``stand_in``, which is refused, naming
+``sim_address``:
 
 .. code-block:: yaml
 
@@ -5193,7 +5216,7 @@ opened, so the configuration that flies is the one that was tested:
            interface: hdlc0
            standard: v35
            clock_type: external
-           stand_in: "127.0.0.1:7950"
+           sim_address: "127.0.0.1:7950"
 
 The Makefiles' run targets give every program ``--simulate=$(SIMULATE)``,
 which is ``all`` unless the command line says otherwise:
@@ -5204,9 +5227,10 @@ which is ``all`` unless the command line says otherwise:
 
 Waiting for the simulator
 ^^^^^^^^^^^^^^^^^^^^^^^^^
-A stand-in has to exist before tcspecial looks for it, so in a run with
-stand-ins tcssim is started first, and tcspecial only once tcssim has said it
-has made them all. tcssim makes every stand-in as it starts; a panel's button
+A simulated device has to exist before tcspecial looks for it, so in a run
+with simulated devices tcssim is started first, and tcspecial only once
+tcssim has said it has made them all. tcssim makes every simulated device as
+it starts; a panel's button
 decides only whether that payload sends.
 
 tcssim says whether it is ready at the UDP address its simulator file gives
@@ -5247,15 +5271,15 @@ Each payload starts silent, until its panel's button is pressed. ``tcssim
 --sending`` starts every one sending instead, for a test with nobody at the
 window: the F´ bridge's is one (see `The F´ bridge`_).
 
-Every stand-in at once
-^^^^^^^^^^^^^^^^^^^^^^
-``make stand-ins-test`` runs tcspecial against tcssim with a payload of each
-type tcssim stands in for, and checks that each one's data reaches the
+Every simulated device at once
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+``make simulated-devices-test`` runs tcspecial against tcssim with a payload
+of each type tcssim simulates, and checks that each one's data reaches the
 ground:
 
 .. code-block:: console
 
-   $ make stand-ins-test
+   $ make simulated-devices-test
    ...
      ok   text: 50 datagrams, 800 bytes, part of tcssim's text
      ok   line: 50 datagrams, 800 bytes
@@ -5263,17 +5287,17 @@ ground:
      ...
      left out can: no virtual CAN bus is up; make mkvcan makes one, as root
 
-It writes its configuration into ``tests/stand-ins/run``, where the stand-ins'
-paths are: a device file, a serial line, a serial line that is an RS-485 bus,
-a SPI peripheral, an rpmsg channel and an IIO buffer, each a file or
-pseudo-terminal tcssim makes, and an HDLC line reached at its ``stand_in``.
-A CAN payload is added where a virtual CAN bus is up, and a GPIO payload where
-a ``gpio-sim`` chip is there for the user running it; the test makes neither,
-since both need root, and says which it left out. It starts tcssim with
-``--sending``, waits for it, starts tcspecial, connects as a ground station
-does, and listens for ten seconds. Then it stops tcssim with a signal, as a
-harness does, and checks that every stand-in is gone. tcssim's window opens
-for the length of the test, so a display is needed.
+It writes its configuration into ``tests/simulated-devices/run``, where the
+simulated devices' paths are: a device file, a serial line, a serial line that
+is an RS-485 bus, a SPI peripheral, an rpmsg channel and an IIO buffer, each a
+file or pseudo-terminal tcssim makes, and an HDLC line reached at its
+``sim_address``. A CAN payload is added where a virtual CAN bus is up, and a
+GPIO payload where a ``gpio-sim`` chip is there for the user running it; the
+test makes neither, since both need root, and says which it left out. It starts
+tcssim with ``--sending``, waits for it, starts tcspecial, connects as a ground
+station does, and listens for ten seconds. Then it stops tcssim with a signal,
+as a harness does, and checks that every simulated device is gone. tcssim's
+window opens for the length of the test, so a display is needed.
 
 Its ports are 47000 to 47999, and it holds ``tcs-ports.lock``, beside the
 main checkout (``TCS_PORTS_LOCK``, from ``beside.mk``), while it runs, so that it never runs at the same time as another
@@ -5355,7 +5379,7 @@ Nothing in the windows can be pressed. Close any of them to stop tcspecial,
 which stops as it does on an interrupt; if tcspecial stops first, the windows
 close.
 
-The window is for a run with stand-ins, so ``--visual`` wants
+The window is for a run with simulated or dummy devices, so ``--visual`` wants
 ``--simulate=some`` or ``--simulate=all`` beside it. Under
 ``--simulate=none``, which is the flight setting and what a run without
 ``--simulate`` gets, it is refused before anything is read: a window there
@@ -6044,8 +6068,8 @@ there are: the two configuration files decide that, so a payload added to or
 removed from them adds or removes a panel.
 
 SIGHUP, SIGINT and SIGTERM do what ``Quit All`` does: every payload stops and
-its stand-in is cleared, and then tcssim exits with the status a shell gives
-a program the signal ended, 128 more than the signal's number -- 130 for
+its simulated device is cleared, and then tcssim exits with the status a shell
+gives a program the signal ended, 128 more than the signal's number -- 130 for
 SIGINT. A second signal, for a stop that is taking too long, ends tcssim at
 once with status 1 and clears nothing.
 

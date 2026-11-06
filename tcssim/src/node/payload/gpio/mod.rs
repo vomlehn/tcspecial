@@ -1,9 +1,10 @@
-//! A simulated device that moves discrete lines.
+//! A simulated payload that moves discrete lines, on a gpio-sim dummy
+//! device.
 //!
 //! A supported type, flown against the kernel's `gpio-sim` by
-//! `tcspecial/tests/kernel-stand-ins.rs`, which moves the lines itself rather
+//! `tcspecial/tests/kernel-dummies.rs`, which moves the lines itself rather
 //! than through this; the scan below is what the tests here cover, as the
-//! I2C stand-in's is.
+//! I2C simulation's is.
 //!
 //! A discrete line is the one type of device the simulator cannot simply be
 //! the far end of. A serial line has a pty; a socket has another socket; a
@@ -34,7 +35,7 @@ use std::sync::Arc;
 use std::time::Instant;
 
 use crate::payload::{
-    could_not_stand_in, wait_out_packet, Pacing, PayloadConfig, PayloadStats,
+    could_not_simulate, wait_out_packet, Pacing, PayloadConfig, PayloadStats,
 };
 
 /// Where the kernel puts a simulated chip's lines: see
@@ -103,13 +104,13 @@ pub(crate) fn lines_of(
 
 /// What to say when there is no simulated chip to be.
 ///
-/// The two commands that make one, as the I2C stand-in names its module: a
+/// The two commands that make one, as the I2C simulation names its module: a
 /// configuration that runs on one machine and not the next is a set whose
 /// kernel was set up differently, and the message is the whole of what says
 /// which.
 pub(crate) fn how_to_make_one(chip: &str) -> String {
     format!(
-        "no simulated GPIO chip stands in for {chip}. Load the module with \
+        "no dummy GPIO chip is at {chip}. Load the module with \
          \"modprobe gpio-sim\" and make a chip through configfs under \
          /sys/kernel/config/gpio-sim, which needs root; the chip's node has to \
          be the one this device names"
@@ -136,7 +137,7 @@ pub fn run_gpio_node(
     ) {
         Some(lines) => lines,
         None => {
-            could_not_stand_in(&config, how_to_make_one(&config.address));
+            could_not_simulate(&config, how_to_make_one(&config.address));
             return;
         }
     };
@@ -198,12 +199,12 @@ pub fn run_gpio_node(
 /// Pulls each line of a chip to what the world says it senses -- a line on a
 /// heater, high while the heater is heating -- rather than to a pattern.
 ///
-/// Looked at every packet interval, which is how often this stand-in looks
+/// Looked at every packet interval, which is how often this payload looks
 /// at the world, and a line is moved only when what it senses changes, so
 /// the vehicle, polling or watching for edges, reads what the part is doing
 /// within an interval of its doing it.
 /// While the payload is disabled in its panel its lines are left where they
-/// are, as a disabled stand-in sends nothing.
+/// are, as a disabled payload sends nothing.
 ///
 /// # Arguments
 ///
@@ -268,8 +269,8 @@ fn pull_to_the_world(
 /// world is driven by it, as one reached over a socket is.
 ///
 /// Disabled -- its panel's button off -- the part is unpowered: a move is
-/// counted, as every stand-in counts what arrives, and kept as the latest
-/// decision, and the part stays off until it is enabled. See
+/// counted, as every simulated payload counts what arrives, and kept as the
+/// latest decision, and the part stays off until it is enabled. See
 /// [`crate::node::physics::Power`].
 ///
 /// # Arguments
@@ -326,9 +327,9 @@ mod tests {
 
     /// A simulated chip is found by the node it became, not by its number.
     ///
-    /// Which is the whole of the scan: a `gpio-sim` chip's node is numbered
-    /// as chips appear, so the number a device set names is not an identity
-    /// -- the same reason the I2C stand-in scans for its adapter rather than
+    /// Which is the whole of the scan: a `gpio-sim` chip's node is numbered as
+    /// chips appear, so the number a device set names is not an identity -- the
+    /// same reason the I2C simulation scans for its adapter rather than
     /// assuming one.
     #[test]
     fn a_simulated_chip_is_found_by_the_node_it_became() {
@@ -347,7 +348,7 @@ mod tests {
             .expect("another chip");
 
         let found = lines_of(tree.path(), "/dev/gpiochip3", &[0, 5])
-            .expect("the chip standing in for gpiochip3");
+            .expect("the dummy chip at gpiochip3");
         assert_eq!(
             found,
             vec![
@@ -360,8 +361,8 @@ mod tests {
             ]
         );
 
-        // A chip nothing stands in for is not found, which is what the
-        // message below is for.
+        // A chip with no dummy device behind it is not found, which is what
+        // the message below is for.
         assert_eq!(lines_of(tree.path(), "/dev/gpiochip9", &[0]), None);
     }
 

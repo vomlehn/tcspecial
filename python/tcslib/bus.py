@@ -4,9 +4,9 @@ The Python spelling of ``tcslib::bus::Ground`` in ``tcslib/src/bus.rs``. A
 vehicle that answers to cFS has no command socket, no beacon socket and no
 telemetry sockets: everything it takes and sends crosses one SBN peer as
 cFS packets told apart by message ID. The far end a station joins is the
-stand-in for the cFS end that tcssim runs, ``tcslib::bus::StandIn``, at
+cFS end as tcssim simulates it, ``tcslib::bus::SimulatedCfs``, at
 ``sbn.peer``; SBN on a real cFS sends no peer what another published, so a
-station is a peer of the stand-in and of nothing else.
+station is a peer of the simulated cFS end and of nothing else.
 
 :class:`Ground` is a station's one peer of the bus, kept on a thread of its
 own: it announces once a second until it is heard, then sends SBN's protocol

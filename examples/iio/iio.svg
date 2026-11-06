@@ -28,7 +28,7 @@
   <rect width="900" height="400" fill="#ffffff"/>
 
   <!-- Column headings -->
-  <text class="heading" x="20" y="44">KERNEL STAND-IN</text>
+  <text class="heading" x="20" y="44">KERNEL DUMMY DEVICE</text>
   <text class="heading" x="245" y="44">TCSPECIAL (VEHICLE)</text>
   <text class="heading" x="705" y="44">GROUND</text>
 

@@ -1,8 +1,8 @@
 """A ground station starts a program, and the program goes when it does.
 
-``sleep`` stands in for tcspecial: what is tested is the process, and a real
-tcspecial would bind an example's ports, which a test run beside the example
-itself must not.
+``sleep`` takes the place of tcspecial: what is tested is the process, and a
+real tcspecial would bind an example's ports, which a test run beside the
+example itself must not.
 """
 
 import subprocess

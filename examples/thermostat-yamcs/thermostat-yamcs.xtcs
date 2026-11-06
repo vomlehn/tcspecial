@@ -80,9 +80,10 @@
     <payloads>
         <!-- The three sensors of the zone, two on an I2C bus and one -->
         <!-- on a SPI bus, as a vehicle would carry them. On a desk each -->
-        <!-- is reached over UDP at its stand_in, where tcssim answers -->
+        <!-- is reached over UDP at its sim_address, where tcssim answers -->
         <!-- with the zone's temperature, so that they touch no -->
-        <!-- hardware; flown, without stand-ins, the buses are opened. -->
+        <!-- hardware; flown, with no simulated devices, the buses are -->
+        <!-- opened. -->
         <type name="i2c_tmass">
             <!-- One of three sensors of the same place, a trio, so that the -->
             <!-- temperature survives one of them going wrong. Two bytes, -->
@@ -92,7 +93,7 @@
                 <group>zone_temps</group>
                 <path>/dev/i2c-1</path>
                 <read_size>2</read_size>
-                <stand_in>127.0.0.1:17801</stand_in>
+                <sim_address>127.0.0.1:17801</sim_address>
                 <world-out>temp1.temp_1</world-out>
             </payload>
             <!-- The second of the trio; the same part as temp_1, on the -->
@@ -102,7 +103,7 @@
                 <group>zone_temps</group>
                 <path>/dev/i2c-1</path>
                 <read_size>2</read_size>
-                <stand_in>127.0.0.1:17802</stand_in>
+                <sim_address>127.0.0.1:17802</sim_address>
                 <world-out>temp2.temp_2</world-out>
             </payload>
         </type>
@@ -117,7 +118,7 @@
                 <path>/dev/spidev0.0</path>
                 <read_size>3</read_size>
                 <spi_mode>0</spi_mode>
-                <stand_in>127.0.0.1:17803</stand_in>
+                <sim_address>127.0.0.1:17803</sim_address>
                 <world-out>temp3.temp_3</world-out>
             </payload>
         </type>

@@ -32,7 +32,8 @@ pub const SETTINGS: &[&str] = &["period", "eclipse", "start"];
 #[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
 #[serde(deny_unknown_fields)]
 pub struct Sun {
-    /// What it is called, which is how a connection or a stand-in names it.
+    /// What it is called, which is how a connection or a simulated payload
+    /// names it.
     #[serde(rename = "component")]
     pub name: String,
     /// How long one orbit takes, as a length of time: `"90 min"`.

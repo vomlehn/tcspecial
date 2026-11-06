@@ -128,11 +128,13 @@
         </type>
         <!-- The three sensors of the zone, two on an I2C bus and one on a SPI bus,
              as a vehicle would carry them, each converted to kelvin for the
-             vote. On a desk the two on I2C are on the kernel's dummy bus,
-             i2c-stub, whose registers tcssim fills with the zone's temperature, and
-             the one on SPI is reached over UDP at its sim_address, where tcssim
-             answers the same; flown, with no simulated devices, the buses are
-             opened. -->
+             vote. On a desk the two on I2C are chips of the kernel's dummy
+             bus, i2c-stub, which bin/mki2c makes and whose registers tcssim
+             fills with the zone's temperature. The kernel numbers the stub as
+             it finds it, so their path is one tcssim makes, a link to the
+             stub wherever it is; flown, it is the vehicle's bus. The one on
+             SPI is reached over UDP at its sim_address, where tcssim answers
+             the same. -->
         <type name="i2c">
             <!-- One of three sensors of the same place, a trio, so that the
                  temperature survives one of them going wrong. Two bytes, signed,
@@ -140,7 +142,7 @@
             <payload name="temp_1">
                 <address>0x48</address>
                 <group>zone_temps</group>
-                <path>/dev/i2c-1</path>
+                <path>/tmp/tcs-thermostat-i2c</path>
                 <read_size>2</read_size>
                 <world-out>to_k1.temp_1</world-out>
             </payload>
@@ -148,7 +150,7 @@
             <payload name="temp_2">
                 <address>0x49</address>
                 <group>zone_temps</group>
-                <path>/dev/i2c-1</path>
+                <path>/tmp/tcs-thermostat-i2c</path>
                 <read_size>2</read_size>
                 <world-out>to_k2.temp_2</world-out>
             </payload>

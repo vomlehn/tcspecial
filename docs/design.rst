@@ -6055,7 +6055,7 @@ aboard, on I\ :superscript:`2`\ C, SPI and GPIO, which is
 ``tests/manual/thermostat``, whose conversions are ``temp1`` to ``temp3``
 where the example's are ``to_k1`` to ``to_k3``; on a desk tcssim plays the
 example's sensors, the two on I\ :superscript:`2`\ C on the kernel's dummy
-bus and ``temp_3`` over UDP. Left out for room
+bus, through a link tcssim makes at their ``path``, and ``temp_3`` over UDP. Left out for room
 are its ``tcspecial`` section, which every configuration must have and without
 which this would be refused, its log node, and the editor's layout; its
 addresses are its own. What is here is checked as it stands, with a

@@ -2295,9 +2295,13 @@ them: ``temp_1`` and ``temp_2`` on an I\ :superscript:`2`\ C bus, of type
 ``examples/thermostat-common/thermostat.ytcs``, which the example includes,
 with the rest of the vehicle. On a desk the two on I\ :superscript:`2`\ C
 are chips of the kernel's dummy bus, ``i2c-stub``, whose registers tcssim
-fills with the zone's temperature -- ``sudo bin/mki2c`` makes it -- and
-``temp_3`` is reached over UDP at its ``sim_address``, ``127.0.0.1:5203``,
-where tcssim answers the same; flown, the buses are opened. The heaters'
+fills with the zone's temperature: ``sudo bin/mki2c`` makes it, with chips at
+their addresses, ``0x48`` and ``0x49``. The kernel numbers the stub as it
+finds it, ``/dev/i2c-1`` on one host and ``/dev/i2c-22`` on the next, so
+their ``path``, ``/tmp/tcs-thermostat-i2c``, is a link tcssim makes to the
+stub wherever it is. ``temp_3`` is reached over UDP at its ``sim_address``,
+``127.0.0.1:5203``, where tcssim answers the same. Flown, the paths are the
+vehicle's buses. The heaters'
 switches are GPIO lines 4 and 5 of the kernel's dummy chip, ``/dev/gpiochip1``, which tcssim moves and watches: ``sudo
 bin/mk-kernel-dummies gpio`` makes it, once, before the example is run --
 see `Making the Kernel's Dummy Devices`_. The gpio example has lines 0 and 1, so

@@ -624,8 +624,9 @@ value as `value_bytes` makes it, in every unit there is, and each decision;
 Yamcs or opens a window.
 
 Its own ports are all in the seventeen thousands, which no other example
-uses. Its sensors are thermostat-common's, at the thermostat example's ports,
-and its heaters are the same GPIO lines, so the two are not run at once.
+uses. Its sensors and its heaters' switches are thermostat-common's,
+simulated at the thermostat example's ports, 5201 to 5205, so the two are
+not run at once.
 
 Languages:
 

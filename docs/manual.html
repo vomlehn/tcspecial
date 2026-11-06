@@ -3523,9 +3523,9 @@ which drives line 1 to it.</object>
 <p>Two lines of one chip, each a payload of its own because one is read and the
 other driven, and a payload's lines all go one way. <tt class="docutils literal">switch</tt> watches line 0
 for both edges: each becomes a sixteen-byte record -- when, which line, and
-what it became -- that goes by its <tt class="docutils literal"><span class="pre">world-out</span></tt> to <tt class="docutils literal">ground</tt> and down to
+what it became -- that goes by its <tt class="docutils literal"><span class="pre">world-out</span></tt> to <tt class="docutils literal">moc</tt> and down to
 the MOC at <tt class="docutils literal">127.0.0.1:3722</tt>. <tt class="docutils literal">lamp</tt> drives line 1: what the ground sends
-up to <tt class="docutils literal">127.0.0.1:3620</tt> leaves <tt class="docutils literal">ground</tt> by its <tt class="docutils literal"><span class="pre">moc-out</span></tt> for it, the
+up to <tt class="docutils literal">127.0.0.1:3620</tt> leaves <tt class="docutils literal">moc</tt> by its <tt class="docutils literal"><span class="pre">moc-out</span></tt> for it, the
 text <tt class="docutils literal">1</tt> lighting the lamp and <tt class="docutils literal">0</tt> putting it out.</p>
 <p>The chip is one of the kernel's <tt class="docutils literal"><span class="pre">gpio-sim</span></tt>, which <tt class="docutils literal">sudo
 <span class="pre">bin/mk-kernel-dummies</span></tt> makes. The configuration names <tt class="docutils literal">/dev/gpiochip1</tt>,

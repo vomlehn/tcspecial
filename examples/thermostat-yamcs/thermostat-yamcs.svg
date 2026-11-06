@@ -100,7 +100,7 @@
   <text class="detail" x="794" y="402">293.15 K, half_band 2.0</text>
   <!-- The ground -->
   <rect class="groundside" x="1010" y="52" width="270" height="828" rx="16"/>
-  <text class="heading" x="1028" y="78">GROUND</text>
+  <text class="heading" x="1028" y="78">MOC</text>
   <!-- The gateway node, on the ground -->
   <rect class="gateway" x="1030" y="96" width="230" height="96" rx="10"/>
   <text class="name" x="1044" y="120">gateway</text>
@@ -163,7 +163,7 @@
   <!-- Legend -->
   <line x1="50" y1="900" x2="1260" y2="900" stroke="#e5e7eb" stroke-width="1"/>
   <path class="groundward" d="M50,932 L100,932" marker-end="url(#arrow-blue)"/>
-  <text class="label" x="110" y="936">data link, toward the ground</text>
+  <text class="label" x="110" y="936">data link, toward the MOC</text>
   <path class="vehicleward" d="M330,932 L380,932" marker-end="url(#arrow-orange)"/>
   <text class="label" x="390" y="936">data link, toward the vehicle</text>
   <path class="command" d="M610,932 L660,932" marker-end="url(#arrow-orange)"/>
@@ -177,7 +177,7 @@
   <rect class="gateway" x="320" y="962" width="22" height="16" rx="4"/>
   <text class="label" x="350" y="975">gateway node</text>
   <rect class="ground" x="450" y="962" width="22" height="16" rx="4"/>
-  <text class="label" x="480" y="975">ground station</text>
+  <text class="label" x="480" y="975">MOC</text>
   <rect class="group" x="620" y="962" width="22" height="16" rx="4"/>
   <text class="label" x="650" y="975">payload group</text>
 </svg>

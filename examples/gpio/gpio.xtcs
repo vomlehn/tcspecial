@@ -43,11 +43,11 @@
                  comes down arrives at ground_base plus the device id of the
                  node that sent it: the switch, device id 2, at
                  127.0.0.1:3722. -->
-            <gateway name="ground">
+            <gateway name="moc">
                 <address>127.0.0.1</address>
                 <ground_base>127.0.0.1:3720</ground_base>
                 <port>3620</port>
-                <moc-out>lamp.ground</moc-out>
+                <moc-out>lamp.moc</moc-out>
                 <world-in>switch</world-in>
             </gateway>
         </type>
@@ -69,7 +69,7 @@
                 <edge>both</edge>
                 <lines>0</lines>
                 <path>/dev/gpiochip1</path>
-                <world-out>ground.switch</world-out>
+                <world-out>moc.switch</world-out>
             </payload>
         </type>
         <type name="gpio_out">
@@ -78,13 +78,13 @@
             <payload name="lamp">
                 <lines>1</lines>
                 <path>/dev/gpiochip1</path>
-                <moc-in>ground</moc-in>
+                <moc-in>moc</moc-in>
             </payload>
         </type>
     </payloads>
     <tcsgui>
         <nodes>
-            <node name="ground" x="469" y="34"/>
+            <node name="moc" x="469" y="34"/>
             <node name="lamp" x="34" y="134"/>
             <node name="switch" x="34" y="34"/>
         </nodes>
